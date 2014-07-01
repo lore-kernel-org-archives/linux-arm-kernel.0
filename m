@@ -1,76 +1,156 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:46 +0900
-Subject: [PATCH 6/8] ARM: shmobile: Allow r8a7790 to build non-SMP APMU code
+Date: Tue,  1 Jul 2014 09:28:41 +0900
+Subject: [PATCH 1/8] ARM: shmobile: Move r8a7791.h
 In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
 References: <cover.1404174157.git.horms+renesas@verge.net.au>
-Message-ID: <06f2c5dcc24b026872bfc9b50b47c384638d2111.1404174157.git.horms+renesas@verge.net.au>
+Message-ID: <5201b5a792e95e3ecebe74cd3553413a67da09db.1404174157.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Build the APMU for r8a7790 even though SMP is
-disabled in the kernel config. Also initialize
-Suspend-to-RAM from pm-r8a7790.c to in the future
-cover both UP and SMP use cases of the APMU.
+Change location of r8a7791.h so it can be included as "r8a7791.h"
+instead of the old style <mach/r8a7791.h>
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile      | 5 +++--
- arch/arm/mach-shmobile/pm-r8a7790.c  | 1 +
- arch/arm/mach-shmobile/smp-r8a7790.c | 1 -
- 3 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/board-koelsch-reference.c |  4 +++-
+ arch/arm/mach-shmobile/board-koelsch.c           |  4 +++-
+ arch/arm/mach-shmobile/include/mach/r8a7791.h    | 11 -----------
+ arch/arm/mach-shmobile/pm-r8a7791.c              |  6 ++++--
+ arch/arm/mach-shmobile/r8a7791.h                 | 11 +++++++++++
+ arch/arm/mach-shmobile/setup-r8a7791.c           |  4 +++-
+ arch/arm/mach-shmobile/smp-r8a7791.c             |  4 +++-
+ 7 files changed, 27 insertions(+), 17 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/r8a7791.h
+ create mode 100644 arch/arm/mach-shmobile/r8a7791.h
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 279d3f3..08f5952 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -36,12 +36,13 @@ endif
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index 1d3f67d..0b1fb23 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -23,11 +23,13 @@
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_data/rcar-du.h>
+-#include <mach/r8a7791.h>
++
+ #include <asm/mach/arch.h>
++
+ #include "clock.h"
+ #include "common.h"
+ #include "irqs.h"
++#include "r8a7791.h"
+ #include "rcar-gen2.h"
  
- # CPU reset vector handling objects
- cpu-y				:= platsmp.o headsmp.o
-+cpu-$(CONFIG_ARCH_R8A7790)	+= platsmp-apmu.o
+ /* DU */
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+index 0d44e7eb..e698b90 100644
+--- a/arch/arm/mach-shmobile/board-koelsch.c
++++ b/arch/arm/mach-shmobile/board-koelsch.c
+@@ -45,11 +45,13 @@
+ #include <linux/spi/flash.h>
+ #include <linux/spi/rspi.h>
+ #include <linux/spi/spi.h>
+-#include <mach/r8a7791.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
+ #include "irqs.h"
++#include "r8a7791.h"
+ #include "rcar-gen2.h"
  
- # SMP objects
- smp-y				:= $(cpu-y)
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
--smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o platsmp-apmu.o
-+smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
- smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o platsmp-apmu.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+ /* DU */
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7791.h b/arch/arm/mach-shmobile/include/mach/r8a7791.h
+deleted file mode 100644
+index 86eae7b..0000000
+--- a/arch/arm/mach-shmobile/include/mach/r8a7791.h
++++ /dev/null
+@@ -1,11 +0,0 @@
+-#ifndef __ASM_R8A7791_H__
+-#define __ASM_R8A7791_H__
+-
+-void r8a7791_add_standard_devices(void);
+-void r8a7791_add_dt_devices(void);
+-void r8a7791_clock_init(void);
+-void r8a7791_pinmux_init(void);
+-void r8a7791_pm_init(void);
+-extern struct smp_operations r8a7791_smp_ops;
+-
+-#endif /* __ASM_R8A7791_H__ */
+diff --git a/arch/arm/mach-shmobile/pm-r8a7791.c b/arch/arm/mach-shmobile/pm-r8a7791.c
+index 1519087..b7e6513 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7791.c
++++ b/arch/arm/mach-shmobile/pm-r8a7791.c
+@@ -10,10 +10,12 @@
+  * for more details.
+  */
  
-@@ -52,7 +53,7 @@ obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o pm-rmobile.o
- obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o pm-rcar.o
--obj-$(CONFIG_ARCH_R8A7790)	+= pm-r8a7790.o pm-rcar.o
-+obj-$(CONFIG_ARCH_R8A7790)	+= pm-r8a7790.o pm-rcar.o $(cpu-y)
- obj-$(CONFIG_ARCH_R8A7791)	+= pm-r8a7791.o pm-rcar.o
+-#include <asm/io.h>
+ #include <linux/kernel.h>
+-#include <mach/r8a7791.h>
++
++#include <asm/io.h>
++
+ #include "pm-rcar.h"
++#include "r8a7791.h"
  
- # IRQ objects
-diff --git a/arch/arm/mach-shmobile/pm-r8a7790.c b/arch/arm/mach-shmobile/pm-r8a7790.c
-index 4289b38..2f3c250 100644
---- a/arch/arm/mach-shmobile/pm-r8a7790.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7790.c
-@@ -78,4 +78,5 @@ void __init r8a7790_pm_init(void)
- 	iounmap(p);
+ /* SYSC */
+ #define SYSCIER 0x0c
+diff --git a/arch/arm/mach-shmobile/r8a7791.h b/arch/arm/mach-shmobile/r8a7791.h
+new file mode 100644
+index 0000000..86eae7b
+--- /dev/null
++++ b/arch/arm/mach-shmobile/r8a7791.h
+@@ -0,0 +1,11 @@
++#ifndef __ASM_R8A7791_H__
++#define __ASM_R8A7791_H__
++
++void r8a7791_add_standard_devices(void);
++void r8a7791_add_dt_devices(void);
++void r8a7791_clock_init(void);
++void r8a7791_pinmux_init(void);
++void r8a7791_pm_init(void);
++extern struct smp_operations r8a7791_smp_ops;
++
++#endif /* __ASM_R8A7791_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index 7e970d0..8823324 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -26,10 +26,12 @@
+ #include <linux/platform_data/irq-renesas-irqc.h>
+ #include <linux/serial_sci.h>
+ #include <linux/sh_timer.h>
+-#include <mach/r8a7791.h>
++
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
+ #include "irqs.h"
++#include "r8a7791.h"
+ #include "rcar-gen2.h"
  
- 	r8a7790_sysc_init();
-+	shmobile_smp_apmu_suspend_init();
- }
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-index 81ba906..1e254f9 100644
---- a/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -39,7 +39,6 @@ static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+ static const struct resource pfc_resources[] __initconst = {
+diff --git a/arch/arm/mach-shmobile/smp-r8a7791.c b/arch/arm/mach-shmobile/smp-r8a7791.c
+index c6543b6..2482555 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7791.c
++++ b/arch/arm/mach-shmobile/smp-r8a7791.c
+@@ -17,9 +17,11 @@
+ #include <linux/init.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++
+ #include <asm/smp_plat.h>
+-#include <mach/r8a7791.h>
++
+ #include "common.h"
++#include "r8a7791.h"
+ #include "rcar-gen2.h"
  
- 	/* turn on power to SCU */
- 	r8a7790_pm_init();
--	shmobile_smp_apmu_suspend_init();
- 	rcar_sysc_power_up(&r8a7790_ca15_scu);
- 	rcar_sysc_power_up(&r8a7790_ca7_scu);
- }
+ #define RST		0xe6160000
 -- 
 2.0.0.rc2
