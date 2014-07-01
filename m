@@ -1,83 +1,108 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:43 +0900
-Subject: [PATCH 3/8] ARM: shmobile: Adjust APMU code to build for non-SMP
+Date: Tue,  1 Jul 2014 09:28:42 +0900
+Subject: [PATCH 2/8] ARM: shmobile: Allow use of boot code for non-SMP case
 In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
 References: <cover.1404174157.git.horms+renesas@verge.net.au>
-Message-ID: <784500be40a0eabcee1e48c70927aea9c9accb1e.1404174157.git.horms+renesas@verge.net.au>
+Message-ID: <8b438bcb9009609a15e5480ab1947acff6fb9005.1404174157.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Adjust the APMU code to allow build when CONFIG_SMP=n.
+Allow build of platsmp.c and headsmp.S even though
+SMP is disabled in the kernel configuration. With
+this in place it is possible to share the reset
+vector setup code with power management code that
+needs to be built even though SMP is disabled.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/platsmp-apmu.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/Makefile  | 11 +++++++----
+ arch/arm/mach-shmobile/headsmp.S | 13 ++++++++-----
+ 2 files changed, 15 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 590e35c..ce07eb9 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -15,6 +15,7 @@
- #include <linux/of_address.h>
- #include <linux/smp.h>
- #include <linux/suspend.h>
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 9c0ad3e..279d3f3 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -34,17 +34,17 @@ obj-$(CONFIG_ARCH_R8A7791)	+= clock-r8a7791.o
+ obj-$(CONFIG_ARCH_R7S72100)	+= clock-r7s72100.o
+ endif
+ 
++# CPU reset vector handling objects
++cpu-y				:= platsmp.o headsmp.o
++
+ # SMP objects
+-smp-y				:= platsmp.o headsmp.o
++smp-y				:= $(cpu-y)
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o platsmp-apmu.o
+ smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o platsmp-apmu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+ 
+-# IRQ objects
+-obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
+-
+ # PM objects
+ obj-$(CONFIG_SUSPEND)		+= suspend.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+@@ -55,6 +55,9 @@ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o pm-rcar.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= pm-r8a7790.o pm-rcar.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= pm-r8a7791.o pm-rcar.o
+ 
++# IRQ objects
++obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
++
+ # Board objects
+ ifdef CONFIG_ARCH_SHMOBILE_MULTI
+ obj-$(CONFIG_MACH_GENMAI)	+= board-genmai-reference.o
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index e5be5c8..faf8214 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -10,14 +10,17 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/linkage.h>
+ #include <linux/init.h>
++#include <linux/linkage.h>
 +#include <linux/threads.h>
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
- #include <asm/proc-fns.h>
-@@ -25,13 +26,13 @@
- static struct {
- 	void __iomem *iomem;
- 	int bit;
--} apmu_cpus[CONFIG_NR_CPUS];
-+} apmu_cpus[NR_CPUS];
- 
- #define WUPCR_OFFS 0x10
- #define PSTR_OFFS 0x40
- #define CPUNCR_OFFS(n) (0x100 + (0x10 * (n)))
- 
--static int apmu_power_on(void __iomem *p, int bit)
-+static int __maybe_unused apmu_power_on(void __iomem *p, int bit)
- {
- 	/* request power on */
- 	writel_relaxed(BIT(bit), p + WUPCR_OFFS);
-@@ -50,7 +51,7 @@ static int apmu_power_off(void __iomem *p, int bit)
- 	return 0;
- }
- 
--static int apmu_power_off_poll(void __iomem *p, int bit)
-+static int __maybe_unused apmu_power_off_poll(void __iomem *p, int bit)
- {
- 	int k;
- 
-@@ -73,7 +74,7 @@ static int apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu))
- 
- static void apmu_init_cpu(struct resource *res, int cpu, int bit)
- {
--	if (apmu_cpus[cpu].iomem)
-+	if ((cpu >= ARRAY_SIZE(apmu_cpus)) || apmu_cpus[cpu].iomem)
- 		return;
- 
- 	apmu_cpus[cpu].iomem = ioremap_nocache(res->start, resource_size(res));
-@@ -137,6 +138,7 @@ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus)
- 	apmu_parse_cfg(apmu_init_cpu);
- }
+ #include <asm/memory.h>
  
 +#ifdef CONFIG_SMP
- int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	/* For this particular CPU register boot vector */
-@@ -144,6 +146,7 @@ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- 	return apmu_wrap(cpu, apmu_power_on);
- }
+ ENTRY(shmobile_invalidate_start)
+ 	bl	v7_invalidate_l1
+ 	b	secondary_startup
+ ENDPROC(shmobile_invalidate_start)
 +#endif
  
- #if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_SUSPEND)
- /* nicked from arch/arm/mach-exynos/hotplug.c */
+ /*
+  * Reset vector for secondary CPUs.
+@@ -68,7 +71,7 @@ shmobile_smp_boot_find_mpidr:
+ 
+ shmobile_smp_boot_next:
+ 	add	r1, r1, #1
+-	cmp	r1, #CONFIG_NR_CPUS
++	cmp	r1, #NR_CPUS
+ 	blo	shmobile_smp_boot_find_mpidr
+ 
+ 	b	shmobile_smp_sleep
+@@ -85,10 +88,10 @@ ENDPROC(shmobile_smp_sleep)
+ 
+ 	.globl	shmobile_smp_mpidr
+ shmobile_smp_mpidr:
+-1:	.space	CONFIG_NR_CPUS * 4
++1:	.space	NR_CPUS * 4
+ 	.globl	shmobile_smp_fn
+ shmobile_smp_fn:
+-2:	.space	CONFIG_NR_CPUS * 4
++2:	.space	NR_CPUS * 4
+ 	.globl	shmobile_smp_arg
+ shmobile_smp_arg:
+-3:	.space	CONFIG_NR_CPUS * 4
++3:	.space	NR_CPUS * 4
 -- 
 2.0.0.rc2
