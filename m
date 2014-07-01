@@ -1,36 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  1 Jul 2014 00:12:52 -0300
-Subject: [PATCH] ARM: mx6: Only check for 1.2GHz for mx6quad
-Message-ID: <1404184372-5321-1-git-send-email-festevam@gmail.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 1 Jul 2014 09:03:18 +0530
+Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
+ Exynos3250
+In-Reply-To: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
+References: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Chanwoo,
 
-It is only the mx6quad variant that can run up to 1.2GHz, so add the check 
-accordingly.
+On Tue, Jul 1, 2014 at 6:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch add TMU (Thermal Management Unit) dt node to monitor the high
+> temperature for Exynos3250.
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> This patch has a dependency on following patch [1]:
+>  [1] https://lkml.org/lkml/2014/6/30/805
+>
+>  arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index 3660cab..1e566af 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -192,6 +192,16 @@
+>                         status = "disabled";
+>                 };
+>
+> +               tmu: tmu at 100C0000 {
+> +                       compatible = "samsung,exynos3250-tmu";
+> +                       interrupt-parent = <&gic>;
+> +                       reg = <0x100C0000 0x100>;
+> +                       interrupts = <0 216 0>;
+> +                       clocks = <&cmu CLK_TMU_APBIF>;
+> +                       clock-names = "tmu_apbif";
+> +                       status = "disabled";
 
-This avoids getting the following warning on a mx6solo:
+I don't think there would be any board specific properties needed. Hence
+leave the status as enabled (by deleting the above line).
 
-failed to disable 1.2 GHz OPP
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e60456d..9b3a233 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -320,7 +320,7 @@ static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
- 	val >>= OCOTP_CFG3_SPEED_SHIFT;
- 	val &= 0x3;
- 
--	if (val != OCOTP_CFG3_SPEED_1P2GHZ)
-+	if ((val != OCOTP_CFG3_SPEED_1P2GHZ) && cpu_is_imx6q())
- 		if (dev_pm_opp_disable(cpu_dev, 1200000000))
- 			pr_warn("failed to disable 1.2 GHz OPP\n");
- 	if (val < OCOTP_CFG3_SPEED_996MHZ)
 -- 
-1.8.3.2
+Regards,
+Sachin.
