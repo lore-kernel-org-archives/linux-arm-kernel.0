@@ -1,56 +1,146 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 01 Jul 2014 13:04:50 +0900
-Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
- Exynos3250
-In-Reply-To: <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
-References: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
- <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
-Message-ID: <53B23362.7080103@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 1 Jul 2014 00:04:35 -0500
+Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
+In-Reply-To: <1404144233-17222-4-git-send-email-agross@codeaurora.org>
+References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
+ <1404144233-17222-4-git-send-email-agross@codeaurora.org>
+Message-ID: <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+On Mon, Jun 30, 2014 at 11:03 AM, Andy Gross <agross@codeaurora.org> wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-On 07/01/2014 12:33 PM, Sachin Kamat wrote:
-> Hi Chanwoo,
-> 
-> On Tue, Jul 1, 2014 at 6:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch add TMU (Thermal Management Unit) dt node to monitor the high
->> temperature for Exynos3250.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> This patch has a dependency on following patch [1]:
->>  [1] https://lkml.org/lkml/2014/6/30/805
->>
->>  arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->> index 3660cab..1e566af 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -192,6 +192,16 @@
->>                         status = "disabled";
->>                 };
->>
->> +               tmu: tmu at 100C0000 {
->> +                       compatible = "samsung,exynos3250-tmu";
->> +                       interrupt-parent = <&gic>;
->> +                       reg = <0x100C0000 0x100>;
->> +                       interrupts = <0 216 0>;
->> +                       clocks = <&cmu CLK_TMU_APBIF>;
->> +                       clock-names = "tmu_apbif";
->> +                       status = "disabled";
-> 
-> I don't think there would be any board specific properties needed. Hence
-> leave the status as enabled (by deleting the above line).
-> 
+Please copy the right lists and maintainers.
 
-I think that if specific board need TMU feature, dts file for specific board
-should include tmu dt node with 'okay' status. The specific board based on
-Exynos3250 might not need TMU feature.
+>
+> QCOM USB3.0 core wrapper consist of USB3.0 IP from Synopsys
+> (SNPS) and HS, SS PHY's control and configuration registers.
+>
+> It could operate in device mode (SS, HS, FS) and host
+> mode (SS, HS, FS, LS).
+>
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../devicetree/bindings/usb/qcom,dwc3.txt          |  104 ++++++++++++++++++++
+>  1 file changed, 104 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> new file mode 100644
+> index 0000000..105b6b7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> @@ -0,0 +1,104 @@
+> +Qualcomm SuperSpeed DWC3 USB SoC controller
+> +
+> +
+> +QCOM DWC3 Highspeed USB PHY
+> +========================
+> +Required properities:
+> +- compatible:  should contain "qcom,dwc3-hsphy";
+> +- reg:                 offset and length of the register set in the memory map
+> +- clocks:              A list of phandle + clock-specifier pairs for the
+> +                               clocks listed in clock-names
+> +- clock-names: Should contain the following:
+> +  "utmi"               UTMI clock
+> +- v1p8-supply: phandle to the regulator for the 1.8v supply to HSPHY.
+> +- v3p3-supply: phandle to the regulator for the 3.3v supply to HSPHY.
+> +- vbus-supply: phandle to the regulator for the vbus supply for host
+> +               mode.
+> +- vddcx-supply: phandle to the regulator for the vdd supply for HSPHY
+> +                digital circuit operation.
+> +
+> +Optional clocks:
+> +  "xo"                 External reference clock
+> +
+> +
+> +QCOM DWC3 Superspeed USB PHY
+> +=========================
+> +Required properities:
+> +- compatible:  should contain "qcom,dwc3-ssphy";
+> +- reg:                 offset and length of the register set in the memory map
+> +- clocks:              A list of phandle + clock-specifier pairs for the
+> +                               clocks listed in clock-names
+> +- clock-names: Should contain the following:
+> +  "ref"                        Reference clock used in host mode.
+> +- v1p8-supply: phandle to the regulator for the 1.8v supply to HSPHY.
+> +- vddcx-supply: phandle to the regulator for the vdd supply for HSPHY
+> +                digital circuit operation.
+> +
+> +Optional clocks:
+> +  "xo"                 External reference clock
+> +
+> +QCOM DWC3 controller wrapper
+> +===========================
+> +Required properties:
+> +- compatible:  should contain "qcom,dwc3"
+> +- clocks:              A list of phandle + clock-specifier pairs for the
+> +                               clocks listed in clock-names
+> +- clock-names: Should contain the following:
+> +  "core"               Master/Core clock, have to be >= 125 MHz for SS
+> +                               operation and >= 60MHz for HS operation
+> +
+> +Optional clocks:
+> +  "iface"              System bus AXI clock.  Not present on all platforms
 
-Best Regards,
-Chanwoo Choi
+Really?, some platforms have a clockless bus?
+
+> +  "sleep"              Sleep clock, used when USB3 core goes into low
+> +                               power mode (U3).
+> +
+> +Optional regulator:
+> +- gdsc-supply: phandle to the regulator from globally distributed
+> +                               switch controller
+
+The name should reflect the name of the input, not the source.
+
+> +
+> +Required child node:
+> +A child node must exist to represent the core DWC3 IP block. The name of
+> +the node is not important. The content of the node is defined in dwc3.txt.
+> +
+> +Example device nodes:
+> +
+> +               hs_phy_0: phy at 110f8800 {
+> +                       compatible = "qcom,dwc3-hsphy";
+> +                       reg = <0x110f8800 0x30>;
+> +                       clocks = <&gcc USB30_0_UTMI_CLK>;
+> +                       clock-names = "utmi";
+> +
+> +                       status = "disabled";
+> +               };
+> +
+> +               ss_phy_0: phy at 110f8830 {
+> +                       compatible = "qcom,dwc3-ssphy";
+> +                       reg = <0x110f8830 0x30>;
+> +
+> +                       clocks = <&gcc USB30_0_MASTER_CLK>;
+> +                       clock-names = "ref";
+> +
+> +                       status = "disabled";
+> +               };
+> +
+> +               usb3_0: usb30 at 0 {
+> +                       compatible = "qcom,dwc3";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       clocks = <&gcc USB30_0_MASTER_CLK>;
+> +                       clock-names = "core";
+> +
+> +                       ranges;
+> +
+> +                       status = "disabled";
+> +
+> +                       dwc3 at 11000000 {
+> +                               compatible = "snps,dwc3";
+
+This sub-node is just wrong. Why can't you have a single node with '
+"qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
+adding here is clocks. Does the Synopsys block have no clocks?
+
+I guess this is copied from other broken dwc3 bindings... That doesn't
+mean you have to copy it.
+
+Rob
