@@ -1,54 +1,102 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:28 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC r8a7779
- Multiplatform Updates for v3.17
-Message-ID: <cover.1404173506.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Jul 2014 09:28:37 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC soc-cleanup Updates
+ for v3.17
+Message-ID: <cover.1404173049.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof, Hi Kevin, Hi Arnd,
 
-Please consider these Second Round of Renesas ARM Based SoC r8a7779
-Multiplatform Updates for v3.17o.
+Please consider these Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17.
 
 This pull request is based on the previous round of
-such requests, tagged as renesas-r8a7779-multiplatform-for-v3.17,
+such requests, tagged as renesas-soc-cleanup-for-v3.17,
 which I have already sent a pull-request for.
 
-I have applied this clean-up change to a non-cleanup branch
-to avoid adding conflicts that were known (to me) at the
-time of queuing up this change.
+This conflicts with other changes made to pm-r8a7790.c in the soc branch
+of the renesas tree. A resolution can be found in the
+renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
+
+In short, the resulting includes should be:
+
+#include <linux/kernel.h>
+#include <linux/smp.h>
+#include <asm/io.h>
+#include "common.h"
+#include "pm-rcar.h"
+#include "r8a7790.h"
 
 
-The following changes since commit c1a0f9932b66b2298163c31f8ac3f2844476e1c2:
+The following changes since commit d83fa4c9c27c4d8612e39e99506b5420fa05b58b:
 
-  ARM: shmobile: marzen: Do not use workaround for scif devices (2014-06-17 19:56:37 +0900)
+  ARM: shmobile: Remove unused r8a7790_init_early() (2014-06-17 19:50:35 +0900)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-r8a7779-multiplatform2-for-v3.17
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-cleanup2-for-v3.17
 
-for you to fetch changes up to 1b55353c9214788b0d0797a5fd4585af1557a12c:
+for you to fetch changes up to 113522ee3034427472bcb4b8665833719809b31a:
 
-  ARM: shmobile: Move r8a7779.h (2014-06-25 16:52:39 +0900)
+  ARM: shmobile: Move sh7372.h (2014-06-25 16:50:00 +0900)
 
 ----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC r8a7779-multiplatform Updates for v3.17
+Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17
 
-* Move r8a7779.h out of mach directory.
+* Move SOC-specific headers out of mach directory.
   This is part of a multi-stage effort to move headers
   out of that directory.
 
 ----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: Move r8a7779.h
+Geert Uytterhoeven (7):
+      ARM: shmobile: Move r7s72100.h
+      ARM: shmobile: Move r8a73a4.h
+      ARM: shmobile: Move r8a7740.h
+      ARM: shmobile: Move r8a7778.h
+      ARM: shmobile: Move r8a7790.h
+      ARM: shmobile: Move sh73a0.h
+      ARM: shmobile: Move sh7372.h
 
- arch/arm/mach-shmobile/board-marzen-reference.c     | 4 +++-
- arch/arm/mach-shmobile/board-marzen.c               | 4 +++-
- arch/arm/mach-shmobile/clock-r8a7779.c              | 3 ++-
- arch/arm/mach-shmobile/pm-r8a7779.c                 | 4 +++-
- arch/arm/mach-shmobile/{include/mach => }/r8a7779.h | 0
- arch/arm/mach-shmobile/setup-r8a7779.c              | 4 +++-
- arch/arm/mach-shmobile/smp-r8a7779.c                | 4 +++-
- 7 files changed, 17 insertions(+), 6 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7779.h (100%)
+ arch/arm/mach-shmobile/board-ape6evm-reference.c         |  4 +++-
+ arch/arm/mach-shmobile/board-ape6evm.c                   |  4 +++-
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c |  4 +++-
+ arch/arm/mach-shmobile/board-armadillo800eva.c           |  4 +++-
+ arch/arm/mach-shmobile/board-bockw-reference.c           |  4 +++-
+ arch/arm/mach-shmobile/board-bockw.c                     |  4 +++-
+ arch/arm/mach-shmobile/board-genmai-reference.c          |  4 +++-
+ arch/arm/mach-shmobile/board-genmai.c                    |  4 +++-
+ arch/arm/mach-shmobile/board-kzm9g-reference.c           |  4 +++-
+ arch/arm/mach-shmobile/board-kzm9g.c                     |  4 +++-
+ arch/arm/mach-shmobile/board-lager-reference.c           |  4 +++-
+ arch/arm/mach-shmobile/board-lager.c                     | 14 ++++++++------
+ arch/arm/mach-shmobile/board-mackerel.c                  |  4 +++-
+ arch/arm/mach-shmobile/clock-r7s72100.c                  |  3 ++-
+ arch/arm/mach-shmobile/clock-r8a7740.c                   |  3 ++-
+ arch/arm/mach-shmobile/clock-r8a7790.c                   |  3 ++-
+ arch/arm/mach-shmobile/intc-sh73a0.c                     |  4 +++-
+ arch/arm/mach-shmobile/pm-r8a7790.c                      |  4 +++-
+ arch/arm/mach-shmobile/pm-sh7372.c                       |  4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/r7s72100.h     |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7740.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7778.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7790.h      |  0
+ arch/arm/mach-shmobile/setup-r7s72100.c                  |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a73a4.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7740.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7778.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7790.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-sh7372.c                    |  4 +++-
+ arch/arm/mach-shmobile/setup-sh73a0.c                    |  4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/sh7372.h       |  0
+ arch/arm/mach-shmobile/{include/mach => }/sh73a0.h       |  0
+ arch/arm/mach-shmobile/smp-r8a7790.c                     |  4 +++-
+ arch/arm/mach-shmobile/smp-sh73a0.c                      |  4 +++-
+ 35 files changed, 86 insertions(+), 33 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r7s72100.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7740.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7778.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7790.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/sh7372.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/sh73a0.h (100%)
