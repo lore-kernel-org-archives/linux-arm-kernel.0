@@ -1,146 +1,90 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 1 Jul 2014 00:04:35 -0500
-Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
-In-Reply-To: <1404144233-17222-4-git-send-email-agross@codeaurora.org>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-4-git-send-email-agross@codeaurora.org>
-Message-ID: <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 1 Jul 2014 13:24:39 +0800
+Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
+In-Reply-To: <20140630070421.GI8053@pengutronix.de>
+References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
+ <20140630041226.GB3329@shlinux2> <20140630070421.GI8053@pengutronix.de>
+Message-ID: <20140701052433.GA14471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 11:03 AM, Andy Gross <agross@codeaurora.org> wrote:
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+On Mon, Jun 30, 2014 at 09:04:21AM +0200, Steffen Trumtrar wrote:
+> Hi!
+> 
+> On Mon, Jun 30, 2014 at 12:12:27PM +0800, Shawn Guo wrote:
+> > On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
+> > > Most peripherals on the i.MX53 have an
+> > > 	Off-Platform Peripheral Access Control Register (OPACR)
+> > > in which the access rights (together with the MPROT registers) can be declared.
+> > > However, this does not seem to work for example for SSI1+SDMA, because the
+> > > supervisor bit is not set for the SDMA unit.
+> > > It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
+> > > works because it does NOT have an OPACR.
+> > > 
+> > > The right solution would be to fix the access rights for the SDMA, but the unit
+> > > responsible for this is the Central Security Unit (CSU), which of course is NOT
+> > > documented. So, until documentation for this is openly available, turn off the
+> > > supervisor protection because it cripples the hardware.
+> > > 
+> > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > > ---
+> > >  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
+> > >  1 file changed, 14 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> > > index 2bad387..380c7ee 100644
+> > > --- a/arch/arm/mach-imx/mach-imx53.c
+> > > +++ b/arch/arm/mach-imx/mach-imx53.c
+> > > @@ -15,6 +15,7 @@
+> > >  #include <linux/err.h>
+> > >  #include <linux/io.h>
+> > >  #include <linux/irq.h>
+> > > +#include <linux/of_address.h>
+> > >  #include <linux/of_irq.h>
+> > >  #include <linux/of_platform.h>
+> > >  #include <asm/mach/arch.h>
+> > > @@ -24,11 +25,24 @@
+> > >  #include "hardware.h"
+> > >  #include "mx53.h"
+> > >  
+> > > +static const struct of_device_id aips_of_matches[] __initconst = {
+> > > +	{ .compatible = "fsl,imx53-aipstz" },
+> > > +	{ /*sentinel*/ }
+> > > +};
+> > > +
+> > >  static void __init imx53_dt_init(void)
+> > >  {
+> > > +	void __iomem *aips_base_addr;
+> > > +	struct device_node *np;
+> > > +
+> > >  	mxc_arch_reset_init_dt();
+> > >  
+> > >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > > +
+> > > +	for_each_matching_node(np, aips_of_matches) {
+> > > +		aips_base_addr = of_iomap(np, 0);
+> > > +		imx_set_aips(aips_base_addr);
+> > > +	}
+> > 
+> > The same code pattern might be needed for i.MX31 and i.MX35 device tree
+> > support later.  Can we have a helper for it, so that i.MX3 DT conversion
+> > can benefit from it?
+> > 
+> 
+> What would be the best place to put this? common.h?
 
-Please copy the right lists and maintainers.
+How about the same place as imx_set_aips()?
 
->
-> QCOM USB3.0 core wrapper consist of USB3.0 IP from Synopsys
-> (SNPS) and HS, SS PHY's control and configuration registers.
->
-> It could operate in device mode (SS, HS, FS) and host
-> mode (SS, HS, FS, LS).
->
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  .../devicetree/bindings/usb/qcom,dwc3.txt          |  104 ++++++++++++++++++++
->  1 file changed, 104 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/qcom,dwc3.txt
->
-> diff --git a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
-> new file mode 100644
-> index 0000000..105b6b7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
-> @@ -0,0 +1,104 @@
-> +Qualcomm SuperSpeed DWC3 USB SoC controller
-> +
-> +
-> +QCOM DWC3 Highspeed USB PHY
-> +========================
-> +Required properities:
-> +- compatible:  should contain "qcom,dwc3-hsphy";
-> +- reg:                 offset and length of the register set in the memory map
-> +- clocks:              A list of phandle + clock-specifier pairs for the
-> +                               clocks listed in clock-names
-> +- clock-names: Should contain the following:
-> +  "utmi"               UTMI clock
-> +- v1p8-supply: phandle to the regulator for the 1.8v supply to HSPHY.
-> +- v3p3-supply: phandle to the regulator for the 3.3v supply to HSPHY.
-> +- vbus-supply: phandle to the regulator for the vbus supply for host
-> +               mode.
-> +- vddcx-supply: phandle to the regulator for the vdd supply for HSPHY
-> +                digital circuit operation.
-> +
-> +Optional clocks:
-> +  "xo"                 External reference clock
-> +
-> +
-> +QCOM DWC3 Superspeed USB PHY
-> +=========================
-> +Required properities:
-> +- compatible:  should contain "qcom,dwc3-ssphy";
-> +- reg:                 offset and length of the register set in the memory map
-> +- clocks:              A list of phandle + clock-specifier pairs for the
-> +                               clocks listed in clock-names
-> +- clock-names: Should contain the following:
-> +  "ref"                        Reference clock used in host mode.
-> +- v1p8-supply: phandle to the regulator for the 1.8v supply to HSPHY.
-> +- vddcx-supply: phandle to the regulator for the vdd supply for HSPHY
-> +                digital circuit operation.
-> +
-> +Optional clocks:
-> +  "xo"                 External reference clock
-> +
-> +QCOM DWC3 controller wrapper
-> +===========================
-> +Required properties:
-> +- compatible:  should contain "qcom,dwc3"
-> +- clocks:              A list of phandle + clock-specifier pairs for the
-> +                               clocks listed in clock-names
-> +- clock-names: Should contain the following:
-> +  "core"               Master/Core clock, have to be >= 125 MHz for SS
-> +                               operation and >= 60MHz for HS operation
-> +
-> +Optional clocks:
-> +  "iface"              System bus AXI clock.  Not present on all platforms
+> Maybe we should then also rename the imx_set_aips to imx_disable_supervisor,
+> because that is basically what the function does.
 
-Really?, some platforms have a clockless bus?
+I'm fine with either way.
 
-> +  "sleep"              Sleep clock, used when USB3 core goes into low
-> +                               power mode (U3).
-> +
-> +Optional regulator:
-> +- gdsc-supply: phandle to the regulator from globally distributed
-> +                               switch controller
+> If I understood our graphics department correctly, the i.MX6 needs this, too,
+> for the VPU (?).
 
-The name should reflect the name of the input, not the source.
+Hmm, I do not see this setup for i.MX6 in FSL kernel tree.  Is it being
+done at somewhere else?
 
-> +
-> +Required child node:
-> +A child node must exist to represent the core DWC3 IP block. The name of
-> +the node is not important. The content of the node is defined in dwc3.txt.
-> +
-> +Example device nodes:
-> +
-> +               hs_phy_0: phy at 110f8800 {
-> +                       compatible = "qcom,dwc3-hsphy";
-> +                       reg = <0x110f8800 0x30>;
-> +                       clocks = <&gcc USB30_0_UTMI_CLK>;
-> +                       clock-names = "utmi";
-> +
-> +                       status = "disabled";
-> +               };
-> +
-> +               ss_phy_0: phy at 110f8830 {
-> +                       compatible = "qcom,dwc3-ssphy";
-> +                       reg = <0x110f8830 0x30>;
-> +
-> +                       clocks = <&gcc USB30_0_MASTER_CLK>;
-> +                       clock-names = "ref";
-> +
-> +                       status = "disabled";
-> +               };
-> +
-> +               usb3_0: usb30 at 0 {
-> +                       compatible = "qcom,dwc3";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       clocks = <&gcc USB30_0_MASTER_CLK>;
-> +                       clock-names = "core";
-> +
-> +                       ranges;
-> +
-> +                       status = "disabled";
-> +
-> +                       dwc3 at 11000000 {
-> +                               compatible = "snps,dwc3";
-
-This sub-node is just wrong. Why can't you have a single node with '
-"qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
-adding here is clocks. Does the Synopsys block have no clocks?
-
-I guess this is copied from other broken dwc3 bindings... That doesn't
-mean you have to copy it.
-
-Rob
+Shawn
