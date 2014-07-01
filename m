@@ -1,1108 +1,260 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  1 Jul 2014 16:11:13 +0100
-Subject: [PATCH 3/8] arm: perf: armv7: condense event maps
+Date: Tue,  1 Jul 2014 16:11:16 +0100
+Subject: [PATCH 6/8] arm: perf: clean up PMU names
 In-Reply-To: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
 References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1404227478-9645-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1404227478-9645-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have macros for declaring fully invalid event maps, put them
-to work for all the ARMv7 PMU event maps. While this necessitates
-repeating common indices, we no longer need to refer to *_UNSUPPORTED
-events at all, and it makes it possible for the even maps to fit on a
-single page on a reasonably sized monitor.
+The perf userspace tools can't handle dashes or spaces in PMU names,
+which conflicts with the current naming scheme in the arm perf backend.
+This prevents these PMUs from being accessed by name from the perf
+tools. Additionally the ARMv6 pmus are named "v6", which does not fully
+distinguish them in the sys/bus/event_source namespace.
+
+This patch renames the PMUs consistently to a lower case form with
+underscores, e.g. "armv6_1176", "armv7_cortex_a9". This is both readily
+accepted by today's perf tool, and far easier to type than the
+(apparently unused) convention in use previously. The OProfile name
+conversion code is updated to handle this.
+
+Due to a copy-paste error involving two "xscale1" entries, "xscale2" has
+never been matched by the name OProfile name mapping. While we're
+updating names, this is corrected.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_v7.c | 949 +++++++++-------------------------------
- 1 file changed, 206 insertions(+), 743 deletions(-)
+ arch/arm/kernel/perf_event_cpu.c    | 10 +++++++---
+ arch/arm/kernel/perf_event_v6.c     | 36 ++++++++++++++++++++++++++++++++----
+ arch/arm/kernel/perf_event_v7.c     | 16 ++++++++--------
+ arch/arm/kernel/perf_event_xscale.c |  4 ++--
+ arch/arm/oprofile/common.c          | 14 ++++++++------
+ 5 files changed, 57 insertions(+), 23 deletions(-)
 
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index af9e35e..191aff0 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -233,8 +233,8 @@ static struct of_device_id cpu_pmu_of_device_ids[] = {
+ 	{.compatible = "arm,cortex-a7-pmu",	.data = armv7_a7_pmu_init},
+ 	{.compatible = "arm,cortex-a5-pmu",	.data = armv7_a5_pmu_init},
+ 	{.compatible = "arm,arm11mpcore-pmu",	.data = armv6mpcore_pmu_init},
+-	{.compatible = "arm,arm1176-pmu",	.data = armv6pmu_init},
+-	{.compatible = "arm,arm1136-pmu",	.data = armv6pmu_init},
++	{.compatible = "arm,arm1176-pmu",	.data = armv6_1176_pmu_init},
++	{.compatible = "arm,arm1136-pmu",	.data = armv6_1136_pmu_init},
+ 	{.compatible = "qcom,krait-pmu",	.data = krait_pmu_init},
+ 	{},
+ };
+@@ -260,9 +260,13 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+ 	if (implementor == ARM_CPU_IMP_ARM) {
+ 		switch (part_number) {
+ 		case ARM_CPU_PART_ARM1136:
++			ret = armv6_1136_pmu_init(pmu);
++			break;
+ 		case ARM_CPU_PART_ARM1156:
++			ret = armv6_1156_pmu_init(pmu);
++			break;
+ 		case ARM_CPU_PART_ARM1176:
+-			ret = armv6pmu_init(pmu);
++			ret = armv6_1176_pmu_init(pmu);
+ 			break;
+ 		case ARM_CPU_PART_ARM11MPCORE:
+ 			ret = armv6mpcore_pmu_init(pmu);
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 0fd4290..62227d1 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -476,9 +476,8 @@ static int armv6_map_event(struct perf_event *event)
+ 				&armv6_perf_cache_map, 0xFF);
+ }
+ 
+-static int armv6pmu_init(struct arm_pmu *cpu_pmu)
++static void armv6pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	cpu_pmu->name		= "v6";
+ 	cpu_pmu->handle_irq	= armv6pmu_handle_irq;
+ 	cpu_pmu->enable		= armv6pmu_enable_event;
+ 	cpu_pmu->disable	= armv6pmu_disable_event;
+@@ -490,7 +489,26 @@ static int armv6pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->map_event	= armv6_map_event;
+ 	cpu_pmu->num_events	= 3;
+ 	cpu_pmu->max_period	= (1LLU << 32) - 1;
++}
++
++static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	armv6pmu_init(cpu_pmu);
++	cpu_pmu->name		= "armv6_1136"
++	return 0;
++}
++
++static int armv6_1156_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	armv6pmu_init(cpu_pmu);
++	cpu_pmu->name		= "armv6_1156"
++	return 0;
++}
+ 
++static int armv6_1176_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	armv6pmu_init(cpu_pmu);
++	cpu_pmu->name		= "armv6_1176"
+ 	return 0;
+ }
+ 
+@@ -510,7 +528,7 @@ static int armv6mpcore_map_event(struct perf_event *event)
+ 
+ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	cpu_pmu->name		= "v6mpcore";
++	cpu_pmu->name		= "armv6_11mpcore";
+ 	cpu_pmu->handle_irq	= armv6pmu_handle_irq;
+ 	cpu_pmu->enable		= armv6pmu_enable_event;
+ 	cpu_pmu->disable	= armv6mpcore_pmu_disable_event;
+@@ -526,7 +544,17 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
+ 	return 0;
+ }
+ #else
+-static int armv6pmu_init(struct arm_pmu *cpu_pmu)
++static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	return -ENODEV;
++}
++
++static int armv6_1156_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	return -ENODEV;
++}
++
++static int armv6_1176_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	return -ENODEV;
+ }
 diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 1d37568..871c465 100644
+index 871c465..d4129bc 100644
 --- a/arch/arm/kernel/perf_event_v7.c
 +++ b/arch/arm/kernel/perf_event_v7.c
-@@ -148,137 +148,62 @@ enum krait_perf_types {
-  * accesses/misses in hardware.
-  */
- static const unsigned armv7_a8_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
- 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
- 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV7_A8_PERFCTR_STALL_ISIDE,
--	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
+@@ -1008,7 +1008,7 @@ static u32 armv7_read_num_pmnc_events(void)
+ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Cortex-A8";
++	cpu_pmu->name		= "armv7_cortex_a8";
+ 	cpu_pmu->map_event	= armv7_a8_map_event;
+ 	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	return 0;
+@@ -1017,7 +1017,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Cortex-A9";
++	cpu_pmu->name		= "armv7_cortex_a9";
+ 	cpu_pmu->map_event	= armv7_a9_map_event;
+ 	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	return 0;
+@@ -1026,7 +1026,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Cortex-A5";
++	cpu_pmu->name		= "armv7_cortex_a5";
+ 	cpu_pmu->map_event	= armv7_a5_map_event;
+ 	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	return 0;
+@@ -1035,7 +1035,7 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Cortex-A15";
++	cpu_pmu->name		= "armv7_cortex_a15";
+ 	cpu_pmu->map_event	= armv7_a15_map_event;
+ 	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+@@ -1045,7 +1045,7 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Cortex-A7";
++	cpu_pmu->name		= "armv7_cortex_a7";
+ 	cpu_pmu->map_event	= armv7_a7_map_event;
+ 	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+@@ -1055,7 +1055,7 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Cortex-A12";
++	cpu_pmu->name		= "armv7_cortex_a12";
+ 	cpu_pmu->map_event	= armv7_a12_map_event;
+ 	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+@@ -1065,7 +1065,7 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7_a12_pmu_init(cpu_pmu);
+-	cpu_pmu->name = "ARMv7 Cortex-A17";
++	cpu_pmu->name = "armv7_cortex_a17";
+ 	return 0;
+ }
+ 
+@@ -1444,7 +1444,7 @@ static void krait_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ static int krait_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv7pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "ARMv7 Krait";
++	cpu_pmu->name		= "armv7_krait";
+ 	/* Some early versions of Krait don't support PC write events */
+ 	if (of_property_read_bool(cpu_pmu->plat_device->dev.of_node,
+ 				  "qcom,no-pc-write"))
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 3d47984..08da0af 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -355,7 +355,7 @@ static int xscale_map_event(struct perf_event *event)
+ 
+ static int xscale1pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	cpu_pmu->name		= "xscale1";
++	cpu_pmu->name		= "armv5_xscale1";
+ 	cpu_pmu->handle_irq	= xscale1pmu_handle_irq;
+ 	cpu_pmu->enable		= xscale1pmu_enable_event;
+ 	cpu_pmu->disable	= xscale1pmu_disable_event;
+@@ -725,7 +725,7 @@ static inline void xscale2pmu_write_counter(struct perf_event *event, u32 val)
+ 
+ static int xscale2pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	cpu_pmu->name		= "xscale2";
++	cpu_pmu->name		= "armv5_xscale2";
+ 	cpu_pmu->handle_irq	= xscale2pmu_handle_irq;
+ 	cpu_pmu->enable		= xscale2pmu_enable_event;
+ 	cpu_pmu->disable	= xscale2pmu_disable_event;
+diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+index 99c63d4b..6826e35 100644
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -33,12 +33,14 @@ static struct op_perf_name {
+ 	char *perf_name;
+ 	char *op_name;
+ } op_perf_name_map[] = {
+-	{ "xscale1",		"arm/xscale1"	},
+-	{ "xscale1",		"arm/xscale2"	},
+-	{ "v6",			"arm/armv6"	},
+-	{ "v6mpcore",		"arm/mpcore"	},
+-	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
+-	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
++	{ "armv5_xscale1",	"arm/xscale1"	},
++	{ "armv5_xscale2",	"arm/xscale2"	},
++	{ "armv6_1136",		"arm/armv6"	},
++	{ "armv6_1156",		"arm/armv6"	},
++	{ "armv6_1176",		"arm/armv6"	},
++	{ "armv6_11mpcore",	"arm/mpcore"	},
++	{ "armv7_cortex_a8",	"arm/armv7"	},
++	{ "armv7_cortex_a9",	"arm/armv7-ca9"	},
  };
  
- static const unsigned armv7_a8_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					  [PERF_COUNT_HW_CACHE_OP_MAX]
- 					  [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		/*
--		 * The performance counters don't differentiate between read
--		 * and write accesses/misses so this isn't strictly correct,
--		 * but it's the best we can do. Writes and reads get
--		 * combined.
--		 */
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A8_PERFCTR_L1_ICACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A8_PERFCTR_L2_CACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_A8_PERFCTR_L2_CACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A8_PERFCTR_L2_CACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_A8_PERFCTR_L2_CACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	/*
-+	 * The performance counters don't differentiate between read and write
-+	 * accesses/misses so this isn't strictly correct, but it's the best we
-+	 * can do. Writes and reads get combined.
-+	 */
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A8_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A8_PERFCTR_L2_CACHE_ACCESS,
-+	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_A8_PERFCTR_L2_CACHE_REFILL,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_A8_PERFCTR_L2_CACHE_ACCESS,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_A8_PERFCTR_L2_CACHE_REFILL,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
-  * Cortex-A9 HW events mapping
-  */
- static const unsigned armv7_a9_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_A9_PERFCTR_INSTR_CORE_RENAME,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
- 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
- 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV7_A9_PERFCTR_STALL_ICACHE,
- 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV7_A9_PERFCTR_STALL_DISPATCH,
- };
-@@ -286,238 +211,83 @@ static const unsigned armv7_a9_perf_map[PERF_COUNT_HW_MAX] = {
- static const unsigned armv7_a9_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					  [PERF_COUNT_HW_CACHE_OP_MAX]
- 					  [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		/*
--		 * The performance counters don't differentiate between read
--		 * and write accesses/misses so this isn't strictly correct,
--		 * but it's the best we can do. Writes and reads get
--		 * combined.
--		 */
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	/*
-+	 * The performance counters don't differentiate between read and write
-+	 * accesses/misses so this isn't strictly correct, but it's the best we
-+	 * can do. Writes and reads get combined.
-+	 */
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
-  * Cortex-A5 HW events mapping
-  */
- static const unsigned armv7_a5_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
- 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
- };
- 
- static const unsigned armv7_a5_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					[PERF_COUNT_HW_CACHE_OP_MAX]
- 					[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL,
--			[C(RESULT_MISS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL_DROP,
--		},
--	},
--	[C(L1I)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		/*
--		 * The prefetch counters don't differentiate between the I
--		 * side and the D side.
--		 */
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL,
--			[C(RESULT_MISS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL_DROP,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_PREFETCH)][C(RESULT_ACCESS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL,
-+	[C(L1D)][C(OP_PREFETCH)][C(RESULT_MISS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL_DROP,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+	/*
-+	 * The prefetch counters don't differentiate between the I side and the
-+	 * D side.
-+	 */
-+	[C(L1I)][C(OP_PREFETCH)][C(RESULT_ACCESS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL,
-+	[C(L1I)][C(OP_PREFETCH)][C(RESULT_MISS)]	= ARMV7_A5_PERFCTR_PREFETCH_LINEFILL_DROP,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
-  * Cortex-A15 HW events mapping
-  */
- static const unsigned armv7_a15_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-@@ -525,123 +295,48 @@ static const unsigned armv7_a15_perf_map[PERF_COUNT_HW_MAX] = {
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_A15_PERFCTR_PC_WRITE_SPEC,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
--	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
- };
- 
- static const unsigned armv7_a15_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					[PERF_COUNT_HW_CACHE_OP_MAX]
- 					[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_READ,
--			[C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_READ,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_WRITE,
--			[C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_WRITE,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		/*
--		 * Not all performance counters differentiate between read
--		 * and write accesses/misses so we're not always strictly
--		 * correct, but it's the best we can do. Writes and reads get
--		 * combined in these cases.
--		 */
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_READ,
--			[C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L2_CACHE_REFILL_READ,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_WRITE,
--			[C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L2_CACHE_REFILL_WRITE,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_DTLB_REFILL_L1_READ,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_DTLB_REFILL_L1_WRITE,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_READ,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_READ,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_WRITE,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_WRITE,
-+
-+	/*
-+	 * Not all performance counters differentiate between read and write
-+	 * accesses/misses so we're not always strictly correct, but it's the
-+	 * best we can do. Writes and reads get combined in these cases.
-+	 */
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_READ,
-+	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L2_CACHE_REFILL_READ,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_WRITE,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_L2_CACHE_REFILL_WRITE,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_DTLB_REFILL_L1_READ,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_A15_PERFCTR_DTLB_REFILL_L1_WRITE,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
-  * Cortex-A7 HW events mapping
-  */
- static const unsigned armv7_a7_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-@@ -649,123 +344,48 @@ static const unsigned armv7_a7_perf_map[PERF_COUNT_HW_MAX] = {
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
--	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
- };
- 
- static const unsigned armv7_a7_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					[PERF_COUNT_HW_CACHE_OP_MAX]
- 					[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		/*
--		 * The performance counters don't differentiate between read
--		 * and write accesses/misses so this isn't strictly correct,
--		 * but it's the best we can do. Writes and reads get
--		 * combined.
--		 */
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L2_CACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L2_CACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	/*
-+	 * The performance counters don't differentiate between read and write
-+	 * accesses/misses so this isn't strictly correct, but it's the best we
-+	 * can do. Writes and reads get combined.
-+	 */
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L2_CACHE_ACCESS,
-+	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L2_CACHE_ACCESS,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
-  * Cortex-A12 HW events mapping
-  */
- static const unsigned armv7_a12_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-@@ -773,138 +393,60 @@ static const unsigned armv7_a12_perf_map[PERF_COUNT_HW_MAX] = {
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_A12_PERFCTR_PC_WRITE_SPEC,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
--	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
- };
- 
- static const unsigned armv7_a12_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					[PERF_COUNT_HW_CACHE_OP_MAX]
- 					[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		/*
--		 * Not all performance counters differentiate between read
--		 * and write accesses/misses so we're not always strictly
--		 * correct, but it's the best we can do. Writes and reads get
--		 * combined in these cases.
--		 */
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_A12_PERFCTR_PF_TLB_REFILL,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+
-+	/*
-+	 * Not all performance counters differentiate between read and write
-+	 * accesses/misses so we're not always strictly correct, but it's the
-+	 * best we can do. Writes and reads get combined in these cases.
-+	 */
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ,
-+	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE,
-+	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+	[C(DTLB)][C(OP_PREFETCH)][C(RESULT_MISS)]	= ARMV7_A12_PERFCTR_PF_TLB_REFILL,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
-  * Krait HW events mapping
-  */
- static const unsigned krait_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV7_PERFCTR_INSTR_EXECUTED,
--	[PERF_COUNT_HW_CACHE_REFERENCES]    = HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_CACHE_MISSES]	    = HW_OP_UNSUPPORTED,
- 	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV7_PERFCTR_PC_WRITE,
- 	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- 	[PERF_COUNT_HW_BUS_CYCLES]	    = ARMV7_PERFCTR_CLOCK_CYCLES,
- };
- 
- static const unsigned krait_perf_map_no_branch[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV7_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV7_PERFCTR_INSTR_EXECUTED,
--	[PERF_COUNT_HW_CACHE_REFERENCES]    = HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_CACHE_MISSES]	    = HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = HW_OP_UNSUPPORTED,
- 	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- 	[PERF_COUNT_HW_BUS_CYCLES]	    = ARMV7_PERFCTR_CLOCK_CYCLES,
- };
-@@ -912,110 +454,31 @@ static const unsigned krait_perf_map_no_branch[PERF_COUNT_HW_MAX] = {
- static const unsigned krait_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 					  [PERF_COUNT_HW_CACHE_OP_MAX]
- 					  [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		/*
--		 * The performance counters don't differentiate between read
--		 * and write accesses/misses so this isn't strictly correct,
--		 * but it's the best we can do. Writes and reads get
--		 * combined.
--		 */
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_ICACHE_ACCESS,
--			[C(RESULT_MISS)]	= KRAIT_PERFCTR_L1_ICACHE_MISS,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_DTLB_ACCESS,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_DTLB_ACCESS,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_ITLB_ACCESS,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_ITLB_ACCESS,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	/*
-+	 * The performance counters don't differentiate between read and write
-+	 * accesses/misses so this isn't strictly correct, but it's the best we
-+	 * can do. Writes and reads get combined.
-+	 */
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= KRAIT_PERFCTR_L1_ICACHE_MISS,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_DTLB_ACCESS,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_DTLB_ACCESS,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_ITLB_ACCESS,
-+	[C(ITLB)][C(OP_WRITE)][C(RESULT_ACCESS)]	= KRAIT_PERFCTR_L1_ITLB_ACCESS,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
+ char *op_name_from_perf_id(void)
 -- 
 1.9.1
