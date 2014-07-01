@@ -1,66 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Jul 2014 15:34:01 +0100
-Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
-In-Reply-To: <53B2C3E8.7030903@mentor.com>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
- <53B2C3E8.7030903@mentor.com>
-Message-ID: <20140701143401.GT32514@n2100.arm.linux.org.uk>
+Date: Tue, 1 Jul 2014 15:40:11 +0100
+Subject: [PATCH v3 0/8] component helper improvements
+Message-ID: <20140701144011.GU32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 09:21:28AM -0500, Nathan Lynch wrote:
-> [apologies if this is a duplicate, I got a weird SMTP error from my
-> organization's mail server when I tried to send this yesterday]
-> 
-> On 06/27/2014 10:15 AM, Russell King - ARM Linux wrote:
-> > This is v2 of my initial round of patches (roughly half of my total
-> > patch set) for the Freescale FEC driver.
-> > 
-> > I'm sending this set out for comments and testing.  So far, I have
-> > had only one ack for one patch in this series, this is pretty poor,
-> > so I'm now sending it with a CFT tag instead.
-> 
-> FWIW I've given your fec-testing branch some testing on BD-SL-i.MX6
-> (Sabre Lite) with 3.16-rc2 (-rc1 has some issue with detecting the mmc).
->  Mainly running glibc 'make check' with SSH, NFSv4, IPv4 on a gigabit
-> switch.  This workload wasn't exhibiting problems before your patches
-> and it does not appear to be regressed by them.
-> 
-> I wanted to test it because I've noticed hard-to-characterize sluggish
-> interactive response in SSH sessions on this system.  Like key echo
-> takes 0.2 seconds too long... sometimes.  I guess it could be anything,
-> but I haven't encountered it yet with your patches.
+A while back, Laurent raised some comments about the component helper,
+which this patch set starts to address.
 
-Thanks for testing.
+The first point it addresses is the repeated parsing inefficiency when
+deferred probing occurs.  When DT is used, the structure of the
+component helper today means that masters end up parsing the device
+tree for each attempt to re-bind the driver.
+									        
+We remove this inefficiency by creating an array of matching data and
+functions, which the component helper can use internally to match up
+components to their master.
 
-Can I add a tested-by tag for you for those patches?
+The second point was the inefficiency of destroying the list of
+components each time we saw a failure.	We did this to ensure that
+we kept things correctly ordered: component bind order matters.
+As we have an array instead, the array is already ordered, so we
+use this array to store the component pointers instead of a list,
+and remember which are duplicates (and thus should be avoided.)
+Avoiding the right duplicates matters as we walk the array in the
+opposite direction at tear down.
 
-It is still possible for that sluggishness to occur with these patches,
-more so as the transmit ring is now soo large - with 512 entries in
-the ring, it is theoretically possible to have up to 512 * 1514 = 757KB
-of data queued in the ring irrespective of the wire speed.
+I hope that this is the final submission in patch form.  Ultimately,
+these patches need to be handled carefully:
 
-If the transmit ring has a significant number of large packets queued,
-and then your interactive ssh packet comes along, it will be tacked
-on the end of the queue, and it will have to wait for all the packets
-ahead of it to be transmitted first.
+Patch		Trees
+1, 2, 3		Driver, Staging, DRM
+4		Driver, DRM
+5		Driver, Staging
+6, 7, 8		To be held back until all users are updated (Exynos DRM)
 
-This is where the byte queue limits really help - it provides more
-control over the amount of data in the transmit ring, and is designed
-to help prevent this kind of issue.
-
-I have such a patch, but it's based upon the work I did on the driver
-prior to the merge window, which does not take account of the changes
-which happened during the window - it's part of my "second half" of
-this series which will be worked on now that the first half is mostly
-out of the way.
-
-Thanks again for testing.
-
-David - how would you like to take the patches?  Shall I just re-send
-them without the CFT tag To: you?  Do you have anything other than
-the IPv6 fix queued up at the moment for this driver?  Thanks.
+ drivers/base/component.c               | 249 ++++++++++++++++++++++-----------
+ drivers/gpu/drm/msm/msm_drv.c          |  83 +++++------
+ drivers/staging/imx-drm/imx-drm-core.c |  57 +-------
+ include/linux/component.h              |   8 +-
+ 4 files changed, 208 insertions(+), 189 deletions(-)
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
 improving, and getting towards what was expected from it.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
