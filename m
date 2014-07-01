@@ -1,107 +1,125 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  1 Jul 2014 19:43:30 +0100
-Subject: [PATCH v8 5/9] pci: Create pci_host_bridge before its associated bus
- in pci_create_root_bus.
+Date: Tue,  1 Jul 2014 19:43:28 +0100
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper function.
 In-Reply-To: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1404240214-9804-6-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
-As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
-the creation order has been changed for no good reason. Revert the order of
-creation as we are going to depend on the pci_host_bridge structure to retrieve the
-domain number of the root bus.
+Some architectures do not have a simple view of the PCI I/O space
+and instead use a range of CPU addresses that map to bus addresses. For
+some architectures these ranges will be expressed by OF bindings
+in a device tree file.
+
+Introduce a pci_register_io_range() helper function with a generic
+implementation that can be used by such architectures to keep track
+of the I/O ranges described by the PCI bindings. If the PCI_IOBASE
+macro is not defined that signals lack of support for PCI and we
+return an error.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Acked-by: Grant Likely <grant.likely@linaro.org>
-Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/probe.c | 31 ++++++++++++++++---------------
- 1 file changed, 16 insertions(+), 15 deletions(-)
+ drivers/of/address.c       | 61 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h |  1 +
+ 2 files changed, 62 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index e3cf8a2..2c92662 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -515,7 +515,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
- 	kfree(bridge);
- }
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 5edfcb0..1345733 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -5,6 +5,7 @@
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/pci_regs.h>
++#include <linux/slab.h>
+ #include <linux/string.h>
  
--static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-+static struct pci_host_bridge *pci_alloc_host_bridge(void)
+ /* Max address size we deal with */
+@@ -601,12 +602,72 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+ }
+ EXPORT_SYMBOL(of_get_address);
+ 
++struct io_range {
++	struct list_head list;
++	phys_addr_t start;
++	resource_size_t size;
++};
++
++static LIST_HEAD(io_range_list);
++
++/*
++ * Record the PCI IO range (expressed as CPU physical address + size).
++ * Return a negative value if an error has occured, zero otherwise
++ */
++int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
++{
++#ifdef PCI_IOBASE
++	struct io_range *res;
++	resource_size_t allocated_size = 0;
++
++	/* check if the range hasn't been previously recorded */
++	list_for_each_entry(res, &io_range_list, list) {
++		if (addr >= res->start && addr + size <= res->start + size)
++			return 0;
++		allocated_size += res->size;
++	}
++
++	/* range not registed yet, check for available space */
++	if (allocated_size + size - 1 > IO_SPACE_LIMIT)
++		return -E2BIG;
++
++	/* add the range to the list */
++	res = kzalloc(sizeof(*res), GFP_KERNEL);
++	if (!res)
++		return -ENOMEM;
++
++	res->start = addr;
++	res->size = size;
++
++	list_add_tail(&res->list, &io_range_list);
++
++	return 0;
++#else
++	return -EINVAL;
++#endif
++}
++
+ unsigned long __weak pci_address_to_pio(phys_addr_t address)
  {
- 	struct pci_host_bridge *bridge;
++#ifdef PCI_IOBASE
++	struct io_range *res;
++	resource_size_t offset = 0;
++
++	list_for_each_entry(res, &io_range_list, list) {
++		if (address >= res->start &&
++			address < res->start + res->size) {
++			return res->start - address + offset;
++		}
++		offset += res->size;
++	}
++
++	return (unsigned long)-1;
++#else
+ 	if (address > IO_SPACE_LIMIT)
+ 		return (unsigned long)-1;
  
-@@ -524,7 +524,6 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&bridge->windows);
--	bridge->bus = b;
- 	return bridge;
+ 	return (unsigned long) address;
++#endif
  }
  
-@@ -1761,9 +1760,16 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	char bus_addr[64];
- 	char *fmt;
+ static int __of_address_to_resource(struct device_node *dev,
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index c13b878..ac4aac4 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -55,6 +55,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+ extern const __be32 *of_get_address(struct device_node *dev, int index,
+ 			   u64 *size, unsigned int *flags);
  
-+	bridge = pci_alloc_host_bridge();
-+	if (!bridge)
-+		return NULL;
-+
-+	bridge->dev.parent = parent;
-+	bridge->dev.release = pci_release_host_bridge_dev;
-+
- 	b = pci_alloc_bus();
- 	if (!b)
--		return NULL;
-+		goto err_out;
++extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+ extern unsigned long pci_address_to_pio(phys_addr_t addr);
  
- 	b->sysdata = sysdata;
- 	b->ops = ops;
-@@ -1772,26 +1778,19 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	if (b2) {
- 		/* If we already got to this bus through a different bridge, ignore it */
- 		dev_dbg(&b2->dev, "bus already known\n");
--		goto err_out;
-+		goto err_bus_out;
- 	}
- 
--	bridge = pci_alloc_host_bridge(b);
--	if (!bridge)
--		goto err_out;
--
--	bridge->dev.parent = parent;
--	bridge->dev.release = pci_release_host_bridge_dev;
-+	bridge->bus = b;
- 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
- 	error = pcibios_root_bridge_prepare(bridge);
--	if (error) {
--		kfree(bridge);
-+	if (error)
- 		goto err_out;
--	}
- 
- 	error = device_register(&bridge->dev);
- 	if (error) {
- 		put_device(&bridge->dev);
--		goto err_out;
-+		goto err_bus_out;
- 	}
- 	b->bridge = get_device(&bridge->dev);
- 	device_enable_async_suspend(b->bridge);
-@@ -1848,8 +1847,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- class_dev_reg_err:
- 	put_device(&bridge->dev);
- 	device_unregister(&bridge->dev);
--err_out:
-+err_bus_out:
- 	kfree(b);
-+err_out:
-+	kfree(bridge);
- 	return NULL;
- }
- 
+ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
 -- 
 2.0.0
