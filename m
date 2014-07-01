@@ -1,27 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  1 Jul 2014 16:12:25 +0200
-Subject: [PATCH 16/33] ARM: at91/dt: qil_a9260: define crystals frequencies
+Date: Tue,  1 Jul 2014 16:12:26 +0200
+Subject: [PATCH 17/33] ARM: at91/dt: mpa1600: define crytals frequencies
 In-Reply-To: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404223962-30471-17-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404223962-30471-18-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Calao QIL-A9260 main and slow crystals frequencies.
+Define Phontech MPA 1600 main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
+Cc: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/at91-qil_a9260.dts | 8 ++++++++
+ arch/arm/boot/dts/mpa1600.dts | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
-index 5576ae8786c0..a9aef53ab764 100644
---- a/arch/arm/boot/dts/at91-qil_a9260.dts
-+++ b/arch/arm/boot/dts/at91-qil_a9260.dts
-@@ -28,6 +28,14 @@
+diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
+index ccf9ea242f72..f0f5e1098928 100644
+--- a/arch/arm/boot/dts/mpa1600.dts
++++ b/arch/arm/boot/dts/mpa1600.dts
+@@ -25,6 +25,14 @@
  			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
+ 			clock-frequency = <18432000>;
  		};
 +
 +		slow_xtal {
@@ -29,7 +29,7 @@ index 5576ae8786c0..a9aef53ab764 100644
 +		};
 +
 +		main_xtal {
-+			clock-frequency = <12000000>;
++			clock-frequency = <18432000>;
 +		};
  	};
  
