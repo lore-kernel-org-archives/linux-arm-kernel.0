@@ -1,39 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 1 Jul 2014 12:42:54 +0200
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <20140701083007.GB26146@shlinux1.ap.freescale.net>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140627032506.GA18039@shlinux1.ap.freescale.net>
- <20140630133313.GA11880@kwain>
- <20140701002112.GA26146@shlinux1.ap.freescale.net>
- <53B27789.3090509@gmail.com>
- <20140701083007.GB26146@shlinux1.ap.freescale.net>
-Message-ID: <20140701104254.GD3427@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 1 Jul 2014 11:50:56 +0100
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <20140630193635.GB32594@mithrandir>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
+ <7497427.LQy8pJts8f@wuerfel> <20140630090118.GA24128@ulmo>
+ <20140630103649.GF28951@arm.com> <20140630104814.GA1495@ulmo>
+ <20140630131628.GA31517@e102568-lin.cambridge.arm.com>
+ <20140630193635.GB32594@mithrandir>
+Message-ID: <20140701105056.GO18313@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2014 at 16:30:08 +0800, Peter Chen wrote :
-> > >>Well, there is nothing specific about the Berlin CI. Some subsystems
-> > >>use the 'generic' keyword in these cases. Do you see a particular reason
-> > >>I should use some Berlin related compatible here?
-> > >
-> > >Not must, one suggestion is: can you change the compatible string
-> > >to "chipidea-usb-generic"?
-> > 
-> > I don't know about ChipIdea/ARC/DW's product portfolio but I guess
-> > the compatible should also carry '2.0' or 'usb2' in it. Or we just
-> > use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
-> > 
+On Mon, Jun 30, 2014 at 08:36:36PM +0100, Thierry Reding wrote:
+> On Mon, Jun 30, 2014 at 02:16:34PM +0100, Lorenzo Pieralisi wrote:
+> > And I think that most of the early bring up issues are just related to
+> > powering-up/resetting a cpu for it to be booted, probably that's the
+> > abstraction we should be focusing on, because it should just require poking
+> > a bunch of registers to kickstart a CPU, no more than that, FW should be
+> > able to deal with that and that's yet another reason behind PSCI design.
 > 
-> The recommended format for compatible string is: "manufacturer,model",
-> I agree with "chipidea,ci13xxx", thanks.
-> 
+> Right, I agree that if we can push that into PSCI that would be great
+> (provided there's an open-source implementation of PSCI).
 
-I think we should probably avoid using wildcards in the compatible
-string.
+At least one (BSD-style license):
+
+https://github.com/ARM-software/arm-trusted-firmware
+
+There are also some patches for U-Boot (only covering secondary CPU
+booting for now and not merged yet).
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
