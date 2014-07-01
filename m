@@ -1,85 +1,147 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 1 Jul 2014 12:33:38 +0200
-Subject: [PATCH] regmap: Fix debugfs-file 'registers' mode
-In-Reply-To: <20140630054507.GX14781@pengutronix.de>
-References: <1403961791-15376-1-git-send-email-mpa@pengutronix.de>
- <20140630054507.GX14781@pengutronix.de>
-Message-ID: <20140701103338.GG28033@pengutronix.de>
+From: Al.Grant@arm.com (Al Grant)
+Date: Tue, 1 Jul 2014 11:32:21 +0100
+Subject: [PATCH 0/9 v2] Coresight framework and drivers
+In-Reply-To: <1403892261-25026-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1403892261-25026-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <DEE44AFE682197449410588EB783A5145BE217925A@BUNGLE.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+> This set is addressing comments received after the May 30th
+> submission[1].  More specifically:
+>
+> .All drivers have been converted to use the AMBA bus
+>  interface.
+> .Debugfs entries are now created with a macro.
+> .A header file was created for the ETM driver to allow
+>  for the reuse of constant definition.
+> .Error path on some drivers have been corrected.
+> .All types converted from uintX_t to uX.
+> .All numeric constant have been replaced with #defines and
+>  comments added where necessary.
+> .Removal of "coresight-id" and "coresigh-name" DT bindings.
+> .Move all DT connections specification to use the generic
+>  graph bindings.
+> .The removal of the replicator driver since it doesn't show
+>  on the AMBA bus.  Drivers for enhanced replicators that have
+>  a configuration space can be added when the need arises.
 
-On Mon, Jun 30, 2014 at 07:45:07AM +0200, Uwe Kleine-K?nig wrote:
-> Hi Markus,
-> 
-> On Sat, Jun 28, 2014 at 03:23:11PM +0200, Markus Pargmann wrote:
-> > The macro "REGMAP_ALLOW_WRITE_DEBUGFS" can be used to enable write
-> minor nit: I'd not call it "macro", but "cpp symbol" because macro
-> sounds more function-like. (There is another "macro" at the end of the
-> commit log.)
+So now any source or link can have multiple output ports.  But you
+still have a device type CORESIGHT_DEV_SUBTYPE_LINK_SPLIT, which is
+now unused.  Is CORESIGHT_DEV_SUBTYPE_LINK_SPLIT there just for
+future programmable replicators?
 
-Okay.
+It would be simpler if you kept the separate replicator component,
+even for non-programmable replicators.  Then a node can be a merge
+node (multiple inputs) or split node (multiple outputs) but not both.
 
-> 
-> > support on the registers file in the debugfs. The mode of the file is
-> > fixed to 0400 so it is not possible to write the file ever.
-> > 
-> > This patch fixes the mode by setting it to the correct value depending
-> > on the macro.
-> > 
-> > Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> > 
-> > Hi,
-> > 
-> > as the kconfig option will probably not be merged, I extracted the mode fix of
-> > my previous patch.
-> > 
-> > Regards,
-> > 
-> > Markus
-> > 
-> >  drivers/base/regmap/regmap-debugfs.c | 9 ++++++++-
-> >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-> > index 45d812c0ea77..f45a0a0e0371 100644
-> > --- a/drivers/base/regmap/regmap-debugfs.c
-> > +++ b/drivers/base/regmap/regmap-debugfs.c
-> > @@ -512,7 +512,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
-> >  			    map, &regmap_reg_ranges_fops);
-> >  
-> >  	if (map->max_register || regmap_readable(map, 0)) {
-> > -		debugfs_create_file("registers", 0400, map->debugfs,
-> > +		unsigned int registers_mode;
-> > +
-> > +		if (IS_ENABLED(REGMAP_ALLOW_WRITE_DEBUGFS))
-> > +			registers_mode = 0600;
-> > +		else
-> > +			registers_mode = 0400;
-> > +
-> > +		debugfs_create_file("registers", registers_mode, map->debugfs,
-> >  				    map, &regmap_map_fops);
-> debugfs_create_file takes an umode_t as 2nd parameter. Maybe you should
-> pick that type for registers_mode here, too?
+Also, the global curr_sink limits you to one trace sink device.
+It will need changing for systems with multiple ETBs, or where
+people want to route one trace source to an ETB and another to a TPIU.
 
-Yes that should be changed, thanks.
+One way to support this (without exposing the full topology to the
+user) would be to have a trace sink per trace source.  So instead of
+switching the sink system-wide, the user would switch the sink for
+each source.  You would then run into the problem that some valid
+end states cannot be reached by individually changing the sink of
+each source, but the sources would have to be changed as a group.
 
-Regards,
+For example:
 
-Markus
+  cpu #0 --funnel--replicator--tpiu
+  cpu #1 -/                  \-etb
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/f4b5d078/attachment.sig>
+  stm ---------etf-------------etr
+
+CPU #0 and CPU #1 have to go to the same place (unless you have a
+programmable filtering replicator) but STM goes to a different place.
+You need an interface that lets you set the destination for multiple
+devices, either to a specific trace sink, or expressed in terms of
+intent (on-chip vs. off-chip) with the ability to read back to find
+out where you'll actually find the trace for any given source.
+
+Al
+
+
+>
+> Regards,
+> Mathieu
+>
+> [1]. http://thread.gmane.org/gmane.linux.kernel/1714785
+>
+> Mathieu Poirier (3):
+>   coresight: adding support for beagle and beagleXM
+>   coresight: adding basic support for Vexpress TC2
+>   ARM: removing support for etb/etm in "arch/arm/kernel/"
+>
+> Pratik Patel (6):
+>   coresight: add CoreSight core layer framework
+>   coresight-tmc: add CoreSight TMC driver
+>   coresight-tpiu: add CoreSight TPIU driver
+>   coresight-etb: add CoreSight ETB driver
+>   coresight-funnel: add CoreSight Funnel driver
+>   coresight-etm: add CoreSight ETM/PTM driver
+>
+>  .../devicetree/bindings/arm/coresight.txt          |  141 ++
+>  arch/arm/boot/dts/omap3-beagle-xm.dts              |   28 +
+>  arch/arm/boot/dts/omap3-beagle.dts                 |   28 +
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  174 +++
+>  arch/arm/include/asm/hardware/coresight.h          |  157 --
+>  arch/arm/include/asm/hardware/cp14.h               |  540 +++++++
+>  arch/arm/kernel/Makefile                           |    1 -
+>  arch/arm/kernel/etm.c                              |  654 ---------
+>  arch/arm/kernel/hw_breakpoint.c                    |    4 +-
+>  arch/arm/mach-omap2/Kconfig                        |    8 -
+>  arch/arm/mach-omap2/Makefile                       |    1 -
+>  arch/arm/mach-omap2/emu.c                          |   50 -
+>  drivers/Kconfig                                    |    2 +
+>  drivers/Makefile                                   |    1 +
+>  drivers/amba/bus.c                                 |    2 +-
+>  drivers/coresight/Kconfig                          |   39 +
+>  drivers/coresight/Makefile                         |    8 +
+>  drivers/coresight/coresight-etb.c                  |  557 ++++++++
+>  drivers/coresight/coresight-etm-cp14.c             |  506 +++++++
+>  drivers/coresight/coresight-etm.c                  | 1507
+> ++++++++++++++++++++
+>  drivers/coresight/coresight-etm.h                  |  192 +++
+>  drivers/coresight/coresight-funnel.c               |  252 ++++
+>  drivers/coresight/coresight-priv.h                 |   69 +
+>  drivers/coresight/coresight-tmc.c                  |  791
+> ++++++++++
+>  drivers/coresight/coresight-tpiu.c                 |  223 +++
+>  drivers/coresight/coresight.c                      |  680 +++++++++
+>  drivers/coresight/of_coresight.c                   |  207 +++
+>  include/linux/amba/bus.h                           |    1 +
+>  include/linux/coresight.h                          |  190 +++
+>  include/linux/of_coresight.h                       |   27 +
+>  30 files changed, 6166 insertions(+), 874 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/arm/coresight.txt
+>  delete mode 100644 arch/arm/include/asm/hardware/coresight.h
+>  create mode 100644 arch/arm/include/asm/hardware/cp14.h
+>  delete mode 100644 arch/arm/kernel/etm.c
+>  delete mode 100644 arch/arm/mach-omap2/emu.c
+>  create mode 100644 drivers/coresight/Kconfig
+>  create mode 100644 drivers/coresight/Makefile
+>  create mode 100644 drivers/coresight/coresight-etb.c
+>  create mode 100644 drivers/coresight/coresight-etm-cp14.c
+>  create mode 100644 drivers/coresight/coresight-etm.c
+>  create mode 100644 drivers/coresight/coresight-etm.h
+>  create mode 100644 drivers/coresight/coresight-funnel.c
+>  create mode 100644 drivers/coresight/coresight-priv.h
+>  create mode 100644 drivers/coresight/coresight-tmc.c
+>  create mode 100644 drivers/coresight/coresight-tpiu.c
+>  create mode 100644 drivers/coresight/coresight.c
+>  create mode 100644 drivers/coresight/of_coresight.c
+>  create mode 100644 include/linux/coresight.h
+>  create mode 100644 include/linux/of_coresight.h
+>
+> --
+> 1.9.1
+>
+
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
