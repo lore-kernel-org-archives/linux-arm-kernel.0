@@ -1,33 +1,88 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue,  1 Jul 2014 10:47:48 +0200
-Subject: [PATCH] ARM: ux500: storage class should be before const qualifier
-Message-ID: <1404204468-8715-1-git-send-email-tklauser@distanz.ch>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 1 Jul 2014 08:49:21 +0000
+Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable
+ coherent HTW
+In-Reply-To: <1404147116-4598-8-git-send-email-ohaugan@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-8-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <e64e7ca617d64093bbe5dc7caf9283e1@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C99 specification states in section 6.11.5:
 
-The placement of a storage-class specifier other than at the beginning
-of the declaration specifiers in a declaration is an obsolescent
-feature.
 
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
----
- arch/arm/mach-ux500/timer.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Olav Haugan
+> Sent: Monday, June 30, 2014 10:22 PM
+> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
+> foundation.org
+> Cc: linux-arm-msm at vger.kernel.org; will.deacon at arm.com;
+> thierry.reding at gmail.com; vgandhi at codeaurora.org
+> Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable
+> coherent HTW
+> 
+> Add a new iommu domain attribute that can be used to enable cache
+> coherent hardware table walks (HTW) by the SMMU. HTW might be supported
+> by the SMMU HW but depending on the use case and the usage of the SMMU in
+> the SoC it might not be always beneficial to always turn on coherent HTW
+> for all domains/iommu's.
+> 
+[Sethi Varun-B16395] Why won't you want to use the coherent table walk feature?
 
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 87efda0..ff28d8a 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -16,7 +16,7 @@
- #include "db8500-regs.h"
- #include "id.h"
- 
--const static struct of_device_id prcmu_timer_of_match[] __initconst = {
-+static const struct of_device_id prcmu_timer_of_match[] __initconst = {
- 	{ .compatible = "stericsson,db8500-prcmu-timer-4", },
- 	{ },
- };
--- 
-1.7.9.5
+> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+> ---
+>  drivers/iommu/msm_iommu-v1.c | 16 ++++++++++++++++
+>  include/linux/iommu.h        |  1 +
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/drivers/iommu/msm_iommu-v1.c b/drivers/iommu/msm_iommu-v1.c
+> index 2c574ef..e163ffc 100644
+> --- a/drivers/iommu/msm_iommu-v1.c
+> +++ b/drivers/iommu/msm_iommu-v1.c
+> @@ -1456,8 +1456,16 @@ static int msm_domain_get_attr(struct iommu_domain
+> *domain,
+>  			       enum iommu_attr attr, void *data)  {
+>  	s32 ret = 0;
+> +	struct msm_iommu_priv *priv = domain->priv;
+> 
+>  	switch (attr) {
+> +	case DOMAIN_ATTR_COHERENT_HTW:
+> +	{
+> +		s32 *int_ptr = (s32 *) data;
+> +
+> +		*int_ptr = priv->pt.redirect;
+> +		break;
+> +	}
+>  	default:
+>  		pr_err("Unsupported attribute type\n");
+>  		ret = -EINVAL;
+> @@ -1471,8 +1479,16 @@ static int msm_domain_set_attr(struct iommu_domain
+> *domain,
+>  			       enum iommu_attr attr, void *data)  {
+>  	s32 ret = 0;
+> +	struct msm_iommu_priv *priv = domain->priv;
+> 
+>  	switch (attr) {
+> +	case DOMAIN_ATTR_COHERENT_HTW:
+> +	{
+> +		s32 *int_ptr = (s32 *) data;
+> +
+> +		priv->pt.redirect = *int_ptr;
+> +		break;
+> +	}
+>  	default:
+>  		pr_err("Unsupported attribute type\n");
+>  		ret = -EINVAL;
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h index
+> 63dca6d..6d9596d 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -81,6 +81,7 @@ enum iommu_attr {
+>  	DOMAIN_ATTR_FSL_PAMU_STASH,
+>  	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>  	DOMAIN_ATTR_FSL_PAMUV1,
+> +	DOMAIN_ATTR_COHERENT_HTW,
+[Sethi Varun-B16395] Would it make sense to represent this as DOMAIN_ATTR_SMMU_COHERENT_HTW? I believe this is specific to SMMU.
+
+-Varun
