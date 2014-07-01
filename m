@@ -1,76 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 01 Jul 2014 21:18:07 +0900
-Subject: [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
-In-Reply-To: <5806444.UHVgoFeOY3@wuerfel>
-References: <1404210076-2362-1-git-send-email-kgene.kim@samsung.com>
- <1404210076-2362-2-git-send-email-kgene.kim@samsung.com>
- <5806444.UHVgoFeOY3@wuerfel>
-Message-ID: <03ef01cf9526$83e93b70$8bbbb250$@samsung.com>
+From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
+Date: Tue, 1 Jul 2014 17:50:08 +0530
+Subject: mwifiex card reset
+In-Reply-To: <20140701065721.GM24891@us.netrek.org>
+References: <CALtMJEBWPM+75wxM2Mp5EX_o6NWtZUJdYRCv6psbvdUn4k295w@mail.gmail.com>
+ <20140628052220.GG10407@us.netrek.org>
+ <20140628072322.GC7410@atomide.com>
+ <CALtMJED5vfgkAhMBXKaDP6u9U9n41c-wziyTxt6e_7XTSxG3oQ@mail.gmail.com>
+ <20140630061912.GA2461@atomide.com> <53B1BAC1.3090902@zonque.org>
+ <477F20668A386D41ADCC57781B1F70430FE5F37540@SC-VEXCH1.marvell.com>
+ <20140701065721.GM24891@us.netrek.org>
+Message-ID: <CA+NduCAuRFTQneJUBiKP2Aeq2HCxe71yxg_iDDStkNvhzRg-Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Tuesday 01 July 2014 19:21:16 Kukjin Kim wrote:
-> > --- a/arch/arm/plat-samsung/Kconfig
-> > +++ b/arch/arm/plat-samsung/Kconfig
-> > @@ -15,7 +15,7 @@ config PLAT_SAMSUNG
-> >
-> >  config PLAT_S5P
-> >         bool
-> > -       depends on (ARCH_S5PC100 || ARCH_S5PV210)
-> > +       depends on ARCH_S5PV210
-> >         default y
-> >         select ARCH_REQUIRE_GPIOLIB
-> >         select ARM_VIC
-> > @@ -78,14 +78,14 @@ config SAMSUNG_CLKSRC
-> >           used by newer systems such as the S3C64XX.
-> >
-> >  config S5P_CLOCK
-> > -       def_bool (ARCH_S5PC100 || ARCH_S5PV210)
-> > +       def_bool ARCH_S5PV210
-> >         help
-> >           Support common clock part for ARCH_S5P and ARCH_EXYNOS SoCs
-> >
-> >  # options for IRQ support
-> >
-> >  config S5P_IRQ
-> > -       def_bool (ARCH_S5PC100 || ARCH_S5PV210)
-> > +       def_bool ARCH_S5PV210
-> >         help
-> >           Support common interrupt part for ARCH_S5P SoCs
-> >
-> > @@ -142,7 +142,7 @@ config S3C_GPIO_TRACK
-> >
-> >  config S5P_DEV_UART
-> >         def_bool y
-> > -       depends on (ARCH_S5PC100 || ARCH_S5PV210)
-> > +       depends on ARCH_S5PV210
-> >
-> >  # ADC driver
-> >
-> 
-> I guess the next logical step would be to either remove these entirely
-> after the move to DT-only ARCH_S5PV210 obsoletes them, or to move the
-> code back to mach-s5pv210, right?
-> 
-Yeah both are possible, but the latter would be more possible at this moment,
-I think. I will cleanup stuff in plat-samsung as you suggested :-)
-
-> 
-> >  config SAMSUNG_DMADEV
-> >        bool "Use legacy Samsung DMA abstraction"
-> > -       depends on CPU_S5PV210 || CPU_S5PC100 || ARCH_S3C64XX
-> > +       depends on CPU_S5PV210 || ARCH_S3C64XX
-> >         select DMADEVICES
-> >         default y
-> >        help
-> 
-> It would be good to just kill this one off now, as nothing uses it
-> any more, but that's also a separate patch.
-> 
-Maybe it is still used for s5pv210 and s3c64xx? If I misunderstand your
-comments, please kindly let me know.
-
-Thanks,
-Kukjin
+On Tue, Jul 1, 2014 at 12:27 PM, James Cameron <quozl@laptop.org> wrote:
+> On Mon, Jun 30, 2014 at 11:44:29PM -0700, Bing Zhao wrote:
+>> I may have missed something, but doesn't the MMC_POWER_OFF and
+>> MMC_POWER_ON|UP handling in controller driver help?
+>> Anyway the clocks/GPIOs/regulators are sort of platform
+>> dependent. Would it be better putting it in /arch/arm/mach-xxxxx/?
+>
+> Wouldn't device tree for mmc be better?
+I have come across same problem.Below is the thread in which more
+discussions happened on this.
+ http://patchwork.ozlabs.org/patch/312444/
+I am adding few more those who are interested in this solution.
+>
+> --
+> James Cameron
+> http://quozl.linux.org.au/
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
