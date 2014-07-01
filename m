@@ -1,31 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Jul 2014 10:23:46 +0100
-Subject: [PATCH v2 09/10] arm64,ia64,ppc,s390,sh,tile,um,x86,mm: Remove
- default gate area
-In-Reply-To: <e1656ab2adfd1891f62610abe3e85ad992ee0cbf.1404164803.git.luto@amacapital.net>
-References: <cover.1404164803.git.luto@amacapital.net>
- <e1656ab2adfd1891f62610abe3e85ad992ee0cbf.1404164803.git.luto@amacapital.net>
-Message-ID: <20140701092345.GH28164@arm.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 1 Jul 2014 16:41:03 +0800
+Subject: [PATCH] dmaengine: fsl-edma: fix dmamux index calculating error
+Message-ID: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:53:20PM +0100, Andy Lutomirski wrote:
-> The core mm code will provide a default gate area based on
-> FIXADDR_USER_START and FIXADDR_USER_END if
-> !defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
-> 
-> This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
-> 64-bit UML, and x86_32 have their own code just to disable it.  arm,
-> 32-bit UML, and x86_64 have gate areas, but they have their own
-> implementations.
-> 
-> This gets rid of the default and moves the code into ia64.
-> 
-> This should save some code on architectures without a gate area: it's
-> now possible to inline the gate_area functions in the default case.
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+---
+ drivers/dma/fsl-edma.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-For the arm64 bit:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index b396a7f..24ab3d3 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -248,11 +248,12 @@ static void fsl_edma_chan_mux(struct fsl_edma_chan *fsl_chan,
+ 			unsigned int slot, bool enable)
+ {
+ 	u32 ch = fsl_chan->vchan.chan.chan_id;
+-	void __iomem *muxaddr = fsl_chan->edma->muxbase[ch / DMAMUX_NR];
++	void __iomem *muxaddr;
+ 	unsigned chans_per_mux, ch_off;
+ 
+ 	chans_per_mux = fsl_chan->edma->n_chans / DMAMUX_NR;
+ 	ch_off = fsl_chan->vchan.chan.chan_id % chans_per_mux;
++	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
+ 
+ 	if (enable)
+ 		edma_writeb(fsl_chan->edma,
+@@ -724,6 +725,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+ {
+ 	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+ 	struct dma_chan *chan, *_chan;
++	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
+ 
+ 	if (dma_spec->args_count != 2)
+ 		return NULL;
+@@ -732,7 +734,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+ 	list_for_each_entry_safe(chan, _chan, &fsl_edma->dma_dev.channels, device_node) {
+ 		if (chan->client_count)
+ 			continue;
+-		if ((chan->chan_id / DMAMUX_NR) == dma_spec->args[0]) {
++		if ((chan->chan_id / chans_per_mux) == dma_spec->args[0]) {
+ 			chan = dma_get_slave_channel(chan);
+ 			if (chan) {
+ 				chan->device->privatecnt++;
+-- 
+1.8.0
