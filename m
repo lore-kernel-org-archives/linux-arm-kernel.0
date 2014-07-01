@@ -1,65 +1,47 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 1 Jul 2014 13:01:14 -0500
-Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
-In-Reply-To: <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-4-git-send-email-agross@codeaurora.org>
- <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
-Message-ID: <20140701180114.GA2082@qualcomm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Jul 2014 19:06:48 +0100
+Subject: [PATCH 7/8] arm: perf: add more specific platform device IDs
+In-Reply-To: <1404227478-9645-8-git-send-email-mark.rutland@arm.com>
+References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
+ <1404227478-9645-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140701180648.GY28164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 12:04:35AM -0500, Rob Herring wrote:
-
-<snip>
-
-> > +- clock-names: Should contain the following:
-> > +  "core"               Master/Core clock, have to be >= 125 MHz for SS
-> > +                               operation and >= 60MHz for HS operation
-> > +
-> > +Optional clocks:
-> > +  "iface"              System bus AXI clock.  Not present on all platforms
+On Tue, Jul 01, 2014 at 04:11:17PM +0100, Mark Rutland wrote:
+> When described in DT, PMUs are given very specific compatible strings
+> (e.g. "arm,cortex-a15-pmu") which makes it very easy to reorganise the
+> way individual PMUs are handled (i.e. we can easily split them into
+> separate drivers). The same is not true of PMUs described in board
+> files, which are all use the platform_device_id "arm-pmu" and must all
+> be handled by the same driver.
 > 
-> Really?, some platforms have a clockless bus?
-
-Some platforms require core and interface.  The specific platform I tested on
-does not have an iface clk.  I'll take a look at the ipq block diagram to see if
-they did something cute, but i don't believe there is one.
-
+> To enable splitting the ARMv6, ARMv7, and XScale PMU drivers we need
+> board files to identify which variant they provide. As a first step,
+> this patch adds new platform_device_id values: "armv6-pmu", "armv7-pmu,
+> and "xscale-pmu".
 > 
-> > +  "sleep"              Sleep clock, used when USB3 core goes into low
-> > +                               power mode (U3).
-> > +
-> > +Optional regulator:
-> > +- gdsc-supply: phandle to the regulator from globally distributed
-> > +                               switch controller
+> Once board files are moved over and all existing uses of "arm-pmu" are
+> gone, we can split the existing driver apart.
 > 
-> The name should reflect the name of the input, not the source.
-
-Ok, I'll revisit this.  I took this from the original patch set.
-
-<snip>
-
-> > +
-> > +                       ranges;
-> > +
-> > +                       status = "disabled";
-> > +
-> > +                       dwc3 at 11000000 {
-> > +                               compatible = "snps,dwc3";
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/perf_event_cpu.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> This sub-node is just wrong. Why can't you have a single node with '
-> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
-> adding here is clocks. Does the Synopsys block have no clocks?
-> 
-> I guess this is copied from other broken dwc3 bindings... That doesn't
-> mean you have to copy it.
+> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> index 191aff0..c63dc42 100644
+> --- a/arch/arm/kernel/perf_event_cpu.c
+> +++ b/arch/arm/kernel/perf_event_cpu.c
+> @@ -241,6 +241,9 @@ static struct of_device_id cpu_pmu_of_device_ids[] = {
+>  
+>  static struct platform_device_id cpu_pmu_plat_device_ids[] = {
+>  	{.name = "arm-pmu"},
+> +	{.name = "armv6-pmu"},
+> +	{.name = "armv7-pmu"},
+> +	{.name = "xscale-pmu"},
 
-The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
-That, in addition to pm, has to be handled from the wrapper.  That's my take
-anyway.  I am sure Felipe can speak more to this.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Will
