@@ -1,21 +1,78 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 1 Jul 2014 17:25:29 -0400
-Subject: [PATCH 0/8] iMX6 SATA configuration
-In-Reply-To: <20140625152912.GI2224@dragon>
-References: <20140624101901.GL32514@n2100.arm.linux.org.uk>
- <20140624220958.GI14909@htj.dyndns.org>
- <20140625152912.GI2224@dragon>
-Message-ID: <20140701212529.GI12459@htj.dyndns.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 01 Jul 2014 14:40:17 -0700
+Subject: [PATCH 1/3] clk: ti: add 'ti,round-rate' flag
+In-Reply-To: <alpine.DEB.2.02.1406131924571.340@utopia.booyaka.com>
+References: <1399540009-6953-1-git-send-email-tomi.valkeinen@ti.com>
+ <5370B839.3050108@ti.com> <5370BAFF.9070501@ti.com>
+ <20140515060834.3084.5199@quantum> <5374B241.9010201@ti.com>
+ <20140531000207.10062.55946@quantum>
+ <alpine.DEB.2.02.1406031907210.14238@utopia.booyaka.com>
+ <538EBBF1.7040804@ti.com>
+ <alpine.DEB.2.02.1406131924571.340@utopia.booyaka.com>
+Message-ID: <20140701214017.32686.37324@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 11:29:14PM +0800, Shawn Guo wrote:
-> I will apply the last two dts patches via IMX tree, and please apply
-> the first 6 patches through your tree.
+Quoting Paul Walmsley (2014-06-13 12:53:06)
+> Furthermore, as a general interface principle, allowing clk_set_rate() to 
+> silently round rates could lead to unexpected behavior, since the set of 
+> rates that clk_set_rate() can round to may change between the call to 
+> clk_round_rate() and the call to clk_set_rate().
 
-Alright, applied the rest to libata/for-3.17.
+Rounding the rate will always happen in a call to clk_set_rate. We need
+to know what rate that clock node can actually support. The real
+question is what do we do with that rounded rate. There are two options:
 
-Thanks.
+1) abort and return an error code if the rounded rate does not exactly
+match the requested rate
 
--- 
-tejun
+2) use the rounded rate even if it does not match the requested rate
+
+#2 has some variations worth considering:
+
+a) allow a rounded rate within a specified tolerance (e.g. 10% of the
+requested rate)
+b) allow a rounded rate so long as it is rounded down from the requested
+rate
+c) same as #b, but rounded up, etc.
+
+> 
+> So again I think that the right way to deal with this is to:
+> 
+> 1. avoid silently rounding rates in clk_set_rate() and to return an error 
+> if calling clk_set_rate() would result in a rate other than the one 
+> desired; and to
+
+Let's get consensus on my above question before we solidify the API.
+It's worth noting that the current behavior of rounding the rate within
+clk_set_rate is actually what Russell had in mind back in 2010. See this
+thread[1] for details.
+
+Also note that this opens up a can of worms regarding *intended rates*.
+For example, if you always abort clk_set_rate if the rounded rate does
+not match the requested rate, then what does that mean for a child clock
+that will be changed by some parent clock higher up the tree? If that
+child gets put to a rate that would never be returned by clk_round_rate
+then is the framework responsible for walking down the tree, checking
+every child and aborting when the first one is off by a few hertz?
+That's going to be messy.
+
+> 
+> 2. modify clk_round_rate() such that it returns the closest 
+> lowest-or-equal rate match to the target rate requested.
+
+I agree that the behavior of clk_round_rate needs to be defined once and
+for all. I also think that clk_round_ceil, clk_round_floor and
+clk_round_exact aren't terrible ideas either.
+
+I'll kick off a thread on this topic shortly, and we can hopefully gain
+some consensus.
+
+Regards,
+Mike
+
+[1] https://lkml.org/lkml/2010/7/14/330
+
+> 
+> 
+> - Paul
