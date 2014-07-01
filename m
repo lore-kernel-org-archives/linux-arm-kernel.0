@@ -1,42 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Jul 2014 18:38:12 +0200
-Subject: [PATCH 22/24] ARM64:ILP32: Use a seperate syscall table as a few
- syscalls need to be using the compat syscalls.
-In-Reply-To: <800835FF-E10A-4C0C-A68F-0ED1434F1CE2@caviumnetworks.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <20140701150539.GA18309@arm.com>
- <800835FF-E10A-4C0C-A68F-0ED1434F1CE2@caviumnetworks.com>
-Message-ID: <4268617.3t49DXZOBa@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Jul 2014 17:42:24 +0100
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <alpine.DEB.2.02.1407011730070.8923@kaball.uk.xensource.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
+ <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
+ <53B27049.10302@arm.com>
+ <alpine.DEB.2.02.1407011730070.8923@kaball.uk.xensource.com>
+Message-ID: <53B2E4F0.8040700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 July 2014 15:30:51 Pinski, Andrew wrote:
-> > On Jul 1, 2014, at 8:07 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
-> >> On Sat, May 24, 2014 at 12:02:17AM -0700, Andrew Pinski wrote:
-> >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> >> index 1e1ebfc..8241ffe 100644
-> >> --- a/arch/arm64/kernel/entry.S
-> >> +++ b/arch/arm64/kernel/entry.S
-> >> @@ -620,9 +620,14 @@ ENDPROC(ret_from_fork)
-> >>  */
-> >>    .align    6
-> >> el0_svc:
-> >> -    adrp    stbl, sys_call_table        // load syscall table pointer
-> >>    uxtw    scno, w8            // syscall number in w8
-> >>    mov    sc_nr, #__NR_syscalls
-> >> +#ifdef CONFIG_ARM64_ILP32
-> >> +    get_thread_info tsk
-> >> +    ldr    x16, [tsk, #TI_FLAGS]
-> >> +    tbnz    x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> >> +#endif
-> >> +    adrp    stbl, sys_call_table        // load syscall table pointer
-> > 
-> > This adds a slight penalty on the AArch64 SVC entry path. I can't tell
-> > whether that's visible or not but I think the x86 guys decided to set an
-> > extra bit to the syscall number to distinguish it from native calls.
+On 01/07/14 17:34, Stefano Stabellini wrote:
+> On Tue, 1 Jul 2014, Marc Zyngier wrote:
+>> Hi Stefano,
+>>
+>> On 30/06/14 20:09, Stefano Stabellini wrote:
+>>> On Wed, 25 Jun 2014, Anup Patel wrote:
+>>>> Hi Marc,
+>>>>
+>>>> On Wed, Jun 25, 2014 at 2:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> So far, GICv2 has been used in with EOImode == 0. The effect of this
+>>>>> mode is to perform the priority drop and the deactivation of the
+>>>>> interrupt at the same time.
+>>>>>
+>>>>> While this works perfectly for Linux (we only have a single priority),
+>>>>> it causes issues when an interrupt is forwarded to a guest, and when
+>>>>> we want the guest to perform the EOI itself.
+>>>>>
+>>>>> For this case, the GIC architecture provides EOImode == 1, where:
+>>>>> - A write to the EOI register drops the priority of the interrupt and leaves
+>>>>> it active. Other interrupts at the same priority level can now be taken,
+>>>>> but the active interrupt cannot be taken again
+>>>>> - A write to the DIR marks the interrupt as inactive, meaning it can
+>>>>> now be taken again.
+>>>>>
+>>>>> We only enable this feature when booted in HYP mode. Also, as most device
+>>>>> trees are broken (they report the CPU interface size to be 4kB, while
+>>>>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
+>>>>> in HYP mode, and disable the feature.
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> ---
+>>>>>  drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
+>>>>>  include/linux/irqchip/arm-gic.h |  4 +++
+>>>>>  2 files changed, 59 insertions(+), 6 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>>>> index 508b815..9295bf2 100644
+>>>>> --- a/drivers/irqchip/irq-gic.c
+>>>>> +++ b/drivers/irqchip/irq-gic.c
+>>>>> @@ -45,6 +45,7 @@
+>>>>>  #include <asm/irq.h>
+>>>>>  #include <asm/exception.h>
+>>>>>  #include <asm/smp_plat.h>
+>>>>> +#include <asm/virt.h>
+>>>>>
+>>>>>  #include "irq-gic-common.h"
+>>>>>  #include "irqchip.h"
+>>>>> @@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
+>>>>>         .irq_set_wake   = NULL,
+>>>>>  };
+>>>>>
+>>>>> +static struct irq_chip *gic_chip;
+>>>>> +
+>>>>> +static bool supports_deactivate = false;
+>>>>> +
+>>>>>  #ifndef MAX_GIC_NR
+>>>>>  #define MAX_GIC_NR     1
+>>>>>  #endif
+>>>>> @@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
+>>>>>         writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>>>>>  }
+>>>>>
+>>>>> +static void gic_eoi_dir_irq(struct irq_data *d)
+>>>>> +{
+>>>>> +       gic_eoi_irq(d);
+>>>>> +       writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
+>>>>> +}
+>>>
+>>> Would it be better if you moved the gic_eoi_irq call earlier? Maybe
+>>> somewhere in gic_handle_irq?
+>>
+>> I'm not sure I see what we'd gain by doing so. Can you elaborate?
+> 
+> You would be dropping the priority earlier. It would be beneficial if
+> Linux was running the interrupt handlers with interrupts enabled, but I
+> realize now that it is not the case.
 
-IIRC the intention on x86 was that you should always be able to call
-any of the three syscall ABIs (x86-32, x86-64, x32) from any process
-by passing the right number, for flexibility.
+Ah, I see what you mean. No, as you noticed, we run the handlers with
+interrupts disabled, so keeping the EOI and DIR close together is
+probably what makes the most sense.
 
-	Arnd
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
