@@ -1,74 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Jul 2014 13:48:51 +0100
-Subject: [RFC] [PATCH] ARM: save/restore power control register on
- Cortex-A9 suspend/resume
-In-Reply-To: <1404218750-5025-1-git-send-email-k.chander@samsung.com>
-References: <1404218750-5025-1-git-send-email-k.chander@samsung.com>
-Message-ID: <20140701124851.GM32514@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 1 Jul 2014 15:48:59 +0300
+Subject: [PATCHv5 05/15] hwspinlock/omap: add support for dt nodes
+In-Reply-To: <1398904476-26200-6-git-send-email-s-anna@ti.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-6-git-send-email-s-anna@ti.com>
+Message-ID: <CAK=WgbamDPN9EmKUu3+c3RbsQn1uhz5MGGvpWSSUJSUKyoH8Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 06:15:49PM +0530, Chander Kashyap wrote:
-> The CP15 power register holds clock latency and dynamic clock gating settings
-> for Cortex-A9 processor, which lost during the suspend/resume. So it needs to
-> be saved/restored on suspend/resume.
-> 
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> ---
->  It is depedent on: ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
->  http://www.spinics.net/lists/arm-kernel/msg340506.html
-> 
->  arch/arm/mm/proc-v7.S |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index e26bfaa..9905df5 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -163,12 +163,14 @@ ENDPROC(cpu_v7_do_resume)
->  	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
->  	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
->  .globl	cpu_ca9mp_suspend_size
-> -.equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 1 * 4
-> +.equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 2 * 4
->  #ifdef CONFIG_ARM_CPU_SUSPEND
->  ENTRY(cpu_ca9mp_do_suspend)
->  	stmfd	sp!, {r4}
->  	mrc	p15, 0, r4, c15, c0, 1  @ Diagnostic register
->  	stmia	r0!, {r4}
-> +	mrc	p15, 0, r4, c15, c0, 0  @ Power register
-> +	stmia	r0!, {r4}
->  	ldmfd	sp!, {r4}
+Hi Suman,
 
-Please combine these - yes, it'll be a larger change, but it'll be much
-better.
+On Thu, May 1, 2014 at 3:34 AM, Suman Anna <s-anna@ti.com> wrote:
+>  static int omap_hwspinlock_probe(struct platform_device *pdev)
+>  {
+> -       struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
+> +       struct device_node *node = pdev->dev.of_node;
+>         struct hwspinlock_device *bank;
+>         struct hwspinlock *hwlock;
+>         struct resource *res;
+>         void __iomem *io_base;
+>         int num_locks, i, ret;
+> +       int base_id = 0;
 
-	stmfd   sp!, {r4-r5}
-	mrc     p15, 0, r4, c15, c0, 1  @ Diagnostic register
-	mrc     p15, 0, r5, c15, c0, 0  @ Power register
-	stmia   r0!, {r4-r5}
-	ldmfd   sp!, {r4-r5}
+We shouldn't implicitly assume base_id is zero: let's explicitly
+protect against potential subsequent invocations of
+omap_hwspinlock_probe.
 
-
->  	b	cpu_v7_do_suspend
->  ENDPROC(cpu_ca9mp_do_suspend)
-> @@ -176,6 +178,8 @@ ENDPROC(cpu_ca9mp_do_suspend)
->  ENTRY(cpu_ca9mp_do_resume)
->  	ldmia	r0!, {r4}
->  	mcr	p15, 0, r4, c15, c0, 1  @ Diagnostic register
-> +	ldmia	r0!, {r4}
-> +	mcr	p15, 0, r4, c15, c0, 0  @ Power register
-
-	ldmia	r0!, {r4-r5}
-	mcr     p15, 0, r4, c15, c0, 1  @ Diagnostic register
-	mcr     p15, 0, r5, c15, c0, 0  @ Power register
-
->  	b	cpu_v7_do_resume
->  ENDPROC(cpu_ca9mp_do_resume)
->  #endif
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks,
+Ohad.
