@@ -1,69 +1,38 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  1 Jul 2014 02:55:26 -0300
-Subject: [PATCH 2/5] ARM: dts: imx6sx: Fix SSI nodes
+Date: Tue,  1 Jul 2014 02:55:27 -0300
+Subject: [PATCH 3/5] ARM: imx: clk-imx6sx: Remove SSI IPG clocks
 In-Reply-To: <1404194129-25543-1-git-send-email-festevam@gmail.com>
 References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
-Message-ID: <1404194129-25543-2-git-send-email-festevam@gmail.com>
+Message-ID: <1404194129-25543-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-The fsl_ssi driver only needs one clock to work, so only pass the required
-SSI clock as done in the other mx6 dtsi files.
+Looking at the CCGR5 register we see that that each SSI has its corresponding
+clock gate field.
 
-Also pass the  fsl,fifo-depth property.
+There are no SSI IPG clock gate field, so remove these SSI IPG variants as
+they point to the same SSI clock fields and have no use in the kernel.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+ arch/arm/mach-imx/clk-imx6sx.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 2929078..ef3cea2 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -301,11 +301,10 @@
- 					compatible = "fsl,imx6sx-ssi", "fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6SX_CLK_SSI1_IPG>,
--						 <&clks IMX6SX_CLK_SSI1>;
--					clock-names = "ipg", "baud";
-+					clocks = <&clks IMX6SX_CLK_SSI1>;
- 					dmas = <&sdma 37 1 0>, <&sdma 38 1 0>;
- 					dma-names = "rx", "tx";
-+					fsl,fifo-depth = <15>;
- 					status = "disabled";
- 				};
- 
-@@ -313,11 +312,10 @@
- 					compatible = "fsl,imx6sx-ssi", "fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6SX_CLK_SSI2_IPG>,
--						 <&clks IMX6SX_CLK_SSI2>;
--					clock-names = "ipg", "baud";
-+					clocks = <&clks IMX6SX_CLK_SSI2>;
- 					dmas = <&sdma 41 1 0>, <&sdma 42 1 0>;
- 					dma-names = "rx", "tx";
-+					fsl,fifo-depth = <15>;
- 					status = "disabled";
- 				};
- 
-@@ -325,11 +323,10 @@
- 					compatible = "fsl,imx6sx-ssi", "fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6SX_CLK_SSI3_IPG>,
--						 <&clks IMX6SX_CLK_SSI3>;
--					clock-names = "ipg", "baud";
-+					clocks = <&clks IMX6SX_CLK_SSI3>;
- 					dmas = <&sdma 45 1 0>, <&sdma 46 1 0>;
- 					dma-names = "rx", "tx";
-+					fsl,fifo-depth = <15>;
- 					status = "disabled";
- 				};
- 
+diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
+index 2e96103..1b198ea 100644
+--- a/arch/arm/mach-imx/clk-imx6sx.c
++++ b/arch/arm/mach-imx/clk-imx6sx.c
+@@ -409,9 +409,6 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SX_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
+ 	clks[IMX6SX_CLK_AUDIO]        = imx_clk_gate2_shared("audio",  "audio_podf",        base + 0x7c, 14, &share_count_audio);
+ 	clks[IMX6SX_CLK_SPDIF]        = imx_clk_gate2_shared("spdif",  "spdif_podf",        base + 0x7c, 14, &share_count_audio);
+-	clks[IMX6SX_CLK_SSI1_IPG]     = imx_clk_gate2("ssi1_ipg",      "ipg",               base + 0x7c, 18);
+-	clks[IMX6SX_CLK_SSI2_IPG]     = imx_clk_gate2("ssi2_ipg",      "ipg",               base + 0x7c, 20);
+-	clks[IMX6SX_CLK_SSI3_IPG]     = imx_clk_gate2("ssi3_ipg",      "ipg",               base + 0x7c, 22);
+ 	clks[IMX6SX_CLK_SSI1]         = imx_clk_gate2("ssi1",          "ssi1_podf",         base + 0x7c, 18);
+ 	clks[IMX6SX_CLK_SSI2]         = imx_clk_gate2("ssi2",          "ssi2_podf",         base + 0x7c, 20);
+ 	clks[IMX6SX_CLK_SSI3]         = imx_clk_gate2("ssi3",          "ssi3_podf",         base + 0x7c, 22);
 -- 
 1.8.3.2
