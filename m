@@ -1,45 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  1 Jul 2014 16:11:18 +0100
-Subject: [PATCH 8/8] arm: perf: krait: stop using singleton PMU
-In-Reply-To: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
-References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1404227478-9645-9-git-send-email-mark.rutland@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  1 Jul 2014 23:25:08 +0800
+Subject: [PATCH] pinctrl: sunxi: Remove gpio_out function from sun5i-a13
+ PG0/1/2 pins
+Message-ID: <1404228308-22783-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the krait_pmu_{enable,disable}_event functions use the global
-cpu_pmu variable while all the other pmu enable/disable functions
-derive this from the event argument.
+The A13 user manual states pins PG0/1/2 only have GPIO input and
+interrupt functions. Remove the gpio_out functions for these pins.
 
-This patch brings the Krait functions into line with the rest of the PMU
-backends by deriving the address of the pmu from the event argument.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/kernel/perf_event_v7.c | 2 ++
- 1 file changed, 2 insertions(+)
+Hi,
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index d4129bc..116758b 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -1286,6 +1286,7 @@ static void krait_pmu_disable_event(struct perf_event *event)
- 	unsigned long flags;
- 	struct hw_perf_event *hwc = &event->hw;
- 	int idx = hwc->idx;
-+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
- 
- 	/* Disable counter and interrupt */
-@@ -1311,6 +1312,7 @@ static void krait_pmu_enable_event(struct perf_event *event)
- 	unsigned long flags;
- 	struct hw_perf_event *hwc = &event->hw;
- 	int idx = hwc->idx;
-+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
- 
- 	/*
+The A13 manual [1] and reference design [2] explicitly warn that pins
+PG0/1/2 can not be used as gpio outputs. This patch removes the output
+functions from the pin definitions.
+
+
+ChenYu
+
+[1] http://dl.linux-sunxi.org/A13/A13%20User%20Manual%20-%20v1.2%20%282013-01-08%29.pdf
+    Page 384.
+[2] https://github.com/OLIMEX/OLINUXINO/raw/master/HARDWARE/A13-PDFs/a13-sch.pdf
+    Page 1, reminder in the red box (in Chinese)
+
+---
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+index 29c734a..e47c33d 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+@@ -330,15 +330,12 @@ static const struct sunxi_desc_pin sun5i_a13_pins[] = {
+ 	/* Hole */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 0),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+-		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION_IRQ(0x6, 0)),		/* EINT0 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 1),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+-		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION_IRQ(0x6, 1)),		/* EINT1 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 2),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+-		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION_IRQ(0x6, 2)),		/* EINT2 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 3),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
-1.9.1
+2.0.0
