@@ -1,92 +1,143 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 1 Jul 2014 11:06:10 +0300
-Subject: [PATCH 6/6] thermal: Add Tegra SOCTHERM thermal management driver
-In-Reply-To: <53B1D538.6000704@wwwdotorg.org>
-References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
- <1403856699-2140-7-git-send-email-mperttunen@nvidia.com>
- <53B1D538.6000704@wwwdotorg.org>
-Message-ID: <53B26BF2.7090009@nvidia.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 1 Jul 2014 16:06:31 +0800
+Subject: [PATCH] ARM: imx: mark .dt_compat as const
+Message-ID: <1404201991-28704-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inline.
+Otherwise GCC will mark the .init.rodata section R/W, which causes
+a compile error once we add other real R/O data.
 
-On 01/07/14 00:23, Stephen Warren wrote:
-> On 06/27/2014 02:11 AM, Mikko Perttunen wrote:
->> This adds support for the Tegra SOCTHERM thermal sensing and management
->> system found in the Tegra124 system-on-chip. This initial driver supports
->> the four thermal zones with hardware-tracked trip points.
->
->> diff --git a/drivers/thermal/tegra_soctherm.c b/drivers/thermal/tegra_soctherm.c
->
->> +static struct tegra_tsensor t124_tsensors[] = {
->> +	{
->> +		.base = 0xc0,
->> +		.name = "cpu0",
->> +		.config = &t124_tsensor_config,
->> +		.calib_fuse_offset = 0x098,
->> +		.fuse_corr_alpha = 1135400,
->> +		.fuse_corr_beta = -6266900,
->> +	},
->
-> I wonder why some of those fields are named "fuse_xxx" when the values
-> are hard-coded in these tables rather than read from fuses? These values
-> don't seem to be used to adjust values read from fuses.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/imx31-dt.c    | 2 +-
+ arch/arm/mach-imx/imx35-dt.c    | 2 +-
+ arch/arm/mach-imx/mach-imx50.c  | 2 +-
+ arch/arm/mach-imx/mach-imx51.c  | 2 +-
+ arch/arm/mach-imx/mach-imx53.c  | 2 +-
+ arch/arm/mach-imx/mach-imx6q.c  | 2 +-
+ arch/arm/mach-imx/mach-imx6sl.c | 2 +-
+ arch/arm/mach-imx/mach-imx6sx.c | 2 +-
+ arch/arm/mach-imx/mach-vf610.c  | 2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
 
-They are used to when calculating the thermal calibration in 
-calculate_tsensor_calibration, which is based on the value read from the 
-fuse. Downstream calls them fuse correction values, so I kept that. (I 
-guess the meaning of corr might not be obvious..) On downstream there is 
-another set of these correction values used depending on the fuse 
-revision, but I believe the older revision is only found internally.
-
->
->> +static int tegra_thermctl_get_temp(void *data, long *out_temp)
->
->> +	switch (zone->sensor) {
->> +	case 0:
->> +		val = readl(zone->tegra->regs + SENSOR_TEMP1)
->> +			>> SENSOR_TEMP1_CPU_TEMP_SHIFT;
->
-> Can't the register offset and shift be stored in *zone, so that this
-> whole switch can be replaced with something generic:
->
-> val = readl(zone->tegra->regs + zone->reg_offset) >> zone->value_shift;
-
-Yes, certainly doable.
-
->
->> +static int tegra_soctherm_probe(struct platform_device *pdev)
->
->> +	irq = platform_get_irq(pdev, 0);
->> +	if (irq <= 0) {
->> +		dev_err(&pdev->dev, "can't get interrupt\n");
->> +		return -EINVAL;
->> +	}
->
-> irq is assigned once here ... (see later)
->
->> +	for (i = 0; i < 4; ++i) {
->
-> Why "4"? Should the loop count be the ARRAY_SIZE(some array)? At the
-> very least, a named constant that describes the value would be useful...
-
-The thermctl sensors have been unchanged for a few chip generations, so 
-I was thinking that just hardcoding this wouldn't be so bad. But I guess
-an array would look nicer here. Will fix.
-
->
->> +		err = devm_request_threaded_irq(&pdev->dev, irq, soctherm_isr,
->> +						soctherm_isr_thread,
->> +						IRQF_SHARED, "tegra_soctherm",
->> +						zone);
->
-> Why request the same IRQ 4 times here. Rather, shouldn't the IRQ be
-> requested once, and the ISR simply loop over the status register (or
-> whatever there are 4 of)?
->
-
-I had that variant as well, but since we need to pass the list of 
-tripped sensors to soctherm_isr_thread somehow, I guess some kind of 
-locking or atomic is needed. This version doesn't need that, so I went 
-with it.
+diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
+index 581f4d6c9b8a..418dbc82adc4 100644
+--- a/arch/arm/mach-imx/imx31-dt.c
++++ b/arch/arm/mach-imx/imx31-dt.c
+@@ -25,7 +25,7 @@ static void __init imx31_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *imx31_dt_board_compat[] __initconst = {
++static const char * const imx31_dt_board_compat[] __initconst = {
+ 	"fsl,imx31",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/imx35-dt.c b/arch/arm/mach-imx/imx35-dt.c
+index a62854c59240..584fbe105579 100644
+--- a/arch/arm/mach-imx/imx35-dt.c
++++ b/arch/arm/mach-imx/imx35-dt.c
+@@ -34,7 +34,7 @@ static void __init imx35_irq_init(void)
+ 	mx35_init_irq();
+ }
+ 
+-static const char *imx35_dt_board_compat[] __initconst = {
++static const char * const imx35_dt_board_compat[] __initconst = {
+ 	"fsl,imx35",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+index 62a4d4580291..b1e56a94a382 100644
+--- a/arch/arm/mach-imx/mach-imx50.c
++++ b/arch/arm/mach-imx/mach-imx50.c
+@@ -23,7 +23,7 @@ static void __init imx50_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *imx50_dt_board_compat[] __initconst = {
++static const char * const imx50_dt_board_compat[] __initconst = {
+ 	"fsl,imx50",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
+index b6f42f80aae2..c77deb3f0893 100644
+--- a/arch/arm/mach-imx/mach-imx51.c
++++ b/arch/arm/mach-imx/mach-imx51.c
+@@ -67,7 +67,7 @@ static void __init imx51_init_late(void)
+ 	imx51_pm_init();
+ }
+ 
+-static const char *imx51_dt_board_compat[] __initconst = {
++static const char * const imx51_dt_board_compat[] __initconst = {
+ 	"fsl,imx51",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index d8c3c08354f6..03a0b40793d6 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -41,7 +41,7 @@ static void __init imx53_init_late(void)
+ 	imx53_pm_init();
+ }
+ 
+-static const char *imx53_dt_board_compat[] __initconst = {
++static const char * const imx53_dt_board_compat[] __initconst = {
+ 	"fsl,imx53",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index e60456d85c9d..5604993458f8 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -396,7 +396,7 @@ static void __init imx6q_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static const char *imx6q_dt_compat[] __initconst = {
++static const char * const imx6q_dt_compat[] __initconst = {
+ 	"fsl,imx6dl",
+ 	"fsl,imx6q",
+ 	NULL,
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index ad323385115c..ed263a21d928 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -70,7 +70,7 @@ static void __init imx6sl_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static const char *imx6sl_dt_compat[] __initconst = {
++static const char * const imx6sl_dt_compat[] __initconst = {
+ 	"fsl,imx6sl",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+index 74ff7d650f8a..673a734165ba 100644
+--- a/arch/arm/mach-imx/mach-imx6sx.c
++++ b/arch/arm/mach-imx/mach-imx6sx.c
+@@ -44,7 +44,7 @@ static void __init imx6sx_init_late(void)
+ 	imx6q_cpuidle_init();
+ }
+ 
+-static const char *imx6sx_dt_compat[] __initconst = {
++static const char * const imx6sx_dt_compat[] __initconst = {
+ 	"fsl,imx6sx",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index c44602758120..ee7e57b752a7 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -20,7 +20,7 @@ static void __init vf610_init_machine(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *vf610_dt_compat[] __initconst = {
++static const char * const vf610_dt_compat[] __initconst = {
+ 	"fsl,vf610",
+ 	NULL,
+ };
+-- 
+1.8.3.2
