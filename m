@@ -1,59 +1,35 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 1 Jul 2014 17:40:12 +0200
-Subject: [PATCH 3/4] ARM: dts: dove: enable lcd0 on SolidRun CuBox
-In-Reply-To: <1404219871-18419-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1404219871-18419-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1404219871-18419-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140701174012.11c60043@armhf>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Tue,  1 Jul 2014 16:53:13 +0100
+Subject: [PATCH] arm64: KVM: export demux regids as KVM_REG_ARM64
+Message-ID: <1404229993-14522-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  1 Jul 2014 15:04:30 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+I suspect this is a -ECUTPASTE fault from the initial implementation. If
+we don't declare the register ID to be KVM_REG_ARM64 the KVM_GET_ONE_REG
+implementation kvm_arm_get_reg() returns -EINVAL and hilarity ensues.
 
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> This enables lcd0 on SolidRun CuBox which is connected to TDA998x
-> HDMI transmitter. Also, set the external video clock connected to
-> Si5351 clock generator.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove-cubox.dts |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-> index 7a70f4c..303a354 100644
-> --- a/arch/arm/boot/dts/dove-cubox.dts
-> +++ b/arch/arm/boot/dts/dove-cubox.dts
-> @@ -134,3 +134,9 @@
->  	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_audio1_extclk>;
->  	pinctrl-names = "default";
->  };
-> +
-> +&lcd0 {
-> +	status = "okay";
-> +	clocks = <&si5351 0>;
-> +	clock-names = "ext_ref_clk_1";
-> +};
+The kvm/api.txt document describes all arm64 registers as starting with
+0x60xx... (i.e KVM_REG_ARM64).
 
-My driver has "axiclk", "extclk0", "lcdpll" and "extclk1" as the clock
-names. It is a bit shorter.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/sys_regs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 0324458..5ee99e4 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -962,7 +962,7 @@ static unsigned int num_demux_regs(void)
+ 
+ static int write_demux_regids(u64 __user *uindices)
+ {
+-	u64 val = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
++	u64 val = KVM_REG_ARM64 | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
+ 	unsigned int i;
+ 
+ 	val |= KVM_REG_ARM_DEMUX_ID_CCSIDR;
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+2.0.0
