@@ -1,91 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  1 Jul 2014 11:33:19 +0200
-Subject: [PATCH v2 06/14] AT91: dt: Remove init_time definitions
+Date: Tue,  1 Jul 2014 11:33:16 +0200
+Subject: [PATCH v2 03/14] AT91: PIT: Use DIV_ROUND_CLOSEST to compute the
+ cycles
 In-Reply-To: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404207208-14513-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404207208-14513-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current AT91 DT boards have a completely generic init_time definition.
-Remove them from the machine declaration.
+Until now, the pit_cycle computation was dividing the rate by HZ, rounding to
+the closest integer, but without using the appropriate macro.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/board-dt-sam9.c  | 11 -----------
- arch/arm/mach-at91/board-dt-sama5.c | 10 ----------
- 2 files changed, 21 deletions(-)
+ arch/arm/mach-at91/at91sam926x_time.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/board-dt-sam9.c b/arch/arm/mach-at91/board-dt-sam9.c
-index a9fcdadfd929..3f80ceb3f444 100644
---- a/arch/arm/mach-at91/board-dt-sam9.c
-+++ b/arch/arm/mach-at91/board-dt-sam9.c
-@@ -14,7 +14,6 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/clk-provider.h>
--#include <linux/clocksource.h>
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index fd3170b65fbb..2e6f1a37ab90 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -252,7 +252,7 @@ void __init at91sam926x_pit_init(void)
+ 	if (IS_ERR(mck))
+ 		panic("AT91: PIT: Unable to get mck clk\n");
+ 	pit_rate = clk_get_rate(mck) / 16;
+-	pit_cycle = (pit_rate + HZ/2) / HZ;
++	pit_cycle = DIV_ROUND_CLOSEST(pit_rate, HZ);
+ 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
  
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -26,15 +25,6 @@
- #include "board.h"
- #include "generic.h"
- 
--
--static void __init sam9_dt_timer_init(void)
--{
--#if defined(CONFIG_COMMON_CLK)
--	of_clk_init(NULL);
--#endif
--	clocksource_of_init();
--}
--
- static const struct of_device_id irq_of_match[] __initconst = {
- 
- 	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
-@@ -53,7 +43,6 @@ static const char *at91_dt_board_compat[] __initdata = {
- 
- DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
- 	/* Maintainer: Atmel */
--	.init_time	= sam9_dt_timer_init,
- 	.map_io		= at91_map_io,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= at91_dt_initialize,
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index c07dd2395f36..030f4b65f449 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -17,7 +17,6 @@
- #include <linux/of_platform.h>
- #include <linux/phy.h>
- #include <linux/clk-provider.h>
--#include <linux/clocksource.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -28,14 +27,6 @@
- #include "at91_aic.h"
- #include "generic.h"
- 
--static void __init sama5_dt_timer_init(void)
--{
--#if defined(CONFIG_COMMON_CLK)
--	of_clk_init(NULL);
--#endif
--	clocksource_of_init();
--}
--
- static const struct of_device_id irq_of_match[] __initconst = {
- 
- 	{ .compatible = "atmel,sama5d3-aic", .data = at91_aic5_of_init },
-@@ -81,7 +72,6 @@ static const char *sama5_dt_board_compat[] __initdata = {
- 
- DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
- 	/* Maintainer: Atmel */
--	.init_time	= sama5_dt_timer_init,
- 	.map_io		= at91_map_io,
- 	.handle_irq	= at91_aic5_handle_irq,
- 	.init_early	= at91_dt_initialize,
+ 	/* Initialize and enable the timer */
 -- 
 2.0.0
