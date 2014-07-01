@@ -1,106 +1,22 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 01 Jul 2014 11:13:02 +0900
-Subject: [GIT PULL] the great <mach/gpio.h> purge
-In-Reply-To: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
-References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
-Message-ID: <02c501cf94d1$fca59720$f5f0c560$@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 1 Jul 2014 10:16:44 +0800
+Subject: [PATCH 7/9] ARM: dts: sun7i: Add new ba10-tvbox board
+In-Reply-To: <1404165479-23785-8-git-send-email-hdegoede@redhat.com>
+References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
+ <1404165479-23785-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v66BO4W5Nrp-9X+20mK+7BObpdmc5x70BC5C7EGEHDcvew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> 
-> Hi ARM SoC guys,
-> 
-Hi Linus,
+On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> The ba10 tvbox is an A10 based android tvbox, with 512M RAM, 8G nand flash,
+> rtl8188ctv usb wifi 1 USB-A receptacle hooked up to an EHCI/OHCI controller,
+> 1 USB-A receptacle hooked up to the OTG and 100Mbit ethernet using a
+> rtl8201 phy.
 
-> please pull in this patch set removing <mach/gpio.h> for good.
-> I guess it could collide with some S5P deletion.
+Nitpick on the subject, should be sun4i.
 
-Yeah...
-
-> If you decide to pull the S5P purge first, tell me so I can rebase.
-> 
-So, I think, would be better if we could remove S5P64X0 and S5PC100 then
-<mach/gpio.h> in samsung stuff. But it's up to arm-soc maintainer? ;-)
-
-Thanks,
-Kukjin
-
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-> 
->   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
-> tags/gpio-h-purge
-> 
-> for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
-> 
->   ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
-> 
-> ----------------------------------------------------------------
-> This is a purge of all things <mach/gpio.h>, now I never
-> want to see it again.
-> 
-> - Remove the need for <mach/gpio.h> from S5P
-> - Kill CONFIG_NEED_MACH_GPIO_H
-> - Kill remnants of ARM_GPIOLIB_COMPLEX
-> 
-> ----------------------------------------------------------------
-> Linus Walleij (4):
->       ARM: s5p: cut the custom ARCH_NR_GPIOS definition
->       ARM: mach-s5p: get rid of all <mach/gpio.h> headers
->       ARM: kill CONFIG_NEED_MACH_GPIO_H
->       ARM: delete old reference to ARM_GPIOLIB_COMPLEX
-> 
->  arch/arm/Kconfig                                         | 10 ----------
->  arch/arm/include/asm/gpio.h                              |  7 -------
->  arch/arm/mach-s5p64x0/common.c                           |  2 +-
->  arch/arm/mach-s5p64x0/dev-audio.c                        |  3 ++-
->  .../mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
->  arch/arm/mach-s5p64x0/mach-smdk6440.c                    |  1 +
->  arch/arm/mach-s5p64x0/mach-smdk6450.c                    |  1 +
->  arch/arm/mach-s5p64x0/setup-fb-24bpp.c                   |  2 +-
->  arch/arm/mach-s5p64x0/setup-i2c0.c                       |  2 +-
->  arch/arm/mach-s5p64x0/setup-i2c1.c                       |  2 +-
->  arch/arm/mach-s5p64x0/setup-sdhci-gpio.c                 |  2 +-
->  arch/arm/mach-s5p64x0/setup-spi.c                        |  2 +-
->  arch/arm/mach-s5pc100/dev-audio.c                        |  2 +-
->  .../mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} |  6 +-----
->  arch/arm/mach-s5pc100/mach-smdkc100.c                    |  1 +
->  arch/arm/mach-s5pc100/setup-fb-24bpp.c                   |  2 +-
->  arch/arm/mach-s5pc100/setup-i2c0.c                       |  2 +-
->  arch/arm/mach-s5pc100/setup-i2c1.c                       |  2 +-
->  arch/arm/mach-s5pc100/setup-ide.c                        |  2 +-
->  arch/arm/mach-s5pc100/setup-keypad.c                     |  2 +-
->  arch/arm/mach-s5pc100/setup-sdhci-gpio.c                 |  2 +-
->  arch/arm/mach-s5pc100/setup-spi.c                        |  2 +-
->  arch/arm/mach-s5pv210/dev-audio.c                        |  2 +-
->  .../mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
->  arch/arm/mach-s5pv210/mach-aquila.c                      |  1 +
->  arch/arm/mach-s5pv210/mach-goni.c                        |  1 +
->  arch/arm/mach-s5pv210/mach-smdkv210.c                    |  1 +
->  arch/arm/mach-s5pv210/setup-fb-24bpp.c                   |  2 +-
->  arch/arm/mach-s5pv210/setup-fimc.c                       |  3 ++-
->  arch/arm/mach-s5pv210/setup-i2c0.c                       |  2 +-
->  arch/arm/mach-s5pv210/setup-i2c1.c                       |  2 +-
->  arch/arm/mach-s5pv210/setup-i2c2.c                       |  2 +-
->  arch/arm/mach-s5pv210/setup-ide.c                        |  2 +-
->  arch/arm/mach-s5pv210/setup-keypad.c                     |  2 +-
->  arch/arm/mach-s5pv210/setup-sdhci-gpio.c                 |  2 +-
->  arch/arm/mach-s5pv210/setup-spi.c                        |  2 +-
->  arch/arm/plat-samsung/Kconfig                            | 16 ----------------
->  arch/arm/plat-samsung/include/plat/gpio-core.h           |  3 +++
->  arch/arm/plat-samsung/pm-gpio.c                          |  2 --
->  arch/arm/plat-samsung/s5p-irq-eint.c                     |  2 +-
->  drivers/gpio/gpio-samsung.c                              |  3 ---
->  sound/soc/samsung/goni_wm8994.c                          |  2 +-
->  42 files changed, 41 insertions(+), 82 deletions(-)
->  rename arch/arm/mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} (95%)
->  rename arch/arm/mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} (97%)
->  rename arch/arm/mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} (96%)
+> The PCB is labelled ba10 hence I've named the board ba10-tvbox. It is used
+> in noname allwinner A10 tv-boxes.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
