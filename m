@@ -1,136 +1,66 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Tue,  1 Jul 2014 20:02:38 +0530
-Subject: [PATCH 2/2] cpuidle: Exynos: fix cpuidle for all states
-In-Reply-To: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
-References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
-Message-ID: <1404225158-8453-3-git-send-email-k.chander@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 15:34:01 +0100
+Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
+In-Reply-To: <53B2C3E8.7030903@mentor.com>
+References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+ <53B2C3E8.7030903@mentor.com>
+Message-ID: <20140701143401.GT32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pre/post platform specific cpuidle operations are handled by pm_notifier.
-But these operations are not same for all cpuidle states. Handle this by
-moving cpuidle specific code from pm_notifier to cpuidle specific function.
+On Tue, Jul 01, 2014 at 09:21:28AM -0500, Nathan Lynch wrote:
+> [apologies if this is a duplicate, I got a weird SMTP error from my
+> organization's mail server when I tried to send this yesterday]
+> 
+> On 06/27/2014 10:15 AM, Russell King - ARM Linux wrote:
+> > This is v2 of my initial round of patches (roughly half of my total
+> > patch set) for the Freescale FEC driver.
+> > 
+> > I'm sending this set out for comments and testing.  So far, I have
+> > had only one ack for one patch in this series, this is pretty poor,
+> > so I'm now sending it with a CFT tag instead.
+> 
+> FWIW I've given your fec-testing branch some testing on BD-SL-i.MX6
+> (Sabre Lite) with 3.16-rc2 (-rc1 has some issue with detecting the mmc).
+>  Mainly running glibc 'make check' with SSH, NFSv4, IPv4 on a gigabit
+> switch.  This workload wasn't exhibiting problems before your patches
+> and it does not appear to be regressed by them.
+> 
+> I wanted to test it because I've noticed hard-to-characterize sluggish
+> interactive response in SSH sessions on this system.  Like key echo
+> takes 0.2 seconds too long... sometimes.  I guess it could be anything,
+> but I haven't encountered it yet with your patches.
 
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
----
- arch/arm/mach-exynos/common.h    |    2 +-
- arch/arm/mach-exynos/pm.c        |   45 ++++++++++----------------------------
- drivers/cpuidle/cpuidle-exynos.c |    7 ++++--
- 3 files changed, 17 insertions(+), 37 deletions(-)
+Thanks for testing.
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 1ee9176..7769f58 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -166,7 +166,7 @@ extern int  exynos_cpu_power_state(int cpu);
- extern void exynos_cluster_power_down(int cluster);
- extern void exynos_cluster_power_up(int cluster);
- extern int  exynos_cluster_power_state(int cluster);
--extern void exynos_enter_aftr(void);
-+extern void exynos_enter_aftr(int entering_idle);
- 
- extern void s5p_init_cpu(void __iomem *cpuid_addr);
- extern unsigned int samsung_rev(void);
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index a092cc3..328644f 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -188,14 +188,6 @@ static void exynos_cpu_set_boot_vector(long flags)
- 	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
- }
- 
--void exynos_enter_aftr(void)
--{
--	exynos_set_wakeupmask(0x0000ff3e);
--	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
--	/* Set value of power down register for aftr mode */
--	exynos_sys_powerdown_conf(SYS_AFTR);
--}
--
- static int exynos_cpu_suspend(unsigned long arg)
- {
- #ifdef CONFIG_CACHE_L2X0
-@@ -386,40 +378,25 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
- 	.valid		= suspend_valid_only_mem,
- };
- 
--static int exynos_cpu_pm_notifier(struct notifier_block *self,
--				  unsigned long cmd, void *v)
-+void exynos_enter_aftr(int entering_idle)
- {
--	int cpu = smp_processor_id();
--
--	switch (cmd) {
--	case CPU_PM_ENTER:
--		if (cpu == 0)
--			exynos_pm_central_suspend();
--		break;
--
--	case CPU_PM_EXIT:
--		if (cpu == 0) {
--			if (read_cpuid_part_number() ==
--					ARM_CPU_PART_CORTEX_A9)
--				scu_enable(S5P_VA_SCU);
--			exynos_pm_central_resume();
--		}
--		break;
-+	if (entering_idle) {
-+		exynos_set_wakeupmask(0x0000ff3e);
-+		exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-+		/* Set value of power down register for aftr mode */
-+		exynos_sys_powerdown_conf(SYS_AFTR);
-+		exynos_pm_central_suspend();
-+	} else {
-+		if (scu_a9_has_base())
-+			scu_enable(S5P_VA_SCU);
-+		exynos_pm_central_resume();
- 	}
--
--	return NOTIFY_OK;
- }
- 
--static struct notifier_block exynos_cpu_pm_notifier_block = {
--	.notifier_call = exynos_cpu_pm_notifier,
--};
--
- void __init exynos_pm_init(void)
- {
- 	u32 tmp;
- 
--	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
--
- 	/* Platform-specific GIC callback */
- 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
- 
-diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-index 7c01512..1196ca7 100644
---- a/drivers/cpuidle/cpuidle-exynos.c
-+++ b/drivers/cpuidle/cpuidle-exynos.c
-@@ -18,11 +18,10 @@
- #include <asm/suspend.h>
- #include <asm/cpuidle.h>
- 
--static void (*exynos_enter_aftr)(void);
-+static void (*exynos_enter_aftr)(int);
- 
- static int idle_finisher(unsigned long flags)
- {
--	exynos_enter_aftr();
- 	cpu_do_idle();
- 
- 	return 1;
-@@ -32,8 +31,12 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv,
- 				int index)
- {
-+	int entering_idle = true;
- 	cpu_pm_enter();
-+	exynos_enter_aftr(entering_idle);
- 	cpu_suspend(0, idle_finisher);
-+	entering_idle = false;
-+	exynos_enter_aftr(entering_idle);
- 	cpu_pm_exit();
- 
- 	return index;
+Can I add a tested-by tag for you for those patches?
+
+It is still possible for that sluggishness to occur with these patches,
+more so as the transmit ring is now soo large - with 512 entries in
+the ring, it is theoretically possible to have up to 512 * 1514 = 757KB
+of data queued in the ring irrespective of the wire speed.
+
+If the transmit ring has a significant number of large packets queued,
+and then your interactive ssh packet comes along, it will be tacked
+on the end of the queue, and it will have to wait for all the packets
+ahead of it to be transmitted first.
+
+This is where the byte queue limits really help - it provides more
+control over the amount of data in the transmit ring, and is designed
+to help prevent this kind of issue.
+
+I have such a patch, but it's based upon the work I did on the driver
+prior to the merge window, which does not take account of the changes
+which happened during the window - it's part of my "second half" of
+this series which will be worked on now that the first half is mostly
+out of the way.
+
+Thanks again for testing.
+
+David - how would you like to take the patches?  Shall I just re-send
+them without the CFT tag To: you?  Do you have anything other than
+the IPv6 fix queued up at the moment for this driver?  Thanks.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
