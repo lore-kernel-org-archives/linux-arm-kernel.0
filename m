@@ -1,62 +1,81 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  1 Jul 2014 11:33:14 +0200
-Subject: [PATCH v2 01/14] AT91: PIT: Follow the general coding rules
+Date: Tue,  1 Jul 2014 11:33:21 +0200
+Subject: [PATCH v2 08/14] AT91: PIT: Use pr_fmt
 In-Reply-To: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404207208-14513-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404207208-14513-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace all masks and bits definitions by matching calls to BIT and GENMASK.
-While we're at it, also fix a few style issues.
+All the panic messages hardcode the same prefix. Define the pr_fmt macro to
+unify its definition.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam926x_time.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ arch/arm/mach-at91/at91sam926x_time.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 0a9e2fc8f796..fd3170b65fbb 100644
+index 641e860e83e7..0abdcb36c555 100644
 --- a/arch/arm/mach-at91/at91sam926x_time.c
 +++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -9,11 +9,12 @@
-  * it under the terms of the GNU General Public License version 2 as
+@@ -10,6 +10,8 @@
   * published by the Free Software Foundation.
   */
+ 
++#define pr_fmt(fmt)	"AT91: PIT: " fmt
 +
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
  #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/clockchips.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -22,17 +23,17 @@
- #include <mach/hardware.h>
+@@ -208,7 +210,7 @@ static void __init at91sam926x_pit_common_init(void)
+ 	/* Set up irq handler */
+ 	ret = setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
+ 	if (ret)
+-		panic("AT91: PIT: Unable to setup IRQ\n");
++		panic(pr_fmt("Unable to setup IRQ\n"));
  
- #define AT91_PIT_MR		0x00			/* Mode Register */
--#define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
--#define		AT91_PIT_PITEN		(1 << 24)		/* Timer Enabled */
--#define		AT91_PIT_PIV		(0xfffff)		/* Periodic Interval Value */
-+#define AT91_PIT_PITIEN			BIT(25)			/* Timer Interrupt Enable */
-+#define AT91_PIT_PITEN			BIT(24)			/* Timer Enabled */
-+#define AT91_PIT_PIV			GENMASK(19, 0)		/* Periodic Interval Value */
+ 	/* Set up and register clockevents */
+ 	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
+@@ -222,7 +224,7 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
  
- #define AT91_PIT_SR		0x04			/* Status Register */
--#define		AT91_PIT_PITS		(1 << 0)		/* Timer Status */
-+#define AT91_PIT_PITS			BIT(0)			/* Timer Status */
+ 	pit_base_addr = of_iomap(node, 0);
+ 	if (!pit_base_addr)
+-		panic("AT91: PIT: Could not map PIT address\n");
++		panic(pr_fmt("Could not map PIT address\n"));
  
- #define AT91_PIT_PIVR		0x08			/* Periodic Interval Value Register */
- #define AT91_PIT_PIIR		0x0c			/* Periodic Interval Image Register */
--#define		AT91_PIT_PICNT		(0xfff << 20)		/* Interval Counter */
--#define		AT91_PIT_CPIV		(0xfffff)		/* Inverval Value */
-+#define AT91_PIT_PICNT			GENMASK(31, 20)		/* Interval Counter */
-+#define AT91_PIT_CPIV			GENMASK(19, 0)		/* Inverval Value */
+ 	mck = of_clk_get(node, 0);
+ 	if (IS_ERR(mck))
+@@ -230,12 +232,12 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
+ 		mck = clk_get(NULL, "mck");
  
- #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
- #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
+ 	if (IS_ERR(mck))
+-		panic("AT91: PIT: Unable to get mck clk\n");
++		panic(pr_fmt("Unable to get mck clk\n"));
+ 
+ 	/* Get the interrupts property */
+ 	irq = irq_of_parse_and_map(node, 0);
+ 	if (!irq)
+-		panic("AT91: PIT: Unable to get IRQ from DT\n");
++		panic(pr_fmt("Unable to get IRQ from DT\n"));
+ 
+ 	at91sam926x_pit_irq.irq = irq;
+ 
+@@ -248,7 +250,7 @@ void __init at91sam926x_pit_init(void)
+ {
+ 	mck = clk_get(NULL, "mck");
+ 	if (IS_ERR(mck))
+-		panic("AT91: PIT: Unable to get mck clk\n");
++		panic(pr_fmt("Unable to get mck clk\n"));
+ 
+ 	at91sam926x_pit_irq.irq = NR_IRQS_LEGACY + AT91_ID_SYS;
+ 
+@@ -263,5 +265,5 @@ void __init at91sam926x_ioremap_pit(u32 addr)
+ 	pit_base_addr = ioremap(addr, 16);
+ 
+ 	if (!pit_base_addr)
+-		panic("Impossible to ioremap PIT\n");
++		panic(pr_fmt("Impossible to ioremap PIT\n"));
+ }
 -- 
 2.0.0
