@@ -1,53 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Jul 2014 18:00:05 +0100
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <53B2CE4B.2010506@wwwdotorg.org>
-References: <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
- <7497427.LQy8pJts8f@wuerfel> <20140630090118.GA24128@ulmo>
- <20140630103649.GF28951@arm.com> <20140630104814.GA1495@ulmo>
- <20140630131628.GA31517@e102568-lin.cambridge.arm.com>
- <20140630193635.GB32594@mithrandir>
- <20140701105056.GO18313@arm.com> <53B2CE4B.2010506@wwwdotorg.org>
-Message-ID: <20140701170005.GW18313@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Jul 2014 19:01:12 +0200
+Subject: [PATCH 00/33] ARM: at91: Switch remaining SoCs and boards to CCF
+In-Reply-To: <20140701164851.GI3427@piout.net>
+References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5780166.MMf0Vhnnsu@wuerfel> <20140701164851.GI3427@piout.net>
+Message-ID: <8196570.1BaMSL4giB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:05:47PM +0100, Stephen Warren wrote:
-> On 07/01/2014 04:50 AM, Catalin Marinas wrote:
-> > On Mon, Jun 30, 2014 at 08:36:36PM +0100, Thierry Reding wrote:
-> >> On Mon, Jun 30, 2014 at 02:16:34PM +0100, Lorenzo Pieralisi wrote:
-> >>> And I think that most of the early bring up issues are just related to
-> >>> powering-up/resetting a cpu for it to be booted, probably that's the
-> >>> abstraction we should be focusing on, because it should just require poking
-> >>> a bunch of registers to kickstart a CPU, no more than that, FW should be
-> >>> able to deal with that and that's yet another reason behind PSCI design.
-> >>
-> >> Right, I agree that if we can push that into PSCI that would be great
-> >> (provided there's an open-source implementation of PSCI).
+On Tuesday 01 July 2014 18:48:51 Alexandre Belloni wrote:
+> On 01/07/2014 at 18:35:50 +0200, Arnd Bergmann wrote :
+> > If I read this right, disabling 'USE_OF' results in still using
+> > the old clock interface. Is that intentional? If you want to always
+> > use COMMON_CLK now, the above can probably be simplified to
 > > 
-> > At least one (BSD-style license):
+> > config AT91_PMC_UNIT
+> >         def_bool !ARCH_AT91X40
+> >       select COMMON_CLK
 > > 
-> > https://github.com/ARM-software/arm-trusted-firmware
-> > 
-> > There are also some patches for U-Boot (only covering secondary CPU
-> > booting for now and not merged yet).
+> > and all references to AT91_USE_OLD_CLK, COMMON_CLK_AT91 and
+> > OLD_CLK_AT91 be removed.
 > 
-> Are the U-Boot patches:
-> 
-> a) Patches to make U-Boot provide a PSCI implementation.
-> 
-> b) Patches to make U-Boot use PSCI as a client.
-> 
-> If you have a link or patch subject to search for, that'd be
-> interesting.
+> Yeah, this is intentional we still have 30 or so boards that we have to
+> migrate to DT. Until then, we want to be able to boot a kernel without
+> CCF. The next step in the migration is to switch those boards to DT,
+> possibly using an hybrid DT/pdata approach until we can get rid of the
+> board files. Then, we will be able to get rid of the old clk
+> implementation (and a few other drivers still living in mach-at91).
 
-It's (a). See the base stuff:
+Ok, I see. Do you expect those 30 boards to work if COMMON_CLK_AT91
+is enabled, or are there known problems with that?
 
-https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/log/?h=wip/psci-v4
+If you have reason to believe it doesn't work, maybe you can expose
+the selection of the clock interface to users, e.g. like
 
-and Allwinner specifics:
+config COMMON_CLK_AT91
+        bool "Use common clock infrastructure"
+        depends on AT91_PMC_UNIT
+	default USE_OF
+        select COMMON_CLK
+	help
+	  The at91 platform is migrating to use the common clk infrastructure
+	  for all boards, but this has not been tested on some of the older
+	  machines that do not use DT yet.
+	  If you encounter problems on legacy boards, try disabling this option
+	  and report the problem to linux-arm-kernel at lists.infradead.org.
 
-https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/log/?h=wip/psci-v4-a20
-
--- 
-Catalin
+	Arnd
