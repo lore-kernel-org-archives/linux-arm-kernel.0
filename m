@@ -1,45 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Jul 2014 10:00:34 +0100
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <53B1D6B8.7080806@amacapital.net>
+Date: Tue, 1 Jul 2014 10:03:09 +0100
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping, and
+ synchronization
+In-Reply-To: <53B1D8AC.7060104@mit.edu>
 References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <53B1D6B8.7080806@amacapital.net>
-Message-ID: <20140701090034.GB28164@arm.com>
+ <1403493118-7597-9-git-send-email-nathan_lynch@mentor.com>
+ <53B1D8AC.7060104@mit.edu>
+Message-ID: <20140701090309.GC28164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:29:28PM +0100, Andy Lutomirski wrote:
+On Mon, Jun 30, 2014 at 10:37:48PM +0100, Andy Lutomirski wrote:
 > On 06/22/2014 08:11 PM, Nathan Lynch wrote:
-> > diff --git a/arch/arm/kernel/vdso/datapage.S b/arch/arm/kernel/vdso/datapage.S
-> > new file mode 100644
-> > index 000000000000..fbf36d75da06
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/vdso/datapage.S
-> > @@ -0,0 +1,15 @@
-> > +#include <linux/linkage.h>
-> > +#include <asm/asm-offsets.h>
+> > Initialize the vdso page list at boot, install the vdso mapping at
+> > exec time, and update the data page during timer ticks.  This code is
+> > not built if CONFIG_VDSO is not enabled.
+> > 
+> > Account for the vdso length when randomizing the offset from the
+> > stack.  The vdso is placed immediately following the sigpage with a
+> > separate install_special_mapping call in arm_install_vdso.
+
+[...]
+
+> > +/* assumes mmap_sem is write-locked */
+> > +void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
+> > +{
+> > +	int ret;
 > > +
-> > +	.align 2
-> > +.L_vdso_data_ptr:
-> > +	.long	_start - . - VDSO_DATA_SIZE
+> > +	mm->context.vdso = ~0UL;
 > > +
-> > +ENTRY(__get_datapage)
-> > +	.cfi_startproc
-> > +	adr	r0, .L_vdso_data_ptr
-> > +	ldr	r1, [r0]
-> > +	add	r0, r0, r1
-> > +	bx	lr
-> > +	.cfi_endproc
-> > +ENDPROC(__get_datapage)
+> > +	if (vdso_pagelist == NULL)
+> > +		return;
+> > +
+> > +	/*
+> > +	 * Put vDSO base into mm struct before calling
+> > +	 * install_special_mapping so the perf counter mmap tracking
+> > +	 * code will recognise it as a vDSO.
+> > +	 */
+> > +	mm->context.vdso = addr;
+> > +
+> > +	ret = install_special_mapping(mm, addr, vdso_mapping_len,
+> > +				      VM_READ|VM_EXEC|
+> > +				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+> > +				      vdso_pagelist);
 > 
-> Can you translate this into English for the non-ARM-speakers here?
+> Eek.  You're mapping the shared data VM_MAYWRITE.  This will cause
+> bizarre and confusing failures if ptrace pokes at it.
 
-Also, I'm not sure .cfi directives are the right things to use for AArch32.
-ARM has special .fnstart, .fnend, .movsp diretives for its own unwind
-format.
-
-Maybe GDB works with both -- have you tried unwinding out of this with
-anything?
+Hmm, but how else can we support software breakpoints on the vdso?
 
 Will
