@@ -1,37 +1,46 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  1 Jul 2014 16:12:29 +0200
-Subject: [PATCH 20/33] ARM: at91/dt: animeo_ip: define crystals frequencies
+Date: Tue,  1 Jul 2014 16:12:37 +0200
+Subject: [PATCH 28/33] ARM: at91: prepare common clk transition for sam9263
 In-Reply-To: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404223962-30471-21-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404223962-30471-29-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Somfy Animeo IP main and slow crystals frequencies.
+Enclose the sam9263 old clk registration in "#if defined(CONFIG_OLD_CLK_AT91)
+ #endif"
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/animeo_ip.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-at91/at91sam9263.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index 3c4f6d983cbd..4e0ad3b82796 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -40,6 +40,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <18432000>;
- 		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <18432000>;
-+		};
- 	};
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index f30290572293..c07465361947 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -25,10 +25,11 @@
+ #include "at91_rstc.h"
+ #include "soc.h"
+ #include "generic.h"
+-#include "clock.h"
+ #include "sam9_smc.h"
+ #include "pm.h"
  
- 	ahb {
++#if defined(CONFIG_OLD_CLK_AT91)
++#include "clock.h"
+ /* --------------------------------------------------------------------
+  *  Clocks
+  * -------------------------------------------------------------------- */
+@@ -280,6 +281,9 @@ static void __init at91sam9263_register_clocks(void)
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
+ }
++#else
++#define at91sam9263_register_clocks NULL
++#endif
+ 
+ /* --------------------------------------------------------------------
+  *  GPIO
 -- 
 1.9.1
