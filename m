@@ -1,102 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:37 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC soc-cleanup Updates
- for v3.17
-Message-ID: <cover.1404173049.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Jul 2014 09:28:33 +0900
+Subject: [PATCH 2/7] ARM: shmobile: Move r8a73a4.h
+In-Reply-To: <cover.1404173049.git.horms+renesas@verge.net.au>
+References: <cover.1404173049.git.horms+renesas@verge.net.au>
+Message-ID: <fac49568b0d19e039e216ca6d13bc534ebf12c34.1404173049.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17.
+Change location of r8a73a4.h so it can be included as "r8a73a4.h"
+instead of the old style <mach/r8a73a4.h>
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc-cleanup-for-v3.17,
-which I have already sent a pull-request for.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-ape6evm-reference.c |  4 +++-
+ arch/arm/mach-shmobile/board-ape6evm.c           |  4 +++-
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h    | 19 -------------------
+ arch/arm/mach-shmobile/r8a73a4.h                 | 19 +++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a73a4.c           |  4 +++-
+ 5 files changed, 28 insertions(+), 22 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/r8a73a4.h
+ create mode 100644 arch/arm/mach-shmobile/r8a73a4.h
 
-This conflicts with other changes made to pm-r8a7790.c in the soc branch
-of the renesas tree. A resolution can be found in the
-renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
-
-In short, the resulting includes should be:
-
-#include <linux/kernel.h>
-#include <linux/smp.h>
-#include <asm/io.h>
-#include "common.h"
-#include "pm-rcar.h"
-#include "r8a7790.h"
-
-
-The following changes since commit d83fa4c9c27c4d8612e39e99506b5420fa05b58b:
-
-  ARM: shmobile: Remove unused r8a7790_init_early() (2014-06-17 19:50:35 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-cleanup2-for-v3.17
-
-for you to fetch changes up to 113522ee3034427472bcb4b8665833719809b31a:
-
-  ARM: shmobile: Move sh7372.h (2014-06-25 16:50:00 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17
-
-* Move SOC-specific headers out of mach directory.
-  This is part of a multi-stage effort to move headers
-  out of that directory.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (7):
-      ARM: shmobile: Move r7s72100.h
-      ARM: shmobile: Move r8a73a4.h
-      ARM: shmobile: Move r8a7740.h
-      ARM: shmobile: Move r8a7778.h
-      ARM: shmobile: Move r8a7790.h
-      ARM: shmobile: Move sh73a0.h
-      ARM: shmobile: Move sh7372.h
-
- arch/arm/mach-shmobile/board-ape6evm-reference.c         |  4 +++-
- arch/arm/mach-shmobile/board-ape6evm.c                   |  4 +++-
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c |  4 +++-
- arch/arm/mach-shmobile/board-armadillo800eva.c           |  4 +++-
- arch/arm/mach-shmobile/board-bockw-reference.c           |  4 +++-
- arch/arm/mach-shmobile/board-bockw.c                     |  4 +++-
- arch/arm/mach-shmobile/board-genmai-reference.c          |  4 +++-
- arch/arm/mach-shmobile/board-genmai.c                    |  4 +++-
- arch/arm/mach-shmobile/board-kzm9g-reference.c           |  4 +++-
- arch/arm/mach-shmobile/board-kzm9g.c                     |  4 +++-
- arch/arm/mach-shmobile/board-lager-reference.c           |  4 +++-
- arch/arm/mach-shmobile/board-lager.c                     | 14 ++++++++------
- arch/arm/mach-shmobile/board-mackerel.c                  |  4 +++-
- arch/arm/mach-shmobile/clock-r7s72100.c                  |  3 ++-
- arch/arm/mach-shmobile/clock-r8a7740.c                   |  3 ++-
- arch/arm/mach-shmobile/clock-r8a7790.c                   |  3 ++-
- arch/arm/mach-shmobile/intc-sh73a0.c                     |  4 +++-
- arch/arm/mach-shmobile/pm-r8a7790.c                      |  4 +++-
- arch/arm/mach-shmobile/pm-sh7372.c                       |  4 +++-
- arch/arm/mach-shmobile/{include/mach => }/r7s72100.h     |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7740.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7778.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7790.h      |  0
- arch/arm/mach-shmobile/setup-r7s72100.c                  |  4 +++-
- arch/arm/mach-shmobile/setup-r8a73a4.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7740.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7778.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7790.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-sh7372.c                    |  4 +++-
- arch/arm/mach-shmobile/setup-sh73a0.c                    |  4 +++-
- arch/arm/mach-shmobile/{include/mach => }/sh7372.h       |  0
- arch/arm/mach-shmobile/{include/mach => }/sh73a0.h       |  0
- arch/arm/mach-shmobile/smp-r8a7790.c                     |  4 +++-
- arch/arm/mach-shmobile/smp-sh73a0.c                      |  4 +++-
- 35 files changed, 86 insertions(+), 33 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r7s72100.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7740.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7778.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7790.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/sh7372.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/sh73a0.h (100%)
+diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
+index 76e4ff1..2f7723e 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
++++ b/arch/arm/mach-shmobile/board-ape6evm-reference.c
+@@ -24,10 +24,12 @@
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <linux/sh_clk.h>
+-#include <mach/r8a73a4.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
++#include "r8a73a4.h"
+ 
+ static void __init ape6evm_add_standard_devices(void)
+ {
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 8f8da25..4855678 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -33,11 +33,13 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/sh_clk.h>
+ #include <linux/smsc911x.h>
+-#include <mach/r8a73a4.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
+ #include "irqs.h"
++#include "r8a73a4.h"
+ 
+ /* LEDS */
+ static struct gpio_led ape6evm_leds[] = {
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+deleted file mode 100644
+index ce8bdd1..0000000
+--- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
++++ /dev/null
+@@ -1,19 +0,0 @@
+-#ifndef __ASM_R8A73A4_H__
+-#define __ASM_R8A73A4_H__
+-
+-/* DMA slave IDs */
+-enum {
+-	SHDMA_SLAVE_INVALID,
+-	SHDMA_SLAVE_MMCIF0_TX,
+-	SHDMA_SLAVE_MMCIF0_RX,
+-	SHDMA_SLAVE_MMCIF1_TX,
+-	SHDMA_SLAVE_MMCIF1_RX,
+-};
+-
+-void r8a73a4_add_standard_devices(void);
+-void r8a73a4_add_dt_devices(void);
+-void r8a73a4_clock_init(void);
+-void r8a73a4_pinmux_init(void);
+-void r8a73a4_init_early(void);
+-
+-#endif /* __ASM_R8A73A4_H__ */
+diff --git a/arch/arm/mach-shmobile/r8a73a4.h b/arch/arm/mach-shmobile/r8a73a4.h
+new file mode 100644
+index 0000000..ce8bdd1
+--- /dev/null
++++ b/arch/arm/mach-shmobile/r8a73a4.h
+@@ -0,0 +1,19 @@
++#ifndef __ASM_R8A73A4_H__
++#define __ASM_R8A73A4_H__
++
++/* DMA slave IDs */
++enum {
++	SHDMA_SLAVE_INVALID,
++	SHDMA_SLAVE_MMCIF0_TX,
++	SHDMA_SLAVE_MMCIF0_RX,
++	SHDMA_SLAVE_MMCIF1_TX,
++	SHDMA_SLAVE_MMCIF1_RX,
++};
++
++void r8a73a4_add_standard_devices(void);
++void r8a73a4_add_dt_devices(void);
++void r8a73a4_clock_init(void);
++void r8a73a4_pinmux_init(void);
++void r8a73a4_init_early(void);
++
++#endif /* __ASM_R8A73A4_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index da94d9b..f470b3c 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -24,11 +24,13 @@
+ #include <linux/serial_sci.h>
+ #include <linux/sh_dma.h>
+ #include <linux/sh_timer.h>
+-#include <mach/r8a73a4.h>
++
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
+ #include "dma-register.h"
+ #include "irqs.h"
++#include "r8a73a4.h"
+ 
+ static const struct resource pfc_resources[] = {
+ 	DEFINE_RES_MEM(0xe6050000, 0x9000),
+-- 
+2.0.0.rc2
