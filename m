@@ -1,137 +1,107 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  1 Jul 2014 19:43:31 +0100
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
+Date: Tue,  1 Jul 2014 19:43:30 +0100
+Subject: [PATCH v8 5/9] pci: Create pci_host_bridge before its associated bus
+ in pci_create_root_bus.
 In-Reply-To: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1404240214-9804-6-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it easier to discover the domain number of a bus by storing
-the number in pci_host_bridge for the root bus. Several architectures
-have their own way of storing this information, so it makes sense
-to try to unify the code. While at this, add a new function that
-creates a root bus in a given domain and make pci_create_root_bus()
-a wrapper around this function.
+Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
+As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
+the creation order has been changed for no good reason. Revert the order of
+creation as we are going to depend on the pci_host_bridge structure to retrieve the
+domain number of the root bus.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Grant Likely <grant.likely@linaro.org>
 Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/probe.c | 41 +++++++++++++++++++++++++++++++++--------
- include/linux/pci.h |  4 ++++
- 2 files changed, 37 insertions(+), 8 deletions(-)
+ drivers/pci/probe.c | 31 ++++++++++++++++---------------
+ 1 file changed, 16 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 2c92662..abf5e82 100644
+index e3cf8a2..2c92662 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -1748,8 +1748,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
- {
+@@ -515,7 +515,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
+ 	kfree(bridge);
  }
  
--struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
--		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
-+		int domain, int bus, struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources)
+-static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
++static struct pci_host_bridge *pci_alloc_host_bridge(void)
  {
- 	int error;
  	struct pci_host_bridge *bridge;
-@@ -1762,27 +1763,31 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
  
- 	bridge = pci_alloc_host_bridge();
- 	if (!bridge)
--		return NULL;
-+		return ERR_PTR(-ENOMEM);
+@@ -524,7 +524,6 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
+ 		return NULL;
  
- 	bridge->dev.parent = parent;
- 	bridge->dev.release = pci_release_host_bridge_dev;
-+	bridge->domain_nr = domain;
+ 	INIT_LIST_HEAD(&bridge->windows);
+-	bridge->bus = b;
+ 	return bridge;
+ }
  
+@@ -1761,9 +1760,16 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	char bus_addr[64];
+ 	char *fmt;
+ 
++	bridge = pci_alloc_host_bridge();
++	if (!bridge)
++		return NULL;
++
++	bridge->dev.parent = parent;
++	bridge->dev.release = pci_release_host_bridge_dev;
++
  	b = pci_alloc_bus();
--	if (!b)
-+	if (!b) {
-+		error = -ENOMEM;
- 		goto err_out;
-+	}
+ 	if (!b)
+-		return NULL;
++		goto err_out;
  
  	b->sysdata = sysdata;
  	b->ops = ops;
- 	b->number = b->busn_res.start = bus;
--	b2 = pci_find_bus(pci_domain_nr(b), bus);
-+	b2 = pci_find_bus(bridge->domain_nr, bus);
+@@ -1772,26 +1778,19 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
  	if (b2) {
  		/* If we already got to this bus through a different bridge, ignore it */
  		dev_dbg(&b2->dev, "bus already known\n");
-+		error = -EEXIST;
- 		goto err_bus_out;
+-		goto err_out;
++		goto err_bus_out;
  	}
  
- 	bridge->bus = b;
--	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-+	dev_set_name(&bridge->dev, "pci%04x:%02x", bridge->domain_nr, bus);
+-	bridge = pci_alloc_host_bridge(b);
+-	if (!bridge)
+-		goto err_out;
+-
+-	bridge->dev.parent = parent;
+-	bridge->dev.release = pci_release_host_bridge_dev;
++	bridge->bus = b;
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
  	error = pcibios_root_bridge_prepare(bridge);
- 	if (error)
+-	if (error) {
+-		kfree(bridge);
++	if (error)
  		goto err_out;
-@@ -1801,7 +1806,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+-	}
  
- 	b->dev.class = &pcibus_class;
- 	b->dev.parent = b->bridge;
--	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
-+	dev_set_name(&b->dev, "%04x:%02x", bridge->domain_nr, bus);
- 	error = device_register(&b->dev);
- 	if (error)
- 		goto class_dev_reg_err;
-@@ -1851,7 +1856,27 @@ err_bus_out:
+ 	error = device_register(&bridge->dev);
+ 	if (error) {
+ 		put_device(&bridge->dev);
+-		goto err_out;
++		goto err_bus_out;
+ 	}
+ 	b->bridge = get_device(&bridge->dev);
+ 	device_enable_async_suspend(b->bridge);
+@@ -1848,8 +1847,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ class_dev_reg_err:
+ 	put_device(&bridge->dev);
+ 	device_unregister(&bridge->dev);
+-err_out:
++err_bus_out:
  	kfree(b);
- err_out:
- 	kfree(bridge);
--	return NULL;
-+	return ERR_PTR(error);
-+}
-+
-+struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+{
-+	int domain_nr;
-+	struct pci_bus *b = pci_alloc_bus();
-+	if (!b)
-+		return NULL;
-+
-+	b->sysdata = sysdata;
-+	domain_nr = pci_domain_nr(b);
-+	kfree(b);
-+
-+	b = pci_create_root_bus_in_domain(parent, domain_nr, bus,
-+				ops, sysdata, resources);
-+	if (IS_ERR(b))
-+		return NULL;
-+
-+	return b;
++err_out:
++	kfree(bridge);
+ 	return NULL;
  }
  
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 466bcd1..7e7b939 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -401,6 +401,7 @@ struct pci_host_bridge_window {
- struct pci_host_bridge {
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
-+	int domain_nr;
- 	struct list_head windows;	/* pci_host_bridge_windows */
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
-@@ -769,6 +770,9 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 				    struct pci_ops *ops, void *sysdata,
- 				    struct list_head *resources);
-+struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
-+			int domain, int bus, struct pci_ops *ops,
-+			void *sysdata, struct list_head *resources);
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
- int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
- void pci_bus_release_busn_res(struct pci_bus *b);
 -- 
 2.0.0
