@@ -1,138 +1,155 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 1 Jul 2014 08:32:14 +0200
-Subject: [PATCH 1/4] clk: Introduce 'clk_find_nearest_rate()'
-In-Reply-To: <475a8ee0-11aa-4fad-94dc-9e5360f298d2@BL2FFO11FD028.protection.gbl>
-References: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
- <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
- <20140630212707.1eb44db6@bbrezillon>
- <475a8ee0-11aa-4fad-94dc-9e5360f298d2@BL2FFO11FD028.protection.gbl>
-Message-ID: <20140701083214.5b31295e@bbrezillon>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 1 Jul 2014 14:32:16 +0800
+Subject: [PATCH] ARM: mx25: Add basic suspend/resume support
+In-Reply-To: <1403723949-9183-1-git-send-email-festevam@gmail.com>
+References: <1403723949-9183-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140701063214.GB14471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
-
-On Mon, 30 Jun 2014 17:12:23 -0700
-S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
-
-> Hi Boris,
+On Wed, Jun 25, 2014 at 04:19:09PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> On Mon, 2014-06-30 at 09:27PM +0200, Boris BREZILLON wrote:
-> > Hello Soren,
-> > 
-> > On Mon, 30 Jun 2014 09:56:33 -0700
-> > Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
-> > 
-> > > Introduce a new API function to find the rate a clock can provide
-> > > which is closest to a given rate.
-> > > 
-> > > clk_round_rate() leaves it to the clock driver how rounding is
-> > > done. Commonly implementations round down due to use-cases that
-> > > have a certain frequency maximum that must not be exceeded.
-> > 
-> > I had the same concern (how could a driver decide whether it should
-> > round up, down or to the closest value), but had a slightly
-> > different approach in mind.
-> > 
-> > AFAIU, you're assuming the clock is always a power of two (which is
-> > true most of the time, but some clock implementation might differ,
-> > i.e. a PLL accept any kind of multiplier not necessarily a power of
-> > 2).
+> Tested basic suspend/resume on a mx25pdk:
 > 
-> No, the idea is to always work. There should not be any such
-> limitation. Where do you see that?
-
-My bad, I should have read the code more carefully.
-BTW, it could help readers if you add some comments to explain how you
-are finding the nearest rate.
-
-My main concern with this approach is that you can spend some time
-iterating to find the nearest rate where a clk driver would find it
-quite quickly (because it knows exactly how the clk works and what are
-the possible clk muxing and clk modifiers options).
-
+> root at freescale /$ echo mem > /sys/power/state 
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.001 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+> Suspending console(s) (use no_console_suspend to debug)
 > 
-> > 
-> > How about improving the clk_ops interface instead by adding a new
-> > method
-> > 
-> > 	long (*round_rate_with_constraint)(struct clk_hw *hw,
-> > 					   unsigned long
-> > requested_rate, unsigned long *parent_rate,
-> > 					   enum clk_round_type
-> > type);
-> > 
-> > with
-> > 
-> > enum clk_round_type {
-> > 	CLK_ROUND_DOWN,
-> > 	CLK_ROUND_UP,
-> > 	CLK_ROUND_CLOSEST,
-> > };
+> (Press the keypad)
 > 
-> I thought about that, but the find_nearest() did already exist more or
-> less and in the end it is not much of a difference, IMHO. If it turns
-> out that the others are needed as well and somebody implements it,
-> they could be added as another convenience function like I did,
-> and/or it could be wrapped in the function you propose here.
->
-> > 
-> > or just adding these 3 methods:
-> > 
-> > 	long (*round_rate_up)(struct clk_hw *hw,
-> > 			      unsigned long requested_rate,
-> > 			      unsigned long *parent_rate);
-> > 
-> > 	long (*round_rate_down)(struct clk_hw *hw,
-> > 				unsigned long requested_rate,
-> > 				unsigned long *parent_rate);
-> > 
-> > 	long (*round_rate_closest)(struct clk_hw *hw,
-> > 				   unsigned long requested_rate,
-> > 				   unsigned long *parent_rate);
+> PM: suspend of devices complete after 5.637 msecs
+> PM: late suspend of devices complete after 1.649 msecs
+> PM: noirq suspend of devices complete after 1.874 msecs
+> PM: noirq resume of devices complete after 1.643 msecs
+> PM: early resume of devices complete after 1.923 msecs
+> PM: resume of devices complete after 62.884 msecs
+> Restarting tasks ... done.
+> fec 50038000.ethernet eth0: Link is Down
+> fec 50038000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
+> root at freescale /$ 
 > 
-> That would be quite a change for clock drivers. So far, there are not
-> many restrictions on round_rate. I think there has already been a
-> discussion in this direction that went nowhere.
-> https://lkml.org/lkml/2010/7/14/260
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/Makefile   |  2 +-
+>  arch/arm/mach-imx/imx25-dt.c |  2 ++
+>  arch/arm/mach-imx/pm-imx25.c | 35 +++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/pm-imx25.h | 13 +++++++++++++
+>  4 files changed, 51 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-imx/pm-imx25.c
+>  create mode 100644 arch/arm/mach-imx/pm-imx25.h
 > 
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index a364e20..ddc28d4 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -3,7 +3,7 @@ obj-y := time.o cpu.o system.o irq-common.o
+>  obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
+>  obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
+>  
+> -obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
+> +obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o pm-imx25.o
+>  
+>  obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
+>  obj-$(CONFIG_SOC_IMX27) += clk-imx27.o mm-imx27.o ehci-imx27.o
+> diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
+> index 42a65e0..39babdf 100644
+> --- a/arch/arm/mach-imx/imx25-dt.c
+> +++ b/arch/arm/mach-imx/imx25-dt.c
+> @@ -16,6 +16,7 @@
+>  #include <asm/mach/time.h>
+>  #include "common.h"
+>  #include "mx25.h"
+> +#include "pm-imx25.h"
+>  
+>  static void __init imx25_dt_init(void)
+>  {
+> @@ -38,6 +39,7 @@ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
+>  	.map_io		= mx25_map_io,
+>  	.init_early	= imx25_init_early,
+>  	.init_irq	= mx25_init_irq,
+> +	.init_late      = mx25_pm_init,
 
-Not if we keep these (or this, depending on the solution you chose)
-functions optional, and return -ENOTSUP, if they're not implemented.
+For new code, please use "imx25" constantly for namespace instead of
+"mx25".
 
-> > 
-> > and let the round_rate method implement the default behaviour.
+>  	.init_time	= imx25_timer_init,
+>  	.init_machine	= imx25_dt_init,
+>  	.dt_compat	= imx25_dt_board_compat,
+> diff --git a/arch/arm/mach-imx/pm-imx25.c b/arch/arm/mach-imx/pm-imx25.c
+> new file mode 100644
+> index 0000000..2463548
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/pm-imx25.c
+> @@ -0,0 +1,35 @@
+> +/*
+> + * Copyright 2014 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/suspend.h>
+> +#include <linux/io.h>
+> +#include "pm-imx25.h"
+> +
+> +static int mx25_suspend_enter(suspend_state_t state)
+> +{
+> +	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		cpu_do_idle();
+> +		break;
+> +
+
+Nit: drop this new line ...
+
+> +	default:
+> +		return -EINVAL;
+> +	}
+
+... and have a new line here.
+
+> +	return 0;
+> +}
+> +
+> +static const struct platform_suspend_ops mx25_suspend_ops = {
+> +	.enter = mx25_suspend_enter,
+> +	.valid = suspend_valid_only_mem,
+> +};
+> +
+> +void __init mx25_pm_init(void)
+> +{
+> +	suspend_set_ops(&mx25_suspend_ops);
+> +}
+> diff --git a/arch/arm/mach-imx/pm-imx25.h b/arch/arm/mach-imx/pm-imx25.h
+> new file mode 100644
+> index 0000000..41da794
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/pm-imx25.h
+> @@ -0,0 +1,13 @@
+> +/*
+> + * Copyright 2014 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifdef CONFIG_PM
+> +void mx25_pm_init(void);
+> +#else
+> +#define mx25_pm_init NULL
+> +#endif
+
+Not sure if it's worth a new header merely for this.  Or you plan to add
+more stuff later?
+
+Shawn
+
+> -- 
+> 1.8.3.2
 > 
-> There is no real default. Rounding is not specified for the current
-> API.
-
-What I meant by default behavior is the behavior already implemented by
-the clock driver (either round up, down or closest).
-This way you do not introduce regressions with existing users, and can
-use new methods in new use cases.
-
-> 
-> > 
-> > This way you could add 3 functions to the API:
-> > 
-> > clk_round_closest (or clk_find_nearest_rate as you called it),
-> > clk_round_up and clk_round_down, and let the clk driver
-> > implementation return the appropriate rate.
-> 
-> I'd say the current patch set does kind of align with that, doesn't
-> it? We can add the find_nearest_rate() (there was a discussion on the
-> name, ane we decided against round_closest in favor of the current
-> proposal) now and the other functions could be added later if people
-> find them to be useful. And if they all get added we can think about
-> consolidating them if it made sense.
-
-Yes sure.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
