@@ -1,66 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Jul 2014 15:22:10 +0100
-Subject: [PATCH RFC v2 3/8] component: add support for component match
- array
-In-Reply-To: <20140626144601.GS32514@n2100.arm.linux.org.uk>
-References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
- <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
- <CA+gwMcdO5P-Yu+-FeHHGxkKwObsATL-ThVDwmEm2_cZ3enUXPQ@mail.gmail.com>
- <20140626144601.GS32514@n2100.arm.linux.org.uk>
-Message-ID: <20140701142210.GS32514@n2100.arm.linux.org.uk>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue,  1 Jul 2014 15:30:44 +0100
+Subject: [PATCH 0/3] Add reset controllers for STiH407 SoC
+Message-ID: <1404225047-9495-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 03:46:01PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 26, 2014 at 02:34:17PM +0200, Philipp Zabel wrote:
-> > Hi Russell,
-> > 
-> > On Tue, Jun 24, 2014 at 9:29 PM, Russell King
-> > <rmk+kernel@arm.linux.org.uk> wrote:
-> > [...]
-> > > +/*
-> > > + * Add a component to be matched.
-> > > + *
-> > > + * The match array is first created or extended if necessary.
-> > > + */
-> > > +void component_match_add(struct device *dev, struct component_match **matchptr,
-> > > +       int (*compare)(struct device *, void *), void *compare_data)
-> > > +{
-> > > +       struct component_match *match = *matchptr;
-> > > +
-> > > +       if (IS_ERR(match))
-> > > +               return;
-> > > +
-> > > +       if (!match || match->num == match->alloc) {
-> > > +               size_t new_size = match ? match->alloc + 16 : 15;
-> > > +
-> > > +               match = component_match_realloc(dev, match, new_size);
-> > > +
-> > > +               *matchptr = match;
-> > > +
-> > > +               if (IS_ERR(match))
-> > > +                       return;
-> > > +       }
-> > > +
-> > > +       match->compare[match->num].fn = compare;
-> > > +       match->compare[match->num].data = compare_data;
-> > > +       match->num++;
-> > > +}
-> > 
-> > component_match_add should be exported.
-> 
-> Fixed, thanks.
+This series adds reset controller support for the STiH407 SoC.
 
-As there's no further comments, and Inki Dae has not responded, I'm
-going to send these out without the RFC tag in the hope that people
-will provide acks.  This allows us to move forward with this despite
-the Exynos DRM blockage.
+Peter Griffin (3):
+  drivers: reset: stih407: Add softreset, powerdown and picophy
+    controllers
+  ARM: sti: Add STiH407 Kconfig entry to select STIH407_RESET
+  ARM: STi: STiH407: Add reset controller support.
 
-The ultimate plan is for patches 1 to 3 inclusive to be merged into
-Greg's driver tree, 1 to 3 and 5 into Greg's staging tree, and 1 to
-3 and 4 for David Airlie's DRM tree - patches 1 to 3 are needed for
-both patches 4 and 5.
+ .../bindings/reset/st,sti-picophyreset.txt         |  41 ++++++
+ arch/arm/boot/dts/stih407.dtsi                     |  16 +++
+ arch/arm/mach-sti/Kconfig                          |  10 ++
+ drivers/reset/sti/Kconfig                          |   4 +
+ drivers/reset/sti/Makefile                         |   1 +
+ drivers/reset/sti/reset-stih407.c                  | 159 +++++++++++++++++++++
+ .../dt-bindings/reset-controller/stih407-resets.h  |  60 ++++++++
+ 7 files changed, 291 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
+ create mode 100644 drivers/reset/sti/reset-stih407.c
+ create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.1
