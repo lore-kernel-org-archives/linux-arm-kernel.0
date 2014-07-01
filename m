@@ -1,44 +1,61 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 1 Jul 2014 14:47:04 -0500
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <20140617131935.GB9070@saruman.home>
-References: <3c3a7a4861df01d0163787a9c18f7b7ac821c5b9.1403000372.git.nsekhar@ti.com>
- <20140617131935.GB9070@saruman.home>
-Message-ID: <20140701194704.GG13396@saruman.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 1 Jul 2014 14:47:46 -0500
+Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
+In-Reply-To: <20140701180114.GA2082@qualcomm.com>
+References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
+ <1404144233-17222-4-git-send-email-agross@codeaurora.org>
+ <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
+ <20140701180114.GA2082@qualcomm.com>
+Message-ID: <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 08:19:35AM -0500, Felipe Balbi wrote:
-> On Tue, Jun 17, 2014 at 04:04:51PM +0530, Sekhar Nori wrote:
-> > ROM code on AM437x does not support writing to L2C-310 power control
-> > register. The L2C driver, however, tries writing to this register for
-> > all revisions >= r3p0.
-> > 
-> > This leads to a warning dump on boot which leads most users to believe
-> > that L2 cache is non-functional.
-> > 
-> > Since the problem is understood, and cannot be addressed through software,
-> > replace the warning with a pr_info() while maintaining the WARN_ON() for
-> > other truly unexpected scenarios.
-> > 
-> > Reported-by: Nishanth Menon <nm@ti.com>
-> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Tested with today's linux-next
-> (5f295cdf5c5dbbb0c40f10f2ddae02ff46bbf773) with am437x-sk, I can see
-> that the WARNING goes away.
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
+On Tue, Jul 1, 2014 at 1:01 PM, Andy Gross <agross@codeaurora.org> wrote:
+> On Tue, Jul 01, 2014 at 12:04:35AM -0500, Rob Herring wrote:
+>
+> <snip>
+>
+>> > +- clock-names: Should contain the following:
+>> > +  "core"               Master/Core clock, have to be >= 125 MHz for SS
+>> > +                               operation and >= 60MHz for HS operation
+>> > +
+>> > +Optional clocks:
+>> > +  "iface"              System bus AXI clock.  Not present on all platforms
+>>
+>> Really?, some platforms have a clockless bus?
+>
+> Some platforms require core and interface.  The specific platform I tested on
+> does not have an iface clk.  I'll take a look at the ipq block diagram to see if
+> they did something cute, but i don't believe there is one.
 
-ping here, I can't see this patch onl linus/master or next/master yet.
+Usually, that difference just means all the clock inputs are connected
+to the same clock source. But the binding should describe the inputs.
+If the dwc3 core has 3 clocks and your wrapper logic varies, I would
+say you should follow the dwc3 core and ignore the wrapper for
+purposes of the binding (unless there is some complex clock tree
+there).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/3e652d65/attachment.sig>
+> <snip>
+>
+>> > +
+>> > +                       ranges;
+>> > +
+>> > +                       status = "disabled";
+>> > +
+>> > +                       dwc3 at 11000000 {
+>> > +                               compatible = "snps,dwc3";
+>>
+>> This sub-node is just wrong. Why can't you have a single node with '
+>> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
+>> adding here is clocks. Does the Synopsys block have no clocks?
+>>
+>> I guess this is copied from other broken dwc3 bindings... That doesn't
+>> mean you have to copy it.
+>
+> The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
+> That, in addition to pm, has to be handled from the wrapper.  That's my take
+> anyway.  I am sure Felipe can speak more to this.
+
+That is a Linux driver issue which is irrelevant to the binding.
+
+Rob
