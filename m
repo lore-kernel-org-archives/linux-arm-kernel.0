@@ -1,39 +1,85 @@
-From: john.liuli@huawei.com (john.liuli)
-Date: Tue, 1 Jul 2014 18:01:50 +0800
-Subject: [PATCH REPOST v2] ARM: virt: fix wrong HSCTLR.EE bit setting
-Message-ID: <1404208910-15284-1-git-send-email-john.liuli@huawei.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 1 Jul 2014 12:33:38 +0200
+Subject: [PATCH] regmap: Fix debugfs-file 'registers' mode
+In-Reply-To: <20140630054507.GX14781@pengutronix.de>
+References: <1403961791-15376-1-git-send-email-mpa@pengutronix.de>
+ <20140630054507.GX14781@pengutronix.de>
+Message-ID: <20140701103338.GG28033@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Li Liu <john.liuli@huawei.com>
+Hi Uwe,
 
-HSCTLR.EE is defined as bit[25] referring to arm manual
-DDI0606C.b(p1590).
+On Mon, Jun 30, 2014 at 07:45:07AM +0200, Uwe Kleine-K?nig wrote:
+> Hi Markus,
+> 
+> On Sat, Jun 28, 2014 at 03:23:11PM +0200, Markus Pargmann wrote:
+> > The macro "REGMAP_ALLOW_WRITE_DEBUGFS" can be used to enable write
+> minor nit: I'd not call it "macro", but "cpp symbol" because macro
+> sounds more function-like. (There is another "macro" at the end of the
+> commit log.)
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Li Liu <john.liuli@huawei.com>
----
-changes v1 -> v2:
-  1)Use the canonical syntax for orr (orr r7, r7, #(1 << 25))
-  2)Use the ARM_BE8 macro instead of the open-coded CONFIG_CPU_BIG_ENDIAN
+Okay.
 
- arch/arm/kernel/hyp-stub.S |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> > support on the registers file in the debugfs. The mode of the file is
+> > fixed to 0400 so it is not possible to write the file ever.
+> > 
+> > This patch fixes the mode by setting it to the correct value depending
+> > on the macro.
+> > 
+> > Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> > 
+> > Hi,
+> > 
+> > as the kconfig option will probably not be merged, I extracted the mode fix of
+> > my previous patch.
+> > 
+> > Regards,
+> > 
+> > Markus
+> > 
+> >  drivers/base/regmap/regmap-debugfs.c | 9 ++++++++-
+> >  1 file changed, 8 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+> > index 45d812c0ea77..f45a0a0e0371 100644
+> > --- a/drivers/base/regmap/regmap-debugfs.c
+> > +++ b/drivers/base/regmap/regmap-debugfs.c
+> > @@ -512,7 +512,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+> >  			    map, &regmap_reg_ranges_fops);
+> >  
+> >  	if (map->max_register || regmap_readable(map, 0)) {
+> > -		debugfs_create_file("registers", 0400, map->debugfs,
+> > +		unsigned int registers_mode;
+> > +
+> > +		if (IS_ENABLED(REGMAP_ALLOW_WRITE_DEBUGFS))
+> > +			registers_mode = 0600;
+> > +		else
+> > +			registers_mode = 0400;
+> > +
+> > +		debugfs_create_file("registers", registers_mode, map->debugfs,
+> >  				    map, &regmap_map_fops);
+> debugfs_create_file takes an umode_t as 2nd parameter. Maybe you should
+> pick that type for registers_mode here, too?
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 797b1a6..7e666cf 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -134,9 +134,7 @@ ENTRY(__hyp_stub_install_secondary)
- 	mcr	p15, 4, r7, c1, c1, 3	@ HSTR
- 
- THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
--#ifdef CONFIG_CPU_BIG_ENDIAN
--	orr	r7, #(1 << 9)		@ HSCTLR.EE
--#endif
-+ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- 	mcr	p15, 4, r7, c1, c0, 0	@ HSCTLR
- 
- 	mrc	p15, 4, r7, c1, c1, 1	@ HDCR
+Yes that should be changed, thanks.
+
+Regards,
+
+Markus
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/f4b5d078/attachment.sig>
