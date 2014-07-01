@@ -1,86 +1,106 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 1 Jul 2014 09:24:24 +0200
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <20140701002112.GA26146@shlinux1.ap.freescale.net>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140627032506.GA18039@shlinux1.ap.freescale.net>
- <20140630133313.GA11880@kwain>
- <20140701002112.GA26146@shlinux1.ap.freescale.net>
-Message-ID: <20140701072424.GA8958@kwain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 1 Jul 2014 09:21:19 +0200
+Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
+ A31 DMA controller
+In-Reply-To: <20140630153305.GA28740@leverpostej>
+References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630142054.GA8756@leverpostej>
+ <20140630151906.GG28647@lukather>
+ <20140630153305.GA28740@leverpostej>
+Message-ID: <20140701072119.GH28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
-
-On Tue, Jul 01, 2014 at 08:21:14AM +0800, Peter Chen wrote:
-> On Mon, Jun 30, 2014 at 03:33:13PM +0200, Antoine T?nart wrote:
-> > On Fri, Jun 27, 2014 at 11:25:07AM +0800, Peter Chen wrote:
-> > > On Tue, Jun 24, 2014 at 12:35:16PM +0200, Antoine T?nart wrote:
-> > > >  
-> > > >  ifneq ($(CONFIG_OF),)
-> > > >  	obj-$(CONFIG_USB_CHIPIDEA)	+= usbmisc_imx.o ci_hdrc_imx.o
-> > > > +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_generic.o
-> > > >  endif
+On Mon, Jun 30, 2014 at 04:33:05PM +0100, Mark Rutland wrote:
+> On Mon, Jun 30, 2014 at 04:19:06PM +0100, Maxime Ripard wrote:
+> > On Mon, Jun 30, 2014 at 03:20:54PM +0100, Mark Rutland wrote:
+> > > Hi Maxime,
 > > > 
-> > > As a generic driver, you may need to support both dt and non-dt
-> > > solution.
-> > 
-> > Since the dt is now the best practice and since there is no need (yet)
-> > for a non-dt usage of this driver shouldn't we let anyone needing it
-> > implement it when the time comes?
-> > 
-> 
-> No, at least your code structure should support both dt and non-dt,
-> and let the compile pass for non-dt platform if you don't have one.
-> Then, someone with non-dt platform can change few to support it. 
-> A good example is: drivers/usb/host/ehci-platform.c
-
-Ok. I'll isolate dt-specific code in the probe, and remove the CONFIG_OF
-dependency.
-
-> 
-> > > > +static int ci_hdrc_generic_probe(struct platform_device *pdev)
-> > > > +{
-> > > > +	struct device *dev = &pdev->dev;
-> > > > +	struct ci_hdrc_generic_priv *priv;
-> > > > +	struct ci_hdrc_platform_data ci_pdata = {
-> > > > +		.name		= "ci_hdrc",
+> > > On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
+> > > > The Allwinner A31 has a 16 channels DMA controller that it shares with the
+> > > > newer A23. Although sharing some similarities with the DMA controller of the
+> > > > older Allwinner SoCs, it's significantly different, I don't expect it to be
+> > > > possible to share the driver for these two.
+> > > >
+> > > > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
+> > > > the 16 channels in parallel.
+> > > >
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > > ---
+> > > >  drivers/dma/Kconfig     |    8 +
+> > > >  drivers/dma/Makefile    |    1 +
+> > > >  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
+> > > >  3 files changed, 1067 insertions(+)
+> > > >  create mode 100644 drivers/dma/sun6i-dma.c
 > > > 
-> > > How about this using dev_name(&pdev->dev) for name?
-> > 
-> > Yes, why not. I don't have a strong preference.
-> > 
+> > > [...]
+> > > 
+> > > > +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
+> > > > +       if (IS_ERR(sdc->clk)) {
+> > > > +               dev_err(&pdev->dev, "No clock specified\n");
+> > > > +               return PTR_ERR(sdc->clk);
+> > > > +       }
 > > > > +
-> > > > +clk_err:
-> > > > +	clk_disable_unprepare(priv->clk);
-> > > 
-> > > You may need to add "if (!IS_ERR(priv->clk))"
-> > 
-> > Right! I'll update this.
-> > 
+> > > > +       mux = clk_get(NULL, "ahb1_mux");
+> > > > +       if (IS_ERR(mux)) {
+> > > > +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+> > > > +               return PTR_ERR(mux);
+> > > > +       }
 > > > > +
-> > > > +static const struct of_device_id ci_hdrc_generic_of_match[] = {
-> > > > +	{ .compatible = "chipidea-usb" },
-> > > > +	{ }
-> > > > +};
+> > > > +       pll6 = clk_get(NULL, "pll6");
+> > > > +       if (IS_ERR(pll6)) {
+> > > > +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
+> > > > +               clk_put(mux);
+> > > > +               return PTR_ERR(pll6);
+> > > > +       }
 > > > 
-> > > Even as a generic driver, you can also use your own compatible string.
+> > > I'm slightly confused. The binding listed a single unnamed clock (the
+> > > AHB clock). What is going on here?
 > > 
-> > Well, there is nothing specific about the Berlin CI. Some subsystems
-> > use the 'generic' keyword in these cases. Do you see a particular reason
-> > I should use some Berlin related compatible here?
+> > The device itself needs only a single clock to work...
 > > 
+> > > 
+> > > > +       ret = clk_set_parent(mux, pll6);
+> > > > +       clk_put(pll6);
+> > > > +       clk_put(mux);
+> > > > +
+> > > > +       if (ret) {
+> > > > +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> > > > +               return ret;
+> > > > +       }
+> > > 
+> > > Why do we need to reparent the mux?
+> > 
+> > ... but will function only if this clock is derived from PLL6.
 > 
-> Not must, one suggestion is: can you change the compatible string
-> to "chipidea-usb-generic"?
+> Ok, but _why_ is that the case? Could we at least have a comment for
+> that?
 
-Sounds good, I'll update.
+I have no idea, sorry.
 
+> Where does the driver get the named clocks from if they aren't provided
+> on the device node? Is there a clock-ranges somewhere?
 
-Antoine
+No, it just looks up the global clock name.
+
+> It feels a little fragile to rely on the organisation of the clock tree
+> and the naming thereof. If the IP block is ever reused on an SoC with a
+> different clock tree layout then we have to handle things differently.
+
+What do you suggest then?
+
+Maxime
 
 -- 
-Antoine T?nart, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/66f06a27/attachment.sig>
