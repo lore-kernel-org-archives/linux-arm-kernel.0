@@ -1,40 +1,51 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 1 Jul 2014 15:45:38 +0300
-Subject: [PATCHv5 04/15] hwspinlock/core: add common OF helpers
-In-Reply-To: <1398904476-26200-5-git-send-email-s-anna@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-5-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbbZvBLT7U638fBfPjF7-MJaP=4WJcrT_fEg6Uu3cXRAyg@mail.gmail.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Tue,  1 Jul 2014 18:15:49 +0530
+Subject: [RFC] [PATCH] ARM: save/restore power control register on Cortex-A9
+ suspend/resume
+Message-ID: <1404218750-5025-1-git-send-email-k.chander@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+The CP15 power register holds clock latency and dynamic clock gating settings
+for Cortex-A9 processor, which lost during the suspend/resume. So it needs to
+be saved/restored on suspend/resume.
 
-On Thu, May 1, 2014 at 3:34 AM, Suman Anna <s-anna@ti.com> wrote:
-> 2. The of_hwspin_lock_simple_xlate() is a simple default
->    translator function for hwspinlock provider implementations
->    that use a single cell number for requesting a specific lock
->    (relatively indexed) within a hwlock bank.
+Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+---
+ It is depedent on: ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
+ http://www.spinics.net/lists/arm-kernel/msg340506.html
 
-Do we have a use case today that require the xlate() method?
+ arch/arm/mm/proc-v7.S |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-If not, let's remove it as we could always add it back if some new
-hardware shows up that needs it.
-
-As long as the dt data is unchanged, we should generally only add
-kernel code that we really need.
-
-> 3. The of_hwspin_lock_request_specific() API can be used by
->    hwspinlock clients to request a specific lock using the
->    phandle + args specifier. This function relies on the
->    implementation providing back a relative hwlock id within
->    the bank from the args specifier.
-
-It seems to me we can just introduce a of_hwspin_lock_get_id() method
-which will provide the global lock id to dt users, with which they
-could just invoke the existing hwspin_lock_request_specific(). This
-way we will have more common code between dt users and users who get
-the lock id from a remote processor.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index e26bfaa..9905df5 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -163,12 +163,14 @@ ENDPROC(cpu_v7_do_resume)
+ 	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
+ 	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
+ .globl	cpu_ca9mp_suspend_size
+-.equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 1 * 4
++.equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 2 * 4
+ #ifdef CONFIG_ARM_CPU_SUSPEND
+ ENTRY(cpu_ca9mp_do_suspend)
+ 	stmfd	sp!, {r4}
+ 	mrc	p15, 0, r4, c15, c0, 1  @ Diagnostic register
+ 	stmia	r0!, {r4}
++	mrc	p15, 0, r4, c15, c0, 0  @ Power register
++	stmia	r0!, {r4}
+ 	ldmfd	sp!, {r4}
+ 	b	cpu_v7_do_suspend
+ ENDPROC(cpu_ca9mp_do_suspend)
+@@ -176,6 +178,8 @@ ENDPROC(cpu_ca9mp_do_suspend)
+ ENTRY(cpu_ca9mp_do_resume)
+ 	ldmia	r0!, {r4}
+ 	mcr	p15, 0, r4, c15, c0, 1  @ Diagnostic register
++	ldmia	r0!, {r4}
++	mcr	p15, 0, r4, c15, c0, 0  @ Power register
+ 	b	cpu_v7_do_resume
+ ENDPROC(cpu_ca9mp_do_resume)
+ #endif
+-- 
+1.7.9.5
