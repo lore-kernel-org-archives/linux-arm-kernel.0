@@ -1,35 +1,42 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 1 Jul 2014 17:22:21 +0100
-Subject: [PATCH v2 4/5] efi: efistub: refactor stub components
-In-Reply-To: <CAKv+Gu8sHpHNEJhDrrJcN12rVrhRgprzmNeJ_BoMCbL+Gh2-NQ@mail.gmail.com>
-References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
- <1403792617-25792-5-git-send-email-ard.biesheuvel@linaro.org>
- <20140701151130.GF7539@console-pimps.org>
- <CAKv+Gu9tY7RqVXdWejwOPnpBTX0S5M9QxBH2te71kpysOV3vWA@mail.gmail.com>
- <CAKv+Gu8sHpHNEJhDrrJcN12rVrhRgprzmNeJ_BoMCbL+Gh2-NQ@mail.gmail.com>
-Message-ID: <20140701162221.GG7539@console-pimps.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 1 Jul 2014 17:26:20 +0100
+Subject: Some Large Address Space Ponders on A9
+In-Reply-To: <CAJgR-BhNHYVYJo+jXAOCy+xzXP-AMjJ7LhuzssrQSEPQN4W=2A@mail.gmail.com>
+References: <CAJgR-BhNHYVYJo+jXAOCy+xzXP-AMjJ7LhuzssrQSEPQN4W=2A@mail.gmail.com>
+Message-ID: <20140701162620.GB18309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 01 Jul, at 05:20:21PM, Ard Biesheuvel wrote:
+On Tue, Jul 01, 2014 at 10:59:45AM -0500, Jon Loeliger wrote:
+> I have a classic Cortex A9 based SoC in which I will need to
+> do some device driver development that will be capable of
+> addressing a physical address space larger than 32-bits.
+> I understand that the A9 doesn't support LPAE and that
+> pretending that it does and config'ing LPAE "on" will just
+> break six-ways-to-hell.
 > 
-> ... but that wasn't your question ....
+> But I need to be able to specify some 64-bit addresses in
+> the Device Tree, and allow my device driver to manipulate
+> 64-bit resource_size_t ranges.
 > 
-> The reason this can't live in "efistub.h" is that it gets included by
-> bits under arch/xxx
-> So perhaps moving the local "efistub.h" to <linux/efistub.h> would be
-> appropriate, yes.
+> Here's the problem.  Over in include/linux/types.h we find:
+> 
+>     #ifdef CONFIG_PHYS_ADDR_T_64BIT
+>     typedef u64 phys_addr_t;
+>     #else
+>     typedef u32 phys_addr_t;
+>     #endif
+> 
+>     typedef phys_addr_t resource_size_t;
 
-I didn't mean that we should add include/linux/efistub.h, rather that we
-should try adding them to efistub.h or asm/efi.h.
+I won't comment on how you define this in DT but for the kernel things
+will likely break when you increase phys_addr_t to 64-bit on non-LPAE
+builds.
 
-But I see that isn't going to work too well and there's no easy fix.
-Let's just leave things as they are for now.
-
-Long term, I've been thinking of splitting up include/linux/efi.h. It's
-currently weighing in at 1208 lines and contains pieces for all sorts of
-different chunks of EFI code, 32-bit and 64-bit versions of data
-structures, etc.
+First (only) question - how do you intend to map such physical address?
+The only way I'm aware of on A9 is using supersections and the ARM Linux
+port provides __arm_ioremap_pfn(). However, the supersections code is
+only enabled if !SMP.
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Catalin
