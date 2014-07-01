@@ -1,88 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Jul 2014 21:36:10 +0200
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <8556461.i7qCGvGY5a@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 1 Jul 2014 14:47:04 -0500
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <20140617131935.GB9070@saruman.home>
+References: <3c3a7a4861df01d0163787a9c18f7b7ac821c5b9.1403000372.git.nsekhar@ti.com>
+ <20140617131935.GB9070@saruman.home>
+Message-ID: <20140701194704.GG13396@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
-> +/*
-> + * Record the PCI IO range (expressed as CPU physical address + size).
-> + * Return a negative value if an error has occured, zero otherwise
-> + */
-> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> +{
-> +#ifdef PCI_IOBASE
-> +       struct io_range *res;
-> +       resource_size_t allocated_size = 0;
-> +
-> +       /* check if the range hasn't been previously recorded */
-> +       list_for_each_entry(res, &io_range_list, list) {
-> +               if (addr >= res->start && addr + size <= res->start + size)
-> +                       return 0;
-> +               allocated_size += res->size;
-> +       }
-> +
-> +       /* range not registed yet, check for available space */
-> +       if (allocated_size + size - 1 > IO_SPACE_LIMIT)
-> +               return -E2BIG;
-> +
-> +       /* add the range to the list */
-> +       res = kzalloc(sizeof(*res), GFP_KERNEL);
-> +       if (!res)
-> +               return -ENOMEM;
-> +
-> +       res->start = addr;
-> +       res->size = size;
-> +
-> +       list_add_tail(&res->list, &io_range_list);
-> +
-> +       return 0;
-> +#else
-> +       return -EINVAL;
-> +#endif
-> +}
-> +
->  unsigned long __weak pci_address_to_pio(phys_addr_t address)
->  {
-> +#ifdef PCI_IOBASE
-> +       struct io_range *res;
-> +       resource_size_t offset = 0;
-> +
-> +       list_for_each_entry(res, &io_range_list, list) {
-> +               if (address >= res->start &&
-> +                       address < res->start + res->size) {
-> +                       return res->start - address + offset;
-> +               }
-> +               offset += res->size;
-> +       }
-> +
-> +       return (unsigned long)-1;
-> +#else
->         if (address > IO_SPACE_LIMIT)
->                 return (unsigned long)-1;
->  
->         return (unsigned long) address;
-> +#endif
->  }
+On Tue, Jun 17, 2014 at 08:19:35AM -0500, Felipe Balbi wrote:
+> On Tue, Jun 17, 2014 at 04:04:51PM +0530, Sekhar Nori wrote:
+> > ROM code on AM437x does not support writing to L2C-310 power control
+> > register. The L2C driver, however, tries writing to this register for
+> > all revisions >= r3p0.
+> > 
+> > This leads to a warning dump on boot which leads most users to believe
+> > that L2 cache is non-functional.
+> > 
+> > Since the problem is understood, and cannot be addressed through software,
+> > replace the warning with a pr_info() while maintaining the WARN_ON() for
+> > other truly unexpected scenarios.
+> > 
+> > Reported-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> 
+> Tested with today's linux-next
+> (5f295cdf5c5dbbb0c40f10f2ddae02ff46bbf773) with am437x-sk, I can see
+> that the WARNING goes away.
+> 
+> Tested-by: Felipe Balbi <balbi@ti.com>
 
-This still conflicts with the other allocator you have in patch 9
-for pci_remap_iospace: nothing guarantees that the mapping is the
-same for both.
+ping here, I can't see this patch onl linus/master or next/master yet.
 
-Also, this is a completely pointless exercise at this moment, because
-nobody cares about the result of pci_address_to_pio on architectures
-that don't already provide this function. If we ever get a proper
-Open Firmware implementation that wants to put hardcoded PCI devices
-into DT, we can add an implementation, but for now this seems overkill.
-
-The allocator in pci_register_io_range seems reasonable, why not merge
-this function with pci_remap_iospace() as I have asked you multiple
-times before? Just make it return the io_offset so the caller can
-put that into the PCI host resources.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/3e652d65/attachment.sig>
