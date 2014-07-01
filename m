@@ -1,48 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Jul 2014 17:50:41 +0100
-Subject: [PATCH 22/24] ARM64:ILP32: Use a seperate syscall table as a few
- syscalls need to be using the compat syscalls.
-In-Reply-To: <4268617.3t49DXZOBa@wuerfel>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <20140701150539.GA18309@arm.com>
- <800835FF-E10A-4C0C-A68F-0ED1434F1CE2@caviumnetworks.com>
- <4268617.3t49DXZOBa@wuerfel>
-Message-ID: <20140701165041.GU18313@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Jul 2014 18:51:24 +0200
+Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
+In-Reply-To: <CAPDyKFqi2NH1r=Q13iOu2ruuvaj1xJeoERiy2WJBVbQ2b1tc_A@mail.gmail.com>
+References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
+ <53A3ED65.80605@redhat.com>
+ <CAPDyKFqi2NH1r=Q13iOu2ruuvaj1xJeoERiy2WJBVbQ2b1tc_A@mail.gmail.com>
+Message-ID: <4396181.E2W0ve8f6g@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 05:38:12PM +0100, Arnd Bergmann wrote:
-> On Tuesday 01 July 2014 15:30:51 Pinski, Andrew wrote:
-> > > On Jul 1, 2014, at 8:07 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
-> > >> On Sat, May 24, 2014 at 12:02:17AM -0700, Andrew Pinski wrote:
-> > >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > >> index 1e1ebfc..8241ffe 100644
-> > >> --- a/arch/arm64/kernel/entry.S
-> > >> +++ b/arch/arm64/kernel/entry.S
-> > >> @@ -620,9 +620,14 @@ ENDPROC(ret_from_fork)
-> > >>  */
-> > >>    .align    6
-> > >> el0_svc:
-> > >> -    adrp    stbl, sys_call_table        // load syscall table pointer
-> > >>    uxtw    scno, w8            // syscall number in w8
-> > >>    mov    sc_nr, #__NR_syscalls
-> > >> +#ifdef CONFIG_ARM64_ILP32
-> > >> +    get_thread_info tsk
-> > >> +    ldr    x16, [tsk, #TI_FLAGS]
-> > >> +    tbnz    x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> > >> +#endif
-> > >> +    adrp    stbl, sys_call_table        // load syscall table pointer
-> > > 
-> > > This adds a slight penalty on the AArch64 SVC entry path. I can't tell
-> > > whether that's visible or not but I think the x86 guys decided to set an
-> > > extra bit to the syscall number to distinguish it from native calls.
+On Tuesday 01 July 2014 18:42:51 Ulf Hansson wrote:
+> On 20 June 2014 10:14, Hans de Goede <hdegoede@redhat.com> wrote:
+> > On 06/20/2014 10:02 AM, Olof Johansson wrote:
+> >> On Fri, Jun 20, 2014 at 12:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> >> I disagree.
+> >>
+> >> The clock is the input to the module, and it is what needs to be
+> >> enabled for the module to work. It's not the input to some
+> >> power-sequence component on the module, or next to the module on the
+> >> bus.
+> >
+> > Right, it is an input to the sdio-module, not to the mmc-host, so its an
+> > input to a different piece of hardware (at different ends of the mmc bus),
+> > but since the mmc-bus normally is fully discoverable we've no node for the
+> > other end of the bus.
+> >
+> > So from the mmc-host pov, which is the one which needs to bind the pwrseq
+> > driver, as that needs to be done before it can probe its bus, this is
+> > a different piece of hardware, hence a subnode to the host makes perfect
+> > sense.  This is in no way part of the host, so certainly it does not belong
+> > inside the hosts subnode.
 > 
-> IIRC the intention on x86 was that you should always be able to call
-> any of the three syscall ABIs (x86-32, x86-64, x32) from any process
-> by passing the right number, for flexibility.
+> I fully agree with you Hans here.
+> 
+> If we were to put this information in the host's DT node, that would
+> be a wrong description of the hardware. Currently, I can't think of
+> anything better than a subnode, but I am open to suggestions.
 
-I don't see how this is useful though. Do you happen to have more
-information?
+The problem that I see with your approach is that you use a subnode
+to describe an abstract concept, which isn't really a better description
+of the hardware than putting the contents in the parent node itself.
 
--- 
-Catalin
+It would be more sensible if the subnode was defined (in this case)
+as describing the attached device (sdio card or similar), and restructure
+the code around that concept.
+
+	Arnd
