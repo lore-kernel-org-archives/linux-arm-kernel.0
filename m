@@ -1,51 +1,63 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  1 Jul 2014 16:11:12 +0100
-Subject: [PATCH 2/8] arm: perf: add macros for empty event mappings
+Date: Tue,  1 Jul 2014 16:11:11 +0100
+Subject: [PATCH 1/8] arm: perf: move event map macros to pmu.h
 In-Reply-To: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
 References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1404227478-9645-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1404227478-9645-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently map from userspace-ABI standard event numbers to
-hardware-specific IDs by use of two arrays, *_perf_map and
-*_perf_cache_map. While we use designated initializers to initialize the
-events we care about, zero is typically a valid hardware event number,
-and thus we have to explicitly initialize unsupported event mappings to a
-nonzero value ({HW,CACHE}_OP_UNSUPPORTED).
+A few PMU-related macros are now looking a little lonely in
+asm/perf_event.h now that all other PMU-specific structs, function
+prototypes and macros live in pmu.h.
 
-In the case of the *_cache_map, this requires initialising almost every
-entry in a 3-dimensional array to CACHE_OP_UNSUPPORTED, requiring over a
-hundred lines to add eleven supported events in the case of Cortex A9.
-
-So as to take up less space and make the tables easier to deal with,
-this patch adds two new macros to initialize every entry in these tables
-to the *_UNSUPPORTED values. Supported events can be overridden
-individually through the use of designated initializers.
+So as to make their placement consistent and to make it easier to build
+atop of the current PMU functionality, let's reunite the entire family in
+pmu.h
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pmu.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/include/asm/perf_event.h | 9 ---------
+ arch/arm/include/asm/pmu.h        | 9 +++++++++
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index 7558775..c3a8369 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -12,15 +12,6 @@
+ #ifndef __ARM_PERF_EVENT_H__
+ #define __ARM_PERF_EVENT_H__
+ 
+-/*
+- * The ARMv7 CPU PMU supports up to 32 event counters.
+- */
+-#define ARMPMU_MAX_HWEVENTS		32
+-
+-#define HW_OP_UNSUPPORTED		0xFFFF
+-#define C(_x)				PERF_COUNT_HW_CACHE_##_x
+-#define CACHE_OP_UNSUPPORTED		0xFFFF
+-
+ #ifdef CONFIG_HW_PERF_EVENTS
+ struct pt_regs;
+ extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
 diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 748d20d..0b648c5 100644
+index ae1919b..748d20d 100644
 --- a/arch/arm/include/asm/pmu.h
 +++ b/arch/arm/include/asm/pmu.h
-@@ -51,6 +51,16 @@ struct arm_pmu_platdata {
- #define C(_x)				PERF_COUNT_HW_CACHE_##_x
- #define CACHE_OP_UNSUPPORTED		0xFFFF
+@@ -42,6 +42,15 @@ struct arm_pmu_platdata {
  
-+#define PERF_MAP_ALL_UNSUPPORTED					\
-+	[0 ... PERF_COUNT_HW_MAX - 1] = HW_OP_UNSUPPORTED
+ #ifdef CONFIG_HW_PERF_EVENTS
+ 
++/*
++ * The ARMv7 CPU PMU supports up to 32 event counters.
++ */
++#define ARMPMU_MAX_HWEVENTS		32
 +
-+#define PERF_CACHE_MAP_ALL_UNSUPPORTED					\
-+[0 ... C(MAX) - 1] = {							\
-+	[0 ... C(OP_MAX) - 1] = {					\
-+		[0 ... C(RESULT_MAX) - 1] = CACHE_OP_UNSUPPORTED,	\
-+	},								\
-+}
++#define HW_OP_UNSUPPORTED		0xFFFF
++#define C(_x)				PERF_COUNT_HW_CACHE_##_x
++#define CACHE_OP_UNSUPPORTED		0xFFFF
 +
  /* The events for a given PMU register set. */
  struct pmu_hw_events {
