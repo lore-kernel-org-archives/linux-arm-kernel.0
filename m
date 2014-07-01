@@ -1,17 +1,126 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  1 Jul 2014 19:44:00 +0100
-Subject: [PATCH] arm64: Add architectural support for PCI
-In-Reply-To: <1404240240-9856-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240240-9856-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1404240240-9856-2-git-send-email-Liviu.Dudau@arm.com>
+Date: Tue,  1 Jul 2014 19:43:59 +0100
+Subject: [PATCH] Add support for PCI in AArch64
+Message-ID: <1404240240-9856-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic host bridge functions to provide support for
-PCI Express on arm64.
+Hi,
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
+This patch adds support for PCI to AArch64. It is based on my v8 patch
+that adds support for creating generic host bridge structure from
+device tree. With that in place, I was able to boot a platform that
+has PCIe host bridge support and use a PCIe network card.
+
+Changes from v7:
+  - Rebased to v3.16-rc3
+  - Removed pci_ioremap_io() function as it is provided by my v8 generic
+    PCI host bridge patches under a different name.
+
+Changes from v6:
+  - Guard the pci_domain_nr() inline implementation with #ifdef CONFIG_PCI as
+    to avoid conflict with default empty version present in include/linux/pci.h.
+    Thanks to Jingoo Han for catching this.
+
+Changes from v5:
+  - Removed pcibios_fixup_bridge_ranges() as the week default version is fine.
+  - Removed the ALIGN() call in pcibios_align_resource()
+  - Stopped exporting pcibios_align_resource()
+
+Changes from v4:
+  - Fixed the pci_domain_nr() implementation for arm64. Now we use
+    find_pci_host_bride() to find the host bridge before we retrieve
+    the domain number.
+
+Changes from v3:
+  - Added Acks accumulated so far ;)
+  - Still carrying Catalin's patch for moving the PCI_IO_BASE until it
+    lands in linux-next or mainline, in order to ease applying the series
+
+Changes from v2:
+  - Implement an arch specific version of pci_register_io_range() and
+    pci_address_to_pio().
+  - Return 1 from pci_proc_domain().
+
+Changes from v1:
+  - Added Catalin's patch for moving the PCI_IO_BASE location and extend
+    its size to 16MB
+  - Integrated Arnd's version of pci_ioremap_io that uses a bitmap for
+    keeping track of assigned IO space and returns an io_offset. At the
+    moment the code is added in arch/arm64 but it can be moved in drivers/pci.
+  - Added a fix for the generic ioport_map() function when !CONFIG_GENERIC_IOMAP
+    as suggested by Arnd.
+
+v7 thread here: https://lkml.org/lkml/2014/3/14/320
+v6 thread here: https://lkml.org/lkml/2014/3/5/41
+v5 thread here: https://lkml.org/lkml/2014/3/4/307
+v4 thread here: https://lkml.org/lkml/2014/3/3/298
+v3 thread here: https://lkml.org/lkml/2014/2/28/211
+v2 thread here: https://lkml.org/lkml/2014/2/27/255
+v1 thread here: https://lkml.org/lkml/2014/2/3/389
+
+The API used is different from the one used by ARM architecture. There is
+no pci_common_init_dev() function and no hw_pci structure, as that is no
+longer needed. Here is an example of what the probe function of a generic
+host bridge could look like:
+
+
+static int myhostbridge_probe(struct platform_device *pdev)
+{
+	int err;
+	struct device_node *dev;
+	struct pci_host_bridge *bridge;
+	struct myhostbridge_port *pp;
+	resource_size_t lastbus;
+
+	dev = pdev->dev.of_node;
+
+	if (!of_device_is_available(dev)) {
+		pr_warn("%s: disabled\n", dev->full_name);
+		return -ENODEV;
+	}
+
+	pp = kzalloc(sizeof(struct myhostbridge_port), GFP_KERNEL);
+	if (!pp)
+		return -ENOMEM;
+
+	bridge = of_create_pci_host_bridge(&pdev->dev, &myhostbridge_ops, pp);
+	if (IS_ERR(bridge)) {
+		err = PTR_ERR(bridge);
+		goto bridge_create_fail;
+	}
+
+	err = myhostbridge_setup(bridge->bus);
+	if (err)
+		goto bridge_setup_fail;
+
+	/* We always enable PCI domains and we keep domain 0 backward
+	 * compatible in /proc for video cards
+	 */
+	pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
+	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
+
+	lastbus = pci_scan_child_bus(bridge->bus);
+	pci_bus_update_busn_res_end(bridge->bus, lastbus);
+
+	pci_assign_unassigned_bus_resources(bridge->bus);
+
+	pci_bus_add_devices(bridge->bus);
+
+	return 0;
+
+bridge_setup_fail:
+	put_device(&bridge->dev);
+	device_unregister(&bridge->dev);
+bridge_create_fail:
+	kfree(pp);
+	return err;
+}
+
+
+Liviu Dudau (1):
+  arm64: Add architectural support for PCI
+
  arch/arm64/Kconfig            | 19 ++++++++++++++++-
  arch/arm64/include/asm/Kbuild |  1 +
  arch/arm64/include/asm/io.h   |  3 ++-
@@ -22,179 +131,5 @@ Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
  create mode 100644 arch/arm64/include/asm/pci.h
  create mode 100644 arch/arm64/kernel/pci.c
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a474de34..48ed631 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -75,7 +75,7 @@ config MMU
- 	def_bool y
- 
- config NO_IOPORT_MAP
--	def_bool y
-+	def_bool y if !PCI
- 
- config STACKTRACE_SUPPORT
- 	def_bool y
-@@ -150,6 +150,23 @@ menu "Bus support"
- config ARM_AMBA
- 	bool
- 
-+config PCI
-+	bool "PCI support"
-+	help
-+	  This feature enables support for PCIe bus system. If you say Y
-+	  here, the kernel will include drivers and infrastructure code
-+	  to support PCIe bus devices.
-+
-+config PCI_DOMAINS
-+	def_bool PCI
-+
-+config PCI_SYSCALL
-+	def_bool PCI
-+
-+source "drivers/pci/Kconfig"
-+source "drivers/pci/pcie/Kconfig"
-+source "drivers/pci/hotplug/Kconfig"
-+
- endmenu
- 
- menu "Kernel Features"
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 0b3fcf8..07cb417 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -29,6 +29,7 @@ generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
- generic-y += pci.h
-+generic-y += pci-bridge.h
- generic-y += poll.h
- generic-y += preempt.h
- generic-y += resource.h
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index e0ecdcf..dc34039 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -121,7 +121,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- /*
-  *  I/O port access primitives.
-  */
--#define IO_SPACE_LIMIT		0xffff
-+#define arch_has_dev_port()	(1)
-+#define IO_SPACE_LIMIT		0x1ffffff
- #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
- static inline u8 inb(unsigned long addr)
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-new file mode 100644
-index 0000000..3f7856e
---- /dev/null
-+++ b/arch/arm64/include/asm/pci.h
-@@ -0,0 +1,49 @@
-+#ifndef __ASM_PCI_H
-+#define __ASM_PCI_H
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <asm/io.h>
-+#include <asm-generic/pci-bridge.h>
-+#include <asm-generic/pci-dma-compat.h>
-+
-+#define PCIBIOS_MIN_IO		0x1000
-+#define PCIBIOS_MIN_MEM		0
-+
-+struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus);
-+
-+/*
-+ * Set to 1 if the kernel should re-assign all PCI bus numbers
-+ */
-+#define pcibios_assign_all_busses() \
-+	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
-+
-+/*
-+ * PCI address space differs from physical memory address space
-+ */
-+#define PCI_DMA_BUS_IS_PHYS	(0)
-+
-+extern int isa_dma_bridge_buggy;
-+
-+#ifdef CONFIG_PCI
-+static inline int pci_domain_nr(struct pci_bus *bus)
-+{
-+	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
-+
-+	if (bridge)
-+		return bridge->domain_nr;
-+
-+	return 0;
-+}
-+
-+static inline int pci_proc_domain(struct pci_bus *bus)
-+{
-+	return 1;
-+}
-+#endif  /* CONFIG_PCI */
-+
-+#endif  /* __KERNEL__ */
-+#endif  /* __ASM_PCI_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index cdaedad..36b117a 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
-+arm64-obj-$(CONFIG_PCI)			+= pci.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-new file mode 100644
-index 0000000..955d6d1
---- /dev/null
-+++ b/arch/arm64/kernel/pci.c
-@@ -0,0 +1,38 @@
-+/*
-+ * Code borrowed from powerpc/kernel/pci-common.c
-+ *
-+ * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
-+ * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+
-+#include <asm/pci-bridge.h>
-+
-+/*
-+ * Called after each bus is probed, but before its children are examined
-+ */
-+void pcibios_fixup_bus(struct pci_bus *bus)
-+{
-+	/* nothing to do, expected to be removed in the future */
-+}
-+
-+/*
-+ * We don't have to worry about legacy ISA devices, so nothing to do here
-+ */
-+resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-+				resource_size_t size, resource_size_t align)
-+{
-+	return res->start;
-+}
 -- 
 2.0.0
