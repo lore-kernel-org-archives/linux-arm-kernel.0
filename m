@@ -1,31 +1,70 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 01 Jul 2014 09:06:31 +0200
-Subject: [linux-sunxi] Re: [PATCH 7/9] ARM: dts: sun7i: Add new ba10-tvbox
- board
-In-Reply-To: <CAGb2v66BO4W5Nrp-9X+20mK+7BObpdmc5x70BC5C7EGEHDcvew@mail.gmail.com>
+Date: Tue, 01 Jul 2014 09:12:32 +0200
+Subject: [PATCH 6/9] ARM: dts: sun7i: Add board support for LinkSprite
+ pcDuino V3
+In-Reply-To: <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
 References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
- <1404165479-23785-8-git-send-email-hdegoede@redhat.com>
- <CAGb2v66BO4W5Nrp-9X+20mK+7BObpdmc5x70BC5C7EGEHDcvew@mail.gmail.com>
-Message-ID: <53B25DF7.8050508@redhat.com>
+ <1404165479-23785-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
+Message-ID: <53B25F60.2050704@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 07/01/2014 04:16 AM, Chen-Yu Tsai wrote:
+On 07/01/2014 04:22 AM, Chen-Yu Tsai wrote:
 > On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> The ba10 tvbox is an A10 based android tvbox, with 512M RAM, 8G nand flash,
->> rtl8188ctv usb wifi 1 USB-A receptacle hooked up to an EHCI/OHCI controller,
->> 1 USB-A receptacle hooked up to the OTG and 100Mbit ethernet using a
->> rtl8201 phy.
+>> From: Zoltan HERPAI <wigyori@uid0.hu>
+>>
+>> The LinkSprite pcDuino V3 is an A20 based development board featuring
+>> arduino compatible io headers, 1G RAM, 4G nand, sata, rtl8188cus usb wifi
+>> and 100 Mbit ethernet using an ip101a phy:
+>>
+>> http://www.pcduino.com/pcduino-v3/
+>>
+>> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
+>> [hdegoede at redhat.com: Various cleanups, correct led pins]
+>> [hdegoede at redhat.com: Add axp209, ir and gpio-keys nodes]
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>
+>> --
+>>
+>> Changes since v2:
+>>  - update MMC entry to comply with upstream
+>>  - unify the 4 patches into one
+>>
+>> Changes since v1:
+>>  - fix cosmetic issues
+>>  - fix i2c entry
+>>  - remove unnecessary input bindings include
+>>  - add MMC support
+>> ---
+>>  arch/arm/boot/dts/Makefile               |   3 +-
+>>  arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 173 +++++++++++++++++++++++++++++++
+>>  2 files changed, 175 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index ed0de8b..fdc590e 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -380,7 +380,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>         sun7i-a20-cubieboard2.dtb \
+>>         sun7i-a20-cubietruck.dtb \
+>>         sun7i-a20-i12-tvbox.dtb \
+>> -       sun7i-a20-olinuxino-micro.dtb
+>> +       sun7i-a20-olinuxino-micro.dtb \
+>> +       sun7i-a20-pcduino3.dtb
 > 
-> Nitpick on the subject, should be sun4i.
+> You may need to rebase onto my sun8i ippo-q8h dts patch.
+> 
+>   https://patchwork.kernel.org/patch/4389951/
+> 
+> There's a likely conflict in the Makefile here.
 
-Right, I actually noticed that myself too, but I forgot to fix this up before
-sending :|
-
-Maxime, can you fix this up, or do you want a resend (and if resend, just this
-patch or the entire set?).
+Has that one already been accepted by Maxime ? I'm fine rebasing patches
+on top of accepted stuff, but rebasing on pending stuff is not really
+useful IMHO.
 
 Regards,
 
