@@ -1,77 +1,119 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:48 +0900
-Subject: [PATCH 8/8] ARM: shmobile: Allow r8a7791 to build non-SMP APMU code
+Date: Tue,  1 Jul 2014 09:28:47 +0900
+Subject: [PATCH 7/8] ARM: shmobile: Move r8a7791 reset code to pm-r8a7791.c
 In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
 References: <cover.1404174157.git.horms+renesas@verge.net.au>
-Message-ID: <bfe4cfa8ae21628267f2b879b4396ee17ea4fd3a.1404174157.git.horms+renesas@verge.net.au>
+Message-ID: <8e26118d44c4877fa52dc8117692f3cc9af3c769.1404174157.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Build the APMU for r8a7791 even though SMP is
-disabled in the kernel config. Also initialize
-Suspend-to-RAM from pm-r8a7791.c to in the future
-cover both UP and SMP use cases of the APMU.
+Move r8a7791 specific reset vector setup code from the
+SMP glue code to PM code. This makes the code one step
+closer to allow PM operations such as Suspend-to-RAM
+in the case when SMP is disabled in the kernel config.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+[horms+renesas at verge.net.au: updated for recent header file changes]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile      | 5 +++--
- arch/arm/mach-shmobile/pm-r8a7791.c  | 1 +
- arch/arm/mach-shmobile/smp-r8a7791.c | 1 -
- 3 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/pm-r8a7791.c  | 27 +++++++++++++++++++++++++--
+ arch/arm/mach-shmobile/smp-r8a7791.c | 24 ------------------------
+ 2 files changed, 25 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 08f5952..cc0224e 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -37,13 +37,14 @@ endif
- # CPU reset vector handling objects
- cpu-y				:= platsmp.o headsmp.o
- cpu-$(CONFIG_ARCH_R8A7790)	+= platsmp-apmu.o
-+cpu-$(CONFIG_ARCH_R8A7791)	+= platsmp-apmu.o
- 
- # SMP objects
- smp-y				:= $(cpu-y)
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
--smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o platsmp-apmu.o
-+smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
- 
- # PM objects
-@@ -54,7 +55,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o pm-rcar.o
- obj-$(CONFIG_ARCH_R8A7790)	+= pm-r8a7790.o pm-rcar.o $(cpu-y)
--obj-$(CONFIG_ARCH_R8A7791)	+= pm-r8a7791.o pm-rcar.o
-+obj-$(CONFIG_ARCH_R8A7791)	+= pm-r8a7791.o pm-rcar.o $(cpu-y)
- 
- # IRQ objects
- obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
 diff --git a/arch/arm/mach-shmobile/pm-r8a7791.c b/arch/arm/mach-shmobile/pm-r8a7791.c
-index c44304c..25f107b 100644
+index b7e6513..c44304c 100644
 --- a/arch/arm/mach-shmobile/pm-r8a7791.c
 +++ b/arch/arm/mach-shmobile/pm-r8a7791.c
-@@ -69,4 +69,5 @@ void __init r8a7791_pm_init(void)
- 	iounmap(p);
+@@ -11,12 +11,17 @@
+  */
  
+ #include <linux/kernel.h>
+-
++#include <linux/smp.h>
+ #include <asm/io.h>
+-
++#include "common.h"
+ #include "pm-rcar.h"
+ #include "r8a7791.h"
+ 
++#define RST		0xe6160000
++#define CA15BAR		0x0020
++#define CA15RESCNT	0x0040
++#define RAM		0xe6300000
++
+ /* SYSC */
+ #define SYSCIER 0x0c
+ #define SYSCIMR 0x10
+@@ -40,10 +45,28 @@ static inline void r8a7791_sysc_init(void) {}
+ 
+ void __init r8a7791_pm_init(void)
+ {
++	void __iomem *p;
++	u32 bar;
+ 	static int once;
+ 
+ 	if (once++)
+ 		return;
+ 
++	/* RAM for jump stub, because BAR requires 256KB aligned address */
++	p = ioremap_nocache(RAM, shmobile_boot_size);
++	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
++	iounmap(p);
++
++	/* setup reset vectors */
++	p = ioremap_nocache(RST, 0x63);
++	bar = (RAM >> 8) & 0xfffffc00;
++	writel_relaxed(bar, p + CA15BAR);
++	writel_relaxed(bar | 0x10, p + CA15BAR);
++
++	/* enable clocks to all CPUs */
++	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
++		       p + CA15RESCNT);
++	iounmap(p);
++
  	r8a7791_sysc_init();
-+	shmobile_smp_apmu_suspend_init();
  }
 diff --git a/arch/arm/mach-shmobile/smp-r8a7791.c b/arch/arm/mach-shmobile/smp-r8a7791.c
-index df086aa..f743386 100644
+index 2482555..df086aa 100644
 --- a/arch/arm/mach-shmobile/smp-r8a7791.c
 +++ b/arch/arm/mach-shmobile/smp-r8a7791.c
-@@ -30,7 +30,6 @@ static void __init r8a7791_smp_prepare_cpus(unsigned int max_cpus)
+@@ -24,35 +24,11 @@
+ #include "r8a7791.h"
+ #include "rcar-gen2.h"
+ 
+-#define RST		0xe6160000
+-#define CA15BAR		0x0020
+-#define CA15RESCNT	0x0040
+-#define RAM		0xe6300000
+-
+ static void __init r8a7791_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	void __iomem *p;
+-	u32 bar;
+-
+ 	/* let APMU code install data related to shmobile_boot_vector */
  	shmobile_smp_apmu_prepare_cpus(max_cpus);
  
+-	/* RAM for jump stub, because BAR requires 256KB aligned address */
+-	p = ioremap_nocache(RAM, shmobile_boot_size);
+-	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
+-	iounmap(p);
+-
+-	/* setup reset vectors */
+-	p = ioremap_nocache(RST, 0x63);
+-	bar = (RAM >> 8) & 0xfffffc00;
+-	writel_relaxed(bar, p + CA15BAR);
+-	writel_relaxed(bar | 0x10, p + CA15BAR);
+-
+-	/* enable clocks to all CPUs */
+-	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
+-		       p + CA15RESCNT);
+-	iounmap(p);
+-
  	r8a7791_pm_init();
--	shmobile_smp_apmu_suspend_init();
+ 	shmobile_smp_apmu_suspend_init();
  }
- 
- static int r8a7791_smp_boot_secondary(unsigned int cpu,
 -- 
 2.0.0.rc2
