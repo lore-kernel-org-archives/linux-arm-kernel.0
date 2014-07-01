@@ -1,62 +1,106 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 01 Jul 2014 11:08:35 +0900
-Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
-In-Reply-To: <4717633.z8gH3C8KXB@wuerfel>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
- <6153646.CZ57BgYKf3@wuerfel> <20140630142224.GA30417@ulmo>
- <4717633.z8gH3C8KXB@wuerfel>
-Message-ID: <02c101cf94d1$5d783b30$1868b190$@samsung.com>
+Date: Tue, 01 Jul 2014 11:13:02 +0900
+Subject: [GIT PULL] the great <mach/gpio.h> purge
+In-Reply-To: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
+References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
+Message-ID: <02c501cf94d1$fca59720$f5f0c560$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+Linus Walleij wrote:
 > 
-> On Monday 30 June 2014 16:22:25 Thierry Reding wrote:
-> > On Mon, Jun 30, 2014 at 03:34:27PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 01 July 2014 06:32:10 Kukjin Kim wrote:
-> > > > This series removes S5P64X0 and S5PC100 related codes in mainline,
-> > > > because no more user now. And if its supporting is required later,
-> > > > it will be done with using device tree.
-> > > >
-> > >
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> > It seems like I'm not completely up-to-date. What happened to our prime
-> > directive never to remove support for boards? Why is this special? What
-> > about people that still use this hardware? The commit message says that
-> > there are no longer any users. How was this determined?
+> Hi ARM SoC guys,
 > 
-I asked whether we may remove its supporting in mainline before not just one
-time and then no objection at that time...
+Hi Linus,
 
-> From what I can tell, the supported machines on these two platforms are
-> all the official development prototypes, not production boards, and they
-> came out in rather small quantities, probably Samsung-internal for the
-> most part. The maintainers have previously assured me they are not aware
-> of anybody using it, and I trust their judgment.
+> please pull in this patch set removing <mach/gpio.h> for good.
+> I guess it could collide with some S5P deletion.
+
+Yeah...
+
+> If you decide to pull the S5P purge first, tell me so I can rebase.
 > 
-Yeah, I think so ;-)
-
-> I'm totally fine with removing support for these machines, and we have
-> removed a number of similar platforms in the past. The rule is not that
-
-S5P6442. I did commit a73ddc61 'ARM: S5P6442: Removing ARCH_S5P6442' in 2011
-because that could not be mass-produced.
-
-> we never remove stuff, the rule is that we never break things for
-> active users.
-> 
-YES.
-
-> As always, if it turns out that we missed some active users, we will
-> revert these patches, or bring support back another way.
-> 
-Sure, so please let us know if you have any objection on this removing.
-
-> This should probably all be spelled out explicitly in the changelog
-> for patch 1, which I admit I have not seen.
-> 
-It's my fault, sorry I forgot it and I'm resending 1/17 and 8/17 with -D.
+So, I think, would be better if we could remove S5P64X0 and S5PC100 then
+<mach/gpio.h> in samsung stuff. But it's up to arm-soc maintainer? ;-)
 
 Thanks,
 Kukjin
+
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+> 
+>   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
+> tags/gpio-h-purge
+> 
+> for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
+> 
+>   ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
+> 
+> ----------------------------------------------------------------
+> This is a purge of all things <mach/gpio.h>, now I never
+> want to see it again.
+> 
+> - Remove the need for <mach/gpio.h> from S5P
+> - Kill CONFIG_NEED_MACH_GPIO_H
+> - Kill remnants of ARM_GPIOLIB_COMPLEX
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (4):
+>       ARM: s5p: cut the custom ARCH_NR_GPIOS definition
+>       ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+>       ARM: kill CONFIG_NEED_MACH_GPIO_H
+>       ARM: delete old reference to ARM_GPIOLIB_COMPLEX
+> 
+>  arch/arm/Kconfig                                         | 10 ----------
+>  arch/arm/include/asm/gpio.h                              |  7 -------
+>  arch/arm/mach-s5p64x0/common.c                           |  2 +-
+>  arch/arm/mach-s5p64x0/dev-audio.c                        |  3 ++-
+>  .../mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c                    |  1 +
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c                    |  1 +
+>  arch/arm/mach-s5p64x0/setup-fb-24bpp.c                   |  2 +-
+>  arch/arm/mach-s5p64x0/setup-i2c0.c                       |  2 +-
+>  arch/arm/mach-s5p64x0/setup-i2c1.c                       |  2 +-
+>  arch/arm/mach-s5p64x0/setup-sdhci-gpio.c                 |  2 +-
+>  arch/arm/mach-s5p64x0/setup-spi.c                        |  2 +-
+>  arch/arm/mach-s5pc100/dev-audio.c                        |  2 +-
+>  .../mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} |  6 +-----
+>  arch/arm/mach-s5pc100/mach-smdkc100.c                    |  1 +
+>  arch/arm/mach-s5pc100/setup-fb-24bpp.c                   |  2 +-
+>  arch/arm/mach-s5pc100/setup-i2c0.c                       |  2 +-
+>  arch/arm/mach-s5pc100/setup-i2c1.c                       |  2 +-
+>  arch/arm/mach-s5pc100/setup-ide.c                        |  2 +-
+>  arch/arm/mach-s5pc100/setup-keypad.c                     |  2 +-
+>  arch/arm/mach-s5pc100/setup-sdhci-gpio.c                 |  2 +-
+>  arch/arm/mach-s5pc100/setup-spi.c                        |  2 +-
+>  arch/arm/mach-s5pv210/dev-audio.c                        |  2 +-
+>  .../mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
+>  arch/arm/mach-s5pv210/mach-aquila.c                      |  1 +
+>  arch/arm/mach-s5pv210/mach-goni.c                        |  1 +
+>  arch/arm/mach-s5pv210/mach-smdkv210.c                    |  1 +
+>  arch/arm/mach-s5pv210/setup-fb-24bpp.c                   |  2 +-
+>  arch/arm/mach-s5pv210/setup-fimc.c                       |  3 ++-
+>  arch/arm/mach-s5pv210/setup-i2c0.c                       |  2 +-
+>  arch/arm/mach-s5pv210/setup-i2c1.c                       |  2 +-
+>  arch/arm/mach-s5pv210/setup-i2c2.c                       |  2 +-
+>  arch/arm/mach-s5pv210/setup-ide.c                        |  2 +-
+>  arch/arm/mach-s5pv210/setup-keypad.c                     |  2 +-
+>  arch/arm/mach-s5pv210/setup-sdhci-gpio.c                 |  2 +-
+>  arch/arm/mach-s5pv210/setup-spi.c                        |  2 +-
+>  arch/arm/plat-samsung/Kconfig                            | 16 ----------------
+>  arch/arm/plat-samsung/include/plat/gpio-core.h           |  3 +++
+>  arch/arm/plat-samsung/pm-gpio.c                          |  2 --
+>  arch/arm/plat-samsung/s5p-irq-eint.c                     |  2 +-
+>  drivers/gpio/gpio-samsung.c                              |  3 ---
+>  sound/soc/samsung/goni_wm8994.c                          |  2 +-
+>  42 files changed, 41 insertions(+), 82 deletions(-)
+>  rename arch/arm/mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} (95%)
+>  rename arch/arm/mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} (97%)
+>  rename arch/arm/mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} (96%)
