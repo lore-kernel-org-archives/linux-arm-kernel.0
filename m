@@ -1,78 +1,33 @@
-From: Wei.Yang@windriver.com (Wei.Yang at windriver.com)
-Date: Tue, 1 Jul 2014 15:41:28 +0800
-Subject: [PATCH v1] ARM:sa1100: Remove a redundant spin lock
-Message-ID: <1404200488-7809-1-git-send-email-Wei.Yang@windriver.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 1 Jul 2014 15:42:56 +0800
+Subject: [PATCH 0/5] ARM: Centralize the access to the SCU register
+In-Reply-To: <53ACA62F.1090802@free-electrons.com>
+References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+ <CAL_JsqL9w0oxxM0zTAVioh0Uf3PNO3TfhxzOLV6KhBOoS4Fdiw@mail.gmail.com>
+ <53ACA62F.1090802@free-electrons.com>
+Message-ID: <20140701074255.GF14471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yang Wei <Wei.Yang@windriver.com>
+On Fri, Jun 27, 2014 at 01:01:03AM +0200, Gregory CLEMENT wrote:
+> >> The last patch removed a direct access to the SCU register by an
+> >> access through the new scu_standby_enable() function. For this one I
+> >> have just checked that the kernel can be built using the
+> >> imx_v6_v7_defconfig config, but I didn't test it on an imx6 hardware.
+> > 
+> > Why would we not just turn on these 2 features unconditionally? If we
+> 
+> You mean in scu_enbale() ?
+> 
+> > don't know of any platform where they are broken, then we should just
+> 
+> At least on some imx6 SCU standby is broken according to the code and
+> the comments.
 
-The pair read/write of accessing pci confiuration space function
-has already protected by pci_lock. so remove nano_lock.
+Hi Gregory,
 
-Signed-off-by: Yang Wei <Wei.Yang@windriver.com>
----
- arch/arm/mach-sa1100/pci-nanoengine.c |    9 ---------
- 1 file changed, 9 deletions(-)
+What's broken on particular revisions of some i.MX6 SoC is WAIT mode
+support, not SCU standby.  I think the SCU standby can just be
+unconditionally enabled in scu_enbale().
 
-diff --git a/arch/arm/mach-sa1100/pci-nanoengine.c b/arch/arm/mach-sa1100/pci-nanoengine.c
-index ff02e2d..b944c99 100644
---- a/arch/arm/mach-sa1100/pci-nanoengine.c
-+++ b/arch/arm/mach-sa1100/pci-nanoengine.c
-@@ -30,7 +30,6 @@
- #include <mach/nanoengine.h>
- #include <mach/hardware.h>
- 
--static DEFINE_SPINLOCK(nano_lock);
- 
- static int nanoengine_get_pci_address(struct pci_bus *bus,
- 	unsigned int devfn, int where, unsigned long *address)
-@@ -52,7 +51,6 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
- {
- 	int ret;
- 	unsigned long address;
--	unsigned long flags;
- 	u32 v;
- 
- 	/* nanoEngine PCI bridge does not return -1 for a non-existing
-@@ -64,15 +62,12 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
- 		goto exit_function;
- 	}
- 
--	spin_lock_irqsave(&nano_lock, flags);
- 
- 	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
- 	if (ret != PCIBIOS_SUCCESSFUL)
- 		return ret;
- 	v = __raw_readl(address);
- 
--	spin_unlock_irqrestore(&nano_lock, flags);
--
- 	v >>= ((where & 3) * 8);
- 	v &= (unsigned long)(-1) >> ((4 - size) * 8);
- 
-@@ -86,13 +81,11 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
- {
- 	int ret;
- 	unsigned long address;
--	unsigned long flags;
- 	unsigned shift;
- 	u32 v;
- 
- 	shift = (where & 3) * 8;
- 
--	spin_lock_irqsave(&nano_lock, flags);
- 
- 	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
- 	if (ret != PCIBIOS_SUCCESSFUL)
-@@ -113,8 +106,6 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
- 	}
- 	__raw_writel(v, address);
- 
--	spin_unlock_irqrestore(&nano_lock, flags);
--
- 	return PCIBIOS_SUCCESSFUL;
- }
- 
--- 
-1.7.9.5
+Shawn
