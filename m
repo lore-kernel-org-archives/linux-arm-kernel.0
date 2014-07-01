@@ -1,124 +1,107 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 01 Jul 2014 15:46:54 +0100
-Subject: [PATCH v3 5/8] imx-drm: update to use component match support
+Date: Tue, 01 Jul 2014 15:46:59 +0100
+Subject: [PATCH v3 6/8] component: remove old add_components method
 In-Reply-To: <20140701144011.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X1zKg-0000cY-DS@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X1zKl-0000cd-Gi@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the imx-drm driver to use the component match support rather than
-add_components.
+Now that drivers create an array of component matches at probe time, we
+can retire the old methods.  This involves removing the add_components
+master method, and removing component_master_add_child() from public
+view.  We also remove component_add_master() as that interface is no
+longer useful.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-This patch is destined for Greg's driver and staging trees.
+This patch should not be applied until all users are updated.
 
- drivers/staging/imx-drm/imx-drm-core.c | 57 +++-------------------------------
- 1 file changed, 4 insertions(+), 53 deletions(-)
+ drivers/base/component.c  | 21 +--------------------
+ include/linux/component.h |  5 -----
+ 2 files changed, 1 insertion(+), 25 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index def8280d7ee6..47ee6c79857a 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -570,22 +570,6 @@ static int compare_of(struct device *dev, void *data)
- 	return dev->of_node == np;
- }
- 
--static LIST_HEAD(imx_drm_components);
--
--static int imx_drm_add_components(struct device *master, struct master *m)
--{
--	struct imx_drm_component *component;
--	int ret;
--
--	list_for_each_entry(component, &imx_drm_components, list) {
--		ret = component_master_add_child(m, compare_of,
--						 component->of_node);
--		if (ret)
--			return ret;
--	}
--	return 0;
--}
--
- static int imx_drm_bind(struct device *dev)
+diff --git a/drivers/base/component.c b/drivers/base/component.c
+index b4236daed4fa..2ca22738ae92 100644
+--- a/drivers/base/component.c
++++ b/drivers/base/component.c
+@@ -84,7 +84,7 @@ static void component_detach_master(struct master *master, struct component *c)
+  * function and compare data.  This is safe to call for duplicate matches
+  * and will not result in the same component being added multiple times.
+  */
+-int component_master_add_child(struct master *master,
++static int component_master_add_child(struct master *master,
+ 	int (*compare)(struct device *, void *), void *compare_data)
  {
- 	return drm_platform_init(&imx_drm_driver, to_platform_device(dev));
-@@ -597,43 +581,14 @@ static void imx_drm_unbind(struct device *dev)
- }
+ 	struct component *c;
+@@ -104,7 +104,6 @@ int component_master_add_child(struct master *master,
  
- static const struct component_master_ops imx_drm_ops = {
--	.add_components = imx_drm_add_components,
- 	.bind = imx_drm_bind,
- 	.unbind = imx_drm_unbind,
+ 	return ret;
+ }
+-EXPORT_SYMBOL_GPL(component_master_add_child);
+ 
+ static int find_components(struct master *master)
+ {
+@@ -112,14 +111,6 @@ static int find_components(struct master *master)
+ 	size_t i;
+ 	int ret = 0;
+ 
+-	if (!match) {
+-		/*
+-		 * Search the list of components, looking for components that
+-		 * belong to this master, and attach them to the master.
+-		 */
+-		return master->ops->add_components(master->dev, master);
+-	}
+-
+ 	/*
+ 	 * Scan the array of match functions and attach
+ 	 * any components which are found to this master.
+@@ -290,9 +281,6 @@ int component_master_add_with_match(struct device *dev,
+ 	struct master *master;
+ 	int ret;
+ 
+-	if (ops->add_components && match)
+-		return -EINVAL;
+-
+ 	/* Reallocate the match array for its true size */
+ 	match = component_match_realloc(dev, match, match->num);
+ 	if (IS_ERR(match))
+@@ -324,13 +312,6 @@ int component_master_add_with_match(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(component_master_add_with_match);
+ 
+-int component_master_add(struct device *dev,
+-	const struct component_master_ops *ops)
+-{
+-	return component_master_add_with_match(dev, ops, NULL);
+-}
+-EXPORT_SYMBOL_GPL(component_master_add);
+-
+ void component_master_del(struct device *dev,
+ 	const struct component_master_ops *ops)
+ {
+diff --git a/include/linux/component.h b/include/linux/component.h
+index c00dcc302611..71c434a6a5ee 100644
+--- a/include/linux/component.h
++++ b/include/linux/component.h
+@@ -17,18 +17,13 @@ void component_unbind_all(struct device *, void *);
+ struct master;
+ 
+ struct component_master_ops {
+-	int (*add_components)(struct device *, struct master *);
+ 	int (*bind)(struct device *);
+ 	void (*unbind)(struct device *);
  };
  
--static struct imx_drm_component *imx_drm_find_component(struct device *dev,
--		struct device_node *node)
--{
--	struct imx_drm_component *component;
--
--	list_for_each_entry(component, &imx_drm_components, list)
--		if (component->of_node == node)
--			return component;
--
--	return NULL;
--}
--
--static int imx_drm_add_component(struct device *dev, struct device_node *node)
--{
--	struct imx_drm_component *component;
--
--	if (imx_drm_find_component(dev, node))
--		return 0;
--
--	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
--	if (!component)
--		return -ENOMEM;
--
--	component->of_node = node;
--	list_add_tail(&component->list, &imx_drm_components);
--
--	return 0;
--}
--
- static int imx_drm_platform_probe(struct platform_device *pdev)
- {
- 	struct device_node *ep, *port, *remote;
-+	struct component_match *match = NULL;
- 	int ret;
- 	int i;
+-int component_master_add(struct device *, const struct component_master_ops *);
+ void component_master_del(struct device *,
+ 	const struct component_master_ops *);
  
-@@ -647,9 +602,7 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
- 		if (!port)
- 			break;
+-int component_master_add_child(struct master *master,
+-	int (*compare)(struct device *, void *), void *compare_data);
+-
+ struct component_match;
  
--		ret = imx_drm_add_component(&pdev->dev, port);
--		if (ret < 0)
--			return ret;
-+		component_match_add(&pdev->dev, &match, compare_of, port);
- 	}
- 
- 	if (i == 0) {
-@@ -675,10 +628,8 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
- 				continue;
- 			}
- 
--			ret = imx_drm_add_component(&pdev->dev, remote);
-+			component_match_add(&pdev->dev, &match, compare_of, remote);
- 			of_node_put(remote);
--			if (ret < 0)
--				return ret;
- 		}
- 		of_node_put(port);
- 	}
-@@ -687,7 +638,7 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	return component_master_add(&pdev->dev, &imx_drm_ops);
-+	return component_master_add_with_match(&pdev->dev, &imx_drm_ops, match);
- }
- 
- static int imx_drm_platform_remove(struct platform_device *pdev)
+ int component_master_add_with_match(struct device *,
 -- 
 1.8.3.1
