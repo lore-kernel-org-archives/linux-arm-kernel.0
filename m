@@ -1,56 +1,109 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Tue, 1 Jul 2014 14:23:57 +0800
-Subject: [PATCH 3/5] ARM: imx: clk-imx6sx: Remove SSI IPG clocks
-In-Reply-To: <1404194129-25543-3-git-send-email-festevam@gmail.com>
-References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
- <1404194129-25543-3-git-send-email-festevam@gmail.com>
-Message-ID: <20140701062355.GA10926@MrMyself>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 1 Jul 2014 08:30:45 +0200
+Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
+In-Reply-To: <20140701052433.GA14471@dragon>
+References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
+ <20140630041226.GB3329@shlinux2>
+ <20140630070421.GI8053@pengutronix.de>
+ <20140701052433.GA14471@dragon>
+Message-ID: <20140701063045.GK8053@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-   
-On Tue, Jul 01, 2014 at 02:55:27AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Looking at the CCGR5 register we see that that each SSI has its corresponding
-> clock gate field.
-> 
-> There are no SSI IPG clock gate field, so remove these SSI IPG variants as
-> they point to the same SSI clock fields and have no use in the kernel.
+Hi!
 
-I was just abort to say that actually each SSI has an IPG clock as CCM shows:
-
-SSIn      ssi_clk      ssin_clk_root      CCGR5[CG11:CG9] (ssi[3:1]_clk_enable)
-          ipg_clk      ipg_clk_root       CCGR5[CG11:CG9] (ssi[3:1]_clk_enable)
-          ipg_clk_s    ipg_clk_root       CCGR5[CG11:CG9] (ssi[3:1]_clk_enable)
-
-So we don't have to remove the IPG one. Instead we shall protect IPG and baud
-clocks with imx_clk_gate2_shared().
-
-Thank you,
-Nicolin
-
+On Tue, Jul 01, 2014 at 01:24:39PM +0800, Shawn Guo wrote:
+> On Mon, Jun 30, 2014 at 09:04:21AM +0200, Steffen Trumtrar wrote:
+> > Hi!
+> > 
+> > On Mon, Jun 30, 2014 at 12:12:27PM +0800, Shawn Guo wrote:
+> > > On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
+> > > > Most peripherals on the i.MX53 have an
+> > > > 	Off-Platform Peripheral Access Control Register (OPACR)
+> > > > in which the access rights (together with the MPROT registers) can be declared.
+> > > > However, this does not seem to work for example for SSI1+SDMA, because the
+> > > > supervisor bit is not set for the SDMA unit.
+> > > > It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
+> > > > works because it does NOT have an OPACR.
+> > > > 
+> > > > The right solution would be to fix the access rights for the SDMA, but the unit
+> > > > responsible for this is the Central Security Unit (CSU), which of course is NOT
+> > > > documented. So, until documentation for this is openly available, turn off the
+> > > > supervisor protection because it cripples the hardware.
+> > > > 
+> > > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > > > ---
+> > > >  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
+> > > >  1 file changed, 14 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> > > > index 2bad387..380c7ee 100644
+> > > > --- a/arch/arm/mach-imx/mach-imx53.c
+> > > > +++ b/arch/arm/mach-imx/mach-imx53.c
+> > > > @@ -15,6 +15,7 @@
+> > > >  #include <linux/err.h>
+> > > >  #include <linux/io.h>
+> > > >  #include <linux/irq.h>
+> > > > +#include <linux/of_address.h>
+> > > >  #include <linux/of_irq.h>
+> > > >  #include <linux/of_platform.h>
+> > > >  #include <asm/mach/arch.h>
+> > > > @@ -24,11 +25,24 @@
+> > > >  #include "hardware.h"
+> > > >  #include "mx53.h"
+> > > >  
+> > > > +static const struct of_device_id aips_of_matches[] __initconst = {
+> > > > +	{ .compatible = "fsl,imx53-aipstz" },
+> > > > +	{ /*sentinel*/ }
+> > > > +};
+> > > > +
+> > > >  static void __init imx53_dt_init(void)
+> > > >  {
+> > > > +	void __iomem *aips_base_addr;
+> > > > +	struct device_node *np;
+> > > > +
+> > > >  	mxc_arch_reset_init_dt();
+> > > >  
+> > > >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > > > +
+> > > > +	for_each_matching_node(np, aips_of_matches) {
+> > > > +		aips_base_addr = of_iomap(np, 0);
+> > > > +		imx_set_aips(aips_base_addr);
+> > > > +	}
+> > > 
+> > > The same code pattern might be needed for i.MX31 and i.MX35 device tree
+> > > support later.  Can we have a helper for it, so that i.MX3 DT conversion
+> > > can benefit from it?
+> > > 
+> > 
+> > What would be the best place to put this? common.h?
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6sx.c | 3 ---
->  1 file changed, 3 deletions(-)
+> How about the same place as imx_set_aips()?
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
-> index 2e96103..1b198ea 100644
-> --- a/arch/arm/mach-imx/clk-imx6sx.c
-> +++ b/arch/arm/mach-imx/clk-imx6sx.c
-> @@ -409,9 +409,6 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
->  	clks[IMX6SX_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
->  	clks[IMX6SX_CLK_AUDIO]        = imx_clk_gate2_shared("audio",  "audio_podf",        base + 0x7c, 14, &share_count_audio);
->  	clks[IMX6SX_CLK_SPDIF]        = imx_clk_gate2_shared("spdif",  "spdif_podf",        base + 0x7c, 14, &share_count_audio);
-> -	clks[IMX6SX_CLK_SSI1_IPG]     = imx_clk_gate2("ssi1_ipg",      "ipg",               base + 0x7c, 18);
-> -	clks[IMX6SX_CLK_SSI2_IPG]     = imx_clk_gate2("ssi2_ipg",      "ipg",               base + 0x7c, 20);
-> -	clks[IMX6SX_CLK_SSI3_IPG]     = imx_clk_gate2("ssi3_ipg",      "ipg",               base + 0x7c, 22);
->  	clks[IMX6SX_CLK_SSI1]         = imx_clk_gate2("ssi1",          "ssi1_podf",         base + 0x7c, 18);
->  	clks[IMX6SX_CLK_SSI2]         = imx_clk_gate2("ssi2",          "ssi2_podf",         base + 0x7c, 20);
->  	clks[IMX6SX_CLK_SSI3]         = imx_clk_gate2("ssi3",          "ssi3_podf",         base + 0x7c, 22);
-> -- 
-> 1.8.3.2
+
+Oh, yeah. Okay.
+
+> > Maybe we should then also rename the imx_set_aips to imx_disable_supervisor,
+> > because that is basically what the function does.
 > 
+> I'm fine with either way.
+> 
+> > If I understood our graphics department correctly, the i.MX6 needs this, too,
+> > for the VPU (?).
+> 
+> Hmm, I do not see this setup for i.MX6 in FSL kernel tree.  Is it being
+> done at somewhere else?
+> 
+
+barebox does it for i.MX6. But it would be better to have it in the kernel,
+so everything works no matter which bootloader is used. AFAIK it is not needed
+for anything the bootloader does.
+
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
