@@ -1,35 +1,33 @@
-From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
-Date: Tue, 1 Jul 2014 17:50:08 +0530
-Subject: mwifiex card reset
-In-Reply-To: <20140701065721.GM24891@us.netrek.org>
-References: <CALtMJEBWPM+75wxM2Mp5EX_o6NWtZUJdYRCv6psbvdUn4k295w@mail.gmail.com>
- <20140628052220.GG10407@us.netrek.org>
- <20140628072322.GC7410@atomide.com>
- <CALtMJED5vfgkAhMBXKaDP6u9U9n41c-wziyTxt6e_7XTSxG3oQ@mail.gmail.com>
- <20140630061912.GA2461@atomide.com> <53B1BAC1.3090902@zonque.org>
- <477F20668A386D41ADCC57781B1F70430FE5F37540@SC-VEXCH1.marvell.com>
- <20140701065721.GM24891@us.netrek.org>
-Message-ID: <CA+NduCAuRFTQneJUBiKP2Aeq2HCxe71yxg_iDDStkNvhzRg-Rg@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 01 Jul 2014 07:21:40 -0500
+Subject: [PATCH] mach-bcm SMC: address clang inline asm incompatibility
+In-Reply-To: <20140701121544.GK32514@n2100.arm.linux.org.uk>
+References: <1404216339-6480-1-git-send-email-elder@linaro.org>
+ <20140701121544.GK32514@n2100.arm.linux.org.uk>
+Message-ID: <53B2A7D4.4020007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 1, 2014 at 12:27 PM, James Cameron <quozl@laptop.org> wrote:
-> On Mon, Jun 30, 2014 at 11:44:29PM -0700, Bing Zhao wrote:
->> I may have missed something, but doesn't the MMC_POWER_OFF and
->> MMC_POWER_ON|UP handling in controller driver help?
->> Anyway the clocks/GPIOs/regulators are sort of platform
->> dependent. Would it be better putting it in /arch/arm/mach-xxxxx/?
->
-> Wouldn't device tree for mmc be better?
-I have come across same problem.Below is the thread in which more
-discussions happened on this.
- http://patchwork.ozlabs.org/patch/312444/
-I am adding few more those who are interested in this solution.
->
-> --
-> James Cameron
-> http://quozl.linux.org.au/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On 07/01/2014 07:15 AM, Russell King - ARM Linux wrote:
+> On Tue, Jul 01, 2014 at 07:05:39AM -0500, Alex Elder wrote:
+>> My GCC-based build environment likes to call register r12 by the
+>> name "ip" in inline asm.  Behan Webster informed me that his Clang-
+>> based build environment likes "r12" instead.
+> 
+> Two objections, one of which is an acceptable outcome:
+> 1. Why can't clang just learn these alternative names?
+
+I suggested that.  I don't know where to send that suggestion
+though.
+
+> 2. Why can't we just use "r12" here?
+
+I don't recall the details, but when I wrote the code originally
+that way it gave me errors.  It's why I had the "Also called r12"
+comment next to the symbol declaration.
+
+I agree, I'd rather have either one of those than this #ifdef
+workaround.  I was supplying this as a potentially quicker fix
+for the problem Behan was hitting.
+
+					-Alex
