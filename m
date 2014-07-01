@@ -1,32 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  1 Jul 2014 16:12:33 +0200
-Subject: [PATCH 24/33] ARM: at91: move at91sam9g45 SoC to the CCF
-In-Reply-To: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404223962-30471-25-git-send-email-alexandre.belloni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 15:14:01 +0100
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping, and
+ synchronization
+In-Reply-To: <CALCETrV=m1v=YuAYVBdRroGWY+nYEfWQbFYKD+su-n_xDBeGKg@mail.gmail.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-9-git-send-email-nathan_lynch@mentor.com>
+ <53B1D8AC.7060104@mit.edu> <53B2BF2A.4070407@mentor.com>
+ <CALCETrV=m1v=YuAYVBdRroGWY+nYEfWQbFYKD+su-n_xDBeGKg@mail.gmail.com>
+Message-ID: <20140701141401.GR32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the selection of AT91_USE_OLD_CLK when selecting at91sam9g45
-SoC support. This will automatically enable COMMON_CLK_AT91 option and add
-support for at91 common clock implementation.
+On Tue, Jul 01, 2014 at 07:09:46AM -0700, Andy Lutomirski wrote:
+> On Tue, Jul 1, 2014 at 7:01 AM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+> > Hmm, which tools?  Shouldn't they be consulting AT_SYSINFO_EHDR in the
+> > auxiliary vector instead?
+> >
+> 
+> There were a bunch of random things written before getauxvec(3) was
+> introduced that look for "[vdso]"
+> 
+> gdb is also a bit weird.  I think it's changed a couple times, but
+> IIRC it looks for a vma that has a start address that matches
+> AT_SYSINFO_EDHR, and then it parses the ELF header and *section*
+> headers (sigh) in that vma.  So if I'm remembering correctly, it just
+> won't notice the vdso at all of AT_SYSINFO_EHDR and the vma start
+> aren't the same.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Hmm, that would explain the weird error I got when trying gdb with the
+vdso in place.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index a2efe6e1e224..461966d0ee4d 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -153,7 +153,6 @@ config SOC_AT91SAM9G45
- 	select HAVE_AT91_DBGU1
- 	select HAVE_FB_ATMEL
- 	select SOC_AT91SAM9
--	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_UTMI
- 	select HAVE_AT91_USB_CLK
- 	help
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
