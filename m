@@ -1,59 +1,41 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 01 Jul 2014 15:21:41 +0200
-Subject: [PATCH 4/4] ARM: mvebu: add armada drm init to Dove board setup
-In-Reply-To: <20140701131026.GO32514@n2100.arm.linux.org.uk>
-References: <1404219871-18419-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1404219871-18419-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140701131026.GO32514@n2100.arm.linux.org.uk>
-Message-ID: <53B2B5E5.50502@gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 1 Jul 2014 14:26:38 +0100
+Subject: [PATCH v2 0/2] efi: preserve NEON registers on UEFI services calls
+In-Reply-To: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140701132638.GC7539@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2014 03:10 PM, Russell King - ARM Linux wrote:
-> On Tue, Jul 01, 2014 at 03:04:31PM +0200, Sebastian Hesselbarth wrote:
->> +	pdev = platform_device_register_full(&armada_drm_dev_info);
->> +	/* assign last found lcd node to drm device for clk lookup */
->> +	pdev->dev.of_node = clknp;
->
-> NAK.  This really isn't a good way to deal with this, even in a
-> temporary basis.  While assigning a DT node to a manually created
-> platform device does solve that problem, it also introduces the
-> problem that this platform device will now match any platform driver
-> which recognises the "marvell,dove-lcd" compatible type, which may
-> occur _before_ we find the driver to match using the legacy strings.
+On Thu, 26 Jun, at 12:09:04PM, Ard Biesheuvel wrote:
+> The current UEFI implementation for arm64 fails to preserve/restore the contents
+> of the NEON register file, which may result in data corruption, especially now
+> that those contents are lazily restored for user processes.
+> 
+> This series proposes to fix this by wrapping all runtime services calls, and
+> adding kernel_neon_begin()/kernel_neon_end() pairs to the wrappers.
+> 
+> The first patch moves the existing x86 versions of those wrappers to generic
+> code, so that the second patch can easily enable them by supplying a definition
+> for efi_call_virt and adding a call to efi_native_runtime_setup().
+> 
+> Changes since v1:
+> - rename runtime.c -> runtime-wrappers.c
+> - make build depend on new Kconfig symbol EFI_RUNTIME_WRAPPERS to fix ia64
+>   breakage
+> - remove default #defines for efi_call_virt()/__efi_call_virt(), they are not
+>   needed anymore now that it is built conditionally
+> - add references to applicable UEFI/AAPCS spec sections
+> 
+> Ard Biesheuvel (2):
+>   efi/x86: move UEFI Runtime Services wrappers to generic code
+>   efi/arm64: preserve FP/SIMD registers on UEFI runtime services calls
 
-Right, I never said it is a good solution but there is no driver for
-"marvell,dove-lcd" *and* there is no way to assign clock aliases for
-clocks not yet registered.
+Thanks Ard. These patches look OK to me, and I've now pulled them into
+my 'next' branch.
 
-> There really isn't an easy solution to this other than doing the thing
-> properly.
+It'd be nice if we could get some ACKs from other people since this is
+an ABI issue.
 
-Well, you may have noticed that three moving subsystems plus new
-bindings plus non-DT/DT drivers quickly create some kind of patch
-deadlock. This is a dirty but tiny step to resolve one of those
-deadlocks.
-
-> The other problem in this series is that while you introduce some
-> bindings which may work today, they're not going to work tomorrow, and
-> that's a problem.  Don't do DT piecemeal like this and end up having to
-> break the bindings (which we will have to do to add the endpoints.)
-
-Adding new properties/subnodes never has been a problem for us at all.
-New generic bindings were introduced *often* in the past and added to
-existing bindings, e.g. clocks, gpio, pinctrl.
-
-The proposed binding for dove-lcd simply reflects the tiny part that
-is mandatory for identifying the lcd controllers. It only contains
-reg and interrupts which would also be in the corresponding
-platform_device.
-
-> If you want to do this then you need to add the endpoints from the start
-> even though the driver doesn't yet make use of them - or don't add the
-> DT bits at all.
-
-If you really think that way, I definitely give up on mainline Dove and
-SolidRun Cubox. You are /really/ proposing to wait for *all* related
-subsystem bindings to settle before even starting to add DT support?
-
-Sebastian
+-- 
+Matt Fleming, Intel Open Source Technology Center
