@@ -1,108 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:42 +0900
-Subject: [PATCH 2/8] ARM: shmobile: Allow use of boot code for non-SMP case
+Date: Tue,  1 Jul 2014 09:28:44 +0900
+Subject: [PATCH 4/8] ARM: shmobile: Use __init for APMU suspend init function
 In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
 References: <cover.1404174157.git.horms+renesas@verge.net.au>
-Message-ID: <8b438bcb9009609a15e5480ab1947acff6fb9005.1404174157.git.horms+renesas@verge.net.au>
+Message-ID: <0d77c9aa7a13a9fcfc93836188474f43394ea657.1404174157.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Allow build of platsmp.c and headsmp.S even though
-SMP is disabled in the kernel configuration. With
-this in place it is possible to share the reset
-vector setup code with power management code that
-needs to be built even though SMP is disabled.
+The function shmobile_smp_apmu_suspend_init() should
+be put into the init section to not trigger section
+mismatch warnings.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile  | 11 +++++++----
- arch/arm/mach-shmobile/headsmp.S | 13 ++++++++-----
- 2 files changed, 15 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/platsmp-apmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 9c0ad3e..279d3f3 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -34,17 +34,17 @@ obj-$(CONFIG_ARCH_R8A7791)	+= clock-r8a7791.o
- obj-$(CONFIG_ARCH_R7S72100)	+= clock-r7s72100.o
- endif
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index ce07eb9..a05b16d 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -240,7 +240,7 @@ static int shmobile_smp_apmu_enter_suspend(suspend_state_t state)
+ 	return 0;
+ }
  
-+# CPU reset vector handling objects
-+cpu-y				:= platsmp.o headsmp.o
-+
- # SMP objects
--smp-y				:= platsmp.o headsmp.o
-+smp-y				:= $(cpu-y)
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o platsmp-apmu.o
- smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o platsmp-apmu.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
- 
--# IRQ objects
--obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
--
- # PM objects
- obj-$(CONFIG_SUSPEND)		+= suspend.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-@@ -55,6 +55,9 @@ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o pm-rcar.o
- obj-$(CONFIG_ARCH_R8A7790)	+= pm-r8a7790.o pm-rcar.o
- obj-$(CONFIG_ARCH_R8A7791)	+= pm-r8a7791.o pm-rcar.o
- 
-+# IRQ objects
-+obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
-+
- # Board objects
- ifdef CONFIG_ARCH_SHMOBILE_MULTI
- obj-$(CONFIG_MACH_GENMAI)	+= board-genmai-reference.o
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index e5be5c8..faf8214 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -10,14 +10,17 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--#include <linux/linkage.h>
- #include <linux/init.h>
-+#include <linux/linkage.h>
-+#include <linux/threads.h>
- #include <asm/memory.h>
- 
-+#ifdef CONFIG_SMP
- ENTRY(shmobile_invalidate_start)
- 	bl	v7_invalidate_l1
- 	b	secondary_startup
- ENDPROC(shmobile_invalidate_start)
-+#endif
- 
- /*
-  * Reset vector for secondary CPUs.
-@@ -68,7 +71,7 @@ shmobile_smp_boot_find_mpidr:
- 
- shmobile_smp_boot_next:
- 	add	r1, r1, #1
--	cmp	r1, #CONFIG_NR_CPUS
-+	cmp	r1, #NR_CPUS
- 	blo	shmobile_smp_boot_find_mpidr
- 
- 	b	shmobile_smp_sleep
-@@ -85,10 +88,10 @@ ENDPROC(shmobile_smp_sleep)
- 
- 	.globl	shmobile_smp_mpidr
- shmobile_smp_mpidr:
--1:	.space	CONFIG_NR_CPUS * 4
-+1:	.space	NR_CPUS * 4
- 	.globl	shmobile_smp_fn
- shmobile_smp_fn:
--2:	.space	CONFIG_NR_CPUS * 4
-+2:	.space	NR_CPUS * 4
- 	.globl	shmobile_smp_arg
- shmobile_smp_arg:
--3:	.space	CONFIG_NR_CPUS * 4
-+3:	.space	NR_CPUS * 4
+-void shmobile_smp_apmu_suspend_init(void)
++void __init shmobile_smp_apmu_suspend_init(void)
+ {
+ 	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
+ }
 -- 
 2.0.0.rc2
