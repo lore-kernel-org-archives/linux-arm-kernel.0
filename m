@@ -1,35 +1,60 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 01 Jul 2014 10:07:03 +0800
-Subject: [PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <1401442715-6350-1-git-send-email-lee.jones@linaro.org>
-References: <1401442715-6350-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1404180423.8366.15.camel@rzhang1-toshiba>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 01 Jul 2014 11:08:28 +0900
+Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
+In-Reply-To: <53B182D6.5050608@gmail.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+ <53B182D6.5050608@gmail.com>
+Message-ID: <02bd01cf94d1$5bccfc30$1366f490$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Eduardo,
-
-what do you think of this patch set?
-
-thanks,
-rui
-
-On Fri, 2014-05-30 at 10:38 +0100, Lee Jones wrote:
-> This patchset adds full support for 2 types of Thermal Controllers
-> produced by STMicroelectronics.  One is a more traditional memory
-> mapped variant, the other is controlled solely by system configuration
-> registers.
+Tushar Behera wrote:
 > 
->  Documentation/devicetree/bindings/thermal/st-thermal.txt |  42 ++++++++++++++++
->  arch/arm/boot/dts/stih416.dtsi                           |  18 +++++++
->  arch/arm/configs/multi_v7_defconfig                      |   2 +
->  drivers/thermal/Kconfig                                  |   5 ++
->  drivers/thermal/Makefile                                 |   1 +
->  drivers/thermal/st/Kconfig                               |  12 +++++
->  drivers/thermal/st/Makefile                              |   3 ++
->  drivers/thermal/st/st_thermal.c                          | 313 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/thermal/st/st_thermal.h                          | 104 ++++++++++++++++++++++++++++++++++++++
->  drivers/thermal/st/st_thermal_memmap.c                   | 209 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/thermal/st/st_thermal_syscfg.c                   | 179 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  11 files changed, 888 insertions(+)
+> On 07/01/2014 03:02 AM, Kukjin Kim wrote:
+> > This series removes S5P64X0 and S5PC100 related codes in mainline,
+> > because no more user now. And if its supporting is required later,
+> > it will be done with using device tree.
+> >
+> > [PATCH 01/17] ARM: S5P64X0: no more support S5P6440 and S5P6450 SoCs
+> > [PATCH 02/17] gpio: samsung: remove s5p64x0 related gpio codes
+> > [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
+> > [PATCH 04/17] ASoC: samsung: no more support for S5P6440 and S5P6450
+> > [PATCH 05/17] pwm: samsung: remove s5p64x0 related pwm codes
+> > [PATCH 06/17] video: fbdev: s3c-fb: remove s5p64x0 related fimd
+> > [PATCH 07/17] serial: samsung: no more support for S5P6440 and
+> > [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
+> > [PATCH 09/17] gpio: samsung: remov s5pc100 related gpio codes
+> > [PATCH 10/17] spi: s3c64xx: remove s5pc100 related spi codes
+> > [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
+> > [PATCH 12/17] serial: samsung: no more support for S5PC100 SoC
+> > [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
+> > [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
+> > [PATCH 15/17] video: fbdev: s3c-fb: remove s5pc100 related fimd and
+> > [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc codes
+> > [PATCH 17/17] ASoC: Samsung: remove s5pc100 related codes
+> >
 > 
+> One more reference to S5PC100 can be found at drivers/irqchip/Kconfig.
+> 
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 131f185..9f39cc6 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -23,7 +23,6 @@ config ARM_VIC
+>  config ARM_VIC_NR
+>         int
+>         default 4 if ARCH_S5PV210
+> -       default 3 if ARCH_S5PC100
+>         default 2
+>         depends on ARM_VIC
+>         help
+
+Tushar, thanks.
+
+BTW, it should be included in 8/17 patch. But not shown in mailing list because
+of
+big changes so I'm resending 1/17 and 8/17 now after re-creating as per Arnd's
+suggestion.
+
+Thanks,
+Kukjin
