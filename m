@@ -1,136 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  1 Jul 2014 15:04:31 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 14:10:26 +0100
 Subject: [PATCH 4/4] ARM: mvebu: add armada drm init to Dove board setup
-In-Reply-To: <1404219871-18419-1-git-send-email-sebastian.hesselbarth@gmail.com>
+In-Reply-To: <1404219871-18419-5-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1404219871-18419-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1404219871-18419-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1404219871-18419-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140701131026.GO32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+On Tue, Jul 01, 2014 at 03:04:31PM +0200, Sebastian Hesselbarth wrote:
+> +	pdev = platform_device_register_full(&armada_drm_dev_info);
+> +	/* assign last found lcd node to drm device for clk lookup */
+> +	pdev->dev.of_node = clknp;
 
-Adding both, driver and proper DT representation, especially when
-subsystem DT bindings are not settled, is almost impossible right
-now. To get some more code testing coverage on Armada DRM driver,
-we add plain old platform_device registration now and get rid of
-it incrementally as we did often in the past.
+NAK.  This really isn't a good way to deal with this, even in a
+temporary basis.  While assigning a DT node to a manually created
+platform device does solve that problem, it also introduces the
+problem that this platform device will now match any platform driver
+which recognises the "marvell,dove-lcd" compatible type, which may
+occur _before_ we find the driver to match using the legacy strings.
 
-This adds DRM platform_device and required quirks to get it up
-and running (framebuffer CMA, lcd resources, clks) which allows
-us to remove it step-by-step again when bindings have settled.
+There really isn't an easy solution to this other than doing the thing
+properly.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-mvebu/dove.c |   70 +++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 69 insertions(+), 1 deletions(-)
+The other problem in this series is that while you introduce some
+bindings which may work today, they're not going to work tomorrow, and
+that's a problem.  Don't do DT piecemeal like this and end up having to
+break the bindings (which we will have to do to add the endpoints.)
 
-diff --git a/arch/arm/mach-mvebu/dove.c b/arch/arm/mach-mvebu/dove.c
-index b50464e..c8c2284 100644
---- a/arch/arm/mach-mvebu/dove.c
-+++ b/arch/arm/mach-mvebu/dove.c
-@@ -11,11 +11,75 @@
- #include <linux/init.h>
- #include <linux/mbus.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <asm/hardware/cache-tauros2.h>
- #include <asm/mach/arch.h>
-+#include <asm/memblock.h>
- #include "common.h"
- 
-+/*
-+ * Armada DRM framebuffer
-+ */
-+static struct resource armada_drm_resources[3] = {
-+	DEFINE_RES_MEM(0, 0),
-+};
-+
-+static const char *armada_drm_devices[4];
-+
-+static const struct platform_device_info armada_drm_dev_info __initconst = {
-+	.name = "armada-510-drm",
-+	.id = -1,
-+	.res = armada_drm_resources,
-+	.num_res = ARRAY_SIZE(armada_drm_resources),
-+	.data = armada_drm_devices,
-+	.size_data = sizeof(armada_drm_devices),
-+};
-+
-+static void __init armada_drm_reserve(void)
-+{
-+	phys_addr_t phys;
-+
-+	/* Steal 32MB for the drm framebuffers */
-+	phys = arm_memblock_steal(SZ_32M, SZ_2M);
-+	armada_drm_resources[0].start = phys;
-+	armada_drm_resources[0].end = phys + SZ_32M - 1;
-+}
-+
-+static void __init armada_drm_init(void)
-+{
-+	struct device_node *np, *clknp = NULL;
-+	struct platform_device *pdev;
-+	int i = 0;
-+
-+	for_each_compatible_node(np, NULL, "marvell,dove-lcd") {
-+		if (!of_device_is_available(np))
-+			continue;
-+
-+		/* add lcd controller mmio resources */
-+		if (of_address_to_resource(np, 0, &armada_drm_resources[i+1]))
-+			continue;
-+
-+		/* get device name for component framework */
-+		pdev = of_find_device_by_node(np);
-+		if (pdev)
-+			armada_drm_devices[i] = dev_name(&pdev->dev);
-+		clknp = np;
-+		i++;
-+	}
-+	armada_drm_devices[i++] = NULL;
-+
-+	pdev = platform_device_register_full(&armada_drm_dev_info);
-+	/* assign last found lcd node to drm device for clk lookup */
-+	pdev->dev.of_node = clknp;
-+}
-+
-+static void __init dove_reserve(void)
-+{
-+	if (IS_ENABLED(CONFIG_DRM_ARMADA))
-+		armada_drm_reserve();
-+}
-+
- static void __init dove_init(void)
- {
- 	pr_info("Dove 88AP510 SoC\n");
-@@ -25,6 +89,9 @@ static void __init dove_init(void)
- #endif
- 	BUG_ON(mvebu_mbus_dt_init(false));
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+
-+	if (IS_ENABLED(CONFIG_DRM_ARMADA))
-+		armada_drm_init();
- }
- 
- static const char * const dove_dt_compat[] = {
-@@ -33,7 +100,8 @@ static const char * const dove_dt_compat[] = {
- };
- 
- DT_MACHINE_START(DOVE_DT, "Marvell Dove")
-+	.dt_compat	= dove_dt_compat,
- 	.init_machine	= dove_init,
-+	.reserve	= dove_reserve,
- 	.restart	= mvebu_restart,
--	.dt_compat	= dove_dt_compat,
- MACHINE_END
+If you want to do this then you need to add the endpoints from the start
+even though the driver doesn't yet make use of them - or don't add the
+DT bits at all.
+
 -- 
-1.7.2.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
