@@ -1,39 +1,42 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 1 Jul 2014 17:17:41 +0800
-Subject: [PATCH 5/5] ARM: imx_v6_v7_defconfig: Enable flexcan driver for
- can support
-In-Reply-To: <9816fbb23593185b711c1fe32836ec5b763b688d.1404132504.git.silvio.fricke@gmail.com>
-References: <cover.1404132504.git.silvio.fricke@gmail.com>
- <9816fbb23593185b711c1fe32836ec5b763b688d.1404132504.git.silvio.fricke@gmail.com>
-Message-ID: <20140701091740.GK14471@dragon>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 1 Jul 2014 11:19:36 +0200
+Subject: [PATCH 8/9 v2] coresight: adding basic support for Vexpress TC2
+In-Reply-To: <1403892261-25026-9-git-send-email-mathieu.poirier@linaro.org>
+References: <1403892261-25026-1-git-send-email-mathieu.poirier@linaro.org>
+ <1403892261-25026-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <53B27D28.7090908@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 03:28:09PM +0200, Silvio Fricke wrote:
-> Signed-off-by: Silvio Fricke <silvio.fricke@gmail.com>
+On 27.06.2014 20:04, mathieu.poirier at linaro.org wrote:
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
+> Support for the 2 PTMs, 3 ETMs, funnel, TPIU and replicator
+> connected to the ETB are included.  Proper handling of the
+> ITM and the replicator linked to it along with the CTIs
+> and SWO are not included.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
->  arch/arm/configs/imx_v6_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index c331de8..88877226 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -69,6 +69,8 @@ CONFIG_IP_PNP_DHCP=y
->  # CONFIG_INET_LRO is not set
->  CONFIG_IPV6=y
->  CONFIG_NETFILTER=y
-> +CONFIG_CAN=m
-> +CONFIG_CAN_FLEXCAN=m
+>   arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 174 +++++++++++++++++++++++++++++
+>   1 file changed, 174 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index 15f98cb..390f2bb 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+...
+> +	funnel {
+> +		compatible = "arm,coresight-funnel", "arm,primecell";
+...
+> +			 * repicator but configured as par of the funnel.
 
-Would it be better to have them as 'y'?  It gets more chance to be
-compile-tested since zImage build is more often than module build.
+Two typos here?
 
-Shawn
+repicator -> replicator
 
->  CONFIG_CFG80211=y
->  CONFIG_MAC80211=y
->  CONFIG_RFKILL=y
-> -- 
-> 2.0.0
-> 
+as par -> as part
+
+Best regards
+
+Dirk
