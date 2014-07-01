@@ -1,34 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 1 Jul 2014 13:11:42 +0100
-Subject: [PATCH] regulator: core: Still free GPIOs using gpio_free()
-In-Reply-To: <20140701120622.GJ32514@n2100.arm.linux.org.uk>
-References: <1404215726-2480-1-git-send-email-broonie@kernel.org>
- <20140701120622.GJ32514@n2100.arm.linux.org.uk>
-Message-ID: <20140701121142.GM23300@sirena.org.uk>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 1 Jul 2014 15:14:52 +0300
+Subject: [RFC 04/10] memory: Add Tegra124 memory controller support
+In-Reply-To: <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
+Message-ID: <8761jh9sxv.fsf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 01:06:22PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 01, 2014 at 12:55:26PM +0100, Mark Brown wrote:
 
-> > Even though we mostly use GPIO descriptors internally we still use
-> > gpio_request_one() to request so we need to pair that with gpio_free() to
-> > release the GPIO.
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-> This doesn't explain the reason...  I see the current GPIO code doing this:
+> diff --git a/include/dt-bindings/memory/tegra124-mc.h b/include/dt-bindings/memory/tegra124-mc.h
+> new file mode 100644
+> index 000000000000..6b1617ce022f
+> --- /dev/null
+> +++ b/include/dt-bindings/memory/tegra124-mc.h
+> @@ -0,0 +1,30 @@
+> +#ifndef DT_BINDINGS_MEMORY_TEGRA124_MC_H
+> +#define DT_BINDINGS_MEMORY_TEGRA124_MC_H
+> +
+> +#define TEGRA_SWGROUP_DC       0
+> +#define TEGRA_SWGROUP_DCB      1
+> +#define TEGRA_SWGROUP_AFI      2
+> +#define TEGRA_SWGROUP_AVPC     3
+> +#define TEGRA_SWGROUP_HDA      4
+> +#define TEGRA_SWGROUP_HC       5
+> +#define TEGRA_SWGROUP_MSENC    6
+> +#define TEGRA_SWGROUP_PPCS     7
+> +#define TEGRA_SWGROUP_SATA     8
+> +#define TEGRA_SWGROUP_VDE      9
+> +#define TEGRA_SWGROUP_MPCORELP 10
+> +#define TEGRA_SWGROUP_MPCORE   11
+> +#define TEGRA_SWGROUP_ISP2     12
+> +#define TEGRA_SWGROUP_XUSB_HOST        13
+> +#define TEGRA_SWGROUP_XUSB_DEV 14
+> +#define TEGRA_SWGROUP_ISP2B    15
+> +#define TEGRA_SWGROUP_TSEC     16
+> +#define TEGRA_SWGROUP_A9AVP    17
+> +#define TEGRA_SWGROUP_GPU      18
+> +#define TEGRA_SWGROUP_SDMMC1A  19
+> +#define TEGRA_SWGROUP_SDMMC2A  20
+> +#define TEGRA_SWGROUP_SDMMC3A  21
+> +#define TEGRA_SWGROUP_SDMMC4A  22
+> +#define TEGRA_SWGROUP_VIC      23
+> +#define TEGRA_SWGROUP_VI       24
+> +
+> +#endif
 
-> void gpio_free(unsigned gpio)
-> {
->         gpiod_free(gpio_to_desc(gpio));
-> }
-> EXPORT_SYMBOL_GPL(gpio_free);
-
-Huh, good point (though it still seems a bit neater to match up the
-request and release functions I guess).  Linus?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/833c328d/attachment.sig>
+In the SMMUv8 patch series, I have assigned unique IDs for all those
+HWAs among Tegra SoC generations so that DT can provide which HWAs are
+attached to that SoC. The SMMUv8 driver would be unified among Tegra
+SoCs, then.
