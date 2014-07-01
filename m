@@ -1,29 +1,27 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 1 Jul 2014 15:53:19 +0300
-Subject: [PATCHv5 07/15] hwspinlock/omap: enable build for AM33xx, AM43xx
- & DRA7xx
-In-Reply-To: <1398904476-26200-8-git-send-email-s-anna@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-8-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbaVzfWLXiX0y9K=-FAG98ywbWojtyyoEket-q5e5pdufA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Jul 2014 08:55:49 -0400
+Subject: [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
+In-Reply-To: <1404210076-2362-2-git-send-email-kgene.kim@samsung.com>
+References: <1404210076-2362-1-git-send-email-kgene.kim@samsung.com>
+ <1404210076-2362-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20140701125549.GG23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Kukjin,
 
-On Thu, May 1, 2014 at 3:34 AM, Suman Anna <s-anna@ti.com> wrote:
-> HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
-> device families as well. The IPs are identical to that of
-> OMAP4/OMAP5, except for the number of locks.
->
-> Add a depends on to the above family of SoCs to enable the
-> build support for OMAP hwspinlock driver for any of the above
-> SoC configs.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+On Tue, Jul 01, 2014 at 07:21:16PM +0900, Kukjin Kim wrote:
+> This patch removes supporting codes for s5pc100 because no more used
+> now.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+...
+>  drivers/irqchip/Kconfig                            |    1 -
 
-This looks too like an independent change. If you want it merged
-without waiting for the entire series please submit it separately.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Thanks,
-Ohad.
+thx,
+
+Jason.
