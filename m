@@ -1,60 +1,62 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 01 Jul 2014 11:08:28 +0900
+Date: Tue, 01 Jul 2014 11:08:35 +0900
 Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
-In-Reply-To: <53B182D6.5050608@gmail.com>
+In-Reply-To: <4717633.z8gH3C8KXB@wuerfel>
 References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
- <53B182D6.5050608@gmail.com>
-Message-ID: <02bd01cf94d1$5bccfc30$1366f490$@samsung.com>
+ <6153646.CZ57BgYKf3@wuerfel> <20140630142224.GA30417@ulmo>
+ <4717633.z8gH3C8KXB@wuerfel>
+Message-ID: <02c101cf94d1$5d783b30$1868b190$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
+Arnd Bergmann wrote:
 > 
-> On 07/01/2014 03:02 AM, Kukjin Kim wrote:
-> > This series removes S5P64X0 and S5PC100 related codes in mainline,
-> > because no more user now. And if its supporting is required later,
-> > it will be done with using device tree.
+> On Monday 30 June 2014 16:22:25 Thierry Reding wrote:
+> > On Mon, Jun 30, 2014 at 03:34:27PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 01 July 2014 06:32:10 Kukjin Kim wrote:
+> > > > This series removes S5P64X0 and S5PC100 related codes in mainline,
+> > > > because no more user now. And if its supporting is required later,
+> > > > it will be done with using device tree.
+> > > >
+> > >
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > >
-> > [PATCH 01/17] ARM: S5P64X0: no more support S5P6440 and S5P6450 SoCs
-> > [PATCH 02/17] gpio: samsung: remove s5p64x0 related gpio codes
-> > [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
-> > [PATCH 04/17] ASoC: samsung: no more support for S5P6440 and S5P6450
-> > [PATCH 05/17] pwm: samsung: remove s5p64x0 related pwm codes
-> > [PATCH 06/17] video: fbdev: s3c-fb: remove s5p64x0 related fimd
-> > [PATCH 07/17] serial: samsung: no more support for S5P6440 and
-> > [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
-> > [PATCH 09/17] gpio: samsung: remov s5pc100 related gpio codes
-> > [PATCH 10/17] spi: s3c64xx: remove s5pc100 related spi codes
-> > [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
-> > [PATCH 12/17] serial: samsung: no more support for S5PC100 SoC
-> > [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
-> > [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
-> > [PATCH 15/17] video: fbdev: s3c-fb: remove s5pc100 related fimd and
-> > [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc codes
-> > [PATCH 17/17] ASoC: Samsung: remove s5pc100 related codes
-> >
+> > It seems like I'm not completely up-to-date. What happened to our prime
+> > directive never to remove support for boards? Why is this special? What
+> > about people that still use this hardware? The commit message says that
+> > there are no longer any users. How was this determined?
 > 
-> One more reference to S5PC100 can be found at drivers/irqchip/Kconfig.
+I asked whether we may remove its supporting in mainline before not just one
+time and then no objection at that time...
+
+> From what I can tell, the supported machines on these two platforms are
+> all the official development prototypes, not production boards, and they
+> came out in rather small quantities, probably Samsung-internal for the
+> most part. The maintainers have previously assured me they are not aware
+> of anybody using it, and I trust their judgment.
 > 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 131f185..9f39cc6 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -23,7 +23,6 @@ config ARM_VIC
->  config ARM_VIC_NR
->         int
->         default 4 if ARCH_S5PV210
-> -       default 3 if ARCH_S5PC100
->         default 2
->         depends on ARM_VIC
->         help
+Yeah, I think so ;-)
 
-Tushar, thanks.
+> I'm totally fine with removing support for these machines, and we have
+> removed a number of similar platforms in the past. The rule is not that
 
-BTW, it should be included in 8/17 patch. But not shown in mailing list because
-of
-big changes so I'm resending 1/17 and 8/17 now after re-creating as per Arnd's
-suggestion.
+S5P6442. I did commit a73ddc61 'ARM: S5P6442: Removing ARCH_S5P6442' in 2011
+because that could not be mass-produced.
+
+> we never remove stuff, the rule is that we never break things for
+> active users.
+> 
+YES.
+
+> As always, if it turns out that we missed some active users, we will
+> revert these patches, or bring support back another way.
+> 
+Sure, so please let us know if you have any objection on this removing.
+
+> This should probably all be spelled out explicitly in the changelog
+> for patch 1, which I admit I have not seen.
+> 
+It's my fault, sorry I forgot it and I'm resending 1/17 and 8/17 with -D.
 
 Thanks,
 Kukjin
