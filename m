@@ -1,117 +1,164 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 1 Jul 2014 14:51:07 +0800
-Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
-In-Reply-To: <1404135864.4305.23.camel@weser.hi.pengutronix.de>
-References: <20140624153559.GA5741@dragon>
- <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
- <20140625062243.GD3242@dragon>
- <CAOMZO5BuOhWo7SCEPFmNRUQBi=5JhDrVv0yvBQM2d_jMyLkbyw@mail.gmail.com>
- <1403693452.4249.1.camel@weser.hi.pengutronix.de>
- <20140625125306.GB6917@dragon>
- <1403772229.4254.4.camel@weser.hi.pengutronix.de>
- <20140628143712.GA7869@dragon>
- <1404135864.4305.23.camel@weser.hi.pengutronix.de>
-Message-ID: <20140701065105.GE14471@dragon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 1 Jul 2014 12:25:38 +0530
+Subject: [PATCH] Update imx-sdma cyclic handling to report residue
+In-Reply-To: <20140625120032.GI32514@n2100.arm.linux.org.uk>
+References: <20140625120032.GI32514@n2100.arm.linux.org.uk>
+Message-ID: <20140701065538.GF2296@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 03:44:24PM +0200, Lucas Stach wrote:
-> Hi Shawn,
+On Wed, Jun 25, 2014 at 01:00:33PM +0100, Russell King - ARM Linux wrote:
+> I received a report this morning from one of the Novena developers that
+> the behaviour of the iMX6 ASoC codec driver (using imx-pcm-dma.c) was
+> sub-optimal under high system load.
 > 
-> can you please test the attached patch on top of 3.16-rc* to see if it
-> helps? If it works for you I would like to try and get this into 3.16 as
-> a bugfix.
+> While there are issues relating to system load remaining, upon reviewing
+> the ASoC imx-pcm-dma.c driver, it was noticed that it not using the
+> residue support, because SDMA doesn't support it.  This has the effect
+> that SDMA has to make multiple calls into the ASoC and ALSA code, one
+> for each period.
+> 
+> Since ALSA's snd_pcm_elapsed() does not need to be called multiple times
+> and it is entirely sufficient to call it once to update ALSA with the
+> current buffer position via the pointer method, we can do better here.
+> We can also avoid stopping the DMA entirely, just like real cyclic DMA
+> implementations behave.  While this means that we replay some old samples,
+> this is a nicer behaviour than having audio stop and restart.
+> 
+> The changes to achieve this are relatively minor - imx-sdma.c can track
+> where the DMA is to the nearest descriptor boundary - it does this
+> already when deciding how many callbacks to issue.  In doing this,
+> buf_tail always points at the descriptor which will complete next.
+> 
+> The residue is defined by the bytes remaining to the end of the buffer,
+> when the buffer is viewed as a single block of memory [start...end].
+> So, when we start out, there's a full buffer worth of residue, and this
+> counts down as we approach the end of the buffer, eventually becoming
+> zero at the end, before returning to the full buffer worth when we
+> wrap back to the start.
+> 
+> Moving the walking of the descriptors into the interrupt handler means
+> that we can update the BD_DONE flag at interrupt time, thus avoiding
+> a delayed tasklet stopping the cyclic DMA.
+> 
+> This means that the residue can be calculated from (total descriptors -
+> buf_tail) * descriptor size.  This is what the change below does.  We
+> update imx-pcm-dma.c to remove the NO_RESIDUE flag since we now provide
+> the residue.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Unfortunately, it doesn't work.  With your change, now it hangs in
-suspend procedure.
+Applied, thanks
 
-$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-Freezing user space processes ... (elapsed 0.005 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
-PM: Entering mem sleep
-sd 0:0:0:0: [sda] Synchronizing SCSI cache
-sd 0:0:0:0: [sda] Stopping disk
-PM: suspend of devices complete after 102.992 msecs
-PM: suspend devices took 0.110 seconds
-PM: late suspend of devices complete after 12.808 msecs
+Mark, this patch *also* touches asoc code. But changes are trivial
 
-Shawn
-
-> 
-> Regards,
-> Lucas
-> 
-> --------------------------->8-----------------------------
-> From f3bfdc9c19249188fa153b1568c3129cd31af4f5 Mon Sep 17 00:00:00 2001
-> From: Lucas Stach <l.stach@pengutronix.de>
-> Date: Mon, 30 Jun 2014 15:33:04 +0200
-> Subject: [PATCH] PCI: imx6: add workaround for errata ERR005723
-> 
-> Fixes system hang after resume from suspend to mem.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+-- 
+~Vinod
 > ---
->  drivers/pci/host/pci-imx6.c | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
+> IMHO, ASoC should encourage all DMA engine drivers to do this just the
+> same way that ASoC requires cyclic DMA support - if the DMA engine
+> driver knows how many times it needs to issue the callback (which is
+> strictly incorrect behaviour to the DMA engine documentation) then it
+> has enough information to be able to provide the residue information
+> and avoid that loop.
 > 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index a568efaa331c..5c58a3ee5dbf 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -589,6 +589,38 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  	return 0;
+> Note that these two files can't be split into separate patches - both
+> changes are mutually dependent.
+> 
+>  drivers/dma/imx-sdma.c      | 22 ++++++++++++++++++----
+>  sound/soc/fsl/imx-pcm-dma.c |  1 -
+>  2 files changed, 18 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index 128714622bf5..14867e3ac8ff 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -255,6 +255,7 @@ struct sdma_channel {
+>  	enum dma_slave_buswidth		word_size;
+>  	unsigned int			buf_tail;
+>  	unsigned int			num_bd;
+> +	unsigned int			period_len;
+>  	struct sdma_buffer_descriptor	*bd;
+>  	dma_addr_t			bd_phys;
+>  	unsigned int			pc_from_device, pc_to_device;
+> @@ -593,6 +594,12 @@ static void sdma_event_disable(struct sdma_channel *sdmac, unsigned int event)
+>  
+>  static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
+>  {
+> +	if (sdmac->desc.callback)
+> +		sdmac->desc.callback(sdmac->desc.callback_param);
+> +}
+> +
+> +static void sdma_update_channel_loop(struct sdma_channel *sdmac)
+> +{
+>  	struct sdma_buffer_descriptor *bd;
+>  
+>  	/*
+> @@ -611,9 +618,6 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
+>  		bd->mode.status |= BD_DONE;
+>  		sdmac->buf_tail++;
+>  		sdmac->buf_tail %= sdmac->num_bd;
+> -
+> -		if (sdmac->desc.callback)
+> -			sdmac->desc.callback(sdmac->desc.callback_param);
+>  	}
 >  }
 >  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int imx6_pcie_suspend(struct device *dev)
-> +{
-> +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> +
-> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-> +			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
-> +
-> +	return 0;
-> +}
-> +
-> +static int imx6_pcie_resume(struct device *dev)
-> +{
-> +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> +
-> +	/*
-> +	 * This is a workaround for
-> +	 * ERR005723: PCIe does not support L2 power down
-> +	 * Toggling the PHY PD bit around system L2 state switching seems to be
-> +	 * enough to wake the PCIe logic after a power down.
-> +	 */
-> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-> +			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(imx6_pcie_pm_ops,
-> +		imx6_pcie_suspend,
-> +		imx6_pcie_resume);
-> +
->  static const struct of_device_id imx6_pcie_of_match[] = {
->  	{ .compatible = "fsl,imx6q-pcie", },
->  	{},
-> @@ -600,6 +632,7 @@ static struct platform_driver imx6_pcie_driver = {
->  		.name	= "imx6q-pcie",
->  		.owner	= THIS_MODULE,
->  		.of_match_table = imx6_pcie_of_match,
-> +		.pm = &imx6_pcie_pm_ops,
->  	},
->  };
+> @@ -669,6 +673,9 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
+>  		int channel = fls(stat) - 1;
+>  		struct sdma_channel *sdmac = &sdma->channel[channel];
 >  
-> -- 
-> 2.0.0
+> +		if (sdmac->flags & IMX_DMA_SG_LOOP)
+> +			sdma_update_channel_loop(sdmac);
+> +
+>  		tasklet_schedule(&sdmac->tasklet);
+>  
+>  		__clear_bit(channel, &stat);
+> @@ -1129,6 +1136,7 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+>  	sdmac->status = DMA_IN_PROGRESS;
+>  
+>  	sdmac->buf_tail = 0;
+> +	sdmac->period_len = period_len;
+>  
+>  	sdmac->flags |= IMX_DMA_SG_LOOP;
+>  	sdmac->direction = direction;
+> @@ -1225,9 +1233,15 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
+>  				      struct dma_tx_state *txstate)
+>  {
+>  	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> +	u32 residue;
+> +
+> +	if (sdmac->flags & IMX_DMA_SG_LOOP)
+> +		residue = (sdmac->num_bd - sdmac->buf_tail) * sdmac->period_len;
+> +	else
+> +		residue = sdmac->chn_count - sdmac->chn_real_count;
+>  
+>  	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
+> -			sdmac->chn_count - sdmac->chn_real_count);
+> +			 residue);
+>  
+>  	return sdmac->status;
+>  }
+> diff --git a/sound/soc/fsl/imx-pcm-dma.c b/sound/soc/fsl/imx-pcm-dma.c
+> index a545cbf8d16e..1f4ad080b907 100644
+> --- a/sound/soc/fsl/imx-pcm-dma.c
+> +++ b/sound/soc/fsl/imx-pcm-dma.c
+> @@ -59,7 +59,6 @@ int imx_pcm_dma_init(struct platform_device *pdev)
+>  {
+>  	return devm_snd_dmaengine_pcm_register(&pdev->dev,
+>  		&imx_dmaengine_pcm_config,
+> -		SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
+>  		SND_DMAENGINE_PCM_FLAG_COMPAT);
+>  }
+>  EXPORT_SYMBOL_GPL(imx_pcm_dma_init);
 > 
 > 
 > -- 
-> Pengutronix e.K.             | Lucas Stach                 |
-> Industrial Linux Solutions   | http://www.pengutronix.de/  |
-> 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
