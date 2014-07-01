@@ -1,48 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Jul 2014 18:35:47 +0100
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
- (part1)
-In-Reply-To: <yw1xzjgtdmas.fsf@unicorn.mansr.com>
-References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
- <yw1x4mz1f2t9.fsf@unicorn.mansr.com>
- <20140701171346.GP3705@n2100.arm.linux.org.uk>
- <yw1xzjgtdmas.fsf@unicorn.mansr.com>
-Message-ID: <20140701173547.GW28164@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 01 Jul 2014 10:40:46 -0700
+Subject: [PATCH 8/8] arm: perf: krait: stop using singleton PMU
+In-Reply-To: <1404227478-9645-9-git-send-email-mark.rutland@arm.com>
+References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
+ <1404227478-9645-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <53B2F29E.5030403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mans,
+On 07/01/14 08:11, Mark Rutland wrote:
+> Currently the krait_pmu_{enable,disable}_event functions use the global
+> cpu_pmu variable while all the other pmu enable/disable functions
+> derive this from the event argument.
+>
+> This patch brings the Krait functions into line with the rest of the PMU
+> backends by deriving the address of the pmu from the event argument.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-On Tue, Jul 01, 2014 at 06:24:43PM +0100, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > As you point out, "bx lr" /may/ be treated specially (I've actually been
-> 
-> Most, if not all, Cortex-A cores do this according the public TRMs.
-> They also do the same thing for "mov pc, lr" so there will probably be
-> no performance gain from this change.  It's still a good idea though,
-> since we don't know what future cores will do.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Funnily enough, that's not actually true (and is more or less what prompted
-this patch after discussion with Russell). There are cores out there that
-don't predict mov pc, lr at all (let alone do anything with the return
-stack).
-
-> > discussing this with Will Deacon over the last couple of days, who has
-> > also been talking to the hardware people in ARM, and Will is happy with
-> > this patch as in its current form.)  This is why I've changed all
-> > "mov pc, reg" instructions which return in some way to use this macro,
-> > and left others (those which are used to call some function and return
-> > back to the same point) alone.
-> 
-> In that case the patch should be fine.  Your patch description didn't
-> make it clear that only actual returns were being changed.
-
-I'm led to believe that some predictors require lr in order to update the
-return stack, whilst others don't. That part is all horribly
-micro-architectural, so the current patch is doing the right thing by
-sticking to the ARM ARM but enabling us to hook into other registers later
-on if we choose.
-
-Cheers,
-
-Will
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
