@@ -1,54 +1,88 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 1 Jul 2014 11:34:25 -0500
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
-Message-ID: <53B2E311.6030609@mentor.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 1 Jul 2014 17:34:28 +0100
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <53B27049.10302@arm.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
+ <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
+ <53B27049.10302@arm.com>
+Message-ID: <alpine.DEB.2.02.1407011730070.8923@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 03:12 AM, Ard Biesheuvel wrote:
-> On 23 June 2014 05:11, Nathan Lynch <nathan_lynch@mentor.com> wrote:
->> Provide fast userspace implementations of gettimeofday and
->> clock_gettime on systems that implement the generic timers extension
->> defined in ARMv7.
-
-...
-
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Tue, 1 Jul 2014, Marc Zyngier wrote:
+> Hi Stefano,
 > 
-> On Exynos-5250 (Cortex-A15):
+> On 30/06/14 20:09, Stefano Stabellini wrote:
+> > On Wed, 25 Jun 2014, Anup Patel wrote:
+> >> Hi Marc,
+> >>
+> >> On Wed, Jun 25, 2014 at 2:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>> So far, GICv2 has been used in with EOImode == 0. The effect of this
+> >>> mode is to perform the priority drop and the deactivation of the
+> >>> interrupt at the same time.
+> >>>
+> >>> While this works perfectly for Linux (we only have a single priority),
+> >>> it causes issues when an interrupt is forwarded to a guest, and when
+> >>> we want the guest to perform the EOI itself.
+> >>>
+> >>> For this case, the GIC architecture provides EOImode == 1, where:
+> >>> - A write to the EOI register drops the priority of the interrupt and leaves
+> >>> it active. Other interrupts at the same priority level can now be taken,
+> >>> but the active interrupt cannot be taken again
+> >>> - A write to the DIR marks the interrupt as inactive, meaning it can
+> >>> now be taken again.
+> >>>
+> >>> We only enable this feature when booted in HYP mode. Also, as most device
+> >>> trees are broken (they report the CPU interface size to be 4kB, while
+> >>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
+> >>> in HYP mode, and disable the feature.
+> >>>
+> >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>> ---
+> >>>  drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
+> >>>  include/linux/irqchip/arm-gic.h |  4 +++
+> >>>  2 files changed, 59 insertions(+), 6 deletions(-)
+> >>>
+> >>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> >>> index 508b815..9295bf2 100644
+> >>> --- a/drivers/irqchip/irq-gic.c
+> >>> +++ b/drivers/irqchip/irq-gic.c
+> >>> @@ -45,6 +45,7 @@
+> >>>  #include <asm/irq.h>
+> >>>  #include <asm/exception.h>
+> >>>  #include <asm/smp_plat.h>
+> >>> +#include <asm/virt.h>
+> >>>
+> >>>  #include "irq-gic-common.h"
+> >>>  #include "irqchip.h"
+> >>> @@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
+> >>>         .irq_set_wake   = NULL,
+> >>>  };
+> >>>
+> >>> +static struct irq_chip *gic_chip;
+> >>> +
+> >>> +static bool supports_deactivate = false;
+> >>> +
+> >>>  #ifndef MAX_GIC_NR
+> >>>  #define MAX_GIC_NR     1
+> >>>  #endif
+> >>> @@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
+> >>>         writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+> >>>  }
+> >>>
+> >>> +static void gic_eoi_dir_irq(struct irq_data *d)
+> >>> +{
+> >>> +       gic_eoi_irq(d);
+> >>> +       writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
+> >>> +}
+> > 
+> > Would it be better if you moved the gic_eoi_irq call earlier? Maybe
+> > somewhere in gic_handle_irq?
 > 
-> clock-gettime-monotonic system calls per second: 1759517
-> clock-gettime-monotonic vdso calls per second:   6027915 (3.43x speedup)
-> clock-getres-monotonic system calls per second: 2144055
-> clock-getres-monotonic vdso calls per second:   82783103 (38.61x speedup)
-> clock-gettime-monotonic-coarse system calls per second: 1971433
-> clock-gettime-monotonic-coarse vdso calls per second:   10710734 (5.43x speedup)
-> clock-getres-monotonic-coarse system calls per second: 2182380
-> clock-getres-monotonic-coarse vdso calls per second:   76710594 (35.15x speedup)
-> clock-gettime-realtime system calls per second: 1722524
-> clock-gettime-realtime vdso calls per second:   6309212 (3.66x speedup)
-> clock-getres-realtime system calls per second: 2182357
-> clock-getres-realtime vdso calls per second:   83120713 (38.09x speedup)
-> clock-gettime-realtime-coarse system calls per second: 2085498
-> clock-gettime-realtime-coarse vdso calls per second:   11326069 (5.43x speedup)
-> clock-getres-realtime-coarse system calls per second: 2178266
-> clock-getres-realtime-coarse vdso calls per second:   76731175 (35.23x speedup)
-> Note: vDSO version of getcpu not found
-> getcpu system calls per second: 2645300
-> getcpu vdso calls per second:   2612154 (0.99x speedup)
-> Note: vDSO version of getcpu not found
-> Note: vDSO version of getcpu not found
-> gettimeofday system calls per second: 1707745
-> gettimeofday vdso calls per second:   6474501 (3.79x speedup)
+> I'm not sure I see what we'd gain by doing so. Can you elaborate?
 
-Thank you very much for testing (especially on a platform I don't have).
-
-These results match up with what I get on OMAP5 (also Cortex-A15).
-
-Since it looks like I will need to make some significant changes for the
-next version, I think I can't in good conscience carry your Tested-by on
-to v8 (although I'm open to different opinions).  But I still very much
-appreciate it.
+You would be dropping the priority earlier. It would be beneficial if
+Linux was running the interrupt handlers with interrupts enabled, but I
+realize now that it is not the case.
