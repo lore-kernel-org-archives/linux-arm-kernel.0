@@ -1,71 +1,149 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 01 Jul 2014 09:12:32 +0200
-Subject: [PATCH 6/9] ARM: dts: sun7i: Add board support for LinkSprite
- pcDuino V3
-In-Reply-To: <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
-References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
- <1404165479-23785-7-git-send-email-hdegoede@redhat.com>
- <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
-Message-ID: <53B25F60.2050704@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 1 Jul 2014 09:18:04 +0200
+Subject: [PATCH 1/4] clk: Introduce 'clk_find_nearest_rate()'
+In-Reply-To: <20140701083214.5b31295e@bbrezillon>
+References: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20140630212707.1eb44db6@bbrezillon>
+ <475a8ee0-11aa-4fad-94dc-9e5360f298d2@BL2FFO11FD028.protection.gbl>
+ <20140701083214.5b31295e@bbrezillon>
+Message-ID: <20140701091804.78bd529f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 1 Jul 2014 08:32:14 +0200
+Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
 
-On 07/01/2014 04:22 AM, Chen-Yu Tsai wrote:
-> On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> From: Zoltan HERPAI <wigyori@uid0.hu>
->>
->> The LinkSprite pcDuino V3 is an A20 based development board featuring
->> arduino compatible io headers, 1G RAM, 4G nand, sata, rtl8188cus usb wifi
->> and 100 Mbit ethernet using an ip101a phy:
->>
->> http://www.pcduino.com/pcduino-v3/
->>
->> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
->> [hdegoede at redhat.com: Various cleanups, correct led pins]
->> [hdegoede at redhat.com: Add axp209, ir and gpio-keys nodes]
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>
->> --
->>
->> Changes since v2:
->>  - update MMC entry to comply with upstream
->>  - unify the 4 patches into one
->>
->> Changes since v1:
->>  - fix cosmetic issues
->>  - fix i2c entry
->>  - remove unnecessary input bindings include
->>  - add MMC support
->> ---
->>  arch/arm/boot/dts/Makefile               |   3 +-
->>  arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 173 +++++++++++++++++++++++++++++++
->>  2 files changed, 175 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index ed0de8b..fdc590e 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -380,7 +380,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>         sun7i-a20-cubieboard2.dtb \
->>         sun7i-a20-cubietruck.dtb \
->>         sun7i-a20-i12-tvbox.dtb \
->> -       sun7i-a20-olinuxino-micro.dtb
->> +       sun7i-a20-olinuxino-micro.dtb \
->> +       sun7i-a20-pcduino3.dtb
+> Hi S?ren,
 > 
-> You may need to rebase onto my sun8i ippo-q8h dts patch.
+> On Mon, 30 Jun 2014 17:12:23 -0700
+> S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
 > 
->   https://patchwork.kernel.org/patch/4389951/
+> > Hi Boris,
+> > 
+> > On Mon, 2014-06-30 at 09:27PM +0200, Boris BREZILLON wrote:
+> > > Hello Soren,
+> > > 
+> > > On Mon, 30 Jun 2014 09:56:33 -0700
+> > > Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+> > > 
+> > > > Introduce a new API function to find the rate a clock can
+> > > > provide which is closest to a given rate.
+> > > > 
+> > > > clk_round_rate() leaves it to the clock driver how rounding is
+> > > > done. Commonly implementations round down due to use-cases that
+> > > > have a certain frequency maximum that must not be exceeded.
+> > > 
+> > > I had the same concern (how could a driver decide whether it
+> > > should round up, down or to the closest value), but had a slightly
+> > > different approach in mind.
+> > > 
+> > > AFAIU, you're assuming the clock is always a power of two (which
+> > > is true most of the time, but some clock implementation might
+> > > differ, i.e. a PLL accept any kind of multiplier not necessarily
+> > > a power of 2).
+> > 
+> > No, the idea is to always work. There should not be any such
+> > limitation. Where do you see that?
 > 
-> There's a likely conflict in the Makefile here.
+> My bad, I should have read the code more carefully.
+> BTW, it could help readers if you add some comments to explain how you
+> are finding the nearest rate.
+> 
+> My main concern with this approach is that you can spend some time
+> iterating to find the nearest rate where a clk driver would find it
+> quite quickly (because it knows exactly how the clk works and what are
+> the possible clk muxing and clk modifiers options).
+> 
+> > 
+> > > 
+> > > How about improving the clk_ops interface instead by adding a new
+> > > method
+> > > 
+> > > 	long (*round_rate_with_constraint)(struct clk_hw *hw,
+> > > 					   unsigned long
+> > > requested_rate, unsigned long *parent_rate,
+> > > 					   enum clk_round_type
+> > > type);
+> > > 
+> > > with
+> > > 
+> > > enum clk_round_type {
+> > > 	CLK_ROUND_DOWN,
+> > > 	CLK_ROUND_UP,
+> > > 	CLK_ROUND_CLOSEST,
+> > > };
+> > 
+> > I thought about that, but the find_nearest() did already exist more
+> > or less and in the end it is not much of a difference, IMHO. If it
+> > turns out that the others are needed as well and somebody
+> > implements it, they could be added as another convenience function
+> > like I did, and/or it could be wrapped in the function you propose
+> > here.
+> >
+> > > 
+> > > or just adding these 3 methods:
+> > > 
+> > > 	long (*round_rate_up)(struct clk_hw *hw,
+> > > 			      unsigned long requested_rate,
+> > > 			      unsigned long *parent_rate);
+> > > 
+> > > 	long (*round_rate_down)(struct clk_hw *hw,
+> > > 				unsigned long requested_rate,
+> > > 				unsigned long *parent_rate);
+> > > 
+> > > 	long (*round_rate_closest)(struct clk_hw *hw,
+> > > 				   unsigned long requested_rate,
+> > > 				   unsigned long *parent_rate);
+> > 
+> > That would be quite a change for clock drivers. So far, there are
+> > not many restrictions on round_rate. I think there has already been
+> > a discussion in this direction that went nowhere.
+> > https://lkml.org/lkml/2010/7/14/260
+> > 
+> 
+> Not if we keep these (or this, depending on the solution you chose)
+> functions optional, and return -ENOTSUP, if they're not implemented.
 
-Has that one already been accepted by Maxime ? I'm fine rebasing patches
-on top of accepted stuff, but rebasing on pending stuff is not really
-useful IMHO.
+Or even better: fall back to your implementation.
 
-Regards,
+> 
+> > > 
+> > > and let the round_rate method implement the default behaviour.
+> > 
+> > There is no real default. Rounding is not specified for the current
+> > API.
+> 
+> What I meant by default behavior is the behavior already implemented
+> by the clock driver (either round up, down or closest).
+> This way you do not introduce regressions with existing users, and can
+> use new methods in new use cases.
+> 
+> > 
+> > > 
+> > > This way you could add 3 functions to the API:
+> > > 
+> > > clk_round_closest (or clk_find_nearest_rate as you called it),
+> > > clk_round_up and clk_round_down, and let the clk driver
+> > > implementation return the appropriate rate.
+> > 
+> > I'd say the current patch set does kind of align with that, doesn't
+> > it? We can add the find_nearest_rate() (there was a discussion on
+> > the name, ane we decided against round_closest in favor of the
+> > current proposal) now and the other functions could be added later
+> > if people find them to be useful. And if they all get added we can
+> > think about consolidating them if it made sense.
+> 
+> Yes sure.
+> 
+> Best Regards,
+> 
+> Boris
+> 
 
-Hans
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
