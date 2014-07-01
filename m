@@ -1,71 +1,65 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 1 Jul 2014 11:00:14 -0700
-Subject: [PATCH v9 3/3] dt-bindings: add mtk-timer bindings
-In-Reply-To: <CABuKBeKknz7OEyffKOGK=yk7ZH7fj7Jf9fgPhw2VGbTC-p21qw@mail.gmail.com>
-References: <1403264929-21325-1-git-send-email-matthias.bgg@gmail.com>
- <1403264929-21325-4-git-send-email-matthias.bgg@gmail.com>
- <20140620123602.GK30188@leverpostej>
- <CABuKBeKknz7OEyffKOGK=yk7ZH7fj7Jf9fgPhw2VGbTC-p21qw@mail.gmail.com>
-Message-ID: <5b2c6b68-6177-47f4-937a-077b4f3c89a4@BN1AFFO11FD048.protection.gbl>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 1 Jul 2014 13:01:14 -0500
+Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
+In-Reply-To: <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
+References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
+ <1404144233-17222-4-git-send-email-agross@codeaurora.org>
+ <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
+Message-ID: <20140701180114.GA2082@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-01 at 07:46PM +0200, Matthias Brugger wrote:
-> 2014-06-20 14:36 GMT+02:00 Mark Rutland <mark.rutland@arm.com>:
-> > On Fri, Jun 20, 2014 at 12:48:49PM +0100, Matthias Brugger wrote:
-> >> Add binding documentation for the General Porpose Timer driver of
-> >> the Mediatek SoCs.
-> >>
-> >> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> >> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> ---
-> >>  .../bindings/timer/mediatek,mtk-timer.txt          |   18 ++++++++++++++++++
-> >>  1 file changed, 18 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> new file mode 100644
-> >> index 0000000..10b7e09
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> @@ -0,0 +1,18 @@
-> >> +Mediatek MT6577, MT6572 and MT6589 Timers
-> >> +---------------------------------------
-> >> +
-> >> +Required properties:
-> >> +- compatible: Should be "mediatek,mt6577-timer"
-> >> +- reg: Should contain location and length for timers register.
-> >> +- clocks: Clocks driving the timer hardware. This list should include two
-> >> +     clocks. The order is system clock and as second clock the RTC clock.
-> >> +
-> >> +Examples:
-> >> +
-> >> +     timer at 10008000 {
-> >> +             compatible = "mediatek,mt6577-timer";
-> >> +             reg = <0x10008000 0x80>;
-> >> +             interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-> >> +             clocks = <&system_clk>, <&rtc_clk>;
-> >> +             clock-names = "system-clk", "rtc-clk";
-> >
-> > These names should be mentioned above, or removed.
+On Tue, Jul 01, 2014 at 12:04:35AM -0500, Rob Herring wrote:
+
+<snip>
+
+> > +- clock-names: Should contain the following:
+> > +  "core"               Master/Core clock, have to be >= 125 MHz for SS
+> > +                               operation and >= 60MHz for HS operation
+> > +
+> > +Optional clocks:
+> > +  "iface"              System bus AXI clock.  Not present on all platforms
 > 
-> I added the clock-names to make it the clock order clearer, as it is
-> done in the arm sp,804 [1].
-> But I think it is clear enough through the phandle names and the
-> description of the clocks property.
-> So I will delete the clock-names in the v10 round.
+> Really?, some platforms have a clockless bus?
 
-I think I originally advocated for adding those names. And my argument
-was that the names in the dts are probably not clearly identifying the
-timer IP's clock inputs since they refer to SOC names for the clocks. We
-had this argument for a while now and it doesn't seem to get better
-than this. But to explain why I try to get IP vs. SOC clock names in
-here is, that I had such a case with Zynq's Ethernet core. That IP has
-quite a few clock inputs and luckily the mainline driver for that IP
-used the proper names from the IP data sheet for the clocks instead
-of the SOC names. That made it relatively easy to match things with the
-Zynq integration of that IP. Had that driver used SOC clock names,
-things would have been more difficult.
+Some platforms require core and interface.  The specific platform I tested on
+does not have an iface clk.  I'll take a look at the ipq block diagram to see if
+they did something cute, but i don't believe there is one.
 
-	S?ren
+> 
+> > +  "sleep"              Sleep clock, used when USB3 core goes into low
+> > +                               power mode (U3).
+> > +
+> > +Optional regulator:
+> > +- gdsc-supply: phandle to the regulator from globally distributed
+> > +                               switch controller
+> 
+> The name should reflect the name of the input, not the source.
+
+Ok, I'll revisit this.  I took this from the original patch set.
+
+<snip>
+
+> > +
+> > +                       ranges;
+> > +
+> > +                       status = "disabled";
+> > +
+> > +                       dwc3 at 11000000 {
+> > +                               compatible = "snps,dwc3";
+> 
+> This sub-node is just wrong. Why can't you have a single node with '
+> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
+> adding here is clocks. Does the Synopsys block have no clocks?
+> 
+> I guess this is copied from other broken dwc3 bindings... That doesn't
+> mean you have to copy it.
+
+The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
+That, in addition to pm, has to be handled from the wrapper.  That's my take
+anyway.  I am sure Felipe can speak more to this.
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
