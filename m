@@ -1,47 +1,37 @@
-From: loeliger@gmail.com (Jon Loeliger)
-Date: Tue, 1 Jul 2014 12:41:36 -0500
-Subject: Some Large Address Space Ponders on A9
-In-Reply-To: <20140701162620.GB18309@arm.com>
-References: <CAJgR-BhNHYVYJo+jXAOCy+xzXP-AMjJ7LhuzssrQSEPQN4W=2A@mail.gmail.com>
- <20140701162620.GB18309@arm.com>
-Message-ID: <CAJgR-BjmDo9HiLqnnDmAabVCXHZCTwvZ9unfLNC_FbyKv+bn7w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 1 Jul 2014 14:44:40 -0300
+Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
+ share_count
+In-Reply-To: <20140701115252.GM14471@dragon>
+References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
+ <1404194129-25543-4-git-send-email-festevam@gmail.com>
+ <20140701115252.GM14471@dragon>
+Message-ID: <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 1, 2014 at 11:26 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
+On Tue, Jul 1, 2014 at 8:52 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
 
->> Here's the problem.  Over in include/linux/types.h we find:
+>> --- a/arch/arm/mach-imx/clk-gate2.c
+>> +++ b/arch/arm/mach-imx/clk-gate2.c
+>> @@ -67,7 +67,7 @@ static void clk_gate2_disable(struct clk_hw *hw)
 >>
->>     #ifdef CONFIG_PHYS_ADDR_T_64BIT
->>     typedef u64 phys_addr_t;
->>     #else
->>     typedef u32 phys_addr_t;
->>     #endif
+>>       spin_lock_irqsave(gate->lock, flags);
 >>
->>     typedef phys_addr_t resource_size_t;
+>> -     if (gate->share_count && --(*gate->share_count) > 0)
+>> +     if (gate->share_count && (*gate->share_count)-- > 0)
 >
-> I won't comment on how you define this in DT but for the kernel things
-> will likely break when you increase phys_addr_t to 64-bit on non-LPAE
-> builds.
->
-> First (only) question - how do you intend to map such physical address?
-> The only way I'm aware of on A9 is using supersections and the ARM Linux
-> port provides __arm_ioremap_pfn(). However, the supersections code is
-> only enabled if !SMP.
->
-> --
-> Catalin
+> The change makes no sense.  Let's say that clk_gate2_disable() gets
+> called with share_count being 1.  In this case, we should access
+> register to gate the clock, right?
 
-So, I don't really need to map in that as physical address space
-that will be actually accessed.  I need to be able to parse the
-large values out of the DT (2-cell values) into resource_size_t
-variables and then manipulate the address space they represent.
-Later, my IP block can handle the larger addresses, not as physical
-memory, but as addresses.  I guess you could think of it as a
-windowing or address translation mechanism that isn't coming
-from the A9's 32-bit AXI bus.
+If share_count is 1 it means that someone else is using the clock and
+we can't disable it.
 
-Does that help explain the weird?  Or just confuse it? :-)
+Please try running the series without this patch. When the extern
+audio clock is enabled, share_count is 1. Later the the spdif clock
+(the one that is shared with extern audio clock) is disabled by the
+CCF as it is not used, which makes the extern audio clock to be also
+disabled, which is not what we want.
 
-jdl
+What would you suggest?
