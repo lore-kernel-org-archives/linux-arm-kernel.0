@@ -1,48 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Jul 2014 18:51:24 +0200
-Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
-In-Reply-To: <CAPDyKFqi2NH1r=Q13iOu2ruuvaj1xJeoERiy2WJBVbQ2b1tc_A@mail.gmail.com>
-References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
- <53A3ED65.80605@redhat.com>
- <CAPDyKFqi2NH1r=Q13iOu2ruuvaj1xJeoERiy2WJBVbQ2b1tc_A@mail.gmail.com>
-Message-ID: <4396181.E2W0ve8f6g@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Jul 2014 12:53:19 -0400
+Subject: [PATCH 4/4] ARM: mvebu: add armada drm init to Dove board setup
+In-Reply-To: <20140701131026.GO32514@n2100.arm.linux.org.uk>
+References: <1404219871-18419-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1404219871-18419-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140701131026.GO32514@n2100.arm.linux.org.uk>
+Message-ID: <20140701165319.GH23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 July 2014 18:42:51 Ulf Hansson wrote:
-> On 20 June 2014 10:14, Hans de Goede <hdegoede@redhat.com> wrote:
-> > On 06/20/2014 10:02 AM, Olof Johansson wrote:
-> >> On Fri, Jun 20, 2014 at 12:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >> I disagree.
-> >>
-> >> The clock is the input to the module, and it is what needs to be
-> >> enabled for the module to work. It's not the input to some
-> >> power-sequence component on the module, or next to the module on the
-> >> bus.
-> >
-> > Right, it is an input to the sdio-module, not to the mmc-host, so its an
-> > input to a different piece of hardware (at different ends of the mmc bus),
-> > but since the mmc-bus normally is fully discoverable we've no node for the
-> > other end of the bus.
-> >
-> > So from the mmc-host pov, which is the one which needs to bind the pwrseq
-> > driver, as that needs to be done before it can probe its bus, this is
-> > a different piece of hardware, hence a subnode to the host makes perfect
-> > sense.  This is in no way part of the host, so certainly it does not belong
-> > inside the hosts subnode.
+Russell,
+
+On Tue, Jul 01, 2014 at 02:10:26PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 01, 2014 at 03:04:31PM +0200, Sebastian Hesselbarth wrote:
+> > +	pdev = platform_device_register_full(&armada_drm_dev_info);
+> > +	/* assign last found lcd node to drm device for clk lookup */
+> > +	pdev->dev.of_node = clknp;
 > 
-> I fully agree with you Hans here.
+> NAK.  This really isn't a good way to deal with this, even in a
+> temporary basis.  While assigning a DT node to a manually created
+> platform device does solve that problem, it also introduces the
+> problem that this platform device will now match any platform driver
+> which recognises the "marvell,dove-lcd" compatible type, which may
+> occur _before_ we find the driver to match using the legacy strings.
 > 
-> If we were to put this information in the host's DT node, that would
-> be a wrong description of the hardware. Currently, I can't think of
-> anything better than a subnode, but I am open to suggestions.
+> There really isn't an easy solution to this other than doing the thing
+> properly.
 
-The problem that I see with your approach is that you use a subnode
-to describe an abstract concept, which isn't really a better description
-of the hardware than putting the contents in the parent node itself.
+And this creates our current deadlock.
 
-It would be more sensible if the subnode was defined (in this case)
-as describing the attached device (sdio card or similar), and restructure
-the code around that concept.
+> The other problem in this series is that while you introduce some
+> bindings which may work today, they're not going to work tomorrow, and
+> that's a problem.  Don't do DT piecemeal like this and end up having to
+> break the bindings (which we will have to do to add the endpoints.)
 
-	Arnd
+Seriously, we've got to do something to get off of the X.  Why not just
+declare the binding Sebastian just sent as unstable?  Then we change it
+as needed until we get all the pieces in place.
+
+At KS2013, we discussed, and agreed upon the fact that we _can_ have
+unstable bindings to keep the bus moving.  Perfection being the enemy of
+getting it done and all.
+
+Once we reach the goal of how we want the bindings to look, then we
+declare it stable.  I know it's not ideal, but "plan it out perfectly
+before pushing anything" isn't realistic either.
+
+thx,
+
+Jason.
