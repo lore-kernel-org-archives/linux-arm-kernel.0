@@ -1,28 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Jul 2014 00:59:30 -0700
-Subject: [PATCH V4 00/16] irqchip: crossbar: Driver fixes
-In-Reply-To: <20140630192910.GA23978@titan.lakedaemon.net>
-References: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
- <20140630192910.GA23978@titan.lakedaemon.net>
-Message-ID: <20140701075930.GN28884@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 1 Jul 2014 09:59:58 +0200
+Subject: [PATCH 6/9] ARM: dts: sun7i: Add board support for LinkSprite
+ pcDuino V3
+In-Reply-To: <53B2638A.3060206@redhat.com>
+References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
+ <1404165479-23785-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
+ <53B25F60.2050704@redhat.com>
+ <CAGb2v64KMxXQ7QaRcsWxHbCLNJtWkh5sxj82C-y9GyNW7R+M_Q@mail.gmail.com>
+ <53B2638A.3060206@redhat.com>
+Message-ID: <20140701075958.GJ28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jason Cooper <jason@lakedaemon.net> [140630 12:30]:
+On Tue, Jul 01, 2014 at 09:30:18AM +0200, Hans de Goede wrote:
+> Ok, I'm not seeing anything for 3.17 here though:
+> https://github.com/mripard/linux/
 > 
-> Whole series applied to irqchip/crossbar, I'll give it a day or two in
-> -next, then I'll merge it into irqchip/core.
-> 
-> Tony: Right now, it's immutable unless you tell me I applied something
-> incorrectly.  Once it goes into irqchip/core, it's immutable no matter
-> what you say. ;-)
+> Maxime, can you push a sunxi/dt-for-3.17 with what you currently have there?
 
-Thanks, looks good to me. Sricharan and Nishant, can you please
-check that we can now apply the related .dts changes on top of
-Jason's branch at:
+Ah, sorry, my bad.
 
-git://git.infradead.org/users/jcooper/linux.git irqchip/crossbar
+>From 3.17, I started to use a kernel.org git tree there:
 
-Regards,
+git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
 
-Tony
+And forgot to notify you.
+
+There will also be linux-next coverage for the patches I gather.
+
+> Then I'll rebase this series on top, fix the commit msg thingie Chen
+> pointed out and send a v2.
+
+Fixed the whitespace error, the conflict, and the commit message, and
+applied.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/e2e50297/attachment.sig>
