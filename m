@@ -1,46 +1,92 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Jul 2014 10:01:53 +0200
-Subject: [linux-sunxi] Re: [PATCH 7/9] ARM: dts: sun7i: Add new
- ba10-tvbox board
-In-Reply-To: <53B25DF7.8050508@redhat.com>
-References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
- <1404165479-23785-8-git-send-email-hdegoede@redhat.com>
- <CAGb2v66BO4W5Nrp-9X+20mK+7BObpdmc5x70BC5C7EGEHDcvew@mail.gmail.com>
- <53B25DF7.8050508@redhat.com>
-Message-ID: <20140701080153.GK28647@lukather>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 1 Jul 2014 11:06:10 +0300
+Subject: [PATCH 6/6] thermal: Add Tegra SOCTHERM thermal management driver
+In-Reply-To: <53B1D538.6000704@wwwdotorg.org>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-7-git-send-email-mperttunen@nvidia.com>
+ <53B1D538.6000704@wwwdotorg.org>
+Message-ID: <53B26BF2.7090009@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 09:06:31AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 07/01/2014 04:16 AM, Chen-Yu Tsai wrote:
-> > On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >> The ba10 tvbox is an A10 based android tvbox, with 512M RAM, 8G nand flash,
-> >> rtl8188ctv usb wifi 1 USB-A receptacle hooked up to an EHCI/OHCI controller,
-> >> 1 USB-A receptacle hooked up to the OTG and 100Mbit ethernet using a
-> >> rtl8201 phy.
-> > 
-> > Nitpick on the subject, should be sun4i.
-> 
-> Right, I actually noticed that myself too, but I forgot to fix this up before
-> sending :|
-> 
-> Maxime, can you fix this up, or do you want a resend (and if resend, just this
-> patch or the entire set?).
+Inline.
 
-Fixed and applied.
+On 01/07/14 00:23, Stephen Warren wrote:
+> On 06/27/2014 02:11 AM, Mikko Perttunen wrote:
+>> This adds support for the Tegra SOCTHERM thermal sensing and management
+>> system found in the Tegra124 system-on-chip. This initial driver supports
+>> the four thermal zones with hardware-tracked trip points.
+>
+>> diff --git a/drivers/thermal/tegra_soctherm.c b/drivers/thermal/tegra_soctherm.c
+>
+>> +static struct tegra_tsensor t124_tsensors[] = {
+>> +	{
+>> +		.base = 0xc0,
+>> +		.name = "cpu0",
+>> +		.config = &t124_tsensor_config,
+>> +		.calib_fuse_offset = 0x098,
+>> +		.fuse_corr_alpha = 1135400,
+>> +		.fuse_corr_beta = -6266900,
+>> +	},
+>
+> I wonder why some of those fields are named "fuse_xxx" when the values
+> are hard-coded in these tables rather than read from fuses? These values
+> don't seem to be used to adjust values read from fuses.
 
-Maxime
+They are used to when calculating the thermal calibration in 
+calculate_tsensor_calibration, which is based on the value read from the 
+fuse. Downstream calls them fuse correction values, so I kept that. (I 
+guess the meaning of corr might not be obvious..) On downstream there is 
+another set of these correction values used depending on the fuse 
+revision, but I believe the older revision is only found internally.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/fbb044da/attachment.sig>
+>
+>> +static int tegra_thermctl_get_temp(void *data, long *out_temp)
+>
+>> +	switch (zone->sensor) {
+>> +	case 0:
+>> +		val = readl(zone->tegra->regs + SENSOR_TEMP1)
+>> +			>> SENSOR_TEMP1_CPU_TEMP_SHIFT;
+>
+> Can't the register offset and shift be stored in *zone, so that this
+> whole switch can be replaced with something generic:
+>
+> val = readl(zone->tegra->regs + zone->reg_offset) >> zone->value_shift;
+
+Yes, certainly doable.
+
+>
+>> +static int tegra_soctherm_probe(struct platform_device *pdev)
+>
+>> +	irq = platform_get_irq(pdev, 0);
+>> +	if (irq <= 0) {
+>> +		dev_err(&pdev->dev, "can't get interrupt\n");
+>> +		return -EINVAL;
+>> +	}
+>
+> irq is assigned once here ... (see later)
+>
+>> +	for (i = 0; i < 4; ++i) {
+>
+> Why "4"? Should the loop count be the ARRAY_SIZE(some array)? At the
+> very least, a named constant that describes the value would be useful...
+
+The thermctl sensors have been unchanged for a few chip generations, so 
+I was thinking that just hardcoding this wouldn't be so bad. But I guess
+an array would look nicer here. Will fix.
+
+>
+>> +		err = devm_request_threaded_irq(&pdev->dev, irq, soctherm_isr,
+>> +						soctherm_isr_thread,
+>> +						IRQF_SHARED, "tegra_soctherm",
+>> +						zone);
+>
+> Why request the same IRQ 4 times here. Rather, shouldn't the IRQ be
+> requested once, and the ISR simply loop over the status register (or
+> whatever there are 4 of)?
+>
+
+I had that variant as well, but since we need to pass the list of 
+tripped sensors to soctherm_isr_thread somehow, I guess some kind of 
+locking or atomic is needed. This version doesn't need that, so I went 
+with it.
