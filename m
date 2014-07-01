@@ -1,56 +1,71 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 01 Jul 2014 21:04:15 +0100
-Subject: [PATCH] ARM: convert all "mov.* pc,
- reg" to "bx reg" for ARMv6+ (part1)
-In-Reply-To: <20140701173547.GW28164@arm.com> (Will Deacon's message of "Tue,
- 1 Jul 2014 18:35:47 +0100")
-References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
- <yw1x4mz1f2t9.fsf@unicorn.mansr.com>
- <20140701171346.GP3705@n2100.arm.linux.org.uk>
- <yw1xzjgtdmas.fsf@unicorn.mansr.com> <20140701173547.GW28164@arm.com>
-Message-ID: <yw1xvbrgethc.fsf@unicorn.mansr.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 1 Jul 2014 22:08:07 +0200
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <53B2E311.6030609@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
+ <53B2E311.6030609@mentor.com>
+Message-ID: <CAKv+Gu-4kzpNf4+0WcsteeOd+=z2-fnCumxDyTFY5yCT9jrB4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
-
-> Hi Mans,
+On 1 July 2014 18:34, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+> On 06/30/2014 03:12 AM, Ard Biesheuvel wrote:
+>> On 23 June 2014 05:11, Nathan Lynch <nathan_lynch@mentor.com> wrote:
+>>> Provide fast userspace implementations of gettimeofday and
+>>> clock_gettime on systems that implement the generic timers extension
+>>> defined in ARMv7.
 >
-> On Tue, Jul 01, 2014 at 06:24:43PM +0100, M?ns Rullg?rd wrote:
->> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->> > As you point out, "bx lr" /may/ be treated specially (I've actually been
->> 
->> Most, if not all, Cortex-A cores do this according the public TRMs.
->> They also do the same thing for "mov pc, lr" so there will probably be
->> no performance gain from this change.  It's still a good idea though,
->> since we don't know what future cores will do.
+> ...
 >
-> Funnily enough, that's not actually true (and is more or less what prompted
-> this patch after discussion with Russell). There are cores out there that
-> don't predict mov pc, lr at all (let alone do anything with the return
-> stack).
-
-Even ones where the TRM says they do?  I suppose the only way to know
-for sure is to measure it.
-
->> > discussing this with Will Deacon over the last couple of days, who has
->> > also been talking to the hardware people in ARM, and Will is happy with
->> > this patch as in its current form.)  This is why I've changed all
->> > "mov pc, reg" instructions which return in some way to use this macro,
->> > and left others (those which are used to call some function and return
->> > back to the same point) alone.
->> 
->> In that case the patch should be fine.  Your patch description didn't
->> make it clear that only actual returns were being changed.
+>> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> On Exynos-5250 (Cortex-A15):
+>>
+>> clock-gettime-monotonic system calls per second: 1759517
+>> clock-gettime-monotonic vdso calls per second:   6027915 (3.43x speedup)
+>> clock-getres-monotonic system calls per second: 2144055
+>> clock-getres-monotonic vdso calls per second:   82783103 (38.61x speedup)
+>> clock-gettime-monotonic-coarse system calls per second: 1971433
+>> clock-gettime-monotonic-coarse vdso calls per second:   10710734 (5.43x speedup)
+>> clock-getres-monotonic-coarse system calls per second: 2182380
+>> clock-getres-monotonic-coarse vdso calls per second:   76710594 (35.15x speedup)
+>> clock-gettime-realtime system calls per second: 1722524
+>> clock-gettime-realtime vdso calls per second:   6309212 (3.66x speedup)
+>> clock-getres-realtime system calls per second: 2182357
+>> clock-getres-realtime vdso calls per second:   83120713 (38.09x speedup)
+>> clock-gettime-realtime-coarse system calls per second: 2085498
+>> clock-gettime-realtime-coarse vdso calls per second:   11326069 (5.43x speedup)
+>> clock-getres-realtime-coarse system calls per second: 2178266
+>> clock-getres-realtime-coarse vdso calls per second:   76731175 (35.23x speedup)
+>> Note: vDSO version of getcpu not found
+>> getcpu system calls per second: 2645300
+>> getcpu vdso calls per second:   2612154 (0.99x speedup)
+>> Note: vDSO version of getcpu not found
+>> Note: vDSO version of getcpu not found
+>> gettimeofday system calls per second: 1707745
+>> gettimeofday vdso calls per second:   6474501 (3.79x speedup)
 >
-> I'm led to believe that some predictors require lr in order to update the
-> return stack, whilst others don't. That part is all horribly
-> micro-architectural, so the current patch is doing the right thing by
-> sticking to the ARM ARM but enabling us to hook into other registers later
-> on if we choose.
+> Thank you very much for testing (especially on a platform I don't have).
+>
+> These results match up with what I get on OMAP5 (also Cortex-A15).
+>
 
-Agreed.
+Good.
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+> Since it looks like I will need to make some significant changes for the
+> next version, I think I can't in good conscience carry your Tested-by on
+> to v8 (although I'm open to different opinions).  But I still very much
+> appreciate it.
+>
+
+We (at Linaro) had independently identified VDSO for ARM as a topic of
+interest after seeing gettimeofday() turn up in a couple of benchmarks
+(which btw seem to be the primary users of gettimeofday() at such a
+high rate), so of course, when someone else steps up and does the
+work, i am happy to at least spend some time testing it. Therefore, I
+would be happy to test your new version either before or after you
+(re)post it, whichever you prefer.
+
+Regards,
+Ard.
