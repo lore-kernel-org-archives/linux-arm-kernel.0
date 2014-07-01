@@ -1,34 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 1 Jul 2014 19:51:26 +0200
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
-In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140701175126.GA20086@lunn.ch>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 1 Jul 2014 19:56:01 +0200
+Subject: [PATCH 00/33] ARM: at91: Switch remaining SoCs and boards to CCF
+In-Reply-To: <8196570.1BaMSL4giB@wuerfel>
+References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5780166.MMf0Vhnnsu@wuerfel> <20140701164851.GI3427@piout.net>
+ <8196570.1BaMSL4giB@wuerfel>
+Message-ID: <20140701175601.GJ3427@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
+On 01/07/2014 at 19:01:12 +0200, Arnd Bergmann wrote :
+> On Tuesday 01 July 2014 18:48:51 Alexandre Belloni wrote:
+> > On 01/07/2014 at 18:35:50 +0200, Arnd Bergmann wrote :
+> > > If I read this right, disabling 'USE_OF' results in still using
+> > > the old clock interface. Is that intentional? If you want to always
+> > > use COMMON_CLK now, the above can probably be simplified to
+> > > 
+> > > config AT91_PMC_UNIT
+> > >         def_bool !ARCH_AT91X40
+> > >       select COMMON_CLK
+> > > 
+> > > and all references to AT91_USE_OLD_CLK, COMMON_CLK_AT91 and
+> > > OLD_CLK_AT91 be removed.
+> > 
+> > Yeah, this is intentional we still have 30 or so boards that we have to
+> > migrate to DT. Until then, we want to be able to boot a kernel without
+> > CCF. The next step in the migration is to switch those boards to DT,
+> > possibly using an hybrid DT/pdata approach until we can get rid of the
+> > board files. Then, we will be able to get rid of the old clk
+> > implementation (and a few other drivers still living in mach-at91).
 > 
-> We provide a new macro "ret" with all its variants for the condition
-> code which will resolve to the appropriate instruction.
+> Ok, I see. Do you expect those 30 boards to work if COMMON_CLK_AT91
+> is enabled, or are there known problems with that?
 > 
-> Rather than doing this piecemeal, and miss some instances, change all
-> the "mov pc" instances to use the new macro, with the exception of
-> the "movs" instruction and the kprobes code.  This allows us to detect
-> the "mov pc, lr" case and fix it up - and also gives us the possibility
-> of deploying this for other registers depending on the CPU selection.
+> If you have reason to believe it doesn't work, maybe you can expose
+> the selection of the clock interface to users, e.g. like
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Hi Russell
+We actually do the opposite, when a board without DT support is
+selected, the old clock support is also selected even when also
+selecting CONFIG_OF.
 
-Boot tested on kirkwood.
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-	   Andrew
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
