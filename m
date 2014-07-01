@@ -1,51 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 01 Jul 2014 20:52:21 +0900
-Subject: [Patch v7 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
-References: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
-Message-ID: <03d501cf9522$eaf67200$c0e35600$@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 1 Jul 2014 19:52:53 +0800
+Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
+ share_count
+In-Reply-To: <1404194129-25543-4-git-send-email-festevam@gmail.com>
+References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
+ <1404194129-25543-4-git-send-email-festevam@gmail.com>
+Message-ID: <20140701115252.GM14471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chander Kashyap wrote:
+On Tue, Jul 01, 2014 at 02:55:28AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
+> SSI clocks use the share_count mechanism since SSI and SPDIF share the same
+> clock gate bits.
 > 
-> This patchset adds cpuidle support for Exynos5420 SoC based on
-> generic big.little cpuidle driver.
+> When using the share_count for the SSI clock we notice that it gets disabled
+> due to the usage of pre-decrement operation in the clk_gate2_disable() function.
 > 
-> Tested on SMDK5420.
-> Rebased on 3.16-rc1
+> Use the post-decrement operation so that the correct share_count is used and the
+> SSI clock does not get disable when an audio file needs to be played. 
 > 
-> Changelog is in respective patches.
-> Chander Kashyap (5):
->   driver: cpuidle-big-little: add of_device_id structure
->   arm: exynos: add generic function to calculate cpu number
->   cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
->     driver
->   driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
->   exynos: cpuidle: do not allow cpuidle registration for Exynos5420
->   mcpm: exynos: populate suspend and powered_up callbacks
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-gate2.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->  arch/arm/mach-exynos/exynos.c        |    4 +++-
->  arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
->  drivers/cpuidle/Kconfig.arm          |    2 +-
->  drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
->  5 files changed, 60 insertions(+), 3 deletions(-)
-> 
+> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+> index 4ba587d..463083c 100644
+> --- a/arch/arm/mach-imx/clk-gate2.c
+> +++ b/arch/arm/mach-imx/clk-gate2.c
+> @@ -67,7 +67,7 @@ static void clk_gate2_disable(struct clk_hw *hw)
+>  
+>  	spin_lock_irqsave(gate->lock, flags);
+>  
+> -	if (gate->share_count && --(*gate->share_count) > 0)
+> +	if (gate->share_count && (*gate->share_count)-- > 0)
 
-+ Nicolas
+The change makes no sense.  Let's say that clk_gate2_disable() gets
+called with share_count being 1.  In this case, we should access
+register to gate the clock, right?
 
-Hi,
+Shawn
 
-This series looks good to me and I asked Chander to test this series with
-Nico's mcpm patches on smdk5420 and he said it works fine. So I will apply
-this into samsung tree if Nicolas has no objection on 6/6.
-
-BTW, one more, there are duplicated sign-off from Chander with different
-e-mail address, I'm not sure it should be fine or not because I didn't see
-same thing before.
-
-Thanks,
-Kukjin
+>  		goto out;
+>  
+>  	reg = readl(gate->reg);
+> -- 
+> 1.8.3.2
+> 
