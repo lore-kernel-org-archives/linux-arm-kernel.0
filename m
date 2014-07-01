@@ -1,34 +1,31 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 30 Jun 2014 21:11:55 -0400
-Subject: [PATCH] clk: Add tracepoints for hardware operations
-In-Reply-To: <53B209E5.1050701@codeaurora.org>
-References: <1404172599-10171-1-git-send-email-sboyd@codeaurora.org>
- <20140630205211.3d114169@gandalf.local.home>
- <53B209E5.1050701@codeaurora.org>
-Message-ID: <20140630211155.18fbffc8@gandalf.local.home>
+From: xerofoify@gmail.com (Nick Krause)
+Date: Mon, 30 Jun 2014 21:59:17 -0400
+Subject: [PATCH] Fixes gemmi_idle in file idle.c
+In-Reply-To: <20140630094157.GT32514@n2100.arm.linux.org.uk>
+References: <1404096760-5239-1-git-send-email-xerofoify@gmail.com>
+ <20140630094157.GT32514@n2100.arm.linux.org.uk>
+Message-ID: <CAPDOMVjNU+XJnxqVsY5ZAh=VUx8RUf_Av0C8yVdaTczQWsh-ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jun 2014 18:07:49 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+Thanks for the good feedback on kernel development , I will delete this file
+in order to clean up race conditions caused by it.
+Cheers Nick
 
-> >
-> >>  		if (clk->ops->enable) {
-> >>  			ret = clk->ops->enable(clk->hw);
-> >>  			if (ret) {
-> >> @@ -945,6 +965,7 @@ static int __clk_enable(struct clk *clk)
-> >>  				return ret;
-> > It may make even more sense to add the tracepoints within the if
-> > statement. Especially if you have a return on error.
-> >
-> >
-> 
-> Right. I was thinking that no "clk*_complete" event would mean there was
-> some error. Detecting that case is not so easy though. It may be better
-> to always have the completion event so we know how long hardware
-> operations take and so that error handling is simpler.
-> 
-
-You could also have the event record the ret as well.
-
--- Steve
+On Mon, Jun 30, 2014 at 5:41 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jun 29, 2014 at 10:52:40PM -0400, Nicholas Krause wrote:
+>> disables the IRQ line in gemmi_idle before calling cpu_do_idle.
+>> In addition, according to the Fixme message in this file fixes
+>> races that may occur due to not disabling the IRQ before calling
+>> cpu_do_idle.
+>
+> 1) the idle method is called with interrupts already disabled.
+> 2) I wonder if you read the comment above the comment you removed, and
+>    if so, why it wasn't removed.
+> 3) can you indicate how the hardware problem has been fixed, or give some
+>    justification why this change should be accepted.
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
