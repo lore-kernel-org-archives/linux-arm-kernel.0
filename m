@@ -1,27 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 02 Jul 2014 00:42:06 +0200
-Subject: [PATCH] ARM: convert all "mov.* pc,
- reg" to "bx reg" for ARMv6+ (part1)
-In-Reply-To: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk> (Russell King's
- message of "Tue, 01 Jul 2014 17:19:33 +0100")
-References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
-Message-ID: <87y4wcog5d.fsf@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 23:44:38 +0100
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <CAKv+Gu-4kzpNf4+0WcsteeOd+=z2-fnCumxDyTFY5yCT9jrB4A@mail.gmail.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
+ <53B2E311.6030609@mentor.com>
+ <CAKv+Gu-4kzpNf4+0WcsteeOd+=z2-fnCumxDyTFY5yCT9jrB4A@mail.gmail.com>
+Message-ID: <20140701224438.GD32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King <rmk+kernel@arm.linux.org.uk> writes:
+On Tue, Jul 01, 2014 at 10:08:07PM +0200, Ard Biesheuvel wrote:
+> We (at Linaro) had independently identified VDSO for ARM as a topic of
+> interest after seeing gettimeofday() turn up in a couple of benchmarks
+> (which btw seem to be the primary users of gettimeofday() at such a
+> high rate), so of course, when someone else steps up and does the
+> work, i am happy to at least spend some time testing it. Therefore, I
+> would be happy to test your new version either before or after you
+> (re)post it, whichever you prefer.
 
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
+As has been covered by Nathan in a previous reply - the VDSO is only
+of real benefit on CPUs with the architected timer.  Those without
+this do not have access from userspace to an appropriate timer to
+allow the VDSO to compute the current time.
 
-For ARMv5 - XScale, and more specificaly the mioa701_bootresume.S path (suspend
-to RAM) :
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hence, the VDSO will just call into the kernel via the standard (and
+very same) syscalls that glibc would otherwise have used.
 
-Cheers.
+This is illustrated nicely by the results posted for iMX6, which
+reflects how the VDSO is going to affect platforms without the
+architected timer.
 
---
-Robert
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
