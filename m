@@ -1,137 +1,217 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 01 Jul 2014 15:46:49 +0100
-Subject: [PATCH v3 4/8] drm: msm: update to use component match support
+Date: Tue, 01 Jul 2014 15:46:44 +0100
+Subject: [PATCH v3 3/8] component: add support for component match array
 In-Reply-To: <20140701144011.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X1zKb-0000cS-9d@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X1zKW-0000cO-60@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update MSM's DRM driver to use the component match support rather than
-add_components.
+Add support for generating a set of component matches at master probe
+time, and submitting them to the component layer.  This allows the
+component layer to perform the matches internally without needing to
+call into the master driver, and allows for further restructuring of
+the component helper.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-This patch is destined for Greg's driver and David's DRM trees.
+This patch is destined for Greg's driver and staging trees, and David's DRM
+tree.
 
- drivers/gpu/drm/msm/msm_drv.c | 83 ++++++++++++++++++-------------------------
- 1 file changed, 35 insertions(+), 48 deletions(-)
+ drivers/base/component.c  | 120 ++++++++++++++++++++++++++++++++++++++++++++--
+ include/linux/component.h |   7 +++
+ 2 files changed, 124 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
-index 9a5d87db5c23..a322029983ce 100644
---- a/drivers/gpu/drm/msm/msm_drv.c
-+++ b/drivers/gpu/drm/msm/msm_drv.c
-@@ -905,12 +905,41 @@ static int compare_of(struct device *dev, void *data)
- {
- 	return dev->of_node == data;
- }
-+#else
-+static int compare_dev(struct device *dev, void *data)
-+{
-+	return dev == data;
-+}
-+#endif
-+
-+static int msm_drm_bind(struct device *dev)
-+{
-+	return drm_platform_init(&msm_driver, to_platform_device(dev));
-+}
-+
-+static void msm_drm_unbind(struct device *dev)
-+{
-+	drm_put_dev(platform_get_drvdata(to_platform_device(dev)));
-+}
-+
-+static const struct component_master_ops msm_drm_ops = {
-+	.bind = msm_drm_bind,
-+	.unbind = msm_drm_unbind,
+diff --git a/drivers/base/component.c b/drivers/base/component.c
+index 55813e91bf0d..b4236daed4fa 100644
+--- a/drivers/base/component.c
++++ b/drivers/base/component.c
+@@ -18,6 +18,15 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ 
++struct component_match {
++	size_t alloc;
++	size_t num;
++	struct {
++		void *data;
++		int (*fn)(struct device *, void *);
++	} compare[0];
 +};
 +
-+/*
-+ * Platform driver:
-+ */
+ struct master {
+ 	struct list_head node;
+ 	struct list_head components;
+@@ -25,6 +34,7 @@ struct master {
  
--static int msm_drm_add_components(struct device *master, struct master *m)
-+static int msm_pdev_probe(struct platform_device *pdev)
- {
--	struct device_node *np = master->of_node;
-+	struct component_match *match = NULL;
-+#ifdef CONFIG_OF
-+	/* NOTE: the CONFIG_OF case duplicates the same code as exynos or imx
-+	 * (or probably any other).. so probably some room for some helpers
+ 	const struct component_master_ops *ops;
+ 	struct device *dev;
++	struct component_match *match;
+ };
+ 
+ struct component {
+@@ -96,6 +106,34 @@ int component_master_add_child(struct master *master,
+ }
+ EXPORT_SYMBOL_GPL(component_master_add_child);
+ 
++static int find_components(struct master *master)
++{
++	struct component_match *match = master->match;
++	size_t i;
++	int ret = 0;
++
++	if (!match) {
++		/*
++		 * Search the list of components, looking for components that
++		 * belong to this master, and attach them to the master.
++		 */
++		return master->ops->add_components(master->dev, master);
++	}
++
++	/*
++	 * Scan the array of match functions and attach
++	 * any components which are found to this master.
 +	 */
-+	struct device_node *np = pdev->dev.of_node;
- 	unsigned i;
--	int ret;
- 
- 	for (i = 0; ; i++) {
- 		struct device_node *node;
-@@ -919,22 +948,9 @@ static int msm_drm_add_components(struct device *master, struct master *m)
- 		if (!node)
- 			break;
- 
--		ret = component_master_add_child(m, compare_of, node);
--		of_node_put(node);
--
--		if (ret)
--			return ret;
-+		component_match_add(&pdev->dev, &match, compare_of, node);
- 	}
--	return 0;
--}
- #else
--static int compare_dev(struct device *dev, void *data)
--{
--	return dev == data;
--}
--
--static int msm_drm_add_components(struct device *master, struct master *m)
--{
- 	/* For non-DT case, it kinda sucks.  We don't actually have a way
- 	 * to know whether or not we are waiting for certain devices (or if
- 	 * they are simply not present).  But for non-DT we only need to
-@@ -958,41 +974,12 @@ static int msm_drm_add_components(struct device *master, struct master *m)
- 			return -EPROBE_DEFER;
- 		}
- 
--		ret = component_master_add_child(m, compare_dev, dev);
--		if (ret) {
--			DBG("could not add child: %d", ret);
--			return ret;
--		}
-+		component_match_add(&pdev->dev, &match, compare_dev, dev);
- 	}
--
--	return 0;
--}
- #endif
- 
--static int msm_drm_bind(struct device *dev)
--{
--	return drm_platform_init(&msm_driver, to_platform_device(dev));
--}
--
--static void msm_drm_unbind(struct device *dev)
--{
--	drm_put_dev(platform_get_drvdata(to_platform_device(dev)));
--}
--
--static const struct component_master_ops msm_drm_ops = {
--		.add_components = msm_drm_add_components,
--		.bind = msm_drm_bind,
--		.unbind = msm_drm_unbind,
--};
--
--/*
-- * Platform driver:
-- */
--
--static int msm_pdev_probe(struct platform_device *pdev)
--{
- 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--	return component_master_add(&pdev->dev, &msm_drm_ops);
-+	return component_master_add_with_match(&pdev->dev, &msm_drm_ops, match);
++	for (i = 0; i < match->num; i++) {
++		ret = component_master_add_child(master,
++						 match->compare[i].fn,
++						 match->compare[i].data);
++		if (ret)
++			break;
++	}
++	return ret;
++}
++
+ /* Detach all attached components from this master */
+ static void master_remove_components(struct master *master)
+ {
+@@ -128,7 +166,7 @@ static int try_to_bring_up_master(struct master *master,
+ 	 * Search the list of components, looking for components that
+ 	 * belong to this master, and attach them to the master.
+ 	 */
+-	if (master->ops->add_components(master->dev, master)) {
++	if (find_components(master)) {
+ 		/* Failed to find all components */
+ 		ret = 0;
+ 		goto out;
+@@ -186,18 +224,87 @@ static void take_down_master(struct master *master)
+ 	master_remove_components(master);
  }
  
- static int msm_pdev_remove(struct platform_device *pdev)
+-int component_master_add(struct device *dev,
+-	const struct component_master_ops *ops)
++static size_t component_match_size(size_t num)
++{
++	return offsetof(struct component_match, compare[num]);
++}
++
++static struct component_match *component_match_realloc(struct device *dev,
++	struct component_match *match, size_t num)
++{
++	struct component_match *new;
++
++	if (match && match->alloc == num)
++		return match;
++
++	new = devm_kmalloc(dev, component_match_size(num), GFP_KERNEL);
++	if (!new)
++		return ERR_PTR(-ENOMEM);
++
++	if (match) {
++		memcpy(new, match, component_match_size(min(match->num, num)));
++		devm_kfree(dev, match);
++	} else {
++		new->num = 0;
++	}
++
++	new->alloc = num;
++
++	return new;
++}
++
++/*
++ * Add a component to be matched.
++ *
++ * The match array is first created or extended if necessary.
++ */
++void component_match_add(struct device *dev, struct component_match **matchptr,
++	int (*compare)(struct device *, void *), void *compare_data)
++{
++	struct component_match *match = *matchptr;
++
++	if (IS_ERR(match))
++		return;
++
++	if (!match || match->num == match->alloc) {
++		size_t new_size = match ? match->alloc + 16 : 15;
++
++		match = component_match_realloc(dev, match, new_size);
++
++		*matchptr = match;
++
++		if (IS_ERR(match))
++			return;
++	}
++
++	match->compare[match->num].fn = compare;
++	match->compare[match->num].data = compare_data;
++	match->num++;
++}
++EXPORT_SYMBOL(component_match_add);
++
++int component_master_add_with_match(struct device *dev,
++	const struct component_master_ops *ops,
++	struct component_match *match)
+ {
+ 	struct master *master;
+ 	int ret;
+ 
++	if (ops->add_components && match)
++		return -EINVAL;
++
++	/* Reallocate the match array for its true size */
++	match = component_match_realloc(dev, match, match->num);
++	if (IS_ERR(match))
++		return PTR_ERR(match);
++
+ 	master = kzalloc(sizeof(*master), GFP_KERNEL);
+ 	if (!master)
+ 		return -ENOMEM;
+ 
+ 	master->dev = dev;
+ 	master->ops = ops;
++	master->match = match;
+ 	INIT_LIST_HEAD(&master->components);
+ 
+ 	/* Add to the list of available masters. */
+@@ -215,6 +322,13 @@ int component_master_add(struct device *dev,
+ 
+ 	return ret < 0 ? ret : 0;
+ }
++EXPORT_SYMBOL_GPL(component_master_add_with_match);
++
++int component_master_add(struct device *dev,
++	const struct component_master_ops *ops)
++{
++	return component_master_add_with_match(dev, ops, NULL);
++}
+ EXPORT_SYMBOL_GPL(component_master_add);
+ 
+ void component_master_del(struct device *dev,
+diff --git a/include/linux/component.h b/include/linux/component.h
+index 68870182ca1e..c00dcc302611 100644
+--- a/include/linux/component.h
++++ b/include/linux/component.h
+@@ -29,4 +29,11 @@ void component_master_del(struct device *,
+ int component_master_add_child(struct master *master,
+ 	int (*compare)(struct device *, void *), void *compare_data);
+ 
++struct component_match;
++
++int component_master_add_with_match(struct device *,
++	const struct component_master_ops *, struct component_match *);
++void component_match_add(struct device *, struct component_match **,
++	int (*compare)(struct device *, void *), void *compare_data);
++
+ #endif
 -- 
 1.8.3.1
