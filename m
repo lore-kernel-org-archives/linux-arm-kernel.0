@@ -1,107 +1,137 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  1 Jul 2014 19:43:29 +0100
-Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
- resources.
+Date: Tue,  1 Jul 2014 19:43:31 +0100
+Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
 In-Reply-To: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ranges property for a host bridge controller in DT describes
-the mapping between the PCI bus address and the CPU physical address.
-The resources framework however expects that the IO resources start
-at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
-The conversion from pci ranges to resources failed to take that into account.
-
-In the process move the function into drivers/of/address.c as it now
-depends on pci_address_to_pio() code and make it return an error message.
+Make it easier to discover the domain number of a bus by storing
+the number in pci_host_bridge for the root bus. Several architectures
+have their own way of storing this information, so it makes sense
+to try to unify the code. While at this, add a new function that
+creates a root bus in a given domain and make pci_create_root_bus()
+a wrapper around this function.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/of/address.c       | 47 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_address.h | 13 ++-----------
- 2 files changed, 49 insertions(+), 11 deletions(-)
+ drivers/pci/probe.c | 41 +++++++++++++++++++++++++++++++++--------
+ include/linux/pci.h |  4 ++++
+ 2 files changed, 37 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 1345733..cbbaed2 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -872,3 +872,50 @@ bool of_dma_is_coherent(struct device_node *np)
- 	return false;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 2c92662..abf5e82 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1748,8 +1748,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
  }
- EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-+
-+/*
-+ * of_pci_range_to_resource - Create a resource from an of_pci_range
-+ * @range:	the PCI range that describes the resource
-+ * @np:		device node where the range belongs to
-+ * @res:	pointer to a valid resource that will be updated to
-+ *              reflect the values contained in the range.
-+ *
-+ * Returns EINVAL if the range cannot be converted to resource.
-+ *
-+ * Note that if the range is an IO range, the resource will be converted
-+ * using pci_address_to_pio() which can fail if it is called too early or
-+ * if the range cannot be matched to any host bridge IO space (our case here).
-+ * To guard against that we try to register the IO range first.
-+ * If that fails we know that pci_address_to_pio() will do too.
-+ */
-+int of_pci_range_to_resource(struct of_pci_range *range,
-+	struct device_node *np, struct resource *res)
-+{
-+	int err;
-+	res->flags = range->flags;
-+	res->parent = res->child = res->sibling = NULL;
-+	res->name = np->full_name;
-+
-+	if (res->flags & IORESOURCE_IO) {
-+		unsigned long port = -1;
-+		err = pci_register_io_range(range->cpu_addr, range->size);
-+		if (err)
-+			goto invalid_range;
-+		port = pci_address_to_pio(range->cpu_addr);
-+		if (port == (unsigned long)-1) {
-+			err = -EINVAL;
-+			goto invalid_range;
-+		}
-+		res->start = port;
-+	} else {
-+		res->start = range->cpu_addr;
+ 
+-struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
++struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
++		int domain, int bus, struct pci_ops *ops, void *sysdata,
++		struct list_head *resources)
+ {
+ 	int error;
+ 	struct pci_host_bridge *bridge;
+@@ -1762,27 +1763,31 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 
+ 	bridge = pci_alloc_host_bridge();
+ 	if (!bridge)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
++	bridge->domain_nr = domain;
+ 
+ 	b = pci_alloc_bus();
+-	if (!b)
++	if (!b) {
++		error = -ENOMEM;
+ 		goto err_out;
 +	}
-+	res->end = res->start + range->size - 1;
-+	return 0;
-+
-+invalid_range:
-+	res->start = (resource_size_t)OF_BAD_ADDR;
-+	res->end = (resource_size_t)OF_BAD_ADDR;
-+	return err;
+ 
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
+-	b2 = pci_find_bus(pci_domain_nr(b), bus);
++	b2 = pci_find_bus(bridge->domain_nr, bus);
+ 	if (b2) {
+ 		/* If we already got to this bus through a different bridge, ignore it */
+ 		dev_dbg(&b2->dev, "bus already known\n");
++		error = -EEXIST;
+ 		goto err_bus_out;
+ 	}
+ 
+ 	bridge->bus = b;
+-	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
++	dev_set_name(&bridge->dev, "pci%04x:%02x", bridge->domain_nr, bus);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error)
+ 		goto err_out;
+@@ -1801,7 +1806,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 
+ 	b->dev.class = &pcibus_class;
+ 	b->dev.parent = b->bridge;
+-	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
++	dev_set_name(&b->dev, "%04x:%02x", bridge->domain_nr, bus);
+ 	error = device_register(&b->dev);
+ 	if (error)
+ 		goto class_dev_reg_err;
+@@ -1851,7 +1856,27 @@ err_bus_out:
+ 	kfree(b);
+ err_out:
+ 	kfree(bridge);
+-	return NULL;
++	return ERR_PTR(error);
 +}
 +
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index ac4aac4..33c0420 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -23,17 +23,8 @@ struct of_pci_range {
- #define for_each_of_pci_range(parser, range) \
- 	for (; of_pci_range_parser_one(parser, range);)
++struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
++		struct pci_ops *ops, void *sysdata, struct list_head *resources)
++{
++	int domain_nr;
++	struct pci_bus *b = pci_alloc_bus();
++	if (!b)
++		return NULL;
++
++	b->sysdata = sysdata;
++	domain_nr = pci_domain_nr(b);
++	kfree(b);
++
++	b = pci_create_root_bus_in_domain(parent, domain_nr, bus,
++				ops, sysdata, resources);
++	if (IS_ERR(b))
++		return NULL;
++
++	return b;
+ }
  
--static inline void of_pci_range_to_resource(struct of_pci_range *range,
--					    struct device_node *np,
--					    struct resource *res)
--{
--	res->flags = range->flags;
--	res->start = range->cpu_addr;
--	res->end = range->cpu_addr + range->size - 1;
--	res->parent = res->child = res->sibling = NULL;
--	res->name = np->full_name;
--}
--
-+extern int of_pci_range_to_resource(struct of_pci_range *range,
-+		struct device_node *np, struct resource *res);
- /* Translate a DMA address from device space to CPU space */
- extern u64 of_translate_dma_address(struct device_node *dev,
- 				    const __be32 *in_addr);
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 466bcd1..7e7b939 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -401,6 +401,7 @@ struct pci_host_bridge_window {
+ struct pci_host_bridge {
+ 	struct device dev;
+ 	struct pci_bus *bus;		/* root bus */
++	int domain_nr;
+ 	struct list_head windows;	/* pci_host_bridge_windows */
+ 	void (*release_fn)(struct pci_host_bridge *);
+ 	void *release_data;
+@@ -769,6 +770,9 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
+ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 				    struct pci_ops *ops, void *sysdata,
+ 				    struct list_head *resources);
++struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
++			int domain, int bus, struct pci_ops *ops,
++			void *sysdata, struct list_head *resources);
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+ int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+ void pci_bus_release_busn_res(struct pci_bus *b);
 -- 
 2.0.0
