@@ -1,30 +1,27 @@
-From: davem@redhat.com (David Miller)
-Date: Tue, 01 Jul 2014 15:38:06 -0700 (PDT)
-Subject: [PATCH v2 0/2] ARM: at91: remove phy fixup for sama5d3xek boards
-In-Reply-To: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140701.153806.1074873302413556163.davem@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 02 Jul 2014 00:42:06 +0200
+Subject: [PATCH] ARM: convert all "mov.* pc,
+ reg" to "bx reg" for ARMv6+ (part1)
+In-Reply-To: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Tue, 01 Jul 2014 17:19:33 +0100")
+References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
+Message-ID: <87y4wcog5d.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Date: Thu, 26 Jun 2014 12:13:33 +0200
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-> This patch removes a board specific hook for sama5d3xek boards from the
-> sama5d3 generic DT board file.
-> 
-> This hook (which register a phy fixup configuring board specific delays
-> in the ksz9021 ethernet phy) is now replaced by the appropriate DT
-> properties definitions in the sama5d3xcm.dtsi file.
-> 
-> Changes since v1:
->  - fix txc-skew-ps and rxc-skew-ps delays
->  - remove phy address info to handle Ronetix and Embest HW designs
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
 
-These patches do not apply cleanly to 'net' nor 'net-next', in fact
-you did not even say which tree these changes are targetting.
+For ARMv5 - XScale, and more specificaly the mioa701_bootresume.S path (suspend
+to RAM) :
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Please respin these patches and explicitly say what tree you wish
-them to be applied to.
+Cheers.
 
-Thanks.
+--
+Robert
