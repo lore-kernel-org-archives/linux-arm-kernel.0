@@ -1,69 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Jul 2014 09:27:44 +0200
-Subject: [GIT PULL] nommu fixes for 3.17-rc1
-In-Reply-To: <4782912.zqsM5TNPdE@wuerfel>
-References: <20140630144355.GH14781@pengutronix.de>
- <4782912.zqsM5TNPdE@wuerfel>
-Message-ID: <20140701072744.GK14781@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 1 Jul 2014 09:26:47 +0200
+Subject: [RFC PATCH 2/6] arm64: Support restart through restart notifier
+ call chain
+In-Reply-To: <1404155499-21177-3-git-send-email-linux@roeck-us.net>
+References: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
+ <1404155499-21177-3-git-send-email-linux@roeck-us.net>
+Message-ID: <20140701072647.GI28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-On Mon, Jun 30, 2014 at 05:52:45PM +0200, Arnd Bergmann wrote:
-> On Monday 30 June 2014 16:43:55 Uwe Kleine-K?nig wrote:
-> > Hello Russell,
-> > 
-> > the following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-> > 
-> >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
-> > 
-> > for you to fetch changes up to 7343ab2ad6772f29d6bbb286a7aa0265a7aa5d3b:
-> > 
-> >   ARM: make user_addr_max more robust (2014-06-30 15:48:30 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > A small collection of ARM-nommu related fixes and cleanups.
-> > 
-> > Regarding the small user base ("Hello, anyone out there apart from me?") and
-> > the problem being fixed exists since 3.6-rc1 I don't consider the patches
-> > serious enough to justify them going in before the next merge window.
-> > 
-> > This series makes efm32 boot again.
-> > ----------------------------------------------------------------
-> > 
-> > I have chosen -rc3 as base because -rc1 and -rc2 don't work for me as
-> > they don't have 6980c3e2514e (ARM: 8086/1: Set memblock limit for
-> > nommu).
-> > 
-> > Uwe Kleine-K?nig (5):
-> >       ARM: nommu: drop support for ARM740T, ARM940T and ARM946E-S processors
-> >       ARM: nommu: don't limit TASK_SIZE
-> >       ARM: nommu: simplify definition of MODULES_END
-> >       ARM: nommu: drop unused Kconfig symbol DRAM_SIZE
-> >       ARM: make user_addr_max more robust
-> > 
+On Mon, Jun 30, 2014 at 12:11:35PM -0700, Guenter Roeck wrote:
+> The kernel core now supports a notifier call chain to restart the system.
 > 
-> I seem to have missed the patches when you posted them a couple of weeks
-> ago. I do have one last-minute comment about dropping ARM740T/940T/946T:
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  arch/arm64/kernel/process.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Your reasoning is that mach-integrator now doesn't work with !MMU any more
-> since it selects ARM_PATCH_PHYS_VIRT, and that no other platform uses
-> these CPUs. The change to integrator was done as a preparation for
-> multiplatform support and probably did not mean to remove support for !MMU
-> integrator. We do plan to remove support for at91x40 in the future, which
-> is the last ARM7TDMI user, and there is no upstream ARM9TDMI user nor has
-> there been at least for a couple of years.
-I don't care much here, so for now I will reshuffle my series to make
-efm32 boot again and drop the patches removing the armv4/v4-nommu archs.
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 43b7c34..9dd2abd 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -43,6 +43,7 @@
+>  #include <linux/hw_breakpoint.h>
+>  #include <linux/personality.h>
+>  #include <linux/notifier.h>
+> +#include <linux/watchdog.h>
 
-Best regards
-Uwe
+I don't think you need this include, or shouldn't it be reboot.h
+instead?
+
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/c23e431a/attachment.sig>
