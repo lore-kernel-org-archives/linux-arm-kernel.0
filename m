@@ -1,80 +1,95 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue,  1 Jul 2014 19:03:26 -0700
-Subject: [PATCHv2 1/3] of: Split early_init_dt_scan into two parts
-Message-ID: <1404266608-3274-1-git-send-email-lauraa@codeaurora.org>
+Date: Tue,  1 Jul 2014 19:03:27 -0700
+Subject: [PATCHv2 2/3] of: Add memory limiting function for flattened
+ devicetrees
+In-Reply-To: <1404266608-3274-1-git-send-email-lauraa@codeaurora.org>
+References: <1404266608-3274-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1404266608-3274-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Currently, early_init_dt_scan validates the header, sets the
-boot params, and scans for chosen/memory all in one function.
-Split this up into two separate functions (validation/setting
-boot params in one, scanning in another) to allow for
-additional setup between boot params and scanning the memory.
+Buggy bootloaders may pass bogus memory entries in the devicetree.
+Add of_fdt_limit_memory to add an upper bound on the number of
+entries that can be present in the devicetree.
 
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- drivers/of/fdt.c       | 18 +++++++++++++++++-
- include/linux/of_fdt.h |  2 ++
- 2 files changed, 19 insertions(+), 1 deletion(-)
+ drivers/of/fdt.c       | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_fdt.h |  1 +
+ 2 files changed, 49 insertions(+)
 
 diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index c4cddf0..55bfca9 100644
+index 55bfca9..fd5db5a 100644
 --- a/drivers/of/fdt.c
 +++ b/drivers/of/fdt.c
-@@ -922,7 +922,7 @@ int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
- }
- #endif
+@@ -26,6 +26,54 @@
+ #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+ #include <asm/page.h>
  
--bool __init early_init_dt_scan(void *params)
-+bool __init early_init_dt_verify(void *params)
- {
- 	if (!params)
- 		return false;
-@@ -936,6 +936,12 @@ bool __init early_init_dt_scan(void *params)
- 		return false;
- 	}
- 
-+	return true;
++/*
++ * of_fdt_limit_memory - limit the number of regions in the /memory node
++ * @limit: maximum entries
++ *
++ * Adjust the flattened device tree to have at most 'limit' number of
++ * memory entries in the /memory node. This function may be called
++ * any time after initial_boot_param is set.
++ */
++void of_fdt_limit_memory(int limit)
++{
++	int memory;
++	int len;
++	const void *val;
++	int nr_address_cells = OF_ROOT_NODE_ADDR_CELLS_DEFAULT;
++	int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
++	const uint32_t *addr_prop;
++	const uint32_t *size_prop;
++	int root_offset;
++	int cell_size;
++
++	root_offset = fdt_path_offset(initial_boot_params, "/");
++	if (root_offset < 0)
++		return;
++
++	addr_prop = fdt_getprop(initial_boot_params, root_offset,
++				"#address-cells", NULL);
++	if (addr_prop)
++		nr_address_cells = fdt32_to_cpu(*addr_prop);
++
++	size_prop = fdt_getprop(initial_boot_params, root_offset,
++				"#size-cells", NULL);
++	if (size_prop)
++		nr_size_cells = fdt32_to_cpu(*size_prop);
++
++	cell_size = sizeof(uint32_t)*(nr_address_cells + nr_size_cells);
++
++	memory = fdt_path_offset(initial_boot_params, "/memory");
++	if (memory > 0) {
++		val = fdt_getprop(initial_boot_params, memory, "reg", &len);
++		if (len > limit*cell_size) {
++			len = limit*cell_size;
++			pr_debug("Limiting number of entries to %d\n", limit);
++			fdt_setprop(initial_boot_params, memory, "reg", val,
++					len);
++		}
++	}
 +}
 +
-+
-+void __init early_init_dt_scan_all(void)
-+{
- 	/* Retrieve various information from the /chosen node */
- 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
- 
-@@ -944,7 +950,17 @@ bool __init early_init_dt_scan(void *params)
- 
- 	/* Setup memory, calling early_init_dt_add_memory_arch */
- 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
-+}
-+
-+bool __init early_init_dt_scan(void *params)
-+{
-+	bool status;
-+
-+	status = early_init_dt_verify(params);
-+	if (!status)
-+		return false;
- 
-+	early_init_dt_scan_all();
- 	return true;
- }
- 
+ /**
+  * of_fdt_is_compatible - Return true if given node from the given blob has
+  * compat in its compatible list
 diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index 0511789..d600993 100644
+index d600993..1aea25c 100644
 --- a/include/linux/of_fdt.h
 +++ b/include/linux/of_fdt.h
-@@ -73,6 +73,8 @@ extern int early_init_dt_scan_root(unsigned long node, const char *uname,
- 				   int depth, void *data);
- 
- extern bool early_init_dt_scan(void *params);
-+extern bool early_init_dt_verify(void *params);
-+extern void early_init_dt_scan_all(void);
- 
- extern const char *of_flat_dt_get_machine_name(void);
- extern const void *of_flat_dt_match_machine(const void *default_match,
+@@ -86,6 +86,7 @@ extern void unflatten_and_copy_device_tree(void);
+ extern void early_init_devtree(void *);
+ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+ extern u64 fdt_translate_address(const void *blob, int node_offset);
++extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
