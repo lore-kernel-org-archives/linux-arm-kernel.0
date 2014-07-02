@@ -1,64 +1,104 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  2 Jul 2014 18:21:07 +0200
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-Message-ID: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed,  2 Jul 2014 18:21:08 +0200
+Subject: [PATCH 1/3] ARM: mvebu: make the coherency_ll.S functions work with
+ no coherency fabric
+In-Reply-To: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404318070-8503-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew, Gregory, Sebastian,
+The ll_add_cpu_to_smp_group(), ll_enable_coherency() and
+ll_disable_coherency() are used on Armada XP to control the coherency
+fabric. However, they make the assumption that the coherency fabric is
+always available, which is currently a correct assumption but will no
+longer be true with a followup commit that disables the usage of the
+coherency fabric when the conditions are not met to use it.
 
-I believe you have seen the on-going discussion with Russell on how to
-ensure that the relevant requirements for hardware I/O coherency are
-meant in non-SMP situations. Since it appears it will take quite a bit
-of time to find a proper solution to this problem, this patch series
-proposes to simply disable hardware I/O coherency in problematic
-configurations.
+Therefore, this commit modifies those functions so that they check the
+return value of ll_get_coherency_base(), and if the return value is 0,
+they simply return without configuring anything in the coherency
+fabric.
 
-It has the consequence of completely disabling hardware I/O coherency
-on Armada 370 (this processor is single-core, so it is never executed
-in a SMP situation, as is_smp() returns false), and it disables
-hardware I/O coherency for Armada XP in !CONFIG_SMP
-configurations. For Armada 375 and 38x there is no change since they
-were already using hardware I/O coherency only in SMP-enabled
-situations.
+The ll_get_coherency_base() function is also modified to properly
+return 0 when the function is called with the MMU disabled. In this
+case, it normally returns the physical address of the coherency
+fabric, but we now check if the virtual address is 0, and if that's
+case, return a physical address of 0 to indicate that the coherency
+fabric is not enabled.
 
-The first patch is a preparation needed to not use the coherency
-fabric at all on Armada 370/XP by making some assembly code accept
-this situation.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v3.8+
+---
+Technically speaking, this patch is not needed up to 3.8, since the
+code was completely different back then. However, the next commit has
+to be backported up to 3.8, and relies on this patch.
 
-The second patch actually implements the disabling by reworking the
-coherency_type() function.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency_ll.S | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
-The third patch is a somewhat unrelated fix, just added in this patch
-series because it touches the same coherency.c file.
-
-Since the fact of having I/O coherency enabled when it should not can
-cause infrequent but real data corruptions, I'd like to see the first
-two patches backported all the way up to when I/O coherency support
-was added, i.e in v3.8. I'm especially interested in seeing these
-patches reach the longterm 3.10 kernel version, which many people are
-using on Armada 370 systems today. As mentionned in the patch
-comments, the patches will most likely not easily apply on older
-kernel versions, but I'll provide the appropriate backports when
-requested.
-
-Some independent testing/review of this patch series would definitely
-be welcome.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (3):
-  ARM: mvebu: make the coherency_ll.S functions work with no coherency
-    fabric
-  ARM: mvebu: disable I/O coherency on non-SMP situations on Armada
-    370/XP
-  ARM: mvebu: add missing of_node_put() call in coherency.c
-
- arch/arm/mach-mvebu/coherency.c    | 39 ++++++++++++++++++++++++--------------
- arch/arm/mach-mvebu/coherency_ll.S | 21 ++++++++++++++++++--
- 2 files changed, 44 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 510c29e..48fc0d8 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -24,7 +24,10 @@
+ #include <asm/cp15.h>
+ 
+ 	.text
+-/* Returns the coherency base address in r1 (r0 is untouched) */
++/*
++ * Returns the coherency base address in r1 (r0 is untouched), or 0 if
++ * the coherency fabric is not enabled.
++ */
+ ENTRY(ll_get_coherency_base)
+ 	mrc	p15, 0, r1, c1, c0, 0
+ 	tst	r1, #CR_M @ Check MMU bit enabled
+@@ -32,8 +35,13 @@ ENTRY(ll_get_coherency_base)
+ 
+ 	/*
+ 	 * MMU is disabled, use the physical address of the coherency
+-	 * base address.
++	 * base address. However, if the coherency fabric isn't mapped
++	 * (i.e its virtual address is zero), it means coherency is
++	 * not enabled, so we return 0.
+ 	 */
++	ldr	r1, =coherency_base
++	cmp	r1, #0
++	beq	2f
+ 	adr	r1, 3f
+ 	ldr	r3, [r1]
+ 	ldr	r1, [r1, r3]
+@@ -85,6 +93,9 @@ ENTRY(ll_add_cpu_to_smp_group)
+ 	 */
+ 	mov 	r0, lr
+ 	bl	ll_get_coherency_base
++	/* Bail out if the coherency is not enabled */
++	cmp	r1, #0
++	moveq	pc, r0
+ 	bl	ll_get_coherency_cpumask
+ 	mov 	lr, r0
+ 	add	r0, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
+@@ -107,6 +118,9 @@ ENTRY(ll_enable_coherency)
+ 	 */
+ 	mov r0, lr
+ 	bl	ll_get_coherency_base
++	/* Bail out if the coherency is not enabled */
++	cmp	r1, #0
++	moveq	pc, r0
+ 	bl	ll_get_coherency_cpumask
+ 	mov lr, r0
+ 	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+@@ -131,6 +145,9 @@ ENTRY(ll_disable_coherency)
+ 	 */
+ 	mov 	r0, lr
+ 	bl	ll_get_coherency_base
++	/* Bail out if the coherency is not enabled */
++	cmp	r1, #0
++	moveq	pc, r0
+ 	bl	ll_get_coherency_cpumask
+ 	mov 	lr, r0
+ 	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
 -- 
 2.0.0
