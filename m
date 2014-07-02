@@ -1,77 +1,40 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Wed, 2 Jul 2014 08:39:13 +0530
-Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
- Exynos3250
-In-Reply-To: <53B349AF.4080606@samsung.com>
-References: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
- <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
- <53B23362.7080103@samsung.com>
- <CAK5sBcER-rFmqe74b8uS=ZxKnTNGtkE0x6f7zaLphmyuHJz7Yg@mail.gmail.com>
- <53B349AF.4080606@samsung.com>
-Message-ID: <CAK5sBcHrMPweMSxfde0SSDOtRHbf7t7WQZkf0wAZNTc+N2=Wgg@mail.gmail.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Wed, 2 Jul 2014 08:41:56 +0530
+Subject: [PATCH 0/2] cpuidle fixes and cleanup
+In-Reply-To: <20140701145244.GX32514@n2100.arm.linux.org.uk>
+References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
+ <20140701145244.GX32514@n2100.arm.linux.org.uk>
+Message-ID: <CADWw7OgCgg8aE4W6LwmU3axDdmt-5uH=a+0fSSErfqDci3nNUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 5:22 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> On 07/01/2014 01:10 PM, Sachin Kamat wrote:
->> Hi Chanwoo,
+On Tue, Jul 1, 2014 at 8:22 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 01, 2014 at 08:02:36PM +0530, Chander Kashyap wrote:
+>> This patch series fixes the cpuidle for different states. Also removes arm
+>> diagnostic and power register save/restore code as it is made generic.
 >>
->> On Tue, Jul 1, 2014 at 9:34 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>> Hi Sachin,
->>>
->>> On 07/01/2014 12:33 PM, Sachin Kamat wrote:
->>>> Hi Chanwoo,
->>>>
->>>> On Tue, Jul 1, 2014 at 6:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>>>> This patch add TMU (Thermal Management Unit) dt node to monitor the high
->>>>> temperature for Exynos3250.
->>>>>
->>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>>> ---
->>>>> This patch has a dependency on following patch [1]:
->>>>>  [1] https://lkml.org/lkml/2014/6/30/805
->>>>>
->>>>>  arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
->>>>>  1 file changed, 10 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->>>>> index 3660cab..1e566af 100644
->>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
->>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->>>>> @@ -192,6 +192,16 @@
->>>>>                         status = "disabled";
->>>>>                 };
->>>>>
->>>>> +               tmu: tmu at 100C0000 {
->>>>> +                       compatible = "samsung,exynos3250-tmu";
->>>>> +                       interrupt-parent = <&gic>;
->>>>> +                       reg = <0x100C0000 0x100>;
->>>>> +                       interrupts = <0 216 0>;
->>>>> +                       clocks = <&cmu CLK_TMU_APBIF>;
->>>>> +                       clock-names = "tmu_apbif";
->>>>> +                       status = "disabled";
->>>>
->>>> I don't think there would be any board specific properties needed. Hence
->>>> leave the status as enabled (by deleting the above line).
->>>>
->>>
->>> I think that if specific board need TMU feature, dts file for specific board
->>> should include tmu dt node with 'okay' status. The specific board based on
->>> Exynos3250 might not need TMU feature.
->>
->> The status field in DT node is not meant for stating the build configuration but
->> represents the readiness of the hardware for usage on the platform. If
->> a particular
->> board does not need this feature it needs to be disabled in the build
->> config and only
->> for any special requirements disable it in board file.
+>> Based on:
+>> ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
+>>  http://www.spinics.net/lists/arm-kernel/msg340506.html
 >
-> TMU (Thermal Management Unit) needs specific regulator for TMU power as following:
-> The regulator for TMU is dependent on board.
+> As there is an outstanding issue with this patch, we can't proceed with
+> this set of changes until we know what's going on there.
 
-In this case it makes sense to leave it disabled in dtsi.
+Sure, I will wait for the conclusion.
 
--- 
-Regards,
-Sachin.
+>
+> Also, bear in mind that I have changes which conflict with this in my
+> tree (which I've just updated.)
+
+I will resend after your changes are posted.
+
+Thanks
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
