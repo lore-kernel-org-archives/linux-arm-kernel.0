@@ -1,11 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 02 Jul 2014 10:06:39 +0200
-Subject: [PATCH/RFC 1/6] ARM: shmobile: r8a7778: add SCI clock support for
- DT
-In-Reply-To: <1404275322-26514-2-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 02 Jul 2014 10:09:43 +0200
+Subject: [PATCH/RFC 2/6] ARM: shmobile: r8a7778: Add SCIF nodes
+In-Reply-To: <1404275322-26514-3-git-send-email-horms+renesas@verge.net.au>
 References: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
- <1404275322-26514-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <3035210.jDL17MeFr8@avalon>
+ <1404275322-26514-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <13504964.HMrnJUVGKG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,40 +12,80 @@ Hi Simon,
 
 Thank you for the patch.
 
-On Wednesday 02 July 2014 06:28:37 Simon Horman wrote:
-> This will be used when initialising SCI devices using DT
-> until common clock framework support is added.
-> 
+On Wednesday 02 July 2014 06:28:38 Simon Horman wrote:
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Just one small comment below. Apart from that,
 
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 > ---
->  arch/arm/mach-shmobile/clock-r8a7778.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/r8a7778.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
 > 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c
-> b/arch/arm/mach-shmobile/clock-r8a7778.c index 16bbc94..9557907 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7778.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-> @@ -202,11 +202,17 @@ static struct clk_lookup lookups[] = {
->  	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
->  	CLKDEV_DEV_ID("ffc73000.i2c", &mstp_clks[MSTP027]), /* I2C3 */
->  	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
-> +	CLKDEV_DEV_ID("ffe40000.serial", &mstp_clks[MSTP026]), /* SCIF0 */
->  	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
-> +	CLKDEV_DEV_ID("ffe41000.serial", &mstp_clks[MSTP025]), /* SCIF1 */
->  	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-> +	CLKDEV_DEV_ID("ffe42000.serial", &mstp_clks[MSTP024]), /* SCIF2 */
->  	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
-> +	CLKDEV_DEV_ID("ffe43000.serial", &mstp_clks[MSTP023]), /* SCIF3 */
->  	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
-> +	CLKDEV_DEV_ID("ffe44000.serial", &mstp_clks[MSTP022]), /* SCIF4 */
->  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
-> +	CLKDEV_DEV_ID("ffe45000.serial", &mstp_clks[MSTP021]), /* SCIF5 */
->  	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
->  	CLKDEV_DEV_ID("fffc7000.spi", &mstp_clks[MSTP007]), /* HSPI0 */
->  	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
+> diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+> index 3af0a21..55357dc 100644
+> --- a/arch/arm/boot/dts/r8a7778.dtsi
+> +++ b/arch/arm/boot/dts/r8a7778.dtsi
+> @@ -156,6 +156,54 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	scif0: serial at ffe40000 {
+> +		compatible = "renesas,scif-r8a7778", "renesas,scif";
+> +		reg = <0xffe40000 0x100>;
+> +		interrupt-parent = <&gic>;
+
+The interrupt-parent property is now specified at the top level, so you can 
+remove it from the scif nodes.
+
+> +		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +	};
+> +
+> +	scif1: serial at ffe41000 {
+> +		compatible = "renesas,scif-r8a7778", "renesas,scif";
+> +		reg = <0xffe41000 0x100>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +	};
+> +
+> +	scif2: serial at ffe42000 {
+> +		compatible = "renesas,scif-r8a7778", "renesas,scif";
+> +		reg = <0xffe42000 0x100>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +	};
+> +
+> +	scif3: serial at ffe43000 {
+> +		compatible = "renesas,scif-r8a7778", "renesas,scif";
+> +		reg = <0xffe43000 0x100>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +	};
+> +
+> +	scif4: serial at ffe44000 {
+> +		compatible = "renesas,scif-r8a7778", "renesas,scif";
+> +		reg = <0xffe44000 0x100>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +	};
+> +
+> +	scif5: serial at ffe45000 {
+> +		compatible = "renesas,scif-r8a7778", "renesas,scif";
+> +		reg = <0xffe45000 0x100>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +	};
+> +
+>  	mmcif: mmc at ffe4e000 {
+>  		compatible = "renesas,sh-mmcif";
+>  		reg = <0xffe4e000 0x100>;
 
 -- 
 Regards,
