@@ -1,39 +1,27 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 2 Jul 2014 14:42:44 -0500
-Subject: [PATCHv5 05/15] hwspinlock/omap: add support for dt nodes
-In-Reply-To: <CAK=WgbamDPN9EmKUu3+c3RbsQn1uhz5MGGvpWSSUJSUKyoH8Cw@mail.gmail.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-6-git-send-email-s-anna@ti.com>
- <CAK=WgbamDPN9EmKUu3+c3RbsQn1uhz5MGGvpWSSUJSUKyoH8Cw@mail.gmail.com>
-Message-ID: <53B460B4.9010200@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Jul 2014 20:42:52 +0100
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140702195154.47d6f6b4@armhf>
+References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
+ <20140702195154.47d6f6b4@armhf>
+Message-ID: <20140702194252.GN410@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On Wed, Jul 02, 2014 at 07:51:54PM +0200, Jean-Francois Moine wrote:
 
-On 07/01/2014 07:48 AM, Ohad Ben-Cohen wrote:
-> Hi Suman,
-> 
-> On Thu, May 1, 2014 at 3:34 AM, Suman Anna <s-anna@ti.com> wrote:
->>  static int omap_hwspinlock_probe(struct platform_device *pdev)
->>  {
->> -       struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
->> +       struct device_node *node = pdev->dev.of_node;
->>         struct hwspinlock_device *bank;
->>         struct hwspinlock *hwlock;
->>         struct resource *res;
->>         void __iomem *io_base;
->>         int num_locks, i, ret;
->> +       int base_id = 0;
-> 
-> We shouldn't implicitly assume base_id is zero: let's explicitly
-> protect against potential subsequent invocations of
-> omap_hwspinlock_probe.
-> 
+> I tested this CODEC with both DAPM and DPCM. If the audio subsystem
+> asks for streaming on both I2S and S/PDIF, only the last call is served
+> (this depends on the order of the DAI links in the audio card creation
+> table).
 
-Yeah, I did this since we only had 1 instance, and used the same value
-as used in the non-DT legacy code. Once I fold back Patch 8 that adds
-the hwlock-base-id property, this will be assigned by reading that property.
-
-regards
-Suman
+I'd expect this to return an error for the busy DAI rather than just
+silently ignore it failing to start or (better) implement some control
+to let the user select which of the DAIs is active.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/bc2ef7e8/attachment-0001.sig>
