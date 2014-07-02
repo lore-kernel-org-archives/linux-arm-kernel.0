@@ -1,66 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Jul 2014 13:49:53 +0200
-Subject: [PATCH v2 5/5] efi: efistub: convert into static library
-In-Reply-To: <CAKv+Gu9N_p49603oy0rKaq+G6sX+GS5ueSfJ2B=Yh7DrF301Cg@mail.gmail.com>
-References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
- <1403792617-25792-6-git-send-email-ard.biesheuvel@linaro.org>
- <20140702111528.GL7539@console-pimps.org>
- <CAKv+Gu9N_p49603oy0rKaq+G6sX+GS5ueSfJ2B=Yh7DrF301Cg@mail.gmail.com>
-Message-ID: <CAKv+Gu9WMsW9Wvcfh7_CM8iWP2Q4zMOkGE1z9mVf3YcVaoDU3A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 Jul 2014 04:50:10 -0700
+Subject: [PATCH v3] ARM: dts: am335x-evmsk: enable display and lcd panel
+ support
+In-Reply-To: <53B3E731.5030604@ti.com>
+References: <1404248420-10086-1-git-send-email-detheridge@ti.com>
+ <20140701210812.GN13396@saruman.home>
+ <20140702074508.GT28884@atomide.com> <53B3E731.5030604@ti.com>
+Message-ID: <20140702115010.GW28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Would something like this
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140702 04:06]:
+> On 02/07/14 10:45, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [140701 14:10]:
+> >> Hi,
+> >>
+> >> On Tue, Jul 01, 2014 at 04:00:20PM -0500, Darren Etheridge wrote:
+> >>> Add the necessary nodes to enable the LCD controller and the
+> >>> LCD panel that is attached to the Texas Instruments AM335x
+> >>> EVMSK platform.  Also setup the necessary pin mux within the
+> >>> DT file to drive the LCD connector and add the correct
+> >>> pinmux settings for the lcd pins to be configured to when
+> >>> the SoC goes into sleep state for the minimum power
+> >>> consumption.
+> >>>
+> >>> For the sleep mode LCD pin settings, MUX_MODE7 is chosen as
+> >>> this corresponds to switching the pins into input GPIO's with
+> >>> an internal pulldown.  Which has been determined to offer the
+> >>> lowest power solution vs leaving the pins configured in LCD
+> >>> mode.
+> >>>
+> >>> Signed-off-by: Darren Etheridge <detheridge@ti.com>
+> >>> Acked-by: Wolfram Sang <wsa@sang-engineering.com>
+> >>
+> >> Tested-by: Felipe Balbi <balbi@ti.com>
+> >>
+> >> serial console capture: http://slexy.org/view/s200thiMb3
+> >>
+> >> note that v2 has been pending since May 9th:
+> >> http://marc.info/?l=linux-omap&m=139966159102339&w=2
+> >>
+> >>> ---
+> >>> Tony, Benoit,
+> >>>
+> >>> I didn't see this patch get applied anywhere, so I updated it and I am
+> >>> resending it.  Please let me know if you need any more info before you will
+> >>> apply it.
+> > 
+> > Tomi, do you want to ack this one or want to queue the panel .dts
+> > changes into a separate branch?
+> 
+> I don't really have experience with the LCDC used on AM335x SoC (it
+> doesn't have DSS), but the patch looks ok, so for what it's worth:
+> 
+> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> 
+> I don't have any .dts changes queued, so I think it's better if you pick
+> it up.
 
-ifneq ($(CONFIG_EFI_STUB)$(CONFIG_EFI_ARMSTUB),nn)
-obj-y += libstub/
-endif
+OK thanks applying into omap-for-v3.17/dt.
 
-be too hideous?
+Regards,
 
-
-
-On 2 July 2014 13:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 2 July 2014 13:15, Matt Fleming <matt@console-pimps.org> wrote:
->> On Thu, 26 Jun, at 04:23:37PM, Ard Biesheuvel wrote:
->>> This patch changes both x86 and arm64 efistub implementations from #including
->>> shared .c files under drivers/firmware/efi to building the shared code as a
->>> static library.
->>>
->>> The x86 code uses a stub built into the boot executable which uncompresses the
->>> kernel at boot time. In this case, the library is linked into the decompressor.
->>>
->>> In the arm64 case, the stub is part of the kernel proper so the library is
->>> linked into the kernel proper as well.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> OK, this breaks the ia64 build because of the following...
->>
->> /drivers/firmware/efi/libstub/efi-stub-helper.c:14:21: fatal error: asm/efi.h: No such file or directory
->>
->>> diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
->>> index e1096539eedb..d9abdbc962f1 100644
->>> --- a/drivers/firmware/efi/Makefile
->>> +++ b/drivers/firmware/efi/Makefile
->>> @@ -1,7 +1,7 @@
->>>  #
->>>  # Makefile for linux kernel
->>>  #
->>> -obj-$(CONFIG_EFI)                    += efi.o vars.o
->>> +obj-$(CONFIG_EFI)                    += efi.o vars.o libstub/
->>>  obj-$(CONFIG_EFI_VARS)                       += efivars.o
->>>  obj-$(CONFIG_EFI_VARS_PSTORE)                += efi-pstore.o
->>>  obj-$(CONFIG_UEFI_CPER)                      += cper.o
->>
->> I guess what we need is CONFIG_EFI_LIBSTUB selected by both
->> CONFIG_EFI_STUB (for x86) and CONFIG_EFI_ARMSTUB (for arm64)? e.g.
->>
->> obj-$(CONFIG_EFI_LIBSTUB)               libstub/
->>
->
-> Yes, that seems the appropriate way to deal with this.
-> Let me respin so I can fix the other thing I mentioned yesterday as well.
->
-> --
-> Ard.
+Tony
