@@ -1,67 +1,85 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 2 Jul 2014 14:20:42 +0100
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <4751391.BGkeOrZGt8@wuerfel>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
- <4751391.BGkeOrZGt8@wuerfel>
-Message-ID: <20140702132042.GG2173@e106497-lin.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 02 Jul 2014 15:19:31 +0200
+Subject: [PATCH] arm: allow all architectures to change max zone order
+In-Reply-To: <20140617150804.GA2819@n2100.arm.linux.org.uk>
+References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
+ <1372689229.4277.4.camel@weser.hi.pengutronix.de>
+ <20140617150804.GA2819@n2100.arm.linux.org.uk>
+Message-ID: <1404307171.4250.5.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 01:38:04PM +0100, Arnd Bergmann wrote:
-> Some more detailed comments now
+Am Dienstag, den 17.06.2014, 16:08 +0100 schrieb Russell King - ARM
+Linux:
+> On Mon, Jul 01, 2013 at 04:33:49PM +0200, Lucas Stach wrote:
+> > Am Freitag, den 31.05.2013, 19:02 +0200 schrieb Lucas Stach:
+> > > Many multimedia applications on architectures without an
+> > > IOMMU need large physically contiguous buffers and so need
+> > > to adjust the max zone order of the page allocator.
+> > > 
+> > > There is zero reason to not allow this adjustment on arches
+> > > other than SHMOBILE.
+> > > 
+> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > > ---
+> > >  arch/arm/Kconfig |    2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index 49d993c..6ceace8 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
+> > >  source "mm/Kconfig"
+> > >  
+> > >  config FORCE_MAX_ZONEORDER
+> > > -	int "Maximum zone order" if ARCH_SHMOBILE
+> > > +	int "Maximum zone order"
+> > >  	range 11 64 if ARCH_SHMOBILE
+> > >  	default "12" if SOC_AM33XX
+> > >  	default "9" if SA1111
+> > 
+> > Ping. This is really straight forward and low risk.
 > 
-> On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
-> > +/*
-> > + * Record the PCI IO range (expressed as CPU physical address + size).
-> > + * Return a negative value if an error has occured, zero otherwise
-> > + */
-> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> > +{
-> > +#ifdef PCI_IOBASE
-> > +       struct io_range *res;
+> According to my greps, this is the only copy of this mail that appeared
+> on the mailing lists in 2013.  I've really not been happy with the
+> blatent assertion in this commit message, so I've been ignoring the
+> patch in the patch system because of that... until now.
 > 
-> I was confused by the variable naming here: A variable named 'res' is
-> normally a 'struct resource'. Maybe better call this 'range'.
+> First, let's look at the default, which is 11.  That corresponds with
+> 2^10 pages, which gives a maximum allocation of 4MB.  While that's
+> rather limiting when you want to allocate a 1080p framebuffer (which
+> works out at slightly over 8MB), it seems that it's entirely possible
+> to allocate such framebuffers without resorting to fiddling with this
+> when CMA is being used.
 > 
-> > +       resource_size_t allocated_size = 0;
-> > +
-> > +       /* check if the range hasn't been previously recorded */
-> > +       list_for_each_entry(res, &io_range_list, list) {
-> > +               if (addr >= res->start && addr + size <= res->start + size)
-> > +                       return 0;
-> > +               allocated_size += res->size;
-> > +       }
+> Indeed, on iMX6 with imx-drm, I have a 1080p frame buffer provided by
+> the current CMA memory backed implementation there just fine with the
+> default value of this.  So, large physically contiguous buffers can
+> definitely be allocated today without problem - with CMA.
 > 
-> A spin_lock around the list lookup should be sufficient to get around
-> the race that Will mentioned.
+> Not using CMA for large memory buffers would be a mistake.  Memory
+> suffers from fragmentation, which makes large memory allocations
+> suffer - I see even 16K allocations fail with 3.x kernels.  So what
+> hope has a 4MB (or larger) allocation got?
 > 
-> > +       /* range not registed yet, check for available space */
-> > +       if (allocated_size + size - 1 > IO_SPACE_LIMIT)
-> > +               return -E2BIG;
+> CMA avoids that by setting aside a special region which is only used
+> for data which can be moved into other memory areas when required,
+> thereby reducing the effects of memory fragmentation in this area.
 > 
-> It might be better to limit the size to 64K if it doesn't fit at first.
+> So, far from "zero reason", there's a very real reason: memory
+> fragmentation leading to OOM situations.  Rather than fiddling with
+> this seemingly easy-to-fiddle-with constant, please use an appropriately
+> adjusted CMA for your multimedia applications instead of alloc_pages().
+> 
+While we carried this patch around exactly for the reason that
+allocating large buffers did not succeed even with CMA in place, it
+seems this is no longer true on todays kernels.
 
-Thanks Arnd for review. Will update and post a new patch soon if I don't
-get any other comments.
+So you are entirely correct in discarding this patch.
 
-Best regards,
-Liviu
-
-> 
-> 
-> 	Arnd
-> 
-> 
-
+Regards,
+Lucas
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
