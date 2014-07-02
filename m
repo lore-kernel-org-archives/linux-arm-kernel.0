@@ -1,47 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Jul 2014 13:34:44 +0100
-Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
- suspend/resume
-In-Reply-To: <53B2E11D.5000507@samsung.com>
-References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
- <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
- <53A9B80B.7020608@samsung.com>
- <20140701144417.GV32514@n2100.arm.linux.org.uk>
- <53B2E11D.5000507@samsung.com>
-Message-ID: <20140702123444.GB24879@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Jul 2014 14:38:04 +0200
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <4751391.BGkeOrZGt8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Some more detailed comments now
 
-I asked the hardware guys to take a closer look at your issue and they've
-uncovered the problem with trying to document an undocumented register.
+On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
+> +/*
+> + * Record the PCI IO range (expressed as CPU physical address + size).
+> + * Return a negative value if an error has occured, zero otherwise
+> + */
+> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> +{
+> +#ifdef PCI_IOBASE
+> +       struct io_range *res;
 
-On Tue, Jul 01, 2014 at 05:26:05PM +0100, Tomasz Figa wrote:
-> On 01.07.2014 16:44, Russell King - ARM Linux wrote:
-> > On Tue, Jun 24, 2014 at 07:40:27PM +0200, Tomasz Figa wrote:
-> >> On 24.06.2014 18:33, Will Deacon wrote:
-> >>> On A9, it should be write-ignore. Are you seeing problems on a real SoC?
-> >>
-> >> I'm observing a complete system hang on Exynos4412-based Trats2 board if
-> >> I try to write this register in resume from system-wide sleep.
+I was confused by the variable naming here: A variable named 'res' is
+normally a 'struct resource'. Maybe better call this 'range'.
 
-In actual fact, this register causes an undefined instruction exception if
-you try to write it from a non-secure mode (although reads work fine, for
-whatever that's worth). That nicely explains what you're seeing, but it
-leaves us in a right old two and eight with respect to the suspend/resume
-code.
+> +       resource_size_t allocated_size = 0;
+> +
+> +       /* check if the range hasn't been previously recorded */
+> +       list_for_each_entry(res, &io_range_list, list) {
+> +               if (addr >= res->start && addr + size <= res->start + size)
+> +                       return 0;
+> +               allocated_size += res->size;
+> +       }
 
-Given that we don't know whether we're running secure or non-secure, I'm
-not sure about the best approach to solve this. For arm64, we simply mandate
-booting non-secure and require firmware to do everything that requires
-secure access, but we're not in a position to attempt imposing these sorts
-of restrictions for arch/arm/.
+A spin_lock around the list lookup should be sufficient to get around
+the race that Will mentioned.
 
-Does anybody have any ideas? We could try `handling' the undef, but it's
-ugly and fragile.
+> +       /* range not registed yet, check for available space */
+> +       if (allocated_size + size - 1 > IO_SPACE_LIMIT)
+> +               return -E2BIG;
 
-Anyway, apologies for the mistake earlier on -- I assumed the documentation
-I had was correct.
+It might be better to limit the size to 64K if it doesn't fit at first.
 
-Will
+
+	Arnd
