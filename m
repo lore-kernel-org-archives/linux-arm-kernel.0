@@ -1,94 +1,85 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Jul 2014 16:28:37 +0100
-Subject: [PATCH 05/12] mfd: arizona: Rid data size incompatibility warn when
+Date: Wed,  2 Jul 2014 16:28:38 +0100
+Subject: [PATCH 06/12] mfd: tps65910: Rid data size incompatibility warn when
  building for 64bit
 In-Reply-To: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
 References: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1404314924-23564-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1404314924-23564-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Extinguishes:
 
-../drivers/mfd/arizona-core.c: In function ?arizona_of_get_type?:
-../drivers/mfd/arizona-core.c:505:10:
+../drivers/mfd/tps65910.c: In function ?tps65910_parse_dt?:
+../drivers/mfd/tps65910.c:404:14:
 	warning: cast from pointer to integer of different size
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/arizona-core.c | 4 ++--
- drivers/mfd/arizona-i2c.c  | 5 +++--
- drivers/mfd/arizona-spi.c  | 3 ++-
- drivers/mfd/arizona.h      | 4 ++--
- 4 files changed, 9 insertions(+), 7 deletions(-)
+ drivers/mfd/tps65910.c       | 10 +++++-----
+ include/linux/mfd/tps65910.h |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mfd/arizona-core.c b/drivers/mfd/arizona-core.c
-index b4f22e7..e9c3563 100644
---- a/drivers/mfd/arizona-core.c
-+++ b/drivers/mfd/arizona-core.c
-@@ -497,12 +497,12 @@ const struct dev_pm_ops arizona_pm_ops = {
- EXPORT_SYMBOL_GPL(arizona_pm_ops);
+diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+index f9e42ea..f243e75 100644
+--- a/drivers/mfd/tps65910.c
++++ b/drivers/mfd/tps65910.c
+@@ -387,7 +387,7 @@ static const struct of_device_id tps65910_of_match[] = {
+ MODULE_DEVICE_TABLE(of, tps65910_of_match);
  
- #ifdef CONFIG_OF
--int arizona_of_get_type(struct device *dev)
-+unsigned long arizona_of_get_type(struct device *dev)
+ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+-						int *chip_id)
++						unsigned long *chip_id)
  {
- 	const struct of_device_id *id = of_match_device(arizona_of_match, dev);
+ 	struct device_node *np = client->dev.of_node;
+ 	struct tps65910_board *board_info;
+@@ -401,7 +401,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+ 		return NULL;
+ 	}
  
- 	if (id)
--		return (int)id->data;
-+		return (unsigned long)id->data;
- 	else
- 		return 0;
- }
-diff --git a/drivers/mfd/arizona-i2c.c b/drivers/mfd/arizona-i2c.c
-index beccb79..9d4156f 100644
---- a/drivers/mfd/arizona-i2c.c
-+++ b/drivers/mfd/arizona-i2c.c
-@@ -24,11 +24,12 @@
- #include "arizona.h"
+-	*chip_id  = (int)match->data;
++	*chip_id  = (unsigned long)match->data;
  
- static int arizona_i2c_probe(struct i2c_client *i2c,
--					  const struct i2c_device_id *id)
-+			     const struct i2c_device_id *id)
- {
- 	struct arizona *arizona;
- 	const struct regmap_config *regmap_config;
--	int ret, type;
-+	unsigned long type;
-+	int ret;
- 
- 	if (i2c->dev.of_node)
- 		type = arizona_of_get_type(&i2c->dev);
-diff --git a/drivers/mfd/arizona-spi.c b/drivers/mfd/arizona-spi.c
-index 1ca554b..5145d78 100644
---- a/drivers/mfd/arizona-spi.c
-+++ b/drivers/mfd/arizona-spi.c
-@@ -28,7 +28,8 @@ static int arizona_spi_probe(struct spi_device *spi)
- 	const struct spi_device_id *id = spi_get_device_id(spi);
- 	struct arizona *arizona;
- 	const struct regmap_config *regmap_config;
--	int ret, type;
-+	unsigned long type;
-+	int ret;
- 
- 	if (spi->dev.of_node)
- 		type = arizona_of_get_type(&spi->dev);
-diff --git a/drivers/mfd/arizona.h b/drivers/mfd/arizona.h
-index b4cef77..2951498 100644
---- a/drivers/mfd/arizona.h
-+++ b/drivers/mfd/arizona.h
-@@ -46,9 +46,9 @@ int arizona_irq_init(struct arizona *arizona);
- int arizona_irq_exit(struct arizona *arizona);
- 
- #ifdef CONFIG_OF
--int arizona_of_get_type(struct device *dev);
-+unsigned long arizona_of_get_type(struct device *dev);
+ 	board_info = devm_kzalloc(&client->dev, sizeof(*board_info),
+ 			GFP_KERNEL);
+@@ -431,7 +431,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
  #else
--static inline int arizona_of_get_type(struct device *dev)
-+static inline unsigned long arizona_of_get_type(struct device *dev)
+ static inline
+ struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+-					 int *chip_id)
++					 unsigned long *chip_id)
  {
- 	return 0;
+ 	return NULL;
  }
+@@ -453,14 +453,14 @@ static void tps65910_power_off(void)
+ }
+ 
+ static int tps65910_i2c_probe(struct i2c_client *i2c,
+-					const struct i2c_device_id *id)
++			      const struct i2c_device_id *id)
+ {
+ 	struct tps65910 *tps65910;
+ 	struct tps65910_board *pmic_plat_data;
+ 	struct tps65910_board *of_pmic_plat_data = NULL;
+ 	struct tps65910_platform_data *init_data;
++	unsigned long chip_id = id->driver_data;
+ 	int ret = 0;
+-	int chip_id = id->driver_data;
+ 
+ 	pmic_plat_data = dev_get_platdata(&i2c->dev);
+ 
+diff --git a/include/linux/mfd/tps65910.h b/include/linux/mfd/tps65910.h
+index 16c2335..6483a6f 100644
+--- a/include/linux/mfd/tps65910.h
++++ b/include/linux/mfd/tps65910.h
+@@ -892,7 +892,7 @@ struct tps65910 {
+ 	struct device *dev;
+ 	struct i2c_client *i2c_client;
+ 	struct regmap *regmap;
+-	unsigned int id;
++	unsigned long id;
+ 
+ 	/* Client devices */
+ 	struct tps65910_pmic *pmic;
 -- 
 1.8.3.2
