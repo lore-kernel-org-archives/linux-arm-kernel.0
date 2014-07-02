@@ -1,46 +1,66 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 2 Jul 2014 14:49:24 +0300
-Subject: ABBA deadlock in Common Clock Framework
-In-Reply-To: <53B3E5F8.80501@samsung.com>
-References: <53B3E5F8.80501@samsung.com>
-Message-ID: <20140702114924.GC3679@tbergstrom-lnx.Nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 2 Jul 2014 13:49:53 +0200
+Subject: [PATCH v2 5/5] efi: efistub: convert into static library
+In-Reply-To: <CAKv+Gu9N_p49603oy0rKaq+G6sX+GS5ueSfJ2B=Yh7DrF301Cg@mail.gmail.com>
+References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1403792617-25792-6-git-send-email-ard.biesheuvel@linaro.org>
+ <20140702111528.GL7539@console-pimps.org>
+ <CAKv+Gu9N_p49603oy0rKaq+G6sX+GS5ueSfJ2B=Yh7DrF301Cg@mail.gmail.com>
+Message-ID: <CAKv+Gu9WMsW9Wvcfh7_CM8iWP2Q4zMOkGE1z9mVf3YcVaoDU3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 12:59:04PM +0200, Tomasz Figa wrote:
-> Hi All,
-> 
-> While testing linux-next (next-20140625) on Exynos4412-based TRATS2
-> board, from time to time I hit a deadlock between clk_disable_unused()
-> of Common Clock Framework and parallel clk_prepare() from s3c24xx-i2c
-> driver.
-> 
-> I believe the following is happening (in processes 1 and 2):
->  1: clk_disable_unused()
->  1: clk_prepare_lock()
->  1: mutex_lock(clk prepare mutex) // lock A
->  1: max77686_clk_is_prepared()
->  1: regmap_read()
->  2: regulator_set_voltage()
->  2: regmap_read()
->  2: mutex_lock(max77686 regmap mutex) // lock B
->  2: i2c_transfer()
->  2: s3c24xx_i2c_xfer()
->  2: clk_unprepare()
->  2: clk_prepare_lock()
->  2: mutex_lock(clk prepare mutex) // lock A
->  1: mutex_lock(max77686 regmap mutex) // lock B
->  1,2: BOOM!
-> 
-> I suppose this is a general problem affecting any MFD device that is
-> also a clock provider, but I clearly don't have a good idea what to do
-> about it.
-> 
+Would something like this
 
-Or if you use notifiers which use i2c... See also
-http://comments.gmane.org/gmane.linux.kernel/1553699. One workaround is to
-always leave the clock of the i2c controller in a prepared state.
+ifneq ($(CONFIG_EFI_STUB)$(CONFIG_EFI_ARMSTUB),nn)
+obj-y += libstub/
+endif
 
-Cheers,
+be too hideous?
 
-Peter.
+
+
+On 2 July 2014 13:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 2 July 2014 13:15, Matt Fleming <matt@console-pimps.org> wrote:
+>> On Thu, 26 Jun, at 04:23:37PM, Ard Biesheuvel wrote:
+>>> This patch changes both x86 and arm64 efistub implementations from #including
+>>> shared .c files under drivers/firmware/efi to building the shared code as a
+>>> static library.
+>>>
+>>> The x86 code uses a stub built into the boot executable which uncompresses the
+>>> kernel at boot time. In this case, the library is linked into the decompressor.
+>>>
+>>> In the arm64 case, the stub is part of the kernel proper so the library is
+>>> linked into the kernel proper as well.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> OK, this breaks the ia64 build because of the following...
+>>
+>> /drivers/firmware/efi/libstub/efi-stub-helper.c:14:21: fatal error: asm/efi.h: No such file or directory
+>>
+>>> diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+>>> index e1096539eedb..d9abdbc962f1 100644
+>>> --- a/drivers/firmware/efi/Makefile
+>>> +++ b/drivers/firmware/efi/Makefile
+>>> @@ -1,7 +1,7 @@
+>>>  #
+>>>  # Makefile for linux kernel
+>>>  #
+>>> -obj-$(CONFIG_EFI)                    += efi.o vars.o
+>>> +obj-$(CONFIG_EFI)                    += efi.o vars.o libstub/
+>>>  obj-$(CONFIG_EFI_VARS)                       += efivars.o
+>>>  obj-$(CONFIG_EFI_VARS_PSTORE)                += efi-pstore.o
+>>>  obj-$(CONFIG_UEFI_CPER)                      += cper.o
+>>
+>> I guess what we need is CONFIG_EFI_LIBSTUB selected by both
+>> CONFIG_EFI_STUB (for x86) and CONFIG_EFI_ARMSTUB (for arm64)? e.g.
+>>
+>> obj-$(CONFIG_EFI_LIBSTUB)               libstub/
+>>
+>
+> Yes, that seems the appropriate way to deal with this.
+> Let me respin so I can fix the other thing I mentioned yesterday as well.
+>
+> --
+> Ard.
