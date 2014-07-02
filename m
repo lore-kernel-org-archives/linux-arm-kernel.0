@@ -1,74 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Jul 2014 09:12:26 +0200
-Subject: [PATCH] ARM: cpu_pj4b_suspend_size should base on
- cpu_v7_suspend_size
-In-Reply-To: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
-References: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <53B3B0DA.30603@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 2 Jul 2014 09:13:12 +0200
+Subject: [PATCH 0/3] s/FOOTBRIDGE/ARCH_FOOTBRIDGE/
+In-Reply-To: <20140701221428.GC32514@n2100.arm.linux.org.uk>
+References: <1404247026-379-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140701221428.GC32514@n2100.arm.linux.org.uk>
+Message-ID: <20140702071312.GO14781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hello Russell,
 
-On 02/07/2014 08:48, Shawn Guo wrote:
-> Since pj4b suspend/resume routines are implemented based on generic
-> ARMv7 ones, instead of hard-coding cpu_pj4b_suspend_size, we should have
-> it be cpu_v7_suspend_size plus pj4b specific bytes.  Otherwise, if
-> cpu_v7_suspend_size gets updated alone, the pj4b suspend/resume will
-> likely be broken.
-
-It was something I thought I did but I forgot to push it! Thanks for having
-spotted it. I am going to test it soon.
-
-
-Thanks,
-
-Gregory
-
-
+On Tue, Jul 01, 2014 at 11:14:28PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 01, 2014 at 10:37:03PM +0200, Uwe Kleine-K?nig wrote:
+> > I'm not sure that FOOTBRIDGE and ARCH_FOOTBRIDGE are semantically
+> > identical; if not, feel free to nack this series.
 > 
-> While at it, fix the comments in cpu_pj4b_do_resume, as we're restoring
-> CP15 registers rather than saving in there.
+> CONFIG_FOOTBRIDGE means that we have a DC21285 in the system.  We
+> used to have ARCH_FOOTBRIDGE and ARCH_CO285 which both selected
+> CONFIG_FOOTBRIDGE.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Completely untested.
+> ARCH_FOOTBRIDGE was for either host or addin mode using a PAGE_OFFSET
+> of 0xc0000000.  ARCH_CO285 had a PAGE_OFFSET of 0x80000000 as they
+> wanted to be able to map almost all of PCI memory space.
 > 
->  arch/arm/mm/proc-v7.S | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3db2c2f04a30..604dda5f65cc 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -184,16 +184,16 @@ ENDPROC(cpu_pj4b_do_suspend)
->  
->  ENTRY(cpu_pj4b_do_resume)
->  	ldmia	r0!, {r6 - r10}
-> -	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
-> -	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
-> -	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
-> -	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
-> -	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
-> +	mcr	p15, 1, r6, c15, c1, 0  @ retore CP15 - extra features
-> +	mcr	p15, 1, r7, c15, c2, 0	@ retore CP15 - Aux Func Modes Ctrl 0
-> +	mcr	p15, 1, r8, c15, c1, 2	@ retore CP15 - Aux Debug Modes Ctrl 2
-> +	mcr	p15, 1, r9, c15, c1, 1  @ retore CP15 - Aux Debug Modes Ctrl 1
-> +	mcr	p15, 0, r10, c9, c14, 0  @ retore CP15 - PMC
->  	b cpu_v7_do_resume
->  ENDPROC(cpu_pj4b_do_resume)
->  #endif
->  .globl	cpu_pj4b_suspend_size
-> -.equ	cpu_pj4b_suspend_size, 4 * 14
-> +.equ	cpu_pj4b_suspend_size, cpu_v7_suspend_size + 4 * 5
->  
->  #endif
->  
-> 
+> So think of CONFIG_FOOTBRIDGE as meaning that we have the physical
+> device, and CONFIG_ARCH_FOOTBRIDGE meaning that we want to support
+> boards with the device on.
+I expected something like that. Is it possible to "have" the device on a
+cpu != StrongARM? If so I wonder why ARCH_FOOTBRIDGE is a "ARM system
+type". And if not, wouldn't it be possible and better to have all
+platforms which select CPU_SA110 (ARCH_EBSA110, ARCH_FOOTBRIDGE; what
+about RPC?) in a single mach dir and make FOOTBRIDGE an option there?
 
+It's hard to find information on the net about these chips, even
+http://developer.intel.com/design/strong/sa110.htm only talks about x86
+stuff only, so please excuse my unknowingness.
+ 
+> So, it may make sense to rename CONFIG_FOOTBRIDGE to CONFIG_DC21285
+> if that makes the configuration symbol intention clearer.
+Maybe even better CONFIG_HAS_DC21285?
+
+Best regards
+Uwe
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
