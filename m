@@ -1,45 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 2 Jul 2014 18:33:03 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140702170141.GH24879@arm.com>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
-Message-ID: <20140702173302.GL410@sirena.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 2 Jul 2014 19:51:54 +0200
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140702165628.GO20799@lunn.ch>
+References: <20140702183841.7c964832@armhf>
+	<20140702165628.GO20799@lunn.ch>
+Message-ID: <20140702195154.47d6f6b4@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 06:01:41PM +0100, Will Deacon wrote:
-> On Wed, Jul 02, 2014 at 05:39:23PM +0100, Mark Brown wrote:
-> > On Wed, Jul 02, 2014 at 11:01:33AM +0100, Will Deacon wrote:
+On Wed, 2 Jul 2014 18:56:28 +0200
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-> > >   (1) The hardware doesn't have the instruction at all. If we start
-> > >       emulating it, then we'll always have to emulate it and it doesn't
-> > >       encourage software migration.
+> How well will this work with Russell concept of a front end and two
+> backends? Can you uses your CODEC twice, once with the I2S backend and
+> a second time with the S/PDIF backend?
 
-> > That's what the logging other architectures did in similar situations
-> > was intended to help address - even if people don't care about the
-> > performance impact having loud complaints in the logs tends to cause
-> > some useful subset of users to report it as a problem.
+Hi Andrew,
 
-> I don't think logging something to dmesg is going to make a blind bit of
-> difference on an Android device. Maybe we could get SWP emulation to request
+The TDA998x CODEC has two functions:
+- it sets the possible formats and rates when the screen connects and
+- it sets the audio input port when audio streaming starts.
 
-The same is true for the use cases this was being done for - you don't
-need *every* user to notice, you need enough users to notice.
+I tested this CODEC with both DAPM and DPCM. If the audio subsystem
+asks for streaming on both I2S and S/PDIF, only the last call is served
+(this depends on the order of the DAI links in the audio card creation
+table).
 
-> Seriously though, nothing causes loud complaints like a SIGILL. This thread
-> is evidence of that.
+As I told to Russell, DPCM just asks for a 'system' DAI (front-end),
+but it also asks for some additional code in the kirkwood DMA driver
+because all PCMs are activated on streaming start.
 
-The trick is to make the complaints go to the application rather than
-system vendor.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/83e5b8df/attachment.sig>
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
