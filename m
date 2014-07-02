@@ -1,48 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Jul 2014 14:30:31 +0200
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140701204508.GA19569@bart.dudau.co.uk>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <8556461.i7qCGvGY5a@wuerfel> <20140701204508.GA19569@bart.dudau.co.uk>
-Message-ID: <7343032.WUqPgbXNQS@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Jul 2014 13:34:44 +0100
+Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
+ suspend/resume
+In-Reply-To: <53B2E11D.5000507@samsung.com>
+References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
+ <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
+ <53A9B80B.7020608@samsung.com>
+ <20140701144417.GV32514@n2100.arm.linux.org.uk>
+ <53B2E11D.5000507@samsung.com>
+Message-ID: <20140702123444.GB24879@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 July 2014 21:45:09 Liviu Dudau wrote:
-> On Tue, Jul 01, 2014 at 09:36:10PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
-> > 
-> > This still conflicts with the other allocator you have in patch 9
-> > for pci_remap_iospace: nothing guarantees that the mapping is the
-> > same for both.
-> > 
-> > Also, this is a completely pointless exercise at this moment, because
-> > nobody cares about the result of pci_address_to_pio on architectures
-> > that don't already provide this function. If we ever get a proper
-> > Open Firmware implementation that wants to put hardcoded PCI devices
-> > into DT, we can add an implementation, but for now this seems overkill.
-> > 
-> > The allocator in pci_register_io_range seems reasonable, why not merge
-> > this function with pci_remap_iospace() as I have asked you multiple
-> > times before? Just make it return the io_offset so the caller can
-> > put that into the PCI host resources.
-> 
-> Hi Arnd,
-> 
-> While I agree with you that at some moment the allocators were inconsistent
-> wrt each other, for this version I would respectfully disagree on this.
-> The allocator in pci_register_io_range() only makes sure that the ranges
-> are not overlapping, it doesn't do any mapping whatsoever, while
-> pci_remap_iospace() does only an ioremap_page_range(). The idea is that
-> you get the offset out of pci_address_to_pio() and apply it to
-> pci_remap_iospace().
+Hi Tomasz,
 
-Ok, got it now, I'm sorry I didn't read this properly at first.
+I asked the hardware guys to take a closer look at your issue and they've
+uncovered the problem with trying to document an undocumented register.
 
-Your solution looks correct to me, just using different
-tradeoffs to what I was expecting: You get a working pci_address_to_pio()
-function, which is probably never needed, but in turn you need to
-keep the state of each host bridge in a global list.
+On Tue, Jul 01, 2014 at 05:26:05PM +0100, Tomasz Figa wrote:
+> On 01.07.2014 16:44, Russell King - ARM Linux wrote:
+> > On Tue, Jun 24, 2014 at 07:40:27PM +0200, Tomasz Figa wrote:
+> >> On 24.06.2014 18:33, Will Deacon wrote:
+> >>> On A9, it should be write-ignore. Are you seeing problems on a real SoC?
+> >>
+> >> I'm observing a complete system hang on Exynos4412-based Trats2 board if
+> >> I try to write this register in resume from system-wide sleep.
 
-	Arnd
+In actual fact, this register causes an undefined instruction exception if
+you try to write it from a non-secure mode (although reads work fine, for
+whatever that's worth). That nicely explains what you're seeing, but it
+leaves us in a right old two and eight with respect to the suspend/resume
+code.
+
+Given that we don't know whether we're running secure or non-secure, I'm
+not sure about the best approach to solve this. For arm64, we simply mandate
+booting non-secure and require firmware to do everything that requires
+secure access, but we're not in a position to attempt imposing these sorts
+of restrictions for arch/arm/.
+
+Does anybody have any ideas? We could try `handling' the undef, but it's
+ugly and fragile.
+
+Anyway, apologies for the mistake earlier on -- I assumed the documentation
+I had was correct.
+
+Will
