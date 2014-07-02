@@ -1,43 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 02 Jul 2014 16:37:18 -0700
-Subject: [PATCH] clk: qcom: HDMI source sel is 3 not 2
-In-Reply-To: <1403732659-14033-1-git-send-email-sboyd@codeaurora.org>
-References: <1403732659-14033-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140702233718.7440.2077@quantum>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 03 Jul 2014 01:51:19 +0200
+Subject: [PATCH v3 0/8] component helper improvements
+In-Reply-To: <20140702145904.GK32514@n2100.arm.linux.org.uk>
+References: <20140701144011.GU32514@n2100.arm.linux.org.uk>
+ <20140702145904.GK32514@n2100.arm.linux.org.uk>
+Message-ID: <36014663.Ic7tWfh3I9@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-06-25 14:44:19)
-> The HDMI PLL input to the tv mux is supposed to be 3, not 2. Fix
-> the code so that we can properly select the HDMI PLL.
+Hi Russell,
+
+Sorry for the late review.
+
+On Wednesday 02 July 2014 15:59:04 Russell King - ARM Linux wrote:
+> On Tue, Jul 01, 2014 at 03:40:11PM +0100, Russell King - ARM Linux wrote:
+> > A while back, Laurent raised some comments about the component helper,
+> > which this patch set starts to address.
 > 
-> Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia clock controller (MMCC)"
-> Reported-by: Rob Clark <robdclark@gmail.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> I looked back over the two other times which this series has posted,
+> and noticed that two patches had been reviewed, so I've added those
+> tags.
+> 
+> Unless there's any objections from anyone, I'll send the first three
+> off to Greg either tonight or tomorrow night, which at least gets us
+> moving forward on this.
+> 
+> If anyone has any objections, please shout ASAP.  Thanks.
 
-Applied to clk-fixes.
+No objection from my side at all, this is a nice improvement. For the first 
+three patches,
 
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+-- 
 Regards,
-Mike
 
-> ---
->  drivers/clk/qcom/mmcc-msm8960.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-> index 12f3c0b64fcd..4c449b3170f6 100644
-> --- a/drivers/clk/qcom/mmcc-msm8960.c
-> +++ b/drivers/clk/qcom/mmcc-msm8960.c
-> @@ -1209,7 +1209,7 @@ static struct clk_branch rot_clk = {
->  
->  static u8 mmcc_pxo_hdmi_map[] = {
->         [P_PXO]         = 0,
-> -       [P_HDMI_PLL]    = 2,
-> +       [P_HDMI_PLL]    = 3,
->  };
->  
->  static const char *mmcc_pxo_hdmi[] = {
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+Laurent Pinchart
