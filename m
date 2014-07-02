@@ -1,60 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 2 Jul 2014 09:51:02 +0100
-Subject: [PATCH 3/3] ARM: STi: STiH407: Add reset controller support.
-In-Reply-To: <1404225047-9495-4-git-send-email-peter.griffin@linaro.org>
+Date: Wed, 2 Jul 2014 09:54:03 +0100
+Subject: [PATCH 2/3] ARM: sti: Add STiH407 Kconfig entry to select
+ STIH407_RESET
+In-Reply-To: <1404225047-9495-3-git-send-email-peter.griffin@linaro.org>
 References: <1404225047-9495-1-git-send-email-peter.griffin@linaro.org>
- <1404225047-9495-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140702085102.GF10311@lee--X1>
+ <1404225047-9495-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140702085403.GG10311@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 01 Jul 2014, Peter Griffin wrote:
 
-> This patch adds the reset controller DT nodes for the powerdown,
->  softreset and picophy controllers.
-> 
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  arch/arm/boot/dts/stih407.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-> index 4f9024f..e8fbb88 100644
-> --- a/arch/arm/boot/dts/stih407.dtsi
-> +++ b/arch/arm/boot/dts/stih407.dtsi
-> @@ -8,6 +8,7 @@
->   */
->  #include "stih407-clock.dtsi"
->  #include "stih407-pinctrl.dtsi"
-> +#include <dt-bindings/reset-controller/stih407-resets.h>
->  / {
->  	#address-cells = <1>;
->  	#size-cells = <1>;
-> @@ -63,6 +64,21 @@
->  		ranges;
->  		compatible = "simple-bus";
+>  arch/arm/mach-sti/Kconfig | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+
+Looks okay, although could probably do with a few words in the commit
+message about what the STiH407 is; yada, yada, yada ...
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+> index 878e9ec..8825bc9 100644
+> --- a/arch/arm/mach-sti/Kconfig
+> +++ b/arch/arm/mach-sti/Kconfig
+> @@ -42,4 +42,14 @@ config SOC_STIH416
+>  	  and other digital audio/video applications using Flattened Device
+>  	  Trees.
 >  
-> +		powerdown: powerdown-controller {
-> +			#reset-cells = <1>;
-> +			compatible = "st,stih407-powerdown";
-> +		};
+> +config SOC_STIH407
+> +	bool "STiH407 STMicroelectronics Consumer Electronics family"
+> +	default y
+> +	select STIH407_RESET
+> +	help
+> +	  This enables support for STMicroelectronics Digital Consumer
+> +	  Electronics family StiH407 parts, targetted at set-top-box
+> +	  and other digital audio/video applications using Flattened Device
+> +	  Trees.
 > +
-> +		softreset: softreset-controller {
-> +			#reset-cells = <1>;
-> +			compatible = "st,stih407-softreset";
-> +		};
-> +
-> +		picophyreset: picophyreset-controller {
-> +			#reset-cells = <1>;
-> +			compatible = "st,stih407-picophyreset";
-> +		};
-> +
-
-I'd always put the compatible string at the very top of the node.
-
->  		syscfg_sbc: sbc-syscfg at 9620000 {
->  			compatible = "st,stih407-sbc-syscfg", "syscon";
->  			reg = <0x9620000 0x1000>;
+>  endif
 
 -- 
 Lee Jones
