@@ -1,98 +1,89 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 2 Jul 2014 11:47:42 +0300
-Subject: [PATCH 08/13] ARM: OMAP2+: clock/dpll: convert bypass check to use
- clk_features
+Date: Wed, 2 Jul 2014 11:47:39 +0300
+Subject: [PATCH 05/13] ARM: OMAP2+: clock: introduce ti_clk_features flags
 In-Reply-To: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
 References: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404290867-6768-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1404290867-6768-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP2 DPLL code for checking whether DPLL is in bypass mode now uses
-clk_features data provided during boot. This avoids the need to use
-cpu_is_X type checks runtime, and allows us to eventually move the
-clock code under the clock driver.
+This shall be used to replace the cpu type checks around the clock code.
+Actual bit values will be introduced in patches later.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clkt_dpll.c |   25 +++++++++++++------------
- arch/arm/mach-omap2/clock.c     |   17 +++++++++++++++++
- arch/arm/mach-omap2/clock.h     |    1 +
- 3 files changed, 31 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/clock.c |   14 ++++++++++++++
+ arch/arm/mach-omap2/clock.h |   10 ++++++++++
+ arch/arm/mach-omap2/io.c    |    2 ++
+ 3 files changed, 26 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
-index f1b052a..51f995a 100644
---- a/arch/arm/mach-omap2/clkt_dpll.c
-+++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -184,18 +184,19 @@ static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
-  */
- static int _omap2_dpll_is_in_bypass(u32 v)
- {
--	if (cpu_is_omap24xx()) {
--		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
--			return 1;
--	} else if (cpu_is_omap34xx()) {
--		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
--			return 1;
--	} else if (soc_is_am33xx() || cpu_is_omap44xx() || soc_is_am43xx()) {
--		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
-+	u8 mask, val;
-+
-+	mask = ti_clk_features.dpll_bypass_vals;
-+
-+	/*
-+	 * Each set bit in the mask corresponds to a bypass value equal
-+	 * to the bitshift. Go through each set-bit in the mask and
-+	 * compare against the given register value.
-+	 */
-+	while (mask) {
-+		val = __ffs(mask);
-+		mask ^= (1 << val);
-+		if (v == val)
- 			return 1;
- 	}
- 
 diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 7efe66e..e438437 100644
+index 591581a..7897053 100644
 --- a/arch/arm/mach-omap2/clock.c
 +++ b/arch/arm/mach-omap2/clock.c
-@@ -767,4 +767,21 @@ void __init ti_clk_init_features(void)
- 		ti_clk_features.fint_min = OMAP3PLUS_DPLL_FINT_MIN;
- 		ti_clk_features.fint_max = OMAP3PLUS_DPLL_FINT_MAX;
- 	}
+@@ -47,6 +47,11 @@
+ u16 cpu_mask;
+ 
+ /*
++ * Clock features setup. Used instead of CPU type checks.
++ */
++struct ti_clk_features ti_clk_features;
 +
-+	/* Bypass value setup for DPLLs */
-+	if (cpu_is_omap24xx()) {
-+		ti_clk_features.dpll_bypass_vals |=
-+			(1 << OMAP2XXX_EN_DPLL_LPBYPASS) |
-+			(1 << OMAP2XXX_EN_DPLL_FRBYPASS);
-+	} else if (cpu_is_omap34xx()) {
-+		ti_clk_features.dpll_bypass_vals |=
-+			(1 << OMAP3XXX_EN_DPLL_LPBYPASS) |
-+			(1 << OMAP3XXX_EN_DPLL_FRBYPASS);
-+	} else if (soc_is_am33xx() || cpu_is_omap44xx() || soc_is_am43xx() ||
-+		   soc_is_omap54xx() || soc_is_dra7xx()) {
-+		ti_clk_features.dpll_bypass_vals |=
-+			(1 << OMAP4XXX_EN_DPLL_LPBYPASS) |
-+			(1 << OMAP4XXX_EN_DPLL_FRBYPASS) |
-+			(1 << OMAP4XXX_EN_DPLL_MNBYPASS);
-+	}
++/*
+  * clkdm_control: if true, then when a clock is enabled in the
+  * hardware, its clockdomain will first be enabled; and when a clock
+  * is disabled in the hardware, its clockdomain will be disabled
+@@ -731,3 +736,12 @@ void __init omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+ 		(clk_get_rate(core_ck) / 1000000),
+ 		(clk_get_rate(mpu_ck) / 1000000));
  }
++
++/**
++ * ti_clk_init_features - init clock features struct for the SoC
++ *
++ * Initializes the clock features struct based on the SoC type.
++ */
++void __init ti_clk_init_features(void)
++{
++}
 diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 02aa2e3..7b2b099 100644
+index e29f982..9b89cc0 100644
 --- a/arch/arm/mach-omap2/clock.h
 +++ b/arch/arm/mach-omap2/clock.h
-@@ -232,6 +232,7 @@ struct ti_clk_features {
- 	long fint_max;
- 	long fint_band1_max;
- 	long fint_band2_min;
-+	u8 dpll_bypass_vals;
- };
- extern struct ti_clk_features ti_clk_features;
+@@ -223,6 +223,14 @@ void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg);
  
+ extern u16 cpu_mask;
+ 
++/*
++ * Clock features setup. Used instead of CPU type checks.
++ */
++struct ti_clk_features {
++	u32 flags;
++};
++extern struct ti_clk_features ti_clk_features;
++
+ extern const struct clkops clkops_omap2_dflt_wait;
+ extern const struct clkops clkops_dummy;
+ extern const struct clkops clkops_omap2_dflt;
+@@ -261,4 +269,6 @@ extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ extern void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ 
+ extern void omap_clocks_register(struct omap_clk *oclks, int cnt);
++
++void __init ti_clk_init_features(void);
+ #endif
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 8f55945..1fae5c1 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -728,6 +728,8 @@ int __init omap_clk_init(void)
+ 	if (!omap_clk_soc_init)
+ 		return 0;
+ 
++	ti_clk_init_features();
++
+ 	ret = of_prcm_init();
+ 	if (!ret)
+ 		ret = omap_clk_soc_init();
 -- 
 1.7.9.5
