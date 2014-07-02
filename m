@@ -1,61 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 02 Jul 2014 16:23:35 +0200
-Subject: [GIT PULL FOR v3.17] Renesas CMT, MTU2 and TMU timers DT support
-In-Reply-To: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <2296815.Nb0BXfBtnT@avalon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Jul 2014 16:31:57 +0200
+Subject: [PATCH 1/2] ARM: kirkwood: add appended DTB support in
+ kirkwood_defconfig
+In-Reply-To: <20140702142510.GM23978@titan.lakedaemon.net>
+References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702134655.GE20799@lunn.ch>
+ <20140702142510.GM23978@titan.lakedaemon.net>
+Message-ID: <20140702143157.GH20799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wed, Jul 02, 2014 at 10:25:10AM -0400, Jason Cooper wrote:
+> On Wed, Jul 02, 2014 at 03:46:55PM +0200, Andrew Lunn wrote:
+> > On Wed, Jul 02, 2014 at 02:56:17PM +0200, Thomas Petazzoni wrote:
+> > > Most of the Kirkwood platforms use fairly old bootloaders that don't
+> > > have Device Tree support, so it makes sense to enable appended DTB
+> > > support by default, as well as the backward compatibility with ATAGS
+> > > passed by the bootloader for those platforms. It helps having a
+> > > defconfig that works fine out of the box for most Kirkwood platforms.
+> > > 
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > ---
+> > >  arch/arm/configs/kirkwood_defconfig | 2 ++
+> > 
+> > Hi Thomas
+> > 
+> > I plan to remove mach-kirkwood this cycle. So kirkwood_defconfig will
+> > get removed. Please could you patch mvebu_v5_defconfig instead?
+> 
+> Do we need to?  There may be users who want to build a non-multiplatform
+> kernel for kirkwood, or dove...  It certainly takes less time than a
+> multiplatform build.
 
-Could you please merge pull the following changes for v3.17 ? They have 
-previously been posted as "[PATCH v4] Renesas CMT, MTU2 and TMU timers DT 
-support". The only change compared to that version is a rebase on top of 
-v3.16-rc3.
+Hi Jason
 
-As last time I have board and SoC changes that depend on the driver changes 
-and that will need to go through Simon's tree. Could you thus please provide a 
-stable branch based on one of the v3.16-rc tags ?
+mvebu_v5_defconfig is a single platform build, since kirkwood is the
+only mvebu v5 device. In future orion5x could be added, but i don't
+expect a huge build time difference.
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-
-are available in the git repository at:
-
-  git://linuxtv.org/pinchartl/fbdev.git timers/upstream/drivers
-
-for you to fetch changes up to 64a653a02e47e3cfdab45d0b52c4522a09bed590:
-
-  clocksource: sh_mtu2: Add DT support (2014-07-02 16:01:53 +0200)
-
-----------------------------------------------------------------
-Laurent Pinchart (10):
-      clocksource: sh_cmt: Drop support for legacy platform data
-      clocksource: sh_cmt: Replace global spinlock with a per-device spinlock
-      clocksource: sh_tmu: Drop support for legacy platform data
-      clocksource: sh_tmu: Replace global spinlock with a per-device spinlock
-      clocksource: sh_mtu2: Drop support for legacy platform data
-      clocksource: sh_mtu2: Replace global spinlock with a per-device spinlock
-      clocksource: shmobile: Remove unused sh_timer_config members
-      clocksource: sh_cmt: Add DT support
-      clocksource: sh_tmu: Add DT support
-      clocksource: sh_mtu2: Add DT support
-
- Documentation/devicetree/bindings/timer/renesas,cmt.txt |  47 +++++
- .../devicetree/bindings/timer/renesas,mtu2.txt          |  39 ++++
- Documentation/devicetree/bindings/timer/renesas,tmu.txt |  39 ++++
- drivers/clocksource/sh_cmt.c                            | 233 ++++++---------
- drivers/clocksource/sh_mtu2.c                           | 146 +++++----------
- drivers/clocksource/sh_tmu.c                            | 127 ++++++-------
- include/linux/sh_timer.h                                |   5 -
- 7 files changed, 309 insertions(+), 327 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
-
--- 
-Regards,
-
-Laurent Pinchart
+	Andrew
