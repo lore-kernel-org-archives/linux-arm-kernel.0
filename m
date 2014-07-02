@@ -1,55 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 02 Jul 2014 15:38:36 +0100
-Subject: [PATCH REPOST v2] ARM: virt: fix wrong HSCTLR.EE bit setting
-In-Reply-To: <1404208910-15284-1-git-send-email-john.liuli@huawei.com>
-References: <1404208910-15284-1-git-send-email-john.liuli@huawei.com>
-Message-ID: <53B4196C.5070007@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 2 Jul 2014 10:39:50 -0400
+Subject: [PATCH 1/2] ARM: kirkwood: add appended DTB support in
+ kirkwood_defconfig
+In-Reply-To: <20140702143157.GH20799@lunn.ch>
+References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702134655.GE20799@lunn.ch>
+ <20140702142510.GM23978@titan.lakedaemon.net>
+ <20140702143157.GH20799@lunn.ch>
+Message-ID: <20140702143950.GN23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/14 11:01, john.liuli wrote:
-> From: Li Liu <john.liuli@huawei.com>
+On Wed, Jul 02, 2014 at 04:31:57PM +0200, Andrew Lunn wrote:
+> On Wed, Jul 02, 2014 at 10:25:10AM -0400, Jason Cooper wrote:
+> > On Wed, Jul 02, 2014 at 03:46:55PM +0200, Andrew Lunn wrote:
+> > > On Wed, Jul 02, 2014 at 02:56:17PM +0200, Thomas Petazzoni wrote:
+> > > > Most of the Kirkwood platforms use fairly old bootloaders that don't
+> > > > have Device Tree support, so it makes sense to enable appended DTB
+> > > > support by default, as well as the backward compatibility with ATAGS
+> > > > passed by the bootloader for those platforms. It helps having a
+> > > > defconfig that works fine out of the box for most Kirkwood platforms.
+> > > > 
+> > > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > > ---
+> > > >  arch/arm/configs/kirkwood_defconfig | 2 ++
+> > > 
+> > > Hi Thomas
+> > > 
+> > > I plan to remove mach-kirkwood this cycle. So kirkwood_defconfig will
+> > > get removed. Please could you patch mvebu_v5_defconfig instead?
+> > 
+> > Do we need to?  There may be users who want to build a non-multiplatform
+> > kernel for kirkwood, or dove...  It certainly takes less time than a
+> > multiplatform build.
 > 
-> HSCTLR.EE is defined as bit[25] referring to arm manual
-> DDI0606C.b(p1590).
+> Hi Jason
 > 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Li Liu <john.liuli@huawei.com>
-> ---
-> changes v1 -> v2:
->   1)Use the canonical syntax for orr (orr r7, r7, #(1 << 25))
->   2)Use the ARM_BE8 macro instead of the open-coded CONFIG_CPU_BIG_ENDIAN
-> 
->  arch/arm/kernel/hyp-stub.S |    4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 797b1a6..7e666cf 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -134,9 +134,7 @@ ENTRY(__hyp_stub_install_secondary)
->  	mcr	p15, 4, r7, c1, c1, 3	@ HSTR
->  
->  THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
-> -#ifdef CONFIG_CPU_BIG_ENDIAN
-> -	orr	r7, #(1 << 9)		@ HSCTLR.EE
-> -#endif
-> +ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
->  	mcr	p15, 4, r7, c1, c0, 0	@ HSCTLR
->  
->  	mrc	p15, 4, r7, c1, c1, 1	@ HDCR
-> 
+> mvebu_v5_defconfig is a single platform build, since kirkwood is the
+> only mvebu v5 device. In future orion5x could be added, but i don't
+> expect a huge build time difference.
 
-Russell,
+Ok, just make kirkwood_defconfig removal a separate patch so we can
+revert it later if we want.
 
-Assuming you're happy with this patch, would you agree to it going
-through the KVM/ARM tree? We have a whole bunch of BE patches queued up,
-and this is a looks like a better fix than what we have so far [1].
+thx,
 
-Thanks,
-
-	M.
-
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/009950.html
--- 
-Jazz is not dead. It just smells funny...
+Jason.
