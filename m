@@ -1,46 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Jul 2014 17:18:44 +0100
-Subject: [PATCH 2/3] ARM: remove remaining definitions of
- PLAT_PHYS_OFFSET from <mach/memory.h>
-In-Reply-To: <20140702161523.GR14781@pengutronix.de>
-References: <1404295043-6661-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1404295043-6661-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140702103819.GH32514@n2100.arm.linux.org.uk>
- <20140702161523.GR14781@pengutronix.de>
-Message-ID: <20140702161844.GO32514@n2100.arm.linux.org.uk>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 2 Jul 2014 11:18:59 -0500
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping,
+ and synchronization
+In-Reply-To: <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-9-git-send-email-nathan_lynch@mentor.com>
+ <53B1D8AC.7060104@mit.edu> <20140701090309.GC28164@arm.com>
+ <53B2C178.30607@mentor.com> <20140701141541.GP28164@arm.com>
+ <CALCETrWeTeeuz4vW6wrhtDrdg54O-hhFbspfKEEunRZ0zf7ZBg@mail.gmail.com>
+ <20140702144050.GD24879@arm.com>
+ <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
+Message-ID: <53B430F3.9070804@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 06:15:23PM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, Jul 02, 2014 at 11:38:19AM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jul 02, 2014 at 11:57:22AM +0200, Uwe Kleine-K?nig wrote:
-> > >  config PHYS_OFFSET
-> > >  	hex "Physical address of main memory" if MMU
-> > > -	depends on !ARM_PATCH_PHYS_VIRT && !NEED_MACH_MEMORY_H
-> > > +	depends on !ARM_PATCH_PHYS_VIRT
-> > >  	default DRAM_BASE if !MMU
-> > > +	default 0x00000000 if ARCH_EBSA110 || EP93XX_SDCE3_SYNC_PHYS_OFFSET || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR || ARCH_IOP13XX || ARCH_KS8695 || (ARCH_REALVIEW && !REALVIEW_HIGH_PHYS_OFFSET)
-> > 
-> > It would be nice to see a few \ characters in that long line.
-> Yeah, right.
+On 07/02/2014 10:54 AM, Andy Lutomirski wrote:
+> Caveat 2: (major) I'm kind of surprised that this, or the current
+> code, works reliably.  You're doing something that I tried briefly for
+> x86_64:
 > 
-> Also note that there is an ARCH_FOOTBRIDGE while mach-footbridge is
-> selected by FOOTBRIDGE. Following up your comments to the footbridge
-> series one of them should be changed. (But I wonder which one.)
+>         _end = .;
+>         PROVIDE(end = .);
+> 
+>         . = ALIGN(PAGE_SIZE);
+>         PROVIDE(_vdso_data = .);
+> 
+> This sounds great, except that you're assuming that vdso_end -
+> vdso_start == ALIGN(_end, PAGE_SIZE) - (vdso base address).
+> 
+> If you *fully* strip the vdso (eu-strip --strip-sections), then this
+> is true: eu-strip --strip-sections outputs just the PT_LOAD piece of
+> the vdso.  But any binutils-generated incompletely stripped ELF image
+> contains a section table and possible non-allocatable sections at the
+> end.  If these exceed the amount of unused space in the last PT_LOAD
+> page, then they'll spill into the next page, and _vdso_data in the
+> vdso will no longer match the address at which vdso.c loads it.  Boom!
+> 
+> I bet you're getting away with this because the whole arm64 vdso seems
+> to be written in assembly, so it seems extremely unlikely to exceed
+> one page minus a few hundred bytes.  But if you start adding
+> complexity, you might get unlucky.
 
-Yes, I spotted that.  It's was actually harmless, because CO285
-also built mach-footbridge:
+This is why I switched (in v5) the proposed 32-bit ARM VDSO to place the
+data page before the code -- adding -frecord-gcc-switches to the
+compiler flags was enough to break it.
 
-+ machine-$(CONFIG_FOOTBRIDGE)     := footbridge
-+  incdir-$(CONFIG_FOOTBRIDGE)     := ebsa285
-+textaddr-$(CONFIG_ARCH_CO285)     := 0x60008000
-+ machine-$(CONFIG_ARCH_CO285)     := footbridge
-+  incdir-$(CONFIG_ARCH_CO285)     := ebsa285
-
-which makes the machine- and incdir- for CO285 redundant...  I'd
-recommend changing that CONFIG_FOOTBRIDGE to CONFIG_ARCH_FOOTBRIDGE
-because that's more conformant to the pattern which people expect.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+I meant to call Will's attention to it at the time for arm64's sake, but
+I guess it slipped my mind... sorry.
