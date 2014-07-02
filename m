@@ -1,46 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Jul 2014 18:58:57 +0100
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <20140702191832.5e9f35fc@free-electrons.com>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140702164147.GQ32514@n2100.arm.linux.org.uk>
- <20140702191832.5e9f35fc@free-electrons.com>
-Message-ID: <20140702175857.GR32514@n2100.arm.linux.org.uk>
+Date: Wed, 2 Jul 2014 19:02:12 +0100
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140702195154.47d6f6b4@armhf>
+References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
+ <20140702195154.47d6f6b4@armhf>
+Message-ID: <20140702180212.GS32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 07:18:32PM +0200, Thomas Petazzoni wrote:
->  1) The Armada 370 and Armada XP are perfectly detectable in the early
->     assembly, since they have different values in the main
->     identification register (they use PJ4B and PJ4B-MP cores).
+On Wed, Jul 02, 2014 at 07:51:54PM +0200, Jean-Francois Moine wrote:
+> On Wed, 2 Jul 2014 18:56:28 +0200
+> Andrew Lunn <andrew@lunn.ch> wrote:
+> 
+> > How well will this work with Russell concept of a front end and two
+> > backends? Can you uses your CODEC twice, once with the I2S backend and
+> > a second time with the S/PDIF backend?
+> 
+> Hi Andrew,
+> 
+> The TDA998x CODEC has two functions:
+> - it sets the possible formats and rates when the screen connects and
+> - it sets the audio input port when audio streaming starts.
+> 
+> I tested this CODEC with both DAPM and DPCM. If the audio subsystem
+> asks for streaming on both I2S and S/PDIF, only the last call is served
+> (this depends on the order of the DAI links in the audio card creation
+> table).
+> 
+> As I told to Russell, DPCM just asks for a 'system' DAI (front-end),
+> but it also asks for some additional code in the kirkwood DMA driver
+> because all PCMs are activated on streaming start.
 
-You say that, but Dove is PJ4B too (I forget whether it's PJ4B or not.)
-The only way to be sure is to compare the ID numbers.  The AP510 in
-Dove I have here has an ID register value of 0x560f5815.  This ties up
-with the PJ4B entry in proc-v7.S:
+Well, as far as I'm concerned right now, it's for Mark to sort out this
+situation, and tell us what he wants to do with the Kirkwood stuff.  I
+suspect he's keeping quiet because he doesn't care about it.
 
-        .type   __v7_pj4b_proc_info, #object
-__v7_pj4b_proc_info:
-        .long   0x560f5800
-        .long   0xff0fff00
-        __v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
-        .size   __v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+Given that he's the one with the knowledge of DPCM, and he's the maintainer
+of ASoC, he has the ultimate responsibility for sorting out this and
+giving direction as to how he wants to proceed.
 
-How does that compare to the ID you see on Armada 370 and XP?  (I've
-no idea what IDs you get there...)  If the ID is different, then we
-should be able to solve this pretty easily for these CPUs by creating
-a new proc_info record as I think I have previously suggested.
+As I understand it though, my solution is the full and proper DPCM solution,
+and I believe that what's currently in mainline is not a DPCM solution.
 
-With a separate record, we can set the S bit if we need to, and we can
-also set the write-allocate mode too, now that the patch I sent you
-is in mainline (which is something I definitely indicated along with
-that patch.)
-
-I've not really said anything new in this email which I haven't said
-before, with the exception of stating what the ID is for the Dove SoC
-I have.  That's the only ID I know, and I assume that those working on
-mvebu have a better idea what ID numbers are found across all the
-families.
+Mark needs to correct that, because he is one of the few who knows this
+stuff.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
