@@ -1,144 +1,94 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 2 Jul 2014 15:04:09 -0500
-Subject: [PATCH 3/3 V2] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <20140702163903.GA26903@leverpostej>
-References: <1404314544-7762-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140702163903.GA26903@leverpostej>
-Message-ID: <53B465B9.7000407@amd.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 2 Jul 2014 22:28:17 +0200
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140702175857.GR32514@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+ <20140702191832.5e9f35fc@free-electrons.com>
+ <20140702175857.GR32514@n2100.arm.linux.org.uk>
+Message-ID: <20140702222817.1262a7b0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks again for the review. Please see my comments below.
+Russell,
 
-On 7/2/2014 11:39 AM, Mark Rutland wrote:
-> On Wed, Jul 02, 2014 at 04:22:23PM +0100, suravee.suthikulpanit at amd.com wrote:
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->> index 5573c08..9e46f7f 100644
->> --- a/Documentation/devicetree/bindings/arm/gic.txt
->> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->> @@ -12,11 +12,13 @@ Main node required properties:
->>
->>   - compatible : should be one of:
->>          "arm,gic-400"
->> +       "arm,gic-400-plus"
->
-> I am not keen on this name.
+On Wed, 2 Jul 2014 18:58:57 +0100, Russell King - ARM Linux wrote:
 
-Ok, I'll change it. Any suggestion on name?  I'm not sure what is the 
-"official" product name. I've seen this in some slides from ARM. What 
-about "gic-400-v2m"??.
+> You say that, but Dove is PJ4B too (I forget whether it's PJ4B or not.)
+> The only way to be sure is to compare the ID numbers.  The AP510 in
+> Dove I have here has an ID register value of 0x560f5815.  This ties up
+> with the PJ4B entry in proc-v7.S:
+> 
+>         .type   __v7_pj4b_proc_info, #object
+> __v7_pj4b_proc_info:
+>         .long   0x560f5800
+>         .long   0xff0fff00
+>         __v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+>         .size   __v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+> 
+> How does that compare to the ID you see on Armada 370 and XP?  (I've
+> no idea what IDs you get there...)  If the ID is different, then we
+> should be able to solve this pretty easily for these CPUs by creating
+> a new proc_info record as I think I have previously suggested.
 
->>          "arm,cortex-a15-gic"
->>          "arm,cortex-a9-gic"
->>          "arm,cortex-a7-gic"
->>          "arm,arm11mp-gic"
->>   - interrupt-controller : Identifies the node as an interrupt controller
->> +
->>   - #interrupt-cells : Specifies the number of cells needed to encode an
->>     interrupt source.  The type shall be a <u32> and the value shall be 3.
->
-> Random (inconsistent) whitespace change?
-It looks to me like there should have been a space here to keep the 
-consistent look, and make it easy to read
+The ID for Armada 370 is 0x560f5811, but the last digit is the "Product
+Revision Number", so I'm not sure it can be used to distinguish Dove
+from Armada 370. However, I believe we could simply run Dove in a
+Write-Allocate cache policy.
 
->> @@ -37,9 +39,16 @@ Main node required properties:
->>          the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
->>          the interrupt is wired to that CPU.  Only valid for PPI interrupts.
->>
->> -- reg : Specifies base physical address(s) and size of the GIC registers. The
->> -  first region is the GIC distributor register base and size. The 2nd region is
->> -  the GIC cpu interface register base and size.
->> +- reg : Specifies base physical address(s) and size of the GIC register frames.
->> +
->> +  Region | Description
->> +  Index  |
->> +  -------------------------------------------------------------------
->> +     0   | GIC distributor register base and size
->> +     1   | GIC cpu interface register base and size
->> +     2   | VGIC interface control register base and size (Optional)
->> +     3   | VGIC CPU interface register base and size (Optional)
->> +     4   | GICv2m MSI interface register base and size (Optional)
->
-> As far as I am aware, the MSI interface is completely orthogonal to
-> having a GICH and GICV.
+> With a separate record, we can set the S bit if we need to, and we can
+> also set the write-allocate mode too, now that the patch I sent you
+> is in mainline (which is something I definitely indicated along with
+> that patch.)
+> 
+> I've not really said anything new in this email which I haven't said
+> before, with the exception of stating what the ID is for the Dove SoC
+> I have.  That's the only ID I know, and I assume that those working on
+> mvebu have a better idea what ID numbers are found across all the
+> families.
 
-Agree. I'm not doing anything with it. I'm just listing them here since 
-they are also mentioned in the gic.txt
+Russell, please again what I've asked numerous times. I already wrote
+the patches that creates specific proc_info structures for Armada 370
+and Armada XP to set the cache policy and S bit, as you suggested. But
+this is only setting the PMD flags, but doesn't touch the TTB flags,
+which remain only defined by ALT_UP/ALT_SMP conditional. And I remember
+Catalin saying that having PMD flags varying from the TTB flags could
+be a problem.
 
->
-> We should figure out how we expect to handle that (zero-sized reg
-> entries? reg-names?).
+That is the question I'm asking to you since several e-mails that you
+never answered, and that is completely unrelated to having separate
+proc_info structure, because the TTB flags are *not* defined in the
+proc_info structure.
 
-I'm not sure how VGIC stuff handles reg/size = 0.
+Sorry to be a bit harsh here but you seem to assume that I'm an idiot
+who didn't read what you said, and you simply repeat again and again
+that your patch already solves the problem by allowing the proc_info
+structure to define the PMD flags. But you never answered my question
+about the TTB flags, which is the question I've been asking since
+several e-mails already.
 
->
->>
->>   Optional
->>   - interrupts   : Interrupt source of the parent interrupt controller on
->> @@ -55,6 +64,10 @@ Optional
->>                    by a crossbar/multiplexer preceding the GIC. The GIC irq
->>                    input line is assigned dynamically when the corresponding
->>                    peripheral's crossbar line is mapped.
->> +
->> +- msi-controller : Identifies the node as an MSI controller.  This requires
->> +  the register region index 4.
->
-> That last clarifying comment is more confusing than helpful.
+See the two attached patches for what I've already done for Armada 370
+and Armada XP using the proc_info structures. Writing those patches
+lead me to the problem of the TTB flags, which remains unanswered.
 
-If you are referring to the table, I added that since it was easier to 
-see than scanning the text.
+Thanks for your help!
 
-> [...]
->
->> +#define GIC_V2M_MIN_SPI                        32
->> +#define GIC_V2M_MAX_SPI                        1024
->
-> GIC interrupt IDs 1020 and above are reserved, no?
->
-> Surely the max ID an SPI can take is 1019?
-
-Right, thanks for catching. But the spec says that the SPI ID value must 
-be in the range of 32 to 1020. I guess it was a bit unclear, but 
-definitely not 1024 :)
-
->> +#define GIC_OF_MSIV2M_RANGE_INDEX      4
->> +
->> +/**
->> + * alloc_msi_irq - Allocate MSIs from avaialbe MSI bitmap.
->> + * @data: Pointer to v2m_data
->> + * @nvec: Number of interrupts to allocate
->> + * @irq: Pointer to the allocated irq
->> + *
->> + * Allocates interrupts only if the contiguous range of MSIs
->> + * with specified nvec are available. Otherwise return the number
->> + * of available interrupts. If none are available, then returns -ENOENT.
->> + */
->
-> This function is overly complicated, and pointlessly so.
->
-> It doesn't achieve anything useful as it returns the size of the _last_
-> contiguous block rather than the _largest_ contiguous block, and the
-> only caller (gicv2m_setup_msi_irq) doesn't even care.
->
-> Simplify this to just return an error code if allocation is impossible.
-
-Actually, I made another mistake in the gicv2m_setup_msi_irq when 
-returning from the alloc_msi_irq().
-
-My understanding is the arch_setup_msi_irqs() is supposed to return the 
-number of available vectors if the requested amount could not be 
-allocated. I notice that the current "drivers/pci/msi.c: 
-arch_setup_msi_irqs()" does not do so, which is okay.
-
-However, We are also working on adding support for multi-MSI support 
-since some of the devices we have are using it, which means we will need 
-to provide a different version of the "arch_setup_msi_irqs()" as the 
-current one does not allow (PCI_CAP_ID_MSI && nvec > 1).
-
-Therefore, I implemented the "alloc_msi_irq" this way to account for 
-future changes.
-
-Thanks,
-
-Suravee
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-mm-split-PJ4B-and-PJ4B-MP.patch
+Type: text/x-patch
+Size: 1231 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/c8f38af7/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-ARM-mm-set-appropriate-mm_mmuflags-for-PJ4B-variants.patch
+Type: text/x-patch
+Size: 1222 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/c8f38af7/attachment-0001.bin>
