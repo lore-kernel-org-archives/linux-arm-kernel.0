@@ -1,260 +1,31 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed,  2 Jul 2014 11:03:37 -0700
-Subject: [PATCHv4 4/5] arm: use genalloc for the atomic pool
-In-Reply-To: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
-References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1404324218-4743-5-git-send-email-lauraa@codeaurora.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 02 Jul 2014 20:05:45 +0200
+Subject: [GIT PULL] Samsung clock fixes for v3.16
+In-Reply-To: <20140702171323.7440.76631@quantum>
+References: <1404319926-6178-1-git-send-email-t.figa@samsung.com>
+ <20140702171323.7440.76631@quantum>
+Message-ID: <53B449F9.8020001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02.07.2014 19:13, Mike Turquette wrote:
+> Quoting Tomasz Figa (2014-07-02 09:52:06)
+>> The following changes since commit b640a6037c9ecd1f0ad23a8e9b4ca5f5b4112508:
+>>
+>>   Merge tag 'sunxi-clk-for-3.16-2' of https://github.com/mripard/linux into clk-next (2014-06-11 07:11:59 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.16/samsung-clk-fixes
+>>
+>> for you to fetch changes up to 44ff0254b89079a8a95e652635e760d93196ac1f:
+>>
+>>   clk: exynos5420: Remove aclk66_peric from the clock tree description (2014-06-30 14:47:33 +0200)
+> 
+> Pulled into clk-fixes. Thanks for the great tag description as well.
 
-ARM currently uses a bitmap for tracking atomic allocations.
-genalloc already handles this type of memory pool allocation
-so switch to using that instead.
+Thanks.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/Kconfig          |   1 +
- arch/arm/mm/dma-mapping.c | 143 ++++++++++++++--------------------------------
- 2 files changed, 44 insertions(+), 100 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 245058b..190d085 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -13,6 +13,7 @@ config ARM
- 	select CLONE_BACKWARDS
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
-+	select GENERIC_ALLOCATOR
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IDLE_POLL_SETUP
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f5190ac..02a1939 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -26,6 +26,7 @@
- #include <linux/io.h>
- #include <linux/vmalloc.h>
- #include <linux/sizes.h>
-+#include <linux/genalloc.h>
- 
- #include <asm/memory.h>
- #include <asm/highmem.h>
-@@ -313,40 +314,31 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
- }
- 
- #define DEFAULT_DMA_COHERENT_POOL_SIZE	SZ_256K
-+static struct gen_pool *atomic_pool;
- 
--struct dma_pool {
--	size_t size;
--	spinlock_t lock;
--	unsigned long *bitmap;
--	unsigned long nr_pages;
--	void *vaddr;
--	struct page **pages;
--};
--
--static struct dma_pool atomic_pool = {
--	.size = DEFAULT_DMA_COHERENT_POOL_SIZE,
--};
-+static size_t atomic_pool_size = DEFAULT_DMA_COHERENT_POOL_SIZE;
- 
- static int __init early_coherent_pool(char *p)
- {
--	atomic_pool.size = memparse(p, &p);
-+	atomic_pool_size = memparse(p, &p);
- 	return 0;
- }
- early_param("coherent_pool", early_coherent_pool);
- 
-+
- void __init init_dma_coherent_pool_size(unsigned long size)
- {
- 	/*
- 	 * Catch any attempt to set the pool size too late.
- 	 */
--	BUG_ON(atomic_pool.vaddr);
-+	BUG_ON(atomic_pool);
- 
- 	/*
- 	 * Set architecture specific coherent pool size only if
- 	 * it has not been changed by kernel command line parameter.
- 	 */
--	if (atomic_pool.size == DEFAULT_DMA_COHERENT_POOL_SIZE)
--		atomic_pool.size = size;
-+	if (atomic_pool_size == DEFAULT_DMA_COHERENT_POOL_SIZE)
-+		atomic_pool_size = size;
- }
- 
- /*
-@@ -354,52 +346,43 @@ void __init init_dma_coherent_pool_size(unsigned long size)
-  */
- static int __init atomic_pool_init(void)
- {
--	struct dma_pool *pool = &atomic_pool;
- 	pgprot_t prot = pgprot_dmacoherent(PAGE_KERNEL);
- 	gfp_t gfp = GFP_KERNEL | GFP_DMA;
--	unsigned long nr_pages = pool->size >> PAGE_SHIFT;
--	unsigned long *bitmap;
- 	struct page *page;
--	struct page **pages;
- 	void *ptr;
--	int bitmap_size = BITS_TO_LONGS(nr_pages) * sizeof(long);
- 
--	bitmap = kzalloc(bitmap_size, GFP_KERNEL);
--	if (!bitmap)
--		goto no_bitmap;
--
--	pages = kzalloc(nr_pages * sizeof(struct page *), GFP_KERNEL);
--	if (!pages)
--		goto no_pages;
-+	atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
-+	if (!atomic_pool)
-+		goto out;
- 
- 	if (dev_get_cma_area(NULL))
--		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
--					      atomic_pool_init);
-+		ptr = __alloc_from_contiguous(NULL, atomic_pool_size, prot,
-+					      &page, atomic_pool_init);
- 	else
--		ptr = __alloc_remap_buffer(NULL, pool->size, gfp, prot, &page,
--					   atomic_pool_init);
-+		ptr = __alloc_remap_buffer(NULL, atomic_pool_size, gfp, prot,
-+					   &page, atomic_pool_init);
- 	if (ptr) {
--		int i;
--
--		for (i = 0; i < nr_pages; i++)
--			pages[i] = page + i;
--
--		spin_lock_init(&pool->lock);
--		pool->vaddr = ptr;
--		pool->pages = pages;
--		pool->bitmap = bitmap;
--		pool->nr_pages = nr_pages;
--		pr_info("DMA: preallocated %u KiB pool for atomic coherent allocations\n",
--		       (unsigned)pool->size / 1024);
-+		int ret;
-+
-+		ret = gen_pool_add_virt(atomic_pool, (unsigned long)ptr,
-+					page_to_phys(page),
-+					atomic_pool_size, -1);
-+		if (ret)
-+			goto destroy_genpool;
-+
-+		gen_pool_set_algo(atomic_pool,
-+				gen_pool_first_fit_order_align, NULL);
-+		pr_info("DMA: preallocated %zd KiB pool for atomic coherent allocations\n",
-+		       atomic_pool_size / 1024);
- 		return 0;
- 	}
- 
--	kfree(pages);
--no_pages:
--	kfree(bitmap);
--no_bitmap:
--	pr_err("DMA: failed to allocate %u KiB pool for atomic coherent allocation\n",
--	       (unsigned)pool->size / 1024);
-+destroy_genpool:
-+	gen_pool_destroy(atomic_pool);
-+	atomic_pool = NULL;
-+out:
-+	pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
-+	       atomic_pool_size / 1024);
- 	return -ENOMEM;
- }
- /*
-@@ -494,76 +477,36 @@ static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
- 
- static void *__alloc_from_pool(size_t size, struct page **ret_page)
- {
--	struct dma_pool *pool = &atomic_pool;
--	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
--	unsigned int pageno;
--	unsigned long flags;
-+	unsigned long val;
- 	void *ptr = NULL;
--	unsigned long align_mask;
- 
--	if (!pool->vaddr) {
-+	if (!atomic_pool) {
- 		WARN(1, "coherent pool not initialised!\n");
- 		return NULL;
- 	}
- 
--	/*
--	 * Align the region allocation - allocations from pool are rather
--	 * small, so align them to their order in pages, minimum is a page
--	 * size. This helps reduce fragmentation of the DMA space.
--	 */
--	align_mask = (1 << get_order(size)) - 1;
--
--	spin_lock_irqsave(&pool->lock, flags);
--	pageno = bitmap_find_next_zero_area(pool->bitmap, pool->nr_pages,
--					    0, count, align_mask);
--	if (pageno < pool->nr_pages) {
--		bitmap_set(pool->bitmap, pageno, count);
--		ptr = pool->vaddr + PAGE_SIZE * pageno;
--		*ret_page = pool->pages[pageno];
--	} else {
--		pr_err_once("ERROR: %u KiB atomic DMA coherent pool is too small!\n"
--			    "Please increase it with coherent_pool= kernel parameter!\n",
--			    (unsigned)pool->size / 1024);
-+	val = gen_pool_alloc(atomic_pool, size);
-+	if (val) {
-+		phys_addr_t phys = gen_pool_virt_to_phys(atomic_pool, val);
-+
-+		*ret_page = phys_to_page(phys);
-+		ptr = (void *)val;
- 	}
--	spin_unlock_irqrestore(&pool->lock, flags);
- 
- 	return ptr;
- }
- 
- static bool __in_atomic_pool(void *start, size_t size)
- {
--	struct dma_pool *pool = &atomic_pool;
--	void *end = start + size;
--	void *pool_start = pool->vaddr;
--	void *pool_end = pool->vaddr + pool->size;
--
--	if (start < pool_start || start >= pool_end)
--		return false;
--
--	if (end <= pool_end)
--		return true;
--
--	WARN(1, "Wrong coherent size(%p-%p) from atomic pool(%p-%p)\n",
--	     start, end - 1, pool_start, pool_end - 1);
--
--	return false;
-+	return addr_in_gen_pool(atomic_pool, (unsigned long)start, size);
- }
- 
- static int __free_from_pool(void *start, size_t size)
- {
--	struct dma_pool *pool = &atomic_pool;
--	unsigned long pageno, count;
--	unsigned long flags;
--
- 	if (!__in_atomic_pool(start, size))
- 		return 0;
- 
--	pageno = (start - pool->vaddr) >> PAGE_SHIFT;
--	count = size >> PAGE_SHIFT;
--
--	spin_lock_irqsave(&pool->lock, flags);
--	bitmap_clear(pool->bitmap, pageno, count);
--	spin_unlock_irqrestore(&pool->lock, flags);
-+	gen_pool_free(atomic_pool, (unsigned long)start, size);
- 
- 	return 1;
- }
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Tomasz
