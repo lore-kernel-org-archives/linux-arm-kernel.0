@@ -1,42 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Jul 2014 16:28:35 +0100
-Subject: [PATCH 03/12] mfd: intel_soc_pmic: Rid compiler working for unused
- ACPI match table
-In-Reply-To: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
-References: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1404314924-23564-4-git-send-email-lee.jones@linaro.org>
+Date: Wed, 2 Jul 2014 16:40:59 +0100
+Subject: [PATCH v2 1/4] reset: stih407: Add softreset, powerdown and
+ picophy controllers
+In-Reply-To: <1404310129-14667-2-git-send-email-peter.griffin@linaro.org>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+ <1404310129-14667-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140702154059.GA17665@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONIFG_ACPI is not enabled we receive the following warning:
+On Wed, 02 Jul 2014, Peter Griffin wrote:
 
-drivers/mfd/intel_soc_pmic_core.c:144:30:
-	warning: ?intel_soc_pmic_acpi_match? defined but not used
+> This patch adds softreset, powerdown and picophy reset controllers for
+> the STiH407 SoC.
+> 
+> With this patch three new devices are registered: -
+> 1. st,stih407-powerdown
+> 2. st,stih407-softreset
+> 3. st,stih407-picophyreset
+> 
+> All three devices use system configuration registers mapped via regmap to
+> perform the reset or powerdown. The powerdown controller also has
+> an acknowledgement.
+> 
+> A separate picophy reset controller manages the different reset channels within
+> the picophy, which have a different polarity to the other system softresets.
+> Managing these different picophy softreset channels is necessary to correctly
+> handle resuming from suspend when USB2 devices are plugged into the USB3 port.
+> 
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/reset/sti/Kconfig                          |   4 +
+>  drivers/reset/sti/Makefile                         |   1 +
+>  drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
+>  .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
+>  4 files changed, 224 insertions(+)
+>  create mode 100644 drivers/reset/sti/reset-stih407.c
+>  create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
 
-This patch rids it.
+Looks good to me now:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/intel_soc_pmic_core.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/mfd/intel_soc_pmic_core.c b/drivers/mfd/intel_soc_pmic_core.c
-index cddbf5a..2720922 100644
---- a/drivers/mfd/intel_soc_pmic_core.c
-+++ b/drivers/mfd/intel_soc_pmic_core.c
-@@ -141,11 +141,13 @@ static const struct i2c_device_id intel_soc_pmic_i2c_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, intel_soc_pmic_i2c_id);
- 
-+#if defined(CONFIG_ACPI)
- static struct acpi_device_id intel_soc_pmic_acpi_match[] = {
- 	{"INT33FD", (kernel_ulong_t)&intel_soc_pmic_config_crc},
- 	{ },
- };
- MODULE_DEVICE_TABLE(acpi, intel_soc_pmic_acpi_match);
-+#endif
- 
- static struct i2c_driver intel_soc_pmic_i2c_driver = {
- 	.driver = {
 -- 
-1.8.3.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
