@@ -1,36 +1,71 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 2 Jul 2014 14:49:57 +0530
-Subject: [PATCH 0/5] phy: miphy365x: Introduce support for MiPHY365x
-In-Reply-To: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <53B3CEBD.2060609@ti.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Wed, 02 Jul 2014 14:50:24 +0530
+Subject: [PATCH v5 14/14] ARM: dts: Add max77802 to exynos5420-peach-pit
+ and exynos5800-peach-pi
+In-Reply-To: <1403806546-31122-15-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-15-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <53B3CED8.4020808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 30 June 2014 06:31 PM, Lee Jones wrote:
-> Hi Kishon,
+On 06/26/2014 11:45 PM, Javier Martinez Canillas wrote:
+> Peach pit and pi boards uses a Maxim 77802 power management
+> IC to drive regulators and its Real Time Clock. This patch
+> adds support for this chip.
 > 
-> This submission is the same as the last one, only each channel is
-> now represented by its own sub-node.  The documentation has also
+> These are the device nodes and pinctrl configuration that
+> are present on the Peach pit DeviceTree source file in the
+> the Chrome OS kernel 3.8 tree.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> ---
 
-really cool.
+[ ... ]
 
-Thanks
-Kishon
-> been updated accordingly.
-> 
-> Kind regards,
-> Lee
-> 
->  .../devicetree/bindings/phy/phy-miphy365x.txt      |  76 +++
->  arch/arm/boot/dts/stih416-b2020-revE.dts           |   5 +
->  arch/arm/boot/dts/stih416-b2020.dts                |   7 +
->  arch/arm/boot/dts/stih416.dtsi                     |  21 +
->  drivers/phy/Kconfig                                |  10 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-miphy365x.c                        | 676 +++++++++++++++++++++
->  include/dt-bindings/phy/phy-miphy365x.h            |  25 +
->  8 files changed, 821 insertions(+)
-> 
+> +
+> +		regulators {
+> +			buck1_reg: BUCK1 {
+> +				regulator-name = "vdd_mif";
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-ramp-delay = <12500>;
+> +			};
+
+IMO, adding a blank line between sub-nodes would be better.
+
+> +			buck2_reg: BUCK2 {
+> +				regulator-name = "vdd_arm_real";
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1500000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-ramp-delay = <12500>;
+> +			};
+
+[ ... ]
+
+> +			vqmmc_sdcard: ldo4_reg: LDO4 {
+> +				regulator-name = "vdd_sd";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-always-on;
+> +
+
+Blank line, can be removed.
+
+> +			};
+
+[ ... ]
+> +			ldo23_reg: LDO23 {
+> +				regulator-name = "ld0_23";
+
+ldo_23, 'o' in place of '0'.
+
+Similar comments for peach-pi DTS file.
+
+-- 
+Tushar Behera
