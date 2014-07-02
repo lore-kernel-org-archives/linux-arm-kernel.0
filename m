@@ -1,30 +1,62 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 02 Jul 2014 16:13:04 +0200
-Subject: [PATCH] dmaengine: fsl-edma: fix dmamux index calculating error
-In-Reply-To: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
-References: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <9c969818e13bcd71307db22fd163a6db@agner.ch>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 2 Jul 2014 17:23:30 +0300
+Subject: [PATCH 1/8] CLK: ti: dra7: Initialize USB_DPLL
+In-Reply-To: <1394197751-28984-2-git-send-email-rogerq@ti.com>
+References: <1394197751-28984-1-git-send-email-rogerq@ti.com>
+ <1394197751-28984-2-git-send-email-rogerq@ti.com>
+Message-ID: <53B415E2.9090203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-07-01 10:41, schrieb Jingchang Lu:
->  	u32 ch = fsl_chan->vchan.chan.chan_id;
-> -	void __iomem *muxaddr = fsl_chan->edma->muxbase[ch / DMAMUX_NR];
-> +	void __iomem *muxaddr;
->  	unsigned chans_per_mux, ch_off;
->  
->  	chans_per_mux = fsl_chan->edma->n_chans / DMAMUX_NR;
->  	ch_off = fsl_chan->vchan.chan.chan_id % chans_per_mux;
-> +	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
+On 03/07/2014 03:09 PM, Roger Quadros wrote:
+> USB_DPLL must be initialized and locked at boot so that
+> USB modules can work.
+>
+> Also program USB_DLL_M2 output to half rate.
+>
+> CC: Mike Turquette <mturquette@linaro.org>
+> CC: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   drivers/clk/ti/clk-7xx.c | 11 +++++++++++
+>   1 file changed, 11 insertions(+)
 
-After realizing that only one DMA channel was working on Vybrid I first
-came up with an almost identically patch before I found this one. I now
-applied and tested this one. Without this patch, the DMA user (e.g.
-lpuart) fails gracefully and work nonetheless, however without DMA.
-Since eDMA support is broken in current state in 3.16-rc3, it would be
-good to get this patch into 3.16.
+Hi,
 
-Tested-by: Stefan Agner <stefan@agner.ch>
+Resurrecting this patch, as it seems the clock-parenting stuff via DT 
+hasn't really moved that much forward.
 
---
-Stefan
+Thus, this patch has been now queued for 3.17, thanks.
+
+-Tero
+
+>
+> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+> index 9977653..f89f3c2 100644
+> --- a/drivers/clk/ti/clk-7xx.c
+> +++ b/drivers/clk/ti/clk-7xx.c
+> @@ -18,6 +18,7 @@
+>
+>   #define DRA7_DPLL_ABE_DEFFREQ				361267200
+>   #define DRA7_DPLL_GMAC_DEFFREQ				1000000000
+> +#define DRA7_DPLL_USB_DEFFREQ				960000000
+>
+>
+>   static struct ti_dt_clk dra7xx_clks[] = {
+> @@ -328,5 +329,15 @@ int __init dra7xx_dt_clk_init(void)
+>   	if (rc)
+>   		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
+>
+> +	dpll_ck = clk_get_sys(NULL, "dpll_usb_ck");
+> +	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ);
+> +	if (rc)
+> +		pr_err("%s: failed to configure USB DPLL!\n", __func__);
+> +
+> +	dpll_ck = clk_get_sys(NULL, "dpll_usb_m2_ck");
+> +	rc = clk_set_rate(dpll_ck, DRA7_DPLL_USB_DEFFREQ/2);
+> +	if (rc)
+> +		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+> +
+>   	return rc;
+>   }
+>
