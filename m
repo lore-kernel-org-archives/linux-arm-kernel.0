@@ -1,35 +1,113 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 2 Jul 2014 10:25:10 -0400
-Subject: [PATCH 1/2] ARM: kirkwood: add appended DTB support in
- kirkwood_defconfig
-In-Reply-To: <20140702134655.GE20799@lunn.ch>
-References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140702134655.GE20799@lunn.ch>
-Message-ID: <20140702142510.GM23978@titan.lakedaemon.net>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Wed, 02 Jul 2014 17:26:31 +0300
+Subject: [PATCH] spi: qup: Add DMA capabilities
+In-Reply-To: <1403816781-31008-1-git-send-email-agross@codeaurora.org>
+References: <1403816781-31008-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1404311191.3622.22.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 03:46:55PM +0200, Andrew Lunn wrote:
-> On Wed, Jul 02, 2014 at 02:56:17PM +0200, Thomas Petazzoni wrote:
-> > Most of the Kirkwood platforms use fairly old bootloaders that don't
-> > have Device Tree support, so it makes sense to enable appended DTB
-> > support by default, as well as the backward compatibility with ATAGS
-> > passed by the bootloader for those platforms. It helps having a
-> > defconfig that works fine out of the box for most Kirkwood platforms.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/configs/kirkwood_defconfig | 2 ++
+
+Hi Andy,
+
+Just few comments.
+
+On Thu, 2014-06-26 at 16:06 -0500, Andy Gross wrote:
+> This patch adds DMA capabilities to the spi-qup driver.  If DMA channels are
+> present, the QUP will use DMA instead of block mode for transfers to/from SPI
+> peripherals for transactions larger than the length of a block.
 > 
-> Hi Thomas
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../devicetree/bindings/spi/qcom,spi-qup.txt       |   10 +
+>  drivers/spi/spi-qup.c                              |  361 ++++++++++++++++++--
+>  2 files changed, 350 insertions(+), 21 deletions(-)
 > 
-> I plan to remove mach-kirkwood this cycle. So kirkwood_defconfig will
-> get removed. Please could you patch mvebu_v5_defconfig instead?
 
-Do we need to?  There may be users who want to build a non-multiplatform
-kernel for kirkwood, or dove...  It certainly takes less time than a
-multiplatform build.
+<snip>
+ 
+> diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
+> index fc1de86..9b01db5 100644
+> --- a/drivers/spi/spi-qup.c
+> +++ b/drivers/spi/spi-qup.c
+> @@ -22,6 +22,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/spi/spi.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+>  
+>  #define QUP_CONFIG			0x0000
+>  #define QUP_STATE			0x0004
+> @@ -116,6 +118,8 @@
+>  
+>  #define SPI_NUM_CHIPSELECTS		4
+>  
+> +#define SPI_MAX_XFER			(SZ_64K - 64)
+> +
+>  /* high speed mode is when bus rate is greater then 26MHz */
+>  #define SPI_HS_MIN_RATE			26000000
+>  #define SPI_MAX_RATE			50000000
+> @@ -142,6 +146,17 @@ struct spi_qup {
+>  	int			w_size;	/* bytes per SPI word */
+>  	int			tx_bytes;
+>  	int			rx_bytes;
+> +
+> +	int			use_dma;
+> +
+> +	struct dma_chan		*rx_chan;
+> +	struct dma_slave_config	rx_conf;
+> +	struct dma_chan		*tx_chan;
+> +	struct dma_slave_config tx_conf;
+> +	dma_addr_t		rx_dma;
+> +	dma_addr_t		tx_dma;
 
-thx,
+DMA addresses seems unused.
 
-Jason.
+> +	void			*dummy;
+
+This is not so dummy, probably 'spare'.
+
+> +	atomic_t		dma_outstanding;
+>  };
+
+<snip>
+
+>  
+>  
+> @@ -632,6 +896,56 @@ static int spi_qup_probe(struct platform_device *pdev)
+>  	writel_relaxed(SPI_ERROR_CLK_UNDER_RUN | SPI_ERROR_CLK_OVER_RUN,
+>  		       base + SPI_ERROR_FLAGS_EN);
+>  
+> +	/* allocate dma resources, if available */
+> +	controller->rx_chan = dma_request_slave_channel(&pdev->dev, "rx");
+> +	if (controller->rx_chan) {
+> +		controller->tx_chan =
+> +			dma_request_slave_channel(&pdev->dev, "tx");
+> +
+> +		if (!controller->tx_chan) {
+> +			dev_err(&pdev->dev, "Failed to allocate dma tx chan");
+> +			dma_release_channel(controller->rx_chan);
+
+
+There is no point to go further with DMA configuration
+if there are no channels, right?
+
+> +		}
+> +
+> +		/* set DMA parameters */
+> +		controller->rx_conf.device_fc = 1;
+> +		controller->rx_conf.src_addr = res->start + QUP_INPUT_FIFO;
+> +		controller->rx_conf.src_maxburst = controller->in_blk_sz;
+> +
+> +		controller->tx_conf.device_fc = 1;
+> +		controller->tx_conf.dst_addr = res->start + QUP_OUTPUT_FIFO;
+> +		controller->tx_conf.dst_maxburst = controller->out_blk_sz;
+> +
+
+
+Please, could you share blsp2_bam device node configuration? 
+I would like to test these changes.
+
+Regards,
+Ivan
