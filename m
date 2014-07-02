@@ -1,49 +1,56 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 02 Jul 2014 08:46:19 -0400
-Subject: [PATCH 0/8] arm: perf: cleanups and initial refactoring
-In-Reply-To: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
-References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <53B3FF1B.2090202@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Jul 2014 14:48:17 +0200
+Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
+In-Reply-To: <1404290605.3622.6.camel@iivanov-dev>
+References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
+ <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
+ <1404290605.3622.6.camel@iivanov-dev>
+Message-ID: <4545008.qD8N1qWmNz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 07/01/2014 11:11 AM, Mark Rutland wrote:
-> While reorganising the ARM perf backend to provide support for
-> heterogeneous PMUs in big.LITTLE systems, I encountered a couple of
-> issues requiring some preparatory work in addition to some opportunities
-> for general cleanup in the backend. This series consists of those
-> initial cleanups.
+On Wednesday 02 July 2014 11:43:25 Ivan T. Ivanov wrote:
+> > > <snip>
+> > >
+> > >> > +
+> > >> > +                       ranges;
+> > >> > +
+> > >> > +                       status = "disabled";
+> > >> > +
+> > >> > +                       dwc3 at 11000000 {
+> > >> > +                               compatible = "snps,dwc3";
+> > >>
+> > >> This sub-node is just wrong. Why can't you have a single node with '
+> > >> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
+> > >> adding here is clocks. Does the Synopsys block have no clocks?
+> > >>
+> > >> I guess this is copied from other broken dwc3 bindings... That doesn't
+> > >> mean you have to copy it.
+> > >
+> > > The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
+> > > That, in addition to pm, has to be handled from the wrapper.  That's my take
+> > > anyway.  I am sure Felipe can speak more to this.
+> > 
+> > That is a Linux driver issue which is irrelevant to the binding.
 > 
-> Currently the event mapping code in the ARM perf backend requires
-> multi-dimensional tables to map from common event encodings to raw
-> hardware values, where empty slots must be initialised to non-zero
-> values. The current way of organising this results in very large support
-> files which we can simplify with some macro use to remove a few hundred
-> lines and make things more legible.
-> 
-> The PMU naming is somewhat of a mess, with most names not being
-> supported by the perf tool. Given that no-one has complained, it seems
-> that the PMUs are not being accessed by name in a perf context, and we
-> can fix these to be consistent and usable with current tools. We update
-> the OProfile name mangling to ensure that OProfile (which accesses the
-> PMUs in its own namespace) are not adversely affected.
-> 
-> To prepare for reorganisation of the PMU probing code, new
-> platform_device_id values are added to allow ARMv6, ARMv7, and XScale
-> PMU platform_devices to be distinguished.
+> DWC3 IP core from Synopsys is the same across SoC's (OMAP, Exynos..),
+> vendors are adding glue IP to provide necessary clocks and voltages. 
+> I think that the DT bindings properly reflect this fact.
 
-I ran Vince Weaver's perf events test suite [1] against a kernel with these
-patches applied on an 8074 Dragonboard [2] and didn't see any regressions. The
-patches also look good to me.
+Not really. The proper way to do this is to have a single node that
+lists multiple compatible strings from the most specific (per SoC variant)
+to most generic (the underlying IP core) and have all properties in it.
 
-Tested-by: Christopher Covington <cov@codeaurora.org>
+We have seen many cases before where it later turned out that whatever
+feature people thought was SoC specific actually was common to all
+of them and that we later want to change the code to handle it in a
+common way, and to reflect it in the common binding. The clocks that
+Rob mentioned are one example of that.
 
-1. https://github.com/deater/perf_event_tests
-2. http://elinux.org/Dragonboard/APQ8074
+If you have a binding that separates one IP block into two device nodes,
+you cannot later adapt the common driver to be more generic and handle
+all sorts of SoCs. See the usb-ehci.txt for an example: it started out
+really simple but the generic driver has been extended multiple times
+to the point where it handles a lot of SoCs by default.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+	Arnd
