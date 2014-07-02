@@ -1,48 +1,54 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 2 Jul 2014 12:15:28 +0100
-Subject: [PATCH v2 5/5] efi: efistub: convert into static library
-In-Reply-To: <1403792617-25792-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
- <1403792617-25792-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140702111528.GL7539@console-pimps.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 2 Jul 2014 13:48:53 +0200
+Subject: [PATCH v2 0/2] ARM: at91: remove phy fixup for sama5d3xek boards
+In-Reply-To: <20140701.153806.1074873302413556163.davem@redhat.com>
+References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140701.153806.1074873302413556163.davem@redhat.com>
+Message-ID: <20140702134853.43d624c9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jun, at 04:23:37PM, Ard Biesheuvel wrote:
-> This patch changes both x86 and arm64 efistub implementations from #including
-> shared .c files under drivers/firmware/efi to building the shared code as a
-> static library.
+Hello David,
+
+On Tue, 01 Jul 2014 15:38:06 -0700 (PDT)
+David Miller <davem@redhat.com> wrote:
+
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Date: Thu, 26 Jun 2014 12:13:33 +0200
 > 
-> The x86 code uses a stub built into the boot executable which uncompresses the
-> kernel at boot time. In this case, the library is linked into the decompressor.
+> > This patch removes a board specific hook for sama5d3xek boards from
+> > the sama5d3 generic DT board file.
+> > 
+> > This hook (which register a phy fixup configuring board specific
+> > delays in the ksz9021 ethernet phy) is now replaced by the
+> > appropriate DT properties definitions in the sama5d3xcm.dtsi file.
+> > 
+> > Changes since v1:
+> >  - fix txc-skew-ps and rxc-skew-ps delays
+> >  - remove phy address info to handle Ronetix and Embest HW designs
 > 
-> In the arm64 case, the stub is part of the kernel proper so the library is
-> linked into the kernel proper as well.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> These patches do not apply cleanly to 'net' nor 'net-next', in fact
+> you did not even say which tree these changes are targetting.
 
-OK, this breaks the ia64 build because of the following...
+Actually, these patches were intended to be taken through at91 (and then
+arm-soc) tree.
 
-/drivers/firmware/efi/libstub/efi-stub-helper.c:14:21: fatal error: asm/efi.h: No such file or directory
+The reason I added netdev in Cc is because I wanted to get feedback on
+the DT phy node definition (which I got from Florian).
 
-> diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
-> index e1096539eedb..d9abdbc962f1 100644
-> --- a/drivers/firmware/efi/Makefile
-> +++ b/drivers/firmware/efi/Makefile
-> @@ -1,7 +1,7 @@
->  #
->  # Makefile for linux kernel
->  #
-> -obj-$(CONFIG_EFI)			+= efi.o vars.o
-> +obj-$(CONFIG_EFI)			+= efi.o vars.o libstub/
->  obj-$(CONFIG_EFI_VARS)			+= efivars.o
->  obj-$(CONFIG_EFI_VARS_PSTORE)		+= efi-pstore.o
->  obj-$(CONFIG_UEFI_CPER)			+= cper.o
+I guess patch 2 does not apply cleanly because I based this work on top
+of other changes which are not merged yet ([1]).
 
-I guess what we need is CONFIG_EFI_LIBSTUB selected by both
-CONFIG_EFI_STUB (for x86) and CONFIG_EFI_ARMSTUB (for arm64)? e.g.
+Nicolas, I'll take care to rebase this series on top of linus/master
+branch (or whatever branch you want me to base it onto).
 
-obj-$(CONFIG_EFI_LIBSTUB)		libstub/
+Thanks,
+
+Boris
+
+[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265216.html
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
