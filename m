@@ -1,38 +1,28 @@
-From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Wed,  2 Jul 2014 10:35:18 -0300
-Subject: [PATCH v2] ARM: OMAP2+: Make GPMC skip disabled devices
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAF8D44@DBDE04.ent.ti.com>
-References: <20980858CB6D3A4BAE95CA194937D5E73EAF8D44@DBDE04.ent.ti.com>
-Message-ID: <1404308118-14843-1-git-send-email-guido@vanguardiasur.com.ar>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Jul 2014 15:46:55 +0200
+Subject: [PATCH 1/2] ARM: kirkwood: add appended DTB support in
+ kirkwood_defconfig
+In-Reply-To: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140702134655.GE20799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, child nodes of the gpmc node are iterated and probed
-regardless of their 'status' property. This means adding 'status =
-"disabled";' has no effect.
+On Wed, Jul 02, 2014 at 02:56:17PM +0200, Thomas Petazzoni wrote:
+> Most of the Kirkwood platforms use fairly old bootloaders that don't
+> have Device Tree support, so it makes sense to enable appended DTB
+> support by default, as well as the backward compatibility with ATAGS
+> passed by the bootloader for those platforms. It helps having a
+> defconfig that works fine out of the box for most Kirkwood platforms.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/configs/kirkwood_defconfig | 2 ++
 
-This patch changes the iteration to only probe nodes marked as
-available.
+Hi Thomas
 
-Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
----
-v2: Make patch title consistent with previous gpmc patches
+I plan to remove mach-kirkwood this cycle. So kirkwood_defconfig will
+get removed. Please could you patch mvebu_v5_defconfig instead?
 
- arch/arm/mach-omap2/gpmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 2c0c281..8bc1338 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1615,7 +1615,7 @@ static int gpmc_probe_dt(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	for_each_child_of_node(pdev->dev.of_node, child) {
-+	for_each_available_child_of_node(pdev->dev.of_node, child) {
- 
- 		if (!child->name)
- 			continue;
--- 
-2.0.0
+Thanks
+	Andrew
