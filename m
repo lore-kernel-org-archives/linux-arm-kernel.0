@@ -1,96 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  2 Jul 2014 18:02:57 +0200
-Subject: [PATCH 2/2] serial: fsl_lpuart: calculate DMA burst
-In-Reply-To: <54df28cb5dccf71b17523896da17ce2f155855fd.1404314964.git.stefan@agner.ch>
-References: <54df28cb5dccf71b17523896da17ce2f155855fd.1404314964.git.stefan@agner.ch>
-Message-ID: <5d0e45bcd38d9030fcd2b32fb5f09fd26c25f0a6.1404314964.git.stefan@agner.ch>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 02 Jul 2014 18:06:34 +0200
+Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
+In-Reply-To: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA burst size must match the transmit FIFO depth in order
-to make sure all character are transmitted. This patch calculates
-DMA burst size by using FIFO depth rather than use the hardcoded
-16 bytes. This is required since some UARTs (e.g. UART2 on Vybrid)
-have a FIFO depth of 8 bytes.
+Hi Peter,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/tty/serial/fsl_lpuart.c | 27 +++++++++++++--------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
+Am Mittwoch, den 02.07.2014, 15:08 +0100 schrieb Peter Griffin:
+> This series adds reset controller support for the STiH407 SoC.
+> 
+> Changes since v1
+>  - Update copyright to 2014
+>  - Add const qualifier
+>  - Fix various whitespace issues
+>  - Remove THIS_OWNER
+>  - Move DT documentation into separate patch
+> 
+> Peter Griffin (4):
+>   reset: stih407: Add softreset, powerdown and picophy controllers
+>   reset: sti: Document sti-picophyreset controllers bindings.
+>   ARM: sti: Add STiH407 Kconfig entry to select STIH407_RESET
+>   ARM: sti: Add STiH407 reset controller support.
+> 
+>  .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
+>  arch/arm/boot/dts/stih407.dtsi                     |  16 +++
+>  arch/arm/mach-sti/Kconfig                          |  10 ++
+>  drivers/reset/sti/Kconfig                          |   4 +
+>  drivers/reset/sti/Makefile                         |   1 +
+>  drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
+>  .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
+>  7 files changed, 292 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
+>  create mode 100644 drivers/reset/sti/reset-stih407.c
+>  create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 6b462a9..f973456 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -117,8 +117,6 @@
- #define UARTSFIFO_TXOF		0x02
- #define UARTSFIFO_RXUF		0x01
- 
--#define DMA_MAXBURST		16
--#define DMA_MAXBURST_MASK	(DMA_MAXBURST - 1)
- #define FSL_UART_RX_DMA_BUFFER_SIZE	64
- 
- #define DRIVER_NAME	"fsl-lpuart"
-@@ -240,7 +238,7 @@ static int lpuart_dma_tx(struct lpuart_port *sport, unsigned long count)
- 
- 	dma_sync_single_for_device(sport->port.dev, sport->dma_tx_buf_bus,
- 				UART_XMIT_SIZE, DMA_TO_DEVICE);
--	sport->dma_tx_bytes = count & ~(DMA_MAXBURST_MASK);
-+	sport->dma_tx_bytes = count & ~(sport->txfifo_size - 1);
- 	tx_bus_addr = sport->dma_tx_buf_bus + xmit->tail;
- 	sport->dma_tx_desc = dmaengine_prep_slave_single(sport->dma_tx_chan,
- 					tx_bus_addr, sport->dma_tx_bytes,
-@@ -269,7 +267,7 @@ static void lpuart_prepare_tx(struct lpuart_port *sport)
- 	if (!count)
- 		return;
- 
--	if (count < DMA_MAXBURST)
-+	if (count < sport->txfifo_size)
- 		writeb(readb(sport->port.membase + UARTCR5) & ~UARTCR5_TDMAS,
- 				sport->port.membase + UARTCR5);
- 	else {
-@@ -599,15 +597,7 @@ static void lpuart_setup_watermark(struct lpuart_port *sport)
- 			UARTCR2_RIE | UARTCR2_RE);
- 	writeb(cr2, sport->port.membase + UARTCR2);
- 
--	/* determine FIFO size and enable FIFO mode */
- 	val = readb(sport->port.membase + UARTPFIFO);
--
--	sport->txfifo_size = 0x1 << (((val >> UARTPFIFO_TXSIZE_OFF) &
--		UARTPFIFO_FIFOSIZE_MASK) + 1);
--
--	sport->rxfifo_size = 0x1 << (((val >> UARTPFIFO_RXSIZE_OFF) &
--		UARTPFIFO_FIFOSIZE_MASK) + 1);
--
- 	writeb(val | UARTPFIFO_TXFE | UARTPFIFO_RXFE,
- 			sport->port.membase + UARTPFIFO);
- 
-@@ -652,7 +642,7 @@ static int lpuart_dma_tx_request(struct uart_port *port)
- 	dma_buf = sport->port.state->xmit.buf;
- 	dma_tx_sconfig.dst_addr = sport->port.mapbase + UARTDR;
- 	dma_tx_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
--	dma_tx_sconfig.dst_maxburst = DMA_MAXBURST;
-+	dma_tx_sconfig.dst_maxburst = sport->txfifo_size;
- 	dma_tx_sconfig.direction = DMA_MEM_TO_DEV;
- 	ret = dmaengine_slave_config(tx_chan, &dma_tx_sconfig);
- 
-@@ -765,7 +755,16 @@ static int lpuart_startup(struct uart_port *port)
- 	unsigned long flags;
- 	unsigned char temp;
- 
--	/*whether use dma support by dma request results*/
-+	/* determine FIFO size and enable FIFO mode */
-+	temp = readb(sport->port.membase + UARTPFIFO);
-+
-+	sport->txfifo_size = 0x1 << (((temp >> UARTPFIFO_TXSIZE_OFF) &
-+		UARTPFIFO_FIFOSIZE_MASK) + 1);
-+
-+	sport->rxfifo_size = 0x1 << (((temp >> UARTPFIFO_RXSIZE_OFF) &
-+		UARTPFIFO_FIFOSIZE_MASK) + 1);
-+
-+	/* Whether use dma support by dma request results */
- 	if (lpuart_dma_tx_request(port) || lpuart_dma_rx_request(port)) {
- 		sport->lpuart_dma_use = false;
- 	} else {
--- 
-2.0.1
+Looks good to me now.
+
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
