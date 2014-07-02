@@ -1,42 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 2 Jul 2014 07:50:53 +0100
-Subject: [PATCH 1/1] drivers/mfd/ab8500-debugfs.c: remove unnecessary
- null test before debugfs_remove_recursive
-In-Reply-To: <1403956697-3197-1-git-send-email-fabf@skynet.be>
-References: <1403956697-3197-1-git-send-email-fabf@skynet.be>
-Message-ID: <20140702065053.GA10311@lee--X1>
+Date: Wed, 2 Jul 2014 07:54:30 +0100
+Subject: [PATCH] mfd: ab8500-debugfs.c:  Cleaning up unnecessary to test,
+ unsigned can't be negative.
+In-Reply-To: <1403991279-7109-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1403991279-7109-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20140702065430.GB10311@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 28 Jun 2014, Fabian Frederick wrote:
-
-> Fix checkpatch warning:
-> WARNING: debugfs_remove_recursive(NULL) is safe this check is probably not required
+> Unsigned variable can't be negative so it is unnecessary to test it
 > 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> This was found using a static code analysis program called cppcheck
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 > ---
->  drivers/mfd/ab8500-debugfs.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+>  drivers/mfd/ab8500-debugfs.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Applied, thanks.
 
 > diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-> index d1a22aa..7ca8713 100644
+> index d1a22aa..0793a10 100644
 > --- a/drivers/mfd/ab8500-debugfs.c
 > +++ b/drivers/mfd/ab8500-debugfs.c
-> @@ -3192,8 +3192,7 @@ static int ab8500_debug_probe(struct platform_device *plf)
->  	return 0;
+> @@ -2504,7 +2504,7 @@ static ssize_t ab8500_gpadc_trig_timer_write(struct file *file,
+>  	if (err)
+>  		return err;
 >  
->  err:
-> -	if (ab8500_dir)
-> -		debugfs_remove_recursive(ab8500_dir);
-> +	debugfs_remove_recursive(ab8500_dir);
->  	dev_err(&plf->dev, "failed to create debugfs entries.\n");
->  
->  	return -ENOMEM;
+> -	if ((user_trig_timer >= 0) && (user_trig_timer <= 255)) {
+> +	if (user_trig_timer <= 255) {
+>  		trig_timer = (u8) user_trig_timer;
+>  	} else {
+>  		dev_err(dev, "debugfs error input: "
 
 -- 
 Lee Jones
