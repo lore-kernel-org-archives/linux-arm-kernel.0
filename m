@@ -1,53 +1,30 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  2 Jul 2014 15:08:49 +0100
-Subject: [PATCH v2 4/4] ARM: sti: Add STiH407 reset controller support.
-In-Reply-To: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
-References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1404310129-14667-5-git-send-email-peter.griffin@linaro.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 02 Jul 2014 16:13:04 +0200
+Subject: [PATCH] dmaengine: fsl-edma: fix dmamux index calculating error
+In-Reply-To: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
+References: <1404204063-20961-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <9c969818e13bcd71307db22fd163a6db@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the reset controller DT nodes for the powerdown,
- softreset and picophy controllers.
+Am 2014-07-01 10:41, schrieb Jingchang Lu:
+>  	u32 ch = fsl_chan->vchan.chan.chan_id;
+> -	void __iomem *muxaddr = fsl_chan->edma->muxbase[ch / DMAMUX_NR];
+> +	void __iomem *muxaddr;
+>  	unsigned chans_per_mux, ch_off;
+>  
+>  	chans_per_mux = fsl_chan->edma->n_chans / DMAMUX_NR;
+>  	ch_off = fsl_chan->vchan.chan.chan_id % chans_per_mux;
+> +	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+After realizing that only one DMA channel was working on Vybrid I first
+came up with an almost identically patch before I found this one. I now
+applied and tested this one. Without this patch, the DMA user (e.g.
+lpuart) fails gracefully and work nonetheless, however without DMA.
+Since eDMA support is broken in current state in 3.16-rc3, it would be
+good to get this patch into 3.16.
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 4f9024f..d2f1aaa 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -8,6 +8,7 @@
-  */
- #include "stih407-clock.dtsi"
- #include "stih407-pinctrl.dtsi"
-+#include <dt-bindings/reset-controller/stih407-resets.h>
- / {
- 	#address-cells = <1>;
- 	#size-cells = <1>;
-@@ -63,6 +64,21 @@
- 		ranges;
- 		compatible = "simple-bus";
- 
-+		powerdown: powerdown-controller {
-+			compatible = "st,stih407-powerdown";
-+			#reset-cells = <1>;
-+		};
-+
-+		softreset: softreset-controller {
-+			compatible = "st,stih407-softreset";
-+			#reset-cells = <1>;
-+		};
-+
-+		picophyreset: picophyreset-controller {
-+			compatible = "st,stih407-picophyreset";
-+			#reset-cells = <1>;
-+		};
-+
- 		syscfg_sbc: sbc-syscfg at 9620000 {
- 			compatible = "st,stih407-sbc-syscfg", "syscon";
- 			reg = <0x9620000 0x1000>;
--- 
-1.9.1
+Tested-by: Stefan Agner <stefan@agner.ch>
+
+--
+Stefan
