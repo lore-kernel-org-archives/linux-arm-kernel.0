@@ -1,42 +1,66 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 2 Jul 2014 23:14:47 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140702170141.GH24879@arm.com>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk> <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk> <20140702170141.GH24879@arm.com>
-Message-ID: <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Wed, 02 Jul 2014 15:32:39 -0700
+Subject: [RFC/PATCH 4/7] iommu: msm: Add MSM IOMMUv1 driver
+In-Reply-To: <20140630170221.GA30740@arm.com>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-5-git-send-email-ohaugan@codeaurora.org>
+ <20140630170221.GA30740@arm.com>
+Message-ID: <53B48887.2010405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 6:01 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jul 02, 2014 at 05:39:23PM +0100, Mark Brown wrote:
->> On Wed, Jul 02, 2014 at 11:01:33AM +0100, Will Deacon wrote:
+On 6/30/2014 10:02 AM, Will Deacon wrote:
+> Hi Olav,
+> 
+> On Mon, Jun 30, 2014 at 05:51:53PM +0100, Olav Haugan wrote:
+>> MSM IOMMUv1 driver supports Qualcomm SoC MSM8974 and
+>> MSM8084.
 >>
->> >   (1) The hardware doesn't have the instruction at all. If we start
->> >       emulating it, then we'll always have to emulate it and it doesn't
->> >       encourage software migration.
+>> The IOMMU driver supports the following features:
 >>
->> That's what the logging other architectures did in similar situations
->> was intended to help address - even if people don't care about the
->> performance impact having loud complaints in the logs tends to cause
->> some useful subset of users to report it as a problem.
->
-> I don't think logging something to dmesg is going to make a blind bit of
-> difference on an Android device. Maybe we could get SWP emulation to request
-> access to the users contacts and send everybody a text message each time
-> they issue the instruction?
->
-> Seriously though, nothing causes loud complaints like a SIGILL. This thread
-> is evidence of that.
+>>     - ARM V7S page table format independent of ARM CPU page table format
+>>     - 4K/64K/1M/16M mappings (V7S)
+>>     - ATOS used for unit testing of driver
+>>     - Sharing of page tables among SMMUs
+>>     - Verbose context bank fault reporting
+>>     - Verbose global fault reporting
+>>     - Support for clocks and GDSC
+>>     - map/unmap range
+>>     - Domain specific enabling of coherent Hardware Table Walk (HTW)
+>>
+>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/iommu/msm,iommu_v1.txt     |   56 +
+>>  drivers/iommu/Kconfig                              |   36 +
+>>  drivers/iommu/Makefile                             |    2 +
+>>  drivers/iommu/msm_iommu-v1.c                       | 1448 +++++++++++++
+>>  drivers/iommu/msm_iommu.c                          |  149 ++
+>>  drivers/iommu/msm_iommu_dev-v1.c                   |  340 +++
+>>  drivers/iommu/msm_iommu_hw-v1.h                    | 2236 ++++++++++++++++++++
+>>  drivers/iommu/msm_iommu_pagetable.c                |  600 ++++++
+>>  drivers/iommu/msm_iommu_pagetable.h                |   33 +
+>>  drivers/iommu/msm_iommu_priv.h                     |   55 +
+>>  include/linux/qcom_iommu.h                         |  221 ++
+>>  11 files changed, 5176 insertions(+)
+> 
+> This patch is *huge*! It may get bounced from some lists (I think the
+> linux-arm-kernel lists has a ~100k limit), so it might be worth trying to do
+> this incrementally.
 
-I think that looks at the problem entirely the wrong way around. We
-don't break userspace. That's been a rule for a very long time.
-Android is not the embedded world where we could get away with a whole
-lot. There is a *freaking huge* installed base of applications.
-Breaking them is not an option, and I think Colin's question makes it
-clear that Android is going make sure that doesn't happen regardless
-of what the mainline kernel does... and they are right to do so.
+Yes, I noticed. Sorry about that.
 
-g.
+> That said, a quick glance at your code indicates that this IOMMU is
+> compliant with the ARM SMMU architecture, and we already have a driver for
+> that. Please can you rework this series to build on top of the code in
+> mainline already, rather than simply duplicating it? We need fewer IOMMU
+> drivers, not more!
+
+Ok, I will rework.
+
+Thanks,
+
+Olav Haugan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
