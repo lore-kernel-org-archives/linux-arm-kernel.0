@@ -1,89 +1,67 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 2 Jul 2014 11:47:39 +0300
-Subject: [PATCH 05/13] ARM: OMAP2+: clock: introduce ti_clk_features flags
+Date: Wed, 2 Jul 2014 11:47:44 +0300
+Subject: [PATCH 10/13] ARM: OMAP2+: clock/interface: add a clk_features
+ definition for idlest value
 In-Reply-To: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
 References: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404290867-6768-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1404290867-6768-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This shall be used to replace the cpu type checks around the clock code.
-Actual bit values will be introduced in patches later.
+Helps to get rid of some runtime cpu_is_x checks. This also allows eventual
+migration of the code under clock driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock.c |   14 ++++++++++++++
- arch/arm/mach-omap2/clock.h |   10 ++++++++++
- arch/arm/mach-omap2/io.c    |    2 ++
- 3 files changed, 26 insertions(+)
+ arch/arm/mach-omap2/clock.c |   18 +++++++++++-------
+ arch/arm/mach-omap2/clock.h |    1 +
+ 2 files changed, 12 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 591581a..7897053 100644
+index 23b5f05..5a0cac9 100644
 --- a/arch/arm/mach-omap2/clock.c
 +++ b/arch/arm/mach-omap2/clock.c
-@@ -47,6 +47,11 @@
- u16 cpu_mask;
- 
- /*
-+ * Clock features setup. Used instead of CPU type checks.
-+ */
-+struct ti_clk_features ti_clk_features;
-+
-+/*
-  * clkdm_control: if true, then when a clock is enabled in the
-  * hardware, its clockdomain will first be enabled; and when a clock
-  * is disabled in the hardware, its clockdomain will be disabled
-@@ -731,3 +736,12 @@ void __init omap2_clk_print_new_rates(const char *hfclkin_ck_name,
- 		(clk_get_rate(core_ck) / 1000000),
- 		(clk_get_rate(mpu_ck) / 1000000));
+@@ -305,13 +305,7 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
+ 	 * 34xx reverses this, just to keep us on our toes
+ 	 * AM35xx uses both, depending on the module.
+ 	 */
+-	if (cpu_is_omap24xx())
+-		*idlest_val = OMAP24XX_CM_IDLEST_VAL;
+-	else if (cpu_is_omap34xx())
+-		*idlest_val = OMAP34XX_CM_IDLEST_VAL;
+-	else
+-		BUG();
+-
++	*idlest_val = ti_clk_features.cm_idlest_val;
  }
+ 
+ /**
+@@ -788,4 +782,14 @@ void __init ti_clk_init_features(void)
+ 	/* Jitter correction only available on OMAP343X */
+ 	if (cpu_is_omap343x())
+ 		ti_clk_features.flags |= TI_CLK_DPLL_HAS_FREQSEL;
 +
-+/**
-+ * ti_clk_init_features - init clock features struct for the SoC
-+ *
-+ * Initializes the clock features struct based on the SoC type.
-+ */
-+void __init ti_clk_init_features(void)
-+{
-+}
++	/* Idlest value for interface clocks.
++	 * 24xx uses 0 to indicate not ready, and 1 to indicate ready.
++	 * 34xx reverses this, just to keep us on our toes
++	 * AM35xx uses both, depending on the module.
++	 */
++	if (cpu_is_omap24xx())
++		ti_clk_features.cm_idlest_val = OMAP24XX_CM_IDLEST_VAL;
++	else if (cpu_is_omap34xx())
++		ti_clk_features.cm_idlest_val = OMAP34XX_CM_IDLEST_VAL;
+ }
 diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index e29f982..9b89cc0 100644
+index d3ef147..0f100dc 100644
 --- a/arch/arm/mach-omap2/clock.h
 +++ b/arch/arm/mach-omap2/clock.h
-@@ -223,6 +223,14 @@ void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg);
+@@ -233,6 +233,7 @@ struct ti_clk_features {
+ 	long fint_band1_max;
+ 	long fint_band2_min;
+ 	u8 dpll_bypass_vals;
++	u8 cm_idlest_val;
+ };
  
- extern u16 cpu_mask;
- 
-+/*
-+ * Clock features setup. Used instead of CPU type checks.
-+ */
-+struct ti_clk_features {
-+	u32 flags;
-+};
-+extern struct ti_clk_features ti_clk_features;
-+
- extern const struct clkops clkops_omap2_dflt_wait;
- extern const struct clkops clkops_dummy;
- extern const struct clkops clkops_omap2_dflt;
-@@ -261,4 +269,6 @@ extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- extern void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- 
- extern void omap_clocks_register(struct omap_clk *oclks, int cnt);
-+
-+void __init ti_clk_init_features(void);
- #endif
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 8f55945..1fae5c1 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -728,6 +728,8 @@ int __init omap_clk_init(void)
- 	if (!omap_clk_soc_init)
- 		return 0;
- 
-+	ti_clk_init_features();
-+
- 	ret = of_prcm_init();
- 	if (!ret)
- 		ret = omap_clk_soc_init();
+ #define TI_CLK_DPLL_HAS_FREQSEL		(1 << 0)
 -- 
 1.7.9.5
