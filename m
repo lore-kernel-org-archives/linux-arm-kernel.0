@@ -1,41 +1,40 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 2 Jul 2014 11:47:47 +0300
-Subject: [PATCH 13/13] ARM: OMAP2+: clock/interface: remove some headers from
- clkt_iclk.c file
-In-Reply-To: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
-References: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404290867-6768-14-git-send-email-t-kristo@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed,  2 Jul 2014 16:47:22 +0800
+Subject: [PATCH 0/4] Clean up ACPI core to prepare for running ACPI on ARM64
+Message-ID: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead, copy the used constants from the header file to the source file.
-This allows the code to be migrated under drivers folder where we don't
-have access to the OMAP specific header files.
+This patch set have no function change for x86 and ia64 and
+just do some clean up to prepare for running ACPI on ARM64.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/clkt_iclk.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+This patch set is splited out from the patch set [1]
+"[PATCH v4 00/13] Enable ACPI on ARM64 in Kconfig" and hope it
+can be merged first before ARM64 ACPI core patches.
 
-diff --git a/arch/arm/mach-omap2/clkt_iclk.c b/arch/arm/mach-omap2/clkt_iclk.c
-index 333f0a6..55eb579 100644
---- a/arch/arm/mach-omap2/clkt_iclk.c
-+++ b/arch/arm/mach-omap2/clkt_iclk.c
-@@ -14,11 +14,11 @@
- #include <linux/clk-provider.h>
- #include <linux/io.h>
- 
--
- #include "clock.h"
--#include "clock2xxx.h"
--#include "cm2xxx_3xxx.h"
--#include "cm-regbits-24xx.h"
-+
-+/* Register offsets */
-+#define CM_AUTOIDLE			0x30
-+#define CM_ICLKEN			0x10
- 
- /* Private functions */
- 
+[1]: https://lkml.org/lkml/2014/6/26/627
+
+Graeme Gregory (2):
+  ACPI: ARM64 does not have a BIOS add config for BIOS table scan.
+  ACPI: Don't use acpi_lapic in ACPI core code
+
+Hanjun Guo (2):
+  ACPI / processor: Introduce ARCH_HAS_ACPI_PDC
+  ACPI: Make EC debugfs depend on X86 || IA64 in Kconfig
+
+ arch/ia64/Kconfig             |    2 +
+ arch/ia64/include/asm/acpi.h  |    5 +
+ arch/x86/Kconfig              |    2 +
+ arch/x86/include/asm/acpi.h   |    5 +
+ drivers/acpi/Kconfig          |   14 +++
+ drivers/acpi/Makefile         |    1 +
+ drivers/acpi/acpi_processor.c |    2 +-
+ drivers/acpi/internal.h       |    5 +
+ drivers/acpi/osl.c            |    4 +-
+ drivers/acpi/processor_core.c |  198 ---------------------------------------
+ drivers/acpi/processor_pdc.c  |  206 +++++++++++++++++++++++++++++++++++++++++
+ 11 files changed, 244 insertions(+), 200 deletions(-)
+ create mode 100644 drivers/acpi/processor_pdc.c
+
 -- 
 1.7.9.5
