@@ -1,71 +1,27 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Wed, 02 Jul 2014 14:50:24 +0530
-Subject: [PATCH v5 14/14] ARM: dts: Add max77802 to exynos5420-peach-pit
- and exynos5800-peach-pi
-In-Reply-To: <1403806546-31122-15-git-send-email-javier.martinez@collabora.co.uk>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-15-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <53B3CED8.4020808@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Jul 2014 10:21:21 +0100
+Subject: [PATCH 1/1] arm: perf: Fix build error
+In-Reply-To: <1404291976-24662-1-git-send-email-sachin.kamat@samsung.com>
+References: <1404291976-24662-1-git-send-email-sachin.kamat@samsung.com>
+Message-ID: <20140702092120.GC18731@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 11:45 PM, Javier Martinez Canillas wrote:
-> Peach pit and pi boards uses a Maxim 77802 power management
-> IC to drive regulators and its Real Time Clock. This patch
-> adds support for this chip.
+Hi Sachin,
+
+On Wed, Jul 02, 2014 at 10:06:16AM +0100, Sachin Kamat wrote:
+> Add missing semicolon to fix the following build errors introduced by
+> commit 6f73e8ababdd ("arm: perf: clean up PMU names"):
+> arch/arm/kernel/perf_event_v6.c:498:2: error: expected ?;? before ?return?
+> arch/arm/kernel/perf_event_v6.c:505:2: error: expected ?;? before ?return?
+> arch/arm/kernel/perf_event_v6.c:512:2: error: expected ?;? before ?return?
 > 
-> These are the device nodes and pinctrl configuration that
-> are present on the Peach pit DeviceTree source file in the
-> the Chrome OS kernel 3.8 tree.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
+> Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-[ ... ]
+Thanks for this, I'll fold it in with the original patch.
 
-> +
-> +		regulators {
-> +			buck1_reg: BUCK1 {
-> +				regulator-name = "vdd_mif";
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1300000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-ramp-delay = <12500>;
-> +			};
+Mark: can you test this on v6 please, preferably with Vince's fuzzer?
 
-IMO, adding a blank line between sub-nodes would be better.
-
-> +			buck2_reg: BUCK2 {
-> +				regulator-name = "vdd_arm_real";
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1500000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-ramp-delay = <12500>;
-> +			};
-
-[ ... ]
-
-> +			vqmmc_sdcard: ldo4_reg: LDO4 {
-> +				regulator-name = "vdd_sd";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-always-on;
-> +
-
-Blank line, can be removed.
-
-> +			};
-
-[ ... ]
-> +			ldo23_reg: LDO23 {
-> +				regulator-name = "ld0_23";
-
-ldo_23, 'o' in place of '0'.
-
-Similar comments for peach-pi DTS file.
-
--- 
-Tushar Behera
+Will
