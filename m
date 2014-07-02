@@ -1,43 +1,51 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Jul 2014 11:58:49 -0300
-Subject: [PATCH v2 1/4] ARM: dts: imx6sx: Fix sdma node
-Message-ID: <1404313132-14400-1-git-send-email-festevam@gmail.com>
+Date: Wed,  2 Jul 2014 11:58:50 -0300
+Subject: [PATCH v2 2/4] ARM: dts: imx6sx: Pass the fsl,fifo-depth property
+In-Reply-To: <1404313132-14400-1-git-send-email-festevam@gmail.com>
+References: <1404313132-14400-1-git-send-email-festevam@gmail.com>
+Message-ID: <1404313132-14400-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Use the correct compatible string for sdma and also provide the sdma firmware
-path.
+Like the other mx6 variants, we need to pass fsl,fifo-depth property in dtsi.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
-- None
+- Only add fifo-depth and keep the clocks as before
 
- arch/arm/boot/dts/imx6sx.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6sx.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index a7d74e7..2929078 100644
+index 2929078..92d48be 100644
 --- a/arch/arm/boot/dts/imx6sx.dtsi
 +++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -703,13 +703,15 @@
- 			};
+@@ -306,6 +306,7 @@
+ 					clock-names = "ipg", "baud";
+ 					dmas = <&sdma 37 1 0>, <&sdma 38 1 0>;
+ 					dma-names = "rx", "tx";
++					fsl,fifo-depth = <15>;
+ 					status = "disabled";
+ 				};
  
- 			sdma: sdma at 020ec000 {
--				compatible = "fsl,imx6sx-sdma";
-+				compatible = "fsl,imx6sx-sdma", "fsl,imx35-sdma";
- 				reg = <0x020ec000 0x4000>;
- 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_SDMA>,
- 					 <&clks IMX6SX_CLK_SDMA>;
- 				clock-names = "ipg", "ahb";
- 				#dma-cells = <3>;
-+				/* imx6sx reuses imx6q sdma firmware */
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
- 			};
- 		};
+@@ -318,6 +319,7 @@
+ 					clock-names = "ipg", "baud";
+ 					dmas = <&sdma 41 1 0>, <&sdma 42 1 0>;
+ 					dma-names = "rx", "tx";
++					fsl,fifo-depth = <15>;
+ 					status = "disabled";
+ 				};
+ 
+@@ -330,6 +332,7 @@
+ 					clock-names = "ipg", "baud";
+ 					dmas = <&sdma 45 1 0>, <&sdma 46 1 0>;
+ 					dma-names = "rx", "tx";
++					fsl,fifo-depth = <15>;
+ 					status = "disabled";
+ 				};
  
 -- 
 1.8.3.2
