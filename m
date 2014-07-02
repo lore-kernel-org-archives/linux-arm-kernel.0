@@ -1,43 +1,53 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  2 Jul 2014 15:08:48 +0100
-Subject: [PATCH v2 3/4] ARM: sti: Add STiH407 Kconfig entry to select
- STIH407_RESET
+Date: Wed,  2 Jul 2014 15:08:49 +0100
+Subject: [PATCH v2 4/4] ARM: sti: Add STiH407 reset controller support.
 In-Reply-To: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
 References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1404310129-14667-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1404310129-14667-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STiH407 is a STMicroelectronics Digital Consumer electronics
-family, targetted at set-top-box and other audio/video applications.
-
-This patch selects the reset controller driver for this family which
-is essential to take various IP's on the SoC out of powerdown / reset.
+This patch adds the reset controller DT nodes for the powerdown,
+ softreset and picophy controllers.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-sti/Kconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/stih407.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 878e9ec..8825bc9 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -42,4 +42,14 @@ config SOC_STIH416
- 	  and other digital audio/video applications using Flattened Device
- 	  Trees.
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 4f9024f..d2f1aaa 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -8,6 +8,7 @@
+  */
+ #include "stih407-clock.dtsi"
+ #include "stih407-pinctrl.dtsi"
++#include <dt-bindings/reset-controller/stih407-resets.h>
+ / {
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+@@ -63,6 +64,21 @@
+ 		ranges;
+ 		compatible = "simple-bus";
  
-+config SOC_STIH407
-+	bool "STiH407 STMicroelectronics Consumer Electronics family"
-+	default y
-+	select STIH407_RESET
-+	help
-+	  This enables support for STMicroelectronics Digital Consumer
-+	  Electronics family StiH407 parts, targetted at set-top-box
-+	  and other digital audio/video applications using Flattened Device
-+	  Trees.
++		powerdown: powerdown-controller {
++			compatible = "st,stih407-powerdown";
++			#reset-cells = <1>;
++		};
 +
- endif
++		softreset: softreset-controller {
++			compatible = "st,stih407-softreset";
++			#reset-cells = <1>;
++		};
++
++		picophyreset: picophyreset-controller {
++			compatible = "st,stih407-picophyreset";
++			#reset-cells = <1>;
++		};
++
+ 		syscfg_sbc: sbc-syscfg at 9620000 {
+ 			compatible = "st,stih407-sbc-syscfg", "syscon";
+ 			reg = <0x9620000 0x1000>;
 -- 
 1.9.1
