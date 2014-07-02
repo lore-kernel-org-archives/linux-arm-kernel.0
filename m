@@ -1,32 +1,89 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Jul 2014 12:38:44 +0800
-Subject: [PATCH v2 0/5] some additions for the edmqmx6 board
-In-Reply-To: <cover.1404212584.git.silvio.fricke@gmail.com>
-References: <cover.1404132504.git.silvio.fricke@gmail.com>
- <cover.1404212584.git.silvio.fricke@gmail.com>
-Message-ID: <20140702043842.GB16176@dragon>
+Date: Wed, 2 Jul 2014 12:45:37 +0800
+Subject: [PATCH v3 1/2] ARM: i.MX: allow disabling supervisor protect via
+ DT
+In-Reply-To: <1404203268-31404-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1404203268-31404-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20140702044536.GC16176@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 01:08:57PM +0200, Silvio Fricke wrote:
-> Hi,
+On Tue, Jul 01, 2014 at 10:27:47AM +0200, Steffen Trumtrar wrote:
+> The i.MX SoCs allow to setup fine grained access rights to peripherals on the
+> AIPS bus.
+> This is done via the Peripheral Access Register (PAR) in e.g. the i.MX21
+> or in later SoC versions the Off-Platform Peripheral Access Control Register
+> (OPACR), e.g. i.MX53.
+> Under certain circumstances this leads to problems in which bus masters are
+> not granted their access rights to peripherals.
+> To be able to disable these restrictions on DT platforms, add a helper function
+> that looks for AIPS nodes in the DT and disables them for every match it finds.
+> The match table has to be declared in the mach-specific entry file, where this
+> helper function should then be called.
 > 
-> please add this patches to your imx-tree.
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/common.h |  2 ++
+>  arch/arm/mach-imx/cpu.c    | 13 +++++++++++++
+>  2 files changed, 15 insertions(+)
 > 
-> v2:
-> * add changes suggested by Shawn Guo
->   * iomux config changed for can and pcie-reset gpio
->   * flexcan not as module
-> 
-> Thank you and bye,
-> Silvio
-> 
-> 
-> Silvio Fricke (5):
->   ARM: imx_v6_v7_defconfig: Enable STMPE gpio support
->   ARM: dts: imx6: edmqmx6: Add PCIe support
->   ARM: dts: imx6: edmqmx6: Add two other i2c buses
->   ARM: dts: imx6: edmqmx6: Add can bus
->   ARM: imx_v6_v7_defconfig: Enable flexcan driver for can support
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 9ab785c..9f6e778 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -19,6 +19,7 @@ struct pt_regs;
+>  struct clk;
+>  struct device_node;
+>  enum mxc_cpu_pwr_mode;
+> +struct of_device_id;
+>  
+>  void mx1_map_io(void);
+>  void mx21_map_io(void);
+> @@ -77,6 +78,7 @@ void mxc_arch_reset_init(void __iomem *);
+>  void mxc_arch_reset_init_dt(void);
+>  int mx53_revision(void);
+>  void imx_set_aips(void __iomem *);
+> +void imx_aips_allow_unprivileged_access(const struct of_device_id *of_matches);
+>  int mxc_device_init(void);
+>  void imx_set_soc_revision(unsigned int rev);
+>  unsigned int imx_get_soc_revision(void);
+> diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+> index bbe8ff1..7f66d77 100644
+> --- a/arch/arm/mach-imx/cpu.c
+> +++ b/arch/arm/mach-imx/cpu.c
+> @@ -2,6 +2,7 @@
+>  #include <linux/module.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/slab.h>
+>  #include <linux/sys_soc.h>
+>  
+> @@ -60,6 +61,18 @@ void __init imx_set_aips(void __iomem *base)
+>  	__raw_writel(reg, base + 0x50);
+>  }
+>  
+> +void __init imx_aips_allow_unprivileged_access(
+> +		const struct of_device_id *of_matches)
+> +{
+> +	void __iomem *aips_base_addr;
+> +	struct device_node *np;
+> +
+> +	for_each_matching_node(np, of_matches) {
 
-Applied all, thanks.
+Can we use for_each_compatible_node() here, so that the caller only
+needs to pass a compatible string instead of a match table?
+
+Shawn
+
+> +		aips_base_addr = of_iomap(np, 0);
+> +		imx_set_aips(aips_base_addr);
+> +	}
+> +}
+> +
+>  struct device * __init imx_soc_device_init(void)
+>  {
+>  	struct soc_device_attribute *soc_dev_attr;
+> -- 
+> 2.0.0
+> 
