@@ -1,134 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Jul 2014 11:58:52 -0300
-Subject: [PATCH v2 4/4] ARM: dts: imx6sx-sdb: Add audio support
-In-Reply-To: <1404313132-14400-1-git-send-email-festevam@gmail.com>
-References: <1404313132-14400-1-git-send-email-festevam@gmail.com>
-Message-ID: <1404313132-14400-4-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Jul 2014 16:58:58 +0200
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140702142303.GJ2173@e106497-lin.cambridge.arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <7343032.WUqPgbXNQS@wuerfel>
+ <20140702142303.GJ2173@e106497-lin.cambridge.arm.com>
+Message-ID: <5997020.x4BWezXjnq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wednesday 02 July 2014 15:23:03 Liviu Dudau wrote:
+> > 
+> > Your solution looks correct to me, just using different
+> > tradeoffs to what I was expecting: You get a working pci_address_to_pio()
+> > function, which is probably never needed, but in turn you need to
+> > keep the state of each host bridge in a global list.
+> 
+> Just a reminder that with my patchset I *do* start using pci_address_to_pio()
+> in order to correctly parse the IO ranges from DT.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-In order to get audio working we still need to fix a bug 
-in arch/arm/mach-imx/clk-gate2.c, which would be an independent fix.
+Yes, what I meant is that it would be easier not to do that. All existing
+drivers expect of_pci_range_to_resource() to return the CPU address for
+an I/O space register, not the Linux I/O port number that we want to 
+pass to the PCI core. This is suboptimal because it's not obvious how
+it works, but it lets us get away without an extra registration step.
+Once all probe functions in PCI host drivers have been changed to the
+of_create_pci_host_bridge, that should not matter any more, because
+there is only one place left that calls it and we only have to get it
+right once.
 
-If someone wants to try audio on mx6sx-sdb board, please manually 
-write 0xffffffff into register CCGR5.
+Also, when you change that of_pci_range_to_resource, you also have to 
+audit all callers of that function and ensure they can deal with the new
+behavior.
 
-Changes since v1:
-- None
-
- arch/arm/boot/dts/imx6sx-sdb.dts | 72 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 2571261..a3980d9 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -82,9 +82,39 @@
- 			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
- 			enable-active-high;
- 		};
-+
-+		reg_psu_5v: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "PSU-5V0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
-+		model = "wm8962-audio";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"Ext Spk", "SPKOUTL",
-+			"Ext Spk", "SPKOUTR",
-+			"AMIC", "MICBIAS",
-+			"IN3R", "AMIC";
-+		mux-int-port = <2>;
-+		mux-ext-port = <6>;
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
- &fec1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet1>;
-@@ -200,6 +230,31 @@
- 	};
- };
- 
-+&i2c4 {
-+        clock-frequency = <100000>;
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&pinctrl_i2c4>;
-+        status = "okay";
-+
-+	codec: wm8962 at 1a {
-+		compatible = "wlf,wm8962";
-+		reg = <0x1a>;
-+		clocks = <&clks IMX6SX_CLK_AUDIO>;
-+		DCVDD-supply = <&vgen4_reg>;
-+		DBVDD-supply = <&vgen4_reg>;
-+		AVDD-supply = <&vgen4_reg>;
-+		CPVDD-supply = <&vgen4_reg>;
-+		MICVDD-supply = <&vgen3_reg>;
-+		PLLVDD-supply = <&vgen4_reg>;
-+		SPKVDD1-supply = <&reg_psu_5v>;
-+		SPKVDD2-supply = <&reg_psu_5v>;
-+	};
-+};
-+
-+&ssi2 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -260,6 +315,16 @@
- 
- &iomuxc {
- 	imx6x-sdb {
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA00__AUDMUX_AUD6_TXC	0x130b0
-+				MX6SX_PAD_CSI_DATA01__AUDMUX_AUD6_TXFS	0x130b0
-+				MX6SX_PAD_CSI_HSYNC__AUDMUX_AUD6_TXD	0x120b0
-+				MX6SX_PAD_CSI_VSYNC__AUDMUX_AUD6_RXD	0x130b0
-+				MX6SX_PAD_CSI_PIXCLK__AUDMUX_MCLK	0x130b0
-+			>;
-+		};
-+
- 		pinctrl_enet1: enet1grp {
- 			fsl,pins = <
- 				MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1
-@@ -293,6 +358,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c4: i2c4grp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA07__I2C4_SDA		0x4001b8b1
-+				MX6SX_PAD_CSI_DATA06__I2C4_SCL		0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
--- 
-1.8.3.2
+	Arnd
