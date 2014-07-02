@@ -1,37 +1,101 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed,  2 Jul 2014 11:46:23 +0100
-Subject: [PATCH] arm64: mm: Make icache synchronisation logic huge page aware
-Message-ID: <1404297983-30840-1-git-send-email-steve.capper@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 02 Jul 2014 12:48:48 +0200
+Subject: [PATCH 0/4] CMA & device tree, once again
+Message-ID: <1404298132-6050-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __sync_icache_dcache routine will only flush the dcache for the
-first page of a compound page, potentially leading to stale icache
-data residing further on in a hugetlb page.
+Hello,
 
-This patch addresses this issue by taking into consideration the
-order of the page when flushing the dcache.
+This is one more respin of the patches which add support for creating
+reserved memory regions defined in device tree. The last attempt
+(http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html)
+ended in merging only half of the code, so right now we have complete
+documentation merged and only basic code, which implements a half of it
+is written in the documentation. Although the merged patches allow to
+reserve memory, there is no way of using it for devices and drivers.
 
-Reported-by: Mark Brown <broonie@linaro.org>
-Tested-by: Mark Brown <broonie@linaro.org>
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
- arch/arm64/mm/flush.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This situation makes CMA rather useless, as the main architecture (ARM),
+which used it, has been converted from board-file based system
+initialization to device tree. Thus there is no place to use direct
+calls to dma_declare_contiguous() and some new solution, which bases on
+device tree, is urgently needed.
 
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index e4193e3..0d64089 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -79,7 +79,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
- 		return;
- 
- 	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
--		__flush_dcache_area(page_address(page), PAGE_SIZE);
-+		__flush_dcache_area(page_address(page),
-+				PAGE_SIZE << compound_order(page));
- 		__flush_icache_all();
- 	} else if (icache_is_aivivt()) {
- 		__flush_icache_all();
+This patch series fixes this issue. It provides two, already widely
+discussed and already present in the kernel, drivers for reserved
+memory: first based on DMA-coherent allocator, second using Contiguous
+Memory Allocator. The first one nicely implements typical 'carved out'
+reserved memory way of allocating contiguous buffers in a kernel-style
+way. The memory is used exclusively by devices assigned to the given
+memory region. The second one allows to reuse reserved memory for
+movable kernel pages (like disk buffers, anonymous memory) and migrates
+it out when device to allocates contiguous memory buffer. Both driver
+provides memory buffers via standard dma-mapping API.
+
+The patches have been rebased on top of latest CMA and mm changes merged
+to akmp kernel tree.
+
+To define a 64MiB CMA region following node is needed:
+
+multimedia_reserved: multimedia_mem_region {
+	compatible = "shared-dma-pool";
+	reusable;
+	size = <0x4000000>;
+	alignment = <0x400000>;
+};
+
+Similarly, one can define 64MiB region with DMA coherent memory:
+
+multimedia_reserved: multimedia_mem_region {
+	compatible = "shared-dma-pool";
+	no-map;
+	size = <0x4000000>;
+	alignment = <0x400000>;
+};
+
+Then the defined region can be assigned to devices:
+
+scaler: scaler at 12500000 {
+	memory-region = <&multimedia_reserved>;
+	/* ... */
+};
+codec: codec at 12600000 {
+	memory-region = <&multimedia_reserved>;
+	/* ... */
+};
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Changes since the version posted in '[PATCH v6 00/11] reserved-memory 
+regions/CMA in devicetree, again' thread 
+http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html:
+- rebased on top of '[PATCH v3 -next 0/9] CMA: generalize CMA reserved
+area management code' patch series on v3.16-rc3
+- improved dma-coherent driver, now it correctly handles assigning more
+than one device to the given memory region
+
+
+Patch summary:
+
+Marek Szyprowski (4):
+  drivers: of: add automated assignment of reserved regions to client
+    devices
+  drivers: of: initialize and assign reserved memory to newly created
+    devices
+  drivers: dma-coherent: add initialization from device tree
+  drivers: dma-contiguous: add initialization from device tree
+
+ drivers/base/dma-coherent.c     | 137 ++++++++++++++++++++++++++++++++++------
+ drivers/base/dma-contiguous.c   |  67 ++++++++++++++++++++
+ drivers/of/of_reserved_mem.c    |  70 ++++++++++++++++++++
+ drivers/of/platform.c           |   7 ++
+ include/linux/cma.h             |   3 +
+ include/linux/of_reserved_mem.h |   7 ++
+ mm/cma.c                        |  69 +++++++++++++++-----
+ 7 files changed, 324 insertions(+), 36 deletions(-)
+
 -- 
-1.9.3
+1.9.2
