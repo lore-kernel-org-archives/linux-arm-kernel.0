@@ -1,54 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 2 Jul 2014 13:48:53 +0200
-Subject: [PATCH v2 0/2] ARM: at91: remove phy fixup for sama5d3xek boards
-In-Reply-To: <20140701.153806.1074873302413556163.davem@redhat.com>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140701.153806.1074873302413556163.davem@redhat.com>
-Message-ID: <20140702134853.43d624c9@bbrezillon>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 2 Jul 2014 14:49:24 +0300
+Subject: ABBA deadlock in Common Clock Framework
+In-Reply-To: <53B3E5F8.80501@samsung.com>
+References: <53B3E5F8.80501@samsung.com>
+Message-ID: <20140702114924.GC3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello David,
-
-On Tue, 01 Jul 2014 15:38:06 -0700 (PDT)
-David Miller <davem@redhat.com> wrote:
-
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Date: Thu, 26 Jun 2014 12:13:33 +0200
+On Wed, Jul 02, 2014 at 12:59:04PM +0200, Tomasz Figa wrote:
+> Hi All,
 > 
-> > This patch removes a board specific hook for sama5d3xek boards from
-> > the sama5d3 generic DT board file.
-> > 
-> > This hook (which register a phy fixup configuring board specific
-> > delays in the ksz9021 ethernet phy) is now replaced by the
-> > appropriate DT properties definitions in the sama5d3xcm.dtsi file.
-> > 
-> > Changes since v1:
-> >  - fix txc-skew-ps and rxc-skew-ps delays
-> >  - remove phy address info to handle Ronetix and Embest HW designs
+> While testing linux-next (next-20140625) on Exynos4412-based TRATS2
+> board, from time to time I hit a deadlock between clk_disable_unused()
+> of Common Clock Framework and parallel clk_prepare() from s3c24xx-i2c
+> driver.
 > 
-> These patches do not apply cleanly to 'net' nor 'net-next', in fact
-> you did not even say which tree these changes are targetting.
+> I believe the following is happening (in processes 1 and 2):
+>  1: clk_disable_unused()
+>  1: clk_prepare_lock()
+>  1: mutex_lock(clk prepare mutex) // lock A
+>  1: max77686_clk_is_prepared()
+>  1: regmap_read()
+>  2: regulator_set_voltage()
+>  2: regmap_read()
+>  2: mutex_lock(max77686 regmap mutex) // lock B
+>  2: i2c_transfer()
+>  2: s3c24xx_i2c_xfer()
+>  2: clk_unprepare()
+>  2: clk_prepare_lock()
+>  2: mutex_lock(clk prepare mutex) // lock A
+>  1: mutex_lock(max77686 regmap mutex) // lock B
+>  1,2: BOOM!
+> 
+> I suppose this is a general problem affecting any MFD device that is
+> also a clock provider, but I clearly don't have a good idea what to do
+> about it.
+> 
 
-Actually, these patches were intended to be taken through at91 (and then
-arm-soc) tree.
+Or if you use notifiers which use i2c... See also
+http://comments.gmane.org/gmane.linux.kernel/1553699. One workaround is to
+always leave the clock of the i2c controller in a prepared state.
 
-The reason I added netdev in Cc is because I wanted to get feedback on
-the DT phy node definition (which I got from Florian).
+Cheers,
 
-I guess patch 2 does not apply cleanly because I based this work on top
-of other changes which are not merged yet ([1]).
-
-Nicolas, I'll take care to rebase this series on top of linus/master
-branch (or whatever branch you want me to base it onto).
-
-Thanks,
-
-Boris
-
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265216.html
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Peter.
