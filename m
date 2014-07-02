@@ -1,108 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Jul 2014 15:02:23 +0200
-Subject: [PATCH v2 2/5] efi/x86: efistub: move shared dependencies to
- <asm/efi.h>
-In-Reply-To: <1404305996.19665.7.camel@deneb.redhat.com>
-References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
- <1403792617-25792-3-git-send-email-ard.biesheuvel@linaro.org>
- <1404305996.19665.7.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu8qR9n0iMRi0NV055qcfmSatVE-BNY0JrAPCY2vCQLoRw@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 2 Jul 2014 14:20:42 +0100
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <4751391.BGkeOrZGt8@wuerfel>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+ <4751391.BGkeOrZGt8@wuerfel>
+Message-ID: <20140702132042.GG2173@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 July 2014 14:59, Mark Salter <msalter@redhat.com> wrote:
-> On Thu, 2014-06-26 at 16:23 +0200, Ard Biesheuvel wrote:
->> This moves definitions depended upon both by code under arch/x86/boot and
->> under drivers/firmware/efi to <asm/efi.h>. This is in preparation of turning
->> the stub code under drivers/firmware/efi into a static library.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/x86/boot/compressed/eboot.c |  5 +----
->>  arch/x86/boot/compressed/eboot.h | 16 ----------------
->>  arch/x86/include/asm/efi.h       | 25 +++++++++++++++++++++++++
->>  3 files changed, 26 insertions(+), 20 deletions(-)
->>
->> diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
->> index 0331d765c2bb..2fd5e2643623 100644
->> --- a/arch/x86/boot/compressed/eboot.c
->> +++ b/arch/x86/boot/compressed/eboot.c
->> @@ -19,10 +19,7 @@
->>
->>  static efi_system_table_t *sys_table;
->>
->> -static struct efi_config *efi_early;
->> -
->> -#define efi_call_early(f, ...)                                               \
->> -     efi_early->call(efi_early->f, __VA_ARGS__);
->> +struct efi_config *efi_early;
->>
->>  #define BOOT_SERVICES(bits)                                          \
->>  static void setup_boot_services##bits(struct efi_config *c)          \
->> diff --git a/arch/x86/boot/compressed/eboot.h b/arch/x86/boot/compressed/eboot.h
->> index c88c31ecad12..d487e727f1ec 100644
->> --- a/arch/x86/boot/compressed/eboot.h
->> +++ b/arch/x86/boot/compressed/eboot.h
->> @@ -103,20 +103,4 @@ struct efi_uga_draw_protocol {
->>       void *blt;
->>  };
->>
->> -struct efi_config {
->> -     u64 image_handle;
->> -     u64 table;
->> -     u64 allocate_pool;
->> -     u64 allocate_pages;
->> -     u64 get_memory_map;
->> -     u64 free_pool;
->> -     u64 free_pages;
->> -     u64 locate_handle;
->> -     u64 handle_protocol;
->> -     u64 exit_boot_services;
->> -     u64 text_output;
->> -     efi_status_t (*call)(unsigned long, ...);
->> -     bool is64;
->> -} __packed;
->> -
->>  #endif /* BOOT_COMPRESSED_EBOOT_H */
->> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
->> index 1eb5f6433ad8..55059a50a01f 100644
->> --- a/arch/x86/include/asm/efi.h
->> +++ b/arch/x86/include/asm/efi.h
->> @@ -156,6 +156,31 @@ static inline efi_status_t efi_thunk_set_virtual_address_map(
->>       return EFI_SUCCESS;
->>  }
->>  #endif /* CONFIG_EFI_MIXED */
->> +
->> +
->> +/* arch specific definitions used by the stub code */
->> +
->> +struct efi_config {
->> +     u64 image_handle;
->> +     u64 table;
->> +     u64 allocate_pool;
->> +     u64 allocate_pages;
->> +     u64 get_memory_map;
->> +     u64 free_pool;
->> +     u64 free_pages;
->> +     u64 locate_handle;
->> +     u64 handle_protocol;
->> +     u64 exit_boot_services;
->> +     u64 text_output;
->> +     efi_status_t (*call)(unsigned long, ...);
->> +     bool is64;
->> +} __packed;
->> +
->> +extern struct efi_config *efi_early;
->> +
->> +#define efi_call_early(f, ...)                                               \
->> +     efi_early->call(efi_early->f, __VA_ARGS__);
->
-> That shouldn't have the trailing ;
->
+On Wed, Jul 02, 2014 at 01:38:04PM +0100, Arnd Bergmann wrote:
+> Some more detailed comments now
+> 
+> On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
+> > +/*
+> > + * Record the PCI IO range (expressed as CPU physical address + size).
+> > + * Return a negative value if an error has occured, zero otherwise
+> > + */
+> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> > +{
+> > +#ifdef PCI_IOBASE
+> > +       struct io_range *res;
+> 
+> I was confused by the variable naming here: A variable named 'res' is
+> normally a 'struct resource'. Maybe better call this 'range'.
+> 
+> > +       resource_size_t allocated_size = 0;
+> > +
+> > +       /* check if the range hasn't been previously recorded */
+> > +       list_for_each_entry(res, &io_range_list, list) {
+> > +               if (addr >= res->start && addr + size <= res->start + size)
+> > +                       return 0;
+> > +               allocated_size += res->size;
+> > +       }
+> 
+> A spin_lock around the list lookup should be sufficient to get around
+> the race that Will mentioned.
+> 
+> > +       /* range not registed yet, check for available space */
+> > +       if (allocated_size + size - 1 > IO_SPACE_LIMIT)
+> > +               return -E2BIG;
+> 
+> It might be better to limit the size to 64K if it doesn't fit at first.
 
-Hmm, perhaps not.
-This patch just moves stuff around, so fixing this should probably be
-done in a separate patch.
+Thanks Arnd for review. Will update and post a new patch soon if I don't
+get any other comments.
+
+Best regards,
+Liviu
+
+> 
+> 
+> 	Arnd
+> 
+> 
 
 -- 
-Ard.
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
