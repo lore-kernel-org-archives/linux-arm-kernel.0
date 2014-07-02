@@ -1,27 +1,32 @@
-From: gorcunov@gmail.com (Cyrill Gorcunov)
-Date: Wed, 2 Jul 2014 23:07:06 +0400
-Subject: [patch 3/4] timerfd: Implement timerfd_ioctl method to restore
- timerfd_ctx::ticks
-In-Reply-To: <4188254.Av1Z2pQssC@wuerfel>
-References: <20140623185431.396309193@openvz.org>
- <53B4382F.9030908@codeaurora.org> <20140702170416.GG12440@moon>
- <4188254.Av1Z2pQssC@wuerfel>
-Message-ID: <20140702190706.GH12440@moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Jul 2014 21:09:06 +0200
+Subject: [PATCH v8 8/9] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <20140702173113.GJ24879@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140702172355.GQ2173@e106497-lin.cambridge.arm.com>
+ <20140702173113.GJ24879@arm.com>
+Message-ID: <4233600.RyK6LJF6ZK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 09:01:02PM +0200, Arnd Bergmann wrote:
+On Wednesday 02 July 2014 18:31:13 Will Deacon wrote:
+> > > > + err = of_pci_parse_bus_range(parent->of_node, bus_range);
+> > > > + if (err) {
+> > > > +         dev_info(parent, "No bus range for %s, using default [0-255]\n",
+> > > > +                 parent->of_node->full_name);
+> > > > +         bus_range->start = 0;
+> > > > +         bus_range->end = 255;
+> > > > +         bus_range->flags = IORESOURCE_BUS;
 > > > 
-> > > 64-bit get_user is currently unsupported on ARM, although it appears work is
-> > > ongoing [1].
-> > > 
-> > > 1. https://lkml.org/lkml/2014/6/17/260
+> > > What about bus_range->name?
 > > 
-> > Thanks for info, Christopher! What arm camp is using then, copy-from-user?
-> > 
+> > Don't know! Is anyone using it?
 > 
-> copy_from_user should work on all architectures. I believe a 64-bit get_user
-> is currently unsupported on most 32-bit architectures, x86-32 being a notable
-> exception.
+> I guess /proc/iomem prints it out? I set it in my current driver, if you
+> want to take a look.
 
-Thanks, I'll update.
+I don't think the bus resources show up anywhere in procfs. Anyway, it's
+always a good idea to give resources a name, if only for debugging purposes.
+
+	Arnd
