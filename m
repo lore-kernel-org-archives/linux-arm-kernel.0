@@ -1,45 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 2 Jul 2014 10:25:05 +0200
-Subject: [PATCH 06/33] ARM: at91: move at91rm9200 SoC to the CCF
-In-Reply-To: <1404223962-30471-7-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404223962-30471-7-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140702102505.3fa92b0f@bbrezillon>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Wed, 02 Jul 2014 11:43:25 +0300
+Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
+In-Reply-To: <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
+References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
+ <1404144233-17222-4-git-send-email-agross@codeaurora.org>
+ <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
+ <20140701180114.GA2082@qualcomm.com>
+ <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
+Message-ID: <1404290605.3622.6.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  1 Jul 2014 16:12:15 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-> This patch removes the selection of AT91_USE_OLD_CLK when selecting
-> at91rm9200 SoC support. This will automatically enable
-> COMMON_CLK_AT91 option and add support for at91 common clk
-> implementation.
+Hi, 
+
+On Tue, 2014-07-01 at 14:47 -0500, Rob Herring wrote:
+> On Tue, Jul 1, 2014 at 1:01 PM, Andy Gross <agross@codeaurora.org> wrote:
+> > On Tue, Jul 01, 2014 at 12:04:35AM -0500, Rob Herring wrote:
+
+<snip>
+
+> > <snip>
+> >
+> >> > +
+> >> > +                       ranges;
+> >> > +
+> >> > +                       status = "disabled";
+> >> > +
+> >> > +                       dwc3 at 11000000 {
+> >> > +                               compatible = "snps,dwc3";
+> >>
+> >> This sub-node is just wrong. Why can't you have a single node with '
+> >> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
+> >> adding here is clocks. Does the Synopsys block have no clocks?
+> >>
+> >> I guess this is copied from other broken dwc3 bindings... That doesn't
+> >> mean you have to copy it.
+> >
+> > The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
+> > That, in addition to pm, has to be handled from the wrapper.  That's my take
+> > anyway.  I am sure Felipe can speak more to this.
 > 
+> That is a Linux driver issue which is irrelevant to the binding.
 
-Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+DWC3 IP core from Synopsys is the same across SoC's (OMAP, Exynos..),
+vendors are adding glue IP to provide necessary clocks and voltages. 
+I think that the DT bindings properly reflect this fact.
 
-> Signed-off-by: Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> ---
->  arch/arm/mach-at91/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
+Regards,
+Ivan 
+
 > 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 45b55e0f0db6..c818136a74b8 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -113,7 +113,6 @@ config SOC_AT91RM9200
->  	select HAVE_AT91_DBGU0
->  	select MULTI_IRQ_HANDLER
->  	select SPARSE_IRQ
-> -	select AT91_USE_OLD_CLK
->  	select HAVE_AT91_USB_CLK
->  
->  config SOC_AT91SAM9260
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Rob
