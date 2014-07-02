@@ -1,54 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 2 Jul 2014 13:52:56 -0300
-Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
- share_count
-In-Reply-To: <20140702152942.12768.85270@quantum>
-References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
- <1404194129-25543-4-git-send-email-festevam@gmail.com>
- <20140701115252.GM14471@dragon>
- <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
- <20140702152942.12768.85270@quantum>
-Message-ID: <CAOMZO5B=Jwodc+2hVhjXrCvERxuyKKviM+zYgH=ynvOSHLWBTw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 2 Jul 2014 18:55:28 +0200
+Subject: [PATCH 03/33] clk: at91: main: warn when the main crystal
+ frequency is not set
+In-Reply-To: <20140702163842.7440.73162@quantum>
+References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1404223962-30471-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140702101811.2f2a507e@bbrezillon>
+ <20140702163842.7440.73162@quantum>
+Message-ID: <20140702185528.5699843a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Wed, 02 Jul 2014 09:38:42 -0700
+Mike Turquette <mturquette@linaro.org> wrote:
 
-On Wed, Jul 2, 2014 at 12:29 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Boris BREZILLON (2014-07-02 01:18:11)
+> > On Tue,  1 Jul 2014 16:12:12 +0200
+> > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > 
+> > > When the main crystal frequency is not set, the main clock is
+> > > approximated using the MAINF value in the CKGR_MCFR register. Warn
+> > > the user in that case.
+> > > 
+> > > Signed-off-by: Alexandre Belloni
+> > > <alexandre.belloni@free-electrons.com> ---
+> > 
+> > Acked-by: Boris BREZILLON <boris.brezillon@overkiz.com>
+> > 
+> > Mike, do you want me to take this patch and send you a pull request, or
+> > should I let you take this one directly ?
+> 
+> I've picked it up since it is just the one patch.
+> 
 
->> If share_count is 1 it means that someone else is using the clock and
->> we can't disable it.
->
-> Why do you keep track of share_count at all? Is the enable_count
-> bookkeeping within the clock framework insufficient for your needs?
+Thanks.
 
-What we are trying to handle here is the case when two clocks share
-the same clock gating bit.
-
-Let's say clocks clk1 and clk2 share the same clock gating bit.
-
-What we want to achieve are:
-
-Scenario 1:
-
-clk2 is disabled
-clk1 is enabled --> clock gate bit is set to 1
-clk1 is disabled --> clock gate bit is set to 0. As clk2 is disabled,
-it is OK to gate off the clock here
-
-Scenario 2:
-
-clk1 is enabled -> clock gate bit is set to 1
-clk2 is disabled -> clock gate bit cannot be set to 0 because clk1 is enabled
-
-We currently have arch/arm/mach-imx/clk-gate2.c and we are trying to
-fix it because the scenario 2 is not working.
-
-I am wondering if we should just extend drivers/clk/clk-gate.c to
-handle shared clock instead of doing this in arch/arm/mach-imx?
-
-What do you think?
-
-Thanks,
-
-Fabio Estevam
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
