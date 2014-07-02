@@ -1,75 +1,54 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 02 Jul 2014 18:52:06 +0200
-Subject: [GIT PULL] Samsung clock fixes for v3.16
-Message-ID: <1404319926-6178-1-git-send-email-t.figa@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 2 Jul 2014 13:52:56 -0300
+Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
+ share_count
+In-Reply-To: <20140702152942.12768.85270@quantum>
+References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
+ <1404194129-25543-4-git-send-email-festevam@gmail.com>
+ <20140701115252.GM14471@dragon>
+ <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
+ <20140702152942.12768.85270@quantum>
+Message-ID: <CAOMZO5B=Jwodc+2hVhjXrCvERxuyKKviM+zYgH=ynvOSHLWBTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b640a6037c9ecd1f0ad23a8e9b4ca5f5b4112508:
+Hi Mike,
 
-  Merge tag 'sunxi-clk-for-3.16-2' of https://github.com/mripard/linux into clk-next (2014-06-11 07:11:59 -0700)
+On Wed, Jul 2, 2014 at 12:29 PM, Mike Turquette <mturquette@linaro.org> wrote:
 
-are available in the git repository at:
+>> If share_count is 1 it means that someone else is using the clock and
+>> we can't disable it.
+>
+> Why do you keep track of share_count at all? Is the enable_count
+> bookkeeping within the clock framework insufficient for your needs?
 
+What we are trying to handle here is the case when two clocks share
+the same clock gating bit.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.16/samsung-clk-fixes
+Let's say clocks clk1 and clk2 share the same clock gating bit.
 
-for you to fetch changes up to 44ff0254b89079a8a95e652635e760d93196ac1f:
+What we want to achieve are:
 
-  clk: exynos5420: Remove aclk66_peric from the clock tree description (2014-06-30 14:47:33 +0200)
+Scenario 1:
 
-----------------------------------------------------------------
-Samsung clock fixes for v3.16.
+clk2 is disabled
+clk1 is enabled --> clock gate bit is set to 1
+clk1 is disabled --> clock gate bit is set to 0. As clk2 is disabled,
+it is OK to gate off the clock here
 
-This pull request contains fixes for various issues found while testing
--rc versions of Linux 3.16. Mostly two kinds of patches:
+Scenario 2:
 
-* Fixes of incorrectly defined clocks
+clk1 is enabled -> clock gate bit is set to 1
+clk2 is disabled -> clock gate bit cannot be set to 0 because clk1 is enabled
 
-1) a37c82a clk: samsung: exynos4: Remove SRC_MASK_ISP gates
+We currently have arch/arm/mach-imx/clk-gate2.c and we are trying to
+fix it because the scenario 2 is not working.
 
-    Issue present since v3.10.
+I am wondering if we should just extend drivers/clk/clk-gate.c to
+handle shared clock instead of doing this in arch/arm/mach-imx?
 
-2) 0b1643b clk/exynos5250: fix bit number for tv sysmmu clock
+What do you think?
 
-    Issue present since v3.16.
+Thanks,
 
-3) 44ff025 clk: exynos5420: Remove aclk66_peric from the clock tree description
-
-    Issue present since v3.11.
-
-* Adding things missed by original patches
-
-1) cec1cde clk: samsung: fix several typos to fix boot on s3c2410
-2) 34ece9e clk: samsung: add more aliases for s3c24xx
-
-    Both issues present since the driver was added in v3.16.
-
-3) a92dda4 clk: s3c64xx: Hookup SPI clocks correctly
-
-    Issue present since v3.12.
-
-----------------------------------------------------------------
-Charles Keepax (1):
-      clk: s3c64xx: Hookup SPI clocks correctly
-
-Doug Anderson (1):
-      clk: exynos5420: Remove aclk66_peric from the clock tree description
-
-Rahul Sharma (1):
-      clk/exynos5250: fix bit number for tv sysmmu clock
-
-Tomasz Figa (1):
-      clk: samsung: exynos4: Remove SRC_MASK_ISP gates
-
-Vasily Khoruzhick (2):
-      clk: samsung: fix several typos to fix boot on s3c2410
-      clk: samsung: add more aliases for s3c24xx
-
- drivers/clk/samsung/clk-exynos4.c      | 16 ++-----
- drivers/clk/samsung/clk-exynos5250.c   |  2 +-
- drivers/clk/samsung/clk-exynos5420.c   | 85 ++++++++++++++++++++++------------
- drivers/clk/samsung/clk-s3c2410.c      |  9 +++-
- drivers/clk/samsung/clk-s3c64xx.c      |  6 ++-
- include/dt-bindings/clock/exynos5420.h |  1 -
- 6 files changed, 71 insertions(+), 48 deletions(-)
+Fabio Estevam
