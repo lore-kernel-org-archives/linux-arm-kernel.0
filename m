@@ -1,57 +1,77 @@
-From: rongjun.ying@csr.com (Rongjun Ying)
-Date: Wed, 2 Jul 2014 10:45:42 +0800
-Subject: [PATCH v2 2/2] ASoC: sirf: Add device tree binding for the USP audio
- device
-In-Reply-To: <1404269142-3557-1-git-send-email-rongjun.ying@csr.com>
-References: <1404269142-3557-1-git-send-email-rongjun.ying@csr.com>
-Message-ID: <1404269142-3557-3-git-send-email-rongjun.ying@csr.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Wed, 2 Jul 2014 08:39:13 +0530
+Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
+ Exynos3250
+In-Reply-To: <53B349AF.4080606@samsung.com>
+References: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
+ <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
+ <53B23362.7080103@samsung.com>
+ <CAK5sBcER-rFmqe74b8uS=ZxKnTNGtkE0x6f7zaLphmyuHJz7Yg@mail.gmail.com>
+ <53B349AF.4080606@samsung.com>
+Message-ID: <CAK5sBcHrMPweMSxfde0SSDOtRHbf7t7WQZkf0wAZNTc+N2=Wgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
----
- .../devicetree/bindings/sound/sirf-usp.txt         | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/sirf-usp.txt
+On Wed, Jul 2, 2014 at 5:22 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> On 07/01/2014 01:10 PM, Sachin Kamat wrote:
+>> Hi Chanwoo,
+>>
+>> On Tue, Jul 1, 2014 at 9:34 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>> Hi Sachin,
+>>>
+>>> On 07/01/2014 12:33 PM, Sachin Kamat wrote:
+>>>> Hi Chanwoo,
+>>>>
+>>>> On Tue, Jul 1, 2014 at 6:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>>>> This patch add TMU (Thermal Management Unit) dt node to monitor the high
+>>>>> temperature for Exynos3250.
+>>>>>
+>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>> ---
+>>>>> This patch has a dependency on following patch [1]:
+>>>>>  [1] https://lkml.org/lkml/2014/6/30/805
+>>>>>
+>>>>>  arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
+>>>>>  1 file changed, 10 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>>>>> index 3660cab..1e566af 100644
+>>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>>>>> @@ -192,6 +192,16 @@
+>>>>>                         status = "disabled";
+>>>>>                 };
+>>>>>
+>>>>> +               tmu: tmu at 100C0000 {
+>>>>> +                       compatible = "samsung,exynos3250-tmu";
+>>>>> +                       interrupt-parent = <&gic>;
+>>>>> +                       reg = <0x100C0000 0x100>;
+>>>>> +                       interrupts = <0 216 0>;
+>>>>> +                       clocks = <&cmu CLK_TMU_APBIF>;
+>>>>> +                       clock-names = "tmu_apbif";
+>>>>> +                       status = "disabled";
+>>>>
+>>>> I don't think there would be any board specific properties needed. Hence
+>>>> leave the status as enabled (by deleting the above line).
+>>>>
+>>>
+>>> I think that if specific board need TMU feature, dts file for specific board
+>>> should include tmu dt node with 'okay' status. The specific board based on
+>>> Exynos3250 might not need TMU feature.
+>>
+>> The status field in DT node is not meant for stating the build configuration but
+>> represents the readiness of the hardware for usage on the platform. If
+>> a particular
+>> board does not need this feature it needs to be disabled in the build
+>> config and only
+>> for any special requirements disable it in board file.
+>
+> TMU (Thermal Management Unit) needs specific regulator for TMU power as following:
+> The regulator for TMU is dependent on board.
 
-diff --git a/Documentation/devicetree/bindings/sound/sirf-usp.txt b/Documentation/devicetree/bindings/sound/sirf-usp.txt
-new file mode 100644
-index 0000000..02f85b3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/sirf-usp.txt
-@@ -0,0 +1,27 @@
-+* SiRF SoC USP module
-+
-+Required properties:
-+- compatible: "sirf,prima2-usp-pcm"
-+- reg: Base address and size entries:
-+- dmas: List of DMA controller phandle and DMA request line ordered pairs.
-+- dma-names: Identifier string for each DMA request line in the dmas property.
-+  These strings correspond 1:1 with the ordered pairs in dmas.
-+
-+  One of the DMA channels will be responsible for transmission (should be
-+  named "tx") and one for reception (should be named "rx").
-+
-+- clocks: USP controller clock source
-+- pinctrl-names: Must contain a "default" entry.
-+- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-+
-+Example:
-+usp0: usp at b0080000 {
-+	compatible = "sirf,prima2-usp-pcm";
-+	reg = <0xb0080000 0x10000>;
-+	clocks = <&clks 28>;
-+	dmas = <&dmac1 1>, <&dmac1 2>;
-+	dma-names = "rx", "tx";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usp0_only_utfs_pins_a>;
-+};
-+
+In this case it makes sense to leave it disabled in dtsi.
+
 -- 
-1.9.3
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+Regards,
+Sachin.
