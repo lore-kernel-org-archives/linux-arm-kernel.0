@@ -1,89 +1,31 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Jul 2014 12:45:37 +0800
-Subject: [PATCH v3 1/2] ARM: i.MX: allow disabling supervisor protect via
- DT
-In-Reply-To: <1404203268-31404-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1404203268-31404-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20140702044536.GC16176@dragon>
+Date: Wed, 2 Jul 2014 13:10:27 +0800
+Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
+In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140702051026.GD16176@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 10:27:47AM +0200, Steffen Trumtrar wrote:
-> The i.MX SoCs allow to setup fine grained access rights to peripherals on the
-> AIPS bus.
-> This is done via the Peripheral Access Register (PAR) in e.g. the i.MX21
-> or in later SoC versions the Off-Platform Peripheral Access Control Register
-> (OPACR), e.g. i.MX53.
-> Under certain circumstances this leads to problems in which bus masters are
-> not granted their access rights to peripherals.
-> To be able to disable these restrictions on DT platforms, add a helper function
-> that looks for AIPS nodes in the DT and disables them for every match it finds.
-> The match table has to be declared in the mach-specific entry file, where this
-> helper function should then be called.
+On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
+> 
+> Rather than doing this piecemeal, and miss some instances, change all
+> the "mov pc" instances to use the new macro, with the exception of
+> the "movs" instruction and the kprobes code.  This allows us to detect
+> the "mov pc, lr" case and fix it up - and also gives us the possibility
+> of deploying this for other registers depending on the CPU selection.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->  arch/arm/mach-imx/common.h |  2 ++
->  arch/arm/mach-imx/cpu.c    | 13 +++++++++++++
->  2 files changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 9ab785c..9f6e778 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -19,6 +19,7 @@ struct pt_regs;
->  struct clk;
->  struct device_node;
->  enum mxc_cpu_pwr_mode;
-> +struct of_device_id;
->  
->  void mx1_map_io(void);
->  void mx21_map_io(void);
-> @@ -77,6 +78,7 @@ void mxc_arch_reset_init(void __iomem *);
->  void mxc_arch_reset_init_dt(void);
->  int mx53_revision(void);
->  void imx_set_aips(void __iomem *);
-> +void imx_aips_allow_unprivileged_access(const struct of_device_id *of_matches);
->  int mxc_device_init(void);
->  void imx_set_soc_revision(unsigned int rev);
->  unsigned int imx_get_soc_revision(void);
-> diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
-> index bbe8ff1..7f66d77 100644
-> --- a/arch/arm/mach-imx/cpu.c
-> +++ b/arch/arm/mach-imx/cpu.c
-> @@ -2,6 +2,7 @@
->  #include <linux/module.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/slab.h>
->  #include <linux/sys_soc.h>
->  
-> @@ -60,6 +61,18 @@ void __init imx_set_aips(void __iomem *base)
->  	__raw_writel(reg, base + 0x50);
->  }
->  
-> +void __init imx_aips_allow_unprivileged_access(
-> +		const struct of_device_id *of_matches)
-> +{
-> +	void __iomem *aips_base_addr;
-> +	struct device_node *np;
-> +
-> +	for_each_matching_node(np, of_matches) {
+...
+>  arch/arm/mach-imx/suspend-imx6.S         |  5 ++--
 
-Can we use for_each_compatible_node() here, so that the caller only
-needs to pass a compatible string instead of a match table?
-
-Shawn
-
-> +		aips_base_addr = of_iomap(np, 0);
-> +		imx_set_aips(aips_base_addr);
-> +	}
-> +}
-> +
->  struct device * __init imx_soc_device_init(void)
->  {
->  	struct soc_device_attribute *soc_dev_attr;
-> -- 
-> 2.0.0
-> 
+Tested-by: Shawn Guo <shawn.guo@freescale.com>
