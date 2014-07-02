@@ -1,50 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Jul 2014 19:02:12 +0100
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140702195154.47d6f6b4@armhf>
-References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
- <20140702195154.47d6f6b4@armhf>
-Message-ID: <20140702180212.GS32514@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 02 Jul 2014 20:02:51 +0200
+Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
+In-Reply-To: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <53B4494B.1030909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 07:51:54PM +0200, Jean-Francois Moine wrote:
-> On Wed, 2 Jul 2014 18:56:28 +0200
-> Andrew Lunn <andrew@lunn.ch> wrote:
-> 
-> > How well will this work with Russell concept of a front end and two
-> > backends? Can you uses your CODEC twice, once with the I2S backend and
-> > a second time with the S/PDIF backend?
-> 
-> Hi Andrew,
-> 
-> The TDA998x CODEC has two functions:
-> - it sets the possible formats and rates when the screen connects and
-> - it sets the audio input port when audio streaming starts.
-> 
-> I tested this CODEC with both DAPM and DPCM. If the audio subsystem
-> asks for streaming on both I2S and S/PDIF, only the last call is served
-> (this depends on the order of the DAI links in the audio card creation
-> table).
-> 
-> As I told to Russell, DPCM just asks for a 'system' DAI (front-end),
-> but it also asks for some additional code in the kirkwood DMA driver
-> because all PCMs are activated on streaming start.
+Hi Kukjin,
 
-Well, as far as I'm concerned right now, it's for Mark to sort out this
-situation, and tell us what he wants to do with the Kirkwood stuff.  I
-suspect he's keeping quiet because he doesn't care about it.
+On 30.06.2014 23:32, Kukjin Kim wrote:
+> This series removes S5P64X0 and S5PC100 related codes in mainline,
+> because no more user now. And if its supporting is required later,
+> it will be done with using device tree.
+> 
+> [PATCH 01/17] ARM: S5P64X0: no more support S5P6440 and S5P6450 SoCs
+> [PATCH 02/17] gpio: samsung: remove s5p64x0 related gpio codes
+> [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
+> [PATCH 04/17] ASoC: samsung: no more support for S5P6440 and S5P6450
+> [PATCH 05/17] pwm: samsung: remove s5p64x0 related pwm codes
+> [PATCH 06/17] video: fbdev: s3c-fb: remove s5p64x0 related fimd
+> [PATCH 07/17] serial: samsung: no more support for S5P6440 and
+> [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
+> [PATCH 09/17] gpio: samsung: remov s5pc100 related gpio codes
+> [PATCH 10/17] spi: s3c64xx: remove s5pc100 related spi codes
+> [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
+> [PATCH 12/17] serial: samsung: no more support for S5PC100 SoC
+> [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
+> [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
+> [PATCH 15/17] video: fbdev: s3c-fb: remove s5pc100 related fimd and
+> [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc codes
+> [PATCH 17/17] ASoC: Samsung: remove s5pc100 related codes
 
-Given that he's the one with the knowledge of DPCM, and he's the maintainer
-of ASoC, he has the ultimate responsibility for sorting out this and
-giving direction as to how he wants to proceed.
+Thanks for this series.
 
-As I understand it though, my solution is the full and proper DPCM solution,
-and I believe that what's currently in mainline is not a DPCM solution.
+Just letting you know that I have rebased my s5pv210 DT migration series
+on top of this and will be sending the patches after some more testing.
 
-Mark needs to correct that, because he is one of the few who knows this
-stuff.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,
+Tomasz
