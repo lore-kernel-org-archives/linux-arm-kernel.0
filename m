@@ -1,54 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 2 Jul 2014 17:56:51 +0100
-Subject: [PATCH 1/3 v5] spi: s3c64xx: fix broken "cs_gpios" usage in the
- driver
-In-Reply-To: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
-References: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140702165651.GK410@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 2 Jul 2014 17:59:24 +0100
+Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
+In-Reply-To: <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+ <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140702165924.GB17665@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 09:29:50AM +0530, Naveen Krishna Chatradhi wrote:
+On Wed, 02 Jul 2014, Philipp Zabel wrote:
 
-> Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
-> considering the time with no compliants about the breakage.
+> Hi Peter,
+> 
+> Am Mittwoch, den 02.07.2014, 15:08 +0100 schrieb Peter Griffin:
+> > This series adds reset controller support for the STiH407 SoC.
+> > 
+> > Changes since v1
+> >  - Update copyright to 2014
+> >  - Add const qualifier
+> >  - Fix various whitespace issues
+> >  - Remove THIS_OWNER
+> >  - Move DT documentation into separate patch
+> > 
+> > Peter Griffin (4):
+> >   reset: stih407: Add softreset, powerdown and picophy controllers
+> >   reset: sti: Document sti-picophyreset controllers bindings.
+> >   ARM: sti: Add STiH407 Kconfig entry to select STIH407_RESET
+> >   ARM: sti: Add STiH407 reset controller support.
+> > 
+> >  .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
+> >  arch/arm/boot/dts/stih407.dtsi                     |  16 +++
+> >  arch/arm/mach-sti/Kconfig                          |  10 ++
+> >  drivers/reset/sti/Kconfig                          |   4 +
+> >  drivers/reset/sti/Makefile                         |   1 +
+> >  drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
+> >  .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
+> >  7 files changed, 292 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
+> >  create mode 100644 drivers/reset/sti/reset-stih407.c
+> >  create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
+> 
+> Looks good to me now.
+> 
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-I'm not clear what the breakage is?  Some boards are broken but what's
-the driver issue?
+Do you have a tree for Reset?  If not, which route do these patches
+normally follow?
 
->  	if (!spi_get_ctldata(spi)) {
->  		/* Request gpio only if cs line is asserted by gpio pins */
-> -		if (sdd->cs_gpio) {
-> -			err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
-> -					dev_name(&spi->dev));
-> +		if (gpio_is_valid(spi->cs_gpio)) {
-> +			err = gpio_request_one(spi->cs_gpio,
-> +						GPIOF_OUT_INIT_HIGH,
-> +						dev_name(&spi->dev));
->  			if (err) {
->  				dev_err(&spi->dev,
->  					"Failed to get /CS gpio [%d]: %d\n",
-> -					cs->line, err);
-> +					spi->cs_gpio, err);
->  				goto err_gpio_req;
->  			}
-> -
-> -			spi->cs_gpio = cs->line;
-> +		} else {
-> +			dev_err(&spi->dev, "chip select gpio is invalid\n");
-> +			return -EINVAL;
->  		}
-
-This appears to be making it mandatory to specify a GPIO when previously
-it was not mandatory which I believe breaks some SoCs - the native chip
-select has to be used on some devices as there is no pinmux option to
-make it a GPIO (this was why the native chip select support was added).
-
-Also I'd need to check but are you sure that GPIO 0 is not valid?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/78876b08/attachment.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
