@@ -1,68 +1,43 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  2 Jul 2014 15:08:47 +0100
-Subject: [PATCH v2 2/4] reset: sti: Document sti-picophyreset controllers
- bindings.
+Date: Wed,  2 Jul 2014 15:08:48 +0100
+Subject: [PATCH v2 3/4] ARM: sti: Add STiH407 Kconfig entry to select
+ STIH407_RESET
 In-Reply-To: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
 References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1404310129-14667-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1404310129-14667-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for sti-picophyreset controller.
+The STiH407 is a STMicroelectronics Digital Consumer electronics
+family, targetted at set-top-box and other audio/video applications.
+
+This patch selects the reset controller driver for this family which
+is essential to take various IP's on the SoC out of powerdown / reset.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../bindings/reset/st,sti-picophyreset.txt         | 42 ++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
+ arch/arm/mach-sti/Kconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt b/Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
-new file mode 100644
-index 0000000..54ae9f7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
-@@ -0,0 +1,42 @@
-+STMicroelectronics STi family Sysconfig Picophy SoftReset Controller
-+=============================================================================
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 878e9ec..8825bc9 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -42,4 +42,14 @@ config SOC_STIH416
+ 	  and other digital audio/video applications using Flattened Device
+ 	  Trees.
+ 
++config SOC_STIH407
++	bool "STiH407 STMicroelectronics Consumer Electronics family"
++	default y
++	select STIH407_RESET
++	help
++	  This enables support for STMicroelectronics Digital Consumer
++	  Electronics family StiH407 parts, targetted at set-top-box
++	  and other digital audio/video applications using Flattened Device
++	  Trees.
 +
-+This binding describes a reset controller device that is used to enable and
-+disable on-chip PicoPHY USB2 phy(s) using "softreset" control bits found in
-+the STi family SoC system configuration registers.
-+
-+The actual action taken when softreset is asserted is hardware dependent.
-+However, when asserted it may not be possible to access the hardware's
-+registers and after an assert/deassert sequence the hardware's previous state
-+may no longer be valid.
-+
-+Please refer to Documentation/devicetree/bindings/reset/reset.txt
-+for common reset controller binding usage.
-+
-+Required properties:
-+- compatible: Should be "st,stih407-picophyreset"
-+- #reset-cells: 1, see below
-+
-+Example:
-+
-+	picophyreset: picophyreset-controller {
-+		compatible = "st,stih407-picophyreset";
-+		#reset-cells = <1>;
-+	};
-+
-+Specifying picophyreset control of devices
-+=======================================
-+
-+Device nodes should specify the reset channel required in their "resets"
-+property, containing a phandle to the picophyreset device node and an
-+index specifying which channel to use, as described in
-+Documentation/devicetree/bindings/reset/reset.txt.
-+
-+Example:
-+
-+	usb2_picophy0: usbpicophy at 0 {
-+		resets = <&picophyreset STIH407_PICOPHY0_RESET>;
-+	};
-+
-+Macro definitions for the supported reset channels can be found in:
-+include/dt-bindings/reset-controller/stih407-resets.h
+ endif
 -- 
 1.9.1
