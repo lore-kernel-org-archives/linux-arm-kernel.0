@@ -1,39 +1,57 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 2 Jul 2014 17:01:04 +0530
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
-In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-Message-ID: <53B3ED78.1070608@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 2 Jul 2014 12:34:28 +0100
+Subject: [PATCH v2 4/5] phy: miphy365x: Represent each PHY channel as a
+ subnode
+In-Reply-To: <53B3DE4F.1040100@ti.com>
+References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
+ <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
+ <20140630144114.GB25926@lee--X1> <53B3DE4F.1040100@ti.com>
+Message-ID: <20140702113428.GA16724@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 July 2014 09:28 PM, Russell King wrote:
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
+> On Monday 30 June 2014 08:11 PM, Lee Jones wrote:
+> > phy: miphy365x: Represent each PHY channel as a DT subnode
+> > 
+> > This has the added advantages of being able to enable/disable each
+> > of the channels as simply as enabling/disabling the DT node.
+> > 
+> > Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
+> > index 1109f42..2c4ea6e 100644
+> > --- a/drivers/phy/phy-miphy365x.c
+> > +++ b/drivers/phy/phy-miphy365x.c
+
+[...]
+
+> > -static int miphy365x_of_probe(struct device_node *np,
+> > +static int miphy365x_of_probe(struct platform_device *pdev,
+> >  			      struct miphy365x_dev *phy_dev)
+> >  {
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	struct device_node *child;
+> > +	int child_count = 0;
+> > +
+> > +	for_each_child_of_node(np, child)
+> > +		child_count++;
 > 
-> We provide a new macro "ret" with all its variants for the condition
-> code which will resolve to the appropriate instruction.
-> 
-> Rather than doing this piecemeal, and miss some instances, change all
-> the "mov pc" instances to use the new macro, with the exception of
-> the "movs" instruction and the kprobes code.  This allows us to detect
-> the "mov pc, lr" case and fix it up - and also gives us the possibility
-> of deploying this for other registers depending on the CPU selection.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> use of_get_child_count() instead.
 
-> ---
+Ah, nice. I'll do that.
 
->  arch/arm/mach-davinci/sleep.S            |  2 +-
+[...]
 
-I build, boot and suspend-to-RAM tested on DA850 which should exercise
-the path you modified. DaVinci devices are ARMv5 (ARM926) so the new bx
-instruction does not really get used.
+> I think you can merge this to your original patch.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+I can do that, but I thought It'd be nice to keep some history and
+show the migration over to a different setup.  This is particularly
+important for when we back-port the changes back into the internal
+development kernel.
 
-Thanks,
-Sekhar
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
