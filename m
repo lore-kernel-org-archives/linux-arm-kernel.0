@@ -1,264 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 02 Jul 2014 12:48:51 +0200
-Subject: [PATCH 3/4] drivers: dma-coherent: add initialization from device tree
-In-Reply-To: <1404298132-6050-1-git-send-email-m.szyprowski@samsung.com>
-References: <1404298132-6050-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1404298132-6050-4-git-send-email-m.szyprowski@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Jul 2014 11:50:14 +0100
+Subject: [PATCH] arm64: mm: Make icache synchronisation logic huge page
+ aware
+In-Reply-To: <1404297983-30840-1-git-send-email-steve.capper@linaro.org>
+References: <1404297983-30840-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140702105013.GI18731@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialization procedure of dma coherent pool has been split into two
-parts, so memory pool can now be initialized without assigning to
-particular struct device. Then initialized region can be assigned to
-more than one struct device. To protect from concurent allocations from
-different devices, a spinlock has been added to dma_coherent_mem
-structure. The last part of this patch adds support for handling
-'shared-dma-pool' reserved-memory device tree nodes.
+On Wed, Jul 02, 2014 at 11:46:23AM +0100, Steve Capper wrote:
+> The __sync_icache_dcache routine will only flush the dcache for the
+> first page of a compound page, potentially leading to stale icache
+> data residing further on in a hugetlb page.
+> 
+> This patch addresses this issue by taking into consideration the
+> order of the page when flushing the dcache.
+> 
+> Reported-by: Mark Brown <broonie@linaro.org>
+> Tested-by: Mark Brown <broonie@linaro.org>
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/base/dma-coherent.c | 137 ++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 118 insertions(+), 19 deletions(-)
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 7d6e84a51424..7185a4f247e1 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -14,11 +14,14 @@ struct dma_coherent_mem {
- 	int		size;
- 	int		flags;
- 	unsigned long	*bitmap;
-+	spinlock_t	spinlock;
- };
- 
--int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
--				dma_addr_t device_addr, size_t size, int flags)
-+static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
-+			     size_t size, int flags,
-+			     struct dma_coherent_mem **mem)
- {
-+	struct dma_coherent_mem *dma_mem = NULL;
- 	void __iomem *mem_base = NULL;
- 	int pages = size >> PAGE_SHIFT;
- 	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
-@@ -27,27 +30,26 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 		goto out;
- 	if (!size)
- 		goto out;
--	if (dev->dma_mem)
--		goto out;
--
--	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
- 
- 	mem_base = ioremap(phys_addr, size);
- 	if (!mem_base)
- 		goto out;
- 
--	dev->dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
--	if (!dev->dma_mem)
-+	dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
-+	if (!dma_mem)
- 		goto out;
--	dev->dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
--	if (!dev->dma_mem->bitmap)
-+	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-+	if (!dma_mem->bitmap)
- 		goto free1_out;
- 
--	dev->dma_mem->virt_base = mem_base;
--	dev->dma_mem->device_base = device_addr;
--	dev->dma_mem->pfn_base = PFN_DOWN(phys_addr);
--	dev->dma_mem->size = pages;
--	dev->dma_mem->flags = flags;
-+	dma_mem->virt_base = mem_base;
-+	dma_mem->device_base = device_addr;
-+	dma_mem->pfn_base = PFN_DOWN(phys_addr);
-+	dma_mem->size = pages;
-+	dma_mem->flags = flags;
-+	spin_lock_init(&dma_mem->spinlock);
-+
-+	*mem = dma_mem;
- 
- 	if (flags & DMA_MEMORY_MAP)
- 		return DMA_MEMORY_MAP;
-@@ -55,12 +57,51 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 	return DMA_MEMORY_IO;
- 
-  free1_out:
--	kfree(dev->dma_mem);
-+	kfree(dma_mem);
-  out:
- 	if (mem_base)
- 		iounmap(mem_base);
- 	return 0;
- }
-+
-+static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
-+{
-+	if (!mem)
-+		return;
-+	iounmap(mem->virt_base);
-+	kfree(mem->bitmap);
-+	kfree(mem);
-+}
-+
-+static int dma_assign_coherent_memory(struct device *dev,
-+				      struct dma_coherent_mem *mem)
-+{
-+	if (dev->dma_mem)
-+		return -EBUSY;
-+
-+	dev->dma_mem = mem;
-+	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
-+
-+	return 0;
-+}
-+
-+int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-+				dma_addr_t device_addr, size_t size, int flags)
-+{
-+	struct dma_coherent_mem *mem;
-+	int ret;
-+
-+	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
-+				       &mem);
-+	if (ret == 0)
-+		return 0;
-+
-+	if (dma_assign_coherent_memory(dev, mem) == 0)
-+		return ret;
-+
-+	dma_release_coherent_memory(mem);
-+	return 0;
-+}
- EXPORT_SYMBOL(dma_declare_coherent_memory);
- 
- void dma_release_declared_memory(struct device *dev)
-@@ -69,10 +110,8 @@ void dma_release_declared_memory(struct device *dev)
- 
- 	if (!mem)
- 		return;
-+	dma_release_coherent_memory(mem);
- 	dev->dma_mem = NULL;
--	iounmap(mem->virt_base);
--	kfree(mem->bitmap);
--	kfree(mem);
- }
- EXPORT_SYMBOL(dma_release_declared_memory);
- 
-@@ -80,6 +119,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
- 					dma_addr_t device_addr, size_t size)
- {
- 	struct dma_coherent_mem *mem = dev->dma_mem;
-+	unsigned long flags;
- 	int pos, err;
- 
- 	size += device_addr & ~PAGE_MASK;
-@@ -87,8 +127,11 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
- 	if (!mem)
- 		return ERR_PTR(-EINVAL);
- 
-+	spin_lock_irqsave(&mem->spinlock, flags);
- 	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
- 	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
-+	spin_unlock_irqrestore(&mem->spinlock, flags);
-+
- 	if (err != 0)
- 		return ERR_PTR(err);
- 	return mem->virt_base + (pos << PAGE_SHIFT);
-@@ -115,6 +158,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- {
- 	struct dma_coherent_mem *mem;
- 	int order = get_order(size);
-+	unsigned long flags;
- 	int pageno;
- 
- 	if (!dev)
-@@ -124,6 +168,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- 		return 0;
- 
- 	*ret = NULL;
-+	spin_lock_irqsave(&mem->spinlock, flags);
- 
- 	if (unlikely(size > (mem->size << PAGE_SHIFT)))
- 		goto err;
-@@ -138,10 +183,12 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
- 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
- 	memset(*ret, 0, size);
-+	spin_unlock_irqrestore(&mem->spinlock, flags);
- 
- 	return 1;
- 
- err:
-+	spin_unlock_irqrestore(&mem->spinlock, flags);
- 	/*
- 	 * In the case where the allocation can not be satisfied from the
- 	 * per-device area, try to fall back to generic memory if the
-@@ -171,8 +218,11 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
- 	if (mem && vaddr >= mem->virt_base && vaddr <
- 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
- 		int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
-+		unsigned long flags;
- 
-+		spin_lock_irqsave(&mem->spinlock, flags);
- 		bitmap_release_region(mem->bitmap, page, order);
-+		spin_unlock_irqrestore(&mem->spinlock, flags);
- 		return 1;
- 	}
- 	return 0;
-@@ -218,3 +268,52 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
- 	return 0;
- }
- EXPORT_SYMBOL(dma_mmap_from_coherent);
-+
-+/*
-+ * Support for reserved memory regions defined in device tree
-+ */
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
-+
-+static void rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
-+{
-+	struct dma_coherent_mem *mem = rmem->priv;
-+	if (!mem &&
-+	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-+				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-+				     &mem) != DMA_MEMORY_MAP) {
-+		pr_info("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
-+			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+		return;
-+	}
-+	rmem->priv = mem;
-+	dma_assign_coherent_memory(dev, mem);
-+}
-+
-+static void rmem_dma_device_release(struct reserved_mem *rmem,
-+				    struct device *dev)
-+{
-+	dev->dma_mem = NULL;
-+}
-+
-+static const struct reserved_mem_ops rmem_dma_ops = {
-+	.device_init	= rmem_dma_device_init,
-+	.device_release	= rmem_dma_device_release,
-+};
-+
-+static int __init rmem_dma_setup(struct reserved_mem *rmem)
-+{
-+	unsigned long node = rmem->fdt_node;
-+
-+	if (of_get_flat_dt_prop(node, "reusable", NULL))
-+		return -EINVAL;
-+
-+	rmem->ops = &rmem_dma_ops;
-+	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
-+		&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+	return 0;
-+}
-+RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
-+#endif
--- 
-1.9.2
+Will
+
+> ---
+>  arch/arm64/mm/flush.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index e4193e3..0d64089 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -79,7 +79,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+>  		return;
+>  
+>  	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
+> -		__flush_dcache_area(page_address(page), PAGE_SIZE);
+> +		__flush_dcache_area(page_address(page),
+> +				PAGE_SIZE << compound_order(page));
+>  		__flush_icache_all();
+>  	} else if (icache_is_aivivt()) {
+>  		__flush_icache_all();
+> -- 
+> 1.9.3
+> 
+> 
