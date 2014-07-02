@@ -1,50 +1,148 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 2 Jul 2014 11:47:38 +0300
-Subject: [PATCH 04/13] ARM: OMAP4+: dpll44xx: remove cm-regbits-44xx.h and
- clock44xx.h includes
+Date: Wed, 2 Jul 2014 11:47:40 +0300
+Subject: [PATCH 06/13] ARM: OMAP2+: clock: add fint values to the
+ ti_clk_features struct
 In-Reply-To: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
 References: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404290867-6768-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1404290867-6768-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead, copy the used bitfield definitions to the source file. Done in
-preparation to migrate the clock implementation under clock driver.
+These are SoC specific and get their init values based on the SoC type.
+Previously the values were hard coded within the DPLL clock code, but
+having them inside the clock features avoids runtime cpu_is_X type checks.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/dpll44xx.c |   12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/clkt_dpll.c |   34 ++++++++++++----------------------
+ arch/arm/mach-omap2/clock.c     |   23 +++++++++++++++++++++++
+ arch/arm/mach-omap2/clock.h     |    4 ++++
+ 3 files changed, 39 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
-index b071891..4613f1e 100644
---- a/arch/arm/mach-omap2/dpll44xx.c
-+++ b/arch/arm/mach-omap2/dpll44xx.c
-@@ -16,8 +16,6 @@
- #include <linux/bitops.h>
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+index 5aa734a..5207e84 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/arch/arm/mach-omap2/clkt_dpll.c
+@@ -44,20 +44,12 @@
+ #define DPLL_ROUNDING_VAL		((DPLL_SCALE_BASE / 2) * \
+ 					 (DPLL_SCALE_FACTOR / DPLL_SCALE_BASE))
  
- #include "clock.h"
--#include "clock44xx.h"
--#include "cm-regbits-44xx.h"
- 
+-/* DPLL valid Fint frequency band limits - from 34xx TRM Section 4.7.6.2 */
+-#define OMAP3430_DPLL_FINT_BAND1_MIN	750000
+-#define OMAP3430_DPLL_FINT_BAND1_MAX	2100000
+-#define OMAP3430_DPLL_FINT_BAND2_MIN	7500000
+-#define OMAP3430_DPLL_FINT_BAND2_MAX	21000000
+-
  /*
-  * Maximum DPLL input frequency (FINT) and output frequency (FOUT) that
-@@ -28,6 +26,16 @@
- #define OMAP4_DPLL_LP_FINT_MAX	1000000
- #define OMAP4_DPLL_LP_FOUT_MAX	100000000
+  * DPLL valid Fint frequency range for OMAP36xx and OMAP4xxx.
+  * From device data manual section 4.3 "DPLL and DLL Specifications".
+  */
+ #define OMAP3PLUS_DPLL_FINT_JTYPE_MIN	500000
+ #define OMAP3PLUS_DPLL_FINT_JTYPE_MAX	2500000
+-#define OMAP3PLUS_DPLL_FINT_MIN		32000
+-#define OMAP3PLUS_DPLL_FINT_MAX		52000000
  
+ /* _dpll_test_fint() return codes */
+ #define DPLL_FINT_UNDERFLOW		-1
+@@ -87,33 +79,31 @@ static int _dpll_test_fint(struct clk_hw_omap *clk, int n)
+ 	/* DPLL divider must result in a valid jitter correction val */
+ 	fint = __clk_get_rate(__clk_get_parent(clk->hw.clk)) / n;
+ 
+-	if (cpu_is_omap24xx()) {
+-		/* Should not be called for OMAP2, so warn if it is called */
+-		WARN(1, "No fint limits available for OMAP2!\n");
+-		return DPLL_FINT_INVALID;
+-	} else if (cpu_is_omap3430()) {
+-		fint_min = OMAP3430_DPLL_FINT_BAND1_MIN;
+-		fint_max = OMAP3430_DPLL_FINT_BAND2_MAX;
+-	} else if (dd->flags & DPLL_J_TYPE) {
++	if (dd->flags & DPLL_J_TYPE) {
+ 		fint_min = OMAP3PLUS_DPLL_FINT_JTYPE_MIN;
+ 		fint_max = OMAP3PLUS_DPLL_FINT_JTYPE_MAX;
+ 	} else {
+-		fint_min = OMAP3PLUS_DPLL_FINT_MIN;
+-		fint_max = OMAP3PLUS_DPLL_FINT_MAX;
++		fint_min = ti_clk_features.fint_min;
++		fint_max = ti_clk_features.fint_max;
++	}
++
++	if (!fint_min || !fint_max) {
++		WARN(1, "No fint limits available!\n");
++		return DPLL_FINT_INVALID;
+ 	}
+ 
+-	if (fint < fint_min) {
++	if (fint < ti_clk_features.fint_min) {
+ 		pr_debug("rejecting n=%d due to Fint failure, lowering max_divider\n",
+ 			 n);
+ 		dd->max_divider = n;
+ 		ret = DPLL_FINT_UNDERFLOW;
+-	} else if (fint > fint_max) {
++	} else if (fint > ti_clk_features.fint_max) {
+ 		pr_debug("rejecting n=%d due to Fint failure, boosting min_divider\n",
+ 			 n);
+ 		dd->min_divider = n;
+ 		ret = DPLL_FINT_INVALID;
+-	} else if (cpu_is_omap3430() && fint > OMAP3430_DPLL_FINT_BAND1_MAX &&
+-		   fint < OMAP3430_DPLL_FINT_BAND2_MIN) {
++	} else if (fint > ti_clk_features.fint_band1_max &&
++		   fint < ti_clk_features.fint_band2_min) {
+ 		pr_debug("rejecting n=%d due to Fint failure\n", n);
+ 		ret = DPLL_FINT_INVALID;
+ 	}
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 7897053..7efe66e 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -51,6 +51,19 @@ u16 cpu_mask;
+  */
+ struct ti_clk_features ti_clk_features;
+ 
++/* DPLL valid Fint frequency band limits - from 34xx TRM Section 4.7.6.2 */
++#define OMAP3430_DPLL_FINT_BAND1_MIN	750000
++#define OMAP3430_DPLL_FINT_BAND1_MAX	2100000
++#define OMAP3430_DPLL_FINT_BAND2_MIN	7500000
++#define OMAP3430_DPLL_FINT_BAND2_MAX	21000000
++
 +/*
-+ * Bitfield declarations
++ * DPLL valid Fint frequency range for OMAP36xx and OMAP4xxx.
++ * From device data manual section 4.3 "DPLL and DLL Specifications".
 + */
-+#define OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK		(1 << 8)
-+#define OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK		(1 << 10)
-+#define OMAP4430_DPLL_REGM4XEN_MASK			(1 << 11)
++#define OMAP3PLUS_DPLL_FINT_MIN		32000
++#define OMAP3PLUS_DPLL_FINT_MAX		52000000
 +
-+/* Static rate multiplier for OMAP4 REGM4XEN clocks */
-+#define OMAP4430_REGM4XEN_MULT				4
-+
- /* Supported only on OMAP4 */
- int omap4_dpllmx_gatectrl_read(struct clk_hw_omap *clk)
+ /*
+  * clkdm_control: if true, then when a clock is enabled in the
+  * hardware, its clockdomain will first be enabled; and when a clock
+@@ -744,4 +757,14 @@ void __init omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+  */
+ void __init ti_clk_init_features(void)
  {
++	/* Fint setup for DPLLs */
++	if (cpu_is_omap3430()) {
++		ti_clk_features.fint_min = OMAP3430_DPLL_FINT_BAND1_MIN;
++		ti_clk_features.fint_max = OMAP3430_DPLL_FINT_BAND2_MAX;
++		ti_clk_features.fint_band1_max = OMAP3430_DPLL_FINT_BAND1_MAX;
++		ti_clk_features.fint_band2_min = OMAP3430_DPLL_FINT_BAND2_MIN;
++	} else {
++		ti_clk_features.fint_min = OMAP3PLUS_DPLL_FINT_MIN;
++		ti_clk_features.fint_max = OMAP3PLUS_DPLL_FINT_MAX;
++	}
+ }
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 9b89cc0..02aa2e3 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -228,6 +228,10 @@ extern u16 cpu_mask;
+  */
+ struct ti_clk_features {
+ 	u32 flags;
++	long fint_min;
++	long fint_max;
++	long fint_band1_max;
++	long fint_band2_min;
+ };
+ extern struct ti_clk_features ti_clk_features;
+ 
 -- 
 1.7.9.5
