@@ -1,92 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 Jul 2014 06:28:39 +0200
-Subject: [PATCH/RFC 3/6] ARM: shmobile: bockw: Initialise SCIF device using DT
+Date: Wed,  2 Jul 2014 06:28:38 +0200
+Subject: [PATCH/RFC 2/6] ARM: shmobile: r8a7778: Add SCIF nodes
 In-Reply-To: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404275322-26514-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404275322-26514-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise SCIF device using DT when booting bockw
-using DT reference.
-
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
 ---
-N.B: This only enables the production serial port (scif0) and not the
-debug serial port. It is unclear to me if the debug port is scif1 or scif5.
-And if the required PFC support is in place. At the very least the
-latter appears to be missing from r8a7778-bockw-reference.dts.
----
- arch/arm/boot/dts/r8a7778-bockw-reference.dts | 14 +++++++++++---
- arch/arm/mach-shmobile/setup-r8a7778.c        | 12 ++++++------
- 2 files changed, 17 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/r8a7778.dtsi | 48 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-index f76f6ec..5d14688 100644
---- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -23,6 +23,10 @@
- 	model = "bockw";
- 	compatible = "renesas,bockw-reference", "renesas,r8a7778";
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 3af0a21..55357dc 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -156,6 +156,54 @@
+ 		status = "disabled";
+ 	};
  
-+	aliases {
-+		serial0 = &scif0;
++	scif0: serial at ffe40000 {
++		compatible = "renesas,scif-r8a7778", "renesas,scif";
++		reg = <0xffe40000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
 +	};
 +
- 	chosen {
- 		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
- 	};
-@@ -70,9 +74,6 @@
- };
- 
- &pfc {
--	pinctrl-0 = <&scif0_pins>;
--	pinctrl-names = "default";
--
- 	scif0_pins: serial0 {
- 		renesas,groups = "scif0_data_a", "scif0_ctrl";
- 		renesas,function = "scif0";
-@@ -124,3 +125,10 @@
- 		};
- 	};
- };
++	scif1: serial at ffe41000 {
++		compatible = "renesas,scif-r8a7778", "renesas,scif";
++		reg = <0xffe41000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
 +
-+&scif0 {
-+       pinctrl-0 = <&scif0_pins>;
-+       pinctrl-names = "default";
++	scif2: serial at ffe42000 {
++		compatible = "renesas,scif-r8a7778", "renesas,scif";
++		reg = <0xffe42000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
 +
-+       status = "okay";
-+};
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 2ccc012..e218c46 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -294,12 +294,6 @@ void __init r8a7778_add_dt_devices(void)
- 	}
- #endif
- 
--	r8a7778_register_scif(0);
--	r8a7778_register_scif(1);
--	r8a7778_register_scif(2);
--	r8a7778_register_scif(3);
--	r8a7778_register_scif(4);
--	r8a7778_register_scif(5);
- 	r8a7778_register_tmu(0);
- }
- 
-@@ -508,6 +502,12 @@ static void __init r8a7778_register_hpb_dmae(void)
- void __init r8a7778_add_standard_devices(void)
- {
- 	r8a7778_add_dt_devices();
-+	r8a7778_register_scif(0);
-+	r8a7778_register_scif(1);
-+	r8a7778_register_scif(2);
-+	r8a7778_register_scif(3);
-+	r8a7778_register_scif(4);
-+	r8a7778_register_scif(5);
- 	r8a7778_register_i2c(0);
- 	r8a7778_register_i2c(1);
- 	r8a7778_register_i2c(2);
++	scif3: serial at ffe43000 {
++		compatible = "renesas,scif-r8a7778", "renesas,scif";
++		reg = <0xffe43000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
++	scif4: serial at ffe44000 {
++		compatible = "renesas,scif-r8a7778", "renesas,scif";
++		reg = <0xffe44000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
++	scif5: serial at ffe45000 {
++		compatible = "renesas,scif-r8a7778", "renesas,scif";
++		reg = <0xffe45000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
+ 	mmcif: mmc at ffe4e000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0xffe4e000 0x100>;
 -- 
 2.0.0.rc2
