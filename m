@@ -1,73 +1,37 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Wed, 02 Jul 2014 11:30:33 +0530
-Subject: [PATCHv2 1/3] of: Split early_init_dt_scan into two parts
-In-Reply-To: <1404266608-3274-1-git-send-email-lauraa@codeaurora.org>
-References: <1404266608-3274-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <53B3A001.1090909@gmail.com>
+From: fredrik.noring@autoliv.com (Fredrik Noring)
+Date: Wed, 2 Jul 2014 06:02:40 +0000
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+Message-ID: <3FFB61A7A8473C49831AF20FA193534A43CB8B5F@ALVA-EXMB01.alv.autoliv.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2014 07:33 AM, Laura Abbott wrote:
-> Currently, early_init_dt_scan validates the header, sets the
-> boot params, and scans for chosen/memory all in one function.
-> Split this up into two separate functions (validation/setting
-> boot params in one, scanning in another) to allow for
-> additional setup between boot params and scanning the memory.
+Hi Russell,
+
+> -----Original Message-----
+> > The initial version (marked RFC) attracted very little interest from
+> > testers, or acks.  I'd very much like to have some testing of it, so
+> > if you want to try it out, I can provide you with a git URL, patches
+> > or a combined patch.
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
+> Sure! A combined gzip patch attachment is fine. Git over HTTP probably
+> works too.
 
-Tested the patchset on top of Linus' tree.
+We are still interested in trying out your patches to improve network
+performance. We can do some testing this week and in August.
 
-Verified after enabling following debug message.
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -865,7 +865,7 @@ int __init early_init_dt_scan_memory(unsigned long
-node, const char *uname,
+Best regards,
+Fredrik
 
-        endp = reg + (l / sizeof(__be32));
+***************************************************************
+Consider the environment before printing this message.
 
--       pr_debug("memory scan node %s, reg size %d, data: %x %x %x %x,\n",
-+       pr_err("memory scan node %s, reg size %d, data: %x %x %x %x,\n",
-
-
-Output before:
-memory scan node memory, reg size 96, data: 20 10 30 10,
-
-Output after:
-memory scan node memory, reg size 64, data: 20 10 30 10,
-
-Tested-by: Tushar Behera <trblinux@gmail.com>
-
-One minor nit below ...
-
->  drivers/of/fdt.c       | 18 +++++++++++++++++-
->  include/linux/of_fdt.h |  2 ++
->  2 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index c4cddf0..55bfca9 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -922,7 +922,7 @@ int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
->  }
->  #endif
->  
-> -bool __init early_init_dt_scan(void *params)
-> +bool __init early_init_dt_verify(void *params)
->  {
->  	if (!params)
->  		return false;
-> @@ -936,6 +936,12 @@ bool __init early_init_dt_scan(void *params)
->  		return false;
->  	}
->  
-> +	return true;
-> +}
-> +
-> +
-
-Extra blank line here. Can be removed.
-
--- 
-Tushar Behera
+To read Autoliv's Information and Confidentiality Notice, follow this link:
+http://www.autoliv.com/disclaimer.html
+***************************************************************
