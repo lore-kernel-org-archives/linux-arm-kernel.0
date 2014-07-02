@@ -1,49 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 2 Jul 2014 16:40:59 +0100
-Subject: [PATCH v2 1/4] reset: stih407: Add softreset, powerdown and
- picophy controllers
-In-Reply-To: <1404310129-14667-2-git-send-email-peter.griffin@linaro.org>
-References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
- <1404310129-14667-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140702154059.GA17665@lee--X1>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 02 Jul 2014 17:40:58 +0200
+Subject: [PATCH 0/6] Various improvements for samsung-pinctrl driver
+Message-ID: <1404315664-3174-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Jul 2014, Peter Griffin wrote:
+This series fixes various shortcommings of the Samsung pin control driver
+that have been spotted while using it on various platforms with multiple
+use cases and requirements.
 
-> This patch adds softreset, powerdown and picophy reset controllers for
-> the STiH407 SoC.
-> 
-> With this patch three new devices are registered: -
-> 1. st,stih407-powerdown
-> 2. st,stih407-softreset
-> 3. st,stih407-picophyreset
-> 
-> All three devices use system configuration registers mapped via regmap to
-> perform the reset or powerdown. The powerdown controller also has
-> an acknowledgement.
-> 
-> A separate picophy reset controller manages the different reset channels within
-> the picophy, which have a different polarity to the other system softresets.
-> Managing these different picophy softreset channels is necessary to correctly
-> handle resuming from suspend when USB2 devices are plugged into the USB3 port.
-> 
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  drivers/reset/sti/Kconfig                          |   4 +
->  drivers/reset/sti/Makefile                         |   1 +
->  drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
->  .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
->  4 files changed, 224 insertions(+)
->  create mode 100644 drivers/reset/sti/reset-stih407.c
->  create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
+Most of the patches are independent of each other, with the exception of
+patch 4/6 which depends on patch 3/6, due to consolidation of IRQ chips.
 
-Looks good to me now:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Please see individual patches for more details.
+
+Tested on Exynos4412-based Trats2 board with display, camera and GPIO keys
+enabled.
+
+Tomasz Figa (6):
+  pinctrl: samsung: Decouple direction setting from pinctrl
+  pinctrl: samsung: Handle GPIO request and free using pinctrl helpers
+  pinctrl: exynos: Consolidate irq_chips of GPIO and WKUP EINTs
+  pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs
+  pinctrl: samsung: Allow grouping multiple pinmux/pinconf nodes
+  pinctrl: samsung: Allow pin value to be initialized using pinfunc
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  24 +-
+ drivers/pinctrl/pinctrl-exynos.c                   | 376 ++++-------
+ drivers/pinctrl/pinctrl-samsung.c                  | 728 ++++++++++++---------
+ drivers/pinctrl/pinctrl-samsung.h                  |  19 +-
+ 4 files changed, 568 insertions(+), 579 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.3
