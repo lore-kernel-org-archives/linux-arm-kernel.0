@@ -1,33 +1,63 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed,  2 Jul 2014 16:47:26 +0800
-Subject: [PATCH 4/4] ACPI: Make EC debugfs depend on X86 || IA64 in Kconfig
-In-Reply-To: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
-References: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1404290847-7671-5-git-send-email-hanjun.guo@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 2 Jul 2014 09:51:02 +0100
+Subject: [PATCH 3/3] ARM: STi: STiH407: Add reset controller support.
+In-Reply-To: <1404225047-9495-4-git-send-email-peter.griffin@linaro.org>
+References: <1404225047-9495-1-git-send-email-peter.griffin@linaro.org>
+ <1404225047-9495-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140702085102.GF10311@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since EC (Embedded controller) needs SCI for the interupt which
-is not available on ARM64, make the EC debugfs depend on X86 || IA64
-only in the Kconfig file.
+On Tue, 01 Jul 2014, Peter Griffin wrote:
 
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+> This patch adds the reset controller DT nodes for the powerdown,
+>  softreset and picophy controllers.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+> index 4f9024f..e8fbb88 100644
+> --- a/arch/arm/boot/dts/stih407.dtsi
+> +++ b/arch/arm/boot/dts/stih407.dtsi
+> @@ -8,6 +8,7 @@
+>   */
+>  #include "stih407-clock.dtsi"
+>  #include "stih407-pinctrl.dtsi"
+> +#include <dt-bindings/reset-controller/stih407-resets.h>
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> @@ -63,6 +64,21 @@
+>  		ranges;
+>  		compatible = "simple-bus";
+>  
+> +		powerdown: powerdown-controller {
+> +			#reset-cells = <1>;
+> +			compatible = "st,stih407-powerdown";
+> +		};
+> +
+> +		softreset: softreset-controller {
+> +			#reset-cells = <1>;
+> +			compatible = "st,stih407-softreset";
+> +		};
+> +
+> +		picophyreset: picophyreset-controller {
+> +			#reset-cells = <1>;
+> +			compatible = "st,stih407-picophyreset";
+> +		};
+> +
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 0e6f72d..7de5e3f 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -69,6 +69,7 @@ config ACPI_PROCFS_POWER
- 
- config ACPI_EC_DEBUGFS
- 	tristate "EC read/write access through /sys/kernel/debug/ec"
-+	depends on X86 || IA64
- 	default n
- 	help
- 	  Say N to disable Embedded Controller /sys/kernel/debug interface
+I'd always put the compatible string at the very top of the node.
+
+>  		syscfg_sbc: sbc-syscfg at 9620000 {
+>  			compatible = "st,stih407-sbc-syscfg", "syscon";
+>  			reg = <0x9620000 0x1000>;
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
