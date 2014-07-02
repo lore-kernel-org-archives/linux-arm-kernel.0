@@ -1,74 +1,85 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Jul 2014 11:14:43 +0200
-Subject: [PATCH] ARM: cpu_pj4b_suspend_size should base on
- cpu_v7_suspend_size
-In-Reply-To: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
-References: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <53B3CD83.5010301@free-electrons.com>
+From: Wei.Yang@windriver.com (Yang,Wei)
+Date: Wed, 2 Jul 2014 17:19:40 +0800
+Subject: [PATCH v1] ARM:sa1100: Remove a redundant spin lock
+In-Reply-To: <1404200488-7809-1-git-send-email-Wei.Yang@windriver.com>
+References: <1404200488-7809-1-git-send-email-Wei.Yang@windriver.com>
+Message-ID: <53B3CEAC.9080609@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Guys,
 
-On 02/07/2014 08:48, Shawn Guo wrote:
-> Since pj4b suspend/resume routines are implemented based on generic
-> ARMv7 ones, instead of hard-coding cpu_pj4b_suspend_size, we should have
-> it be cpu_v7_suspend_size plus pj4b specific bytes.  Otherwise, if
-> cpu_v7_suspend_size gets updated alone, the pj4b suspend/resume will
-> likely be broken.
-> 
-> While at it, fix the comments in cpu_pj4b_do_resume, as we're restoring
-> CP15 registers rather than saving in there.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+What about this patch?
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-and
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-
+Thanks
+Wei
+On 07/01/2014 03:41 PM, Wei.Yang at windriver.com wrote:
+> From: Yang Wei <Wei.Yang@windriver.com>
+>
+> The pair read/write of accessing pci confiuration space function
+> has already protected by pci_lock. so remove nano_lock.
+>
+> Signed-off-by: Yang Wei <Wei.Yang@windriver.com>
 > ---
-> Completely untested.
-> 
->  arch/arm/mm/proc-v7.S | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3db2c2f04a30..604dda5f65cc 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -184,16 +184,16 @@ ENDPROC(cpu_pj4b_do_suspend)
->  
->  ENTRY(cpu_pj4b_do_resume)
->  	ldmia	r0!, {r6 - r10}
-> -	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
-> -	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
-> -	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
-> -	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
-> -	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
-> +	mcr	p15, 1, r6, c15, c1, 0  @ retore CP15 - extra features
-> +	mcr	p15, 1, r7, c15, c2, 0	@ retore CP15 - Aux Func Modes Ctrl 0
-> +	mcr	p15, 1, r8, c15, c1, 2	@ retore CP15 - Aux Debug Modes Ctrl 2
-> +	mcr	p15, 1, r9, c15, c1, 1  @ retore CP15 - Aux Debug Modes Ctrl 1
-> +	mcr	p15, 0, r10, c9, c14, 0  @ retore CP15 - PMC
->  	b cpu_v7_do_resume
->  ENDPROC(cpu_pj4b_do_resume)
->  #endif
->  .globl	cpu_pj4b_suspend_size
-> -.equ	cpu_pj4b_suspend_size, 4 * 14
-> +.equ	cpu_pj4b_suspend_size, cpu_v7_suspend_size + 4 * 5
->  
->  #endif
->  
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>   arch/arm/mach-sa1100/pci-nanoengine.c |    9 ---------
+>   1 file changed, 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-sa1100/pci-nanoengine.c b/arch/arm/mach-sa1100/pci-nanoengine.c
+> index ff02e2d..b944c99 100644
+> --- a/arch/arm/mach-sa1100/pci-nanoengine.c
+> +++ b/arch/arm/mach-sa1100/pci-nanoengine.c
+> @@ -30,7 +30,6 @@
+>   #include <mach/nanoengine.h>
+>   #include <mach/hardware.h>
+>   
+> -static DEFINE_SPINLOCK(nano_lock);
+>   
+>   static int nanoengine_get_pci_address(struct pci_bus *bus,
+>   	unsigned int devfn, int where, unsigned long *address)
+> @@ -52,7 +51,6 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
+>   {
+>   	int ret;
+>   	unsigned long address;
+> -	unsigned long flags;
+>   	u32 v;
+>   
+>   	/* nanoEngine PCI bridge does not return -1 for a non-existing
+> @@ -64,15 +62,12 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
+>   		goto exit_function;
+>   	}
+>   
+> -	spin_lock_irqsave(&nano_lock, flags);
+>   
+>   	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
+>   	if (ret != PCIBIOS_SUCCESSFUL)
+>   		return ret;
+>   	v = __raw_readl(address);
+>   
+> -	spin_unlock_irqrestore(&nano_lock, flags);
+> -
+>   	v >>= ((where & 3) * 8);
+>   	v &= (unsigned long)(-1) >> ((4 - size) * 8);
+>   
+> @@ -86,13 +81,11 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
+>   {
+>   	int ret;
+>   	unsigned long address;
+> -	unsigned long flags;
+>   	unsigned shift;
+>   	u32 v;
+>   
+>   	shift = (where & 3) * 8;
+>   
+> -	spin_lock_irqsave(&nano_lock, flags);
+>   
+>   	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
+>   	if (ret != PCIBIOS_SUCCESSFUL)
+> @@ -113,8 +106,6 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
+>   	}
+>   	__raw_writel(v, address);
+>   
+> -	spin_unlock_irqrestore(&nano_lock, flags);
+> -
+>   	return PCIBIOS_SUCCESSFUL;
+>   }
+>   
