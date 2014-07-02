@@ -1,63 +1,33 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 2 Jul 2014 11:47:41 +0300
-Subject: [PATCH 07/13] ARM: OMAP2+: clock/dpll: add private API for checking
- if DPLL is in bypass
+Date: Wed, 2 Jul 2014 11:47:42 +0300
+Subject: [PATCH 08/13] ARM: OMAP2+: clock/dpll: convert bypass check to use
+ clk_features
 In-Reply-To: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
 References: <1404290867-6768-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404290867-6768-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1404290867-6768-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, same functionality is copy pasted in two locations. Instead,
-add a private API for this and get rid of some duplicated code.
+OMAP2 DPLL code for checking whether DPLL is in bypass mode now uses
+clk_features data provided during boot. This avoids the need to use
+cpu_is_X type checks runtime, and allows us to eventually move the
+clock code under the clock driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clkt_dpll.c |   60 +++++++++++++++++++++------------------
- 1 file changed, 32 insertions(+), 28 deletions(-)
+ arch/arm/mach-omap2/clkt_dpll.c |   25 +++++++++++++------------
+ arch/arm/mach-omap2/clock.c     |   17 +++++++++++++++++
+ arch/arm/mach-omap2/clock.h     |    1 +
+ 3 files changed, 31 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
-index 5207e84..f1b052a 100644
+index f1b052a..51f995a 100644
 --- a/arch/arm/mach-omap2/clkt_dpll.c
 +++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -175,6 +175,33 @@ static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
- 	return r;
- }
- 
-+/**
-+ * _omap2_dpll_is_in_bypass - check if DPLL is in bypass mode or not
-+ * @v: bitfield value of the DPLL enable
-+ *
-+ * Checks given DPLL enable bitfield to see whether the DPLL is in bypass
-+ * mode or not. Returns 1 if the DPLL is in bypass, 0 otherwise.
-+ */
-+static int _omap2_dpll_is_in_bypass(u32 v)
-+{
-+	if (cpu_is_omap24xx()) {
-+		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
-+			return 1;
-+	} else if (cpu_is_omap34xx()) {
-+		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
-+			return 1;
-+	} else if (soc_is_am33xx() || cpu_is_omap44xx() || soc_is_am43xx()) {
-+		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
-+		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
-+		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
- /* Public functions */
- u8 omap2_init_dpll_parent(struct clk_hw *hw)
+@@ -184,18 +184,19 @@ static int _dpll_test_mult(int *m, int n, unsigned long *new_rate,
+  */
+ static int _omap2_dpll_is_in_bypass(u32 v)
  {
-@@ -191,20 +218,9 @@ u8 omap2_init_dpll_parent(struct clk_hw *hw)
- 	v >>= __ffs(dd->enable_mask);
- 
- 	/* Reparent the struct clk in case the dpll is in bypass */
 -	if (cpu_is_omap24xx()) {
 -		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
 -		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
@@ -70,36 +40,59 @@ index 5207e84..f1b052a 100644
 -		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
 -		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
 -		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
--			return 1;
--	}
-+	if (_omap2_dpll_is_in_bypass(v))
-+		return 1;
++	u8 mask, val;
 +
- 	return 0;
++	mask = ti_clk_features.dpll_bypass_vals;
++
++	/*
++	 * Each set bit in the mask corresponds to a bypass value equal
++	 * to the bitshift. Go through each set-bit in the mask and
++	 * compare against the given register value.
++	 */
++	while (mask) {
++		val = __ffs(mask);
++		mask ^= (1 << val);
++		if (v == val)
+ 			return 1;
+ 	}
+ 
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 7efe66e..e438437 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -767,4 +767,21 @@ void __init ti_clk_init_features(void)
+ 		ti_clk_features.fint_min = OMAP3PLUS_DPLL_FINT_MIN;
+ 		ti_clk_features.fint_max = OMAP3PLUS_DPLL_FINT_MAX;
+ 	}
++
++	/* Bypass value setup for DPLLs */
++	if (cpu_is_omap24xx()) {
++		ti_clk_features.dpll_bypass_vals |=
++			(1 << OMAP2XXX_EN_DPLL_LPBYPASS) |
++			(1 << OMAP2XXX_EN_DPLL_FRBYPASS);
++	} else if (cpu_is_omap34xx()) {
++		ti_clk_features.dpll_bypass_vals |=
++			(1 << OMAP3XXX_EN_DPLL_LPBYPASS) |
++			(1 << OMAP3XXX_EN_DPLL_FRBYPASS);
++	} else if (soc_is_am33xx() || cpu_is_omap44xx() || soc_is_am43xx() ||
++		   soc_is_omap54xx() || soc_is_dra7xx()) {
++		ti_clk_features.dpll_bypass_vals |=
++			(1 << OMAP4XXX_EN_DPLL_LPBYPASS) |
++			(1 << OMAP4XXX_EN_DPLL_FRBYPASS) |
++			(1 << OMAP4XXX_EN_DPLL_MNBYPASS);
++	}
  }
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 02aa2e3..7b2b099 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -232,6 +232,7 @@ struct ti_clk_features {
+ 	long fint_max;
+ 	long fint_band1_max;
+ 	long fint_band2_min;
++	u8 dpll_bypass_vals;
+ };
+ extern struct ti_clk_features ti_clk_features;
  
-@@ -237,20 +253,8 @@ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
- 	v &= dd->enable_mask;
- 	v >>= __ffs(dd->enable_mask);
- 
--	if (cpu_is_omap24xx()) {
--		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
--			return __clk_get_rate(dd->clk_bypass);
--	} else if (cpu_is_omap34xx()) {
--		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
--			return __clk_get_rate(dd->clk_bypass);
--	} else if (soc_is_am33xx() || cpu_is_omap44xx() || soc_is_am43xx()) {
--		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
--		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
--			return __clk_get_rate(dd->clk_bypass);
--	}
-+	if (_omap2_dpll_is_in_bypass(v))
-+		return __clk_get_rate(dd->clk_bypass);
- 
- 	v = omap2_clk_readl(clk, dd->mult_div1_reg);
- 	dpll_mult = v & dd->mult_mask;
 -- 
 1.7.9.5
