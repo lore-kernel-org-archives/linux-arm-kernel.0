@@ -1,44 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Jul 2014 12:17:48 +0100
-Subject: [PATCH v8 7/9] pci: of: Parse and map the IRQ when adding the
- PCI device.
-In-Reply-To: <1404240214-9804-8-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-8-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140702111748.GJ18731@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 2 Jul 2014 16:50:02 +0530
+Subject: [PATCH v2 1/2] Documentation: Document Hisilicon hix5hd2 sata PHY
+In-Reply-To: <1403687648-29082-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1403687648-29082-1-git-send-email-zhangfei.gao@linaro.org>
+ <1403687648-29082-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <53B3EAE2.4040101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 07:43:32PM +0100, Liviu Dudau wrote:
-> Enhance the default implementation of pcibios_add_device() to
-> parse and map the IRQ of the device if a DT binding is available.
+Hi,
+
+On Wednesday 25 June 2014 02:44 PM, Zhangfei Gao wrote:
+> From: Jiancheng Xue <xuejiancheng@huawei.com>
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Add necessary binding documentation SATA PHY on Hisilicon hix5hd2 soc.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 > ---
->  drivers/pci/pci.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  .../devicetree/bindings/phy/hix5hd2-sata-phy.txt   |   22 ++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/hix5hd2-sata-phy.txt
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 63a54a3..8e65dc3 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -17,6 +17,7 @@
->  #include <linux/spinlock.h>
->  #include <linux/string.h>
->  #include <linux/log2.h>
-> +#include <linux/of_pci.h>
->  #include <linux/pci-aspm.h>
->  #include <linux/pm_wakeup.h>
->  #include <linux/interrupt.h>
-> @@ -1453,6 +1454,9 @@ EXPORT_SYMBOL(pcim_pin_device);
->   */
->  int __weak pcibios_add_device(struct pci_dev *dev)
->  {
-> +#ifdef CONFIG_OF
-> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +#endif
+> diff --git a/Documentation/devicetree/bindings/phy/hix5hd2-sata-phy.txt b/Documentation/devicetree/bindings/phy/hix5hd2-sata-phy.txt
+> new file mode 100644
+> index 0000000..296168b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/hix5hd2-sata-phy.txt
 
-You could avoid the #ifdef by only assigning dev->irq if
-of_irq_parse_and_map_pci returned something > 0.
+Generally we have a single file for a SoC while adding phy binding
+documentation. So just make it hix5hd2-phy.txt.
 
-Will
+Thanks
+Kishon
