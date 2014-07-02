@@ -1,56 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Jul 2014 14:48:17 +0200
-Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
-In-Reply-To: <1404290605.3622.6.camel@iivanov-dev>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
- <1404290605.3622.6.camel@iivanov-dev>
-Message-ID: <4545008.qD8N1qWmNz@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  2 Jul 2014 14:54:39 +0200
+Subject: [PATCH v3 1/5] efi/arm64: Avoid EFI_ERROR as a generic return code
+In-Reply-To: <1404305683-26501-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1404305683-26501-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1404305683-26501-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 July 2014 11:43:25 Ivan T. Ivanov wrote:
-> > > <snip>
-> > >
-> > >> > +
-> > >> > +                       ranges;
-> > >> > +
-> > >> > +                       status = "disabled";
-> > >> > +
-> > >> > +                       dwc3 at 11000000 {
-> > >> > +                               compatible = "snps,dwc3";
-> > >>
-> > >> This sub-node is just wrong. Why can't you have a single node with '
-> > >> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
-> > >> adding here is clocks. Does the Synopsys block have no clocks?
-> > >>
-> > >> I guess this is copied from other broken dwc3 bindings... That doesn't
-> > >> mean you have to copy it.
-> > >
-> > > The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
-> > > That, in addition to pm, has to be handled from the wrapper.  That's my take
-> > > anyway.  I am sure Felipe can speak more to this.
-> > 
-> > That is a Linux driver issue which is irrelevant to the binding.
-> 
-> DWC3 IP core from Synopsys is the same across SoC's (OMAP, Exynos..),
-> vendors are adding glue IP to provide necessary clocks and voltages. 
-> I think that the DT bindings properly reflect this fact.
+As EFI_ERROR is not a UEFI result code but a local invention only
+intended to allow get_dram_base() to signal failure, we should not use
+it elsewhere.
 
-Not really. The proper way to do this is to have a single node that
-lists multiple compatible strings from the most specific (per SoC variant)
-to most generic (the underlying IP core) and have all properties in it.
+Replace with EFI_LOAD_ERROR.
 
-We have seen many cases before where it later turned out that whatever
-feature people thought was SoC specific actually was common to all
-of them and that we later want to change the code to handle it in a
-common way, and to reflect it in the common binding. The clocks that
-Rob mentioned are one example of that.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Matt Fleming <matt.fleming@intel.com>
+---
+ arch/arm64/kernel/efi-stub.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-If you have a binding that separates one IP block into two device nodes,
-you cannot later adapt the common driver to be more generic and handle
-all sorts of SoCs. See the usb-ehci.txt for an example: it started out
-really simple but the generic driver has been extended multiple times
-to the point where it handles a lot of SoCs by default.
-
-	Arnd
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index e786e6cdc400..7aa7155a9740 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -69,7 +69,7 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 		if (*image_addr != (dram_base + TEXT_OFFSET)) {
+ 			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+ 			efi_free(sys_table, kernel_memsize, *image_addr);
+-			return EFI_ERROR;
++			return EFI_LOAD_ERROR;
+ 		}
+ 		*image_size = kernel_memsize;
+ 	}
+-- 
+1.8.3.2
