@@ -1,64 +1,77 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 2 Jul 2014 09:47:08 -0700
-Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping,
- and synchronization
-In-Reply-To: <20140702162726.GG24879@arm.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-9-git-send-email-nathan_lynch@mentor.com>
- <53B1D8AC.7060104@mit.edu> <20140701090309.GC28164@arm.com>
- <53B2C178.30607@mentor.com> <20140701141541.GP28164@arm.com>
- <CALCETrWeTeeuz4vW6wrhtDrdg54O-hhFbspfKEEunRZ0zf7ZBg@mail.gmail.com>
- <20140702144050.GD24879@arm.com>
- <CALCETrUVa-Yt7qZpzkpiAGVf+sYeasNq_YS1MuH6CFfWCcW6BA@mail.gmail.com>
- <53B430F3.9070804@mentor.com> <20140702162726.GG24879@arm.com>
-Message-ID: <CALCETrVSqH66jqG2_O2dir-3md4SHH800qs++4KhWYsGm9T-BQ@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 02 Jul 2014 12:49:51 -0400
+Subject: [patch 3/4] timerfd: Implement timerfd_ioctl method to restore
+ timerfd_ctx::ticks
+In-Reply-To: <20140624220351.GZ2095@moon>
+References: <20140623185431.396309193@openvz.org>
+ <20140623190345.499956567@openvz.org> <20140624220351.GZ2095@moon>
+Message-ID: <53B4382F.9030908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 9:27 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jul 02, 2014 at 05:18:59PM +0100, Nathan Lynch wrote:
->> On 07/02/2014 10:54 AM, Andy Lutomirski wrote:
->> > Caveat 2: (major) I'm kind of surprised that this, or the current
->> > code, works reliably.  You're doing something that I tried briefly for
->> > x86_64:
->> >
->> >         _end = .;
->> >         PROVIDE(end = .);
->> >
->> >         . = ALIGN(PAGE_SIZE);
->> >         PROVIDE(_vdso_data = .);
->> >
->> > This sounds great, except that you're assuming that vdso_end -
->> > vdso_start == ALIGN(_end, PAGE_SIZE) - (vdso base address).
->> >
->> > If you *fully* strip the vdso (eu-strip --strip-sections), then this
->> > is true: eu-strip --strip-sections outputs just the PT_LOAD piece of
->> > the vdso.  But any binutils-generated incompletely stripped ELF image
->> > contains a section table and possible non-allocatable sections at the
->> > end.  If these exceed the amount of unused space in the last PT_LOAD
->> > page, then they'll spill into the next page, and _vdso_data in the
->> > vdso will no longer match the address at which vdso.c loads it.  Boom!
->> >
->> > I bet you're getting away with this because the whole arm64 vdso seems
->> > to be written in assembly, so it seems extremely unlikely to exceed
->> > one page minus a few hundred bytes.  But if you start adding
->> > complexity, you might get unlucky.
->>
->> This is why I switched (in v5) the proposed 32-bit ARM VDSO to place the
->> data page before the code -- adding -frecord-gcc-switches to the
->> compiler flags was enough to break it.
->>
->> I meant to call Will's attention to it at the time for arm64's sake, but
->> I guess it slipped my mind... sorry.
->
-> Hmm, so I could definitely look at doing the same thing, but I don't know if
-> we actually need to for arm64. As Andy points out, we're written entirely in
-> assembly and we objcopy -S to create the vdso.so. I've dumped the headers
-> below and everything appears to be PT_LOAD.
+Hi Cyrill,
 
-Your dump doesn't show the location of the section and section string
-tables themselves.  Try:
+On 06/24/2014 06:03 PM, Cyrill Gorcunov wrote:
+> The read() of timerfd files allows to fetch the number of timer ticks
+> while there is no way to set it back from userspace.
+> 
+> To restore the timer's state as it was at checkpoint moment we need
+> a path to bring @ticks back. Initially I thought about writing ticks
+> back via write() interface but it seems such API is somehow obscure.
+> 
+> Instead implement timerfd_ioctl() method with TFD_IOC_SET_TICKS
+> command which allows to adjust @ticks into non-zero value waking
+> up the waiters.
+> 
+> I wrapped code with CONFIG_CHECKPOINT_RESTORE which can be
+> dropped off if there users except c/r camp appear.
+> 
+> v2 (by akpm@):
+>  -Use define timerfd_ioctl NULL for non c/r config
+> 
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: Andrew Morton <akpm@linux-foundation.org>
+> CC: Andrey Vagin <avagin@openvz.org>
+> CC: Pavel Emelyanov <xemul@parallels.com>
+> CC: Vladimir Davydov <vdavydov@parallels.com>
+> Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
+> ---
+> 
+> A nit fixed for for non c/r config in timerfd_ioctl declaration
+> 
+>  fs/timerfd.c            |   37 +++++++++++++++++++++++++++++++++++++
+>  include/linux/timerfd.h |    5 +++++
+>  2 files changed, 42 insertions(+)
+> 
+> Index: linux-2.6.git/fs/timerfd.c
+> ===================================================================
+> --- linux-2.6.git.orig/fs/timerfd.c
+> +++ linux-2.6.git/fs/timerfd.c
+> @@ -315,12 +315,49 @@ static int timerfd_show(struct seq_file
+>  #define timerfd_show NULL
+>  #endif
+>  
+> +#ifdef CONFIG_CHECKPOINT_RESTORE
+> +static long timerfd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+> +{
+> +	struct timerfd_ctx *ctx = file->private_data;
+> +	int ret = 0;
+> +
+> +	switch (cmd) {
+> +	case TFD_IOC_SET_TICKS: {
+> +		u64 ticks;
+> +
+> +		if (get_user(ticks, (u64 __user *)arg))
 
-eu-readelf -l -h -S whatever.so
+64-bit get_user is currently unsupported on ARM, although it appears work is
+ongoing [1].
 
---Andy
+1. https://lkml.org/lkml/2014/6/17/260
+
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
