@@ -1,77 +1,75 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 02 Jul 2014 12:49:51 -0400
-Subject: [patch 3/4] timerfd: Implement timerfd_ioctl method to restore
- timerfd_ctx::ticks
-In-Reply-To: <20140624220351.GZ2095@moon>
-References: <20140623185431.396309193@openvz.org>
- <20140623190345.499956567@openvz.org> <20140624220351.GZ2095@moon>
-Message-ID: <53B4382F.9030908@codeaurora.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 02 Jul 2014 18:52:06 +0200
+Subject: [GIT PULL] Samsung clock fixes for v3.16
+Message-ID: <1404319926-6178-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrill,
+The following changes since commit b640a6037c9ecd1f0ad23a8e9b4ca5f5b4112508:
 
-On 06/24/2014 06:03 PM, Cyrill Gorcunov wrote:
-> The read() of timerfd files allows to fetch the number of timer ticks
-> while there is no way to set it back from userspace.
-> 
-> To restore the timer's state as it was at checkpoint moment we need
-> a path to bring @ticks back. Initially I thought about writing ticks
-> back via write() interface but it seems such API is somehow obscure.
-> 
-> Instead implement timerfd_ioctl() method with TFD_IOC_SET_TICKS
-> command which allows to adjust @ticks into non-zero value waking
-> up the waiters.
-> 
-> I wrapped code with CONFIG_CHECKPOINT_RESTORE which can be
-> dropped off if there users except c/r camp appear.
-> 
-> v2 (by akpm@):
->  -Use define timerfd_ioctl NULL for non c/r config
-> 
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> CC: Andrew Morton <akpm@linux-foundation.org>
-> CC: Andrey Vagin <avagin@openvz.org>
-> CC: Pavel Emelyanov <xemul@parallels.com>
-> CC: Vladimir Davydov <vdavydov@parallels.com>
-> Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
-> ---
-> 
-> A nit fixed for for non c/r config in timerfd_ioctl declaration
-> 
->  fs/timerfd.c            |   37 +++++++++++++++++++++++++++++++++++++
->  include/linux/timerfd.h |    5 +++++
->  2 files changed, 42 insertions(+)
-> 
-> Index: linux-2.6.git/fs/timerfd.c
-> ===================================================================
-> --- linux-2.6.git.orig/fs/timerfd.c
-> +++ linux-2.6.git/fs/timerfd.c
-> @@ -315,12 +315,49 @@ static int timerfd_show(struct seq_file
->  #define timerfd_show NULL
->  #endif
->  
-> +#ifdef CONFIG_CHECKPOINT_RESTORE
-> +static long timerfd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-> +{
-> +	struct timerfd_ctx *ctx = file->private_data;
-> +	int ret = 0;
-> +
-> +	switch (cmd) {
-> +	case TFD_IOC_SET_TICKS: {
-> +		u64 ticks;
-> +
-> +		if (get_user(ticks, (u64 __user *)arg))
+  Merge tag 'sunxi-clk-for-3.16-2' of https://github.com/mripard/linux into clk-next (2014-06-11 07:11:59 -0700)
 
-64-bit get_user is currently unsupported on ARM, although it appears work is
-ongoing [1].
+are available in the git repository at:
 
-1. https://lkml.org/lkml/2014/6/17/260
 
-Regards,
-Christopher
+  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.16/samsung-clk-fixes
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+for you to fetch changes up to 44ff0254b89079a8a95e652635e760d93196ac1f:
+
+  clk: exynos5420: Remove aclk66_peric from the clock tree description (2014-06-30 14:47:33 +0200)
+
+----------------------------------------------------------------
+Samsung clock fixes for v3.16.
+
+This pull request contains fixes for various issues found while testing
+-rc versions of Linux 3.16. Mostly two kinds of patches:
+
+* Fixes of incorrectly defined clocks
+
+1) a37c82a clk: samsung: exynos4: Remove SRC_MASK_ISP gates
+
+    Issue present since v3.10.
+
+2) 0b1643b clk/exynos5250: fix bit number for tv sysmmu clock
+
+    Issue present since v3.16.
+
+3) 44ff025 clk: exynos5420: Remove aclk66_peric from the clock tree description
+
+    Issue present since v3.11.
+
+* Adding things missed by original patches
+
+1) cec1cde clk: samsung: fix several typos to fix boot on s3c2410
+2) 34ece9e clk: samsung: add more aliases for s3c24xx
+
+    Both issues present since the driver was added in v3.16.
+
+3) a92dda4 clk: s3c64xx: Hookup SPI clocks correctly
+
+    Issue present since v3.12.
+
+----------------------------------------------------------------
+Charles Keepax (1):
+      clk: s3c64xx: Hookup SPI clocks correctly
+
+Doug Anderson (1):
+      clk: exynos5420: Remove aclk66_peric from the clock tree description
+
+Rahul Sharma (1):
+      clk/exynos5250: fix bit number for tv sysmmu clock
+
+Tomasz Figa (1):
+      clk: samsung: exynos4: Remove SRC_MASK_ISP gates
+
+Vasily Khoruzhick (2):
+      clk: samsung: fix several typos to fix boot on s3c2410
+      clk: samsung: add more aliases for s3c24xx
+
+ drivers/clk/samsung/clk-exynos4.c      | 16 ++-----
+ drivers/clk/samsung/clk-exynos5250.c   |  2 +-
+ drivers/clk/samsung/clk-exynos5420.c   | 85 ++++++++++++++++++++++------------
+ drivers/clk/samsung/clk-s3c2410.c      |  9 +++-
+ drivers/clk/samsung/clk-s3c64xx.c      |  6 ++-
+ include/dt-bindings/clock/exynos5420.h |  1 -
+ 6 files changed, 71 insertions(+), 48 deletions(-)
