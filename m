@@ -1,85 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 2 Jul 2014 10:04:46 +0200
-Subject: [PATCH 05/33] ARM: at91/dt: rm9200: define clocks
-In-Reply-To: <1404223962-30471-6-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404223962-30471-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140702100446.14910191@bbrezillon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 02 Jul 2014 10:06:39 +0200
+Subject: [PATCH/RFC 1/6] ARM: shmobile: r8a7778: add SCI clock support for
+ DT
+In-Reply-To: <1404275322-26514-2-git-send-email-horms+renesas@verge.net.au>
+References: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
+ <1404275322-26514-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <3035210.jDL17MeFr8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexandre,
+Hi Simon,
 
-On Tue,  1 Jul 2014 16:12:14 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Thank you for the patch.
 
-> Signed-off-by: Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> ---
->  arch/arm/boot/dts/at91rm9200.dtsi | 304
-> ++++++++++++++++++++++++++++++++++++++ 1 file changed, 304
-> insertions(+)
+On Wednesday 02 July 2014 06:28:37 Simon Horman wrote:
+> This will be used when initialising SCI devices using DT
+> until common clock framework support is added.
 > 
-> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi
-> b/arch/arm/boot/dts/at91rm9200.dtsi index c61b16fba79b..477cfe570f47
-> 100644 --- a/arch/arm/boot/dts/at91rm9200.dtsi
-> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
-> @@ -14,6 +14,7 @@
->  #include <dt-bindings/pinctrl/at91.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/clock/at91.h>
->  
->  / {
->  	model = "Atmel AT91RM9200 family SoC";
-> @@ -51,6 +52,20 @@
->  		reg = <0x20000000 0x04000000>;
->  	};
->  
-> +	clocks {
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-[...]
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-> +
-> +					tcb0_clk: tcb0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <17>;
-> +					};
-> +
-> +					tcb1_clk: tcb1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <18>;
-> +					};
-> +
-> +					tcb2_clk: tcb2_clk {
-> +						#clock-cells = <0>;
-> +						reg = <19>;
-> +					};
-> +
-> +					tcb3_clk: tcb3_clk {
-> +						#clock-cells = <0>;
-> +						reg = <20>;
-> +					};
-> +
-> +					tcb4_clk: tcb4_clk {
-> +						#clock-cells = <0>;
-> +						reg = <21>;
-> +					};
-> +
-> +					tcb5_clk: tcb5_clk {
-> +						#clock-cells = <0>;
-> +						reg = <22>;
-> +					};
-
-Just a nitpick, but the names defined in at91rm9200.c and in the
-datasheet are tcX_clk and not tcbX_clk.
-
-Best Regards,
-
-Boris
-
-
+> ---
+>  arch/arm/mach-shmobile/clock-r8a7778.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c
+> b/arch/arm/mach-shmobile/clock-r8a7778.c index 16bbc94..9557907 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7778.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+> @@ -202,11 +202,17 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
+>  	CLKDEV_DEV_ID("ffc73000.i2c", &mstp_clks[MSTP027]), /* I2C3 */
+>  	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
+> +	CLKDEV_DEV_ID("ffe40000.serial", &mstp_clks[MSTP026]), /* SCIF0 */
+>  	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
+> +	CLKDEV_DEV_ID("ffe41000.serial", &mstp_clks[MSTP025]), /* SCIF1 */
+>  	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
+> +	CLKDEV_DEV_ID("ffe42000.serial", &mstp_clks[MSTP024]), /* SCIF2 */
+>  	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
+> +	CLKDEV_DEV_ID("ffe43000.serial", &mstp_clks[MSTP023]), /* SCIF3 */
+>  	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
+> +	CLKDEV_DEV_ID("ffe44000.serial", &mstp_clks[MSTP022]), /* SCIF4 */
+>  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
+> +	CLKDEV_DEV_ID("ffe45000.serial", &mstp_clks[MSTP021]), /* SCIF5 */
+>  	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
+>  	CLKDEV_DEV_ID("fffc7000.spi", &mstp_clks[MSTP007]), /* HSPI0 */
+>  	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
