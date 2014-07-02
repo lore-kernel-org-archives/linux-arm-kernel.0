@@ -1,37 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Jul 2014 16:58:58 +0200
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140702142303.GJ2173@e106497-lin.cambridge.arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <7343032.WUqPgbXNQS@wuerfel>
- <20140702142303.GJ2173@e106497-lin.cambridge.arm.com>
-Message-ID: <5997020.x4BWezXjnq@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 2 Jul 2014 11:03:31 -0400
+Subject: [PATCH 1/2] ARM: kirkwood: add appended DTB support in
+ kirkwood_defconfig
+In-Reply-To: <20140702144340.GJ20799@lunn.ch>
+References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702134655.GE20799@lunn.ch>
+ <20140702142510.GM23978@titan.lakedaemon.net>
+ <20140702143157.GH20799@lunn.ch>
+ <20140702143950.GN23978@titan.lakedaemon.net>
+ <20140702144340.GJ20799@lunn.ch>
+Message-ID: <20140702150331.GO23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 July 2014 15:23:03 Liviu Dudau wrote:
-> > 
-> > Your solution looks correct to me, just using different
-> > tradeoffs to what I was expecting: You get a working pci_address_to_pio()
-> > function, which is probably never needed, but in turn you need to
-> > keep the state of each host bridge in a global list.
+On Wed, Jul 02, 2014 at 04:43:40PM +0200, Andrew Lunn wrote:
+> > Ok, just make kirkwood_defconfig removal a separate patch so we can
+> > revert it later if we want.
 > 
-> Just a reminder that with my patchset I *do* start using pci_address_to_pio()
-> in order to correctly parse the IO ranges from DT.
+> Hi Jason
+> 
+> How would that work exactly, without having mach-kirkwood?
 
-Yes, what I meant is that it would be easier not to do that. All existing
-drivers expect of_pci_range_to_resource() to return the CPU address for
-an I/O space register, not the Linux I/O port number that we want to 
-pass to the PCI core. This is suboptimal because it's not obvious how
-it works, but it lets us get away without an extra registration step.
-Once all probe functions in PCI host drivers have been changed to the
-of_create_pci_host_bridge, that should not matter any more, because
-there is only one place left that calls it and we only have to get it
-right once.
+Set ARCH_MVEBU, MACH_KIRKWOOD, unset ARCH_MULTI_V5 and adjust the
+Kconfig to allow such a scenario.
 
-Also, when you change that of_pci_range_to_resource, you also have to 
-audit all callers of that function and ensure they can deal with the new
-behavior.
+It may not be desirable right now, but having it as a separate patch
+doesn't hurt anything, and it keeps the door open to the possibility in
+the future.
 
-	Arnd
+thx,
+
+Jason.
