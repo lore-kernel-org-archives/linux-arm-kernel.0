@@ -1,49 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 2 Jul 2014 10:10:52 +0200
-Subject: [PATCH 01/33] Documentation: dt: document all the atmel pmc
- compatibles
-In-Reply-To: <1404223962-30471-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404223962-30471-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140702101052.3c9a452c@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 Jul 2014 01:11:43 -0700
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <20140701194704.GG13396@saruman.home>
+References: <3c3a7a4861df01d0163787a9c18f7b7ac821c5b9.1403000372.git.nsekhar@ti.com>
+ <20140617131935.GB9070@saruman.home>
+ <20140701194704.GG13396@saruman.home>
+Message-ID: <20140702081142.GU28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  1 Jul 2014 16:12:10 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> Documentation for atmel-pmc only list one compatible, add the
-> remaining compatible strings.
+* Felipe Balbi <balbi@ti.com> [140701 12:49]:
+> On Tue, Jun 17, 2014 at 08:19:35AM -0500, Felipe Balbi wrote:
+> > On Tue, Jun 17, 2014 at 04:04:51PM +0530, Sekhar Nori wrote:
+> > > ROM code on AM437x does not support writing to L2C-310 power control
+> > > register. The L2C driver, however, tries writing to this register for
+> > > all revisions >= r3p0.
+> > > 
+> > > This leads to a warning dump on boot which leads most users to believe
+> > > that L2 cache is non-functional.
+> > > 
+> > > Since the problem is understood, and cannot be addressed through software,
+> > > replace the warning with a pr_info() while maintaining the WARN_ON() for
+> > > other truly unexpected scenarios.
+> > > 
+> > > Reported-by: Nishanth Menon <nm@ti.com>
+> > > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> > 
+> > Tested with today's linux-next
+> > (5f295cdf5c5dbbb0c40f10f2ddae02ff46bbf773) with am437x-sk, I can see
+> > that the WARNING goes away.
+> > 
+> > Tested-by: Felipe Balbi <balbi@ti.com>
 > 
-> Signed-off-by: Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> ---
->  Documentation/devicetree/bindings/arm/atmel-pmc.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-> b/Documentation/devicetree/bindings/arm/atmel-pmc.txt index
-> 389bed5056e8..4ce09d1acdc9 100644 ---
-> a/Documentation/devicetree/bindings/arm/atmel-pmc.txt +++
-> b/Documentation/devicetree/bindings/arm/atmel-pmc.txt @@ -1,7 +1,10 @@
->  * Power Management Controller (PMC)
->  
->  Required properties:
-> -- compatible: Should be "atmel,at91rm9200-pmc"
-> +- compatible: Should be "atmel,<chip>-pmc".
-> +	<chip> can be: at91rm9200, at91sam9260, at91sam9g45,
-> at91sam9n12,
-> +	at91sam9x5
-> +
+> ping here, I can't see this patch onl linus/master or next/master yet.
 
-You missed sama5d3.
+Sorry I've been waiting for my pull request against -rc1 to get
+merged first, no idea why that is still pending.
 
->  - reg: Should contain PMC registers location and length
->  
->  Examples:
+Regards,
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tony
