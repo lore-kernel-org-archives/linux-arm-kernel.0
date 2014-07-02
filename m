@@ -1,61 +1,90 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Wed, 2 Jul 2014 13:43:41 -0700
-Subject: [PATCH v8 2/9] pci: Export find_pci_host_bridge() function.
-In-Reply-To: <7101568.8DVJFku5jp@wuerfel>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
- <CACoXjck+aU33=kSy=KCGABNXNR7tj2KndAiBqEDK7wQ_Qei80Q@mail.gmail.com>
- <7101568.8DVJFku5jp@wuerfel>
-Message-ID: <CACoXjcn5wdOwQx6PSfhTyuo-FQqBL62o-MNj3i6EfENRnUNt6g@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 2 Jul 2014 16:14:09 -0500
+Subject: [PATCHv5 03/15] hwspinlock/core: maintain a list of registered
+ hwspinlock banks
+In-Reply-To: <CAK=WgbakGbTaYz+4K24aT3vyRkDYwPKCm6XrcJvH667NMMfTTA@mail.gmail.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-4-git-send-email-s-anna@ti.com>
+ <CAK=WgbakGbTaYz+4K24aT3vyRkDYwPKCm6XrcJvH667NMMfTTA@mail.gmail.com>
+Message-ID: <53B47621.6090307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 12:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 02 July 2014 11:06:38 Tanmay Inamdar wrote:
->> On Tue, Jul 1, 2014 at 11:43 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > This is a useful function and we should make it visible outside the
->> > generic PCI code. Export it as a GPL symbol.
->> >
->> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
->> > ---
->> >  drivers/pci/host-bridge.c | 3 ++-
->> >  1 file changed, 2 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
->> > index 0e5f3c9..36c669e 100644
->> > --- a/drivers/pci/host-bridge.c
->> > +++ b/drivers/pci/host-bridge.c
->> > @@ -16,12 +16,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
->> >         return bus;
->> >  }
->> >
->> > -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
->> > +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
->> >  {
->> >         struct pci_bus *root_bus = find_pci_root_bus(bus);
->> >
->> >         return to_pci_host_bridge(root_bus->bridge);
->> >  }
->> > +EXPORT_SYMBOL_GPL(find_pci_host_bridge);
->>
->> Is there any specific reason behind making this symbol GPL? I think
->> the other functions in this file are just EXPORT_SYMBOL. Ultimately
->> companies which have non gpl Linux modules (nvidia) will face issue
->> using this API.
->>
->> The same applies to 'of_create_pci_host_bridge'.
->
-> I think EXPORT_SYMBOL_GPL() is better here. The new symbols are unlikely
-> to be used by a peripheral device driver, and PCI host controllers are
-> already restricted by EXPORT_SYMBOL_GPL.
->
+Hi Ohad,
 
-You are right as long as the functions are not used directly. But what
-if GPL functions are called indirectly.  For example, 'pci_domain_nr'
-implementation in Liviu's V7 series calls 'find_pci_host_bridge'.
+On 07/01/2014 07:26 AM, Ohad Ben-Cohen wrote:
+> Hi Suman,
+> 
+> On Thu, May 1, 2014 at 3:34 AM, Suman Anna <s-anna@ti.com> wrote:
+>>
+>> The hwspinlock_device structure is used for registering a bank of
+>> locks with the driver core. The structure already contains the
+>> necessary members to identify the bank of locks. The core does not
+>> maintain the hwspinlock_devices itself, but maintains only a radix
+>> tree for all the registered locks. A specific lock can be requested
+>> by users using a global lock id, and any device-specific fields
+>> can be retrieved through a reference to the hwspinlock_device in
+>> each lock.
+>>
+>> The global lock id, however, is not friendly to be requested for
+>> users using the device-tree model. The device-tree representation
+>> will typically have each of the hwspinlock devices represented as
+>> a DT node, and a specific lock can be requested using the device's
+>> phandle and a lock specifier. Add support to the core therefore to
+>> maintain all the registered hwspinlock_devices, so that a device
+>> can be looked up and a specific lock belonging to the device
+>> requested through a phandle + args approach.
+>>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+> 
+> I'm not sure we need this patch.
 
-> nvidia will certainly not do a PCI host controller driver that is not
-> upstream or not GPL-compatible.
->
->         Arnd
+This patch is needed if we use the controller-phandle + args specifier
+for requesting hwlocks by a client, as we need to translate
+controller-phandle to the corresponding hwspinlock_device.
+
+Looks like we still don't have a closure on the semantics of how
+clients have to request a lock in DT. You are suggesting something like
+    hwlocks = <global_lock1 global_lock2 ...>;
+
+whereas this patch is built to support based on comments from
+DT-maintainers,
+    hwlocks = <controller-phandle lock-specifier1>, <controller-phandle
+lock-specifier2>...;
+
+Mark, Kumar,
+We need your input here as DT maintainers. Some of the discussion is on
+the v4 cover-letter thread [1].
+
+Kumar, Josh,
+How does this fit with the MSM spinlock driver?
+
+> It seems to me that the global lock id can be the base_id + lock
+> index, where the former should be a property of the parent dt node,
+> and the latter can just be the phandle argument. Then, with the global
+> lock id in hand, drivers could just use the existing
+> hwspin_lock_request_specific API.
+> 
+> If future hardware will bring a more complex scenario, we could then
+> introduce the xlate proposal to resolve it. As long as we're not
+> changing the dt data, and this is all handled by kernel code, 
+
+Once we define dt data one way, how can we support a different mechanism
+later on? Are you implying that we support both controller-phandle +
+specifier and global-lock convention somehow through driver changes?
+
+> then I'd
+> prefer opting for less code now as long as it addresses the
+> requirements.
+> 
+> Please let me know if currently there is a use case that can't be
+> addressed using this simpler model.
+
+This is just a question of DT semantics for the longer term, it can be
+done both ways. I have started out the series with exactly what you are
+suggesting here.
+
+regards
+Suman
+
+[1] https://lkml.org/lkml/2014/3/17/576
