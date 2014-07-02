@@ -1,52 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Jul 2014 14:48:35 +0800
-Subject: [PATCH] ARM: cpu_pj4b_suspend_size should base on cpu_v7_suspend_size
-Message-ID: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 2 Jul 2014 07:50:53 +0100
+Subject: [PATCH 1/1] drivers/mfd/ab8500-debugfs.c: remove unnecessary
+ null test before debugfs_remove_recursive
+In-Reply-To: <1403956697-3197-1-git-send-email-fabf@skynet.be>
+References: <1403956697-3197-1-git-send-email-fabf@skynet.be>
+Message-ID: <20140702065053.GA10311@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since pj4b suspend/resume routines are implemented based on generic
-ARMv7 ones, instead of hard-coding cpu_pj4b_suspend_size, we should have
-it be cpu_v7_suspend_size plus pj4b specific bytes.  Otherwise, if
-cpu_v7_suspend_size gets updated alone, the pj4b suspend/resume will
-likely be broken.
+On Sat, 28 Jun 2014, Fabian Frederick wrote:
 
-While at it, fix the comments in cpu_pj4b_do_resume, as we're restoring
-CP15 registers rather than saving in there.
+> Fix checkpatch warning:
+> WARNING: debugfs_remove_recursive(NULL) is safe this check is probably not required
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> ---
+>  drivers/mfd/ab8500-debugfs.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Completely untested.
+Applied, thanks.
 
- arch/arm/mm/proc-v7.S | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+> index d1a22aa..7ca8713 100644
+> --- a/drivers/mfd/ab8500-debugfs.c
+> +++ b/drivers/mfd/ab8500-debugfs.c
+> @@ -3192,8 +3192,7 @@ static int ab8500_debug_probe(struct platform_device *plf)
+>  	return 0;
+>  
+>  err:
+> -	if (ab8500_dir)
+> -		debugfs_remove_recursive(ab8500_dir);
+> +	debugfs_remove_recursive(ab8500_dir);
+>  	dev_err(&plf->dev, "failed to create debugfs entries.\n");
+>  
+>  	return -ENOMEM;
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3db2c2f04a30..604dda5f65cc 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -184,16 +184,16 @@ ENDPROC(cpu_pj4b_do_suspend)
- 
- ENTRY(cpu_pj4b_do_resume)
- 	ldmia	r0!, {r6 - r10}
--	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
--	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
--	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
--	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
--	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
-+	mcr	p15, 1, r6, c15, c1, 0  @ retore CP15 - extra features
-+	mcr	p15, 1, r7, c15, c2, 0	@ retore CP15 - Aux Func Modes Ctrl 0
-+	mcr	p15, 1, r8, c15, c1, 2	@ retore CP15 - Aux Debug Modes Ctrl 2
-+	mcr	p15, 1, r9, c15, c1, 1  @ retore CP15 - Aux Debug Modes Ctrl 1
-+	mcr	p15, 0, r10, c9, c14, 0  @ retore CP15 - PMC
- 	b cpu_v7_do_resume
- ENDPROC(cpu_pj4b_do_resume)
- #endif
- .globl	cpu_pj4b_suspend_size
--.equ	cpu_pj4b_suspend_size, 4 * 14
-+.equ	cpu_pj4b_suspend_size, cpu_v7_suspend_size + 4 * 5
- 
- #endif
- 
 -- 
-1.8.3.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
