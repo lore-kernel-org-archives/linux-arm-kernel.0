@@ -1,76 +1,44 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 02 Jul 2014 08:52:15 +0900
-Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
- Exynos3250
-In-Reply-To: <CAK5sBcER-rFmqe74b8uS=ZxKnTNGtkE0x6f7zaLphmyuHJz7Yg@mail.gmail.com>
-References: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
- <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
- <53B23362.7080103@samsung.com>
- <CAK5sBcER-rFmqe74b8uS=ZxKnTNGtkE0x6f7zaLphmyuHJz7Yg@mail.gmail.com>
-Message-ID: <53B349AF.4080606@samsung.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 2 Jul 2014 01:10:00 +0000
+Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
+In-Reply-To: <53B2D151.60404@cogentembedded.com>
+References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140627032506.GA18039@shlinux1.ap.freescale.net>
+ <20140630133313.GA11880@kwain>
+ <20140701002112.GA26146@shlinux1.ap.freescale.net>
+ <53B27789.3090509@gmail.com>
+ <20140701083007.GB26146@shlinux1.ap.freescale.net>
+ <20140701104254.GD3427@piout.net> <53B2D151.60404@cogentembedded.com>
+Message-ID: <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2014 01:10 PM, Sachin Kamat wrote:
-> Hi Chanwoo,
+ 
 > 
-> On Tue, Jul 1, 2014 at 9:34 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> Hi Sachin,
->>
->> On 07/01/2014 12:33 PM, Sachin Kamat wrote:
->>> Hi Chanwoo,
->>>
->>> On Tue, Jul 1, 2014 at 6:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>>> This patch add TMU (Thermal Management Unit) dt node to monitor the high
->>>> temperature for Exynos3250.
->>>>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>> This patch has a dependency on following patch [1]:
->>>>  [1] https://lkml.org/lkml/2014/6/30/805
->>>>
->>>>  arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
->>>>  1 file changed, 10 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->>>> index 3660cab..1e566af 100644
->>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->>>> @@ -192,6 +192,16 @@
->>>>                         status = "disabled";
->>>>                 };
->>>>
->>>> +               tmu: tmu at 100C0000 {
->>>> +                       compatible = "samsung,exynos3250-tmu";
->>>> +                       interrupt-parent = <&gic>;
->>>> +                       reg = <0x100C0000 0x100>;
->>>> +                       interrupts = <0 216 0>;
->>>> +                       clocks = <&cmu CLK_TMU_APBIF>;
->>>> +                       clock-names = "tmu_apbif";
->>>> +                       status = "disabled";
->>>
->>> I don't think there would be any board specific properties needed. Hence
->>> leave the status as enabled (by deleting the above line).
->>>
->>
->> I think that if specific board need TMU feature, dts file for specific board
->> should include tmu dt node with 'okay' status. The specific board based on
->> Exynos3250 might not need TMU feature.
+> Hello.
 > 
-> The status field in DT node is not meant for stating the build configuration but
-> represents the readiness of the hardware for usage on the platform. If
-> a particular
-> board does not need this feature it needs to be disabled in the build
-> config and only
-> for any special requirements disable it in board file.
+> On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
+> 
+> >>>>> Well, there is nothing specific about the Berlin CI. Some
+> >>>>> subsystems use the 'generic' keyword in these cases. Do you see a
+> >>>>> particular reason I should use some Berlin related compatible here?
+> 
+> >>>> Not must, one suggestion is: can you change the compatible string
+> >>>> to "chipidea-usb-generic"?
+> 
+> >>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
+> >>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
+> >>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
+> 
+> >> The recommended format for compatible string is:
+> >> "manufacturer,model", I agree with "chipidea,ci13xxx", thanks.
+> 
+> > I think we should probably avoid using wildcards in the compatible
+> > string.
+> 
+>     I'm sure wildcards shouldn't be allowed there. :-)
 
-TMU (Thermal Management Unit) needs specific regulator for TMU power as following:
-The regulator for TMU is dependent on board.
+Then, what's your guys recommend, how about "chipidea,usb2-generic"?
 
-For exmaple: in board dts file including tmu dt
-
-	&tmu {
-		vtmu-supply = <&ldo7_reg>;
-		status = "okay";
-	};
+Peter
