@@ -1,64 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 2 Jul 2014 13:19:33 +0100
-Subject: [PATCH v2 4/5] phy: miphy365x: Represent each PHY channel as a
- subnode
-In-Reply-To: <53B3F3B1.2030807@ti.com>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
- <20140630144114.GB25926@lee--X1> <53B3DE4F.1040100@ti.com>
- <20140702113428.GA16724@lee--X1> <53B3F3B1.2030807@ti.com>
-Message-ID: <20140702121933.GG16724@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Jul 2014 14:30:31 +0200
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140701204508.GA19569@bart.dudau.co.uk>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <8556461.i7qCGvGY5a@wuerfel> <20140701204508.GA19569@bart.dudau.co.uk>
+Message-ID: <7343032.WUqPgbXNQS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Jul 2014, Kishon Vijay Abraham I wrote:
-> On Wednesday 02 July 2014 05:04 PM, Lee Jones wrote:
-> >> On Monday 30 June 2014 08:11 PM, Lee Jones wrote:
-> >>> phy: miphy365x: Represent each PHY channel as a DT subnode
-> >>>
-> >>> This has the added advantages of being able to enable/disable each
-> >>> of the channels as simply as enabling/disabling the DT node.
-> >>>
-> >>> Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>
-> >>> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> >>> index 1109f42..2c4ea6e 100644
-> >>> --- a/drivers/phy/phy-miphy365x.c
-> >>> +++ b/drivers/phy/phy-miphy365x.c
+On Tuesday 01 July 2014 21:45:09 Liviu Dudau wrote:
+> On Tue, Jul 01, 2014 at 09:36:10PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
 > > 
-> > [...]
+> > This still conflicts with the other allocator you have in patch 9
+> > for pci_remap_iospace: nothing guarantees that the mapping is the
+> > same for both.
 > > 
-> >>> -static int miphy365x_of_probe(struct device_node *np,
-> >>> +static int miphy365x_of_probe(struct platform_device *pdev,
-> >>>  			      struct miphy365x_dev *phy_dev)
-> >>>  {
-> >>> +	struct device_node *np = pdev->dev.of_node;
-> >>> +	struct device_node *child;
-> >>> +	int child_count = 0;
-> >>> +
-> >>> +	for_each_child_of_node(np, child)
-> >>> +		child_count++;
-> >>
-> >> use of_get_child_count() instead.
+> > Also, this is a completely pointless exercise at this moment, because
+> > nobody cares about the result of pci_address_to_pio on architectures
+> > that don't already provide this function. If we ever get a proper
+> > Open Firmware implementation that wants to put hardcoded PCI devices
+> > into DT, we can add an implementation, but for now this seems overkill.
 > > 
-> > Ah, nice. I'll do that.
-> > 
-> > [...]
-> > 
-> >> I think you can merge this to your original patch.
-> > 
-> > I can do that, but I thought It'd be nice to keep some history and
-> > show the migration over to a different setup.  This is particularly
-> > important for when we back-port the changes back into the internal
-> > development kernel.
+> > The allocator in pci_register_io_range seems reasonable, why not merge
+> > this function with pci_remap_iospace() as I have asked you multiple
+> > times before? Just make it return the io_offset so the caller can
+> > put that into the PCI host resources.
 > 
-> cool.. i'm fine with it.
+> Hi Arnd,
+> 
+> While I agree with you that at some moment the allocators were inconsistent
+> wrt each other, for this version I would respectfully disagree on this.
+> The allocator in pci_register_io_range() only makes sure that the ranges
+> are not overlapping, it doesn't do any mapping whatsoever, while
+> pci_remap_iospace() does only an ioremap_page_range(). The idea is that
+> you get the offset out of pci_address_to_pio() and apply it to
+> pci_remap_iospace().
 
-Thanks.
+Ok, got it now, I'm sorry I didn't read this properly at first.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Your solution looks correct to me, just using different
+tradeoffs to what I was expecting: You get a working pci_address_to_pio()
+function, which is probably never needed, but in turn you need to
+keep the state of each host bridge in a global list.
+
+	Arnd
