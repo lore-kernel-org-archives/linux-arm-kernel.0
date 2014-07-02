@@ -1,65 +1,60 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 2 Jul 2014 14:54:45 +0530
-Subject: [PATCH 1/5] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <1404133317-25953-2-git-send-email-lee.jones@linaro.org>
+Date: Wed, 2 Jul 2014 14:58:30 +0530
+Subject: [PATCH 2/5] phy: miphy365x: Add MiPHY365x header file for DT
+ x Driver defines
+In-Reply-To: <1404133317-25953-3-git-send-email-lee.jones@linaro.org>
 References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <53B3CFDD.5090504@ti.com>
+ <1404133317-25953-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <53B3D0BE.9090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On Monday 30 June 2014 06:31 PM, Lee Jones wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
+> This provides the shared header file which will be reference from both
+> the MiPHY365x driver and its associated Device Tree node(s).
 > 
 > Cc: Kishon Vijay Abraham I <kishon@ti.com>
 > Acked-by: Mark Rutland <mark.rutland@arm.com>
 > Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  .../devicetree/bindings/phy/phy-miphy365x.txt      | 76 ++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+>  include/dt-bindings/phy/phy-miphy365x.h | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
 > new file mode 100644
-> index 0000000..d75f300
+> index 0000000..8757c02
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> @@ -0,0 +1,76 @@
-> +STMicroelectronics STi MIPHY365x PHY binding
-> +============================================
+> +++ b/include/dt-bindings/phy/phy-miphy365x.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * This header provides constants for the phy framework
+> + * based on the STMicroelectronics miphy365x.
+> + */
+> +#ifndef _DT_BINDINGS_PHY_MIPHY
+> +#define _DT_BINDINGS_PHY_MIPHY
 > +
-> +This binding describes a miphy device that is used to control PHY hardware
-> +for SATA and PCIe.
+> +/* Supports 16 ports without a datatype change (u8 & 0xF0). */
+> +#define MIPHY_PORT_0			0
+> +#define MIPHY_PORT_1			1
+> +#define MIPHY_PORT_2			2
+> +#define MIPHY_PORT_3			3
 > +
-> +Required properties:
-> +- compatible :	Should be "st,miphy365x-phy"
-> +- #phy-cells :	Should be 2 (See second example)
-> +		First cell is the port number from:
-> +			- MIPHY_PORT_0
-> +			- MIPHY_PORT_1
+> +/* Supports 16 types without a datatype change (u8 & 0x0F). */
+> +#define MIPHY_TYPE_SHIFT		4
+> +#define MIPHY_TYPE_SATA			(0 << MIPHY_TYPE_SHIFT)
+> +#define MIPHY_TYPE_PCIE			(1 << MIPHY_TYPE_SHIFT)
+> +#define MIPHY_TYPE_USB			(2 << MIPHY_TYPE_SHIFT)
+> +
+> +#define MIPHY_SATA_PORT0		(MIPHY_TYPE_SATA) | (MIPHY_PORT_0)
+> +#define MIPHY_SATA_PORT1		(MIPHY_TYPE_SATA) | (MIPHY_PORT_1)
+> +#define MIPHY_PCIE_PORT0		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_0)
+> +#define MIPHY_PCIE_PORT1		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_1)
 
-I'm just thinking if we can directly give phandle to the sub-node
-(channel0/channel1 or port0/port1) we won't need this information in the PHY
-specifier. This might need some modification in the phy-core but that can be done.
-> +		Second cell is device type from:
-> +			- MIPHY_TYPE_SATA
-> +			- MIPHY_TYPE_PCI
-> +- reg       :	Address and length of register sets for each device in
-> +		"reg-names"
-> +- reg-names : 	The names of the register addresses corresponding to the
-> +		registers filled in "reg", from:
-> +			- sata0: For SATA port 0 registers
-> +			- sata1: For SATA port 1 registers
-> +			- pcie0: For PCIE port 0 registers
-> +			- pcie1: For PCIE port 1 registers
+As Sergei pointed in your previous version it should be (X | Y).
 
-this information should be in the documentation of sub-nodes.
-
-Cheers
+Thanks
 Kishon
