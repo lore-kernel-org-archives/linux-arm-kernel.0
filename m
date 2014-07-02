@@ -1,102 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 2 Jul 2014 11:27:21 -0300
-Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
- share_count
-In-Reply-To: <20140702043508.GA16176@dragon>
-References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
- <1404194129-25543-4-git-send-email-festevam@gmail.com>
- <20140701115252.GM14471@dragon>
- <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
- <20140702043508.GA16176@dragon>
-Message-ID: <CAOMZO5AYA-i8Rp2Oo+unwUXmH0uQ8D3rnXxBQUgqKrfXw-vN-A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jul 2014 15:26:21 +0100
+Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
+ suspend/resume
+In-Reply-To: <20140702140134.GA21091@e102568-lin.cambridge.arm.com>
+References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
+ <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
+ <53A9B80B.7020608@samsung.com>
+ <20140701144417.GV32514@n2100.arm.linux.org.uk>
+ <53B2E11D.5000507@samsung.com> <20140702123444.GB24879@arm.com>
+ <20140702140134.GA21091@e102568-lin.cambridge.arm.com>
+Message-ID: <20140702142620.GJ32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 1:35 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> What about the patch below?
+On Wed, Jul 02, 2014 at 03:01:34PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Jul 02, 2014 at 01:34:44PM +0100, Will Deacon wrote:
+> > Does anybody have any ideas? We could try `handling' the undef, but it's
+> > ugly and fragile.
+> 
+> You could try to treat it the same way as ACTLR (see cpu_v7_do_resume,
+> where the ACTLR is first read, if it is already set, ie equal to the
+> saved value, skip the write); ACTLR suffers from the same issue and IIRC
+> that's why Russell added the "teq" then "write" test at the time
+> cpu_suspend was consolidated.
 
-It does allow audio to play, but it resulted in CCGR5 as 0xffffffff
-(all clocks enabled), so we still need to adjust it.
+We can't do that now for these, because if they were already correct,
+then by definition we wouldn't need to restore them except on secure
+parts.
 
-> Shawn
->
-> ----8<-------------
->
-> From 0ed4b3edc661c63f86c914ea3c6deb3af3438151 Mon Sep 17 00:00:00 2001
-> From: Shawn Guo <shawn.guo@freescale.com>
-> Date: Wed, 2 Jul 2014 11:32:06 +0800
-> Subject: [PATCH] ARM: imx: fix shared gate clock to have its own enable count
->
-> Let's say clock A and B are two gate clocks that share the same register
-> bit in hardware.  Therefore they should be registered as shared gate
-> clocks with imx_clk_gate2_shared().
->
-> In the current implementation, clk_enable(A) call will have share_count
-> become 1.  If clk_disable(B) is called right after that, the register
-> bit will be cleared to gate off the clocks.  This is unexpected.  The
-> cause for that is there is no enable count tracking for clock A and B
-> respectively.
->
-> The patch fixes the issue by adding enable_count into clk_gate2, and
-> tracks it prior to share_count in .enable and .disable.  Also,
-> .is_enabled is fixed to report enable state instead of hardware state
-> in case of shared gate clock.
->
-> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: <stable@vger.kernel.org>
-> Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
+>From the comments that have been made on the subject of these registers,
+it is already the case that non-secure platforms don't restore this
+register, instead relying on the platform to jump through hoops to
+update it _after_ the MMU has been enabled.
 
-No need to Cc stable on this one as the this commit did not reach stable.
+Will Deacon raised a point when I discussed this that once the MMU is
+enabled, the hardware doesn't expect the diagnostic register to be
+changed.  So, having platform code (which runs after the MMU has been
+enabled) sounds dodgy to me.
 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-gate2.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-> index 4ba587da89d2..c5dca7cdbbb1 100644
-> --- a/arch/arm/mach-imx/clk-gate2.c
-> +++ b/arch/arm/mach-imx/clk-gate2.c
-> @@ -33,6 +33,7 @@ struct clk_gate2 {
->         u8              bit_idx;
->         u8              flags;
->         spinlock_t      *lock;
-> +       unsigned int    enable_count;
->         unsigned int    *share_count;
->  };
->
-> @@ -46,6 +47,9 @@ static int clk_gate2_enable(struct clk_hw *hw)
->
->         spin_lock_irqsave(gate->lock, flags);
->
-> +       if (gate->enable_count++ > 0)
-> +               goto out;
-> +
->         if (gate->share_count && (*gate->share_count)++ > 0)
->                 goto out;
->
-> @@ -67,6 +71,9 @@ static void clk_gate2_disable(struct clk_hw *hw)
->
->         spin_lock_irqsave(gate->lock, flags);
->
-> +       if (--gate->enable_count > 0)
-> +               goto out;
+Of course, prior to DT and single zImage, this wouldn't be that big
+a deal, we _could_ work around it via the kernel config or similar,
+insisting that we have a secure and a non-secure build mode.  We don't
+have that "luxury" anymore though.
 
-All these pre-decrement look buggy because enable_count and
-share_count are 'unsigned int'.
+What this all means is that we can't even augment the suspend/resume
+paths to deal with this register even for secure mode parts.
 
-If share_count is 0 and then you decrement it, it will still be
-greater than zero.
---(*gate->share_count) > 0 and --gate->enable_count > 0 are always true.
+I, too, don't know what the answer is here.  This is really a totally
+fubar'd situation where there is no solution which will work for
+everyone.
 
-I have tried to make share_count and enable_count as 'int'. Then it
-resulted CGR5 as
-0FFFCFFF, which still leaves ssi1 and ssi3 enabled (I have locally
-made ssi a shared clock now)
+I guess what this ultimately comes down to is that we _did_ accept the
+work-arounds into the kernel source for secure parts - had we not done
+that and set a clear message like ARM64 does that work-arounds must be
+done prior to calling the kernel (irrespective of how that happens,
+iow, whether boot or resume) then we wouldn't have this problem right
+now.  Such a statement would have raised lots of objections though, but
+with hindsight, it would have been the right thing to do to overrule
+those objections and just mandate it.  It would've been a pain for some
+people, but we would not be in this situation now where there is no
+proper solution which works for everyone.
 
-I will post a v2 without touching arch/arm/mach-imx/clk-gate2.c to
-make it easier for us to debug it.
-
-Thanks,
-
-Fabio Estevam
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
