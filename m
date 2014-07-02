@@ -1,27 +1,31 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 2 Jul 2014 20:42:52 +0100
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140702195154.47d6f6b4@armhf>
-References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
- <20140702195154.47d6f6b4@armhf>
-Message-ID: <20140702194252.GN410@sirena.org.uk>
+Date: Wed, 2 Jul 2014 20:47:31 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140702182500.GN24879@arm.com>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140701234800.GA23577@sirena.org.uk>
+ <20140702100133.GE18731@arm.com>
+ <CAMbhsRSm_o78X-+2mfgUfR7pwgaDob75Lcvjfck50kHcagX=cQ@mail.gmail.com>
+ <20140702161649.GF24879@arm.com> <53B44979.10100@codeaurora.org>
+ <20140702182500.GN24879@arm.com>
+Message-ID: <20140702194731.GP410@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 07:51:54PM +0200, Jean-Francois Moine wrote:
+On Wed, Jul 02, 2014 at 07:25:00PM +0100, Will Deacon wrote:
 
-> I tested this CODEC with both DAPM and DPCM. If the audio subsystem
-> asks for streaming on both I2S and S/PDIF, only the last call is served
-> (this depends on the order of the DAI links in the audio card creation
-> table).
+> Partially because we have to maintain the stuff forever, but also because
+> it sets precedent for merging more (unremoveable) emulation code in the
+> future, which gets proportionally less testing over time.
 
-I'd expect this to return an error for the busy DAI rather than just
-silently ignore it failing to start or (better) implement some control
-to let the user select which of the DAIs is active.
+If testing is a concern would a testsuite help address that?  I'd expect
+we could get it run regularly on mainline by someone like Linaro or
+Google.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/bc2ef7e8/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140702/56c009c1/attachment.sig>
