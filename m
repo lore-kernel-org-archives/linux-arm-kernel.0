@@ -1,222 +1,109 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 2 Jul 2014 15:56:23 +0530
-Subject: [PATCH v2 4/5] phy: miphy365x: Represent each PHY channel as
- a subnode
-In-Reply-To: <20140630144114.GB25926@lee--X1>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
- <20140630144114.GB25926@lee--X1>
-Message-ID: <53B3DE4F.1040100@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  2 Jul 2014 12:34:37 +0200
+Subject: [PATCH resend] arm64: dmi: Add SMBIOS/DMI support
+Message-ID: <1404297277-28295-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Yi Li <yi.li@linaro.org>
 
-On Monday 30 June 2014 08:11 PM, Lee Jones wrote:
-> phy: miphy365x: Represent each PHY channel as a DT subnode
-> 
-> This has the added advantages of being able to enable/disable each
-> of the channels as simply as enabling/disabling the DT node.
-> 
-> Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> index 1109f42..2c4ea6e 100644
-> --- a/drivers/phy/phy-miphy365x.c
-> +++ b/drivers/phy/phy-miphy365x.c
-> @@ -17,6 +17,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/of_address.h>
->  #include <linux/clk.h>
->  #include <linux/phy/phy.h>
->  #include <linux/delay.h>
-> @@ -144,6 +145,7 @@ struct miphy365x {
->  	void __iomem *pcie;
->  	u8 type;
->  	u8 port;
-> +	bool enabled;
->  };
->  
->  struct miphy365x_dev {
-> @@ -468,7 +470,7 @@ static struct phy *miphy365x_xlate(struct device *dev,
->  	struct miphy365x_dev *state = dev_get_drvdata(dev);
->  	u8 port, type;
->  
-> -	if (args->count != 2) {
-> +	if (args->args_count != 2) {
->  		dev_err(dev, "Invalid number of cells in 'phy' property\n");
->  		return ERR_PTR(-EINVAL);
->  	}
-> @@ -484,6 +486,11 @@ static struct phy *miphy365x_xlate(struct device *dev,
->  	if (WARN_ON(port >= ARRAY_SIZE(ports)))
->  		return ERR_PTR(-EINVAL);
->  
-> +	if (!state->phys[port].enabled) {
-> +		dev_warn(dev, "PHY port %d is disabled\n", port);
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
->  	if (type == MIPHY_TYPE_SATA)
->  		state->phys[port].base = state->phys[port].sata;
->  	else if (type == MIPHY_TYPE_PCIE)
-> @@ -503,38 +510,75 @@ static struct phy_ops miphy365x_ops = {
->  	.owner		= THIS_MODULE,
->  };
->  
-> -static int miphy365x_get_base_addr(struct platform_device *pdev,
-> -				    struct miphy365x_phy *phy, u8 port)
-> +static int miphy365x_get_base_addr_one(struct platform_device *pdev,
-> +				       struct miphy365x *phy,
-> +				       struct device_node *child,
-> +				       int index)
->  {
-> -	struct resource *res;
-> -	char type[6];
-> +	void __iomem *base;
-> +	const char *name;
-> +	int ret;
->  
-> -	sprintf(type, "sata%d", port);
-> +	base = of_iomap(child, index);
-> +	if (!base) {
-> +		dev_err(&pdev->dev, "Failed to map %s\n", child->full_name);
-> +		return -EINVAL;
-> +	}
->  
-> -	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, type);
-> -	if (!res)
-> -		return -ENODEV;
-> +	ret = of_property_read_string_index(child, "reg-names", index, &name);
-> +	if (ret) {
-> +		dev_err(&pdev->dev,
-> +			"%s: no reg-names property not found\n", child->name);
-> +		return ret;
-> +	}
->  
-> -	phy->sata = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> -	if (!phy->sata)
-> -		return -ENOMEM;
-> +	if (!strncmp(name, "sata", 4))
-> +		phy->sata = base;
-> +	else if (!strncmp(name, "pcie", 4))
-> +		phy->pcie = base;
-> +	else {
-> +		dev_err(&pdev->dev, "reg-names in %s not sata or pcie: %s",
-> +			child->name, name);
-> +		return -EINVAL;
-> +	}
->  
-> -	sprintf(type, "pcie%d", port);
-> +	return 0;
-> +}
->  
-> -	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, type);
-> -	if (!res)
-> -		return -ENODEV;
-> +static int miphy365x_get_base_addr(struct platform_device *pdev,
-> +				   struct miphy365x *phy,
-> +				   struct device_node *child)
-> +{
-> +	int index;
-> +	int ret;
->  
-> -	phy->pcie = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> -	if (!phy->pcie)
-> -		return -ENOMEM;
-> +	/* Each port handles SATA or PCIE. */
-> +	for (index = 0; index < 2; index++) {
-> +		ret = miphy365x_get_base_addr_one(pdev, phy,
-> +						  child, index);
-> +		if (ret)
-> +			return ret;
-> +	}
->  
->  	return 0;
->  }
->  
-> -static int miphy365x_of_probe(struct device_node *np,
-> +static int miphy365x_of_probe(struct platform_device *pdev,
->  			      struct miphy365x_dev *phy_dev)
->  {
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *child;
-> +	int child_count = 0;
-> +
-> +	for_each_child_of_node(np, child)
-> +		child_count++;
+SMbios is important for server hardware vendors. It implements a spec for
+providing descriptive information about the platform. Things like serial
+numbers, physical layout of the ports, build configuration data, and the like.
 
-use of_get_child_count() instead.
-> +
-> +	if (child_count != ARRAY_SIZE(ports)) {
-> +		dev_err(&pdev->dev, "%d ports supported, %d supplied\n",
-> +			ARRAY_SIZE(ports), child_count);
-> +		return -EINVAL;
-> +	}
-> +
->  	phy_dev->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
->  	if (IS_ERR(phy_dev->regmap)) {
->  		dev_err(phy_dev->dev, "No syscfg phandle specified\n");
-> @@ -556,11 +600,10 @@ static int miphy365x_of_probe(struct device_node *np,
->  
->  static int miphy365x_probe(struct platform_device *pdev)
->  {
-> -	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *child, *np = pdev->dev.of_node;
->  	struct miphy365x_dev *phy_dev;
->  	struct device *dev = &pdev->dev;
->  	struct phy_provider *provider;
-> -	u8 port;
->  	int ret;
->  
->  	if (!np) {
-> @@ -572,7 +615,7 @@ static int miphy365x_probe(struct platform_device *pdev)
->  	if (!phy_dev)
->  		return -ENOMEM;
->  
-> -	ret = miphy365x_of_probe(np, phy_dev);
-> +	ret = miphy365x_of_probe(pdev, phy_dev);
->  	if (ret)
->  		return ret;
->  
-> @@ -582,8 +625,9 @@ static int miphy365x_probe(struct platform_device *pdev)
->  
->  	mutex_init(&phy_dev->miphy_mutex);
->  
-> -	for (port = 0; port < ARRAY_SIZE(ports); port++) {
-> +	for_each_child_of_node(np, child) {
->  		struct phy *phy;
-> +		static int port = 0;
->  
->  		phy = devm_phy_create(dev, &miphy365x_ops, NULL);
->  		if (IS_ERR(phy)) {
-> @@ -591,15 +635,17 @@ static int miphy365x_probe(struct platform_device *pdev)
->  			return PTR_ERR(phy);
->  		}
->  
-> -		phy_dev->phys[port].phy  = phy;
-> -		phy_dev->phys[port].port = port;
-> -
-> -		ret = miphy365x_get_base_addr(pdev,
-> -					&phy_dev->phys[port], port);
-> +		ret = miphy365x_get_base_addr(pdev, &phy_dev->phys[port],
-> +					      child);
->  		if (ret)
->  			return ret;
->  
-> +		phy_dev->phys[port].phy  = phy;
-> +		phy_dev->phys[port].port = port;
-> +		phy_dev->phys[port].enabled = !!of_device_is_available(child);
-> +
->  		phy_set_drvdata(phy, &phy_dev->phys[port]);
-> +		port++;
->  	}
->  
->  	provider = devm_of_phy_provider_register(dev, miphy365x_xlate);
+This has been tested by dmidecode and lshw tools.
 
-I think you can merge this to your original patch.
+Signed-off-by: Yi Li <yi.li@linaro.org>
+[ardb: whitespace, commit log tweaks]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-Cheers
-Kishon
+Resending on behalf of Yi.
+Please consider for 3.17.
+
+Regards,
+Ard.
+
+ arch/arm64/Kconfig           | 10 ++++++++++
+ arch/arm64/include/asm/dmi.h | 28 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c    |  2 ++
+ 3 files changed, 40 insertions(+)
+ create mode 100644 arch/arm64/include/asm/dmi.h
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a474de346be6..560996c4a172 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -307,6 +307,16 @@ config EFI
+ 	  allow the kernel to be booted as an EFI application. This
+ 	  is only useful on systems that have UEFI firmware.
+ 
++config DMI
++	bool "Enable support for SMBIOS (DMI) tables"
++	depends on EFI
++	default y
++	help
++	  This enables SMBIOS/DMI feature for systems.
++
++	  This option is only useful on systems that have UEFI firmware.
++	  However, even with this option, the resultant kernel should
++	  continue to boot on existing non-UEFI platforms.
+ endmenu
+ 
+ menu "Userspace binary formats"
+diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+new file mode 100644
+index 000000000000..b8758f46fb42
+--- /dev/null
++++ b/arch/arm64/include/asm/dmi.h
+@@ -0,0 +1,28 @@
++/*
++ * arch/arm64/include/asm/dmi.h
++ *
++ * Copyright (C) 2013 Linaro Limited.
++ * Written by: Yi Li (yi.li at linaro.org)
++ *
++ * based on arch/ia64/include/asm/dmi.h
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++
++#ifndef _ASM_DMI_H
++#define _ASM_DMI_H 1
++
++#include <linux/slab.h>
++#include <linux/efi.h>
++
++/* Use efi mappings for DMI */
++#define dmi_early_remap(x, l)		efi_lookup_mapped_addr(x)
++#define dmi_early_unmap(x, l)
++#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
++#define dmi_unmap(x)
++#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
++
++#endif
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 46d1125571f6..4075e46282b1 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -43,6 +43,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
+ #include <linux/efi.h>
++#include <linux/dmi.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/cputype.h>
+@@ -413,6 +414,7 @@ void __init setup_arch(char **cmdline_p)
+ static int __init arm64_device_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	dmi_scan_machine();
+ 	return 0;
+ }
+ arch_initcall_sync(arm64_device_init);
+-- 
+1.8.3.2
