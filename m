@@ -1,195 +1,167 @@
-From: ast@plumgrid.com (Alexei Starovoitov)
-Date: Wed, 2 Jul 2014 14:28:44 -0700
-Subject: [PATCH RFC] arm64: eBPF JIT compiler
-In-Reply-To: <1404278424-31176-1-git-send-email-zlim.lnx@gmail.com>
-References: <1404278424-31176-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <CAMEtUuy8Dxzcn1svphvxVEGwSL1yvMuDN8uQC_4d-h3Cw33TfQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jul 2014 22:33:40 +0100
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140702222817.1262a7b0@free-electrons.com>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+ <20140702191832.5e9f35fc@free-electrons.com>
+ <20140702175857.GR32514@n2100.arm.linux.org.uk>
+ <20140702222817.1262a7b0@free-electrons.com>
+Message-ID: <20140702213340.GT32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 1, 2014 at 10:20 PM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
-> The JIT compiler emits A64 instructions. It supports eBPF only.
-> Legacy BPF is supported thanks to conversion by BPF core.
->
-> JIT is enabled in the same way as for other architectures:
->
->         echo 1 > /proc/sys/net/core/bpf_jit_enable
->
-> Or for additional compiler output:
->
->         echo 2 > /proc/sys/net/core/bpf_jit_enable
->
-> See Documentation/networking/filter.txt for more information.
->
-> The implementation passes all 57 tests in lib/test_bpf.c
-> on ARMv8 Foundation Model :)
+On Wed, Jul 02, 2014 at 10:28:17PM +0200, Thomas Petazzoni wrote:
+> Russell,
+> 
+> On Wed, 2 Jul 2014 18:58:57 +0100, Russell King - ARM Linux wrote:
+> 
+> > You say that, but Dove is PJ4B too (I forget whether it's PJ4B or not.)
+> > The only way to be sure is to compare the ID numbers.  The AP510 in
+> > Dove I have here has an ID register value of 0x560f5815.  This ties up
+> > with the PJ4B entry in proc-v7.S:
+> > 
+> >         .type   __v7_pj4b_proc_info, #object
+> > __v7_pj4b_proc_info:
+> >         .long   0x560f5800
+> >         .long   0xff0fff00
+> >         __v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+> >         .size   __v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+> > 
+> > How does that compare to the ID you see on Armada 370 and XP?  (I've
+> > no idea what IDs you get there...)  If the ID is different, then we
+> > should be able to solve this pretty easily for these CPUs by creating
+> > a new proc_info record as I think I have previously suggested.
+> 
+> The ID for Armada 370 is 0x560f5811, but the last digit is the "Product
+> Revision Number", so I'm not sure it can be used to distinguish Dove
+> from Armada 370. However, I believe we could simply run Dove in a
+> Write-Allocate cache policy.
+> 
+> > With a separate record, we can set the S bit if we need to, and we can
+> > also set the write-allocate mode too, now that the patch I sent you
+> > is in mainline (which is something I definitely indicated along with
+> > that patch.)
+> > 
+> > I've not really said anything new in this email which I haven't said
+> > before, with the exception of stating what the ID is for the Dove SoC
+> > I have.  That's the only ID I know, and I assume that those working on
+> > mvebu have a better idea what ID numbers are found across all the
+> > families.
+> 
+> Russell, please again what I've asked numerous times. I already wrote
+> the patches that creates specific proc_info structures for Armada 370
+> and Armada XP to set the cache policy and S bit, as you suggested. But
+> this is only setting the PMD flags, but doesn't touch the TTB flags,
+> which remain only defined by ALT_UP/ALT_SMP conditional. And I remember
+> Catalin saying that having PMD flags varying from the TTB flags could
+> be a problem.
 
-Looks great. Comments below:
+That's where having a separate processor struct comes in (which we
+already have for the pj4b) and having a separate switch_mm which knows
+to set the TTB flags to write allocate.
 
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -43,6 +43,7 @@ TEXT_OFFSET := 0x00080000
->  export TEXT_OFFSET GZFLAGS
->
->  core-y         += arch/arm64/kernel/ arch/arm64/mm/
-> +core-y         += arch/arm64/net/
+> Sorry to be a bit harsh here but you seem to assume that I'm an idiot
+> who didn't read what you said, and you simply repeat again and again
+> that your patch already solves the problem by allowing the proc_info
+> structure to define the PMD flags. But you never answered my question
+> about the TTB flags, which is the question I've been asking since
+> several e-mails already.
 
-please use instead:
-core-$(CONFIG_NET)
+You're assuming that I remember all the details each time... I know
+that you have sent me several times all the details about what each
+Armada device requires, and each time I've briefly read it and thought
+"yes, I must get to that" and then never have done.  That's why we're
+not making progress - I haven't had the time to read and digest your
+messages properly.  For example, if you asked me right now what
+Armada XP requires, whether it's SMP or not, I really couldn't tell
+you.
 
-> +
-> +#define BITSMASK(bits) ((1 << (bits)) - 1)
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 6e1b2da..310834e 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -483,14 +483,14 @@ __v7_ca9mp_proc_info:
+>  __v7_pj4b_proc_info:
+>  	.long	0x560f5810
+>  	.long	0xff0ffff0
+> -	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+> +	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions, mm_mmuflags = PMD_SECT_WBWA
+>  	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+>  
+>  	.type   __v7_pj4b_mp_proc_info, #object
+>  __v7_pj4b_mp_proc_info:
+>  	.long	0x560f5840
+>  	.long	0xff0ffff0
+> -	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+> +	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions, mm_mmuflags = PMD_SECT_WBWA|PMD_SECT_S
+>  	.size	__v7_pj4b_mp_proc_info, . - __v7_pj4b_mp_proc_info
+>  #endif
 
-there is GENMASK macro already.
+Right, so you're using pj4b_processor_functions here.
 
-> +/* Compare & branch (immediate) */
-> +static inline u32 A64_COMP_BRANCH_IMM(int sf, int op, int imm19, int Rt)
+#ifdef CONFIG_CPU_PJ4B
+        globl_equ       cpu_pj4b_switch_mm,     cpu_v7_switch_mm
+        globl_equ       cpu_pj4b_set_pte_ext,   cpu_v7_set_pte_ext
+        globl_equ       cpu_pj4b_proc_init,     cpu_v7_proc_init
 
-odd function name. lower case it?
+So we need to delete the first (switch_mm) so we can replace it.  I
+think we may need a second set of processor functions to deal with
+the MP version as well.  Most of these would need to be aliased
+to the cpu_pj4b versions, except for the switch_mm one too.
 
-> +/* Conditional branch (immediate) */
-> +static inline u32 A64_COND_BRANCH_IMM(int o1, int imm19, int o0, int cond)
+You may wish to consider changing switch_mm to look something like the
+following.  I'm assuming that for pj4b you just need WBWA for both
+the inner and the outer, but not the shared bit - you'll need to change
+that if it needs something else:
 
-same and in several other places.
-I guess you're trying to make the usage look similar for macro and function
-calls. I don't think the look-alike is worth it. Functions should be lower case.
+ENTRY(cpu_pj4b_switch_mm)
+	orr	r0, r0, #TTB_IRGN_WBWA | TTB_RGN_OC_WBWA
+	b	1f
+ENTRY(cpu_pj4b_mp_switch_mm)
+	orr	r0, r0, #TTB_FLAGS_SMP
+	b	1f
+	
+ENTRY(cpu_v7_switch_mm)
+#ifdef CONFIG_MMU
+        ALT_SMP(orr     r0, r0, #TTB_FLAGS_SMP)
+        ALT_UP(orr      r0, r0, #TTB_FLAGS_UP)
+1:      mmid    r1, r1                          @ get mm->context.id
+        mov     r2, #0
+#ifdef CONFIG_ARM_ERRATA_430973
+        mcr     p15, 0, r2, c7, c5, 6           @ flush BTAC/BTB
+#endif
+...
+ENDPROC(cpu_v7_switch_mm)
+ENDPROC(cpu_pj4b_switch_mm)
+ENDPROC(cpu_pj4b_mp_switch_mm)
 
-> +#define EMIT(insn) emit(insn, ctx)
+That gets rid of the one in the switch_mm path.  The setup
+function is much more icky.
 
-extra macro just to save one argument? I would add ...,ctx) explicitly.
+I think __v7_setup needs splitting up - especially due to all the
+errata in there.  I think we ought to add a whole load of processor
+proc_info's - for ARM Cortex-A8, Cortex-A9, Cortex-A15 etc.  Each
+one calls a separate setup function which runs only the appropriate
+errata fixups for that core (which eliminates a load of testing in
+__v7_setup).
 
-> +#define EMIT_A64_MOV_I64(reg, val) emit_A64_MOV_I64(reg, val, ctx)
+This also means we can split the v7_ttb_setup macro and change it
+to be per CPU.  (I'm not entirely convinced right now that TTB1
+isn't initialised with an undefined value - I can't see where r8
+is setup amongst the mess that this has turned into.
 
-same here and in other cases.
+I'm not sure what this means for the 3level v7 code - that's something
+I've never looked at except a brief glance when it went in.  The
+v7_ttb_setup there looks rather complicated and might make the changes
+I outlined above much harder.  That also isn't something I can play
+around with because I've never been able to get Linux running on the
+Versatile Express with the CPU card that would support that code.  We
+may need to enlist Catalin's help to modify that code.
 
-> +static void build_prologue(struct jit_ctx *ctx)
-> +{
-> +       const u8 r6 = bpf2a64[BPF_REG_6];
-> +       const u8 r7 = bpf2a64[BPF_REG_7];
-> +       const u8 r8 = bpf2a64[BPF_REG_8];
-> +       const u8 r9 = bpf2a64[BPF_REG_9];
-> +       const u8 fp = bpf2a64[BPF_REG_FP];
-> +       const u8 ra = bpf2a64[BPF_REG_A];
-> +       const u8 rx = bpf2a64[BPF_REG_X];
-> +       const u8 tmp1 = bpf2a64[TMP_REG_1];
-> +       const u8 tmp2 = bpf2a64[TMP_REG_2];
-> +       int stack_size = MAX_BPF_STACK;
-> +
-> +       stack_size += 16; /* extra for skb_copy_bit buffer */
+That's about the best guidance I can give this evening, and I hope
+it helps you.
 
-why extra 16? skb_copy_bits is called with max len 4
-
-> +       /* Save callee-saved register */
-> +       EMIT(A64_PUSH(r6, r7, A64_SP));
-
-simd style double push requires consecutive registers or not? Just curious.
-
-> +/* From load_pointer in net/core/filter.c.
-> + * XXX: should we just export it? */
-> +extern void *bpf_internal_load_pointer_neg_helper(const struct sk_buff *skb,
-> +                                                 int k, unsigned int size);
-> +static void *load_pointer_helper(const struct sk_buff *skb, int k,
-> +                                unsigned int size, void *buffer)
-
-That's an interesting way of supporting negative offsets!
-probably makes sense to move load_pointer() from net/core/filter.c into filter.h
-and export bpf_internal_load_pointer_neg_helper() in filter.h as well,
-but I'm not sure which tree you want this stuff to go through.
-If it's arm tree, then it's better to keep things as you did and do a
-cleanup patch
-later. If net-next, then it's better to do it cleanly right away.
-
-> +       case BPF_ALU | BPF_MOD | BPF_X:
-> +       case BPF_ALU64 | BPF_MOD | BPF_X:
-> +               ctx->tmp_used = 1;
-> +               EMIT(A64_UDIV(is64, tmp, dst, src));
-> +               EMIT(A64_MUL(is64, tmp, tmp, src));
-> +               EMIT(A64_SUB(is64, dst, dst, tmp));
-> +               break;
-
-there needs to be run-time check for src == 0
-
-> +       /* dst = dst OP imm */
-> +       case BPF_ALU | BPF_ADD | BPF_K:
-> +       case BPF_ALU64 | BPF_ADD | BPF_K:
-> +               ctx->tmp_used = 1;
-> +               EMIT_A64_MOV_I(is64, tmp, imm);
-> +               EMIT(A64_ADD(is64, dst, dst, tmp));
-> +               break;
-
-Potential for future optimizations on small immediate?
-
-> +       /* function call */
-> +       case BPF_JMP | BPF_CALL:
-> +       {
-> +               const u8 r0 = bpf2a64[BPF_REG_0];
-> +               const u64 func = (u64)__bpf_call_base + imm;
-> +
-> +               ctx->tmp_used = 1;
-> +               EMIT_A64_MOV_I64(tmp, func);
-> +               EMIT(A64_PUSH(A64_FP, A64_LR, A64_SP));
-> +               EMIT(A64_MOV(1, A64_FP, A64_SP));
-> +               EMIT(A64_BLR(tmp));
-
-Aren't on arm64 kernel and module_alloc() addresses in the same 32-bit range?
-Do you really need 'jump by register' then? Regular 'bl' would be much faster.
-
-> +       /* R0 = ntohx(*(size *)(((struct sk_buff *)R6)->data + imm)) */
-> +       case BPF_LD | BPF_ABS | BPF_W:
-> +       case BPF_LD | BPF_ABS | BPF_H:
-> +       case BPF_LD | BPF_ABS | BPF_B:
-> +       case BPF_LD | BPF_ABS | BPF_DW:
-
-there is no such LD_ABS + DW instruction yet.
-Would be trivial to add, but let's not rush it in just because it's so easy.
-
-> +       /* R0 = ntohx(*(size *)(((struct sk_buff *)R6)->data + src + imm)) */
-> +       case BPF_LD | BPF_IND | BPF_W:
-> +       case BPF_LD | BPF_IND | BPF_H:
-> +       case BPF_LD | BPF_IND | BPF_B:
-> +       case BPF_LD | BPF_IND | BPF_DW:
-> +       {
-> +               const u8 r0 = bpf2a64[BPF_REG_0]; /* r0 = return value */
-> +               const u8 r6 = bpf2a64[BPF_REG_6]; /* r6 = pointer to sk_buff */
-> +               const u8 fp = bpf2a64[BPF_REG_FP];
-> +               const u8 r1 = bpf2a64[BPF_REG_1]; /* r1: struct sk_buff *skb */
-> +               const u8 r2 = bpf2a64[BPF_REG_2]; /* r2: int k */
-> +               const u8 r3 = bpf2a64[BPF_REG_3]; /* r3: unsigned int size */
-> +               const u8 r4 = bpf2a64[BPF_REG_4]; /* r4: void *buffer */
-> +               const u8 r5 = bpf2a64[BPF_REG_5]; /* r5: void *(*func)(...) */
-> +               int size;
-> +
-> +               EMIT(A64_MOV(1, r1, r6));
-> +               EMIT_A64_MOV_I(0, r2, imm);
-> +               if (BPF_MODE(code) == BPF_IND)
-> +                       EMIT(A64_ADD(0, r2, r2, src));
-> +               switch (BPF_SIZE(code)) {
-> +               case BPF_W:
-> +                       size = 4;
-> +                       break;
-> +               case BPF_H:
-> +                       size = 2;
-> +                       break;
-> +               case BPF_B:
-> +                       size = 1;
-> +                       break;
-> +               case BPF_DW:
-> +                       size = 8;
-
-there is no DW in ld_abs/ld_ind. Let's not rush it in.
-
-> +notyet:
-> +               pr_info("*** NOT YET: opcode %02x ***\n", code);
-> +               return -EFAULT;
-
-It's ok to implement JIT support step by step.
-Just change pr_info() to pr_info_once() not to spam the logs.
-
-> +       default:
-> +               pr_err("unknown opcode %02x\n", code);
-
-same.
-
-Overall looks great. Thank you for doing all this work!
-
-Alexei
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
