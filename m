@@ -1,33 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  2 Jul 2014 14:56:18 +0200
-Subject: [PATCH 2/2] ARM: kirkwood: add devtmpfs to kirkwood_defconfig
-In-Reply-To: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404305778-17757-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 02 Jul 2014 08:59:56 -0400
+Subject: [PATCH v2 2/5] efi/x86: efistub: move shared dependencies to
+ <asm/efi.h>
+In-Reply-To: <1403792617-25792-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1403792617-25792-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1404305996.19665.7.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The devtmpfs filesystem is now widely used and generally needed to
-boot Linux systems. 42 ARM defconfigs have it enabled, so it makes
-sense to have it enabled as well in kirkwood_defconfig.
+On Thu, 2014-06-26 at 16:23 +0200, Ard Biesheuvel wrote:
+> This moves definitions depended upon both by code under arch/x86/boot and
+> under drivers/firmware/efi to <asm/efi.h>. This is in preparation of turning
+> the stub code under drivers/firmware/efi into a static library.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/x86/boot/compressed/eboot.c |  5 +----
+>  arch/x86/boot/compressed/eboot.h | 16 ----------------
+>  arch/x86/include/asm/efi.h       | 25 +++++++++++++++++++++++++
+>  3 files changed, 26 insertions(+), 20 deletions(-)
+> 
+> diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
+> index 0331d765c2bb..2fd5e2643623 100644
+> --- a/arch/x86/boot/compressed/eboot.c
+> +++ b/arch/x86/boot/compressed/eboot.c
+> @@ -19,10 +19,7 @@
+>  
+>  static efi_system_table_t *sys_table;
+>  
+> -static struct efi_config *efi_early;
+> -
+> -#define efi_call_early(f, ...)						\
+> -	efi_early->call(efi_early->f, __VA_ARGS__);
+> +struct efi_config *efi_early;
+>  
+>  #define BOOT_SERVICES(bits)						\
+>  static void setup_boot_services##bits(struct efi_config *c)		\
+> diff --git a/arch/x86/boot/compressed/eboot.h b/arch/x86/boot/compressed/eboot.h
+> index c88c31ecad12..d487e727f1ec 100644
+> --- a/arch/x86/boot/compressed/eboot.h
+> +++ b/arch/x86/boot/compressed/eboot.h
+> @@ -103,20 +103,4 @@ struct efi_uga_draw_protocol {
+>  	void *blt;
+>  };
+>  
+> -struct efi_config {
+> -	u64 image_handle;
+> -	u64 table;
+> -	u64 allocate_pool;
+> -	u64 allocate_pages;
+> -	u64 get_memory_map;
+> -	u64 free_pool;
+> -	u64 free_pages;
+> -	u64 locate_handle;
+> -	u64 handle_protocol;
+> -	u64 exit_boot_services;
+> -	u64 text_output;
+> -	efi_status_t (*call)(unsigned long, ...);
+> -	bool is64;
+> -} __packed;
+> -
+>  #endif /* BOOT_COMPRESSED_EBOOT_H */
+> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+> index 1eb5f6433ad8..55059a50a01f 100644
+> --- a/arch/x86/include/asm/efi.h
+> +++ b/arch/x86/include/asm/efi.h
+> @@ -156,6 +156,31 @@ static inline efi_status_t efi_thunk_set_virtual_address_map(
+>  	return EFI_SUCCESS;
+>  }
+>  #endif /* CONFIG_EFI_MIXED */
+> +
+> +
+> +/* arch specific definitions used by the stub code */
+> +
+> +struct efi_config {
+> +	u64 image_handle;
+> +	u64 table;
+> +	u64 allocate_pool;
+> +	u64 allocate_pages;
+> +	u64 get_memory_map;
+> +	u64 free_pool;
+> +	u64 free_pages;
+> +	u64 locate_handle;
+> +	u64 handle_protocol;
+> +	u64 exit_boot_services;
+> +	u64 text_output;
+> +	efi_status_t (*call)(unsigned long, ...);
+> +	bool is64;
+> +} __packed;
+> +
+> +extern struct efi_config *efi_early;
+> +
+> +#define efi_call_early(f, ...)						\
+> +	efi_early->call(efi_early->f, __VA_ARGS__);
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/kirkwood_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+That shouldn't have the trailing ;
 
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 2da96bc..5827c5f 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -49,6 +49,8 @@ CONFIG_NET_PKTGEN=m
- CONFIG_CFG80211=y
- CONFIG_MAC80211=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
--- 
-2.0.0
+> +
+>  #else
+>  /*
+>   * IF EFI is not configured, have the EFI calls return -ENOSYS.
