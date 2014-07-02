@@ -1,72 +1,52 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 01 Jul 2014 23:40:56 -0700
-Subject: [PATCH] clk: sunxi: fix devm_ioremap_resource error detection code
-In-Reply-To: <53AF35D2.4090904@elopez.com.ar>
-References: <20140628172355.GA3387@himangi-Dell>
- <53AF024B.3010100@free-electrons.com>
- <53AF35D2.4090904@elopez.com.ar>
-Message-ID: <20140702064056.23338.13139@quantum>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Jul 2014 14:48:35 +0800
+Subject: [PATCH] ARM: cpu_pj4b_suspend_size should base on cpu_v7_suspend_size
+Message-ID: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2014-06-28 14:38:26)
-> Hi,
-> 
-> El 28/06/14 14:58, Boris BREZILLON escribi?:
-> > Hello,
-> >
-> > On 28/06/2014 19:23, Himangi Saraogi wrote:
-> >> devm_ioremap_resource returns an ERR_PTR value, not NULL, on failure.
-> >>
-> >> A simplified version of the semantic match that finds this problem is as
-> >> follows:
-> >>
-> >> // <smpl>
-> >> @@
-> >> expression e,e1;
-> >> statement S;
-> >> @@
-> >>
-> >> *e = devm_ioremap_resource(...);
-> >> if (!e1) S
-> >>
-> >> // </smpl>
-> >> Signed-off-by: Himangi Saraogi<himangi774@gmail.com>
-> >> Acked-by: Julia Lawall<julia.lawall@lip6.fr>
-> >> ---
-> >>   drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 2 +-
-> >>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-> >> index 44cd27c..670f90d 100644
-> >> --- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-> >> +++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-> >> @@ -29,7 +29,7 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
-> >>
-> >>      r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>      reg = devm_ioremap_resource(&pdev->dev, r);
-> >> -    if (!reg)
-> >> +    if (IS_ERR(reg))
-> >>              return PTR_ERR(reg);
-> >>
-> >>      clk_parent = of_clk_get_parent_name(np, 0);
-> >
-> > Oops, one more mistake in testing devm_ioremap_resource return code (I
-> > always mix devm_ioremap_resource and devm_request_and_ioremap behaviours).
-> >
-> > Sorry for the inconvenience, and of course, you have my:
-> >
-> > Acked-by Boris BREZILLON <boris.brezillon@free-electrons.com>
-> 
-> Mike, do you want to take this directly for the -rc cycle, or should I 
-> queue it for 3.17? Please let me know.
+Since pj4b suspend/resume routines are implemented based on generic
+ARMv7 ones, instead of hard-coding cpu_pj4b_suspend_size, we should have
+it be cpu_v7_suspend_size plus pj4b specific bytes.  Otherwise, if
+cpu_v7_suspend_size gets updated alone, the pj4b suspend/resume will
+likely be broken.
 
-I've picked it for the current -rc cycle.
+While at it, fix the comments in cpu_pj4b_do_resume, as we're restoring
+CP15 registers rather than saving in there.
 
-Thanks,
-Mike
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Completely untested.
 
-> 
-> Cheers,
-> 
-> Emilio
+ arch/arm/mm/proc-v7.S | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3db2c2f04a30..604dda5f65cc 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -184,16 +184,16 @@ ENDPROC(cpu_pj4b_do_suspend)
+ 
+ ENTRY(cpu_pj4b_do_resume)
+ 	ldmia	r0!, {r6 - r10}
+-	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
+-	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
+-	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
+-	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
+-	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
++	mcr	p15, 1, r6, c15, c1, 0  @ retore CP15 - extra features
++	mcr	p15, 1, r7, c15, c2, 0	@ retore CP15 - Aux Func Modes Ctrl 0
++	mcr	p15, 1, r8, c15, c1, 2	@ retore CP15 - Aux Debug Modes Ctrl 2
++	mcr	p15, 1, r9, c15, c1, 1  @ retore CP15 - Aux Debug Modes Ctrl 1
++	mcr	p15, 0, r10, c9, c14, 0  @ retore CP15 - PMC
+ 	b cpu_v7_do_resume
+ ENDPROC(cpu_pj4b_do_resume)
+ #endif
+ .globl	cpu_pj4b_suspend_size
+-.equ	cpu_pj4b_suspend_size, 4 * 14
++.equ	cpu_pj4b_suspend_size, cpu_v7_suspend_size + 4 * 5
+ 
+ #endif
+ 
+-- 
+1.8.3.2
