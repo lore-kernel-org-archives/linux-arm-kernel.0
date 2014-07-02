@@ -1,34 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Jul 2014 18:01:41 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140702163923.GJ410@sirena.org.uk>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk>
-Message-ID: <20140702170141.GH24879@arm.com>
+From: gorcunov@gmail.com (Cyrill Gorcunov)
+Date: Wed, 2 Jul 2014 21:04:16 +0400
+Subject: [patch 3/4] timerfd: Implement timerfd_ioctl method to restore
+ timerfd_ctx::ticks
+In-Reply-To: <53B4382F.9030908@codeaurora.org>
+References: <20140623185431.396309193@openvz.org>
+ <20140623190345.499956567@openvz.org> <20140624220351.GZ2095@moon>
+ <53B4382F.9030908@codeaurora.org>
+Message-ID: <20140702170416.GG12440@moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 05:39:23PM +0100, Mark Brown wrote:
-> On Wed, Jul 02, 2014 at 11:01:33AM +0100, Will Deacon wrote:
+On Wed, Jul 02, 2014 at 12:49:51PM -0400, Christopher Covington wrote:
+> >  
+> > +#ifdef CONFIG_CHECKPOINT_RESTORE
+> > +static long timerfd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+> > +{
+> > +	struct timerfd_ctx *ctx = file->private_data;
+> > +	int ret = 0;
+> > +
+> > +	switch (cmd) {
+> > +	case TFD_IOC_SET_TICKS: {
+> > +		u64 ticks;
+> > +
+> > +		if (get_user(ticks, (u64 __user *)arg))
 > 
-> >   (1) The hardware doesn't have the instruction at all. If we start
-> >       emulating it, then we'll always have to emulate it and it doesn't
-> >       encourage software migration.
+> 64-bit get_user is currently unsupported on ARM, although it appears work is
+> ongoing [1].
 > 
-> That's what the logging other architectures did in similar situations
-> was intended to help address - even if people don't care about the
-> performance impact having loud complaints in the logs tends to cause
-> some useful subset of users to report it as a problem.
+> 1. https://lkml.org/lkml/2014/6/17/260
 
-I don't think logging something to dmesg is going to make a blind bit of
-difference on an Android device. Maybe we could get SWP emulation to request
-access to the users contacts and send everybody a text message each time
-they issue the instruction?
-
-Seriously though, nothing causes loud complaints like a SIGILL. This thread
-is evidence of that.
-
-Will
+Thanks for info, Christopher! What arm camp is using then, copy-from-user?
