@@ -1,279 +1,49 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 2 Jul 2014 13:40:24 +0100
-Subject: [PATCH 1/3] drivers: reset: stih407: Add softreset, powerdown
- and picophy controllers
-In-Reply-To: <20140702084819.GD10311@lee--X1>
-References: <1404225047-9495-1-git-send-email-peter.griffin@linaro.org>
- <1404225047-9495-2-git-send-email-peter.griffin@linaro.org>
- <20140702084819.GD10311@lee--X1>
-Message-ID: <20140702124024.GD8809@griffinp-ThinkPad-X1-Carbon-2nd>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 02 Jul 2014 08:46:19 -0400
+Subject: [PATCH 0/8] arm: perf: cleanups and initial refactoring
+In-Reply-To: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
+References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <53B3FF1B.2090202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Mark,
 
-Thanks for reviewing, see my inline comments below
-
-> > This patch adds a softreset, powerdown and picophy reset controllers for
-> > the STiH407 SoC.
+On 07/01/2014 11:11 AM, Mark Rutland wrote:
+> While reorganising the ARM perf backend to provide support for
+> heterogeneous PMUs in big.LITTLE systems, I encountered a couple of
+> issues requiring some preparatory work in addition to some opportunities
+> for general cleanup in the backend. This series consists of those
+> initial cleanups.
 > 
-> s/adds a softreset/adds softreset/
-
-Fixed in V2
-
+> Currently the event mapping code in the ARM perf backend requires
+> multi-dimensional tables to map from common event encodings to raw
+> hardware values, where empty slots must be initialised to non-zero
+> values. The current way of organising this results in very large support
+> files which we can simplify with some macro use to remove a few hundred
+> lines and make things more legible.
 > 
-> >  .../bindings/reset/st,sti-picophyreset.txt         |  41 ++++++
-> >  drivers/reset/sti/Kconfig                          |   4 +
-> >  drivers/reset/sti/Makefile                         |   1 +
-> >  drivers/reset/sti/reset-stih407.c                  | 159 +++++++++++++++++++++
-> >  .../dt-bindings/reset-controller/stih407-resets.h  |  60 ++++++++
+> The PMU naming is somewhat of a mess, with most names not being
+> supported by the perf tool. Given that no-one has complained, it seems
+> that the PMUs are not being accessed by name in a perf context, and we
+> can fix these to be consistent and usable with current tools. We update
+> the OProfile name mangling to ensure that OProfile (which accesses the
+> PMUs in its own namespace) are not adversely affected.
 > 
-> Documentation is normally split out as a separate patch.
+> To prepare for reorganisation of the PMU probing code, new
+> platform_device_id values are added to allow ARMv6, ARMv7, and XScale
+> PMU platform_devices to be distinguished.
 
-Ok will seperate out in v2.
+I ran Vince Weaver's perf events test suite [1] against a kernel with these
+patches applied on an 8074 Dragonboard [2] and didn't see any regressions. The
+patches also look good to me.
 
-> > +Please refer to Documentation/devicetree/bindings/reset/reset.txt
-> > +for common reset controller binding usage.
-> > +
-> > +Required properties:
-> > +- compatible: Should be "st,<chip>-softreset"
-> 
-> You need to list the possible values here in full.
+Tested-by: Christopher Covington <cov@codeaurora.org>
 
-Ok changed in V2
-> 
-> > +- #reset-cells: 1, see below
-> > +
-> > +example:
-> 
-> Nit: s/example/Example
+1. https://github.com/deater/perf_event_tests
+2. http://elinux.org/Dragonboard/APQ8074
 
-Changed in V2
-
-> 
-> > +
-> > +	picophyreset: picophyreset-controller {
-> > +		#reset-cells = <1>;
-> > +		compatible = "st,stih407-picophyreset";
-> 
-> Nit: Stick the compatible string at the top.
-
-Changed in V2
-
-> > +
-> > +example:
-> 
-> '\n'
-
-Ok Changed in V2, and I capitialized the 'E' whilst I was there.
-
-> 
-> > +	usb2_picophy0: usbpicophy at 0 {
-> > +		resets = <&picophyreset STIH407_PICOPHY0_RESET>;
-> > +	};
-> > +
-> > +Macro definitions for the supported reset channels can be found in:
-> > +include/dt-bindings/reset-controller/stih407-resets.h
-> > diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
-> > index 88d2d03..f8c15a3 100644
-> > --- a/drivers/reset/sti/Kconfig
-> > +++ b/drivers/reset/sti/Kconfig
-> > @@ -12,4 +12,8 @@ config STIH416_RESET
-> >  	bool
-> >  	select STI_RESET_SYSCFG
-> >  
-> > +config STIH407_RESET
-> > +	bool
-> > +	select STI_RESET_SYSCFG
-> > +
-> 
-> No help?
-
-Nope, currently no other platform using reset API has provided help.
-
-> 
-> >  endif
-> > diff --git a/drivers/reset/sti/Makefile b/drivers/reset/sti/Makefile
-> > index be1c976..dc85dfb 100644
-> > --- a/drivers/reset/sti/Makefile
-> > +++ b/drivers/reset/sti/Makefile
-> > @@ -2,3 +2,4 @@ obj-$(CONFIG_STI_RESET_SYSCFG) += reset-syscfg.o
-> >  
-> >  obj-$(CONFIG_STIH415_RESET) += reset-stih415.o
-> >  obj-$(CONFIG_STIH416_RESET) += reset-stih416.o
-> > +obj-$(CONFIG_STIH407_RESET) += reset-stih407.o
-> 
-> Genuine question: how different are these?  Can they be consolidated?
-
-No, the common code is already abstracted into reset-syscfg.c. The SoC specific parts are
-in the reset-stiXYZ files.
-
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/platform_device.h>
-> > +
-> > +#include <dt-bindings/reset-controller/stih407-resets.h>
-> > +
-> > +#include "reset-syscfg.h"
-> 
-> May as well squash these up.
-
-Fixed in V2, but alters the style versus the other reset-XYZ files in this 
-directory.
-
-> 
-> > +/*
-> > + * STiH407 Peripheral powerdown definitions.
-> > + */
-> 
-> Should be single line comment.
-
-Fixed in V2.
-> 
-> > +static const char stih407_core[] = "st,stih407-core-syscfg";
-> > +static const char stih407_sbc_reg[] = "st,stih407-sbc-reg-syscfg";
-> > +static const char stih407_lpm[] = "st,stih407-lpm-syscfg";
-> > +
-> > +#define STIH407_PDN_0(_bit) \
-> > +	_SYSCFG_RST_CH(stih407_core, SYSCFG_5000, _bit, SYSSTAT_5500, _bit)
-> > +#define STIH407_PDN_1(_bit) \
-> > +	_SYSCFG_RST_CH(stih407_core, SYSCFG_5001, _bit, SYSSTAT_5501, _bit)
-> > +#define STIH407_PDN_ETH(_bit, _stat) \
-> > +	_SYSCFG_RST_CH(stih407_sbc_reg, SYSCFG_4032, _bit, SYSSTAT_4520, _stat)
-> > +
-> > +/* Powerdown requests control 0 */
-> > +#define SYSCFG_5000	0x0
-> > +#define SYSSTAT_5500	0x7d0
-> 
-> Separate these with a '\n'.
-
-Have fixed in V2
-> 
-> > +/* Powerdown requests control 1 (High Speed Links) */
-> > +#define SYSCFG_5001	0x4
-> > +#define SYSSTAT_5501	0x7d4
-> > +
-> > +/* Ethernet powerdown/status/reset */
-> > +#define	SYSCFG_4032	0x80
-> > +#define	SYSSTAT_4520	0x820
-> > +
-> 
-> What does this '\n' separate? Is it an Ethernet related value, or not?
-
-Fixed in V2, have removed the '\n'
-
-> 
-> > +#define	SYSCFG_4002	0x8
-> 
-> Can you address the formatting for all of the above.  Sometimes tabs
-> are used, other times it's spaces and the padding is also different -
-
-Fixed in V2.
-
-> can you standardise to 3 values post-fixing the '0x' i.e. 0xNNN.
-
-I can change this, but it alters the style versus the other reset-XYZ files
-in this directory.
-
-> 
-> > +static const struct syscfg_reset_channel_data stih407_powerdowns[] = {
-> > +	[STIH407_EMISS_POWERDOWN] = STIH407_PDN_0(1),
-> > +	[STIH407_NAND_POWERDOWN] = STIH407_PDN_0(0),
-> > +	[STIH407_USB3_POWERDOWN] = STIH407_PDN_1(6),
-> > +	[STIH407_USB2_PORT1_POWERDOWN] = STIH407_PDN_1(5),
-> > +	[STIH407_USB2_PORT0_POWERDOWN] = STIH407_PDN_1(4),
-> > +	[STIH407_PCIE1_POWERDOWN] = STIH407_PDN_1(3),
-> > +	[STIH407_PCIE0_POWERDOWN] = STIH407_PDN_1(2),
-> > +	[STIH407_SATA1_POWERDOWN] = STIH407_PDN_1(1),
-> > +	[STIH407_SATA0_POWERDOWN] = STIH407_PDN_1(0),
-> > +	[STIH407_ETH1_POWERDOWN] = STIH407_PDN_ETH(0, 2),
-> > +};
-> 
-> Being a little OCD, I _personally_ like to see the '='s lined up with
-> tabs, but some maintainers don't like that.  Philipp's call I guess.
-
-I will leave this one for the maintainer to decide, as maintaining that sort of
-alignment can be time consuming.
-
-> > +static struct syscfg_reset_controller_data stih407_picophyreset_controller = {
-> > +	.wait_for_ack = false,
-> > +	.nr_channels = ARRAY_SIZE(stih407_picophyresets),
-> > +	.channels = stih407_picophyresets,
-> > +};
-> 
-> I believe these should be const.
-
-Fixed in V2.
-
-> 
-> > +static struct of_device_id stih407_reset_match[] = {
-> > +	{.compatible = "st,stih407-powerdown",
-> > +	 .data = &stih407_powerdown_controller,},
-> > +	{.compatible = "st,stih407-softreset",
-> > +	 .data = &stih407_softreset_controller,},
-> > +	{.compatible = "st,stih407-picophyreset",
-> > +	 .data = &stih407_picophyreset_controller,},
-> 
-> Formatting should be:
-> 
-> 	{
-> 		.compatible = "st,stih407-picophyreset",
-> 	 	.data = &stih407_picophyreset_controller,
-> 	},
-
-Changed in V2, but it alters the style versus other reset-XYZ dfiles in this directory.
-
-> > +	{},
-> > +};
-> > +
-> > +static struct platform_driver stih407_reset_driver = {
-> > +	.probe = syscfg_reset_probe,
-> > +	.driver = {
-> > +		   .name = "reset-stih407",
-> > +		   .owner = THIS_MODULE,
-> 
-> Remove this line, it's done for you as part of
-> platform_driver_register().
-
-Fixed in V2.
-
-> 
-> > +		   .of_match_table = stih407_reset_match,
-> > +		   },
-> 
-> Tabbing is borked.
-
-Fixed in V2
-
-> > +/* Synp GMAC PowerDown */
-> > +#define	STIH407_ETH1_POWERDOWN		2
-> 
-> For consistency, either add a line here, or remove the one 3 up.
-
-Fixed in V2
-> 
-> > +/* Powerdown requests control 1 */
-> > +#define STIH407_USB3_POWERDOWN		3
-> > +#define STIH407_USB2_PORT1_POWERDOWN	4
-> > +#define STIH407_USB2_PORT0_POWERDOWN	5
-> > +#define STIH407_PCIE1_POWERDOWN		6
-> > +#define STIH407_PCIE0_POWERDOWN		7
-> > +#define STIH407_SATA1_POWERDOWN		8
-> > +#define STIH407_SATA0_POWERDOWN		9
-> 
-> Do these all line up in your editor? 
-
-Yes
-> 
-> > +#define	STIH407_KEYSCAN_SOFTRESET	26
-> > +#define	STIH407_USB2_PORT0_SOFTRESET	27
-> > +#define	STIH407_USB2_PORT1_SOFTRESET	28
-> 
-> Again, you have tabs here and spaces elsewhere.
-
-Fixed in V2
-
-regards,
-
-Peter.
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
