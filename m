@@ -1,35 +1,53 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 2 Jul 2014 19:51:54 +0200
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140702165628.GO20799@lunn.ch>
-References: <20140702183841.7c964832@armhf>
-	<20140702165628.GO20799@lunn.ch>
-Message-ID: <20140702195154.47d6f6b4@armhf>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Wed, 2 Jul 2014 10:54:26 -0700
+Subject: [RFC PATCH] arm64: Add arch support for PCI
+In-Reply-To: <805EF793-7CA2-4F4A-B7D2-0AF2582EFFAA@codeaurora.org>
+References: <1382529163-31968-1-git-send-email-tinamdar@apm.com>
+ <1382531997.14960.8.camel@mbp>
+ <CACoXjcmJPHdkrGRng8oWosgo9V_pLDNYw5Z3R_yN6w_rUe=G8Q@mail.gmail.com>
+ <805EF793-7CA2-4F4A-B7D2-0AF2582EFFAA@codeaurora.org>
+Message-ID: <CACoXjckS50sQGF54Go-FeoN3MfiX=SXb7s6wYKynBr8BoH8a8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Jul 2014 18:56:28 +0200
-Andrew Lunn <andrew@lunn.ch> wrote:
+On Wed, May 21, 2014 at 11:57 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Nov 21, 2013, at 7:38 AM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+>
+>> This patch adds the PCI(e) arch support in arm64. The files are
+>> based on PCI(e) support in 32bit arm.
+>>
+>>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ---
+>> arch/arm64/Kconfig               |   19 ++
+>> arch/arm64/include/asm/dma.h     |   18 +
+>> arch/arm64/include/asm/pci.h     |   74 ++++
+>> arch/arm64/include/asm/pcibios.h |   98 ++++++
+>> arch/arm64/kernel/Makefile       |    1 +
+>> arch/arm64/kernel/pcibios.c      |  689 ++++++++++++++++++++++++++++++++++++++
+>> arch/arm64/mm/Makefile           |    2 +-
+>> arch/arm64/mm/iomap.c            |   31 ++
+>> drivers/pci/Makefile             |    1 +
+>> 9 files changed, 932 insertions(+), 1 deletion(-)
+>>
+>> create mode 100644 arch/arm64/include/asm/dma.h
+>> create mode 100644 arch/arm64/include/asm/pci.h
+>> create mode 100644 arch/arm64/include/asm/pcibios.h
+>> create mode 100644 arch/arm64/kernel/pcibios.c
+>> create mode 100644 arch/arm64/mm/iomap.c
+>
+> Do you mind reposting this, the version I can find on mailing list archives seems corrupt.  This is at least useful until we get something merged upstream for arm64 pci work.
 
-> How well will this work with Russell concept of a front end and two
-> backends? Can you uses your CODEC twice, once with the I2S backend and
-> a second time with the S/PDIF backend?
+Sure. I have a patch that applies to 3.13 Linux Kernel. I will post that out.
 
-Hi Andrew,
-
-The TDA998x CODEC has two functions:
-- it sets the possible formats and rates when the screen connects and
-- it sets the audio input port when audio streaming starts.
-
-I tested this CODEC with both DAPM and DPCM. If the audio subsystem
-asks for streaming on both I2S and S/PDIF, only the last call is served
-(this depends on the order of the DAI links in the audio card creation
-table).
-
-As I told to Russell, DPCM just asks for a 'system' DAI (front-end),
-but it also asks for some additional code in the kirkwood DMA driver
-because all PCMs are activated on streaming start.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+>
+> thanks
+>
+> - k
+>
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
