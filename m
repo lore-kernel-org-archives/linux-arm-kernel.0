@@ -1,44 +1,80 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 2 Jul 2014 01:10:00 +0000
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <53B2D151.60404@cogentembedded.com>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140627032506.GA18039@shlinux1.ap.freescale.net>
- <20140630133313.GA11880@kwain>
- <20140701002112.GA26146@shlinux1.ap.freescale.net>
- <53B27789.3090509@gmail.com>
- <20140701083007.GB26146@shlinux1.ap.freescale.net>
- <20140701104254.GD3427@piout.net> <53B2D151.60404@cogentembedded.com>
-Message-ID: <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue,  1 Jul 2014 19:03:26 -0700
+Subject: [PATCHv2 1/3] of: Split early_init_dt_scan into two parts
+Message-ID: <1404266608-3274-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+Currently, early_init_dt_scan validates the header, sets the
+boot params, and scans for chosen/memory all in one function.
+Split this up into two separate functions (validation/setting
+boot params in one, scanning in another) to allow for
+additional setup between boot params and scanning the memory.
+
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ drivers/of/fdt.c       | 18 +++++++++++++++++-
+ include/linux/of_fdt.h |  2 ++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index c4cddf0..55bfca9 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -922,7 +922,7 @@ int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
+ }
+ #endif
  
-> 
-> Hello.
-> 
-> On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
-> 
-> >>>>> Well, there is nothing specific about the Berlin CI. Some
-> >>>>> subsystems use the 'generic' keyword in these cases. Do you see a
-> >>>>> particular reason I should use some Berlin related compatible here?
-> 
-> >>>> Not must, one suggestion is: can you change the compatible string
-> >>>> to "chipidea-usb-generic"?
-> 
-> >>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
-> >>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
-> >>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
-> 
-> >> The recommended format for compatible string is:
-> >> "manufacturer,model", I agree with "chipidea,ci13xxx", thanks.
-> 
-> > I think we should probably avoid using wildcards in the compatible
-> > string.
-> 
->     I'm sure wildcards shouldn't be allowed there. :-)
-
-Then, what's your guys recommend, how about "chipidea,usb2-generic"?
-
-Peter
+-bool __init early_init_dt_scan(void *params)
++bool __init early_init_dt_verify(void *params)
+ {
+ 	if (!params)
+ 		return false;
+@@ -936,6 +936,12 @@ bool __init early_init_dt_scan(void *params)
+ 		return false;
+ 	}
+ 
++	return true;
++}
++
++
++void __init early_init_dt_scan_all(void)
++{
+ 	/* Retrieve various information from the /chosen node */
+ 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+ 
+@@ -944,7 +950,17 @@ bool __init early_init_dt_scan(void *params)
+ 
+ 	/* Setup memory, calling early_init_dt_add_memory_arch */
+ 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
++}
++
++bool __init early_init_dt_scan(void *params)
++{
++	bool status;
++
++	status = early_init_dt_verify(params);
++	if (!status)
++		return false;
+ 
++	early_init_dt_scan_all();
+ 	return true;
+ }
+ 
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 0511789..d600993 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -73,6 +73,8 @@ extern int early_init_dt_scan_root(unsigned long node, const char *uname,
+ 				   int depth, void *data);
+ 
+ extern bool early_init_dt_scan(void *params);
++extern bool early_init_dt_verify(void *params);
++extern void early_init_dt_scan_all(void);
+ 
+ extern const char *of_flat_dt_get_machine_name(void);
+ extern const void *of_flat_dt_match_machine(const void *default_match,
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
