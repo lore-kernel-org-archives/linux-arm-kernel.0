@@ -1,135 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 2 Jul 2014 12:21:25 +0100
-Subject: [PATCH 4/5] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <1404291772-2644-5-git-send-email-jingchang.lu@freescale.com>
-References: <1404291772-2644-1-git-send-email-jingchang.lu@freescale.com>
- <1404291772-2644-5-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140702112125.GE14665@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Jul 2014 12:22:22 +0100
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140702112222.GK18731@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 10:02:51AM +0100, Jingchang Lu wrote:
-> From: Jingchang Lu <b35083@freescale.com>
+On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
+> Some architectures do not have a simple view of the PCI I/O space
+> and instead use a range of CPU addresses that map to bus addresses. For
+> some architectures these ranges will be expressed by OF bindings
+> in a device tree file.
 > 
-> The LS1021A SoC is a dual-core Cortex-A7 based processor,
-> this add the initial support for it.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> ---
->  arch/arm/mach-imx/Kconfig        | 17 ++++++++++++++
->  arch/arm/mach-imx/Makefile       |  2 ++
->  arch/arm/mach-imx/mach-ls1021a.c | 49 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 68 insertions(+)
->  create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index bdfe276..7f24892 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -762,6 +762,23 @@ config SOC_VF610
->  	help
->  	  This enable support for Freescale Vybrid VF610 processor.
->  
-> +config FSL_SOC
-> +	bool
-> +
-> +config SOC_LS1021A
-> +	bool "Freescale LS1021A support"
-> +	select CPU_V7
-> +	select ARM_GIC
-> +	select CLKSRC_OF
-> +	select HAVE_ARM_ARCH_TIMER
-> +	select HAVE_SMP
-> +	select FSL_SOC
-> +	select MIGHT_HAVE_PCI
-> +	select PCI_DOMAINS if PCI
-> +
-> +	help
-> +	  This enable support for Freescale LS1021A  processor.
-> +
->  endif
->  
->  source "arch/arm/mach-imx/devices/Kconfig"
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index a364e20..f49cbdb 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -114,4 +114,6 @@ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
->  
->  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
->  
-> +obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
-> +
->  obj-y += devices/
-> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-> new file mode 100644
-> index 0000000..d1a9bb9
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/mach-ls1021a.c
-> @@ -0,0 +1,49 @@
+> Introduce a pci_register_io_range() helper function with a generic
+> implementation that can be used by such architectures to keep track
+> of the I/O ranges described by the PCI bindings. If the PCI_IOBASE
+> macro is not defined that signals lack of support for PCI and we
+> return an error.
+
+[...]
+
 > +/*
-> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
+> + * Record the PCI IO range (expressed as CPU physical address + size).
+> + * Return a negative value if an error has occured, zero otherwise
 > + */
-> +
-> +#include <linux/of_platform.h>
-> +#include <asm/mach/arch.h>
-> +
-> +#include "common.h"
-> +
-> +static const struct of_device_id of_ls1021a_match_table[] = {
-> +	{
-> +		.compatible =	"simple-bus",
-> +	},
-> +	{
-> +		.compatible     = "fsl,ifc",
-> +	},
-> +	{
-> +		.compatible	= "fsl,fpga-qixis",
-> +	},
-> +	{
-> +		.compatible	= "fsl,qe",
-> +	},
-> +	{}
-> +};
-
-Are any of thse not always-on (or default-on) MMIO busses?
-
-Is there any reason for not giving them their own drivers?
-
-> +
-> +static void __init ls1021a_init_machine(void)
+> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
 > +{
-> +	mxc_arch_reset_init_dt();
-
-This looks to only be used to set up a watchdog timer. Is there any
-reason this logic can't be moved to the watchdog timer driver?
-
-> +	of_platform_populate(NULL, of_ls1021a_match_table, NULL, NULL);
-> +}
+> +#ifdef PCI_IOBASE
+> +	struct io_range *res;
+> +	resource_size_t allocated_size = 0;
 > +
-> +static const char *ls1021a_dt_compat[] __initdata = {
-> +	"fsl,ls1021a",
-> +	NULL,
-> +};
+> +	/* check if the range hasn't been previously recorded */
+> +	list_for_each_entry(res, &io_range_list, list) {
+> +		if (addr >= res->start && addr + size <= res->start + size)
+> +			return 0;
+> +		allocated_size += res->size;
+> +	}
 > +
-> +DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-> +#ifdef CONFIG_ZONE_DMA
-> +	.dma_zone_size	= SZ_128M,
-> +#endif
-> +	.init_machine   = ls1021a_init_machine,
-> +	.dt_compat	= ls1021a_dt_compat,
-> +	.restart	= mxc_restart,
+> +	/* range not registed yet, check for available space */
+> +	if (allocated_size + size - 1 > IO_SPACE_LIMIT)
+> +		return -E2BIG;
+> +
+> +	/* add the range to the list */
+> +	res = kzalloc(sizeof(*res), GFP_KERNEL);
+> +	if (!res)
+> +		return -ENOMEM;
+> +
+> +	res->start = addr;
+> +	res->size = size;
+> +
+> +	list_add_tail(&res->list, &io_range_list);
+> +
+> +	return 0;
 
-AFAICT, that jsut uses the WDT for restart. Why can't the watchdog
-driver register itself as a restart device?
+Hopefully a stupid question, but how is this serialised? I'm just surprised
+that adding to and searching a list are sufficient, unless there's a big
+lock somewhere.
 
-That would bring us close to an empty machine descriptor, and enable
-reuse of the WDT and those busses.
-
-Thanks,
-Mark.
+Will
