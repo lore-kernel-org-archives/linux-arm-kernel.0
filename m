@@ -1,57 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 2 Jul 2014 12:34:28 +0100
-Subject: [PATCH v2 4/5] phy: miphy365x: Represent each PHY channel as a
- subnode
-In-Reply-To: <53B3DE4F.1040100@ti.com>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
- <20140630144114.GB25926@lee--X1> <53B3DE4F.1040100@ti.com>
-Message-ID: <20140702113428.GA16724@lee--X1>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 2 Jul 2014 12:15:28 +0100
+Subject: [PATCH v2 5/5] efi: efistub: convert into static library
+In-Reply-To: <1403792617-25792-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1403792617-25792-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140702111528.GL7539@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Monday 30 June 2014 08:11 PM, Lee Jones wrote:
-> > phy: miphy365x: Represent each PHY channel as a DT subnode
-> > 
-> > This has the added advantages of being able to enable/disable each
-> > of the channels as simply as enabling/disabling the DT node.
-> > 
-> > Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> > index 1109f42..2c4ea6e 100644
-> > --- a/drivers/phy/phy-miphy365x.c
-> > +++ b/drivers/phy/phy-miphy365x.c
-
-[...]
-
-> > -static int miphy365x_of_probe(struct device_node *np,
-> > +static int miphy365x_of_probe(struct platform_device *pdev,
-> >  			      struct miphy365x_dev *phy_dev)
-> >  {
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	struct device_node *child;
-> > +	int child_count = 0;
-> > +
-> > +	for_each_child_of_node(np, child)
-> > +		child_count++;
+On Thu, 26 Jun, at 04:23:37PM, Ard Biesheuvel wrote:
+> This patch changes both x86 and arm64 efistub implementations from #including
+> shared .c files under drivers/firmware/efi to building the shared code as a
+> static library.
 > 
-> use of_get_child_count() instead.
+> The x86 code uses a stub built into the boot executable which uncompresses the
+> kernel at boot time. In this case, the library is linked into the decompressor.
+> 
+> In the arm64 case, the stub is part of the kernel proper so the library is
+> linked into the kernel proper as well.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Ah, nice. I'll do that.
+OK, this breaks the ia64 build because of the following...
 
-[...]
+/drivers/firmware/efi/libstub/efi-stub-helper.c:14:21: fatal error: asm/efi.h: No such file or directory
 
-> I think you can merge this to your original patch.
+> diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+> index e1096539eedb..d9abdbc962f1 100644
+> --- a/drivers/firmware/efi/Makefile
+> +++ b/drivers/firmware/efi/Makefile
+> @@ -1,7 +1,7 @@
+>  #
+>  # Makefile for linux kernel
+>  #
+> -obj-$(CONFIG_EFI)			+= efi.o vars.o
+> +obj-$(CONFIG_EFI)			+= efi.o vars.o libstub/
+>  obj-$(CONFIG_EFI_VARS)			+= efivars.o
+>  obj-$(CONFIG_EFI_VARS_PSTORE)		+= efi-pstore.o
+>  obj-$(CONFIG_UEFI_CPER)			+= cper.o
 
-I can do that, but I thought It'd be nice to keep some history and
-show the migration over to a different setup.  This is particularly
-important for when we back-port the changes back into the internal
-development kernel.
+I guess what we need is CONFIG_EFI_LIBSTUB selected by both
+CONFIG_EFI_STUB (for x86) and CONFIG_EFI_ARMSTUB (for arm64)? e.g.
+
+obj-$(CONFIG_EFI_LIBSTUB)		libstub/
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Matt Fleming, Intel Open Source Technology Center
