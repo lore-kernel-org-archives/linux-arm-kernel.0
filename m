@@ -1,44 +1,46 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 3 Jul 2014 02:43:23 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add CAN DT support
+Date: Thu, 3 Jul 2014 02:46:16 +0400
+Subject: [PATCH 2/2] ARM: shmobile: henninger: add CAN0 DT support
 In-Reply-To: <201407030239.15921.sergei.shtylyov@cogentembedded.com>
 References: <201407030239.15921.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201407030243.25237.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201407030246.17501.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7791 parts of the CAN0/1 device nodes.
+Define the Henninger board dependent part of the CAN0 device node.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7791.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7791-henninger.dts |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -518,6 +518,22 @@
- 		status = "disabled";
+--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
++++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+@@ -125,6 +125,11 @@
+ 				 "msiof0_tx";
+ 		renesas,function = "msiof0";
  	};
++
++	can0_pins: can0 {
++		renesas,groups = "can0_data_a", "can_clk_d";
++		renesas,function = "can0";
++	};
+ };
  
-+	can0: can at e6e80000 {
-+		compatible = "renesas,rcar-can";
-+		reg = <0 0xe6e80000 0 0x1000>;
-+		interrupts = <0 186 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7791_CLK_RCAN0>;
-+		status = "disabled";
-+	};
+ &scif0 {
+@@ -175,6 +180,12 @@
+ 	status = "okay";
+ };
+ 
++&can0 {
++	pinctrl-0 = <&can0_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++};
 +
-+	can1: can at e6e88000 {
-+		compatible = "renesas,rcar-can";
-+		reg = <0 0xe6e88000 0 0x1000>;
-+		interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7791_CLK_RCAN1>;
-+		status = "disabled";
-+	};
-+
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
+ &i2c2 {
+ 	pinctrl-0 = <&i2c2_pins>;
+ 	pinctrl-names = "default";
