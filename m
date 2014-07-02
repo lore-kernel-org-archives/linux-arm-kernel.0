@@ -1,117 +1,105 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 2 Jul 2014 23:50:25 +0200
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <20140702213340.GT32514@n2100.arm.linux.org.uk>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140702164147.GQ32514@n2100.arm.linux.org.uk>
- <20140702191832.5e9f35fc@free-electrons.com>
- <20140702175857.GR32514@n2100.arm.linux.org.uk>
- <20140702222817.1262a7b0@free-electrons.com>
- <20140702213340.GT32514@n2100.arm.linux.org.uk>
-Message-ID: <20140702235025.33025455@free-electrons.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Wed, 02 Jul 2014 15:11:13 -0700
+Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable coherent
+ HTW
+In-Reply-To: <e64e7ca617d64093bbe5dc7caf9283e1@BL2PR03MB468.namprd03.prod.outlook.com>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-8-git-send-email-ohaugan@codeaurora.org>
+ <e64e7ca617d64093bbe5dc7caf9283e1@BL2PR03MB468.namprd03.prod.outlook.com>
+Message-ID: <53B48381.9050707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Wed, 2 Jul 2014 22:33:40 +0100, Russell King - ARM Linux wrote:
-
-> That's where having a separate processor struct comes in (which we
-> already have for the pj4b) and having a separate switch_mm which knows
-> to set the TTB flags to write allocate.
-
-Ah, okay.
-
-> You're assuming that I remember all the details each time... I know
-> that you have sent me several times all the details about what each
-> Armada device requires, and each time I've briefly read it and thought
-> "yes, I must get to that" and then never have done.  That's why we're
-> not making progress - I haven't had the time to read and digest your
-> messages properly.  For example, if you asked me right now what
-> Armada XP requires, whether it's SMP or not, I really couldn't tell
-> you.
-
-That's surely something I understand perfectly. It took me a while to
-get in my head all the requirements of the various SoCs, so I certainly
-understand that someone not working on a daily with only those specific
-SoCs can easily lose track of what each SoC requires.
-
-Maybe I should write up a summary document/web-page of the requirements
-of each SoC, with their identifier values, all progressively add all
-the relevant details as the discussion progresses.
-
-> Right, so you're using pj4b_processor_functions here.
+On 7/1/2014 1:49 AM, Varun Sethi wrote:
 > 
-> #ifdef CONFIG_CPU_PJ4B
->         globl_equ       cpu_pj4b_switch_mm,     cpu_v7_switch_mm
->         globl_equ       cpu_pj4b_set_pte_ext,   cpu_v7_set_pte_ext
->         globl_equ       cpu_pj4b_proc_init,     cpu_v7_proc_init
 > 
-> So we need to delete the first (switch_mm) so we can replace it.  I
-> think we may need a second set of processor functions to deal with
-> the MP version as well.  Most of these would need to be aliased
-> to the cpu_pj4b versions, except for the switch_mm one too.
-> 
-> You may wish to consider changing switch_mm to look something like the
-> following.  I'm assuming that for pj4b you just need WBWA for both
-> the inner and the outer, but not the shared bit - you'll need to change
-> that if it needs something else:
-> 
-> ENTRY(cpu_pj4b_switch_mm)
-> 	orr	r0, r0, #TTB_IRGN_WBWA | TTB_RGN_OC_WBWA
-> 	b	1f
-> ENTRY(cpu_pj4b_mp_switch_mm)
-> 	orr	r0, r0, #TTB_FLAGS_SMP
-> 	b	1f
-> 	
-> ENTRY(cpu_v7_switch_mm)
-> #ifdef CONFIG_MMU
->         ALT_SMP(orr     r0, r0, #TTB_FLAGS_SMP)
->         ALT_UP(orr      r0, r0, #TTB_FLAGS_UP)
-> 1:      mmid    r1, r1                          @ get mm->context.id
->         mov     r2, #0
-> #ifdef CONFIG_ARM_ERRATA_430973
->         mcr     p15, 0, r2, c7, c5, 6           @ flush BTAC/BTB
-> #endif
-> ...
-> ENDPROC(cpu_v7_switch_mm)
-> ENDPROC(cpu_pj4b_switch_mm)
-> ENDPROC(cpu_pj4b_mp_switch_mm)
-> 
-> That gets rid of the one in the switch_mm path.  The setup
-> function is much more icky.
-> 
-> I think __v7_setup needs splitting up - especially due to all the
-> errata in there.  I think we ought to add a whole load of processor
-> proc_info's - for ARM Cortex-A8, Cortex-A9, Cortex-A15 etc.  Each
-> one calls a separate setup function which runs only the appropriate
-> errata fixups for that core (which eliminates a load of testing in
-> __v7_setup).
-> 
-> This also means we can split the v7_ttb_setup macro and change it
-> to be per CPU.  (I'm not entirely convinced right now that TTB1
-> isn't initialised with an undefined value - I can't see where r8
-> is setup amongst the mess that this has turned into.
-> 
-> I'm not sure what this means for the 3level v7 code - that's something
-> I've never looked at except a brief glance when it went in.  The
-> v7_ttb_setup there looks rather complicated and might make the changes
-> I outlined above much harder.  That also isn't something I can play
-> around with because I've never been able to get Linux running on the
-> Versatile Express with the CPU card that would support that code.  We
-> may need to enlist Catalin's help to modify that code.
-> 
-> That's about the best guidance I can give this evening, and I hope
-> it helps you.
+>> -----Original Message-----
+>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+>> bounces at lists.linux-foundation.org] On Behalf Of Olav Haugan
+>> Sent: Monday, June 30, 2014 10:22 PM
+>> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
+>> foundation.org
+>> Cc: linux-arm-msm at vger.kernel.org; will.deacon at arm.com;
+>> thierry.reding at gmail.com; vgandhi at codeaurora.org
+>> Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable
+>> coherent HTW
+>>
+>> Add a new iommu domain attribute that can be used to enable cache
+>> coherent hardware table walks (HTW) by the SMMU. HTW might be supported
+>> by the SMMU HW but depending on the use case and the usage of the SMMU in
+>> the SoC it might not be always beneficial to always turn on coherent HTW
+>> for all domains/iommu's.
+>>
+> [Sethi Varun-B16395] Why won't you want to use the coherent table walk feature?
 
-Wow, thanks a lot for all those details. It'll also take me a little
-while to digest these informations, and see what I can implement based
-on that.
+Very good question. We have found that turning on IOMMU coherent HTW is
+not always beneficial to performance (performance either the same or
+slightly worse in some cases). Even if the perf. is the same we would
+like to avoid using precious L2 cache for no benefit to the IOMMU.
+Although our HW supports this feature we don't always want to turn this
+on for a specific use case/domain (bus master).
 
-Thanks again!
+>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+>> ---
+>>  drivers/iommu/msm_iommu-v1.c | 16 ++++++++++++++++
+>>  include/linux/iommu.h        |  1 +
+>>  2 files changed, 17 insertions(+)
+>>
+>> diff --git a/drivers/iommu/msm_iommu-v1.c b/drivers/iommu/msm_iommu-v1.c
+>> index 2c574ef..e163ffc 100644
+>> --- a/drivers/iommu/msm_iommu-v1.c
+>> +++ b/drivers/iommu/msm_iommu-v1.c
+>> @@ -1456,8 +1456,16 @@ static int msm_domain_get_attr(struct iommu_domain
+>> *domain,
+>>  			       enum iommu_attr attr, void *data)  {
+>>  	s32 ret = 0;
+>> +	struct msm_iommu_priv *priv = domain->priv;
+>>
+>>  	switch (attr) {
+>> +	case DOMAIN_ATTR_COHERENT_HTW:
+>> +	{
+>> +		s32 *int_ptr = (s32 *) data;
+>> +
+>> +		*int_ptr = priv->pt.redirect;
+>> +		break;
+>> +	}
+>>  	default:
+>>  		pr_err("Unsupported attribute type\n");
+>>  		ret = -EINVAL;
+>> @@ -1471,8 +1479,16 @@ static int msm_domain_set_attr(struct iommu_domain
+>> *domain,
+>>  			       enum iommu_attr attr, void *data)  {
+>>  	s32 ret = 0;
+>> +	struct msm_iommu_priv *priv = domain->priv;
+>>
+>>  	switch (attr) {
+>> +	case DOMAIN_ATTR_COHERENT_HTW:
+>> +	{
+>> +		s32 *int_ptr = (s32 *) data;
+>> +
+>> +		priv->pt.redirect = *int_ptr;
+>> +		break;
+>> +	}
+>>  	default:
+>>  		pr_err("Unsupported attribute type\n");
+>>  		ret = -EINVAL;
+>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h index
+>> 63dca6d..6d9596d 100644
+>> --- a/include/linux/iommu.h
+>> +++ b/include/linux/iommu.h
+>> @@ -81,6 +81,7 @@ enum iommu_attr {
+>>  	DOMAIN_ATTR_FSL_PAMU_STASH,
+>>  	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>>  	DOMAIN_ATTR_FSL_PAMUV1,
+>> +	DOMAIN_ATTR_COHERENT_HTW,
+> [Sethi Varun-B16395] Would it make sense to represent this as DOMAIN_ATTR_SMMU_COHERENT_HTW? I believe this is specific to SMMU.
 
-Thomas
+Yes, it does.
+
+Thanks,
+
+Olav Haugan
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
