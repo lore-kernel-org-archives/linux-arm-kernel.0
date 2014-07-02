@@ -1,57 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu,  3 Jul 2014 07:40:17 +0900
-Subject: [PATCH v2 04/17] ASoC: samsung: no more support for S5P6440 and
- S5P6450 SoCs
-Message-ID: <1404340817-28902-1-git-send-email-kgene.kim@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 3 Jul 2014 02:43:23 +0400
+Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add CAN DT support
+In-Reply-To: <201407030239.15921.sergei.shtylyov@cogentembedded.com>
+References: <201407030239.15921.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201407030243.25237.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes s5p64x0 related WM8580 because of removing support
-for s5p64x0 SoCs.
+Define the generic R8A7791 parts of the CAN0/1 device nodes.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Mark Brown <broonie@linaro.org>
-[pebolle at tiscali.nl: reported missing dependency for smdk6450]
-Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- sound/soc/samsung/Kconfig          | 4 ++--
- sound/soc/samsung/smdk_wm8580pcm.c | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 753b8c9..4f8d22f 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
+Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
++++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+@@ -518,6 +518,22 @@
+ 		status = "disabled";
+ 	};
  
- config SND_SOC_SAMSUNG_SMDK_WM8580
- 	tristate "SoC I2S Audio support for WM8580 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDK6440 || MACH_SMDK6450 || MACH_SMDKV210 || MACH_SMDKC110)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
- 	depends on REGMAP_I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_I2S
-@@ -178,7 +178,7 @@ config SND_SOC_SAMSUNG_SMDK_SPDIF
- 
- config SND_SOC_SMDK_WM8580_PCM
- 	tristate "SoC PCM Audio support for WM8580 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDK6450 || MACH_SMDKV210 || MACH_SMDKC110)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDKV210 || MACH_SMDKC110)
- 	depends on REGMAP_I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_PCM
-diff --git a/sound/soc/samsung/smdk_wm8580pcm.c b/sound/soc/samsung/smdk_wm8580pcm.c
-index e119aaa..63d0793 100644
---- a/sound/soc/samsung/smdk_wm8580pcm.c
-+++ b/sound/soc/samsung/smdk_wm8580pcm.c
-@@ -25,7 +25,7 @@
-  *  o '0' means 'OFF'
-  *  o 'X' means 'Don't care'
-  *
-- * SMDK6410, SMDK6440, SMDK6450 Base B/D: CFG1-0000, CFG2-1111
-+ * SMDK6410 Base B/D: CFG1-0000, CFG2-1111
-  * SMDKC110, SMDKV210: CFGB11-100100, CFGB12-0000
-  */
- 
--- 
-1.8.2.1.339.g52a3e01
++	can0: can at e6e80000 {
++		compatible = "renesas,rcar-can";
++		reg = <0 0xe6e80000 0 0x1000>;
++		interrupts = <0 186 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7791_CLK_RCAN0>;
++		status = "disabled";
++	};
++
++	can1: can at e6e88000 {
++		compatible = "renesas,rcar-can";
++		reg = <0 0xe6e88000 0 0x1000>;
++		interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7791_CLK_RCAN1>;
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
