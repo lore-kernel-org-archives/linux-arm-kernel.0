@@ -1,46 +1,61 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 02 Jul 2014 10:29:45 -0400
-Subject: [PATCH 1/2] efi/arm64: fix potential NULL dereference of
- efi.systab
-In-Reply-To: <CAKv+Gu-SLQC82q7Rj5ZusbFxwysy7KpRhZ=vw1ipXu9kvq46aQ@mail.gmail.com>
-References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-SLQC82q7Rj5ZusbFxwysy7KpRhZ=vw1ipXu9kvq46aQ@mail.gmail.com>
-Message-ID: <1404311385.19665.15.camel@deneb.redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 02 Jul 2014 16:23:35 +0200
+Subject: [GIT PULL FOR v3.17] Renesas CMT, MTU2 and TMU timers DT support
+In-Reply-To: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <2296815.Nb0BXfBtnT@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-07-02 at 12:13 +0200, Ard Biesheuvel wrote:
-> > On 2 July 2014 12:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > We assign efi.systab using efi_lookup_mapped_addr(), and test for !NULL, but
-> > then go on an dereference it anyway.
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/kernel/efi.c | 7 +++++--
-> >  1 file changed, 5 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > index 56c3327bbf79..e785f93f17cb 100644
-> > --- a/arch/arm64/kernel/efi.c
-> > +++ b/arch/arm64/kernel/efi.c
-> > @@ -419,8 +419,11 @@ static int __init arm64_enter_virtual_mode(void)
-> >         }
-> >
-> >         efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
-> > -       if (efi.systab)
-> > -               set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-> > +       if (!efi.systab) {
-> > +               pr_err("Failed to remap EFI System Table!\n");
-> 
-> ... this needs a kfree(virtmap) as well.
-> 
+Hi Daniel,
 
-And probably should unmap all the remapped regions in virtmap first.
-Presumably the systab will be in a runtime memory region which gets
-virtual mapping from remap_region(). If that succeeds, then the
-efi_lookup_mapped_addr should always succeed. But to be careful,
-we should probably bail out earlier if remap_region() ever returns
-zero. If all remaps work and efi_lookup_mapped_addr() fails, then
-we should try ioremap_cache() directly. Or do what x86 does and make
-a local copy of the table earlier when we early_memremap() it in
-uefi_init().
+Could you please merge pull the following changes for v3.17 ? They have 
+previously been posted as "[PATCH v4] Renesas CMT, MTU2 and TMU timers DT 
+support". The only change compared to that version is a rebase on top of 
+v3.16-rc3.
+
+As last time I have board and SoC changes that depend on the driver changes 
+and that will need to go through Simon's tree. Could you thus please provide a 
+stable branch based on one of the v3.16-rc tags ?
+
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+
+are available in the git repository at:
+
+  git://linuxtv.org/pinchartl/fbdev.git timers/upstream/drivers
+
+for you to fetch changes up to 64a653a02e47e3cfdab45d0b52c4522a09bed590:
+
+  clocksource: sh_mtu2: Add DT support (2014-07-02 16:01:53 +0200)
+
+----------------------------------------------------------------
+Laurent Pinchart (10):
+      clocksource: sh_cmt: Drop support for legacy platform data
+      clocksource: sh_cmt: Replace global spinlock with a per-device spinlock
+      clocksource: sh_tmu: Drop support for legacy platform data
+      clocksource: sh_tmu: Replace global spinlock with a per-device spinlock
+      clocksource: sh_mtu2: Drop support for legacy platform data
+      clocksource: sh_mtu2: Replace global spinlock with a per-device spinlock
+      clocksource: shmobile: Remove unused sh_timer_config members
+      clocksource: sh_cmt: Add DT support
+      clocksource: sh_tmu: Add DT support
+      clocksource: sh_mtu2: Add DT support
+
+ Documentation/devicetree/bindings/timer/renesas,cmt.txt |  47 +++++
+ .../devicetree/bindings/timer/renesas,mtu2.txt          |  39 ++++
+ Documentation/devicetree/bindings/timer/renesas,tmu.txt |  39 ++++
+ drivers/clocksource/sh_cmt.c                            | 233 ++++++---------
+ drivers/clocksource/sh_mtu2.c                           | 146 +++++----------
+ drivers/clocksource/sh_tmu.c                            | 127 ++++++-------
+ include/linux/sh_timer.h                                |   5 -
+ 7 files changed, 309 insertions(+), 327 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
+
+-- 
+Regards,
+
+Laurent Pinchart
