@@ -1,43 +1,41 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Jul 2014 15:23:36 +0800
-Subject: [PATCH] ARM: add revision info for PL310 errata 588369 and 727915
-Message-ID: <1404285816-3763-1-git-send-email-shawn.guo@freescale.com>
+Date: Wed, 2 Jul 2014 15:28:27 +0800
+Subject: [PATCH] ARM: imx: drop PL310 errata 588369 and 727915
+Message-ID: <1404286107-9553-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add revision info for PL310_ERRATA_588369 and PL310_ERRATA_727915 to
-help people understand if they need to enable the errata for their
-hardware.
+The PL310 integrated on i.MX6 series and VF610 are revision r3p1 and
+later.  Per ARM PL310 errata document, 588369 is fixed in r2p0 and
+727915 is fixed in r3p1.  Neither is needed for i.MX6 or VF610.  So
+let's drop them.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mm/Kconfig | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/Kconfig | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index eda0dd0ab97b..9fb8a02b7e35 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -907,8 +907,8 @@ config PL310_ERRATA_588369
- 	   They are architecturally defined to behave as the execution of a
- 	   clean operation followed immediately by an invalidate operation,
- 	   both performing to the same memory location. This functionality
--	   is not correctly implemented in PL310 as clean lines are not
--	   invalidated as a result of these operations.
-+	   is not correctly implemented in PL310 prior to r2p0 (fixed in r2p0)
-+	   as clean lines are not invalidated as a result of these operations.
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index ca187bea74ca..1350785e15a6 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -722,8 +722,6 @@ config SOC_IMX6
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
+ 	select MFD_SYSCON
+-	select PL310_ERRATA_588369 if CACHE_PL310
+-	select PL310_ERRATA_727915 if CACHE_PL310
+ 	select PL310_ERRATA_769419 if CACHE_PL310
  
- config PL310_ERRATA_727915
- 	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
-@@ -919,7 +919,8 @@ config PL310_ERRATA_727915
- 	  PL310 can handle normal accesses while it is in progress. Under very
- 	  rare circumstances, due to this erratum, write data can be lost when
- 	  PL310 treats a cacheable write transaction during a Clean &
--	  Invalidate by Way operation.
-+	  Invalidate by Way operation.  Revisions prior to r3p1 are affected by
-+	  this errata (fixed in r3p1).
+ config SOC_IMX6Q
+@@ -759,8 +757,6 @@ config SOC_VF610
+ 	select ARM_GIC
+ 	select PINCTRL_VF610
+ 	select VF_PIT_TIMER
+-	select PL310_ERRATA_588369 if CACHE_PL310
+-	select PL310_ERRATA_727915 if CACHE_PL310
+ 	select PL310_ERRATA_769419 if CACHE_PL310
  
- config PL310_ERRATA_753970
- 	bool "PL310 errata: cache sync operation may be faulty"
+ 	help
 -- 
 1.8.3.2
