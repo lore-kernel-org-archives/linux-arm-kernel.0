@@ -1,47 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Jul 2014 15:45:57 +0100
-Subject: [PATCH 0/8] arm: perf: cleanups and initial refactoring
-In-Reply-To: <53B3FF1B.2090202@codeaurora.org>
-References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
- <53B3FF1B.2090202@codeaurora.org>
-Message-ID: <20140702144557.GE24879@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Jul 2014 16:43:40 +0200
+Subject: [PATCH 1/2] ARM: kirkwood: add appended DTB support in
+ kirkwood_defconfig
+In-Reply-To: <20140702143950.GN23978@titan.lakedaemon.net>
+References: <1404305778-17757-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702134655.GE20799@lunn.ch>
+ <20140702142510.GM23978@titan.lakedaemon.net>
+ <20140702143157.GH20799@lunn.ch>
+ <20140702143950.GN23978@titan.lakedaemon.net>
+Message-ID: <20140702144340.GJ20799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 01:46:19PM +0100, Christopher Covington wrote:
-> Hi Mark,
-> 
-> On 07/01/2014 11:11 AM, Mark Rutland wrote:
-> > While reorganising the ARM perf backend to provide support for
-> > heterogeneous PMUs in big.LITTLE systems, I encountered a couple of
-> > issues requiring some preparatory work in addition to some opportunities
-> > for general cleanup in the backend. This series consists of those
-> > initial cleanups.
-> > 
-> > Currently the event mapping code in the ARM perf backend requires
-> > multi-dimensional tables to map from common event encodings to raw
-> > hardware values, where empty slots must be initialised to non-zero
-> > values. The current way of organising this results in very large support
-> > files which we can simplify with some macro use to remove a few hundred
-> > lines and make things more legible.
-> > 
-> > The PMU naming is somewhat of a mess, with most names not being
-> > supported by the perf tool. Given that no-one has complained, it seems
-> > that the PMUs are not being accessed by name in a perf context, and we
-> > can fix these to be consistent and usable with current tools. We update
-> > the OProfile name mangling to ensure that OProfile (which accesses the
-> > PMUs in its own namespace) are not adversely affected.
-> > 
-> > To prepare for reorganisation of the PMU probing code, new
-> > platform_device_id values are added to allow ARMv6, ARMv7, and XScale
-> > PMU platform_devices to be distinguished.
-> 
-> I ran Vince Weaver's perf events test suite [1] against a kernel with these
-> patches applied on an 8074 Dragonboard [2] and didn't see any regressions. The
-> patches also look good to me.
-> 
-> Tested-by: Christopher Covington <cov@codeaurora.org>
+> Ok, just make kirkwood_defconfig removal a separate patch so we can
+> revert it later if we want.
 
-Thanks for testing, Christopher!
+Hi Jason
 
-Will
+How would that work exactly, without having mach-kirkwood?
+
+    Andrew
