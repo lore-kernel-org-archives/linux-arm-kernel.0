@@ -1,119 +1,43 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 2 Jul 2014 13:24:36 +0530
-Subject: [RFC] [PATCH] ARM: save/restore power control register on
- Cortex-A9 suspend/resume
-In-Reply-To: <alpine.LFD.2.11.1407012324310.16842@knanqh.ubzr>
-References: <1404218750-5025-1-git-send-email-k.chander@samsung.com>
- <20140701124851.GM32514@n2100.arm.linux.org.uk>
- <CADWw7Oi1Lj76yxU6KUrdAc3X0AAabjOJRM+3Xr4UgTiJqWjC-Q@mail.gmail.com>
- <alpine.LFD.2.11.1407012324310.16842@knanqh.ubzr>
-Message-ID: <CANuQgHE5MKXp_dot-VeOPccpzzYB+Wo+iUiXWiMNBrV0aa2XTg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 02 Jul 2014 10:01:10 +0200
+Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7778
+In-Reply-To: <1404274746-26098-1-git-send-email-horms+renesas@verge.net.au>
+References: <1404274746-26098-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <2879829.a9Do9uWj60@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 July 2014 08:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 2 Jul 2014, Chander Kashyap wrote:
->
->> On Tue, Jul 1, 2014 at 6:18 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Jul 01, 2014 at 06:15:49PM +0530, Chander Kashyap wrote:
->> >> The CP15 power register holds clock latency and dynamic clock gating settings
->> >> for Cortex-A9 processor, which lost during the suspend/resume. So it needs to
->> >> be saved/restored on suspend/resume.
->> >>
->> >> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
->> >> ---
->> >>  It is depedent on: ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
->> >>  http://www.spinics.net/lists/arm-kernel/msg340506.html
->> >>
->> >>  arch/arm/mm/proc-v7.S |    6 +++++-
->> >>  1 file changed, 5 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> >> index e26bfaa..9905df5 100644
->> >> --- a/arch/arm/mm/proc-v7.S
->> >> +++ b/arch/arm/mm/proc-v7.S
->> >> @@ -163,12 +163,14 @@ ENDPROC(cpu_v7_do_resume)
->> >>       globl_equ       cpu_ca9mp_switch_mm,    cpu_v7_switch_mm
->> >>       globl_equ       cpu_ca9mp_set_pte_ext,  cpu_v7_set_pte_ext
->> >>  .globl       cpu_ca9mp_suspend_size
->> >> -.equ cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 1 * 4
->> >> +.equ cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 2 * 4
->> >>  #ifdef CONFIG_ARM_CPU_SUSPEND
->> >>  ENTRY(cpu_ca9mp_do_suspend)
->> >>       stmfd   sp!, {r4}
->> >>       mrc     p15, 0, r4, c15, c0, 1  @ Diagnostic register
->> >>       stmia   r0!, {r4}
->> >> +     mrc     p15, 0, r4, c15, c0, 0  @ Power register
->> >> +     stmia   r0!, {r4}
->> >>       ldmfd   sp!, {r4}
->> >
->> > Please combine these - yes, it'll be a larger change, but it'll be much
->> > better.
->>
->> Are asking me to squash this patch with Shawn's patch?
->> If so i will do that.
->
-> I'm not sure that's what RMK ment.
->
-> You should at least merge the loads and stores into a combined ldmia and
-> stmia instructions as illustrated.
+Hi Simon,
 
-Sure I will do that.
+Thank you for the patch.
 
->
->>
->> >
->> >         stmfd   sp!, {r4-r5}
->> >         mrc     p15, 0, r4, c15, c0, 1  @ Diagnostic register
->> >         mrc     p15, 0, r5, c15, c0, 0  @ Power register
->> >         stmia   r0!, {r4-r5}
->> >         ldmfd   sp!, {r4-r5}
->> >
->> >
->> >>       b       cpu_v7_do_suspend
->> >>  ENDPROC(cpu_ca9mp_do_suspend)
->> >> @@ -176,6 +178,8 @@ ENDPROC(cpu_ca9mp_do_suspend)
->> >>  ENTRY(cpu_ca9mp_do_resume)
->> >>       ldmia   r0!, {r4}
->> >>       mcr     p15, 0, r4, c15, c0, 1  @ Diagnostic register
->> >> +     ldmia   r0!, {r4}
->> >> +     mcr     p15, 0, r4, c15, c0, 0  @ Power register
->> >
->> >         ldmia   r0!, {r4-r5}
->> >         mcr     p15, 0, r4, c15, c0, 1  @ Diagnostic register
->> >         mcr     p15, 0, r5, c15, c0, 0  @ Power register
->>
->> I will do these changes
->>
->>
->> Thanks for the review.
->>
->> >
->> >>       b       cpu_v7_do_resume
->> >>  ENDPROC(cpu_ca9mp_do_resume)
->> >>  #endif
->> >
->> > Thanks.
->> >
->> > --
->> > FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
->> > improving, and getting towards what was expected from it.
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Wednesday 02 July 2014 06:19:06 Simon Horman wrote:
+> Simply document a new compat string.
+> There appears to be no need for a driver updates.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Thanks Nicolas
+> ---
+>  Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+> b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt index
+> 64fd7de..8a50a2e 100644
+> --- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+> +++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+> @@ -4,6 +4,7 @@ Required properties:
+> 
+>    - compatible: Must contain one of the following:
+> 
+> +    - "renesas,scif-r8a7778" for R8A7778 (R-Car M1) SCIF compatible UART.
+>      - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
+>      - "renesas,scif-r8a7790" for R8A7790 (R-Car H2) SCIF compatible UART.
+>      - "renesas,scifa-r8a7790" for R8A7790 (R-Car H2) SCIFA compatible UART.
 
 -- 
-with warm regards,
-Chander Kashyap
+Regards,
+
+Laurent Pinchart
