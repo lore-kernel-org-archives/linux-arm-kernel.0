@@ -1,80 +1,31 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 3 Jul 2014 00:26:39 +0900
-Subject: [PATCH RFC v2 3/8] component: add support for component match
- array
-In-Reply-To: <20140701142210.GS32514@n2100.arm.linux.org.uk>
-References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
- <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
- <CA+gwMcdO5P-Yu+-FeHHGxkKwObsATL-ThVDwmEm2_cZ3enUXPQ@mail.gmail.com>
- <20140626144601.GS32514@n2100.arm.linux.org.uk>
- <20140701142210.GS32514@n2100.arm.linux.org.uk>
-Message-ID: <CAAQKjZOf-UoONHFf=6W4j4rXuo0nSJrhK_QesxNR55CEF7XONw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jul 2014 16:27:04 +0100
+Subject: [PATCH v3 RESEND] drm/i2c: tda998x: Fix lack of required reg
+ in DT documentation
+In-Reply-To: <20140619104732.4ae7f6d3@armhf>
+References: <20140619104732.4ae7f6d3@armhf>
+Message-ID: <20140702152704.GL32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-01 23:22 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Jun 26, 2014 at 03:46:01PM +0100, Russell King - ARM Linux wrote:
->> On Thu, Jun 26, 2014 at 02:34:17PM +0200, Philipp Zabel wrote:
->> > Hi Russell,
->> >
->> > On Tue, Jun 24, 2014 at 9:29 PM, Russell King
->> > <rmk+kernel@arm.linux.org.uk> wrote:
->> > [...]
->> > > +/*
->> > > + * Add a component to be matched.
->> > > + *
->> > > + * The match array is first created or extended if necessary.
->> > > + */
->> > > +void component_match_add(struct device *dev, struct component_match **matchptr,
->> > > +       int (*compare)(struct device *, void *), void *compare_data)
->> > > +{
->> > > +       struct component_match *match = *matchptr;
->> > > +
->> > > +       if (IS_ERR(match))
->> > > +               return;
->> > > +
->> > > +       if (!match || match->num == match->alloc) {
->> > > +               size_t new_size = match ? match->alloc + 16 : 15;
->> > > +
->> > > +               match = component_match_realloc(dev, match, new_size);
->> > > +
->> > > +               *matchptr = match;
->> > > +
->> > > +               if (IS_ERR(match))
->> > > +                       return;
->> > > +       }
->> > > +
->> > > +       match->compare[match->num].fn = compare;
->> > > +       match->compare[match->num].data = compare_data;
->> > > +       match->num++;
->> > > +}
->> >
->> > component_match_add should be exported.
->>
->> Fixed, thanks.
->
-> As there's no further comments, and Inki Dae has not responded, I'm
+On Thu, Jun 19, 2014 at 10:47:32AM +0200, Jean-Francois Moine wrote:
+> The I2C address (reg) is required for the TDA998x driver to be loaded
+> and initialized.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> - v3
+> 	- change subject to drm/i2c
+> - v2
+> 	- don't force the I2C address to be 0x70
+> This patch applies to linux-next.
 
-It's has been just a week. I will check and look into your patch
-series. I think Exynos drm should also be considered for the use of
-component match array.
+I had hoped that DT people would pick this up, as it's touching their
+documentation.  However, it seems not, so I've added it to my fixes
+queue, which I'll send RSN to David.
 
-Thanks,
-Inki Dae
+Thanks.
 
-> going to send these out without the RFC tag in the hope that people
-> will provide acks.  This allows us to move forward with this despite
-> the Exynos DRM blockage.
->
-> The ultimate plan is for patches 1 to 3 inclusive to be merged into
-> Greg's driver tree, 1 to 3 and 5 into Greg's staging tree, and 1 to
-> 3 and 4 for David Airlie's DRM tree - patches 1 to 3 are needed for
-> both patches 4 and 5.
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
