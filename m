@@ -1,37 +1,72 @@
-From: fredrik.noring@autoliv.com (Fredrik Noring)
-Date: Wed, 2 Jul 2014 06:02:40 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
-Message-ID: <3FFB61A7A8473C49831AF20FA193534A43CB8B5F@ALVA-EXMB01.alv.autoliv.int>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 01 Jul 2014 23:40:56 -0700
+Subject: [PATCH] clk: sunxi: fix devm_ioremap_resource error detection code
+In-Reply-To: <53AF35D2.4090904@elopez.com.ar>
+References: <20140628172355.GA3387@himangi-Dell>
+ <53AF024B.3010100@free-electrons.com>
+ <53AF35D2.4090904@elopez.com.ar>
+Message-ID: <20140702064056.23338.13139@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> -----Original Message-----
-> > The initial version (marked RFC) attracted very little interest from
-> > testers, or acks.  I'd very much like to have some testing of it, so
-> > if you want to try it out, I can provide you with a git URL, patches
-> > or a combined patch.
+Quoting Emilio L?pez (2014-06-28 14:38:26)
+> Hi,
 > 
-> Sure! A combined gzip patch attachment is fine. Git over HTTP probably
-> works too.
+> El 28/06/14 14:58, Boris BREZILLON escribi?:
+> > Hello,
+> >
+> > On 28/06/2014 19:23, Himangi Saraogi wrote:
+> >> devm_ioremap_resource returns an ERR_PTR value, not NULL, on failure.
+> >>
+> >> A simplified version of the semantic match that finds this problem is as
+> >> follows:
+> >>
+> >> // <smpl>
+> >> @@
+> >> expression e,e1;
+> >> statement S;
+> >> @@
+> >>
+> >> *e = devm_ioremap_resource(...);
+> >> if (!e1) S
+> >>
+> >> // </smpl>
+> >> Signed-off-by: Himangi Saraogi<himangi774@gmail.com>
+> >> Acked-by: Julia Lawall<julia.lawall@lip6.fr>
+> >> ---
+> >>   drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 2 +-
+> >>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+> >> index 44cd27c..670f90d 100644
+> >> --- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+> >> +++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+> >> @@ -29,7 +29,7 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
+> >>
+> >>      r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>      reg = devm_ioremap_resource(&pdev->dev, r);
+> >> -    if (!reg)
+> >> +    if (IS_ERR(reg))
+> >>              return PTR_ERR(reg);
+> >>
+> >>      clk_parent = of_clk_get_parent_name(np, 0);
+> >
+> > Oops, one more mistake in testing devm_ioremap_resource return code (I
+> > always mix devm_ioremap_resource and devm_request_and_ioremap behaviours).
+> >
+> > Sorry for the inconvenience, and of course, you have my:
+> >
+> > Acked-by Boris BREZILLON <boris.brezillon@free-electrons.com>
+> 
+> Mike, do you want to take this directly for the -rc cycle, or should I 
+> queue it for 3.17? Please let me know.
 
-We are still interested in trying out your patches to improve network
-performance. We can do some testing this week and in August.
+I've picked it for the current -rc cycle.
 
-Best regards,
-Fredrik
+Thanks,
+Mike
 
-***************************************************************
-Consider the environment before printing this message.
-
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+> 
+> Cheers,
+> 
+> Emilio
