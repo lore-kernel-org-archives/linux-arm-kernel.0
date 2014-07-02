@@ -1,66 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Jul 2014 15:26:21 +0100
-Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
- suspend/resume
-In-Reply-To: <20140702140134.GA21091@e102568-lin.cambridge.arm.com>
-References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
- <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
- <53A9B80B.7020608@samsung.com>
- <20140701144417.GV32514@n2100.arm.linux.org.uk>
- <53B2E11D.5000507@samsung.com> <20140702123444.GB24879@arm.com>
- <20140702140134.GA21091@e102568-lin.cambridge.arm.com>
-Message-ID: <20140702142620.GJ32514@n2100.arm.linux.org.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 02 Jul 2014 10:29:45 -0400
+Subject: [PATCH 1/2] efi/arm64: fix potential NULL dereference of
+ efi.systab
+In-Reply-To: <CAKv+Gu-SLQC82q7Rj5ZusbFxwysy7KpRhZ=vw1ipXu9kvq46aQ@mail.gmail.com>
+References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-SLQC82q7Rj5ZusbFxwysy7KpRhZ=vw1ipXu9kvq46aQ@mail.gmail.com>
+Message-ID: <1404311385.19665.15.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 03:01:34PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Jul 02, 2014 at 01:34:44PM +0100, Will Deacon wrote:
-> > Does anybody have any ideas? We could try `handling' the undef, but it's
-> > ugly and fragile.
+On Wed, 2014-07-02 at 12:13 +0200, Ard Biesheuvel wrote:
+> > On 2 July 2014 12:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > We assign efi.systab using efi_lookup_mapped_addr(), and test for !NULL, but
+> > then go on an dereference it anyway.
+> >
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm64/kernel/efi.c | 7 +++++--
+> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 56c3327bbf79..e785f93f17cb 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -419,8 +419,11 @@ static int __init arm64_enter_virtual_mode(void)
+> >         }
+> >
+> >         efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
+> > -       if (efi.systab)
+> > -               set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+> > +       if (!efi.systab) {
+> > +               pr_err("Failed to remap EFI System Table!\n");
 > 
-> You could try to treat it the same way as ACTLR (see cpu_v7_do_resume,
-> where the ACTLR is first read, if it is already set, ie equal to the
-> saved value, skip the write); ACTLR suffers from the same issue and IIRC
-> that's why Russell added the "teq" then "write" test at the time
-> cpu_suspend was consolidated.
+> ... this needs a kfree(virtmap) as well.
+> 
 
-We can't do that now for these, because if they were already correct,
-then by definition we wouldn't need to restore them except on secure
-parts.
-
->From the comments that have been made on the subject of these registers,
-it is already the case that non-secure platforms don't restore this
-register, instead relying on the platform to jump through hoops to
-update it _after_ the MMU has been enabled.
-
-Will Deacon raised a point when I discussed this that once the MMU is
-enabled, the hardware doesn't expect the diagnostic register to be
-changed.  So, having platform code (which runs after the MMU has been
-enabled) sounds dodgy to me.
-
-Of course, prior to DT and single zImage, this wouldn't be that big
-a deal, we _could_ work around it via the kernel config or similar,
-insisting that we have a secure and a non-secure build mode.  We don't
-have that "luxury" anymore though.
-
-What this all means is that we can't even augment the suspend/resume
-paths to deal with this register even for secure mode parts.
-
-I, too, don't know what the answer is here.  This is really a totally
-fubar'd situation where there is no solution which will work for
-everyone.
-
-I guess what this ultimately comes down to is that we _did_ accept the
-work-arounds into the kernel source for secure parts - had we not done
-that and set a clear message like ARM64 does that work-arounds must be
-done prior to calling the kernel (irrespective of how that happens,
-iow, whether boot or resume) then we wouldn't have this problem right
-now.  Such a statement would have raised lots of objections though, but
-with hindsight, it would have been the right thing to do to overrule
-those objections and just mandate it.  It would've been a pain for some
-people, but we would not be in this situation now where there is no
-proper solution which works for everyone.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+And probably should unmap all the remapped regions in virtmap first.
+Presumably the systab will be in a runtime memory region which gets
+virtual mapping from remap_region(). If that succeeds, then the
+efi_lookup_mapped_addr should always succeed. But to be careful,
+we should probably bail out earlier if remap_region() ever returns
+zero. If all remaps work and efi_lookup_mapped_addr() fails, then
+we should try ioremap_cache() directly. Or do what x86 does and make
+a local copy of the table earlier when we early_memremap() it in
+uefi_init().
