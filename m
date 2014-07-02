@@ -1,51 +1,74 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Wed,  2 Jul 2014 14:36:16 +0530
-Subject: [PATCH 1/1] arm: perf: Fix build error
-Message-ID: <1404291976-24662-1-git-send-email-sachin.kamat@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Jul 2014 11:14:43 +0200
+Subject: [PATCH] ARM: cpu_pj4b_suspend_size should base on
+ cpu_v7_suspend_size
+In-Reply-To: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
+References: <1404283715-3631-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <53B3CD83.5010301@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing semicolon to fix the following build errors introduced by
-commit 6f73e8ababdd ("arm: perf: clean up PMU names"):
-arch/arm/kernel/perf_event_v6.c:498:2: error: expected ?;? before ?return?
-arch/arm/kernel/perf_event_v6.c:505:2: error: expected ?;? before ?return?
-arch/arm/kernel/perf_event_v6.c:512:2: error: expected ?;? before ?return?
+Hi Shawn,
 
-Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/perf_event_v6.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On 02/07/2014 08:48, Shawn Guo wrote:
+> Since pj4b suspend/resume routines are implemented based on generic
+> ARMv7 ones, instead of hard-coding cpu_pj4b_suspend_size, we should have
+> it be cpu_v7_suspend_size plus pj4b specific bytes.  Otherwise, if
+> cpu_v7_suspend_size gets updated alone, the pj4b suspend/resume will
+> likely be broken.
+> 
+> While at it, fix the comments in cpu_pj4b_do_resume, as we're restoring
+> CP15 registers rather than saving in there.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index 62227d11e874..abfeb04f3213 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -494,21 +494,21 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
- static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	armv6pmu_init(cpu_pmu);
--	cpu_pmu->name		= "armv6_1136"
-+	cpu_pmu->name		= "armv6_1136";
- 	return 0;
- }
- 
- static int armv6_1156_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	armv6pmu_init(cpu_pmu);
--	cpu_pmu->name		= "armv6_1156"
-+	cpu_pmu->name		= "armv6_1156";
- 	return 0;
- }
- 
- static int armv6_1176_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	armv6pmu_init(cpu_pmu);
--	cpu_pmu->name		= "armv6_1176"
-+	cpu_pmu->name		= "armv6_1176";
- 	return 0;
- }
- 
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+and
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+> ---
+> Completely untested.
+> 
+>  arch/arm/mm/proc-v7.S | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 3db2c2f04a30..604dda5f65cc 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -184,16 +184,16 @@ ENDPROC(cpu_pj4b_do_suspend)
+>  
+>  ENTRY(cpu_pj4b_do_resume)
+>  	ldmia	r0!, {r6 - r10}
+> -	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
+> -	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
+> -	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
+> -	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
+> -	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
+> +	mcr	p15, 1, r6, c15, c1, 0  @ retore CP15 - extra features
+> +	mcr	p15, 1, r7, c15, c2, 0	@ retore CP15 - Aux Func Modes Ctrl 0
+> +	mcr	p15, 1, r8, c15, c1, 2	@ retore CP15 - Aux Debug Modes Ctrl 2
+> +	mcr	p15, 1, r9, c15, c1, 1  @ retore CP15 - Aux Debug Modes Ctrl 1
+> +	mcr	p15, 0, r10, c9, c14, 0  @ retore CP15 - PMC
+>  	b cpu_v7_do_resume
+>  ENDPROC(cpu_pj4b_do_resume)
+>  #endif
+>  .globl	cpu_pj4b_suspend_size
+> -.equ	cpu_pj4b_suspend_size, 4 * 14
+> +.equ	cpu_pj4b_suspend_size, cpu_v7_suspend_size + 4 * 5
+>  
+>  #endif
+>  
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
