@@ -1,58 +1,74 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Jul 2014 16:28:34 +0100
-Subject: [PATCH 02/12] mfd: ab8500-debugfs: Simplify invalid debugfs data
- checking
+Date: Wed,  2 Jul 2014 16:28:36 +0100
+Subject: [PATCH 04/12] mfd: stmpe: Rid data size incompatibility warn when
+ building for 64bit
 In-Reply-To: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
 References: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1404314924-23564-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1404314924-23564-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Noticed during a coding review, if we reorganised the checking a
-little, we can rid the code of a pointless 'else'.  Whilst looking
-for this particular code hunk I noticed another pointless 'else',
-which I've subsequently fixed in this patch.
+Extinguishes:
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+../drivers/mfd/stmpe-i2c.c: In function ?stmpe_i2c_probe?:
+../drivers/mfd/stmpe-i2c.c:88:13:
+	warning: cast from pointer to integer of different size
+	partnum = (int)of_id->data;
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-debugfs.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/mfd/stmpe-i2c.c | 4 ++--
+ drivers/mfd/stmpe.c     | 2 +-
+ drivers/mfd/stmpe.h     | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index e23fcba..f7f271c 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -2503,14 +2503,14 @@ static ssize_t ab8500_gpadc_trig_timer_write(struct file *file,
- 	if (err)
- 		return err;
+diff --git a/drivers/mfd/stmpe-i2c.c b/drivers/mfd/stmpe-i2c.c
+index a45f9c0..5c05403 100644
+--- a/drivers/mfd/stmpe-i2c.c
++++ b/drivers/mfd/stmpe-i2c.c
+@@ -68,7 +68,7 @@ MODULE_DEVICE_TABLE(of, stmpe_of_match);
+ static int
+ stmpe_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+ {
+-	int partnum;
++	enum stmpe_partnum partnum;
+ 	const struct of_device_id *of_id;
  
--	if (user_trig_timer <= 255) {
--		trig_timer = (u8) user_trig_timer;
--	} else {
--		dev_err(dev, "debugfs error input: "
--			"should be beetween 0 to 255\n");
-+	if (user_trig_timer & ~0xFF) {
-+		dev_err(dev,
-+			"debugfs error input: should be beetween 0 to 255\n");
- 		return -EINVAL;
- 	}
+ 	i2c_ci.data = (void *)id;
+@@ -85,7 +85,7 @@ stmpe_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+ 		dev_info(&i2c->dev, "matching on node name, compatible is preferred\n");
+ 		partnum = id->driver_data;
+ 	} else
+-		partnum = (int)of_id->data;
++		partnum = (enum stmpe_partnum)of_id->data;
  
-+	trig_timer = (u8) user_trig_timer;
-+
- 	return count;
+ 	return stmpe_probe(&i2c_ci, partnum);
+ }
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index 3b6bfa7..02a17c3 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -1147,7 +1147,7 @@ static void stmpe_of_probe(struct stmpe_platform_data *pdata,
  }
  
-@@ -2764,8 +2764,8 @@ static ssize_t show_irq(struct device *dev,
- 	irq_index = name - irq_first;
- 	if (irq_index >= num_irqs)
- 		return -EINVAL;
--	else
--		return sprintf(buf, "%u\n", irq_count[irq_index]);
-+
-+	return sprintf(buf, "%u\n", irq_count[irq_index]);
- }
+ /* Called from client specific probe routines */
+-int stmpe_probe(struct stmpe_client_info *ci, int partnum)
++int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+ {
+ 	struct stmpe_platform_data *pdata = dev_get_platdata(ci->dev);
+ 	struct device_node *np = ci->dev->of_node;
+diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
+index 9e4d21d..2d045f2 100644
+--- a/drivers/mfd/stmpe.h
++++ b/drivers/mfd/stmpe.h
+@@ -97,7 +97,7 @@ struct stmpe_client_info {
+ 	void (*init)(struct stmpe *stmpe);
+ };
  
- static ssize_t ab8500_subscribe_write(struct file *file,
+-int stmpe_probe(struct stmpe_client_info *ci, int partnum);
++int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum);
+ int stmpe_remove(struct stmpe *stmpe);
+ 
+ #define STMPE_ICR_LSB_HIGH	(1 << 2)
 -- 
 1.8.3.2
