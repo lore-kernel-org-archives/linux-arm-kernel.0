@@ -1,42 +1,26 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 02 Jul 2014 12:17:54 +0200
-Subject: [PATCH v5 04/14] clk: max77686: Improve Maxim 77686 PMIC clocks
- binding
-In-Reply-To: <20140701172959.32686.9863@quantum>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-5-git-send-email-javier.martinez@collabora.co.uk>
- <20140701172959.32686.9863@quantum>
-Message-ID: <53B3DC52.7040803@collabora.co.uk>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 2 Jul 2014 11:19:27 +0100
+Subject: [PATCH 3/3] ARM: STi: STiH407: Add reset controller support.
+In-Reply-To: <20140702085102.GF10311@lee--X1>
+References: <1404225047-9495-1-git-send-email-peter.griffin@linaro.org>
+ <1404225047-9495-4-git-send-email-peter.griffin@linaro.org>
+ <20140702085102.GF10311@lee--X1>
+Message-ID: <20140702101927.GC8809@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mike,
+Hi Lee,
 
-On 07/01/2014 07:29 PM, Mike Turquette wrote:
-> Quoting Javier Martinez Canillas (2014-06-26 11:15:36)
->> Like most clock drivers, the Maxim 77686 PMIC clock binding
->> follows the convention that the "#clock-cells" property is
->> used to specify the number of cells in a clock provider.
->> 
->> But the binding document is not clear enough that it shall
->> be set to 1 since the PMIC support multiple clocks outputs.
->> 
->> Also, explain that the clocks identifiers are defined in a
->> header file that can be included by Device Tree source with
->> client nodes to avoid using magic numbers.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> > +		picophyreset: picophyreset-controller {
+> > +			#reset-cells = <1>;
+> > +			compatible = "st,stih407-picophyreset";
+> > +		};
+> > +
 > 
-> Looks good to me.
-> 
-> Regards,
-> Mike
-> 
+> I'd always put the compatible string at the very top of the node.
 
-Thanks a lot, an Acked-by or Reviewed-by tags for this patch and 03/14 will be
-great as well so I can carry those on the next version of the series.
+Thanks for reviewing, have changed in v2.
 
-Best regards,
-Javier
+regards,
+
+Peter.
