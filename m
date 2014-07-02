@@ -1,48 +1,56 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 2 Jul 2014 10:18:11 +0200
-Subject: [PATCH 03/33] clk: at91: main: warn when the main crystal
- frequency is not set
-In-Reply-To: <1404223962-30471-4-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Wed, 2 Jul 2014 10:20:23 +0200
+Subject: [PATCH 04/33] ARM: at91: prepare common clk transition for rm9200
+In-Reply-To: <1404223962-30471-5-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404223962-30471-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140702101811.2f2a507e@bbrezillon>
+ <1404223962-30471-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140702102023.24f186b8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  1 Jul 2014 16:12:12 +0200
+On Tue,  1 Jul 2014 16:12:13 +0200
 Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-> When the main crystal frequency is not set, the main clock is
-> approximated using the MAINF value in the CKGR_MCFR register. Warn
-> the user in that case.
+> Enclose the rm9200 old clk registration in "#if
+> defined(CONFIG_OLD_CLK_AT91) #endif"
 > 
+
+Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+
 > Signed-off-by: Alexandre Belloni
 > <alexandre.belloni@free-electrons.com> ---
-
-Acked-by: Boris BREZILLON <boris.brezillon@overkiz.com>
-
-Mike, do you want me to take this patch and send you a pull request, or
-should I let you take this one directly ?
-
-Best Regards,
-
-Boris
-
->  drivers/clk/at91/clk-main.c | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/mach-at91/at91rm9200.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-> index 733306131b99..59fa3cc96c9e 100644
-> --- a/drivers/clk/at91/clk-main.c
-> +++ b/drivers/clk/at91/clk-main.c
-> @@ -388,6 +388,7 @@ static unsigned long clk_main_recalc_rate(struct
-> at91_pmc *pmc, if (parent_rate)
->  		return parent_rate;
+> diff --git a/arch/arm/mach-at91/at91rm9200.c
+> b/arch/arm/mach-at91/at91rm9200.c index 787bb50a4dff..038702ee8bc6
+> 100644 --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -26,10 +26,11 @@
+>  #include "at91_aic.h"
+>  #include "soc.h"
+>  #include "generic.h"
+> -#include "clock.h"
+>  #include "sam9_smc.h"
+>  #include "pm.h"
 >  
-> +	pr_warn("Main crystal frequency not set, using approximate
-> value\n"); tmp = pmc_read(pmc, AT91_CKGR_MCFR);
->  	if (!(tmp & AT91_PMC_MAINRDY))
->  		return 0;
+> +#if defined(CONFIG_OLD_CLK_AT91)
+> +#include "clock.h"
+>  /*
+> --------------------------------------------------------------------
+>   *  Clocks
+>   *
+> --------------------------------------------------------------------
+> */ @@ -277,6 +278,9 @@ static void __init
+> at91rm9200_register_clocks(void) clk_register(&pck2);
+> clk_register(&pck3); }
+> +#else
+> +#define at91rm9200_register_clocks NULL
+> +#endif
+>  
+>  /*
+> --------------------------------------------------------------------
+>   *  GPIO
 
 
 
