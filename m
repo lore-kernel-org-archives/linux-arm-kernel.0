@@ -1,87 +1,46 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 02 Jul 2014 11:22:42 +0200
-Subject: [PATCH v5 14/14] ARM: dts: Add max77802 to exynos5420-peach-pit
- and exynos5800-peach-pi
-In-Reply-To: <53B3CED8.4020808@gmail.com>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-15-git-send-email-javier.martinez@collabora.co.uk>
- <53B3CED8.4020808@gmail.com>
-Message-ID: <53B3CF62.2020205@collabora.co.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Jul 2014 11:24:28 +0200
+Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
+In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+Message-ID: <53B3CFCC.50506@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tushar,
+Hi Russell,
 
-Thanks a lot for your feedback.
+On 01/07/2014 17:58, Russell King wrote:
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
+> 
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
+> 
+> Rather than doing this piecemeal, and miss some instances, change all
+> the "mov pc" instances to use the new macro, with the exception of
+> the "movs" instruction and the kprobes code.  This allows us to detect
+> the "mov pc, lr" case and fix it up - and also gives us the possibility
+> of deploying this for other registers depending on the CPU selection.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-On 07/02/2014 11:20 AM, Tushar Behera wrote:
-> On 06/26/2014 11:45 PM, Javier Martinez Canillas wrote:
->> Peach pit and pi boards uses a Maxim 77802 power management
->> IC to drive regulators and its Real Time Clock. This patch
->> adds support for this chip.
->> 
->> These are the device nodes and pinctrl configuration that
->> are present on the Peach pit DeviceTree source file in the
->> the Chrome OS kernel 3.8 tree.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> ---
-> 
-> [ ... ]
-> 
->> +
->> +		regulators {
->> +			buck1_reg: BUCK1 {
->> +				regulator-name = "vdd_mif";
->> +				regulator-min-microvolt = <800000>;
->> +				regulator-max-microvolt = <1300000>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +				regulator-ramp-delay = <12500>;
->> +			};
-> 
-> IMO, adding a blank line between sub-nodes would be better.
-> 
+It booted on Armada XP, Armada 370, Armada 385 and Armada 375
 
-Ok
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
->> +			buck2_reg: BUCK2 {
->> +				regulator-name = "vdd_arm_real";
->> +				regulator-min-microvolt = <800000>;
->> +				regulator-max-microvolt = <1500000>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +				regulator-ramp-delay = <12500>;
->> +			};
-> 
-> [ ... ]
-> 
->> +			vqmmc_sdcard: ldo4_reg: LDO4 {
->> +				regulator-name = "vdd_sd";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-always-on;
->> +
-> 
-> Blank line, can be removed.
->
+Thanks,
 
-Ok
+Gregory
 
->> +			};
-> 
-> [ ... ]
->> +			ldo23_reg: LDO23 {
->> +				regulator-name = "ld0_23";
-> 
-> ldo_23, 'o' in place of '0'.
->
 
-Right, missed that. Thanks for pointing out.
+> ---
 
-> Similar comments for peach-pi DTS file.
-> 
 
-Best regards,
-Javier
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
