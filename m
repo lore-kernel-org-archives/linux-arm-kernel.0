@@ -1,54 +1,109 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 02 Jul 2014 11:43:25 +0300
-Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
-In-Reply-To: <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-4-git-send-email-agross@codeaurora.org>
- <CAL_JsqJTO4htxHMVtMG6mGLmgRtQ7igE1OCX_jXM4xabN76ntg@mail.gmail.com>
- <20140701180114.GA2082@qualcomm.com>
- <CAL_JsqLjjDV50x5LCDeySvV0u4U1om-3KDkFHMd5WouC=eV8kw@mail.gmail.com>
-Message-ID: <1404290605.3622.6.camel@iivanov-dev>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 02 Jul 2014 10:45:24 +0200
+Subject: [PATCH/RFC 3/6] ARM: shmobile: bockw: Initialise SCIF device
+ using DT
+In-Reply-To: <1404275322-26514-4-git-send-email-horms+renesas@verge.net.au>
+References: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
+ <1404275322-26514-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1966232.B2FzpQpRot@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-Hi, 
+Thank you for the patch.
 
-On Tue, 2014-07-01 at 14:47 -0500, Rob Herring wrote:
-> On Tue, Jul 1, 2014 at 1:01 PM, Andy Gross <agross@codeaurora.org> wrote:
-> > On Tue, Jul 01, 2014 at 12:04:35AM -0500, Rob Herring wrote:
-
-<snip>
-
-> > <snip>
-> >
-> >> > +
-> >> > +                       ranges;
-> >> > +
-> >> > +                       status = "disabled";
-> >> > +
-> >> > +                       dwc3 at 11000000 {
-> >> > +                               compatible = "snps,dwc3";
-> >>
-> >> This sub-node is just wrong. Why can't you have a single node with '
-> >> "qcom,dwc3", "snps,dwc3" ' for the compatible property? All you are
-> >> adding here is clocks. Does the Synopsys block have no clocks?
-> >>
-> >> I guess this is copied from other broken dwc3 bindings... That doesn't
-> >> mean you have to copy it.
-> >
-> > The dwc3 core does not deal with clocks.  That is why everyone has a wrapper.
-> > That, in addition to pm, has to be handled from the wrapper.  That's my take
-> > anyway.  I am sure Felipe can speak more to this.
+On Wednesday 02 July 2014 06:28:39 Simon Horman wrote:
+> Initialise SCIF device using DT when booting bockw
+> using DT reference.
 > 
-> That is a Linux driver issue which is irrelevant to the binding.
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-DWC3 IP core from Synopsys is the same across SoC's (OMAP, Exynos..),
-vendors are adding glue IP to provide necessary clocks and voltages. 
-I think that the DT bindings properly reflect this fact.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
+> ---
+> N.B: This only enables the production serial port (scif0) and not the
+> debug serial port. It is unclear to me if the debug port is scif1 or scif5.
+> And if the required PFC support is in place. At the very least the
+> latter appears to be missing from r8a7778-bockw-reference.dts.
+
+It's missing, but could be easily added :-)
+
+> ---
+>  arch/arm/boot/dts/r8a7778-bockw-reference.dts | 14 +++++++++++---
+>  arch/arm/mach-shmobile/setup-r8a7778.c        | 12 ++++++------
+>  2 files changed, 17 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+> b/arch/arm/boot/dts/r8a7778-bockw-reference.dts index f76f6ec..5d14688
+> 100644
+> --- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+> +++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+> @@ -23,6 +23,10 @@
+>  	model = "bockw";
+>  	compatible = "renesas,bockw-reference", "renesas,r8a7778";
+> 
+> +	aliases {
+> +		serial0 = &scif0;
+> +	};
+> +
+>  	chosen {
+>  		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs 
+ip=dhcp
+> rw"; };
+> @@ -70,9 +74,6 @@
+>  };
+> 
+>  &pfc {
+> -	pinctrl-0 = <&scif0_pins>;
+> -	pinctrl-names = "default";
+> -
+>  	scif0_pins: serial0 {
+>  		renesas,groups = "scif0_data_a", "scif0_ctrl";
+>  		renesas,function = "scif0";
+> @@ -124,3 +125,10 @@
+>  		};
+>  	};
+>  };
+> +
+> +&scif0 {
+> +       pinctrl-0 = <&scif0_pins>;
+> +       pinctrl-names = "default";
+> +
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c
+> b/arch/arm/mach-shmobile/setup-r8a7778.c index 2ccc012..e218c46 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7778.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+> @@ -294,12 +294,6 @@ void __init r8a7778_add_dt_devices(void)
+>  	}
+>  #endif
+> 
+> -	r8a7778_register_scif(0);
+> -	r8a7778_register_scif(1);
+> -	r8a7778_register_scif(2);
+> -	r8a7778_register_scif(3);
+> -	r8a7778_register_scif(4);
+> -	r8a7778_register_scif(5);
+>  	r8a7778_register_tmu(0);
+>  }
+> 
+> @@ -508,6 +502,12 @@ static void __init r8a7778_register_hpb_dmae(void)
+>  void __init r8a7778_add_standard_devices(void)
+>  {
+>  	r8a7778_add_dt_devices();
+> +	r8a7778_register_scif(0);
+> +	r8a7778_register_scif(1);
+> +	r8a7778_register_scif(2);
+> +	r8a7778_register_scif(3);
+> +	r8a7778_register_scif(4);
+> +	r8a7778_register_scif(5);
+>  	r8a7778_register_i2c(0);
+>  	r8a7778_register_i2c(1);
+>  	r8a7778_register_i2c(2);
+
+-- 
 Regards,
-Ivan 
 
-> 
-> Rob
+Laurent Pinchart
