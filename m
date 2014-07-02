@@ -1,46 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 02 Jul 2014 11:07:12 +0200
-Subject: [PATCH/RFC 4/6] ARM: shmobile: r8a7778: add TMU clock support for
- DT
-In-Reply-To: <1404275322-26514-5-git-send-email-horms+renesas@verge.net.au>
-References: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
- <1404275322-26514-5-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <10404353.kCosisU6aq@avalon>
+From: sachin.kamat@samsung.com (Sachin Kamat)
+Date: Wed,  2 Jul 2014 14:36:16 +0530
+Subject: [PATCH 1/1] arm: perf: Fix build error
+Message-ID: <1404291976-24662-1-git-send-email-sachin.kamat@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Add missing semicolon to fix the following build errors introduced by
+commit 6f73e8ababdd ("arm: perf: clean up PMU names"):
+arch/arm/kernel/perf_event_v6.c:498:2: error: expected ?;? before ?return?
+arch/arm/kernel/perf_event_v6.c:505:2: error: expected ?;? before ?return?
+arch/arm/kernel/perf_event_v6.c:512:2: error: expected ?;? before ?return?
 
-Thank you for the patch.
+Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_v6.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-On Wednesday 02 July 2014 06:28:40 Simon Horman wrote:
-> This will be used when initialising TMU devices using DT
-> until common clock framework support is added.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  arch/arm/mach-shmobile/clock-r8a7778.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c
-> b/arch/arm/mach-shmobile/clock-r8a7778.c index 9557907..67980a0 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7778.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-> @@ -244,7 +244,9 @@ static struct clk_lookup lookups[] = {
->  	CLKDEV_ICK_ID("src.7", "rcar_sound", &mstp_clks[MSTP524]),
->  	CLKDEV_ICK_ID("src.8", "rcar_sound", &mstp_clks[MSTP523]),
->  	CLKDEV_ICK_ID("fck", "sh-tmu.0", &mstp_clks[MSTP016]),
-> +	CLKDEV_ICK_ID("fck", "ffd80000.timer", &mstp_clks[MSTP016]),
->  	CLKDEV_ICK_ID("fck", "sh-tmu.1", &mstp_clks[MSTP015]),
-> +	CLKDEV_ICK_ID("fck", "ffd81000.timer", &mstp_clks[MSTP015]),
->  };
-> 
->  void __init r8a7778_clock_init(void)
-
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 62227d11e874..abfeb04f3213 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -494,21 +494,21 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv6pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "armv6_1136"
++	cpu_pmu->name		= "armv6_1136";
+ 	return 0;
+ }
+ 
+ static int armv6_1156_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv6pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "armv6_1156"
++	cpu_pmu->name		= "armv6_1156";
+ 	return 0;
+ }
+ 
+ static int armv6_1176_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv6pmu_init(cpu_pmu);
+-	cpu_pmu->name		= "armv6_1176"
++	cpu_pmu->name		= "armv6_1176";
+ 	return 0;
+ }
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
