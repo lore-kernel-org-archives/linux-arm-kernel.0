@@ -1,62 +1,102 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 1 Jul 2014 22:22:49 -0500
-Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
-In-Reply-To: <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
-References: <1402676147-3711-1-git-send-email-balbi@ti.com>
- <1402676147-3711-2-git-send-email-balbi@ti.com>
- <20140613162323.GH8319@saruman.home>
- <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
-Message-ID: <20140702032249.GA26010@saruman.home>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 1 Jul 2014 23:27:04 -0400 (EDT)
+Subject: [RFC] [PATCH] ARM: save/restore power control register on
+ Cortex-A9 suspend/resume
+In-Reply-To: <CADWw7Oi1Lj76yxU6KUrdAc3X0AAabjOJRM+3Xr4UgTiJqWjC-Q@mail.gmail.com>
+References: <1404218750-5025-1-git-send-email-k.chander@samsung.com>
+ <20140701124851.GM32514@n2100.arm.linux.org.uk>
+ <CADWw7Oi1Lj76yxU6KUrdAc3X0AAabjOJRM+3Xr4UgTiJqWjC-Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1407012324310.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2 Jul 2014, Chander Kashyap wrote:
 
-On Fri, Jun 13, 2014 at 07:11:58PM +0000, Paul Walmsley wrote:
-> Hi Felipe, Tomi,
+> On Tue, Jul 1, 2014 at 6:18 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Jul 01, 2014 at 06:15:49PM +0530, Chander Kashyap wrote:
+> >> The CP15 power register holds clock latency and dynamic clock gating settings
+> >> for Cortex-A9 processor, which lost during the suspend/resume. So it needs to
+> >> be saved/restored on suspend/resume.
+> >>
+> >> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> >> ---
+> >>  It is depedent on: ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
+> >>  http://www.spinics.net/lists/arm-kernel/msg340506.html
+> >>
+> >>  arch/arm/mm/proc-v7.S |    6 +++++-
+> >>  1 file changed, 5 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> >> index e26bfaa..9905df5 100644
+> >> --- a/arch/arm/mm/proc-v7.S
+> >> +++ b/arch/arm/mm/proc-v7.S
+> >> @@ -163,12 +163,14 @@ ENDPROC(cpu_v7_do_resume)
+> >>       globl_equ       cpu_ca9mp_switch_mm,    cpu_v7_switch_mm
+> >>       globl_equ       cpu_ca9mp_set_pte_ext,  cpu_v7_set_pte_ext
+> >>  .globl       cpu_ca9mp_suspend_size
+> >> -.equ cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 1 * 4
+> >> +.equ cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 2 * 4
+> >>  #ifdef CONFIG_ARM_CPU_SUSPEND
+> >>  ENTRY(cpu_ca9mp_do_suspend)
+> >>       stmfd   sp!, {r4}
+> >>       mrc     p15, 0, r4, c15, c0, 1  @ Diagnostic register
+> >>       stmia   r0!, {r4}
+> >> +     mrc     p15, 0, r4, c15, c0, 0  @ Power register
+> >> +     stmia   r0!, {r4}
+> >>       ldmfd   sp!, {r4}
+> >
+> > Please combine these - yes, it'll be a larger change, but it'll be much
+> > better.
 > 
-> On Fri, 13 Jun 2014, Felipe Balbi wrote:
+> Are asking me to squash this patch with Shawn's patch?
+> If so i will do that.
+
+I'm not sure that's what RMK ment.
+
+You should at least merge the loads and stores into a combined ldmia and 
+stmia instructions as illustrated.
+
 > 
-> > On Fri, Jun 13, 2014 at 11:15:46AM -0500, Felipe Balbi wrote:
-> > > From: Sathya Prakash M R <sathyap@ti.com>
-> > > 
-> > > Add DSS hwmod data for AM43xx.
-> > > 
-> > > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > > Acked-by: Rajendra Nayak <rnayak@ti.com>
-> > > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
-> > > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > > 
-> > > Note that this patch was originally send on May 9th [1], changes were requested
-> > > and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
-> > > maintainer again and go no response.
-> > > 
-> > > Without this patch, we cannot get display working on any AM437x devices.
-> > > 
-> > > [1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
-> > > [2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
-> > > [3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
-> > > 
-> > >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
-> > >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
-> > >  2 files changed, 99 insertions(+)
+> >
+> >         stmfd   sp!, {r4-r5}
+> >         mrc     p15, 0, r4, c15, c0, 1  @ Diagnostic register
+> >         mrc     p15, 0, r5, c15, c0, 0  @ Power register
+> >         stmia   r0!, {r4-r5}
+> >         ldmfd   sp!, {r4-r5}
+> >
+> >
+> >>       b       cpu_v7_do_suspend
+> >>  ENDPROC(cpu_ca9mp_do_suspend)
+> >> @@ -176,6 +178,8 @@ ENDPROC(cpu_ca9mp_do_suspend)
+> >>  ENTRY(cpu_ca9mp_do_resume)
+> >>       ldmia   r0!, {r4}
+> >>       mcr     p15, 0, r4, c15, c0, 1  @ Diagnostic register
+> >> +     ldmia   r0!, {r4}
+> >> +     mcr     p15, 0, r4, c15, c0, 0  @ Power register
+> >
+> >         ldmia   r0!, {r4-r5}
+> >         mcr     p15, 0, r4, c15, c0, 1  @ Diagnostic register
+> >         mcr     p15, 0, r5, c15, c0, 0  @ Power register
 > 
-> Sorry for the delay on this.  Have been corresponding with TI management 
-> to figure out what to do about patches for AM43xx.  I don't have boards or 
-> public documentation for these devices, so it's impossible for me to 
-
-documentation is now available publicly
-
-http://www.ti.com/product/AM4379
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/a6ba122e/attachment-0001.sig>
+> I will do these changes
+> 
+> 
+> Thanks for the review.
+> 
+> >
+> >>       b       cpu_v7_do_resume
+> >>  ENDPROC(cpu_ca9mp_do_resume)
+> >>  #endif
+> >
+> > Thanks.
+> >
+> > --
+> > FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> > improving, and getting towards what was expected from it.
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
