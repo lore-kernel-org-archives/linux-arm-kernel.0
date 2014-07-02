@@ -1,73 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 2 Jul 2014 10:22:00 +0100
-Subject: [PATCH 1/1] arm: perf: Fix build error
-In-Reply-To: <1404291976-24662-1-git-send-email-sachin.kamat@samsung.com>
-References: <1404291976-24662-1-git-send-email-sachin.kamat@samsung.com>
-Message-ID: <20140702092200.GA14665@leverpostej>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 02 Jul 2014 11:22:42 +0200
+Subject: [PATCH v5 14/14] ARM: dts: Add max77802 to exynos5420-peach-pit
+ and exynos5800-peach-pi
+In-Reply-To: <53B3CED8.4020808@gmail.com>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-15-git-send-email-javier.martinez@collabora.co.uk>
+ <53B3CED8.4020808@gmail.com>
+Message-ID: <53B3CF62.2020205@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hello Tushar,
 
-Thanks for reporting the issue.
+Thanks a lot for your feedback.
 
-As it may not be obvious to others from the commit message alone, this
-is a breakage in linux-next, not mainline.
-
-On Wed, Jul 02, 2014 at 10:06:16AM +0100, Sachin Kamat wrote:
-> Add missing semicolon to fix the following build errors introduced by
-> commit 6f73e8ababdd ("arm: perf: clean up PMU names"):
-> arch/arm/kernel/perf_event_v6.c:498:2: error: expected ?;? before ?return?
-> arch/arm/kernel/perf_event_v6.c:505:2: error: expected ?;? before ?return?
-> arch/arm/kernel/perf_event_v6.c:512:2: error: expected ?;? before ?return?
-
-This was a fairly obvious bug on my behalf, apologies for that. I must
-have messed that up while rebasing the series.
-
-I'll fix up the relevant commit and give the series another round of
-testing.
-
-Thanks,
-Mark.
-
+On 07/02/2014 11:20 AM, Tushar Behera wrote:
+> On 06/26/2014 11:45 PM, Javier Martinez Canillas wrote:
+>> Peach pit and pi boards uses a Maxim 77802 power management
+>> IC to drive regulators and its Real Time Clock. This patch
+>> adds support for this chip.
+>> 
+>> These are the device nodes and pinctrl configuration that
+>> are present on the Peach pit DeviceTree source file in the
+>> the Chrome OS kernel 3.8 tree.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> ---
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/perf_event_v6.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> [ ... ]
 > 
-> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-> index 62227d11e874..abfeb04f3213 100644
-> --- a/arch/arm/kernel/perf_event_v6.c
-> +++ b/arch/arm/kernel/perf_event_v6.c
-> @@ -494,21 +494,21 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
->  static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
->  {
->  	armv6pmu_init(cpu_pmu);
-> -	cpu_pmu->name		= "armv6_1136"
-> +	cpu_pmu->name		= "armv6_1136";
->  	return 0;
->  }
->  
->  static int armv6_1156_pmu_init(struct arm_pmu *cpu_pmu)
->  {
->  	armv6pmu_init(cpu_pmu);
-> -	cpu_pmu->name		= "armv6_1156"
-> +	cpu_pmu->name		= "armv6_1156";
->  	return 0;
->  }
->  
->  static int armv6_1176_pmu_init(struct arm_pmu *cpu_pmu)
->  {
->  	armv6pmu_init(cpu_pmu);
-> -	cpu_pmu->name		= "armv6_1176"
-> +	cpu_pmu->name		= "armv6_1176";
->  	return 0;
->  }
->  
-> -- 
-> 1.7.9.5
+>> +
+>> +		regulators {
+>> +			buck1_reg: BUCK1 {
+>> +				regulator-name = "vdd_mif";
+>> +				regulator-min-microvolt = <800000>;
+>> +				regulator-max-microvolt = <1300000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +				regulator-ramp-delay = <12500>;
+>> +			};
 > 
+> IMO, adding a blank line between sub-nodes would be better.
 > 
+
+Ok
+
+>> +			buck2_reg: BUCK2 {
+>> +				regulator-name = "vdd_arm_real";
+>> +				regulator-min-microvolt = <800000>;
+>> +				regulator-max-microvolt = <1500000>;
+>> +				regulator-always-on;
+>> +				regulator-boot-on;
+>> +				regulator-ramp-delay = <12500>;
+>> +			};
+> 
+> [ ... ]
+> 
+>> +			vqmmc_sdcard: ldo4_reg: LDO4 {
+>> +				regulator-name = "vdd_sd";
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <2800000>;
+>> +				regulator-always-on;
+>> +
+> 
+> Blank line, can be removed.
+>
+
+Ok
+
+>> +			};
+> 
+> [ ... ]
+>> +			ldo23_reg: LDO23 {
+>> +				regulator-name = "ld0_23";
+> 
+> ldo_23, 'o' in place of '0'.
+>
+
+Right, missed that. Thanks for pointing out.
+
+> Similar comments for peach-pi DTS file.
+> 
+
+Best regards,
+Javier
