@@ -1,53 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 01 Jul 2014 23:17:22 -0400 (EDT)
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
- (part1)
-In-Reply-To: <20140701173547.GW28164@arm.com>
-References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
- <yw1x4mz1f2t9.fsf@unicorn.mansr.com>
- <20140701171346.GP3705@n2100.arm.linux.org.uk>
- <yw1xzjgtdmas.fsf@unicorn.mansr.com> <20140701173547.GW28164@arm.com>
-Message-ID: <alpine.LFD.2.11.1407012314100.16842@knanqh.ubzr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 1 Jul 2014 22:22:49 -0500
+Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
+References: <1402676147-3711-1-git-send-email-balbi@ti.com>
+ <1402676147-3711-2-git-send-email-balbi@ti.com>
+ <20140613162323.GH8319@saruman.home>
+ <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
+Message-ID: <20140702032249.GA26010@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Jul 2014, Will Deacon wrote:
+Hi,
 
-> Hi Mans,
+On Fri, Jun 13, 2014 at 07:11:58PM +0000, Paul Walmsley wrote:
+> Hi Felipe, Tomi,
 > 
-> On Tue, Jul 01, 2014 at 06:24:43PM +0100, M?ns Rullg?rd wrote:
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > > As you point out, "bx lr" /may/ be treated specially (I've actually been
-> > 
-> > Most, if not all, Cortex-A cores do this according the public TRMs.
-> > They also do the same thing for "mov pc, lr" so there will probably be
-> > no performance gain from this change.  It's still a good idea though,
-> > since we don't know what future cores will do.
+> On Fri, 13 Jun 2014, Felipe Balbi wrote:
 > 
-> Funnily enough, that's not actually true (and is more or less what prompted
-> this patch after discussion with Russell). There are cores out there that
-> don't predict mov pc, lr at all (let alone do anything with the return
-> stack).
+> > On Fri, Jun 13, 2014 at 11:15:46AM -0500, Felipe Balbi wrote:
+> > > From: Sathya Prakash M R <sathyap@ti.com>
+> > > 
+> > > Add DSS hwmod data for AM43xx.
+> > > 
+> > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > Acked-by: Rajendra Nayak <rnayak@ti.com>
+> > > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> > > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > > 
+> > > Note that this patch was originally send on May 9th [1], changes were requested
+> > > and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
+> > > maintainer again and go no response.
+> > > 
+> > > Without this patch, we cannot get display working on any AM437x devices.
+> > > 
+> > > [1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
+> > > [2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
+> > > [3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
+> > > 
+> > >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+> > >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+> > >  2 files changed, 99 insertions(+)
 > 
-> > > discussing this with Will Deacon over the last couple of days, who has
-> > > also been talking to the hardware people in ARM, and Will is happy with
-> > > this patch as in its current form.)  This is why I've changed all
-> > > "mov pc, reg" instructions which return in some way to use this macro,
-> > > and left others (those which are used to call some function and return
-> > > back to the same point) alone.
-> > 
-> > In that case the patch should be fine.  Your patch description didn't
-> > make it clear that only actual returns were being changed.
-> 
-> I'm led to believe that some predictors require lr in order to update the
-> return stack, whilst others don't. That part is all horribly
-> micro-architectural, so the current patch is doing the right thing by
-> sticking to the ARM ARM but enabling us to hook into other registers later
-> on if we choose.
+> Sorry for the delay on this.  Have been corresponding with TI management 
+> to figure out what to do about patches for AM43xx.  I don't have boards or 
+> public documentation for these devices, so it's impossible for me to 
 
-May I suggest to have a patch with only the macro definition in it and 
-all this discussion in the commit log please?  The usage sites should be 
-done in a separate patch to make it clearer.
+documentation is now available publicly
 
+http://www.ti.com/product/AM4379
 
-Nicolas
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/a6ba122e/attachment-0001.sig>
