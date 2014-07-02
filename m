@@ -1,31 +1,51 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 02 Jul 2014 20:05:45 +0200
-Subject: [GIT PULL] Samsung clock fixes for v3.16
-In-Reply-To: <20140702171323.7440.76631@quantum>
-References: <1404319926-6178-1-git-send-email-t.figa@samsung.com>
- <20140702171323.7440.76631@quantum>
-Message-ID: <53B449F9.8020001@samsung.com>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Wed, 2 Jul 2014 11:06:38 -0700
+Subject: [PATCH v8 2/9] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <CACoXjck+aU33=kSy=KCGABNXNR7tj2KndAiBqEDK7wQ_Qei80Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.07.2014 19:13, Mike Turquette wrote:
-> Quoting Tomasz Figa (2014-07-02 09:52:06)
->> The following changes since commit b640a6037c9ecd1f0ad23a8e9b4ca5f5b4112508:
->>
->>   Merge tag 'sunxi-clk-for-3.16-2' of https://github.com/mripard/linux into clk-next (2014-06-11 07:11:59 -0700)
->>
->> are available in the git repository at:
->>
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.16/samsung-clk-fixes
->>
->> for you to fetch changes up to 44ff0254b89079a8a95e652635e760d93196ac1f:
->>
->>   clk: exynos5420: Remove aclk66_peric from the clock tree description (2014-06-30 14:47:33 +0200)
-> 
-> Pulled into clk-fixes. Thanks for the great tag description as well.
+Hi,
 
-Thanks.
+On Tue, Jul 1, 2014 at 11:43 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> This is a useful function and we should make it visible outside the
+> generic PCI code. Export it as a GPL symbol.
+>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host-bridge.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 0e5f3c9..36c669e 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -16,12 +16,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+>         return bus;
+>  }
+>
+> -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+>  {
+>         struct pci_bus *root_bus = find_pci_root_bus(bus);
+>
+>         return to_pci_host_bridge(root_bus->bridge);
+>  }
+> +EXPORT_SYMBOL_GPL(find_pci_host_bridge);
 
-Best regards,
-Tomasz
+Is there any specific reason behind making this symbol GPL? I think
+the other functions in this file are just EXPORT_SYMBOL. Ultimately
+companies which have non gpl Linux modules (nvidia) will face issue
+using this API.
+
+The same applies to 'of_create_pci_host_bridge'.
+>
+>  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+>                                  void (*release_fn)(struct pci_host_bridge *),
+> --
+> 2.0.0
+>
