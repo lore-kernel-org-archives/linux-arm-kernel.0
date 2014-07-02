@@ -1,116 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Jul 2014 12:19:57 +0200
-Subject: [PATCH v5 05/14] clk: Add generic driver for Maxim PMIC clocks
-In-Reply-To: <53B3DB49.6020604@collabora.co.uk>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
- <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
- <20140701172616.32686.44374@quantum> <53B3DB49.6020604@collabora.co.uk>
-Message-ID: <1404296397.12439.2.camel@AMDC1943>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Jul 2014 11:25:13 +0100
+Subject: drm/i2c: tda998x: Set CEC I2C address from TDA I2C address
+In-Reply-To: <53B3D1F8.7080106@arm.com>
+References: <53B3D1F8.7080106@arm.com>
+Message-ID: <20140702102513.GF32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2014-07-02 at 12:13 +0200, Javier Martinez Canillas wrote:
-> Hello Mike,
-> 
-> On 07/01/2014 07:26 PM, Mike Turquette wrote:
-> > Quoting Yadwinder Singh Brar (2014-06-29 21:01:36)
-> >> Hi Javier,
-> >> 
-> >> On Thu, Jun 26, 2014 at 11:45 PM, Javier Martinez Canillas
-> >> <javier.martinez@collabora.co.uk> wrote:
-> >> > Maxim Integrated Power Management ICs are very similar with
-> >> > regard to their clock outputs. Most of the clock drivers for
-> >> > these chips are duplicating code and are simpler enough that
-> >> > can be converted to use a generic driver to consolidate code
-> >> > and avoid duplication.
-> >> >
-> >> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> > ---
-> >> >
-> >> > Changes since v4:
-> >> >  - Return recalc 0 if clock isn't enabled in Suggested by Yadwinder Singh Brar.
-> >> >
-> >> 
-> >> It seems you didn't implement or posted same patch again :) .
-> >> 
-> >> > Changes since v3:
-> >> >  - Add current copyright information. Suggested by Krzysztof Kozlowski
-> >> >  - Do a single allocation for struct max_gen_clk. Suggested by Krzysztof Kozlowski
-> >> >  - Add EXPORT_SYMBOL() for exported symbols. Suggested by Krzysztof Kozlowski
-> >> >
-> >> >  drivers/clk/Kconfig       |   3 +
-> >> >  drivers/clk/Makefile      |   1 +
-> >> >  drivers/clk/clk-max-gen.c | 195 ++++++++++++++++++++++++++++++++++++++++++++++
-> >> >  drivers/clk/clk-max-gen.h |  32 ++++++++
-> >> >  4 files changed, 231 insertions(+)
-> >> >  create mode 100644 drivers/clk/clk-max-gen.c
-> >> >  create mode 100644 drivers/clk/clk-max-gen.h
-> >> >
-> >> 
-> >> [ .. ]
-> >> 
-> >> > +
-> >> > +static unsigned long max_gen_recalc_rate(struct clk_hw *hw,
-> >> > +                                        unsigned long parent_rate)
-> >> > +{
-> >> > +       return 32768;
-> >> > +}
-> >> 
-> >> Its still same here.
-> > 
-> > Changing this would be a new behavior. I do not know of any other clock
-> > drivers that conditionally returns a rate of 0 based on whether or not
-> > the clock is gated.
-> > 
-> 
-> After Yadwinder feedback I searched for clock drivers that returned 0 when the
-> clock was not enabled/prepared and found for example drivers/clk/clk-s2mps11.c:
-> 
-> 
-> static unsigned long s2mps11_clk_recalc_rate(struct clk_hw *hw,
->                                              unsigned long parent_rate)
-> {
->         struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
->         if (s2mps11->enabled)
->                 return 32768;
->         else
->                 return 0;
-> }
-> 
-> > It is also buggy since calls to clk_enable and clk_disable do not invoke
-> > .recalc_rate, so the rate of your clock would not be updated from the
-> > framework's perspective until some later point where you call
-> > clk_set_rate or something.
-> >
-> 
-> s2ps11->enabled is set in the driver's clk_ops .prepare and .unprepare function
-> handlers and calls to clk_prepare and clk_unprepare also don't seems to invoke
-> .recalc_rate so I guess that driver is wrong as well and should just return the
-> clock rate unconditionally?
+You missed me as the maintainer of the driver:
 
-The s2mps11 may be not a best example for proper clock driver :).
-Karol Wrona already sent a patch for s2mps11:
-https://lkml.org/lkml/2014/7/1/389
+NXP TDA998X DRM DRIVER
+M:      Russell King <rmk+kernel@arm.linux.org.uk>
+S:      Supported
+F:      drivers/gpu/drm/i2c/tda998x_drv.c
+F:      include/drm/i2c/tda998x.h
 
+On Wed, Jul 02, 2014 at 10:33:44AM +0100, Andrew Jackson wrote:
+> @@ -1274,9 +1275,9 @@ tda998x_encoder_init(struct i2c_client *client,
+> 
+>         priv->current_page = 0xff;
+>         priv->hdmi = client;
+> -       priv->cec = i2c_new_dummy(client->adapter, 0x34);
+> -       if (!priv->cec)
+> -               priv->cec = i2c_new_dummy(client->adapter, 0x35);
+> +       /* CEC I2C address bound to TDA998x I2C addr by configuration pins */
+> +       cec_addr = 0x34 + (client->addr & 3);
+> +       priv->cec = i2c_new_dummy(client->adapter, cec_addr);
 
-Best regards,
-Krzysztof
+We discussed the issue of the I2C CEC address when the DT binding first
+came up...
 
-> 
-> > If your driver needs to know whether or not the clock is enabled then we
-> > could introduce a new bool clk_is_enabled(struct clk *clk); to clk.h,
-> > but I'd rather not do that. Instead if a driver needs a clock then it
-> > calls clk_enable on it without any knowledge about the internal state of
-> > the clock enable_count.
-> > 
-> > Regards,
-> > Mike
-> >
-> 
-> Thanks a lot for the explanation, I'll revert that change then and return the
-> clock rate unconditionally on the next version of the patch-set.
-> 
-> Best regards,
-> Javier
+Do we know for certain that the above is always true for all the devices
+that this driver supports?
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
