@@ -1,75 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 Jul 2014 06:28:38 +0200
-Subject: [PATCH/RFC 2/6] ARM: shmobile: r8a7778: Add SCIF nodes
+Date: Wed,  2 Jul 2014 06:28:40 +0200
+Subject: [PATCH/RFC 4/6] ARM: shmobile: r8a7778: add TMU clock support for DT
 In-Reply-To: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404275322-26514-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404275322-26514-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404275322-26514-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This will be used when initialising TMU devices using DT
+until common clock framework support is added.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 48 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7778.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 3af0a21..55357dc 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -156,6 +156,54 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 9557907..67980a0 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -244,7 +244,9 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_ICK_ID("src.7", "rcar_sound", &mstp_clks[MSTP524]),
+ 	CLKDEV_ICK_ID("src.8", "rcar_sound", &mstp_clks[MSTP523]),
+ 	CLKDEV_ICK_ID("fck", "sh-tmu.0", &mstp_clks[MSTP016]),
++	CLKDEV_ICK_ID("fck", "ffd80000.timer", &mstp_clks[MSTP016]),
+ 	CLKDEV_ICK_ID("fck", "sh-tmu.1", &mstp_clks[MSTP015]),
++	CLKDEV_ICK_ID("fck", "ffd81000.timer", &mstp_clks[MSTP015]),
+ };
  
-+	scif0: serial at ffe40000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe40000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif1: serial at ffe41000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe41000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif2: serial at ffe42000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe42000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif3: serial at ffe43000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe43000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif4: serial at ffe44000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe44000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif5: serial at ffe45000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe45000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
- 	mmcif: mmc at ffe4e000 {
- 		compatible = "renesas,sh-mmcif";
- 		reg = <0xffe4e000 0x100>;
+ void __init r8a7778_clock_init(void)
 -- 
 2.0.0.rc2
