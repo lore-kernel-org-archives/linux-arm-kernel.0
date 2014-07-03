@@ -1,52 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jul 2014 18:32:26 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140703170558.GZ32514@n2100.arm.linux.org.uk>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703170558.GZ32514@n2100.arm.linux.org.uk>
-Message-ID: <20140703173226.GC17372@arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 3 Jul 2014 12:35:45 -0500
+Subject: [PATCHv5 04/15] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAK=WgbbJ6a17wrsEcvNq6tPiaciQ=E+22QE06t9EA8RFqicNRg@mail.gmail.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-5-git-send-email-s-anna@ti.com>
+ <CAK=WgbbZvBLT7U638fBfPjF7-MJaP=4WJcrT_fEg6Uu3cXRAyg@mail.gmail.com>
+ <53B47626.4040506@ti.com>
+ <CAK=WgbbJ6a17wrsEcvNq6tPiaciQ=E+22QE06t9EA8RFqicNRg@mail.gmail.com>
+Message-ID: <53B59471.30703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 06:05:58PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
-> > So, no. I completely reject any notion that breaking existing apps is
-> > okay. If we're going to say that v8 still supports 32-bit apps, then
-> > it has to be all of v7, not just the 'good' bits. Nor do I think
-> > saying "it's just a bunch of games" justifies anything. We're kernel
-> > engineers. Applications are applications and we don't break userspace.
-> > Period.
+Hi Ohad,
+
+On 07/03/2014 02:15 AM, Ohad Ben-Cohen wrote:
+> Hi Suman,
 > 
-> +1 on all points above.  I'd go further - if we're going to say that v8
-> still supports 32-bit apps, that covers at least v6 *as well*.
+> On Thu, Jul 3, 2014 at 12:14 AM, Suman Anna <s-anna@ti.com> wrote:
+>>> Do we have a use case today that require the xlate() method?
+>>>
+>>> If not, let's remove it as we could always add it back if some new
+>>> hardware shows up that needs it.
+>>
+>> The xlate() method is to support the phandle + args specifier way of
+>> requesting hwlocks, platform implementations are free to implement their
+>> own xlate functions, but the above supports the simplest case of
+>> controller + relative lock index within controller.
+> 
+> Do we have a use case for a different implementation other than the
+> simplest case? If not, it seems to me this will just become redundant
+> boilerplate code (every platform will use the simple xlate method).
 
-We've never pretended to support anything other than ARMv8 in the compat
-layer. uname even reports this in the machine name.
+Not at the moment, with the existing platform implementations. So, if I
+understand you correctly, you are asking to leave out the xlate ops and
+make the of_hwspin_lock_simple_xlate() internal until a need for an
+xlate method arises. This also means, we only support a value of 1 for
+#hwlock-cells.
 
-If people are suddenly so concerned about *full* compatibility with an ARMv7
-kernel, that needs a lot more than just SWP emulation:
+> 
+>> This function again is to support the phandle + args specifier way of
+>> requesting hwlocks, the hwspin_lock_request_specific() is invoked
+>> internally within this function, so we are still reusing the actual
+>> request code other than handling the DT parsing portion. If we go back
+>> to using global locks in client hwlocks property, we don't need a
+>> of_hwspin_lock_get_id(), the same can be achieved using the existing DT
+>> function, of_property_read_u32_index().
+> 
+> I think you may have misunderstood me, sorry. I'm ok with the phandle
+> + args specifier. I just think we can use it, together with the
+> base_id property, to infer the global lock id from the DT data. 
 
-  - Alignment fixups for ldm/stm
-  - SETEND
-  - CP15 barriers
-  - SWI breakpoints + branch through zero syscalls
-  (- SWP)
+Aah ok, its minor code rearrangement for what you are asking - I just
+need to leave out invoking the request_specific invocation in the OF
+request specific existing function, just return the global id and let
+the client users call the normal request_specific API themselves.
 
-By the arguments presented so far, I can't see why we wouldn't also need
-OABI too. In other words, where do we draw the line? If we're not completely
-compatible, then the compatibility argument suddenly becomes subjective.
+But, that would mean DT-based client users would have to invoke two
+function calls to request a hwspinlock. We already have an API to get
+the lock id given a hwspinlock - hwspin_lock_get_id(), so I added the OF
+API for requesting a lock directly rather than giving an OF API for
+getting the lock id. This is in keeping in convention with what other
+drivers do normally - a regular get and an OF get. I can modify it if
+you still prefer the OF API for getting a global lock id, but I feel its
+a burden for client users.
 
-It seems that people really want us to implement the subset of the ABI which
-is needed by the Google Play store and are trying to dress that up as the
-ARMv7 kernel ABI. The latter is a lot more work and conflating the two isn't
-especially helpful.
+Also, do you prefer an open property-name in client users (like I am
+doing at the moment) or imposing a standard property name "hwlocks"?
 
-Will
+regards
+Suman
+
+> This is not only a must to support heterogenous multi-processing systems,
+> it will also substantially simplify the code.
+> 
+> Thanks,
+> Ohad.
+> 
