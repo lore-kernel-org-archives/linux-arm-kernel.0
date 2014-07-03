@@ -1,34 +1,228 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 03 Jul 2014 16:34:46 +0200
-Subject: [PATCH 0/4] SiI9022 HDMI encoder for AM4xxx boards
-In-Reply-To: <1404394800-18138-1-git-send-email-tomi.valkeinen@ti.com> (Tomi
- Valkeinen's message of "Thu, 3 Jul 2014 16:39:56 +0300")
-References: <1404394800-18138-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <87k37u7bp5.fsf@lebrac.rtp-net.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu,  3 Jul 2014 16:38:38 +0200
+Subject: [RFC v2 0/5] Per-user clock constraints
+Message-ID: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomi Valkeinen <tomi.valkeinen@ti.com> writes:
+Hello,
 
-> Hi,
+here is another round for commenting, not very different from the first one.
 
-Hi,
+Something I forgot to mention before is that the function rename was performed
+by the scripts in:
 
->
-> This series adds a driver for SiI9022 HDMI encoder, which is used on AM437x GP
-> and AM43x EPOS boards.
->
-> The series is based on the OMAPDSS HDMI infoframe series sent earlier, as the
-> SiI9022 driver uses the new infoframe support.
+http://cgit.collabora.com/git/user/tomeu/linux.git/commit/?h=clk-refactoring-4&id=0e983e28864229f2cd525f87d59e034c4876b233
 
-Is there any small possibility to not make it an omap specific driver?
-There are other boards with sii9022 out there. imx5x dev boards could
-receive a daughter board with this chip (both sold by Freescale) and
-efikamx platform has it too. I think that some old msm platforms has it
-too.
-I've not compared the code of the drivers and don't know how the sii9022
-works but would be annoying to have 2 or more drivers for the same piece
-of HW. imho, it would be nice if it could be avoided.
+As before, I have only checked that drivers/clk/ builds with allyesconfig, and
+that a kernel can be built for tegra_defconfig.
 
 Thanks,
-Arnaud
+
+Tomeu
+
+v2:	* Rename provider API to e.g. clk_provider_set_rate as suggested by
+Stephen
+	* Remove unnecessary error message on kzmalloc returning ENOMEM
+	* Have struct clk contain a pointer to struct clk_core as intended
+
+Rabin Vincent (2):
+  clk: use struct clk only for external API
+  clk: per-user clock accounting for debug
+
+Tomeu Vizoso (3):
+  clk: Add temporary mapping to the existing API
+  clk: Move all drivers to use internal API
+  clk: Add floor and ceiling constraints to clock rates
+
+ drivers/clk/at91/clk-main.c               |  24 +-
+ drivers/clk/at91/clk-master.c             |   6 +-
+ drivers/clk/at91/clk-peripheral.c         |  12 +-
+ drivers/clk/at91/clk-pll.c                |   6 +-
+ drivers/clk/at91/clk-plldiv.c             |   6 +-
+ drivers/clk/at91/clk-programmable.c       |  10 +-
+ drivers/clk/at91/clk-slow.c               |  24 +-
+ drivers/clk/at91/clk-smd.c                |   6 +-
+ drivers/clk/at91/clk-system.c             |   6 +-
+ drivers/clk/at91/clk-usb.c                |  18 +-
+ drivers/clk/at91/clk-utmi.c               |   6 +-
+ drivers/clk/bcm/clk-kona-setup.c          |   6 +-
+ drivers/clk/bcm/clk-kona.c                |  12 +-
+ drivers/clk/bcm/clk-kona.h                |   2 +-
+ drivers/clk/berlin/berlin2-avpll.c        |   4 +-
+ drivers/clk/berlin/berlin2-avpll.h        |   4 +-
+ drivers/clk/berlin/berlin2-div.c          |   2 +-
+ drivers/clk/berlin/berlin2-div.h          |   2 +-
+ drivers/clk/berlin/berlin2-pll.c          |   2 +-
+ drivers/clk/berlin/berlin2-pll.h          |   2 +-
+ drivers/clk/berlin/bg2.c                  |  13 +-
+ drivers/clk/berlin/bg2q.c                 |   9 +-
+ drivers/clk/clk-axi-clkgen.c              |   2 +-
+ drivers/clk/clk-axm5516.c                 |   4 +-
+ drivers/clk/clk-bcm2835.c                 |   2 +-
+ drivers/clk/clk-composite.c               |   6 +-
+ drivers/clk/clk-devres.c                  |  14 +-
+ drivers/clk/clk-divider.c                 |   8 +-
+ drivers/clk/clk-efm32gg.c                 |   2 +-
+ drivers/clk/clk-fixed-factor.c            |   6 +-
+ drivers/clk/clk-fixed-rate.c              |   8 +-
+ drivers/clk/clk-fractional-divider.c      |   4 +-
+ drivers/clk/clk-gate.c                    |   4 +-
+ drivers/clk/clk-highbank.c                |   8 +-
+ drivers/clk/clk-ls1x.c                    |  16 +-
+ drivers/clk/clk-max77686.c                |  10 +-
+ drivers/clk/clk-moxart.c                  |   8 +-
+ drivers/clk/clk-mux.c                     |   6 +-
+ drivers/clk/clk-nomadik.c                 |  14 +-
+ drivers/clk/clk-nspire.c                  |   4 +-
+ drivers/clk/clk-ppc-corenet.c             |   8 +-
+ drivers/clk/clk-s2mps11.c                 |   6 +-
+ drivers/clk/clk-si5351.c                  |  17 +-
+ drivers/clk/clk-si570.c                   |   4 +-
+ drivers/clk/clk-twl6040.c                 |   2 +-
+ drivers/clk/clk-u300.c                    |  12 +-
+ drivers/clk/clk-vt8500.c                  |   4 +-
+ drivers/clk/clk-wm831x.c                  |   6 +-
+ drivers/clk/clk-xgene.c                   |  12 +-
+ drivers/clk/clk.c                         | 664 ++++++++++++++++++++----------
+ drivers/clk/clk.h                         |   9 +-
+ drivers/clk/clkdev.c                      | 102 +++--
+ drivers/clk/hisilicon/clk-hi3620.c        |   8 +-
+ drivers/clk/hisilicon/clk.c               |  16 +-
+ drivers/clk/hisilicon/clk.h               |   2 +-
+ drivers/clk/hisilicon/clkgate-separated.c |   4 +-
+ drivers/clk/keystone/gate.c               |   6 +-
+ drivers/clk/keystone/pll.c                |  10 +-
+ drivers/clk/mmp/clk-apbc.c                |   4 +-
+ drivers/clk/mmp/clk-apmu.c                |   4 +-
+ drivers/clk/mmp/clk-frac.c                |   4 +-
+ drivers/clk/mmp/clk-mmp2.c                |  14 +-
+ drivers/clk/mmp/clk-pxa168.c              |  12 +-
+ drivers/clk/mmp/clk-pxa910.c              |  12 +-
+ drivers/clk/mmp/clk.h                     |   8 +-
+ drivers/clk/mvebu/clk-corediv.c           |   4 +-
+ drivers/clk/mvebu/clk-cpu.c               |   8 +-
+ drivers/clk/mvebu/common.c                |  14 +-
+ drivers/clk/mxs/clk-div.c                 |   4 +-
+ drivers/clk/mxs/clk-frac.c                |   4 +-
+ drivers/clk/mxs/clk-imx23.c               |   4 +-
+ drivers/clk/mxs/clk-imx28.c               |   4 +-
+ drivers/clk/mxs/clk-pll.c                 |   4 +-
+ drivers/clk/mxs/clk-ref.c                 |   4 +-
+ drivers/clk/mxs/clk-ssp.c                 |   2 +-
+ drivers/clk/mxs/clk.h                     |  16 +-
+ drivers/clk/qcom/clk-rcg.c                |   6 +-
+ drivers/clk/qcom/clk-rcg2.c               |  14 +-
+ drivers/clk/qcom/clk-regmap.c             |   2 +-
+ drivers/clk/qcom/clk-regmap.h             |   2 +-
+ drivers/clk/qcom/common.c                 |   6 +-
+ drivers/clk/qcom/gcc-msm8660.c            |   2 +-
+ drivers/clk/qcom/gcc-msm8960.c            |   2 +-
+ drivers/clk/qcom/gcc-msm8974.c            |   2 +-
+ drivers/clk/qcom/mmcc-msm8960.c           |  11 +-
+ drivers/clk/rockchip/clk-rockchip.c       |   2 +-
+ drivers/clk/samsung/clk-exynos-audss.c    |  16 +-
+ drivers/clk/samsung/clk-exynos4.c         |   6 +-
+ drivers/clk/samsung/clk-pll.c             |   6 +-
+ drivers/clk/samsung/clk-pll.h             |   2 +-
+ drivers/clk/samsung/clk-s3c2410-dclk.c    |  10 +-
+ drivers/clk/samsung/clk.c                 |  22 +-
+ drivers/clk/samsung/clk.h                 |   2 +-
+ drivers/clk/shmobile/clk-div6.c           |   2 +-
+ drivers/clk/shmobile/clk-emev2.c          |   4 +-
+ drivers/clk/shmobile/clk-mstp.c           |   6 +-
+ drivers/clk/shmobile/clk-r8a7740.c        |   6 +-
+ drivers/clk/shmobile/clk-r8a7779.c        |   6 +-
+ drivers/clk/shmobile/clk-rcar-gen2.c      |  10 +-
+ drivers/clk/shmobile/clk-rz.c             |   6 +-
+ drivers/clk/sirf/clk-atlas6.c             |   2 +-
+ drivers/clk/sirf/clk-common.c             |  30 +-
+ drivers/clk/sirf/clk-prima2.c             |   2 +-
+ drivers/clk/socfpga/clk-gate.c            |   2 +-
+ drivers/clk/socfpga/clk-periph.c          |   2 +-
+ drivers/clk/socfpga/clk-pll.c             |   4 +-
+ drivers/clk/spear/clk-aux-synth.c         |   8 +-
+ drivers/clk/spear/clk-frac-synth.c        |   4 +-
+ drivers/clk/spear/clk-gpt-synth.c         |   4 +-
+ drivers/clk/spear/clk-vco-pll.c           |   8 +-
+ drivers/clk/spear/clk.h                   |  14 +-
+ drivers/clk/spear/spear1310_clock.c       |   2 +-
+ drivers/clk/spear/spear1340_clock.c       |   2 +-
+ drivers/clk/spear/spear3xx_clock.c        |   8 +-
+ drivers/clk/spear/spear6xx_clock.c        |   2 +-
+ drivers/clk/st/clkgen-fsyn.c              |  22 +-
+ drivers/clk/st/clkgen-mux.c               |  32 +-
+ drivers/clk/st/clkgen-pll.c               |  34 +-
+ drivers/clk/sunxi/clk-a10-hosc.c          |   2 +-
+ drivers/clk/sunxi/clk-a20-gmac.c          |   2 +-
+ drivers/clk/sunxi/clk-factors.c           |   4 +-
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c  |   2 +-
+ drivers/clk/sunxi/clk-sun6i-apb0.c        |   2 +-
+ drivers/clk/sunxi/clk-sun6i-ar100.c       |   6 +-
+ drivers/clk/sunxi/clk-sunxi.c             |  18 +-
+ drivers/clk/tegra/clk-audio-sync.c        |   4 +-
+ drivers/clk/tegra/clk-divider.c           |   4 +-
+ drivers/clk/tegra/clk-periph-gate.c       |   4 +-
+ drivers/clk/tegra/clk-periph.c            |   8 +-
+ drivers/clk/tegra/clk-pll-out.c           |   4 +-
+ drivers/clk/tegra/clk-pll.c               |  40 +-
+ drivers/clk/tegra/clk-super.c             |   4 +-
+ drivers/clk/tegra/clk-tegra-audio.c       |   4 +-
+ drivers/clk/tegra/clk-tegra-fixed.c       |   8 +-
+ drivers/clk/tegra/clk-tegra-periph.c      |  12 +-
+ drivers/clk/tegra/clk-tegra-pmc.c         |   4 +-
+ drivers/clk/tegra/clk-tegra-super-gen4.c  |   8 +-
+ drivers/clk/tegra/clk-tegra114.c          |  10 +-
+ drivers/clk/tegra/clk-tegra124.c          |   6 +-
+ drivers/clk/tegra/clk-tegra20.c           |  12 +-
+ drivers/clk/tegra/clk-tegra30.c           |   8 +-
+ drivers/clk/tegra/clk.c                   |  24 +-
+ drivers/clk/tegra/clk.h                   |  38 +-
+ drivers/clk/ti/apll.c                     |   8 +-
+ drivers/clk/ti/clk-2xxx.c                 |   8 +-
+ drivers/clk/ti/clk-33xx.c                 |  18 +-
+ drivers/clk/ti/clk-3xxx.c                 |   8 +-
+ drivers/clk/ti/clk-43xx.c                 |   8 +-
+ drivers/clk/ti/clk-44xx.c                 |  16 +-
+ drivers/clk/ti/clk-54xx.c                 |  25 +-
+ drivers/clk/ti/clk-7xx.c                  |  16 +-
+ drivers/clk/ti/clk-dra7-atl.c             |   6 +-
+ drivers/clk/ti/clk.c                      |   2 +-
+ drivers/clk/ti/clockdomain.c              |   4 +-
+ drivers/clk/ti/composite.c                |   2 +-
+ drivers/clk/ti/divider.c                  |   6 +-
+ drivers/clk/ti/dpll.c                     |   8 +-
+ drivers/clk/ti/fixed-factor.c             |   2 +-
+ drivers/clk/ti/gate.c                     |   2 +-
+ drivers/clk/ti/interface.c                |   2 +-
+ drivers/clk/ti/mux.c                      |   6 +-
+ drivers/clk/ux500/abx500-clk.c            |   2 +-
+ drivers/clk/ux500/clk-prcc.c              |   8 +-
+ drivers/clk/ux500/clk-prcmu.c             |  16 +-
+ drivers/clk/ux500/clk-sysctrl.c           |  10 +-
+ drivers/clk/ux500/clk.h                   |  22 +-
+ drivers/clk/ux500/u8500_clk.c             |   2 +-
+ drivers/clk/ux500/u8500_of_clk.c          |  12 +-
+ drivers/clk/ux500/u8540_clk.c             |   2 +-
+ drivers/clk/versatile/clk-icst.c          |   4 +-
+ drivers/clk/versatile/clk-icst.h          |   2 +-
+ drivers/clk/versatile/clk-impd1.c         |  18 +-
+ drivers/clk/versatile/clk-integrator.c    |   2 +-
+ drivers/clk/versatile/clk-realview.c      |   2 +-
+ drivers/clk/versatile/clk-sp810.c         |  30 +-
+ drivers/clk/versatile/clk-vexpress-osc.c  |   2 +-
+ drivers/clk/versatile/clk-vexpress.c      |   6 +-
+ drivers/clk/x86/clk-lpt.c                 |   2 +-
+ drivers/clk/zynq/clkc.c                   |  22 +-
+ drivers/clk/zynq/pll.c                    |   4 +-
+ include/linux/clk-private.h               |  43 +-
+ include/linux/clk-provider.h              | 110 ++---
+ include/linux/clk.h                       |  39 +-
+ include/linux/clk/ti.h                    |  10 +-
+ include/linux/clk/zynq.h                  |   3 +-
+ include/linux/clkdev.h                    |  24 +-
+ include/linux/platform_data/si5351.h      |   4 +-
+ 187 files changed, 1397 insertions(+), 1050 deletions(-)
+
+-- 
+1.9.3
