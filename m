@@ -1,51 +1,18 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 03 Jul 2014 10:12:08 +0100
-Subject: [PATCH 1/9 v2] coresight: add CoreSight core layer framework
-In-Reply-To: <CANLsYkxKZvb4cOeEfwFB8CbK_PKy6daPL63L00Sx=NvtDjGbfw@mail.gmail.com>
-References: <1403892261-25026-1-git-send-email-mathieu.poirier@linaro.org>	<1403892261-25026-2-git-send-email-mathieu.poirier@linaro.org>	<53B3D2F9.2030009@linaro.org>
- <CANLsYkxKZvb4cOeEfwFB8CbK_PKy6daPL63L00Sx=NvtDjGbfw@mail.gmail.com>
-Message-ID: <53B51E68.7090308@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Jul 2014 17:13:34 +0800
+Subject: [PATCH v2 1/4] ARM: dts: imx6sx: Fix sdma node
+In-Reply-To: <1404313132-14400-1-git-send-email-festevam@gmail.com>
+References: <1404313132-14400-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140703091333.GC30239@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/14 20:06, Mathieu Poirier wrote:
->>> +struct dentry *cs_debugfs_parent = NULL;
->>> +
->>> +static int curr_sink = NO_SINK;
->>> +static LIST_HEAD(coresight_orph_conns);
->>> +static LIST_HEAD(coresight_devs);
->>> +static DEFINE_SEMAPHORE(coresight_mutex);
->>
->> Why is coresight_mutex a semaphore?
+On Wed, Jul 02, 2014 at 11:58:49AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Bad naming convention.
-
-Really? I only saw it used like a mutex, in other words I thought it was
-incorrectly typed, rather than incorrectly named.
-
-
->>> +static void coresight_disable_link(struct coresight_device *csdev)
->>> +{
->>> +     int link_subtype;
->>> +     int refport, inport, outport;
->>> +
->>> +     inport = coresight_find_link_inport(csdev);
->>> +     outport = coresight_find_link_outport(csdev);
->>> +
->>> +     link_subtype = csdev->subtype.link_subtype;
->>> +     if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_MERG)
->>> +             refport = inport;
->>> +     else if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_SPLIT)
->>> +             refport = outport;
->>> +     else
->>> +             refport = 0;
->>
->> I already read these 7 lines once...
+> Use the correct compatible string for sdma and also provide the sdma firmware
+> path.
 > 
-> It is really worth spinning off a function to save 5 lines?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Pretty marginal really. If the code here stays as it is I don't care
-enough to raise this point a second time.
-
-
-Daniel.
+Applied all 4, thanks.
