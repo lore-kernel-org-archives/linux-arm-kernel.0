@@ -1,163 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 Jul 2014 22:24:28 +0200
-Subject: [PATCH] arm: get rid of hardcoded assumptions about kernel stack
- size
-In-Reply-To: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
-References: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <201407032224.28386.arnd@arndb.de>
+From: xerofoify@gmail.com (Nick Krause)
+Date: Thu, 3 Jul 2014 16:37:16 -0400
+Subject: [PATCH 2/2] mach-spear: fixed spear1340.c file
+In-Reply-To: <1404412596.16291.30.camel@x220>
+References: <1404354994-7478-1-git-send-email-xerofoify@gmail.com>
+ <1404410691.16291.11.camel@x220>
+ <CAPDOMVh0qyjq11kKaO2ndYhLW8j+dZyv3-c89BBcO1AxY+fiHQ@mail.gmail.com>
+ <1404412596.16291.30.camel@x220>
+Message-ID: <CAPDOMViwxnTFhqio+_9A5nxygFbVJBWVXSWQd8Pj2XP6diyHQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014, Andrey Ryabinin wrote:
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index f989d7c..f85d2b0 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -14,9 +14,10 @@
->  
->  #include <linux/compiler.h>
->  #include <asm/fpstate.h>
-> +#include <asm/page.h>
->  
->  #define THREAD_SIZE_ORDER      1
-> -#define THREAD_SIZE            8192
-> +#define THREAD_SIZE            (PAGE_SIZE << THREAD_SIZE_ORDER)
->  #define THREAD_START_SP                (THREAD_SIZE - 8)
->  
->  #ifndef __ASSEMBLY__
+Very well then I will read the documentation on Kconfig in order to
+understand that and fix up my patches for that.
+On the other hand I will send a email before the patches to tell in
+what order to apply them.
+Cheers Nick
 
-The extra #include has caused recursive inclusion on the iop13xx platform, as you
-can see below. I've been able to work around it using this small patch:
-
-diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-index 17b4027..e851f5c 100644
---- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-+++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-@@ -3,8 +3,6 @@
- 
- #ifndef __ASSEMBLY__
- 
--#include <linux/reboot.h>
--
- /* The ATU offsets can change based on the strapping */
- extern u32 iop13xx_atux_pmmr_offset;
- extern u32 iop13xx_atue_pmmr_offset;
-@@ -14,6 +12,7 @@ void iop13xx_map_io(void);
- void iop13xx_platform_init(void);
- void iop13xx_add_tpmi_devices(void);
- void iop13xx_init_irq(void);
-+enum reboot_mode;
- void iop13xx_restart(enum reboot_mode, const char *);
- 
- /* CPUID CP6 R0 Page 0 */
-diff --git a/arch/arm/mach-iop13xx/setup.c b/arch/arm/mach-iop13xx/setup.c
-index bca96f43..53c316f 100644
---- a/arch/arm/mach-iop13xx/setup.c
-+++ b/arch/arm/mach-iop13xx/setup.c
-@@ -20,6 +20,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/serial_8250.h>
- #include <linux/io.h>
-+#include <linux/reboot.h>
- #ifdef CONFIG_MTD_PHYSMAP
- #include <linux/mtd/physmap.h>
- #endif
-
-
-but I wonder if there is a way to avoid the extra include here, as it might also
-cause a general slowdown because of asm/memory.h getting pulled into more .c
-files. Would it be reasonable to hardcode PAGE_SIZE here?
-
-	Arnd
-
-----
-In file included from /git/arm-soc/include/linux/srcu.h:33:0,
-                 from /git/arm-soc/include/linux/notifier.h:15,
-                 from /git/arm-soc/include/linux/reboot.h:5,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/iop13xx.h:6,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/hardware.h:14,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/memory.h:4,
-                 from /git/arm-soc/arch/arm/include/asm/memory.h:24,
-                 from /git/arm-soc/arch/arm/include/asm/page.h:163,
-                 from /git/arm-soc/arch/arm/include/asm/thread_info.h:17,
-                 from /git/arm-soc/include/linux/thread_info.h:54,
-                 from /git/arm-soc/include/asm-generic/preempt.h:4,
-                 from arch/arm/include/generated/asm/preempt.h:1,
-                 from /git/arm-soc/include/linux/preempt.h:18,
-                 from /git/arm-soc/include/linux/spinlock.h:50,
-                 from /git/arm-soc/include/linux/seqlock.h:35,
-                 from /git/arm-soc/include/linux/time.h:5,
-                 from /git/arm-soc/include/uapi/linux/timex.h:56,
-                 from /git/arm-soc/include/linux/timex.h:56,
-                 from /git/arm-soc/include/linux/sched.h:19,
-                 from /git/arm-soc/arch/arm/kernel/asm-offsets.c:13:
-/git/arm-soc/include/linux/rcupdate.h: In function '__rcu_read_lock':
-/git/arm-soc/include/linux/rcupdate.h:219:2: error: implicit declaration of function 'preempt_disable' [-Werror=implicit-function-declaration]
-  preempt_disable();
-  ^
-/git/arm-soc/include/linux/rcupdate.h: In function '__rcu_read_unlock':
-/git/arm-soc/include/linux/rcupdate.h:224:2: error: implicit declaration of function 'preempt_enable' [-Werror=implicit-function-declaration]
-  preempt_enable();
-  ^
-In file included from /git/arm-soc/include/linux/srcu.h:33:0,
-                 from /git/arm-soc/include/linux/notifier.h:15,
-                 from /git/arm-soc/include/linux/reboot.h:5,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/iop13xx.h:6,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/hardware.h:14,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/memory.h:4,
-                 from /git/arm-soc/arch/arm/include/asm/memory.h:24,
-                 from /git/arm-soc/arch/arm/include/asm/page.h:163,
-                 from /git/arm-soc/arch/arm/include/asm/thread_info.h:17,
-                 from /git/arm-soc/include/linux/thread_info.h:54,
-                 from /git/arm-soc/include/asm-generic/preempt.h:4,
-                 from arch/arm/include/generated/asm/preempt.h:1,
-                 from /git/arm-soc/include/linux/preempt.h:18,
-                 from /git/arm-soc/include/linux/spinlock.h:50,
-                 from /git/arm-soc/include/linux/seqlock.h:35,
-                 from /git/arm-soc/include/linux/time.h:5,
-                 from /git/arm-soc/include/uapi/linux/timex.h:56,
-                 from /git/arm-soc/include/linux/timex.h:56,
-                 from /git/arm-soc/include/linux/sched.h:19,
-                 from /git/arm-soc/arch/arm/kernel/asm-offsets.c:13:
-/git/arm-soc/include/linux/rcupdate.h: In function 'rcu_read_lock_bh':
-/git/arm-soc/include/linux/rcupdate.h:928:2: error: implicit declaration of function 'local_bh_disable' [-Werror=implicit-function-declaration]
-  local_bh_disable();
-  ^
-/git/arm-soc/include/linux/rcupdate.h: In function 'rcu_read_unlock_bh':
-/git/arm-soc/include/linux/rcupdate.h:942:2: error: implicit declaration of function 'local_bh_enable' [-Werror=implicit-function-declaration]
-  local_bh_enable();
-  ^
-/git/arm-soc/include/linux/rcupdate.h: In function 'rcu_read_lock_sched_notrace':
-/git/arm-soc/include/linux/rcupdate.h:968:2: error: implicit declaration of function 'preempt_disable_notrace' [-Werror=implicit-function-declaration]
-  preempt_disable_notrace();
-  ^
-/git/arm-soc/include/linux/rcupdate.h: In function 'rcu_read_unlock_sched_notrace':
-/git/arm-soc/include/linux/rcupdate.h:988:2: error: implicit declaration of function 'preempt_enable_notrace' [-Werror=implicit-function-declaration]
-  preempt_enable_notrace();
-  ^
-In file included from /git/arm-soc/include/linux/ktime.h:25:0,
-                 from /git/arm-soc/include/linux/timer.h:5,
-                 from /git/arm-soc/include/linux/workqueue.h:8,
-                 from /git/arm-soc/include/linux/srcu.h:34,
-                 from /git/arm-soc/include/linux/notifier.h:15,
-                 from /git/arm-soc/include/linux/reboot.h:5,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/iop13xx.h:6,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/hardware.h:14,
-                 from /git/arm-soc/arch/arm/mach-iop13xx/include/mach/memory.h:4,
-                 from /git/arm-soc/arch/arm/include/asm/memory.h:24,
-                 from /git/arm-soc/arch/arm/include/asm/page.h:163,
-                 from /git/arm-soc/arch/arm/include/asm/thread_info.h:17,
-                 from /git/arm-soc/include/linux/thread_info.h:54,
-                 from /git/arm-soc/include/asm-generic/preempt.h:4,
-                 from arch/arm/include/generated/asm/preempt.h:1,
-                 from /git/arm-soc/include/linux/preempt.h:18,
-                 from /git/arm-soc/include/linux/spinlock.h:50,
-                 from /git/arm-soc/include/linux/seqlock.h:35,
-                 from /git/arm-soc/include/linux/time.h:5,
-                 from /git/arm-soc/include/uapi/linux/timex.h:56,
-                 from /git/arm-soc/include/linux/timex.h:56,
-                 from /git/arm-soc/include/linux/sched.h:19,
-                 from /git/arm-soc/arch/arm/kernel/asm-offsets.c:13:
-/git/arm-soc/include/linux/jiffies.h: At top level:
-/git/arm-soc/include/linux/jiffies.h:256:10: warning: "NSEC_PER_SEC" is not defined [-Wundef]
-... many more...
+On Thu, Jul 3, 2014 at 2:36 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> [I fixed the top posting.]
+>
+> On Thu, 2014-07-03 at 14:08 -0400, Nick Krause wrote:
+>> On Thu, Jul 3, 2014 at 2:04 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+>> > This patch, together with patch 1/2, basically moves a chunk of code
+>> > into a separate file, didn't it? If so, why did you split that move in
+>> > two patches?
+>>
+>> Yes it is and I did it in two patches in order to be more readable.
+>
+> It makes it harder to understand the change (I had to _guess_ it was a
+> move). Moreover, depending on the order that these two patches would be
+> merged, we could end up with a chunk of code being either included twice
+> or not included at all, in some range of commits. Neither would be good.
+>
+>> > And how does all this work without any changes to a Makefile?
+>>
+>> Furthermore I don't known Kconfig well enough to do the Makefile
+>> for the file I created.
+>
+> Then I think you should, well, study the kernel build system before
+> submitting a change like this. And you can also ask a question or two to
+> get things going. (Not sure what the relevant list would be.)
+>
+>
+> Paul Bolle
+>
