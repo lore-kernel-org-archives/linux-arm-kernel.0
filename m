@@ -1,76 +1,98 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Jul 2014 22:55:45 +0800
-Subject: [PATCH v3 5/9] serial: 8250_dw: Add optional reset control support
+Date: Thu,  3 Jul 2014 22:55:49 +0800
+Subject: [PATCH v3 9/9] ARM: sun8i: Add reset controller nodes to the DTSI
 In-Reply-To: <1404399349-20237-1-git-send-email-wens@csie.org>
 References: <1404399349-20237-1-git-send-email-wens@csie.org>
-Message-ID: <1404399349-20237-6-git-send-email-wens@csie.org>
+Message-ID: <1404399349-20237-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 and A23 SoCs have a reset controller
-maintaining the UART in reset by default.
+The A23 has the same MMIO reset controllers matching the clocks gates,
+just like in the A31. This patch adds the reset controller nodes and
+the reset control phandles for the peripherals needing them to the
+DTSI.
 
-This patch adds optional reset support to the driver.
+Unlike the sun6i DTSI, this patch uses sun6i-a31-clock-reset for
+ahb1_rst. sun6i-a31-ahb-reset is for early init, and requires some
+additions to the machine code. It is used to support the hstimer.
+However the hstimer on sun8i only has 1 timer, which is somewhat
+useless. Support for it will probably not be added. Hence the
+decision to use sun6i-a31-clock-reset here to avoid the changes to
+sun8i machine code.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt | 1 +
- drivers/tty/serial/8250/8250_dw.c                             | 9 +++++++++
- 2 files changed, 10 insertions(+)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-index f13f1c5..cb9af84 100644
---- a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-@@ -7,6 +7,7 @@ Required properties:
- - clock-frequency : the input clock frequency for the UART.
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index e10c708..7d47933 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -187,6 +187,24 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- Optional properties:
-+- resets : phandle to the parent reset controller.
- - reg-shift : quantity to shift the register offsets by.  If this property is
-   not present then the register offsets are not shifted.
- - reg-io-width : the size (in bytes) of the IO accesses that should be
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index 51b307a..cb1b3dc 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/acpi.h>
- #include <linux/clk.h>
-+#include <linux/reset.h>
- #include <linux/pm_runtime.h>
- 
- #include <asm/byteorder.h>
-@@ -59,6 +60,7 @@ struct dw8250_data {
- 	int			last_mcr;
- 	int			line;
- 	struct clk		*clk;
-+	struct reset_control	*rst;
- 	struct uart_8250_dma	dma;
- };
- 
-@@ -408,6 +410,10 @@ static int dw8250_probe(struct platform_device *pdev)
- 		uart.port.uartclk = clk_get_rate(data->clk);
- 	}
- 
-+	data->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-+	if (!IS_ERR(data->rst))
-+		reset_control_deassert(data->rst);
++		ahb1_rst: reset at 01c202c0 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			reg = <0x01c202c0 0xc>;
++		};
 +
- 	data->dma.rx_chan_id = -1;
- 	data->dma.tx_chan_id = -1;
- 	data->dma.rx_param = data;
-@@ -451,6 +457,9 @@ static int dw8250_remove(struct platform_device *pdev)
- 
- 	serial8250_unregister_port(data->line);
- 
-+	if (!IS_ERR(data->rst))
-+		reset_control_assert(data->rst);
++		apb1_rst: reset at 01c202d0 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			reg = <0x01c202d0 0x4>;
++		};
 +
- 	if (!IS_ERR(data->clk))
- 		clk_disable_unprepare(data->clk);
++		apb2_rst: reset at 01c202d8 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			reg = <0x01c202d8 0x4>;
++		};
++
+ 		timer at 01c20c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0xa0>;
+@@ -208,6 +226,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 16>;
++			resets = <&apb2_rst 16>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -218,6 +237,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 17>;
++			resets = <&apb2_rst 17>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -228,6 +248,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 18>;
++			resets = <&apb2_rst 18>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -238,6 +259,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 19>;
++			resets = <&apb2_rst 19>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -248,6 +270,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 20>;
++			resets = <&apb2_rst 20>;
+ 			status = "disabled";
+ 		};
  
 -- 
 2.0.1
