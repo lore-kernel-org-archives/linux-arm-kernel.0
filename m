@@ -1,177 +1,82 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 3 Jul 2014 18:36:47 -0400
-Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
- CRTCs
-In-Reply-To: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
-References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAF6AEGtEUqK=YBWwOz8bf8a_e_p8-Y0vFYRfs2uxJ20015roOA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 04 Jul 2014 02:39:53 +0400
+Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
+In-Reply-To: <CAFp+6iGYZdRL17UqPhskyDDhfD++His3mO2v7uzG5OF1Hd3TrQ@mail.gmail.com>
+References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>	<1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>	<CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>	<53A9FCDB.6060805@cogentembedded.com>
+ <CAFp+6iGYZdRL17UqPhskyDDhfD++His3mO2v7uzG5OF1Hd3TrQ@mail.gmail.com>
+Message-ID: <53B5DBB9.3080202@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 3, 2014 at 12:49 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Add a helper to allow encoders to find their possible CRTCs from the
-> OF graph without having to re-implement this functionality.  We add a
-> device_node to drm_crtc which corresponds with the port node in the
-> DT description of the CRTC device.
->
-> We can then scan the DRM device list for CRTCs to find their index,
-> matching the appropriate CRTC using the port device_node, thus building
-> up the possible CRTC mask.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This helper will be shared between imx-drm and Armada DRM, and should
-> be useful for other OF-based drivers.  At the moment, this is being
-> sent for comments and acks; I need to build upon this patch in order
-> to convert Armada DRM to DT.
->
->  drivers/gpu/drm/Makefile |  1 +
->  drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/drm/drm_crtc.h   |  2 ++
->  include/drm/drm_of.h     | 18 ++++++++++++++
+Hello.
 
-oh, probably also should get links in Documentation/DocBook/drm.tmpl
+On 06/25/2014 12:44 PM, Vivek Gautam wrote:
 
-BR,
--R
+>>>> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+>>>> index 9ffecd5..453d89e 100644
+>>>> --- a/drivers/usb/host/xhci.h
+>>>> +++ b/drivers/usb/host/xhci.h
+>>>> @@ -1582,6 +1582,9 @@ struct xhci_hcd {
+>>>>           u32                     port_status_u0;
+>>>>    /* Compliance Mode Timer Triggered every 2 seconds */
+>>>>    #define COMP_MODE_RCVRY_MSECS 2000
+>>>> +       /* phys for the controller */
+>>>> +       struct phy              *phy2_gen;
+>>>> +       struct phy              *phy3_gen;
+>>>>    };
 
->  4 files changed, 86 insertions(+)
->  create mode 100644 drivers/gpu/drm/drm_of.c
->  create mode 100644 include/drm/drm_of.h
->
-> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-> index dd2ba4269740..533d011eab3e 100644
-> --- a/drivers/gpu/drm/Makefile
-> +++ b/drivers/gpu/drm/Makefile
-> @@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
->  drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
->  drm-$(CONFIG_PCI) += ati_pcigart.o
->  drm-$(CONFIG_DRM_PANEL) += drm_panel.o
-> +drm-$(CONFIG_OF) += drm_of.o
->
->  drm-usb-y   := drm_usb.o
->
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> new file mode 100644
-> index 000000000000..46d967881689
-> --- /dev/null
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -0,0 +1,65 @@
-> +#include <linux/export.h>
-> +#include <linux/list.h>
-> +#include <linux/of_graph.h>
-> +#include <drm/drmP.h>
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_of.h>
-> +
-> +/**
-> + * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
-> + * @dev: DRM device
-> + * @port: port OF node
-> + *
-> + * Given a port OF node, return the possible mask of the corresponding
-> + * CRTC within a device's list of CRTCs.  Returns zero if not found.
-> + */
-> +static uint32_t drm_crtc_port_mask(struct drm_device *dev,
-> +                                  struct device_node *port)
-> +{
-> +       unsigned int index = 0;
-> +       struct drm_crtc *tmp;
-> +
-> +       list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
-> +               if (tmp->port == port)
-> +                       return 1 << index;
-> +
-> +               index++;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
-> + * @dev: DRM device
-> + * @port: encoder port to scan for endpoints
-> + *
-> + * Scan all endpoints attached to a port, locate their attached CRTCs,
-> + * and generate the DRM mask of CRTCs which may be attached to this
-> + * encoder.
-> + */
-> +uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> +                                   struct device_node *port)
-> +{
-> +       struct device_node *remote_port, *ep = NULL;
-> +       uint32_t possible_crtcs = 0;
-> +
-> +       do {
-> +               ep = of_graph_get_next_endpoint(port, ep);
-> +               if (!ep)
-> +                       break;
-> +
-> +               remote_port = of_graph_get_remote_port(ep);
-> +               if (!remote_port) {
-> +                       of_node_put(ep);
-> +                       return 0;
-> +               }
-> +
-> +               possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
-> +
-> +               of_node_put(remote_port);
-> +       } while (1);
-> +
-> +       return possible_crtcs;
-> +}
-> +EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-> diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-> index 251b75e6bf7a..6a94909f1ca9 100644
-> --- a/include/drm/drm_crtc.h
-> +++ b/include/drm/drm_crtc.h
-> @@ -41,6 +41,7 @@ struct drm_framebuffer;
->  struct drm_object_properties;
->  struct drm_file;
->  struct drm_clip_rect;
-> +struct device_node;
->
->  #define DRM_MODE_OBJECT_CRTC 0xcccccccc
->  #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
-> @@ -314,6 +315,7 @@ struct drm_crtc_funcs {
->   */
->  struct drm_crtc {
->         struct drm_device *dev;
-> +       struct device_node *port;
->         struct list_head head;
->
->         /**
-> diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-> new file mode 100644
-> index 000000000000..2441f7112074
-> --- /dev/null
-> +++ b/include/drm/drm_of.h
-> @@ -0,0 +1,18 @@
-> +#ifndef __DRM_OF_H__
-> +#define __DRM_OF_H__
-> +
-> +struct drm_device;
-> +struct device_node;
-> +
-> +#ifdef CONFIG_OF
-> +extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> +                                          struct device_node *port);
-> +#else
-> +static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> +                                                 struct device_node *port)
-> +{
-> +       return 0;
-> +}
-> +#endif
-> +
-> +#endif /* __DRM_OF_H__ */
-> --
-> 1.8.3.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>> I don't think adding new variables here and restricting most of this
+>>> logic to xhci-plat.c (in the next patch) is the best way to do it.
+
+>>     Indeed.
+
+    Actually, I haven't given enough thought to this...
+
+>>> There's no conceptual reason why other host controllers (e.g. xhci-pci
+>>> or even EHCI) could not have a similar need to tune their PHY after
+>>> reset. PHYs are universal to all host controllers.
+
+>>> There is already a 'phy' member in struct usb_hcd which I think is
+>>> mostly unused right now. I think it would be much less
+>>> confusing/redundant to reuse that member for this purpose (you could
+>>> still set it up from xhci_plat_probe(), and then call it from
+>>> hcd_bus_resume() or something like that).
+
+>>     That member has type 'struct usb_phy *' while here we have 'struct phy *'
+>> -- feel the difference.
+>>     I have already tried adding 'struct phy *gen_phy' to 'struct usb_hcd',
+
+> So the 'struct phy *' available in the usb_hcd is requested in usb_add_hcd().
+> This is requested with the constant string 'usb' :
+>             struct phy *phy = phy_get(hcd->self.controller, "usb");
+
+> This can get the phy with string 'usb' only if, either the host
+> controller has a device node wherein the phys are given.
+
+    Yes, that was the plan. Currently, the PHY driver for which this was 
+written can be probed from the device tree only.
+
+> Even in this case one can't give same constant string for two
+> different phys, UTMI+ and PIPE3 phy, isn't it ?
+
+    Yes, you're right. I didn't really consider the case of some host needing 
+2 distinct PHY.
+
+> Or, the other way can be when host gets a lookup table to look into to
+> find the relevant phys, something like
+> Heikki has suggested:
+> usb: dwc3: host: convey the PHYs to xhci
+> (https://lkml.org/lkml/2014/6/5/585) and related patch series.
+
+    Well, AFAIK the look-up table method is already provided by the current 
+PHY core for non-DT use cases; this doesn't seem to have changed with that 
+patch set, does it?
+
+> So if we use this second approach, we would need to override the
+> 'phy_get()' that has been done in usb_add_hcd()
+> in xhci_plat_probe(), and then use them in later operations.
+
+    I guess it'd probably be simpler to ignore the 'gen_phy' member of 'struct 
+usb_hcd' in your case (if it gets eventually added).
+
+WBR, Sergei
