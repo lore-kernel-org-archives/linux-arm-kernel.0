@@ -1,107 +1,52 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 03 Jul 2014 19:31:52 +0200
-Subject: [PATCH 2/3] clocksource: add device-tree support for PXA timer
-In-Reply-To: <53B5470D.4070009@linaro.org> (Daniel Lezcano's message of "Thu,
- 03 Jul 2014 14:05:33 +0200")
-References: <1403388588-11956-1-git-send-email-robert.jarzmik@free.fr>
- <1403388588-11956-2-git-send-email-robert.jarzmik@free.fr>
- <53B5470D.4070009@linaro.org>
-Message-ID: <87tx6ynybb.fsf@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 18:32:26 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140703170558.GZ32514@n2100.arm.linux.org.uk>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140701234800.GA23577@sirena.org.uk>
+ <20140702100133.GE18731@arm.com>
+ <20140702163923.GJ410@sirena.org.uk>
+ <20140702170141.GH24879@arm.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+ <20140703170558.GZ32514@n2100.arm.linux.org.uk>
+Message-ID: <20140703173226.GC17372@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On Thu, Jul 03, 2014 at 06:05:58PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
+> > So, no. I completely reject any notion that breaking existing apps is
+> > okay. If we're going to say that v8 still supports 32-bit apps, then
+> > it has to be all of v7, not just the 'good' bits. Nor do I think
+> > saying "it's just a bunch of games" justifies anything. We're kernel
+> > engineers. Applications are applications and we don't break userspace.
+> > Period.
+> 
+> +1 on all points above.  I'd go further - if we're going to say that v8
+> still supports 32-bit apps, that covers at least v6 *as well*.
 
->> -#include <mach/regs-ost.h>
->>   #include <mach/irqs.h>
->> +#include <mach/hardware.h>
->
-> Now as the driver is in 'drivers', do not reference the headers files in
-> mach. Moving the driver to the drivers directory implies some cleanup with the
-> headers dependencies.
-I don't see that very possible.
-Or said another way, I don't see how the irq number, IRQ_OST0 (in mach/irqs.h)
-can be guessed for non device-tree configuration.
+We've never pretended to support anything other than ARMv8 in the compat
+layer. uname even reports this in the machine name.
 
->> +#define OSMR0		0x00	/* */
->> +#define OSMR1		0x04	/* */
->> +#define OSMR2		0x08	/* */
->> +#define OSMR3		0x0C	/* */
->> +#define OSMR4		0x80	/* */
->
-> Can you please remove those unused empty comment or fill them with something
-> appropriate.
-Sure.
+If people are suddenly so concerned about *full* compatibility with an ARMv7
+kernel, that needs a lot more than just SWP emulation:
 
->
->> +#define OSCR		0x10	/* OS Timer Counter Register */
->> +#define OSCR4		0x40	/* OS Timer Counter Register */
->> +#define OMCR4		0xC0	/* */
->> +#define OSSR		0x14	/* OS Timer Status Register */
->> +#define OWER		0x18	/* OS Timer Watchdog Enable Register */
->> +#define OIER		0x1C	/* OS Timer Interrupt Enable Register */
->> +
->> +#define OSSR_M3		(1 << 3)	/* Match status channel 3 */
->> +#define OSSR_M2		(1 << 2)	/* Match status channel 2 */
->> +#define OSSR_M1		(1 << 1)	/* Match status channel 1 */
->> +#define OSSR_M0		(1 << 0)	/* Match status channel 0 */
->> +
->> +#define OWER_WME	(1 << 0)	/* Watchdog Match Enable */
->> +
->> +#define OIER_E3		(1 << 3)	/* Interrupt enable channel 3 */
->> +#define OIER_E2		(1 << 2)	/* Interrupt enable channel 2 */
->> +#define OIER_E1		(1 << 1)	/* Interrupt enable channel 1 */
->> +#define OIER_E0		(1 << 0)	/* Interrupt enable channel 0 */
->
-> Is it possible to do some cleanups around regs-ost.h and here in order to remove
-> the unused macros. Also, it seems some define will be duplicate as they are
-> shared with the watchdog. Any plan to fix that ?
-For the cleanup, yes, will do.
+  - Alignment fixups for ldm/stm
+  - SETEND
+  - CP15 barriers
+  - SWI breakpoints + branch through zero syscalls
+  (- SWP)
 
-For the watchdog I don't have any plan yet. This patch's purpose is only to
-bring the PXA time source to drivers/clocksource, and make it compatible with
-both device-tree and non device-tree builds.
+By the arguments presented so far, I can't see why we wouldn't also need
+OABI too. In other words, where do we draw the line? If we're not completely
+compatible, then the compatibility argument suddenly becomes subjective.
 
->> @@ -33,9 +60,14 @@
->>    * calls to sched_clock() which should always be the case in practice.
->>    */
->>
->> +#define timer_readl(reg) readl_relaxed(timer_base + (reg))
->> +#define timer_writel(val, reg) writel_relaxed((val), timer_base + (reg))
->> +
->> +static void __iomem *timer_base;
->> +
->>   static u64 notrace pxa_read_sched_clock(void)
->>   {
->> -	return readl_relaxed(OSCR);
->
-> So here there is a change which is not explained in the changelog (timer_base
-> offset).
->
-> Even it is obvious for me because I am used to see this kind of code, that would
-> deserve a better description in the changelog.
-OK, I'll add the backward compatibility explanation with non device-tree builds,
-and the necessary timer_base iomem hard encoded value. And the Janus double face
-explanation of the driver (both DT and non-DT oriented).
+It seems that people really want us to implement the subset of the ABI which
+is needed by the Google Play store and are trying to dress that up as the
+ARMv7 kernel ABI. The latter is a lot more work and conflating the two isn't
+especially helpful.
 
-Another question brought up by this : if I remove all 'mach/' includes, I loose
-io_p2v() right ? How can I guess timer_base then ?
-
->> +	/* we are only interested in OS-timer0 irq */
->> +	irq = irq_of_parse_and_map(np, 0);
->> +	if (irq <= 0)
->> +		panic("%s: unable to parse OS-timer0 irq\n", np->name);
->
-> Is the 'panic' desirable ? The clksrc-of is written in a way to use different
-> clocks, no ?
-Good question.
-
-Maybe not, I followed the same rationale as in orion-timer, which is :
- - as this timer is the only possible timer for PXA boards, and because without
- it the kernel boot will stall (scheduling will be blocked), it's better to
- panic early that to remain stalled.
-
-Isn't this a good approach ?
-
--- 
-Robert
+Will
