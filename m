@@ -1,49 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Jul 2014 19:32:43 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140703173226.GC17372@arm.com>
-References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703170558.GZ32514@n2100.arm.linux.org.uk>
- <20140703173226.GC17372@arm.com>
-Message-ID: <20140703183243.GN410@sirena.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 03 Jul 2014 20:36:36 +0200
+Subject: [PATCH 2/2] mach-spear: fixed spear1340.c file
+In-Reply-To: <CAPDOMVh0qyjq11kKaO2ndYhLW8j+dZyv3-c89BBcO1AxY+fiHQ@mail.gmail.com>
+References: <1404354994-7478-1-git-send-email-xerofoify@gmail.com>
+ <1404410691.16291.11.camel@x220>
+ <CAPDOMVh0qyjq11kKaO2ndYhLW8j+dZyv3-c89BBcO1AxY+fiHQ@mail.gmail.com>
+Message-ID: <1404412596.16291.30.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 06:32:26PM +0100, Will Deacon wrote:
-> On Thu, Jul 03, 2014 at 06:05:58PM +0100, Russell King - ARM Linux wrote:
+[I fixed the top posting.]
 
-> > +1 on all points above.  I'd go further - if we're going to say that v8
-> > still supports 32-bit apps, that covers at least v6 *as well*.
+On Thu, 2014-07-03 at 14:08 -0400, Nick Krause wrote:
+> On Thu, Jul 3, 2014 at 2:04 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > This patch, together with patch 1/2, basically moves a chunk of code
+> > into a separate file, didn't it? If so, why did you split that move in
+> > two patches?
+>
+> Yes it is and I did it in two patches in order to be more readable.
 
-> We've never pretended to support anything other than ARMv8 in the compat
-> layer. uname even reports this in the machine name.
+It makes it harder to understand the change (I had to _guess_ it was a
+move). Moreover, depending on the order that these two patches would be
+merged, we could end up with a chunk of code being either included twice
+or not included at all, in some range of commits. Neither would be good.
 
-That may have been the intention but sadly I rather suspect you'll find
-that this doesn't match what users have been understanding.
+> > And how does all this work without any changes to a Makefile?
+>
+> Furthermore I don't known Kconfig well enough to do the Makefile
+> for the file I created.
 
-> By the arguments presented so far, I can't see why we wouldn't also need
-> OABI too. In other words, where do we draw the line? If we're not completely
-> compatible, then the compatibility argument suddenly becomes subjective.
+Then I think you should, well, study the kernel build system before
+submitting a change like this. And you can also ask a question or two to
+get things going. (Not sure what the relevant list would be.)
 
-> It seems that people really want us to implement the subset of the ABI which
-> is needed by the Google Play store and are trying to dress that up as the
-> ARMv7 kernel ABI. The latter is a lot more work and conflating the two isn't
-> especially helpful.
 
-Right, or at least that's the set where there is the combination of
-caring and time/ability to implement required to do the work to provide
-the compatibility which is probably the real metric.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/0afe6d31/attachment.sig>
+Paul Bolle
