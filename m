@@ -1,65 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 3 Jul 2014 16:16:42 +0200
-Subject: arch/arm64/efi-stub.o rebuilding every time?
-In-Reply-To: <20140703141342.GB14305@arm.com>
-References: <20140703141342.GB14305@arm.com>
-Message-ID: <CAKv+Gu_pRmMU+_ApBMYiBjQAPygrsTSs-iy4zrAUN9L28uAqag@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  3 Jul 2014 16:14:46 +0200
+Subject: [PATCH 08/18] AT91: soc: Introduce register_devices callback
+In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-14-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2014 16:13, Will Deacon <will.deacon@arm.com> wrote:
-> Hi guys,
->
-> If I build an arm64 kernel, then simply hit make again without changing
-> anything, I find that efi-stub.o is rebuilt every time (with an annoying
-> warning too, but I think you already know about that):
->
+Some core devices should be registered by the SoC itself rather than by every
+board using this SoC. Introduce a register_devices callback that should be
+called during the init_machine in order to do that.
 
-Yep, I had noticed that as well. The reason is that it depends on
-generated header files, which it shouldn't. There's already a patch
-queued in Matt Fleming's tree for this:
-https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=86b2eb8cdffda7eef07b1d6e5464491df1e86ee9
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-at91/generic.h | 2 ++
+ arch/arm/mach-at91/setup.c   | 5 +++++
+ arch/arm/mach-at91/soc.h     | 1 +
+ 3 files changed, 8 insertions(+)
 
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 631fa3b8c16d..4c2c96195a50 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -37,6 +37,8 @@ extern int  __init at91_aic5_of_init(struct device_node *node,
+ extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
+ extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
+ 
++ /* Devices */
++extern void __init at91_register_devices(void);
+ 
+  /* Timer */
+ extern void at91rm9200_ioremap_st(u32 addr);
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 71003e40f01c..fe0601e0a3c0 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -508,3 +508,8 @@ void __init at91_initialize(unsigned long main_clock)
+ 
+ 	pinctrl_provide_dummies();
+ }
++
++void __init at91_register_devices(void)
++{
++	at91_boot_soc.register_devices();
++}
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index a1e1482c6da8..ab983f2cc7dd 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -11,6 +11,7 @@ struct at91_init_soc {
+ 	void (*map_io)(void);
+ 	void (*ioremap_registers)(void);
+ 	void (*register_clocks)(void);
++	void (*register_devices)(void);
+ 	void (*init)(void);
+ };
+ 
 -- 
-Ard.
-
->
-> $ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- -j8 Image
->   CHK     include/config/kernel.release
->   CHK     include/generated/uapi/linux/version.h
->   CHK     include/generated/utsrelease.h
->   CALL    scripts/checksyscalls.sh
->   CHK     include/generated/compile.h
->   CC      arch/arm64/kernel/efi-stub.o
-> In file included from arch/arm64/kernel/efi-stub.c:44:0:
-> arch/arm64/kernel/../../../drivers/firmware/efi/fdt.c: In function ?update_fdt?:
-> arch/arm64/kernel/../../../drivers/firmware/efi/fdt.c:66:22: warning: unused variable ?name? [-Wunused-variable]
->    const char *type, *name;
->                       ^
->   CHK     kernel/config_data.h
->   LD      arch/arm64/kernel/built-in.o
->   LINK    vmlinux
->   LD      vmlinux.o
->   MODPOST vmlinux.o
->   GEN     .version
->   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   LD      init/built-in.o
->   KSYM    .tmp_kallsyms1.o
->   KSYM    .tmp_kallsyms2.o
->   LD      vmlinux
->   SORTEX  vmlinux
->   SYSMAP  System.map
->   OBJCOPY arch/arm64/boot/Image
->
->
-> Does this actually need to be rebuilt, or is there a buggy Makefile
-> somewhere?
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2.0.1
