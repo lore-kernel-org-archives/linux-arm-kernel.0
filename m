@@ -1,70 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jul 2014 16:43:25 +0100
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140703172909.60caf2c7@armhf>
-References: <20140702165628.GO20799@lunn.ch> <20140702195154.47d6f6b4@armhf>
- <20140702194252.GN410@sirena.org.uk> <20140703074959.7c489912@armhf>
- <20140703104432.GV410@sirena.org.uk> <20140703133406.2d3e3a1d@armhf>
- <20140703115924.GY410@sirena.org.uk> <20140703152826.103c9d6c@armhf>
- <20140703134346.GW32514@n2100.arm.linux.org.uk>
- <20140703172909.60caf2c7@armhf>
-Message-ID: <20140703154325.GY32514@n2100.arm.linux.org.uk>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 3 Jul 2014 17:44:26 +0200
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140703140736.GF5814@saruman.home>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <20140703132509.GA5814@saruman.home>
+ <CAOCHtYi0JwRO12gHa+KFGH1k7pPk4TL40igwhzRRxutw-tqf6A@mail.gmail.com>
+ <20140703140736.GF5814@saruman.home>
+Message-ID: <20140703154425.GC23309@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 05:29:09PM +0200, Jean-Francois Moine wrote:
-> I think that you did not look at my code.
+Hi,
+
+On Thu, Jul 03, 2014 at 09:07:36AM -0500, Felipe Balbi wrote:
+> On Thu, Jul 03, 2014 at 08:34:44AM -0500, Robert Nelson wrote:
+> > On Thu, Jul 3, 2014 at 8:25 AM, Felipe Balbi <balbi@ti.com> wrote:
+> > > On Thu, Jul 03, 2014 at 12:34:11AM -0700, Tony Lindgren wrote:
+> > >> * Robert Nelson <robertcnelson@gmail.com> [140702 12:27]:
+> > >> > On Wed, Jul 2, 2014 at 2:09 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> > >> > > Hi,
+> > >> > >
+> > >> > > On Wed, Jul 02, 2014 at 11:09:32AM -0500, Felipe Balbi wrote:
+> > >> > >> > It has been only tested as console UART.
+> > >> > >> > The tty name is ttyS based instead of ttyO. How big is the pain here,
+> > >> > >> > what could be the easiest way to provide compatibility?
+> > >> > >>
+> > >> > >> have been considering that myself for months. You could pass an optional
+> > >> > >> argument to serial8250_register_8250_port() but that only solves part of
+> > >> > >> the problem :-(
+> > >>
+> > >> Some kind of compability layer sure would be nice.
+> > >>
+> > >> > > When ttyS -> ttyO change was done on OMAP, compatibility was not an issue.
+> > >> > > Why should we care about it now?
+> > >> >
+> > >> > It would be a good opportunity to force everyone to update their bootloader. ;)
+> > >> >
+> > >> > Besides the BeagleBoard forum is quiet now, no one is complaining
+> > >> > about that old (ttyS -> ttyO) transition anymore..
+> > >>
+> > >> How about a Kconfig option to provide ttyO by default? The not even
+> > >> do that if kernel has cmdline option nottyomap.
+> > >
+> > > what about single zImage ? I don't want to use ttyO on my
+> > > Allwinner/Exynos/Snapdragon/whatever SoC just because OMAP is in the
+> > > same image ;-)
+> > 
+> > What if we just kept it simple, leave the ttyO driver enabled and add
+> > a warning (pr_info) that it's deprecated.  It's not like it's broken,
+> > it just won't get later features or devices support added.
 > 
-> Both S/PDIF and I2S work with the TDA998x. It is a choice of the audio
-> subsystem to do this choice, not Russell King.
+> Fine by me, I'd switch to 8250 as soon as it's merged though :-) would
+> be nice to get an example DTS change just so I can start testing on the
+> boards I have around.
 
-If you think I'm arguing because I personally want something, then we're
-not going to make any progress.
+DT is supposed to contain information about the hardware, so it
+should stay the same? I think there is no non-hackish way to decide
+at runtime which driver should be loaded.
 
-What I want is for this to be _correct_ and _not_ to introduce silly
-restrictions which break people's setups.
+One possible solution is:
+ * Keep both drivers for a couple of kernel releases
+ * Add the deprecation warning to the older one
+ * Add a conflict between both drivers in Kconfig
 
-> When DPCM will handle the formats and rates, the audio subsystem will
-> find by itself if such stream will go to the HDMI only or to the S/PDIF
-> only or to both. The kirwood audio driver will work as it is and the tda998x
-> CODEC will work as it is. There will be no need to change these drivers.
+Thus its decided at build-time, which driver should be used. This
+would keep existing .config files working for a couple of releases.
 
-Except, as Mark has already pointed out, and as I keep pointing out to
-you, and you keep refusing to accept, the kirkwood driver as it stands
-is *not* a DPCM driver.  It makes no use of that stuff at all.
-
-What you're doing in kirkwood-i2s is providing two plain DAI links,
-and then insisting that only one can be active any any one time.
-
-A DPCM solution provides at least one frontend DAI link and at least
-one backend DAI link.  Your code does not do this.
-
-The second point is that - and as I keep telling you - that as soon
-as you couple your existing code (which restricts things like the
-sample rates) you can no longer output anything else through the
-optical out ON THE CUBOX.  For this statement, I'm not talking
-_generally_,  I'm talking _specifically_ about _one_ _platform_.
-
-> All we need actually is some more code in DPCM or multi-codec or
-> whatever mechanism which will route the stream according to the rates
-> and formats.
-
-Yes, DPCM currently lacks full support, that's been known about for
-some time - I've reported it to Mark, but it seems that this isn't
-something that is going to get fixed until others put work into it.
-
-> Eventually, the TDA998x is used in other machines. Are you sure that
-> the audio controllers of all these machines have a S/PDIF output
-> connected to the S/PDIF input of the tda998x?
-
-Which bit of "we need to support both I2S and SPDIF" in my previous
-emails was not clear.  Which bit of "We should only support SPDIF
-on the Cubox" was not clear?
-
-I *fully* acknowledge that we need to support both, but I'm putting
-a _strong_ recommendation to you _with_ technical reasons why we
-should _only_ support SPDIF on the Cubox.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/b3a4290e/attachment.sig>
