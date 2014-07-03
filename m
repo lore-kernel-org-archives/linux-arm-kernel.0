@@ -1,73 +1,36 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 3 Jul 2014 14:04:02 +0530
-Subject: [PATCH] arm: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
-In-Reply-To: <1401180943-14296-1-git-send-email-rnayak@ti.com>
-References: <1401180943-14296-1-git-send-email-rnayak@ti.com>
-Message-ID: <53B5157A.3020108@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Jul 2014 10:39:52 +0200
+Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
+ address of the boot register
+In-Reply-To: <20140630144620.0030cf94@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
+ <20140630144620.0030cf94@free-electrons.com>
+Message-ID: <53B516D8.8070003@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 May 2014 02:25 PM, Rajendra Nayak wrote:
-> Without the patch:
-> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
-> 532000000
-> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
-> 532000000
-> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
-> 532000000
-> 
-> With the patch:
-> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
-> 532000000
-> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
-> 266000000
-> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
-> 133000000
-> 
-> The l3 clock derived from core DPLL is actually a divider clock,
-> with the default divider set to 2. l4 then derived from l3 is a fixed factor
-> clock, but the fixed divider is 2 and not 1. Which means the l3 clock is
-> half of core DPLLs h12x2 and l4 is half of l3 (as seen with this patch)
+Hi Thomas,
 
-Tero, this seems like is yet to be picked up. You see any issues with this that needs to be
-addressed?
+On 30/06/2014 14:46, Thomas Petazzoni wrote:
+> Gregory,
+> 
+> I'm not sure that the best approach to solve this problem. Instead,
+> maybe the system-controller.c code should set up the boot address
+> workaround on Armada 375. Since the workaround on 375 is really related
+> to setting the boot address which is done by the system controller,
+> maybe the initialization of the workaround belongs in
+> system-controller.c ?
 
-regards,
-Rajendra
+So moving the workaround into mvebu_system_controller_set_cpu_boot_addr()
+should be the thing to do.
 
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/boot/dts/dra7xx-clocks.dtsi |   10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index cfb8fc7..a14c99b 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -673,10 +673,12 @@
->  
->  	l3_iclk_div: l3_iclk_div {
->  		#clock-cells = <0>;
-> -		compatible = "fixed-factor-clock";
-> +		compatible = "ti,divider-clock";
-> +		ti,max-div = <2>;
-> +		ti,bit-shift = <4>;
-> +		reg = <0x0100>;
->  		clocks = <&dpll_core_h12x2_ck>;
-> -		clock-mult = <1>;
-> -		clock-div = <1>;
-> +		ti,index-power-of-two;
->  	};
->  
->  	l4_root_clk_div: l4_root_clk_div {
-> @@ -684,7 +686,7 @@
->  		compatible = "fixed-factor-clock";
->  		clocks = <&l3_iclk_div>;
->  		clock-mult = <1>;
-> -		clock-div = <1>;
-> +		clock-div = <2>;
->  	};
->  
->  	video1_clk2_div: video1_clk2_div {
-> 
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
