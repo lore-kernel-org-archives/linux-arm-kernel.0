@@ -1,60 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Jul 2014 14:51:44 +0200
-Subject: [PATCH 11/16] ARM: mvebu: dts: Add CA9 MPcore SoC Controller node
-In-Reply-To: <20140630173755.32793586@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-12-git-send-email-gregory.clement@free-electrons.com>
- <20140630173755.32793586@free-electrons.com>
-Message-ID: <53B551E0.6040103@free-electrons.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu,  3 Jul 2014 20:52:51 +0800
+Subject: [PATCH] clocksource: sirf: fix incorrect clock enable counter for
+ timer
+Message-ID: <1404391971-24214-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Zhiwu Song <Zhiwu.Song@csr.com>
 
+in the clocksource driver, we didn't explicitly enable the clock.
+it makes the clk reference counter wrong.
+we didn't encounter any hang issue because the tick's clock input
+has been open and is shared by some other hardware components, but
+if we don't enable those components in kernel, in the stage of
+disabling unused clk in kernel boot, Linux tick hangs.
 
-> On Fri, 27 Jun 2014 15:22:52 +0200, Gregory CLEMENT wrote:
->> The CA9 MPcore SoC Control block allows to do some configuration that
->> the SoC could use for a specific use case. In most cases the defaults
->> case is enough. However there is few exception: for cpuidle we need to
->> use the CA9 MPcore Reset Control register.
-> 
-> I'd reword this to something like:
-> 
-> """
-> The CA9 MPcore SoC Control block is a set of registers that allows to
-> configure certain internal aspects of the core blocks of the SoC
-> (Cortex-A9, L2 cache controller, etc.). In most cases, the default
-> values are fine so they aren't many reasons to touch those registers,
-> but there is one exception: to support cpuidle on Armada 38x, we need
-> to modify the value of the CA9 MPcore Reset Control register.
-> 
-> Therefore, this commit adds a new Device Tree binding for this hardware
-> block, and uses this new binding for the Armada 38x Device Tree file.
-> 
-> """
+this patch fixes it. it does an explicit prepare and enable to the
+clock input, and increases the usage counter of the clk.
 
-[...]
+Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/clocksource/timer-marco.c  | 3 +++
+ drivers/clocksource/timer-prima2.c | 3 +++
+ 2 files changed, 6 insertions(+)
 
->> +- reg: should be register base and length as documented in the
-> 
-> should be *the* register base and length
-> 
-			reg = <0x21010 0x1c>;
-> 
-> With those fixed:
-> 
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-
-I will apply your change.
-
-Thanks,
-
-Gregory
-
-
-
+diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
+index dbd3039..330e930 100644
+--- a/drivers/clocksource/timer-marco.c
++++ b/drivers/clocksource/timer-marco.c
+@@ -260,6 +260,9 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
+ 
+ 	clk = of_clk_get(np, 0);
+ 	BUG_ON(IS_ERR(clk));
++
++	BUG_ON(clk_prepare_enable(clk));
++
+ 	rate = clk_get_rate(clk);
+ 
+ 	BUG_ON(rate < MARCO_CLOCK_FREQ);
+diff --git a/drivers/clocksource/timer-prima2.c b/drivers/clocksource/timer-prima2.c
+index a722aac..ce18d57 100644
+--- a/drivers/clocksource/timer-prima2.c
++++ b/drivers/clocksource/timer-prima2.c
+@@ -200,6 +200,9 @@ static void __init sirfsoc_prima2_timer_init(struct device_node *np)
+ 
+ 	clk = of_clk_get(np, 0);
+ 	BUG_ON(IS_ERR(clk));
++
++	BUG_ON(clk_prepare_enable(clk));
++
+ 	rate = clk_get_rate(clk);
+ 
+ 	BUG_ON(rate < PRIMA2_CLOCK_FREQ);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.3
