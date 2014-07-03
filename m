@@ -1,128 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 3 Jul 2014 17:41:46 -0500
-Subject: [PATCH 1/2] mmc: hsmmc: Add reset gpio configuration option.
-In-Reply-To: <1404420564-30245-1-git-send-email-marek@goldelico.com>
-References: <1404420564-30245-1-git-send-email-marek@goldelico.com>
-Message-ID: <20140703224146.GC2540@saruman.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 23:47:53 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <yw1xoax6dr67.fsf@unicorn.mansr.com>
+References: <20140701234800.GA23577@sirena.org.uk>
+ <20140702100133.GE18731@arm.com> <20140702163923.GJ410@sirena.org.uk>
+ <20140702170141.GH24879@arm.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+ <20140703170558.GZ32514@n2100.arm.linux.org.uk>
+ <20140703173226.GC17372@arm.com> <yw1xoax6dr67.fsf@unicorn.mansr.com>
+Message-ID: <20140703224753.GB21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 03, 2014 at 10:49:23PM +0200, Marek Belisko wrote:
-> From: NeilBrown <neilb@suse.de>
+On Thu, Jul 03, 2014 at 11:16:16PM +0100, M?ns Rullg?rd wrote:
+> Will Deacon <will.deacon@arm.com> writes:
 > 
-> If a 'gpio_reset' is specified, then hold it low while
-> turning the power regulator on.
-> This is needed for some wi2wi wireless modules, particularly
-> when the regulator is held active by some other client.
-> The wi2wi needs to be reset if power isn't actually removed, and
-> the gpio can be used to do this.
+> > On Thu, Jul 03, 2014 at 06:05:58PM +0100, Russell King - ARM Linux wrote:
+> >> On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
+> >> > So, no. I completely reject any notion that breaking existing apps is
+> >> > okay. If we're going to say that v8 still supports 32-bit apps, then
+> >> > it has to be all of v7, not just the 'good' bits. Nor do I think
+> >> > saying "it's just a bunch of games" justifies anything. We're kernel
+> >> > engineers. Applications are applications and we don't break userspace.
+> >> > Period.
+> >> 
+> >> +1 on all points above.  I'd go further - if we're going to say that v8
+> >> still supports 32-bit apps, that covers at least v6 *as well*.
+> >
+> > We've never pretended to support anything other than ARMv8 in the compat
+> > layer. uname even reports this in the machine name.
+> >
+> > If people are suddenly so concerned about *full* compatibility with an ARMv7
+> > kernel, that needs a lot more than just SWP emulation:
+> >
+> >   - Alignment fixups for ldm/stm
 > 
-> Signed-off-by: NeilBrown <neilb@suse.de>
-> ---
->  arch/arm/mach-omap2/hsmmc.c            |  7 ++++++-
->  arch/arm/mach-omap2/hsmmc.h            |  3 +++
->  drivers/mmc/host/omap_hsmmc.c          | 26 +++++++++++++++++++++++---
->  include/linux/platform_data/mmc-omap.h |  1 +
->  4 files changed, 33 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index 07d4c7b..046bfdd 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -172,6 +172,10 @@ static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
->  		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
->  		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
->  					OMAP_PIN_INPUT_PULLUP);
-> +	if (gpio_is_valid(mmc_controller->slots[0].gpio_reset) &&
-> +		(mmc_controller->slots[0].gpio_reset < OMAP_MAX_GPIO_LINES))
-> +		omap_mux_init_gpio(mmc_controller->slots[0].gpio_reset,
-> +					OMAP_PIN_OUTPUT);
->  	if (cpu_is_omap34xx()) {
->  		if (controller_nr == 0) {
->  			omap_mux_init_signal("sdmmc1_clk",
-> @@ -270,6 +274,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
->  
->  	mmc->slots[0].switch_pin = c->gpio_cd;
->  	mmc->slots[0].gpio_wp = c->gpio_wp;
-> +	mmc->slots[0].gpio_reset = c->gpio_reset;
->  
->  	mmc->slots[0].remux = c->remux;
->  	mmc->slots[0].init_card = c->init_card;
-> @@ -389,7 +394,7 @@ void omap_hsmmc_late_init(struct omap2_hsmmc_info *c)
->  			continue;
->  
->  		mmc_pdata->slots[0].switch_pin = c->gpio_cd;
-> -		mmc_pdata->slots[0].gpio_wp = c->gpio_wp;
-> +		mmc_pdata->slots[0].gpio_reset = c->gpio_reset;
->  
->  		res = omap_device_register(pdev);
->  		if (res)
-> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-> index 7f2e790..16b2ac5 100644
-> --- a/arch/arm/mach-omap2/hsmmc.h
-> +++ b/arch/arm/mach-omap2/hsmmc.h
-> @@ -24,6 +24,9 @@ struct omap2_hsmmc_info {
->  	bool	deferred;	/* mmc needs a deferred probe */
->  	int	gpio_cd;	/* or -EINVAL */
->  	int	gpio_wp;	/* or -EINVAL */
-> +	int	gpio_reset;	/* or -EINVAL - reset is held low during
-> +				 * power-on
-> +				 */
->  	char	*name;		/* or NULL for default */
->  	struct platform_device *pdev;	/* mmc controller instance */
->  	int	ocr_mask;	/* temporary HACK */
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 9656726..4a264fc 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -300,6 +300,8 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
->  	if (!host->vcc)
->  		return 0;
->  
-> +	if (gpio_is_valid(mmc_slot(host).gpio_reset))
-> +		gpio_set_value_cansleep(mmc_slot(host).gpio_reset, 0);
->  	if (mmc_slot(host).before_set_reg)
->  		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
->  
-> @@ -365,6 +367,8 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
->  
->  	if (mmc_slot(host).after_set_reg)
->  		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
-> +	if (gpio_is_valid(mmc_slot(host).gpio_reset))
-> +		gpio_set_value_cansleep(mmc_slot(host).gpio_reset, 1);
->  
->  error_set_power:
->  	return ret;
-> @@ -481,10 +485,22 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
->  	} else
->  		pdata->slots[0].gpio_wp = -EINVAL;
->  
-> -	return 0;
-> +	if (gpio_is_valid(pdata->slots[0].gpio_reset)) {
-> +		ret = gpio_request(pdata->slots[0].gpio_reset, "mmc_reset");
-> +		if (ret)
-> +			goto err_free_wp;
-> +		ret = gpio_direction_output(pdata->slots[0].gpio_reset, 1);
-> +		if (ret)
-> +			goto err_free_reset;
-> +	} else
-> +		pdata->slots[0].gpio_reset = -EINVAL;
+> No ARM variant ever supported unaligned ldm/stm.
 
-looks like this should be implemented as a reset-gpio.c driver. This
-piece of code would, then
+Quite right but that's not the point being discussed.  Please note that
+the sentence says "with an ARMv7 *kernel*" - we are not talking about
+the architecture there.
 
-	reset_assert(slot->reset);
-	do_the_magic_dance();
-	reset_deassert(slot->reset);
+So, what's more to the point is that on 32-bit ARM userspace under Linux,
+we _have_ supported it since early 2000 up to present.  It's not currently
+supported on 64-bit ARM running Linux, even when running a 32-bit binary
+in userspace.
+
+Ergo, it's a user visible ABI change, one which we don't know whether it
+matters.  In all probability, it doesn't because (hopefully) no one ever
+does unaligned LDMs/STMs - I think it would require hand-crafted assembly,
+at which point you're talking about optimising something, and you'd be
+silly to do it as it would invoke the alignment fault handling which
+would be slow.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/3326e218/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
