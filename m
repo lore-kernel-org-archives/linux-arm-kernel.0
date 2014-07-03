@@ -1,168 +1,35 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 3 Jul 2014 11:35:48 +0200
-Subject: socfpga/sockit ethernet problems
-In-Reply-To: <20140507104518.GB18139@amd.pavel.ucw.cz>
-References: <20140507104518.GB18139@amd.pavel.ucw.cz>
-Message-ID: <20140703093548.GA9937@amd.pavel.ucw.cz>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 3 Jul 2014 10:40:01 +0100
+Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
+In-Reply-To: <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+ <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
+ <20140702165924.GB17665@lee--X1> <53B50EFD.2070007@st.com>
+ <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140703094001.GB32208@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
+On Thu, 03 Jul 2014, Philipp Zabel wrote:
+> Am Donnerstag, den 03.07.2014, 10:06 +0200 schrieb Maxime Coquelin:
+> > I will queue patch 4 to STi DT branch for v3.17.
+> > For now, no nodes uses reset for STiH407, so we don't need the 
+> > dt-bindings header file in the STi tree.
+> > 
+> > If we have a DT node using a reset line before my pull-request, I might 
+> > have to integrate the series in the STi DT branch.
+> > Philipp, does that sound reasonable?
 > 
-> It seems we have some problems with Ethernet on socfpga boards.
-> 
-> Like, "stmmac: Energy-Efficient Ethernet initialized" repeated way too
-> often. Or machine failing to boot because NFS server can not be
-> accessed. (And then working on next try). Or link going up and down
-> and up and down. Or link taking 3 seconds, 10 seconds to estabilish.
-> 
-> It also seems to be picky about hubs it wants to talk to.
-> 
-> This time it mounted root; on last boot it just hung.
-...
-> u-boot talk 12.033741 Configuring PHY skew timing for Micrel ksz9021
-> 
-> is there something similar that needs to be done at Linux layer.
+> Patch 4 depends on patch 1 for the header. My tree is still empty, how
+> about I take the first two, and you merge that branch and then take 3
+> and 4 on top?
 
-It seems there is. There is patch at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184335.html
-, but it does not match the code we have in u-boot (and that seems to
-work).
-
-I made this, but ethernet problems I currently see are not frequent
-enough to allow easy debugging. If link takes long to  estabilish for
-you, could you test the patch below?
-
-Thanks,
-								Pavel
-
-Signed-off-by: Pavel Machek <pavel@denx.de>
-
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index 075ec05..6a2d5f7 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -51,11 +51,11 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
- 	int value;
- 
- 	/* Set delay values */
--	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000;
-+	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW | 0x8000;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
- 	value = 0xF2F4;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
--	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000;
-+	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW | 0x8000;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
- 	value = 0x2222;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e60456d..8a0ba06 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -45,15 +45,15 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 	if (IS_BUILTIN(CONFIG_PHYLIB)) {
- 		/* min rx data delay */
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
--			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW);
-+			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW);
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
- 
- 		/* max rx/tx clock delay, min rx/tx control delay */
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
--			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
-+			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0xf0f0);
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
--			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
-+			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index adbf383..4a953c0 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -19,6 +19,8 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/reboot.h>
-+#include <linux/phy.h>
-+#include <linux/micrel_phy.h>
- 
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
-@@ -85,6 +87,44 @@ static void __init socfpga_init_irq(void)
- 	socfpga_sysmgr_init();
- }
- 
-+static int ksz9021rn_phy_fixup(struct phy_device *phydev)
-+{
-+        if (IS_BUILTIN(CONFIG_PHYLIB)) {
-+		printk("------------- running phy fixup\n");
-+
-+                /* min rx data delay */
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
-+			  0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW);
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
-+
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
-+			  0x8000 | MICREL_KSZ9021_RGMII_TX_DATA_PAD_SKEW);
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
-+
-+                /* max rx/tx clock delay, min rx/tx control delay */
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
-+			  0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0xf0f0);
-+                phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
-+			  MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
-+        }
-+
-+        return 0;
-+}
-+
-+static void __init socfpga_init_machine(void)
-+{
-+	early_printk("socfpga_init_machine\n");
-+        if (IS_BUILTIN(CONFIG_PHYLIB)) {
-+		printk("---------- registering phy fixup\n");
-+                phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
-+					   ksz9021rn_phy_fixup);
-+        }
-+	early_printk("socfpga_init_machine done\n");
-+
-+}
-+
-+
- static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
- {
- 	u32 temp;
-@@ -109,6 +149,7 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
- 	.smp		= smp_ops(socfpga_smp_ops),
- 	.map_io		= socfpga_map_io,
- 	.init_irq	= socfpga_init_irq,
-+	.init_late   = socfpga_init_machine,
- 	.restart	= socfpga_cyclone5_restart,
- 	.dt_compat	= altera_dt_match,
- MACHINE_END
-diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
-index 2e5b194..de40c89 100644
---- a/include/linux/micrel_phy.h
-+++ b/include/linux/micrel_phy.h
-@@ -40,7 +40,8 @@
- 
- #define MICREL_KSZ9021_EXTREG_CTRL	0xB
- #define MICREL_KSZ9021_EXTREG_DATA_WRITE	0xC
--#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW	0x104
--#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW	0x105
-+#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW	0x104
-+#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW	0x105
-+#define MICREL_KSZ9021_RGMII_TX_DATA_PAD_SKEW	0x106
- 
- #endif /* _MICREL_PHY_H */
-
+That approach sounds reasonable.  Once you've applied the patches can
+you tag the branch and provide Maxime with a pull-request please
+Philipp?
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
