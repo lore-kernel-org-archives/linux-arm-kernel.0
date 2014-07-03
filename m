@@ -1,168 +1,97 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:29 +0200
-Subject: [PATCH RESEND 14/18] AT91: Register the poweroff driver
+Date: Thu,  3 Jul 2014 16:41:16 +0200
+Subject: [PATCH RESEND 01/18] power: reset: Add if statement isntead of
+ multiple depends on
 In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404398493-28907-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the poweroff driver in the old-style SoC definition so that the driver
-is loaded and provide a shutdown hook.
+All the config option so far are depending on the POWER_RESET symbol
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9260.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9261.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9263.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9g45.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9rl.c  | 15 +++++++++++++++
- 5 files changed, 75 insertions(+)
+ drivers/power/reset/Kconfig | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 197c0149406a..5fa1986be2aa 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -377,9 +377,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index bdcf5173e377..19d546c5edfa 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -6,15 +6,17 @@ menuconfig POWER_RESET
  
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9260_BASE_SHDWC,
-+		.end    = AT91SAM9260_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9260_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
+ 	  Say Y here to enable board reset and power off
  
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index ef44977f1cae..5ccc67235e7a 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -340,9 +340,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9261_BASE_SHDWC,
-+		.end    = AT91SAM9261_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
++if POWER_RESET
 +
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9261_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
+ config POWER_RESET_AS3722
+ 	bool "ams AS3722 power-off driver"
+-	depends on MFD_AS3722 && POWER_RESET
++	depends on MFD_AS3722
+ 	help
+ 	  This driver supports turning off board via a ams AS3722 power-off.
  
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index cb078e150a19..4d28c3479d4b 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -358,9 +358,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
+ config POWER_RESET_AXXIA
+ 	bool "LSI Axxia reset driver"
+-	depends on POWER_RESET && ARCH_AXXIA
++	depends on ARCH_AXXIA
+ 	help
+ 	  This driver supports restart for Axxia SoC.
  
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9263_BASE_SHDWC,
-+		.end    = AT91SAM9263_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9263_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
+@@ -22,7 +24,7 @@ config POWER_RESET_AXXIA
  
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 329749eb1dff..22034c96d488 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -412,9 +412,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
+ config POWER_RESET_GPIO
+ 	bool "GPIO power-off driver"
+-	depends on OF_GPIO && POWER_RESET
++	depends on OF_GPIO
+ 	help
+ 	  This driver supports turning off your board via a GPIO line.
+ 	  If your board needs a GPIO high/low to power down, say Y and
+@@ -30,13 +32,13 @@ config POWER_RESET_GPIO
  
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9G45_BASE_SHDWC,
-+		.end    = AT91SAM9G45_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9g45_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
+ config POWER_RESET_MSM
+ 	bool "Qualcomm MSM power-off driver"
+-	depends on POWER_RESET && ARCH_QCOM
++	depends on ARCH_QCOM
+ 	help
+ 	  Power off and restart support for Qualcomm boards.
  
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index e0e1729fe0e4..323a9f90931a 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -350,9 +350,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
+ config POWER_RESET_QNAP
+ 	bool "QNAP power-off driver"
+-	depends on OF_GPIO && POWER_RESET && PLAT_ORION
++	depends on OF_GPIO && PLAT_ORION
+ 	help
+ 	  This driver supports turning off QNAP NAS devices by sending
+ 	  commands to the microcontroller which controls the main power.
+@@ -54,14 +56,13 @@ config POWER_RESET_RESTART
+ config POWER_RESET_SUN6I
+ 	bool "Allwinner A31 SoC reset driver"
+ 	depends on ARCH_SUNXI
+-	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the Allwinner A31 SoCs.
  
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9RL_BASE_SHDWC,
-+		.end    = AT91SAM9RL_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9rl_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
+ config POWER_RESET_VEXPRESS
+ 	bool "ARM Versatile Express power-off and reset driver"
+ 	depends on ARM || ARM64
+-	depends on POWER_RESET && VEXPRESS_CONFIG
++	depends on VEXPRESS_CONFIG
+ 	help
+ 	  Power off and reset support for the ARM Ltd. Versatile
+ 	  Express boards.
+@@ -69,7 +70,6 @@ config POWER_RESET_VEXPRESS
+ config POWER_RESET_XGENE
+ 	bool "APM SoC X-Gene reset driver"
+ 	depends on ARM64
+-	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the APM SoC X-Gene Eval boards.
  
- /* --------------------------------------------------------------------
+@@ -80,3 +80,4 @@ config POWER_RESET_KEYSTONE
+ 	help
+ 	  Reboot support for the KEYSTONE SoCs.
+ 
++endif
 -- 
 2.0.1
