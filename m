@@ -1,46 +1,180 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 03 Jul 2014 23:16:16 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140703173226.GC17372@arm.com> (Will Deacon's message of "Thu,
- 3 Jul 2014 18:32:26 +0100")
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com> <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703170558.GZ32514@n2100.arm.linux.org.uk>
- <20140703173226.GC17372@arm.com>
-Message-ID: <yw1xoax6dr67.fsf@unicorn.mansr.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 3 Jul 2014 18:17:24 -0400
+Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
+ CRTCs
+In-Reply-To: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
+References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAF6AEGs-p0dXfaSXvy67X8LbSmKF7gT8zubaJx4LSRh_-aKNZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
-
-> On Thu, Jul 03, 2014 at 06:05:58PM +0100, Russell King - ARM Linux wrote:
->> On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
->> > So, no. I completely reject any notion that breaking existing apps is
->> > okay. If we're going to say that v8 still supports 32-bit apps, then
->> > it has to be all of v7, not just the 'good' bits. Nor do I think
->> > saying "it's just a bunch of games" justifies anything. We're kernel
->> > engineers. Applications are applications and we don't break userspace.
->> > Period.
->> 
->> +1 on all points above.  I'd go further - if we're going to say that v8
->> still supports 32-bit apps, that covers at least v6 *as well*.
+On Thu, Jul 3, 2014 at 12:49 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Add a helper to allow encoders to find their possible CRTCs from the
+> OF graph without having to re-implement this functionality.  We add a
+> device_node to drm_crtc which corresponds with the port node in the
+> DT description of the CRTC device.
 >
-> We've never pretended to support anything other than ARMv8 in the compat
-> layer. uname even reports this in the machine name.
+> We can then scan the DRM device list for CRTCs to find their index,
+> matching the appropriate CRTC using the port device_node, thus building
+> up the possible CRTC mask.
 >
-> If people are suddenly so concerned about *full* compatibility with an ARMv7
-> kernel, that needs a lot more than just SWP emulation:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> This helper will be shared between imx-drm and Armada DRM, and should
+> be useful for other OF-based drivers.  At the moment, this is being
+> sent for comments and acks; I need to build upon this patch in order
+> to convert Armada DRM to DT.
+
+ok, possibly a dumb question, but in my defense I don't claim to be a
+DT expert ;-)
+
+Do you have somewhere handy a example dts which this would be parsing?
+ I think that would help me understand this patch a bit better.
+
+BR,
+-R
+
+>  drivers/gpu/drm/Makefile |  1 +
+>  drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/drm/drm_crtc.h   |  2 ++
+>  include/drm/drm_of.h     | 18 ++++++++++++++
+>  4 files changed, 86 insertions(+)
+>  create mode 100644 drivers/gpu/drm/drm_of.c
+>  create mode 100644 include/drm/drm_of.h
 >
->   - Alignment fixups for ldm/stm
-
-No ARM variant ever supported unaligned ldm/stm.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> index dd2ba4269740..533d011eab3e 100644
+> --- a/drivers/gpu/drm/Makefile
+> +++ b/drivers/gpu/drm/Makefile
+> @@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+>  drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>  drm-$(CONFIG_PCI) += ati_pcigart.o
+>  drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+> +drm-$(CONFIG_OF) += drm_of.o
+>
+>  drm-usb-y   := drm_usb.o
+>
+> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> new file mode 100644
+> index 000000000000..46d967881689
+> --- /dev/null
+> +++ b/drivers/gpu/drm/drm_of.c
+> @@ -0,0 +1,65 @@
+> +#include <linux/export.h>
+> +#include <linux/list.h>
+> +#include <linux/of_graph.h>
+> +#include <drm/drmP.h>
+> +#include <drm/drm_crtc.h>
+> +#include <drm/drm_of.h>
+> +
+> +/**
+> + * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
+> + * @dev: DRM device
+> + * @port: port OF node
+> + *
+> + * Given a port OF node, return the possible mask of the corresponding
+> + * CRTC within a device's list of CRTCs.  Returns zero if not found.
+> + */
+> +static uint32_t drm_crtc_port_mask(struct drm_device *dev,
+> +                                  struct device_node *port)
+> +{
+> +       unsigned int index = 0;
+> +       struct drm_crtc *tmp;
+> +
+> +       list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
+> +               if (tmp->port == port)
+> +                       return 1 << index;
+> +
+> +               index++;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
+> + * @dev: DRM device
+> + * @port: encoder port to scan for endpoints
+> + *
+> + * Scan all endpoints attached to a port, locate their attached CRTCs,
+> + * and generate the DRM mask of CRTCs which may be attached to this
+> + * encoder.
+> + */
+> +uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> +                                   struct device_node *port)
+> +{
+> +       struct device_node *remote_port, *ep = NULL;
+> +       uint32_t possible_crtcs = 0;
+> +
+> +       do {
+> +               ep = of_graph_get_next_endpoint(port, ep);
+> +               if (!ep)
+> +                       break;
+> +
+> +               remote_port = of_graph_get_remote_port(ep);
+> +               if (!remote_port) {
+> +                       of_node_put(ep);
+> +                       return 0;
+> +               }
+> +
+> +               possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
+> +
+> +               of_node_put(remote_port);
+> +       } while (1);
+> +
+> +       return possible_crtcs;
+> +}
+> +EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> index 251b75e6bf7a..6a94909f1ca9 100644
+> --- a/include/drm/drm_crtc.h
+> +++ b/include/drm/drm_crtc.h
+> @@ -41,6 +41,7 @@ struct drm_framebuffer;
+>  struct drm_object_properties;
+>  struct drm_file;
+>  struct drm_clip_rect;
+> +struct device_node;
+>
+>  #define DRM_MODE_OBJECT_CRTC 0xcccccccc
+>  #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
+> @@ -314,6 +315,7 @@ struct drm_crtc_funcs {
+>   */
+>  struct drm_crtc {
+>         struct drm_device *dev;
+> +       struct device_node *port;
+>         struct list_head head;
+>
+>         /**
+> diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+> new file mode 100644
+> index 000000000000..2441f7112074
+> --- /dev/null
+> +++ b/include/drm/drm_of.h
+> @@ -0,0 +1,18 @@
+> +#ifndef __DRM_OF_H__
+> +#define __DRM_OF_H__
+> +
+> +struct drm_device;
+> +struct device_node;
+> +
+> +#ifdef CONFIG_OF
+> +extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> +                                          struct device_node *port);
+> +#else
+> +static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> +                                                 struct device_node *port)
+> +{
+> +       return 0;
+> +}
+> +#endif
+> +
+> +#endif /* __DRM_OF_H__ */
+> --
+> 1.8.3.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
