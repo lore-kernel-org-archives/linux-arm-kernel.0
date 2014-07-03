@@ -1,267 +1,176 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:15:05 +0200
-Subject: [PATCH 18/18] AT91: Remove rstc and shdwc headers
+Date: Thu,  3 Jul 2014 16:14:35 +0200
+Subject: [PATCH 02/18] AT91: setup: Switch to pr_fmt
 In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-33-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These headers used to provide an "API" to access the rstc and shdwc registers.
-Now that no-one uses this API anymore, we can safely remove those.
+Most of the printed messages are using the "AT91:" prefix in the setup.c file,
+but not all of them. Moreover, those who add it hardcode it directly in the
+message, while the pr_fmt macro makes it easier for us to support such a case.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91_rstc.h          | 53 ---------------------------------
- arch/arm/mach-at91/at91_shdwc.h         | 50 -------------------------------
- arch/arm/mach-at91/at91sam9260.c        |  1 -
- arch/arm/mach-at91/at91sam9261.c        |  1 -
- arch/arm/mach-at91/at91sam9263.c        |  1 -
- arch/arm/mach-at91/at91sam9rl.c         |  1 -
- arch/arm/mach-at91/board-sam9260ek.c    |  1 -
- arch/arm/mach-at91/board-sam9261ek.c    |  1 -
- arch/arm/mach-at91/board-sam9263ek.c    |  1 -
- arch/arm/mach-at91/board-sam9m10g45ek.c |  1 -
- arch/arm/mach-at91/board-sam9rlek.c     |  1 -
- arch/arm/mach-at91/setup.c              |  1 -
- 12 files changed, 113 deletions(-)
- delete mode 100644 arch/arm/mach-at91/at91_rstc.h
- delete mode 100644 arch/arm/mach-at91/at91_shdwc.h
+ arch/arm/mach-at91/setup.c | 42 ++++++++++++++++++++++--------------------
+ 1 file changed, 22 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91_rstc.h b/arch/arm/mach-at91/at91_rstc.h
-deleted file mode 100644
-index a600e6992920..000000000000
---- a/arch/arm/mach-at91/at91_rstc.h
-+++ /dev/null
-@@ -1,53 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/at91_rstc.h
-- *
-- * Copyright (C) 2007 Andrew Victor
-- * Copyright (C) 2007 Atmel Corporation.
-- *
-- * Reset Controller (RSTC) - System peripherals regsters.
-- * Based on AT91SAM9261 datasheet revision D.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef AT91_RSTC_H
--#define AT91_RSTC_H
--
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_rstc_base;
--
--#define at91_rstc_read(field) \
--	__raw_readl(at91_rstc_base + field)
--
--#define at91_rstc_write(field, value) \
--	__raw_writel(value, at91_rstc_base + field)
--#else
--.extern at91_rstc_base
--#endif
--
--#define AT91_RSTC_CR		0x00			/* Reset Controller Control Register */
--#define		AT91_RSTC_PROCRST	(1 << 0)		/* Processor Reset */
--#define		AT91_RSTC_PERRST	(1 << 2)		/* Peripheral Reset */
--#define		AT91_RSTC_EXTRST	(1 << 3)		/* External Reset */
--#define		AT91_RSTC_KEY		(0xa5 << 24)		/* KEY Password */
--
--#define AT91_RSTC_SR		0x04			/* Reset Controller Status Register */
--#define		AT91_RSTC_URSTS		(1 << 0)		/* User Reset Status */
--#define		AT91_RSTC_RSTTYP	(7 << 8)		/* Reset Type */
--#define			AT91_RSTC_RSTTYP_GENERAL	(0 << 8)
--#define			AT91_RSTC_RSTTYP_WAKEUP		(1 << 8)
--#define			AT91_RSTC_RSTTYP_WATCHDOG	(2 << 8)
--#define			AT91_RSTC_RSTTYP_SOFTWARE	(3 << 8)
--#define			AT91_RSTC_RSTTYP_USER	(4 << 8)
--#define		AT91_RSTC_NRSTL		(1 << 16)		/* NRST Pin Level */
--#define		AT91_RSTC_SRCMP		(1 << 17)		/* Software Reset Command in Progress */
--
--#define AT91_RSTC_MR		0x08			/* Reset Controller Mode Register */
--#define		AT91_RSTC_URSTEN	(1 << 0)		/* User Reset Enable */
--#define		AT91_RSTC_URSTIEN	(1 << 4)		/* User Reset Interrupt Enable */
--#define		AT91_RSTC_ERSTL		(0xf << 8)		/* External Reset Length */
--
--#endif
-diff --git a/arch/arm/mach-at91/at91_shdwc.h b/arch/arm/mach-at91/at91_shdwc.h
-deleted file mode 100644
-index 9e29f31ec9a6..000000000000
---- a/arch/arm/mach-at91/at91_shdwc.h
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/at91_shdwc.h
-- *
-- * Copyright (C) 2007 Andrew Victor
-- * Copyright (C) 2007 Atmel Corporation.
-- *
-- * Shutdown Controller (SHDWC) - System peripherals regsters.
-- * Based on AT91SAM9261 datasheet revision D.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef AT91_SHDWC_H
--#define AT91_SHDWC_H
--
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_shdwc_base;
--
--#define at91_shdwc_read(field) \
--	__raw_readl(at91_shdwc_base + field)
--
--#define at91_shdwc_write(field, value) \
--	__raw_writel(value, at91_shdwc_base + field)
--#endif
--
--#define AT91_SHDW_CR		0x00			/* Shut Down Control Register */
--#define		AT91_SHDW_SHDW		(1    << 0)		/* Shut Down command */
--#define		AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
--
--#define AT91_SHDW_MR		0x04			/* Shut Down Mode Register */
--#define		AT91_SHDW_WKMODE0	(3 << 0)		/* Wake-up 0 Mode Selection */
--#define			AT91_SHDW_WKMODE0_NONE		0
--#define			AT91_SHDW_WKMODE0_HIGH		1
--#define			AT91_SHDW_WKMODE0_LOW		2
--#define			AT91_SHDW_WKMODE0_ANYLEVEL	3
--#define		AT91_SHDW_CPTWK0_MAX	0xf			/* Maximum Counter On Wake Up 0 */
--#define		AT91_SHDW_CPTWK0	(AT91_SHDW_CPTWK0_MAX << 4) /* Counter On Wake Up 0 */
--#define			AT91_SHDW_CPTWK0_(x)	((x) << 4)
--#define		AT91_SHDW_RTTWKEN	(1   << 16)		/* Real Time Timer Wake-up Enable */
--#define		AT91_SHDW_RTCWKEN	(1   << 17)		/* Real Time Clock Wake-up Enable */
--
--#define AT91_SHDW_SR		0x08			/* Shut Down Status Register */
--#define		AT91_SHDW_WAKEUP0	(1 <<  0)		/* Wake-up 0 Status */
--#define		AT91_SHDW_RTTWK		(1 << 16)		/* Real-time Timer Wake-up */
--#define		AT91_SHDW_RTCWK		(1 << 17)		/* Real-time Clock Wake-up [SAM9RL] */
--
--#endif
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 16dd13800b1f..624fe15ec352 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -25,7 +25,6 @@
- #include <mach/hardware.h>
- 
- #include "at91_aic.h"
--#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 2c8553e63785..f115f4709021 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -24,7 +24,6 @@
- #include <mach/hardware.h>
- 
- #include "at91_aic.h"
--#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 63a47c7d7f2b..08e0f4ec7d11 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -23,7 +23,6 @@
- #include <mach/hardware.h>
- 
- #include "at91_aic.h"
--#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index ea9ac0ee0895..d6ad162b9a88 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -24,7 +24,6 @@
- #include <mach/hardware.h>
- 
- #include "at91_aic.h"
--#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index da9c5f1f2c49..18f49c93f3f3 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -45,7 +45,6 @@
- #include <mach/system_rev.h>
- 
- #include "at91_aic.h"
--#include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index d1be10b09ab3..5a23e7211203 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -49,7 +49,6 @@
- #include <mach/system_rev.h>
- 
- #include "at91_aic.h"
--#include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 3f613d962d9b..e2aa41d19fc1 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -48,7 +48,6 @@
- #include <mach/system_rev.h>
- 
- #include "at91_aic.h"
--#include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 33a7b19f7400..e7d793b7601e 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -46,7 +46,6 @@
- #include <mach/system_rev.h>
- 
- #include "at91_aic.h"
--#include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 262e3f957d9f..5cb82464be1a 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -35,7 +35,6 @@
- 
- 
- #include "at91_aic.h"
--#include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index eb2b922a4adb..61d0b96c31e9 100644
+index f7a07a58ebb6..9c4c7fb323fb 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -22,7 +22,6 @@
- #include <mach/cpu.h>
- #include <mach/at91_dbgu.h>
+@@ -5,6 +5,8 @@
+  * Under GPLv2
+  */
  
--#include "at91_shdwc.h"
- #include "soc.h"
- #include "generic.h"
- #include "pm.h"
++#define pr_fmt(fmt)	"AT91: " fmt
++
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/mm.h>
+@@ -37,7 +39,7 @@ void __init at91rm9200_set_type(int type)
+ 	else
+ 		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ 
+-	pr_info("AT91: filled in soc subtype: %s\n",
++	pr_info("filled in soc subtype: %s\n",
+ 		at91_get_soc_subtype(&at91_soc_initdata));
+ }
+ 
+@@ -66,7 +68,7 @@ void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+ 	}
+ 	at91_ramc_base[id] = ioremap(addr, size);
+ 	if (!at91_ramc_base[id])
+-		panic("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
++		panic(pr_fmt("Impossible to ioremap ramc.%d 0x%x\n"), id, addr);
+ }
+ 
+ static struct map_desc sram_desc[2] __initdata;
+@@ -83,7 +85,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
+ 	desc->length = length;
+ 	desc->type = MT_MEMORY_RWX_NONCACHED;
+ 
+-	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
++	pr_info("sram at 0x%lx of 0x%x mapped at 0x%lx\n",
+ 		base, length, desc->virtual);
+ 
+ 	iotable_init(desc, 1);
+@@ -302,16 +304,16 @@ void __init at91_map_io(void)
+ 		soc_detect(AT91_BASE_DBGU1);
+ 
+ 	if (!at91_soc_is_detected())
+-		panic("AT91: Impossible to detect the SOC type");
++		panic(pr_fmt("Impossible to detect the SOC type"));
+ 
+-	pr_info("AT91: Detected soc type: %s\n",
++	pr_info("Detected soc type: %s\n",
+ 		at91_get_soc_type(&at91_soc_initdata));
+ 	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
+-		pr_info("AT91: Detected soc subtype: %s\n",
++		pr_info("Detected soc subtype: %s\n",
+ 			at91_get_soc_subtype(&at91_soc_initdata));
+ 
+ 	if (!at91_soc_is_enabled())
+-		panic("AT91: Soc not enabled");
++		panic(pr_fmt("Soc not enabled"));
+ 
+ 	if (at91_boot_soc.map_io)
+ 		at91_boot_soc.map_io();
+@@ -328,7 +330,7 @@ void __init at91_ioremap_shdwc(u32 base_addr)
+ {
+ 	at91_shdwc_base = ioremap(base_addr, 16);
+ 	if (!at91_shdwc_base)
+-		panic("Impossible to ioremap at91_shdwc_base\n");
++		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
+ 	pm_power_off = at91sam9_poweroff;
+ }
+ 
+@@ -338,7 +340,7 @@ void __init at91_ioremap_rstc(u32 base_addr)
+ {
+ 	at91_rstc_base = ioremap(base_addr, 16);
+ 	if (!at91_rstc_base)
+-		panic("Impossible to ioremap at91_rstc_base\n");
++		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
+ }
+ 
+ void __iomem *at91_matrix_base;
+@@ -348,7 +350,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
+ {
+ 	at91_matrix_base = ioremap(base_addr, 512);
+ 	if (!at91_matrix_base)
+-		panic("Impossible to ioremap at91_matrix_base\n");
++		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+ }
+ 
+ #if defined(CONFIG_OF) && !defined(CONFIG_ARCH_AT91X40)
+@@ -365,15 +367,15 @@ static void at91_dt_rstc(void)
+ 
+ 	np = of_find_matching_node(NULL, rstc_ids);
+ 	if (!np)
+-		panic("unable to find compatible rstc node in dtb\n");
++		panic(pr_fmt("unable to find compatible rstc node in dtb\n"));
+ 
+ 	at91_rstc_base = of_iomap(np, 0);
+ 	if (!at91_rstc_base)
+-		panic("unable to map rstc cpu registers\n");
++		panic(pr_fmt("unable to map rstc cpu registers\n"));
+ 
+ 	of_id = of_match_node(rstc_ids, np);
+ 	if (!of_id)
+-		panic("AT91: rtsc no restart function available\n");
++		panic(pr_fmt("rtsc no restart function available\n"));
+ 
+ 	arm_pm_restart = of_id->data;
+ 
+@@ -394,17 +396,17 @@ static void at91_dt_ramc(void)
+ 
+ 	np = of_find_matching_node(NULL, ramc_ids);
+ 	if (!np)
+-		panic("unable to find compatible ram controller node in dtb\n");
++		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
+ 
+ 	at91_ramc_base[0] = of_iomap(np, 0);
+ 	if (!at91_ramc_base[0])
+-		panic("unable to map ramc[0] cpu registers\n");
++		panic(pr_fmt("unable to map ramc[0] cpu registers\n"));
+ 	/* the controller may have 2 banks */
+ 	at91_ramc_base[1] = of_iomap(np, 1);
+ 
+ 	of_id = of_match_node(ramc_ids, np);
+ 	if (!of_id)
+-		pr_warn("AT91: ramc no standby function available\n");
++		pr_warn("ramc no standby function available\n");
+ 	else
+ 		at91_pm_set_standby(of_id->data);
+ 
+@@ -450,23 +452,23 @@ static void at91_dt_shdwc(void)
+ 
+ 	np = of_find_matching_node(NULL, shdwc_ids);
+ 	if (!np) {
+-		pr_debug("AT91: unable to find compatible shutdown (shdwc) controller node in dtb\n");
++		pr_debug("unable to find compatible shutdown (shdwc) controller node in dtb\n");
+ 		return;
+ 	}
+ 
+ 	at91_shdwc_base = of_iomap(np, 0);
+ 	if (!at91_shdwc_base)
+-		panic("AT91: unable to map shdwc cpu registers\n");
++		panic(pr_fmt("unable to map shdwc cpu registers\n"));
+ 
+ 	wakeup_mode = at91_dtget_shdwc_wakeup_mode(np);
+ 	if (wakeup_mode < 0) {
+-		pr_warn("AT91: shdwc unknown wakeup mode\n");
++		pr_warn("shdwc unknown wakeup mode\n");
+ 		goto end;
+ 	}
+ 
+ 	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
+ 		if (reg > AT91_SHDW_CPTWK0_MAX) {
+-			pr_warn("AT91: shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
++			pr_warn("shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
+ 				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
+ 			reg = AT91_SHDW_CPTWK0_MAX;
+ 		}
 -- 
 2.0.1
