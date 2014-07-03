@@ -1,45 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 3 Jul 2014 15:38:42 +0200
-Subject: [PATCH 2/2] ARM: mvebu: add devtmpfs to mvebu_v5_defconfig
-In-Reply-To: <1404375830-22169-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404375830-22169-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140703133842.GR20799@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 14:43:46 +0100
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140703152826.103c9d6c@armhf>
+References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
+ <20140702195154.47d6f6b4@armhf> <20140702194252.GN410@sirena.org.uk>
+ <20140703074959.7c489912@armhf> <20140703104432.GV410@sirena.org.uk>
+ <20140703133406.2d3e3a1d@armhf> <20140703115924.GY410@sirena.org.uk>
+ <20140703152826.103c9d6c@armhf>
+Message-ID: <20140703134346.GW32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 10:23:50AM +0200, Thomas Petazzoni wrote:
-> The devtmpfs filesystem is now widely used and generally needed to
-> boot Linux systems. 42 ARM defconfigs have it enabled, so it makes
-> sense to have it enabled as well in mvebu_v5_defconfig.
+On Thu, Jul 03, 2014 at 03:28:26PM +0200, Jean-Francois Moine wrote:
+> OK. no problem, I can do that: only the first stream is switched and
+> the second is rejected.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> But, this means that there will be a lot of errors when DPCM will be
+> used, because, in most cases for the Cubox (kirkwood audio + tda998x),
+> both ways I2S and S/PDIF will be activated at the same time for a
+> single stream (you may note that the routes from the second input
+> cannot be blocked by the CODEC after it received the first input,
+> because these routes have already been computed).
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+This is /very/ easy to solve on the Cubox, if only you would listen
+to me - I've stated many times that I2S should not be used there.
 
-I have Debian sid on my boxes, and they is quite happy without
-devtmpfs. Hence i've not proposed such a patch before.
+Just because the hardware is wired up with both the SPDIF connected
+and the I2S connected, it does *not* mean that we have to wire them
+both up in software.
 
-	  Andrew
+Indeed, *everything* works with just SPDIF.  The same is not true of
+I2S.  So, what we do for the Cubox is we just wire up SPDIF in software
+and be done with it - we then get a fully functional setup.  So using
+I2S on the Cubox is mostly pointless - unless you wish to use I2S for
+testing purposes.
 
+Let me also point out that adding your changes - including the addition
+of this codec patch - explicitly deny the possibility of:
+* using compressed audio streams via the optical SPDIF out socket
+* using compressed audio streams over HDMI
+* using audio rates and formats not supported by the attached HDMI
+  device via the optical SPDIF socket.
 
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index 9f70f59..5df35e9 100644
-> --- a/arch/arm/configs/mvebu_v5_defconfig
-> +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -38,6 +38,8 @@ CONFIG_NET_PKTGEN=m
->  CONFIG_CFG80211=y
->  CONFIG_MAC80211=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_MTD=y
->  CONFIG_MTD_CMDLINE_PARTS=y
->  CONFIG_MTD_BLOCK=y
-> -- 
-> 2.0.0
-> 
+These are serious issues which thus far you have so far failed to
+respond on.  People who use the Cubox as a media platform rather
+than (presumably) just a music jukebox want things like compressed
+audio out and SPDIF out to work.
+
+Look, one reason to use the optical socket is because you want to
+push out a stream at (eg) 96kHz to your audio system, but your TV
+doesn't support it.  With your approach, you explicitly block that
+because the TDA998x codec assocated with the Kirkwood CPU DAI
+refuses to allow that sample rate.  Fine, if the attached device
+does not support that rate, then the right thing to do may be to
+disable audio transmission over HDMI, but with the Cubox hardware,
+limiting the sample rates is totally the wrong solution.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
