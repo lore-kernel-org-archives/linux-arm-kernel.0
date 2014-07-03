@@ -1,111 +1,112 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Jul 2014 16:12:00 +0100
-Subject: [PATCH 4/5] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <cb01fef2c4d44711b04a321fddae33d4@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1404291772-2644-1-git-send-email-jingchang.lu@freescale.com>
- <1404291772-2644-5-git-send-email-jingchang.lu@freescale.com>
- <20140702112125.GE14665@leverpostej>
- <cb01fef2c4d44711b04a321fddae33d4@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <20140703151200.GB22146@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  3 Jul 2014 16:41:31 +0200
+Subject: [PATCH RESEND 16/18] AT91: pm: Remove show_reset_status function
+In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404398493-28907-17-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 11:17:12AM +0100, Jingchang Lu wrote:
-> >-----Original Message-----
-> >From: Mark Rutland [mailto:mark.rutland at arm.com]
-> >Sent: Wednesday, July 02, 2014 7:21 PM
-> >To: Lu Jingchang-B35083
-> >Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
-> >devicetree at vger.kernel.org; Lu Jingchang-B35083
-> >Subject: Re: [PATCH 4/5] ARM: imx: Add initial support for Freescale
-> >LS1021A
-> >
-> >On Wed, Jul 02, 2014 at 10:02:51AM +0100, Jingchang Lu wrote:
-> >> From: Jingchang Lu <b35083@freescale.com>
-> >>
-> >> diff --git a/arch/arm/mach-imx/mach-ls1021a.c
-> >> b/arch/arm/mach-imx/mach-ls1021a.c
-> >> new file mode 100644
-> >> index 0000000..d1a9bb9
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-imx/mach-ls1021a.c
-> >> @@ -0,0 +1,49 @@
-> >> +/*
-> >> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> +modify
-> >> + * it under the terms of the GNU General Public License as published
-> >> +by
-> >> + * the Free Software Foundation; either version 2 of the License, or
-> >> + * (at your option) any later version.
-> >> + */
-> >> +
-> >> +#include <linux/of_platform.h>
-> >> +#include <asm/mach/arch.h>
-> >> +
-> >> +#include "common.h"
-> >> +
-> >> +static const struct of_device_id of_ls1021a_match_table[] = {
-> >> +	{
-> >> +		.compatible =	"simple-bus",
-> >> +	},
-> >> +	{
-> >> +		.compatible     = "fsl,ifc",
-> >> +	},
-> >> +	{
-> >> +		.compatible	= "fsl,fpga-qixis",
-> >> +	},
-> >> +	{
-> >> +		.compatible	= "fsl,qe",
-> >> +	},
-> >> +	{}
-> >> +};
-> >
-> >Are any of thse not always-on (or default-on) MMIO busses?
-> >
-> >Is there any reason for not giving them their own drivers?
-> >
-> Normally these are always-on. The child nodes are handled by different drivers,
-> so to make the devices being added by the of system, they are claimed here.
-> Thanks.
+Both the reset and poweroff drivers are now implementing what the
+show_reset_status function used to do. Hence, we can remove this rather hackish
+function that prevents us from doing further cleanup.
 
-If these are always-on MMIO busses, is there any reason these can't have
-"simple-bus" as a fallback in their compatible lists in the DT? They
-would seemd to be compatible with it given they are in the table
-above...
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.c | 72 -------------------------------------------------
+ 1 file changed, 72 deletions(-)
 
-That way we don't need the table at all, and we can always add drivers
-for them later if we need them...
-
-> >> +
-> >> +static void __init ls1021a_init_machine(void) {
-> >> +	mxc_arch_reset_init_dt();
-> >
-> >This looks to only be used to set up a watchdog timer. Is there any reason
-> >this logic can't be moved to the watchdog timer driver?
-> >
-> >> +
-> >> +DT_MACHINE_START(LS1021A, "Freescale LS1021A") #ifdef CONFIG_ZONE_DMA
-> >> +	.dma_zone_size	= SZ_128M,
-> >> +#endif
-> >> +	.init_machine   = ls1021a_init_machine,
-> >> +	.dt_compat	= ls1021a_dt_compat,
-> >> +	.restart	= mxc_restart,
-> >
-> >AFAICT, that jsut uses the WDT for restart. Why can't the watchdog driver
-> >register itself as a restart device?
-> >
-> >That would bring us close to an empty machine descriptor, and enable reuse
-> >of the WDT and those busses.
-> >
-> >Thanks,
-> >Mark.
-> Yes, we use the watchdog timer for restart, just as i.MX and Vybrid, the WDT as a
-> common driver it is still work for watchdog. Thanks.
-
-That doesn't answer the question of why the restart code (and
-registration thereof) can't live in the WDT driver.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index e95554532987..213606111d9a 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -34,79 +34,8 @@
+ #include "pm.h"
+ #include "gpio.h"
+ 
+-/*
+- * Show the reason for the previous system reset.
+- */
+-
+-#include "at91_rstc.h"
+-#include "at91_shdwc.h"
+-
+ static void (*at91_pm_standby)(void);
+ 
+-static void __init show_reset_status(void)
+-{
+-	static char reset[] __initdata = "reset";
+-
+-	static char general[] __initdata = "general";
+-	static char wakeup[] __initdata = "wakeup";
+-	static char watchdog[] __initdata = "watchdog";
+-	static char software[] __initdata = "software";
+-	static char user[] __initdata = "user";
+-	static char unknown[] __initdata = "unknown";
+-
+-	static char signal[] __initdata = "signal";
+-	static char rtc[] __initdata = "rtc";
+-	static char rtt[] __initdata = "rtt";
+-	static char restore[] __initdata = "power-restored";
+-
+-	char *reason, *r2 = reset;
+-	u32 reset_type, wake_type;
+-
+-	if (!at91_shdwc_base || !at91_rstc_base)
+-		return;
+-
+-	reset_type = at91_rstc_read(AT91_RSTC_SR) & AT91_RSTC_RSTTYP;
+-	wake_type = at91_shdwc_read(AT91_SHDW_SR);
+-
+-	switch (reset_type) {
+-	case AT91_RSTC_RSTTYP_GENERAL:
+-		reason = general;
+-		break;
+-	case AT91_RSTC_RSTTYP_WAKEUP:
+-		/* board-specific code enabled the wakeup sources */
+-		reason = wakeup;
+-
+-		/* "wakeup signal" */
+-		if (wake_type & AT91_SHDW_WAKEUP0)
+-			r2 = signal;
+-		else {
+-			r2 = reason;
+-			if (wake_type & AT91_SHDW_RTTWK)	/* rtt wakeup */
+-				reason = rtt;
+-			else if (wake_type & AT91_SHDW_RTCWK)	/* rtc wakeup */
+-				reason = rtc;
+-			else if (wake_type == 0)	/* power-restored wakeup */
+-				reason = restore;
+-			else				/* unknown wakeup */
+-				reason = unknown;
+-		}
+-		break;
+-	case AT91_RSTC_RSTTYP_WATCHDOG:
+-		reason = watchdog;
+-		break;
+-	case AT91_RSTC_RSTTYP_SOFTWARE:
+-		reason = software;
+-		break;
+-	case AT91_RSTC_RSTTYP_USER:
+-		reason = user;
+-		break;
+-	default:
+-		reason = unknown;
+-		break;
+-	}
+-	pr_info("AT91: Starting after %s %s\n", reason, r2);
+-}
+-
+ static int at91_pm_valid_state(suspend_state_t state)
+ {
+ 	switch (state) {
+@@ -338,7 +267,6 @@ static int __init at91_pm_init(void)
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+ 
+-	show_reset_status();
+ 	return 0;
+ }
+ arch_initcall(at91_pm_init);
+-- 
+2.0.1
