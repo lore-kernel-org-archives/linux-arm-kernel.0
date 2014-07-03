@@ -1,173 +1,82 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 3 Jul 2014 14:14:33 +0800
-Subject: [PATCH 2/4] dts: add devicetree bindings for pxa27x clocks
-In-Reply-To: <1404066744-13416-3-git-send-email-robert.jarzmik@free.fr>
+Date: Thu, 3 Jul 2014 14:21:14 +0800
+Subject: [PATCH 0/4] Migrate PXA27x platforms to clock framework
+In-Reply-To: <877g3yp7ie.fsf@free.fr>
 References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
- <1404066744-13416-3-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CAN1soZys4k6g5RgPLbreopOxTwDJ+bfPOq8XPwsNpyt5+YURjg@mail.gmail.com>
+ <7034630.fvV46PN35C@wuerfel> <877g3yp7ie.fsf@free.fr>
+Message-ID: <CAN1soZyu192Y7z-HJHo+3_bddFcf=H0udgJSWez1=Lmrb5wVfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 2:32 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Add the clock tree description for the PXA27x based boards.
+On Tue, Jul 1, 2014 at 2:38 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 >
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  arch/arm/boot/dts/pxa27x.dtsi            | 134 ++++++++++++++++++++++++++++++-
->  include/dt-bindings/clock/pxa2xx-clock.h |  45 +++++++++++
->  2 files changed, 178 insertions(+), 1 deletion(-)
->  create mode 100644 include/dt-bindings/clock/pxa2xx-clock.h
+>> On Sunday 29 June 2014 20:32:20 Robert Jarzmik wrote:
+>>> As the RFC posted in [1] didn't meet an unrivaled success for
+>>> review, I'm posting this serie for PXA27x transition to clock
+>>> framework.
+>>>
+>>> This transition is needed :
+>>>  - to enable device-tree drivers port, as clocks are needed almost
+>>>    everywhere
+>>>  - to enable the long term multi-platform kernel to support PXA
+>>>
+>>> As I had said before, this serie aims at :
+>>>  - keeping legacy platforms working (ie. without device-tree)
+>>>  - enable PXA27x to work with a device-tree kernel, and hence
+>>>    open the way to drivers conversion
+>>>  - be robust enough to support pxa25x and pxa3xx later inclusion
+>>>    with almost no change to clk-pxa-dt.c.
+>>>
+>>> As this serie is holding the rest of the device-tree drivers
+>>> port, I'd like it to be reviewed, even it's an old unsexy
+>>> platform.
+>>
+>> I have one basic question about this series: if pxa27x gets moved
+>> to used the common-clk framework but the others (pxa25x, pxa26x,
+>> pxa3xx, pxa93x) don't, does that imply that they become mutually
+>> exclusiv at compile-time?
 >
-> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-> index a705469..badaa71 100644
-> --- a/arch/arm/boot/dts/pxa27x.dtsi
-> +++ b/arch/arm/boot/dts/pxa27x.dtsi
-> @@ -1,5 +1,6 @@
->  /* The pxa3xx skeleton simply augments the 2xx version */
-> -/include/ "pxa2xx.dtsi"
-> +#include "pxa2xx.dtsi"
-> +#include "dt-bindings/clock/pxa2xx-clock.h"
+> Unfortunately yes, they become exclusive.
+> The reason being that arch/arm/mach-pxa/clock.c defines the function
+> "clk_enable()", which of course is also defined by the clock framework.
 >
->  / {
->         model = "Marvell PXA27x familiy SoC";
-> @@ -35,4 +36,135 @@
->                         #pwm-cells = <1>;
->                 };
->         };
-> +
-> +       clocks {
-> +              /*
-> +               * The muxing of external clocks/internal dividers for osc* clock
-> +               * sources has been hidden under the carpet by now.
-> +               */
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               osc13mhz:osc13mhz {
-> +                       compatible = "fixed-clock";
-> +                        #clock-cells = <0>;
-> +                       clock-frequency = <13000000>;
-> +               };
-> +
-> +               osc32_768khz:osc32_768khz {
-> +                       compatible = "fixed-clock";
-> +                        #clock-cells = <0>;
-> +                       clock-frequency = <32768>;
-> +               };
-> +
-> +               pll_312mhz:pll_312mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&osc13mhz>;
-> +                       clock-div = <1>;
-> +                       clock-mult = <24>;
-> +               };
-> +
-> +               clk_48mhz:clk_48mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&pll_312mhz>;
-> +                       clock-div = <13>;
-> +                       clock-mult = <2>;
-> +               };
-> +
-> +               clk_32_842mhz:clk_32_842mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&pll_312mhz>;
-> +                       clock-div = <19>;
-> +                       clock-mult = <2>;
-> +               };
-> +
-> +               clk_19_5mhz:clk_19_5mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&pll_312mhz>;
-> +                       clock-div = <32>;
-> +                       clock-mult = <2>;
-> +               };
-> +
-> +               clk_14_857mhz:clk_14_857mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&pll_312mhz>;
-> +                       clock-div = <42>;
-> +                       clock-mult = <2>;
-> +               };
-> +
-> +               clk_14_682mhz:clk_14_682mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&pll_312mhz>;
-> +                       clock-div = <51>;
-> +                       clock-mult = <2>;
-> +               };
-> +
-> +               clk_13mhz:clk_13mhz {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&osc13mhz>;
-> +                       clock-div = <1>;
-> +                       clock-mult = <1>;
-> +               };
-> +
-> +               clk_dummy:clk_dummy {
-> +                       compatible = "fixed-clock";
-> +                        #clock-cells = <0>;
-> +                       clock-frequency = <0>;
-> +               };
-> +
-> +               clk_ostimer:clk_ostimer {
-> +                       compatible = "fixed-factor-clock";
-> +                        #clock-cells = <0>;
-> +                       clocks = <&osc13mhz>;
-> +                       clock-div = <4>;
-> +                       clock-mult = <1>;
-> +               };
-> +
-> +               pxa27x_sysclks:pxa27x_sysclks {
-> +                       compatible = "marvell,pxa270-core-clocks";
-> +                       #clock-cells = <1>;
-> +                       clocks = <&osc13mhz>;
-> +                       clock-output-names = "run mode", "half-turbo mode",
-> +                               "turbo mode", "cpu core", "system bus", "memory", "lcd";
-> +               };
-> +
-> +               pxa2xx_clks: pxa2xx_clks at 41300004 {
-> +                       compatible = "marvell,pxa-clocks";
-> +                       reg = <0x41300004 0x4>;
-> +                       clocks =
-> +                               <&clk_13mhz>, <&clk_13mhz>, <&clk_dummy>, <&clk_13mhz>,
-> +                               <&clk_13mhz>, <&clk_14_857mhz>, <&clk_14_857mhz>, <&clk_14_857mhz>,
-> +                               <&clk_14_682mhz>, <&clk_ostimer>, <&clk_48mhz>, <&clk_48mhz>,
-> +                               <&clk_19_5mhz>, <&clk_48mhz>, <&clk_32_842mhz>, <&clk_13mhz>,
-> +                               <&pxa27x_sysclks 6>, <&clk_48mhz>, <&clk_48mhz>, <&osc32_768khz>,
-> +                               <&clk_dummy>, <&clk_19_5mhz>, <&pxa27x_sysclks 4>, <&clk_13mhz>,
-> +                               <&pxa27x_sysclks 6>, <&clk_dummy>;
-> +                       #clock-cells = <1>;
-> +                       clock-output-names =
-> +                               "pwm 0,2", "pwm 1,3", "ac97", "ssp2",
-> +                               "ssp3,hwuart", "stuart", "ffuart", "btuart",
-> +                               "i2s", "nssp,ostimer", "usb host,assp", "usb udc",
-> +                               "mmc", "ficp", "i2c", "pwri2c",
-> +                               "lcd", "msl", "usim", "keypad",
-> +                                "im", "memstk", "memc", "ssp1",
-> +                                "camera", "ac97conf";
-> +                       clock-indices = <
-> +                               CKEN_PWM0 CKEN_PWM1 CKEN_AC97 CKEN_SSP2
-> +                               CKEN_SSP3 CKEN_STUART CKEN_FFUART CKEN_BTUART
-> +                               CKEN_I2S CKEN_OSTIMER CKEN_USBHOST CKEN_USB
-> +                               CKEN_MMC CKEN_FICP CKEN_I2C CKEN_PWRI2C
-> +                               CKEN_LCD CKEN_MSL CKEN_USIM CKEN_KEYPAD
-> +                               CKEN_IM CKEN_MEMSTK 65 CKEN_SSP1
-> +                               CKEN_CAMERA CKEN_AC97CONF >;
-> +               };
-> +       };
-> +
->  };
+>> If so, do you plan to first complete all of them before merging
+>> upstream, or do you intend to have one or more kernel releases
+>> that don't allow building a combined kernel for all pxa platforms?
+> I intend to have first only pxa27x.
+> Then in a second stage pxa27x + pxa25x + pxa3xx.
+>
+>> I don't object to doing the latter, but if that is the plan, you
+>> need to make that very clear in the changelog and have all the
+>> relevant maintainers agree to that.
+> OK, that would be Haojian then, I think he maintains all PXA platforms.
+>
+> Haojian, are you ok with that ? And BTW, does a combined kernel for PXA
+> platforms even exists (mixing pxa3xx and pxa2xx for example) ?
+>
 
-Maybe defining these clocks in pxa27x clock driver is better.
+It's acceptable to me that different silicons are queued in different stages.
+I only request that it won't break the compiler building & bootup.
+
+But I think that the pxa clock driver may be shared among all PXA silicons
+except for the clock table. What's your opinion?
+
+>> Also (for my understanding) when you say that you plan to do
+>> pxa25x and pxa3xx next, does that include pxa26x and pxa93x?
+> I don't have the Technical Reference Manuals for these ones so the answer is
+> no. And Google wasn't a great friend at providing them.
+>
+
+Converting them into new clock driver may not rely on the reference manual.
+
+>> I assume it does as they are apparently minor revisions of the
+>> former, but it's not completely clear from your description.
+> My description doesn't mention them, as I have no information about them, nor
+> any hardware to test on.
+>
+
+We can request others to help testing in the mailing list.
 
 Regards
 Haojian
