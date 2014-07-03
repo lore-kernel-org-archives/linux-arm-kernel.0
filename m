@@ -1,186 +1,76 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Thu, 3 Jul 2014 10:47:41 -0500
-Subject: [PATCH 3/3 V2] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <20140703084608.GB29837@leverpostej>
-References: <1404314544-7762-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140702163903.GA26903@leverpostej> <53B465B9.7000407@amd.com>
- <20140703084608.GB29837@leverpostej>
-Message-ID: <53B57B1D.8090308@amd.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Jul 2014 10:52:40 -0500
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140703154425.GC23309@earth.universe>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <20140703132509.GA5814@saruman.home>
+ <CAOCHtYi0JwRO12gHa+KFGH1k7pPk4TL40igwhzRRxutw-tqf6A@mail.gmail.com>
+ <20140703140736.GF5814@saruman.home>
+ <20140703154425.GC23309@earth.universe>
+Message-ID: <20140703155240.GU5814@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/3/2014 3:46 AM, Mark Rutland wrote:
-> On Wed, Jul 02, 2014 at 09:04:09PM +0100, Suravee Suthikulanit wrote:
->> Thanks again for the review. Please see my comments below.
->>
->> On 7/2/2014 11:39 AM, Mark Rutland wrote:
->>> On Wed, Jul 02, 2014 at 04:22:23PM +0100, suravee.suthikulpanit at amd.com wrote:
->>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->>>> index 5573c08..9e46f7f 100644
->>>> --- a/Documentation/devicetree/bindings/arm/gic.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->>>> @@ -12,11 +12,13 @@ Main node required properties:
->>>>
->>>>    - compatible : should be one of:
->>>>           "arm,gic-400"
->>>> +       "arm,gic-400-plus"
->>>
->>> I am not keen on this name.
->>
->> Ok, I'll change it. Any suggestion on name?  I'm not sure what is the
->> "official" product name. I've seen this in some slides from ARM. What
->> about "gic-400-v2m"??.
->
-> I'll query this internally.
-Thanks.
+On Thu, Jul 03, 2014 at 05:44:26PM +0200, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Thu, Jul 03, 2014 at 09:07:36AM -0500, Felipe Balbi wrote:
+> > On Thu, Jul 03, 2014 at 08:34:44AM -0500, Robert Nelson wrote:
+> > > On Thu, Jul 3, 2014 at 8:25 AM, Felipe Balbi <balbi@ti.com> wrote:
+> > > > On Thu, Jul 03, 2014 at 12:34:11AM -0700, Tony Lindgren wrote:
+> > > >> * Robert Nelson <robertcnelson@gmail.com> [140702 12:27]:
+> > > >> > On Wed, Jul 2, 2014 at 2:09 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> > > >> > > Hi,
+> > > >> > >
+> > > >> > > On Wed, Jul 02, 2014 at 11:09:32AM -0500, Felipe Balbi wrote:
+> > > >> > >> > It has been only tested as console UART.
+> > > >> > >> > The tty name is ttyS based instead of ttyO. How big is the pain here,
+> > > >> > >> > what could be the easiest way to provide compatibility?
+> > > >> > >>
+> > > >> > >> have been considering that myself for months. You could pass an optional
+> > > >> > >> argument to serial8250_register_8250_port() but that only solves part of
+> > > >> > >> the problem :-(
+> > > >>
+> > > >> Some kind of compability layer sure would be nice.
+> > > >>
+> > > >> > > When ttyS -> ttyO change was done on OMAP, compatibility was not an issue.
+> > > >> > > Why should we care about it now?
+> > > >> >
+> > > >> > It would be a good opportunity to force everyone to update their bootloader. ;)
+> > > >> >
+> > > >> > Besides the BeagleBoard forum is quiet now, no one is complaining
+> > > >> > about that old (ttyS -> ttyO) transition anymore..
+> > > >>
+> > > >> How about a Kconfig option to provide ttyO by default? The not even
+> > > >> do that if kernel has cmdline option nottyomap.
+> > > >
+> > > > what about single zImage ? I don't want to use ttyO on my
+> > > > Allwinner/Exynos/Snapdragon/whatever SoC just because OMAP is in the
+> > > > same image ;-)
+> > > 
+> > > What if we just kept it simple, leave the ttyO driver enabled and add
+> > > a warning (pr_info) that it's deprecated.  It's not like it's broken,
+> > > it just won't get later features or devices support added.
+> > 
+> > Fine by me, I'd switch to 8250 as soon as it's merged though :-) would
+> > be nice to get an example DTS change just so I can start testing on the
+> > boards I have around.
+> 
+> DT is supposed to contain information about the hardware, so it
+> should stay the same? I think there is no non-hackish way to decide
 
->>>> @@ -37,9 +39,16 @@ Main node required properties:
->>>>           the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
->>>>           the interrupt is wired to that CPU.  Only valid for PPI interrupts.
->>>>
->>>> -- reg : Specifies base physical address(s) and size of the GIC registers. The
->>>> -  first region is the GIC distributor register base and size. The 2nd region is
->>>> -  the GIC cpu interface register base and size.
->>>> +- reg : Specifies base physical address(s) and size of the GIC register frames.
->>>> +
->>>> +  Region | Description
->>>> +  Index  |
->>>> +  -------------------------------------------------------------------
->>>> +     0   | GIC distributor register base and size
->>>> +     1   | GIC cpu interface register base and size
->>>> +     2   | VGIC interface control register base and size (Optional)
->>>> +     3   | VGIC CPU interface register base and size (Optional)
->>>> +     4   | GICv2m MSI interface register base and size (Optional)
->>>
->>> As far as I am aware, the MSI interface is completely orthogonal to
->>> having a GICH and GICV.
->>
->> Agree. I'm not doing anything with it. I'm just listing them here since
->> they are also mentioned in the gic.txt
->>
->>>
->>> We should figure out how we expect to handle that (zero-sized reg
->>> entries? reg-names?).
->>
->> I'm not sure how VGIC stuff handles reg/size = 0.
->
-> Neither am I.
->
-> However, what I said was that we should figure out how we _expect_ to
-> handle that case. If we have to make changes to handle it, that's fine
-> given we already have to make changes to support GICv2m.
+compatible would change, at a minimum.
 
-Looking through the code in virt/kvm/arm/vgic.c, I believe this would 
-ended up returning -EINVAL or -ENXIO from kvm_vgic_hyp_init().
-
->>>
->>>>
->>>>    Optional
->>>>    - interrupts   : Interrupt source of the parent interrupt controller on
->>>> @@ -55,6 +64,10 @@ Optional
->>>>                     by a crossbar/multiplexer preceding the GIC. The GIC irq
->>>>                     input line is assigned dynamically when the corresponding
->>>>                     peripheral's crossbar line is mapped.
->>>> +
->>>> +- msi-controller : Identifies the node as an MSI controller.  This requires
->>>> +  the register region index 4.
->>>
->>> That last clarifying comment is more confusing than helpful.
->>
->> If you are referring to the table, I added that since it was easier to
->> see than scanning the text.
->
-> I was referring to "This requires the register region index 4".
->
-> How about:
->
-> - msi-controller : Identifies the node as an MSI controller. Requried
->    for GICv2m.
-
-OK
-
->>
->>> [...]
->>>
->>>> +#define GIC_V2M_MIN_SPI                        32
->>>> +#define GIC_V2M_MAX_SPI                        1024
->>>
->>> GIC interrupt IDs 1020 and above are reserved, no?
->>>
->>> Surely the max ID an SPI can take is 1019?
->>
->> Right, thanks for catching. But the spec says that the SPI ID value must
->> be in the range of 32 to 1020. I guess it was a bit unclear, but
->> definitely not 1024 :)
->
-> Which spec?
-
-This was in the "Server Base System Architecture v1.0".
->
-> In the GICv2 spec I see:
->
-> * "Interrupt numbers ID32-ID1019 are used for SPIs." in
->    2.2.1 Interrupt IDs.
->
-> * "The GIC architecture reserves interrupt ID numbers 1020-1023 for
->    special purposes." in 3.2.5 Special interrupt numbers.
->
->>
->>>> +#define GIC_OF_MSIV2M_RANGE_INDEX      4
->>>> +
->>>> +/**
->>>> + * alloc_msi_irq - Allocate MSIs from avaialbe MSI bitmap.
->>>> + * @data: Pointer to v2m_data
->>>> + * @nvec: Number of interrupts to allocate
->>>> + * @irq: Pointer to the allocated irq
->>>> + *
->>>> + * Allocates interrupts only if the contiguous range of MSIs
->>>> + * with specified nvec are available. Otherwise return the number
->>>> + * of available interrupts. If none are available, then returns -ENOENT.
->>>> + */
->>>
->>> This function is overly complicated, and pointlessly so.
->>>
->>> It doesn't achieve anything useful as it returns the size of the _last_
->>> contiguous block rather than the _largest_ contiguous block, and the
->>> only caller (gicv2m_setup_msi_irq) doesn't even care.
->>>
->>> Simplify this to just return an error code if allocation is impossible.
->>
->> Actually, I made another mistake in the gicv2m_setup_msi_irq when
->> returning from the alloc_msi_irq().
->
-> Ok.
->
->> My understanding is the arch_setup_msi_irqs() is supposed to return the
->> number of available vectors if the requested amount could not be
->> allocated. I notice that the current "drivers/pci/msi.c:
->> arch_setup_msi_irqs()" does not do so, which is okay.
->>
->> However, We are also working on adding support for multi-MSI support
->> since some of the devices we have are using it, which means we will need
->> to provide a different version of the "arch_setup_msi_irqs()" as the
->> current one does not allow (PCI_CAP_ID_MSI && nvec > 1).
->>
->> Therefore, I implemented the "alloc_msi_irq" this way to account for
->> future changes.
->
-> Per my comments, I still think the function is broken given it returns
-> the size of the last contiguous block of available interrupts.
-
-Actually, the current logic for alloc_msi_irq() should do the following:
-     - Return the next available contiguous block of nvec.
-     - In case the requested nvec is not available, return the size of 
-of the largest available range, since the for loop always call the 
-"bitmap_find_next_zero_area()" from the first index of the bitmap.
-
-Actually, let me just add the code for multiple MSIs, which should be 
-making use of this function also in the V3 patch set.  That way, it 
-would be clear.
-
-Thanks,
-
-Suravee
-
-Suravee
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/41a0687f/attachment.sig>
