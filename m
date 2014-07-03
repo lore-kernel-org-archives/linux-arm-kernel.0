@@ -1,144 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 3 Jul 2014 17:17:47 +0800
-Subject: [PATCH v2] ARM: mx25: Add basic suspend/resume support
-In-Reply-To: <1404347237-19665-1-git-send-email-festevam@gmail.com>
-References: <1404347237-19665-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140703091746.GE30239@dragon>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 03 Jul 2014 11:20:48 +0200
+Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
+In-Reply-To: <53B50EFD.2070007@st.com>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+ <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
+ <20140702165924.GB17665@lee--X1> <53B50EFD.2070007@st.com>
+Message-ID: <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 09:27:17PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Tested basic suspend/resume on a mx25pdk:
-> 
-> root at freescale /$ echo mem > /sys/power/state 
-> PM: Syncing filesystems ... done.
-> Freezing user space processes ... (elapsed 0.001 seconds) done.
-> Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-> Suspending console(s) (use no_console_suspend to debug)
-> 
-> (Press the keypad)
-> 
-> PM: suspend of devices complete after 5.637 msecs
-> PM: late suspend of devices complete after 1.649 msecs
-> PM: noirq suspend of devices complete after 1.874 msecs
-> PM: noirq resume of devices complete after 1.643 msecs
-> PM: early resume of devices complete after 1.923 msecs
-> PM: resume of devices complete after 62.884 msecs
-> Restarting tasks ... done.
-> fec 50038000.ethernet eth0: Link is Down
-> fec 50038000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-> root at freescale /$ 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Change since v1:
-> - Fix blank lines
-> - Do not create a new file for storing the prototype
-> 
->  arch/arm/mach-imx/Makefile   |  2 +-
->  arch/arm/mach-imx/imx25-dt.c |  1 +
->  arch/arm/mach-imx/mx25.h     |  2 ++
->  arch/arm/mach-imx/pm-imx25.c | 41 +++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 45 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-imx/pm-imx25.c
-> 
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index a364e20..ddc28d4 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -3,7 +3,7 @@ obj-y := time.o cpu.o system.o irq-common.o
->  obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
->  obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
->  
-> -obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
-> +obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o pm-imx25.o
->  
->  obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
->  obj-$(CONFIG_SOC_IMX27) += clk-imx27.o mm-imx27.o ehci-imx27.o
-> diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
-> index cf8032b..2872ef7 100644
-> --- a/arch/arm/mach-imx/imx25-dt.c
-> +++ b/arch/arm/mach-imx/imx25-dt.c
-> @@ -33,6 +33,7 @@ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
->  	.map_io		= mx25_map_io,
->  	.init_early	= imx25_init_early,
->  	.init_irq	= mx25_init_irq,
-> +	.init_late      = imx25_pm_init,
->  	.init_machine	= imx25_dt_init,
->  	.dt_compat	= imx25_dt_board_compat,
->  	.restart	= mxc_restart,
-> diff --git a/arch/arm/mach-imx/mx25.h b/arch/arm/mach-imx/mx25.h
-> index ec46640..0bb5894 100644
-> --- a/arch/arm/mach-imx/mx25.h
-> +++ b/arch/arm/mach-imx/mx25.h
-> @@ -114,4 +114,6 @@
->  extern int mx25_revision(void);
->  #endif
->  
-> +void imx25_pm_init(void);
-> +
+Hi,
 
-Shouldn't this be put into #ifndef __ASSEMBLY__ together with
-mx25_revision()?  Or can we simply put it into common.h?
-
->  #endif /* ifndef __MACH_MX25_H__ */
-> diff --git a/arch/arm/mach-imx/pm-imx25.c b/arch/arm/mach-imx/pm-imx25.c
-> new file mode 100644
-> index 0000000..560baba
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/pm-imx25.c
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Copyright 2014 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/suspend.h>
-> +#include <linux/io.h>
-> +
-> +#ifdef CONFIG_PM
-> +static int mx25_suspend_enter(suspend_state_t state)
-
-imx25_suspend_enter
-
-> +{
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		cpu_do_idle();
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int mx25_suspend_enter(suspend_state_t state)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static const struct platform_suspend_ops mx25_suspend_ops = {
-
-imx25_suspend_ops
-
-Shawn
-
-> +	.enter = mx25_suspend_enter,
-> +	.valid = suspend_valid_only_mem,
-> +};
-> +
-> +void __init imx25_pm_init(void)
-> +{
-> +	suspend_set_ops(&mx25_suspend_ops);
-> +}
-> -- 
-> 1.8.3.2
+Am Donnerstag, den 03.07.2014, 10:06 +0200 schrieb Maxime Coquelin:
+> I will queue patch 4 to STi DT branch for v3.17.
+> For now, no nodes uses reset for STiH407, so we don't need the 
+> dt-bindings header file in the STi tree.
 > 
+> If we have a DT node using a reset line before my pull-request, I might 
+> have to integrate the series in the STi DT branch.
+> Philipp, does that sound reasonable?
+
+Patch 4 depends on patch 1 for the header. My tree is still empty, how
+about I take the first two, and you merge that branch and then take 3
+and 4 on top?
+
+    git://git.pengutronix.de/git/pza/linux.git reset/for_v3.17
+
+Lee, shall I also add your Ack to the documentation patch?
+
+regards
+Philipp
