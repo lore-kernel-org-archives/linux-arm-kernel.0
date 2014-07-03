@@ -1,64 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 3 Jul 2014 18:04:02 +0200
-Subject: [PATCH 1/2] efi/arm64: fix potential NULL dereference of
- efi.systab
-In-Reply-To: <1404311385.19665.15.camel@deneb.redhat.com>
-References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-SLQC82q7Rj5ZusbFxwysy7KpRhZ=vw1ipXu9kvq46aQ@mail.gmail.com>
- <1404311385.19665.15.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu_RAFFfsX75mdTZ06q7fUrOzD+auFj6uo1sx6Rj=x7Qbw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 17:11:54 +0100
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <CALCETrWQdHmn0-so1JHFoT-2A02mgcxDUb3jphSQmBGn-SQ+pA@mail.gmail.com>
+References: <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+ <20140620172330.GA30656@arm.com>
+ <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+ <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+ <20140623084608.GA9316@arm.com>
+ <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
+ <20140624085405.GA26013@arm.com> <53B5098B.9050801@linaro.org>
+ <20140703102450.GD12958@arm.com>
+ <CALCETrWQdHmn0-so1JHFoT-2A02mgcxDUb3jphSQmBGn-SQ+pA@mail.gmail.com>
+Message-ID: <20140703161154.GF14305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 July 2014 16:29, Mark Salter <msalter@redhat.com> wrote:
-> On Wed, 2014-07-02 at 12:13 +0200, Ard Biesheuvel wrote:
->> > On 2 July 2014 12:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > We assign efi.systab using efi_lookup_mapped_addr(), and test for !NULL, but
->> > then go on an dereference it anyway.
->> >
->> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > ---
->> >  arch/arm64/kernel/efi.c | 7 +++++--
->> >  1 file changed, 5 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> > index 56c3327bbf79..e785f93f17cb 100644
->> > --- a/arch/arm64/kernel/efi.c
->> > +++ b/arch/arm64/kernel/efi.c
->> > @@ -419,8 +419,11 @@ static int __init arm64_enter_virtual_mode(void)
->> >         }
->> >
->> >         efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
->> > -       if (efi.systab)
->> > -               set_bit(EFI_SYSTEM_TABLES, &efi.flags);
->> > +       if (!efi.systab) {
->> > +               pr_err("Failed to remap EFI System Table!\n");
->>
->> ... this needs a kfree(virtmap) as well.
->>
->
-> And probably should unmap all the remapped regions in virtmap first.
+On Thu, Jul 03, 2014 at 04:39:21PM +0100, Andy Lutomirski wrote:
+> On Thu, Jul 3, 2014 at 3:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Jul 03, 2014 at 08:43:07AM +0100, AKASHI Takahiro wrote:
+> >> On 06/24/2014 05:54 PM, Will Deacon wrote:
+> >> > On Mon, Jun 23, 2014 at 08:46:52PM +0100, Kees Cook wrote:
+> >> >> What's the state of seccomp on arm64? I saw a series back in March,
+> >> >> but nothing since then? It looked complete, but I haven't set up a
+> >> >> test environment yet to verify.
+> >> >
+> >> > I think Akashi was going to repost `real soon now' so we can include them
+> >> > for 3.17. He missed the merge window last time around.
+> >>
+> >> I took a quick look at the current implementation of ptrace.
+> >> ptrace(PTRACE_GETREGSET/SETREGSET), eventually gpr_get/set(), handles only
+> >> 'struct user_pt_regs', and we have no way to modify orig_x0 nor syscallno
+> >> in 'struct pt_regs' directly.
+> >> So it seems to me that we can't change a system call by ptrace().
+> >> Do I misunderstand anything?
+> >
+> > No, it looks like you have a point here. I don't think userspace has any
+> > business with orig_x0, but changing syscallno is certainly useful. I can
+> > think of two ways to fix this:
+> >
+> >   (1) Updating syscallno based on w8, but this ties us to the current ABI
+> >       and could get messy if this register changes in the future.
+> >
+> >   (2) Adding a PTRACE_SET_SYSCALL request, like we have for arch/arm/,
+> >       but that means adding arch-specific stuff to arch_ptrace (which
+> >       currently goes straight to ptrace_request on arm64).
+> >
+> > It looks like x86 uses orig_ax, which I *think* means we would go with
+> > (1) above if we followed their lead.
+> 
+> w8 is a real register, right?  On x86, at least orig_ax isn't a real
+> register, so it's quite unlikely to conflict with hardware stuff.
 
-Yes.
+Yeah, w8 is the hardware register which the Linux ABI uses for the system
+call number. I was thinking We could allow the debugger/tracer to update
+the syscall number by updating that register, or do you see an issue with
+that? (other than tying us to the current ABI).
 
-> Presumably the systab will be in a runtime memory region which gets
-> virtual mapping from remap_region(). If that succeeds, then the
-> efi_lookup_mapped_addr should always succeed. But to be careful,
-> we should probably bail out earlier if remap_region() ever returns
-> zero. If all remaps work and efi_lookup_mapped_addr() fails, then
-> we should try ioremap_cache() directly. Or do what x86 does and make
-> a local copy of the table earlier when we early_memremap() it in
-> uefi_init().
->
+> On x86, the "user_struct" thing has nothing to do with any real kernel
+> data structure, so it's extensible.  Can you just add syscallno to it?
 
-Bailing early (and cleaning up) if any remap_region() call fails seems
-like a wise thing to do.
-But if they all succeed, and efi_lookup_mapped_addr() then fails to
-resolve efi_system_table, it means it lives in a region which will
-become inaccessible to the runtime services themselves after
-set_virtual_address_map() has been called. So doing any kind of
-fallback masks a severe firmware bug, which makes me think we should
-just complain loudly and not enable UEFI bits any further
+I'm really not keen on changing user-facing structures like that. For
+example, KVM embeds user_pt_regs into kvm_regs.
 
--- 
-Ard.
+We can add a new ptrace request if we have to.
+
+Will
