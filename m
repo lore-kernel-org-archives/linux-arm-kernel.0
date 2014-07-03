@@ -1,40 +1,54 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Thu, 03 Jul 2014 18:57:00 +0100
-Subject: [PATCH v2 2/6] input: touchscreen: imx25 tcq driver
-In-Reply-To: <20140629114901.GO32514@n2100.arm.linux.org.uk>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1402672899-6995-1-git-send-email-denis@eukrea.com>
- <1402672899-6995-3-git-send-email-denis@eukrea.com>
- <53A55BD8.7030905@kernel.org>
- <CAOMZO5BxZDX5TDZdUCbpTw2LpVC=vr4cnn4eSpzd_023wcy+Fg@mail.gmail.com>
- <53AFF1C4.1010402@kernel.org> <20140629114901.GO32514@n2100.arm.linux.org.uk>
-Message-ID: <53B5996C.5000204@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 18:57:06 +0100
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <9034CBD80F070943B59700D7F8149ED90182308172@SC-VEXCH4.marvell.com>
+References: <20140423170821.GJ5649@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
+ <5360FB07.5030407@arm.com>
+ <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+ <537337F3.4080300@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875776@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED90182308172@SC-VEXCH4.marvell.com>
+Message-ID: <20140703175706.GI17372@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/14 12:49, Russell King - ARM Linux wrote:
-> On Sun, Jun 29, 2014 at 12:00:20PM +0100, Jonathan Cameron wrote:
->> On 21/06/14 20:55, Fabio Estevam wrote:
->>> On Sat, Jun 21, 2014 at 7:18 AM, Jonathan Cameron <jic23@kernel.org> wrote:
->>>>> +
->>>>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>>
->>>> Could this not in theory fail?
->>>
->>> Yes, but devm_ioremap_resource will take care of it, so we don't need
->>> to check for error here.
->> Nothing like counter intuitive behaviour.  Ah well.
->>
->> Thanks for explaining this!
->
-> Maybe it would be better to have:
->
-> 	mem = platform_ioremap_resource(pdev, IORESOURCE_MEM, 0);
->
-> which wraps up both the platform_get_resource() call with
-> devm_ioremap_resource() so driver writers don't have to be concerned
-> about this aspect?
->
-Good idea.
+On Mon, Jun 30, 2014 at 11:39:15AM +0100, Neil Zhang wrote:
+> > > > I will prepare another patch to add DT description under PMU since
+> > > > there is no generic power domain support for pm notifier if no other
+> > > concerns.
+> > > > We can change the manner if there is generic power domain support
+> > > > for
+> > > pm notifier later.
+> > > > Thanks.
+> > >
+> > > No, please don't add any DT bindings for power domains specific to PMU
+> > > node.
+> > > We can't change the DT bindings once added.
+> > >
+> > > As I pointed out the DT bindings for generic power domains are under
+> > > discussion.
+> > > See if you can reuse it, if not help in extending it so that it can be used.
+> > >
+> > 
+> > Sorry for reply later.
+> > As I said before the under discussed generic power domain is not suitable for
+> > CPU peripherals since they are all known belong to CPU or cluster power
+> > domain.
+> > If we want to follow the way they are discussion, we need to register core
+> > and cluster power provider, and need vfp/gic/pmu etc to require them.
+> > Is it really suitable?
+> > 
+> Do you have any comments?
+> If no, I would like to put it under PMU node.
 
-Something like that would certainly make more sense to me.
+Sudeep is a better person to comment than me, but I'd still rather this was
+handled more generically as opposed to a PMU-specific hack. I don't see a
+problem including GIC and VFP here, but only when we actually need to
+save/restore them (i.e. what the hardware guys went crazy with the power
+domains).
+
+Will
