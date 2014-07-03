@@ -1,42 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Jul 2014 18:45:45 +0100
-Subject: [PATCH v6 00/21] arm64: GICv3 support
-In-Reply-To: <53B18732.4070509@arm.com>
-References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
- <20140630154337.GR23978@titan.lakedaemon.net> <53B18732.4070509@arm.com>
-Message-ID: <53B596C9.2060701@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 03 Jul 2014 19:46:24 +0200
+Subject: timers & suspend
+In-Reply-To: <12596549-d0f6-43b6-810d-ccd908404364@BL2FFO11FD055.protection.gbl>
+References: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
+ <53B54AC2.5040908@linaro.org>
+ <83fa689b-a06a-4f1c-97cb-f7a7121a0f25@BL2FFO11FD041.protection.gbl>
+ <53B5922A.7020006@linaro.org>
+ <12596549-d0f6-43b6-810d-ccd908404364@BL2FFO11FD055.protection.gbl>
+Message-ID: <53B596F0.7020507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On 30/06/14 16:50, Marc Zyngier wrote:
-> Hi Jason,
-> 
-> On 30/06/14 16:43, Jason Cooper wrote:
->> Marc,
+On 07/03/2014 07:40 PM, S?ren Brinkmann wrote:
+> On Thu, 2014-07-03 at 07:26PM +0200, Daniel Lezcano wrote:
+>> On 07/03/2014 06:09 PM, S?ren Brinkmann wrote:
+>>> On Thu, 2014-07-03 at 02:21PM +0200, Daniel Lezcano wrote:
+>>>> On 06/30/2014 08:39 PM, S?ren Brinkmann wrote:
+>>>>> Hi,
+>>>>>
+>>>>> I'm currently working on suspend for Zynq and try to track down some
+>>>>> spurious wakes. It looks like the spurious wakes are caused by timers,
+>>>>> hence I was wondering whether there are any special requirements for
+>>>>> timer drivers when it comes to suspend support or if I just missed
+>>>>> something.
+>>>>>
+>>>>> Zynq sets the 'IRQCHIP_MASK_ON_SUSPEND' flag, which should mask all
+>>>>> interrupts but the wake source. Reading through kernel/irq/pm.c
+>>>>> indicates, that timer interrupts get some special treatment though.
+>>>>> Therefore I implemented some suspend/resume callbacks for the
+>>>>> cadence_ttc which disable and clear the timer's interrupts when going
+>>>>> into suspend. That seems to mitigate the issue quite a bit, but I still
+>>>>> saw spurious wakes - just a lot less often.
+>>>>> Digging a little deeper revealed, the spurious wakes are caused by the
+>>>>> ARM's smp_twd timer now. Given that that driver is probably used by a few
+>>>>> more ARM platforms, I get the feeling that I'm missing something.
+>>>>
+>>>> Do you receive any interrupt from the cadence_ttc ? (/proc/interrupts)
+>>>>
+>>>> That's funny because I realize that you cadence ttc timer is never
+>>>> used as there are the architected timers. The cadence ttc would be
+>>>> only useful if there were an idle state powering down the smp_twd
+>>>> timers but it is not the case on this board, IIUC.
+>>> Yes they are used. They TTC is the only broadcast capable timer for
+>>> Zynq. In my experience, I can not even boot without it (may have
+>>> dependencies on CPUidle or something).
 >>
->> On Mon, Jun 30, 2014 at 04:01:29PM +0100, Marc Zyngier wrote:
->>> I now have received enough Reviewed-by from people familiar with the
->>> architecture, and a number of Tested-by from actual implementors,
->>> which (IMHO) makes ready for merging into 3.17 (Thomas, Jason: How do
->>> you want to play it? We have a rather big dependency between the first
->>> few patches and the rest of the stuff, which is KVM only).
+>> Actually the cpuidle driver is wrong. It assumes the state #1 will
+>> power off the different cores with their architected timers and then
+>> switch to the broadcast timer. But this one is not needed as we
+>> don't power down the core with the twd timers, so no need to switch
+>> to a backup timer device.
 >>
->> On a quick glance, it looks like patch #1 is conflict-prone and #2 crosses
->> outside of irqchip/.  So, I could setup a topic branch for #1 that
->> we'll both use.  Then I'll Ack #2 for you to take.  Would that work for
->> you?
-> 
-> That'd be absolutely great. Just point me to the topic branch you'd like
-> to use, and I'll get it into the KVM/ARM tree.
+>> The implementation of the DDR self refresh idle state (incoming
+>> patchset) removes the cpu_pm notifiers + the flag TIMER_STOP. The
+>> result is 0 interrupts for ttc cadence timer. I removed in the dts
+>> the cadence ttc and my board booted without problem (it is a zynq
+>> 702).
+>>
+>> Except I missed something, the cadence ttc is actually not used at all.
+> I tested on the current master branch. I see TTC interrupts on CPU0 and
+> timer_list shows the TTC to be the broadcast device. Removing the TTC
+> nodes from my DT results in boot hanging - shortly after cpuidle is
+> started.
+>
+> Removing cpuidle from my kernel makes the system boot. And it has no
+> broadcast device anymore.
 
-Sorry to pester you... Do you have any update on this? Christoffer and I
-are putting our queue together for the next merge window, and I'd really
-like to get this going before disappearing on holiday...
+You can safely remove the CPUIDLE_FLAG_TIMER_STOP in the cpuidle drivers 
+and I am pretty sure it will boot without problem.
 
-Thanks a lot,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
