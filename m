@@ -1,71 +1,117 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 3 Jul 2014 09:07:58 +0100
-Subject: [PATCH 3/5] phy: miphy365x: Provide support for the MiPHY356x
- Generic PHY
-In-Reply-To: <53B3DCBC.8000105@ti.com>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-4-git-send-email-lee.jones@linaro.org>
- <53B3DCBC.8000105@ti.com>
-Message-ID: <20140703080758.GI30534@lee--X1>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 3 Jul 2014 13:37:55 +0530
+Subject: [PATCH 2/2] arm: dra7xx: Add hwmod data for pcie1 and pcie2
+ subsystems
+In-Reply-To: <1403719366-9656-3-git-send-email-kishon@ti.com>
+References: <1403719366-9656-1-git-send-email-kishon@ti.com>
+ <1403719366-9656-3-git-send-email-kishon@ti.com>
+Message-ID: <53B50F5B.7010505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Jul 2014, Kishon Vijay Abraham I wrote:
-> On Monday 30 June 2014 06:31 PM, Lee Jones wrote:
-> > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> > devices. It has 2 ports which it can use for either; both SATA, both
-> > PCIe or one of each in any configuration.
-> > 
-> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-Removed.
-
-> > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/phy/Kconfig         |  10 +
-> >  drivers/phy/Makefile        |   1 +
-> >  drivers/phy/phy-miphy365x.c | 630 ++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 641 insertions(+)
-> >  create mode 100644 drivers/phy/phy-miphy365x.c
-
-[...]
-
-> > +struct miphy365x_dev {
-> > +	struct device *dev;
-> > +	struct mutex miphy_mutex;
-> > +	struct miphy365x phys[ARRAY_SIZE(ports)];
+On Wednesday 25 June 2014 11:32 PM, Kishon Vijay Abraham I wrote:
+> Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
 > 
-> Avoid using fixed array sizes for ports or channels. Refer [1].
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> Please find the bootlog with these hwmod patches
+> http://paste.ubuntu.com/7701601/
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   55 +++++++++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 6ff40a6..934aa9d 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1290,6 +1290,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>  };
+>  
+>  /*
+> + * 'PCIE' class
+> + *
+> + */
+> +
+> +static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
+> +	.name	= "pcie",
+> +};
+> +
+> +/* pcie1 */
+> +static struct omap_hwmod dra7xx_pcie1_hwmod = {
+> +	.name		= "pcie1",
+> +	.class		= &dra7xx_pcie_hwmod_class,
+> +	.clkdm_name	= "l3init_clkdm",
 
-Just addressing this point in this mail.  Any other subsequent points
-will either be fixed up or addressed in other correspondence.
+The TRM tells me it belongs to 'pcie_clkdm' instead. Can you please recheck?
 
-I don't agree with this point.  I don't believe the number of channels
-should be dictated by the number of DT sub-nodes supplied.  Instead,
-the driver should contain knowledge about what is supported and
-validate the DT data accordingly.  If it's omitted we lose the ability
-to conduct any kind of bounds checking, such like the following: 
+> +	.main_clk	= "l4_root_clk_div",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+> +			.modulemode	= MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/* pcie2 */
+> +static struct omap_hwmod dra7xx_pcie2_hwmod = {
+> +	.name		= "pcie2",
+> +	.class		= &dra7xx_pcie_hwmod_class,
+> +	.clkdm_name	= "l3init_clkdm",
+> +	.main_clk	= "l4_root_clk_div",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/*
+>   * 'PCIE PHY' class
+>   *
+>   */
+> @@ -2448,6 +2485,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_cfg -> pcie1 */
 
-        if (WARN_ON(port >= ARRAY_SIZE(ports)))
-                return ERR_PTR(-EINVAL);
-And
-        if (child_count != ARRAY_SIZE(ports)) {
-                dev_err(&pdev->dev, "%d ports supported, %d supplied\n",
-                        ARRAY_SIZE(ports), child_count);
-                return -EINVAL;
-        }
+There seems to be a slave port on l3_init as well which seems to be missing?
 
-If at a later point, we need to expand the driver to support a new
-chip which supports more channels/ports then we need to expand the
-bounds checking based on match data extracted from the supplied
-compatible string.  For instance, if a 4 port controller is being used
-and only 2 channels have been supplied, or vice versa then probe()
-should fail.
+Refer to 'Figure 24-157. PCIe Controllers Integration' of TRM version P.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+regards,
+Rajendra
+
+> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
+> +	.master		= &dra7xx_l4_cfg_hwmod,
+> +	.slave		= &dra7xx_pcie1_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* l4_cfg -> pcie2 */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
+> +	.master		= &dra7xx_l4_cfg_hwmod,
+> +	.slave		= &dra7xx_pcie2_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  /* l4_cfg -> pcie1 phy */
+>  static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
+>  	.master		= &dra7xx_l4_cfg_hwmod,
+> @@ -2813,6 +2866,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_cfg__mpu,
+>  	&dra7xx_l4_cfg__ocp2scp1,
+>  	&dra7xx_l4_cfg__ocp2scp3,
+> +	&dra7xx_l4_cfg__pcie1,
+> +	&dra7xx_l4_cfg__pcie2,
+>  	&dra7xx_l4_cfg__pcie1_phy,
+>  	&dra7xx_l4_cfg__pcie2_phy,
+>  	&dra7xx_l3_main_1__qspi,
+> 
