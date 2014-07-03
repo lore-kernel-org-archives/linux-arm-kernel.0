@@ -1,246 +1,284 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu,  3 Jul 2014 16:38:43 +0200
-Subject: [RFC v2 5/5] clk: Add floor and ceiling constraints to clock rates
-In-Reply-To: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1404398323-18934-6-git-send-email-tomeu.vizoso@collabora.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 3 Jul 2014 22:39:08 +0800
+Subject: [PATCH 05/18] power: reset: Add AT91 reset driver
+In-Reply-To: <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <F9547E0F-AB97-47E6-BA09-135EE4E1BC73@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a way for clock consumers to set maximum and minimum rates. This can be
-used for thermal drivers to set ceiling rates, or by misc. drivers to set
-floor rates to assure a minimum performance level.
+NACK
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/clk/clk.c           | 103 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk.h           |   1 +
- drivers/clk/clkdev.c        |   7 +--
- include/linux/clk-private.h |   1 +
- include/linux/clk.h         |  18 ++++++++
- 5 files changed, 124 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index b887c69..3efcd18 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -23,6 +23,19 @@
- 
- #include "clk.h"
- 
-+enum constraint_type {
-+	CONSTRAINT_FLOOR,
-+	CONSTRAINT_CEILING,
-+};
-+
-+struct rate_constraint {
-+	struct hlist_node	node;
-+	const char		*dev_id;
-+	const char		*con_id;
-+	enum constraint_type	type;
-+	unsigned long		rate;
-+};
-+
- static DEFINE_SPINLOCK(enable_lock);
- static DEFINE_MUTEX(prepare_lock);
- 
-@@ -1624,6 +1637,7 @@ static void clk_change_rate(struct clk_core *clk)
- int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
- {
- 	struct clk_core *top, *fail_clk;
-+	struct rate_constraint *constraint;
- 	int ret = 0;
- 
- 	if (!clk)
-@@ -1632,6 +1646,17 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
- 	/* prevent racing with updates to the clock topology */
- 	clk_prepare_lock();
- 
-+	hlist_for_each_entry(constraint, &clk->rate_constraints, node) {
-+		switch(constraint->type) {
-+		case CONSTRAINT_FLOOR:
-+			rate = max(rate, constraint->rate);
-+			break;
-+		case CONSTRAINT_CEILING:
-+			rate = min(rate, constraint->rate);
-+			break;
-+		}
-+	}
-+
- 	/* bail early if nothing to do */
- 	if (rate == clk_provider_get_rate(clk))
- 		goto out;
-@@ -1695,6 +1720,65 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
- }
- EXPORT_SYMBOL_GPL(clk_set_rate);
- 
-+static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
-+						   enum constraint_type type)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint = NULL;
-+	bool found = false;
-+
-+	hlist_for_each_entry(constraint, &clk->rate_constraints, node) {
-+		if (constraint->dev_id == clk_user->dev_id &&
-+		    constraint->con_id == clk_user->con_id &&
-+		    constraint->type == type)
-+			found = true;
-+	}
-+
-+	if (!found) {
-+		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
-+		if (!constraint)
-+			return NULL;
-+		hlist_add_head(&constraint->node, &clk->rate_constraints);
-+	}
-+
-+	return constraint;
-+}
-+
-+static int __clk_set_constraint(struct clk *clk_user, unsigned long rate,
-+				enum constraint_type type)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint;
-+	int ret;
-+
-+	clk_prepare_lock();
-+
-+	constraint = __ensure_constraint(clk_user, type);
-+	if (!constraint)
-+		return -ENOMEM;
-+
-+	constraint->rate = rate;
-+
-+	/* Update the rate so the new constraint is taken into account */
-+	ret = clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+
-+	clk_prepare_unlock();
-+
-+	return ret;
-+}
-+
-+int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
-+{
-+	return __clk_set_constraint(clk_user, rate, CONSTRAINT_FLOOR);
-+}
-+EXPORT_SYMBOL_GPL(clk_set_floor_rate);
-+
-+int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
-+{
-+	return __clk_set_constraint(clk_user, rate, CONSTRAINT_CEILING);
-+}
-+EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
-+
- struct clk_core *clk_provider_get_parent(struct clk_core *clk)
- {
- 	struct clk_core *parent;
-@@ -2028,6 +2112,8 @@ int __clk_init(struct device *dev, struct clk_core *clk)
- 			}
- 	 }
- 
-+	INIT_HLIST_HEAD(&clk->rate_constraints);
-+
- 	/*
- 	 * optional platform-specific magic
- 	 *
-@@ -2458,6 +2544,23 @@ int clk_notifier_unregister(struct clk *clk_user, struct notifier_block *nb)
- }
- EXPORT_SYMBOL_GPL(clk_notifier_unregister);
- 
-+void __clk_free_clk(struct clk *clk_user)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint;
-+	struct hlist_node *tmp;
-+
-+	hlist_for_each_entry_safe(constraint, tmp, &clk->rate_constraints, node) {
-+		if (constraint->dev_id == clk_user->dev_id &&
-+		    constraint->con_id == clk_user->con_id) {
-+			hlist_del(&constraint->node);
-+			kfree(constraint);
-+		}
-+	}
-+
-+	kfree(clk);
-+}
-+
- #ifdef CONFIG_OF
- /**
-  * struct of_clk_provider - Clock provider registration structure
-diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
-index 2f682bf..ea84797 100644
---- a/drivers/clk/clk.h
-+++ b/drivers/clk/clk.h
-@@ -18,4 +18,5 @@ void of_clk_unlock(void);
- 
- #if defined(CONFIG_COMMON_CLK)
- struct clk_core *clk_to_clk_core(struct clk *clk);
-+void __clk_free_clk(struct clk *clk_user);
- #endif
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 5be6bb1..40f1c66 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -230,16 +230,11 @@ struct clk *clk_get(struct device *dev, const char *con_id)
- }
- EXPORT_SYMBOL(clk_get);
- 
--static void clk_free_clk(struct clk *clk)
--{
--	kfree(clk);
--}
--
- void clk_put(struct clk *clk)
- {
- 	clk_core_t *core = clk_to_clk_core(clk);
- 
--	clk_free_clk(clk);
-+	__clk_free_clk(clk);
- 	__clk_put(core);
- }
- EXPORT_SYMBOL(clk_put);
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 9657fc8..a8279e1 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -48,6 +48,7 @@ struct clk_core {
- 	unsigned long		accuracy;
- 	struct hlist_head	children;
- 	struct hlist_node	child_node;
-+	struct hlist_head	rate_constraints;
- 	unsigned int		notifier_count;
- #ifdef CONFIG_DEBUG_FS
- 	struct dentry		*dentry;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 9633459..fbfc8eb 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -274,6 +274,24 @@ long clk_round_rate(struct clk *clk, unsigned long rate);
- int clk_set_rate(struct clk *clk, unsigned long rate);
- 
- /**
-+ * clk_set_floor_rate - set a minimum clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired minimum clock rate in Hz
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_floor_rate(struct clk *clk, unsigned long rate);
-+
-+/**
-+ * clk_set_ceiling_rate - set a maximum clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired maximum clock rate in Hz
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
-+
-+/**
-  * clk_set_parent - set the parent clock source for this clock
-  * @clk: clock source
-  * @parent: parent clock source
--- 
-1.9.3
+On Jul 3, 2014, at 10:14 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> 
+> Implement the reset behaviour of the various AT91 SoCS in drivers/power/reset.
+> 
+> It used to be (and still is) located in arch/arm/mach-at91, and in order to
+> preserve bisectability is not removed yet, but every board should be converted
+> to use this driver instead.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> drivers/power/reset/Kconfig      |   7 ++
+> drivers/power/reset/Makefile     |   1 +
+> drivers/power/reset/at91-reset.c | 202 +++++++++++++++++++++++++++++++++++++++
+> 3 files changed, 210 insertions(+)
+> create mode 100644 drivers/power/reset/at91-reset.c
+> 
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index 19d546c5edfa..b3fef01d7cbb 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -14,6 +14,13 @@ config POWER_RESET_AS3722
+> 	help
+> 	  This driver supports turning off board via a ams AS3722 power-off.
+> 
+> +config POWER_RESET_AT91_RESET
+> +	bool "Atmel AT91 reset driver"
+> +	default SOC_AT91SAM9 || SOC_SAMA5
+> +	help
+> +	  This driver supports restart for Atmel AT91SAM9 and SAMA5
+> +	  SoCs
+> +
+> config POWER_RESET_AXXIA
+> 	bool "LSI Axxia reset driver"
+> 	depends on ARCH_AXXIA
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index dde2e8bbac53..1599214b91d9 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -1,4 +1,5 @@
+> obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
+> +obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
+> obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
+> obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+> obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+> new file mode 100644
+> index 000000000000..878547410acb
+> --- /dev/null
+> +++ b/drivers/power/reset/at91-reset.c
+> @@ -0,0 +1,202 @@
+> +/*
+> + * Atmel AT91 SAM9 SoCs reset code
+> + *
+> + * Copyright (C) 2014 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+
+you can not own the copyright as it?s basically a copy of other people code
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+> +
+> +#include <asm/system_misc.h>
+> +
+> +#include <mach/at91sam9_ddrsdr.h>
+> +#include <mach/at91sam9_sdramc.h>
+> +
+> +#define AT91_RSTC_CR	0x00		/* Reset Controller Control Register */
+> +#define	AT91_RSTC_PROCRST	BIT(0)		/* Processor Reset */
+> +#define	AT91_RSTC_PERRST	BIT(2)		/* Peripheral Reset */
+> +#define	AT91_RSTC_EXTRST	BIT(3)		/* External Reset */
+> +#define	AT91_RSTC_KEY		(0xa5 << 24)	/* KEY Password */
+> +
+> +#define AT91_RSTC_SR	0x04		/* Reset Controller Status Register */
+> +#define	AT91_RSTC_URSTS		BIT(0)		/* User Reset Status */
+> +#define	AT91_RSTC_RSTTYP	GENMASK(10, 8)	/* Reset Type */
+> +#define	AT91_RSTC_NRSTL		BIT(16)		/* NRST Pin Level */
+> +#define	AT91_RSTC_SRCMP		BIT(17)		/* Software Reset Command in Progress */
+> +
+> +#define AT91_RSTC_MR	0x08		/* Reset Controller Mode Register */
+> +#define	AT91_RSTC_URSTEN	BIT(0)		/* User Reset Enable */
+> +#define	AT91_RSTC_URSTIEN	BIT(4)		/* User Reset Interrupt Enable */
+> +#define	AT91_RSTC_ERSTL		GENMASK(11, 8)	/* External Reset Length */
+> +
+> +enum reset_type {
+> +	RESET_TYPE_GENERAL	= 0,
+> +	RESET_TYPE_WAKEUP	= 1,
+> +	RESET_TYPE_WATCHDOG	= 2,
+> +	RESET_TYPE_SOFTWARE	= 3,
+> +	RESET_TYPE_USER		= 4,
+> +};
+> +
+> +static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+> +
+> +static void at91sam9_restart(enum reboot_mode mode, const char *cmd)
+> +{
+> +	asm volatile(
+> +		".balign 32\n\t"
+> +
+> +		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
+> +		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
+> +		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
+> +
+> +		"b	.\n\t"
+> +		:
+> +		: "r" (at91_ramc_base[0]),
+> +		  "r" (at91_rstc_base),
+> +		  "r" (1),
+> +		  "r" (AT91_SDRAMC_LPCB_POWER_DOWN),
+> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST));
+> +}
+> +
+> +static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+> +{
+> +	asm volatile(
+> +		"cmp	%1, #0\n\t"
+> +		"beq	1f\n\t"
+> +
+> +		"ldr	r0, [%1]\n\t"
+> +		"cmp	r0, #0\n\t"
+> +
+> +		".balign 32\n\t"
+> +
+> +		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> +		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> +		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> +		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> +		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+> +
+> +		"	b	.\n\t"
+> +		:
+> +		: "r" (at91_ramc_base[0]),
+> +		  "r" (at91_ramc_base[1]),
+> +		  "r" (at91_rstc_base),
+> +		  "r" (1),
+> +		  "r" (AT91_DDRSDRC_LPCB_POWER_DOWN),
+> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST)
+> +		: "r0");
+> +}
+> +
+move this to an assembly file more easy to read than a C code
+
+> +static void __init at91_reset_status(struct platform_device *pdev)
+> +{
+> +	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+> +	char *reason;
+> +
+> +	switch ((reg & AT91_RSTC_RSTTYP) >> 8) {
+> +	case RESET_TYPE_GENERAL:
+> +		reason = "general reset";
+> +		break;
+> +	case RESET_TYPE_WAKEUP:
+> +		reason = "wakeup";
+> +		break;
+> +	case RESET_TYPE_WATCHDOG:
+> +		reason = "watchdog reset";
+> +		break;
+> +	case RESET_TYPE_SOFTWARE:
+> +		reason = "software reset";
+> +		break;
+> +	case RESET_TYPE_USER:
+> +		reason = "user reset";
+> +		break;
+> +	default:
+> +		reason = "unknown reset";
+> +		break;
+> +	}
+> +
+> +	pr_info("AT91: Starting after %s\n", reason);
+> +}
+> +
+> +static struct of_device_id at91_ramc_of_match[] = {
+> +	{ .compatible = "atmel,at91sam9260-sdramc", },
+> +	{ .compatible = "atmel,at91sam9g45-ddramc", },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct of_device_id at91_reset_of_match[] = {
+> +	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_restart },
+> +	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int at91_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(at91_rstc_base)) {
+> +		dev_err(&pdev->dev, "Could not map reset controller address\n");
+> +		return PTR_ERR(at91_rstc_base);
+> +	}
+> +
+> +	if (pdev->dev.of_node) {
+
+split in 2 function more easy to ready and less indentation
+> +		const struct of_device_id *match;
+> +		struct device_node *np;
+> +		int idx = 0;
+> +
+> +		for_each_matching_node(np, at91_ramc_of_match) {
+> +			at91_ramc_base[idx] = of_iomap(np, 0);
+> +			if (!at91_ramc_base[idx]) {
+> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+> +				return -ENODEV;
+> +			}
+> +			idx++;
+> +		}
+
+and if you can not probe the ram controler it?s a panic not a -ENODEV
+
+as you have an unstable platform
+> +
+> +		match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+> +		arm_pm_restart = match->data;
+> +	} else {
+> +		const struct platform_device_id *match;
+> +		int idx = 0;
+> +
+> +		for (idx = 0; idx < 2; idx++) {
+> +			res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
+> +			at91_ramc_base[idx] = devm_ioremap_resource(&pdev->dev, res);
+> +			if (IS_ERR(at91_ramc_base[idx])) {
+> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+> +				return PTR_ERR(at91_rstc_base);
+> +			}
+> +		}
+> +
+> +		match = platform_get_device_id(pdev);
+> +		arm_pm_restart = (void (*)(enum reboot_mode, const char*))
+> +			match->driver_data;
+> +	}
+> +
+> +	at91_reset_status(pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_device_id at91_reset_plat_match[] = {
+> +	{ "at91-sam9-reset", (unsigned long)at91sam9_restart },
+> +	{ "at91-g45-reset", (unsigned long)at91sam9g45_restart },
+	    at91-sam9???
+
+	    from the beginning of DT we put the first SoC were the reset was introduce and why do you change the DT binding?
+
+
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver at91_reset_driver = {
+> +	.probe = at91_reset_probe,
+> +	.driver = {
+> +		.name = "at91-reset",
+> +		.of_match_table = at91_reset_of_match,
+> +	},
+> +	.id_table = at91_reset_plat_match,
+> +};
+> +module_platform_driver(at91_reset_driver);
+> -- 
+> 2.0.1
+> 
