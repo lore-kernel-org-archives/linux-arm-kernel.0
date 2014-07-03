@@ -1,49 +1,98 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jul 2014 18:43:21 +0100
-Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable
- coherent HTW
-In-Reply-To: <53B48381.9050707@codeaurora.org>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-8-git-send-email-ohaugan@codeaurora.org>
- <e64e7ca617d64093bbe5dc7caf9283e1@BL2PR03MB468.namprd03.prod.outlook.com>
- <53B48381.9050707@codeaurora.org>
-Message-ID: <20140703174321.GE17372@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Jul 2014 18:43:18 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140701234800.GA23577@sirena.org.uk>
+ <20140702100133.GE18731@arm.com>
+ <20140702163923.GJ410@sirena.org.uk>
+ <20140702170141.GH24879@arm.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+Message-ID: <20140703174318.GE28175@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 11:11:13PM +0100, Olav Haugan wrote:
-> On 7/1/2014 1:49 AM, Varun Sethi wrote:
-> > 
-> > 
-> >> -----Original Message-----
-> >> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> >> bounces at lists.linux-foundation.org] On Behalf Of Olav Haugan
-> >> Sent: Monday, June 30, 2014 10:22 PM
-> >> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
-> >> foundation.org
-> >> Cc: linux-arm-msm at vger.kernel.org; will.deacon at arm.com;
-> >> thierry.reding at gmail.com; vgandhi at codeaurora.org
-> >> Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable
-> >> coherent HTW
-> >>
-> >> Add a new iommu domain attribute that can be used to enable cache
-> >> coherent hardware table walks (HTW) by the SMMU. HTW might be supported
-> >> by the SMMU HW but depending on the use case and the usage of the SMMU in
-> >> the SoC it might not be always beneficial to always turn on coherent HTW
-> >> for all domains/iommu's.
-> >>
-> > [Sethi Varun-B16395] Why won't you want to use the coherent table walk feature?
+On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
+> On Thu, Jul 3, 2014 at 11:41 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > (I've been away for a day and missed all the fun ;))
+> >
+> > On Wed, Jul 02, 2014 at 11:14:47PM +0100, Grant Likely wrote:
+> >> Android is not the embedded world where we could get away with a whole
+> >> lot. There is a *freaking huge* installed base of applications.
+> >> Breaking them is not an option, and I think Colin's question makes it
+> >> clear that Android is going make sure that doesn't happen regardless
+> >> of what the mainline kernel does... and they are right to do so.
+> >
+> > I don't know how huge this installed base of applications is. AFAIK,
+> > it's limited to a (maybe significant) number of Android games all based
+> > on certain library which no longer uses SWP in its recent releases. I
+> > may be wrong but the information I have so far is that this huge base of
+> > applications does not go beyond Android. Furthermore, people getting a
+> > new Android phone with ARMv8 will have to re-download applications
+> > anyway, so the currently installed base does _not_ matter. What matters
+> > is what is provided in the Android _app store_.
 > 
-> Very good question. We have found that turning on IOMMU coherent HTW is
-> not always beneficial to performance (performance either the same or
-> slightly worse in some cases). Even if the perf. is the same we would
-> like to avoid using precious L2 cache for no benefit to the IOMMU.
-> Although our HW supports this feature we don't always want to turn this
-> on for a specific use case/domain (bus master).
+> Okay, I have to bite on this one....
+> 
+> Ah, no. The installed base *does* matter. Breaking things under the
+> assumption that they can be fixed with an update is a horrible reason
+> for breaking stuff. That creates hell for developers.
 
-Could we at least invert the feature flag, please? i.e. you set an attribute
-to *disable* coherent walks? I'd also be interested to see some performance
-numbers, as the added cacheflushing overhead from non-coherent walks is
-going to be non-trivial.
+My point is that you *cannot* upgrade your phone from ARMv7 to ARMv8
+without re-downloading the apps. You don't carry over your filesystem
+(installed base) on an SD card from the old phone to the new one. That's
+where Google has some control I didn't say that Google should break
+those apps but actively try to update them (in the meantime, they could
+provide some form of SWP emulation).
 
-Will
+> So, no. I completely reject any notion that breaking existing apps is
+> okay. If we're going to say that v8 still supports 32-bit apps, then
+> it has to be all of v7, not just the 'good' bits. Nor do I think
+> saying "it's just a bunch of games" justifies anything. We're kernel
+> engineers. Applications are applications and we don't break userspace.
+> Period.
+
+Here you need to define user-space. OABI?
+
+> > Note that I don't say Google should break those applications but they
+> > can carry a patch in their Android kernel while reaching out to
+> > developers to sort their code (can the Android app store be scanned?).
+> > What I don't want is to be in a situation 10 years from now when we
+> > still carry SWP emulation code that no-one uses but we can't remove
+> > because it would break the user space features we agreed upon.
+> 
+> Welcome to system programming. This is what we do. It is a *good*
+> thing that an x86 userspace from 1995 can still be booted.
+
+I'm not sure how much of it is just the merit of Linux but rather the
+hardware backwards compatibility. As you can see with SWP, we don't
+always have this on ARM (and don't blame the kernel maintainers for this
+;)).
+
+The same question again - shall we support OABI or we just add ABI
+features based on who shouts louder?
+
+> > I have limited knowledge of Android user space but I think SWP emulation
+> > could also be implemented in user space via a SIGILL handler in the
+> > zygote thread and inherited by forked apps (performance doesn't really
+> > matter here). A similar example for Android is the binder driver
+> > user-kernel ABI. AFAIK, Google decided not to provide a compat ABI for
+> > the 64-bit compilation of this driver but update the AArch32 user-space
+> > library to use the new 64-bit ABI. That's perfectly fine by me, they
+> > chose not to provide such ABI in the kernel but solve it entirely in
+> > user space and could do the same with SWP.
+> 
+> Really? Why would we even want that? We're far better positioned in
+> the kernel to present the correct behaviour that any trapping from a
+> userspace application.
+
+Because by adding it to the kernel we declare it ABI (rather than just
+an Android issue on ARMv8 hardware; I'm not currently aware of other
+ARMv7 Linux distros affected).
+
+-- 
+Catalin
