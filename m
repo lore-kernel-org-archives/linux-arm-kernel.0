@@ -1,50 +1,112 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Jul 2014 00:34:11 -0700
-Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
-References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
- <20140702160932.GF5541@saruman.home>
- <20140702190944.GA567@drone.musicnaut.iki.fi>
- <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
-Message-ID: <20140703073411.GX28884@atomide.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 3 Jul 2014 15:37:36 +0800
+Subject: [PATCH v4 0/6] clk: sunxi: fixes, cleanups and A23 basic clocks
+In-Reply-To: <20140702223552.7440.60829@quantum>
+References: <1403798144-32188-1-git-send-email-wens@csie.org>
+ <20140702223552.7440.60829@quantum>
+Message-ID: <CAGb2v67ceT8X-zmB7ULPg6Kqd8PRpmo0x_Vu9iF4s_6euXg_FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [140702 12:27]:
-> On Wed, Jul 2, 2014 at 2:09 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> > Hi,
-> >
-> > On Wed, Jul 02, 2014 at 11:09:32AM -0500, Felipe Balbi wrote:
-> >> > It has been only tested as console UART.
-> >> > The tty name is ttyS based instead of ttyO. How big is the pain here,
-> >> > what could be the easiest way to provide compatibility?
-> >>
-> >> have been considering that myself for months. You could pass an optional
-> >> argument to serial8250_register_8250_port() but that only solves part of
-> >> the problem :-(
+On Thu, Jul 3, 2014 at 6:35 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Chen-Yu Tsai (2014-06-26 08:55:38)
+>> Hi everyone,
+>>
+>> This is v4 of the sun8i clock series, which adds basic clock
+>> support for the A23 SoC. It is based on my initial sun8i bring
+>> up series [1]. This series was split up from the original A23
+>> series [2]. Yet to come are more clocks, reset controllers,
+>> prcm, pinctrl, and mmc.
+>
+> Hello Chen-Yu,
+>
+> This series looks good to me.
 
-Some kind of compability layer sure would be nice.
+Thanks. Assuming no one else raises any issues, I consider this
+series merged. I'll send the next sun8i series later today.
 
-> > When ttyS -> ttyO change was done on OMAP, compatibility was not an issue.
-> > Why should we care about it now?
-> 
-> It would be a good opportunity to force everyone to update their bootloader. ;)
-> 
-> Besides the BeagleBoard forum is quiet now, no one is complaining
-> about that old (ttyS -> ttyO) transition anymore..
+The remaining series still have some clock patches, so thanks
+in advance.
 
-How about a Kconfig option to provide ttyO by default? The not even
-do that if kernel has cmdline option nottyomap.
- 
-> I'll just end up carrying a patch like, to support bb.org users over
-> the transition..
-> 
-> https://github.com/RobertCNelson/stable-kernel/blob/v3.7.x/patches/omap_beagle/0004-zeroMAP-Open-your-eyes.patch
 
-Heh. Just to summarize the reason ttyO needs to be a separate name
-and device entry from ttyS is because we also have external 8250
-devices on GPMC and hotplug busses.
+Cheers
+ChenYu
 
-Regards,
 
-Tony
+> Maxime,
+>
+> I see that you Acked it already. Are you planning to roll this into a
+> pull request later on?
+>
+> Regards,
+> Mike
+>
+>>
+>> The first patch fixes the reworked clock protection code merged in
+>> 3.16-rc1, which unintentionally made clock gates unprotectable.
+>>
+>> The second patch moves the remaining "ahb_sdram" clock to the
+>> protected clock list, now that it works.
+>>
+>> The third patch adds support for factor clocks that have an N factor
+>> not starting from 0. This is found on some PLLs in A31/A23.
+>>
+>> The fourth patch adds table-based dividers for div clocks, as some
+>> clocks, such as apb0 divider on sun4/5/7i, apb1 on sun6/8i and axi
+>> on sun8i.
+>>
+>> The fifth patch adds support for the basic clocks in the A23, just
+>> PLL1 for cpus, and the system bus clocks and gates.
+>>
+>> The last patch adds the DT nodes for the newly added clocks, and
+>> updates clock phandles for existing peripherals, the uarts.
+>>
+>> Originally I intended for patch 1 to be merged as a fix for 3.16.
+>> However, the only user of the affected code, sun6i's "ahb1_sdram"
+>> clock, doesn't seem to result in any runtime issues. So this whole
+>> series can go into 3.17.
+>>
+>>
+>> Related changes since v3:
+>>
+>>   - Dropped fields with default values from sun8i_a23_axi_div_data
+>>   - Added Maxime's Acked-by
+>>   - Fixed incorrect compatible string for axi clock node
+>>   - Updated clock phandles for uarts in dtsi
+>>
+>> Related changes since v2:
+>>
+>>   - Rewrote factor clocks to support any (0~255) N factor starting value
+>>
+>> Related changes since v1:
+>>
+>>   - Added "clk: sunxi: Add support for table-based divider clocks"
+>>   - Added table-based divider axi clock
+>>   - Fixed incorrectly squashed fixups
+>>
+>>
+>> Cheers
+>> ChenYu
+>>
+>>
+>>   [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265211.html
+>>   [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259097.html
+>>
+>> Chen-Yu Tsai (6):
+>>   clk: sunxi: register clock gates with clkdev
+>>   clk: sunxi: move "ahb_sdram" to protected clock list
+>>   clk: sunxi: Support factor clocks with N factor starting not from 0
+>>   clk: sunxi: Add support for table-based divider clocks
+>>   clk: sunxi: Add A23 clocks support
+>>   ARM: sun8i: Add basic clock nodes to the DTSI
+>>
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |   5 +
+>>  arch/arm/boot/dts/sun8i-a23.dtsi                  | 125 +++++++++++++++++++++-
+>>  drivers/clk/sunxi/clk-factors.c                   |   2 +-
+>>  drivers/clk/sunxi/clk-factors.h                   |   1 +
+>>  drivers/clk/sunxi/clk-sunxi.c                     | 119 ++++++++++++++++++--
+>>  5 files changed, 237 insertions(+), 15 deletions(-)
+>>
+>> --
+>> 2.0.0
+>>
