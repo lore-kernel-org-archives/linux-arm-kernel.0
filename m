@@ -1,34 +1,43 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 3 Jul 2014 19:17:40 +0300
-Subject: pull request for Tegra clock updates for 3.17
-Message-ID: <20140703161740.GA6078@tbergstrom-lnx.Nvidia.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 3 Jul 2014 18:19:47 +0200
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140703160622.GE23309@earth.universe>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <20140703132509.GA5814@saruman.home>
+ <CAOCHtYi0JwRO12gHa+KFGH1k7pPk4TL40igwhzRRxutw-tqf6A@mail.gmail.com>
+ <20140703140736.GF5814@saruman.home>
+ <20140703154425.GC23309@earth.universe>
+ <20140703155240.GU5814@saruman.home>
+ <20140703160622.GE23309@earth.universe>
+Message-ID: <CABxcv=nGPyK7SeQZ+W1ZEfBPQ-RraVTawyYuKOGz02df0g=6Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, Jul 3, 2014 at 6:06 PM, Sebastian Reichel <sre@kernel.org> wrote:
+> Hi,
+>
+> On Thu, Jul 03, 2014 at 10:52:40AM -0500, Felipe Balbi wrote:
+>> > DT is supposed to contain information about the hardware, so it
+>> > should stay the same? I think there is no non-hackish way to decide
+>>
+>> compatible would change, at a minimum.
+>
+> why? I would expect it to stay the same (and the current patch uses
+> the same compatible strings).
+>
 
-A few bug fixes for Tegra124 clocks and some updates for the SATA driver
+Exactly, the new driver must support all the compatible strings
+defined in Documentation/devicetree/bindings/serial/omap_serial.tx
+(which already does as you pointed out).
 
+Otherwise the current drivers/tty/serial/omap-serial.c could never be
+removed since that would mean breaking DT backward compatibility.
 
-The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+> -- Sebastian
 
-  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-
-are available in the git repository at:
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-3.17
-
-Mikko Perttunen (2):
-      clk: tegra: Enable hardware control of SATA PLL
-      clk: tegra: Add SATA clocks to Tegra124 initialization table
-
-Peter De Schrijver (3):
-      clk: tegra: fix vi_sensor clocks on Tegra124
-      clk: tegra124: init table updates
-      clk: tegra: export clock names for debugging
-
- drivers/clk/tegra/clk-pll.c          |    8 ++++++++
- drivers/clk/tegra/clk-tegra-periph.c |    4 ++--
- drivers/clk/tegra/clk-tegra114.c     |   31 ++++++++++++++++++++++++++++++-
- drivers/clk/tegra/clk-tegra124.c     |   10 +++++++++-
- drivers/clk/tegra/clk.c              |    6 ++++++
- 5 files changed, 55 insertions(+), 4 deletions(-)
+Best regards,
+Javier
