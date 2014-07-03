@@ -1,65 +1,79 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 3 Jul 2014 12:28:46 -0500
-Subject: [PATCHv5 03/15] hwspinlock/core: maintain a list of registered
- hwspinlock banks
-In-Reply-To: <CAK=WgbYtJ7TGqvjG3VAPPD5tVXx9-jEJU3iKEStUMxOvD1v=LQ@mail.gmail.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-4-git-send-email-s-anna@ti.com>
- <CAK=WgbakGbTaYz+4K24aT3vyRkDYwPKCm6XrcJvH667NMMfTTA@mail.gmail.com>
- <53B47621.6090307@ti.com>
- <CAK=WgbYtJ7TGqvjG3VAPPD5tVXx9-jEJU3iKEStUMxOvD1v=LQ@mail.gmail.com>
-Message-ID: <53B592CE.2010001@ti.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 3 Jul 2014 10:30:38 -0700
+Subject: timers & suspend
+In-Reply-To: <53B5922A.7020006@linaro.org>
+References: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
+ <53B54AC2.5040908@linaro.org>
+ <83fa689b-a06a-4f1c-97cb-f7a7121a0f25@BL2FFO11FD041.protection.gbl>
+ <53B5922A.7020006@linaro.org>
+Message-ID: <b4b5a783-75cb-42f9-a501-7384b750b719@BN1AFFO11FD038.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On 07/03/2014 02:00 AM, Ohad Ben-Cohen wrote:
-> Hi Suman,
+On Thu, 2014-07-03 at 07:26PM +0200, Daniel Lezcano wrote:
+> On 07/03/2014 06:09 PM, S?ren Brinkmann wrote:
+> >On Thu, 2014-07-03 at 02:21PM +0200, Daniel Lezcano wrote:
+> >>On 06/30/2014 08:39 PM, S?ren Brinkmann wrote:
+> >>>Hi,
+> >>>
+> >>>I'm currently working on suspend for Zynq and try to track down some
+> >>>spurious wakes. It looks like the spurious wakes are caused by timers,
+> >>>hence I was wondering whether there are any special requirements for
+> >>>timer drivers when it comes to suspend support or if I just missed
+> >>>something.
+> >>>
+> >>>Zynq sets the 'IRQCHIP_MASK_ON_SUSPEND' flag, which should mask all
+> >>>interrupts but the wake source. Reading through kernel/irq/pm.c
+> >>>indicates, that timer interrupts get some special treatment though.
+> >>>Therefore I implemented some suspend/resume callbacks for the
+> >>>cadence_ttc which disable and clear the timer's interrupts when going
+> >>>into suspend. That seems to mitigate the issue quite a bit, but I still
+> >>>saw spurious wakes - just a lot less often.
+> >>>Digging a little deeper revealed, the spurious wakes are caused by the
+> >>>ARM's smp_twd timer now. Given that that driver is probably used by a few
+> >>>more ARM platforms, I get the feeling that I'm missing something.
+> >>
+> >>Do you receive any interrupt from the cadence_ttc ? (/proc/interrupts)
+> >>
+> >>That's funny because I realize that you cadence ttc timer is never
+> >>used as there are the architected timers. The cadence ttc would be
+> >>only useful if there were an idle state powering down the smp_twd
+> >>timers but it is not the case on this board, IIUC.
+> >Yes they are used. They TTC is the only broadcast capable timer for
+> >Zynq. In my experience, I can not even boot without it (may have
+> >dependencies on CPUidle or something).
 > 
-> On Thu, Jul 3, 2014 at 12:14 AM, Suman Anna <s-anna@ti.com> wrote:
->>> I'm not sure we need this patch.
->>
->> This patch is needed if we use the controller-phandle + args specifier
->> for requesting hwlocks by a client, as we need to translate
->> controller-phandle to the corresponding hwspinlock_device.
->>
->> Looks like we still don't have a closure on the semantics of how
->> clients have to request a lock in DT. You are suggesting something like
->>     hwlocks = <global_lock1 global_lock2 ...>;
->>
->> whereas this patch is built to support based on comments from
->> DT-maintainers,
->>     hwlocks = <controller-phandle lock-specifier1>, <controller-phandle
->> lock-specifier2>...;
+> Actually the cpuidle driver is wrong. It assumes the state #1 will
+> power off the different cores with their architected timers and then
+> switch to the broadcast timer. But this one is not needed as we
+> don't power down the core with the twd timers, so no need to switch
+> to a backup timer device.
 > 
-> I'm actually ok with this suggestion and haven't suggested otherwise.
-
-OK, thanks for confirming and sorry for the misinterpretation.
+> The implementation of the DDR self refresh idle state (incoming
+> patchset) removes the cpu_pm notifiers + the flag TIMER_STOP. The
+> result is 0 interrupts for ttc cadence timer. I removed in the dts
+> the cadence ttc and my board booted without problem (it is a zynq
+> 702).
+> 
+> Except I missed something, the cadence ttc is actually not used at all.
+You mean with your patches, or without? I'd have to check that.
 
 > 
-> All I propose is that we add the base_id property to the controller
-> node (as you have done in the subsequent patches), and then drivers
-> will be able to infer the global lock id from the DT data by adding
-> the controller's base_id to the lock specifier.
-
-OK, but we would still require this function to lookup the registered
-device from the controller-phandle to retrieve the base_id. Do note that
-the hwspinlock core currently only maintains the registered locks in an
-integrated radix tree, but not the registered hwspinlock banks themselves.
-
-regards
-Suman
-
-> Controllers with non standard lock indexing may use an xlate() method
-> if needed but frankly this is fictional right now. We can start
-> without this, and add it later when needed, as this doesn't affect the
-> DT data.
+> >>>It's probably worth mentioning that the suspend state in Zynq does not
+> >>>power off the CPU cores. It just asserts the resets on secondary cores
+> >>>and the primary one waits in wfi.
+> >>
+> >>Why do you need to reset them ?
+> >CPU0 is not reset, but all secondary cores are. That is as close to
+> >power off as we get and works well with hotplug.
 > 
-> With the global lock id in hand, drivers could simply use the existing
-> hwspin_lock_request_specific API to obtain a specific lock, and then
-> we don't need this patch.
-> 
-> Thanks,
-> Ohad.
-> 
+> Ok, I was not aware of this approach. Is there any patchset
+> available in the net ?
+It's in mainline for a while. arch/arm/mach-zynq/platsmp.c defines the
+SMP ops. Zynq's cpu_die/kill result in the CPU reset being asserted. And
+when the core is plugged in again, it gets deasserted and goes through
+the secondary boot path.
+That code is a little cleaned up in our vendor tree, but overall it
+should be the same functionality wise.
+
+	S?ren
