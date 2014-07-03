@@ -1,49 +1,81 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 3 Jul 2014 10:00:18 +0300
-Subject: [PATCHv5 03/15] hwspinlock/core: maintain a list of registered
- hwspinlock banks
-In-Reply-To: <53B47621.6090307@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-4-git-send-email-s-anna@ti.com>
- <CAK=WgbakGbTaYz+4K24aT3vyRkDYwPKCm6XrcJvH667NMMfTTA@mail.gmail.com>
- <53B47621.6090307@ti.com>
-Message-ID: <CAK=WgbYtJ7TGqvjG3VAPPD5tVXx9-jEJU3iKEStUMxOvD1v=LQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 3 Jul 2014 09:10:16 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
+References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630102934.GV32514@n2100.arm.linux.org.uk>
+ <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
+ <20140630124919.GC28647@lukather>
+ <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
+ <20140630140146.GD28647@lukather>
+ <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
+ <20140630145847.GE28647@lukather>
+ <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
+Message-ID: <20140703071016.GB31996@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On Mon, Jun 30, 2014 at 05:06:16PM +0200, Vincent Guittot wrote:
+> On 30 June 2014 16:58, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Jun 30, 2014 at 04:48:35PM +0200, Vincent Guittot wrote:
+> >> On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >> > On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
+> >> >> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
+> >> >> >> >> -             if (!rate || len != 4) {
+> >> >> >> >> -                     pr_err("%s missing clock-frequency property\n",
+> >> >> >> >> -                             cn->full_name);
+> >> >> >> >> +             clk = of_clk_get(cn, 0);
+> >> >> >> >> +             if (!IS_ERR(clk))
+> >> >> >> >> +                     rate = clk_get_rate(clk);
+> >> >> >>
+> >> >> >> We need the max frequency as it will be used to weight the different
+> >> >> >> CPUs capacity. How do you ensure that the current clock rate is the
+> >> >> >> max one ?
+> >> >> >
+> >> >> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
+> >> >> > current CPU frequency, not the max one.
+> >> >>
+> >> >> What means current frequency in device tree when DVFS is involved ?
+> >> >
+> >> > The ePAPR states that clock-frequency is supposed to be "the current
+> >> > clock speed of the CPU in Hertz". It's exactly what my patch add.
+> >> >
+> >> > Now, you're right, DVFS would be an issue here with clock-frequency,
+> >> > but this patch actually makes it easier to deal with, since you only
+> >> > get a reference to a clock, and you can get its rate at any given
+> >> > time.
+> >>
+> >> and what about using clk_round_rate(clk, ULONG_MAX) ?
+> >
+> > Well, the clock itself might generate a frequency higher that what the
+> > CPU can run at, so I'm not sure it's a valid assumption.
+> 
+> yes, you're right
+> 
+> >
+> >> We will not be dependent of when we parse DT
+> >
+> > You lost me there. clk_round_rate and clk_get_rate are available at
+> > the same time in the boot process, aren't they?
+> 
+> yes, but  clk_round_rate(clk, ULONG_MAX) will return the max frequency
+> and not the current one. But as you mentioned, it doesn't ensure that
+> it's a possible frequency for the core
 
-On Thu, Jul 3, 2014 at 12:14 AM, Suman Anna <s-anna@ti.com> wrote:
->> I'm not sure we need this patch.
->
-> This patch is needed if we use the controller-phandle + args specifier
-> for requesting hwlocks by a client, as we need to translate
-> controller-phandle to the corresponding hwspinlock_device.
->
-> Looks like we still don't have a closure on the semantics of how
-> clients have to request a lock in DT. You are suggesting something like
->     hwlocks = <global_lock1 global_lock2 ...>;
->
-> whereas this patch is built to support based on comments from
-> DT-maintainers,
->     hwlocks = <controller-phandle lock-specifier1>, <controller-phandle
-> lock-specifier2>...;
+Is this an Acked-by ?
 
-I'm actually ok with this suggestion and haven't suggested otherwise.
+Maxime
 
-All I propose is that we add the base_id property to the controller
-node (as you have done in the subsequent patches), and then drivers
-will be able to infer the global lock id from the DT data by adding
-the controller's base_id to the lock specifier.
-
-Controllers with non standard lock indexing may use an xlate() method
-if needed but frankly this is fictional right now. We can start
-without this, and add it later when needed, as this doesn't affect the
-DT data.
-
-With the global lock id in hand, drivers could simply use the existing
-hwspin_lock_request_specific API to obtain a specific lock, and then
-we don't need this patch.
-
-Thanks,
-Ohad.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/491ce4a6/attachment.sig>
