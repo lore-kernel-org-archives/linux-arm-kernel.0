@@ -1,29 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jul 2014 22:31:28 +0100
-Subject: [GIT PULL] component helper updates for 3.17
-In-Reply-To: <20140703202003.GA4431@kroah.com>
-References: <20140703141040.GA725@rmk-PC.arm.linux.org.uk>
- <20140703202003.GA4431@kroah.com>
-Message-ID: <20140703213127.GF32514@n2100.arm.linux.org.uk>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 03 Jul 2014 14:59:11 -0700
+Subject: RFC: Leave sysfs nodes alone during hotplug
+Message-ID: <53B5D22F.2070308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 01:20:03PM -0700, Greg Kroah-Hartman wrote:
-> On Thu, Jul 03, 2014 at 03:10:40PM +0100, Russell King wrote:
-> > Greg,
-> > 
-> > Please incorporate the latest component updates, which can be found at:
-> > 
-> >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-driver
-> > 
-> > with SHA1 6955b58254c2bcee8a7b55ce06468a645dc98ec5.
-> 
-> Pulled into my driver-core-next branch of my driver-core.git tree and
-> pushed out.
+The adding and removing of sysfs nodes in cpufreq causes a ton of pain. 
+There's always some stability or deadlock issue every few weeks on our 
+internal tree. We sync up our internal tree fairly often with the 
+upstream cpufreq code. And more of these issues are popping up as we 
+start exercising the cpufreq framework for b.L systems or HMP systems.
 
-Many thanks!  I'll send the other two (one for staging, and one for DRM)
-tomorrow.
+It looks like we adding a lot of unnecessary complexity by adding and 
+removing these sysfs nodes. The other per CPU sysfs nodes like:
+/sys/devices/system/cpu/cpu1/power or cpuidle are left alone during 
+hotplug. So, why are we not doing the same for cpufreq too?
+
+Any objections to leaving them alone during hotplug? If those files are 
+read/written to when the entire cluster is hotplugged off, we could just 
+return an error. I'm not saying it would be impossible to fix all these 
+deadlock and race issues in the current code -- but it seems like a lot 
+of pointless effort to remove/add sysfs nodes.
+
+Examples of issues caused by this:
+1. Race when changing governor really quickly from userspace. The 
+governors end up getting 2 STOP or 2 START events. This was introduced 
+by [1] when it tried to fix another deadlock issue.
+
+2. Incorrect policy/sysfs handling during suspend/resume. Suspend takes 
+out CPU in the order n, n+1, n+2, etc and resume adds them back in the 
+same order. Both sysfs and policy ownership transfer aren't handled 
+correctly in this case. This obviously applies even outside 
+suspend/resume if the same sequence is repeated using just hotplug.
+
+I'd be willing to take a shot at this if there isn't any objection to 
+this. It's a lot of work/refactor -- so I don't want to spend a lot of 
+time on it if there's a strong case for removing these sysfs nodes.
+
+Thoughts?
+
+-Saravana
+P.S: I always find myself sending emails to the lists close to one 
+holiday or another. Sigh.
+
+[1] - 
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/rafael/linux-pm/+/955ef4833574636819cd269cfbae12f79cbde63a%5E!/
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
