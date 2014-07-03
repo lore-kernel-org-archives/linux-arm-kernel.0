@@ -1,71 +1,132 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jul 2014 15:43:41 +0100
-Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
-In-Reply-To: <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
- <1404125530-17984-3-git-send-email-will.deacon@arm.com>
- <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <20140703144341.GC14305@arm.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Thu, 3 Jul 2014 20:16:00 +0530
+Subject: [RFC PATCH v4] ARM: EXYNOS: Use MCPM call-backs to support S2R on
+ Exynos5420
+In-Reply-To: <alpine.LFD.2.11.1407030912210.6220@knanqh.ubzr>
+References: <1404313142-1278-1-git-send-email-a.kesavan@samsung.com>
+ <1404363737-26222-1-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1407030912210.6220@knanqh.ubzr>
+Message-ID: <CAM4voa=VYGhyKEOQ6_XjriXE1rR3vxowt=cYsaoqeJw9Un=3sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
-> Hi Will,
+Hi Nicolas,
 
-Hi Varun,
+On Thu, Jul 3, 2014 at 6:59 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
+>
+>> Use the MCPM layer to handle core suspend/resume on Exynos5420.
+>> Also, restore the entry address setup code post-resume.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> ---
+>> Changes in v2:
+>>       - Made use of the MCPM suspend/powered_up call-backs
+>> Changes in v3:
+>>       - Used the residency value to indicate the entered state
+>> Changes in v4:
+>>       - Checked if MCPM has been enabled to prevent build error
+>>
+>> This has been tested both on an SMDK5420 and Peach Pit Chromebook on
+>> 3.16-rc3/next-20140702.
+>>
+>> Here are the dependencies (some of these patches did not apply cleanly):
+>> 1) Cleanup patches for mach-exynos
+>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/33772
+>>
+>> 2) PMU cleanup and refactoring for using DT
+>> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg671625.html
+>>
+>> 3) Exynos5420 PMU/S2R Series
+>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/33898
+>>
+>> 4) MCPM boot CPU CCI enablement patches
+>> www.spinics.net/lists/linux-samsung-soc/msg32923.html
+>>
+>> 5) Exynos5420 CPUIdle Series which populates MCPM suspend/powered_up
+>> call-backs.
+>> www.gossamer-threads.com/lists/linux/kernel/1945347
+>> https://patchwork.kernel.org/patch/4357461/
+>>
+>> 6) Exynos5420 MCPM cluster power down support
+>> http://www.spinics.net/lists/arm-kernel/msg339988.html
+>>
+>> 7) TPM reset mask patch
+>> http://www.spinics.net/lists/arm-kernel/msg341884.html
+>>
+>>  arch/arm/include/asm/mcpm.h          |    6 ++++
+>>  arch/arm/mach-exynos/mcpm-exynos.c   |   50 ++++++++++++++++++++++++----------
+>>  arch/arm/mach-exynos/pm.c            |   38 ++++++++++++++++++++++++--
+>>  arch/arm/mach-exynos/regs-pmu.h      |    1 +
+>>  drivers/cpuidle/cpuidle-big_little.c |    2 +-
+>>  5 files changed, 79 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+>> index ff73aff..051fbf1 100644
+>> --- a/arch/arm/include/asm/mcpm.h
+>> +++ b/arch/arm/include/asm/mcpm.h
+>> @@ -272,4 +272,10 @@ void __init mcpm_smp_set_ops(void);
+>>  #define MCPM_SYNC_CLUSTER_SIZE \
+>>       (MCPM_SYNC_CLUSTER_INBOUND + __CACHE_WRITEBACK_GRANULE)
+>>
+>> +/* Definitions for various MCPM scenarios that might need special handling */
+>> +#define MCPM_CPU_IDLE                0x0
+>> +#define MCPM_CPU_SUSPEND     0x1
+>> +#define MCPM_CPU_SWITCH              0x2
+>> +#define MCPM_CPU_HOTPLUG     0x3
+>
+> Please, let's avoid going that route.  There is no such special handling
+> needed if the API is sufficient.  And the provided API allows you to
+> suspend a CPU or shut it down.  It shouldn't matter at that level if
+> this is due to a cluster switch or a hotplug event. Do you really need
+> something else?
+No, just one local flag for suspend should be enough for me. Will remove these.
+>
+> [...]
+>> @@ -129,7 +132,7 @@ static int exynos_power_up(unsigned int cpu, unsigned int cluster)
+>>   * and can only be executed on processors like A15 and A7 that hit the cache
+>>   * with the C bit clear in the SCTLR register.
+>>   */
+>> -static void exynos_power_down(void)
+>> +static void exynos_mcpm_power_down(u64 residency)
+>>  {
+>>       unsigned int mpidr, cpu, cluster;
+>>       bool last_man = false, skip_wfi = false;
+>> @@ -150,7 +153,12 @@ static void exynos_power_down(void)
+>>       BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+>>       cpu_use_count[cpu][cluster]--;
+>>       if (cpu_use_count[cpu][cluster] == 0) {
+>> -             exynos_cpu_power_down(cpunr);
+>> +             /*
+>> +              * Bypass power down for CPU0 during suspend. This is being
+>> +              * taken care by the SYS_PWR_CFG bit in CORE0_SYS_PWR_REG.
+>> +              */
+>> +             if ((cpunr != 0) || (residency != MCPM_CPU_SUSPEND))
+>> +                     exynos_cpu_power_down(cpunr);
+>>
+>>               if (exynos_cluster_unused(cluster)) {
+>>                       exynos_cluster_power_down(cluster);
+>> @@ -209,6 +217,11 @@ static void exynos_power_down(void)
+>>       /* Not dead at this point?  Let our caller cope. */
+>>  }
+>>
+>> +static void exynos_power_down(void)
+>> +{
+>> +     exynos_mcpm_power_down(MCPM_CPU_SWITCH | MCPM_CPU_HOTPLUG);
+>> +}
+>
+> To distinguish between a suspend and a power-down, you can simply use
+> exynos_power_down() as your common handler, and have
+> exynos_mcpm_power_down() and exynos_mcpm_suspend() as wrappers around it
+> passing the appropriate private flags with local meanings.
+My patch is in line with your explanation, except it makes use of the
+new MCPM flags. I will clean those out and just use one flag for
+suspend instead. Please check the v5 patch that I will post in a bit
+in case I have missed something.
 
-Thanks for taking a look at this!
-
-> > +static struct arm_smmu_master_cfg *
-> > +find_smmu_master_cfg(struct arm_smmu_device *smmu, struct device *dev)
-> > +{
-> > +     struct arm_smmu_master *master;
-> > +
-> > +     if (dev_is_pci(dev))
-> > +             return dev->archdata.iommu;
-> > +
-> > +     master = find_smmu_master(smmu, dev_get_master_dev(dev)->of_node);
-> [Sethi Varun-B16395] Why use dev_get_master_dev over here? You can simply use dev.
-
-True; we've already done the PCI check above. I'll tidy this up.
-
-> > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
-> > *dev)
-> >               return PTR_ERR(group);
-> >       }
-> >
-> > +     if (dev_is_pci(dev)) {
-> > +             struct arm_smmu_master_cfg *cfg;
-> > +             struct pci_dev *pdev = to_pci_dev(dev);
-> > +
-> > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> > +             if (!cfg) {
-> > +                     ret = -ENOMEM;
-> > +                     goto out_put_group;
-> > +             }
-> > +
-> > +             cfg->num_streamids = 1;
-> > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
-> > +                                    &cfg->streamids[0]);
-> [Sethi Varun-B16395] We need to look for upstream DMA device. We should be
-> using pci_find_dma_isolation_root here. Also, this would also imply that
-> there could be multiple devices sharing the same stream ID. So, we should
-> check if a particular stream ID value has already been configured in the
-> SMR registers.
-
-That function doesn't seem to appear in mainline or next. I can move to it
-when it's available, but in the meantime the above is working for me. I'm
-making the assumption here that the system is configured so that there
-aren't any duplicate stream IDs. What we actually need is a function here
-which maps the requester ID to a stream ID using firmware tables (provided
-by DT or ACPI). In the absence of those tables at the moment, I just assign
-the ID directly, which happens to work on my platform (1:1 mapping).
-
-Once Thierry's generic IOMMU binding is sorted, we should look at adding
-support for the Stream ID description. Have you looked at that at all?
-
-Will
-
-BTW: You seem to have a rather strange quoting style on your replies. Is
-there any way to configure your editor to limit your lines to 80 columns?
-You also don't need the prefix with your name and number in brackets!
+Regards,
+Abhilash
+>
+>
+> Nicolas
+>
