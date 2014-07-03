@@ -1,49 +1,48 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Thu, 3 Jul 2014 15:10:40 +0100
-Subject: [GIT PULL] component helper updates for 3.17
-Message-ID: <20140703141040.GA725@rmk-PC.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 15:13:42 +0100
+Subject: arch/arm64/efi-stub.o rebuilding every time?
+Message-ID: <20140703141342.GB14305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Hi guys,
 
-Please incorporate the latest component updates, which can be found at:
+If I build an arm64 kernel, then simply hit make again without changing
+anything, I find that efi-stub.o is rebuilt every time (with an annoying
+warning too, but I think you already know about that):
 
-  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-driver
 
-with SHA1 6955b58254c2bcee8a7b55ce06468a645dc98ec5.
+$ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- -j8 Image
+  CHK     include/config/kernel.release
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  CALL    scripts/checksyscalls.sh
+  CHK     include/generated/compile.h
+  CC      arch/arm64/kernel/efi-stub.o
+In file included from arch/arm64/kernel/efi-stub.c:44:0:
+arch/arm64/kernel/../../../drivers/firmware/efi/fdt.c: In function ?update_fdt?:
+arch/arm64/kernel/../../../drivers/firmware/efi/fdt.c:66:22: warning: unused variable ?name? [-Wunused-variable]
+   const char *type, *name;
+                      ^
+  CHK     kernel/config_data.h
+  LD      arch/arm64/kernel/built-in.o
+  LINK    vmlinux
+  LD      vmlinux.o
+  MODPOST vmlinux.o
+  GEN     .version
+  CHK     include/generated/compile.h
+  UPD     include/generated/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+  KSYM    .tmp_kallsyms1.o
+  KSYM    .tmp_kallsyms2.o
+  LD      vmlinux
+  SORTEX  vmlinux
+  SYSMAP  System.map
+  OBJCOPY arch/arm64/boot/Image
 
-These updates fix one bug in the component helper where the matched
-components are not properly cleaned up when the master fails to bind.
-I'll provide a version of this for stable trees if it's deemed that
-we need to backport it.
 
-The second patch causes the component helper to ignore duplicate
-matches when adding components - this is something that was originally
-needed for imx-drm, but since that has now been updated, we no longer
-need to skip over a component which has already been matched.
+Does this actually need to be rebuilt, or is there a buggy Makefile
+somewhere?
 
-The final patch starts the process of updating the component helper
-API to achieve two goals: to allow the API to be more efficient when
-deferred probing occurs, and to allow for future improvements to the
-component helper without having a major impact on the users.
-
-This represents groundwork for some other changes; once this has been
-merged, I will then send two further pull requests (one for the staging
-tree, and one for the DRM tree) to update the drivers to the new API.
-This will result in these three commits being shared with those trees.
-
-This will update the following files:
-
- drivers/base/component.c  | 190 +++++++++++++++++++++++++++++++++++++---------
- include/linux/component.h |   7 ++
- 2 files changed, 162 insertions(+), 35 deletions(-)
-
-through these changes:
-
-Russell King (3):
-      component: fix missed cleanup in case of devres failure
-      component: ignore multiple additions of the same component
-      component: add support for component match array
-
-Many thanks.
+Will
