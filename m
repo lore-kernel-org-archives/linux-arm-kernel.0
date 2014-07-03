@@ -1,61 +1,187 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Jul 2014 10:44:34 +0200
-Subject: [PATCH 05/16] ARM: mvebu: Add workaround for cpuidle support
- for Armada 370
-In-Reply-To: <20140630145027.3b583cfa@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
- <20140630145027.3b583cfa@free-electrons.com>
-Message-ID: <53B517F2.4030104@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Jul 2014 09:46:08 +0100
+Subject: [PATCH 3/3 V2] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <53B465B9.7000407@amd.com>
+References: <1404314544-7762-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140702163903.GA26903@leverpostej> <53B465B9.7000407@amd.com>
+Message-ID: <20140703084608.GB29837@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 30/06/2014 14:50, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On Wed, Jul 02, 2014 at 09:04:09PM +0100, Suravee Suthikulanit wrote:
+> Thanks again for the review. Please see my comments below.
 > 
-> On Fri, 27 Jun 2014 15:22:46 +0200, Gregory CLEMENT wrote:
->> On Armada 370, there is "a slow exit process from the deep idle state
->> due to heavy L1/L2 cache cleanup operations performed by the BootROM
->> software" (cf errata GL-BootROM-10). To avoid this, we replace the
->> restart code of the BootROM by a simple jump to the boot address. Then
->> the code located at this boot address will take care of the
->> initialization.
->>
->> For this purpose, we use the common function mvebu_boot_addr_wa()
->> introduced in the previous commit.
+> On 7/2/2014 11:39 AM, Mark Rutland wrote:
+> > On Wed, Jul 02, 2014 at 04:22:23PM +0100, suravee.suthikulpanit at amd.com wrote:
+> >> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> >> index 5573c08..9e46f7f 100644
+> >> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> >> @@ -12,11 +12,13 @@ Main node required properties:
+> >>
+> >>   - compatible : should be one of:
+> >>          "arm,gic-400"
+> >> +       "arm,gic-400-plus"
+> >
+> > I am not keen on this name.
 > 
-> "in the previous commit" would make sense if the commit immediately
-> before this one in the series was the one you would be referencing. But
-> that's not the case here, so it should be either: "introduced in one of
-> the previous commits", or better "introduced in commit <title of the
-> commit>".
+> Ok, I'll change it. Any suggestion on name?  I'm not sure what is the 
+> "official" product name. I've seen this in some slides from ARM. What 
+> about "gic-400-v2m"??.
 
-Yes it should have been the previous commit at a point of development
-and it was moved during a rebase. Using the title of the commit is more
-reliable indeed.
+I'll query this internally.
+
+> >>          "arm,cortex-a15-gic"
+> >>          "arm,cortex-a9-gic"
+> >>          "arm,cortex-a7-gic"
+> >>          "arm,arm11mp-gic"
+> >>   - interrupt-controller : Identifies the node as an interrupt controller
+> >> +
+> >>   - #interrupt-cells : Specifies the number of cells needed to encode an
+> >>     interrupt source.  The type shall be a <u32> and the value shall be 3.
+> >
+> > Random (inconsistent) whitespace change?
+> It looks to me like there should have been a space here to keep the 
+> consistent look, and make it easy to read
+
+As far as I can see it's inconsistent because you didn't add a newline
+before the "interrupt-controller" line immediately before.
+
+I'm not against adding spacing between the properties, so long as it is
+consistent.
+
+> >> @@ -37,9 +39,16 @@ Main node required properties:
+> >>          the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
+> >>          the interrupt is wired to that CPU.  Only valid for PPI interrupts.
+> >>
+> >> -- reg : Specifies base physical address(s) and size of the GIC registers. The
+> >> -  first region is the GIC distributor register base and size. The 2nd region is
+> >> -  the GIC cpu interface register base and size.
+> >> +- reg : Specifies base physical address(s) and size of the GIC register frames.
+> >> +
+> >> +  Region | Description
+> >> +  Index  |
+> >> +  -------------------------------------------------------------------
+> >> +     0   | GIC distributor register base and size
+> >> +     1   | GIC cpu interface register base and size
+> >> +     2   | VGIC interface control register base and size (Optional)
+> >> +     3   | VGIC CPU interface register base and size (Optional)
+> >> +     4   | GICv2m MSI interface register base and size (Optional)
+> >
+> > As far as I am aware, the MSI interface is completely orthogonal to
+> > having a GICH and GICV.
+> 
+> Agree. I'm not doing anything with it. I'm just listing them here since 
+> they are also mentioned in the gic.txt
+> 
+> >
+> > We should figure out how we expect to handle that (zero-sized reg
+> > entries? reg-names?).
+> 
+> I'm not sure how VGIC stuff handles reg/size = 0.
+
+Neither am I.
+
+However, what I said was that we should figure out how we _expect_ to
+handle that case. If we have to make changes to handle it, that's fine
+given we already have to make changes to support GICv2m.
+
+> >
+> >>
+> >>   Optional
+> >>   - interrupts   : Interrupt source of the parent interrupt controller on
+> >> @@ -55,6 +64,10 @@ Optional
+> >>                    by a crossbar/multiplexer preceding the GIC. The GIC irq
+> >>                    input line is assigned dynamically when the corresponding
+> >>                    peripheral's crossbar line is mapped.
+> >> +
+> >> +- msi-controller : Identifies the node as an MSI controller.  This requires
+> >> +  the register region index 4.
+> >
+> > That last clarifying comment is more confusing than helpful.
+> 
+> If you are referring to the table, I added that since it was easier to 
+> see than scanning the text.
+
+I was referring to "This requires the register region index 4".
+
+How about:
+
+- msi-controller : Identifies the node as an MSI controller. Requried
+  for GICv2m.
 
 > 
->>  #define PMSU_BASE_OFFSET    0x100
->>  #define PMSU_REG_SIZE	    0x1000
->> @@ -77,6 +76,9 @@ extern void ll_enable_coherency(void);
->>  
->>  extern void armada_370_xp_cpu_resume(void);
->>  
->> +static unsigned long pmsu_mp_phys_base;
+> > [...]
+> >
+> >> +#define GIC_V2M_MIN_SPI                        32
+> >> +#define GIC_V2M_MAX_SPI                        1024
+> >
+> > GIC interrupt IDs 1020 and above are reserved, no?
+> >
+> > Surely the max ID an SPI can take is 1019?
 > 
-> phys_addr_t.
+> Right, thanks for catching. But the spec says that the SPI ID value must 
+> be in the range of 32 to 1020. I guess it was a bit unclear, but 
+> definitely not 1024 :)
 
-OK
+Which spec?
 
+In the GICv2 spec I see:
+
+* "Interrupt numbers ID32-ID1019 are used for SPIs." in 
+  2.2.1 Interrupt IDs.
+
+* "The GIC architecture reserves interrupt ID numbers 1020-1023 for
+  special purposes." in 3.2.5 Special interrupt numbers.
+
+> 
+> >> +#define GIC_OF_MSIV2M_RANGE_INDEX      4
+> >> +
+> >> +/**
+> >> + * alloc_msi_irq - Allocate MSIs from avaialbe MSI bitmap.
+> >> + * @data: Pointer to v2m_data
+> >> + * @nvec: Number of interrupts to allocate
+> >> + * @irq: Pointer to the allocated irq
+> >> + *
+> >> + * Allocates interrupts only if the contiguous range of MSIs
+> >> + * with specified nvec are available. Otherwise return the number
+> >> + * of available interrupts. If none are available, then returns -ENOENT.
+> >> + */
+> >
+> > This function is overly complicated, and pointlessly so.
+> >
+> > It doesn't achieve anything useful as it returns the size of the _last_
+> > contiguous block rather than the _largest_ contiguous block, and the
+> > only caller (gicv2m_setup_msi_irq) doesn't even care.
+> >
+> > Simplify this to just return an error code if allocation is impossible.
+> 
+> Actually, I made another mistake in the gicv2m_setup_msi_irq when 
+> returning from the alloc_msi_irq().
+
+Ok.
+
+> My understanding is the arch_setup_msi_irqs() is supposed to return the 
+> number of available vectors if the requested amount could not be 
+> allocated. I notice that the current "drivers/pci/msi.c: 
+> arch_setup_msi_irqs()" does not do so, which is okay.
+> 
+> However, We are also working on adding support for multi-MSI support 
+> since some of the devices we have are using it, which means we will need 
+> to provide a different version of the "arch_setup_msi_irqs()" as the 
+> current one does not allow (PCI_CAP_ID_MSI && nvec > 1).
+> 
+> Therefore, I implemented the "alloc_msi_irq" this way to account for 
+> future changes.
+
+Per my comments, I still think the function is broken given it returns
+the size of the last contiguous block of available interrupts.
+
+If we don't yet have support for multi-MSI, just return an error code
+for now. The code isn't helpful and that path isn't tested.
+
+We can fix up the driver when we add multi-MSI support.
 
 Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Mark.
