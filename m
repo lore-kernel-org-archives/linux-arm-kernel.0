@@ -1,34 +1,111 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Jul 2014 17:09:55 +0200
-Subject: [PATCH 15/16] ARM: mvebu: Add CPU idle support for Armada 38x
-In-Reply-To: <20140701163524.086a5f79@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-16-git-send-email-gregory.clement@free-electrons.com>
- <20140701163524.086a5f79@free-electrons.com>
-Message-ID: <53B57243.80300@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Jul 2014 16:12:00 +0100
+Subject: [PATCH 4/5] ARM: imx: Add initial support for Freescale LS1021A
+In-Reply-To: <cb01fef2c4d44711b04a321fddae33d4@BL2PR03MB467.namprd03.prod.outlook.com>
+References: <1404291772-2644-1-git-send-email-jingchang.lu@freescale.com>
+ <1404291772-2644-5-git-send-email-jingchang.lu@freescale.com>
+ <20140702112125.GE14665@leverpostej>
+ <cb01fef2c4d44711b04a321fddae33d4@BL2PR03MB467.namprd03.prod.outlook.com>
+Message-ID: <20140703151200.GB22146@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Jul 03, 2014 at 11:17:12AM +0100, Jingchang Lu wrote:
+> >-----Original Message-----
+> >From: Mark Rutland [mailto:mark.rutland at arm.com]
+> >Sent: Wednesday, July 02, 2014 7:21 PM
+> >To: Lu Jingchang-B35083
+> >Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
+> >devicetree at vger.kernel.org; Lu Jingchang-B35083
+> >Subject: Re: [PATCH 4/5] ARM: imx: Add initial support for Freescale
+> >LS1021A
+> >
+> >On Wed, Jul 02, 2014 at 10:02:51AM +0100, Jingchang Lu wrote:
+> >> From: Jingchang Lu <b35083@freescale.com>
+> >>
+> >> diff --git a/arch/arm/mach-imx/mach-ls1021a.c
+> >> b/arch/arm/mach-imx/mach-ls1021a.c
+> >> new file mode 100644
+> >> index 0000000..d1a9bb9
+> >> --- /dev/null
+> >> +++ b/arch/arm/mach-imx/mach-ls1021a.c
+> >> @@ -0,0 +1,49 @@
+> >> +/*
+> >> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or
+> >> +modify
+> >> + * it under the terms of the GNU General Public License as published
+> >> +by
+> >> + * the Free Software Foundation; either version 2 of the License, or
+> >> + * (at your option) any later version.
+> >> + */
+> >> +
+> >> +#include <linux/of_platform.h>
+> >> +#include <asm/mach/arch.h>
+> >> +
+> >> +#include "common.h"
+> >> +
+> >> +static const struct of_device_id of_ls1021a_match_table[] = {
+> >> +	{
+> >> +		.compatible =	"simple-bus",
+> >> +	},
+> >> +	{
+> >> +		.compatible     = "fsl,ifc",
+> >> +	},
+> >> +	{
+> >> +		.compatible	= "fsl,fpga-qixis",
+> >> +	},
+> >> +	{
+> >> +		.compatible	= "fsl,qe",
+> >> +	},
+> >> +	{}
+> >> +};
+> >
+> >Are any of thse not always-on (or default-on) MMIO busses?
+> >
+> >Is there any reason for not giving them their own drivers?
+> >
+> Normally these are always-on. The child nodes are handled by different drivers,
+> so to make the devices being added by the of system, they are claimed here.
+> Thanks.
 
-> On Fri, 27 Jun 2014 15:22:56 +0200, Gregory CLEMENT wrote:
-> 
->> +ENTRY(armada_38x_cpu_resume)
->> +	/* do we need it for Armada 38x*/
->> +ARM_BE8(setend	be )			@ go BE8 if entered LE
-> 
-> We logically needed this, but I've confirmed, and indeed it is really
-> needed for cpuidle to work properly on Armada 38x in big-endian
-> configuration.
-> 
+If these are always-on MMIO busses, is there any reason these can't have
+"simple-bus" as a fallback in their compatible lists in the DT? They
+would seemd to be compatible with it given they are in the table
+above...
 
-OK
+That way we don't need the table at all, and we can always add drivers
+for them later if we need them...
+
+> >> +
+> >> +static void __init ls1021a_init_machine(void) {
+> >> +	mxc_arch_reset_init_dt();
+> >
+> >This looks to only be used to set up a watchdog timer. Is there any reason
+> >this logic can't be moved to the watchdog timer driver?
+> >
+> >> +
+> >> +DT_MACHINE_START(LS1021A, "Freescale LS1021A") #ifdef CONFIG_ZONE_DMA
+> >> +	.dma_zone_size	= SZ_128M,
+> >> +#endif
+> >> +	.init_machine   = ls1021a_init_machine,
+> >> +	.dt_compat	= ls1021a_dt_compat,
+> >> +	.restart	= mxc_restart,
+> >
+> >AFAICT, that jsut uses the WDT for restart. Why can't the watchdog driver
+> >register itself as a restart device?
+> >
+> >That would bring us close to an empty machine descriptor, and enable reuse
+> >of the WDT and those busses.
+> >
+> >Thanks,
+> >Mark.
+> Yes, we use the watchdog timer for restart, just as i.MX and Vybrid, the WDT as a
+> common driver it is still work for watchdog. Thanks.
+
+That doesn't answer the question of why the restart code (and
+registration thereof) can't live in the WDT driver.
+
 Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Mark.
