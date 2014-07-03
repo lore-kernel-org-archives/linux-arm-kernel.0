@@ -1,87 +1,35 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 03 Jul 2014 16:02:14 +0200
-Subject: [RFC 5/5] clk: Add floor and ceiling constraints to clock rates
-In-Reply-To: <53ADF6E6.6090705@wwwdotorg.org>
-References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
- <1403855872-14749-6-git-send-email-tomeu.vizoso@collabora.com>
- <53ADF6E6.6090705@wwwdotorg.org>
-Message-ID: <53B56266.8090208@collabora.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 3 Jul 2014 10:03:35 -0400
+Subject: [PATCH v5 1/2] libahci: Implement the function
+ ahci_restart_engine to restart the port dma engine.
+In-Reply-To: <1404296108-16233-2-git-send-email-stripathi@apm.com>
+References: <1404296108-16233-1-git-send-email-stripathi@apm.com>
+ <1404296108-16233-2-git-send-email-stripathi@apm.com>
+Message-ID: <20140703140335.GD16191@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2014 12:57 AM, Stephen Warren wrote:
-> On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
->> Adds a way for clock consumers to set maximum and minimum rates. This can be
->> used for thermal drivers to set ceiling rates, or by misc. drivers to set
->> floor rates to assure a minimum performance level.
->
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->
->> +static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
->> +						   enum constraint_type type)
->
->> +	if (!found) {
->> +		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
->> +		if (!constraint) {
->> +			pr_err("%s: could not allocate constraint\n", __func__);
->
-> Doesn't kzalloc print an error itself if the allocation fails? I've
-> certainly seen quite a few patches ripping out custom "allocation
-> failed" errors in code.
+Hello,
 
-Thanks for pointing this out, have fixed it in a new version that will 
-be sent soon.
+On Wed, Jul 02, 2014 at 03:45:07PM +0530, Suman Tripathi wrote:
+> +int ahci_restart_engine(struct ata_port *ap)
+> +{
+> +	struct ahci_host_priv *hpriv = ap->host->private_data;
+> +
+> +	ahci_stop_engine(ap);
+> +	ahci_start_fis_rx(ap);
+> +	hpriv->start_engine(ap);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(ahci_restart_engine);
 
->> +void __clk_free_clk(struct clk *clk_user)
->> +{
->> +	struct clk_core *clk = clk_to_clk_core(clk_user);
->> +	struct rate_constraint *constraint;
->> +	struct hlist_node *tmp;
->> +
->> +	hlist_for_each_entry_safe(constraint, tmp, &clk->rate_constraints, node) {
->> +		if (constraint->dev_id == clk_user->dev_id &&
->> +		    constraint->con_id == clk_user->con_id) {
->> +			hlist_del(&constraint->node);
->> +			kfree(constraint);
->
-> Perhaps the list of constraints should be indexed by the client clk
-> structure, so that test should be:
->
-> if (constraint->clk_user == clk_user)
->
-> It might be a bit more work, but perhaps the constraints should simply
-> be stored directly in the struct clk rater than the struct clk_core.
-> That would require a nested loop to apply constraints though; first over
-> each struct clk associated with a struct clk_core, then over each
-> constraints in that struct clk. It would slightly simplify
-> adding/removing constraints though, and store the constraints at their
-> "source".
+I don't get this function.  No other ahci needs it and it's not even
+contained libahci proper.  It calls back to the calling low level
+driver.  Why not just expose ahci_start_fis_rx() and implement the
+above in xgene?
 
-Yeah, I like this alternative from a code organization point of view, 
-but I found the increased code complexity hard to justify. Wonder if 
-anybody else has an opinion on this.
+Thanks.
 
->> diff --git a/include/linux/clk.h b/include/linux/clk.h
->
->> +int clk_set_floor_rate(struct clk *clk, unsigned long rate);
->
->> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
->
-> Additions functions to explicitly remove any previously requested
-> floor/ceiling rate might be useful. The same effect could be achieved by
-> a floor of 0 or a very high ceiling, but it feels cleaner to remove them.
-
-I'm also on the fence on whether the improved readability justifies the 
-additional API, because I find convenient that one just has to grep for 
-a single function call to find all usages (it was certainly useful when 
-I looked at how downstream does the equivalent). I'll be glad to add the 
-functions in a future version if there's consensus on this.
-
-> Overall, this series seems to implement the right kind of concept to me.
-> It'll certainly stop us (NVIDIA at least) wanting to create all kinds of
-> "virtual" clock objects (and associated clock IDs and device tree clock
-> IDs) to achieve a similar effect.
-
-Thanks for the great feedback,
-
-Tomeu
+-- 
+tejun
