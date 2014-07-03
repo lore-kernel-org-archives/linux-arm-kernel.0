@@ -1,88 +1,173 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 3 Jul 2014 14:12:11 +0800
-Subject: [PATCH 1/4] clk: add pxa27x clock drivers
-In-Reply-To: <1404066744-13416-2-git-send-email-robert.jarzmik@free.fr>
+Date: Thu, 3 Jul 2014 14:14:33 +0800
+Subject: [PATCH 2/4] dts: add devicetree bindings for pxa27x clocks
+In-Reply-To: <1404066744-13416-3-git-send-email-robert.jarzmik@free.fr>
 References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
- <1404066744-13416-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CAN1soZzoiGAz3OicdKbg5Dv2tW3yeinsu2i=M7KX+j1HuMs3Kg@mail.gmail.com>
+ <1404066744-13416-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CAN1soZys4k6g5RgPLbreopOxTwDJ+bfPOq8XPwsNpyt5+YURjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jun 30, 2014 at 2:32 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Move pxa27x clock drivers from arch/arm/mach-pxa to driver/clk.
-> In the move :
->  - convert to new clock framework legacy clocks
->  - provide clocks as before for platform data based boards
->  - provide clocks through devicetree with clk-pxa-dt
->
-> This is the preliminary step in the conversion. The remaining steps are
-> :
->  - migrate pxa25x and pxa3xx
->  - once PXA is fully converted to device tree, if that happens,
->    clk-pxa2* and clk-pxa3* should only hold the core clocks which cannot
->    be described in devicetree.
+> Add the clock tree description for the PXA27x based boards.
 >
 > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > ---
->  drivers/clk/Makefile         |   1 +
->  drivers/clk/pxa/Makefile     |   4 +
->  drivers/clk/pxa/clk-pxa-dt.c |  76 ++++++++++
->  drivers/clk/pxa/clk-pxa27x.c | 324 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/pxa/clk-pxa2xx.c |  74 ++++++++++
->  drivers/clk/pxa/clk-pxa2xx.h |  47 +++++++
->  6 files changed, 526 insertions(+)
->  create mode 100644 drivers/clk/pxa/Makefile
->  create mode 100644 drivers/clk/pxa/clk-pxa-dt.c
->  create mode 100644 drivers/clk/pxa/clk-pxa27x.c
->  create mode 100644 drivers/clk/pxa/clk-pxa2xx.c
->  create mode 100644 drivers/clk/pxa/clk-pxa2xx.h
+>  arch/arm/boot/dts/pxa27x.dtsi            | 134 ++++++++++++++++++++++++++++++-
+>  include/dt-bindings/clock/pxa2xx-clock.h |  45 +++++++++++
+>  2 files changed, 178 insertions(+), 1 deletion(-)
+>  create mode 100644 include/dt-bindings/clock/pxa2xx-clock.h
 >
+> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+> index a705469..badaa71 100644
+> --- a/arch/arm/boot/dts/pxa27x.dtsi
+> +++ b/arch/arm/boot/dts/pxa27x.dtsi
+> @@ -1,5 +1,6 @@
+>  /* The pxa3xx skeleton simply augments the 2xx version */
+> -/include/ "pxa2xx.dtsi"
+> +#include "pxa2xx.dtsi"
+> +#include "dt-bindings/clock/pxa2xx-clock.h"
+>
+>  / {
+>         model = "Marvell PXA27x familiy SoC";
+> @@ -35,4 +36,135 @@
+>                         #pwm-cells = <1>;
+>                 };
+>         };
 > +
-> +static struct pxa27x_clocks_fixed_cken pxa27x_without_dt_clocks[] __initdata = {
-> +       PXA2_FIXED_RATE("pxa2xx-uart.0", NULL, FFUART, 14857000, 1),
-> +       PXA2_FIXED_RATE("pxa2xx-uart.1", NULL, BTUART, 14857000, 1),
-> +       PXA2_FIXED_RATE("pxa2xx-uart.2", NULL, STUART, 14857000, 1),
-> +       PXA2_FIXED_RATE(NULL, "UARTCLK", STUART, 14857000, 1),
-> +       PXA2_FIXED_RATE("pxa2xx-i2s", NULL, I2S, 14682000, 0),
-> +       PXA2_FIXED_RATE("pxa2xx-i2c.0", NULL, I2C, 32842000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-udc", NULL, USB, 48000000, 5),
-> +       PXA2_FIXED_RATE("pxa2xx-mci.0", NULL, MMC, 19500000, 0),
-> +       PXA2_FIXED_RATE("pxa2xx-ir", "FICPCLK", FICP, 48000000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-ohci", NULL, USBHOST, 48000000, 0),
-> +       PXA2_FIXED_RATE("pxa2xx-i2c.1", NULL, PWRI2C, 13000000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-keypad", NULL, KEYPAD, 32768, 0),
-> +       PXA2_FIXED_RATE("pxa27x-ssp.0", NULL, SSP1, 13000000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-ssp.1", NULL, SSP2, 13000000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-ssp.2", NULL, SSP3, 13000000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-pwm.0", NULL, PWM0, 13000000, 0),
-> +       PXA2_FIXED_RATE("pxa27x-pwm.1", NULL, PWM1, 13000000, 0),
-> +       PXA2_FIXED_RATE(NULL, "AC97CLK", AC97, 24576000, 0),
-> +       PXA2_FIXED_RATE(NULL, "AC97CONFCLK", AC97CONF, 24576000, 0),
-> +       PXA2_FIXED_RATE(NULL, "MSLCLK", MSL, 48000000, 0),
-> +       PXA2_FIXED_RATE(NULL, "USIMCLK", USIM, 48000000, 0),
-> +       PXA2_FIXED_RATE(NULL, "MSTKCLK", MEMSTK, 19500000, 0),
-> +       PXA2_FIXED_RATE(NULL, "IMCLK", IM, 0, 0),
-> +       PXA2_FIXED_RATE_AO("pxa27x-memc", "MEMCLK", MEMC, 0, 0),
-> +};
+> +       clocks {
+> +              /*
+> +               * The muxing of external clocks/internal dividers for osc* clock
+> +               * sources has been hidden under the carpet by now.
+> +               */
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
 > +
-> +static struct pxa27x_clocks_var_rate pxa27x_var_rate_clocks[] __initdata = {
-> +       PXA2_VAR_RATE("pxa2xx-fb", true, LCD, &clk_pxa27x_lcd_ops),
-> +       PXA2_VAR_RATE("pxa27x-camera.0", true, CAMERA, &clk_pxa27x_lcd_ops),
-> +       PXA2_VAR_RATE("pxa2xx-pcmcia", false, MEMC, &clk_pxa27x_mem_ops),
-> +};
+> +               osc13mhz:osc13mhz {
+> +                       compatible = "fixed-clock";
+> +                        #clock-cells = <0>;
+> +                       clock-frequency = <13000000>;
+> +               };
 > +
+> +               osc32_768khz:osc32_768khz {
+> +                       compatible = "fixed-clock";
+> +                        #clock-cells = <0>;
+> +                       clock-frequency = <32768>;
+> +               };
+> +
+> +               pll_312mhz:pll_312mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&osc13mhz>;
+> +                       clock-div = <1>;
+> +                       clock-mult = <24>;
+> +               };
+> +
+> +               clk_48mhz:clk_48mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&pll_312mhz>;
+> +                       clock-div = <13>;
+> +                       clock-mult = <2>;
+> +               };
+> +
+> +               clk_32_842mhz:clk_32_842mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&pll_312mhz>;
+> +                       clock-div = <19>;
+> +                       clock-mult = <2>;
+> +               };
+> +
+> +               clk_19_5mhz:clk_19_5mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&pll_312mhz>;
+> +                       clock-div = <32>;
+> +                       clock-mult = <2>;
+> +               };
+> +
+> +               clk_14_857mhz:clk_14_857mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&pll_312mhz>;
+> +                       clock-div = <42>;
+> +                       clock-mult = <2>;
+> +               };
+> +
+> +               clk_14_682mhz:clk_14_682mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&pll_312mhz>;
+> +                       clock-div = <51>;
+> +                       clock-mult = <2>;
+> +               };
+> +
+> +               clk_13mhz:clk_13mhz {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&osc13mhz>;
+> +                       clock-div = <1>;
+> +                       clock-mult = <1>;
+> +               };
+> +
+> +               clk_dummy:clk_dummy {
+> +                       compatible = "fixed-clock";
+> +                        #clock-cells = <0>;
+> +                       clock-frequency = <0>;
+> +               };
+> +
+> +               clk_ostimer:clk_ostimer {
+> +                       compatible = "fixed-factor-clock";
+> +                        #clock-cells = <0>;
+> +                       clocks = <&osc13mhz>;
+> +                       clock-div = <4>;
+> +                       clock-mult = <1>;
+> +               };
+> +
+> +               pxa27x_sysclks:pxa27x_sysclks {
+> +                       compatible = "marvell,pxa270-core-clocks";
+> +                       #clock-cells = <1>;
+> +                       clocks = <&osc13mhz>;
+> +                       clock-output-names = "run mode", "half-turbo mode",
+> +                               "turbo mode", "cpu core", "system bus", "memory", "lcd";
+> +               };
+> +
+> +               pxa2xx_clks: pxa2xx_clks at 41300004 {
+> +                       compatible = "marvell,pxa-clocks";
+> +                       reg = <0x41300004 0x4>;
+> +                       clocks =
+> +                               <&clk_13mhz>, <&clk_13mhz>, <&clk_dummy>, <&clk_13mhz>,
+> +                               <&clk_13mhz>, <&clk_14_857mhz>, <&clk_14_857mhz>, <&clk_14_857mhz>,
+> +                               <&clk_14_682mhz>, <&clk_ostimer>, <&clk_48mhz>, <&clk_48mhz>,
+> +                               <&clk_19_5mhz>, <&clk_48mhz>, <&clk_32_842mhz>, <&clk_13mhz>,
+> +                               <&pxa27x_sysclks 6>, <&clk_48mhz>, <&clk_48mhz>, <&osc32_768khz>,
+> +                               <&clk_dummy>, <&clk_19_5mhz>, <&pxa27x_sysclks 4>, <&clk_13mhz>,
+> +                               <&pxa27x_sysclks 6>, <&clk_dummy>;
+> +                       #clock-cells = <1>;
+> +                       clock-output-names =
+> +                               "pwm 0,2", "pwm 1,3", "ac97", "ssp2",
+> +                               "ssp3,hwuart", "stuart", "ffuart", "btuart",
+> +                               "i2s", "nssp,ostimer", "usb host,assp", "usb udc",
+> +                               "mmc", "ficp", "i2c", "pwri2c",
+> +                               "lcd", "msl", "usim", "keypad",
+> +                                "im", "memstk", "memc", "ssp1",
+> +                                "camera", "ac97conf";
+> +                       clock-indices = <
+> +                               CKEN_PWM0 CKEN_PWM1 CKEN_AC97 CKEN_SSP2
+> +                               CKEN_SSP3 CKEN_STUART CKEN_FFUART CKEN_BTUART
+> +                               CKEN_I2S CKEN_OSTIMER CKEN_USBHOST CKEN_USB
+> +                               CKEN_MMC CKEN_FICP CKEN_I2C CKEN_PWRI2C
+> +                               CKEN_LCD CKEN_MSL CKEN_USIM CKEN_KEYPAD
+> +                               CKEN_IM CKEN_MEMSTK 65 CKEN_SSP1
+> +                               CKEN_CAMERA CKEN_AC97CONF >;
+> +               };
+> +       };
+> +
+>  };
 
-It's not good to define a VAR table any more.
-
-Now we have the common clock framework. Since these three clocks are
-used as clock
-gate. And their clock frequency is controlled by other bits in
-peripheral controller registers.
-We can define parent & child clocks in clock tables. I think that you
-can get a lot of
-reference in clock drivers, such as exynos, hisilicon, ...
-
-Same comment on PXA_FIXED_RATE table.
+Maybe defining these clocks in pxa27x clock driver is better.
 
 Regards
 Haojian
