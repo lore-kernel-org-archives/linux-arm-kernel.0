@@ -1,40 +1,149 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Jul 2014 12:59:24 +0100
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140703133406.2d3e3a1d@armhf>
-References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
- <20140702195154.47d6f6b4@armhf>
- <20140702194252.GN410@sirena.org.uk>
- <20140703074959.7c489912@armhf>
- <20140703104432.GV410@sirena.org.uk>
- <20140703133406.2d3e3a1d@armhf>
-Message-ID: <20140703115924.GY410@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 03 Jul 2014 14:05:33 +0200
+Subject: [PATCH 2/3] clocksource: add device-tree support for PXA timer
+In-Reply-To: <1403388588-11956-2-git-send-email-robert.jarzmik@free.fr>
+References: <1403388588-11956-1-git-send-email-robert.jarzmik@free.fr>
+ <1403388588-11956-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <53B5470D.4070009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 01:34:06PM +0200, Jean-Francois Moine wrote:
-> Mark Brown <broonie@kernel.org> wrote:
+On 06/22/2014 12:09 AM, Robert Jarzmik wrote:
+> Add device-tree support to PXA platforms.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>   drivers/clocksource/pxa_timer.c | 131 ++++++++++++++++++++++++++++++----------
+>   1 file changed, 98 insertions(+), 33 deletions(-)
+>
+> diff --git a/drivers/clocksource/pxa_timer.c b/drivers/clocksource/pxa_timer.c
+> index fca174e..67da3f5 100644
+> --- a/drivers/clocksource/pxa_timer.c
+> +++ b/drivers/clocksource/pxa_timer.c
+> @@ -15,14 +15,41 @@
+>   #include <linux/kernel.h>
+>   #include <linux/init.h>
+>   #include <linux/interrupt.h>
+> +#include <linux/clk.h>
+>   #include <linux/clockchips.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>   #include <linux/sched_clock.h>
+>
+>   #include <asm/div64.h>
+>   #include <asm/mach/irq.h>
+>   #include <asm/mach/time.h>
+> -#include <mach/regs-ost.h>
+>   #include <mach/irqs.h>
+> +#include <mach/hardware.h>
 
-> > Your board happens to only be able to present the same input on both I2S
-> > and S/PDIF but that might not apply to other boards, they may be able to
-> > route different signals to each which would present a practical problem.
+Now as the driver is in 'drivers', do not reference the headers files in 
+mach. Moving the driver to the drivers directory implies some cleanup 
+with the headers dependencies.
 
-> If there are two different streamss on I2S and S/PDIF, and if the audio
-> subsystem wants to route these streams to the same connector (widget
-> 'hdmi-out'), then, somewhere, there should be a software or a design
-> bug. No?
+> +#define OSMR0		0x00	/* */
+> +#define OSMR1		0x04	/* */
+> +#define OSMR2		0x08	/* */
+> +#define OSMR3		0x0C	/* */
+> +#define OSMR4		0x80	/* */
 
-Yes, which is why the driver shouldn't silently ignore the situation.
+Can you please remove those unused empty comment or fill them with 
+something appropriate.
 
-> Anyway, the tda998x cannot know if the double route is wanted or not.
+> +#define OSCR		0x10	/* OS Timer Counter Register */
+> +#define OSCR4		0x40	/* OS Timer Counter Register */
+> +#define OMCR4		0xC0	/* */
+> +#define OSSR		0x14	/* OS Timer Status Register */
+> +#define OWER		0x18	/* OS Timer Watchdog Enable Register */
+> +#define OIER		0x1C	/* OS Timer Interrupt Enable Register */
+> +
+> +#define OSSR_M3		(1 << 3)	/* Match status channel 3 */
+> +#define OSSR_M2		(1 << 2)	/* Match status channel 2 */
+> +#define OSSR_M1		(1 << 1)	/* Match status channel 1 */
+> +#define OSSR_M0		(1 << 0)	/* Match status channel 0 */
+> +
+> +#define OWER_WME	(1 << 0)	/* Watchdog Match Enable */
+> +
+> +#define OIER_E3		(1 << 3)	/* Interrupt enable channel 3 */
+> +#define OIER_E2		(1 << 2)	/* Interrupt enable channel 2 */
+> +#define OIER_E1		(1 << 1)	/* Interrupt enable channel 1 */
+> +#define OIER_E0		(1 << 0)	/* Interrupt enable channel 0 */
 
-It doesn't need to know, it just needs to identify something it can't
-support either by providing a way to pick which interface is used or by
-rejecting the second interface.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/d5383422/attachment.sig>
+Is it possible to do some cleanups around regs-ost.h and here in order 
+to remove the unused macros. Also, it seems some define will be 
+duplicate as they are shared with the watchdog. Any plan to fix that ?
+
+>   /*
+>    * This is PXA's sched_clock implementation. This has a resolution
+> @@ -33,9 +60,14 @@
+>    * calls to sched_clock() which should always be the case in practice.
+>    */
+>
+> +#define timer_readl(reg) readl_relaxed(timer_base + (reg))
+> +#define timer_writel(val, reg) writel_relaxed((val), timer_base + (reg))
+> +
+> +static void __iomem *timer_base;
+> +
+>   static u64 notrace pxa_read_sched_clock(void)
+>   {
+> -	return readl_relaxed(OSCR);
+
+So here there is a change which is not explained in the changelog 
+(timer_base offset).
+
+Even it is obvious for me because I am used to see this kind of code, 
+that would deserve a better description in the changelog.
+
+> +	return timer_readl(OSCR);
+>   }
+>
+
+[ ... ]
+
+> +static void __init pxa_timer_dt_init(struct device_node *np)
+> +{
+> +	struct clk *clk;
+> +	int irq;
+> +
+> +	/* timer registers are shared with watchdog timer */
+> +	timer_base = of_iomap(np, 0);
+> +	if (!timer_base)
+> +		panic("%s: unable to map resource\n", np->name);
+> +
+> +	clk = of_clk_get(np, 0);
+> +	if (IS_ERR(clk))
+> +		panic("%s: unable to get clk\n", np->name);
+> +	clk_prepare_enable(clk);
+> +
+> +	/* we are only interested in OS-timer0 irq */
+> +	irq = irq_of_parse_and_map(np, 0);
+> +	if (irq <= 0)
+> +		panic("%s: unable to parse OS-timer0 irq\n", np->name);
+
+Is the 'panic' desirable ? The clksrc-of is written in a way to use 
+different clocks, no ?
+
+> +
+> +	pxa_timer_common_init(irq, clk_get_rate(clk));
+> +}
+> +CLOCKSOURCE_OF_DECLARE(pxa_timer, "marvell,pxa-timer", pxa_timer_dt_init);
+> +
+> +/*
+> + * Legacy timer init for non device-tree boards.
+> + */
+> +void __init pxa_timer_init(void)
+> +{
+> +	unsigned long clock_tick_rate = get_clock_tick_rate();
+> +
+> +	timer_base = io_p2v(0x40a00000);
+> +	pxa_timer_common_init(IRQ_OST0, clock_tick_rate);
+>   }
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
