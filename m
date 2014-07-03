@@ -1,48 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 03 Jul 2014 14:21:22 +0200
-Subject: timers & suspend
-In-Reply-To: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
-References: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
-Message-ID: <53B54AC2.5040908@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 03 Jul 2014 14:44:17 +0200
+Subject: [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
+In-Reply-To: <1404163947-3105-12-git-send-email-kgene.kim@samsung.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+ <1404163947-3105-12-git-send-email-kgene.kim@samsung.com>
+Message-ID: <53B55021.9020307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 08:39 PM, S?ren Brinkmann wrote:
-> Hi,
->
-> I'm currently working on suspend for Zynq and try to track down some
-> spurious wakes. It looks like the spurious wakes are caused by timers,
-> hence I was wondering whether there are any special requirements for
-> timer drivers when it comes to suspend support or if I just missed
-> something.
->
-> Zynq sets the 'IRQCHIP_MASK_ON_SUSPEND' flag, which should mask all
-> interrupts but the wake source. Reading through kernel/irq/pm.c
-> indicates, that timer interrupts get some special treatment though.
-> Therefore I implemented some suspend/resume callbacks for the
-> cadence_ttc which disable and clear the timer's interrupts when going
-> into suspend. That seems to mitigate the issue quite a bit, but I still
-> saw spurious wakes - just a lot less often.
-> Digging a little deeper revealed, the spurious wakes are caused by the
-> ARM's smp_twd timer now. Given that that driver is probably used by a few
-> more ARM platforms, I get the feeling that I'm missing something.
+Hi Kukjin,
 
-Do you receive any interrupt from the cadence_ttc ? (/proc/interrupts)
+On 30.06.2014 23:32, Kukjin Kim wrote:
+> This patch removes supporting s5pc100 related pwm codes.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-samsung.txt |    2 --
+>  drivers/clocksource/samsung_pwm_timer.c               |   12 ------------
+>  drivers/pwm/pwm-samsung.c                             |    8 --------
+>  3 files changed, 22 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> index 43925d3..82c7f6b 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> @@ -11,8 +11,6 @@ Required properties:
+>  - compatible : should be one of following:
+>      samsung,s3c2410-pwm - for 16-bit timers present on S3C24xx SoCs
+>      samsung,s3c6400-pwm - for 32-bit timers present on S3C64xx SoCs
+> -    samsung,s5pc100-pwm - for 32-bit timers present on S5PC100, S5PV210,
+> -			  Exynos4210 rev0 SoCs
 
-That's funny because I realize that you cadence ttc timer is never used 
-as there are the architected timers. The cadence ttc would be only 
-useful if there were an idle state powering down the smp_twd timers but 
-it is not the case on this board, IIUC.
+As you can see here, this variant is used for more than S5PC100. It is
+needed for S5PV210 and Exynos4210 rev0 SoCs as well. So this patch
+should be dropped.
 
-> It's probably worth mentioning that the suspend state in Zynq does not
-> power off the CPU cores. It just asserts the resets on secondary cores
-> and the primary one waits in wfi.
-
-Why do you need to reset them ?
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best regards,
+Tomasz
