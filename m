@@ -1,45 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Jul 2014 00:01:14 +0100
-Subject: [PATCH 1/2] mmc: hsmmc: Add reset gpio configuration option.
-In-Reply-To: <1404420564-30245-1-git-send-email-marek@goldelico.com>
-References: <1404420564-30245-1-git-send-email-marek@goldelico.com>
-Message-ID: <20140703230113.GR3705@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Jul 2014 18:33:21 -0500
+Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <20140702032249.GA26010@saruman.home>
+References: <1402676147-3711-1-git-send-email-balbi@ti.com>
+ <1402676147-3711-2-git-send-email-balbi@ti.com>
+ <20140613162323.GH8319@saruman.home>
+ <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
+ <20140702032249.GA26010@saruman.home>
+Message-ID: <20140703233321.GB3655@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 10:49:23PM +0200, Marek Belisko wrote:
-> From: NeilBrown <neilb@suse.de>
+On Tue, Jul 01, 2014 at 10:22:49PM -0500, Felipe Balbi wrote:
+> Hi,
 > 
-> If a 'gpio_reset' is specified, then hold it low while
-> turning the power regulator on.
-> This is needed for some wi2wi wireless modules, particularly
-> when the regulator is held active by some other client.
-> The wi2wi needs to be reset if power isn't actually removed, and
-> the gpio can be used to do this.
+> On Fri, Jun 13, 2014 at 07:11:58PM +0000, Paul Walmsley wrote:
+> > Hi Felipe, Tomi,
+> > 
+> > On Fri, 13 Jun 2014, Felipe Balbi wrote:
+> > 
+> > > On Fri, Jun 13, 2014 at 11:15:46AM -0500, Felipe Balbi wrote:
+> > > > From: Sathya Prakash M R <sathyap@ti.com>
+> > > > 
+> > > > Add DSS hwmod data for AM43xx.
+> > > > 
+> > > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > > Acked-by: Rajendra Nayak <rnayak@ti.com>
+> > > > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> > > > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > ---
+> > > > 
+> > > > Note that this patch was originally send on May 9th [1], changes were requested
+> > > > and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
+> > > > maintainer again and go no response.
+> > > > 
+> > > > Without this patch, we cannot get display working on any AM437x devices.
+> > > > 
+> > > > [1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
+> > > > [2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
+> > > > [3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
+> > > > 
+> > > >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+> > > >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+> > > >  2 files changed, 99 insertions(+)
+> > 
+> > Sorry for the delay on this.  Have been corresponding with TI management 
+> > to figure out what to do about patches for AM43xx.  I don't have boards or 
+> > public documentation for these devices, so it's impossible for me to 
 > 
-> Signed-off-by: NeilBrown <neilb@suse.de>
+> documentation is now available publicly
+> 
+> http://www.ti.com/product/AM4379
 
-Obvious statement knowing what's been going on elsewhere...
+at [1] you can find most (all?) board-related documentation. [2] will
+give you AM437x GP EVM schematics.
 
-A while back, Olof produced a couple of patches to add /generic/ support
-to deal with power and reset controls for SDIO WIFI cards.  Patches
-were posted to linux-arm-kernel and other places around January time
-this year.
-
-No real conclusion came out of it, and it kind of died.  The point here
-is that this is not an OMAP problem.  We have this very same problem
-on different platforms and different SoCs.
-
-Why should we have N different solutions to the same problem.  Why can't
-we have one solution to fix this issue, rather than having every host
-driver implement some different solution to what's a common problem.
-
-If everyone is going to run away from generic problems and continue
-inventing their own private solutions to generic problems, the kernel
-is just going to become severely bloated and unmaintainable...
-
-Please, sort out generic problems with generic solutions.
+[1] http://processors.wiki.ti.com/index.php/AM437X_EVM_Boards
+[2] http://processors.wiki.ti.com/images/9/95/Am437x_gp_evm_3k0006_schematic_rev1_4a.pdf
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/b28692b0/attachment-0001.sig>
