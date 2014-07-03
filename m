@@ -1,104 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jul 2014 23:41:17 +0100
-Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
- CRTCs
-In-Reply-To: <CAF6AEGs-p0dXfaSXvy67X8LbSmKF7gT8zubaJx4LSRh_-aKNZQ@mail.gmail.com>
-References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
- <CAF6AEGs-p0dXfaSXvy67X8LbSmKF7gT8zubaJx4LSRh_-aKNZQ@mail.gmail.com>
-Message-ID: <20140703224117.GA21766@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Jul 2014 17:41:46 -0500
+Subject: [PATCH 1/2] mmc: hsmmc: Add reset gpio configuration option.
+In-Reply-To: <1404420564-30245-1-git-send-email-marek@goldelico.com>
+References: <1404420564-30245-1-git-send-email-marek@goldelico.com>
+Message-ID: <20140703224146.GC2540@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 06:17:24PM -0400, Rob Clark wrote:
-> On Thu, Jul 3, 2014 at 12:49 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Add a helper to allow encoders to find their possible CRTCs from the
-> > OF graph without having to re-implement this functionality.  We add a
-> > device_node to drm_crtc which corresponds with the port node in the
-> > DT description of the CRTC device.
-> >
-> > We can then scan the DRM device list for CRTCs to find their index,
-> > matching the appropriate CRTC using the port device_node, thus building
-> > up the possible CRTC mask.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> > This helper will be shared between imx-drm and Armada DRM, and should
-> > be useful for other OF-based drivers.  At the moment, this is being
-> > sent for comments and acks; I need to build upon this patch in order
-> > to convert Armada DRM to DT.
+Hi,
+
+On Thu, Jul 03, 2014 at 10:49:23PM +0200, Marek Belisko wrote:
+> From: NeilBrown <neilb@suse.de>
 > 
-> ok, possibly a dumb question, but in my defense I don't claim to be a
-> DT expert ;-)
+> If a 'gpio_reset' is specified, then hold it low while
+> turning the power regulator on.
+> This is needed for some wi2wi wireless modules, particularly
+> when the regulator is held active by some other client.
+> The wi2wi needs to be reset if power isn't actually removed, and
+> the gpio can be used to do this.
 > 
-> Do you have somewhere handy a example dts which this would be parsing?
->  I think that would help me understand this patch a bit better.
+> Signed-off-by: NeilBrown <neilb@suse.de>
+> ---
+>  arch/arm/mach-omap2/hsmmc.c            |  7 ++++++-
+>  arch/arm/mach-omap2/hsmmc.h            |  3 +++
+>  drivers/mmc/host/omap_hsmmc.c          | 26 +++++++++++++++++++++++---
+>  include/linux/platform_data/mmc-omap.h |  1 +
+>  4 files changed, 33 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index 07d4c7b..046bfdd 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -172,6 +172,10 @@ static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
+>  		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+>  		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+>  					OMAP_PIN_INPUT_PULLUP);
+> +	if (gpio_is_valid(mmc_controller->slots[0].gpio_reset) &&
+> +		(mmc_controller->slots[0].gpio_reset < OMAP_MAX_GPIO_LINES))
+> +		omap_mux_init_gpio(mmc_controller->slots[0].gpio_reset,
+> +					OMAP_PIN_OUTPUT);
+>  	if (cpu_is_omap34xx()) {
+>  		if (controller_nr == 0) {
+>  			omap_mux_init_signal("sdmmc1_clk",
+> @@ -270,6 +274,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+>  
+>  	mmc->slots[0].switch_pin = c->gpio_cd;
+>  	mmc->slots[0].gpio_wp = c->gpio_wp;
+> +	mmc->slots[0].gpio_reset = c->gpio_reset;
+>  
+>  	mmc->slots[0].remux = c->remux;
+>  	mmc->slots[0].init_card = c->init_card;
+> @@ -389,7 +394,7 @@ void omap_hsmmc_late_init(struct omap2_hsmmc_info *c)
+>  			continue;
+>  
+>  		mmc_pdata->slots[0].switch_pin = c->gpio_cd;
+> -		mmc_pdata->slots[0].gpio_wp = c->gpio_wp;
+> +		mmc_pdata->slots[0].gpio_reset = c->gpio_reset;
+>  
+>  		res = omap_device_register(pdev);
+>  		if (res)
+> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+> index 7f2e790..16b2ac5 100644
+> --- a/arch/arm/mach-omap2/hsmmc.h
+> +++ b/arch/arm/mach-omap2/hsmmc.h
+> @@ -24,6 +24,9 @@ struct omap2_hsmmc_info {
+>  	bool	deferred;	/* mmc needs a deferred probe */
+>  	int	gpio_cd;	/* or -EINVAL */
+>  	int	gpio_wp;	/* or -EINVAL */
+> +	int	gpio_reset;	/* or -EINVAL - reset is held low during
+> +				 * power-on
+> +				 */
+>  	char	*name;		/* or NULL for default */
+>  	struct platform_device *pdev;	/* mmc controller instance */
+>  	int	ocr_mask;	/* temporary HACK */
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 9656726..4a264fc 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -300,6 +300,8 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
+>  	if (!host->vcc)
+>  		return 0;
+>  
+> +	if (gpio_is_valid(mmc_slot(host).gpio_reset))
+> +		gpio_set_value_cansleep(mmc_slot(host).gpio_reset, 0);
+>  	if (mmc_slot(host).before_set_reg)
+>  		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
+>  
+> @@ -365,6 +367,8 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
+>  
+>  	if (mmc_slot(host).after_set_reg)
+>  		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
+> +	if (gpio_is_valid(mmc_slot(host).gpio_reset))
+> +		gpio_set_value_cansleep(mmc_slot(host).gpio_reset, 1);
+>  
+>  error_set_power:
+>  	return ret;
+> @@ -481,10 +485,22 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
+>  	} else
+>  		pdata->slots[0].gpio_wp = -EINVAL;
+>  
+> -	return 0;
+> +	if (gpio_is_valid(pdata->slots[0].gpio_reset)) {
+> +		ret = gpio_request(pdata->slots[0].gpio_reset, "mmc_reset");
+> +		if (ret)
+> +			goto err_free_wp;
+> +		ret = gpio_direction_output(pdata->slots[0].gpio_reset, 1);
+> +		if (ret)
+> +			goto err_free_reset;
+> +	} else
+> +		pdata->slots[0].gpio_reset = -EINVAL;
 
-The patch is merely moving something that's already being used by
-imx-drm into a more convenient location.
+looks like this should be implemented as a reset-gpio.c driver. This
+piece of code would, then
 
-The documentation for the "binding" (it isn't really parsing a binding,
-merely traversing the graph itself) is:
-
-Documentation/devicetree/bindings/graph.txt
-
-which is shared from the v4l2 code.
-
-To give an example, this is an extract from the imx6qdl dtsi file.  I've
-cut out a load of stuff which isn't that relevant to the overall
-structure.  The full stuff is arch/arm/boots/dts/imx6qdl.dtsi.
-
-IPU contains two display interfaces (DIs, aka CRTCs).  Each display
-interface is connected to a set of muxes, one mux per display bridge
-(encoder/connector) which can select between DI0 or DI1.  Some chips
-have two IPUs, hence four DIs, making it possible to drive the four
-display bridges entirely independently.
-
-                ipu1: ipu at 02400000 {
-                        ipu1_di0: port at 2 {
-                                ipu1_di0_hdmi: endpoint at 1 {
-                                        remote-endpoint = <&hdmi_mux_0>;
-                                };
-...
-                                ipu1_di0_lvds1: endpoint at 4 {
-                                        remote-endpoint = <&lvds1_mux_0>;
-                                };
-                        };
-
-                        ipu1_di1: port at 3 {
-                                ipu1_di0_disp1: endpoint at 0 {
-                                };
-
-                                ipu1_di1_hdmi: endpoint at 1 {
-                                        remote-endpoint = <&hdmi_mux_1>;
-                                };
-...
-                                ipu1_di1_lvds1: endpoint at 4 {
-                                        remote-endpoint = <&lvds1_mux_1>;
-                                };
-                        };
-                };
-
-HDMI transmitter component:
-
-                        hdmi: hdmi at 0120000 {
-                                port at 0 {
-                                        reg = <0>;
-
-                                        hdmi_mux_0: endpoint {
-                                                remote-endpoint = <&ipu1_di0_hdmi>;
-                                        };
-                                };
-
-                                port at 1 {
-                                        reg = <1>;
-
-                                        hdmi_mux_1: endpoint {
-                                                remote-endpoint = <&ipu1_di1_hdmi>;
-                                        };
-                                };
-                        };
+	reset_assert(slot->reset);
+	do_the_magic_dance();
+	reset_deassert(slot->reset);
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/3326e218/attachment.sig>
