@@ -1,94 +1,56 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Thu, 3 Jul 2014 10:17:12 +0000
-Subject: [PATCH 4/5] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <20140702112125.GE14665@leverpostej>
-References: <1404291772-2644-1-git-send-email-jingchang.lu@freescale.com>
- <1404291772-2644-5-git-send-email-jingchang.lu@freescale.com>
- <20140702112125.GE14665@leverpostej>
-Message-ID: <cb01fef2c4d44711b04a321fddae33d4@BL2PR03MB467.namprd03.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 11:24:50 +0100
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <53B5098B.9050801@linaro.org>
+References: <20140618202748.GA9022@www.outflux.net>
+ <20140620102258.GA26626@arm.com>
+ <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+ <20140620172330.GA30656@arm.com>
+ <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+ <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+ <20140623084608.GA9316@arm.com>
+ <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
+ <20140624085405.GA26013@arm.com> <53B5098B.9050801@linaro.org>
+Message-ID: <20140703102450.GD12958@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Mark Rutland [mailto:mark.rutland at arm.com]
->Sent: Wednesday, July 02, 2014 7:21 PM
->To: Lu Jingchang-B35083
->Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
->devicetree at vger.kernel.org; Lu Jingchang-B35083
->Subject: Re: [PATCH 4/5] ARM: imx: Add initial support for Freescale
->LS1021A
->
->On Wed, Jul 02, 2014 at 10:02:51AM +0100, Jingchang Lu wrote:
->> From: Jingchang Lu <b35083@freescale.com>
->>
->> diff --git a/arch/arm/mach-imx/mach-ls1021a.c
->> b/arch/arm/mach-imx/mach-ls1021a.c
->> new file mode 100644
->> index 0000000..d1a9bb9
->> --- /dev/null
->> +++ b/arch/arm/mach-imx/mach-ls1021a.c
->> @@ -0,0 +1,49 @@
->> +/*
->> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or
->> +modify
->> + * it under the terms of the GNU General Public License as published
->> +by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +
->> +#include <linux/of_platform.h>
->> +#include <asm/mach/arch.h>
->> +
->> +#include "common.h"
->> +
->> +static const struct of_device_id of_ls1021a_match_table[] = {
->> +	{
->> +		.compatible =	"simple-bus",
->> +	},
->> +	{
->> +		.compatible     = "fsl,ifc",
->> +	},
->> +	{
->> +		.compatible	= "fsl,fpga-qixis",
->> +	},
->> +	{
->> +		.compatible	= "fsl,qe",
->> +	},
->> +	{}
->> +};
->
->Are any of thse not always-on (or default-on) MMIO busses?
->
->Is there any reason for not giving them their own drivers?
->
-Normally these are always-on. The child nodes are handled by different drivers,
-so to make the devices being added by the of system, they are claimed here.
-Thanks.
->> +
->> +static void __init ls1021a_init_machine(void) {
->> +	mxc_arch_reset_init_dt();
->
->This looks to only be used to set up a watchdog timer. Is there any reason
->this logic can't be moved to the watchdog timer driver?
->
->> +
->> +DT_MACHINE_START(LS1021A, "Freescale LS1021A") #ifdef CONFIG_ZONE_DMA
->> +	.dma_zone_size	= SZ_128M,
->> +#endif
->> +	.init_machine   = ls1021a_init_machine,
->> +	.dt_compat	= ls1021a_dt_compat,
->> +	.restart	= mxc_restart,
->
->AFAICT, that jsut uses the WDT for restart. Why can't the watchdog driver
->register itself as a restart device?
->
->That would bring us close to an empty machine descriptor, and enable reuse
->of the WDT and those busses.
->
->Thanks,
->Mark.
-Yes, we use the watchdog timer for restart, just as i.MX and Vybrid, the WDT as a
-common driver it is still work for watchdog. Thanks.
+On Thu, Jul 03, 2014 at 08:43:07AM +0100, AKASHI Takahiro wrote:
+> Hi Will,
+
+Hi Akashi,
+
+> On 06/24/2014 05:54 PM, Will Deacon wrote:
+> > On Mon, Jun 23, 2014 at 08:46:52PM +0100, Kees Cook wrote:
+> >> What's the state of seccomp on arm64? I saw a series back in March,
+> >> but nothing since then? It looked complete, but I haven't set up a
+> >> test environment yet to verify.
+> >
+> > I think Akashi was going to repost `real soon now' so we can include them
+> > for 3.17. He missed the merge window last time around.
+> 
+> I took a quick look at the current implementation of ptrace.
+> ptrace(PTRACE_GETREGSET/SETREGSET), eventually gpr_get/set(), handles only
+> 'struct user_pt_regs', and we have no way to modify orig_x0 nor syscallno
+> in 'struct pt_regs' directly.
+> So it seems to me that we can't change a system call by ptrace().
+> Do I misunderstand anything?
+
+No, it looks like you have a point here. I don't think userspace has any
+business with orig_x0, but changing syscallno is certainly useful. I can
+think of two ways to fix this:
+
+  (1) Updating syscallno based on w8, but this ties us to the current ABI
+      and could get messy if this register changes in the future.
+
+  (2) Adding a PTRACE_SET_SYSCALL request, like we have for arch/arm/,
+      but that means adding arch-specific stuff to arch_ptrace (which
+      currently goes straight to ptrace_request on arm64).
+
+It looks like x86 uses orig_ax, which I *think* means we would go with
+(1) above if we followed their lead.
+
+Anybody else have an opinion about this?
+
+Will
