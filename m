@@ -1,59 +1,76 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Jul 2014 22:55:46 +0800
-Subject: [PATCH v3 6/9] serial: 8250_dw: Add support for deferred probing
+Date: Thu,  3 Jul 2014 22:55:45 +0800
+Subject: [PATCH v3 5/9] serial: 8250_dw: Add optional reset control support
 In-Reply-To: <1404399349-20237-1-git-send-email-wens@csie.org>
 References: <1404399349-20237-1-git-send-email-wens@csie.org>
-Message-ID: <1404399349-20237-7-git-send-email-wens@csie.org>
+Message-ID: <1404399349-20237-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 8250_dw driver fails to probe if the specified clock isn't
-registered at probe time. Even if a clock frequency is given,
-the required clock might be gated because it wasn't properly
-enabled.
+The Allwinner A31 and A23 SoCs have a reset controller
+maintaining the UART in reset by default.
 
-This happened to me when the device is registered through DT,
-and the clock was part of an MFD, the PRCM found on A31 and A23
-SoCs. Unlike core clocks that are registered with OF_CLK_DECLARE,
-which happen almost immediately after the kernel starts, the
-clocks are registered as sub-devices of the PRCM MFD platform
-device. Even though devices are registered in the order they are
-found in the DT, the drivers are registered in a different,
-arbitrary order. It is possible that the 8250_dw driver is
-registered, and thus associated with the device and probed, before
-the clock driver is registered and probed.
-
-8250_dw then reports unable to get the clock, and fails. Without
-a working console, the kernel panics.
-
-This patch adds support for deferred probe handling for the clock
-and reset controller.
+This patch adds optional reset support to the driver.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/tty/serial/8250/8250_dw.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt | 1 +
+ drivers/tty/serial/8250/8250_dw.c                             | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
+index f13f1c5..cb9af84 100644
+--- a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
++++ b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
+@@ -7,6 +7,7 @@ Required properties:
+ - clock-frequency : the input clock frequency for the UART.
+ 
+ Optional properties:
++- resets : phandle to the parent reset controller.
+ - reg-shift : quantity to shift the register offsets by.  If this property is
+   not present then the register offsets are not shifted.
+ - reg-io-width : the size (in bytes) of the IO accesses that should be
 diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index cb1b3dc..d9eeed7 100644
+index 51b307a..cb1b3dc 100644
 --- a/drivers/tty/serial/8250/8250_dw.c
 +++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -405,12 +405,16 @@ static int dw8250_probe(struct platform_device *pdev)
+@@ -26,6 +26,7 @@
+ #include <linux/slab.h>
+ #include <linux/acpi.h>
+ #include <linux/clk.h>
++#include <linux/reset.h>
+ #include <linux/pm_runtime.h>
  
- 	data->usr_reg = DW_UART_USR;
- 	data->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
- 	if (!IS_ERR(data->clk)) {
- 		clk_prepare_enable(data->clk);
+ #include <asm/byteorder.h>
+@@ -59,6 +60,7 @@ struct dw8250_data {
+ 	int			last_mcr;
+ 	int			line;
+ 	struct clk		*clk;
++	struct reset_control	*rst;
+ 	struct uart_8250_dma	dma;
+ };
+ 
+@@ -408,6 +410,10 @@ static int dw8250_probe(struct platform_device *pdev)
  		uart.port.uartclk = clk_get_rate(data->clk);
  	}
  
- 	data->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-+	if (IS_ERR(data->rst) && PTR_ERR(data->rst) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
- 	if (!IS_ERR(data->rst))
- 		reset_control_deassert(data->rst);
++	data->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
++	if (!IS_ERR(data->rst))
++		reset_control_deassert(data->rst);
++
+ 	data->dma.rx_chan_id = -1;
+ 	data->dma.tx_chan_id = -1;
+ 	data->dma.rx_param = data;
+@@ -451,6 +457,9 @@ static int dw8250_remove(struct platform_device *pdev)
+ 
+ 	serial8250_unregister_port(data->line);
+ 
++	if (!IS_ERR(data->rst))
++		reset_control_assert(data->rst);
++
+ 	if (!IS_ERR(data->clk))
+ 		clk_disable_unprepare(data->clk);
  
 -- 
 2.0.1
