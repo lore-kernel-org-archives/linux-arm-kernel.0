@@ -1,144 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 3 Jul 2014 15:00:36 -0400 (EDT)
-Subject: several messages
-In-Reply-To: <CAM4voanVAA4KOHWemQf59WjBpZXxVG_0P49xfzeq8KOvOwg4xg@mail.gmail.com>
-References: <1404363737-26222-1-git-send-email-a.kesavan@samsung.com>
- <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1407031111100.6220@knanqh.ubzr>
- <CAM4voanVAA4KOHWemQf59WjBpZXxVG_0P49xfzeq8KOvOwg4xg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1407031442210.6220@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 20:00:55 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140703185243.GD32514@n2100.arm.linux.org.uk>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <20140703150008.GX32514@n2100.arm.linux.org.uk>
+ <20140703171356.GD28175@arm.com> <4840595.cpHbY6hJKL@wuerfel>
+ <20140703183055.GC32514@n2100.arm.linux.org.uk>
+ <20140703183739.GA21086@arm.com>
+ <20140703185243.GD32514@n2100.arm.linux.org.uk>
+Message-ID: <20140703190055.GA21394@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
-
-> Hi Nicolas,
+On Thu, Jul 03, 2014 at 07:52:43PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 03, 2014 at 07:37:39PM +0100, Will Deacon wrote:
+> > On Thu, Jul 03, 2014 at 07:30:55PM +0100, Russell King - ARM Linux wrote:
+> > > which produces the correct answer of 5.  SWP_EMULATE is off.  HWCAP_SWP
+> > > is set (as it always has been).  There's no warning in the kernel
+> > > message log.
+> > 
+> > Even more worrying, that swp you just executed probably wasn't atomic. Try
+> > it with a multithreaded program...
+> > 
+> > > Now look at the situation on ARMv8.  Executing the above suddenly fails
+> > > with SIGILL.
+> > > 
+> > > This means that from the developer and user point of view, there has
+> > > been *no* visible deprecation of this instruction.  There's only
+> > > "it used to work on ARMv7 but doesn't on ARMv8".
+> > > 
+> > > Yes, SWP_EMULATE was introduced.  Great, that has the power to issue
+> > > warnings, except it doesn't because they're at DEBUG level, which
+> > > normally gets compiled out.  So that doesn't help warn people.
+> > > 
+> > > Even with SWP_EMULATE enabled and with the debug problem fixed... does
+> > > it help warn people?  Only if you're running on a CPU with virtualisation
+> > > extensions, because it silently continues to work on CPUs without.
+> > 
+> > Not *quite* true; SWP_EMULATE=y disables the h/w SWP instruction by
+> > configuring the sctlr accordingly. So even without virtualisation
+> > extensions (more specifically, on cores with MP extensions), you would
+> > still see the warning if it was fixed.
 > 
-> On Thu, Jul 3, 2014 at 9:15 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
-> >
-> >> On Thu, Jul 3, 2014 at 6:59 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> > Please, let's avoid going that route.  There is no such special handling
-> >> > needed if the API is sufficient.  And the provided API allows you to
-> >> > suspend a CPU or shut it down.  It shouldn't matter at that level if
-> >> > this is due to a cluster switch or a hotplug event. Do you really need
-> >> > something else?
-> >> No, just one local flag for suspend should be enough for me. Will remove these.
-> >
-> > [...]
-> >
-> >> Changes in v5:
-> >>       - Removed the MCPM flags and just used a local flag to
-> >>       indicate that we are suspending.
-> >
-> > [...]
-> >
-> >> -static void exynos_power_down(void)
-> >> +static void exynos_mcpm_power_down(u64 residency)
-> >>  {
-> >>       unsigned int mpidr, cpu, cluster;
-> >>       bool last_man = false, skip_wfi = false;
-> >> @@ -150,7 +153,12 @@ static void exynos_power_down(void)
-> >>       BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> >>       cpu_use_count[cpu][cluster]--;
-> >>       if (cpu_use_count[cpu][cluster] == 0) {
-> >> -             exynos_cpu_power_down(cpunr);
-> >> +             /*
-> >> +              * Bypass power down for CPU0 during suspend. This is being
-> >> +              * taken care by the SYS_PWR_CFG bit in CORE0_SYS_PWR_REG.
-> >> +              */
-> >> +             if ((cpunr != 0) || (residency != S5P_CHECK_SLEEP))
-> >> +                     exynos_cpu_power_down(cpunr);
-> >>
-> >>               if (exynos_cluster_unused(cluster)) {
-> >>                       exynos_cluster_power_down(cluster);
-> >> @@ -209,6 +217,11 @@ static void exynos_power_down(void)
-> >>       /* Not dead at this point?  Let our caller cope. */
-> >>  }
-> >>
-> >> +static void exynos_power_down(void)
-> >> +{
-> >> +     exynos_mcpm_power_down(0);
-> >> +}
-> >
-> > [...]
-> >
-> >> +static int notrace exynos_mcpm_cpu_suspend(unsigned long arg)
-> >> +{
-> >> +     /* MCPM works with HW CPU identifiers */
-> >> +     unsigned int mpidr = read_cpuid_mpidr();
-> >> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> >> +     unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> >> +
-> >> +     __raw_writel(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
-> >> +
-> >> +     mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
-> >> +
-> >> +     /*
-> >> +      * Pass S5P_CHECK_SLEEP flag to the MCPM back-end to indicate that
-> >> +      * we are suspending the system and need to skip CPU0 power down.
-> >> +      */
-> >> +     mcpm_cpu_suspend(S5P_CHECK_SLEEP);
-> >
-> > NAK.
-> >
-> > When I say "local flag with local meaning", I don't want you to smuggle
-> > that flag through a public interface either.  I find it rather inelegant
-> > to have the notion of special handling for CPU0 being spread around like
-> > that.
-> >
-> > If CPU0 is special, then it should be dealth with in one place only,
-> > ideally in the MCPM backend, so the rest of the kernel doesn't have to
-> > care.
-> >
-> > Again, here's what I mean:
-> >
-> > static void exynos_mcpm_down_handler(int flags)
-> > {
-> >         [...]
-> >         if ((cpunr != 0) || !(flags & SKIP_CPU_POWERDOWN_IF_CPU0))
-> >                 exynos_cpu_power_down(cpunr);
-> >         [...]
-> > }
-> >
-> > static void exynos_mcpm_power_down()
-> > {
-> >         exynos_mcpm_down_handler(0);
-> > }
-> >
-> > static void exynos_mcpm_suspend(u64 residency)
-> > {
-> >         /*
-> >          * Theresidency argument is ignored for now.
-> >          * However, in the CPU suspend case, we bypass power down for
-> >          * CPU0 as this is being taken care by the SYS_PWR_CFG bit in
-> >          * CORE0_SYS_PWR_REG.
-> >          */
-> >         exynos_mcpm_down_handler(SKIP_CPU_POWERDOWN_IF_CPU0);
-> > }
-> >
-> > And SKIP_CPU_POWERDOWN_IF_CPU0 is defined in and visible to
-> > mcpm-exynos.c only.
-> Sorry if I am being dense, but the exynos_mcpm_suspend function would
-> get called from both the bL cpuidle driver as well the exynos pm code.
+> Well, does anyone have SWP_EMULATE enabled?
+> 
+> arch/arm/configs/spear13xx_defconfig:# CONFIG_SWP_EMULATE is not set
+> arch/arm/configs/mvebu_v7_defconfig:# CONFIG_SWP_EMULATE is not set
+> arch/arm/configs/prima2_defconfig:# CONFIG_SWP_EMULATE is not set
+> arch/arm/configs/marzen_defconfig:# CONFIG_SWP_EMULATE is not set
+> arch/arm/configs/shmobile_defconfig:# CONFIG_SWP_EMULATE is not set
+> arch/arm/configs/koelsch_defconfig:# CONFIG_SWP_EMULATE is not set
+> arch/arm/configs/vexpress_defconfig:# CONFIG_SWP_EMULATE is not set
+> 
+> I think not.  Even with SWP_EMULATE set, HWCAP_SWP is still
+> advertised, which you must admit is a very contradictory situation.
 
-What is that exynos pm code actually doing?
+Yup, it's probably worth trying to address these inconsistencies regardless
+of the conclusion for the 64-bit kernel. Removing the hwcap and screaming
+when emulation happens both sound very sensible to me.
 
-> We want to skip CPU0 only in case of the S2R case i.e. the pm code and
-> keep the CPU0 power down code for all other cases including CPUIdle.
-
-OK.  If so I missed that somehow (hint hint).
-
-> If I call exynos_mcpm_down_handler with the flag in
-> exynos_mcpm_suspend(), CPUIdle will also skip CPU0 isn't it ?
-
-As it is, yes.  You could logically use an infinite residency time 
-(something like U64_MAX) to distinguish S2RAM from other types of 
-suspend.
-
-Yet, why is this SYS_PWR_CFG bit set outside of MCPM?  Couldn't the MCPM 
-backend handle it directly instead of expecting some other entity to do 
-it?
-
-
-Nicolas
+Will
