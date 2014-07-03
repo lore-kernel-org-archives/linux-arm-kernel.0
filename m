@@ -1,36 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 3 Jul 2014 09:16:18 +0200
-Subject: [PATCH 02/16] ARM: mvebu: Add a common function for the boot
- address work around
-In-Reply-To: <53B48E8E.1080808@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
- <20140630144054.2f71514b@free-electrons.com>
- <53B48E8E.1080808@free-electrons.com>
-Message-ID: <20140703091618.1e5408f0@free-electrons.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 3 Jul 2014 09:22:50 +0200
+Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
+In-Reply-To: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <53B504CA.9060502@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+Hi Peter,
 
-On Thu, 03 Jul 2014 00:58:22 +0200, Gregory CLEMENT wrote:
-
-> >> +#define CRYPT0_ENG_ATTR	0x1
-> > 
-> > For consistency, I'd prefer to see this being passed as argument to
-> > mvebu_boot_addr_wa().
-> 
-> The attribute is the same, so why bother with it? If later we have a SoC
-> where this attribute can be different then I agree to add this argument.
-
-Simply for consistency. MBus windows are defined by their target and
-attribute values, so it makes sense to always pass both these values,
-even if for the existing cases the attribute is for now always 0x1.
+	The series look good to me.
 
 Thanks,
+Maxime
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On 07/02/2014 04:08 PM, Peter Griffin wrote:
+> This series adds reset controller support for the STiH407 SoC.
+>
+> Changes since v1
+>   - Update copyright to 2014
+>   - Add const qualifier
+>   - Fix various whitespace issues
+>   - Remove THIS_OWNER
+>   - Move DT documentation into separate patch
+>
+> Peter Griffin (4):
+>    reset: stih407: Add softreset, powerdown and picophy controllers
+>    reset: sti: Document sti-picophyreset controllers bindings.
+>    ARM: sti: Add STiH407 Kconfig entry to select STIH407_RESET
+>    ARM: sti: Add STiH407 reset controller support.
+>
+>   .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
+>   arch/arm/boot/dts/stih407.dtsi                     |  16 +++
+>   arch/arm/mach-sti/Kconfig                          |  10 ++
+>   drivers/reset/sti/Kconfig                          |   4 +
+>   drivers/reset/sti/Makefile                         |   1 +
+>   drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
+>   .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
+>   7 files changed, 292 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
+>   create mode 100644 drivers/reset/sti/reset-stih407.c
+>   create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
+>
