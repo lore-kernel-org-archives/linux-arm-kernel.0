@@ -1,110 +1,27 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Thu, 3 Jul 2014 16:08:17 +0200
-Subject: [PATCH 5/5] ARM: DT: STi: Add DT node for MiPHY365x
-In-Reply-To: <1404133317-25953-6-git-send-email-lee.jones@linaro.org>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAG374jBYcOAL=GMGvkjf6AuzKaEFs8TaaYr=8_yBZykSrbuO_g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Jul 2014 16:08:30 +0200
+Subject: ARM: shmobile: fix shmobile_smp_apmu_suspend_init build failure for
+ !SUSPEND
+Message-ID: <4396372.pxzjeyg4CZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Patch d6d757c9a4e ("ARM: shmobile: APMU: Add Core-Standby-state for
+Suspend to RAM") added both an inline wrapper for shmobile_smp_apmu_suspend_init
+and an empty function in arch/arm/mach-shmobile/platsmp-apmu.c. We get a
+build failure when both are present, so this patch removes the one in the .c
+file and keeps the inline version.
 
-You missed to mention the target name (stih416) in the title or in the
-commit message.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-BR
-Gabriel
-
-
-On 30 June 2014 15:01, Lee Jones <lee.jones@linaro.org> wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih416-b2020-revE.dts |  5 +++++
->  arch/arm/boot/dts/stih416-b2020.dts      |  7 +++++++
->  arch/arm/boot/dts/stih416.dtsi           | 21 +++++++++++++++++++++
->  3 files changed, 33 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> index ba0fa2c..0e2c870 100644
-> --- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> @@ -31,5 +31,10 @@
->                 ethernet1: dwmac at fef08000 {
->                         snps,reset-gpio = <&PIO0 7>;
->                 };
-> +
-> +               miphy365x_phy: miphy365x at fe382000 {
-> +                       st,pcie-tx-pol-inv;
-> +                       st,sata-gen = <3>;
-> +               };
->         };
->  };
-> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> index 4e2df66..6f1145c 100644
-> --- a/arch/arm/boot/dts/stih416-b2020.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020.dts
-> @@ -12,4 +12,11 @@
->  / {
->         model = "STiH416 B2020";
->         compatible = "st,stih416-b2020", "st,stih416";
-> +
-> +       soc {
-> +               miphy365x_phy: miphy365x at fe382000 {
-> +                       st,pcie-tx-pol-inv;
-> +                       st,sata-gen = <3>;
-> +               };
-> +       };
->  };
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index 06473c5..6d7aee3 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -9,6 +9,8 @@
->  #include "stih41x.dtsi"
->  #include "stih416-clock.dtsi"
->  #include "stih416-pinctrl.dtsi"
-> +
-> +#include <dt-bindings/phy/phy-miphy365x.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/reset-controller/stih416-resets.h>
->  / {
-> @@ -236,5 +238,24 @@
->                         resets  = <&powerdown STIH416_KEYSCAN_POWERDOWN>,
->                                   <&softreset STIH416_KEYSCAN_SOFTRESET>;
->                 };
-> +
-> +               miphy365x_phy: miphy365x at fe382000 {
-> +                       compatible      = "st,miphy365x-phy";
-> +                       st,syscfg       = <&syscfg_rear>;
-> +                       #phy-cells      = <2>;
-> +                       #address-cells  = <1>;
-> +                       #size-cells     = <1>;
-> +                       ranges;
-> +
-> +                       phy_port0: port at fe382000 {
-> +                               reg = <0xfe382000 0x100>, <0xfe394000 0x100>;
-> +                               reg-names = "sata", "pcie";
-> +                       };
-> +
-> +                       phy_port1: port at fe38a000 {
-> +                               reg = <0xfe38a000 0x100>, <0xfe804000 0x100>;
-> +                               reg-names = "sata", "pcie";
-> +                       };
-> +               };
->         };
->  };
-> --
-> 1.8.3.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index a05b16d..2c06810 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -244,6 +244,4 @@ void __init shmobile_smp_apmu_suspend_init(void)
+ {
+ 	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
+ }
+-#else
+-void shmobile_smp_apmu_suspend_init(void) {}
+ #endif
