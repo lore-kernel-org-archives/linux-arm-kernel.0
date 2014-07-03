@@ -1,112 +1,140 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:31 +0200
-Subject: [PATCH RESEND 16/18] AT91: pm: Remove show_reset_status function
-In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-17-git-send-email-maxime.ripard@free-electrons.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 3 Jul 2014 17:29:09 +0200
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140703134346.GW32514@n2100.arm.linux.org.uk>
+References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
+ <20140702195154.47d6f6b4@armhf>
+ <20140702194252.GN410@sirena.org.uk>
+ <20140703074959.7c489912@armhf>
+ <20140703104432.GV410@sirena.org.uk>
+ <20140703133406.2d3e3a1d@armhf>
+ <20140703115924.GY410@sirena.org.uk>
+ <20140703152826.103c9d6c@armhf>
+ <20140703134346.GW32514@n2100.arm.linux.org.uk>
+Message-ID: <20140703172909.60caf2c7@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the reset and poweroff drivers are now implementing what the
-show_reset_status function used to do. Hence, we can remove this rather hackish
-function that prevents us from doing further cleanup.
+On Thu, 3 Jul 2014 14:43:46 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-at91/pm.c | 72 -------------------------------------------------
- 1 file changed, 72 deletions(-)
+> > But, this means that there will be a lot of errors when DPCM will be
+> > used, because, in most cases for the Cubox (kirkwood audio + tda998x),
+> > both ways I2S and S/PDIF will be activated at the same time for a
+> > single stream (you may note that the routes from the second input
+> > cannot be blocked by the CODEC after it received the first input,
+> > because these routes have already been computed).  
+> 
+> This is /very/ easy to solve on the Cubox, if only you would listen
+> to me - I've stated many times that I2S should not be used there.
+> 
+> Just because the hardware is wired up with both the SPDIF connected
+> and the I2S connected, it does *not* mean that we have to wire them
+> both up in software.
+> 
+> Indeed, *everything* works with just SPDIF.  The same is not true of
+> I2S.  So, what we do for the Cubox is we just wire up SPDIF in software
+> and be done with it - we then get a fully functional setup.  So using
+> I2S on the Cubox is mostly pointless - unless you wish to use I2S for
+> testing purposes.
+> 
+> Let me also point out that adding your changes - including the addition
+> of this codec patch - explicitly deny the possibility of:
+> * using compressed audio streams via the optical SPDIF out socket
+> * using compressed audio streams over HDMI
+> * using audio rates and formats not supported by the attached HDMI
+>   device via the optical SPDIF socket.
+> 
+> These are serious issues which thus far you have so far failed to
+> respond on.  People who use the Cubox as a media platform rather
+> than (presumably) just a music jukebox want things like compressed
+> audio out and SPDIF out to work.
+> 
+> Look, one reason to use the optical socket is because you want to
+> push out a stream at (eg) 96kHz to your audio system, but your TV
+> doesn't support it.  With your approach, you explicitly block that
+> because the TDA998x codec assocated with the Kirkwood CPU DAI
+> refuses to allow that sample rate.  Fine, if the attached device
+> does not support that rate, then the right thing to do may be to
+> disable audio transmission over HDMI, but with the Cubox hardware,
+> limiting the sample rates is totally the wrong solution.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index e95554532987..213606111d9a 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -34,79 +34,8 @@
- #include "pm.h"
- #include "gpio.h"
- 
--/*
-- * Show the reason for the previous system reset.
-- */
--
--#include "at91_rstc.h"
--#include "at91_shdwc.h"
--
- static void (*at91_pm_standby)(void);
- 
--static void __init show_reset_status(void)
--{
--	static char reset[] __initdata = "reset";
--
--	static char general[] __initdata = "general";
--	static char wakeup[] __initdata = "wakeup";
--	static char watchdog[] __initdata = "watchdog";
--	static char software[] __initdata = "software";
--	static char user[] __initdata = "user";
--	static char unknown[] __initdata = "unknown";
--
--	static char signal[] __initdata = "signal";
--	static char rtc[] __initdata = "rtc";
--	static char rtt[] __initdata = "rtt";
--	static char restore[] __initdata = "power-restored";
--
--	char *reason, *r2 = reset;
--	u32 reset_type, wake_type;
--
--	if (!at91_shdwc_base || !at91_rstc_base)
--		return;
--
--	reset_type = at91_rstc_read(AT91_RSTC_SR) & AT91_RSTC_RSTTYP;
--	wake_type = at91_shdwc_read(AT91_SHDW_SR);
--
--	switch (reset_type) {
--	case AT91_RSTC_RSTTYP_GENERAL:
--		reason = general;
--		break;
--	case AT91_RSTC_RSTTYP_WAKEUP:
--		/* board-specific code enabled the wakeup sources */
--		reason = wakeup;
--
--		/* "wakeup signal" */
--		if (wake_type & AT91_SHDW_WAKEUP0)
--			r2 = signal;
--		else {
--			r2 = reason;
--			if (wake_type & AT91_SHDW_RTTWK)	/* rtt wakeup */
--				reason = rtt;
--			else if (wake_type & AT91_SHDW_RTCWK)	/* rtc wakeup */
--				reason = rtc;
--			else if (wake_type == 0)	/* power-restored wakeup */
--				reason = restore;
--			else				/* unknown wakeup */
--				reason = unknown;
--		}
--		break;
--	case AT91_RSTC_RSTTYP_WATCHDOG:
--		reason = watchdog;
--		break;
--	case AT91_RSTC_RSTTYP_SOFTWARE:
--		reason = software;
--		break;
--	case AT91_RSTC_RSTTYP_USER:
--		reason = user;
--		break;
--	default:
--		reason = unknown;
--		break;
--	}
--	pr_info("AT91: Starting after %s %s\n", reason, r2);
--}
--
- static int at91_pm_valid_state(suspend_state_t state)
- {
- 	switch (state) {
-@@ -338,7 +267,6 @@ static int __init at91_pm_init(void)
- 
- 	suspend_set_ops(&at91_pm_ops);
- 
--	show_reset_status();
- 	return 0;
- }
- arch_initcall(at91_pm_init);
+I think that you did not look at my code.
+
+Both S/PDIF and I2S work with the TDA998x. It is a choice of the audio
+subsystem to do this choice, not Russell King. If you want only S/PDIF,
+it is easy: just declare the S/PDIF DAIs, on both sides, source
+(kirkwood) and sinks (tda998x and S/PDIF):
+
+	dai-link at 1 {		/* S/PDIF - HDMI */
+		cpu {
+			sound-dai = <&audio1 1>;
+		};
+		,codec {
+			sound-dai = <&hdmi 1>;
+		};
+	};
+
+	dai-link at 2 {		/* S/PDIF - S/PDIF */
+		cpu {
+			sound-dai = <&audio1 1>;
+		};
+		codec {
+			sound-dai = <&spdif_codec>;
+		};
+	};
+
+When DPCM will handle the formats and rates, the audio subsystem will
+find by itself if such stream will go to the HDMI only or to the S/PDIF
+only or to both. The kirwood audio driver will work as it is and the tda998x
+CODEC will work as it is. There will be no need to change these drivers.
+All we need actually is some more code in DPCM or multi-codec or
+whatever mechanism which will route the stream according to the rates
+and formats.
+
+Actually, as DPCM does not work, the user has to choose which PCM to
+use, otherwise, the application does a format and rate translation.
+
+Anyway, if you want S/PDIF output with the actual kernel (3.16-rc3), in
+the DT, put:
+
+	spdif_codec: spdif-codec {
+		compatible = "linux,spdif-dit";
+		#sound-dai-cells = <0>;
+	};
+
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Cubox Audio";
+		simple-audio-card,format = "i2s";
+
+		simple-audio-card,dai-link {		/* S/PDIF - S/PDIF */
+			simple-audio-card,cpu {
+				sound-dai = <&audio1 1>;
+			};
+			simple-audio-card,codec {
+				sound-dai = <&spdif_codec>;
+			};
+		};
+	};
+
+&audio1 {
+	status = "okay";
+	clocks = <&gate_clk 13>, <&si5351 2>;
+	clock-names = "internal", "extclk";
+	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_audio1_extclk>;
+	pinctrl-names = "default";
+	#sound-dai-cells = <1>;
+};
+
+and the sound should get out of your S/PDIF optical connector.
+
+Eventually, the TDA998x is used in other machines. Are you sure that
+the audio controllers of all these machines have a S/PDIF output
+connected to the S/PDIF input of the tda998x?
+
+The tda998x CODEC I propose works in all configurations.
+
 -- 
-2.0.1
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
