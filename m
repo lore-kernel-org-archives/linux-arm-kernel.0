@@ -1,161 +1,153 @@
-From: punnaia@xilinx.com (punnaiah choudary kalluri)
-Date: Thu, 3 Jul 2014 08:17:34 +0530
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CAGnW=BbA3gLdSv8AKkD_ysnYAaN0KoCdVW+wxWPB9zzGCh9+jQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Jul 2014 11:26:17 +0800
+Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
+ share_count
+In-Reply-To: <CAOMZO5AYA-i8Rp2Oo+unwUXmH0uQ8D3rnXxBQUgqKrfXw-vN-A@mail.gmail.com>
+References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
+ <1404194129-25543-4-git-send-email-festevam@gmail.com>
+ <20140701115252.GM14471@dragon>
+ <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
+ <20140702043508.GA16176@dragon>
+ <CAOMZO5AYA-i8Rp2Oo+unwUXmH0uQ8D3rnXxBQUgqKrfXw-vN-A@mail.gmail.com>
+Message-ID: <20140703032615.GE16176@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since its a generic driver, support for configuring the dma_mask using
-dma_coerce_mask_and_coherent would be good.
+On Wed, Jul 02, 2014 at 11:27:21AM -0300, Fabio Estevam wrote:
+> > From 0ed4b3edc661c63f86c914ea3c6deb3af3438151 Mon Sep 17 00:00:00 2001
+> > From: Shawn Guo <shawn.guo@freescale.com>
+> > Date: Wed, 2 Jul 2014 11:32:06 +0800
+> > Subject: [PATCH] ARM: imx: fix shared gate clock to have its own enable count
+> >
+> > Let's say clock A and B are two gate clocks that share the same register
+> > bit in hardware.  Therefore they should be registered as shared gate
+> > clocks with imx_clk_gate2_shared().
+> >
+> > In the current implementation, clk_enable(A) call will have share_count
+> > become 1.  If clk_disable(B) is called right after that, the register
+> > bit will be cleared to gate off the clocks.  This is unexpected.  The
+> > cause for that is there is no enable count tracking for clock A and B
+> > respectively.
+> >
+> > The patch fixes the issue by adding enable_count into clk_gate2, and
+> > tracks it prior to share_count in .enable and .disable.  Also,
+> > .is_enabled is fixed to report enable state instead of hardware state
+> > in case of shared gate clock.
+> >
+> > Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: <stable@vger.kernel.org>
+> > Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
+> 
+> No need to Cc stable on this one as the this commit did not reach stable.
 
-Regards,
-Punnaiah
+Yes, you're right.
 
-On Tue, Jun 24, 2014 at 4:05 PM, Antoine T?nart
-<antoine.tenart@free-electrons.com> wrote:
-> Add a generic ChipIdea driver, with optional PHY and clock, to support
-> ChipIdea controllers that doesn't need specific functions.
->
-> Needed for the Marvell Berlin SoCs SUB controllers.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/usb/chipidea/Makefile          |   1 +
->  drivers/usb/chipidea/ci_hdrc_generic.c | 108 +++++++++++++++++++++++++++++++++
->  2 files changed, 109 insertions(+)
->  create mode 100644 drivers/usb/chipidea/ci_hdrc_generic.c
->
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 2f099c7df7b5..c705f0fe7a00 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -20,4 +20,5 @@ endif
->
->  ifneq ($(CONFIG_OF),)
->         obj-$(CONFIG_USB_CHIPIDEA)      += usbmisc_imx.o ci_hdrc_imx.o
-> +       obj-$(CONFIG_USB_CHIPIDEA)      += ci_hdrc_generic.o
->  endif
-> diff --git a/drivers/usb/chipidea/ci_hdrc_generic.c b/drivers/usb/chipidea/ci_hdrc_generic.c
-> new file mode 100644
-> index 000000000000..27520710a1f7
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci_hdrc_generic.c
-> @@ -0,0 +1,108 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/usb/chipidea.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/usb/ulpi.h>
-> +
-> +#include "ci.h"
-> +
-> +struct ci_hdrc_generic_priv {
-> +       struct platform_device  *ci_pdev;
-> +       struct clk              *clk;
-> +};
-> +
-> +static int ci_hdrc_generic_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct ci_hdrc_generic_priv *priv;
-> +       struct ci_hdrc_platform_data ci_pdata = {
-> +               .name           = "ci_hdrc",
-> +               .capoffset      = DEF_CAPOFFSET,
-> +               .flags          = CI_HDRC_REQUIRE_TRANSCEIVER |
-> +                                 CI_HDRC_DISABLE_STREAMING,
-> +       };
-> +       int ret;
-> +
-> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       priv->clk = devm_clk_get(dev, NULL);
-> +       if (!IS_ERR(priv->clk)) {
-> +               ret = clk_prepare_enable(priv->clk);
-> +               if (ret) {
-> +                       dev_err(dev, "failed to enable the clock: %d\n", ret);
-> +                       return ret;
-> +               }
-> +       }
-> +
-> +       ci_pdata.phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-> +       if (IS_ERR(ci_pdata.phy))
-> +               /* PHY is optional */
-> +               ci_pdata.phy = NULL;
-> +
-> +       priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> +                                    pdev->num_resources, &ci_pdata);
-> +       if (IS_ERR(priv->ci_pdev)) {
-> +               ret = PTR_ERR(priv->ci_pdev);
-> +               if (ret != -EPROBE_DEFER)
-> +                       dev_err(dev,
-> +                               "failed to register ci_hdrc platform device: %d\n",
-> +                               ret);
-> +               goto clk_err;
-> +       }
-> +
-> +       platform_set_drvdata(pdev, priv);
-> +
-> +       pm_runtime_no_callbacks(dev);
-> +       pm_runtime_enable(dev);
-> +
-> +       return 0;
-> +
-> +clk_err:
-> +       clk_disable_unprepare(priv->clk);
-> +       return ret;
-> +}
-> +
-> +static int ci_hdrc_generic_remove(struct platform_device *pdev)
-> +{
-> +       struct ci_hdrc_generic_priv *priv = platform_get_drvdata(pdev);
-> +
-> +       pm_runtime_disable(&pdev->dev);
-> +       ci_hdrc_remove_device(priv->ci_pdev);
-> +       clk_disable_unprepare(priv->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id ci_hdrc_generic_of_match[] = {
-> +       { .compatible = "chipidea-usb" },
-> +       { }
-> +};
-> +MODULE_DEVICE_TABLE(of, ci_hdrc_generic_of_match);
-> +
-> +static struct platform_driver ci_hdrc_generic_driver = {
-> +       .probe  = ci_hdrc_generic_probe,
-> +       .remove = ci_hdrc_generic_remove,
-> +       .driver = {
-> +               .name           = "chipidea-usb",
-> +               .owner          = THIS_MODULE,
-> +               .of_match_table = ci_hdrc_generic_of_match,
-> +       },
-> +};
-> +module_platform_driver(ci_hdrc_generic_driver);
-> +
-> +MODULE_DESCRIPTION("Generic ChipIdea HDRC USB binding");
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+...
+
+> > @@ -67,6 +71,9 @@ static void clk_gate2_disable(struct clk_hw *hw)
+> >
+> >         spin_lock_irqsave(gate->lock, flags);
+> >
+> > +       if (--gate->enable_count > 0)
+> > +               goto out;
+> 
+> All these pre-decrement look buggy because enable_count and
+> share_count are 'unsigned int'.
+> 
+> If share_count is 0 and then you decrement it, it will still be
+> greater than zero.
+> --(*gate->share_count) > 0 and --gate->enable_count > 0 are always true.
+
+Hmm, clk_gate2_disable() should never be called with a zero share_count.
+I will add a check for that.
+
+> I have tried to make share_count and enable_count as 'int'. Then it
+> resulted CGR5 as
+> 0FFFCFFF, which still leaves ssi1 and ssi3 enabled (I have locally
+> made ssi a shared clock now)
+
+Right.  The patch did not fix the problem correctly.  I just started it
+over again with the one below.  Can you please test it?  Thanks.
+
+Shawn
+
+---8<-------------------
+
+>From e057f4c129e77639372f2b4a3b9eb8a9de2095f8 Mon Sep 17 00:00:00 2001
+From: Shawn Guo <shawn.guo@freescale.com>
+Date: Wed, 2 Jul 2014 11:32:06 +0800
+Subject: [PATCH] ARM: imx: fix shared gate clock
+
+to be added ...
+
+Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/clk-gate2.c | 30 ++++++++++++++++++++++--------
+ 1 file changed, 22 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+index 4ba587da89d2..3aa9c74d13be 100644
+--- a/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-gate2.c
+@@ -67,8 +67,12 @@ static void clk_gate2_disable(struct clk_hw *hw)
+ 
+ 	spin_lock_irqsave(gate->lock, flags);
+ 
+-	if (gate->share_count && --(*gate->share_count) > 0)
+-		goto out;
++	if (gate->share_count) {
++		if (WARN_ON(*gate->share_count == 0))
++			goto out;
++		else if (--(*gate->share_count) > 0)
++			goto out;
++	}
+ 
+ 	reg = readl(gate->reg);
+ 	reg &= ~(3 << gate->bit_idx);
+@@ -78,19 +82,26 @@ out:
+ 	spin_unlock_irqrestore(gate->lock, flags);
+ }
+ 
+-static int clk_gate2_is_enabled(struct clk_hw *hw)
++static int clk_gate2_reg_is_enabled(void __iomem *reg, u8 bit_idx)
+ {
+-	u32 reg;
+-	struct clk_gate2 *gate = to_clk_gate2(hw);
++	u32 val = readl(reg);
+ 
+-	reg = readl(gate->reg);
+-
+-	if (((reg >> gate->bit_idx) & 1) == 1)
++	if (((val >> bit_idx) & 1) == 1)
+ 		return 1;
+ 
+ 	return 0;
+ }
+ 
++static int clk_gate2_is_enabled(struct clk_hw *hw)
++{
++	struct clk_gate2 *gate = to_clk_gate2(hw);
++
++	if (gate->share_count)
++		return !!(*gate->share_count);
++	else
++		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
++}
++
+ static struct clk_ops clk_gate2_ops = {
+ 	.enable = clk_gate2_enable,
+ 	.disable = clk_gate2_disable,
+@@ -116,6 +127,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ 	gate->bit_idx = bit_idx;
+ 	gate->flags = clk_gate2_flags;
+ 	gate->lock = lock;
++
++	if (share_count)
++		*share_count = clk_gate2_reg_is_enabled(reg, bit_idx) ? 1 : 0;
+ 	gate->share_count = share_count;
+ 
+ 	init.name = name;
+-- 
+1.8.3.2
