@@ -1,27 +1,70 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 3 Jul 2014 22:35:59 +0800
-Subject: [PATCH] ARM: imx: build cpu_is_imx6sl function conditionally
-In-Reply-To: <4295402.oOSEcbAj2f@wuerfel>
-References: <4295402.oOSEcbAj2f@wuerfel>
-Message-ID: <20140703143558.GG30239@dragon>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 3 Jul 2014 22:34:17 +0800
+Subject: [PATCH 04/18] AT91: Rework ramc mapping code
+In-Reply-To: <1404396906-25194-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404396906-25194-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1DD61BDB-B880-49B4-BDAD-DC2BBE011F77@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 04:22:54PM +0200, Arnd Bergmann wrote:
-> imx6q_pm_enter calls imx6sl_set_wait_clk when run on an imx6sl
-> based machine. However if support for imx6sl is not enabled
-> at compile time, this prevents us from building the kernel and
-> we get this link error instead:
-> 
-> arch/arm/mach-imx/built-in.o: In function `imx6q_pm_enter':
-> :(.text+0x4b84): undefined reference to `imx6sl_set_wait_clk'
-> 
-> This makes the cpu_is_imx6sl function conditionally return false
-> if imx6sl is disabled at compile-time, which matches what the
-> older cpu_is_mx* macros did. We have similar inline functions for
-> the other imx6 variants, but so far I have not run into a case
-> where the extra #ifdef is necessary.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+patch 4 and 18 what is the difference?
 
-Applied, thanks.
+Best Regards,
+J.
+On Jul 3, 2014, at 10:14 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> 
+> Adapt the ramc mapping code to handle multiple ram controllers in the DT.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> arch/arm/mach-at91/setup.c | 26 ++++++++++++++------------
+> 1 file changed, 14 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index 9c4c7fb323fb..cc520596f23b 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -393,24 +393,26 @@ static void at91_dt_ramc(void)
+> {
+> 	struct device_node *np;
+> 	const struct of_device_id *of_id;
+> +	int idx = 0;
+> 
+> -	np = of_find_matching_node(NULL, ramc_ids);
+> -	if (!np)
+> -		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
+> +	for_each_matching_node(np, ramc_ids) {
+> +		at91_ramc_base[idx] = of_iomap(np, 0);
+> +		if (!at91_ramc_base[idx])
+> +			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"), idx);
+> 
+> -	at91_ramc_base[0] = of_iomap(np, 0);
+> -	if (!at91_ramc_base[0])
+> -		panic(pr_fmt("unable to map ramc[0] cpu registers\n"));
+> -	/* the controller may have 2 banks */
+> -	at91_ramc_base[1] = of_iomap(np, 1);
+> +		idx++;
+> +	}
+> +
+> +	if (!idx)
+> +		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
+> 
+> 	of_id = of_match_node(ramc_ids, np);
+> -	if (!of_id)
+> +	if (!of_id) {
+> 		pr_warn("ramc no standby function available\n");
+> -	else
+> -		at91_pm_set_standby(of_id->data);
+> +		return;
+> +	}
+> 
+> -	of_node_put(np);
+> +	at91_pm_set_standby(of_id->data);
+> }
+> 
+> static struct of_device_id shdwc_ids[] = {
+> -- 
+> 2.0.1
+> 
