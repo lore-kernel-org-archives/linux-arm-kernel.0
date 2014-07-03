@@ -1,58 +1,48 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 3 Jul 2014 21:44:00 +0800
-Subject: [PATCH] crypto: ux500: make interrupt mode plausible
-In-Reply-To: <13720857.JmA1VNKFj8@wuerfel>
-References: <13720857.JmA1VNKFj8@wuerfel>
-Message-ID: <20140703134400.GC14291@gondor.apana.org.au>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 3 Jul 2014 14:47:01 +0100
+Subject: [PATCH V6 2/2] arm: mm: Modify pte_write and pmd_write logic for
+ LPAE
+In-Reply-To: <20140703121808.GV32514@n2100.arm.linux.org.uk>
+References: <1404389173-4246-1-git-send-email-steve.capper@linaro.org>
+ <1404389173-4246-3-git-send-email-steve.capper@linaro.org>
+ <20140703121808.GV32514@n2100.arm.linux.org.uk>
+Message-ID: <20140703134700.GA6720@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:43:02PM +0200, Arnd Bergmann wrote:
-> The interrupt handler in the ux500 crypto driver has an obviously
-> incorrect way to access the data buffer, which for a while has
-> caused this build warning:
+On Thu, Jul 03, 2014 at 01:18:08PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 03, 2014 at 01:06:13PM +0100, Steve Capper wrote:
+> > diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+> > index c508f41..00a1cf9 100644
+> > --- a/arch/arm/mm/dump.c
+> > +++ b/arch/arm/mm/dump.c
+> > @@ -126,8 +126,8 @@ static const struct prot_bits section_bits[] = {
+> >  		.val	= PMD_SECT_USER,
+> >  		.set	= "USR",
+> >  	}, {
+> > -		.mask	= PMD_SECT_RDONLY,
+> > -		.val	= PMD_SECT_RDONLY,
+> > +		.mask	= PMD_SECT_AP2,
+> > +		.val	= PMD_SECT_AP2,
 > 
-> ../ux500/cryp/cryp_core.c: In function 'cryp_interrupt_handler':
-> ../ux500/cryp/cryp_core.c:234:5: warning: passing argument 1 of '__fswab32' makes integer from pointer without a cast [enabled by default]
->      writel_relaxed(ctx->indata,
->      ^
-> In file included from ../include/linux/swab.h:4:0,
->                  from ../include/uapi/linux/byteorder/big_endian.h:12,
->                  from ../include/linux/byteorder/big_endian.h:4,
->                  from ../arch/arm/include/uapi/asm/byteorder.h:19,
->                  from ../include/asm-generic/bitops/le.h:5,
->                  from ../arch/arm/include/asm/bitops.h:340,
->                  from ../include/linux/bitops.h:33,
->                  from ../include/linux/kernel.h:10,
->                  from ../include/linux/clk.h:16,
->                  from ../drivers/crypto/ux500/cryp/cryp_core.c:12:
-> ../include/uapi/linux/swab.h:57:119: note: expected '__u32' but argument is of type 'const u8 *'
->  static inline __attribute_const__ __u32 __fswab32(__u32 val)
+> I think we're almost there, except for this hunk, which I think can
+> just be deleted.
 > 
-> There are at least two, possibly three problems here:
-> a) when writing into the FIFO, we copy the pointer rather than the
->    actual data we want to give to the hardware
-> b) the data pointer is an array of 8-bit values, while the FIFO
->    is 32-bit wide, so both the read and write access fail to do
->    a proper type conversion
-> c) This seems incorrect for big-endian kernels, on which we need to
->    byte-swap any register access, but not normally FIFO accesses,
->    at least the DMA case doesn't do it either.
+> We want to report what the PTEs/PMDs are requested to be, not what they
+> physically are at the point where we dump them out.  In other words, we
+> don't want to know that they're physically read-only because the dirty
+> bit isn't set - what we want to know is that they have permission to be
+> written to if the dirty bit were to be set.
 > 
-> This converts the bogus loop to use the same readsl/writesl pair
-> that we use for the two other modes (DMA and polling). This is
-> more efficient and consistent, and probably correct for endianess.
+> The reasoning is that we want the dump to reflect what is possible -
+> for example, we want to know whether a page can be executed _and_ written
+> to.
 > 
-> The bug has existed since the driver was first merged, and was
-> probably never detected because nobody tried to use interrupt mode.
-> It might make sense to backport this fix to stable kernels, depending
-> on how the crypto maintainers feel about that.
+> Consider the case where the dirty bit is implemented in hardware.
 
-Patch applied.  I'm not going to push this to stable though until
-I see some more testing.  We can always push this later if needed.
+Thanks Russell, that makes more sense. I'll change the mask and val to:
+L_PMD_SECT_RDONLY, to catch the software bit.
 
-Thanks,
+Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Steve
