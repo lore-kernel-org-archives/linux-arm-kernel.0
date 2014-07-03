@@ -1,45 +1,36 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 3 Jul 2014 10:15:38 +0300
-Subject: [PATCHv5 04/15] hwspinlock/core: add common OF helpers
-In-Reply-To: <53B47626.4040506@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-5-git-send-email-s-anna@ti.com>
- <CAK=WgbbZvBLT7U638fBfPjF7-MJaP=4WJcrT_fEg6Uu3cXRAyg@mail.gmail.com>
- <53B47626.4040506@ti.com>
-Message-ID: <CAK=WgbbJ6a17wrsEcvNq6tPiaciQ=E+22QE06t9EA8RFqicNRg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 3 Jul 2014 09:16:18 +0200
+Subject: [PATCH 02/16] ARM: mvebu: Add a common function for the boot
+ address work around
+In-Reply-To: <53B48E8E.1080808@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140630144054.2f71514b@free-electrons.com>
+ <53B48E8E.1080808@free-electrons.com>
+Message-ID: <20140703091618.1e5408f0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Gregory,
 
-On Thu, Jul 3, 2014 at 12:14 AM, Suman Anna <s-anna@ti.com> wrote:
->> Do we have a use case today that require the xlate() method?
->>
->> If not, let's remove it as we could always add it back if some new
->> hardware shows up that needs it.
->
-> The xlate() method is to support the phandle + args specifier way of
-> requesting hwlocks, platform implementations are free to implement their
-> own xlate functions, but the above supports the simplest case of
-> controller + relative lock index within controller.
+On Thu, 03 Jul 2014 00:58:22 +0200, Gregory CLEMENT wrote:
 
-Do we have a use case for a different implementation other than the
-simplest case? If not, it seems to me this will just become redundant
-boilerplate code (every platform will use the simple xlate method).
+> >> +#define CRYPT0_ENG_ATTR	0x1
+> > 
+> > For consistency, I'd prefer to see this being passed as argument to
+> > mvebu_boot_addr_wa().
+> 
+> The attribute is the same, so why bother with it? If later we have a SoC
+> where this attribute can be different then I agree to add this argument.
 
-> This function again is to support the phandle + args specifier way of
-> requesting hwlocks, the hwspin_lock_request_specific() is invoked
-> internally within this function, so we are still reusing the actual
-> request code other than handling the DT parsing portion. If we go back
-> to using global locks in client hwlocks property, we don't need a
-> of_hwspin_lock_get_id(), the same can be achieved using the existing DT
-> function, of_property_read_u32_index().
-
-I think you may have misunderstood me, sorry. I'm ok with the phandle
-+ args specifier. I just think we can use it, together with the
-base_id property, to infer the global lock id from the DT data. This
-is not only a must to support heterogenous multi-processing systems,
-it will also substantially simplify the code.
+Simply for consistency. MBus windows are defined by their target and
+attribute values, so it makes sense to always pass both these values,
+even if for the existing cases the attribute is for now always 0x1.
 
 Thanks,
-Ohad.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
