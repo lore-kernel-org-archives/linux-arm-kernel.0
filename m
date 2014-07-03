@@ -1,19 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 3 Jul 2014 16:53:00 +0200
-Subject: [PATCH 04/18] AT91: Rework ramc mapping code
-In-Reply-To: <1DD61BDB-B880-49B4-BDAD-DC2BBE011F77@jcrosoft.com>
+Date: Thu, 3 Jul 2014 16:52:22 +0200
+Subject: [PATCH 09/18] AT91: Call at91_register_devices in the board files
+In-Reply-To: <D103F102-4B04-4CC6-8F20-58CEB0EC8E36@jcrosoft.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404396906-25194-5-git-send-email-maxime.ripard@free-electrons.com>
- <1DD61BDB-B880-49B4-BDAD-DC2BBE011F77@jcrosoft.com>
-Message-ID: <20140703145300.GF31996@lukather>
+ <1404396906-25194-15-git-send-email-maxime.ripard@free-electrons.com>
+ <D103F102-4B04-4CC6-8F20-58CEB0EC8E36@jcrosoft.com>
+Message-ID: <20140703145222.GE31996@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 10:34:17PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> patch 4 and 18 what is the difference?
+Hi,
 
-There's none, I just messed up at sending the patches. The resend
-should be on its way.
+On Thu, Jul 03, 2014 at 10:29:58PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> no do this at SoC level
+
+Since it has to be done at init_machine, I don't see any other easy
+way to do this at the SoC level.
+
+What is your suggestion?
 
 Maxime
 
@@ -27,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/1d077649/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/0de9bd37/attachment-0001.sig>
