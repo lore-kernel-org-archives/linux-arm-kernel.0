@@ -1,64 +1,146 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 3 Jul 2014 10:06:21 +0200
-Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
-In-Reply-To: <20140702165924.GB17665@lee--X1>
-References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
- <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
- <20140702165924.GB17665@lee--X1>
-Message-ID: <53B50EFD.2070007@st.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 3 Jul 2014 13:34:31 +0530
+Subject: [PATCH 1/2] arm: dra7xx: Add hwmod data for pcie1 phy and pcie2
+ phy
+In-Reply-To: <1403719366-9656-2-git-send-email-kishon@ti.com>
+References: <1403719366-9656-1-git-send-email-kishon@ti.com>
+ <1403719366-9656-2-git-send-email-kishon@ti.com>
+Message-ID: <53B50E8F.7010604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 25 June 2014 11:32 PM, Kishon Vijay Abraham I wrote:
+> Added hwmod data for pcie1 and pcie2 phy present in DRA7xx SOC.
+> Also added the missing CLKCTRL OFFSET macro and CONTEXT OFFSET macro
+> for pcie1 phy and pcie2 phy.
+> 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
 
+Looks good to me, feel free to add
+Reviewed-by: Rajendra Nayak <rnayak@ti.com>
 
-On 07/02/2014 06:59 PM, Lee Jones wrote:
-> On Wed, 02 Jul 2014, Philipp Zabel wrote:
->
->> Hi Peter,
->>
->> Am Mittwoch, den 02.07.2014, 15:08 +0100 schrieb Peter Griffin:
->>> This series adds reset controller support for the STiH407 SoC.
->>>
->>> Changes since v1
->>>   - Update copyright to 2014
->>>   - Add const qualifier
->>>   - Fix various whitespace issues
->>>   - Remove THIS_OWNER
->>>   - Move DT documentation into separate patch
->>>
->>> Peter Griffin (4):
->>>    reset: stih407: Add softreset, powerdown and picophy controllers
->>>    reset: sti: Document sti-picophyreset controllers bindings.
->>>    ARM: sti: Add STiH407 Kconfig entry to select STIH407_RESET
->>>    ARM: sti: Add STiH407 reset controller support.
->>>
->>>   .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
->>>   arch/arm/boot/dts/stih407.dtsi                     |  16 +++
->>>   arch/arm/mach-sti/Kconfig                          |  10 ++
->>>   drivers/reset/sti/Kconfig                          |   4 +
->>>   drivers/reset/sti/Makefile                         |   1 +
->>>   drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
->>>   .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
->>>   7 files changed, 292 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
->>>   create mode 100644 drivers/reset/sti/reset-stih407.c
->>>   create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
->>
->> Looks good to me now.
->>
->> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->
-> Do you have a tree for Reset?  If not, which route do these patches
-> normally follow?
->
-
-I will queue patch 4 to STi DT branch for v3.17.
-For now, no nodes uses reset for STiH407, so we don't need the 
-dt-bindings header file in the STi tree.
-
-If we have a DT node using a reset line before my pull-request, I might 
-have to integrate the series in the STi DT branch.
-Philipp, does that sound reasonable?
-
-Regards,
-Maxime
+> ---
+> Please find the bootlog with these hwmod patches
+> http://paste.ubuntu.com/7701601/
+>  arch/arm/mach-omap2/cm2_7xx.h             |    4 ++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   57 +++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prm7xx.h              |    4 ++
+>  3 files changed, 65 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/cm2_7xx.h b/arch/arm/mach-omap2/cm2_7xx.h
+> index 9ad7594..e966e3a 100644
+> --- a/arch/arm/mach-omap2/cm2_7xx.h
+> +++ b/arch/arm/mach-omap2/cm2_7xx.h
+> @@ -357,6 +357,10 @@
+>  #define DRA7XX_CM_L3INIT_SATA_CLKCTRL				DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x0088)
+>  #define DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET				0x00a0
+>  #define DRA7XX_CM_PCIE_STATICDEP_OFFSET				0x00a4
+> +#define DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET			0x00b0
+> +#define DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL			DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x00b0)
+> +#define DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET			0x00b8
+> +#define DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL			DRA7XX_CM_CORE_REGADDR(DRA7XX_CM_CORE_L3INIT_INST, 0x00b8)
+>  #define DRA7XX_CM_GMAC_CLKSTCTRL_OFFSET				0x00c0
+>  #define DRA7XX_CM_GMAC_STATICDEP_OFFSET				0x00c4
+>  #define DRA7XX_CM_GMAC_DYNAMICDEP_OFFSET			0x00c8
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 3deb76e..6ff40a6 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1290,6 +1290,45 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>  };
+>  
+>  /*
+> + * 'PCIE PHY' class
+> + *
+> + */
+> +
+> +static struct omap_hwmod_class dra7xx_pcie_phy_hwmod_class = {
+> +	.name	= "pcie-phy",
+> +};
+> +
+> +/* pcie1 phy */
+> +static struct omap_hwmod dra7xx_pcie1_phy_hwmod = {
+> +	.name		= "pcie1-phy",
+> +	.class		= &dra7xx_pcie_phy_hwmod_class,
+> +	.clkdm_name	= "l3init_clkdm",
+> +	.main_clk	= "l4_root_clk_div",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/* pcie2 phy */
+> +static struct omap_hwmod dra7xx_pcie2_phy_hwmod = {
+> +	.name		= "pcie2-phy",
+> +	.class		= &dra7xx_pcie_phy_hwmod_class,
+> +	.clkdm_name	= "l3init_clkdm",
+> +	.main_clk	= "l4_root_clk_div",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/*
+>   * 'qspi' class
+>   *
+>   */
+> @@ -2409,6 +2448,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_cfg -> pcie1 phy */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
+> +	.master		= &dra7xx_l4_cfg_hwmod,
+> +	.slave		= &dra7xx_pcie1_phy_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* l4_cfg -> pcie2 phy */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2_phy = {
+> +	.master		= &dra7xx_l4_cfg_hwmod,
+> +	.slave		= &dra7xx_pcie2_phy_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_addr_space dra7xx_qspi_addrs[] = {
+>  	{
+>  		.pa_start	= 0x4b300000,
+> @@ -2758,6 +2813,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_cfg__mpu,
+>  	&dra7xx_l4_cfg__ocp2scp1,
+>  	&dra7xx_l4_cfg__ocp2scp3,
+> +	&dra7xx_l4_cfg__pcie1_phy,
+> +	&dra7xx_l4_cfg__pcie2_phy,
+>  	&dra7xx_l3_main_1__qspi,
+>  	&dra7xx_l4_cfg__sata,
+>  	&dra7xx_l4_cfg__smartreflex_core,
+> diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
+> index d92a840..4bb50fbf 100644
+> --- a/arch/arm/mach-omap2/prm7xx.h
+> +++ b/arch/arm/mach-omap2/prm7xx.h
+> @@ -374,6 +374,10 @@
+>  #define DRA7XX_RM_L3INIT_IEEE1500_2_OCP_CONTEXT_OFFSET		0x007c
+>  #define DRA7XX_PM_L3INIT_SATA_WKDEP_OFFSET			0x0088
+>  #define DRA7XX_RM_L3INIT_SATA_CONTEXT_OFFSET			0x008c
+> +#define DRA7XX_PM_L3INIT_PCIESS1_WKDEP_OFFSET			0x00b0
+> +#define DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET		0x00b4
+> +#define DRA7XX_PM_L3INIT_PCIESS2_WKDEP_OFFSET			0x00b8
+> +#define DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET		0x00bc
+>  #define DRA7XX_RM_GMAC_GMAC_CONTEXT_OFFSET			0x00d4
+>  #define DRA7XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET		0x00e4
+>  #define DRA7XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET		0x00ec
+> 
