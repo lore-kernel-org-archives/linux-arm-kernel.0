@@ -1,117 +1,33 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 3 Jul 2014 13:37:55 +0530
-Subject: [PATCH 2/2] arm: dra7xx: Add hwmod data for pcie1 and pcie2
- subsystems
-In-Reply-To: <1403719366-9656-3-git-send-email-kishon@ti.com>
-References: <1403719366-9656-1-git-send-email-kishon@ti.com>
- <1403719366-9656-3-git-send-email-kishon@ti.com>
-Message-ID: <53B50F5B.7010505@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu,  3 Jul 2014 10:23:50 +0200
+Subject: [PATCH 2/2] ARM: mvebu: add devtmpfs to mvebu_v5_defconfig
+In-Reply-To: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404375830-22169-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 June 2014 11:32 PM, Kishon Vijay Abraham I wrote:
-> Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> Please find the bootlog with these hwmod patches
-> http://paste.ubuntu.com/7701601/
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   55 +++++++++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 6ff40a6..934aa9d 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -1290,6 +1290,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
->  };
->  
->  /*
-> + * 'PCIE' class
-> + *
-> + */
-> +
-> +static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
-> +	.name	= "pcie",
-> +};
-> +
-> +/* pcie1 */
-> +static struct omap_hwmod dra7xx_pcie1_hwmod = {
-> +	.name		= "pcie1",
-> +	.class		= &dra7xx_pcie_hwmod_class,
-> +	.clkdm_name	= "l3init_clkdm",
+The devtmpfs filesystem is now widely used and generally needed to
+boot Linux systems. 42 ARM defconfigs have it enabled, so it makes
+sense to have it enabled as well in mvebu_v5_defconfig.
 
-The TRM tells me it belongs to 'pcie_clkdm' instead. Can you please recheck?
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/configs/mvebu_v5_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-> +			.modulemode	= MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +};
-> +
-> +/* pcie2 */
-> +static struct omap_hwmod dra7xx_pcie2_hwmod = {
-> +	.name		= "pcie2",
-> +	.class		= &dra7xx_pcie_hwmod_class,
-> +	.clkdm_name	= "l3init_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-> +			.modulemode   = MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +};
-> +
-> +/*
->   * 'PCIE PHY' class
->   *
->   */
-> @@ -2448,6 +2485,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +/* l4_cfg -> pcie1 */
-
-There seems to be a slave port on l3_init as well which seems to be missing?
-
-Refer to 'Figure 24-157. PCIe Controllers Integration' of TRM version P.
-
-regards,
-Rajendra
-
-> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
-> +	.master		= &dra7xx_l4_cfg_hwmod,
-> +	.slave		= &dra7xx_pcie1_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* l4_cfg -> pcie2 */
-> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
-> +	.master		= &dra7xx_l4_cfg_hwmod,
-> +	.slave		= &dra7xx_pcie2_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  /* l4_cfg -> pcie1 phy */
->  static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
->  	.master		= &dra7xx_l4_cfg_hwmod,
-> @@ -2813,6 +2866,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
->  	&dra7xx_l4_cfg__mpu,
->  	&dra7xx_l4_cfg__ocp2scp1,
->  	&dra7xx_l4_cfg__ocp2scp3,
-> +	&dra7xx_l4_cfg__pcie1,
-> +	&dra7xx_l4_cfg__pcie2,
->  	&dra7xx_l4_cfg__pcie1_phy,
->  	&dra7xx_l4_cfg__pcie2_phy,
->  	&dra7xx_l3_main_1__qspi,
-> 
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 9f70f59..5df35e9 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -38,6 +38,8 @@ CONFIG_NET_PKTGEN=m
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+-- 
+2.0.0
