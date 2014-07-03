@@ -1,172 +1,97 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:14:47 +0200
-Subject: [PATCH 09/18] AT91: Call at91_register_devices in the board files
+Date: Thu,  3 Jul 2014 16:14:34 +0200
+Subject: [PATCH 01/18] power: reset: Add if statement isntead of multiple
+ depends on
 In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make every board call the register_devices callback so that the devices
-declared by the SoC are registered.
+All the config option so far are depending on the POWER_RESET symbol
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/board-afeb-9260v1.c  | 2 ++
- arch/arm/mach-at91/board-cam60.c        | 2 ++
- arch/arm/mach-at91/board-cpu9krea.c     | 2 ++
- arch/arm/mach-at91/board-flexibity.c    | 2 ++
- arch/arm/mach-at91/board-sam9-l9260.c   | 2 ++
- arch/arm/mach-at91/board-sam9260ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9261ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9263ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9m10g45ek.c | 2 ++
- arch/arm/mach-at91/board-sam9rlek.c     | 2 ++
- arch/arm/mach-at91/board-snapper9260.c  | 2 ++
- 11 files changed, 22 insertions(+)
+ drivers/power/reset/Kconfig | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 597c649170aa..fc9621ccb606 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -167,6 +167,8 @@ static struct at91_cf_data afeb9260_cf_data = {
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index bdcf5173e377..19d546c5edfa 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -6,15 +6,17 @@ menuconfig POWER_RESET
  
- static void __init afeb9260_board_init(void)
- {
-+	at91_register_devices();
+ 	  Say Y here to enable board reset and power off
+ 
++if POWER_RESET
 +
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index a30502c8d379..283655bd86c1 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -170,6 +170,8 @@ static void __init cam60_add_device_nand(void)
+ config POWER_RESET_AS3722
+ 	bool "ams AS3722 power-off driver"
+-	depends on MFD_AS3722 && POWER_RESET
++	depends on MFD_AS3722
+ 	help
+ 	  This driver supports turning off board via a ams AS3722 power-off.
  
- static void __init cam60_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 2037f78c84e7..29a89032bb9a 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -322,6 +322,8 @@ static struct mci_platform_data __initdata cpu9krea_mci0_data = {
+ config POWER_RESET_AXXIA
+ 	bool "LSI Axxia reset driver"
+-	depends on POWER_RESET && ARCH_AXXIA
++	depends on ARCH_AXXIA
+ 	help
+ 	  This driver supports restart for Axxia SoC.
  
- static void __init cpu9krea_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* NOR */
- 	cpu9krea_add_device_nor();
- 	/* Serial */
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index 68f1ab6bd08f..79bd411b0cee 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -138,6 +138,8 @@ static struct gpio_led flexibity_leds[] = {
+@@ -22,7 +24,7 @@ config POWER_RESET_AXXIA
  
- static void __init flexibity_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index d24dda67e2d3..70309404f366 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -187,6 +187,8 @@ static struct gpio_led ek_leds[] = {
+ config POWER_RESET_GPIO
+ 	bool "GPIO power-off driver"
+-	depends on OF_GPIO && POWER_RESET
++	depends on OF_GPIO
+ 	help
+ 	  This driver supports turning off your board via a GPIO line.
+ 	  If your board needs a GPIO high/low to power down, say Y and
+@@ -30,13 +32,13 @@ config POWER_RESET_GPIO
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index 65dea12d685e..da9c5f1f2c49 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -307,6 +307,8 @@ static void __init ek_add_device_buttons(void) {}
+ config POWER_RESET_MSM
+ 	bool "Qualcomm MSM power-off driver"
+-	depends on POWER_RESET && ARCH_QCOM
++	depends on ARCH_QCOM
+ 	help
+ 	  Power off and restart support for Qualcomm boards.
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 4637432de08f..d1be10b09ab3 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -561,6 +561,8 @@ static struct gpio_led ek_leds[] = {
+ config POWER_RESET_QNAP
+ 	bool "QNAP power-off driver"
+-	depends on OF_GPIO && POWER_RESET && PLAT_ORION
++	depends on OF_GPIO && PLAT_ORION
+ 	help
+ 	  This driver supports turning off QNAP NAS devices by sending
+ 	  commands to the microcontroller which controls the main power.
+@@ -54,14 +56,13 @@ config POWER_RESET_RESTART
+ config POWER_RESET_SUN6I
+ 	bool "Allwinner A31 SoC reset driver"
+ 	depends on ARCH_SUNXI
+-	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the Allwinner A31 SoCs.
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index cd2726ee5add..3f613d962d9b 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -405,6 +405,8 @@ static struct at91_can_data ek_can_data = {
+ config POWER_RESET_VEXPRESS
+ 	bool "ARM Versatile Express power-off and reset driver"
+ 	depends on ARM || ARM64
+-	depends on POWER_RESET && VEXPRESS_CONFIG
++	depends on VEXPRESS_CONFIG
+ 	help
+ 	  Power off and reset support for the ARM Ltd. Versatile
+ 	  Express boards.
+@@ -69,7 +70,6 @@ config POWER_RESET_VEXPRESS
+ config POWER_RESET_XGENE
+ 	bool "APM SoC X-Gene reset driver"
+ 	depends on ARM64
+-	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the APM SoC X-Gene Eval boards.
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 1ea61328f30d..33a7b19f7400 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -450,6 +450,8 @@ static struct platform_device *devices[] __initdata = {
+@@ -80,3 +80,4 @@ config POWER_RESET_KEYSTONE
+ 	help
+ 	  Reboot support for the KEYSTONE SoCs.
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index b64648b4a1fc..262e3f957d9f 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -292,6 +292,8 @@ static void __init ek_add_device_buttons(void) {}
- 
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 1b870e6def0c..2a817b85569f 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -154,6 +154,8 @@ static void __init snapper9260_add_device_nand(void)
- 
- static void __init snapper9260_board_init(void)
- {
-+	at91_register_devices();
-+
- 	at91_add_device_i2c(snapper9260_i2c_devices,
- 			    ARRAY_SIZE(snapper9260_i2c_devices));
- 
++endif
 -- 
 2.0.1
