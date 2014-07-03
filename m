@@ -1,34 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Jul 2014 18:52:58 +0100
-Subject: [PATCH] arm: Make sure memory starting at physical address 0
- is reserved.
-In-Reply-To: <1404409205-7368-1-git-send-email-alcooperx@gmail.com>
-References: <1404409205-7368-1-git-send-email-alcooperx@gmail.com>
-Message-ID: <20140703175258.GB32514@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 18:53:07 +0100
+Subject: [PATCH 1/3] ARM: perf: Check that current->mm is alive before
+ getting user callchain
+In-Reply-To: <1403881067-22690-2-git-send-email-jean.pihet@linaro.org>
+References: <1403881067-22690-1-git-send-email-jean.pihet@linaro.org>
+ <1403881067-22690-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140703175306.GG17372@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 01:40:05PM -0400, Al Cooper wrote:
-> Some older hardware, like USB OHCI, cannot DMA to physical address
-> zero. This change makes sure that the first PAGESIZE block of memory
-> starting at zero is reserved so it can't end up in any free
-> memory pool.
+On Fri, Jun 27, 2014 at 03:57:45PM +0100, Jean Pihet wrote:
+> An event may occur when an mm is already released.
+> 
+> As per commit 20afc60f892d285fde179ead4b24e6a7938c2f1b
+>  'x86, perf: Check that current->mm is alive before getting user callchain'
+> 
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
 
-I really don't like this approach.  The assumption here is that DMA
-address zero on a peripheral is the same as physical address zero.
-That isn't always the case.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-What if DMA address zero corresponds with the first byte of RAM, but
-the first byte of RAM is at 0x80000000?
-
-I believe there's even some cases where the first byte of RAM is not
-what the kernel sees as the first byte of RAM (because people want
-to hide the first half of RAM from the kernel for a DSP or similar.)
-
-What I'm saying is I don't think there's a nice simple solution to
-this.  We probably need the DT reserved memory support to handle
-this.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+>  arch/arm/kernel/perf_event.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 4238bcb..6493c4c 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -590,6 +590,10 @@ perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
+>  	}
+>  
+>  	perf_callchain_store(entry, regs->ARM_pc);
+> +
+> +	if (!current->mm)
+> +		return;
+> +
+>  	tail = (struct frame_tail __user *)regs->ARM_fp - 1;
+>  
+>  	while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
+> -- 
+> 1.8.1.2
+> 
+> 
