@@ -1,76 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jul 2014 18:52:31 +0100
-Subject: [PATCH 2/3] ARM: perf: disable the pagefault handler when
- reading from user space
-In-Reply-To: <1403881067-22690-3-git-send-email-jean.pihet@linaro.org>
-References: <1403881067-22690-1-git-send-email-jean.pihet@linaro.org>
- <1403881067-22690-3-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140703175231.GF17372@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 18:52:58 +0100
+Subject: [PATCH] arm: Make sure memory starting at physical address 0
+ is reserved.
+In-Reply-To: <1404409205-7368-1-git-send-email-alcooperx@gmail.com>
+References: <1404409205-7368-1-git-send-email-alcooperx@gmail.com>
+Message-ID: <20140703175258.GB32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+On Thu, Jul 03, 2014 at 01:40:05PM -0400, Al Cooper wrote:
+> Some older hardware, like USB OHCI, cannot DMA to physical address
+> zero. This change makes sure that the first PAGESIZE block of memory
+> starting at zero is reserved so it can't end up in any free
+> memory pool.
 
-On Fri, Jun 27, 2014 at 03:57:46PM +0100, Jean Pihet wrote:
-> As done on other architectures (ARM64, x86, Sparc etc.).
-> 
-> This prevents a deadlock on down_read in do_page_fault when unwinding
-> using fp and triggering on kernel tracepoints:
+I really don't like this approach.  The assumption here is that DMA
+address zero on a peripheral is the same as physical address zero.
+That isn't always the case.
 
-So is this an issue because you could try setting tracepoints on the
-pagefault path? If so, the patch is a little brutal as it would break user
-backtracing as soon as we take any old page fault, no?
+What if DMA address zero corresponds with the first byte of RAM, but
+the first byte of RAM is at 0x80000000?
 
-Or am I missing something obvious?
+I believe there's even some cases where the first byte of RAM is not
+what the kernel sees as the first byte of RAM (because people want
+to hide the first half of RAM from the kernel for a DSP or similar.)
 
-Will
+What I'm saying is I don't think there's a nice simple solution to
+this.  We probably need the DT reserved memory support to handle
+this.
 
->   INFO: task stress:2116 blocked for more than 120 seconds.
->         Not tainted 3.15.0-rc4-00364-g3401dfb-dirty #43
->   "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
->   stress          D c04b41e8     0  2116   2115 0x00000000
->   [<c04b41e8>] (__schedule) from [<c04b46dc>] (schedule+0x40/0x90)
->   [<c04b46dc>] (schedule) from [<c04b6ec8>] (__down_read+0xc4/0xfc)
->   [<c04b6ec8>] (__down_read) from [<c04b69c0>] (down_read+0x18/0x1c)
->   [<c04b69c0>] (down_read) from [<c001d41c>] (do_page_fault+0xac/0x420)
->   [<c001d41c>] (do_page_fault) from [<c0008444>] (do_DataAbort+0x44/0xa8)
->   [<c0008444>] (do_DataAbort) from [<c00136b8>] (__dabt_svc+0x38/0x60)
->   Exception stack(0xecbc3af8 to 0xecbc3b40)
->   3ae0:                                                       ecbc3b74 b6d72ff4
->   3b00: ffffffec 00000000 b6d72ff4 ec0fc000 00000000 ec0fc000 0000007e 00000000
->   3b20: ecbc2000 ecbc3bac 00000014 ecbc3b44 c0019e78 c021ef44 00000013 ffffffff
->   [<c00136b8>] (__dabt_svc) from [<c021ef44>] (__copy_from_user+0xa4/0x3a0)
-> 
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/perf_event.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 6493c4c..f5aeca2 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -560,11 +560,16 @@ user_backtrace(struct frame_tail __user *tail,
->  	       struct perf_callchain_entry *entry)
->  {
->  	struct frame_tail buftail;
-> +	unsigned long err;
->  
-> -	/* Also check accessibility of one struct frame_tail beyond */
->  	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
->  		return NULL;
-> -	if (__copy_from_user_inatomic(&buftail, tail, sizeof(buftail)))
-> +
-> +	pagefault_disable();
-> +	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
-> +	pagefault_enable();
-> +
-> +	if (err)
->  		return NULL;
->  
->  	perf_callchain_store(entry, buftail.lr);
-> -- 
-> 1.8.1.2
-> 
-> 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
