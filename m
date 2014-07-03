@@ -1,51 +1,64 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 3 Jul 2014 09:09:55 -0700
-Subject: timers & suspend
-In-Reply-To: <53B54AC2.5040908@linaro.org>
-References: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
- <53B54AC2.5040908@linaro.org>
-Message-ID: <83fa689b-a06a-4f1c-97cb-f7a7121a0f25@BL2FFO11FD041.protection.gbl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 Jul 2014 18:04:02 +0200
+Subject: [PATCH 1/2] efi/arm64: fix potential NULL dereference of
+ efi.systab
+In-Reply-To: <1404311385.19665.15.camel@deneb.redhat.com>
+References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-SLQC82q7Rj5ZusbFxwysy7KpRhZ=vw1ipXu9kvq46aQ@mail.gmail.com>
+ <1404311385.19665.15.camel@deneb.redhat.com>
+Message-ID: <CAKv+Gu_RAFFfsX75mdTZ06q7fUrOzD+auFj6uo1sx6Rj=x7Qbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-07-03 at 02:21PM +0200, Daniel Lezcano wrote:
-> On 06/30/2014 08:39 PM, S?ren Brinkmann wrote:
-> >Hi,
-> >
-> >I'm currently working on suspend for Zynq and try to track down some
-> >spurious wakes. It looks like the spurious wakes are caused by timers,
-> >hence I was wondering whether there are any special requirements for
-> >timer drivers when it comes to suspend support or if I just missed
-> >something.
-> >
-> >Zynq sets the 'IRQCHIP_MASK_ON_SUSPEND' flag, which should mask all
-> >interrupts but the wake source. Reading through kernel/irq/pm.c
-> >indicates, that timer interrupts get some special treatment though.
-> >Therefore I implemented some suspend/resume callbacks for the
-> >cadence_ttc which disable and clear the timer's interrupts when going
-> >into suspend. That seems to mitigate the issue quite a bit, but I still
-> >saw spurious wakes - just a lot less often.
-> >Digging a little deeper revealed, the spurious wakes are caused by the
-> >ARM's smp_twd timer now. Given that that driver is probably used by a few
-> >more ARM platforms, I get the feeling that I'm missing something.
-> 
-> Do you receive any interrupt from the cadence_ttc ? (/proc/interrupts)
-> 
-> That's funny because I realize that you cadence ttc timer is never
-> used as there are the architected timers. The cadence ttc would be
-> only useful if there were an idle state powering down the smp_twd
-> timers but it is not the case on this board, IIUC.
-Yes they are used. They TTC is the only broadcast capable timer for
-Zynq. In my experience, I can not even boot without it (may have
-dependencies on CPUidle or something).
+On 2 July 2014 16:29, Mark Salter <msalter@redhat.com> wrote:
+> On Wed, 2014-07-02 at 12:13 +0200, Ard Biesheuvel wrote:
+>> > On 2 July 2014 12:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > We assign efi.systab using efi_lookup_mapped_addr(), and test for !NULL, but
+>> > then go on an dereference it anyway.
+>> >
+>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > ---
+>> >  arch/arm64/kernel/efi.c | 7 +++++--
+>> >  1 file changed, 5 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> > index 56c3327bbf79..e785f93f17cb 100644
+>> > --- a/arch/arm64/kernel/efi.c
+>> > +++ b/arch/arm64/kernel/efi.c
+>> > @@ -419,8 +419,11 @@ static int __init arm64_enter_virtual_mode(void)
+>> >         }
+>> >
+>> >         efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
+>> > -       if (efi.systab)
+>> > -               set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+>> > +       if (!efi.systab) {
+>> > +               pr_err("Failed to remap EFI System Table!\n");
+>>
+>> ... this needs a kfree(virtmap) as well.
+>>
+>
+> And probably should unmap all the remapped regions in virtmap first.
 
-> 
-> >It's probably worth mentioning that the suspend state in Zynq does not
-> >power off the CPU cores. It just asserts the resets on secondary cores
-> >and the primary one waits in wfi.
-> 
-> Why do you need to reset them ?
-CPU0 is not reset, but all secondary cores are. That is as close to
-power off as we get and works well with hotplug.
+Yes.
 
-	S?ren
+> Presumably the systab will be in a runtime memory region which gets
+> virtual mapping from remap_region(). If that succeeds, then the
+> efi_lookup_mapped_addr should always succeed. But to be careful,
+> we should probably bail out earlier if remap_region() ever returns
+> zero. If all remaps work and efi_lookup_mapped_addr() fails, then
+> we should try ioremap_cache() directly. Or do what x86 does and make
+> a local copy of the table earlier when we early_memremap() it in
+> uefi_init().
+>
+
+Bailing early (and cleaning up) if any remap_region() call fails seems
+like a wise thing to do.
+But if they all succeed, and efi_lookup_mapped_addr() then fails to
+resolve efi_system_table, it means it lives in a region which will
+become inaccessible to the runtime services themselves after
+set_virtual_address_map() has been called. So doing any kind of
+fallback masks a severe firmware bug, which makes me think we should
+just complain loudly and not enable UEFI bits any further
+
+-- 
+Ard.
