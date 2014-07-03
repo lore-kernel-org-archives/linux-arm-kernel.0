@@ -1,140 +1,136 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 3 Jul 2014 17:29:09 +0200
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140703134346.GW32514@n2100.arm.linux.org.uk>
-References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
- <20140702195154.47d6f6b4@armhf>
- <20140702194252.GN410@sirena.org.uk>
- <20140703074959.7c489912@armhf>
- <20140703104432.GV410@sirena.org.uk>
- <20140703133406.2d3e3a1d@armhf>
- <20140703115924.GY410@sirena.org.uk>
- <20140703152826.103c9d6c@armhf>
- <20140703134346.GW32514@n2100.arm.linux.org.uk>
-Message-ID: <20140703172909.60caf2c7@armhf>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Jul 2014 17:29:57 +0200
+Subject: [PATCH 15/16] ARM: mvebu: Add CPU idle support for Armada 38x
+In-Reply-To: <20140630170741.73256ba0@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-16-git-send-email-gregory.clement@free-electrons.com>
+ <20140630170741.73256ba0@free-electrons.com>
+Message-ID: <53B576F5.6080508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jul 2014 14:43:46 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi Thomas,
 
-> > But, this means that there will be a lot of errors when DPCM will be
-> > used, because, in most cases for the Cubox (kirkwood audio + tda998x),
-> > both ways I2S and S/PDIF will be activated at the same time for a
-> > single stream (you may note that the routes from the second input
-> > cannot be blocked by the CODEC after it received the first input,
-> > because these routes have already been computed).  
+
+>> Unlike the Armada XP and the Armada 370, this SoC uses a Cortex A9
+>> core.
 > 
-> This is /very/ easy to solve on the Cubox, if only you would listen
-> to me - I've stated many times that I2S should not be used there.
+> Isn't there some more details missing in this sentence? When I read it,
+> at the end of the sentence, I'm wondering "and so what? what does this
+> implies in terms of cpuidle support?".
+
+Humm, actually, it the next sentence was wrongly formulate. Using a
+Cortex A9 implies(or at least encourage) the use of ARM L2 cache and of
+the SCU.
+
 > 
-> Just because the hardware is wired up with both the SPDIF connected
-> and the I2S connected, it does *not* mean that we have to wire them
-> both up in software.
+>> Beside this, the main difference for the cpu idle is the way to
+>> handle the L2 cache and the use of SCU.
+
+
+[...]
+
+>>  		pr_err("unable to request region\n");
+>>  		ret = -EBUSY;
+>> +
 > 
-> Indeed, *everything* works with just SPDIF.  The same is not true of
-> I2S.  So, what we do for the Cubox is we just wire up SPDIF in software
-> and be done with it - we then get a fully functional setup.  So using
-> I2S on the Cubox is mostly pointless - unless you wish to use I2S for
-> testing purposes.
+> This change.
 > 
-> Let me also point out that adding your changes - including the addition
-> of this codec patch - explicitly deny the possibility of:
-> * using compressed audio streams via the optical SPDIF out socket
-> * using compressed audio streams over HDMI
-> * using audio rates and formats not supported by the attached HDMI
->   device via the optical SPDIF socket.
+>>  		goto out;
+>>  	}
+>>  
+>> @@ -163,7 +181,6 @@ static int __init mvebu_v7_pmsu_init(void)
+>>  		ret = -ENOMEM;
+>>  		goto out;
+>>  	}
+>> -
 > 
-> These are serious issues which thus far you have so far failed to
-> respond on.  People who use the Cubox as a media platform rather
-> than (presumably) just a music jukebox want things like compressed
-> audio out and SPDIF out to work.
+> And this one look like spurious changes not related to the patch.
+
+yes of course.
+
 > 
-> Look, one reason to use the optical socket is because you want to
-> push out a stream at (eg) 96kHz to your audio system, but your TV
-> doesn't support it.  With your approach, you explicitly block that
-> because the TDA998x codec assocated with the Kirkwood CPU DAI
-> refuses to allow that sample rate.  Fine, if the attached device
-> does not support that rate, then the right thing to do may be to
-> disable audio transmission over HDMI, but with the Cubox hardware,
-> limiting the sample rates is totally the wrong solution.
+>>   out:
+>>  	of_node_put(np);
+>>  	return ret;
+>> @@ -260,6 +277,27 @@ static int armada_xp_370_cpu_suspend(unsigned long deepidle)
+>>  	return cpu_suspend(deepidle, do_armada_xp_370_cpu_suspend);
+>>  }
+>>  
+>> +static noinline int do_armada_38x_cpu_suspend(unsigned long deepidle)
+>> +{
+>> +	mvebu_v7_pmsu_idle_prepare(deepidle, false);
+>> +	/*
+>> +	 * Already flushed cache, but do it again as the outer cache
+>> +	 * functions dirty the cache with spinlocks
+>> +	 */
+>> +	v7_exit_coherency_flush(louis);
+>> +
+>> +	scu_power_mode(scu_base, SCU_PM_POWEROFF);
+>> +
+>> +	cpu_do_idle();
+> 
+> I see cpu_do_idle() does dsb() and wfi(), so why don't we use in the
+> do_armada_370_xp_cpu_suspend() function ?
 
-I think that you did not look at my code.
+We can use cpu_do_idle() in do_armada_370_xp_cpu_suspend() too.
 
-Both S/PDIF and I2S work with the TDA998x. It is a choice of the audio
-subsystem to do this choice, not Russell King. If you want only S/PDIF,
-it is easy: just declare the S/PDIF DAIs, on both sides, source
-(kirkwood) and sinks (tda998x and S/PDIF):
+> 
+>> +
+>> +	return 1;
+> 
+> You return 1 here, but in the do_armada_370_xp_cpu_suspend() function
+> you return zero. Is the return value being used? Why use 0 in one case
+> and 1 in the other?
 
-	dai-link at 1 {		/* S/PDIF - HDMI */
-		cpu {
-			sound-dai = <&audio1 1>;
-		};
-		,codec {
-			sound-dai = <&hdmi 1>;
-		};
-	};
+return 1 means error. But I think it was a nasty trick to not enter in the
+CPU_PM_EXIT case. I forgot to go back on this, once the cpu idle was working
+on Armada 38x. I will take care of it in the next series.
 
-	dai-link at 2 {		/* S/PDIF - S/PDIF */
-		cpu {
-			sound-dai = <&audio1 1>;
-		};
-		codec {
-			sound-dai = <&spdif_codec>;
-		};
-	};
+[...]
 
-When DPCM will handle the formats and rates, the audio subsystem will
-find by itself if such stream will go to the HDMI only or to the S/PDIF
-only or to both. The kirwood audio driver will work as it is and the tda998x
-CODEC will work as it is. There will be no need to change these drivers.
-All we need actually is some more code in DPCM or multi-codec or
-whatever mechanism which will route the stream according to the rates
-and formats.
+>> +{
+>> +	struct device_node *np;
+>> +	void __iomem *mpsoc_base;
+>> +	u32 reg;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL,
+>> +				"marvell,armada-380-coherency-fabric");
+>> +	if (!np)
+>> +		return false;
+> 
+> 		return -ENODEV;
+> 
+>> +	of_node_put(np);
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL,
+>> +				"marvell,armada-380-mpcore-soc-ctrl");
+>> +	if (!np)
+>> +		return false;
+> 
+> 		return -ENODEV;
+> 
+>> +	mpsoc_base = of_iomap(np, 0);
+>> +	WARN_ON(!mpsoc_base);
+> 
+> WARN_ON() seems a bit weak for something that will make the next line
+> crash the kernel. What about:
+> 
+> 	if (!mpsoc_base)
+> 		return -ENOMEM;
+> 
+> I think the of_node_put(np) should be here.
 
-Actually, as DPCM does not work, the user has to choose which PCM to
-use, otherwise, the application does a format and rate translation.
+OK
 
-Anyway, if you want S/PDIF output with the actual kernel (3.16-rc3), in
-the DT, put:
 
-	spdif_codec: spdif-codec {
-		compatible = "linux,spdif-dit";
-		#sound-dai-cells = <0>;
-	};
+Thanks,
 
-	sound {
-		compatible = "simple-audio-card";
-		simple-audio-card,name = "Cubox Audio";
-		simple-audio-card,format = "i2s";
+Gregory
 
-		simple-audio-card,dai-link {		/* S/PDIF - S/PDIF */
-			simple-audio-card,cpu {
-				sound-dai = <&audio1 1>;
-			};
-			simple-audio-card,codec {
-				sound-dai = <&spdif_codec>;
-			};
-		};
-	};
 
-&audio1 {
-	status = "okay";
-	clocks = <&gate_clk 13>, <&si5351 2>;
-	clock-names = "internal", "extclk";
-	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_audio1_extclk>;
-	pinctrl-names = "default";
-	#sound-dai-cells = <1>;
-};
-
-and the sound should get out of your S/PDIF optical connector.
-
-Eventually, the TDA998x is used in other machines. Are you sure that
-the audio controllers of all these machines have a S/PDIF output
-connected to the S/PDIF input of the tda998x?
-
-The tda998x CODEC I propose works in all configurations.
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
