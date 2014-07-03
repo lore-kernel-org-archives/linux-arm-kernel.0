@@ -1,83 +1,48 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 3 Jul 2014 15:36:51 +0530
-Subject: [PATCH 3/5] phy: miphy365x: Provide support for the MiPHY356x
- Generic PHY
-In-Reply-To: <20140703080758.GI30534@lee--X1>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-4-git-send-email-lee.jones@linaro.org>
- <53B3DCBC.8000105@ti.com> <20140703080758.GI30534@lee--X1>
-Message-ID: <53B52B3B.4010507@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Jul 2014 12:07:53 +0200
+Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
+ address of the boot register
+In-Reply-To: <20140703112538.533b73e1@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>	<20140630144620.0030cf94@free-electrons.com>	<53B516D8.8070003@free-electrons.com>
+ <20140703112538.533b73e1@free-electrons.com>
+Message-ID: <53B52B79.8080409@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas,
 
-On Thursday 03 July 2014 01:37 PM, Lee Jones wrote:
-> On Wed, 02 Jul 2014, Kishon Vijay Abraham I wrote:
->> On Monday 30 June 2014 06:31 PM, Lee Jones wrote:
->>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
->>> devices. It has 2 ports which it can use for either; both SATA, both
->>> PCIe or one of each in any configuration.
->>>
->>> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 03/07/2014 11:25, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
 > 
-> Removed.
+> On Thu, 03 Jul 2014 10:39:52 +0200, Gregory CLEMENT wrote:
 > 
->>> Acked-by: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>  drivers/phy/Kconfig         |  10 +
->>>  drivers/phy/Makefile        |   1 +
->>>  drivers/phy/phy-miphy365x.c | 630 ++++++++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 641 insertions(+)
->>>  create mode 100644 drivers/phy/phy-miphy365x.c
-> 
-> [...]
-> 
->>> +struct miphy365x_dev {
->>> +	struct device *dev;
->>> +	struct mutex miphy_mutex;
->>> +	struct miphy365x phys[ARRAY_SIZE(ports)];
+>>> I'm not sure that the best approach to solve this problem. Instead,
+>>> maybe the system-controller.c code should set up the boot address
+>>> workaround on Armada 375. Since the workaround on 375 is really related
+>>> to setting the boot address which is done by the system controller,
+>>> maybe the initialization of the workaround belongs in
+>>> system-controller.c ?
 >>
->> Avoid using fixed array sizes for ports or channels. Refer [1].
+>> So moving the workaround into mvebu_system_controller_set_cpu_boot_addr()
+>> should be the thing to do.
 > 
-> Just addressing this point in this mail.  Any other subsequent points
-> will either be fixed up or addressed in other correspondence.
-> 
-> I don't agree with this point.  I don't believe the number of channels
-> should be dictated by the number of DT sub-nodes supplied.  Instead,
+> Except that mvebu_system_controller_set_cpu_boot_addr() is called
+> multiple times during the system execution, while you want the
+> workaround to be initialized once. And we surely don't really want a
+> static variable in there to test if the workaround has already been
+> initialized or not.
 
-But that's the way it is. The DT describes your hw and not the driver. However
-the driver may not support everything that is in the hw.
-> the driver should contain knowledge about what is supported and
-> validate the DT data accordingly.  If it's omitted we lose the ability
+Actually mvebu_system_controller_set_cpu_boot_addr()? is called only in
+mvebu_cortex_a9_boot_secondary() just after the call to mvebu_boot_addr_wa().
 
-IMO the driver cannot validate DT data, it can just return error if there is
-something the _driver_ cannot support.
-> to conduct any kind of bounds checking, such like the following: 
-> 
->         if (WARN_ON(port >= ARRAY_SIZE(ports)))
->                 return ERR_PTR(-EINVAL);
+So it won't change anything. Moreover the call to mvebu_cortex_a9_boot_secondary()
+is not expected to be done too often  during the system execution.
 
-Just as I mentioned in the other patch, 'ports' shouldn't be needed at all. If
-we directly give phandle to the sub-node, it won't be needed.
-> And
->         if (child_count != ARRAY_SIZE(ports)) {
->                 dev_err(&pdev->dev, "%d ports supported, %d supplied\n",
->                         ARRAY_SIZE(ports), child_count);
->                 return -EINVAL;
->         }
-> 
-> If at a later point, we need to expand the driver to support a new
-> chip which supports more channels/ports then we need to expand the
-> bounds checking based on match data extracted from the supplied
-> compatible string.  For instance, if a 4 port controller is being used
-> and only 2 channels have been supplied, or vice versa then probe()
-> should fail.
+Gregory
 
-I don't think error checking of this sort should be done in driver. The dt
-_should_ know what is the controller that is being used.
 
-Cheers
-Kishon
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
