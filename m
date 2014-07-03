@@ -1,63 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Jul 2014 20:23:41 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 19:30:55 +0100
 Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140703173226.GC17372@arm.com>
+In-Reply-To: <4840595.cpHbY6hJKL@wuerfel>
 References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <20140703170558.GZ32514@n2100.arm.linux.org.uk>
- <20140703173226.GC17372@arm.com>
-Message-ID: <6860270.v9z8a8Se80@wuerfel>
+ <20140703150008.GX32514@n2100.arm.linux.org.uk>
+ <20140703171356.GD28175@arm.com> <4840595.cpHbY6hJKL@wuerfel>
+Message-ID: <20140703183055.GC32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 July 2014 18:32:26 Will Deacon wrote:
-> On Thu, Jul 03, 2014 at 06:05:58PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
-> > > So, no. I completely reject any notion that breaking existing apps is
-> > > okay. If we're going to say that v8 still supports 32-bit apps, then
-> > > it has to be all of v7, not just the 'good' bits. Nor do I think
-> > > saying "it's just a bunch of games" justifies anything. We're kernel
-> > > engineers. Applications are applications and we don't break userspace.
-> > > Period.
-> > 
-> > +1 on all points above.  I'd go further - if we're going to say that v8
-> > still supports 32-bit apps, that covers at least v6 *as well*.
-> 
-> We've never pretended to support anything other than ARMv8 in the compat
-> layer. uname even reports this in the machine name.
-> 
-> If people are suddenly so concerned about *full* compatibility with an ARMv7
-> kernel, that needs a lot more than just SWP emulation:
-> 
->   - Alignment fixups for ldm/stm
->   - SETEND
->   - CP15 barriers
->   - SWI breakpoints + branch through zero syscalls
->   (- SWP)
+On Thu, Jul 03, 2014 at 08:15:32PM +0200, Arnd Bergmann wrote:
+> The default answer is "as long as anybody is using it". I had the
+> same idea with making it gradually slower but in reality that isn't
+> going to help. I think the best option is to make it easy to find
+> and debug any application that is using deprecated instructions so
+> people stop relying on them, and encourage distros to turn the emulation
+> code off as soon as they are ready.
 
-Thanks for the list. Of course we would only have to support the ones
-that anybody is using on ARMv8. We know about SWP and I suppose SETEND
-as well, cp15 barriers are likely to be needed by someone, and I have
-no idea about the others.
+If you read the musl thread from last week, you'll understand why
+there's a problem there.
 
-Do you know if it's actually technically possible to emulate all of
-them? E.g. does ARMv8 allow implementations that cannot switch endianess
-at all?
+Yes, SWP is deprecated in ARMv6 and ARMv7.  However, it is required to
+implement atomics in ARMv5 - there is _no_ other way.
 
-> By the arguments presented so far, I can't see why we wouldn't also need
-> OABI too. In other words, where do we draw the line? If we're not completely
-> compatible, then the compatibility argument suddenly becomes subjective.
+So, let's say that you want to build an application which will run on
+Android from ARMv5 through to ARMv8.
 
-As I just said in the other thread, OABI is pretty clearly on the other
-side of the line. Same for NWFPE and BINFMT_AOUT (you removed the latter
-on ARM32 already).
- 
-> It seems that people really want us to implement the subset of the ABI which
-> is needed by the Google Play store and are trying to dress that up as the
-> ARMv7 kernel ABI. The latter is a lot more work and conflating the two isn't
-> especially helpful.
+You may need to make the decision about when to use SWP and when to
+use the new exclusives.  One possible way is to hook SIGILL, and
+try executing a LDREX.  If it succeeds, great, they can be used.
 
-Right. This should be about keeping users from getting mad at us (or at
-people using our kernel, who then get mad at us), not about strict adherence
-an ABI if nobody cares about it.
+Now, consider this.  You build your application for ARMv5.  The toolchain
+in this instance will *not* warn you that SWP is deprecated.  You've been
+running it on Android platforms from ARMv5 upwards.  You have never had
+a report of failure.
 
-	Arnd
+An ARMv8 Android device comes to market, and you now start getting lots
+of bug reports...
+
+Nothing before that point told you that there was a problem.
+
+To prove this, I just ran this on iMX6DL:
+
+#include <stdio.h>
+
+int val = 5;
+
+extern int swap(int v, int *a);
+
+asm(""
+"       .arm\n"
+"swap:  swp     r2, r0, [r1]\n"
+"       mov     r0, r2\n"
+"       bx      lr\n"
+"       .type   swap, #function\n"
+"       .size   swap, . - swap\n"
+"       .thumb");
+
+int main()
+{
+        int v = swap(1, &val);
+
+        printf("%u\n", v);
+        return 0;
+}
+
+which produces the correct answer of 5.  SWP_EMULATE is off.  HWCAP_SWP
+is set (as it always has been).  There's no warning in the kernel
+message log.
+
+Now look at the situation on ARMv8.  Executing the above suddenly fails
+with SIGILL.
+
+This means that from the developer and user point of view, there has
+been *no* visible deprecation of this instruction.  There's only
+"it used to work on ARMv7 but doesn't on ARMv8".
+
+Yes, SWP_EMULATE was introduced.  Great, that has the power to issue
+warnings, except it doesn't because they're at DEBUG level, which
+normally gets compiled out.  So that doesn't help warn people.
+
+Even with SWP_EMULATE enabled and with the debug problem fixed... does
+it help warn people?  Only if you're running on a CPU with virtualisation
+extensions, because it silently continues to work on CPUs without.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
