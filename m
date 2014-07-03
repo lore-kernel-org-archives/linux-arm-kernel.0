@@ -1,153 +1,61 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 3 Jul 2014 11:26:17 +0800
-Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
- share_count
-In-Reply-To: <CAOMZO5AYA-i8Rp2Oo+unwUXmH0uQ8D3rnXxBQUgqKrfXw-vN-A@mail.gmail.com>
-References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
- <1404194129-25543-4-git-send-email-festevam@gmail.com>
- <20140701115252.GM14471@dragon>
- <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
- <20140702043508.GA16176@dragon>
- <CAOMZO5AYA-i8Rp2Oo+unwUXmH0uQ8D3rnXxBQUgqKrfXw-vN-A@mail.gmail.com>
-Message-ID: <20140703032615.GE16176@dragon>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Thu, 3 Jul 2014 09:05:23 +0530
+Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
+In-Reply-To: <53B48BCB.4010308@samsung.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+ <53B4494B.1030909@samsung.com> <53B48BCB.4010308@samsung.com>
+Message-ID: <CAK5sBcHbs1ZSu=ZTWvEOeWO-kTCBh1OjTJc-YYxQzgV5QGOLNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 11:27:21AM -0300, Fabio Estevam wrote:
-> > From 0ed4b3edc661c63f86c914ea3c6deb3af3438151 Mon Sep 17 00:00:00 2001
-> > From: Shawn Guo <shawn.guo@freescale.com>
-> > Date: Wed, 2 Jul 2014 11:32:06 +0800
-> > Subject: [PATCH] ARM: imx: fix shared gate clock to have its own enable count
-> >
-> > Let's say clock A and B are two gate clocks that share the same register
-> > bit in hardware.  Therefore they should be registered as shared gate
-> > clocks with imx_clk_gate2_shared().
-> >
-> > In the current implementation, clk_enable(A) call will have share_count
-> > become 1.  If clk_disable(B) is called right after that, the register
-> > bit will be cleared to gate off the clocks.  This is unexpected.  The
-> > cause for that is there is no enable count tracking for clock A and B
-> > respectively.
-> >
-> > The patch fixes the issue by adding enable_count into clk_gate2, and
-> > tracks it prior to share_count in .enable and .disable.  Also,
-> > .is_enabled is fixed to report enable state instead of hardware state
-> > in case of shared gate clock.
-> >
-> > Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: <stable@vger.kernel.org>
-> > Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
-> 
-> No need to Cc stable on this one as the this commit did not reach stable.
+Hi Kukjin,
 
-Yes, you're right.
+On Thu, Jul 3, 2014 at 4:16 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 07/03/14 03:02, Tomasz Figa wrote:
+>>
+>> Hi Kukjin,
+>>
+> Hi,
+>
+>
+>> On 30.06.2014 23:32, Kukjin Kim wrote:
+>>>
+>>> This series removes S5P64X0 and S5PC100 related codes in mainline,
+>>> because no more user now. And if its supporting is required later,
+>>> it will be done with using device tree.
+>>>
+>>> [PATCH 01/17] ARM: S5P64X0: no more support S5P6440 and S5P6450 SoCs
+>>> [PATCH 02/17] gpio: samsung: remove s5p64x0 related gpio codes
+>>> [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
+>>> [PATCH 04/17] ASoC: samsung: no more support for S5P6440 and S5P6450
+>>> [PATCH 05/17] pwm: samsung: remove s5p64x0 related pwm codes
+>>> [PATCH 06/17] video: fbdev: s3c-fb: remove s5p64x0 related fimd
+>>> [PATCH 07/17] serial: samsung: no more support for S5P6440 and
+>>> [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
+>>> [PATCH 09/17] gpio: samsung: remov s5pc100 related gpio codes
+>>> [PATCH 10/17] spi: s3c64xx: remove s5pc100 related spi codes
+>>> [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
+>>> [PATCH 12/17] serial: samsung: no more support for S5PC100 SoC
+>>> [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
+>>> [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
+>>> [PATCH 15/17] video: fbdev: s3c-fb: remove s5pc100 related fimd and
+>>> [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc codes
+>>> [PATCH 17/17] ASoC: Samsung: remove s5pc100 related codes
+>>
+>>
+>> Thanks for this series.
+>>
+>> Just letting you know that I have rebased my s5pv210 DT migration series
+>> on top of this and will be sending the patches after some more testing.
+>>
+> Just note since I've missed one more change in the series, I amended it just
+> now but it should be fine with your series I think.
+>
+> Please see v3.17-next/cleanup-s5p branch.
 
-...
+Can you please push out the other patches that you applied last week?
 
-> > @@ -67,6 +71,9 @@ static void clk_gate2_disable(struct clk_hw *hw)
-> >
-> >         spin_lock_irqsave(gate->lock, flags);
-> >
-> > +       if (--gate->enable_count > 0)
-> > +               goto out;
-> 
-> All these pre-decrement look buggy because enable_count and
-> share_count are 'unsigned int'.
-> 
-> If share_count is 0 and then you decrement it, it will still be
-> greater than zero.
-> --(*gate->share_count) > 0 and --gate->enable_count > 0 are always true.
-
-Hmm, clk_gate2_disable() should never be called with a zero share_count.
-I will add a check for that.
-
-> I have tried to make share_count and enable_count as 'int'. Then it
-> resulted CGR5 as
-> 0FFFCFFF, which still leaves ssi1 and ssi3 enabled (I have locally
-> made ssi a shared clock now)
-
-Right.  The patch did not fix the problem correctly.  I just started it
-over again with the one below.  Can you please test it?  Thanks.
-
-Shawn
-
----8<-------------------
-
->From e057f4c129e77639372f2b4a3b9eb8a9de2095f8 Mon Sep 17 00:00:00 2001
-From: Shawn Guo <shawn.guo@freescale.com>
-Date: Wed, 2 Jul 2014 11:32:06 +0800
-Subject: [PATCH] ARM: imx: fix shared gate clock
-
-to be added ...
-
-Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/clk-gate2.c | 30 ++++++++++++++++++++++--------
- 1 file changed, 22 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index 4ba587da89d2..3aa9c74d13be 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -67,8 +67,12 @@ static void clk_gate2_disable(struct clk_hw *hw)
- 
- 	spin_lock_irqsave(gate->lock, flags);
- 
--	if (gate->share_count && --(*gate->share_count) > 0)
--		goto out;
-+	if (gate->share_count) {
-+		if (WARN_ON(*gate->share_count == 0))
-+			goto out;
-+		else if (--(*gate->share_count) > 0)
-+			goto out;
-+	}
- 
- 	reg = readl(gate->reg);
- 	reg &= ~(3 << gate->bit_idx);
-@@ -78,19 +82,26 @@ out:
- 	spin_unlock_irqrestore(gate->lock, flags);
- }
- 
--static int clk_gate2_is_enabled(struct clk_hw *hw)
-+static int clk_gate2_reg_is_enabled(void __iomem *reg, u8 bit_idx)
- {
--	u32 reg;
--	struct clk_gate2 *gate = to_clk_gate2(hw);
-+	u32 val = readl(reg);
- 
--	reg = readl(gate->reg);
--
--	if (((reg >> gate->bit_idx) & 1) == 1)
-+	if (((val >> bit_idx) & 1) == 1)
- 		return 1;
- 
- 	return 0;
- }
- 
-+static int clk_gate2_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_gate2 *gate = to_clk_gate2(hw);
-+
-+	if (gate->share_count)
-+		return !!(*gate->share_count);
-+	else
-+		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
-+}
-+
- static struct clk_ops clk_gate2_ops = {
- 	.enable = clk_gate2_enable,
- 	.disable = clk_gate2_disable,
-@@ -116,6 +127,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- 	gate->bit_idx = bit_idx;
- 	gate->flags = clk_gate2_flags;
- 	gate->lock = lock;
-+
-+	if (share_count)
-+		*share_count = clk_gate2_reg_is_enabled(reg, bit_idx) ? 1 : 0;
- 	gate->share_count = share_count;
- 
- 	init.name = name;
+Thanks.
 -- 
-1.8.3.2
+Regards,
+Sachin.
