@@ -1,138 +1,176 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:32 +0200
-Subject: [PATCH RESEND 17/18] AT91: Remove rstc and shdwnc global base
- addresses
+Date: Thu,  3 Jul 2014 16:41:17 +0200
+Subject: [PATCH RESEND 02/18] AT91: setup: Switch to pr_fmt
 In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404398493-28907-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there's no user left for the global variables holding the reset and
-shutdown controllers base address, we can remove these variables and their
-associated mapping function.
+Most of the printed messages are using the "AT91:" prefix in the setup.c file,
+but not all of them. Moreover, those who add it hardcode it directly in the
+message, while the pr_fmt macro makes it easier for us to support such a case.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9260.c |  2 --
- arch/arm/mach-at91/at91sam9261.c |  2 --
- arch/arm/mach-at91/at91sam9263.c |  2 --
- arch/arm/mach-at91/at91sam9g45.c |  2 --
- arch/arm/mach-at91/at91sam9rl.c  |  2 --
- arch/arm/mach-at91/generic.h     |  6 ------
- arch/arm/mach-at91/setup.c       | 18 ------------------
- 7 files changed, 34 deletions(-)
+ arch/arm/mach-at91/setup.c | 42 ++++++++++++++++++++++--------------------
+ 1 file changed, 22 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 5fa1986be2aa..16dd13800b1f 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -339,8 +339,6 @@ static void __init at91sam9260_map_io(void)
- 
- static void __init at91sam9260_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9260_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9260_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9260_BASE_SDRAMC, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
- 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 5ccc67235e7a..2c8553e63785 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -302,8 +302,6 @@ static void __init at91sam9261_map_io(void)
- 
- static void __init at91sam9261_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9261_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9261_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9261_BASE_SDRAMC, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
- 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 4d28c3479d4b..63a47c7d7f2b 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -317,8 +317,6 @@ static void __init at91sam9263_map_io(void)
- 
- static void __init at91sam9263_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9263_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9263_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9263_BASE_SDRAMC0, 512);
- 	at91_ioremap_ramc(1, AT91SAM9263_BASE_SDRAMC1, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 22034c96d488..f0b78923da75 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -367,8 +367,6 @@ static void __init at91sam9g45_map_io(void)
- 
- static void __init at91sam9g45_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9G45_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9G45_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9G45_BASE_DDRSDRC1, 512);
- 	at91_ioremap_ramc(1, AT91SAM9G45_BASE_DDRSDRC0, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 323a9f90931a..ea9ac0ee0895 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -311,8 +311,6 @@ static void __init at91sam9rl_map_io(void)
- 
- static void __init at91sam9rl_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9RL_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9RL_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9RL_BASE_SDRAMC, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
- 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 5d5e55237c41..f42b0490ad98 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -64,12 +64,6 @@ extern void at91_irq_resume(void);
- /* idle */
- extern void at91sam9_idle(void);
- 
--/* reset */
--extern void at91_ioremap_rstc(u32 base_addr);
--
--/* shutdown */
--extern void at91_ioremap_shdwc(u32 base_addr);
--
- /* Matrix */
- extern void at91_ioremap_matrix(u32 base_addr);
- 
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index cdd717a4fa30..eb2b922a4adb 100644
+index f7a07a58ebb6..9c4c7fb323fb 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -319,24 +319,6 @@ void __init at91_map_io(void)
- 		at91_boot_soc.map_io();
+@@ -5,6 +5,8 @@
+  * Under GPLv2
+  */
+ 
++#define pr_fmt(fmt)	"AT91: " fmt
++
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/mm.h>
+@@ -37,7 +39,7 @@ void __init at91rm9200_set_type(int type)
+ 	else
+ 		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ 
+-	pr_info("AT91: filled in soc subtype: %s\n",
++	pr_info("filled in soc subtype: %s\n",
+ 		at91_get_soc_subtype(&at91_soc_initdata));
  }
  
--void __iomem *at91_shdwc_base = NULL;
--
--void __init at91_ioremap_shdwc(u32 base_addr)
--{
--	at91_shdwc_base = ioremap(base_addr, 16);
--	if (!at91_shdwc_base)
--		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
--}
--
--void __iomem *at91_rstc_base;
--
--void __init at91_ioremap_rstc(u32 base_addr)
--{
--	at91_rstc_base = ioremap(base_addr, 16);
--	if (!at91_rstc_base)
--		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
--}
--
- void __iomem *at91_matrix_base;
- EXPORT_SYMBOL_GPL(at91_matrix_base);
+@@ -66,7 +68,7 @@ void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+ 	}
+ 	at91_ramc_base[id] = ioremap(addr, size);
+ 	if (!at91_ramc_base[id])
+-		panic("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
++		panic(pr_fmt("Impossible to ioremap ramc.%d 0x%x\n"), id, addr);
+ }
  
+ static struct map_desc sram_desc[2] __initdata;
+@@ -83,7 +85,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
+ 	desc->length = length;
+ 	desc->type = MT_MEMORY_RWX_NONCACHED;
+ 
+-	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
++	pr_info("sram at 0x%lx of 0x%x mapped at 0x%lx\n",
+ 		base, length, desc->virtual);
+ 
+ 	iotable_init(desc, 1);
+@@ -302,16 +304,16 @@ void __init at91_map_io(void)
+ 		soc_detect(AT91_BASE_DBGU1);
+ 
+ 	if (!at91_soc_is_detected())
+-		panic("AT91: Impossible to detect the SOC type");
++		panic(pr_fmt("Impossible to detect the SOC type"));
+ 
+-	pr_info("AT91: Detected soc type: %s\n",
++	pr_info("Detected soc type: %s\n",
+ 		at91_get_soc_type(&at91_soc_initdata));
+ 	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
+-		pr_info("AT91: Detected soc subtype: %s\n",
++		pr_info("Detected soc subtype: %s\n",
+ 			at91_get_soc_subtype(&at91_soc_initdata));
+ 
+ 	if (!at91_soc_is_enabled())
+-		panic("AT91: Soc not enabled");
++		panic(pr_fmt("Soc not enabled"));
+ 
+ 	if (at91_boot_soc.map_io)
+ 		at91_boot_soc.map_io();
+@@ -328,7 +330,7 @@ void __init at91_ioremap_shdwc(u32 base_addr)
+ {
+ 	at91_shdwc_base = ioremap(base_addr, 16);
+ 	if (!at91_shdwc_base)
+-		panic("Impossible to ioremap at91_shdwc_base\n");
++		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
+ 	pm_power_off = at91sam9_poweroff;
+ }
+ 
+@@ -338,7 +340,7 @@ void __init at91_ioremap_rstc(u32 base_addr)
+ {
+ 	at91_rstc_base = ioremap(base_addr, 16);
+ 	if (!at91_rstc_base)
+-		panic("Impossible to ioremap at91_rstc_base\n");
++		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
+ }
+ 
+ void __iomem *at91_matrix_base;
+@@ -348,7 +350,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
+ {
+ 	at91_matrix_base = ioremap(base_addr, 512);
+ 	if (!at91_matrix_base)
+-		panic("Impossible to ioremap at91_matrix_base\n");
++		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+ }
+ 
+ #if defined(CONFIG_OF) && !defined(CONFIG_ARCH_AT91X40)
+@@ -365,15 +367,15 @@ static void at91_dt_rstc(void)
+ 
+ 	np = of_find_matching_node(NULL, rstc_ids);
+ 	if (!np)
+-		panic("unable to find compatible rstc node in dtb\n");
++		panic(pr_fmt("unable to find compatible rstc node in dtb\n"));
+ 
+ 	at91_rstc_base = of_iomap(np, 0);
+ 	if (!at91_rstc_base)
+-		panic("unable to map rstc cpu registers\n");
++		panic(pr_fmt("unable to map rstc cpu registers\n"));
+ 
+ 	of_id = of_match_node(rstc_ids, np);
+ 	if (!of_id)
+-		panic("AT91: rtsc no restart function available\n");
++		panic(pr_fmt("rtsc no restart function available\n"));
+ 
+ 	arm_pm_restart = of_id->data;
+ 
+@@ -394,17 +396,17 @@ static void at91_dt_ramc(void)
+ 
+ 	np = of_find_matching_node(NULL, ramc_ids);
+ 	if (!np)
+-		panic("unable to find compatible ram controller node in dtb\n");
++		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
+ 
+ 	at91_ramc_base[0] = of_iomap(np, 0);
+ 	if (!at91_ramc_base[0])
+-		panic("unable to map ramc[0] cpu registers\n");
++		panic(pr_fmt("unable to map ramc[0] cpu registers\n"));
+ 	/* the controller may have 2 banks */
+ 	at91_ramc_base[1] = of_iomap(np, 1);
+ 
+ 	of_id = of_match_node(ramc_ids, np);
+ 	if (!of_id)
+-		pr_warn("AT91: ramc no standby function available\n");
++		pr_warn("ramc no standby function available\n");
+ 	else
+ 		at91_pm_set_standby(of_id->data);
+ 
+@@ -450,23 +452,23 @@ static void at91_dt_shdwc(void)
+ 
+ 	np = of_find_matching_node(NULL, shdwc_ids);
+ 	if (!np) {
+-		pr_debug("AT91: unable to find compatible shutdown (shdwc) controller node in dtb\n");
++		pr_debug("unable to find compatible shutdown (shdwc) controller node in dtb\n");
+ 		return;
+ 	}
+ 
+ 	at91_shdwc_base = of_iomap(np, 0);
+ 	if (!at91_shdwc_base)
+-		panic("AT91: unable to map shdwc cpu registers\n");
++		panic(pr_fmt("unable to map shdwc cpu registers\n"));
+ 
+ 	wakeup_mode = at91_dtget_shdwc_wakeup_mode(np);
+ 	if (wakeup_mode < 0) {
+-		pr_warn("AT91: shdwc unknown wakeup mode\n");
++		pr_warn("shdwc unknown wakeup mode\n");
+ 		goto end;
+ 	}
+ 
+ 	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
+ 		if (reg > AT91_SHDW_CPTWK0_MAX) {
+-			pr_warn("AT91: shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
++			pr_warn("shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
+ 				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
+ 			reg = AT91_SHDW_CPTWK0_MAX;
+ 		}
 -- 
 2.0.1
