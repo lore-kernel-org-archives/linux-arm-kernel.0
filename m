@@ -1,35 +1,26 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 3 Jul 2014 15:36:53 +0200
-Subject: [PATCH 1/2] ARM: mvebu: add appended DTB support in
- mvebu_v5_defconfig
-In-Reply-To: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 3 Jul 2014 15:38:42 +0200
+Subject: [PATCH 2/2] ARM: mvebu: add devtmpfs to mvebu_v5_defconfig
+In-Reply-To: <1404375830-22169-2-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140703133653.GQ20799@lunn.ch>
+ <1404375830-22169-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140703133842.GR20799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 10:23:49AM +0200, Thomas Petazzoni wrote:
-> The mvebu_v5_defconfig is currently used for Kirkwood platforms, and
-> in the future hopefully used for Orion5x platforms. Those platforms
-> use fairly old bootloaders that don't have Device Tree support, so it
-> makes sense to enable appended DTB support by default, as well as the
-> backward compatibility with ATAGS passed by the bootloader for those
-> platforms. It helps having a defconfig that works fine out of the box
-> for most Kirkwood platforms.
+On Thu, Jul 03, 2014 at 10:23:50AM +0200, Thomas Petazzoni wrote:
+> The devtmpfs filesystem is now widely used and generally needed to
+> boot Linux systems. 42 ARM defconfigs have it enabled, so it makes
+> sense to have it enabled as well in mvebu_v5_defconfig.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Hi Thomas
-
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-And a minor nit. Jason would like to see kirkwood in the subject,
-instead of mvebu, so we have a simple way to filter patches by SoC
-in mvebu.
+I have Debian sid on my boxes, and they is quite happy without
+devtmpfs. Hence i've not proposed such a patch before.
 
 	  Andrew
-
-
 
 
 > ---
@@ -37,18 +28,18 @@ in mvebu.
 >  1 file changed, 2 insertions(+)
 > 
 > diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index 27c732f..9f70f59 100644
+> index 9f70f59..5df35e9 100644
 > --- a/arch/arm/configs/mvebu_v5_defconfig
 > +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -19,6 +19,8 @@ CONFIG_AEABI=y
->  CONFIG_HIGHMEM=y
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
-> +CONFIG_ARM_APPENDED_DTB=y
-> +CONFIG_ARM_ATAG_DTB_COMPAT=y
->  CONFIG_CPU_FREQ=y
->  CONFIG_CPU_FREQ_STAT_DETAILS=y
->  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+> @@ -38,6 +38,8 @@ CONFIG_NET_PKTGEN=m
+>  CONFIG_CFG80211=y
+>  CONFIG_MAC80211=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DEVTMPFS_MOUNT=y
+>  CONFIG_MTD=y
+>  CONFIG_MTD_CMDLINE_PARTS=y
+>  CONFIG_MTD_BLOCK=y
 > -- 
 > 2.0.0
 > 
