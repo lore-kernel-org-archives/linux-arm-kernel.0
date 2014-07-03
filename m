@@ -1,136 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Jul 2014 17:29:57 +0200
-Subject: [PATCH 15/16] ARM: mvebu: Add CPU idle support for Armada 38x
-In-Reply-To: <20140630170741.73256ba0@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-16-git-send-email-gregory.clement@free-electrons.com>
- <20140630170741.73256ba0@free-electrons.com>
-Message-ID: <53B576F5.6080508@free-electrons.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Thu, 3 Jul 2014 08:39:21 -0700
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <20140703102450.GD12958@arm.com>
+References: <20140618202748.GA9022@www.outflux.net>
+ <20140620102258.GA26626@arm.com>
+ <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+ <20140620172330.GA30656@arm.com>
+ <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+ <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+ <20140623084608.GA9316@arm.com>
+ <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
+ <20140624085405.GA26013@arm.com> <53B5098B.9050801@linaro.org>
+ <20140703102450.GD12958@arm.com>
+Message-ID: <CALCETrWQdHmn0-so1JHFoT-2A02mgcxDUb3jphSQmBGn-SQ+pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Jul 3, 2014 at 3:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jul 03, 2014 at 08:43:07AM +0100, AKASHI Takahiro wrote:
+>> Hi Will,
+>
+> Hi Akashi,
+>
+>> On 06/24/2014 05:54 PM, Will Deacon wrote:
+>> > On Mon, Jun 23, 2014 at 08:46:52PM +0100, Kees Cook wrote:
+>> >> What's the state of seccomp on arm64? I saw a series back in March,
+>> >> but nothing since then? It looked complete, but I haven't set up a
+>> >> test environment yet to verify.
+>> >
+>> > I think Akashi was going to repost `real soon now' so we can include them
+>> > for 3.17. He missed the merge window last time around.
+>>
+>> I took a quick look at the current implementation of ptrace.
+>> ptrace(PTRACE_GETREGSET/SETREGSET), eventually gpr_get/set(), handles only
+>> 'struct user_pt_regs', and we have no way to modify orig_x0 nor syscallno
+>> in 'struct pt_regs' directly.
+>> So it seems to me that we can't change a system call by ptrace().
+>> Do I misunderstand anything?
+>
+> No, it looks like you have a point here. I don't think userspace has any
+> business with orig_x0, but changing syscallno is certainly useful. I can
+> think of two ways to fix this:
+>
+>   (1) Updating syscallno based on w8, but this ties us to the current ABI
+>       and could get messy if this register changes in the future.
+>
+>   (2) Adding a PTRACE_SET_SYSCALL request, like we have for arch/arm/,
+>       but that means adding arch-specific stuff to arch_ptrace (which
+>       currently goes straight to ptrace_request on arm64).
+>
+> It looks like x86 uses orig_ax, which I *think* means we would go with
+> (1) above if we followed their lead.
 
+w8 is a real register, right?  On x86, at least orig_ax isn't a real
+register, so it's quite unlikely to conflict with hardware stuff.
 
->> Unlike the Armada XP and the Armada 370, this SoC uses a Cortex A9
->> core.
-> 
-> Isn't there some more details missing in this sentence? When I read it,
-> at the end of the sentence, I'm wondering "and so what? what does this
-> implies in terms of cpuidle support?".
+On x86, the "user_struct" thing has nothing to do with any real kernel
+data structure, so it's extensible.  Can you just add syscallno to it?
 
-Humm, actually, it the next sentence was wrongly formulate. Using a
-Cortex A9 implies(or at least encourage) the use of ARM L2 cache and of
-the SCU.
-
-> 
->> Beside this, the main difference for the cpu idle is the way to
->> handle the L2 cache and the use of SCU.
-
-
-[...]
-
->>  		pr_err("unable to request region\n");
->>  		ret = -EBUSY;
->> +
-> 
-> This change.
-> 
->>  		goto out;
->>  	}
->>  
->> @@ -163,7 +181,6 @@ static int __init mvebu_v7_pmsu_init(void)
->>  		ret = -ENOMEM;
->>  		goto out;
->>  	}
->> -
-> 
-> And this one look like spurious changes not related to the patch.
-
-yes of course.
-
-> 
->>   out:
->>  	of_node_put(np);
->>  	return ret;
->> @@ -260,6 +277,27 @@ static int armada_xp_370_cpu_suspend(unsigned long deepidle)
->>  	return cpu_suspend(deepidle, do_armada_xp_370_cpu_suspend);
->>  }
->>  
->> +static noinline int do_armada_38x_cpu_suspend(unsigned long deepidle)
->> +{
->> +	mvebu_v7_pmsu_idle_prepare(deepidle, false);
->> +	/*
->> +	 * Already flushed cache, but do it again as the outer cache
->> +	 * functions dirty the cache with spinlocks
->> +	 */
->> +	v7_exit_coherency_flush(louis);
->> +
->> +	scu_power_mode(scu_base, SCU_PM_POWEROFF);
->> +
->> +	cpu_do_idle();
-> 
-> I see cpu_do_idle() does dsb() and wfi(), so why don't we use in the
-> do_armada_370_xp_cpu_suspend() function ?
-
-We can use cpu_do_idle() in do_armada_370_xp_cpu_suspend() too.
-
-> 
->> +
->> +	return 1;
-> 
-> You return 1 here, but in the do_armada_370_xp_cpu_suspend() function
-> you return zero. Is the return value being used? Why use 0 in one case
-> and 1 in the other?
-
-return 1 means error. But I think it was a nasty trick to not enter in the
-CPU_PM_EXIT case. I forgot to go back on this, once the cpu idle was working
-on Armada 38x. I will take care of it in the next series.
-
-[...]
-
->> +{
->> +	struct device_node *np;
->> +	void __iomem *mpsoc_base;
->> +	u32 reg;
->> +
->> +	np = of_find_compatible_node(NULL, NULL,
->> +				"marvell,armada-380-coherency-fabric");
->> +	if (!np)
->> +		return false;
-> 
-> 		return -ENODEV;
-> 
->> +	of_node_put(np);
->> +
->> +	np = of_find_compatible_node(NULL, NULL,
->> +				"marvell,armada-380-mpcore-soc-ctrl");
->> +	if (!np)
->> +		return false;
-> 
-> 		return -ENODEV;
-> 
->> +	mpsoc_base = of_iomap(np, 0);
->> +	WARN_ON(!mpsoc_base);
-> 
-> WARN_ON() seems a bit weak for something that will make the next line
-> crash the kernel. What about:
-> 
-> 	if (!mpsoc_base)
-> 		return -ENOMEM;
-> 
-> I think the of_node_put(np) should be here.
-
-OK
-
-
-Thanks,
-
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+--Andy
