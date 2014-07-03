@@ -1,24 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Jul 2014 19:57:02 +0200
-Subject: [PATCH] ARM: imx: imx6sx uses imx6q cpuidle code
-In-Reply-To: <6439884.YMH7C85FhG@wuerfel>
-References: <6439884.YMH7C85FhG@wuerfel>
-Message-ID: <20140703175702.GV14781@pengutronix.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 03 Jul 2014 20:04:51 +0200
+Subject: [PATCH 2/2] mach-spear: fixed spear1340.c file
+In-Reply-To: <1404354994-7478-1-git-send-email-xerofoify@gmail.com>
+References: <1404354994-7478-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <1404410691.16291.11.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Wed, 2014-07-02 at 22:36 -0400, Nicholas Krause wrote:
+> This is the fixed file after moving sata support to new file in
+> spear1340_sata.c
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-spear/spear1340.c | 111 ----------------------------------------
+>  1 file changed, 111 deletions(-)
 
-On Thu, Jul 03, 2014 at 04:16:06PM +0200, Arnd Bergmann wrote:
->  obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
->  obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
->  obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
-> +obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6q.o
-as this line looks wrong it might be worth a comment ...
+This patch, together with patch 1/2, basically moves a chunk of code
+into a separate file, didn't it? If so, why did you split that move in
+two patches?
 
-Best regards
-Uwe
+And how does all this work without any changes to a Makefile?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
+> index 7b6bff7..f9d8ef3 100644
+> --- a/arch/arm/mach-spear/spear1340.c
+> +++ b/arch/arm/mach-spear/spear1340.c
+> @@ -21,117 +21,6 @@
+>  #include "generic.h"
+>  #include <mach/spear.h>
+>  
+> -/* FIXME: Move SATA PHY code into a standalone driver */
+
+(I have no idea what this FIXME is about, but I do wonder whether that
+new file by itself is the standalone driver this FIXME is about. The
+spear developers will surely know.)
+
+
+Paul Bolle
