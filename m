@@ -1,55 +1,40 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Thu, 3 Jul 2014 08:34:44 -0500
-Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <20140703132509.GA5814@saruman.home>
-References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
- <20140702160932.GF5541@saruman.home>
- <20140702190944.GA567@drone.musicnaut.iki.fi>
- <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
- <20140703073411.GX28884@atomide.com>
- <20140703132509.GA5814@saruman.home>
-Message-ID: <CAOCHtYi0JwRO12gHa+KFGH1k7pPk4TL40igwhzRRxutw-tqf6A@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 3 Jul 2014 16:39:56 +0300
+Subject: [PATCH 0/4] SiI9022 HDMI encoder for AM4xxx boards
+Message-ID: <1404394800-18138-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 3, 2014 at 8:25 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Thu, Jul 03, 2014 at 12:34:11AM -0700, Tony Lindgren wrote:
->> * Robert Nelson <robertcnelson@gmail.com> [140702 12:27]:
->> > On Wed, Jul 2, 2014 at 2:09 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> > > Hi,
->> > >
->> > > On Wed, Jul 02, 2014 at 11:09:32AM -0500, Felipe Balbi wrote:
->> > >> > It has been only tested as console UART.
->> > >> > The tty name is ttyS based instead of ttyO. How big is the pain here,
->> > >> > what could be the easiest way to provide compatibility?
->> > >>
->> > >> have been considering that myself for months. You could pass an optional
->> > >> argument to serial8250_register_8250_port() but that only solves part of
->> > >> the problem :-(
->>
->> Some kind of compability layer sure would be nice.
->>
->> > > When ttyS -> ttyO change was done on OMAP, compatibility was not an issue.
->> > > Why should we care about it now?
->> >
->> > It would be a good opportunity to force everyone to update their bootloader. ;)
->> >
->> > Besides the BeagleBoard forum is quiet now, no one is complaining
->> > about that old (ttyS -> ttyO) transition anymore..
->>
->> How about a Kconfig option to provide ttyO by default? The not even
->> do that if kernel has cmdline option nottyomap.
->
-> what about single zImage ? I don't want to use ttyO on my
-> Allwinner/Exynos/Snapdragon/whatever SoC just because OMAP is in the
-> same image ;-)
+Hi,
 
-What if we just kept it simple, leave the ttyO driver enabled and add
-a warning (pr_info) that it's deprecated.  It's not like it's broken,
-it just won't get later features or devices support added.
+This series adds a driver for SiI9022 HDMI encoder, which is used on AM437x GP
+and AM43x EPOS boards.
 
-Regards,
+The series is based on the OMAPDSS HDMI infoframe series sent earlier, as the
+SiI9022 driver uses the new infoframe support.
+
+ Tomi
+
+Tomi Valkeinen (4):
+  OMAPDSS: add SiI9022 encoder driver
+  Doc/DT: Add SiI9022 binding documentation
+  arm/dts: am43x EPOS HDMI support
+  arm/dts: am437x GP HDMI support
+
+ .../devicetree/bindings/video/sil,sii9022.txt      |  53 ++
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ arch/arm/boot/dts/am437x-gp-evm-hdmi.dts           |  70 ++
+ arch/arm/boot/dts/am43x-epos-evm-hdmi.dts          |  83 ++
+ drivers/video/fbdev/omap2/displays-new/Kconfig     |   8 +
+ drivers/video/fbdev/omap2/displays-new/Makefile    |   1 +
+ .../fbdev/omap2/displays-new/encoder-sii9022.c     | 966 +++++++++++++++++++++
+ .../fbdev/omap2/displays-new/encoder-sii9022.h     |  58 ++
+ 8 files changed, 1242 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/video/sil,sii9022.txt
+ create mode 100644 arch/arm/boot/dts/am437x-gp-evm-hdmi.dts
+ create mode 100644 arch/arm/boot/dts/am43x-epos-evm-hdmi.dts
+ create mode 100644 drivers/video/fbdev/omap2/displays-new/encoder-sii9022.c
+ create mode 100644 drivers/video/fbdev/omap2/displays-new/encoder-sii9022.h
 
 -- 
-Robert Nelson
-http://www.rcn-ee.com/
+1.9.1
