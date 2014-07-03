@@ -1,44 +1,18 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 3 Jul 2014 09:22:50 +0200
-Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
-In-Reply-To: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
-References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <53B504CA.9060502@st.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 3 Jul 2014 10:25:01 +0300
+Subject: [PATCHv5 05/15] hwspinlock/omap: add support for dt nodes
+In-Reply-To: <53B460B4.9010200@ti.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-6-git-send-email-s-anna@ti.com>
+ <CAK=WgbamDPN9EmKUu3+c3RbsQn1uhz5MGGvpWSSUJSUKyoH8Cw@mail.gmail.com>
+ <53B460B4.9010200@ti.com>
+Message-ID: <CAK=WgbZL9XbMtHpsQz8zuo5mbqSUnQhtjDoWPi2M2mfVxjaFNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Wed, Jul 2, 2014 at 10:42 PM, Suman Anna <s-anna@ti.com> wrote:
+> Yeah, I did this since we only had 1 instance, and used the same value
+> as used in the non-DT legacy code. Once I fold back Patch 8 that adds
+> the hwlock-base-id property, this will be assigned by reading that property.
 
-	The series look good to me.
-
-Thanks,
-Maxime
-
-On 07/02/2014 04:08 PM, Peter Griffin wrote:
-> This series adds reset controller support for the STiH407 SoC.
->
-> Changes since v1
->   - Update copyright to 2014
->   - Add const qualifier
->   - Fix various whitespace issues
->   - Remove THIS_OWNER
->   - Move DT documentation into separate patch
->
-> Peter Griffin (4):
->    reset: stih407: Add softreset, powerdown and picophy controllers
->    reset: sti: Document sti-picophyreset controllers bindings.
->    ARM: sti: Add STiH407 Kconfig entry to select STIH407_RESET
->    ARM: sti: Add STiH407 reset controller support.
->
->   .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
->   arch/arm/boot/dts/stih407.dtsi                     |  16 +++
->   arch/arm/mach-sti/Kconfig                          |  10 ++
->   drivers/reset/sti/Kconfig                          |   4 +
->   drivers/reset/sti/Makefile                         |   1 +
->   drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
->   .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
->   7 files changed, 292 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
->   create mode 100644 drivers/reset/sti/reset-stih407.c
->   create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
->
+Sounds good, thanks!
