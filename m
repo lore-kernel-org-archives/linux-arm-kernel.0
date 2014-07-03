@@ -1,82 +1,56 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 3 Jul 2014 14:21:14 +0800
-Subject: [PATCH 0/4] Migrate PXA27x platforms to clock framework
-In-Reply-To: <877g3yp7ie.fsf@free.fr>
-References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
- <7034630.fvV46PN35C@wuerfel> <877g3yp7ie.fsf@free.fr>
-Message-ID: <CAN1soZyu192Y7z-HJHo+3_bddFcf=H0udgJSWez1=Lmrb5wVfg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 3 Jul 2014 08:31:42 +0200
+Subject: [PATCH] MAINTAINERS: merge MXS entry into IMX one
+In-Reply-To: <1404286630-9662-1-git-send-email-shawn.guo@freescale.com>
+References: <1404286630-9662-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140703063142.GL14257@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 1, 2014 at 2:38 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
->
->> On Sunday 29 June 2014 20:32:20 Robert Jarzmik wrote:
->>> As the RFC posted in [1] didn't meet an unrivaled success for
->>> review, I'm posting this serie for PXA27x transition to clock
->>> framework.
->>>
->>> This transition is needed :
->>>  - to enable device-tree drivers port, as clocks are needed almost
->>>    everywhere
->>>  - to enable the long term multi-platform kernel to support PXA
->>>
->>> As I had said before, this serie aims at :
->>>  - keeping legacy platforms working (ie. without device-tree)
->>>  - enable PXA27x to work with a device-tree kernel, and hence
->>>    open the way to drivers conversion
->>>  - be robust enough to support pxa25x and pxa3xx later inclusion
->>>    with almost no change to clk-pxa-dt.c.
->>>
->>> As this serie is holding the rest of the device-tree drivers
->>> port, I'd like it to be reviewed, even it's an old unsexy
->>> platform.
->>
->> I have one basic question about this series: if pxa27x gets moved
->> to used the common-clk framework but the others (pxa25x, pxa26x,
->> pxa3xx, pxa93x) don't, does that imply that they become mutually
->> exclusiv at compile-time?
->
-> Unfortunately yes, they become exclusive.
-> The reason being that arch/arm/mach-pxa/clock.c defines the function
-> "clk_enable()", which of course is also defined by the clock framework.
->
->> If so, do you plan to first complete all of them before merging
->> upstream, or do you intend to have one or more kernel releases
->> that don't allow building a combined kernel for all pxa platforms?
-> I intend to have first only pxa27x.
-> Then in a second stage pxa27x + pxa25x + pxa3xx.
->
->> I don't object to doing the latter, but if that is the plan, you
->> need to make that very clear in the changelog and have all the
->> relevant maintainers agree to that.
-> OK, that would be Haojian then, I think he maintains all PXA platforms.
->
-> Haojian, are you ok with that ? And BTW, does a combined kernel for PXA
-> platforms even exists (mixing pxa3xx and pxa2xx for example) ?
->
+On Wed, Jul 02, 2014 at 03:37:10PM +0800, Shawn Guo wrote:
+> The mach-mxs platform is actually co-maintained by myself and
+> pengutronix folks.  Also it's hosted in the same kernel tree as IMX.
+> So let's merge the entry into IMX one.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-It's acceptable to me that different silicons are queued in different stages.
-I only request that it won't break the compiler building & bootup.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-But I think that the pxa clock driver may be shared among all PXA silicons
-except for the clock table. What's your opinion?
+Sascha
 
->> Also (for my understanding) when you say that you plan to do
->> pxa25x and pxa3xx next, does that include pxa26x and pxa93x?
-> I don't have the Technical Reference Manuals for these ones so the answer is
-> no. And Google wasn't a great friend at providing them.
->
+> ---
+>  MAINTAINERS | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 134483f206e4..161762e40b85 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -943,16 +943,10 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+>  F:	arch/arm/mach-imx/
+> +F:	arch/arm/mach-mxs/
+>  F:	arch/arm/boot/dts/imx*
+>  F:	arch/arm/configs/imx*_defconfig
+>  
+> -ARM/FREESCALE MXS ARM ARCHITECTURE
+> -M:	Shawn Guo <shawn.guo@linaro.org>
+> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Maintained
+> -T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
+> -F:	arch/arm/mach-mxs/
+> -
+>  ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -- 
+> 1.8.3.2
+> 
+> 
 
-Converting them into new clock driver may not rely on the reference manual.
-
->> I assume it does as they are apparently minor revisions of the
->> former, but it's not completely clear from your description.
-> My description doesn't mention them, as I have no information about them, nor
-> any hardware to test on.
->
-
-We can request others to help testing in the mailing list.
-
-Regards
-Haojian
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
