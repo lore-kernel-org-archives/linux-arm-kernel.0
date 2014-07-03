@@ -1,39 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Jul 2014 16:22:54 +0200
-Subject: [PATCH] ARM: imx: build cpu_is_imx6sl function conditionally
-Message-ID: <4295402.oOSEcbAj2f@wuerfel>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Jul 2014 22:23:12 +0800
+Subject: [PATCH] ARM: imx: imx6sx uses imx6q cpuidle code
+In-Reply-To: <6439884.YMH7C85FhG@wuerfel>
+References: <6439884.YMH7C85FhG@wuerfel>
+Message-ID: <20140703142311.GF30239@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx6q_pm_enter calls imx6sl_set_wait_clk when run on an imx6sl
-based machine. However if support for imx6sl is not enabled
-at compile time, this prevents us from building the kernel and
-we get this link error instead:
+On Thu, Jul 03, 2014 at 04:16:06PM +0200, Arnd Bergmann wrote:
+> Building a kernel for imx6sx but without imx6q support results in
+> this link error because of the missing cpuidle driver:
+> 
+> arch/arm/mach-imx/built-in.o: In function `imx6sx_init_late'::(.init.text+0xc228):
+>  undefined reference to `imx6q_cpuidle_init'
+> 
+> This patch adds a Makefile entry so we always build support for
+> the imx6q_cpuidle code when at least one of the 6sx or 6q variants
+> are enabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-arch/arm/mach-imx/built-in.o: In function `imx6q_pm_enter':
-:(.text+0x4b84): undefined reference to `imx6sl_set_wait_clk'
+Thanks for the fixing, Arnd.  Applied.
 
-This makes the cpu_is_imx6sl function conditionally return false
-if imx6sl is disabled at compile-time, which matches what the
-older cpu_is_mx* macros did. We have similar inline functions for
-the other imx6 variants, but so far I have not run into a case
-where the extra #ifdef is necessary.
+Shawn
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index 75d6a37..b03b808 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -156,7 +156,11 @@ extern unsigned int __mxc_cpu_type;
- #ifndef __ASSEMBLY__
- static inline bool cpu_is_imx6sl(void)
- {
-+#ifdef CONFIG_SOC_IMX6SL
- 	return __mxc_cpu_type == MXC_CPU_IMX6SL;
-+#else
-+	return 0;
-+#endif
- }
- 
- static inline bool cpu_is_imx6dl(void)
+> 
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index a364e20..d0179cd 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -31,6 +31,7 @@ ifeq ($(CONFIG_CPU_IDLE),y)
+>  obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
+>  obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
+>  obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
+> +obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6q.o
+>  endif
+>  
+>  ifdef CONFIG_SND_IMX_SOC
+> 
