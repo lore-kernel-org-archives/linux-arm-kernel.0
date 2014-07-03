@@ -1,83 +1,70 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 3 Jul 2014 16:40:04 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140703150008.GX32514@n2100.arm.linux.org.uk>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com> <5534788.ziUvZhb6y0@wuerfel>
- <20140703150008.GX32514@n2100.arm.linux.org.uk>
-Message-ID: <CACxGe6v4X+NGReTX5DP3kX4fGB0-AM+0i+EHTYGYJ5strMJ6VA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 16:43:25 +0100
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140703172909.60caf2c7@armhf>
+References: <20140702165628.GO20799@lunn.ch> <20140702195154.47d6f6b4@armhf>
+ <20140702194252.GN410@sirena.org.uk> <20140703074959.7c489912@armhf>
+ <20140703104432.GV410@sirena.org.uk> <20140703133406.2d3e3a1d@armhf>
+ <20140703115924.GY410@sirena.org.uk> <20140703152826.103c9d6c@armhf>
+ <20140703134346.GW32514@n2100.arm.linux.org.uk>
+ <20140703172909.60caf2c7@armhf>
+Message-ID: <20140703154325.GY32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 3, 2014 at 4:00 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 03, 2014 at 04:28:38PM +0200, Arnd Bergmann wrote:
->> On Thursday 03 July 2014 11:41:35 Catalin Marinas wrote:
->> >
->> > In my view, we don't break user space. It's rather a choice of how much
->> > legacy we support on ARMv8 hardware with an arm64 kernel. We don't even
->> > provide HWCAP_SWP for compat (not that anyone bothers checking that).
->> > It's a similar reason we choose not to support/emulate NWFPE or OABI
->> > even though there are existing binaries out there. If we choose to
->> > support SWP in the arm64 kernel, then we won't be able to break user
->> > space and have to carry it for a long time (unless you figure out a way
->> > to remove such features from the kernel because HWCAP certainly doesn't
->> > work, nor printk).
->> >
->> > The ARM feature deprecation/removal cycle allows for two architecture
->> > revisions before being entirely removed. SWP has been deprecated in
->> > ARMv6, made optional in ARMv7 (with the possibility of disabling it if
->> > still available) and removed in ARMv8. The Thumb-1/2 instruction sets
->> > never had the SWP instruction. Even when SWP was available in certain
->> > ARMv7 implementations, it was no longer guaranteed to be atomic.
->>
->> The problem really is that the ARM architecture deprecation method is
->> not compatible with the one we use in the kernel. I don't think there
->> is a good answer to that.
->>
->> Note that other architectures have a different way of handling this
->> by never removing instructions. Obviously knowing that does not help
->> deal with the problem on ARM.
->
-> Actually, there's not much difference.
->
-> Let's take a look at what x86 does.  As the instruction set there
-> develops, they too "retire" old instructions.  Rather than deprecating
-> them and then removing them entirely, instructions which were once
-> fast become slower because the core is no longer optimised to execute
-> that instruction.
->
-> This encourages those who wish to have high performance to move to the
-> new solution - but most importantly, existing software continues to
-> work.
->
-> We can have that on ARM, but only for userspace.  The difference is
-> that the kernel has to do the backwards compatibility rather than the
-> (nonexistent) CPU microcode - and we do have that capability for SWP.
->
-> We may not find it desirable to do it for ARMv8, but _if_ we wish to
-> allow users to migrate... if we wish to allow the existing set of
-> userspace programs (some of which may be statically linked to their
-> C library) to continue to work, there's only one option here.
->
-> While I can understand ARM Ltd not wanting to pollute their nice clean
-> ARM64 kernel with ARM32 "legacy junk", the fact of the matter is that
-> even the CPU is already polluted with the legacy ARM32 stuff - it
-> supports ARM32 binaries.
->
-> As ARM Ltd is moving towards server type systems, they should really
-> start demonstrating that they understand this point, otherwise people
-> are going to run away from ARM.  ISA compatibility - and a standardised
-> platform is what has made x86 become the universal platform that it
-> has.
->
-> The problem here is the embedded thinking, which is "we can make any
-> change, we just need to update and rebuild all the software which runs
-> on the CPU."  That really doesn't work when people want to provide a
-> single binary which works everywhere.
+On Thu, Jul 03, 2014 at 05:29:09PM +0200, Jean-Francois Moine wrote:
+> I think that you did not look at my code.
+> 
+> Both S/PDIF and I2S work with the TDA998x. It is a choice of the audio
+> subsystem to do this choice, not Russell King.
 
-Well said. Exactly my point. I was ready to write a long reply, but
-this email pretty much covers it.
+If you think I'm arguing because I personally want something, then we're
+not going to make any progress.
 
-g.
+What I want is for this to be _correct_ and _not_ to introduce silly
+restrictions which break people's setups.
+
+> When DPCM will handle the formats and rates, the audio subsystem will
+> find by itself if such stream will go to the HDMI only or to the S/PDIF
+> only or to both. The kirwood audio driver will work as it is and the tda998x
+> CODEC will work as it is. There will be no need to change these drivers.
+
+Except, as Mark has already pointed out, and as I keep pointing out to
+you, and you keep refusing to accept, the kirkwood driver as it stands
+is *not* a DPCM driver.  It makes no use of that stuff at all.
+
+What you're doing in kirkwood-i2s is providing two plain DAI links,
+and then insisting that only one can be active any any one time.
+
+A DPCM solution provides at least one frontend DAI link and at least
+one backend DAI link.  Your code does not do this.
+
+The second point is that - and as I keep telling you - that as soon
+as you couple your existing code (which restricts things like the
+sample rates) you can no longer output anything else through the
+optical out ON THE CUBOX.  For this statement, I'm not talking
+_generally_,  I'm talking _specifically_ about _one_ _platform_.
+
+> All we need actually is some more code in DPCM or multi-codec or
+> whatever mechanism which will route the stream according to the rates
+> and formats.
+
+Yes, DPCM currently lacks full support, that's been known about for
+some time - I've reported it to Mark, but it seems that this isn't
+something that is going to get fixed until others put work into it.
+
+> Eventually, the TDA998x is used in other machines. Are you sure that
+> the audio controllers of all these machines have a S/PDIF output
+> connected to the S/PDIF input of the tda998x?
+
+Which bit of "we need to support both I2S and SPDIF" in my previous
+emails was not clear.  Which bit of "We should only support SPDIF
+on the Cubox" was not clear?
+
+I *fully* acknowledge that we need to support both, but I'm putting
+a _strong_ recommendation to you _with_ technical reasons why we
+should _only_ support SPDIF on the Cubox.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
