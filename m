@@ -1,15 +1,69 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 3 Jul 2014 17:14:24 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: add FSL_EDMA and PRINTK_TIME
-In-Reply-To: <1404328399-17632-1-git-send-email-stefan@agner.ch>
-References: <1404328399-17632-1-git-send-email-stefan@agner.ch>
-Message-ID: <20140703091423.GD30239@dragon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 10:14:50 +0100
+Subject: [PATCH RFC] arm64: eBPF JIT compiler
+In-Reply-To: <1404278424-31176-1-git-send-email-zlim.lnx@gmail.com>
+References: <1404278424-31176-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <20140703091450.GB12958@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 09:13:19PM +0200, Stefan Agner wrote:
-> Add EDMA for DMA support for Vybrid SoCs. Also add printk time.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Hello,
 
-Applied, thanks.
+On Wed, Jul 02, 2014 at 06:20:24AM +0100, Zi Shen Lim wrote:
+> The JIT compiler emits A64 instructions. It supports eBPF only.
+> Legacy BPF is supported thanks to conversion by BPF core.
+> 
+> JIT is enabled in the same way as for other architectures:
+> 
+>         echo 1 > /proc/sys/net/core/bpf_jit_enable
+> 
+> Or for additional compiler output:
+> 
+>         echo 2 > /proc/sys/net/core/bpf_jit_enable
+> 
+> See Documentation/networking/filter.txt for more information.
+> 
+> The implementation passes all 57 tests in lib/test_bpf.c
+> on ARMv8 Foundation Model :)
+
+First off, this is really cool. Thanks for putting in the effort to get this
+supported on arm64! I'm happy to run tests on some real hardware if you tell
+me how to run them :)
+
+One general observation relates to your instruction encoding logic, e.g:
+
+> +/* 5-bit Register Operand */
+> +#define A64_R(x)       x               /* R0-R30: General purpose */
+> +#define A64_FP         A64_R(29)       /* Frame pointer */
+> +#define A64_LR         A64_R(30)       /* Link register */
+> +#define A64_ZR         31              /* As source register operand */
+> +#define A64_SP         31              /* As load/store base register */
+> +
+> +#define BITSMASK(bits) ((1 << (bits)) - 1)
+> +
+> +/* Compare & branch (immediate) */
+> +static inline u32 A64_COMP_BRANCH_IMM(int sf, int op, int imm19, int Rt)
+> +{
+> +       sf &= BITSMASK(1);
+> +       op &= BITSMASK(1);
+> +       imm19 &= BITSMASK(19);
+> +       Rt &= BITSMASK(5);
+> +       return 0x34000000 | sf << 31 | op << 24 | imm19 << 5 | Rt;
+> +}
+> +#define A64_CBZ(sf, Rt, imm19)  A64_COMP_BRANCH_IMM(sf, 0, imm19, Rt)
+> +#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH_IMM(sf, 1, imm19, Rt)
+
+We already have some some basic instruction manipulation code in
+arch/arm64/kernel/insn.c and arch/arm64/include/asm/insn.h. Would you be
+able to move some of this there please (but only the bits that aren't tied
+to BPF?
+
+The reason I ask, is because we're inevitebly going to need this stuff
+for other subsystems (e.g. kprobes, dynamic code patching ("alternatives"))
+and I'd like to avoid a proliferation of magic numbers across the codebase.
+
+Does this sound remotely feasible?
+
+Cheers,
+
+Will
