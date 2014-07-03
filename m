@@ -1,98 +1,101 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Jul 2014 18:43:18 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
-Message-ID: <20140703174318.GE28175@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 03 Jul 2014 19:44:04 +0200
+Subject: timers & suspend
+In-Reply-To: <b4b5a783-75cb-42f9-a501-7384b750b719@BN1AFFO11FD038.protection.gbl>
+References: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
+ <53B54AC2.5040908@linaro.org>
+ <83fa689b-a06a-4f1c-97cb-f7a7121a0f25@BL2FFO11FD041.protection.gbl>
+ <53B5922A.7020006@linaro.org>
+ <b4b5a783-75cb-42f9-a501-7384b750b719@BN1AFFO11FD038.protection.gbl>
+Message-ID: <53B59664.3030809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
-> On Thu, Jul 3, 2014 at 11:41 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > (I've been away for a day and missed all the fun ;))
-> >
-> > On Wed, Jul 02, 2014 at 11:14:47PM +0100, Grant Likely wrote:
-> >> Android is not the embedded world where we could get away with a whole
-> >> lot. There is a *freaking huge* installed base of applications.
-> >> Breaking them is not an option, and I think Colin's question makes it
-> >> clear that Android is going make sure that doesn't happen regardless
-> >> of what the mainline kernel does... and they are right to do so.
-> >
-> > I don't know how huge this installed base of applications is. AFAIK,
-> > it's limited to a (maybe significant) number of Android games all based
-> > on certain library which no longer uses SWP in its recent releases. I
-> > may be wrong but the information I have so far is that this huge base of
-> > applications does not go beyond Android. Furthermore, people getting a
-> > new Android phone with ARMv8 will have to re-download applications
-> > anyway, so the currently installed base does _not_ matter. What matters
-> > is what is provided in the Android _app store_.
-> 
-> Okay, I have to bite on this one....
-> 
-> Ah, no. The installed base *does* matter. Breaking things under the
-> assumption that they can be fixed with an update is a horrible reason
-> for breaking stuff. That creates hell for developers.
+On 07/03/2014 07:30 PM, S?ren Brinkmann wrote:
+> On Thu, 2014-07-03 at 07:26PM +0200, Daniel Lezcano wrote:
+>> On 07/03/2014 06:09 PM, S?ren Brinkmann wrote:
+>>> On Thu, 2014-07-03 at 02:21PM +0200, Daniel Lezcano wrote:
+>>>> On 06/30/2014 08:39 PM, S?ren Brinkmann wrote:
+>>>>> Hi,
+>>>>>
+>>>>> I'm currently working on suspend for Zynq and try to track down some
+>>>>> spurious wakes. It looks like the spurious wakes are caused by timers,
+>>>>> hence I was wondering whether there are any special requirements for
+>>>>> timer drivers when it comes to suspend support or if I just missed
+>>>>> something.
+>>>>>
+>>>>> Zynq sets the 'IRQCHIP_MASK_ON_SUSPEND' flag, which should mask all
+>>>>> interrupts but the wake source. Reading through kernel/irq/pm.c
+>>>>> indicates, that timer interrupts get some special treatment though.
+>>>>> Therefore I implemented some suspend/resume callbacks for the
+>>>>> cadence_ttc which disable and clear the timer's interrupts when going
+>>>>> into suspend. That seems to mitigate the issue quite a bit, but I still
+>>>>> saw spurious wakes - just a lot less often.
+>>>>> Digging a little deeper revealed, the spurious wakes are caused by the
+>>>>> ARM's smp_twd timer now. Given that that driver is probably used by a few
+>>>>> more ARM platforms, I get the feeling that I'm missing something.
+>>>>
+>>>> Do you receive any interrupt from the cadence_ttc ? (/proc/interrupts)
+>>>>
+>>>> That's funny because I realize that you cadence ttc timer is never
+>>>> used as there are the architected timers. The cadence ttc would be
+>>>> only useful if there were an idle state powering down the smp_twd
+>>>> timers but it is not the case on this board, IIUC.
+>>> Yes they are used. They TTC is the only broadcast capable timer for
+>>> Zynq. In my experience, I can not even boot without it (may have
+>>> dependencies on CPUidle or something).
+>>
+>> Actually the cpuidle driver is wrong. It assumes the state #1 will
+>> power off the different cores with their architected timers and then
+>> switch to the broadcast timer. But this one is not needed as we
+>> don't power down the core with the twd timers, so no need to switch
+>> to a backup timer device.
+>>
+>> The implementation of the DDR self refresh idle state (incoming
+>> patchset) removes the cpu_pm notifiers + the flag TIMER_STOP. The
+>> result is 0 interrupts for ttc cadence timer. I removed in the dts
+>> the cadence ttc and my board booted without problem (it is a zynq
+>> 702).
+>>
+>> Except I missed something, the cadence ttc is actually not used at all.
+> You mean with your patches, or without? I'd have to check that.
 
-My point is that you *cannot* upgrade your phone from ARMv7 to ARMv8
-without re-downloading the apps. You don't carry over your filesystem
-(installed base) on an SD card from the old phone to the new one. That's
-where Google has some control I didn't say that Google should break
-those apps but actively try to update them (in the meantime, they could
-provide some form of SWP emulation).
+I meant with my patches.
 
-> So, no. I completely reject any notion that breaking existing apps is
-> okay. If we're going to say that v8 still supports 32-bit apps, then
-> it has to be all of v7, not just the 'good' bits. Nor do I think
-> saying "it's just a bunch of games" justifies anything. We're kernel
-> engineers. Applications are applications and we don't break userspace.
-> Period.
+>>>>> It's probably worth mentioning that the suspend state in Zynq does not
+>>>>> power off the CPU cores. It just asserts the resets on secondary cores
+>>>>> and the primary one waits in wfi.
+>>>>
+>>>> Why do you need to reset them ?
+>>> CPU0 is not reset, but all secondary cores are. That is as close to
+>>> power off as we get and works well with hotplug.
+>>
+>> Ok, I was not aware of this approach. Is there any patchset
+>> available in the net ?
+> It's in mainline for a while. arch/arm/mach-zynq/platsmp.c defines the
+> SMP ops. Zynq's cpu_die/kill result in the CPU reset being asserted. And
+> when the core is plugged in again, it gets deasserted and goes through
+> the secondary boot path.
+> That code is a little cleaned up in our vendor tree, but overall it
+> should be the same functionality wise.
 
-Here you need to define user-space. OABI?
+Ah, interesting. Thanks for the precision. I was pointing to v3.16-rc3 
+and I didn't see the upstream xilinx code. So my patchset is now 
+out-dated :(
 
-> > Note that I don't say Google should break those applications but they
-> > can carry a patch in their Android kernel while reaching out to
-> > developers to sort their code (can the Android app store be scanned?).
-> > What I don't want is to be in a situation 10 years from now when we
-> > still carry SWP emulation code that no-one uses but we can't remove
-> > because it would break the user space features we agreed upon.
-> 
-> Welcome to system programming. This is what we do. It is a *good*
-> thing that an x86 userspace from 1995 can still be booted.
+I will look at the code closely.
 
-I'm not sure how much of it is just the merit of Linux but rather the
-hardware backwards compatibility. As you can see with SWP, we don't
-always have this on ARM (and don't blame the kernel maintainers for this
-;)).
+Thanks
+   -- Daniel
 
-The same question again - shall we support OABI or we just add ABI
-features based on who shouts louder?
 
-> > I have limited knowledge of Android user space but I think SWP emulation
-> > could also be implemented in user space via a SIGILL handler in the
-> > zygote thread and inherited by forked apps (performance doesn't really
-> > matter here). A similar example for Android is the binder driver
-> > user-kernel ABI. AFAIK, Google decided not to provide a compat ABI for
-> > the 64-bit compilation of this driver but update the AArch32 user-space
-> > library to use the new 64-bit ABI. That's perfectly fine by me, they
-> > chose not to provide such ABI in the kernel but solve it entirely in
-> > user space and could do the same with SWP.
-> 
-> Really? Why would we even want that? We're far better positioned in
-> the kernel to present the correct behaviour that any trapping from a
-> userspace application.
 
-Because by adding it to the kernel we declare it ABI (rather than just
-an Android issue on ARMv8 hardware; I'm not currently aware of other
-ARMv7 Linux distros affected).
+
+
 
 -- 
-Catalin
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
