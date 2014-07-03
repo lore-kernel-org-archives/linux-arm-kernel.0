@@ -1,47 +1,53 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Jul 2014 15:23:56 +0200
-Subject: [PATCH 13/16] cpuidle: mvebu: Move the description of the cpuidle
- states in the platform part
-In-Reply-To: <20140630153202.69f885e0@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-14-git-send-email-gregory.clement@free-electrons.com>
- <20140630153202.69f885e0@free-electrons.com>
-Message-ID: <53B5596C.7010304@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Jul 2014 08:25:09 -0500
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140703073411.GX28884@atomide.com>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+Message-ID: <20140703132509.GA5814@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
->> In order to prepare the add of new SoCs supports for this cpuidle
+On Thu, Jul 03, 2014 at 12:34:11AM -0700, Tony Lindgren wrote:
+> * Robert Nelson <robertcnelson@gmail.com> [140702 12:27]:
+> > On Wed, Jul 2, 2014 at 2:09 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> > > Hi,
+> > >
+> > > On Wed, Jul 02, 2014 at 11:09:32AM -0500, Felipe Balbi wrote:
+> > >> > It has been only tested as console UART.
+> > >> > The tty name is ttyS based instead of ttyO. How big is the pain here,
+> > >> > what could be the easiest way to provide compatibility?
+> > >>
+> > >> have been considering that myself for months. You could pass an optional
+> > >> argument to serial8250_register_8250_port() but that only solves part of
+> > >> the problem :-(
 > 
-> "the add of new SoCs supports for this cpuidle" -> "the addition of the
-> support for more SoCs in this cpuidle".
+> Some kind of compability layer sure would be nice.
 > 
->> driver, this patch moves the description of the state in the platform
->> part. Indeed the number of the cpuidle state, and the value of the
->> flag used will vary depending of the SoC.
+> > > When ttyS -> ttyO change was done on OMAP, compatibility was not an issue.
+> > > Why should we care about it now?
+> > 
+> > It would be a good opportunity to force everyone to update their bootloader. ;)
+> > 
+> > Besides the BeagleBoard forum is quiet now, no one is complaining
+> > about that old (ttyS -> ttyO) transition anymore..
 > 
-> I actually don't really agree with the reasoning here. We can perfectly
-> fine have several separate compatible strings, one for each SoC. We do
-> this for pinctrl, for clocks, and for many other drivers. Why should it
-> be different for the cpuidle driver? I know the function to enter idle
-> will most likely implemented in arch/arm/mach-mvebu/ because those
-> functions are generally too tightly coupled with a bunch of system
-> registers changes, but the description of the different idle states can
-> just as well be inside the cpuidle driver itself.
+> How about a Kconfig option to provide ttyO by default? The not even
+> do that if kernel has cmdline option nottyomap.
 
-So that would means a different probe and driver name for each SOC?
-Indeed it is doable. With my solution adding the support for a new Soc
-won't modify the cpu idle driver itself, so the merge would be easier.
-But I admit that it is a misuse of the mach- directory.
-
-
-Thanks,
-
-Gregory
-
+what about single zImage ? I don't want to use ttyO on my
+Allwinner/Exynos/Snapdragon/whatever SoC just because OMAP is in the
+same image ;-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/4400eab2/attachment.sig>
