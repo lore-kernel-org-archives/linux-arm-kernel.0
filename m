@@ -1,29 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Jul 2014 12:26:32 +0200
-Subject: [PATCH v8 2/9] pci: Export find_pci_host_bridge() function.
-In-Reply-To: <CACoXjcn5wdOwQx6PSfhTyuo-FQqBL62o-MNj3i6EfENRnUNt6g@mail.gmail.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <7101568.8DVJFku5jp@wuerfel>
- <CACoXjcn5wdOwQx6PSfhTyuo-FQqBL62o-MNj3i6EfENRnUNt6g@mail.gmail.com>
-Message-ID: <12857279.nHR7kEbqBW@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 11:37:26 +0100
+Subject: [PATCH v3 0/8] component helper improvements
+In-Reply-To: <36014663.Ic7tWfh3I9@avalon>
+References: <20140701144011.GU32514@n2100.arm.linux.org.uk>
+ <20140702145904.GK32514@n2100.arm.linux.org.uk> <36014663.Ic7tWfh3I9@avalon>
+Message-ID: <20140703103726.GU32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 July 2014 13:43:41 Tanmay Inamdar wrote:
-> On Wed, Jul 2, 2014 at 12:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I think EXPORT_SYMBOL_GPL() is better here. The new symbols are unlikely
-> > to be used by a peripheral device driver, and PCI host controllers are
-> > already restricted by EXPORT_SYMBOL_GPL.
-> >
+On Thu, Jul 03, 2014 at 01:51:19AM +0200, Laurent Pinchart wrote:
+> On Wednesday 02 July 2014 15:59:04 Russell King - ARM Linux wrote:
+> > On Tue, Jul 01, 2014 at 03:40:11PM +0100, Russell King - ARM Linux wrote:
+> > > A while back, Laurent raised some comments about the component helper,
+> > > which this patch set starts to address.
+> > 
+> > I looked back over the two other times which this series has posted,
+> > and noticed that two patches had been reviewed, so I've added those
+> > tags.
+> > 
+> > Unless there's any objections from anyone, I'll send the first three
+> > off to Greg either tonight or tomorrow night, which at least gets us
+> > moving forward on this.
+> > 
+> > If anyone has any objections, please shout ASAP.  Thanks.
 > 
-> You are right as long as the functions are not used directly. But what
-> if GPL functions are called indirectly.  For example, 'pci_domain_nr'
-> implementation in Liviu's V7 series calls 'find_pci_host_bridge'.
+> No objection from my side at all, this is a nice improvement. For the first 
+> three patches,
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Good point. If pci_domain_nr() doesn't require access to an EXPORT_SYMBOL_GPL
-symbol, it should not start doing that after this patch.
+Thanks, ack added.
 
-For of_create_pci_host_bridge() however, I can't think of any reason to use
-a legacy EXPORT_SYMBOL.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
