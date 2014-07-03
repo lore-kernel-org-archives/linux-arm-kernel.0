@@ -1,160 +1,141 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 03 Jul 2014 17:49:05 +0100
-Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible CRTCs
-Message-ID: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
+Date: Thu, 03 Jul 2014 17:52:57 +0100
+Subject: [PATCH RFC] imx-drm: convert imx-drm to use the generic DRM OF helper
+Message-ID: <E1X2kFl-0000us-GN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to allow encoders to find their possible CRTCs from the
-OF graph without having to re-implement this functionality.  We add a
-device_node to drm_crtc which corresponds with the port node in the
-DT description of the CRTC device.
-
-We can then scan the DRM device list for CRTCs to find their index,
-matching the appropriate CRTC using the port device_node, thus building
-up the possible CRTC mask.
+Use the generic DRM OF helper to locate the possible CRTCs for the
+encoder, thereby shrinking the imx-drm driver some more.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-This helper will be shared between imx-drm and Armada DRM, and should
-be useful for other OF-based drivers.  At the moment, this is being
-sent for comments and acks; I need to build upon this patch in order
-to convert Armada DRM to DT.
+This patch builds upon "drm: add of_graph endpoint helper to find
+possible CRTCs", converting imx-drm to use this new helper.
 
- drivers/gpu/drm/Makefile |  1 +
- drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/drm/drm_crtc.h   |  2 ++
- include/drm/drm_of.h     | 18 ++++++++++++++
- 4 files changed, 86 insertions(+)
- create mode 100644 drivers/gpu/drm/drm_of.c
- create mode 100644 include/drm/drm_of.h
+ drivers/staging/imx-drm/imx-drm-core.c | 72 ++++++----------------------------
+ 1 file changed, 13 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-index dd2ba4269740..533d011eab3e 100644
---- a/drivers/gpu/drm/Makefile
-+++ b/drivers/gpu/drm/Makefile
-@@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
- drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
- drm-$(CONFIG_PCI) += ati_pcigart.o
- drm-$(CONFIG_DRM_PANEL) += drm_panel.o
-+drm-$(CONFIG_OF) += drm_of.o
- 
- drm-usb-y   := drm_usb.o
- 
-diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-new file mode 100644
-index 000000000000..46d967881689
---- /dev/null
-+++ b/drivers/gpu/drm/drm_of.c
-@@ -0,0 +1,65 @@
-+#include <linux/export.h>
-+#include <linux/list.h>
-+#include <linux/of_graph.h>
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc.h>
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 47ee6c79857a..05ba8894793d 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -24,6 +24,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
 +#include <drm/drm_of.h>
-+
-+/**
-+ * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
-+ * @dev: DRM device
-+ * @port: port OF node
-+ *
-+ * Given a port OF node, return the possible mask of the corresponding
-+ * CRTC within a device's list of CRTCs.  Returns zero if not found.
-+ */
-+static uint32_t drm_crtc_port_mask(struct drm_device *dev,
-+				   struct device_node *port)
-+{
-+	unsigned int index = 0;
-+	struct drm_crtc *tmp;
-+
-+	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
-+		if (tmp->port == port)
-+			return 1 << index;
-+
-+		index++;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
-+ * @dev: DRM device
-+ * @port: encoder port to scan for endpoints
-+ *
-+ * Scan all endpoints attached to a port, locate their attached CRTCs,
-+ * and generate the DRM mask of CRTCs which may be attached to this
-+ * encoder.
-+ */
-+uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-+				    struct device_node *port)
-+{
-+	struct device_node *remote_port, *ep = NULL;
-+	uint32_t possible_crtcs = 0;
-+
-+	do {
-+		ep = of_graph_get_next_endpoint(port, ep);
-+		if (!ep)
-+			break;
-+
-+		remote_port = of_graph_get_remote_port(ep);
-+		if (!remote_port) {
-+			of_node_put(ep);
-+			return 0;
-+		}
-+
-+		possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
-+
-+		of_node_put(remote_port);
-+	} while (1);
-+
-+	return possible_crtcs;
-+}
-+EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-index 251b75e6bf7a..6a94909f1ca9 100644
---- a/include/drm/drm_crtc.h
-+++ b/include/drm/drm_crtc.h
-@@ -41,6 +41,7 @@ struct drm_framebuffer;
- struct drm_object_properties;
- struct drm_file;
- struct drm_clip_rect;
-+struct device_node;
  
- #define DRM_MODE_OBJECT_CRTC 0xcccccccc
- #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
-@@ -314,6 +315,7 @@ struct drm_crtc_funcs {
-  */
- struct drm_crtc {
- 	struct drm_device *dev;
-+	struct device_node *port;
- 	struct list_head head;
+ #include "imx-drm.h"
  
- 	/**
-diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-new file mode 100644
-index 000000000000..2441f7112074
---- /dev/null
-+++ b/include/drm/drm_of.h
-@@ -0,0 +1,18 @@
-+#ifndef __DRM_OF_H__
-+#define __DRM_OF_H__
+@@ -47,7 +48,6 @@ struct imx_drm_crtc {
+ 	struct drm_crtc				*crtc;
+ 	int					pipe;
+ 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
+-	struct device_node			*port;
+ };
+ 
+ static int legacyfb_depth = 16;
+@@ -364,9 +364,10 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 
+ 	imx_drm_crtc->imx_drm_helper_funcs = *imx_drm_helper_funcs;
+ 	imx_drm_crtc->pipe = imxdrm->pipes++;
+-	imx_drm_crtc->port = port;
+ 	imx_drm_crtc->crtc = crtc;
+ 
++	crtc->port = port;
 +
-+struct drm_device;
-+struct device_node;
-+
-+#ifdef CONFIG_OF
-+extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-+					   struct device_node *port);
-+#else
-+static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-+						  struct device_node *port)
-+{
-+	return 0;
-+}
-+#endif
-+
-+#endif /* __DRM_OF_H__ */
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
+ 
+ 	*new_crtc = imx_drm_crtc;
+@@ -407,33 +408,6 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_remove_crtc);
+ 
+-/*
+- * Find the DRM CRTC possible mask for the connected endpoint.
+- *
+- * The encoder possible masks are defined by their position in the
+- * mode_config crtc_list.  This means that CRTCs must not be added
+- * or removed once the DRM device has been fully initialised.
+- */
+-static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
+-	struct device_node *endpoint)
+-{
+-	struct device_node *port;
+-	unsigned i;
+-
+-	port = of_graph_get_remote_port(endpoint);
+-	if (!port)
+-		return 0;
+-	of_node_put(port);
+-
+-	for (i = 0; i < MAX_CRTC; i++) {
+-		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
+-		if (imx_drm_crtc && imx_drm_crtc->port == port)
+-			return drm_crtc_mask(imx_drm_crtc->crtc);
+-	}
+-
+-	return 0;
+-}
+-
+ static struct device_node *imx_drm_of_get_next_endpoint(
+ 		const struct device_node *parent, struct device_node *prev)
+ {
+@@ -445,36 +419,16 @@ static struct device_node *imx_drm_of_get_next_endpoint(
+ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np)
+ {
+-	struct imx_drm_device *imxdrm = drm->dev_private;
+-	struct device_node *ep = NULL;
+-	uint32_t crtc_mask = 0;
+-	int i;
+-
+-	for (i = 0; ; i++) {
+-		u32 mask;
+-
+-		ep = imx_drm_of_get_next_endpoint(np, ep);
+-		if (!ep)
+-			break;
+-
+-		mask = imx_drm_find_crtc_mask(imxdrm, ep);
++	uint32_t crtc_mask = drm_of_find_possible_crtcs(drm, np);
+ 
+-		/*
+-		 * If we failed to find the CRTC(s) which this encoder is
+-		 * supposed to be connected to, it's because the CRTC has
+-		 * not been registered yet.  Defer probing, and hope that
+-		 * the required CRTC is added later.
+-		 */
+-		if (mask == 0)
+-			return -EPROBE_DEFER;
+-
+-		crtc_mask |= mask;
+-	}
+-
+-	if (ep)
+-		of_node_put(ep);
+-	if (i == 0)
+-		return -ENOENT;
++	/*
++	 * If we failed to find the CRTC(s) which this encoder is
++	 * supposed to be connected to, it's because the CRTC has
++	 * not been registered yet.  Defer probing, and hope that
++	 * the required CRTC is added later.
++	 */
++	if (crtc_mask == 0)
++		return -EPROBE_DEFER;
+ 
+ 	encoder->possible_crtcs = crtc_mask;
+ 
+@@ -508,7 +462,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
+ 
+ 		port = of_graph_get_remote_port(ep);
+ 		of_node_put(port);
+-		if (port == imx_crtc->port) {
++		if (port == imx_crtc->crtc->port) {
+ 			ret = of_graph_parse_endpoint(ep, &endpoint);
+ 			return ret ? ret : endpoint.port;
+ 		}
 -- 
 1.8.3.1
