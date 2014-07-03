@@ -1,46 +1,161 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Thu, 3 Jul 2014 16:37:16 -0400
-Subject: [PATCH 2/2] mach-spear: fixed spear1340.c file
-In-Reply-To: <1404412596.16291.30.camel@x220>
-References: <1404354994-7478-1-git-send-email-xerofoify@gmail.com>
- <1404410691.16291.11.camel@x220>
- <CAPDOMVh0qyjq11kKaO2ndYhLW8j+dZyv3-c89BBcO1AxY+fiHQ@mail.gmail.com>
- <1404412596.16291.30.camel@x220>
-Message-ID: <CAPDOMViwxnTFhqio+_9A5nxygFbVJBWVXSWQd8Pj2XP6diyHQQ@mail.gmail.com>
+From: marek@goldelico.com (Marek Belisko)
+Date: Thu,  3 Jul 2014 22:49:23 +0200
+Subject: [PATCH 1/2] mmc: hsmmc: Add reset gpio configuration option.
+Message-ID: <1404420564-30245-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Very well then I will read the documentation on Kconfig in order to
-understand that and fix up my patches for that.
-On the other hand I will send a email before the patches to tell in
-what order to apply them.
-Cheers Nick
+From: NeilBrown <neilb@suse.de>
 
-On Thu, Jul 3, 2014 at 2:36 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> [I fixed the top posting.]
->
-> On Thu, 2014-07-03 at 14:08 -0400, Nick Krause wrote:
->> On Thu, Jul 3, 2014 at 2:04 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
->> > This patch, together with patch 1/2, basically moves a chunk of code
->> > into a separate file, didn't it? If so, why did you split that move in
->> > two patches?
->>
->> Yes it is and I did it in two patches in order to be more readable.
->
-> It makes it harder to understand the change (I had to _guess_ it was a
-> move). Moreover, depending on the order that these two patches would be
-> merged, we could end up with a chunk of code being either included twice
-> or not included at all, in some range of commits. Neither would be good.
->
->> > And how does all this work without any changes to a Makefile?
->>
->> Furthermore I don't known Kconfig well enough to do the Makefile
->> for the file I created.
->
-> Then I think you should, well, study the kernel build system before
-> submitting a change like this. And you can also ask a question or two to
-> get things going. (Not sure what the relevant list would be.)
->
->
-> Paul Bolle
->
+If a 'gpio_reset' is specified, then hold it low while
+turning the power regulator on.
+This is needed for some wi2wi wireless modules, particularly
+when the regulator is held active by some other client.
+The wi2wi needs to be reset if power isn't actually removed, and
+the gpio can be used to do this.
+
+Signed-off-by: NeilBrown <neilb@suse.de>
+---
+ arch/arm/mach-omap2/hsmmc.c            |  7 ++++++-
+ arch/arm/mach-omap2/hsmmc.h            |  3 +++
+ drivers/mmc/host/omap_hsmmc.c          | 26 +++++++++++++++++++++++---
+ include/linux/platform_data/mmc-omap.h |  1 +
+ 4 files changed, 33 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index 07d4c7b..046bfdd 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -172,6 +172,10 @@ static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
+ 		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+ 		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+ 					OMAP_PIN_INPUT_PULLUP);
++	if (gpio_is_valid(mmc_controller->slots[0].gpio_reset) &&
++		(mmc_controller->slots[0].gpio_reset < OMAP_MAX_GPIO_LINES))
++		omap_mux_init_gpio(mmc_controller->slots[0].gpio_reset,
++					OMAP_PIN_OUTPUT);
+ 	if (cpu_is_omap34xx()) {
+ 		if (controller_nr == 0) {
+ 			omap_mux_init_signal("sdmmc1_clk",
+@@ -270,6 +274,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 
+ 	mmc->slots[0].switch_pin = c->gpio_cd;
+ 	mmc->slots[0].gpio_wp = c->gpio_wp;
++	mmc->slots[0].gpio_reset = c->gpio_reset;
+ 
+ 	mmc->slots[0].remux = c->remux;
+ 	mmc->slots[0].init_card = c->init_card;
+@@ -389,7 +394,7 @@ void omap_hsmmc_late_init(struct omap2_hsmmc_info *c)
+ 			continue;
+ 
+ 		mmc_pdata->slots[0].switch_pin = c->gpio_cd;
+-		mmc_pdata->slots[0].gpio_wp = c->gpio_wp;
++		mmc_pdata->slots[0].gpio_reset = c->gpio_reset;
+ 
+ 		res = omap_device_register(pdev);
+ 		if (res)
+diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+index 7f2e790..16b2ac5 100644
+--- a/arch/arm/mach-omap2/hsmmc.h
++++ b/arch/arm/mach-omap2/hsmmc.h
+@@ -24,6 +24,9 @@ struct omap2_hsmmc_info {
+ 	bool	deferred;	/* mmc needs a deferred probe */
+ 	int	gpio_cd;	/* or -EINVAL */
+ 	int	gpio_wp;	/* or -EINVAL */
++	int	gpio_reset;	/* or -EINVAL - reset is held low during
++				 * power-on
++				 */
+ 	char	*name;		/* or NULL for default */
+ 	struct platform_device *pdev;	/* mmc controller instance */
+ 	int	ocr_mask;	/* temporary HACK */
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 9656726..4a264fc 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -300,6 +300,8 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
+ 	if (!host->vcc)
+ 		return 0;
+ 
++	if (gpio_is_valid(mmc_slot(host).gpio_reset))
++		gpio_set_value_cansleep(mmc_slot(host).gpio_reset, 0);
+ 	if (mmc_slot(host).before_set_reg)
+ 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
+ 
+@@ -365,6 +367,8 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
+ 
+ 	if (mmc_slot(host).after_set_reg)
+ 		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
++	if (gpio_is_valid(mmc_slot(host).gpio_reset))
++		gpio_set_value_cansleep(mmc_slot(host).gpio_reset, 1);
+ 
+ error_set_power:
+ 	return ret;
+@@ -481,10 +485,22 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
+ 	} else
+ 		pdata->slots[0].gpio_wp = -EINVAL;
+ 
+-	return 0;
++	if (gpio_is_valid(pdata->slots[0].gpio_reset)) {
++		ret = gpio_request(pdata->slots[0].gpio_reset, "mmc_reset");
++		if (ret)
++			goto err_free_wp;
++		ret = gpio_direction_output(pdata->slots[0].gpio_reset, 1);
++		if (ret)
++			goto err_free_reset;
++	} else
++		pdata->slots[0].gpio_reset = -EINVAL;
+ 
++	return 0;
++err_free_reset:
++	gpio_free(pdata->slots[0].gpio_reset);
+ err_free_wp:
+-	gpio_free(pdata->slots[0].gpio_wp);
++	if (gpio_is_valid(pdata->slots[0].gpio_wp))
++		gpio_free(pdata->slots[0].gpio_wp);
+ err_free_cd:
+ 	if (gpio_is_valid(pdata->slots[0].switch_pin))
+ err_free_sp:
+@@ -494,6 +510,8 @@ err_free_sp:
+ 
+ static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
+ {
++	if (gpio_is_valid(pdata->slots[0].gpio_reset))
++		gpio_free(pdata->slots[0].gpio_reset);
+ 	if (gpio_is_valid(pdata->slots[0].gpio_wp))
+ 		gpio_free(pdata->slots[0].gpio_wp);
+ 	if (gpio_is_valid(pdata->slots[0].switch_pin))
+@@ -1952,10 +1970,11 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
+ 	struct omap_mmc_platform_data *pdata;
+ 	struct device_node *np = dev->of_node;
+ 	u32 bus_width, max_freq;
+-	int cd_gpio, wp_gpio;
++	int cd_gpio, wp_gpio, reset_gpio;
+ 
+ 	cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
+ 	wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
++	reset_gpio = of_get_named_gpio(np, "reset-gpios", 0);
+ 	if (cd_gpio == -EPROBE_DEFER || wp_gpio == -EPROBE_DEFER)
+ 		return ERR_PTR(-EPROBE_DEFER);
+ 
+@@ -1970,6 +1989,7 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
+ 	pdata->nr_slots = 1;
+ 	pdata->slots[0].switch_pin = cd_gpio;
+ 	pdata->slots[0].gpio_wp = wp_gpio;
++	pdata->slots[0].gpio_reset = reset_gpio;
+ 
+ 	if (of_find_property(np, "ti,non-removable", NULL)) {
+ 		pdata->slots[0].nonremovable = true;
+diff --git a/include/linux/platform_data/mmc-omap.h b/include/linux/platform_data/mmc-omap.h
+index 51e70cf..8f3ee4a 100644
+--- a/include/linux/platform_data/mmc-omap.h
++++ b/include/linux/platform_data/mmc-omap.h
+@@ -116,6 +116,7 @@ struct omap_mmc_platform_data {
+ 
+ 		int switch_pin;			/* gpio (card detect) */
+ 		int gpio_wp;			/* gpio (write protect) */
++		int gpio_reset;			/* gpio (reset) */
+ 
+ 		int (*set_bus_mode)(struct device *dev, int slot, int bus_mode);
+ 		int (*set_power)(struct device *dev, int slot,
+-- 
+1.9.1
