@@ -1,168 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:14:56 +0200
-Subject: [PATCH 13/18] AT91: Register the poweroff driver
+Date: Thu,  3 Jul 2014 16:14:36 +0200
+Subject: [PATCH 03/18] AT91: G45: DT: Declare a second ram controller
 In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-24-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the poweroff driver in the old-style SoC definition so that the driver
-is loaded and provide a shutdown hook.
+The G45 has two identical ram controller, that are defined as a single one,
+with two reg cells.
+
+The proper way to support such a case is to have two separate DT nodes.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9260.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9261.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9263.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9g45.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9rl.c  | 15 +++++++++++++++
- 5 files changed, 75 insertions(+)
+ arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 197c0149406a..5fa1986be2aa 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -377,9 +377,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index ace6bf197b70..6f648b85b725 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -75,8 +75,12 @@
  
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9260_BASE_SHDWC,
-+		.end    = AT91SAM9260_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
+ 			ramc0: ramc at ffffe400 {
+ 				compatible = "atmel,at91sam9g45-ddramc";
+-				reg = <0xffffe400 0x200
+-				       0xffffe600 0x200>;
++				reg = <0xffffe400 0x200>;
++			};
 +
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9260_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
++			ramc1: ramc at ffffe600 {
++				compatible = "atmel,at91sam9g45-ddramc";
++				reg = <0xffffe600 0x200>;
+ 			};
  
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index ef44977f1cae..5ccc67235e7a 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -340,9 +340,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9261_BASE_SHDWC,
-+		.end    = AT91SAM9261_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9261_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
- 
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index cb078e150a19..4d28c3479d4b 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -358,9 +358,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9263_BASE_SHDWC,
-+		.end    = AT91SAM9263_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9263_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
- 
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 329749eb1dff..22034c96d488 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -412,9 +412,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9G45_BASE_SHDWC,
-+		.end    = AT91SAM9G45_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9g45_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
- 
- /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index e0e1729fe0e4..323a9f90931a 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -350,9 +350,24 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource shdwc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9RL_BASE_SHDWC,
-+		.end    = AT91SAM9RL_BASE_SHDWC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device shdwc_device = {
-+	.name           = "at91-poweroff",
-+	.resource       = shdwc_resources,
-+	.num_resources  = ARRAY_SIZE(shdwc_resources),
-+};
-+
- static void __init at91sam9rl_register_devices(void)
- {
- 	platform_device_register(&rstc_device);
-+	platform_device_register(&shdwc_device);
- }
- 
- /* --------------------------------------------------------------------
+ 			pmc: pmc at fffffc00 {
 -- 
 2.0.1
