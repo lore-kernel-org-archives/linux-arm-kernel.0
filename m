@@ -1,60 +1,114 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:23 +0200
-Subject: [PATCH RESEND 08/18] AT91: soc: Introduce register_devices callback
+Date: Thu,  3 Jul 2014 16:41:28 +0200
+Subject: [PATCH RESEND 13/18] AT91: DT: Remove poweroff DT probing
 In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404398493-28907-14-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some core devices should be registered by the SoC itself rather than by every
-board using this SoC. Introduce a register_devices callback that should be
-called during the init_machine in order to do that.
+Now that the poweroff code is a driver of its own, remove the DT probing in
+mach-at91 and let the usual DT code do its job.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/generic.h | 2 ++
- arch/arm/mach-at91/setup.c   | 5 +++++
- arch/arm/mach-at91/soc.h     | 1 +
- 3 files changed, 8 insertions(+)
+ arch/arm/mach-at91/setup.c | 77 ----------------------------------------------
+ 1 file changed, 77 deletions(-)
 
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 631fa3b8c16d..4c2c96195a50 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -37,6 +37,8 @@ extern int  __init at91_aic5_of_init(struct device_node *node,
- extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
- extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
- 
-+ /* Devices */
-+extern void __init at91_register_devices(void);
- 
-  /* Timer */
- extern void at91rm9200_ioremap_st(u32 addr);
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 71003e40f01c..fe0601e0a3c0 100644
+index fe0601e0a3c0..ae269291d19d 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -508,3 +508,8 @@ void __init at91_initialize(unsigned long main_clock)
- 
- 	pinctrl_provide_dummies();
+@@ -387,82 +387,6 @@ static void at91_dt_ramc(void)
+ 	at91_pm_set_standby(of_id->data);
  }
-+
-+void __init at91_register_devices(void)
-+{
-+	at91_boot_soc.register_devices();
-+}
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index a1e1482c6da8..ab983f2cc7dd 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -11,6 +11,7 @@ struct at91_init_soc {
- 	void (*map_io)(void);
- 	void (*ioremap_registers)(void);
- 	void (*register_clocks)(void);
-+	void (*register_devices)(void);
- 	void (*init)(void);
- };
  
+-static struct of_device_id shdwc_ids[] = {
+-	{ .compatible = "atmel,at91sam9260-shdwc", },
+-	{ .compatible = "atmel,at91sam9rl-shdwc", },
+-	{ .compatible = "atmel,at91sam9x5-shdwc", },
+-	{ /*sentinel*/ }
+-};
+-
+-static const char *shdwc_wakeup_modes[] = {
+-	[AT91_SHDW_WKMODE0_NONE]	= "none",
+-	[AT91_SHDW_WKMODE0_HIGH]	= "high",
+-	[AT91_SHDW_WKMODE0_LOW]		= "low",
+-	[AT91_SHDW_WKMODE0_ANYLEVEL]	= "any",
+-};
+-
+-const int at91_dtget_shdwc_wakeup_mode(struct device_node *np)
+-{
+-	const char *pm;
+-	int err, i;
+-
+-	err = of_property_read_string(np, "atmel,wakeup-mode", &pm);
+-	if (err < 0)
+-		return AT91_SHDW_WKMODE0_ANYLEVEL;
+-
+-	for (i = 0; i < ARRAY_SIZE(shdwc_wakeup_modes); i++)
+-		if (!strcasecmp(pm, shdwc_wakeup_modes[i]))
+-			return i;
+-
+-	return -ENODEV;
+-}
+-
+-static void at91_dt_shdwc(void)
+-{
+-	struct device_node *np;
+-	int wakeup_mode;
+-	u32 reg;
+-	u32 mode = 0;
+-
+-	np = of_find_matching_node(NULL, shdwc_ids);
+-	if (!np) {
+-		pr_debug("unable to find compatible shutdown (shdwc) controller node in dtb\n");
+-		return;
+-	}
+-
+-	at91_shdwc_base = of_iomap(np, 0);
+-	if (!at91_shdwc_base)
+-		panic(pr_fmt("unable to map shdwc cpu registers\n"));
+-
+-	wakeup_mode = at91_dtget_shdwc_wakeup_mode(np);
+-	if (wakeup_mode < 0) {
+-		pr_warn("shdwc unknown wakeup mode\n");
+-		goto end;
+-	}
+-
+-	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
+-		if (reg > AT91_SHDW_CPTWK0_MAX) {
+-			pr_warn("shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
+-				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
+-			reg = AT91_SHDW_CPTWK0_MAX;
+-		}
+-		mode |= AT91_SHDW_CPTWK0_(reg);
+-	}
+-
+-	if (of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
+-			mode |= AT91_SHDW_RTCWKEN;
+-
+-	if (of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
+-			mode |= AT91_SHDW_RTTWKEN;
+-
+-	at91_shdwc_write(AT91_SHDW_MR, wakeup_mode | mode);
+-
+-end:
+-	pm_power_off = at91sam9_poweroff;
+-
+-	of_node_put(np);
+-}
+-
+ void __init at91rm9200_dt_initialize(void)
+ {
+ 	at91_dt_ramc();
+@@ -480,7 +404,6 @@ void __init at91rm9200_dt_initialize(void)
+ void __init at91_dt_initialize(void)
+ {
+ 	at91_dt_ramc();
+-	at91_dt_shdwc();
+ 
+ 	/* Init clock subsystem */
+ 	at91_dt_clock_init();
 -- 
 2.0.1
