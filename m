@@ -1,56 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jul 2014 11:24:50 +0100
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-In-Reply-To: <53B5098B.9050801@linaro.org>
-References: <20140618202748.GA9022@www.outflux.net>
- <20140620102258.GA26626@arm.com>
- <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
- <20140620172330.GA30656@arm.com>
- <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
- <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
- <20140623084608.GA9316@arm.com>
- <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
- <20140624085405.GA26013@arm.com> <53B5098B.9050801@linaro.org>
-Message-ID: <20140703102450.GD12958@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 3 Jul 2014 15:52:36 +0530
+Subject: [PATCH] ARM: DRA7: hwmod: add entry for RTCSS
+In-Reply-To: <f99196358a3cc28b0bd451459badcfc286533845.1399638849.git.nsekhar@ti.com>
+References: <f99196358a3cc28b0bd451459badcfc286533845.1399638849.git.nsekhar@ti.com>
+Message-ID: <53B52EEC.2030800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 08:43:07AM +0100, AKASHI Takahiro wrote:
-> Hi Will,
-
-Hi Akashi,
-
-> On 06/24/2014 05:54 PM, Will Deacon wrote:
-> > On Mon, Jun 23, 2014 at 08:46:52PM +0100, Kees Cook wrote:
-> >> What's the state of seccomp on arm64? I saw a series back in March,
-> >> but nothing since then? It looked complete, but I haven't set up a
-> >> test environment yet to verify.
-> >
-> > I think Akashi was going to repost `real soon now' so we can include them
-> > for 3.17. He missed the merge window last time around.
+On Friday 09 May 2014 06:07 PM, Sekhar Nori wrote:
+> From: Lokesh Vutla <lokeshvutla@ti.com>
 > 
-> I took a quick look at the current implementation of ptrace.
-> ptrace(PTRACE_GETREGSET/SETREGSET), eventually gpr_get/set(), handles only
-> 'struct user_pt_regs', and we have no way to modify orig_x0 nor syscallno
-> in 'struct pt_regs' directly.
-> So it seems to me that we can't change a system call by ptrace().
-> Do I misunderstand anything?
+> RTCSS on DRA7 provides a precise real-time clock.
+> Add hwmod entry for this IP.
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-No, it looks like you have a point here. I don't think userspace has any
-business with orig_x0, but changing syscallno is certainly useful. I can
-think of two ways to fix this:
+Reviewed-by: Rajendra Nayak <rnayak@ti.com>
 
-  (1) Updating syscallno based on w8, but this ties us to the current ABI
-      and could get messy if this register changes in the future.
+> ---
+> Applies to linux-next of 5th May.
 
-  (2) Adding a PTRACE_SET_SYSCALL request, like we have for arch/arm/,
-      but that means adding arch-specific stuff to arch_ptrace (which
-      currently goes straight to ptrace_request on arm64).
+Might need a repost with rebase on the latest mainline.
 
-It looks like x86 uses orig_ax, which I *think* means we would go with
-(1) above if we followed their lead.
-
-Anybody else have an opinion about this?
-
-Will
+> 
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   41 +++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 810c205..402ffc7 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1249,6 +1249,38 @@ static struct omap_hwmod dra7xx_qspi_hwmod = {
+>  };
+>  
+>  /*
+> + * 'rtcss' class
+> + *
+> + */
+> +static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
+> +	.sysc_offs	= 0x0078,
+> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> +			   SIDLE_SMART_WKUP),
+> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+> +};
+> +
+> +static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
+> +	.name	= "rtcss",
+> +	.sysc	= &dra7xx_rtcss_sysc,
+> +};
+> +
+> +/* rtcss */
+> +static struct omap_hwmod dra7xx_rtcss_hwmod = {
+> +	.name		= "rtcss",
+> +	.class		= &dra7xx_rtcss_hwmod_class,
+> +	.clkdm_name	= "rtc_clkdm",
+> +	.main_clk	= "sys_32k_ck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_RTC_RTCSS_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_RTC_RTCSS_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/*
+>   * 'sata' class
+>   *
+>   */
+> @@ -2354,6 +2386,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__qspi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_per3 -> rtcss */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_per3__rtcss = {
+> +	.master		= &dra7xx_l4_per3_hwmod,
+> +	.slave		= &dra7xx_rtcss_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_addr_space dra7xx_sata_addrs[] = {
+>  	{
+>  		.name		= "sysc",
+> @@ -2683,6 +2723,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_cfg__mpu,
+>  	&dra7xx_l4_cfg__ocp2scp1,
+>  	&dra7xx_l3_main_1__qspi,
+> +	&dra7xx_l4_per3__rtcss,
+>  	&dra7xx_l4_cfg__sata,
+>  	&dra7xx_l4_cfg__smartreflex_core,
+>  	&dra7xx_l4_cfg__smartreflex_mpu,
+> 
