@@ -1,41 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Jul 2014 17:02:45 +0100
-Subject: [PATCH V7] arm: mm: Modify pte_write and pmd_write logic for LPAE
-In-Reply-To: <1404402296-11173-1-git-send-email-steve.capper@linaro.org>
-References: <1404389173-4246-1-git-send-email-steve.capper@linaro.org>
- <1404402296-11173-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140703160245.GE14305@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 3 Jul 2014 18:06:23 +0200
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140703155240.GU5814@saruman.home>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <20140703132509.GA5814@saruman.home>
+ <CAOCHtYi0JwRO12gHa+KFGH1k7pPk4TL40igwhzRRxutw-tqf6A@mail.gmail.com>
+ <20140703140736.GF5814@saruman.home>
+ <20140703154425.GC23309@earth.universe>
+ <20140703155240.GU5814@saruman.home>
+Message-ID: <20140703160622.GE23309@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 04:44:56PM +0100, Steve Capper wrote:
-> For LPAE, we have the following means for encoding writable or dirty
-> ptes:
->                               L_PTE_DIRTY       L_PTE_RDONLY
->     !pte_dirty && !pte_write        0               1
->     !pte_dirty && pte_write         0               1
->     pte_dirty && !pte_write         1               1
->     pte_dirty && pte_write          1               0
-> 
-> So we can't distinguish between writeable clean ptes and read only
-> ptes. This can cause problems with ptes being incorrectly flagged as
-> read only when they are writeable but not dirty.
-> 
-> This patch renumbers L_PTE_RDONLY from AP[2] to a software bit #58,
-> and adds additional logic to set AP[2] whenever the pte is read only
-> or not dirty. That way we can distinguish between clean writeable ptes
-> and read only ptes.
-> 
-> HugeTLB pages will use this new logic automatically.
-> 
-> We need to add some logic to Transparent HugePages to ensure that they
-> correctly interpret the revised pgprot permissions (L_PTE_RDONLY has
-> moved and no longer matches PMD_SECT_AP2). In the process of revising
-> THP, the names of the PMD software bits have been prefixed with L_ to
-> make them easier to distinguish from their hardware bit counterparts.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Hi,
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+On Thu, Jul 03, 2014 at 10:52:40AM -0500, Felipe Balbi wrote:
+> > DT is supposed to contain information about the hardware, so it
+> > should stay the same? I think there is no non-hackish way to decide
+> 
+> compatible would change, at a minimum.
 
-Will
+why? I would expect it to stay the same (and the current patch uses
+the same compatible strings).
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/0243fe41/attachment.sig>
