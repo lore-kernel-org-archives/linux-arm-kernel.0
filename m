@@ -1,141 +1,90 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 03 Jul 2014 17:52:57 +0100
-Subject: [PATCH RFC] imx-drm: convert imx-drm to use the generic DRM OF helper
-Message-ID: <E1X2kFl-0000us-GN@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Jul 2014 18:05:58 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140701234800.GA23577@sirena.org.uk> <20140702100133.GE18731@arm.com>
+ <20140702163923.GJ410@sirena.org.uk> <20140702170141.GH24879@arm.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+Message-ID: <20140703170558.GZ32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic DRM OF helper to locate the possible CRTCs for the
-encoder, thereby shrinking the imx-drm driver some more.
+On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
+> On Thu, Jul 3, 2014 at 11:41 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > (I've been away for a day and missed all the fun ;))
+> >
+> > On Wed, Jul 02, 2014 at 11:14:47PM +0100, Grant Likely wrote:
+> >> Android is not the embedded world where we could get away with a whole
+> >> lot. There is a *freaking huge* installed base of applications.
+> >> Breaking them is not an option, and I think Colin's question makes it
+> >> clear that Android is going make sure that doesn't happen regardless
+> >> of what the mainline kernel does... and they are right to do so.
+> >
+> > I don't know how huge this installed base of applications is. AFAIK,
+> > it's limited to a (maybe significant) number of Android games all based
+> > on certain library which no longer uses SWP in its recent releases. I
+> > may be wrong but the information I have so far is that this huge base of
+> > applications does not go beyond Android. Furthermore, people getting a
+> > new Android phone with ARMv8 will have to re-download applications
+> > anyway, so the currently installed base does _not_ matter. What matters
+> > is what is provided in the Android _app store_.
+> 
+> Okay, I have to bite on this one....
+> 
+> Ah, no. The installed base *does* matter. Breaking things under the
+> assumption that they can be fixed with an update is a horrible reason
+> for breaking stuff. That creates hell for developers.
+> 
+> The first indication they'll have that something is wrong is they'll
+> start getting negative reviews in the Play store ("This software is
+> ****, it crashes immediately"). Then they've got to figure out why
+> things have gone wrong. It won't necessarily be obvious that the
+> complaining users have v8 hardware. Obtain a v8 device, and then
+> figure out how to update all of their affected apps. During that
+> entire time their app is broken and they are getting blamed by users
+> for putting out crap software. And that assumes that the app is
+> actively maintained. Multiply this by every affected developer.
+> 
+> Then there are the apps that work just fine, but don't have any active
+> maintenance, either because it is an old project that doesn't have a
+> team on it anymore or the vendor has disappeared. Do you really think
+> it is okay to break working apps that are probably not going to get
+> updated?
+> 
+> Third, there are side loaded apps. An update may not be readily or
+> easily available. The Play store is not the only game in town. There
+> are also kioskified Android devices that are basically stock, but have
+> a custom application installed on it. There is also the Amazon app
+> store.
+> 
+> Finally, stating that "the developer can just fix it" is a huge
+> assumption. You're basically saying every app development shop has
+> extra resources to go back and fix things in their older apps.
+> 
+> So, no. I completely reject any notion that breaking existing apps is
+> okay. If we're going to say that v8 still supports 32-bit apps, then
+> it has to be all of v7, not just the 'good' bits. Nor do I think
+> saying "it's just a bunch of games" justifies anything. We're kernel
+> engineers. Applications are applications and we don't break userspace.
+> Period.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This patch builds upon "drm: add of_graph endpoint helper to find
-possible CRTCs", converting imx-drm to use this new helper.
++1 on all points above.  I'd go further - if we're going to say that v8
+still supports 32-bit apps, that covers at least v6 *as well*.
 
- drivers/staging/imx-drm/imx-drm-core.c | 72 ++++++----------------------------
- 1 file changed, 13 insertions(+), 59 deletions(-)
+For reference, the full story on SWP is:
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 47ee6c79857a..05ba8894793d 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -24,6 +24,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_gem_cma_helper.h>
- #include <drm/drm_fb_cma_helper.h>
-+#include <drm/drm_of.h>
- 
- #include "imx-drm.h"
- 
-@@ -47,7 +48,6 @@ struct imx_drm_crtc {
- 	struct drm_crtc				*crtc;
- 	int					pipe;
- 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
--	struct device_node			*port;
- };
- 
- static int legacyfb_depth = 16;
-@@ -364,9 +364,10 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 
- 	imx_drm_crtc->imx_drm_helper_funcs = *imx_drm_helper_funcs;
- 	imx_drm_crtc->pipe = imxdrm->pipes++;
--	imx_drm_crtc->port = port;
- 	imx_drm_crtc->crtc = crtc;
- 
-+	crtc->port = port;
-+
- 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
- 
- 	*new_crtc = imx_drm_crtc;
-@@ -407,33 +408,6 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
- }
- EXPORT_SYMBOL_GPL(imx_drm_remove_crtc);
- 
--/*
-- * Find the DRM CRTC possible mask for the connected endpoint.
-- *
-- * The encoder possible masks are defined by their position in the
-- * mode_config crtc_list.  This means that CRTCs must not be added
-- * or removed once the DRM device has been fully initialised.
-- */
--static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
--	struct device_node *endpoint)
--{
--	struct device_node *port;
--	unsigned i;
--
--	port = of_graph_get_remote_port(endpoint);
--	if (!port)
--		return 0;
--	of_node_put(port);
--
--	for (i = 0; i < MAX_CRTC; i++) {
--		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
--		if (imx_drm_crtc && imx_drm_crtc->port == port)
--			return drm_crtc_mask(imx_drm_crtc->crtc);
--	}
--
--	return 0;
--}
--
- static struct device_node *imx_drm_of_get_next_endpoint(
- 		const struct device_node *parent, struct device_node *prev)
- {
-@@ -445,36 +419,16 @@ static struct device_node *imx_drm_of_get_next_endpoint(
- int imx_drm_encoder_parse_of(struct drm_device *drm,
- 	struct drm_encoder *encoder, struct device_node *np)
- {
--	struct imx_drm_device *imxdrm = drm->dev_private;
--	struct device_node *ep = NULL;
--	uint32_t crtc_mask = 0;
--	int i;
--
--	for (i = 0; ; i++) {
--		u32 mask;
--
--		ep = imx_drm_of_get_next_endpoint(np, ep);
--		if (!ep)
--			break;
--
--		mask = imx_drm_find_crtc_mask(imxdrm, ep);
-+	uint32_t crtc_mask = drm_of_find_possible_crtcs(drm, np);
- 
--		/*
--		 * If we failed to find the CRTC(s) which this encoder is
--		 * supposed to be connected to, it's because the CRTC has
--		 * not been registered yet.  Defer probing, and hope that
--		 * the required CRTC is added later.
--		 */
--		if (mask == 0)
--			return -EPROBE_DEFER;
--
--		crtc_mask |= mask;
--	}
--
--	if (ep)
--		of_node_put(ep);
--	if (i == 0)
--		return -ENOENT;
-+	/*
-+	 * If we failed to find the CRTC(s) which this encoder is
-+	 * supposed to be connected to, it's because the CRTC has
-+	 * not been registered yet.  Defer probing, and hope that
-+	 * the required CRTC is added later.
-+	 */
-+	if (crtc_mask == 0)
-+		return -EPROBE_DEFER;
- 
- 	encoder->possible_crtcs = crtc_mask;
- 
-@@ -508,7 +462,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
- 
- 		port = of_graph_get_remote_port(ep);
- 		of_node_put(port);
--		if (port == imx_crtc->port) {
-+		if (port == imx_crtc->crtc->port) {
- 			ret = of_graph_parse_endpoint(ep, &endpoint);
- 			return ret ? ret : endpoint.port;
- 		}
+- present in all ARMv4, ARMv5 CPUs
+- deprecated but still present in ARMv6, ARMv7 CPUs
+- optionally present in ARMv7VE CPUs
+
+The ARM ARM doesn't positively identify what an ARMv7VE is, but my
+guess would be ARMv7 with the virtualisation extensions.
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
