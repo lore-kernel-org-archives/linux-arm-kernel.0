@@ -1,61 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:19 +0200
-Subject: [PATCH RESEND 04/18] AT91: Rework ramc mapping code
+Date: Thu,  3 Jul 2014 16:41:23 +0200
+Subject: [PATCH RESEND 08/18] AT91: soc: Introduce register_devices callback
 In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404398493-28907-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt the ramc mapping code to handle multiple ram controllers in the DT.
+Some core devices should be registered by the SoC itself rather than by every
+board using this SoC. Introduce a register_devices callback that should be
+called during the init_machine in order to do that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/setup.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+ arch/arm/mach-at91/generic.h | 2 ++
+ arch/arm/mach-at91/setup.c   | 5 +++++
+ arch/arm/mach-at91/soc.h     | 1 +
+ 3 files changed, 8 insertions(+)
 
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 631fa3b8c16d..4c2c96195a50 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -37,6 +37,8 @@ extern int  __init at91_aic5_of_init(struct device_node *node,
+ extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
+ extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
+ 
++ /* Devices */
++extern void __init at91_register_devices(void);
+ 
+  /* Timer */
+ extern void at91rm9200_ioremap_st(u32 addr);
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 9c4c7fb323fb..cc520596f23b 100644
+index 71003e40f01c..fe0601e0a3c0 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -393,24 +393,26 @@ static void at91_dt_ramc(void)
- {
- 	struct device_node *np;
- 	const struct of_device_id *of_id;
-+	int idx = 0;
+@@ -508,3 +508,8 @@ void __init at91_initialize(unsigned long main_clock)
  
--	np = of_find_matching_node(NULL, ramc_ids);
--	if (!np)
--		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
-+	for_each_matching_node(np, ramc_ids) {
-+		at91_ramc_base[idx] = of_iomap(np, 0);
-+		if (!at91_ramc_base[idx])
-+			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"), idx);
- 
--	at91_ramc_base[0] = of_iomap(np, 0);
--	if (!at91_ramc_base[0])
--		panic(pr_fmt("unable to map ramc[0] cpu registers\n"));
--	/* the controller may have 2 banks */
--	at91_ramc_base[1] = of_iomap(np, 1);
-+		idx++;
-+	}
-+
-+	if (!idx)
-+		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
- 
- 	of_id = of_match_node(ramc_ids, np);
--	if (!of_id)
-+	if (!of_id) {
- 		pr_warn("ramc no standby function available\n");
--	else
--		at91_pm_set_standby(of_id->data);
-+		return;
-+	}
- 
--	of_node_put(np);
-+	at91_pm_set_standby(of_id->data);
+ 	pinctrl_provide_dummies();
  }
++
++void __init at91_register_devices(void)
++{
++	at91_boot_soc.register_devices();
++}
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index a1e1482c6da8..ab983f2cc7dd 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -11,6 +11,7 @@ struct at91_init_soc {
+ 	void (*map_io)(void);
+ 	void (*ioremap_registers)(void);
+ 	void (*register_clocks)(void);
++	void (*register_devices)(void);
+ 	void (*init)(void);
+ };
  
- static struct of_device_id shdwc_ids[] = {
 -- 
 2.0.1
