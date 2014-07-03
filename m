@@ -1,118 +1,54 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 3 Jul 2014 16:40:00 +0300
-Subject: [PATCH 4/4] arm/dts: am437x GP HDMI support
-In-Reply-To: <1404394800-18138-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1404394800-18138-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1404394800-18138-5-git-send-email-tomi.valkeinen@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 3 Jul 2014 15:36:53 +0200
+Subject: [PATCH 1/2] ARM: mvebu: add appended DTB support in
+ mvebu_v5_defconfig
+In-Reply-To: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140703133653.GQ20799@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM437x GP board has both LCD and HDMI outputs. The active display is
-selected with a GPIO, which affects video and audio signal routing, and
-LCD backlight.
+On Thu, Jul 03, 2014 at 10:23:49AM +0200, Thomas Petazzoni wrote:
+> The mvebu_v5_defconfig is currently used for Kirkwood platforms, and
+> in the future hopefully used for Orion5x platforms. Those platforms
+> use fairly old bootloaders that don't have Device Tree support, so it
+> makes sense to enable appended DTB support by default, as well as the
+> backward compatibility with ATAGS passed by the bootloader for those
+> platforms. It helps having a defconfig that works fine out of the box
+> for most Kirkwood platforms.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Managing the gpio dynamically has proven rather difficult, so the
-approach taken here is just to have two separate .dts files for LCD/HDMI
-use cases. The HDMI dts file includes the base file, which has LCD
-support, and overrides and adds the necessary items.
+Hi Thomas
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/Makefile               |  3 +-
- arch/arm/boot/dts/am437x-gp-evm-hdmi.dts | 70 ++++++++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/am437x-gp-evm-hdmi.dts
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5a1fba6d10b5..3065fb2d113b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -302,7 +302,8 @@ dtb-$(CONFIG_ARCH_OMAP4) += omap4-duovero-parlor.dtb \
- 	omap4-var-stk-om44.dtb
- dtb-$(CONFIG_SOC_AM43XX) += am43x-epos-evm.dtb \
- 	am437x-gp-evm.dtb \
--	am43x-epos-evm-hdmi.dtb
-+	am43x-epos-evm-hdmi.dtb \
-+	am437x-gp-evm-hdmi.dtb
- dtb-$(CONFIG_SOC_OMAP5) += omap5-cm-t54.dtb \
- 	omap5-sbc-t54.dtb \
- 	omap5-uevm.dtb
-diff --git a/arch/arm/boot/dts/am437x-gp-evm-hdmi.dts b/arch/arm/boot/dts/am437x-gp-evm-hdmi.dts
-new file mode 100644
-index 000000000000..9380a422227b
---- /dev/null
-+++ b/arch/arm/boot/dts/am437x-gp-evm-hdmi.dts
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/* AM437x GP EVM with HDMI output */
-+
-+#include "am437x-gp-evm.dts"
-+
-+/ {
-+	aliases {
-+		display0 = &hdmi;
-+	};
-+
-+	hdmi: connector {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "b";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&sii9022_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	sii9022 at 3b {
-+		compatible = "sil,sii9022";
-+		reg = <0x3b>;
-+
-+		/* XXX 'SelLCDorHDMI' Gpio, LOW to select HDMI */
-+		reset-gpios = <&gpio5 8 GPIO_ACTIVE_HIGH>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				sii9022_in: endpoint {
-+					remote-endpoint = <&dpi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				sii9022_out: endpoint {
-+					remote-endpoint = <&hdmi_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&dss {
-+	port {
-+		dpi_out: endpoint at 0 {
-+			remote-endpoint = <&sii9022_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
--- 
-1.9.1
+And a minor nit. Jason would like to see kirkwood in the subject,
+instead of mvebu, so we have a simple way to filter patches by SoC
+in mvebu.
+
+	  Andrew
+
+
+
+
+> ---
+>  arch/arm/configs/mvebu_v5_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+> index 27c732f..9f70f59 100644
+> --- a/arch/arm/configs/mvebu_v5_defconfig
+> +++ b/arch/arm/configs/mvebu_v5_defconfig
+> @@ -19,6 +19,8 @@ CONFIG_AEABI=y
+>  CONFIG_HIGHMEM=y
+>  CONFIG_ZBOOT_ROM_TEXT=0x0
+>  CONFIG_ZBOOT_ROM_BSS=0x0
+> +CONFIG_ARM_APPENDED_DTB=y
+> +CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CPU_FREQ=y
+>  CONFIG_CPU_FREQ_STAT_DETAILS=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+> -- 
+> 2.0.0
+> 
