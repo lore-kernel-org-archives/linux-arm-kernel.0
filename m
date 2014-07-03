@@ -1,173 +1,138 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:25 +0200
-Subject: [PATCH RESEND 10/18] AT91: Call at91_register_devices in the board
- files
+Date: Thu,  3 Jul 2014 16:41:32 +0200
+Subject: [PATCH RESEND 17/18] AT91: Remove rstc and shdwnc global base
+ addresses
 In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404398493-28907-18-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make every board call the register_devices callback so that the devices
-declared by the SoC are registered.
+Now that there's no user left for the global variables holding the reset and
+shutdown controllers base address, we can remove these variables and their
+associated mapping function.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/board-afeb-9260v1.c  | 2 ++
- arch/arm/mach-at91/board-cam60.c        | 2 ++
- arch/arm/mach-at91/board-cpu9krea.c     | 2 ++
- arch/arm/mach-at91/board-flexibity.c    | 2 ++
- arch/arm/mach-at91/board-sam9-l9260.c   | 2 ++
- arch/arm/mach-at91/board-sam9260ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9261ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9263ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9m10g45ek.c | 2 ++
- arch/arm/mach-at91/board-sam9rlek.c     | 2 ++
- arch/arm/mach-at91/board-snapper9260.c  | 2 ++
- 11 files changed, 22 insertions(+)
+ arch/arm/mach-at91/at91sam9260.c |  2 --
+ arch/arm/mach-at91/at91sam9261.c |  2 --
+ arch/arm/mach-at91/at91sam9263.c |  2 --
+ arch/arm/mach-at91/at91sam9g45.c |  2 --
+ arch/arm/mach-at91/at91sam9rl.c  |  2 --
+ arch/arm/mach-at91/generic.h     |  6 ------
+ arch/arm/mach-at91/setup.c       | 18 ------------------
+ 7 files changed, 34 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 597c649170aa..fc9621ccb606 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -167,6 +167,8 @@ static struct at91_cf_data afeb9260_cf_data = {
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 5fa1986be2aa..16dd13800b1f 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -339,8 +339,6 @@ static void __init at91sam9260_map_io(void)
  
- static void __init afeb9260_board_init(void)
+ static void __init at91sam9260_ioremap_registers(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index a30502c8d379..283655bd86c1 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -170,6 +170,8 @@ static void __init cam60_add_device_nand(void)
+-	at91_ioremap_shdwc(AT91SAM9260_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9260_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9260_BASE_SDRAMC, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 5ccc67235e7a..2c8553e63785 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -302,8 +302,6 @@ static void __init at91sam9261_map_io(void)
  
- static void __init cam60_board_init(void)
+ static void __init at91sam9261_ioremap_registers(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 2037f78c84e7..29a89032bb9a 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -322,6 +322,8 @@ static struct mci_platform_data __initdata cpu9krea_mci0_data = {
+-	at91_ioremap_shdwc(AT91SAM9261_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9261_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9261_BASE_SDRAMC, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 4d28c3479d4b..63a47c7d7f2b 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -317,8 +317,6 @@ static void __init at91sam9263_map_io(void)
  
- static void __init cpu9krea_board_init(void)
+ static void __init at91sam9263_ioremap_registers(void)
  {
-+	at91_register_devices();
-+
- 	/* NOR */
- 	cpu9krea_add_device_nor();
- 	/* Serial */
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index 68f1ab6bd08f..79bd411b0cee 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -138,6 +138,8 @@ static struct gpio_led flexibity_leds[] = {
+-	at91_ioremap_shdwc(AT91SAM9263_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9263_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9263_BASE_SDRAMC0, 512);
+ 	at91_ioremap_ramc(1, AT91SAM9263_BASE_SDRAMC1, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 22034c96d488..f0b78923da75 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -367,8 +367,6 @@ static void __init at91sam9g45_map_io(void)
  
- static void __init flexibity_board_init(void)
+ static void __init at91sam9g45_ioremap_registers(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index d24dda67e2d3..70309404f366 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -187,6 +187,8 @@ static struct gpio_led ek_leds[] = {
+-	at91_ioremap_shdwc(AT91SAM9G45_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9G45_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9G45_BASE_DDRSDRC1, 512);
+ 	at91_ioremap_ramc(1, AT91SAM9G45_BASE_DDRSDRC0, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 323a9f90931a..ea9ac0ee0895 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -311,8 +311,6 @@ static void __init at91sam9rl_map_io(void)
  
- static void __init ek_board_init(void)
+ static void __init at91sam9rl_ioremap_registers(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index 65dea12d685e..da9c5f1f2c49 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -307,6 +307,8 @@ static void __init ek_add_device_buttons(void) {}
+-	at91_ioremap_shdwc(AT91SAM9RL_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9RL_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9RL_BASE_SDRAMC, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 5d5e55237c41..f42b0490ad98 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -64,12 +64,6 @@ extern void at91_irq_resume(void);
+ /* idle */
+ extern void at91sam9_idle(void);
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 4637432de08f..d1be10b09ab3 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -561,6 +561,8 @@ static struct gpio_led ek_leds[] = {
+-/* reset */
+-extern void at91_ioremap_rstc(u32 base_addr);
+-
+-/* shutdown */
+-extern void at91_ioremap_shdwc(u32 base_addr);
+-
+ /* Matrix */
+ extern void at91_ioremap_matrix(u32 base_addr);
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index cd2726ee5add..3f613d962d9b 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -405,6 +405,8 @@ static struct at91_can_data ek_can_data = {
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index cdd717a4fa30..eb2b922a4adb 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -319,24 +319,6 @@ void __init at91_map_io(void)
+ 		at91_boot_soc.map_io();
+ }
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 1ea61328f30d..33a7b19f7400 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -450,6 +450,8 @@ static struct platform_device *devices[] __initdata = {
- 
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index b64648b4a1fc..262e3f957d9f 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -292,6 +292,8 @@ static void __init ek_add_device_buttons(void) {}
- 
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 1b870e6def0c..2a817b85569f 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -154,6 +154,8 @@ static void __init snapper9260_add_device_nand(void)
- 
- static void __init snapper9260_board_init(void)
- {
-+	at91_register_devices();
-+
- 	at91_add_device_i2c(snapper9260_i2c_devices,
- 			    ARRAY_SIZE(snapper9260_i2c_devices));
+-void __iomem *at91_shdwc_base = NULL;
+-
+-void __init at91_ioremap_shdwc(u32 base_addr)
+-{
+-	at91_shdwc_base = ioremap(base_addr, 16);
+-	if (!at91_shdwc_base)
+-		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
+-}
+-
+-void __iomem *at91_rstc_base;
+-
+-void __init at91_ioremap_rstc(u32 base_addr)
+-{
+-	at91_rstc_base = ioremap(base_addr, 16);
+-	if (!at91_rstc_base)
+-		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
+-}
+-
+ void __iomem *at91_matrix_base;
+ EXPORT_SYMBOL_GPL(at91_matrix_base);
  
 -- 
 2.0.1
