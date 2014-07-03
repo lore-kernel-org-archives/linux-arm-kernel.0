@@ -1,117 +1,186 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 3 Jul 2014 11:45:32 -0400 (EDT)
-Subject: several messages
-In-Reply-To: <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
-References: <1404363737-26222-1-git-send-email-a.kesavan@samsung.com>
- <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <alpine.LFD.2.11.1407031111100.6220@knanqh.ubzr>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Thu, 3 Jul 2014 10:47:41 -0500
+Subject: [PATCH 3/3 V2] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <20140703084608.GB29837@leverpostej>
+References: <1404314544-7762-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140702163903.GA26903@leverpostej> <53B465B9.7000407@amd.com>
+ <20140703084608.GB29837@leverpostej>
+Message-ID: <53B57B1D.8090308@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
+On 7/3/2014 3:46 AM, Mark Rutland wrote:
+> On Wed, Jul 02, 2014 at 09:04:09PM +0100, Suravee Suthikulanit wrote:
+>> Thanks again for the review. Please see my comments below.
+>>
+>> On 7/2/2014 11:39 AM, Mark Rutland wrote:
+>>> On Wed, Jul 02, 2014 at 04:22:23PM +0100, suravee.suthikulpanit at amd.com wrote:
+>>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>>>> index 5573c08..9e46f7f 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/gic.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>>>> @@ -12,11 +12,13 @@ Main node required properties:
+>>>>
+>>>>    - compatible : should be one of:
+>>>>           "arm,gic-400"
+>>>> +       "arm,gic-400-plus"
+>>>
+>>> I am not keen on this name.
+>>
+>> Ok, I'll change it. Any suggestion on name?  I'm not sure what is the
+>> "official" product name. I've seen this in some slides from ARM. What
+>> about "gic-400-v2m"??.
+>
+> I'll query this internally.
+Thanks.
 
-> On Thu, Jul 3, 2014 at 6:59 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > Please, let's avoid going that route.  There is no such special handling
-> > needed if the API is sufficient.  And the provided API allows you to
-> > suspend a CPU or shut it down.  It shouldn't matter at that level if
-> > this is due to a cluster switch or a hotplug event. Do you really need
-> > something else?
-> No, just one local flag for suspend should be enough for me. Will remove these.
+>>>> @@ -37,9 +39,16 @@ Main node required properties:
+>>>>           the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
+>>>>           the interrupt is wired to that CPU.  Only valid for PPI interrupts.
+>>>>
+>>>> -- reg : Specifies base physical address(s) and size of the GIC registers. The
+>>>> -  first region is the GIC distributor register base and size. The 2nd region is
+>>>> -  the GIC cpu interface register base and size.
+>>>> +- reg : Specifies base physical address(s) and size of the GIC register frames.
+>>>> +
+>>>> +  Region | Description
+>>>> +  Index  |
+>>>> +  -------------------------------------------------------------------
+>>>> +     0   | GIC distributor register base and size
+>>>> +     1   | GIC cpu interface register base and size
+>>>> +     2   | VGIC interface control register base and size (Optional)
+>>>> +     3   | VGIC CPU interface register base and size (Optional)
+>>>> +     4   | GICv2m MSI interface register base and size (Optional)
+>>>
+>>> As far as I am aware, the MSI interface is completely orthogonal to
+>>> having a GICH and GICV.
+>>
+>> Agree. I'm not doing anything with it. I'm just listing them here since
+>> they are also mentioned in the gic.txt
+>>
+>>>
+>>> We should figure out how we expect to handle that (zero-sized reg
+>>> entries? reg-names?).
+>>
+>> I'm not sure how VGIC stuff handles reg/size = 0.
+>
+> Neither am I.
+>
+> However, what I said was that we should figure out how we _expect_ to
+> handle that case. If we have to make changes to handle it, that's fine
+> given we already have to make changes to support GICv2m.
 
-[...]
+Looking through the code in virt/kvm/arm/vgic.c, I believe this would 
+ended up returning -EINVAL or -ENXIO from kvm_vgic_hyp_init().
 
-> Changes in v5:
-> 	- Removed the MCPM flags and just used a local flag to
-> 	indicate that we are suspending.
+>>>
+>>>>
+>>>>    Optional
+>>>>    - interrupts   : Interrupt source of the parent interrupt controller on
+>>>> @@ -55,6 +64,10 @@ Optional
+>>>>                     by a crossbar/multiplexer preceding the GIC. The GIC irq
+>>>>                     input line is assigned dynamically when the corresponding
+>>>>                     peripheral's crossbar line is mapped.
+>>>> +
+>>>> +- msi-controller : Identifies the node as an MSI controller.  This requires
+>>>> +  the register region index 4.
+>>>
+>>> That last clarifying comment is more confusing than helpful.
+>>
+>> If you are referring to the table, I added that since it was easier to
+>> see than scanning the text.
+>
+> I was referring to "This requires the register region index 4".
+>
+> How about:
+>
+> - msi-controller : Identifies the node as an MSI controller. Requried
+>    for GICv2m.
 
-[...]
+OK
 
-> -static void exynos_power_down(void)
-> +static void exynos_mcpm_power_down(u64 residency)
->  {
->  	unsigned int mpidr, cpu, cluster;
->  	bool last_man = false, skip_wfi = false;
-> @@ -150,7 +153,12 @@ static void exynos_power_down(void)
->  	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
->  	cpu_use_count[cpu][cluster]--;
->  	if (cpu_use_count[cpu][cluster] == 0) {
-> -		exynos_cpu_power_down(cpunr);
-> +		/*
-> +		 * Bypass power down for CPU0 during suspend. This is being
-> +		 * taken care by the SYS_PWR_CFG bit in CORE0_SYS_PWR_REG.
-> +		 */
-> +		if ((cpunr != 0) || (residency != S5P_CHECK_SLEEP))
-> +			exynos_cpu_power_down(cpunr);
->  
->  		if (exynos_cluster_unused(cluster)) {
->  			exynos_cluster_power_down(cluster);
-> @@ -209,6 +217,11 @@ static void exynos_power_down(void)
->  	/* Not dead at this point?  Let our caller cope. */
->  }
->  
-> +static void exynos_power_down(void)
-> +{
-> +	exynos_mcpm_power_down(0);
-> +}
+>>
+>>> [...]
+>>>
+>>>> +#define GIC_V2M_MIN_SPI                        32
+>>>> +#define GIC_V2M_MAX_SPI                        1024
+>>>
+>>> GIC interrupt IDs 1020 and above are reserved, no?
+>>>
+>>> Surely the max ID an SPI can take is 1019?
+>>
+>> Right, thanks for catching. But the spec says that the SPI ID value must
+>> be in the range of 32 to 1020. I guess it was a bit unclear, but
+>> definitely not 1024 :)
+>
+> Which spec?
 
-[...]
+This was in the "Server Base System Architecture v1.0".
+>
+> In the GICv2 spec I see:
+>
+> * "Interrupt numbers ID32-ID1019 are used for SPIs." in
+>    2.2.1 Interrupt IDs.
+>
+> * "The GIC architecture reserves interrupt ID numbers 1020-1023 for
+>    special purposes." in 3.2.5 Special interrupt numbers.
+>
+>>
+>>>> +#define GIC_OF_MSIV2M_RANGE_INDEX      4
+>>>> +
+>>>> +/**
+>>>> + * alloc_msi_irq - Allocate MSIs from avaialbe MSI bitmap.
+>>>> + * @data: Pointer to v2m_data
+>>>> + * @nvec: Number of interrupts to allocate
+>>>> + * @irq: Pointer to the allocated irq
+>>>> + *
+>>>> + * Allocates interrupts only if the contiguous range of MSIs
+>>>> + * with specified nvec are available. Otherwise return the number
+>>>> + * of available interrupts. If none are available, then returns -ENOENT.
+>>>> + */
+>>>
+>>> This function is overly complicated, and pointlessly so.
+>>>
+>>> It doesn't achieve anything useful as it returns the size of the _last_
+>>> contiguous block rather than the _largest_ contiguous block, and the
+>>> only caller (gicv2m_setup_msi_irq) doesn't even care.
+>>>
+>>> Simplify this to just return an error code if allocation is impossible.
+>>
+>> Actually, I made another mistake in the gicv2m_setup_msi_irq when
+>> returning from the alloc_msi_irq().
+>
+> Ok.
+>
+>> My understanding is the arch_setup_msi_irqs() is supposed to return the
+>> number of available vectors if the requested amount could not be
+>> allocated. I notice that the current "drivers/pci/msi.c:
+>> arch_setup_msi_irqs()" does not do so, which is okay.
+>>
+>> However, We are also working on adding support for multi-MSI support
+>> since some of the devices we have are using it, which means we will need
+>> to provide a different version of the "arch_setup_msi_irqs()" as the
+>> current one does not allow (PCI_CAP_ID_MSI && nvec > 1).
+>>
+>> Therefore, I implemented the "alloc_msi_irq" this way to account for
+>> future changes.
+>
+> Per my comments, I still think the function is broken given it returns
+> the size of the last contiguous block of available interrupts.
 
-> +static int notrace exynos_mcpm_cpu_suspend(unsigned long arg)
-> +{
-> +	/* MCPM works with HW CPU identifiers */
-> +	unsigned int mpidr = read_cpuid_mpidr();
-> +	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +	unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +
-> +	__raw_writel(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
-> +
-> +	mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
-> +
-> +	/*
-> +	 * Pass S5P_CHECK_SLEEP flag to the MCPM back-end to indicate that
-> +	 * we are suspending the system and need to skip CPU0 power down.
-> +	 */
-> +	mcpm_cpu_suspend(S5P_CHECK_SLEEP);
+Actually, the current logic for alloc_msi_irq() should do the following:
+     - Return the next available contiguous block of nvec.
+     - In case the requested nvec is not available, return the size of 
+of the largest available range, since the for loop always call the 
+"bitmap_find_next_zero_area()" from the first index of the bitmap.
 
-NAK.
+Actually, let me just add the code for multiple MSIs, which should be 
+making use of this function also in the V3 patch set.  That way, it 
+would be clear.
 
-When I say "local flag with local meaning", I don't want you to smuggle 
-that flag through a public interface either.  I find it rather inelegant 
-to have the notion of special handling for CPU0 being spread around like 
-that.
+Thanks,
 
-If CPU0 is special, then it should be dealth with in one place only, 
-ideally in the MCPM backend, so the rest of the kernel doesn't have to 
-care.
+Suravee
 
-Again, here's what I mean:
-
-static void exynos_mcpm_down_handler(int flags)
-{
-	[...]
-	if ((cpunr != 0) || !(flags & SKIP_CPU_POWERDOWN_IF_CPU0))
-		exynos_cpu_power_down(cpunr);
-	[...]
-}
-
-static void exynos_mcpm_power_down()
-{
-	exynos_mcpm_down_handler(0);
-}
-
-static void exynos_mcpm_suspend(u64 residency)
-{
-	/*
-	 * Theresidency argument is ignored for now.
-	 * However, in the CPU suspend case, we bypass power down for 
-	 * CPU0 as this is being taken care by the SYS_PWR_CFG bit in
-	 * CORE0_SYS_PWR_REG.
-	 */
-	exynos_mcpm_down_handler(SKIP_CPU_POWERDOWN_IF_CPU0);
-}
-
-And SKIP_CPU_POWERDOWN_IF_CPU0 is defined in and visible to 
-mcpm-exynos.c only.
-
-
-Nicolas
+Suravee
