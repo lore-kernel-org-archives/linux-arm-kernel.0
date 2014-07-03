@@ -1,32 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu,  3 Jul 2014 13:58:52 +0200
-Subject: [PATCH] irqchip: gic: Add support for cortex a7 compatible string
-Message-ID: <1404388732-28890-1-git-send-email-matthias.bgg@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 3 Jul 2014 12:59:24 +0100
+Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
+In-Reply-To: <20140703133406.2d3e3a1d@armhf>
+References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
+ <20140702195154.47d6f6b4@armhf>
+ <20140702194252.GN410@sirena.org.uk>
+ <20140703074959.7c489912@armhf>
+ <20140703104432.GV410@sirena.org.uk>
+ <20140703133406.2d3e3a1d@armhf>
+Message-ID: <20140703115924.GY410@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 0a68214b "ARM: DT: Add binding for GIC virtualization extentions (VGIC)" added
-the "arm,cortex-a7-gic" compatible string, but the corresponding IRQCHIP_DECLARE
-was never added to the gic driver.
+On Thu, Jul 03, 2014 at 01:34:06PM +0200, Jean-Francois Moine wrote:
+> Mark Brown <broonie@kernel.org> wrote:
 
-To let real Cortex-A7 SoCs use it, add the necessary declaration to the device driver.
+> > Your board happens to only be able to present the same input on both I2S
+> > and S/PDIF but that might not apply to other boards, they may be able to
+> > route different signals to each which would present a practical problem.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/irqchip/irq-gic.c |    1 +
- 1 file changed, 1 insertion(+)
+> If there are two different streamss on I2S and S/PDIF, and if the audio
+> subsystem wants to route these streams to the same connector (widget
+> 'hdmi-out'), then, somewhere, there should be a software or a design
+> bug. No?
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index c305983..3b66369 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1071,6 +1071,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- }
- IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
- IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
-+IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
- IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
- IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
- 
--- 
-1.7.9.5
+Yes, which is why the driver shouldn't silently ignore the situation.
+
+> Anyway, the tda998x cannot know if the double route is wanted or not.
+
+It doesn't need to know, it just needs to identify something it can't
+support either by providing a way to pick which interface is used or by
+rejecting the second interface.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/d5383422/attachment.sig>
