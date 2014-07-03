@@ -1,149 +1,54 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 03 Jul 2014 14:05:33 +0200
-Subject: [PATCH 2/3] clocksource: add device-tree support for PXA timer
-In-Reply-To: <1403388588-11956-2-git-send-email-robert.jarzmik@free.fr>
-References: <1403388588-11956-1-git-send-email-robert.jarzmik@free.fr>
- <1403388588-11956-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <53B5470D.4070009@linaro.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu,  3 Jul 2014 13:06:11 +0100
+Subject: [PATCH V6 0/2] PTE fixes for ARM LPAE
+Message-ID: <1404389173-4246-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2014 12:09 AM, Robert Jarzmik wrote:
-> Add device-tree support to PXA platforms.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->   drivers/clocksource/pxa_timer.c | 131 ++++++++++++++++++++++++++++++----------
->   1 file changed, 98 insertions(+), 33 deletions(-)
->
-> diff --git a/drivers/clocksource/pxa_timer.c b/drivers/clocksource/pxa_timer.c
-> index fca174e..67da3f5 100644
-> --- a/drivers/clocksource/pxa_timer.c
-> +++ b/drivers/clocksource/pxa_timer.c
-> @@ -15,14 +15,41 @@
->   #include <linux/kernel.h>
->   #include <linux/init.h>
->   #include <linux/interrupt.h>
-> +#include <linux/clk.h>
->   #include <linux/clockchips.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
->   #include <linux/sched_clock.h>
->
->   #include <asm/div64.h>
->   #include <asm/mach/irq.h>
->   #include <asm/mach/time.h>
-> -#include <mach/regs-ost.h>
->   #include <mach/irqs.h>
-> +#include <mach/hardware.h>
+This series fixes a couple of problems that I encountered on ARM with
+LPAE.
+ 1) Some pte accessors can have their results cancelled out by a
+    downcast. This is addressed by the first patch.
 
-Now as the driver is in 'drivers', do not reference the headers files in 
-mach. Moving the driver to the drivers directory implies some cleanup 
-with the headers dependencies.
+ 2) It is impossible to distinguish between clean writeable ptes and
+    read only ptes. This is addressed by the second patch.
 
-> +#define OSMR0		0x00	/* */
-> +#define OSMR1		0x04	/* */
-> +#define OSMR2		0x08	/* */
-> +#define OSMR3		0x0C	/* */
-> +#define OSMR4		0x80	/* */
+Notable changes from V5->V6:
+ o) Renamed PMD_SECT_RDONLY to PMD_SECT_AP2 to make the distinction
+    between software and hardware bits clearer.
+ o) pmd_trans_huge tidied up to use !pmd_table(.)
 
-Can you please remove those unused empty comment or fill them with 
-something appropriate.
+Notable changes in this series from V4->V5:
+ o) Rather than switch to L_PTE_WRITE semantics, we move L_PTE_RDONLY
+    to a software bit. This allows for a much smaller patch set that
+    does not affect the 2-level code.
 
-> +#define OSCR		0x10	/* OS Timer Counter Register */
-> +#define OSCR4		0x40	/* OS Timer Counter Register */
-> +#define OMCR4		0xC0	/* */
-> +#define OSSR		0x14	/* OS Timer Status Register */
-> +#define OWER		0x18	/* OS Timer Watchdog Enable Register */
-> +#define OIER		0x1C	/* OS Timer Interrupt Enable Register */
-> +
-> +#define OSSR_M3		(1 << 3)	/* Match status channel 3 */
-> +#define OSSR_M2		(1 << 2)	/* Match status channel 2 */
-> +#define OSSR_M1		(1 << 1)	/* Match status channel 1 */
-> +#define OSSR_M0		(1 << 0)	/* Match status channel 0 */
-> +
-> +#define OWER_WME	(1 << 0)	/* Watchdog Match Enable */
-> +
-> +#define OIER_E3		(1 << 3)	/* Interrupt enable channel 3 */
-> +#define OIER_E2		(1 << 2)	/* Interrupt enable channel 2 */
-> +#define OIER_E1		(1 << 1)	/* Interrupt enable channel 1 */
-> +#define OIER_E0		(1 << 0)	/* Interrupt enable channel 0 */
+Notable changes in this series from V3->V4:
+ o) Rebased to take into account the BE LPAE fix in 3.16-rc1.
+ o) THP logic added as this was missing.
 
-Is it possible to do some cleanups around regs-ost.h and here in order 
-to remove the unused macros. Also, it seems some define will be 
-duplicate as they are shared with the watchdog. Any plan to fix that ?
+This series has been tested with libhugetlbfs unit tests, ltp mm tests
+and a custom THP test to test what happens when PROT_NONE THPs are
+faulted. I have tested on an Arndale board with LPAE and classic MMU
+(with classic MMU, only ltp mm tests were run). Testing was performed
+against 3.16-rc3.
 
->   /*
->    * This is PXA's sched_clock implementation. This has a resolution
-> @@ -33,9 +60,14 @@
->    * calls to sched_clock() which should always be the case in practice.
->    */
->
-> +#define timer_readl(reg) readl_relaxed(timer_base + (reg))
-> +#define timer_writel(val, reg) writel_relaxed((val), timer_base + (reg))
-> +
-> +static void __iomem *timer_base;
-> +
->   static u64 notrace pxa_read_sched_clock(void)
->   {
-> -	return readl_relaxed(OSCR);
+Any comments/feedback would be appreciated.
 
-So here there is a change which is not explained in the changelog 
-(timer_base offset).
+Cheers,
+--
+Steve
 
-Even it is obvious for me because I am used to see this kind of code, 
-that would deserve a better description in the changelog.
+Steve Capper (2):
+  arm: mm: Introduce {pte,pmd}_isset and {pte,pmd}_isclear
+  arm: mm: Modify pte_write and pmd_write logic for LPAE
 
-> +	return timer_readl(OSCR);
->   }
->
-
-[ ... ]
-
-> +static void __init pxa_timer_dt_init(struct device_node *np)
-> +{
-> +	struct clk *clk;
-> +	int irq;
-> +
-> +	/* timer registers are shared with watchdog timer */
-> +	timer_base = of_iomap(np, 0);
-> +	if (!timer_base)
-> +		panic("%s: unable to map resource\n", np->name);
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (IS_ERR(clk))
-> +		panic("%s: unable to get clk\n", np->name);
-> +	clk_prepare_enable(clk);
-> +
-> +	/* we are only interested in OS-timer0 irq */
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	if (irq <= 0)
-> +		panic("%s: unable to parse OS-timer0 irq\n", np->name);
-
-Is the 'panic' desirable ? The clksrc-of is written in a way to use 
-different clocks, no ?
-
-> +
-> +	pxa_timer_common_init(irq, clk_get_rate(clk));
-> +}
-> +CLOCKSOURCE_OF_DECLARE(pxa_timer, "marvell,pxa-timer", pxa_timer_dt_init);
-> +
-> +/*
-> + * Legacy timer init for non device-tree boards.
-> + */
-> +void __init pxa_timer_init(void)
-> +{
-> +	unsigned long clock_tick_rate = get_clock_tick_rate();
-> +
-> +	timer_base = io_p2v(0x40a00000);
-> +	pxa_timer_common_init(IRQ_OST0, clock_tick_rate);
->   }
->
-
+ arch/arm/include/asm/pgtable-3level-hwdef.h |  3 +-
+ arch/arm/include/asm/pgtable-3level.h       | 49 ++++++++++++++++++-----------
+ arch/arm/include/asm/pgtable.h              | 18 ++++++-----
+ arch/arm/mm/dump.c                          |  4 +--
+ arch/arm/mm/proc-v7-3level.S                |  9 ++++--
+ 5 files changed, 52 insertions(+), 31 deletions(-)
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.3
