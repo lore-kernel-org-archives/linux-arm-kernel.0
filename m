@@ -1,176 +1,110 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:14:35 +0200
-Subject: [PATCH 02/18] AT91: setup: Switch to pr_fmt
-In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-3-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Jul 2014 16:28:38 +0200
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140703104135.GA28175@arm.com>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+Message-ID: <5534788.ziUvZhb6y0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the printed messages are using the "AT91:" prefix in the setup.c file,
-but not all of them. Moreover, those who add it hardcode it directly in the
-message, while the pr_fmt macro makes it easier for us to support such a case.
+On Thursday 03 July 2014 11:41:35 Catalin Marinas wrote:
+> 
+> In my view, we don't break user space. It's rather a choice of how much
+> legacy we support on ARMv8 hardware with an arm64 kernel. We don't even
+> provide HWCAP_SWP for compat (not that anyone bothers checking that).
+> It's a similar reason we choose not to support/emulate NWFPE or OABI
+> even though there are existing binaries out there. If we choose to
+> support SWP in the arm64 kernel, then we won't be able to break user
+> space and have to carry it for a long time (unless you figure out a way
+> to remove such features from the kernel because HWCAP certainly doesn't
+> work, nor printk).
+> 
+> The ARM feature deprecation/removal cycle allows for two architecture
+> revisions before being entirely removed. SWP has been deprecated in
+> ARMv6, made optional in ARMv7 (with the possibility of disabling it if
+> still available) and removed in ARMv8. The Thumb-1/2 instruction sets
+> never had the SWP instruction. Even when SWP was available in certain
+> ARMv7 implementations, it was no longer guaranteed to be atomic.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-at91/setup.c | 42 ++++++++++++++++++++++--------------------
- 1 file changed, 22 insertions(+), 20 deletions(-)
+The problem really is that the ARM architecture deprecation method is
+not compatible with the one we use in the kernel. I don't think there
+is a good answer to that.
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index f7a07a58ebb6..9c4c7fb323fb 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -5,6 +5,8 @@
-  * Under GPLv2
-  */
- 
-+#define pr_fmt(fmt)	"AT91: " fmt
-+
- #include <linux/module.h>
- #include <linux/io.h>
- #include <linux/mm.h>
-@@ -37,7 +39,7 @@ void __init at91rm9200_set_type(int type)
- 	else
- 		at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
- 
--	pr_info("AT91: filled in soc subtype: %s\n",
-+	pr_info("filled in soc subtype: %s\n",
- 		at91_get_soc_subtype(&at91_soc_initdata));
- }
- 
-@@ -66,7 +68,7 @@ void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
- 	}
- 	at91_ramc_base[id] = ioremap(addr, size);
- 	if (!at91_ramc_base[id])
--		panic("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
-+		panic(pr_fmt("Impossible to ioremap ramc.%d 0x%x\n"), id, addr);
- }
- 
- static struct map_desc sram_desc[2] __initdata;
-@@ -83,7 +85,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
- 	desc->length = length;
- 	desc->type = MT_MEMORY_RWX_NONCACHED;
- 
--	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
-+	pr_info("sram at 0x%lx of 0x%x mapped at 0x%lx\n",
- 		base, length, desc->virtual);
- 
- 	iotable_init(desc, 1);
-@@ -302,16 +304,16 @@ void __init at91_map_io(void)
- 		soc_detect(AT91_BASE_DBGU1);
- 
- 	if (!at91_soc_is_detected())
--		panic("AT91: Impossible to detect the SOC type");
-+		panic(pr_fmt("Impossible to detect the SOC type"));
- 
--	pr_info("AT91: Detected soc type: %s\n",
-+	pr_info("Detected soc type: %s\n",
- 		at91_get_soc_type(&at91_soc_initdata));
- 	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
--		pr_info("AT91: Detected soc subtype: %s\n",
-+		pr_info("Detected soc subtype: %s\n",
- 			at91_get_soc_subtype(&at91_soc_initdata));
- 
- 	if (!at91_soc_is_enabled())
--		panic("AT91: Soc not enabled");
-+		panic(pr_fmt("Soc not enabled"));
- 
- 	if (at91_boot_soc.map_io)
- 		at91_boot_soc.map_io();
-@@ -328,7 +330,7 @@ void __init at91_ioremap_shdwc(u32 base_addr)
- {
- 	at91_shdwc_base = ioremap(base_addr, 16);
- 	if (!at91_shdwc_base)
--		panic("Impossible to ioremap at91_shdwc_base\n");
-+		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
- 	pm_power_off = at91sam9_poweroff;
- }
- 
-@@ -338,7 +340,7 @@ void __init at91_ioremap_rstc(u32 base_addr)
- {
- 	at91_rstc_base = ioremap(base_addr, 16);
- 	if (!at91_rstc_base)
--		panic("Impossible to ioremap at91_rstc_base\n");
-+		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
- }
- 
- void __iomem *at91_matrix_base;
-@@ -348,7 +350,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
- {
- 	at91_matrix_base = ioremap(base_addr, 512);
- 	if (!at91_matrix_base)
--		panic("Impossible to ioremap at91_matrix_base\n");
-+		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
- }
- 
- #if defined(CONFIG_OF) && !defined(CONFIG_ARCH_AT91X40)
-@@ -365,15 +367,15 @@ static void at91_dt_rstc(void)
- 
- 	np = of_find_matching_node(NULL, rstc_ids);
- 	if (!np)
--		panic("unable to find compatible rstc node in dtb\n");
-+		panic(pr_fmt("unable to find compatible rstc node in dtb\n"));
- 
- 	at91_rstc_base = of_iomap(np, 0);
- 	if (!at91_rstc_base)
--		panic("unable to map rstc cpu registers\n");
-+		panic(pr_fmt("unable to map rstc cpu registers\n"));
- 
- 	of_id = of_match_node(rstc_ids, np);
- 	if (!of_id)
--		panic("AT91: rtsc no restart function available\n");
-+		panic(pr_fmt("rtsc no restart function available\n"));
- 
- 	arm_pm_restart = of_id->data;
- 
-@@ -394,17 +396,17 @@ static void at91_dt_ramc(void)
- 
- 	np = of_find_matching_node(NULL, ramc_ids);
- 	if (!np)
--		panic("unable to find compatible ram controller node in dtb\n");
-+		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
- 
- 	at91_ramc_base[0] = of_iomap(np, 0);
- 	if (!at91_ramc_base[0])
--		panic("unable to map ramc[0] cpu registers\n");
-+		panic(pr_fmt("unable to map ramc[0] cpu registers\n"));
- 	/* the controller may have 2 banks */
- 	at91_ramc_base[1] = of_iomap(np, 1);
- 
- 	of_id = of_match_node(ramc_ids, np);
- 	if (!of_id)
--		pr_warn("AT91: ramc no standby function available\n");
-+		pr_warn("ramc no standby function available\n");
- 	else
- 		at91_pm_set_standby(of_id->data);
- 
-@@ -450,23 +452,23 @@ static void at91_dt_shdwc(void)
- 
- 	np = of_find_matching_node(NULL, shdwc_ids);
- 	if (!np) {
--		pr_debug("AT91: unable to find compatible shutdown (shdwc) controller node in dtb\n");
-+		pr_debug("unable to find compatible shutdown (shdwc) controller node in dtb\n");
- 		return;
- 	}
- 
- 	at91_shdwc_base = of_iomap(np, 0);
- 	if (!at91_shdwc_base)
--		panic("AT91: unable to map shdwc cpu registers\n");
-+		panic(pr_fmt("unable to map shdwc cpu registers\n"));
- 
- 	wakeup_mode = at91_dtget_shdwc_wakeup_mode(np);
- 	if (wakeup_mode < 0) {
--		pr_warn("AT91: shdwc unknown wakeup mode\n");
-+		pr_warn("shdwc unknown wakeup mode\n");
- 		goto end;
- 	}
- 
- 	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
- 		if (reg > AT91_SHDW_CPTWK0_MAX) {
--			pr_warn("AT91: shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
-+			pr_warn("shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
- 				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
- 			reg = AT91_SHDW_CPTWK0_MAX;
- 		}
--- 
-2.0.1
+Note that other architectures have a different way of handling this
+by never removing instructions. Obviously knowing that does not help
+deal with the problem on ARM.
+
+> > Android is not the embedded world where we could get away with a whole
+> > lot. There is a *freaking huge* installed base of applications.
+> > Breaking them is not an option, and I think Colin's question makes it
+> > clear that Android is going make sure that doesn't happen regardless
+> > of what the mainline kernel does... and they are right to do so.
+> 
+> I don't know how huge this installed base of applications is. AFAIK,
+> it's limited to a (maybe significant) number of Android games all based
+> on certain library which no longer uses SWP in its recent releases. I
+> may be wrong but the information I have so far is that this huge base of
+> applications does not go beyond Android. Furthermore, people getting a
+> new Android phone with ARMv8 will have to re-download applications
+> anyway, so the currently installed base does _not_ matter. What matters
+> is what is provided in the Android _app store_.
+>
+> Note that I don't say Google should break those applications but they
+> can carry a patch in their Android kernel while reaching out to
+> developers to sort their code (can the Android app store be scanned?).
+> What I don't want is to be in a situation 10 years from now when we
+> still carry SWP emulation code that no-one uses but we can't remove
+> because it would break the user space features we agreed upon.
+
+The rule is still that we don't break stuff, it's not that we can't
+make interface changes over a long period of time.
+
+The way the ARM architecture feature deprecation works, we are pretty
+much forced to make incompatible changes eventually, but we can
+decide when to make them. Going from a 32-bit kernel to a 64-bit
+kernel is a reasonable point for breaking compatibility with some
+old features, but it's not the only option.
+
+For someone shipping a device, it's pretty obvious that they want to
+be as compatible as possible with existing applications, and they
+definitely will patch their kernel to do this.
+
+For someone shipping an Android SDK OTOH, it would be best to enforce
+that no features that are deprecated in any architecture level are used,
+and it would be good to provide a way for the kernel to allow that.
+This has clearly not been the case in the past, and I find it hard
+to blame the Android developers for that given the language in the
+Kconfig help text ("if unsure, say Y", default y if SMP).\
+It would be nice however to see that done now, to ensure that
+all newly built applications are actually good in this regard.
+
+There are two related questions that we have to ask ourselves:
+
+a) I believe there are other instructions that are marked deprecated
+   in ARMv8 and that will likely be removed at a later point. Can
+   we add an option to the kernel to trap them all and either abort
+   the program or emit a warning so we don't get another surprise
+   like this when ARMv9 eventually comes out?
+
+b) how do we deal with obsolete instructions in a the 32-bit kernel?
+   Running a 32-bit kernel in a virtual machine on ARMv8 hardware
+   should give a similar behavior to running them on a 64-bit kernel,
+   so we probably have to deal with 32-bit ARMv8 environments as well.
+
+> I have limited knowledge of Android user space but I think SWP emulation
+> could also be implemented in user space via a SIGILL handler in the
+> zygote thread and inherited by forked apps (performance doesn't really
+> matter here). A similar example for Android is the binder driver
+> user-kernel ABI. AFAIK, Google decided not to provide a compat ABI for
+> the 64-bit compilation of this driver but update the AArch32 user-space
+> library to use the new 64-bit ABI. That's perfectly fine by me, they
+> chose not to provide such ABI in the kernel but solve it entirely in
+> user space and could do the same with SWP.
+
+I believe a difference here is that installable Android apps are not
+expected to call the binder ioctls directly, so as long as the library
+interface is unchanged, nothing is broken.
+
+	Arnd
