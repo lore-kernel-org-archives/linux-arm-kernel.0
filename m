@@ -1,47 +1,34 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 03 Jul 2014 16:52:19 +0900
-Subject: [PATCH] ARM: dts: Add I2S dt node for Exynos3250
-Message-ID: <1404373939-10510-1-git-send-email-cw00.choi@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Jul 2014 15:56:47 +0800
+Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
+ share_count
+In-Reply-To: <20140703074553.GA30239@dragon>
+References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
+ <1404194129-25543-4-git-send-email-festevam@gmail.com>
+ <20140701115252.GM14471@dragon>
+ <CAOMZO5BmJFmjYP9=rfR5eRKWPioPoW=UjE_h=Q3kbEAJGRixAQ@mail.gmail.com>
+ <20140702152942.12768.85270@quantum>
+ <CAOMZO5B=Jwodc+2hVhjXrCvERxuyKKviM+zYgH=ynvOSHLWBTw@mail.gmail.com>
+ <20140703074553.GA30239@dragon>
+Message-ID: <20140703075646.GA1970@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+On Thu, Jul 03, 2014 at 03:46:00PM +0800, Shawn Guo wrote:
+> > Scenario 2:
+> > 
+> > clk1 is enabled -> clock gate bit is set to 1
+> > clk2 is disabled -> clock gate bit cannot be set to 0 because clk1 is enabled
+> 
+> This never happens.  If clk2 is disabled by clk_disable() without being
+> enabled by clk_enable() beforehand, it returns from __clk_disable()
+> immediately due to hitting of the WARN below.
+> 
+> 	if (WARN_ON(clk->enable_count == 0))
+> 		return;
 
-This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
-(1 channels) IIS-bus for audio interface with DMA-based operation.
+Well, it only happens in case that clock core calls clk->ops->disable()
+directly from clk_disable_unused_subtree() in order to disable unused
+clocks.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Inha Song <ideal.song@samsung.com>
-Tested-by: Inha Song <ideal.song@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 1f8384f..e9017ef 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -644,6 +644,19 @@
- 			status = "disabled";
- 		};
- 
-+		i2s: i2s at 13970000 {
-+			compatible = "samsung,s3c6410-i2s";
-+			reg = <0x13970000 0x100>;
-+			interrupts = <0 126 0>;
-+			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
-+			clock-names = "iis", "i2s_opclk0";
-+			dmas = <&pdma0 14>, <&pdma0 13>;
-+			dma-names = "tx", "rx";
-+			pinctrl-0 = <&i2s2_bus>;
-+			pinctrl-name = "default";
-+			status = "disabled";
-+		};
-+
- 		pwm: pwm at 139D0000 {
- 			compatible = "samsung,exynos4210-pwm";
- 			reg = <0x139D0000 0x1000>;
--- 
-1.8.0
+Shawn
