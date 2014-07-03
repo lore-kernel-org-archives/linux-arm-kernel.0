@@ -1,35 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 3 Jul 2014 10:40:01 +0100
-Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
-In-Reply-To: <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
-References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
- <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
- <20140702165924.GB17665@lee--X1> <53B50EFD.2070007@st.com>
- <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140703094001.GB32208@lee--X1>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 3 Jul 2014 12:51:22 +0300
+Subject: [PATCH 1/2] ARM: DTS: am335x-evm: Enable the McASP FIFO for audio
+Message-ID: <1404381083-27029-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Jul 2014, Philipp Zabel wrote:
-> Am Donnerstag, den 03.07.2014, 10:06 +0200 schrieb Maxime Coquelin:
-> > I will queue patch 4 to STi DT branch for v3.17.
-> > For now, no nodes uses reset for STiH407, so we don't need the 
-> > dt-bindings header file in the STi tree.
-> > 
-> > If we have a DT node using a reset line before my pull-request, I might 
-> > have to integrate the series in the STi DT branch.
-> > Philipp, does that sound reasonable?
-> 
-> Patch 4 depends on patch 1 for the header. My tree is still empty, how
-> about I take the first two, and you merge that branch and then take 3
-> and 4 on top?
+The use of FIFO in McASP can reduce the risk of audio under/overrun and
+lowers the load on the memories since the DMA will operate in bursts.
 
-That approach sounds reasonable.  Once you've applied the patches can
-you tag the branch and provide Maxime with a pull-request please
-Philipp?
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/am335x-evm.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index ecb267767cf5..e2156a583de7 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -529,8 +529,8 @@
+ 		serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
+ 			0 0 1 2
+ 		>;
+-		tx-num-evt = <1>;
+-		rx-num-evt = <1>;
++		tx-num-evt = <32>;
++		rx-num-evt = <32>;
+ };
+ 
+ &tps {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.0.0
