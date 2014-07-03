@@ -1,50 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Jul 2014 11:24:23 +0200
-Subject: [PATCH 08/16] ARM: mvebu: Use a local variable to store the resume
- address
-In-Reply-To: <20140630170952.6d92f96d@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>	<1403875377-940-9-git-send-email-gregory.clement@free-electrons.com>
- <20140630170952.6d92f96d@free-electrons.com>
-Message-ID: <53B52147.9070601@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 3 Jul 2014 11:25:38 +0200
+Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
+ address of the boot register
+In-Reply-To: <53B516D8.8070003@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
+ <20140630144620.0030cf94@free-electrons.com>
+ <53B516D8.8070003@free-electrons.com>
+Message-ID: <20140703112538.533b73e1@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Dear Gregory CLEMENT,
 
-On 30/06/2014 17:09, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On Thu, 03 Jul 2014 10:39:52 +0200, Gregory CLEMENT wrote:
+
+> > I'm not sure that the best approach to solve this problem. Instead,
+> > maybe the system-controller.c code should set up the boot address
+> > workaround on Armada 375. Since the workaround on 375 is really related
+> > to setting the boot address which is done by the system controller,
+> > maybe the initialization of the workaround belongs in
+> > system-controller.c ?
 > 
-> On Fri, 27 Jun 2014 15:22:49 +0200, Gregory CLEMENT wrote:
-> 
->> +static void *mvebu_cpu_resume;
->> +
->>  static struct platform_device mvebu_v7_cpuidle_device = {
->>  	.name = "cpuidle-armada-370-xp",
->>  };
->> @@ -281,7 +283,7 @@ static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
->>  {
->>  	if (action == CPU_PM_ENTER) {
->>  		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
->> -		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
->> +		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, mvebu_cpu_resume);
-> 
-> Instead of doing this in the CPU_PM_ENTER notifier, do we have a reason
-> to not do it in the do_armada_370_xp_cpu_suspend() function, and then
-> do_armada_38x_suspend() function respectively? Those functions are
-> already SoC-specific, so surely, they already know whether the resume
-> path should go through armada_370_xp_cpu_resume() or
-> armada_38x_cpu_resume(), no?
+> So moving the workaround into mvebu_system_controller_set_cpu_boot_addr()
+> should be the thing to do.
 
-Now that all this code is also part of pmsu and no more in the cpu dile driver.
-It should be possible. Let me see what it implies about the path code.
+Except that mvebu_system_controller_set_cpu_boot_addr() is called
+multiple times during the system execution, while you want the
+workaround to be initialized once. And we surely don't really want a
+static variable in there to test if the workaround has already been
+initialized or not.
 
-Thanks,
-
-Gregory
-
-
+Thomas
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
