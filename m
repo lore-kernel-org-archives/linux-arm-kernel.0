@@ -1,51 +1,83 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 3 Jul 2014 19:05:05 +0900
-Subject: [PATCH v3 0/2] drm: nouveau: memory coherency for ARM
-In-Reply-To: <1403868134-31741-1-git-send-email-acourbot@nvidia.com>
-References: <1403868134-31741-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <CAAVeFuLWpfjqWFRyGqROdxw7qP2OkXFZTPkCHCtwzwE=VjjRgQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 3 Jul 2014 15:36:51 +0530
+Subject: [PATCH 3/5] phy: miphy365x: Provide support for the MiPHY356x
+ Generic PHY
+In-Reply-To: <20140703080758.GI30534@lee--X1>
+References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
+ <1404133317-25953-4-git-send-email-lee.jones@linaro.org>
+ <53B3DCBC.8000105@ti.com> <20140703080758.GI30534@lee--X1>
+Message-ID: <53B52B3B.4010507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While this series is more correct from the DMA API point of view, it
-is also much heavier as it strictly disables the use of any cache on
-all user-space mapped BOs, and is also much more restricted in terms
-of which memory it can use.
+Hi,
 
-I have a v4 in the works that lets us use TTM for user-mapped objects
-and only falls back to using the DMA API for kernel-only objects
-(fences & PBs basically). Will push it shortly but wanted to signal
-this revision as deprecated in the meantime.
+On Thursday 03 July 2014 01:37 PM, Lee Jones wrote:
+> On Wed, 02 Jul 2014, Kishon Vijay Abraham I wrote:
+>> On Monday 30 June 2014 06:31 PM, Lee Jones wrote:
+>>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+>>> devices. It has 2 ports which it can use for either; both SATA, both
+>>> PCIe or one of each in any configuration.
+>>>
+>>> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> Removed.
+> 
+>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>>> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>  drivers/phy/Kconfig         |  10 +
+>>>  drivers/phy/Makefile        |   1 +
+>>>  drivers/phy/phy-miphy365x.c | 630 ++++++++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 641 insertions(+)
+>>>  create mode 100644 drivers/phy/phy-miphy365x.c
+> 
+> [...]
+> 
+>>> +struct miphy365x_dev {
+>>> +	struct device *dev;
+>>> +	struct mutex miphy_mutex;
+>>> +	struct miphy365x phys[ARRAY_SIZE(ports)];
+>>
+>> Avoid using fixed array sizes for ports or channels. Refer [1].
+> 
+> Just addressing this point in this mail.  Any other subsequent points
+> will either be fixed up or addressed in other correspondence.
+> 
+> I don't agree with this point.  I don't believe the number of channels
+> should be dictated by the number of DT sub-nodes supplied.  Instead,
 
-On Fri, Jun 27, 2014 at 8:22 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> v2 was doing some pretty nasty things with the DMA API, so I took a different
-> approach for this v3.
->
-> As suggested, this version uses ttm_dma_populate() to populate BOs. The reason
-> for doing this was that it would entitle us to using the DMA sync functions,
-> but since the memory returned is already coherent anyway, we do not even
-> need to call these functions anymore.
->
-> So this series has turned into 2 small patches:
->
-> - The first attempts to make it more obvious that Nouveau can use different
-> ways to populate TTs, and make it possible to choose which method to use from
-> a single place.
-> - The second leverages this work to select the DMA allocator to populate TTs
-> on ARM.
->
-> Doing this solves all our coherency problems with Nouveau on Tegra, and
-> hopefully makes the code easier to read in the process.
->
-> Alexandre Courbot (2):
->   drm/nouveau: cleanup TTM population logic
->   drm/nouveau: use DMA TT population method on ARM
->
->  drivers/gpu/drm/nouveau/nouveau_bo.c  | 63 ++++++++++++++++++-----------------
->  drivers/gpu/drm/nouveau/nouveau_drm.h | 11 ++++++
->  drivers/gpu/drm/nouveau/nouveau_ttm.c | 17 ++++++++++
->  3 files changed, 61 insertions(+), 30 deletions(-)
->
-> --
-> 2.0.0
->
+But that's the way it is. The DT describes your hw and not the driver. However
+the driver may not support everything that is in the hw.
+> the driver should contain knowledge about what is supported and
+> validate the DT data accordingly.  If it's omitted we lose the ability
+
+IMO the driver cannot validate DT data, it can just return error if there is
+something the _driver_ cannot support.
+> to conduct any kind of bounds checking, such like the following: 
+> 
+>         if (WARN_ON(port >= ARRAY_SIZE(ports)))
+>                 return ERR_PTR(-EINVAL);
+
+Just as I mentioned in the other patch, 'ports' shouldn't be needed at all. If
+we directly give phandle to the sub-node, it won't be needed.
+> And
+>         if (child_count != ARRAY_SIZE(ports)) {
+>                 dev_err(&pdev->dev, "%d ports supported, %d supplied\n",
+>                         ARRAY_SIZE(ports), child_count);
+>                 return -EINVAL;
+>         }
+> 
+> If at a later point, we need to expand the driver to support a new
+> chip which supports more channels/ports then we need to expand the
+> bounds checking based on match data extracted from the supplied
+> compatible string.  For instance, if a 4 port controller is being used
+> and only 2 channels have been supplied, or vice versa then probe()
+> should fail.
+
+I don't think error checking of this sort should be done in driver. The dt
+_should_ know what is the controller that is being used.
+
+Cheers
+Kishon
