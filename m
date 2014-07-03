@@ -1,112 +1,114 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:14:59 +0200
-Subject: [PATCH 15/18] AT91: pm: Remove show_reset_status function
+Date: Thu,  3 Jul 2014 16:14:53 +0200
+Subject: [PATCH 12/18] AT91: DT: Remove poweroff DT probing
 In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-27-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-21-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the reset and poweroff drivers are now implementing what the
-show_reset_status function used to do. Hence, we can remove this rather hackish
-function that prevents us from doing further cleanup.
+Now that the poweroff code is a driver of its own, remove the DT probing in
+mach-at91 and let the usual DT code do its job.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 72 -------------------------------------------------
- 1 file changed, 72 deletions(-)
+ arch/arm/mach-at91/setup.c | 77 ----------------------------------------------
+ 1 file changed, 77 deletions(-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index e95554532987..213606111d9a 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -34,79 +34,8 @@
- #include "pm.h"
- #include "gpio.h"
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 771e0495bfe5..69967c21d5c0 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -385,82 +385,6 @@ static void at91_dt_ramc(void)
+ 	of_node_put(np);
+ }
  
--/*
-- * Show the reason for the previous system reset.
-- */
+-static struct of_device_id shdwc_ids[] = {
+-	{ .compatible = "atmel,at91sam9260-shdwc", },
+-	{ .compatible = "atmel,at91sam9rl-shdwc", },
+-	{ .compatible = "atmel,at91sam9x5-shdwc", },
+-	{ /*sentinel*/ }
+-};
 -
--#include "at91_rstc.h"
--#include "at91_shdwc.h"
+-static const char *shdwc_wakeup_modes[] = {
+-	[AT91_SHDW_WKMODE0_NONE]	= "none",
+-	[AT91_SHDW_WKMODE0_HIGH]	= "high",
+-	[AT91_SHDW_WKMODE0_LOW]		= "low",
+-	[AT91_SHDW_WKMODE0_ANYLEVEL]	= "any",
+-};
 -
- static void (*at91_pm_standby)(void);
- 
--static void __init show_reset_status(void)
+-const int at91_dtget_shdwc_wakeup_mode(struct device_node *np)
 -{
--	static char reset[] __initdata = "reset";
+-	const char *pm;
+-	int err, i;
 -
--	static char general[] __initdata = "general";
--	static char wakeup[] __initdata = "wakeup";
--	static char watchdog[] __initdata = "watchdog";
--	static char software[] __initdata = "software";
--	static char user[] __initdata = "user";
--	static char unknown[] __initdata = "unknown";
+-	err = of_property_read_string(np, "atmel,wakeup-mode", &pm);
+-	if (err < 0)
+-		return AT91_SHDW_WKMODE0_ANYLEVEL;
 -
--	static char signal[] __initdata = "signal";
--	static char rtc[] __initdata = "rtc";
--	static char rtt[] __initdata = "rtt";
--	static char restore[] __initdata = "power-restored";
+-	for (i = 0; i < ARRAY_SIZE(shdwc_wakeup_modes); i++)
+-		if (!strcasecmp(pm, shdwc_wakeup_modes[i]))
+-			return i;
 -
--	char *reason, *r2 = reset;
--	u32 reset_type, wake_type;
--
--	if (!at91_shdwc_base || !at91_rstc_base)
--		return;
--
--	reset_type = at91_rstc_read(AT91_RSTC_SR) & AT91_RSTC_RSTTYP;
--	wake_type = at91_shdwc_read(AT91_SHDW_SR);
--
--	switch (reset_type) {
--	case AT91_RSTC_RSTTYP_GENERAL:
--		reason = general;
--		break;
--	case AT91_RSTC_RSTTYP_WAKEUP:
--		/* board-specific code enabled the wakeup sources */
--		reason = wakeup;
--
--		/* "wakeup signal" */
--		if (wake_type & AT91_SHDW_WAKEUP0)
--			r2 = signal;
--		else {
--			r2 = reason;
--			if (wake_type & AT91_SHDW_RTTWK)	/* rtt wakeup */
--				reason = rtt;
--			else if (wake_type & AT91_SHDW_RTCWK)	/* rtc wakeup */
--				reason = rtc;
--			else if (wake_type == 0)	/* power-restored wakeup */
--				reason = restore;
--			else				/* unknown wakeup */
--				reason = unknown;
--		}
--		break;
--	case AT91_RSTC_RSTTYP_WATCHDOG:
--		reason = watchdog;
--		break;
--	case AT91_RSTC_RSTTYP_SOFTWARE:
--		reason = software;
--		break;
--	case AT91_RSTC_RSTTYP_USER:
--		reason = user;
--		break;
--	default:
--		reason = unknown;
--		break;
--	}
--	pr_info("AT91: Starting after %s %s\n", reason, r2);
+-	return -ENODEV;
 -}
 -
- static int at91_pm_valid_state(suspend_state_t state)
+-static void at91_dt_shdwc(void)
+-{
+-	struct device_node *np;
+-	int wakeup_mode;
+-	u32 reg;
+-	u32 mode = 0;
+-
+-	np = of_find_matching_node(NULL, shdwc_ids);
+-	if (!np) {
+-		pr_debug("unable to find compatible shutdown (shdwc) controller node in dtb\n");
+-		return;
+-	}
+-
+-	at91_shdwc_base = of_iomap(np, 0);
+-	if (!at91_shdwc_base)
+-		panic(pr_fmt("unable to map shdwc cpu registers\n"));
+-
+-	wakeup_mode = at91_dtget_shdwc_wakeup_mode(np);
+-	if (wakeup_mode < 0) {
+-		pr_warn("shdwc unknown wakeup mode\n");
+-		goto end;
+-	}
+-
+-	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
+-		if (reg > AT91_SHDW_CPTWK0_MAX) {
+-			pr_warn("shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
+-				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
+-			reg = AT91_SHDW_CPTWK0_MAX;
+-		}
+-		mode |= AT91_SHDW_CPTWK0_(reg);
+-	}
+-
+-	if (of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
+-			mode |= AT91_SHDW_RTCWKEN;
+-
+-	if (of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
+-			mode |= AT91_SHDW_RTTWKEN;
+-
+-	at91_shdwc_write(AT91_SHDW_MR, wakeup_mode | mode);
+-
+-end:
+-	pm_power_off = at91sam9_poweroff;
+-
+-	of_node_put(np);
+-}
+-
+ void __init at91rm9200_dt_initialize(void)
  {
- 	switch (state) {
-@@ -338,7 +267,6 @@ static int __init at91_pm_init(void)
+ 	at91_dt_ramc();
+@@ -478,7 +402,6 @@ void __init at91rm9200_dt_initialize(void)
+ void __init at91_dt_initialize(void)
+ {
+ 	at91_dt_ramc();
+-	at91_dt_shdwc();
  
- 	suspend_set_ops(&at91_pm_ops);
- 
--	show_reset_status();
- 	return 0;
- }
- arch_initcall(at91_pm_init);
+ 	/* Init clock subsystem */
+ 	at91_dt_clock_init();
 -- 
 2.0.1
