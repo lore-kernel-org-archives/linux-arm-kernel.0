@@ -1,34 +1,33 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Jul 2014 11:44:32 +0100
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140703074959.7c489912@armhf>
-References: <20140702183841.7c964832@armhf> <20140702165628.GO20799@lunn.ch>
- <20140702195154.47d6f6b4@armhf>
- <20140702194252.GN410@sirena.org.uk>
- <20140703074959.7c489912@armhf>
-Message-ID: <20140703104432.GV410@sirena.org.uk>
+Date: Thu, 3 Jul 2014 12:14:42 +0100
+Subject: ASoC: samsung: MACH_SMDK6450
+In-Reply-To: <53B48993.5020809@samsung.com>
+References: <1404287238.12021.7.camel@x220>
+ <20140702092347.GB410@sirena.org.uk> <53B48993.5020809@samsung.com>
+Message-ID: <20140703111442.GW410@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 07:49:59AM +0200, Jean-Francois Moine wrote:
-> Mark Brown <broonie@kernel.org> wrote:
+On Thu, Jul 03, 2014 at 07:37:07AM +0900, Kukjin Kim wrote:
+> On 07/02/14 18:23, Mark Brown wrote:
 
-> > I'd expect this to return an error for the busy DAI rather than just
-> > silently ignore it failing to start or (better) implement some control
-> > to let the user select which of the DAIs is active.
+> >This also wasn't sent to me for review, please always send patches to
+> >maintainers.
 
-> This is not an error. If the audio subsystem (DPCM, not the user)
-> chooses to activate both I2S and S/PDIF, this means the HDMI audio may
-> be taken either from I2S or from S/PDIF: both inputs have the right
-> format and rate.
+> Mark, I always send patches to regarding maintainers and in this case the
+> patch missed the change. I'm resending new patch and if any problems, please
+> let me know. Just note, I just wanted to check whether there is no problem
+> with other maintainers' tree early in -next tree.
 
-Your board happens to only be able to present the same input on both I2S
-and S/PDIF but that might not apply to other boards, they may be able to
-route different signals to each which would present a practical problem.
+It looks like you've sent it to broonie at linaro.org not broonie at kernel.org 
+which is listed in MAINTAINERS and what I use for e-mail - upstream mail
+that goes to my work address often just gets dropped on the floor (and
+generally ends up at the bottom of my queue to look at) since it ends up
+in a completely different place to my personal mail.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/d93d80ab/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/1c74f73f/attachment.sig>
