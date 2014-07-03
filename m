@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:14:38 +0200
-Subject: [PATCH 04/18] AT91: SAMA5D3: DT: Add shutdown controller
+Date: Thu,  3 Jul 2014 16:14:39 +0200
+Subject: [PATCH 05/18] AT91: SAMA5D3: DT: Add shutdown controller
 In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
