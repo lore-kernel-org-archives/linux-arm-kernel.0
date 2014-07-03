@@ -1,35 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  3 Jul 2014 10:23:49 +0200
-Subject: [PATCH 1/2] ARM: mvebu: add appended DTB support in mvebu_v5_defconfig
-Message-ID: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 3 Jul 2014 14:04:02 +0530
+Subject: [PATCH] arm: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
+In-Reply-To: <1401180943-14296-1-git-send-email-rnayak@ti.com>
+References: <1401180943-14296-1-git-send-email-rnayak@ti.com>
+Message-ID: <53B5157A.3020108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu_v5_defconfig is currently used for Kirkwood platforms, and
-in the future hopefully used for Orion5x platforms. Those platforms
-use fairly old bootloaders that don't have Device Tree support, so it
-makes sense to enable appended DTB support by default, as well as the
-backward compatibility with ATAGS passed by the bootloader for those
-platforms. It helps having a defconfig that works fine out of the box
-for most Kirkwood platforms.
+On Tuesday 27 May 2014 02:25 PM, Rajendra Nayak wrote:
+> Without the patch:
+> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
+> 532000000
+> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
+> 532000000
+> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
+> 532000000
+> 
+> With the patch:
+> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
+> 532000000
+> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
+> 266000000
+> /debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
+> 133000000
+> 
+> The l3 clock derived from core DPLL is actually a divider clock,
+> with the default divider set to 2. l4 then derived from l3 is a fixed factor
+> clock, but the fixed divider is 2 and not 1. Which means the l3 clock is
+> half of core DPLLs h12x2 and l4 is half of l3 (as seen with this patch)
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/mvebu_v5_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Tero, this seems like is yet to be picked up. You see any issues with this that needs to be
+addressed?
 
-diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-index 27c732f..9f70f59 100644
---- a/arch/arm/configs/mvebu_v5_defconfig
-+++ b/arch/arm/configs/mvebu_v5_defconfig
-@@ -19,6 +19,8 @@ CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
--- 
-2.0.0
+regards,
+Rajendra
+
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index cfb8fc7..a14c99b 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -673,10 +673,12 @@
+>  
+>  	l3_iclk_div: l3_iclk_div {
+>  		#clock-cells = <0>;
+> -		compatible = "fixed-factor-clock";
+> +		compatible = "ti,divider-clock";
+> +		ti,max-div = <2>;
+> +		ti,bit-shift = <4>;
+> +		reg = <0x0100>;
+>  		clocks = <&dpll_core_h12x2_ck>;
+> -		clock-mult = <1>;
+> -		clock-div = <1>;
+> +		ti,index-power-of-two;
+>  	};
+>  
+>  	l4_root_clk_div: l4_root_clk_div {
+> @@ -684,7 +686,7 @@
+>  		compatible = "fixed-factor-clock";
+>  		clocks = <&l3_iclk_div>;
+>  		clock-mult = <1>;
+> -		clock-div = <1>;
+> +		clock-div = <2>;
+>  	};
+>  
+>  	video1_clk2_div: video1_clk2_div {
+> 
