@@ -1,51 +1,69 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 3 Jul 2014 18:26:00 +0200
-Subject: [PATCH] ASoC: tda998x: add a codec to the HDMI transmitter
-In-Reply-To: <20140703154325.GY32514@n2100.arm.linux.org.uk>
-References: <20140702165628.GO20799@lunn.ch> <20140702195154.47d6f6b4@armhf>
- <20140702194252.GN410@sirena.org.uk>
- <20140703074959.7c489912@armhf>
- <20140703104432.GV410@sirena.org.uk>
- <20140703133406.2d3e3a1d@armhf>
- <20140703115924.GY410@sirena.org.uk>
- <20140703152826.103c9d6c@armhf>
- <20140703134346.GW32514@n2100.arm.linux.org.uk>
- <20140703172909.60caf2c7@armhf>
- <20140703154325.GY32514@n2100.arm.linux.org.uk>
-Message-ID: <20140703182600.7a98c5b6@armhf>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Jul 2014 17:32:00 +0100
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <CALCETrXNQ0aLsE03mM0rdt-3mWP1Zze-nHSsME7Bwcf=5DyisA@mail.gmail.com>
+References: <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+ <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+ <20140623084608.GA9316@arm.com>
+ <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
+ <20140624085405.GA26013@arm.com> <53B5098B.9050801@linaro.org>
+ <20140703102450.GD12958@arm.com>
+ <CALCETrWQdHmn0-so1JHFoT-2A02mgcxDUb3jphSQmBGn-SQ+pA@mail.gmail.com>
+ <20140703161154.GF14305@arm.com>
+ <CALCETrXNQ0aLsE03mM0rdt-3mWP1Zze-nHSsME7Bwcf=5DyisA@mail.gmail.com>
+Message-ID: <20140703163200.GA17372@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jul 2014 16:43:25 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> What you're doing in kirkwood-i2s is providing two plain DAI links,
-> and then insisting that only one can be active any any one time.
+On Thu, Jul 03, 2014 at 05:13:50PM +0100, Andy Lutomirski wrote:
+> On Thu, Jul 3, 2014 at 9:11 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Jul 03, 2014 at 04:39:21PM +0100, Andy Lutomirski wrote:
+> >> On Thu, Jul 3, 2014 at 3:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Thu, Jul 03, 2014 at 08:43:07AM +0100, AKASHI Takahiro wrote:
+> >> >> So it seems to me that we can't change a system call by ptrace().
+> >> >> Do I misunderstand anything?
+> >> >
+> >> > No, it looks like you have a point here. I don't think userspace has any
+> >> > business with orig_x0, but changing syscallno is certainly useful. I can
+> >> > think of two ways to fix this:
+> >> >
+> >> >   (1) Updating syscallno based on w8, but this ties us to the current ABI
+> >> >       and could get messy if this register changes in the future.
+> >> >
+> >> >   (2) Adding a PTRACE_SET_SYSCALL request, like we have for arch/arm/,
+> >> >       but that means adding arch-specific stuff to arch_ptrace (which
+> >> >       currently goes straight to ptrace_request on arm64).
+> >> >
+> >> > It looks like x86 uses orig_ax, which I *think* means we would go with
+> >> > (1) above if we followed their lead.
+> >>
+> >> w8 is a real register, right?  On x86, at least orig_ax isn't a real
+> >> register, so it's quite unlikely to conflict with hardware stuff.
+> >
+> > Yeah, w8 is the hardware register which the Linux ABI uses for the system
+> > call number. I was thinking We could allow the debugger/tracer to update
+> > the syscall number by updating that register, or do you see an issue with
+> > that? (other than tying us to the current ABI).
 > 
-> A DPCM solution provides at least one frontend DAI link and at least
-> one backend DAI link.  Your code does not do this.
-
-You know why I did not insert the DPCM code in the kirkwood driver: it
-does not work. But, as I tested it end 2013, I still have the code.
-Do you want I propose a patch?
-
-> Which bit of "we need to support both I2S and SPDIF" in my previous
-> emails was not clear.  Which bit of "We should only support SPDIF
-> on the Cubox" was not clear?
+> Not immediately, but I'm not super-familiar with ptrace.
 > 
-> I *fully* acknowledge that we need to support both, but I'm putting
-> a _strong_ recommendation to you _with_ technical reasons why we
-> should _only_ support SPDIF on the Cubox.
+> Is w8 clobbered or otherwise changed by syscalls?  Using w8 for this
+> has the odd effect that tracers can't force a return with a specific
+> value of w8 without executing the corresponding syscall.  If that's a
+> meaningful limitation, then presumably some other channel should be
+> used.
 
-Sorry, I still don't see why only S/PDIF should be supported on the
-Cubox. I have both, and both are working on HDMI. I hope someone will
-tell me it also works on S/PDIF: there is no reason it could not.
+Hmm, that's true. Currently w8 is preserved across a syscall by the kernel,
+so it would be pretty bizarre for somebody to try and modify it but I guess
+they could do it if they wanted to. However, they could just as easily
+modify it on the syscall return path and have the same effect...
 
-I don't see your technical reasons: you know the constraints of each
-protocol I2S and S/PDIF. If you don't want I2S, just don't declare it
-in the DT (see my previous mail). You may also note that I did not put
-any change relative to the Cubox DT in my patch.
+Furthermore, glibc unconditionally emits a mov into w8 prior to the svc
+instruction, so from a user's perspective that register always contains
+the system call number.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+FWIW: the role of w8 in the PCS is `Indirect result location register', so
+I'd expect it to be saved across the syscall anyway.
+
+Will
