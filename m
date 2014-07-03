@@ -1,98 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Jul 2014 22:55:49 +0800
-Subject: [PATCH v3 9/9] ARM: sun8i: Add reset controller nodes to the DTSI
+Date: Thu,  3 Jul 2014 22:55:47 +0800
+Subject: [PATCH v3 7/9] ARM: sunxi: select MFD_SUN6I_PRCM when sun8i arch
+ support is enabled
 In-Reply-To: <1404399349-20237-1-git-send-email-wens@csie.org>
 References: <1404399349-20237-1-git-send-email-wens@csie.org>
-Message-ID: <1404399349-20237-10-git-send-email-wens@csie.org>
+Message-ID: <1404399349-20237-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A23 has the same MMIO reset controllers matching the clocks gates,
-just like in the A31. This patch adds the reset controller nodes and
-the reset control phandles for the peripherals needing them to the
-DTSI.
+Select the MFD_SUN6I_PRCM option when sun8i arch is enabled in order to
+get the PRCM (Power/Reset/Clock Management) related drivers compiled.
 
-Unlike the sun6i DTSI, this patch uses sun6i-a31-clock-reset for
-ahb1_rst. sun6i-a31-ahb-reset is for early init, and requires some
-additions to the machine code. It is used to support the hstimer.
-However the hstimer on sun8i only has 1 timer, which is somewhat
-useless. Support for it will probably not be added. Hence the
-decision to use sun6i-a31-clock-reset here to avoid the changes to
-sun8i machine code.
+Also select ARCH_HAS_RESET_CONTROLLER and RESET_CONTROLLER to make sure
+the reset controller drivers are compiled.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/mach-sunxi/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index e10c708..7d47933 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -187,6 +187,24 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index f776c5f..6434e3b 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -38,6 +38,9 @@ config MACH_SUN7I
+ config MACH_SUN8I
+ 	bool "Allwinner A23 (sun8i) SoCs support"
+ 	default ARCH_SUNXI
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_GIC
++	select MFD_SUN6I_PRCM
++	select RESET_CONTROLLER
  
-+		ahb1_rst: reset at 01c202c0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x01c202c0 0xc>;
-+		};
-+
-+		apb1_rst: reset at 01c202d0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x01c202d0 0x4>;
-+		};
-+
-+		apb2_rst: reset at 01c202d8 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x01c202d8 0x4>;
-+		};
-+
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-a10-timer";
- 			reg = <0x01c20c00 0xa0>;
-@@ -208,6 +226,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 16>;
-+			resets = <&apb2_rst 16>;
- 			status = "disabled";
- 		};
- 
-@@ -218,6 +237,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 17>;
-+			resets = <&apb2_rst 17>;
- 			status = "disabled";
- 		};
- 
-@@ -228,6 +248,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 18>;
-+			resets = <&apb2_rst 18>;
- 			status = "disabled";
- 		};
- 
-@@ -238,6 +259,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 19>;
-+			resets = <&apb2_rst 19>;
- 			status = "disabled";
- 		};
- 
-@@ -248,6 +270,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 20>;
-+			resets = <&apb2_rst 20>;
- 			status = "disabled";
- 		};
- 
+ endif
 -- 
 2.0.1
