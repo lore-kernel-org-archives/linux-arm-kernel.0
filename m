@@ -1,38 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 3 Jul 2014 11:25:38 +0200
-Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
- address of the boot register
-In-Reply-To: <53B516D8.8070003@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
- <20140630144620.0030cf94@free-electrons.com>
- <53B516D8.8070003@free-electrons.com>
-Message-ID: <20140703112538.533b73e1@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 3 Jul 2014 10:33:48 +0100
+Subject: [PATCH v2 0/4] Add reset controllers for STiH407 SoC
+In-Reply-To: <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+ <1404317194.4109.13.camel@paszta.hi.pengutronix.de>
+ <20140702165924.GB17665@lee--X1> <53B50EFD.2070007@st.com>
+ <1404379248.18039.31.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140703093348.GA32208@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Thu, 03 Jul 2014, Philipp Zabel wrote:
 
-On Thu, 03 Jul 2014 10:39:52 +0200, Gregory CLEMENT wrote:
-
-> > I'm not sure that the best approach to solve this problem. Instead,
-> > maybe the system-controller.c code should set up the boot address
-> > workaround on Armada 375. Since the workaround on 375 is really related
-> > to setting the boot address which is done by the system controller,
-> > maybe the initialization of the workaround belongs in
-> > system-controller.c ?
+> Hi,
 > 
-> So moving the workaround into mvebu_system_controller_set_cpu_boot_addr()
-> should be the thing to do.
+> Am Donnerstag, den 03.07.2014, 10:06 +0200 schrieb Maxime Coquelin:
+> > I will queue patch 4 to STi DT branch for v3.17.
+> > For now, no nodes uses reset for STiH407, so we don't need the 
+> > dt-bindings header file in the STi tree.
+> > 
+> > If we have a DT node using a reset line before my pull-request, I might 
+> > have to integrate the series in the STi DT branch.
+> > Philipp, does that sound reasonable?
+> 
+> Patch 4 depends on patch 1 for the header. My tree is still empty, how
+> about I take the first two, and you merge that branch and then take 3
+> and 4 on top?
+> 
+>     git://git.pengutronix.de/git/pza/linux.git reset/for_v3.17
+> 
+> Lee, shall I also add your Ack to the documentation patch?
 
-Except that mvebu_system_controller_set_cpu_boot_addr() is called
-multiple times during the system execution, while you want the
-workaround to be initialized once. And we surely don't really want a
-static variable in there to test if the workaround has already been
-initialized or not.
+I don't think there's anything to contentious in there:
 
-Thomas
+  Acked-by: Lee Jones <lee.jones@linaro.org>
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
