@@ -1,81 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 3 Jul 2014 09:10:16 +0200
-Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
- CPU frequency
-In-Reply-To: <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
-References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140630102934.GV32514@n2100.arm.linux.org.uk>
- <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
- <20140630124919.GC28647@lukather>
- <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
- <20140630140146.GD28647@lukather>
- <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
- <20140630145847.GE28647@lukather>
- <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
-Message-ID: <20140703071016.GB31996@lukather>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 3 Jul 2014 10:15:38 +0300
+Subject: [PATCHv5 04/15] hwspinlock/core: add common OF helpers
+In-Reply-To: <53B47626.4040506@ti.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-5-git-send-email-s-anna@ti.com>
+ <CAK=WgbbZvBLT7U638fBfPjF7-MJaP=4WJcrT_fEg6Uu3cXRAyg@mail.gmail.com>
+ <53B47626.4040506@ti.com>
+Message-ID: <CAK=WgbbJ6a17wrsEcvNq6tPiaciQ=E+22QE06t9EA8RFqicNRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 05:06:16PM +0200, Vincent Guittot wrote:
-> On 30 June 2014 16:58, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Jun 30, 2014 at 04:48:35PM +0200, Vincent Guittot wrote:
-> >> On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> >> > On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
-> >> >> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
-> >> >> >> >> -             if (!rate || len != 4) {
-> >> >> >> >> -                     pr_err("%s missing clock-frequency property\n",
-> >> >> >> >> -                             cn->full_name);
-> >> >> >> >> +             clk = of_clk_get(cn, 0);
-> >> >> >> >> +             if (!IS_ERR(clk))
-> >> >> >> >> +                     rate = clk_get_rate(clk);
-> >> >> >>
-> >> >> >> We need the max frequency as it will be used to weight the different
-> >> >> >> CPUs capacity. How do you ensure that the current clock rate is the
-> >> >> >> max one ?
-> >> >> >
-> >> >> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
-> >> >> > current CPU frequency, not the max one.
-> >> >>
-> >> >> What means current frequency in device tree when DVFS is involved ?
-> >> >
-> >> > The ePAPR states that clock-frequency is supposed to be "the current
-> >> > clock speed of the CPU in Hertz". It's exactly what my patch add.
-> >> >
-> >> > Now, you're right, DVFS would be an issue here with clock-frequency,
-> >> > but this patch actually makes it easier to deal with, since you only
-> >> > get a reference to a clock, and you can get its rate at any given
-> >> > time.
-> >>
-> >> and what about using clk_round_rate(clk, ULONG_MAX) ?
-> >
-> > Well, the clock itself might generate a frequency higher that what the
-> > CPU can run at, so I'm not sure it's a valid assumption.
-> 
-> yes, you're right
-> 
-> >
-> >> We will not be dependent of when we parse DT
-> >
-> > You lost me there. clk_round_rate and clk_get_rate are available at
-> > the same time in the boot process, aren't they?
-> 
-> yes, but  clk_round_rate(clk, ULONG_MAX) will return the max frequency
-> and not the current one. But as you mentioned, it doesn't ensure that
-> it's a possible frequency for the core
+Hi Suman,
 
-Is this an Acked-by ?
+On Thu, Jul 3, 2014 at 12:14 AM, Suman Anna <s-anna@ti.com> wrote:
+>> Do we have a use case today that require the xlate() method?
+>>
+>> If not, let's remove it as we could always add it back if some new
+>> hardware shows up that needs it.
+>
+> The xlate() method is to support the phandle + args specifier way of
+> requesting hwlocks, platform implementations are free to implement their
+> own xlate functions, but the above supports the simplest case of
+> controller + relative lock index within controller.
 
-Maxime
+Do we have a use case for a different implementation other than the
+simplest case? If not, it seems to me this will just become redundant
+boilerplate code (every platform will use the simple xlate method).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140703/491ce4a6/attachment.sig>
+> This function again is to support the phandle + args specifier way of
+> requesting hwlocks, the hwspin_lock_request_specific() is invoked
+> internally within this function, so we are still reusing the actual
+> request code other than handling the DT parsing portion. If we go back
+> to using global locks in client hwlocks property, we don't need a
+> of_hwspin_lock_get_id(), the same can be achieved using the existing DT
+> function, of_property_read_u32_index().
+
+I think you may have misunderstood me, sorry. I'm ok with the phandle
++ args specifier. I just think we can use it, together with the
+base_id property, to infer the global lock id from the DT data. This
+is not only a must to support heterogenous multi-processing systems,
+it will also substantially simplify the code.
+
+Thanks,
+Ohad.
