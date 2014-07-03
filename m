@@ -1,172 +1,232 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:14:49 +0200
-Subject: [PATCH 10/18] AT91: Call at91_register_devices in the board files
+Date: Thu,  3 Jul 2014 16:14:50 +0200
+Subject: [PATCH 10/18] AT91: Remove reset code the machine code
 In-Reply-To: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404396906-25194-17-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404396906-25194-18-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make every board call the register_devices callback so that the devices
-declared by the SoC are registered.
+Now that the transition is over and that we probe our reset driver in every
+case, we can remove the legacy code from the machine directory.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/board-afeb-9260v1.c  | 2 ++
- arch/arm/mach-at91/board-cam60.c        | 2 ++
- arch/arm/mach-at91/board-cpu9krea.c     | 2 ++
- arch/arm/mach-at91/board-flexibity.c    | 2 ++
- arch/arm/mach-at91/board-sam9-l9260.c   | 2 ++
- arch/arm/mach-at91/board-sam9260ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9261ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9263ek.c    | 2 ++
- arch/arm/mach-at91/board-sam9m10g45ek.c | 2 ++
- arch/arm/mach-at91/board-sam9rlek.c     | 2 ++
- arch/arm/mach-at91/board-snapper9260.c  | 2 ++
- 11 files changed, 22 insertions(+)
+ arch/arm/mach-at91/Kconfig              |  8 ------
+ arch/arm/mach-at91/Makefile             |  2 --
+ arch/arm/mach-at91/at91sam9260.c        |  1 -
+ arch/arm/mach-at91/at91sam9261.c        |  1 -
+ arch/arm/mach-at91/at91sam9263.c        |  1 -
+ arch/arm/mach-at91/at91sam9_alt_reset.S | 40 -----------------------------
+ arch/arm/mach-at91/at91sam9g45.c        |  1 -
+ arch/arm/mach-at91/at91sam9g45_reset.S  | 45 ---------------------------------
+ arch/arm/mach-at91/at91sam9rl.c         |  1 -
+ arch/arm/mach-at91/generic.h            |  2 --
+ 10 files changed, 102 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
 
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 597c649170aa..fc9621ccb606 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -167,6 +167,8 @@ static struct at91_cf_data afeb9260_cf_data = {
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 45b55e0f0db6..d2a1ffec5e11 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -28,14 +28,6 @@ config OLD_CLK_AT91
+ 	bool
+ 	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
  
- static void __init afeb9260_board_init(void)
+-config AT91_SAM9_ALT_RESET
+-	bool
+-	default !ARCH_AT91X40
+-
+-config AT91_SAM9G45_RESET
+-	bool
+-	default !ARCH_AT91X40
+-
+ config AT91_SAM9_TIME
+ 	bool
+ 
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 78e9cec282f4..2947834d93c3 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -8,8 +8,6 @@ obj-n		:=
+ obj-		:=
+ 
+ obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
+-obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
+-obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
+ obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
+ obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+ 
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 9ffab0cf94cd..197c0149406a 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -351,7 +351,6 @@ static void __init at91sam9260_ioremap_registers(void)
+ static void __init at91sam9260_initialize(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index a30502c8d379..283655bd86c1 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -170,6 +170,8 @@ static void __init cam60_add_device_nand(void)
+ 	arm_pm_idle = at91sam9_idle;
+-	arm_pm_restart = at91sam9_alt_restart;
  
- static void __init cam60_board_init(void)
+ 	at91_sysirq_mask_rtt(AT91SAM9260_BASE_RTT);
+ 
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 41fa9b9a6f05..ef44977f1cae 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -314,7 +314,6 @@ static void __init at91sam9261_ioremap_registers(void)
+ static void __init at91sam9261_initialize(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index 2037f78c84e7..29a89032bb9a 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -322,6 +322,8 @@ static struct mci_platform_data __initdata cpu9krea_mci0_data = {
+ 	arm_pm_idle = at91sam9_idle;
+-	arm_pm_restart = at91sam9_alt_restart;
  
- static void __init cpu9krea_board_init(void)
+ 	at91_sysirq_mask_rtt(AT91SAM9261_BASE_RTT);
+ 
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 0c6949c342dc..cb078e150a19 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -331,7 +331,6 @@ static void __init at91sam9263_ioremap_registers(void)
+ static void __init at91sam9263_initialize(void)
  {
-+	at91_register_devices();
-+
- 	/* NOR */
- 	cpu9krea_add_device_nor();
- 	/* Serial */
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index 68f1ab6bd08f..79bd411b0cee 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -138,6 +138,8 @@ static struct gpio_led flexibity_leds[] = {
+ 	arm_pm_idle = at91sam9_idle;
+-	arm_pm_restart = at91sam9_alt_restart;
  
- static void __init flexibity_board_init(void)
+ 	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT0);
+ 	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT1);
+diff --git a/arch/arm/mach-at91/at91sam9_alt_reset.S b/arch/arm/mach-at91/at91sam9_alt_reset.S
+deleted file mode 100644
+index f039538d3bdb..000000000000
+--- a/arch/arm/mach-at91/at91sam9_alt_reset.S
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+- * reset AT91SAM9G20 as per errata
+- *
+- * (C) BitBox Ltd 2010
+- *
+- * unless the SDRAM is cleanly shutdown before we hit the
+- * reset register it can be left driving the data bus and
+- * killing the chance of a subsequent boot from NAND
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#include <linux/linkage.h>
+-#include <mach/hardware.h>
+-#include <mach/at91_ramc.h>
+-#include "at91_rstc.h"
+-
+-			.arm
+-
+-			.globl	at91sam9_alt_restart
+-
+-at91sam9_alt_restart:	ldr	r0, =at91_ramc_base		@ preload constants
+-			ldr	r0, [r0]
+-			ldr	r4, =at91_rstc_base
+-			ldr	r1, [r4]
+-
+-			mov	r2, #1
+-			mov	r3, #AT91_SDRAMC_LPCB_POWER_DOWN
+-			ldr	r4, =AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST
+-
+-			.balign	32				@ align to cache line
+-
+-			str	r2, [r0, #AT91_SDRAMC_TR]	@ disable SDRAM access
+-			str	r3, [r0, #AT91_SDRAMC_LPR]	@ power down SDRAM
+-			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
+-
+-			b	.
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 61c0bc1185e9..329749eb1dff 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -380,7 +380,6 @@ static void __init at91sam9g45_ioremap_registers(void)
+ static void __init at91sam9g45_initialize(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index d24dda67e2d3..70309404f366 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -187,6 +187,8 @@ static struct gpio_led ek_leds[] = {
+ 	arm_pm_idle = at91sam9_idle;
+-	arm_pm_restart = at91sam9g45_restart;
  
- static void __init ek_board_init(void)
+ 	at91_sysirq_mask_rtc(AT91SAM9G45_BASE_RTC);
+ 	at91_sysirq_mask_rtt(AT91SAM9G45_BASE_RTT);
+diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
+deleted file mode 100644
+index c40c1e2ef80f..000000000000
+--- a/arch/arm/mach-at91/at91sam9g45_reset.S
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/*
+- * reset AT91SAM9G45 as per errata
+- *
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcosoft.com>
+- *
+- * unless the SDRAM is cleanly shutdown before we hit the
+- * reset register it can be left driving the data bus and
+- * killing the chance of a subsequent boot from NAND
+- *
+- * GPLv2 Only
+- */
+-
+-#include <linux/linkage.h>
+-#include <mach/hardware.h>
+-#include <mach/at91_ramc.h>
+-#include "at91_rstc.h"
+-			.arm
+-
+-/*
+- * at91_ramc_base is an array void*
+- * init at NULL if only one DDR controler is present in or DT
+- */
+-			.globl	at91sam9g45_restart
+-
+-at91sam9g45_restart:
+-			ldr	r5, =at91_ramc_base		@ preload constants
+-			ldr	r0, [r5]
+-			ldr	r5, [r5, #4]			@ ddr1
+-			cmp	r5, #0
+-			ldr	r4, =at91_rstc_base
+-			ldr	r1, [r4]
+-
+-			mov	r2, #1
+-			mov	r3, #AT91_DDRSDRC_LPCB_POWER_DOWN
+-			ldr	r4, =AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST
+-
+-			.balign	32				@ align to cache line
+-
+-			strne	r2, [r5, #AT91_DDRSDRC_RTR]	@ disable DDR1 access
+-			strne	r3, [r5, #AT91_DDRSDRC_LPR]	@ power down DDR1
+-			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
+-			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
+-			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
+-
+-			b	.
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 417c8b6fb85e..e0e1729fe0e4 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -323,7 +323,6 @@ static void __init at91sam9rl_ioremap_registers(void)
+ static void __init at91sam9rl_initialize(void)
  {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index 65dea12d685e..da9c5f1f2c49 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -307,6 +307,8 @@ static void __init ek_add_device_buttons(void) {}
+ 	arm_pm_idle = at91sam9_idle;
+-	arm_pm_restart = at91sam9_alt_restart;
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 4637432de08f..d1be10b09ab3 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -561,6 +561,8 @@ static struct gpio_led ek_leds[] = {
+ 	at91_sysirq_mask_rtc(AT91SAM9RL_BASE_RTC);
+ 	at91_sysirq_mask_rtt(AT91SAM9RL_BASE_RTT);
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 4c2c96195a50..5d5e55237c41 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -66,8 +66,6 @@ extern void at91sam9_idle(void);
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index cd2726ee5add..3f613d962d9b 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -405,6 +405,8 @@ static struct at91_can_data ek_can_data = {
+ /* reset */
+ extern void at91_ioremap_rstc(u32 base_addr);
+-extern void at91sam9_alt_restart(enum reboot_mode, const char *);
+-extern void at91sam9g45_restart(enum reboot_mode, const char *);
  
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 1ea61328f30d..33a7b19f7400 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -450,6 +450,8 @@ static struct platform_device *devices[] __initdata = {
- 
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index b64648b4a1fc..262e3f957d9f 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -292,6 +292,8 @@ static void __init ek_add_device_buttons(void) {}
- 
- static void __init ek_board_init(void)
- {
-+	at91_register_devices();
-+
- 	/* Serial */
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 1b870e6def0c..2a817b85569f 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -154,6 +154,8 @@ static void __init snapper9260_add_device_nand(void)
- 
- static void __init snapper9260_board_init(void)
- {
-+	at91_register_devices();
-+
- 	at91_add_device_i2c(snapper9260_i2c_devices,
- 			    ARRAY_SIZE(snapper9260_i2c_devices));
- 
+ /* shutdown */
+ extern void at91_ioremap_shdwc(u32 base_addr);
 -- 
 2.0.1
