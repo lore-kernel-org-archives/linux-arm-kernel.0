@@ -1,34 +1,83 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 3 Jul 2014 12:51:23 +0300
-Subject: [PATCH 2/2] ARM: DTS: am335x-evmsk: Enable the McASP FIFO for audio
-In-Reply-To: <1404381083-27029-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1404381083-27029-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1404381083-27029-2-git-send-email-peter.ujfalusi@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 3 Jul 2014 10:53:02 +0100
+Subject: [PATCH v8 2/9] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <CACoXjcn5wdOwQx6PSfhTyuo-FQqBL62o-MNj3i6EfENRnUNt6g@mail.gmail.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
+ <CACoXjck+aU33=kSy=KCGABNXNR7tj2KndAiBqEDK7wQ_Qei80Q@mail.gmail.com>
+ <7101568.8DVJFku5jp@wuerfel>
+ <CACoXjcn5wdOwQx6PSfhTyuo-FQqBL62o-MNj3i6EfENRnUNt6g@mail.gmail.com>
+Message-ID: <20140703095302.GY2173@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of FIFO in McASP can reduce the risk of audio under/overrun and
-lowers the load on the memories since the DMA will operate in bursts.
+On Wed, Jul 02, 2014 at 09:43:41PM +0100, Tanmay Inamdar wrote:
+> On Wed, Jul 2, 2014 at 12:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 02 July 2014 11:06:38 Tanmay Inamdar wrote:
+> >> On Tue, Jul 1, 2014 at 11:43 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > This is a useful function and we should make it visible outside the
+> >> > generic PCI code. Export it as a GPL symbol.
+> >> >
+> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> >> > ---
+> >> >  drivers/pci/host-bridge.c | 3 ++-
+> >> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> >> > index 0e5f3c9..36c669e 100644
+> >> > --- a/drivers/pci/host-bridge.c
+> >> > +++ b/drivers/pci/host-bridge.c
+> >> > @@ -16,12 +16,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+> >> >         return bus;
+> >> >  }
+> >> >
+> >> > -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> >> > +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> >> >  {
+> >> >         struct pci_bus *root_bus = find_pci_root_bus(bus);
+> >> >
+> >> >         return to_pci_host_bridge(root_bus->bridge);
+> >> >  }
+> >> > +EXPORT_SYMBOL_GPL(find_pci_host_bridge);
+> >>
+> >> Is there any specific reason behind making this symbol GPL? I think
+> >> the other functions in this file are just EXPORT_SYMBOL. Ultimately
+> >> companies which have non gpl Linux modules (nvidia) will face issue
+> >> using this API.
+> >>
+> >> The same applies to 'of_create_pci_host_bridge'.
+> >
+> > I think EXPORT_SYMBOL_GPL() is better here. The new symbols are unlikely
+> > to be used by a peripheral device driver, and PCI host controllers are
+> > already restricted by EXPORT_SYMBOL_GPL.
+> >
+> 
+> You are right as long as the functions are not used directly. But what
+> if GPL functions are called indirectly.  For example, 'pci_domain_nr'
+> implementation in Liviu's V7 series calls 'find_pci_host_bridge'.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I will not be drawn into the discussion of EXPORT_SYMBOL vs EXPORT_SYMBOL_GPL()
+other than to say that I don't understand what is so secret in implementing
+a standard. I do not want to support host bridge drivers that are not open
+source.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index ab9a34ce524c..80a3b215e7d6 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -560,8 +560,8 @@
- 		serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
- 			0 0 1 2
- 		>;
--		tx-num-evt = <1>;
--		rx-num-evt = <1>;
-+		tx-num-evt = <32>;
-+		rx-num-evt = <32>;
- };
- 
- &tscadc {
+Best regards,
+Liviu
+
+> 
+> > nvidia will certainly not do a PCI host controller driver that is not
+> > upstream or not GPL-compatible.
+> >
+> >         Arnd
+> 
+
 -- 
-2.0.0
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
