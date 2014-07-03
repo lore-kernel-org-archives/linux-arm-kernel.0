@@ -1,97 +1,82 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  3 Jul 2014 16:41:16 +0200
-Subject: [PATCH RESEND 01/18] power: reset: Add if statement isntead of
- multiple depends on
-In-Reply-To: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404398493-28907-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu,  3 Jul 2014 16:41:15 +0200
+Subject: [PATCH RESEND 00/18] AT91: cleanup of the reset and poweroff code
+Message-ID: <1404398493-28907-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the config option so far are depending on the POWER_RESET symbol
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/power/reset/Kconfig | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+This patchset is an attempt to further cleanup mach-at91 by removing
+code that can be put into a driver nowadays.
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index bdcf5173e377..19d546c5edfa 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -6,15 +6,17 @@ menuconfig POWER_RESET
- 
- 	  Say Y here to enable board reset and power off
- 
-+if POWER_RESET
-+
- config POWER_RESET_AS3722
- 	bool "ams AS3722 power-off driver"
--	depends on MFD_AS3722 && POWER_RESET
-+	depends on MFD_AS3722
- 	help
- 	  This driver supports turning off board via a ams AS3722 power-off.
- 
- config POWER_RESET_AXXIA
- 	bool "LSI Axxia reset driver"
--	depends on POWER_RESET && ARCH_AXXIA
-+	depends on ARCH_AXXIA
- 	help
- 	  This driver supports restart for Axxia SoC.
- 
-@@ -22,7 +24,7 @@ config POWER_RESET_AXXIA
- 
- config POWER_RESET_GPIO
- 	bool "GPIO power-off driver"
--	depends on OF_GPIO && POWER_RESET
-+	depends on OF_GPIO
- 	help
- 	  This driver supports turning off your board via a GPIO line.
- 	  If your board needs a GPIO high/low to power down, say Y and
-@@ -30,13 +32,13 @@ config POWER_RESET_GPIO
- 
- config POWER_RESET_MSM
- 	bool "Qualcomm MSM power-off driver"
--	depends on POWER_RESET && ARCH_QCOM
-+	depends on ARCH_QCOM
- 	help
- 	  Power off and restart support for Qualcomm boards.
- 
- config POWER_RESET_QNAP
- 	bool "QNAP power-off driver"
--	depends on OF_GPIO && POWER_RESET && PLAT_ORION
-+	depends on OF_GPIO && PLAT_ORION
- 	help
- 	  This driver supports turning off QNAP NAS devices by sending
- 	  commands to the microcontroller which controls the main power.
-@@ -54,14 +56,13 @@ config POWER_RESET_RESTART
- config POWER_RESET_SUN6I
- 	bool "Allwinner A31 SoC reset driver"
- 	depends on ARCH_SUNXI
--	depends on POWER_RESET
- 	help
- 	  Reboot support for the Allwinner A31 SoCs.
- 
- config POWER_RESET_VEXPRESS
- 	bool "ARM Versatile Express power-off and reset driver"
- 	depends on ARM || ARM64
--	depends on POWER_RESET && VEXPRESS_CONFIG
-+	depends on VEXPRESS_CONFIG
- 	help
- 	  Power off and reset support for the ARM Ltd. Versatile
- 	  Express boards.
-@@ -69,7 +70,6 @@ config POWER_RESET_VEXPRESS
- config POWER_RESET_XGENE
- 	bool "APM SoC X-Gene reset driver"
- 	depends on ARM64
--	depends on POWER_RESET
- 	help
- 	  Reboot support for the APM SoC X-Gene Eval boards.
- 
-@@ -80,3 +80,4 @@ config POWER_RESET_KEYSTONE
- 	help
- 	  Reboot support for the KEYSTONE SoCs.
- 
-+endif
+This time, the target is the reset and poweroff code, that can now be
+put in drivers/power/reset.
+
+Resent because the author doesn't know how to send patches
+properly....
+
+Maxime
+
+Maxime Ripard (18):
+  power: reset: Add if statement isntead of multiple depends on
+  AT91: setup: Switch to pr_fmt
+  AT91: G45: DT: Declare a second ram controller
+  AT91: Rework ramc mapping code
+  AT91: SAMA5D3: DT: Add shutdown controller
+  power: reset: Add AT91 reset driver
+  AT91: DT: Remove the old-style reset probing
+  AT91: soc: Introduce register_devices callback
+  AT91: Probe the reset driver
+  AT91: Call at91_register_devices in the board files
+  AT91: Remove reset code the machine code
+  power: reset: Add AT91 poweroff driver
+  AT91: DT: Remove poweroff DT probing
+  AT91: Register the poweroff driver
+  AT91: Remove poweroff code
+  AT91: pm: Remove show_reset_status function
+  AT91: Remove rstc and shdwnc global base addresses
+  AT91: Remove rstc and shdwc headers
+
+ arch/arm/boot/dts/at91sam9g45.dtsi      |   8 +-
+ arch/arm/boot/dts/sama5d3.dtsi          |   5 +
+ arch/arm/mach-at91/Kconfig              |   8 --
+ arch/arm/mach-at91/Makefile             |   2 -
+ arch/arm/mach-at91/at91_rstc.h          |  53 ---------
+ arch/arm/mach-at91/at91_shdwc.h         |  50 --------
+ arch/arm/mach-at91/at91sam9260.c        |  45 ++++++-
+ arch/arm/mach-at91/at91sam9261.c        |  45 ++++++-
+ arch/arm/mach-at91/at91sam9263.c        |  45 ++++++-
+ arch/arm/mach-at91/at91sam9_alt_reset.S |  40 -------
+ arch/arm/mach-at91/at91sam9g45.c        |  49 +++++++-
+ arch/arm/mach-at91/at91sam9g45_reset.S  |  45 -------
+ arch/arm/mach-at91/at91sam9rl.c         |  45 ++++++-
+ arch/arm/mach-at91/board-afeb-9260v1.c  |   2 +
+ arch/arm/mach-at91/board-cam60.c        |   2 +
+ arch/arm/mach-at91/board-cpu9krea.c     |   2 +
+ arch/arm/mach-at91/board-flexibity.c    |   2 +
+ arch/arm/mach-at91/board-sam9-l9260.c   |   2 +
+ arch/arm/mach-at91/board-sam9260ek.c    |   3 +-
+ arch/arm/mach-at91/board-sam9261ek.c    |   3 +-
+ arch/arm/mach-at91/board-sam9263ek.c    |   3 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c |   3 +-
+ arch/arm/mach-at91/board-sam9rlek.c     |   3 +-
+ arch/arm/mach-at91/board-snapper9260.c  |   2 +
+ arch/arm/mach-at91/generic.h            |  10 +-
+ arch/arm/mach-at91/pm.c                 |  72 ------------
+ arch/arm/mach-at91/setup.c              | 178 +++++-----------------------
+ arch/arm/mach-at91/soc.h                |   1 +
+ drivers/power/reset/Kconfig             |  31 +++--
+ drivers/power/reset/Makefile            |   2 +
+ drivers/power/reset/at91-poweroff.c     | 156 ++++++++++++++++++++++++
+ drivers/power/reset/at91-reset.c        | 202 ++++++++++++++++++++++++++++++++
+ 32 files changed, 657 insertions(+), 462 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/at91_rstc.h
+ delete mode 100644 arch/arm/mach-at91/at91_shdwc.h
+ delete mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
+ create mode 100644 drivers/power/reset/at91-poweroff.c
+ create mode 100644 drivers/power/reset/at91-reset.c
+
 -- 
 2.0.1
