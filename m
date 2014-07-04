@@ -1,49 +1,101 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 4 Jul 2014 11:02:57 +0300
-Subject: [PATCH 0/4] SiI9022 HDMI encoder for AM4xxx boards
-In-Reply-To: <87k37u7bp5.fsf@lebrac.rtp-net.org>
-References: <1404394800-18138-1-git-send-email-tomi.valkeinen@ti.com>
- <87k37u7bp5.fsf@lebrac.rtp-net.org>
-Message-ID: <53B65FB1.5020901@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 4 Jul 2014 10:02:55 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <CAKfTPtBonwH0PoEkKazUS9bPaR631Vu7p7qZ0AF1whmXq_53wg@mail.gmail.com>
+References: <20140630102934.GV32514@n2100.arm.linux.org.uk>
+ <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
+ <20140630124919.GC28647@lukather>
+ <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
+ <20140630140146.GD28647@lukather>
+ <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
+ <20140630145847.GE28647@lukather>
+ <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
+ <20140703071016.GB31996@lukather>
+ <CAKfTPtBonwH0PoEkKazUS9bPaR631Vu7p7qZ0AF1whmXq_53wg@mail.gmail.com>
+Message-ID: <20140704080255.GO31996@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/14 17:34, Arnaud Patard wrote:
-> Tomi Valkeinen <tomi.valkeinen@ti.com> writes:
+On Thu, Jul 03, 2014 at 09:51:27AM +0200, Vincent Guittot wrote:
+> On 3 July 2014 09:10, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Jun 30, 2014 at 05:06:16PM +0200, Vincent Guittot wrote:
+> >> On 30 June 2014 16:58, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >> > On Mon, Jun 30, 2014 at 04:48:35PM +0200, Vincent Guittot wrote:
+> >> >> On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >> >> > On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
+> >> >> >> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
+> >> >> >> >> >> -             if (!rate || len != 4) {
+> >> >> >> >> >> -                     pr_err("%s missing clock-frequency property\n",
+> >> >> >> >> >> -                             cn->full_name);
+> >> >> >> >> >> +             clk = of_clk_get(cn, 0);
+> >> >> >> >> >> +             if (!IS_ERR(clk))
+> >> >> >> >> >> +                     rate = clk_get_rate(clk);
+> >> >> >> >>
+> >> >> >> >> We need the max frequency as it will be used to weight the different
+> >> >> >> >> CPUs capacity. How do you ensure that the current clock rate is the
+> >> >> >> >> max one ?
+> >> >> >> >
+> >> >> >> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
+> >> >> >> > current CPU frequency, not the max one.
+> >> >> >>
+> >> >> >> What means current frequency in device tree when DVFS is involved ?
+> >> >> >
+> >> >> > The ePAPR states that clock-frequency is supposed to be "the current
+> >> >> > clock speed of the CPU in Hertz". It's exactly what my patch add.
+> >> >> >
+> >> >> > Now, you're right, DVFS would be an issue here with clock-frequency,
+> >> >> > but this patch actually makes it easier to deal with, since you only
+> >> >> > get a reference to a clock, and you can get its rate at any given
+> >> >> > time.
+> >> >>
+> >> >> and what about using clk_round_rate(clk, ULONG_MAX) ?
+> >> >
+> >> > Well, the clock itself might generate a frequency higher that what the
+> >> > CPU can run at, so I'm not sure it's a valid assumption.
+> >>
+> >> yes, you're right
+> >>
+> >> >
+> >> >> We will not be dependent of when we parse DT
+> >> >
+> >> > You lost me there. clk_round_rate and clk_get_rate are available at
+> >> > the same time in the boot process, aren't they?
+> >>
+> >> yes, but  clk_round_rate(clk, ULONG_MAX) will return the max frequency
+> >> and not the current one. But as you mentioned, it doesn't ensure that
+> >> it's a possible frequency for the core
+> >
+> > Is this an Acked-by ?
 > 
->> Hi,
-> 
-> Hi,
-> 
->>
->> This series adds a driver for SiI9022 HDMI encoder, which is used on AM437x GP
->> and AM43x EPOS boards.
->>
->> The series is based on the OMAPDSS HDMI infoframe series sent earlier, as the
->> SiI9022 driver uses the new infoframe support.
-> 
-> Is there any small possibility to not make it an omap specific driver?
-> There are other boards with sii9022 out there. imx5x dev boards could
-> receive a daughter board with this chip (both sold by Freescale) and
-> efikamx platform has it too. I think that some old msm platforms has it
-> too.
-> I've not compared the code of the drivers and don't know how the sii9022
-> works but would be annoying to have 2 or more drivers for the same piece
-> of HW. imho, it would be nice if it could be avoided.
+>  I still think that using the current rate with clk_get_rate is not a
+> good solution.
 
-No, not at the moment. There is no framework to create generic drivers
-for display components.
+Well, it's just as good as using clock-frequency, really. If you want
+the CPU max frequency, it's not the right property (plus, since the
+changed behaviour is not documented in Linux anywhere, the only
+reference we have is the ePAPR on this).
 
-There has been work towards that (google for "Common Display
-Framework"), but that is far from finished.
+> Could you give us more details about why you nee to use current clock ?
 
- Tomi
+Honestly, I just want to remove that big warning at boot on the
+A7-based SoCs we have :)
 
+> AFAICT, your patch only makes sense for HMP system which don't have
+> DVFS, is it your case ?
 
+Nope, it's just plain simple SMP.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/2563c878/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/4224dc53/attachment.sig>
