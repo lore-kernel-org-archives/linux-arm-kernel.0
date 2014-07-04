@@ -1,55 +1,85 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 4 Jul 2014 10:44:40 +0100
-Subject: [PATCH] arm64: PCI(e) arch support
-In-Reply-To: <53B5F81B.8010801@freescale.com>
-References: <1404422876-1160-1-git-send-email-tinamdar@apm.com>
- <53B5F81B.8010801@freescale.com>
-Message-ID: <20140704094440.GC6501@e106497-lin.cambridge.arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 4 Jul 2014 11:45:09 +0200
+Subject: [PATCH v2 2/2] ARM: dts: at_xdmac: add bindings documentation
+In-Reply-To: <20140704085834.GC31812@leverpostej>
+References: <1404459370-3540-1-git-send-email-ludovic.desroches@atmel.com>
+ <1404459370-3540-3-git-send-email-ludovic.desroches@atmel.com>
+ <20140704085834.GC31812@leverpostej>
+Message-ID: <20140704094509.GH2386@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 01:40:59AM +0100, Prabhakar Kushwaha wrote:
-> Hi Tanmay, Liviu,
-> On 7/4/2014 2:57 AM, Tanmay Inamdar wrote:
-> > Reposting on request of several people since previously posted one was
-> > corrupted.
-> >
-> > This patch adds the arch support for PCI(e) for arm64. The files
-> > added or modified in this patch are based on PCI(e) support in
-> > 32bit arm.
-> >
-> > Please note that this patch is just for the reference. Liviu Dudau from ARM
-> > has posted his v8 series of patch to support PCIe in arm64.
-> >
-> > The patch will apply against 3.13 Linux Kernel
-> >
-> > Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> >
+On Fri, Jul 04, 2014 at 09:58:34AM +0100, Mark Rutland wrote:
+> On Fri, Jul 04, 2014 at 08:36:10AM +0100, Ludovic Desroches wrote:
+> > Add bindings documentation for the new Atmel DMA controller (XDMAC)
+> > introduced with SAMA5D4.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  .../devicetree/bindings/dma/atmel-xdma.txt         |   39 ++++++++++++++++++++
+> >  1 file changed, 39 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> > new file mode 100644
+> > index 0000000..1e09fda
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> > @@ -0,0 +1,39 @@
+> > +* Atmel Extensible Direct Memory Access Controller (XDMAC)
+> > +
+> > +Required properties:
+> > +- compatible: Should be "atmel,<chip>-dma".
+> > +- reg: Should contain DMA registers location and length.
+> > +- interrupts: Should contain DMA interrupt.
+> > +- #dma-cells: Must be <2>, used to represent the number of integer cells in
+> > +the dmas property of client devices.
 > 
-> do we foresee similar type of changes in u-boot  to support PCI(e) for 
-> ARM64.
+> Could you please move the description of the two cells in the
+> dma-specifier here? It makes it far easier to read the binding.
 
-I'm afraid I'm not familiar with u-boot's support for PCI(e), so I cannot
-answer that. As a general matter, ARM has decided to officially support
-UEFI as a bootloader for ARMv8 and that already has support for PCI(e),
-one only needs a driver for the specific host bridge.
-
-Best regards,
-Liviu
+Of course, I'll do it for next version.
 
 > 
-> Regards,
-> Prabhakar
+> Cheers,
+> Mark.
 > 
-> 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> > +
+> > +Example:
+> > +
+> > +dma1: dma-controller at f0004000 {
+> > +	compatible = "atmel,sama5d4-dma";
+> > +	reg = <0xf0004000 0x200>;
+> > +	interrupts = <50 4 0>;
+> > +	#dma-cells = <2>;
+> > +};
+> > +
+> > +DMA clients connected to the Atmel XDMA controller must use the format
+> > +described in the dma.txt file, using a three-cell specifier for each channel:
+> > +a phandle plus two integer cells.
+> > +The two cells in order are:
+> > +
+> > +1. A phandle pointing to the DMA controller.
+> > +2. The memory interface (16 most significant bits), the peripheral interface
+> > +(16 less significant bits).
+> > +3. Channel configuration register. Configurable fields are:
+> > +  - bit 30-24: PERID, peripheral identifier.
+> > +
+> > +Example:
+> > +
+> > +i2c2: i2c at f8024000 {
+> > +	compatible = "atmel,at91sam9x5-i2c";
+> > +	reg = <0xf8024000 0x4000>;
+> > +	interrupts = <34 4 6>;
+> > +	dmas = <&dma0 0x00000001 0x06000000>,
+> > +	       <&dma0 0x00000001 0x07000000>;
+> > +	dma-names = "tx", "rx";
+> > +};
+> > -- 
+> > 1.7.9.5
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
