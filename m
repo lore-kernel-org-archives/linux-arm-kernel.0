@@ -1,36 +1,23 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 04 Jul 2014 13:04:18 +0200
-Subject: [PATCH 2/2] ASoC: samsung: Add machine driver for odroidx2
-In-Reply-To: <20140522185334.GT12304@sirena.org.uk>
-References: <1400759708-25831-1-git-send-email-s.nawrocki@samsung.com>
- <1400759708-25831-2-git-send-email-s.nawrocki@samsung.com>
- <20140522185334.GT12304@sirena.org.uk>
-Message-ID: <53B68A32.8000203@samsung.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 4 Jul 2014 13:05:30 +0200
+Subject: [RFC 01/10] iommu: Add IOMMU device registry
+In-Reply-To: <1403815790-8548-2-git-send-email-thierry.reding@gmail.com>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140704110529.GF13434@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/14 20:53, Mark Brown wrote:
->> +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
->> > +					| SND_SOC_DAIFMT_NB_NF
->> > +					| SND_SOC_DAIFMT_CBM_CFM);
->> > +	if (ret < 0)
->> > +		return ret;
->> > +
->> > +	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S
->> > +					| SND_SOC_DAIFMT_NB_NF
->> > +					| SND_SOC_DAIFMT_CBM_CFM);
->> > +	if (ret < 0)
->> > +		return ret;
->
-> These are constant, set these in the dai_link.
+On Thu, Jun 26, 2014 at 10:49:41PM +0200, Thierry Reding wrote:
+> Add an IOMMU device registry for drivers to register with and implement
+> a method for users of the IOMMU API to attach to an IOMMU device. This
+> allows to support deferred probing and gives the IOMMU API a convenient
+> hook to perform early initialization of a device if necessary.
 
-set_fmt also sets master/slave mode of the I2S DAI, after I moved
-this into the cpu_dai link data structure after suspend/resume cycle
-the I2S IP block is not being properly re-configured. Should the
-format setting be added in resume_post callback, or is there any
-other preferred way ? Similarly the syclk settings are being lost
-over suspend/resume cycle and nothing restores them.
+Can you elaborate on why exactly you need this? The IOMMU-API is
+designed to hide any details from the user about the available IOMMUs in
+the system and which IOMMU handles which device. This looks like it is
+going in a completly different direction from that.
 
---
-Thanks,
-Sylwester
+
+	Joerg
