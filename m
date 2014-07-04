@@ -1,60 +1,45 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  4 Jul 2014 16:28:31 +0900
-Subject: [PATCH v10 3/3] arm64: audit: Add audit hook in
- syscall_trace_enter/exit()
-In-Reply-To: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1404458911-8214-4-git-send-email-takahiro.akashi@linaro.org>
+From: lizefan@huawei.com (Li Zefan)
+Date: Fri, 4 Jul 2014 15:30:36 +0800
+Subject: [PATCH] MAINTAINERS:ARM:hisi: add Hisilicon SoC family
+In-Reply-To: <53B65397.40108@hisilicon.com>
+References: <53B65397.40108@hisilicon.com>
+Message-ID: <53B6581C.4060001@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds auditing functions on entry to or exit from
-every system call invocation.
+On 2014/7/4 15:11, xuwei wrote:
+> 
+> Introduce a new mach-hisi that will support Hisilicon SoCs based on ARMv7
+> and I am taking maintainership for it.
+> 
+> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+> ---
+>  MAINTAINERS | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 134483f..c11c89b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -972,6 +972,14 @@ F:	arch/arm/mach-pxa/hx4700.c
+>  F:	arch/arm/mach-pxa/include/mach/hx4700.h
+>  F:	sound/soc/pxa/hx4700.c
+>  
+> +ARM/Hisilicon SoC support
+> +M:	Wei Xu <xuwei5@hisilicon.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +W:	www.hisilicon.com
+> +S:	Maintained
 
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
-Acked-by Will Deacon <will.deacon@arm.com>
+S:	Supported ?
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/ptrace.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+Supported:   Someone is actually paid to look after this.
+Maintained:  Someone actually looks after it.
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 9fde010..70526cf 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/audit.h>
- #include <linux/compat.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
-@@ -39,6 +40,7 @@
- #include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
- 
-@@ -1113,11 +1115,16 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		trace_sys_enter(regs, regs->syscallno);
- 
-+	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-+		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-+
- 	return regs->syscallno;
- }
- 
- asmlinkage void syscall_trace_exit(struct pt_regs *regs)
- {
-+	audit_syscall_exit(regs);
-+
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		trace_sys_exit(regs, regs_return_value(regs));
- 
--- 
-1.7.9.5
+> +T:	git git://github.com/hisilicon/linux-hisi.git
+> +F:	arch/arm/mach-hisi/
+> +
+>  ARM/HP JORNADA 7XX MACHINE SUPPORT
+>  M:	Kristoffer Ericson <kristoffer.ericson@gmail.com>
+>  W:	www.jlime.com
+> 
