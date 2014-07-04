@@ -1,53 +1,43 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Fri, 4 Jul 2014 19:14:57 +0530
-Subject: [PATCH v3 3/8] component: add support for component match array
-In-Reply-To: <20140704122554.GG21766@n2100.arm.linux.org.uk>
-References: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
- <20140704105258.GF21766@n2100.arm.linux.org.uk>
- <CAK5sBcFof_QvDouNOUD1SVqPucMQ+wW4u_jxguCqDgO=zD7_Og@mail.gmail.com>
- <20140704122554.GG21766@n2100.arm.linux.org.uk>
-Message-ID: <CAK5sBcEB=aoThzc4-hyqu8HA9+z=yt-UoAdC4NnCHUkFthbmmA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 4 Jul 2014 15:47:10 +0200
+Subject: [RFC 01/10] iommu: Add IOMMU device registry
+In-Reply-To: <20140704110529.GF13434@8bytes.org>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-2-git-send-email-thierry.reding@gmail.com>
+ <20140704110529.GF13434@8bytes.org>
+Message-ID: <20140704134709.GA4203@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 5:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 04, 2014 at 05:00:36PM +0530, Sachin Kamat wrote:
->> On Fri, Jul 4, 2014 at 4:22 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Jul 04, 2014 at 04:17:35PM +0530, Sachin Kamat wrote:
->> >> Hi Russell
->> >>
->> >> > +int component_master_add_with_match(struct device *dev,
->> >> > +       const struct component_master_ops *ops,
->> >> > +       struct component_match *match)
->> >> >  {
->> >> >         struct master *master;
->> >> >         int ret;
->> >> >
->> >> > +       if (ops->add_components && match)
->> >> > +               return -EINVAL;
->> >> > +
->> >> > +       /* Reallocate the match array for its true size */
->> >> > +       match = component_match_realloc(dev, match, match->num);
->> >>
->> >>            ^^^^^^^^^^^^^
->> >> This gives a NULL pointer dereference error when match is NULL (as passed
->> >> by component_master_add() below). Observed this while testing linux-next
->> >> kernel (next-20140704) on Exynos based board with DRM enabled.
->> >
->> > Thanks for your report.  Please verify that the patch below resolves it
->> > for you.  Thanks.
->>
->> Yes, the below patch fixes the crash. Thanks for the fix.
->
-> Thanks.  I'll add a tested-by and reported-by for your address when
-> committing this patch.  Let me know if you want something different.
+On Fri, Jul 04, 2014 at 01:05:30PM +0200, Joerg Roedel wrote:
+> On Thu, Jun 26, 2014 at 10:49:41PM +0200, Thierry Reding wrote:
+> > Add an IOMMU device registry for drivers to register with and implement
+> > a method for users of the IOMMU API to attach to an IOMMU device. This
+> > allows to support deferred probing and gives the IOMMU API a convenient
+> > hook to perform early initialization of a device if necessary.
+> 
+> Can you elaborate on why exactly you need this? The IOMMU-API is
+> designed to hide any details from the user about the available IOMMUs in
+> the system and which IOMMU handles which device. This looks like it is
+> going in a completly different direction from that.
 
-Thanks. Please use the following for the tags:
+I need this primarily to properly serialize device probing order.
+Without it the IOMMU may be probed later than its clients, in which case
+the client drivers will assume that there is no IOMMU (iommu_present()
+for the parent bus fails).
 
-Sachin Kamat <sachin.kamat@samsung.com>
+There are other ways around this, but I think we'll need to eventually
+come up with something like this anyway. Consider for example what
+happens when a device has master interfaces on two different IOMMUs. Not
+only does the current model of having one and one only IOMMU per struct
+bus_type break down, but also IOMMU masters will need a way to specify
+which IOMMU they're talking to.
 
--- 
-Regards,
-Sachin.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/07d12776/attachment-0001.sig>
