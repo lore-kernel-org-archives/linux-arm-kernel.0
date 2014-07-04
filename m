@@ -1,51 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Jul 2014 23:30:10 -0700
-Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <20140703170822.GB5814@saruman.home>
-References: <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
- <20140703073411.GX28884@atomide.com>
- <20140703132509.GA5814@saruman.home>
- <CAOCHtYi0JwRO12gHa+KFGH1k7pPk4TL40igwhzRRxutw-tqf6A@mail.gmail.com>
- <20140703140736.GF5814@saruman.home>
- <20140703154425.GC23309@earth.universe>
- <20140703155240.GU5814@saruman.home>
- <20140703160622.GE23309@earth.universe>
- <CABxcv=nGPyK7SeQZ+W1ZEfBPQ-RraVTawyYuKOGz02df0g=6Qg@mail.gmail.com>
- <20140703170822.GB5814@saruman.home>
-Message-ID: <20140704063010.GY28884@atomide.com>
+From: matt.fleming@intel.com (Matt Fleming)
+Date: Fri, 4 Jul 2014 07:36:17 +0100
+Subject: arch/arm64/efi-stub.o rebuilding every time?
+In-Reply-To: <CAKv+Gu_pRmMU+_ApBMYiBjQAPygrsTSs-iy4zrAUN9L28uAqag@mail.gmail.com>
+References: <20140703141342.GB14305@arm.com>
+ <CAKv+Gu_pRmMU+_ApBMYiBjQAPygrsTSs-iy4zrAUN9L28uAqag@mail.gmail.com>
+Message-ID: <1404455777.3649.154.camel@mfleming-mobl1.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140703 10:10]:
-> On Thu, Jul 03, 2014 at 06:19:47PM +0200, Javier Martinez Canillas wrote:
-> > On Thu, Jul 3, 2014 at 6:06 PM, Sebastian Reichel <sre@kernel.org> wrote:
-> > > Hi,
-> > >
-> > > On Thu, Jul 03, 2014 at 10:52:40AM -0500, Felipe Balbi wrote:
-> > >> > DT is supposed to contain information about the hardware, so it
-> > >> > should stay the same? I think there is no non-hackish way to decide
-> > >>
-> > >> compatible would change, at a minimum.
-> > >
-> > > why? I would expect it to stay the same (and the current patch uses
-> > > the same compatible strings).
-> > >
-> > 
-> > Exactly, the new driver must support all the compatible strings
-> > defined in Documentation/devicetree/bindings/serial/omap_serial.tx
-> > (which already does as you pointed out).
-> > 
-> > Otherwise the current drivers/tty/serial/omap-serial.c could never be
-> > removed since that would mean breaking DT backward compatibility.
+On Thu, 2014-07-03 at 16:16 +0200, Ard Biesheuvel wrote:
+> On 3 July 2014 16:13, Will Deacon <will.deacon@arm.com> wrote:
+> > Hi guys,
+> >
+> > If I build an arm64 kernel, then simply hit make again without changing
+> > anything, I find that efi-stub.o is rebuilt every time (with an annoying
+> > warning too, but I think you already know about that):
+> >
 > 
-> that settles it then... good. I'll start testing this next week.
+> Yep, I had noticed that as well. The reason is that it depends on
+> generated header files, which it shouldn't. There's already a patch
+> queued in Matt Fleming's tree for this:
+> https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=86b2eb8cdffda7eef07b1d6e5464491df1e86ee9
 
-Yeah full compability is the way to go here.
+It sounds like that commit should actually be put into my 'urgent'
+branch and sent to tip asap instead of being queued up for the next
+merge window.
 
-FYI we cannot switch over completely until runtime PM works as it
-will block the deeper idle states for omaps and make it impossible
-to debug PM features.
-
-Regards,
-
-Tony
+Objections?
