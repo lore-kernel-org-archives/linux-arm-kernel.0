@@ -1,39 +1,41 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 04 Jul 2014 20:52:07 +0100
-Subject: [PATCH 2/4] ARM: SWP emulation: always enable when SMP is enabled
+Date: Fri, 04 Jul 2014 20:52:12 +0100
+Subject: [PATCH 3/4] ARM: SWP emulation: only initialise on ARMv7 CPUs
 In-Reply-To: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
 References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
-Message-ID: <E1X39Wh-0000lq-KV@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X39Wm-0000lu-O1@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SWP is deprecated in ARMv6 and ARMv7 CPUs, but more importantly, when
-running on a SMP system, SWP doesn't guarantee atomicity.  This means
-it can't really be used (by userspace) for locking purposes in a SMP
-environment.
-
-Currently, many configurations leave the SWP emulation disabled, which
-means we never know if userspace executes this instruction on ARMv7
-hardware.  Rectify this by enabling SWP emulation for ARMv7 with SMP
-(where we can trap the instruction.)
+Previous CPUs do not have the ability to trap SWP instructions, so
+it's pointless initialising this code there.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/swp_emulate.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c348eaee7ee2..c78c7db6aa83 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -669,7 +669,7 @@ config ARM_VIRT_EXT
- 	  details.
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+index b1b89882b113..67ca8578c6d8 100644
+--- a/arch/arm/kernel/swp_emulate.c
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -27,6 +27,7 @@
+ #include <linux/perf_event.h>
  
- config SWP_EMULATE
--	bool "Emulate SWP/SWPB instructions"
-+	bool "Emulate SWP/SWPB instructions" if !SMP
- 	depends on CPU_V7
- 	default y if SMP
- 	select HAVE_PROC_CPU if PROC_FS
+ #include <asm/opcodes.h>
++#include <asm/system_info.h>
+ #include <asm/traps.h>
+ #include <asm/uaccess.h>
+ 
+@@ -266,6 +267,9 @@ static struct undef_hook swp_hook = {
+  */
+ static int __init swp_emulation_init(void)
+ {
++	if (cpu_architecture() < CPU_ARCH_ARMv7)
++		return 0;
++
+ #ifdef CONFIG_PROC_FS
+ 	if (!proc_create("cpu/swp_emulation", S_IRUGO, NULL, &proc_status_fops))
+ 		return -ENOMEM;
 -- 
 1.8.3.1
