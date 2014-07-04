@@ -1,707 +1,859 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 04 Jul 2014 14:52:51 +0200
-Subject: [PATCH v6 22/23] rtc: Add driver for Maxim 77802 PMIC
- Real-Time-Clock
-In-Reply-To: <1404474972.14069.20.camel@AMDC1943>
-References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404467722-26687-23-git-send-email-javier.martinez@collabora.co.uk>
- <1404474972.14069.20.camel@AMDC1943>
-Message-ID: <53B6A3A3.9090300@collabora.co.uk>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Fri, 04 Jul 2014 18:23:04 +0530
+Subject: [PATCH v2 1/1] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <1404474812-16855-1-git-send-email-b29396@freescale.com>
+References: <1404474812-16855-1-git-send-email-b29396@freescale.com>
+Message-ID: <53B6A3B0.4020509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On 07/04/2014 05:23 PM, Dong Aisheng wrote:
+> The patch adds the basic CAN TX/RX function support for Bosch M_CAN controller.
+> For TX, only one dedicated tx buffer is used for sending data.
+> For RX, RXFIFO 0 is used for receiving data to avoid overflow.
+> Rx FIFO 1 and Rx Buffers are not used currently, as well as Tx Event FIFO.
+>
+> Due to the message ram can be shared by multi m_can instances
+> and the fifo element is configurable which is SoC dependant,
+> the design is to parse the message ram related configuration data from device
+> tree rather than hardcode define it in driver which can make the message
+> ram sharing fully transparent to M_CAN controller driver,
+> then we can gain better driver maintainability and future features upgrade.
+>
+> M_CAN also supports CANFD protocol features like data payload up to 64 bytes
+> and bitrate switch at runtime, however, this patch still does not add the
+> support for these features.
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+> Changes since v1:
+> Addressed all comments from Mark Rutland, Hartkopp and Marc Kleine-Budde
+> - merge three patches into one
+> - create directory drivers/net/can/m_can
+> - improve binding doc
+> - make sure using valid pointer before netif_receive_skb(skb)
+> - remove debug info a bit
+> - let the stats are updated even if alloc_can_err_skb() fails
+> - other small fixes
+>
+> Test result:
+> Passed over night can-utils/canfdtest stress test on iMX6SX SDB board.
+>
+> ---
+>   .../devicetree/bindings/net/can/m_can.txt          |   65 ++
+>   drivers/net/can/Kconfig                            |    2 +
+>   drivers/net/can/Makefile                           |    1 +
+>   drivers/net/can/m_can/Kconfig                      |    4 +
+>   drivers/net/can/m_can/Makefile                     |    7 +
+>   drivers/net/can/m_can/m_can.c                      | 1136 ++++++++++++++++++++
+>   6 files changed, 1215 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+>   create mode 100644 drivers/net/can/m_can/Kconfig
+>   create mode 100644 drivers/net/can/m_can/Makefile
+>   create mode 100644 drivers/net/can/m_can/m_can.c
+>
+[...]
 
-Thanks a lot for your feedback.
+> +static inline u32 m_can_read(const struct m_can_priv *priv, enum m_can_reg reg)
+> +{
+> +	return readl(priv->base + reg);
+> +}
+> +
+> +static inline void m_can_write(const struct m_can_priv *priv,
+> +				enum m_can_reg reg, u32 val)
 
-On 07/04/2014 01:56 PM, Krzysztof Kozlowski wrote:
-> On pi?, 2014-07-04 at 11:55 +0200, Javier Martinez Canillas wrote:
->> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
->> This patch adds support for the RTC and is based on a driver
->> added by Simon Glass to the Chrome OS kernel 3.8 tree.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->> 
->> Changes since v5: None
->> 
->> Changes since v4: None
->> 
->> Changes since v3: None
->> ---
->>  drivers/rtc/Kconfig        |  10 +
->>  drivers/rtc/Makefile       |   1 +
->>  drivers/rtc/rtc-max77802.c | 637 +++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 648 insertions(+)
->>  create mode 100644 drivers/rtc/rtc-max77802.c
->> 
->> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
->> index a672dd1..243ac72 100644
->> --- a/drivers/rtc/Kconfig
->> +++ b/drivers/rtc/Kconfig
->> @@ -288,6 +288,16 @@ config RTC_DRV_MAX77686
->>  	  This driver can also be built as a module. If so, the module
->>  	  will be called rtc-max77686.
->>  
->> +config RTC_DRV_MAX77802
->> +	tristate "Maxim 77802 RTC"
->> +	depends on MFD_MAX77686
->> +	help
->> +	  If you say yes here you will get support for the
->> +	  RTC of Maxim MAX77802 PMIC.
->> +
->> +	  This driver can also be built as a module. If so, the module
->> +	  will be called rtc-max77802.
->> +
->>  config RTC_DRV_RS5C372
->>  	tristate "Ricoh R2025S/D, RS5C372A/B, RV5C386, RV5C387A"
->>  	help
->> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
->> index 70347d0..247de78 100644
->> --- a/drivers/rtc/Makefile
->> +++ b/drivers/rtc/Makefile
->> @@ -81,6 +81,7 @@ obj-$(CONFIG_RTC_DRV_MAX8998)	+= rtc-max8998.o
->>  obj-$(CONFIG_RTC_DRV_MAX8997)	+= rtc-max8997.o
->>  obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
->>  obj-$(CONFIG_RTC_DRV_MAX77686)	+= rtc-max77686.o
->> +obj-$(CONFIG_RTC_DRV_MAX77802)  += rtc-max77802.o
->>  obj-$(CONFIG_RTC_DRV_MC13XXX)	+= rtc-mc13xxx.o
->>  obj-$(CONFIG_RTC_DRV_MCP795)	+= rtc-mcp795.o
->>  obj-$(CONFIG_RTC_DRV_MSM6242)	+= rtc-msm6242.o
->> diff --git a/drivers/rtc/rtc-max77802.c b/drivers/rtc/rtc-max77802.c
->> new file mode 100644
->> index 0000000..2f4fc2e
->> --- /dev/null
->> +++ b/drivers/rtc/rtc-max77802.c
->> @@ -0,0 +1,637 @@
->> +/*
->> + * RTC driver for Maxim MAX77802
->> + *
->> + * Copyright (C) 2013 Google, Inc
->> + *
->> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
->> + *
->> + *  based on rtc-max8997.c
->> + *
->> + *  This program is free software; you can redistribute  it and/or modify it
->> + *  under  the terms of  the GNU General  Public License as published by the
->> + *  Free Software Foundation;  either version 2 of the  License, or (at your
->> + *  option) any later version.
->> + *
->> + */
->> +
->> +#include <linux/slab.h>
->> +#include <linux/rtc.h>
->> +#include <linux/delay.h>
->> +#include <linux/mutex.h>
->> +#include <linux/module.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/mfd/max77686-private.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/regmap.h>
->> +
->> +/* RTC Control Register */
->> +#define BCD_EN_SHIFT			0
->> +#define BCD_EN_MASK			(1 << BCD_EN_SHIFT)
->> +#define MODEL24_SHIFT			1
->> +#define MODEL24_MASK			(1 << MODEL24_SHIFT)
->> +/* RTC Update Register1 */
->> +#define RTC_UDR_SHIFT			0
->> +#define RTC_UDR_MASK			(1 << RTC_UDR_SHIFT)
->> +#define RTC_RBUDR_SHIFT			4
->> +#define RTC_RBUDR_MASK			(1 << RTC_RBUDR_SHIFT)
->> +/* WTSR and SMPL Register */
->> +#define WTSRT_SHIFT			0
->> +#define SMPLT_SHIFT			2
->> +#define WTSR_EN_SHIFT			6
->> +#define SMPL_EN_SHIFT			7
->> +#define WTSRT_MASK			(3 << WTSRT_SHIFT)
->> +#define SMPLT_MASK			(3 << SMPLT_SHIFT)
->> +#define WTSR_EN_MASK			(1 << WTSR_EN_SHIFT)
->> +#define SMPL_EN_MASK			(1 << SMPL_EN_SHIFT)
->> +/* RTC Hour register */
->> +#define HOUR_PM_SHIFT			6
->> +#define HOUR_PM_MASK			(1 << HOUR_PM_SHIFT)
->> +/* RTC Alarm Enable */
->> +#define ALARM_ENABLE_SHIFT		7
->> +#define ALARM_ENABLE_MASK		(1 << ALARM_ENABLE_SHIFT)
->> +
->> +/* For the RTCAE1 register, we write this value to enable the alarm */
->> +#define ALARM_ENABLE_VALUE		0x77
->> +
->> +#define MAX77802_RTC_UPDATE_DELAY_US	200
->> +#undef MAX77802_RTC_WTSR_SMPL
-> 
-> Hmmm... I am not sure what is the purpose of this undef. It disables
-> some functions below. I saw same code in 77686 RTC driver but this does
-> not help me :).
-> 
-> If this is on purpose can you add a comment explaining the
-> purpose/cause?
-> 
+Alignment should match open parenthesis....  :-)
 
-This is a left over from when a combined 77686/802 driver was attempted since as
-you said the 77686 RTC driver does the same.
+> +{
+> +	writel(val, priv->base + reg);
+> +}
+> +
+> +static inline void m_can_config_endisable(const struct m_can_priv *priv,
+> +				bool enable)
 
-I just checked MAX77802 data sheet and the MAX77802_RTC_WTSR_SMPL register is to
-control the SMPL (Sudden Momentary Power Loss) and WTSR (Watchdog Timeout and
-Software Resets) features.
+see above..
 
-Now, I wanted to figure out why the 77686 driver unset that register and have
-those conditionals but git blame shows me that this was already in the original
-commit that added the driver: fca1dd03 ("rtc: max77686: add Maxim 77686 driver").
+> +{
+> +	u32 cccr = m_can_read(priv, M_CAN_CCCR);
+> +	u32 timeout = 10;
+> +	u32 val = 0;
+> +
+> +	if (enable) {
+> +		/* enable m_can configuration */
+> +		m_can_write(priv, M_CAN_CCCR, cccr | CCCR_INIT);
+> +		/* CCCR.CCE can only be set/reset while CCCR.INIT = '1' */
+> +		m_can_write(priv, M_CAN_CCCR, cccr | CCCR_INIT | CCCR_CCE);
+> +	} else {
+> +		m_can_write(priv, M_CAN_CCCR, cccr & ~(CCCR_INIT | CCCR_CCE));
+> +	}
+> +
+> +	/* there's a delay for module initialization */
+> +	if (enable)
+> +		val = CCCR_INIT | CCCR_CCE;
+> +
+> +	while ((m_can_read(priv, M_CAN_CCCR) & (CCCR_INIT | CCCR_CCE))
+> +				!= val) {
+> +		if (timeout == 0) {
+> +			netdev_warn(priv->dev, "Failed to init module\n");
+> +			return;
+> +		}
+> +		timeout--;
+> +		udelay(1);
+> +	}
+> +}
+> +
+> +static void m_can_enable_all_interrupts(const struct m_can_priv *priv)
+> +{
+> +	m_can_write(priv, M_CAN_ILE, ILE_EINT0 | ILE_EINT1);
+> +}
+> +
+> +static void m_can_disable_all_interrupts(const struct m_can_priv *priv)
+> +{
+> +	m_can_write(priv, M_CAN_ILE, 0x0);
+> +}
+> +
+> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> +				u32 rxfs)
 
-Also, I see that the MAX8997 driver (drivers/rtc/rtc-max8997.c) also has a
-similar register but actually uses it and doesn't have the conditionals if is
-disabled. But this driver has two module parameters to control if these features
-are enabled or not (wtsr_en and smpl_en).
+same ..
 
-If these two features have been disabled since the max77686 driver was merged
-then I guess that the dead code should be removed from that driver as well? Or
-do you have more hints about why it has been disabled?
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	u32 flags, fgi;
+> +	void __iomem *fifo_addr;
+> +
+> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> +	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
+> +	flags = readl(fifo_addr);
+> +	if (flags & RX_BUF_XTD)
+> +		cf->can_id = (flags & CAN_EFF_MASK) | CAN_EFF_FLAG;
+> +	else
+> +		cf->can_id = (flags >> 18) & CAN_SFF_MASK;
+> +
+> +	if (flags & RX_BUF_RTR) {
+> +		cf->can_id |= CAN_RTR_FLAG;
+> +	} else {
+> +		flags = readl(fifo_addr + 0x4);
+> +		cf->can_dlc = get_can_dlc((flags >> 16) & 0x0F);
+> +		*(u32 *)(cf->data + 0) = readl(fifo_addr + 0x8);
+> +		*(u32 *)(cf->data + 4) = readl(fifo_addr + 0xC);
+> +	}
+> +
+> +	/* acknowledge rx fifo 0 */
+> +	m_can_write(priv, M_CAN_RXF0A, fgi);
+> +}
+> +
+> +static int m_can_do_rx_poll(struct net_device *dev, int quota)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	struct net_device_stats *stats = &dev->stats;
+> +	struct sk_buff *skb;
+> +	struct can_frame *frame;
+> +	u32 num_rx_pkts = 0;
+> +	u32 rxfs;
+> +
+> +	rxfs = m_can_read(priv, M_CAN_RXF0S);
+> +	if (!(rxfs & RXFS_FFL_MASK)) {
+> +		netdev_dbg(dev, "no messages in fifo0\n");
+> +		return 0;
+> +	}
+> +
+> +	while ((rxfs & RXFS_FFL_MASK) && (quota > 0)) {
+> +		if (rxfs & RXFS_RFL)
+> +			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
+> +
+> +		skb = alloc_can_skb(dev, &frame);
+> +		if (!skb) {
+> +			stats->rx_dropped++;
+> +			return 0;
+> +		}
+> +
+> +		m_can_read_fifo(dev, frame, rxfs);
+> +
+> +		stats->rx_packets++;
+> +		stats->rx_bytes += frame->can_dlc;
+> +
+> +		netif_receive_skb(skb);
+> +
+> +		quota--;
+> +		num_rx_pkts++;
+> +		rxfs = m_can_read(priv, M_CAN_RXF0S);
+> +	};
+> +
+> +	can_led_event(dev, CAN_LED_EVENT_RX);
+> +
+> +	return num_rx_pkts;
+> +}
+> +
+> +static int m_can_handle_lost_msg(struct net_device *dev)
+> +{
+> +	struct net_device_stats *stats = &dev->stats;
+> +	struct sk_buff *skb;
+> +	struct can_frame *frame;
+> +
+> +	netdev_err(dev, "msg lost in rxf0\n");
+> +
+> +	stats->rx_errors++;
+> +	stats->rx_over_errors++;
+> +
+> +	skb = alloc_can_err_skb(dev, &frame);
+> +	if (unlikely(!skb))
+> +		return 0;
+> +
+> +	frame->can_id |= CAN_ERR_CRTL;
+> +	frame->data[1] = CAN_ERR_CRTL_RX_OVERFLOW;
+> +
+> +	netif_receive_skb(skb);
+> +
+> +	return 1;
+> +}
+> +
+> +static int m_can_handle_lec_err(struct net_device *dev,
+> +				enum m_can_lec_type lec_type)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	struct net_device_stats *stats = &dev->stats;
+> +	struct can_frame *cf;
+> +	struct sk_buff *skb;
+> +
+> +	/* early exit if no lec update */
+> +	if (lec_type == LEC_UNUSED)
+> +		return 0;
+> +
+> +	priv->can.can_stats.bus_error++;
+> +	stats->rx_errors++;
+> +
+> +	/* propagate the error condition to the CAN stack */
+> +	skb = alloc_can_err_skb(dev, &cf);
+> +	if (unlikely(!skb))
+> +		return 0;
+> +
+> +	/*
+> +	 * check for 'last error code' which tells us the
+> +	 * type of the last error to occur on the CAN bus
+> +	 */
 
->> +
->> +enum {
->> +	RTC_SEC = 0,
->> +	RTC_MIN,
->> +	RTC_HOUR,
->> +	RTC_WEEKDAY,
->> +	RTC_MONTH,
->> +	RTC_YEAR,
->> +	RTC_DATE,
->> +	RTC_NR_TIME
->> +};
->> +
->> +struct max77802_rtc_info {
->> +	struct device		*dev;
->> +	struct max77686_dev	*max77802;
->> +	struct i2c_client	*rtc;
->> +	struct rtc_device	*rtc_dev;
->> +	struct mutex		lock;
->> +
->> +	struct regmap		*regmap;
->> +
->> +	int virq;
->> +	int rtc_24hr_mode;
->> +};
->> +
->> +enum MAX77802_RTC_OP {
->> +	MAX77802_RTC_WRITE,
->> +	MAX77802_RTC_READ,
->> +};
->> +
->> +static inline int max77802_rtc_calculate_wday(u8 shifted)
->> +{
->> +	int counter = -1;
->> +
->> +	while (shifted) {
->> +		shifted >>= 1;
->> +		counter++;
->> +	}
->> +
->> +	return counter;
->> +}
->> +
->> +static void max77802_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
->> +				   int rtc_24hr_mode)
->> +{
->> +	tm->tm_sec = data[RTC_SEC] & 0xff;
->> +	tm->tm_min = data[RTC_MIN] & 0xff;
->> +	if (rtc_24hr_mode)
->> +		tm->tm_hour = data[RTC_HOUR] & 0x1f;
->> +	else {
->> +		tm->tm_hour = data[RTC_HOUR] & 0x0f;
->> +		if (data[RTC_HOUR] & HOUR_PM_MASK)
->> +			tm->tm_hour += 12;
->> +	}
->> +
->> +	tm->tm_wday = max77802_rtc_calculate_wday(data[RTC_WEEKDAY] & 0xff);
->> +	tm->tm_mday = data[RTC_DATE] & 0x1f;
->> +	tm->tm_mon = (data[RTC_MONTH] & 0x0f) - 1;
->> +
->> +	tm->tm_year = data[RTC_YEAR] & 0xff;
->> +	tm->tm_yday = 0;
->> +	tm->tm_isdst = 0;
->> +}
->> +
->> +static int max77802_rtc_tm_to_data(struct rtc_time *tm, u8 *data)
->> +{
->> +	data[RTC_SEC] = tm->tm_sec;
->> +	data[RTC_MIN] = tm->tm_min;
->> +	data[RTC_HOUR] = tm->tm_hour;
->> +	data[RTC_WEEKDAY] = 1 << tm->tm_wday;
->> +	data[RTC_DATE] = tm->tm_mday;
->> +	data[RTC_MONTH] = tm->tm_mon + 1;
->> +	data[RTC_YEAR] = tm->tm_year;
->> +
->> +	return 0;
->> +}
->> +
->> +static int max77802_rtc_update(struct max77802_rtc_info *info,
->> +	enum MAX77802_RTC_OP op)
->> +{
->> +	int ret;
->> +	unsigned int data;
->> +
->> +	if (op == MAX77802_RTC_WRITE)
->> +		data = 1 << RTC_UDR_SHIFT;
->> +	else
->> +		data = 1 << RTC_RBUDR_SHIFT;
->> +
->> +	ret = regmap_update_bits(info->max77802->regmap,
->> +				 MAX77802_RTC_UPDATE0, data, data);
->> +	if (ret < 0)
->> +		dev_err(info->dev, "%s: fail to write update reg(ret=%d, data=0x%x)\n",
->> +				__func__, ret, data);
->> +	else {
->> +		/* Minimum delay required before RTC update. */
->> +		usleep_range(MAX77802_RTC_UPDATE_DELAY_US,
->> +			     MAX77802_RTC_UPDATE_DELAY_US * 2);
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_read_time(struct device *dev, struct rtc_time *tm)
->> +{
->> +	struct max77802_rtc_info *info = dev_get_drvdata(dev);
->> +	u8 data[RTC_NR_TIME];
->> +	int ret;
->> +
->> +	mutex_lock(&info->lock);
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_READ);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	ret = regmap_bulk_read(info->max77802->regmap,
->> +				MAX77802_RTC_SEC, data, RTC_NR_TIME);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to read time reg(%d)\n", __func__,
->> +			ret);
->> +		goto out;
->> +	}
->> +
->> +	max77802_rtc_data_to_tm(data, tm, info->rtc_24hr_mode);
->> +
->> +	ret = rtc_valid_tm(tm);
->> +
->> +out:
->> +	mutex_unlock(&info->lock);
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_set_time(struct device *dev, struct rtc_time *tm)
->> +{
->> +	struct max77802_rtc_info *info = dev_get_drvdata(dev);
->> +	u8 data[RTC_NR_TIME];
->> +	int ret;
->> +
->> +	ret = max77802_rtc_tm_to_data(tm, data);
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	mutex_lock(&info->lock);
->> +
->> +	ret = regmap_bulk_write(info->max77802->regmap,
->> +				 MAX77802_RTC_SEC, data, RTC_NR_TIME);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to write time reg(%d)\n", __func__,
->> +			ret);
->> +		goto out;
->> +	}
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +
->> +out:
->> +	mutex_unlock(&info->lock);
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
->> +{
->> +	struct max77802_rtc_info *info = dev_get_drvdata(dev);
->> +	u8 data[RTC_NR_TIME];
->> +	unsigned int val;
->> +	int ret;
->> +
->> +	mutex_lock(&info->lock);
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_READ);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	ret = regmap_bulk_read(info->max77802->regmap,
->> +				 MAX77802_ALARM1_SEC, data, RTC_NR_TIME);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s:%d fail to read alarm reg(%d)\n",
->> +				__func__, __LINE__, ret);
->> +		goto out;
->> +	}
->> +
->> +	max77802_rtc_data_to_tm(data, &alrm->time, info->rtc_24hr_mode);
->> +
->> +	alrm->enabled = 0;
->> +	ret = regmap_read(info->max77802->regmap,
->> +			  MAX77802_RTC_AE1, &val);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s:%d fail to read alarm enable(%d)\n",
->> +			__func__, __LINE__, ret);
->> +		goto out;
->> +	}
->> +	if (val)
->> +		alrm->enabled = 1;
->> +
->> +	alrm->pending = 0;
->> +	ret = regmap_read(info->max77802->regmap, MAX77802_REG_STATUS2, &val);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s:%d fail to read status2 reg(%d)\n",
->> +				__func__, __LINE__, ret);
->> +		goto out;
->> +	}
->> +
->> +	if (val & (1 << 2)) /* RTCA1 */
->> +		alrm->pending = 1;
->> +
->> +out:
->> +	mutex_unlock(&info->lock);
->> +	return 0;
->> +}
->> +
->> +static int max77802_rtc_stop_alarm(struct max77802_rtc_info *info)
->> +{
->> +	int ret;
->> +
->> +	if (!mutex_is_locked(&info->lock))
->> +		dev_warn(info->dev, "%s: should have mutex locked\n", __func__);
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_READ);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	ret = regmap_write(info->max77802->regmap,
->> +			   MAX77802_RTC_AE1, 0);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to write alarm reg(%d)\n",
->> +			__func__, ret);
->> +		goto out;
->> +	}
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +out:
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_start_alarm(struct max77802_rtc_info *info)
->> +{
->> +	int ret;
->> +
->> +	if (!mutex_is_locked(&info->lock))
->> +		dev_warn(info->dev, "%s: should have mutex locked\n",
->> +			 __func__);
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_READ);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	ret = regmap_write(info->max77802->regmap,
->> +				   MAX77802_RTC_AE1,
->> +				   ALARM_ENABLE_VALUE);
->> +
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to read alarm reg(%d)\n",
->> +				__func__, ret);
->> +		goto out;
->> +	}
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +out:
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
->> +{
->> +	struct max77802_rtc_info *info = dev_get_drvdata(dev);
->> +	u8 data[RTC_NR_TIME];
->> +	int ret;
->> +
->> +	ret = max77802_rtc_tm_to_data(&alrm->time, data);
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	mutex_lock(&info->lock);
->> +
->> +	ret = max77802_rtc_stop_alarm(info);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	ret = regmap_bulk_write(info->max77802->regmap,
->> +				 MAX77802_ALARM1_SEC, data, RTC_NR_TIME);
->> +
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to write alarm reg(%d)\n",
->> +				__func__, ret);
->> +		goto out;
->> +	}
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	if (alrm->enabled)
->> +		ret = max77802_rtc_start_alarm(info);
->> +out:
->> +	mutex_unlock(&info->lock);
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_alarm_irq_enable(struct device *dev,
->> +					 unsigned int enabled)
->> +{
->> +	struct max77802_rtc_info *info = dev_get_drvdata(dev);
->> +	int ret;
->> +
->> +	mutex_lock(&info->lock);
->> +	if (enabled)
->> +		ret = max77802_rtc_start_alarm(info);
->> +	else
->> +		ret = max77802_rtc_stop_alarm(info);
->> +	mutex_unlock(&info->lock);
->> +
->> +	return ret;
->> +}
->> +
->> +static irqreturn_t max77802_rtc_alarm_irq(int irq, void *data)
->> +{
->> +	struct max77802_rtc_info *info = data;
->> +
->> +	dev_info(info->dev, "%s:irq(%d)\n", __func__, irq);
-> 
-> Doesn't seem so important message to user so use dev_dbg.
-> 
+networking block comments don't use an empty /* line, use /* Comment
 
-Ok
+> +	cf->can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR;
+> +	cf->data[2] |= CAN_ERR_PROT_UNSPEC;
+> +
+> +	switch (lec_type) {
+> +	case LEC_STUFF_ERROR:
+> +		netdev_dbg(dev, "stuff error\n");
+> +		cf->data[2] |= CAN_ERR_PROT_STUFF;
+> +		break;
+> +	case LEC_FORM_ERROR:
+> +		netdev_dbg(dev, "form error\n");
+> +		cf->data[2] |= CAN_ERR_PROT_FORM;
+> +		break;
+> +	case LEC_ACK_ERROR:
+> +		netdev_dbg(dev, "ack error\n");
+> +		cf->data[3] |= (CAN_ERR_PROT_LOC_ACK |
+> +				CAN_ERR_PROT_LOC_ACK_DEL);
+> +		break;
+> +	case LEC_BIT1_ERROR:
+> +		netdev_dbg(dev, "bit1 error\n");
+> +		cf->data[2] |= CAN_ERR_PROT_BIT1;
+> +		break;
+> +	case LEC_BIT0_ERROR:
+> +		netdev_dbg(dev, "bit0 error\n");
+> +		cf->data[2] |= CAN_ERR_PROT_BIT0;
+> +		break;
+> +	case LEC_CRC_ERROR:
+> +		netdev_dbg(dev, "CRC error\n");
+> +		cf->data[3] |= (CAN_ERR_PROT_LOC_CRC_SEQ |
+> +				CAN_ERR_PROT_LOC_CRC_DEL);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	stats->rx_packets++;
+> +	stats->rx_bytes += cf->can_dlc;
+> +	netif_receive_skb(skb);
+> +
+> +	return 1;
+> +}
+> +
+> +static int m_can_get_berr_counter(const struct net_device *dev,
+> +				  struct can_berr_counter *bec)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	unsigned int ecr;
+> +
+> +	clk_prepare_enable(priv->hclk);
+> +	clk_prepare_enable(priv->cclk);
+> +
+> +	ecr = m_can_read(priv, M_CAN_ECR);
+> +	bec->rxerr = (ecr & ECR_REC_MASK) >> ECR_REC_SHIFT;
+> +	bec->txerr = ecr & ECR_TEC_MASK;
+> +
+> +	clk_disable_unprepare(priv->hclk);
+> +	clk_disable_unprepare(priv->cclk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int m_can_handle_state_change(struct net_device *dev,
+> +				enum can_state new_state)
 
->> +
->> +	rtc_update_irq(info->rtc_dev, 1, RTC_IRQF | RTC_AF);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static const struct rtc_class_ops max77802_rtc_ops = {
->> +	.read_time = max77802_rtc_read_time,
->> +	.set_time = max77802_rtc_set_time,
->> +	.read_alarm = max77802_rtc_read_alarm,
->> +	.set_alarm = max77802_rtc_set_alarm,
->> +	.alarm_irq_enable = max77802_rtc_alarm_irq_enable,
->> +};
->> +
->> +#ifdef MAX77802_RTC_WTSR_SMPL
->> +static void max77802_rtc_enable_wtsr(struct max77802_rtc_info *info, bool enable)
->> +{
->> +	int ret;
->> +	unsigned int val, mask;
->> +
->> +	if (enable)
->> +		val = (1 << WTSR_EN_SHIFT) | (3 << WTSRT_SHIFT);
->> +	else
->> +		val = 0;
->> +
->> +	mask = WTSR_EN_MASK | WTSRT_MASK;
->> +
->> +	dev_info(info->dev, "%s: %s WTSR\n", __func__,
->> +			enable ? "enable" : "disable");
-> 
-> Doesn't seem so important message to user so use dev_dbg.
-> 
+Alignment should match open parenthesis
 
-Ok, this function is going to probably be removed on the next version anyways.
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	struct net_device_stats *stats = &dev->stats;
+> +	struct can_frame *cf;
+> +	struct sk_buff *skb;
+> +	struct can_berr_counter bec;
+> +	unsigned int ecr;
+> +
+> +	switch (new_state) {
+> +	case CAN_STATE_ERROR_ACTIVE:
+> +		/* error warning state */
+> +		priv->can.can_stats.error_warning++;
+> +		priv->can.state = CAN_STATE_ERROR_WARNING;
+> +		break;
+> +	case CAN_STATE_ERROR_PASSIVE:
+> +		/* error passive state */
+> +		priv->can.can_stats.error_passive++;
+> +		priv->can.state = CAN_STATE_ERROR_PASSIVE;
+> +		break;
+> +	case CAN_STATE_BUS_OFF:
+> +		/* bus-off state */
+> +		priv->can.state = CAN_STATE_BUS_OFF;
+> +		m_can_disable_all_interrupts(priv);
+> +		can_bus_off(dev);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	/* propagate the error condition to the CAN stack */
+> +	skb = alloc_can_err_skb(dev, &cf);
+> +	if (unlikely(!skb))
+> +		return 0;
+> +
+> +	m_can_get_berr_counter(dev, &bec);
+> +
+> +	switch (new_state) {
+> +	case CAN_STATE_ERROR_ACTIVE:
+> +		/* error warning state */
+> +		cf->can_id |= CAN_ERR_CRTL;
+> +		cf->data[1] = (bec.txerr > bec.rxerr) ?
+> +			CAN_ERR_CRTL_TX_WARNING :
+> +			CAN_ERR_CRTL_RX_WARNING;
+> +		cf->data[6] = bec.txerr;
+> +		cf->data[7] = bec.rxerr;
+> +		break;
+> +	case CAN_STATE_ERROR_PASSIVE:
+> +		/* error passive state */
+> +		cf->can_id |= CAN_ERR_CRTL;
+> +		ecr = m_can_read(priv, M_CAN_ECR);
+> +		if (ecr & ECR_RP)
+> +			cf->data[1] |= CAN_ERR_CRTL_RX_PASSIVE;
+> +		if (bec.txerr > 127)
+> +			cf->data[1] |= CAN_ERR_CRTL_TX_PASSIVE;
+> +		cf->data[6] = bec.txerr;
+> +		cf->data[7] = bec.rxerr;
+> +		break;
+> +	case CAN_STATE_BUS_OFF:
+> +		/* bus-off state */
+> +		cf->can_id |= CAN_ERR_BUSOFF;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	stats->rx_packets++;
+> +	stats->rx_bytes += cf->can_dlc;
+> +	netif_receive_skb(skb);
+> +
+> +	return 1;
+> +}
+> +
+> +static int m_can_handle_state_errors(struct net_device *dev, u32 psr)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	int work_done = 0;
+> +
+> +	if ((psr & PSR_EW) &&
+> +		(priv->can.state != CAN_STATE_ERROR_WARNING))
 
->> +
->> +	ret = regmap_update_bits(info->max77802->regmap,
->> +				 MAX77802_WTSR_SMPL_CNTL, mask, val);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to update WTSR reg(%d)\n",
->> +				__func__, ret);
->> +		return;
->> +	}
->> +
->> +	max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +}
->> +
->> +static void max77802_rtc_enable_smpl(struct max77802_rtc_info *info, bool enable)
->> +{
->> +	int ret;
->> +	unsigned int val, mask;
->> +
->> +	if (enable)
->> +		val = (1 << SMPL_EN_SHIFT) | (0 << SMPLT_SHIFT);
->> +	else
->> +		val = 0;
->> +
->> +	mask = SMPL_EN_MASK | SMPLT_MASK;
->> +
->> +	dev_info(info->dev, "%s: %s SMPL\n", __func__,
->> +			enable ? "enable" : "disable");
-> 
-> Doesn't seem so important message to user so use dev_dbg.
-> 
+Alignment should match open parenthesis
 
-Same here.
+>   {
+> +		netdev_dbg(dev, "entered error warning state\n");
+> +		work_done += m_can_handle_state_change(dev,
+> +				CAN_STATE_ERROR_WARNING);
+> +	}
+> +
+> +	if ((psr & PSR_EP) &&
+> +		(priv->can.state != CAN_STATE_ERROR_PASSIVE))
 
->> +
->> +	ret = regmap_update_bits(info->max77802->regmap,
->> +				 MAX77802_WTSR_SMPL_CNTL, mask, val);
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to update SMPL reg(%d)\n",
->> +				__func__, ret);
->> +		return;
->> +	}
->> +
->> +	max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +
->> +	val = 0;
->> +	regmap_read(info->max77802->regmap, MAX77802_WTSR_SMPL_CNTL, &val);
->> +	dev_info(info->dev, "%s: WTSR_SMPL(0x%02x)\n", __func__, val);
->> +}
->> +#endif /* MAX77802_RTC_WTSR_SMPL */
->> +
->> +static int max77802_rtc_init_reg(struct max77802_rtc_info *info)
->> +{
->> +	u8 data[2];
->> +	int ret;
->> +
->> +	max77802_rtc_update(info, MAX77802_RTC_READ);
->> +
->> +	/* Set RTC control register : Binary mode, 24hour mdoe */
->> +	data[0] = (1 << BCD_EN_SHIFT) | (1 << MODEL24_SHIFT);
->> +	data[1] = (0 << BCD_EN_SHIFT) | (1 << MODEL24_SHIFT);
->> +
->> +	info->rtc_24hr_mode = 1;
->> +
->> +	ret = regmap_bulk_write(info->max77802->regmap,
->> +				MAX77802_RTC_CONTROLM, data, 2);
-> 
-> Use ARRAY_SIZE as last param?
-> 
+Alignment should match open parenthesis
 
-Ok
+>   {
+> +		netdev_dbg(dev, "entered error warning state\n");
+> +		work_done += m_can_handle_state_change(dev,
+> +				CAN_STATE_ERROR_PASSIVE);
+> +	}
+> +
+> +	if ((psr & PSR_BO) &&
+> +		(priv->can.state != CAN_STATE_BUS_OFF))
 
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to write controlm reg(%d)\n",
->> +				__func__, ret);
->> +		return ret;
->> +	}
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +
->> +	/* Mask control register */
->> +	max77802_rtc_update(info, MAX77802_RTC_READ);
->> +
->> +	ret = regmap_update_bits(info->max77802->regmap,
->> +				 MAX77802_RTC_CONTROLM, 0x0, 0x3);
-> 
-> Can you define/comment the magic number '0x3' (and probably 0x0)?
-> 
-> Anyway I'm confused here. If I'm correct few lines above you wrote the
-> same to the MAX77802_RTC_CONTROLM register. Why doing this again?
-> 
+Alignment should match open parenthesis
 
-Right, the second update is not needed indeed so I'll remove it on the next version.
+>   {
+> +		netdev_dbg(dev, "entered error warning state\n");
+> +		work_done += m_can_handle_state_change(dev,
+> +				CAN_STATE_BUS_OFF);
+> +	}
+> +
+> +	return work_done;
+> +}
+> +
+> +static int m_can_handle_bus_errors(struct net_device *dev, u32 irqstatus,
+> +							u32 psr)
 
->> +	if (ret < 0) {
->> +		dev_err(info->dev, "%s: fail to mask CONTROLM reg(%d)\n",
->> +				__func__, ret);
->> +		return ret;
->> +	}
->> +
->> +	ret = max77802_rtc_update(info, MAX77802_RTC_WRITE);
->> +
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_probe(struct platform_device *pdev)
->> +{
->> +	struct max77686_dev *max77802 = dev_get_drvdata(pdev->dev.parent);
->> +	struct max77802_rtc_info *info;
->> +	int ret;
->> +
->> +	dev_info(&pdev->dev, "%s\n", __func__);
->> +
->> +	info = devm_kzalloc(&pdev->dev, sizeof(struct max77802_rtc_info),
->> +			    GFP_KERNEL);
->> +	if (!info)
->> +		return -ENOMEM;
->> +
->> +	mutex_init(&info->lock);
->> +	info->dev = &pdev->dev;
->> +	info->max77802 = max77802;
->> +	info->rtc = max77802->i2c;
->> +
->> +	platform_set_drvdata(pdev, info);
->> +
->> +	ret = max77802_rtc_init_reg(info);
->> +
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "Failed to initialize RTC reg:%d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +#ifdef MAX77802_RTC_WTSR_SMPL
->> +	max77802_rtc_enable_wtsr(info, true);
->> +	max77802_rtc_enable_smpl(info, true);
->> +#endif
->> +
->> +	device_init_wakeup(&pdev->dev, 1);
->> +
->> +	info->rtc_dev = devm_rtc_device_register(&pdev->dev, "max77802-rtc",
->> +						 &max77802_rtc_ops, THIS_MODULE);
->> +
->> +	if (IS_ERR(info->rtc_dev)) {
->> +		dev_info(&pdev->dev, "%s: fail\n", __func__);
->> +
->> +		ret = PTR_ERR(info->rtc_dev);
->> +		dev_err(&pdev->dev, "Failed to register RTC device: %d\n", ret);
->> +		if (ret == 0)
->> +			ret = -EINVAL;
->> +		return ret;
->> +	}
->> +	info->virq = regmap_irq_get_virq(max77802->rtc_irq_data,
->> +					 MAX77686_RTCIRQ_RTCA1);
->> +
->> +	if (info->virq <= 0) {
->> +		dev_err(&pdev->dev, "Failed to get virtual IRQ %d\n",
->> +			MAX77686_RTCIRQ_RTCA1);
->> +		ret = -EINVAL;
->> +		return ret;
->> +	}
->> +
->> +	ret = devm_request_threaded_irq(&pdev->dev, info->virq, NULL,
->> +					max77802_rtc_alarm_irq, 0, "rtc-alarm1",
->> +					info);
->> +	if (ret < 0)
->> +		dev_err(&pdev->dev, "Failed to request alarm IRQ: %d: %d\n",
->> +			info->virq, ret);
->> +
->> +	return ret;
->> +}
->> +
->> +static int max77802_rtc_remove(struct platform_device *pdev)
->> +{
->> +	struct max77802_rtc_info *info = platform_get_drvdata(pdev);
->> +
->> +	free_irq(info->virq, info);
->> +	rtc_device_unregister(info->rtc_dev);
-> 
-> Both are allocated with devm() code so this will lead to double free and
-> unregister.
-> 
+Alignment should match open parenthesis
 
-You are right, in fact the whole .remove function handler can go away in that
-case. I'll do in the next version as well.
+> +{
+> +	int work_done = 0;
+> +
+> +	if (irqstatus & IR_RF0L)
+> +		work_done += m_can_handle_lost_msg(dev);
+> +
+> +	/* handle lec errors on the bus */
+> +	if (psr & LEC_UNUSED)
+> +		work_done += m_can_handle_lec_err(dev,
+> +				psr & LEC_UNUSED);
+> +
+> +	/* other unproccessed error interrupts */
+> +	if (irqstatus & IR_WDI)
+> +		netdev_err(dev, "Message RAM Watchdog event due to missing READY\n");
+> +	if (irqstatus & IR_TOO)
+> +		netdev_err(dev, "Timeout reached\n");
+> +	if (irqstatus & IR_MRAF)
+> +		netdev_err(dev, "Message RAM access failure occurred\n");
+> +
+> +	return work_done;
+> +}
+> +
+> +static int m_can_poll(struct napi_struct *napi, int quota)
+> +{
+> +	struct net_device *dev = napi->dev;
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	int work_done = 0;
+> +	u32 irqstatus, psr;
+> +
+> +	irqstatus = priv->irqstatus | m_can_read(priv, M_CAN_IR);
+> +	if (!irqstatus)
+> +		goto end;
+> +
+> +	psr = m_can_read(priv, M_CAN_PSR);
+> +	if (irqstatus & IR_ERR_STATE)
+> +		work_done += m_can_handle_state_errors(dev, psr);
+> +
+> +	if (irqstatus & IR_ERR_BUS)
+> +		work_done += m_can_handle_bus_errors(dev, irqstatus, psr);
+> +
+> +	if (irqstatus & IR_RF0N)
+> +		/* handle events corresponding to receive message objects */
+> +		work_done += m_can_do_rx_poll(dev, (quota - work_done));
+> +
+> +	if (work_done < quota) {
+> +		napi_complete(napi);
+> +		m_can_enable_all_interrupts(priv);
+> +	}
+> +
+> +end:
+> +	return work_done;
+> +}
+> +
+> +static irqreturn_t m_can_isr(int irq, void *dev_id)
+> +{
+> +	struct net_device *dev = (struct net_device *)dev_id;
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	struct net_device_stats *stats = &dev->stats;
+> +	u32 ir;
+> +
+> +	ir = m_can_read(priv, M_CAN_IR);
+> +	if (!ir)
+> +		return IRQ_NONE;
+> +
+> +	/* ACK all irqs */
+> +	if (ir & IR_ALL_INT)
+> +		m_can_write(priv, M_CAN_IR, ir);
+> +
+> +	/*
+> +	 * schedule NAPI in case of
+> +	 * - rx IRQ
+> +	 * - state change IRQ
+> +	 * - bus error IRQ and bus error reporting
+> +	 */
 
-> Best regards,
-> Krzysztof
+networking block comments don't use an empty /* line, use /* Comment
 
-Best regards,
-Javier
+> +	if ((ir & IR_RF0N) || (ir & IR_ERR_ALL)) {
+> +		priv->irqstatus = ir;
+> +		m_can_disable_all_interrupts(priv);
+> +		napi_schedule(&priv->napi);
+> +	}
+> +
+> +	/* transmission complete interrupt */
+> +	if (ir & IR_TC) {
+> +		stats->tx_bytes += can_get_echo_skb(dev, 0);
+> +		stats->tx_packets++;
+> +		can_led_event(dev, CAN_LED_EVENT_TX);
+> +		netif_wake_queue(dev);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static const struct can_bittiming_const m_can_bittiming_const = {
+> +	.name = KBUILD_MODNAME,
+> +	.tseg1_min = 2,		/* Time segment 1 = prop_seg + phase_seg1 */
+> +	.tseg1_max = 64,
+> +	.tseg2_min = 1,		/* Time segment 2 = phase_seg2 */
+> +	.tseg2_max = 16,
+> +	.sjw_max = 16,
+> +	.brp_min = 1,
+> +	.brp_max = 1024,
+> +	.brp_inc = 1,
+> +};
+> +
+> +static int m_can_set_bittiming(struct net_device *dev)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	const struct can_bittiming *bt = &priv->can.bittiming;
+> +	u16 brp, sjw, tseg1, tseg2;
+> +	u32 reg_btp;
+> +
+> +	brp = bt->brp - 1;
+> +	sjw = bt->sjw - 1;
+> +	tseg1 = bt->prop_seg + bt->phase_seg1 - 1;
+> +	tseg2 = bt->phase_seg2 - 1;
+> +	reg_btp = (brp << BTR_BRP_SHIFT) | (sjw << BTR_SJW_SHIFT) |
+> +			(tseg1 << BTR_TSEG1_SHIFT) | (tseg2 << BTR_TSEG2_SHIFT);
+> +	m_can_write(priv, M_CAN_BTP, reg_btp);
+> +	netdev_dbg(dev, "setting BTP 0x%x\n", reg_btp);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Configure M_CAN chip:
+> + * - set rx buffer/fifo element size
+> + * - configure rx fifo
+> + * - accept non-matching frame into fifo 0
+> + * - configure tx buffer
+> + * - configure mode
+> + * - setup bittiming
+> + */
+
+networking block comments don't use an empty /* line, use /* Comment
+
+> +static void m_can_chip_config(struct net_device *dev)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	u32 cccr, test;
+> +
+> +	m_can_config_endisable(priv, true);
+> +
+> +	/* RX Buffer/FIFO Element Size 8 bytes data field */
+> +	m_can_write(priv, M_CAN_RXESC, M_CAN_RXESC_8BYTES);
+> +
+> +	/* Accept Non-matching Frames Into FIFO 0 */
+> +	m_can_write(priv, M_CAN_GFC, 0x0);
+> +
+> +	/* only support one Tx Buffer currently */
+> +	m_can_write(priv, M_CAN_TXBC, (1 << TXBC_NDTB_OFF) |
+> +		(priv->mram_off + priv->txb_off));
+> +
+> +	/* only support 8 bytes firstly */
+> +	m_can_write(priv, M_CAN_TXESC, TXESC_TBDS_8BYTES);
+> +
+> +	m_can_write(priv, M_CAN_TXEFC, 0x00010000 |
+> +		(priv->mram_off + priv->txe_off));
+> +
+> +	/* rx fifo configuration, blocking mode, fifo size 1 */
+> +	m_can_write(priv, M_CAN_RXF0C, (priv->rxf0_elems << RXFC_FS_OFF) |
+> +		RXFC_FWM_1 | (priv->mram_off + priv->rxf0_off));
+> +
+> +	m_can_write(priv, M_CAN_RXF1C, (priv->rxf1_elems << RXFC_FS_OFF) |
+> +		RXFC_FWM_1 | (priv->mram_off + priv->rxf1_off));
+> +
+> +	cccr = m_can_read(priv, M_CAN_CCCR);
+> +	cccr &= ~(CCCR_TEST | CCCR_MON);
+> +	test = m_can_read(priv, M_CAN_TEST);
+> +	test &= ~TEST_LBCK;
+> +
+> +	if (priv->can.ctrlmode & CAN_CTRLMODE_LISTENONLY)
+> +		cccr |= CCCR_MON;
+> +
+> +	if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
+> +		cccr |= CCCR_TEST;
+> +		test |= TEST_LBCK;
+> +	}
+> +
+> +	m_can_write(priv, M_CAN_CCCR, cccr);
+> +	m_can_write(priv, M_CAN_TEST, test);
+> +
+> +	/* enable all interrupts */
+> +	m_can_write(priv, M_CAN_IR, IR_ALL_INT);
+> +	m_can_write(priv, M_CAN_IE, IR_ALL_INT);
+> +	/* route all interrupts to INT0 */
+> +	m_can_write(priv, M_CAN_ILS, ILS_ALL_INT0);
+> +
+> +	/* set bittiming params */
+> +	m_can_set_bittiming(dev);
+> +
+> +	m_can_config_endisable(priv, false);
+> +}
+> +
+> +static void m_can_start(struct net_device *dev)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +
+> +	/* basic m_can configuration */
+> +	m_can_chip_config(dev);
+> +
+> +	priv->can.state = CAN_STATE_ERROR_ACTIVE;
+> +
+> +	m_can_enable_all_interrupts(priv);
+> +}
+> +
+> +static int m_can_set_mode(struct net_device *dev, enum can_mode mode)
+> +{
+> +	switch (mode) {
+> +	case CAN_MODE_START:
+> +		m_can_start(dev);
+> +		netif_wake_queue(dev);
+> +		break;
+> +	default:
+> +		return -EOPNOTSUPP;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void free_m_can_dev(struct net_device *dev)
+> +{
+> +	free_candev(dev);
+> +}
+> +
+> +static struct net_device *alloc_m_can_dev(void)
+> +{
+> +	struct net_device *dev;
+> +	struct m_can_priv *priv;
+> +
+> +	dev = alloc_candev(sizeof(struct m_can_priv), 1);
+> +	if (!dev)
+> +		return NULL;
+> +
+> +	priv = netdev_priv(dev);
+> +	netif_napi_add(dev, &priv->napi, m_can_poll, M_CAN_NAPI_WEIGHT);
+> +
+> +	priv->dev = dev;
+> +	priv->can.bittiming_const = &m_can_bittiming_const;
+> +	priv->can.do_set_mode = m_can_set_mode;
+> +	priv->can.do_get_berr_counter = m_can_get_berr_counter;
+> +	priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
+> +					CAN_CTRLMODE_LISTENONLY |
+> +					CAN_CTRLMODE_BERR_REPORTING;
+> +
+> +	return dev;
+> +}
+> +
+> +static int m_can_open(struct net_device *dev)
+> +{
+> +	int err;
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +
+> +	clk_prepare_enable(priv->hclk);
+> +	clk_prepare_enable(priv->cclk);
+> +
+> +	/* open the can device */
+> +	err = open_candev(dev);
+> +	if (err) {
+> +		netdev_err(dev, "failed to open can device\n");
+> +		goto exit_open_fail;
+> +	}
+> +
+> +	/* register interrupt handler */
+> +	err = request_irq(dev->irq, m_can_isr, IRQF_SHARED, dev->name,
+> +				dev);
+
+Alignment should match open parenthesis
+
+> +	if (err < 0) {
+> +		netdev_err(dev, "failed to request interrupt\n");
+> +		goto exit_irq_fail;
+> +	}
+> +
+> +	/* start the m_can controller */
+> +	m_can_start(dev);
+> +
+> +	can_led_event(dev, CAN_LED_EVENT_OPEN);
+> +	napi_enable(&priv->napi);
+> +	netif_start_queue(dev);
+> +
+> +	return 0;
+> +
+> +exit_irq_fail:
+> +	close_candev(dev);
+> +exit_open_fail:
+> +	clk_disable_unprepare(priv->hclk);
+> +	clk_disable_unprepare(priv->cclk);
+> +	return err;
+> +}
+> +
+> +static void m_can_stop(struct net_device *dev)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +
+> +	/* disable all interrupts */
+> +	m_can_disable_all_interrupts(priv);
+> +
+> +	clk_disable_unprepare(priv->hclk);
+> +	clk_disable_unprepare(priv->cclk);
+> +
+> +	/* set the state as STOPPED */
+> +	priv->can.state = CAN_STATE_STOPPED;
+> +}
+> +
+> +static int m_can_close(struct net_device *dev)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +
+> +	netif_stop_queue(dev);
+> +	napi_disable(&priv->napi);
+> +	m_can_stop(dev);
+> +	free_irq(dev->irq, dev);
+> +	close_candev(dev);
+> +	can_led_event(dev, CAN_LED_EVENT_STOP);
+> +
+> +	return 0;
+> +}
+> +
+> +static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
+> +					struct net_device *dev)
+> +{
+> +	struct m_can_priv *priv = netdev_priv(dev);
+> +	struct can_frame *cf = (struct can_frame *)skb->data;
+> +	u32 flags = 0, id;
+> +	void __iomem *fifo_addr;
+> +
+> +	if (can_dropped_invalid_skb(dev, skb))
+> +		return NETDEV_TX_OK;
+> +
+> +	netif_stop_queue(dev);
+> +
+> +	if (cf->can_id & CAN_RTR_FLAG)
+> +		flags |= TX_BUF_RTR;
+> +
+> +	if (cf->can_id & CAN_EFF_FLAG) {
+> +		id = cf->can_id & CAN_EFF_MASK;
+> +		flags |= TX_BUF_XTD;
+> +	} else {
+> +		id = ((cf->can_id & CAN_SFF_MASK) << 18);
+> +	}
+> +
+> +	/* message ram configuration */
+> +	fifo_addr = priv->mram_base + priv->mram_off + priv->txb_off;
+> +	writel(id | flags, fifo_addr);
+> +	writel(cf->can_dlc << 16, fifo_addr + 0x4);
+> +	writel(*(u32 *)(cf->data + 0), fifo_addr + 0x8);
+> +	writel(*(u32 *)(cf->data + 4), fifo_addr + 0xc);
+> +
+> +	can_put_echo_skb(skb, dev, 0);
+> +
+> +	/* enable first TX buffer to start transfer  */
+> +	m_can_write(priv, M_CAN_TXBTIE, 0x1);
+> +	m_can_write(priv, M_CAN_TXBAR, 0x1);
+> +
+> +	return NETDEV_TX_OK;
+> +}
+> +
+> +static const struct net_device_ops m_can_netdev_ops = {
+> +	.ndo_open = m_can_open,
+> +	.ndo_stop = m_can_close,
+> +	.ndo_start_xmit = m_can_start_xmit,
+> +};
+> +
+> +static int register_m_can_dev(struct net_device *dev)
+> +{
+> +	dev->flags |= IFF_ECHO;	/* we support local echo */
+> +	dev->netdev_ops = &m_can_netdev_ops;
+> +
+> +	return register_candev(dev);
+> +}
+> +
+> +static const struct of_device_id m_can_of_table[] = {
+> +	{ .compatible = "bosch,m_can", .data = NULL },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, m_can_of_table);
+> +
+> +static int m_can_of_parse_mram(struct platform_device *pdev,
+> +				struct m_can_priv *priv)
+
+Alignment should match open parenthesis
+
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *res;
+> +	void __iomem *addr;
+> +	u32 out_val[MRAM_CFG_LEN];
+> +	int ret;
+> +
+> +	/* message ram could be shared */
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
+> +	if (!res)
+> +		return -ENODEV;
+> +
+> +	addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> +	if (!addr)
+> +		return -ENODEV;
+> +
+> +	/* get message ram configuration */
+> +	ret = of_property_read_u32_array(np, "mram-cfg",
+> +				out_val, sizeof(out_val) / 4);
+
+Alignment should match open parenthesis
+
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "can not get message ram configuration\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	priv->mram_base = addr;
+> +	priv->mram_off = out_val[0];
+> +	priv->sidf_elems = out_val[1];
+> +	priv->sidf_off = priv->mram_off;
+> +	priv->xidf_elems = out_val[2];
+> +	priv->xidf_off = priv->sidf_off + priv->sidf_elems * SIDF_ELEMENT_SIZE;
+> +	priv->rxf0_elems = out_val[3] & RXFC_FS_MASK;
+> +	priv->rxf0_off = priv->xidf_off + priv->xidf_elems * XIDF_ELEMENT_SIZE;
+> +	priv->rxf1_elems = out_val[4] & RXFC_FS_MASK;
+> +	priv->rxf1_off = priv->rxf0_off + priv->rxf0_elems * RXF0_ELEMENT_SIZE;
+> +	priv->rxb_elems = out_val[5];
+> +	priv->rxb_off = priv->rxf1_off + priv->rxf1_elems * RXF1_ELEMENT_SIZE;
+> +	priv->txe_elems = out_val[6];
+> +	priv->txe_off = priv->rxb_off + priv->rxb_elems * RXB_ELEMENT_SIZE;
+> +	priv->txb_elems = out_val[7] & TXBC_NDTB_MASK;
+> +	priv->txb_off = priv->txe_off + priv->txe_elems * TXE_ELEMENT_SIZE;
+> +
+> +	dev_dbg(&pdev->dev, "mram_base =%p mram_off =0x%x "
+> +		"sidf %d xidf %d rxf0 %d rxf1 %d rxb %d txe %d txb %d\n",
+> +		priv->mram_base, priv->mram_off, priv->sidf_elems,
+> +		priv->xidf_elems, priv->rxf0_elems, priv->rxf1_elems,
+> +		priv->rxb_elems, priv->txe_elems, priv->txb_elems);
+
+quoted string split across lines...
+
+-- 
+Cheers,
+Varka Bhadram.
