@@ -1,62 +1,23 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 04 Jul 2014 13:19:49 +0200
-Subject: [PATCHv2 4/5] ARM: dts: rockchip: unuse the slot-node and
- deprecated the supports-highspeed for dw-mmc
-In-Reply-To: <1404128960-27225-5-git-send-email-jh80.chung@samsung.com>
-References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
- <1404128960-27225-5-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1641373.ldKZaK4qer@diego>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Fri, 4 Jul 2014 16:53:41 +0530
+Subject: [PATCH] thermal: Add missing cpumask_clear
+In-Reply-To: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
+References: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
+Message-ID: <CAK5sBcHDTgyj67xVWgtNH-Z7XU1Ykp6m650_mWBVp=Az2P6f=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 30. Juni 2014, 20:49:18 schrieb Jaehoon Chung:
-> dw-mmc controller can support multiple slots.
-> But, there are no use-cases anywhere. So we don't need to support the
-> slot-node for dw-mmc controller.
-> And "supports-highspeed" property in dw-mmc is deprecated.
-> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
-> 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Reviewed-by: Tushar Behera <trblinux@gmail.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Hi Jonghwan,
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+On Fri, Jul 4, 2014 at 3:52 PM, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
+> Cpumasks should be cleared before using.
 
+Please explain why and what is issue observed without this.
+
+>
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
 > ---
->  arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
->  1 file changed, 4 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> b/arch/arm/boot/dts/rk3066a-bqcurie2.dts index afb3273..ecea889 100644
-> --- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> +++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> @@ -59,12 +59,8 @@
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
->  			vmmc-supply = <&vcc_sd0>;
-> -
-> -			slot at 0 {
-> -				reg = <0>;
-> -				bus-width = <4>;
-> -				disable-wp;
-> -			};
-> +			bus-width = <4>;
-> +			disable-wp;
->  		};
-> 
->  		dwmmc at 10218000 { /* wifi */
-> @@ -74,12 +70,8 @@
-> 
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
-> -
-> -			slot at 0 {
-> -				reg = <0>;
-> -				bus-width = <4>;
-> -				disable-wp;
-> -			};
-> +			bus-width = <4>;
-> +			disable-wp;
->  		};
-> 
->  		gpio-keys {
+
+-- 
+Regards,
+Sachin.
