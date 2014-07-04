@@ -1,132 +1,188 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 04 Jul 2014 14:22:50 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140703174318.GE28175@arm.com>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk> <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk> <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703174318.GE28175@arm.com>
-Message-ID: <20140704132250.A2447C40ADD@trevor.secretlab.ca>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 04 Jul 2014 15:23:48 +0200
+Subject: [PATCH v6 22/23] rtc: Add driver for Maxim 77802 PMIC
+ Real-Time-Clock
+In-Reply-To: <1404479478.2653.5.camel@AMDC1943>
+References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404467722-26687-23-git-send-email-javier.martinez@collabora.co.uk>
+ <1404474972.14069.20.camel@AMDC1943> <53B6A3A3.9090300@collabora.co.uk>
+ <1404479478.2653.5.camel@AMDC1943>
+Message-ID: <53B6AAE4.4020700@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Jul 2014 18:43:18 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
-> > On Thu, Jul 3, 2014 at 11:41 AM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> > > (I've been away for a day and missed all the fun ;))
-> > >
-> > > On Wed, Jul 02, 2014 at 11:14:47PM +0100, Grant Likely wrote:
-> > >> Android is not the embedded world where we could get away with a whole
-> > >> lot. There is a *freaking huge* installed base of applications.
-> > >> Breaking them is not an option, and I think Colin's question makes it
-> > >> clear that Android is going make sure that doesn't happen regardless
-> > >> of what the mainline kernel does... and they are right to do so.
-> > >
-> > > I don't know how huge this installed base of applications is. AFAIK,
-> > > it's limited to a (maybe significant) number of Android games all based
-> > > on certain library which no longer uses SWP in its recent releases. I
-> > > may be wrong but the information I have so far is that this huge base of
-> > > applications does not go beyond Android. Furthermore, people getting a
-> > > new Android phone with ARMv8 will have to re-download applications
-> > > anyway, so the currently installed base does _not_ matter. What matters
-> > > is what is provided in the Android _app store_.
-> > 
-> > Okay, I have to bite on this one....
-> > 
-> > Ah, no. The installed base *does* matter. Breaking things under the
-> > assumption that they can be fixed with an update is a horrible reason
-> > for breaking stuff. That creates hell for developers.
+Hello Krzysztof,
+
+On 07/04/2014 03:11 PM, Krzysztof Kozlowski wrote:
+> On pi?, 2014-07-04 at 14:52 +0200, Javier Martinez Canillas wrote:
+>> Hello Krzysztof,
+>> 
+>> Thanks a lot for your feedback.
+>> 
+>> On 07/04/2014 01:56 PM, Krzysztof Kozlowski wrote:
+>> > On pi?, 2014-07-04 at 11:55 +0200, Javier Martinez Canillas wrote:
+>> >> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
+>> >> This patch adds support for the RTC and is based on a driver
+>> >> added by Simon Glass to the Chrome OS kernel 3.8 tree.
+>> >> 
+>> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> >> ---
+>> >> 
+>> >> Changes since v5: None
+>> >> 
+>> >> Changes since v4: None
+>> >> 
+>> >> Changes since v3: None
+>> >> ---
+>> >>  drivers/rtc/Kconfig        |  10 +
+>> >>  drivers/rtc/Makefile       |   1 +
+>> >>  drivers/rtc/rtc-max77802.c | 637 +++++++++++++++++++++++++++++++++++++++++++++
+>> >>  3 files changed, 648 insertions(+)
+>> >>  create mode 100644 drivers/rtc/rtc-max77802.c
+>> >> 
+>> >> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+>> >> index a672dd1..243ac72 100644
+>> >> --- a/drivers/rtc/Kconfig
+>> >> +++ b/drivers/rtc/Kconfig
+>> >> @@ -288,6 +288,16 @@ config RTC_DRV_MAX77686
+>> >>  	  This driver can also be built as a module. If so, the module
+>> >>  	  will be called rtc-max77686.
+>> >>  
+>> >> +config RTC_DRV_MAX77802
+>> >> +	tristate "Maxim 77802 RTC"
+>> >> +	depends on MFD_MAX77686
+>> >> +	help
+>> >> +	  If you say yes here you will get support for the
+>> >> +	  RTC of Maxim MAX77802 PMIC.
+>> >> +
+>> >> +	  This driver can also be built as a module. If so, the module
+>> >> +	  will be called rtc-max77802.
+>> >> +
+>> >>  config RTC_DRV_RS5C372
+>> >>  	tristate "Ricoh R2025S/D, RS5C372A/B, RV5C386, RV5C387A"
+>> >>  	help
+>> >> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+>> >> index 70347d0..247de78 100644
+>> >> --- a/drivers/rtc/Makefile
+>> >> +++ b/drivers/rtc/Makefile
+>> >> @@ -81,6 +81,7 @@ obj-$(CONFIG_RTC_DRV_MAX8998)	+= rtc-max8998.o
+>> >>  obj-$(CONFIG_RTC_DRV_MAX8997)	+= rtc-max8997.o
+>> >>  obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
+>> >>  obj-$(CONFIG_RTC_DRV_MAX77686)	+= rtc-max77686.o
+>> >> +obj-$(CONFIG_RTC_DRV_MAX77802)  += rtc-max77802.o
+>> >>  obj-$(CONFIG_RTC_DRV_MC13XXX)	+= rtc-mc13xxx.o
+>> >>  obj-$(CONFIG_RTC_DRV_MCP795)	+= rtc-mcp795.o
+>> >>  obj-$(CONFIG_RTC_DRV_MSM6242)	+= rtc-msm6242.o
+>> >> diff --git a/drivers/rtc/rtc-max77802.c b/drivers/rtc/rtc-max77802.c
+>> >> new file mode 100644
+>> >> index 0000000..2f4fc2e
+>> >> --- /dev/null
+>> >> +++ b/drivers/rtc/rtc-max77802.c
+>> >> @@ -0,0 +1,637 @@
+>> >> +/*
+>> >> + * RTC driver for Maxim MAX77802
+>> >> + *
+>> >> + * Copyright (C) 2013 Google, Inc
+>> >> + *
+>> >> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
+>> >> + *
+>> >> + *  based on rtc-max8997.c
+>> >> + *
+>> >> + *  This program is free software; you can redistribute  it and/or modify it
+>> >> + *  under  the terms of  the GNU General  Public License as published by the
+>> >> + *  Free Software Foundation;  either version 2 of the  License, or (at your
+>> >> + *  option) any later version.
+>> >> + *
+>> >> + */
+>> >> +
+>> >> +#include <linux/slab.h>
+>> >> +#include <linux/rtc.h>
+>> >> +#include <linux/delay.h>
+>> >> +#include <linux/mutex.h>
+>> >> +#include <linux/module.h>
+>> >> +#include <linux/platform_device.h>
+>> >> +#include <linux/mfd/max77686-private.h>
+>> >> +#include <linux/irqdomain.h>
+>> >> +#include <linux/regmap.h>
+>> >> +
+>> >> +/* RTC Control Register */
+>> >> +#define BCD_EN_SHIFT			0
+>> >> +#define BCD_EN_MASK			(1 << BCD_EN_SHIFT)
+>> >> +#define MODEL24_SHIFT			1
+>> >> +#define MODEL24_MASK			(1 << MODEL24_SHIFT)
+>> >> +/* RTC Update Register1 */
+>> >> +#define RTC_UDR_SHIFT			0
+>> >> +#define RTC_UDR_MASK			(1 << RTC_UDR_SHIFT)
+>> >> +#define RTC_RBUDR_SHIFT			4
+>> >> +#define RTC_RBUDR_MASK			(1 << RTC_RBUDR_SHIFT)
+>> >> +/* WTSR and SMPL Register */
+>> >> +#define WTSRT_SHIFT			0
+>> >> +#define SMPLT_SHIFT			2
+>> >> +#define WTSR_EN_SHIFT			6
+>> >> +#define SMPL_EN_SHIFT			7
+>> >> +#define WTSRT_MASK			(3 << WTSRT_SHIFT)
+>> >> +#define SMPLT_MASK			(3 << SMPLT_SHIFT)
+>> >> +#define WTSR_EN_MASK			(1 << WTSR_EN_SHIFT)
+>> >> +#define SMPL_EN_MASK			(1 << SMPL_EN_SHIFT)
+>> >> +/* RTC Hour register */
+>> >> +#define HOUR_PM_SHIFT			6
+>> >> +#define HOUR_PM_MASK			(1 << HOUR_PM_SHIFT)
+>> >> +/* RTC Alarm Enable */
+>> >> +#define ALARM_ENABLE_SHIFT		7
+>> >> +#define ALARM_ENABLE_MASK		(1 << ALARM_ENABLE_SHIFT)
+>> >> +
+>> >> +/* For the RTCAE1 register, we write this value to enable the alarm */
+>> >> +#define ALARM_ENABLE_VALUE		0x77
+>> >> +
+>> >> +#define MAX77802_RTC_UPDATE_DELAY_US	200
+>> >> +#undef MAX77802_RTC_WTSR_SMPL
+>> > 
+>> > Hmmm... I am not sure what is the purpose of this undef. It disables
+>> > some functions below. I saw same code in 77686 RTC driver but this does
+>> > not help me :).
+>> > 
+>> > If this is on purpose can you add a comment explaining the
+>> > purpose/cause?
+>> > 
+>> 
+>> This is a left over from when a combined 77686/802 driver was attempted since as
+>> you said the 77686 RTC driver does the same.
+>> 
+>> I just checked MAX77802 data sheet and the MAX77802_RTC_WTSR_SMPL register is to
+>> control the SMPL (Sudden Momentary Power Loss) and WTSR (Watchdog Timeout and
+>> Software Resets) features.
+>> 
+>> Now, I wanted to figure out why the 77686 driver unset that register and have
+>> those conditionals but git blame shows me that this was already in the original
+>> commit that added the driver: fca1dd03 ("rtc: max77686: add Maxim 77686 driver").
+>> 
+>> Also, I see that the MAX8997 driver (drivers/rtc/rtc-max8997.c) also has a
+>> similar register but actually uses it and doesn't have the conditionals if is
+>> disabled. But this driver has two module parameters to control if these features
+>> are enabled or not (wtsr_en and smpl_en).
+>> 
+>> If these two features have been disabled since the max77686 driver was merged
+>> then I guess that the dead code should be removed from that driver as well? Or
+>> do you have more hints about why it has been disabled?
 > 
-> My point is that you *cannot* upgrade your phone from ARMv7 to ARMv8
-> without re-downloading the apps. You don't carry over your filesystem
-> (installed base) on an SD card from the old phone to the new one. That's
-> where Google has some control I didn't say that Google should break
-> those apps but actively try to update them (in the meantime, they could
-> provide some form of SWP emulation).
-
-Look at Colin's original email. There are apps in the app store that
-work fine now, but have seen zero updates in the last 2 years. It is
-very unlikely that they will be upgraded. They will break on a v8 phone.
-This is a software ecosystem issue. Yes of course Google should be
-encouraging those apps to be updated, but the reality is there will be a
-non-trivial percentage of them which never will be. Breaking those
-applications is hostile to the platform.
-
-I'm concerned that this whole debate shows contempt for any kind of
-platform stability. For the first time *ever* (and, arguably, despite
-our best efforts) we have a huge ISV ecosystem for Linux. Even more
-amazingly, it's built around ARM, not x86! Woo! For years we hoped this
-would happen. So then we choose to dump all over it by deciding old binaries
-don't matter? For shame.
-
-> > So, no. I completely reject any notion that breaking existing apps is
-> > okay. If we're going to say that v8 still supports 32-bit apps, then
-> > it has to be all of v7, not just the 'good' bits. Nor do I think
-> > saying "it's just a bunch of games" justifies anything. We're kernel
-> > engineers. Applications are applications and we don't break userspace.
-> > Period.
+> If the max77802 driver in current form works fine for your setup then I
+> think these functions can be removed completely. It should not harm
+> since this is dead code anyway and it will simplify the driver.
 > 
-> Here you need to define user-space. OABI?
 
-This is where we can be pragmatic. Listen to our users. Colin was very
-clear about what some apps need in order to keep working. He's not even
-asking for old kernels or system libraries to be supported because he
-has control over those components and they can be fixed. The important
-ABI is the ABI used by Android applications.
+Agreed, I'll just remove it.
 
-We can drop ABIs that nobody uses. If nobody complains, is it really
-broken?
-
-> > > Note that I don't say Google should break those applications but they
-> > > can carry a patch in their Android kernel while reaching out to
-> > > developers to sort their code (can the Android app store be scanned?).
-> > > What I don't want is to be in a situation 10 years from now when we
-> > > still carry SWP emulation code that no-one uses but we can't remove
-> > > because it would break the user space features we agreed upon.
-> > 
-> > Welcome to system programming. This is what we do. It is a *good*
-> > thing that an x86 userspace from 1995 can still be booted.
+> I think the same applies to max77686 (especially that as you said - this
+> is dead since beginning). Just remove it in separate patch.
 > 
-> I'm not sure how much of it is just the merit of Linux but rather the
-> hardware backwards compatibility. As you can see with SWP, we don't
-> always have this on ARM (and don't blame the kernel maintainers for this
-> ;)).
+
+Ok, I'll add that as a separate cleanup patch in the next version of the series
+as well.
+
+> Best regards,
+> Krzysztof
 > 
-> The same question again - shall we support OABI or we just add ABI
-> features based on who shouts louder?
-
-Yes. Listen to the people who shout. When they shout acknowledge it as a
-bug and fix it. I'll defer to rmk on the OABI question. I don't think there
-is a OABI ecosystem that needs to be carried over to v8, but I'm not
-informed enough to take a position.
-
-> > > I have limited knowledge of Android user space but I think SWP emulation
-> > > could also be implemented in user space via a SIGILL handler in the
-> > > zygote thread and inherited by forked apps (performance doesn't really
-> > > matter here). A similar example for Android is the binder driver
-> > > user-kernel ABI. AFAIK, Google decided not to provide a compat ABI for
-> > > the 64-bit compilation of this driver but update the AArch32 user-space
-> > > library to use the new 64-bit ABI. That's perfectly fine by me, they
-> > > chose not to provide such ABI in the kernel but solve it entirely in
-> > > user space and could do the same with SWP.
-> > 
-> > Really? Why would we even want that? We're far better positioned in
-> > the kernel to present the correct behaviour that any trapping from a
-> > userspace application.
 > 
-> Because by adding it to the kernel we declare it ABI (rather than just
-> an Android issue on ARMv8 hardware; I'm not currently aware of other
-> ARMv7 Linux distros affected).
 
-It's already an ABI. That's the point. Cat, bag, out.
-
-Arguing that other distros don't have the problem is bogus because it
-presumes all distros have an ISV ecosystem. Despite trying, none of them
-have been able to achieve that yet.
-
-g.
+Best regards,
+Javier
