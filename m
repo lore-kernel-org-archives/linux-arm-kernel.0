@@ -1,24 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 4 Jul 2014 20:29:47 +0100
-Subject: [PATCH] ASoC: samsung: Correct I2S DAI suspend/resume ops
-In-Reply-To: <1404482745-29177-1-git-send-email-s.nawrocki@samsung.com>
-References: <1404482745-29177-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140704192947.GG14896@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Jul 2014 21:33:24 +0200
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140704192405.GE14896@sirena.org.uk>
+References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140704132250.A2447C40ADD@trevor.secretlab.ca>
+ <20140704192405.GE14896@sirena.org.uk>
+Message-ID: <6519224.oaibQ22oiI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 04:05:45PM +0200, Sylwester Nawrocki wrote:
-> We should save/restore relevant I2S registers regardless of
-> the dai->active flag, otherwise some settings are being lost
-> after system suspend/resume cycle. E.g. I2S slave mode set only
-> during dai initialization is not preserved and the device ends
-> up in master mode after system resume.
+On Friday 04 July 2014 20:24:05 Mark Brown wrote:
+> 
+> Another question I think it's worth asking is what the use case for 32
+> bit mode is other than preexisting binaries - I guess there's a case for
+> smaller binaries giving better cache utilisation?
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/8a3d9d20/attachment.sig>
+If you wanted that, you'd probably run x32-mode (or whatever it gets called
+on ARM64), which I'd expect to also be more efficient ;-)
+
+Seriously, backwards-compatibility is the only reason I can think of
+really, but that doesn't /have/ to mean existing binaries; there is a large
+amount of source code that can readily be compiled to any CPU as long as
+it's little-endian 32-bit.
+
+	Arnd
