@@ -1,33 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 5 Jul 2014 01:04:10 +0200
-Subject: [PATCH v2 2/4] pinctrl: Add NVIDIA Tegra XUSB pad controller
- support
-In-Reply-To: <539A0FE9.1080802@wwwdotorg.org>
-References: <1402398708-10722-1-git-send-email-thierry.reding@gmail.com>
- <1402398708-10722-2-git-send-email-thierry.reding@gmail.com>
- <539A0FE9.1080802@wwwdotorg.org>
-Message-ID: <CACRpkdZvO-RZZKDtbFY6Uv5Td2NJ828xj0sVbTh2=ehx7Ha6fA@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Fri, 4 Jul 2014 16:05:29 -0700
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <20140703163200.GA17372@arm.com>
+References: <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+ <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+ <20140623084608.GA9316@arm.com>
+ <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
+ <20140624085405.GA26013@arm.com> <53B5098B.9050801@linaro.org>
+ <20140703102450.GD12958@arm.com>
+ <CALCETrWQdHmn0-so1JHFoT-2A02mgcxDUb3jphSQmBGn-SQ+pA@mail.gmail.com>
+ <20140703161154.GF14305@arm.com>
+ <CALCETrXNQ0aLsE03mM0rdt-3mWP1Zze-nHSsME7Bwcf=5DyisA@mail.gmail.com>
+ <20140703163200.GA17372@arm.com>
+Message-ID: <CALCETrUCX0sF5TBqfx1qzv4FKbesEKjr9KggF_kD4+yLQtFKnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 10:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/10/2014 05:11 AM, Thierry Reding wrote:
-
-> Aside from the issue Andrew pointed out, this series looks good to me.
-> I'll apply once that one issue is fixed.
+On Thu, Jul 3, 2014 at 9:32 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jul 03, 2014 at 05:13:50PM +0100, Andy Lutomirski wrote:
+>> On Thu, Jul 3, 2014 at 9:11 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Thu, Jul 03, 2014 at 04:39:21PM +0100, Andy Lutomirski wrote:
+>> >> On Thu, Jul 3, 2014 at 3:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > On Thu, Jul 03, 2014 at 08:43:07AM +0100, AKASHI Takahiro wrote:
+>> >> >> So it seems to me that we can't change a system call by ptrace().
+>> >> >> Do I misunderstand anything?
+>> >> >
+>> >> > No, it looks like you have a point here. I don't think userspace has any
+>> >> > business with orig_x0, but changing syscallno is certainly useful. I can
+>> >> > think of two ways to fix this:
+>> >> >
+>> >> >   (1) Updating syscallno based on w8, but this ties us to the current ABI
+>> >> >       and could get messy if this register changes in the future.
+>> >> >
+>> >> >   (2) Adding a PTRACE_SET_SYSCALL request, like we have for arch/arm/,
+>> >> >       but that means adding arch-specific stuff to arch_ptrace (which
+>> >> >       currently goes straight to ptrace_request on arm64).
+>> >> >
+>> >> > It looks like x86 uses orig_ax, which I *think* means we would go with
+>> >> > (1) above if we followed their lead.
+>> >>
+>> >> w8 is a real register, right?  On x86, at least orig_ax isn't a real
+>> >> register, so it's quite unlikely to conflict with hardware stuff.
+>> >
+>> > Yeah, w8 is the hardware register which the Linux ABI uses for the system
+>> > call number. I was thinking We could allow the debugger/tracer to update
+>> > the syscall number by updating that register, or do you see an issue with
+>> > that? (other than tying us to the current ABI).
+>>
+>> Not immediately, but I'm not super-familiar with ptrace.
+>>
+>> Is w8 clobbered or otherwise changed by syscalls?  Using w8 for this
+>> has the odd effect that tracers can't force a return with a specific
+>> value of w8 without executing the corresponding syscall.  If that's a
+>> meaningful limitation, then presumably some other channel should be
+>> used.
 >
-> Linus,
+> Hmm, that's true. Currently w8 is preserved across a syscall by the kernel,
+> so it would be pretty bizarre for somebody to try and modify it but I guess
+> they could do it if they wanted to. However, they could just as easily
+> modify it on the syscall return path and have the same effect...
 >
-> Patch 2 (pinctrl driver) depends on patch 1 (binding header), and there
-> are other patches that will also depend on the binding header in patch
-> 1. I guess I should apply patch 1 in a topic branch and send you a pull
-> request which you can merge before applying patch 2. Does that sound OK
-> to you?
+> Furthermore, glibc unconditionally emits a mov into w8 prior to the svc
+> instruction, so from a user's perspective that register always contains
+> the system call number.
 
-Bah I've got some mess in my mailbox.
+That means that, if someone uses a seccomp trace action to skip or
+emulate a syscall by writing -1 to w8, then user code will see an
+unexpected -1 in w8.  I don't know how much this matters.
 
-Please proceed as this Stephen, I trust your pull request will
-be fine.
+>
+> FWIW: the role of w8 in the PCS is `Indirect result location register', so
+> I'd expect it to be saved across the syscall anyway.
+>
+> Will
 
-Yours,
-Linus Walleij
+
+
+-- 
+Andy Lutomirski
+AMA Capital Management, LLC
