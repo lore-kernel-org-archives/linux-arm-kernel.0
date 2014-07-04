@@ -1,81 +1,73 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 4 Jul 2014 17:10:29 +0300
-Subject: [PATCH 04/10] ARM: OMAP3: PRM: add API for checking and clearing cold
- reset status
+Date: Fri, 4 Jul 2014 17:10:28 +0300
+Subject: [PATCH 03/10] ARM: OMAP3: PRM: move modem reset to PRM driver
 In-Reply-To: <1404483035-21666-1-git-send-email-t-kristo@ti.com>
 References: <1404483035-21666-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404483035-21666-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1404483035-21666-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This isolates the PRM register access within the PRM driver.
+This is a more proper isolation of the code. Done in preparation of making
+PRM an individual driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/control.c |    6 +-----
- arch/arm/mach-omap2/prm3xxx.c |   20 ++++++++++++++++++++
+ arch/arm/mach-omap2/pm34xx.c  |    5 +----
+ arch/arm/mach-omap2/prm3xxx.c |   15 +++++++++++++++
  arch/arm/mach-omap2/prm3xxx.h |    1 +
- 3 files changed, 22 insertions(+), 5 deletions(-)
+ 3 files changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 751f354..f8eb3e4 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -282,13 +282,9 @@ void omap3_clear_scratchpad_contents(void)
- 	void __iomem *v_addr;
- 	u32 offset = 0;
- 	v_addr = OMAP2_L4_IO_ADDRESS(OMAP343X_SCRATCHPAD_ROM);
--	if (omap2_prm_read_mod_reg(OMAP3430_GR_MOD, OMAP3_PRM_RSTST_OFFSET) &
--	    OMAP3430_GLOBAL_COLD_RST_MASK) {
-+	if (omap3xxx_prm_clear_global_cold_reset()) {
- 		for ( ; offset <= max_offset; offset += 0x4)
- 			writel_relaxed(0x0, (v_addr + offset));
--		omap2_prm_set_mod_reg_bits(OMAP3430_GLOBAL_COLD_RST_MASK,
--					   OMAP3430_GR_MOD,
--					   OMAP3_PRM_RSTST_OFFSET);
- 	}
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 6d02573..acb895d 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -371,10 +371,7 @@ static void __init omap3_d2d_idle(void)
+ 	omap_ctrl_writew(padconf, OMAP3_PADCONF_SAD2D_IDLEACK);
+ 
+ 	/* reset modem */
+-	omap2_prm_write_mod_reg(OMAP3430_RM_RSTCTRL_CORE_MODEM_SW_RSTPWRON_MASK |
+-			  OMAP3430_RM_RSTCTRL_CORE_MODEM_SW_RST_MASK,
+-			  CORE_MOD, OMAP2_RM_RSTCTRL);
+-	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP2_RM_RSTCTRL);
++	omap3_prm_reset_modem();
  }
  
+ static void __init prcm_setup_regs(void)
 diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index e46ff71..4733c28 100644
+index a575b69..e46ff71 100644
 --- a/arch/arm/mach-omap2/prm3xxx.c
 +++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -389,6 +389,26 @@ void omap3xxx_prm_iva_idle(void)
- 				OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+@@ -260,6 +260,21 @@ int omap3xxx_prm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
  }
  
-+/**
-+ * omap3xxx_prm_clear_global_cold_reset - checks the global cold reset status
-+ *					  and clears it if asserted
+ /**
++ * omap3_prm_reset_modem - toggle reset signal for modem
 + *
-+ * Checks if cold-reset has occurred and clears the status bit if yes. Returns
-+ * 1 if cold-reset has occurred, 0 otherwise.
++ * Toggles the reset signal to modem IP block. Required to allow
++ * OMAP3430 without stacked modem to idle properly.
 + */
-+int omap3xxx_prm_clear_global_cold_reset(void)
++void __init omap3_prm_reset_modem(void)
 +{
-+	if (omap2_prm_read_mod_reg(OMAP3430_GR_MOD, OMAP3_PRM_RSTST_OFFSET) &
-+	    OMAP3430_GLOBAL_COLD_RST_MASK) {
-+		omap2_prm_set_mod_reg_bits(OMAP3430_GLOBAL_COLD_RST_MASK,
-+					   OMAP3430_GR_MOD,
-+					   OMAP3_PRM_RSTST_OFFSET);
-+		return 1;
-+	}
-+
-+	return 0;
++	omap2_prm_write_mod_reg(
++		OMAP3430_RM_RSTCTRL_CORE_MODEM_SW_RSTPWRON_MASK |
++		OMAP3430_RM_RSTCTRL_CORE_MODEM_SW_RST_MASK,
++				CORE_MOD, OMAP2_RM_RSTCTRL);
++	omap2_prm_write_mod_reg(0, CORE_MOD, OMAP2_RM_RSTCTRL);
 +}
 +
- /* Powerdomain low-level functions */
- 
- static int omap3_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
++/**
+  * omap3xxx_prm_reconfigure_io_chain - clear latches and reconfigure I/O chain
+  *
+  * Clear any previously-latched I/O wakeup events and ensure that the
 diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
-index 21eb1d5..7548ae0 100644
+index 007ff59..21eb1d5 100644
 --- a/arch/arm/mach-omap2/prm3xxx.h
 +++ b/arch/arm/mach-omap2/prm3xxx.h
-@@ -165,6 +165,7 @@ extern u32 omap3xxx_prm_get_reset_sources(void);
+@@ -164,6 +164,7 @@ extern int __init omap3xxx_prm_init(void);
+ extern u32 omap3xxx_prm_get_reset_sources(void);
  int omap3xxx_prm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits);
  void omap3xxx_prm_iva_idle(void);
- void omap3_prm_reset_modem(void);
-+int omap3xxx_prm_clear_global_cold_reset(void);
++void omap3_prm_reset_modem(void);
  
  #endif /* __ASSEMBLER */
  
