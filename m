@@ -1,60 +1,118 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Fri, 4 Jul 2014 11:46:44 +0530
-Subject: [PATCH v3 2/3] soc: qcom-rpm: Driver for the Qualcomm RPM
-In-Reply-To: <1402944372-31901-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1402944372-31901-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAMf-jSkvfE8miYk_JtTkEUd3AE-ze9E-1c3ourgbEm_SOkAPKw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 04 Jul 2014 08:18:05 +0200
+Subject: [PATCH 2/3] clocksource: add device-tree support for PXA timer
+In-Reply-To: <87tx6ynybb.fsf@free.fr>
+References: <1403388588-11956-1-git-send-email-robert.jarzmik@free.fr>	<1403388588-11956-2-git-send-email-robert.jarzmik@free.fr>	<53B5470D.4070009@linaro.org>
+ <87tx6ynybb.fsf@free.fr>
+Message-ID: <53B6471D.3010001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On Tue, Jun 17, 2014 at 12:16 AM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> Driver for the Resource Power Manager (RPM) found in Qualcomm 8660, 8960
-> and 8064 based devices. The driver exposes resources that child drivers
-> can operate on; to implementing regulator, clock and bus frequency
-> drivers.
+On 07/03/2014 07:31 PM, Robert Jarzmik wrote:
+> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 >
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  drivers/soc/qcom/Kconfig     |  14 ++
->  drivers/soc/qcom/Makefile    |   1 +
->  drivers/soc/qcom/qcom_rpm.c  | 573 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/soc/qcom_rpm.h |  12 +
->  4 files changed, 600 insertions(+)
->  create mode 100644 drivers/soc/qcom/qcom_rpm.c
->  create mode 100644 include/linux/soc/qcom_rpm.h
+>>> -#include <mach/regs-ost.h>
+>>>    #include <mach/irqs.h>
+>>> +#include <mach/hardware.h>
+>>
+>> Now as the driver is in 'drivers', do not reference the headers files in
+>> mach. Moving the driver to the drivers directory implies some cleanup with the
+>> headers dependencies.
+> I don't see that very possible.
+> Or said another way, I don't see how the irq number, IRQ_OST0 (in mach/irqs.h)
+> can be guessed for non device-tree configuration.
 >
-> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> index 7bd2c94..a8c2a96 100644
-> --- a/drivers/soc/qcom/Kconfig
-> +++ b/drivers/soc/qcom/Kconfig
-> @@ -9,3 +9,17 @@ config QCOM_GSBI
->            functions for connecting the underlying serial UART, SPI, and I2C
->            devices to the output pins.
+>>> +#define OSMR0		0x00	/* */
+>>> +#define OSMR1		0x04	/* */
+>>> +#define OSMR2		0x08	/* */
+>>> +#define OSMR3		0x0C	/* */
+>>> +#define OSMR4		0x80	/* */
+>>
+>> Can you please remove those unused empty comment or fill them with something
+>> appropriate.
+> Sure.
 >
-> +config QCOM_RPM
-> +       tristate "Qualcomm Resource Power Manager (RPM)"
-> +       depends on ARCH_QCOM && OF
-> +       help
-> +         If you say yes to this option, support will be included for the
-> +         Resource Power Manager system found in the Qualcomm 8660, 8960 and
-> +         8064 based devices.
-> +
-> +         This is required to access many regulators, clocks and bus
-> +         frequencies controlled by the RPM on these devices.
-> +
-> +         Say M here if you want to include support for the Qualcomm RPM as a
-> +         module. This will build a module called "qcom_rpm".
-> +
-Adds extra line EOF here.
+>>
+>>> +#define OSCR		0x10	/* OS Timer Counter Register */
+>>> +#define OSCR4		0x40	/* OS Timer Counter Register */
+>>> +#define OMCR4		0xC0	/* */
+>>> +#define OSSR		0x14	/* OS Timer Status Register */
+>>> +#define OWER		0x18	/* OS Timer Watchdog Enable Register */
+>>> +#define OIER		0x1C	/* OS Timer Interrupt Enable Register */
+>>> +
+>>> +#define OSSR_M3		(1 << 3)	/* Match status channel 3 */
+>>> +#define OSSR_M2		(1 << 2)	/* Match status channel 2 */
+>>> +#define OSSR_M1		(1 << 1)	/* Match status channel 1 */
+>>> +#define OSSR_M0		(1 << 0)	/* Match status channel 0 */
+>>> +
+>>> +#define OWER_WME	(1 << 0)	/* Watchdog Match Enable */
+>>> +
+>>> +#define OIER_E3		(1 << 3)	/* Interrupt enable channel 3 */
+>>> +#define OIER_E2		(1 << 2)	/* Interrupt enable channel 2 */
+>>> +#define OIER_E1		(1 << 1)	/* Interrupt enable channel 1 */
+>>> +#define OIER_E0		(1 << 0)	/* Interrupt enable channel 0 */
+>>
+>> Is it possible to do some cleanups around regs-ost.h and here in order to remove
+>> the unused macros. Also, it seems some define will be duplicate as they are
+>> shared with the watchdog. Any plan to fix that ?
+> For the cleanup, yes, will do.
+>
+> For the watchdog I don't have any plan yet. This patch's purpose is only to
+> bring the PXA time source to drivers/clocksource, and make it compatible with
+> both device-tree and non device-tree builds.
+>
+>>> @@ -33,9 +60,14 @@
+>>>     * calls to sched_clock() which should always be the case in practice.
+>>>     */
+>>>
+>>> +#define timer_readl(reg) readl_relaxed(timer_base + (reg))
+>>> +#define timer_writel(val, reg) writel_relaxed((val), timer_base + (reg))
+>>> +
+>>> +static void __iomem *timer_base;
+>>> +
+>>>    static u64 notrace pxa_read_sched_clock(void)
+>>>    {
+>>> -	return readl_relaxed(OSCR);
+>>
+>> So here there is a change which is not explained in the changelog (timer_base
+>> offset).
+>>
+>> Even it is obvious for me because I am used to see this kind of code, that would
+>> deserve a better description in the changelog.
+> OK, I'll add the backward compatibility explanation with non device-tree builds,
+> and the necessary timer_base iomem hard encoded value. And the Janus double face
+> explanation of the driver (both DT and non-DT oriented).
+>
+> Another question brought up by this : if I remove all 'mach/' includes, I loose
+> io_p2v() right ? How can I guess timer_base then ?
+>
+>>> +	/* we are only interested in OS-timer0 irq */
+>>> +	irq = irq_of_parse_and_map(np, 0);
+>>> +	if (irq <= 0)
+>>> +		panic("%s: unable to parse OS-timer0 irq\n", np->name);
+>>
+>> Is the 'panic' desirable ? The clksrc-of is written in a way to use different
+>> clocks, no ?
+> Good question.
+>
+> Maybe not, I followed the same rationale as in orion-timer, which is :
+>   - as this timer is the only possible timer for PXA boards, and because without
+>   it the kernel boot will stall (scheduling will be blocked), it's better to
+>   panic early that to remain stalled.
 
-> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-> index 4389012..e7706e8 100644
-> --- a/drivers/soc/qcom/Makefile
+There isn't the arm global timer ?
+
+> Isn't this a good approach ?
+
+I suppose we can live with that. IMO, the right fix would be in 
+clksrc-of to pr_crit a message when an initialization fails. But that 
+means to change all the init functions for all drivers which is out of 
+the scope of this patchset.
 
 
-br,
-Pramod
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
