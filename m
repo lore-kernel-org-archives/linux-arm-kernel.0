@@ -1,47 +1,47 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  4 Jul 2014 10:30:46 +0200
-Subject: [PATCH 5/5] imx-drm: use for_each_endpoint_of_node macro in
- imx_drm_encoder_get_mux_id
+Date: Fri,  4 Jul 2014 10:30:43 +0200
+Subject: [PATCH 2/5] of: Decrement refcount of previous endpoint in
+ of_graph_get_next_endpoint
 In-Reply-To: <1404462646-1769-1-git-send-email-p.zabel@pengutronix.de>
 References: <1404462646-1769-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1404462646-1769-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1404462646-1769-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the for_each_... macro should make the code bit shorter and
-easier to read. This patch also properly decrements the endpoint node
-reference count before returning out of the loop.
+Decreasing the reference count of the previous endpoint node allows to use
+the of_graph_get_next_endpoint function in a for_each_... style macro.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ drivers/of/base.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index e6663dd..4881fd9 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -447,18 +447,15 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
- 	if (!node || !imx_crtc)
- 		return -EINVAL;
- 
--	do {
--		ep = of_graph_get_next_endpoint(node, ep);
--		if (!ep)
--			break;
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 8368d96..9480e10 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -2262,8 +2262,7 @@ EXPORT_SYMBOL(of_graph_parse_endpoint);
+  * @prev: previous endpoint node, or NULL to get first
+  *
+  * Return: An 'endpoint' node pointer with refcount incremented. Refcount
+- * of the passed @prev node is not decremented, the caller have to use
+- * of_node_put() on it when done.
++ * of the passed @prev node is decremented.
+  */
+ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
+ 					struct device_node *prev)
+@@ -2299,12 +2298,6 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
+ 		if (WARN_ONCE(!port, "%s(): endpoint %s has no parent node\n",
+ 			      __func__, prev->full_name))
+ 			return NULL;
 -
-+	for_each_endpoint_of_node(node, ep) {
- 		port = of_graph_get_remote_port(ep);
- 		of_node_put(port);
- 		if (port == imx_crtc->crtc->port) {
- 			ret = of_graph_parse_endpoint(ep, &endpoint);
-+			of_node_put(ep);
- 			return ret ? ret : endpoint.port;
- 		}
--	} while (ep);
-+	}
+-		/*
+-		 * Avoid dropping prev node refcount to 0 when getting the next
+-		 * child below.
+-		 */
+-		of_node_get(prev);
+ 	}
  
- 	return -EINVAL;
- }
+ 	while (1) {
 -- 
 2.0.0
