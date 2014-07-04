@@ -1,62 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Jul 2014 11:52:58 +0100
-Subject: [PATCH v3 3/8] component: add support for component match array
-In-Reply-To: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
-References: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
-Message-ID: <20140704105258.GF21766@n2100.arm.linux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 04 Jul 2014 12:54:05 +0200
+Subject: [PATCH v6 06/23] mfd: max77686: Make error checking consistent
+In-Reply-To: <1404467722-26687-7-git-send-email-javier.martinez@collabora.co.uk>
+References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404467722-26687-7-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1404471245.14069.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 04:17:35PM +0530, Sachin Kamat wrote:
-> Hi Russell
+On pi?, 2014-07-04 at 11:55 +0200, Javier Martinez Canillas wrote:
+> Error checking across the driver is mostly consistent besides
+> a few exceptions, so change these exceptions for consistency.
 > 
-> > +int component_master_add_with_match(struct device *dev,
-> > +       const struct component_master_ops *ops,
-> > +       struct component_match *match)
-> >  {
-> >         struct master *master;
-> >         int ret;
-> >
-> > +       if (ops->add_components && match)
-> > +               return -EINVAL;
-> > +
-> > +       /* Reallocate the match array for its true size */
-> > +       match = component_match_realloc(dev, match, match->num);
-> 
->            ^^^^^^^^^^^^^
-> This gives a NULL pointer dereference error when match is NULL (as passed
-> by component_master_add() below). Observed this while testing linux-next
-> kernel (next-20140704) on Exynos based board with DRM enabled.
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  drivers/mfd/max77686.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 
-Thanks for your report.  Please verify that the patch below resolves it
-for you.  Thanks.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
- drivers/base/component.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index b4236daed4fa..f748430bb654 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -293,10 +293,12 @@ int component_master_add_with_match(struct device *dev,
- 	if (ops->add_components && match)
- 		return -EINVAL;
- 
--	/* Reallocate the match array for its true size */
--	match = component_match_realloc(dev, match, match->num);
--	if (IS_ERR(match))
--		return PTR_ERR(match);
-+	if (match) {
-+		/* Reallocate the match array for its true size */
-+		match = component_match_realloc(dev, match, match->num);
-+		if (IS_ERR(match))
-+			return PTR_ERR(match);
-+	}
- 
- 	master = kzalloc(sizeof(*master), GFP_KERNEL);
- 	if (!master)
+Best regards,
+Krzysztof
 
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+> index ada4976..87fe52e 100644
+> --- a/drivers/mfd/max77686.c
+> +++ b/drivers/mfd/max77686.c
+> @@ -134,7 +134,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>  
+>  	max77686 = devm_kzalloc(&i2c->dev,
+>  				sizeof(struct max77686_dev), GFP_KERNEL);
+> -	if (max77686 == NULL)
+> +	if (!max77686)
+>  		return -ENOMEM;
+>  
+>  	i2c_set_clientdata(i2c, max77686);
+> @@ -153,8 +153,8 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>  		return ret;
+>  	}
+>  
+> -	if (regmap_read(max77686->regmap,
+> -			 MAX77686_REG_DEVICE_ID, &data) < 0) {
+> +	ret = regmap_read(max77686->regmap, MAX77686_REG_DEVICE_ID, &data);
+> +	if (ret < 0) {
+>  		dev_err(max77686->dev,
+>  			"device not found on this channel (this is not an error)\n");
+>  		return -ENODEV;
+> @@ -180,7 +180,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>  				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+>  				  IRQF_SHARED, 0, &max77686_irq_chip,
+>  				  &max77686->irq_data);
+> -	if (ret != 0) {
+> +	if (ret) {
+>  		dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
+>  		goto err_unregister_i2c;
+>  	}
+> @@ -188,7 +188,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>  				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+>  				  IRQF_SHARED, 0, &max77686_rtc_irq_chip,
+>  				  &max77686->rtc_irq_data);
+> -	if (ret != 0) {
+> +	if (ret) {
+>  		dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
+>  		goto err_del_irqc;
+>  	}
