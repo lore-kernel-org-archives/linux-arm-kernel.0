@@ -1,67 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Jul 2014 12:54:05 +0200
-Subject: [PATCH v6 06/23] mfd: max77686: Make error checking consistent
-In-Reply-To: <1404467722-26687-7-git-send-email-javier.martinez@collabora.co.uk>
-References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404467722-26687-7-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1404471245.14069.1.camel@AMDC1943>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Jul 2014 11:57:00 +0100
+Subject: [PATCH v10 1/3] arm64: Add __NR_* definitions for compat syscalls
+In-Reply-To: <5418828.mxvNk2rT0e@wuerfel>
+References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
+ <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
+ <5418828.mxvNk2rT0e@wuerfel>
+Message-ID: <20140704105700.GD16404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-07-04 at 11:55 +0200, Javier Martinez Canillas wrote:
-> Error checking across the driver is mostly consistent besides
-> a few exceptions, so change these exceptions for consistency.
+On Fri, Jul 04, 2014 at 11:06:07AM +0100, Arnd Bergmann wrote:
+> On Friday 04 July 2014 16:28:29 AKASHI Takahiro wrote:
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> > 
+> > This patch adds __NR_* definitions to asm/unistd32.h, moves the
+> > __NR_compat_* definitions to asm/unistd.h and removes all the explicit
+> > unistd32.h includes apart from the one building the compat syscall
+> > table. The aim is to have the compat __NR_* definitions available but
+> > without colliding with the native syscall definitions.
+> > 
+> > And adds more syscall definitions for 3.16.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/mfd/max77686.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> Can you explain in more detail why you want to add those macros? I've
+> looked at all three patches in the series but can't find any code using
+> them.
+> 
+> I would expect that we don't need to define those macros at all for
+> compat mode, since they are meant primarily for user space (glibc)
+> compilation, which gets them from arch/arm/include/asm/unistd.h.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+That's coming from commit 4b58841149dc (audit: Add generic compat
+syscall support). The compat_audit.c code reuses some of the existing
+asm-generic/audit_*.h headers which depend on __NR_* definitions (rather
+than __NR_COMPAT_*). Akashi's suggestion was to include a unistd32.h,
+hence this patch.
 
-Best regards,
-Krzysztof
-
-
-> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-> index ada4976..87fe52e 100644
-> --- a/drivers/mfd/max77686.c
-> +++ b/drivers/mfd/max77686.c
-> @@ -134,7 +134,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  
->  	max77686 = devm_kzalloc(&i2c->dev,
->  				sizeof(struct max77686_dev), GFP_KERNEL);
-> -	if (max77686 == NULL)
-> +	if (!max77686)
->  		return -ENOMEM;
->  
->  	i2c_set_clientdata(i2c, max77686);
-> @@ -153,8 +153,8 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  		return ret;
->  	}
->  
-> -	if (regmap_read(max77686->regmap,
-> -			 MAX77686_REG_DEVICE_ID, &data) < 0) {
-> +	ret = regmap_read(max77686->regmap, MAX77686_REG_DEVICE_ID, &data);
-> +	if (ret < 0) {
->  		dev_err(max77686->dev,
->  			"device not found on this channel (this is not an error)\n");
->  		return -ENODEV;
-> @@ -180,7 +180,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
->  				  IRQF_SHARED, 0, &max77686_irq_chip,
->  				  &max77686->irq_data);
-> -	if (ret != 0) {
-> +	if (ret) {
->  		dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
->  		goto err_unregister_i2c;
->  	}
-> @@ -188,7 +188,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
->  				  IRQF_SHARED, 0, &max77686_rtc_irq_chip,
->  				  &max77686->rtc_irq_data);
-> -	if (ret != 0) {
-> +	if (ret) {
->  		dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
->  		goto err_del_irqc;
->  	}
+-- 
+Catalin
