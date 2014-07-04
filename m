@@ -1,124 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 4 Jul 2014 17:10:35 +0300
-Subject: [PATCH 10/10] ARM: OMAP3: control: isolate control module init to its
- own function
-In-Reply-To: <1404483035-21666-1-git-send-email-t-kristo@ti.com>
-References: <1404483035-21666-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1404483035-21666-11-git-send-email-t-kristo@ti.com>
+From: gilbertd@treblig.org (Dr. David Alan Gilbert)
+Date: Fri, 4 Jul 2014 15:09:52 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <7255305.EKPTbfD3OE@wuerfel>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <20140704085745.GB16404@arm.com>
+ <20140704092519.GC21766@n2100.arm.linux.org.uk>
+ <7255305.EKPTbfD3OE@wuerfel>
+Message-ID: <20140704140952.GA31399@gallifrey>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control module related PM initializations are now moved within control
-module driver. Done in preparation to isolate the code to its own driver.
+* Arnd Bergmann (arnd at arndb.de) wrote:
+> On Friday 04 July 2014 10:25:19 Russell King - ARM Linux wrote:
+> > Moreover, when you download from the play store, you are only presented
+> > with the version which is appropriate for your device - when you buy a
+> > new device, and you re-fetch your apps, you don't get the same version
+> > that you've had on previous device if there's one more appropriate for
+> > your new device.
+> 
+> This is certainly true, but at the same time the device makers have
+> a valid interest in making as many apps as possible be enabled without
+> requiring a recompile. If it becomes known that device A supports 90%
+> of the popular apps while device B only supports 70% of the same apps
+> (until they get recompiled), the decision whether to put emulation in
+> or not is more about maximizing revenue than about theoretical
+> correctness.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/control.c |   19 +++++++++++++++++--
- arch/arm/mach-omap2/control.h |    3 +--
- arch/arm/mach-omap2/pm34xx.c  |    3 +--
- arch/arm/mach-omap2/prm3xxx.c |    6 ------
- 4 files changed, 19 insertions(+), 12 deletions(-)
+I've got a case of mislabelled/misdelivered CPU type in the play store,
+where it's delivering my ARMv6t phone a library that has v6t2 instructions
+in (cbz/cbnz) - for Google's own Google+ app.
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index f432ffc..f4796c0 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -564,7 +564,7 @@ int omap3_ctrl_save_padconf(void)
-  * Sets the bootmode for IVA2 to idle. This is needed by the PM code to
-  * force disable IVA2 so that it does not prevent any low-power states.
-  */
--void omap3_ctrl_set_iva_bootmode_idle(void)
-+static void __init omap3_ctrl_set_iva_bootmode_idle(void)
- {
- 	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
- 			 OMAP343X_CONTROL_IVA2_BOOTMOD);
-@@ -576,7 +576,7 @@ void omap3_ctrl_set_iva_bootmode_idle(void)
-  * Sets up the pads controlling the stacked modem in such way that the
-  * device can enter idle.
-  */
--void omap3_ctrl_setup_d2d_padconf(void)
-+static void __init omap3_ctrl_setup_d2d_padconf(void)
- {
- 	u16 mask, padconf;
- 
-@@ -595,4 +595,19 @@ void omap3_ctrl_setup_d2d_padconf(void)
- 	padconf |= mask;
- 	omap_ctrl_writew(padconf, OMAP3_PADCONF_SAD2D_IDLEACK);
- }
-+
-+/**
-+ * omap3_ctrl_init - does static initializations for control module
-+ *
-+ * Initializes system control module. This sets up the sysconfig autoidle,
-+ * and sets up modem and iva2 so that they can be idled properly.
-+ */
-+void __init omap3_ctrl_init(void)
-+{
-+	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
-+
-+	omap3_ctrl_set_iva_bootmode_idle();
-+
-+	omap3_ctrl_setup_d2d_padconf();
-+}
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index fc00158..ccbd70c 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -427,8 +427,7 @@ extern void omap_ctrl_write_dsp_boot_addr(u32 bootaddr);
- extern void omap_ctrl_write_dsp_boot_mode(u8 bootmode);
- extern void omap3630_ctrl_disable_rta(void);
- extern int omap3_ctrl_save_padconf(void);
--extern void omap3_ctrl_set_iva_bootmode_idle(void);
--void omap3_ctrl_setup_d2d_padconf(void);
-+void omap3_ctrl_init(void);
- extern void omap2_set_globals_control(void __iomem *ctrl,
- 				      void __iomem *ctrl_pad);
- #else
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 9410b4a..3f80929 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -355,8 +355,7 @@ restore:
- 
- static void __init prcm_setup_regs(void)
- {
--	/* XXX This should be handled by hwmod code or SCM init code */
--	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
-+	omap3_ctrl_init();
- 
- 	omap3_prm_init_pm(cpu_is_omap3630(), omap3_has_iva());
- }
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 75dfe8e..2458be6 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -28,7 +28,6 @@
- #include "prm-regbits-34xx.h"
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
--#include "control.h"
- 
- static const struct omap_prcm_irq omap3_prcm_irqs[] = {
- 	OMAP_PRCM_IRQ("wkup",	0,	0),
-@@ -366,8 +365,6 @@ void __init omap3_prm_init_pm(bool has_uart4, bool has_iva)
- 	/* We need to idle iva2_pwrdm even on am3703 with no iva2. */
- 	omap3xxx_prm_iva_idle();
- 
--	omap3_ctrl_setup_d2d_padconf();
--
- 	omap3_prm_reset_modem();
- }
- 
-@@ -470,9 +467,6 @@ void omap3xxx_prm_iva_idle(void)
- 	omap2_cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
- 			       OMAP3430_IVA2_MOD, CM_FCLKEN);
- 
--	/* Set IVA2 boot mode to 'idle' */
--	omap3_ctrl_set_iva_bootmode_idle();
--
- 	/* Un-reset IVA2 */
- 	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
- 
+Dave
+
 -- 
-1.7.9.5
+ -----Open up your eyes, open up your mind, open up your code -------   
+/ Dr. David Alan Gilbert    |       Running GNU/Linux       | Happy  \ 
+\ gro.gilbert @ treblig.org |                               | In Hex /
+ \ _________________________|_____ http://www.treblig.org   |_______/
