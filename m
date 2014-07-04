@@ -1,38 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 Jul 2014 23:39:16 +0200
-Subject: [PATCH v3 4/4] pinctrl: sunxi: Define enable / disable irq
- callbacks for level triggered irqs
-In-Reply-To: <1404051062-24079-5-git-send-email-hdegoede@redhat.com>
-References: <1404051062-24079-1-git-send-email-hdegoede@redhat.com>
- <1404051062-24079-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdZ15gMYp2ZSAhNzZMzqWx2xXwMmeKzVudQcVUqiziTW_Q@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 05 Jul 2014 06:44:05 +0900
+Subject: [PATCH v3 0/3] Exynos MCT udelay, MCT cleanup, MCT to 32-bits
+In-Reply-To: <1403286472-6817-1-git-send-email-dianders@chromium.org>
+References: <1403286472-6817-1-git-send-email-dianders@chromium.org>
+Message-ID: <53B72025.5030902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 4:11 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+On 06/21/14 02:47, Doug Anderson wrote:
+> This is a series of 3 patches related to the exynos MCT (multi core
+> timer).  The first allows MCT to function as a udelay() timer which
+> fixes broken udelay on 5400, 5800, and even (to a lesser extent) on
+> 5250.  The second is some general cleanup.  The third moves MCT to
+> 32-bits where possible to give us a nice speedup.
+>
+> The first probably ought to be destined for 3.16 as a bugfix whereas
+> the others could land in a future kernel release.
+>
+> This series is based on (clocksource: exynos_mct: Fix ftrace).
+>
+> With this series we can drop the patches I submitted:
+> - clocksource: exynos_mct: cache mct upper count
+> - clocksource: exynos_mct: Optimize register reads with ldmia
+>
+> Changes in v3:
+> - Back to exynos_frc_read for now until 32/64 is resolved.
+> - Now returns cycles_t which matches arch/arm/include/asm/timex.h.
+> - Rebased.
+> - Moved registration to its own function.
+> - __raw_readl / __raw_writel patch new for version 3
+> - Now 32-bit version instead of ldmia version
+>
+> Changes in v2:
+> - Added #defines for ARM and ARM64 as pointed by Doug Anderson.
+>
+> Amit Daniel Kachhap (1):
+>    clocksource: exynos_mct: Register the timer for stable udelay
+>
+> Doug Anderson (2):
+>    clocksource: exynos_mct: __raw_readl/__raw_writel =>
+>      readl_relaxed/writel_relaxed
+>    clocksource: exynos_mct: Only use 32-bits where possible
+>
+>   drivers/clocksource/Kconfig      |  1 +
+>   drivers/clocksource/exynos_mct.c | 72 ++++++++++++++++++++++++++++++----------
+>   2 files changed, 55 insertions(+), 18 deletions(-)
+>
 
-> Some drivers use disable_irq / enable_irq and do the work clearing the source
-> in another thread instead of using a threaded interrupt handler.
->
-> The irqchip used not having irq_disable and irq_enable callbacks in this case,
-> will lead to unnecessary spurious interrupts:
->
-> On a disable_irq in a chip without a handller for this, the irq core will
-> remember the disable, but not actually call into the irqchip. With a level
-> triggered interrupt (where the source has not been cleared) this will lead
-> to an immediate retrigger, at which point the irq-core will mask the irq.
-> So having an irq_disable callback in the irqchip will save us the interrupt
-> firing a 2nd time for nothing.
->
-> Drivers using disable / enable_irq like this, will call enable_irq when
-> they finally have cleared the interrupt source, without an enable_irq callback,
-> this will turn into an unmask, at which point the irq will trigger immediately
-> because when it was originally acked the level was still high, so the ack was
-> a nop.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Sorry for late taking this series...looks good to me and applied 
+including previous 'fix ftrace'.
 
-Patch applied with Maxime's ACK.
-
-Yours,
-Linus Walleij
+Thanks,
+Kukjin
