@@ -1,46 +1,53 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 04 Jul 2014 17:38:31 +0400
-Subject: [PATCH] arm: get rid of hardcoded assumptions about kernel stack
- size
-In-Reply-To: <4429781.iuSvvPCxYj@wuerfel>
-References: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
- <201407032224.28386.arnd@arndb.de> <53B6541B.6000702@samsung.com>
- <4429781.iuSvvPCxYj@wuerfel>
-Message-ID: <53B6AE57.70307@samsung.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Fri, 4 Jul 2014 19:14:57 +0530
+Subject: [PATCH v3 3/8] component: add support for component match array
+In-Reply-To: <20140704122554.GG21766@n2100.arm.linux.org.uk>
+References: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
+ <20140704105258.GF21766@n2100.arm.linux.org.uk>
+ <CAK5sBcFof_QvDouNOUD1SVqPucMQ+wW4u_jxguCqDgO=zD7_Og@mail.gmail.com>
+ <20140704122554.GG21766@n2100.arm.linux.org.uk>
+Message-ID: <CAK5sBcEB=aoThzc4-hyqu8HA9+z=yt-UoAdC4NnCHUkFthbmmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/14 14:27, Arnd Bergmann wrote:
-> On Friday 04 July 2014 11:13:31 Andrey Ryabinin wrote:
->>>
->>> but I wonder if there is a way to avoid the extra include here, as it might also
->>> cause a general slowdown because of asm/memory.h getting pulled into more .c
->>> files. Would it be reasonable to hardcode PAGE_SIZE here?
->>>
+On Fri, Jul 4, 2014 at 5:55 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 04, 2014 at 05:00:36PM +0530, Sachin Kamat wrote:
+>> On Fri, Jul 4, 2014 at 4:22 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Jul 04, 2014 at 04:17:35PM +0530, Sachin Kamat wrote:
+>> >> Hi Russell
+>> >>
+>> >> > +int component_master_add_with_match(struct device *dev,
+>> >> > +       const struct component_master_ops *ops,
+>> >> > +       struct component_match *match)
+>> >> >  {
+>> >> >         struct master *master;
+>> >> >         int ret;
+>> >> >
+>> >> > +       if (ops->add_components && match)
+>> >> > +               return -EINVAL;
+>> >> > +
+>> >> > +       /* Reallocate the match array for its true size */
+>> >> > +       match = component_match_realloc(dev, match, match->num);
+>> >>
+>> >>            ^^^^^^^^^^^^^
+>> >> This gives a NULL pointer dereference error when match is NULL (as passed
+>> >> by component_master_add() below). Observed this while testing linux-next
+>> >> kernel (next-20140704) on Exynos based board with DRM enabled.
+>> >
+>> > Thanks for your report.  Please verify that the patch below resolves it
+>> > for you.  Thanks.
 >>
->> IMO it's a bug of iop13xx platform, that it includes "higlevel" linux/reboot.h
->> from a very "lowlevel" header mach/iop13xx.h. I think it should be fixed with a patch above.
->> Slowing down of kernel build for a few more seconds is not good enough reason for me to
->> hardcode PAGE_SIZE here.
-> 
-> I don't think we can pinpoint a specific header that is "wrong" here, the
+>> Yes, the below patch fixes the crash. Thanks for the fix.
+>
+> Thanks.  I'll add a tested-by and reported-by for your address when
+> committing this patch.  Let me know if you want something different.
 
-That's just my opinion. Anyway, if this header needed only for declaring single enum
-it worth to replace include with enum declaration.
+Thanks. Please use the following for the tags:
 
-> fundamental problem is that our header files are a bit messy when it comes
-> to recursive inclusion and we'd be better off if we generally were a little
-> more careful about including headers from other headers.
-> 
+Sachin Kamat <sachin.kamat@samsung.com>
 
-That's why we need to remove reboot.h from iop13xx.h.
-Are you going to send a proper formatted patch for that?
-
-Speaking of asm/page.h, a lot of other architectures
-also have it included in thread_info.h, so I would leave it there.
-
-
-> It's also very hard to retroactively clean this up on a large scale.
-> 
-> 	Arnd
-> 
+-- 
+Regards,
+Sachin.
