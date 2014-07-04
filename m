@@ -1,32 +1,45 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Fri,  4 Jul 2014 17:04:03 -0400
-Subject: [PATCH] mach-omap2: Change if statement in omap2_dflt_clk_enable
-Message-ID: <1404507843-3648-1-git-send-email-xerofoify@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 05 Jul 2014 06:06:35 +0900
+Subject: [PATCH] ARM: dts: exynos5410: Fill in CPU clock-frequency
+In-Reply-To: <53B690B9.2090906@suse.de>
+References: <1403466596-3347-1-git-send-email-afaerber@suse.de>
+ <53A7DCF8.4090108@samsung.com> <53B690B9.2090906@suse.de>
+Message-ID: <53B7175B.1030109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes this function to check for if v is returning value from the
-called function. If not it does the else. Furthermore fixes the FIXME message above
-if statement for holding INVERT_ENABLE bit when not needing to be checked for
-in if statement by just checking for if v is not Null.
+On 07/04/14 20:32, Andreas F?rber wrote:
+> Am 23.06.2014 09:53, schrieb Tarek Dakhran:
+>> On 06/22/2014 11:49 PM, Andreas F?rber wrote:
+>>> It's 1.6 GHz for the Cortex-A15.
+>>>
+>>> Avoids warnings like "/cpus/cpu at 0 missing clock-frequency property".
+>>>
+>>> Signed-off-by: Andreas afaerber at suse.de>
+>>> ---
+>>>    arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
+>>>    1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5410.dtsi
+>>> b/arch/arm/boot/dts/exynos5410.dtsi
+>>> index 3839c26..9d0b8cc 100644
+>>> --- a/arch/arm/boot/dts/exynos5410.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+>>> @@ -28,24 +28,28 @@
+>>>                device_type = "cpu";
+>>>                compatible = "arm,cortex-a15";
+>>>                reg =<0x0>;
+>>> +            clock-frequency =<1600000000>;
+>>>
+>>
+>> Reviewed-by: Tarek Dakhran<t.dakhran@samsung.com>
+>
+> Ping? Seems really trivial...
+>
+Will apply.
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- arch/arm/mach-omap2/clock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+BTW Andreas, I can't use 'F?rber' in my git tree so which one is right 
+or more preferred? Farber, Faerber, Ferber? Sorry.
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 591581a..626363d 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -379,7 +379,7 @@ void omap2_dflt_clk_disable(struct clk_hw *hw)
- 	}
- 
- 	v = omap2_clk_readl(clk, clk->enable_reg);
--	if (clk->flags & INVERT_ENABLE)
-+	if (v)
- 		v |= (1 << clk->enable_bit);
- 	else
- 		v &= ~(1 << clk->enable_bit);
--- 
-1.9.1
+Thanks,
+Kukjin
