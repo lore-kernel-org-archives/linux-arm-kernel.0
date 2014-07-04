@@ -1,54 +1,31 @@
-From: jhbird.choi@samsung.com (Jonghwan Choi)
-Date: Fri, 04 Jul 2014 19:22:40 +0900
-Subject: [PATCH] thermal: Add missing cpumask_clear
-Message-ID: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Jul 2014 12:27:04 +0200
+Subject: [PATCH] arm: get rid of hardcoded assumptions about kernel stack
+ size
+In-Reply-To: <53B6541B.6000702@samsung.com>
+References: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
+ <201407032224.28386.arnd@arndb.de> <53B6541B.6000702@samsung.com>
+Message-ID: <4429781.iuSvvPCxYj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cpumasks should be cleared before using.
+On Friday 04 July 2014 11:13:31 Andrey Ryabinin wrote:
+> > 
+> > but I wonder if there is a way to avoid the extra include here, as it might also
+> > cause a general slowdown because of asm/memory.h getting pulled into more .c
+> > files. Would it be reasonable to hardcode PAGE_SIZE here?
+> > 
+> 
+> IMO it's a bug of iop13xx platform, that it includes "higlevel" linux/reboot.h
+> from a very "lowlevel" header mach/iop13xx.h. I think it should be fixed with a patch above.
+> Slowing down of kernel build for a few more seconds is not good enough reason for me to
+> hardcode PAGE_SIZE here.
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
----
- drivers/thermal/db8500_cpufreq_cooling.c        |    1 +
- drivers/thermal/imx_thermal.c                   |    1 +
- drivers/thermal/samsung/exynos_thermal_common.c |    1 +
- 3 files changed, 3 insertions(+)
+I don't think we can pinpoint a specific header that is "wrong" here, the
+fundamental problem is that our header files are a bit messy when it comes
+to recursive inclusion and we'd be better off if we generally were a little
+more careful about including headers from other headers.
 
-diff --git a/drivers/thermal/db8500_cpufreq_cooling.c b/drivers/thermal/db8500_cpufreq_cooling.c
-index 786d192..1fa46ff 100644
---- a/drivers/thermal/db8500_cpufreq_cooling.c
-+++ b/drivers/thermal/db8500_cpufreq_cooling.c
-@@ -34,6 +34,7 @@ static int db8500_cpufreq_cooling_probe(struct platform_device *pdev)
- 	if (!cpufreq_frequency_get_table(0))
- 		return -EPROBE_DEFER;
- 
-+	cpumask_clear(&mask_val);
- 	cpumask_set_cpu(0, &mask_val);
- 	cdev = cpufreq_cooling_register(&mask_val);
- 
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index a99c631..a21acf8 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -449,6 +449,7 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 	regmap_write(map, MISC0 + REG_SET, MISC0_REFTOP_SELBIASOFF);
- 	regmap_write(map, TEMPSENSE0 + REG_SET, TEMPSENSE0_POWER_DOWN);
- 
-+	cpumask_clear(&clip_cpus);
- 	cpumask_set_cpu(0, &clip_cpus);
- 	data->cdev = cpufreq_cooling_register(&clip_cpus);
- 	if (IS_ERR(data->cdev)) {
-diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-index 3f5ad25..47efa4c 100644
---- a/drivers/thermal/samsung/exynos_thermal_common.c
-+++ b/drivers/thermal/samsung/exynos_thermal_common.c
-@@ -361,6 +361,7 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
- 		return -ENOMEM;
- 
- 	th_zone->sensor_conf = sensor_conf;
-+	cpumask_clear(&mask_val);
- 	/*
- 	 * TODO: 1) Handle multiple cooling devices in a thermal zone
- 	 *	 2) Add a flag/name in cooling info to map to specific
--- 
-1.7.10.4
+It's also very hard to retroactively clean this up on a large scale.
+
+	Arnd
