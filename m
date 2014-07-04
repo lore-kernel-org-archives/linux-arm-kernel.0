@@ -1,164 +1,69 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Jul 2014 00:13:18 -0400 (EDT)
-Subject: several messages
-In-Reply-To: <CAM4voamgOkJ5+OgX577YrGJc3gdxQAcWYkQziw9Uv92PJQAgRQ@mail.gmail.com>
-References: <1404363737-26222-1-git-send-email-a.kesavan@samsung.com>
- <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1407031111100.6220@knanqh.ubzr>
- <CAM4voanVAA4KOHWemQf59WjBpZXxVG_0P49xfzeq8KOvOwg4xg@mail.gmail.com>
- <alpine.LFD.2.11.1407031442210.6220@knanqh.ubzr>
- <CAM4voamgOkJ5+OgX577YrGJc3gdxQAcWYkQziw9Uv92PJQAgRQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1407040007370.19626@knanqh.ubzr>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 4 Jul 2014 07:29:40 +0300
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Jul 2014, Abhilash Kesavan wrote:
+Hi Olav,
 
-> Hi Nicolas,
-> 
-> On Fri, Jul 4, 2014 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
-> >
-> >> Hi Nicolas,
-> >>
-> >> On Thu, Jul 3, 2014 at 9:15 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> > On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
-> >> >
-> >> >> On Thu, Jul 3, 2014 at 6:59 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> >> > Please, let's avoid going that route.  There is no such special handling
-> >> >> > needed if the API is sufficient.  And the provided API allows you to
-> >> >> > suspend a CPU or shut it down.  It shouldn't matter at that level if
-> >> >> > this is due to a cluster switch or a hotplug event. Do you really need
-> >> >> > something else?
-> >> >> No, just one local flag for suspend should be enough for me. Will remove these.
-> >> >
-> >> > [...]
-> >> >
-> >> >> Changes in v5:
-> >> >>       - Removed the MCPM flags and just used a local flag to
-> >> >>       indicate that we are suspending.
-> >> >
-> >> > [...]
-> >> >
-> >> >> -static void exynos_power_down(void)
-> >> >> +static void exynos_mcpm_power_down(u64 residency)
-> >> >>  {
-> >> >>       unsigned int mpidr, cpu, cluster;
-> >> >>       bool last_man = false, skip_wfi = false;
-> >> >> @@ -150,7 +153,12 @@ static void exynos_power_down(void)
-> >> >>       BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> >> >>       cpu_use_count[cpu][cluster]--;
-> >> >>       if (cpu_use_count[cpu][cluster] == 0) {
-> >> >> -             exynos_cpu_power_down(cpunr);
-> >> >> +             /*
-> >> >> +              * Bypass power down for CPU0 during suspend. This is being
-> >> >> +              * taken care by the SYS_PWR_CFG bit in CORE0_SYS_PWR_REG.
-> >> >> +              */
-> >> >> +             if ((cpunr != 0) || (residency != S5P_CHECK_SLEEP))
-> >> >> +                     exynos_cpu_power_down(cpunr);
-> >> >>
-> >> >>               if (exynos_cluster_unused(cluster)) {
-> >> >>                       exynos_cluster_power_down(cluster);
-> >> >> @@ -209,6 +217,11 @@ static void exynos_power_down(void)
-> >> >>       /* Not dead at this point?  Let our caller cope. */
-> >> >>  }
-> >> >>
-> >> >> +static void exynos_power_down(void)
-> >> >> +{
-> >> >> +     exynos_mcpm_power_down(0);
-> >> >> +}
-> >> >
-> >> > [...]
-> >> >
-> >> >> +static int notrace exynos_mcpm_cpu_suspend(unsigned long arg)
-> >> >> +{
-> >> >> +     /* MCPM works with HW CPU identifiers */
-> >> >> +     unsigned int mpidr = read_cpuid_mpidr();
-> >> >> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> >> >> +     unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> >> >> +
-> >> >> +     __raw_writel(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
-> >> >> +
-> >> >> +     mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
-> >> >> +
-> >> >> +     /*
-> >> >> +      * Pass S5P_CHECK_SLEEP flag to the MCPM back-end to indicate that
-> >> >> +      * we are suspending the system and need to skip CPU0 power down.
-> >> >> +      */
-> >> >> +     mcpm_cpu_suspend(S5P_CHECK_SLEEP);
-> >> >
-> >> > NAK.
-> >> >
-> >> > When I say "local flag with local meaning", I don't want you to smuggle
-> >> > that flag through a public interface either.  I find it rather inelegant
-> >> > to have the notion of special handling for CPU0 being spread around like
-> >> > that.
-> >> >
-> >> > If CPU0 is special, then it should be dealth with in one place only,
-> >> > ideally in the MCPM backend, so the rest of the kernel doesn't have to
-> >> > care.
-> >> >
-> >> > Again, here's what I mean:
-> >> >
-> >> > static void exynos_mcpm_down_handler(int flags)
-> >> > {
-> >> >         [...]
-> >> >         if ((cpunr != 0) || !(flags & SKIP_CPU_POWERDOWN_IF_CPU0))
-> >> >                 exynos_cpu_power_down(cpunr);
-> >> >         [...]
-> >> > }
-> >> >
-> >> > static void exynos_mcpm_power_down()
-> >> > {
-> >> >         exynos_mcpm_down_handler(0);
-> >> > }
-> >> >
-> >> > static void exynos_mcpm_suspend(u64 residency)
-> >> > {
-> >> >         /*
-> >> >          * Theresidency argument is ignored for now.
-> >> >          * However, in the CPU suspend case, we bypass power down for
-> >> >          * CPU0 as this is being taken care by the SYS_PWR_CFG bit in
-> >> >          * CORE0_SYS_PWR_REG.
-> >> >          */
-> >> >         exynos_mcpm_down_handler(SKIP_CPU_POWERDOWN_IF_CPU0);
-> >> > }
-> >> >
-> >> > And SKIP_CPU_POWERDOWN_IF_CPU0 is defined in and visible to
-> >> > mcpm-exynos.c only.
-> >> Sorry if I am being dense, but the exynos_mcpm_suspend function would
-> >> get called from both the bL cpuidle driver as well the exynos pm code.
-> >
-> > What is that exynos pm code actually doing?
-> exynos pm code is shared across Exynos4 and 5 SoCs. It primarily does
-> a series of register configurations which are required to put the
-> system to sleep (some parts of these are SoC specific and others
-> common). It also populates the suspend_ops for exynos. In the current
-> patch, exynos_suspend_enter() is where I have plugged in the
-> mcpm_cpu_suspend call.
-> 
-> This patch is based on the S2R series for 5420
-> (http://comments.gmane.org/gmane.linux.kernel.samsung-soc/33898), you
-> may also have a look at that for a clearer picture.
-> >
-> >> We want to skip CPU0 only in case of the S2R case i.e. the pm code and
-> >> keep the CPU0 power down code for all other cases including CPUIdle.
-> >
-> > OK.  If so I missed that somehow (hint hint).
-> >
-> >> If I call exynos_mcpm_down_handler with the flag in
-> >> exynos_mcpm_suspend(), CPUIdle will also skip CPU0 isn't it ?
-> >
-> > As it is, yes.  You could logically use an infinite residency time
-> > (something like U64_MAX) to distinguish S2RAM from other types of
-> > suspend.
-> OK, I will use this rather than the S5P_CHECK_SLEEP macro.
+Olav Haugan <ohaugan@codeaurora.org> writes:
 
-Another suggestion which might possibly be better: why not looking for 
-the SYS_PWR_CFG bit in exynos_cpu_power_down() directly?  After all, 
-exynos_cpu_power_down() is semantically supposed to do what its name 
-suggest and could simply do nothing if the proper conditions are already 
-in place.
+> Mapping and unmapping are more often than not in the critical path.
+> map_range and unmap_range allows SMMU driver implementations to optimize
+> the process of mapping and unmapping buffers into the SMMU page tables.
+> Instead of mapping one physical address, do TLB operation (expensive),
+> mapping, do TLB operation, mapping, do TLB operation the driver can map
+> a scatter-gatherlist of physically contiguous pages into one virtual
+> address space and then at the end do one TLB operation.
+>
+> Additionally, the mapping operation would be faster in general since
+> clients does not have to keep calling map API over and over again for
+> each physically contiguous chunk of memory that needs to be mapped to a
+> virtually contiguous region.
+>
+> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+> ---
+>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
+>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
+>  2 files changed, 48 insertions(+)
+>
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index e5555fc..f2a6b80 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>  EXPORT_SYMBOL_GPL(iommu_unmap);
+>  
+>  
+> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
+> +		    struct scatterlist *sg, unsigned int len, int prot)
+> +{
+> +	if (unlikely(domain->ops->map_range == NULL))
+> +		return -ENODEV;
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	return domain->ops->map_range(domain, iova, sg, len, prot);
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_map_range);
 
+We have the similar one internally, which is named, "iommu_map_sg()",
+called from DMA API.
 
-Nicolas
+> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
+> +		      unsigned int len)
+> +{
+> +	if (unlikely(domain->ops->unmap_range == NULL))
+> +		return -ENODEV;
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	return domain->ops->unmap_range(domain, iova, len);
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
+
+Can the existing iommu_unmap() do the same?
