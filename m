@@ -1,188 +1,35 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 04 Jul 2014 15:23:48 +0200
-Subject: [PATCH v6 22/23] rtc: Add driver for Maxim 77802 PMIC
- Real-Time-Clock
-In-Reply-To: <1404479478.2653.5.camel@AMDC1943>
-References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404467722-26687-23-git-send-email-javier.martinez@collabora.co.uk>
- <1404474972.14069.20.camel@AMDC1943> <53B6A3A3.9090300@collabora.co.uk>
- <1404479478.2653.5.camel@AMDC1943>
-Message-ID: <53B6AAE4.4020700@collabora.co.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 04 Jul 2014 14:25:45 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140703171356.GD28175@arm.com>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com> <5534788.ziUvZhb6y0@wuerfel>
+ <20140703150008.GX32514@n2100.arm.linux.org.uk>
+ <20140703171356.GD28175@arm.com>
+Message-ID: <20140704132545.7D0D7C40ADD@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 07/04/2014 03:11 PM, Krzysztof Kozlowski wrote:
-> On pi?, 2014-07-04 at 14:52 +0200, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
->> 
->> Thanks a lot for your feedback.
->> 
->> On 07/04/2014 01:56 PM, Krzysztof Kozlowski wrote:
->> > On pi?, 2014-07-04 at 11:55 +0200, Javier Martinez Canillas wrote:
->> >> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
->> >> This patch adds support for the RTC and is based on a driver
->> >> added by Simon Glass to the Chrome OS kernel 3.8 tree.
->> >> 
->> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> >> ---
->> >> 
->> >> Changes since v5: None
->> >> 
->> >> Changes since v4: None
->> >> 
->> >> Changes since v3: None
->> >> ---
->> >>  drivers/rtc/Kconfig        |  10 +
->> >>  drivers/rtc/Makefile       |   1 +
->> >>  drivers/rtc/rtc-max77802.c | 637 +++++++++++++++++++++++++++++++++++++++++++++
->> >>  3 files changed, 648 insertions(+)
->> >>  create mode 100644 drivers/rtc/rtc-max77802.c
->> >> 
->> >> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
->> >> index a672dd1..243ac72 100644
->> >> --- a/drivers/rtc/Kconfig
->> >> +++ b/drivers/rtc/Kconfig
->> >> @@ -288,6 +288,16 @@ config RTC_DRV_MAX77686
->> >>  	  This driver can also be built as a module. If so, the module
->> >>  	  will be called rtc-max77686.
->> >>  
->> >> +config RTC_DRV_MAX77802
->> >> +	tristate "Maxim 77802 RTC"
->> >> +	depends on MFD_MAX77686
->> >> +	help
->> >> +	  If you say yes here you will get support for the
->> >> +	  RTC of Maxim MAX77802 PMIC.
->> >> +
->> >> +	  This driver can also be built as a module. If so, the module
->> >> +	  will be called rtc-max77802.
->> >> +
->> >>  config RTC_DRV_RS5C372
->> >>  	tristate "Ricoh R2025S/D, RS5C372A/B, RV5C386, RV5C387A"
->> >>  	help
->> >> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
->> >> index 70347d0..247de78 100644
->> >> --- a/drivers/rtc/Makefile
->> >> +++ b/drivers/rtc/Makefile
->> >> @@ -81,6 +81,7 @@ obj-$(CONFIG_RTC_DRV_MAX8998)	+= rtc-max8998.o
->> >>  obj-$(CONFIG_RTC_DRV_MAX8997)	+= rtc-max8997.o
->> >>  obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
->> >>  obj-$(CONFIG_RTC_DRV_MAX77686)	+= rtc-max77686.o
->> >> +obj-$(CONFIG_RTC_DRV_MAX77802)  += rtc-max77802.o
->> >>  obj-$(CONFIG_RTC_DRV_MC13XXX)	+= rtc-mc13xxx.o
->> >>  obj-$(CONFIG_RTC_DRV_MCP795)	+= rtc-mcp795.o
->> >>  obj-$(CONFIG_RTC_DRV_MSM6242)	+= rtc-msm6242.o
->> >> diff --git a/drivers/rtc/rtc-max77802.c b/drivers/rtc/rtc-max77802.c
->> >> new file mode 100644
->> >> index 0000000..2f4fc2e
->> >> --- /dev/null
->> >> +++ b/drivers/rtc/rtc-max77802.c
->> >> @@ -0,0 +1,637 @@
->> >> +/*
->> >> + * RTC driver for Maxim MAX77802
->> >> + *
->> >> + * Copyright (C) 2013 Google, Inc
->> >> + *
->> >> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
->> >> + *
->> >> + *  based on rtc-max8997.c
->> >> + *
->> >> + *  This program is free software; you can redistribute  it and/or modify it
->> >> + *  under  the terms of  the GNU General  Public License as published by the
->> >> + *  Free Software Foundation;  either version 2 of the  License, or (at your
->> >> + *  option) any later version.
->> >> + *
->> >> + */
->> >> +
->> >> +#include <linux/slab.h>
->> >> +#include <linux/rtc.h>
->> >> +#include <linux/delay.h>
->> >> +#include <linux/mutex.h>
->> >> +#include <linux/module.h>
->> >> +#include <linux/platform_device.h>
->> >> +#include <linux/mfd/max77686-private.h>
->> >> +#include <linux/irqdomain.h>
->> >> +#include <linux/regmap.h>
->> >> +
->> >> +/* RTC Control Register */
->> >> +#define BCD_EN_SHIFT			0
->> >> +#define BCD_EN_MASK			(1 << BCD_EN_SHIFT)
->> >> +#define MODEL24_SHIFT			1
->> >> +#define MODEL24_MASK			(1 << MODEL24_SHIFT)
->> >> +/* RTC Update Register1 */
->> >> +#define RTC_UDR_SHIFT			0
->> >> +#define RTC_UDR_MASK			(1 << RTC_UDR_SHIFT)
->> >> +#define RTC_RBUDR_SHIFT			4
->> >> +#define RTC_RBUDR_MASK			(1 << RTC_RBUDR_SHIFT)
->> >> +/* WTSR and SMPL Register */
->> >> +#define WTSRT_SHIFT			0
->> >> +#define SMPLT_SHIFT			2
->> >> +#define WTSR_EN_SHIFT			6
->> >> +#define SMPL_EN_SHIFT			7
->> >> +#define WTSRT_MASK			(3 << WTSRT_SHIFT)
->> >> +#define SMPLT_MASK			(3 << SMPLT_SHIFT)
->> >> +#define WTSR_EN_MASK			(1 << WTSR_EN_SHIFT)
->> >> +#define SMPL_EN_MASK			(1 << SMPL_EN_SHIFT)
->> >> +/* RTC Hour register */
->> >> +#define HOUR_PM_SHIFT			6
->> >> +#define HOUR_PM_MASK			(1 << HOUR_PM_SHIFT)
->> >> +/* RTC Alarm Enable */
->> >> +#define ALARM_ENABLE_SHIFT		7
->> >> +#define ALARM_ENABLE_MASK		(1 << ALARM_ENABLE_SHIFT)
->> >> +
->> >> +/* For the RTCAE1 register, we write this value to enable the alarm */
->> >> +#define ALARM_ENABLE_VALUE		0x77
->> >> +
->> >> +#define MAX77802_RTC_UPDATE_DELAY_US	200
->> >> +#undef MAX77802_RTC_WTSR_SMPL
->> > 
->> > Hmmm... I am not sure what is the purpose of this undef. It disables
->> > some functions below. I saw same code in 77686 RTC driver but this does
->> > not help me :).
->> > 
->> > If this is on purpose can you add a comment explaining the
->> > purpose/cause?
->> > 
->> 
->> This is a left over from when a combined 77686/802 driver was attempted since as
->> you said the 77686 RTC driver does the same.
->> 
->> I just checked MAX77802 data sheet and the MAX77802_RTC_WTSR_SMPL register is to
->> control the SMPL (Sudden Momentary Power Loss) and WTSR (Watchdog Timeout and
->> Software Resets) features.
->> 
->> Now, I wanted to figure out why the 77686 driver unset that register and have
->> those conditionals but git blame shows me that this was already in the original
->> commit that added the driver: fca1dd03 ("rtc: max77686: add Maxim 77686 driver").
->> 
->> Also, I see that the MAX8997 driver (drivers/rtc/rtc-max8997.c) also has a
->> similar register but actually uses it and doesn't have the conditionals if is
->> disabled. But this driver has two module parameters to control if these features
->> are enabled or not (wtsr_en and smpl_en).
->> 
->> If these two features have been disabled since the max77686 driver was merged
->> then I guess that the dead code should be removed from that driver as well? Or
->> do you have more hints about why it has been disabled?
+On Thu, 3 Jul 2014 18:13:56 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Jul 03, 2014 at 04:00:08PM +0100, Russell King - ARM Linux wrote:
+> > We can have that on ARM, but only for userspace.  The difference is
+> > that the kernel has to do the backwards compatibility rather than the
+> > (nonexistent) CPU microcode - and we do have that capability for SWP.
+> > 
+> > We may not find it desirable to do it for ARMv8, but _if_ we wish to
+> > allow users to migrate... if we wish to allow the existing set of
+> > userspace programs (some of which may be statically linked to their
+> > C library) to continue to work, there's only one option here.
+> > 
+> > While I can understand ARM Ltd
 > 
-> If the max77802 driver in current form works fine for your setup then I
-> think these functions can be removed completely. It should not harm
-> since this is dead code anyway and it will simplify the driver.
-> 
+> Please don't generalise to ARM Ltd here, even though Will and myself are
+> employed by ARM. We try hard to separate the kernel maintenance
+> decisions from the ARM (management) ones (in this instance, they may
+> actually differ).
 
-Agreed, I'll just remove it.
+In case it gets lost in the heat of this debate, I have certainly
+noticed that you do so and I truly appreciate it. Well done.
 
-> I think the same applies to max77686 (especially that as you said - this
-> is dead since beginning). Just remove it in separate patch.
-> 
-
-Ok, I'll add that as a separate cleanup patch in the next version of the series
-as well.
-
-> Best regards,
-> Krzysztof
-> 
-> 
-
-Best regards,
-Javier
+g.
