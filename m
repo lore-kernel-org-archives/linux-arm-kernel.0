@@ -1,31 +1,49 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 4 Jul 2014 12:27:10 +0100
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for
- ARMv6+
-In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1407041226530.17694@kaball.uk.xensource.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 04 Jul 2014 13:28:22 +0200
+Subject: [alsa-devel] [PATCH 2/2] ASoC: samsung: Add machine driver for
+ odroidx2
+In-Reply-To: <53B68EF4.1090101@samsung.com>
+References: <1400759708-25831-1-git-send-email-s.nawrocki@samsung.com>
+ <1400759708-25831-2-git-send-email-s.nawrocki@samsung.com>
+ <20140522185334.GT12304@sirena.org.uk> <53B68A32.8000203@samsung.com>
+ <53B68B96.9010708@metafoo.de> <53B68EF4.1090101@samsung.com>
+Message-ID: <53B68FD6.4090601@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Jul 2014, Russell King wrote:
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
-> 
-> We provide a new macro "ret" with all its variants for the condition
-> code which will resolve to the appropriate instruction.
-> 
-> Rather than doing this piecemeal, and miss some instances, change all
-> the "mov pc" instances to use the new macro, with the exception of
-> the "movs" instruction and the kprobes code.  This allows us to detect
-> the "mov pc, lr" case and fix it up - and also gives us the possibility
-> of deploying this for other registers depending on the CPU selection.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 07/04/2014 01:24 PM, Sylwester Nawrocki wrote:
+> On 04/07/14 13:10, Lars-Peter Clausen wrote:
+>> On 07/04/2014 01:04 PM, Sylwester Nawrocki wrote:
+>>> On 22/05/14 20:53, Mark Brown wrote:
+>>>>> +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
+>>>>>> +					| SND_SOC_DAIFMT_NB_NF
+>>>>>> +					| SND_SOC_DAIFMT_CBM_CFM);
+>>>>>> +	if (ret < 0)
+>>>>>> +		return ret;
+>>>>>> +
+>>>>>> +	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S
+>>>>>> +					| SND_SOC_DAIFMT_NB_NF
+>>>>>> +					| SND_SOC_DAIFMT_CBM_CFM);
+>>>>>> +	if (ret < 0)
+>>>>>> +		return ret;
+>>>>
+>>>> These are constant, set these in the dai_link.
+>>>
+>>> set_fmt also sets master/slave mode of the I2S DAI, after I moved
+>>> this into the cpu_dai link data structure after suspend/resume cycle
+>>> the I2S IP block is not being properly re-configured. Should the
+>>> format setting be added in resume_post callback, or is there any
+>>> other preferred way ? Similarly the syclk settings are being lost
+>>> over suspend/resume cycle and nothing restores them.
+>>
+>> The I2S driver should save and restore it's register during suspend/resume.
+>
+> OK, thanks. I checked the I2S driver does it, but only when dai->active
+> flags is set [1]. However, during system resume this flag is not set
+> (in situation where playback or capture wasn't active right before
+> system suspend). Is the dai->active test wrong in that driver then ?
+> I'm not sure if it could just be removed.
 
-For the Xen changes:
+Yes, just remove the check.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+- Lars
