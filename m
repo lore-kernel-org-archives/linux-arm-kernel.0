@@ -1,101 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 4 Jul 2014 10:02:55 +0200
-Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
- CPU frequency
-In-Reply-To: <CAKfTPtBonwH0PoEkKazUS9bPaR631Vu7p7qZ0AF1whmXq_53wg@mail.gmail.com>
-References: <20140630102934.GV32514@n2100.arm.linux.org.uk>
- <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
- <20140630124919.GC28647@lukather>
- <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
- <20140630140146.GD28647@lukather>
- <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
- <20140630145847.GE28647@lukather>
- <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
- <20140703071016.GB31996@lukather>
- <CAKfTPtBonwH0PoEkKazUS9bPaR631Vu7p7qZ0AF1whmXq_53wg@mail.gmail.com>
-Message-ID: <20140704080255.GO31996@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 4 Jul 2014 10:05:56 +0200
+Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <20140704064547.GZ28884@atomide.com>
+References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
+ <1403660878-56350-3-git-send-email-s-anna@ti.com>
+ <20140628170709.GB23634@xo-6d-61-c0.localdomain>
+ <53B18999.2020506@ti.com> <20140630185942.GA5410@amd.pavel.ucw.cz>
+ <53B1BBA8.5090507@ti.com> <20140630203225.GA3893@amd.pavel.ucw.cz>
+ <20140704064547.GZ28884@atomide.com>
+Message-ID: <20140704080556.GA16274@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 09:51:27AM +0200, Vincent Guittot wrote:
-> On 3 July 2014 09:10, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Jun 30, 2014 at 05:06:16PM +0200, Vincent Guittot wrote:
-> >> On 30 June 2014 16:58, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> >> > On Mon, Jun 30, 2014 at 04:48:35PM +0200, Vincent Guittot wrote:
-> >> >> On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> >> >> > On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
-> >> >> >> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
-> >> >> >> >> >> -             if (!rate || len != 4) {
-> >> >> >> >> >> -                     pr_err("%s missing clock-frequency property\n",
-> >> >> >> >> >> -                             cn->full_name);
-> >> >> >> >> >> +             clk = of_clk_get(cn, 0);
-> >> >> >> >> >> +             if (!IS_ERR(clk))
-> >> >> >> >> >> +                     rate = clk_get_rate(clk);
-> >> >> >> >>
-> >> >> >> >> We need the max frequency as it will be used to weight the different
-> >> >> >> >> CPUs capacity. How do you ensure that the current clock rate is the
-> >> >> >> >> max one ?
-> >> >> >> >
-> >> >> >> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
-> >> >> >> > current CPU frequency, not the max one.
-> >> >> >>
-> >> >> >> What means current frequency in device tree when DVFS is involved ?
-> >> >> >
-> >> >> > The ePAPR states that clock-frequency is supposed to be "the current
-> >> >> > clock speed of the CPU in Hertz". It's exactly what my patch add.
-> >> >> >
-> >> >> > Now, you're right, DVFS would be an issue here with clock-frequency,
-> >> >> > but this patch actually makes it easier to deal with, since you only
-> >> >> > get a reference to a clock, and you can get its rate at any given
-> >> >> > time.
-> >> >>
-> >> >> and what about using clk_round_rate(clk, ULONG_MAX) ?
-> >> >
-> >> > Well, the clock itself might generate a frequency higher that what the
-> >> > CPU can run at, so I'm not sure it's a valid assumption.
-> >>
-> >> yes, you're right
-> >>
-> >> >
-> >> >> We will not be dependent of when we parse DT
-> >> >
-> >> > You lost me there. clk_round_rate and clk_get_rate are available at
-> >> > the same time in the boot process, aren't they?
-> >>
-> >> yes, but  clk_round_rate(clk, ULONG_MAX) will return the max frequency
-> >> and not the current one. But as you mentioned, it doesn't ensure that
-> >> it's a possible frequency for the core
-> >
-> > Is this an Acked-by ?
+Hi!
+
+> > > >>>> The non-DT support has to be maintained for now to not break
+> > > >>>> OMAP3 legacy boot, and the legacy-style code will be cleaned
+> > > >>>> up once OMAP3 is also converted to DT-boot only.
+> > > >>>
+> > > >>>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
+> > > >>>>  	return 0;
+> > > >>>>  }
+> > > >>>>  
+> > > >>>> +static const struct omap_mbox_device_data omap2_data = {
+> > > >>>> +	.num_users	= 4,
+> > > >>>> +	.num_fifos	= 6,
+> > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+> > > >>>> +};
+> > > >>>> +
+> > > >>>> +static const struct omap_mbox_device_data omap3_data = {
+> > > >>>> +	.num_users	= 2,
+> > > >>>> +	.num_fifos	= 2,
+> > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+> > > >>>> +};
+> > > >>>> +
+> > > >>>> +static const struct omap_mbox_device_data am335x_data = {
+> > > >>>> +	.num_users	= 4,
+> > > >>>> +	.num_fifos	= 8,
+> > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
+> > > >>>> +};
+> > > >>>
+
+> > Aha, ok, then the intr_type should be derived from
+> > compatible-string. Or rather... you should have three
+> > compatible-strings for the three possibilities? (And then subtype,
+> > currently unused, in case there are more hw differences).
 > 
->  I still think that using the current rate with clk_get_rate is not a
-> good solution.
+> The compatible string can and should be separate for each revision
+> unless they are the same exacat hardware revision.
 
-Well, it's just as good as using clock-frequency, really. If you want
-the CPU max frequency, it's not the right property (plus, since the
-changed behaviour is not documented in Linux anywhere, the only
-reference we have is the ePAPR on this).
+ACK.
 
-> Could you give us more details about why you nee to use current clock ?
+> > > two are HW IP design parameters, so in general putting them in DT isn't
+> > > completely a bad idea, but I will wait to see if there are any further
+> > > comments on this from Tony or DT maintainers before I make changes.
+> > 
+> > Ok, right... I'd vote for putting them into DT.
+> 
+> I would avoid adding custom DT properties where possible and let the
+> driver just initialize the right data based on the compatible flag.
 
-Honestly, I just want to remove that big warning at boot on the
-A7-based SoCs we have :)
+If these are HW IP design parameters, we can expect to see many
+different combinations. Yet we know ahead of time how to handle
+different parameters HW people select.
 
-> AFAICT, your patch only makes sense for HMP system which don't have
-> DVFS, is it your case ?
-
-Nope, it's just plain simple SMP.
-
-Maxime
-
+Thus IMO we should do it in the device tree.
+									Pavel
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/4224dc53/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
