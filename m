@@ -1,25 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Jul 2014 17:03:57 -0400 (EDT)
-Subject: [PATCH v6] ARM: EXYNOS: Use MCPM call-backs to support S2R on
- Exynos5420
-In-Reply-To: <CAM4voa=K6s0FFmeuiqWZh6HSQZAfSpxL8A_kMTxCi+2t3tzydw@mail.gmail.com>
-References: <alpine.LFD.2.11.1407041408120.22282@knanqh.ubzr>
- <CAM4voamqpCj=Zw69DGjzhouwu=6RE6e3Px5WL8akc-TUAts0Xg@mail.gmail.com>
- <CAM4voa=K6s0FFmeuiqWZh6HSQZAfSpxL8A_kMTxCi+2t3tzydw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1407041702310.22282@knanqh.ubzr>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Fri,  4 Jul 2014 17:04:03 -0400
+Subject: [PATCH] mach-omap2: Change if statement in omap2_dflt_clk_enable
+Message-ID: <1404507843-3648-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 5 Jul 2014, Abhilash Kesavan wrote:
+This patch changes this function to check for if v is returning value from the
+called function. If not it does the else. Furthermore fixes the FIXME message above
+if statement for holding INVERT_ENABLE bit when not needing to be checked for
+in if statement by just checking for if v is not Null.
 
-> On a different note, I have been using the cpuidle patchset
-> (https://patchwork.kernel.org/patch/4357421/) as base for S2R support
-> and had a question. Rather than making the driver depend on
-> ARCH_EXYNOS should it depend on EXYNOS5420_MCPM which in turn depends
-> on MCPM (like TC2) or should we just be making the bL cpuidle driver
-> depend on MCPM ?
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-omap2/clock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Probably making it depend on MCPM directly is the best approach.
-
-
-Nicolas
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 591581a..626363d 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -379,7 +379,7 @@ void omap2_dflt_clk_disable(struct clk_hw *hw)
+ 	}
+ 
+ 	v = omap2_clk_readl(clk, clk->enable_reg);
+-	if (clk->flags & INVERT_ENABLE)
++	if (v)
+ 		v |= (1 << clk->enable_bit);
+ 	else
+ 		v &= ~(1 << clk->enable_bit);
+-- 
+1.9.1
