@@ -1,23 +1,51 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 4 Jul 2014 13:05:30 +0200
-Subject: [RFC 01/10] iommu: Add IOMMU device registry
-In-Reply-To: <1403815790-8548-2-git-send-email-thierry.reding@gmail.com>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-2-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140704110529.GF13434@8bytes.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 04 Jul 2014 20:05:47 +0900
+Subject: [PATCH v10 1/3] arm64: Add __NR_* definitions for compat syscalls
+In-Reply-To: <5418828.mxvNk2rT0e@wuerfel>
+References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
+ <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
+ <5418828.mxvNk2rT0e@wuerfel>
+Message-ID: <53B68A8B.1020106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 10:49:41PM +0200, Thierry Reding wrote:
-> Add an IOMMU device registry for drivers to register with and implement
-> a method for users of the IOMMU API to attach to an IOMMU device. This
-> allows to support deferred probing and gives the IOMMU API a convenient
-> hook to perform early initialization of a device if necessary.
+Arnd,
 
-Can you elaborate on why exactly you need this? The IOMMU-API is
-designed to hide any details from the user about the available IOMMUs in
-the system and which IOMMU handles which device. This looks like it is
-going in a completly different direction from that.
+On 07/04/2014 07:06 PM, Arnd Bergmann wrote:
+> On Friday 04 July 2014 16:28:29 AKASHI Takahiro wrote:
+>> From: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> This patch adds __NR_* definitions to asm/unistd32.h, moves the
+>> __NR_compat_* definitions to asm/unistd.h and removes all the explicit
+>> unistd32.h includes apart from the one building the compat syscall
+>> table. The aim is to have the compat __NR_* definitions available but
+>> without colliding with the native syscall definitions.
+>>
+>> And adds more syscall definitions for 3.16.
+>
+> Can you explain in more detail why you want to add those macros? I've
+> looked at all three patches in the series but can't find any code using
+> them.
 
+Right. "unistd32.h" is not used by this patch, but by lib/compat_audit.c.
+when I thought of adding audit support for arm64, there was duplicated code
+of auditing compat system calls across many architectures.
+lib/compat_audit.c fixes this issue but at the same time it also requires
+__NR_* macros for a couple of compat system calls which arm64 didn't have.
 
-	Joerg
+In the first implementation, I generated an extra generated/asm/unistd_32.h
+from the original asm/unist32.h by using a sed script. But Catalin suggested
+(agreed?) to modify unistd32.h for this purpose.
+
+See
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/228992.html
+
+Thanks,
+-Takahiro AKASHI
+
+> I would expect that we don't need to define those macros at all for
+> compat mode, since they are meant primarily for user space (glibc)
+> compilation, which gets them from arch/arm/include/asm/unistd.h.
+>
+> 	Arnd
+>
