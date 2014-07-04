@@ -1,32 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 Jul 2014 23:28:38 +0200
-Subject: [PATCH V5 2/3] Documentation: gpio: Add APM X-Gene SoC GPIO
- controller DTS binding
-In-Reply-To: <20140630125339.GA21390@leverpostej>
-References: <1403823587-23404-1-git-send-email-fkan@apm.com>
- <1403823587-23404-3-git-send-email-fkan@apm.com>
- <20140630125339.GA21390@leverpostej>
-Message-ID: <CACRpkdZ18SsRBBbngSVyxR0GFkC0kLD4OHm9RJmgZDLXbqvOBQ@mail.gmail.com>
+Date: Fri, 4 Jul 2014 23:32:19 +0200
+Subject: [PATCH v3 1/4] pinctrl: sunxi: Add IRQCHIP_SKIP_SET_WAKE flag for
+ pinctrl irq chip
+In-Reply-To: <1404051062-24079-2-git-send-email-hdegoede@redhat.com>
+References: <1404051062-24079-1-git-send-email-hdegoede@redhat.com>
+ <1404051062-24079-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACRpkdYt+QOURRfSRGnMUnN-U8qCW-1_1pVWiEP096ApAE79gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 2:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jun 26, 2014 at 11:59:46PM +0100, Feng Kan wrote:
+On Sun, Jun 29, 2014 at 4:10 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 
->> +- #gpio-cells: Should be two.
->> +     - first cell is the pin number
->> +     - second cell is used to specify optional parameters (unused)
+> From: Chen-Yu Tsai <wens@csie.org>
 >
-> Why is there an unused cell?
+> The sunxi pinctrl irq chip driver does not support wakeup at the
+> moment. Adding IRQCHIP_SKIP_SET_WAKE lets the irqs work with drivers
+> using wakeup.
 >
-> Why not just make this a single cell if the binding defines no valid
-> parameters?
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I don't get this either. The only reason would be that this cell
-should contain flags (such as open collector) the code for using
-it being inplemented later.
-
-If the controller is too primitive to use such flags it should be onecell.
+Patch applied.
 
 Yours,
 Linus Walleij
