@@ -1,54 +1,163 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 04 Jul 2014 16:05:45 +0200
-Subject: [PATCH] ASoC: samsung: Correct I2S DAI suspend/resume ops
-Message-ID: <1404482745-29177-1-git-send-email-s.nawrocki@samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 4 Jul 2014 17:10:27 +0300
+Subject: [PATCH 02/10] ARM: OMAP3: PRM: move iva reset to PRM driver
+In-Reply-To: <1404483035-21666-1-git-send-email-t-kristo@ti.com>
+References: <1404483035-21666-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1404483035-21666-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should save/restore relevant I2S registers regardless of
-the dai->active flag, otherwise some settings are being lost
-after system suspend/resume cycle. E.g. I2S slave mode set only
-during dai initialization is not preserved and the device ends
-up in master mode after system resume.
+This is a more proper isolation of the code. Done in preparation of making
+PRM an individual driver.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- sound/soc/samsung/i2s.c |   16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c  |   49 +----------------------------------------
+ arch/arm/mach-omap2/prm3xxx.c |   45 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm3xxx.h |    1 +
+ 3 files changed, 47 insertions(+), 48 deletions(-)
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 2ac76fa..5f9b255 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -920,11 +920,9 @@ static int i2s_suspend(struct snd_soc_dai *dai)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 74d03f2..6d02573 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -353,53 +353,6 @@ restore:
+ #define omap3_pm_suspend NULL
+ #endif /* CONFIG_SUSPEND */
+ 
+-
+-/**
+- * omap3_iva_idle(): ensure IVA is in idle so it can be put into
+- *                   retention
+- *
+- * In cases where IVA2 is activated by bootcode, it may prevent
+- * full-chip retention or off-mode because it is not idle.  This
+- * function forces the IVA2 into idle state so it can go
+- * into retention/off and thus allow full-chip retention/off.
+- *
+- **/
+-static void __init omap3_iva_idle(void)
+-{
+-	/* ensure IVA2 clock is disabled */
+-	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
+-
+-	/* if no clock activity, nothing else to do */
+-	if (!(omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
+-	      OMAP3430_CLKACTIVITY_IVA2_MASK))
+-		return;
+-
+-	/* Reset IVA2 */
+-	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
+-			  OMAP3430_RST2_IVA2_MASK |
+-			  OMAP3430_RST3_IVA2_MASK,
+-			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+-
+-	/* Enable IVA2 clock */
+-	omap2_cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
+-			 OMAP3430_IVA2_MOD, CM_FCLKEN);
+-
+-	/* Set IVA2 boot mode to 'idle' */
+-	omap3_ctrl_set_iva_bootmode_idle();
+-
+-	/* Un-reset IVA2 */
+-	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+-
+-	/* Disable IVA2 clock */
+-	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
+-
+-	/* Reset IVA2 */
+-	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
+-			  OMAP3430_RST2_IVA2_MASK |
+-			  OMAP3430_RST3_IVA2_MASK,
+-			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+-}
+-
+ static void __init omap3_d2d_idle(void)
  {
- 	struct i2s_dai *i2s = to_info(dai);
+ 	u16 mask, padconf;
+@@ -503,7 +456,7 @@ static void __init prcm_setup_regs(void)
+ 	/*
+ 	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
+ 	 */
+-	omap3_iva_idle();
++	omap3xxx_prm_iva_idle();
  
--	if (dai->active) {
--		i2s->suspend_i2smod = readl(i2s->addr + I2SMOD);
--		i2s->suspend_i2scon = readl(i2s->addr + I2SCON);
--		i2s->suspend_i2spsr = readl(i2s->addr + I2SPSR);
--	}
-+	i2s->suspend_i2smod = readl(i2s->addr + I2SMOD);
-+	i2s->suspend_i2scon = readl(i2s->addr + I2SCON);
-+	i2s->suspend_i2spsr = readl(i2s->addr + I2SPSR);
- 
- 	return 0;
+ 	omap3_d2d_idle();
  }
-@@ -933,11 +931,9 @@ static int i2s_resume(struct snd_soc_dai *dai)
- {
- 	struct i2s_dai *i2s = to_info(dai);
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+index 014ba70d..a575b69 100644
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -28,6 +28,7 @@
+ #include "prm-regbits-34xx.h"
+ #include "cm3xxx.h"
+ #include "cm-regbits-34xx.h"
++#include "control.h"
  
--	if (dai->active) {
--		writel(i2s->suspend_i2scon, i2s->addr + I2SCON);
--		writel(i2s->suspend_i2smod, i2s->addr + I2SMOD);
--		writel(i2s->suspend_i2spsr, i2s->addr + I2SPSR);
--	}
-+	writel(i2s->suspend_i2scon, i2s->addr + I2SCON);
-+	writel(i2s->suspend_i2smod, i2s->addr + I2SMOD);
-+	writel(i2s->suspend_i2spsr, i2s->addr + I2SPSR);
- 
- 	return 0;
+ static const struct omap_prcm_irq omap3_prcm_irqs[] = {
+ 	OMAP_PRCM_IRQ("wkup",	0,	0),
+@@ -329,6 +330,50 @@ static u32 omap3xxx_prm_read_reset_sources(void)
+ 	return r;
  }
+ 
++/**
++ * omap3xxx_prm_iva_idle - ensure IVA is in idle so it can be put into retention
++ *
++ * In cases where IVA2 is activated by bootcode, it may prevent
++ * full-chip retention or off-mode because it is not idle.  This
++ * function forces the IVA2 into idle state so it can go
++ * into retention/off and thus allow full-chip retention/off.
++ */
++void omap3xxx_prm_iva_idle(void)
++{
++	/* ensure IVA2 clock is disabled */
++	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
++
++	/* if no clock activity, nothing else to do */
++	if (!(omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
++	      OMAP3430_CLKACTIVITY_IVA2_MASK))
++		return;
++
++	/* Reset IVA2 */
++	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
++				OMAP3430_RST2_IVA2_MASK |
++				OMAP3430_RST3_IVA2_MASK,
++				OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
++
++	/* Enable IVA2 clock */
++	omap2_cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
++			       OMAP3430_IVA2_MOD, CM_FCLKEN);
++
++	/* Set IVA2 boot mode to 'idle' */
++	omap3_ctrl_set_iva_bootmode_idle();
++
++	/* Un-reset IVA2 */
++	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
++
++	/* Disable IVA2 clock */
++	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
++
++	/* Reset IVA2 */
++	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
++				OMAP3430_RST2_IVA2_MASK |
++				OMAP3430_RST3_IVA2_MASK,
++				OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
++}
++
+ /* Powerdomain low-level functions */
+ 
+ static int omap3_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 14a5fbc..007ff59 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -163,6 +163,7 @@ extern void omap3xxx_prm_dpll3_reset(void);
+ extern int __init omap3xxx_prm_init(void);
+ extern u32 omap3xxx_prm_get_reset_sources(void);
+ int omap3xxx_prm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits);
++void omap3xxx_prm_iva_idle(void);
+ 
+ #endif /* __ASSEMBLER */
+ 
 -- 
 1.7.9.5
