@@ -1,75 +1,32 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  4 Jul 2014 11:55:01 +0200
-Subject: [PATCH v6 02/23] mfd: max77686: Add power management support
-In-Reply-To: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1404467722-26687-3-git-send-email-javier.martinez@collabora.co.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 4 Jul 2014 15:25:35 +0530
+Subject: [PATCH 2/8] cpufreq: add driver for Armada XP
+In-Reply-To: <1404467103-29644-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404467103-29644-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1404467103-29644-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAKohponuvPd1kWDdB66kxd8TxxYqQ219jCq2D2RGhMHAuZTSWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver doesn't have PM operations defined so add a suspend
-and resume function handlers to allow the PMIC IRQ to wakeup
-the system when it is put into a sleep state.
+On 4 July 2014 15:14, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> This commit adds a simple cpufreq driver for the Armada XP SoC, which
+> has one separately controllable clock for each CPU. For this reason,
+> the existing cpufreq-cpu0 generic driver cannot be used because it
+> currently assumes that there is only one clock controlling the
+> frequency of all CPUs.
+>
+> There are on-going discussions on extending the cpufreq-cpu0 to cover
+> the case of having one clock for each CPU, but there are still some
+> unresolved issues to get this extended cpufreq-cpu0 driver merged.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- drivers/mfd/max77686.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+Exactly, and those changes would get merged in one form or the other.
+Surely in 3.17 atleast, if not 3.16 as we are already reaching rc4..
 
-diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-index 3cb41d0..a38e9ee 100644
---- a/drivers/mfd/max77686.c
-+++ b/drivers/mfd/max77686.c
-@@ -240,10 +240,50 @@ static const struct i2c_device_id max77686_i2c_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, max77686_i2c_id);
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int max77686_suspend(struct device *dev)
-+{
-+	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
-+	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
-+
-+	if (device_may_wakeup(dev))
-+		enable_irq_wake(max77686->irq);
-+
-+	/*
-+	 * IRQ must be disabled during suspend because if it happens
-+	 * while suspended it will be handled before resuming I2C.
-+	 *
-+	 * When device is woken up from suspend (e.g. by RTC wake alarm),
-+	 * an interrupt occurs before resuming I2C bus controller.
-+	 * Interrupt handler tries to read registers but this read
-+	 * will fail because I2C is still suspended.
-+	 */
-+	disable_irq(max77686->irq);
-+
-+	return 0;
-+}
-+
-+static int max77686_resume(struct device *dev)
-+{
-+	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
-+	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
-+
-+	if (device_may_wakeup(dev))
-+		disable_irq_wake(max77686->irq);
-+
-+	enable_irq(max77686->irq);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_PM_SLEEP */
-+
-+static SIMPLE_DEV_PM_OPS(max77686_pm, max77686_suspend, max77686_resume);
-+
- static struct i2c_driver max77686_i2c_driver = {
- 	.driver = {
- 		   .name = "max77686",
- 		   .owner = THIS_MODULE,
-+		   .pm = &max77686_pm,
- 		   .of_match_table = of_match_ptr(max77686_pmic_dt_match),
- 	},
- 	.probe = max77686_i2c_probe,
--- 
-2.0.0.rc2
+So, it would be great if you can test on top of those changes to see if
+something isn't solved for your platform yet?
+
+git://git.linaro.org/people/viresh.kumar/linux.git cpufreq/cpu0-krait-v3
+
+--
+viresh
