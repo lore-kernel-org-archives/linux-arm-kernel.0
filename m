@@ -1,35 +1,85 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  4 Jul 2014 11:55:06 +0200
-Subject: [PATCH v6 07/23] mfd: max77686: Remove unneeded OOM error message
+Date: Fri,  4 Jul 2014 11:55:08 +0200
+Subject: [PATCH v6 09/23] rtc: max77686: Allow the max77686 rtc to wakeup the
+ system
 In-Reply-To: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1404467722-26687-8-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1404467722-26687-10-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to print out-of-memory errors since this is already
-done by the memory management subsystem which even calls dump_stack().
+From: Doug Anderson <dianders@chromium.org>
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+The max77686 includes an RTC that keeps power during suspend.  It's
+convenient to be able to use it as a wakeup source.
+
+NOTE: due to wakeup ordering problems this patch alone doesn't work so
+well on exynos5250-snow.  You also need something that brings the i2c
+bus up before the max77686 wakeup runs.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/mfd/max77686.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-index 87fe52e..8650832 100644
---- a/drivers/mfd/max77686.c
-+++ b/drivers/mfd/max77686.c
-@@ -107,10 +107,8 @@ static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
- 	struct max77686_platform_data *pd;
+Changes since v5:
+ - Fix $SUBJECT since the patch does not actually touch the mfd subsys.
+   Suggested by Lee Jones.
+
+Changes since v4: None
+
+Changes since v3:
+ - Keep the note that this patch needs another change due wakeup
+   ordering problems.
+---
+ drivers/rtc/rtc-max77686.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+index d20a7f0..c1c6055 100644
+--- a/drivers/rtc/rtc-max77686.c
++++ b/drivers/rtc/rtc-max77686.c
+@@ -583,6 +583,33 @@ static void max77686_rtc_shutdown(struct platform_device *pdev)
+ #endif /* MAX77686_RTC_WTSR_SMPL */
+ }
  
- 	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
--	if (!pd) {
--		dev_err(dev, "could not allocate memory for pdata\n");
-+	if (!pd)
- 		return NULL;
--	}
- 
- 	dev->platform_data = pd;
- 	return pd;
++#ifdef CONFIG_PM_SLEEP
++static int max77686_rtc_suspend(struct device *dev)
++{
++	if (device_may_wakeup(dev)) {
++		struct max77686_rtc_info *info = dev_get_drvdata(dev);
++
++		return enable_irq_wake(info->virq);
++	}
++
++	return 0;
++}
++
++static int max77686_rtc_resume(struct device *dev)
++{
++	if (device_may_wakeup(dev)) {
++		struct max77686_rtc_info *info = dev_get_drvdata(dev);
++
++		return disable_irq_wake(info->virq);
++	}
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(max77686_rtc_pm_ops,
++			 max77686_rtc_suspend, max77686_rtc_resume);
++
+ static const struct platform_device_id rtc_id[] = {
+ 	{ "max77686-rtc", 0 },
+ 	{},
+@@ -592,6 +619,7 @@ static struct platform_driver max77686_rtc_driver = {
+ 	.driver		= {
+ 		.name	= "max77686-rtc",
+ 		.owner	= THIS_MODULE,
++		.pm	= &max77686_rtc_pm_ops,
+ 	},
+ 	.probe		= max77686_rtc_probe,
+ 	.shutdown	= max77686_rtc_shutdown,
 -- 
 2.0.0.rc2
