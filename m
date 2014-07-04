@@ -1,57 +1,274 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Thu, 3 Jul 2014 20:05:04 -0700
-Subject: [PATCH] ARM: remove redundant code in machine_halt
-In-Reply-To: <9034CBD80F070943B59700D7F8149ED9A0875745@SC-VEXCH4.marvell.com>
-References: <1399441823-9907-1-git-send-email-zhangwm@marvell.com>
- <9034CBD80F070943B59700D7F8149ED9A0875745@SC-VEXCH4.marvell.com>
-Message-ID: <9034CBD80F070943B59700D7F8149ED90182308483@SC-VEXCH4.marvell.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 4 Jul 2014 11:08:20 +0800
+Subject: [PATCH 05/18] power: reset: Add AT91 reset driver
+In-Reply-To: <20140703145957.GH31996@lukather>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
+ <F9547E0F-AB97-47E6-BA09-135EE4E1BC73@jcrosoft.com>
+ <20140703145957.GH31996@lukather>
+Message-ID: <B425B925-B75E-4761-8CE6-9B12C5AC0469@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Neil Zhang
-> Sent: 2014?5?14? 15:52
-> To: Neil Zhang; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Cc: rmk+kernel at arm.linux.org.uk
-> Subject: RE: [PATCH] ARM: remove redundant code in machine_halt
+
+On Jul 3, 2014, at 10:59 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> On Thu, Jul 03, 2014 at 10:39:08PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> +++ b/drivers/power/reset/at91-reset.c
+>>> @@ -0,0 +1,202 @@
+>>> +/*
+>>> + * Atmel AT91 SAM9 SoCs reset code
+>>> + *
+>>> + * Copyright (C) 2014 Maxime Ripard
+>>> + *
+>>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> 
+>> you can not own the copyright as it?s basically a copy of other
+>> people code
 > 
-> > -----Original Message-----
-> > From: Neil Zhang [mailto:zhangwm at marvell.com]
-> > Sent: 2014?5?7? 13:50
-> > To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> > Cc: rmk+kernel at arm.linux.org.uk; Neil Zhang
-> > Subject: [PATCH] ARM: remove redundant code in machine_halt
-> >
-> > There is no need to call local_irq_disable twice.
-> >
-> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> > ---
-> >  arch/arm/kernel/process.c |    1 -
-> >  1 file changed, 1 deletion(-)
-> >
-> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c index
-> > 81ef686..18cfce4 100644
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -195,7 +195,6 @@ void machine_halt(void)
-> >  	local_irq_disable();
-> >  	smp_send_stop();
-> >
-> > -	local_irq_disable();
-> >  	while (1);
-> >  }
-> >
-> > --
-> > 1.7.9.5
+> The previous names are missing, right.
 > 
-> Any comments?
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2.  This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#include <linux/io.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/reboot.h>
+>>> +
+>>> +#include <asm/system_misc.h>
+>>> +
+>>> +#include <mach/at91sam9_ddrsdr.h>
+>>> +#include <mach/at91sam9_sdramc.h>
+>>> +
+>>> +#define AT91_RSTC_CR	0x00		/* Reset Controller Control Register */
+>>> +#define	AT91_RSTC_PROCRST	BIT(0)		/* Processor Reset */
+>>> +#define	AT91_RSTC_PERRST	BIT(2)		/* Peripheral Reset */
+>>> +#define	AT91_RSTC_EXTRST	BIT(3)		/* External Reset */
+>>> +#define	AT91_RSTC_KEY		(0xa5 << 24)	/* KEY Password */
+>>> +
+>>> +#define AT91_RSTC_SR	0x04		/* Reset Controller Status Register */
+>>> +#define	AT91_RSTC_URSTS		BIT(0)		/* User Reset Status */
+>>> +#define	AT91_RSTC_RSTTYP	GENMASK(10, 8)	/* Reset Type */
+>>> +#define	AT91_RSTC_NRSTL		BIT(16)		/* NRST Pin Level */
+>>> +#define	AT91_RSTC_SRCMP		BIT(17)		/* Software Reset Command in Progress */
+>>> +
+>>> +#define AT91_RSTC_MR	0x08		/* Reset Controller Mode Register */
+>>> +#define	AT91_RSTC_URSTEN	BIT(0)		/* User Reset Enable */
+>>> +#define	AT91_RSTC_URSTIEN	BIT(4)		/* User Reset Interrupt Enable */
+>>> +#define	AT91_RSTC_ERSTL		GENMASK(11, 8)	/* External Reset Length */
+>>> +
+>>> +enum reset_type {
+>>> +	RESET_TYPE_GENERAL	= 0,
+>>> +	RESET_TYPE_WAKEUP	= 1,
+>>> +	RESET_TYPE_WATCHDOG	= 2,
+>>> +	RESET_TYPE_SOFTWARE	= 3,
+>>> +	RESET_TYPE_USER		= 4,
+>>> +};
+>>> +
+>>> +static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+>>> +
+>>> +static void at91sam9_restart(enum reboot_mode mode, const char *cmd)
+>>> +{
+>>> +	asm volatile(
+>>> +		".balign 32\n\t"
+>>> +
+>>> +		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
+>>> +		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
+>>> +		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
+>>> +
+>>> +		"b	.\n\t"
+>>> +		:
+>>> +		: "r" (at91_ramc_base[0]),
+>>> +		  "r" (at91_rstc_base),
+>>> +		  "r" (1),
+>>> +		  "r" (AT91_SDRAMC_LPCB_POWER_DOWN),
+>>> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST));
+>>> +}
+>>> +
+>>> +static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+>>> +{
+>>> +	asm volatile(
+>>> +		"cmp	%1, #0\n\t"
+>>> +		"beq	1f\n\t"
+>>> +
+>>> +		"ldr	r0, [%1]\n\t"
+>>> +		"cmp	r0, #0\n\t"
+>>> +
+>>> +		".balign 32\n\t"
+>>> +
+>>> +		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+>>> +
+>>> +		"	b	.\n\t"
+>>> +		:
+>>> +		: "r" (at91_ramc_base[0]),
+>>> +		  "r" (at91_ramc_base[1]),
+>>> +		  "r" (at91_rstc_base),
+>>> +		  "r" (1),
+>>> +		  "r" (AT91_DDRSDRC_LPCB_POWER_DOWN),
+>>> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST)
+>>> +		: "r0");
+>>> +}
+>>> +
+>> move this to an assembly file more easy to read than a C code
+> 
+> Nope. It's a pain to pass variable to an external assembly file, and
+> this makes the use of global variable pretty much mandatory, which is
+> definitely not great.
+
+Not at all I did for the PM slow clock code just write a function and pas it as a parameter
+you have 3
+
+so basically you have to use the current and just pass at91_ramc_base[0], at91_ramc_base[1]
+and at91_rstc_base
+it?s 3 lignes of modification, if you have at91_ramc_base and at91_ramc_base same
+
+so NACK
+> 
+>> 
+>>> +static void __init at91_reset_status(struct platform_device *pdev)
+>>> +{
+>>> +	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+>>> +	char *reason;
+>>> +
+>>> +	switch ((reg & AT91_RSTC_RSTTYP) >> 8) {
+>>> +	case RESET_TYPE_GENERAL:
+>>> +		reason = "general reset";
+>>> +		break;
+>>> +	case RESET_TYPE_WAKEUP:
+>>> +		reason = "wakeup";
+>>> +		break;
+>>> +	case RESET_TYPE_WATCHDOG:
+>>> +		reason = "watchdog reset";
+>>> +		break;
+>>> +	case RESET_TYPE_SOFTWARE:
+>>> +		reason = "software reset";
+>>> +		break;
+>>> +	case RESET_TYPE_USER:
+>>> +		reason = "user reset";
+>>> +		break;
+>>> +	default:
+>>> +		reason = "unknown reset";
+>>> +		break;
+>>> +	}
+>>> +
+>>> +	pr_info("AT91: Starting after %s\n", reason);
+>>> +}
+>>> +
+>>> +static struct of_device_id at91_ramc_of_match[] = {
+>>> +	{ .compatible = "atmel,at91sam9260-sdramc", },
+>>> +	{ .compatible = "atmel,at91sam9g45-ddramc", },
+>>> +	{ /* sentinel */ }
+>>> +};
+>>> +
+>>> +static struct of_device_id at91_reset_of_match[] = {
+>>> +	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_restart },
+>>> +	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+>>> +	{ /* sentinel */ }
+>>> +};
+>>> +
+>>> +static int at91_reset_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct resource *res;
+>>> +
+>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
+>>> +	if (IS_ERR(at91_rstc_base)) {
+>>> +		dev_err(&pdev->dev, "Could not map reset controller address\n");
+>>> +		return PTR_ERR(at91_rstc_base);
+>>> +	}
+>>> +
+>>> +	if (pdev->dev.of_node) {
+>> 
+>> split in 2 function more easy to ready and less indentation
+> 
+> ok.
+> 
+>>> +		const struct of_device_id *match;
+>>> +		struct device_node *np;
+>>> +		int idx = 0;
+>>> +
+>>> +		for_each_matching_node(np, at91_ramc_of_match) {
+>>> +			at91_ramc_base[idx] = of_iomap(np, 0);
+>>> +			if (!at91_ramc_base[idx]) {
+>>> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+>>> +				return -ENODEV;
+>>> +			}
+>>> +			idx++;
+>>> +		}
+>> 
+>> and if you can not probe the ram controler it?s a panic not a -ENODEV
+>> 
+>> as you have an unstable platform
+> 
+> I don't really see why. That the pm code and the reset code won't be
+> able to work, it's obvious. But making the assumption that the
+> platforms don't have a RAM properly setup just because it doesn't have
+> a DT node seems quite weak.
+
+no as if you do not have the RAMC your reset will cause hardware issue as there is a bug
+in the SoC so yes mandatory as 95% of the people will not known why there board will suddenly
+do not reboot. As this specific reset in assembly was write to run from cache to fix a SoC bug
+in the reset controller
+> 
+>>> +
+>>> +		match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+>>> +		arm_pm_restart = match->data;
+>>> +	} else {
+>>> +		const struct platform_device_id *match;
+>>> +		int idx = 0;
+>>> +
+>>> +		for (idx = 0; idx < 2; idx++) {
+>>> +			res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
+>>> +			at91_ramc_base[idx] = devm_ioremap_resource(&pdev->dev, res);
+>>> +			if (IS_ERR(at91_ramc_base[idx])) {
+>>> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+>>> +				return PTR_ERR(at91_rstc_base);
+>>> +			}
+>>> +		}
+>>> +
+>>> +		match = platform_get_device_id(pdev);
+>>> +		arm_pm_restart = (void (*)(enum reboot_mode, const char*))
+>>> +			match->driver_data;
+>>> +	}
+>>> +
+>>> +	at91_reset_status(pdev);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct platform_device_id at91_reset_plat_match[] = {
+>>> +	{ "at91-sam9-reset", (unsigned long)at91sam9_restart },
+>>> +	{ "at91-g45-reset", (unsigned long)at91sam9g45_restart },
+>> 	    at91-sam9???
+>> 
+>> 	    from the beginning of DT we put the first SoC were the
+>> 	    reset was introduce and why do you change the DT binding?
+> 
+> Except that this is not about DT probing, but the old-style board
+> files one.
 > 
 
-Ping!
-
-> Best Regards,
-> Neil Zhang
+except that in al the other driver such as FBDEV we use the same principle for platform_device
 
 Best Regards,
-Neil Zhang
+J.
+
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
