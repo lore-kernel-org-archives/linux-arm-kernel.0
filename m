@@ -1,18 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 Jul 2014 21:58:54 +0200
-Subject: [PATCH 12/12] mfd: ab8500-core: Resolve code style issues
-In-Reply-To: <1404314924-23564-13-git-send-email-lee.jones@linaro.org>
-References: <1404314924-23564-1-git-send-email-lee.jones@linaro.org>
- <1404314924-23564-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZPYWfkr5MARQArHO8-LuQ3d8S2adBEfW_z7a3JQDhOkg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Jul 2014 22:11:06 +0200
+Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
+ it has exclusives
+In-Reply-To: <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk>
+References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+ <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk>
+Message-ID: <4606711.7KmFAGVNmG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 5:28 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Friday 04 July 2014 20:52:17 Russell King wrote:
+>         /*
+>          * HWCAP_TLS is available only on 1136 r1p0 and later,
+>          * see also kuser_get_tls_init.
+>          */
+> -       if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
+> +       if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&
+> +           ((id >> 20) & 3) == 0) {
+>                 elf_hwcap &= ~HWCAP_TLS;
+> +               return;
+> +       }
+> 
 
-> Soothes the following checkpatch warnings:
+Would it make sense to tie this check to the ARMv6K architecture level?
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+I see that cpu_architecture currently reports the same value for plain
+ARMv6 (1136r0) and for ARMv6K (1136r1+ or any other ARM11), but we already
+distinguish them at compile time in a number of places and it seems you
+make the exact same distinction here at runtime.
 
-Yours,
-Linus Walleij
+	Arnd
