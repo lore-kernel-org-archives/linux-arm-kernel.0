@@ -1,67 +1,83 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 04 Jul 2014 17:43:22 +0900
-Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
-In-Reply-To: <CAK5sBcHbs1ZSu=ZTWvEOeWO-kTCBh1OjTJc-YYxQzgV5QGOLNw@mail.gmail.com>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
- <53B4494B.1030909@samsung.com> <53B48BCB.4010308@samsung.com>
- <CAK5sBcHbs1ZSu=ZTWvEOeWO-kTCBh1OjTJc-YYxQzgV5QGOLNw@mail.gmail.com>
-Message-ID: <033301cf9764$032390e0$096ab2a0$@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 04 Jul 2014 10:47:44 +0200
+Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
+In-Reply-To: <53B5CA26.7050405@free-electrons.com>
+References: <20140703135146.GA6898@luxor.wired.org>
+ <53B5C61D.2060308@free-electrons.com> <53B5CA26.7050405@free-electrons.com>
+Message-ID: <1936558.QaAG1bYMuD@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
-> 
-> Hi Kukjin,
-> 
-Hi,
+Hi Gregory,
 
-> On Thu, Jul 3, 2014 at 4:16 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > On 07/03/14 03:02, Tomasz Figa wrote:
-> >>
-> >> Hi Kukjin,
-> >>
-> > Hi,
-> >
-> >
-> >> On 30.06.2014 23:32, Kukjin Kim wrote:
-> >>>
-> >>> This series removes S5P64X0 and S5PC100 related codes in mainline,
-> >>> because no more user now. And if its supporting is required later,
-> >>> it will be done with using device tree.
-> >>>
-> >>> [PATCH 01/17] ARM: S5P64X0: no more support S5P6440 and S5P6450 SoCs
-> >>> [PATCH 02/17] gpio: samsung: remove s5p64x0 related gpio codes
-> >>> [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
-> >>> [PATCH 04/17] ASoC: samsung: no more support for S5P6440 and S5P6450
-> >>> [PATCH 05/17] pwm: samsung: remove s5p64x0 related pwm codes
-> >>> [PATCH 06/17] video: fbdev: s3c-fb: remove s5p64x0 related fimd
-> >>> [PATCH 07/17] serial: samsung: no more support for S5P6440 and
-> >>> [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
-> >>> [PATCH 09/17] gpio: samsung: remov s5pc100 related gpio codes
-> >>> [PATCH 10/17] spi: s3c64xx: remove s5pc100 related spi codes
-> >>> [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
-> >>> [PATCH 12/17] serial: samsung: no more support for S5PC100 SoC
-> >>> [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
-> >>> [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
-> >>> [PATCH 15/17] video: fbdev: s3c-fb: remove s5pc100 related fimd and
-> >>> [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc codes
-> >>> [PATCH 17/17] ASoC: Samsung: remove s5pc100 related codes
-> >>
-> >>
-> >> Thanks for this series.
-> >>
-> >> Just letting you know that I have rebased my s5pv210 DT migration series
-> >> on top of this and will be sending the patches after some more testing.
-> >>
-> > Just note since I've missed one more change in the series, I amended it just
-> > now but it should be fine with your series I think.
-> >
-> > Please see v3.17-next/cleanup-s5p branch.
-> 
-> Can you please push out the other patches that you applied last week?
-> 
-You mean whole patches in this series? OK, I will in this weekend.
-Note, as you know, missing patches in my tree are handled by other maintainer.
+(CC'ing the IOMMU mailing list)
 
-Thanks,
-Kukjin
+On Thursday 03 July 2014 23:24:54 Gregory CLEMENT wrote:
+> On 03/07/2014 23:07, Gregory CLEMENT wrote:
+> > On 03/07/2014 23:01, Thomas Petazzoni wrote:
+> >> Hello,
+> >> 
+> >> If you have touched the OMAP IOMMU driver recently, please read on.
+> >> 
+> >> On Thu, 03 Jul 2014 22:57:38 +0200, Gregory CLEMENT wrote:
+> >>>> So it calls bus_set_iommu() unconditionally, without caring at all
+> >>>> whether it is running on a platform that actually cares about OMAP
+> >>>> IOMMU. And then later on, a bus notifier of the IOMMU subsystem gets
+> >>>> called, and some NULL pointer gets dereferenced. I'm pretty sure that
+> >>>> if you comment out this subsys_initcall(), you won't see the problem
+> >>>> anymore.
+
+The OMAP IOMMU driver isn't the only one registering itself with the platform 
+bus at probe time, regardless of the system the kernel runs on. Some IOMMU 
+drivers push the bus_set_iommu() call to the probe function, but that's not a 
+good solution either, as we could have several instances of the same IOMMU, 
+and all of them should be probed before the bus_set_iommu() call.
+
+We need a quick fix for v3.16, but we also need to fix bus_set_iommu(). That's 
+on my to-do list for <insert some fuzzy future date here>, but if you want to 
+give it a go, please feel free to do so. In all cases, this is a good occasion 
+to start discussing the problem. Any opinion on what the perfect API would 
+look like ?
+
+> >>> Indeed I comment it, and I didn't see the problem anymore.
+> >>> 
+> >>>> However, this code has been around since a while, so I don't know if
+> >>>> it's actually the change that makes it visible. Maybe some other IOMMU
+> >>>> core internal change makes it actually visible. But this
+> >>>> subsys_initcall() that does random stuff without caring about the
+> >>>> platform it runs on anyway looks incorrect.
+> >>> 
+> >>> I think that nobody until now have run this configuration.
+> >> 
+> >> Hum, indeed, I was assuming multi_v7_defconfig would have that enabled,
+> >> but it only has the Tegra IOMMU enabled, and not the OMAP IOMMU one.
+> >> 
+> >> So, the bug clearly belongs to the developers of the OMAP IOMMU driver,
+> >> so I've added a bunch of people who touched this driver recently in Cc.
+> > 
+> > To add more information: I thought the problem was here from a long time
+> > so I tested a 3.14 kernel, and in this case the kernel booted without any
+> > problem. So the bug is pretty recent. I will do a last test with 3.15 and
+> > I will keep you inform.
+> 
+> So it also boot well in 3.15 and then failed in 3.16-rc3. I hope it will
+> help the developers of the OMAP IOMMU driver to fix it.
+
+Thank you. I've had a look at the OMAP IOMMU driver changes between v3.15 and 
+v3.16-rc3, and didn't find at first sight any change that could explain the 
+crash.
+
+286f600 iommu/omap: Fix map protection value handling
+67b779d iommu/omap: Remove comment about supporting single page mappings only
+f7129a0 iommu/omap: Fix 'no page for' debug message in flush_iotlb_page()
+5acc97d iommu/omap: Move to_iommu definition from omap-iopgtable.h
+2ac6133 iommu/omap: Remove omap_iommu_domain_has_cap() function
+d760e3e iommu/omap: Correct init value of iotlb_entry valid field
+
+Could you try reverting those changes and retest ? If the problem doesn't 
+disappear, we'll need to look somewhere else.
+
+-- 
+Regards,
+
+Laurent Pinchart
