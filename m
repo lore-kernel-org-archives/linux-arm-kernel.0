@@ -1,47 +1,46 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  4 Jul 2014 10:30:43 +0200
-Subject: [PATCH 2/5] of: Decrement refcount of previous endpoint in
- of_graph_get_next_endpoint
+Date: Fri,  4 Jul 2014 10:30:45 +0200
+Subject: [PATCH 4/5] drm: use for_each_endpoint_of_node macro in
+ drm_of_find_possible_crtcs
 In-Reply-To: <1404462646-1769-1-git-send-email-p.zabel@pengutronix.de>
 References: <1404462646-1769-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1404462646-1769-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1404462646-1769-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Decreasing the reference count of the previous endpoint node allows to use
-the of_graph_get_next_endpoint function in a for_each_... style macro.
+Using the for_each_... macro should make the code a bit shorter and
+easier to read.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/of/base.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ drivers/gpu/drm/drm_of.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 8368d96..9480e10 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -2262,8 +2262,7 @@ EXPORT_SYMBOL(of_graph_parse_endpoint);
-  * @prev: previous endpoint node, or NULL to get first
-  *
-  * Return: An 'endpoint' node pointer with refcount incremented. Refcount
-- * of the passed @prev node is not decremented, the caller have to use
-- * of_node_put() on it when done.
-+ * of the passed @prev node is decremented.
-  */
- struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
- 					struct device_node *prev)
-@@ -2299,12 +2298,6 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
- 		if (WARN_ONCE(!port, "%s(): endpoint %s has no parent node\n",
- 			      __func__, prev->full_name))
- 			return NULL;
--
--		/*
--		 * Avoid dropping prev node refcount to 0 when getting the next
--		 * child below.
--		 */
--		of_node_get(prev);
- 	}
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+index 46d9678..1b315b6 100644
+--- a/drivers/gpu/drm/drm_of.c
++++ b/drivers/gpu/drm/drm_of.c
+@@ -44,11 +44,7 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 	struct device_node *remote_port, *ep = NULL;
+ 	uint32_t possible_crtcs = 0;
  
- 	while (1) {
+-	do {
+-		ep = of_graph_get_next_endpoint(port, ep);
+-		if (!ep)
+-			break;
+-
++	for_each_endpoint_of_node(port, ep) {
+ 		remote_port = of_graph_get_remote_port(ep);
+ 		if (!remote_port) {
+ 			of_node_put(ep);
+@@ -58,7 +54,7 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 		possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
+ 
+ 		of_node_put(remote_port);
+-	} while (1);
++	}
+ 
+ 	return possible_crtcs;
+ }
 -- 
 2.0.0
