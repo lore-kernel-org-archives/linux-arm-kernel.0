@@ -1,47 +1,72 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 4 Jul 2014 03:13:02 -0700
-Subject: [PATCH] arm64: KVM: export demux regids as KVM_REG_ARM64
-In-Reply-To: <53B2DA42.40604@arm.com>
-References: <1404229993-14522-1-git-send-email-alex.bennee@linaro.org>
- <53B2DA42.40604@arm.com>
-Message-ID: <20140704101302.GD20451@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  4 Jul 2014 12:16:37 +0200
+Subject: [PATCH v2] efi/arm64: handle missing virtual mapping for UEFI System
+ Table
+Message-ID: <1404468997-6925-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:56:50PM +0100, Marc Zyngier wrote:
-> On 01/07/14 16:53, Alex Benn?e wrote:
-> > I suspect this is a -ECUTPASTE fault from the initial implementation. If
-> > we don't declare the register ID to be KVM_REG_ARM64 the KVM_GET_ONE_REG
-> > implementation kvm_arm_get_reg() returns -EINVAL and hilarity ensues.
-> > 
-> > The kvm/api.txt document describes all arm64 registers as starting with
-> > 0x60xx... (i.e KVM_REG_ARM64).
-> > 
-> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm64/kvm/sys_regs.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index 0324458..5ee99e4 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -962,7 +962,7 @@ static unsigned int num_demux_regs(void)
-> >  
-> >  static int write_demux_regids(u64 __user *uindices)
-> >  {
-> > -	u64 val = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
-> > +	u64 val = KVM_REG_ARM64 | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
-> >  	unsigned int i;
-> >  
-> >  	val |= KVM_REG_ARM_DEMUX_ID_CCSIDR;
-> > 
-> 
-> -EBROWNPAPERBAG.
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-Applied to kvmarm/master,
+If we cannot resolve the virtual address of the UEFI System Table, its physical
+offset must be missing from the virtual memory map, and there is really no point
+in proceeding with installing the virtual memory map and the runtime services
+dispatch table. So back out gracefully.
 
-thanks.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+
+v2:
+- release mappings and free virtmap before bailing
+
+ arch/arm64/kernel/efi.c | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 56c3327bbf79..23942158e0f8 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -416,11 +416,23 @@ static int __init arm64_enter_virtual_mode(void)
+ 			continue;
+ 		if (remap_region(md, &virt_md))
+ 			++count;
++		else
++			goto err_unmap;
+ 	}
+ 
+ 	efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
+-	if (efi.systab)
+-		set_bit(EFI_SYSTEM_TABLES, &efi.flags);
++	if (!efi.systab) {
++		/*
++		 * If we have no virtual mapping for the System Table at this
++		 * point, the memory map doesn't cover the physical offset where
++		 * it resides. This means the System Table will be inaccessible
++		 * to Runtime Services themselves once the virtual mapping is
++		 * installed.
++		 */
++		pr_err("Failed to remap EFI System Table -- buggy firmware?\n");
++		goto err_unmap;
++	}
++	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+ 
+ 	local_irq_save(flags);
+ 	cpu_switch_mm(idmap_pg_dir, &init_mm);
+@@ -453,5 +465,17 @@ static int __init arm64_enter_virtual_mode(void)
+ 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 
+ 	return 0;
++
++err_unmap:
++	/* unmap all mappings that succeeded: there are 'count' of those */
++	for_each_efi_memory_desc(&memmap, md) {
++		if (!(md->attribute & EFI_MEMORY_RUNTIME))
++			continue;
++		if (!count--)
++			break;
++		iounmap((__force void *)md->virt_addr);
++	}
++	kfree(virtmap);
++	return -1;
+ }
+ early_initcall(arm64_enter_virtual_mode);
+-- 
+1.8.3.2
