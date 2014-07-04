@@ -1,104 +1,172 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  4 Jul 2014 19:41:53 +0200
-Subject: [PATCH v3 2/2] efi/arm64: preserve FP/SIMD registers on UEFI runtime
- services calls
-In-Reply-To: <1404495713-10338-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1404495713-10338-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1404495713-10338-3-git-send-email-ard.biesheuvel@linaro.org>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 4 Jul 2014 23:15:17 +0530
+Subject: several messages
+In-Reply-To: <alpine.LFD.2.11.1407040007370.19626@knanqh.ubzr>
+References: <1404363737-26222-1-git-send-email-a.kesavan@samsung.com>
+ <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1407031111100.6220@knanqh.ubzr>
+ <CAM4voanVAA4KOHWemQf59WjBpZXxVG_0P49xfzeq8KOvOwg4xg@mail.gmail.com>
+ <alpine.LFD.2.11.1407031442210.6220@knanqh.ubzr>
+ <CAM4voamgOkJ5+OgX577YrGJc3gdxQAcWYkQziw9Uv92PJQAgRQ@mail.gmail.com>
+ <alpine.LFD.2.11.1407040007370.19626@knanqh.ubzr>
+Message-ID: <CAM4voamF8EnEF7ntzp8xrexfp6haVAfHpf1-3U-D9E0LmR7a8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the UEFI spec section 2.3.6.4, the use of FP/SIMD instructions is
-allowed, and should adhere to the AAPCS64 calling convention, which states that
-'only the bottom 64 bits of each value stored in registers v8-v15 need to be
-preserved' (section 5.1.2).
+Hi Nicolas,
 
-This applies equally to UEFI Runtime Services called by the kernel, so make sure
-the FP/SIMD register file is preserved in this case. We do this by enabling the
-wrappers for UEFI Runtime Services (CONFIG_EFI_RUNTIME_WRAPPERS) and inserting
-calls to kernel_neon_begin() and kernel_neon_end() into these wrappers.
+On Fri, Jul 4, 2014 at 9:43 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Fri, 4 Jul 2014, Abhilash Kesavan wrote:
+>
+>> Hi Nicolas,
+>>
+>> On Fri, Jul 4, 2014 at 12:30 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
+>> >
+>> >> Hi Nicolas,
+>> >>
+>> >> On Thu, Jul 3, 2014 at 9:15 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> >> > On Thu, 3 Jul 2014, Abhilash Kesavan wrote:
+>> >> >
+>> >> >> On Thu, Jul 3, 2014 at 6:59 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> >> >> > Please, let's avoid going that route.  There is no such special handling
+>> >> >> > needed if the API is sufficient.  And the provided API allows you to
+>> >> >> > suspend a CPU or shut it down.  It shouldn't matter at that level if
+>> >> >> > this is due to a cluster switch or a hotplug event. Do you really need
+>> >> >> > something else?
+>> >> >> No, just one local flag for suspend should be enough for me. Will remove these.
+>> >> >
+>> >> > [...]
+>> >> >
+>> >> >> Changes in v5:
+>> >> >>       - Removed the MCPM flags and just used a local flag to
+>> >> >>       indicate that we are suspending.
+>> >> >
+>> >> > [...]
+>> >> >
+>> >> >> -static void exynos_power_down(void)
+>> >> >> +static void exynos_mcpm_power_down(u64 residency)
+>> >> >>  {
+>> >> >>       unsigned int mpidr, cpu, cluster;
+>> >> >>       bool last_man = false, skip_wfi = false;
+>> >> >> @@ -150,7 +153,12 @@ static void exynos_power_down(void)
+>> >> >>       BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+>> >> >>       cpu_use_count[cpu][cluster]--;
+>> >> >>       if (cpu_use_count[cpu][cluster] == 0) {
+>> >> >> -             exynos_cpu_power_down(cpunr);
+>> >> >> +             /*
+>> >> >> +              * Bypass power down for CPU0 during suspend. This is being
+>> >> >> +              * taken care by the SYS_PWR_CFG bit in CORE0_SYS_PWR_REG.
+>> >> >> +              */
+>> >> >> +             if ((cpunr != 0) || (residency != S5P_CHECK_SLEEP))
+>> >> >> +                     exynos_cpu_power_down(cpunr);
+>> >> >>
+>> >> >>               if (exynos_cluster_unused(cluster)) {
+>> >> >>                       exynos_cluster_power_down(cluster);
+>> >> >> @@ -209,6 +217,11 @@ static void exynos_power_down(void)
+>> >> >>       /* Not dead at this point?  Let our caller cope. */
+>> >> >>  }
+>> >> >>
+>> >> >> +static void exynos_power_down(void)
+>> >> >> +{
+>> >> >> +     exynos_mcpm_power_down(0);
+>> >> >> +}
+>> >> >
+>> >> > [...]
+>> >> >
+>> >> >> +static int notrace exynos_mcpm_cpu_suspend(unsigned long arg)
+>> >> >> +{
+>> >> >> +     /* MCPM works with HW CPU identifiers */
+>> >> >> +     unsigned int mpidr = read_cpuid_mpidr();
+>> >> >> +     unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> >> >> +     unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> >> >> +
+>> >> >> +     __raw_writel(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
+>> >> >> +
+>> >> >> +     mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
+>> >> >> +
+>> >> >> +     /*
+>> >> >> +      * Pass S5P_CHECK_SLEEP flag to the MCPM back-end to indicate that
+>> >> >> +      * we are suspending the system and need to skip CPU0 power down.
+>> >> >> +      */
+>> >> >> +     mcpm_cpu_suspend(S5P_CHECK_SLEEP);
+>> >> >
+>> >> > NAK.
+>> >> >
+>> >> > When I say "local flag with local meaning", I don't want you to smuggle
+>> >> > that flag through a public interface either.  I find it rather inelegant
+>> >> > to have the notion of special handling for CPU0 being spread around like
+>> >> > that.
+>> >> >
+>> >> > If CPU0 is special, then it should be dealth with in one place only,
+>> >> > ideally in the MCPM backend, so the rest of the kernel doesn't have to
+>> >> > care.
+>> >> >
+>> >> > Again, here's what I mean:
+>> >> >
+>> >> > static void exynos_mcpm_down_handler(int flags)
+>> >> > {
+>> >> >         [...]
+>> >> >         if ((cpunr != 0) || !(flags & SKIP_CPU_POWERDOWN_IF_CPU0))
+>> >> >                 exynos_cpu_power_down(cpunr);
+>> >> >         [...]
+>> >> > }
+>> >> >
+>> >> > static void exynos_mcpm_power_down()
+>> >> > {
+>> >> >         exynos_mcpm_down_handler(0);
+>> >> > }
+>> >> >
+>> >> > static void exynos_mcpm_suspend(u64 residency)
+>> >> > {
+>> >> >         /*
+>> >> >          * Theresidency argument is ignored for now.
+>> >> >          * However, in the CPU suspend case, we bypass power down for
+>> >> >          * CPU0 as this is being taken care by the SYS_PWR_CFG bit in
+>> >> >          * CORE0_SYS_PWR_REG.
+>> >> >          */
+>> >> >         exynos_mcpm_down_handler(SKIP_CPU_POWERDOWN_IF_CPU0);
+>> >> > }
+>> >> >
+>> >> > And SKIP_CPU_POWERDOWN_IF_CPU0 is defined in and visible to
+>> >> > mcpm-exynos.c only.
+>> >> Sorry if I am being dense, but the exynos_mcpm_suspend function would
+>> >> get called from both the bL cpuidle driver as well the exynos pm code.
+>> >
+>> > What is that exynos pm code actually doing?
+>> exynos pm code is shared across Exynos4 and 5 SoCs. It primarily does
+>> a series of register configurations which are required to put the
+>> system to sleep (some parts of these are SoC specific and others
+>> common). It also populates the suspend_ops for exynos. In the current
+>> patch, exynos_suspend_enter() is where I have plugged in the
+>> mcpm_cpu_suspend call.
+>>
+>> This patch is based on the S2R series for 5420
+>> (http://comments.gmane.org/gmane.linux.kernel.samsung-soc/33898), you
+>> may also have a look at that for a clearer picture.
+>> >
+>> >> We want to skip CPU0 only in case of the S2R case i.e. the pm code and
+>> >> keep the CPU0 power down code for all other cases including CPUIdle.
+>> >
+>> > OK.  If so I missed that somehow (hint hint).
+>> >
+>> >> If I call exynos_mcpm_down_handler with the flag in
+>> >> exynos_mcpm_suspend(), CPUIdle will also skip CPU0 isn't it ?
+>> >
+>> > As it is, yes.  You could logically use an infinite residency time
+>> > (something like U64_MAX) to distinguish S2RAM from other types of
+>> > suspend.
+>> OK, I will use this rather than the S5P_CHECK_SLEEP macro.
+>
+> Another suggestion which might possibly be better: why not looking for
+> the SYS_PWR_CFG bit in exynos_cpu_power_down() directly?  After all,
+> exynos_cpu_power_down() is semantically supposed to do what its name
+> suggest and could simply do nothing if the proper conditions are already
+> in place.
+I have implemented this and it works fine. Patch coming up.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig           |  1 +
- arch/arm64/include/asm/efi.h | 21 +++++++++++++++++++++
- arch/arm64/kernel/efi.c      | 14 +-------------
- 3 files changed, 23 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a474de346be6..93e11f4d9513 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -299,6 +299,7 @@ config EFI
- 	select LIBFDT
- 	select UCS2_STRING
- 	select EFI_PARAMS_FROM_FDT
-+	select EFI_RUNTIME_WRAPPERS
- 	default y
- 	help
- 	  This option provides support for runtime services provided
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 5a46c4e7f539..375ba342dca6 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -2,6 +2,7 @@
- #define _ASM_EFI_H
- 
- #include <asm/io.h>
-+#include <asm/neon.h>
- 
- #ifdef CONFIG_EFI
- extern void efi_init(void);
-@@ -11,4 +12,24 @@ extern void efi_idmap_init(void);
- #define efi_idmap_init()
- #endif
- 
-+#define efi_call_virt(f, ...)						\
-+({									\
-+	efi_##f##_t *__f = efi.systab->runtime->f;			\
-+	efi_status_t __s;						\
-+									\
-+	kernel_neon_begin();						\
-+	__s = __f(__VA_ARGS__);						\
-+	kernel_neon_end();						\
-+	__s;								\
-+})
-+
-+#define __efi_call_virt(f, ...)						\
-+({									\
-+	efi_##f##_t *__f = efi.systab->runtime->f;			\
-+									\
-+	kernel_neon_begin();						\
-+	__f(__VA_ARGS__);						\
-+	kernel_neon_end();						\
-+})
-+
- #endif /* _ASM_EFI_H */
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 14db1f6e8d7f..56c3327bbf79 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -449,19 +449,7 @@ static int __init arm64_enter_virtual_mode(void)
- 
- 	/* Set up runtime services function pointers */
- 	runtime = efi.systab->runtime;
--	efi.get_time = runtime->get_time;
--	efi.set_time = runtime->set_time;
--	efi.get_wakeup_time = runtime->get_wakeup_time;
--	efi.set_wakeup_time = runtime->set_wakeup_time;
--	efi.get_variable = runtime->get_variable;
--	efi.get_next_variable = runtime->get_next_variable;
--	efi.set_variable = runtime->set_variable;
--	efi.query_variable_info = runtime->query_variable_info;
--	efi.update_capsule = runtime->update_capsule;
--	efi.query_capsule_caps = runtime->query_capsule_caps;
--	efi.get_next_high_mono_count = runtime->get_next_high_mono_count;
--	efi.reset_system = runtime->reset_system;
--
-+	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
- 	return 0;
--- 
-1.8.3.2
+Regards,
+Abhilash
+>
+>
+> Nicolas
