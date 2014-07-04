@@ -1,19 +1,30 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 4 Jul 2014 02:58:44 -0700
-Subject: [PATCH v6 21/21] arm64: KVM: vgic: enable GICv2 emulation on top
- on GICv3 hardware
-In-Reply-To: <1404140510-5382-22-git-send-email-marc.zyngier@arm.com>
-References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
- <1404140510-5382-22-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140704095844.GB20451@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Jul 2014 12:06:07 +0200
+Subject: [PATCH v10 1/3] arm64: Add __NR_* definitions for compat syscalls
+In-Reply-To: <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
+ <1404458911-8214-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <5418828.mxvNk2rT0e@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 04:01:50PM +0100, Marc Zyngier wrote:
-> Add the last missing bits that enable GICv2 emulation on top of
-> GICv3 hardware.
+On Friday 04 July 2014 16:28:29 AKASHI Takahiro wrote:
+> From: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+> This patch adds __NR_* definitions to asm/unistd32.h, moves the
+> __NR_compat_* definitions to asm/unistd.h and removes all the explicit
+> unistd32.h includes apart from the one building the compat syscall
+> table. The aim is to have the compat __NR_* definitions available but
+> without colliding with the native syscall definitions.
+> 
+> And adds more syscall definitions for 3.16.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Can you explain in more detail why you want to add those macros? I've
+looked at all three patches in the series but can't find any code using
+them.
+
+I would expect that we don't need to define those macros at all for
+compat mode, since they are meant primarily for user space (glibc)
+compilation, which gets them from arch/arm/include/asm/unistd.h.
+
+	Arnd
