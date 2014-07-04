@@ -1,62 +1,219 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  4 Jul 2014 22:24:09 +0200
-Subject: [PATCH v7 06/24] mfd: max77686: Make error checking consistent
+Date: Fri,  4 Jul 2014 22:24:11 +0200
+Subject: [PATCH v7 08/24] mfd: max77686: Add Dynamic Voltage Scaling (DVS)
+ support
 In-Reply-To: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1404505467-26526-7-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1404505467-26526-9-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Error checking across the driver is mostly consistent besides
-a few exceptions, so change these exceptions for consistency.
+Some regulators on the MAX77686 PMIC have Dynamic Voltage Scaling
+(DVS) support that allows output voltage to change dynamically.
+
+For MAX77686, these regulators are Buck regulators 2, 3 and 4.
+
+Each Buck output voltage is selected using a set of external
+inputs: DVS1-3 and SELB2-4.
+
+DVS registers can be used to configure the output voltages for each
+Buck regulator and which one is active is controled by DVSx lines.
+
+SELBx lines are used to control if individual Buck lines are ON or OFF.
+
+This patch adds support to configure the DVSx and SELBx lines
+from DT and to setup and read the GPIO lines connected to them.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/mfd/max77686.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+
+Changes since v6:
+ - Add a comment that max77686_read_gpios() function can sleep.
+   Sugggested by Krzysztof Kozlowski
+---
+ drivers/mfd/max77686.c       | 119 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/max77686.h |  18 ++++---
+ 2 files changed, 129 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-index ada4976..87fe52e 100644
+index 8650832..d193873 100644
 --- a/drivers/mfd/max77686.c
 +++ b/drivers/mfd/max77686.c
-@@ -134,7 +134,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+@@ -32,8 +32,10 @@
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/max77686.h>
+ #include <linux/mfd/max77686-private.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
++#include <linux/export.h>
  
- 	max77686 = devm_kzalloc(&i2c->dev,
- 				sizeof(struct max77686_dev), GFP_KERNEL);
--	if (max77686 == NULL)
-+	if (!max77686)
- 		return -ENOMEM;
+ #define I2C_ADDR_RTC	(0x0C >> 1)
  
- 	i2c_set_clientdata(i2c, max77686);
-@@ -153,8 +153,8 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 		return ret;
- 	}
+@@ -101,9 +103,119 @@ static const struct of_device_id max77686_pmic_dt_match[] = {
+ 	{},
+ };
  
--	if (regmap_read(max77686->regmap,
--			 MAX77686_REG_DEVICE_ID, &data) < 0) {
-+	ret = regmap_read(max77686->regmap, MAX77686_REG_DEVICE_ID, &data);
-+	if (ret < 0) {
- 		dev_err(max77686->dev,
- 			"device not found on this channel (this is not an error)\n");
- 		return -ENODEV;
-@@ -180,7 +180,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
- 				  IRQF_SHARED, 0, &max77686_irq_chip,
- 				  &max77686->irq_data);
--	if (ret != 0) {
-+	if (ret) {
- 		dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
- 		goto err_unregister_i2c;
- 	}
-@@ -188,7 +188,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
- 				  IRQF_SHARED, 0, &max77686_rtc_irq_chip,
- 				  &max77686->rtc_irq_data);
--	if (ret != 0) {
-+	if (ret) {
- 		dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
- 		goto err_del_irqc;
- 	}
++static void max77686_dt_parse_dvs_gpio(struct device *dev)
++{
++	struct max77686_platform_data *pd = dev_get_platdata(dev);
++	int i;
++
++	/*
++	 * NOTE: we don't consider GPIO errors fatal; board may have some lines
++	 * directly pulled high or low and thus doesn't specify them.
++	 */
++	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_dvs); i++)
++		pd->buck_gpio_dvs[i] =
++			devm_gpiod_get_index(dev, "max77686,pmic-buck-dvs", i);
++
++	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++)
++		pd->buck_gpio_selb[i] =
++			devm_gpiod_get_index(dev, "max77686,pmic-buck-selb", i);
++}
++
++/**
++ * max77686_setup_gpios() - init DVS-related GPIOs
++ * @dev: device whose platform data contains the dvs GPIOs information
++ *
++ * This function claims / initalizations GPIOs related to DVS if they are
++ * defined. This may have the effect of switching voltages if the
++ * pdata->buck_default_idx does not match the boot time state of pins.
++ */
++int max77686_setup_gpios(struct device *dev)
++{
++	struct max77686_platform_data *pd = dev_get_platdata(dev);
++	int buck_default_idx = pd->buck_default_idx;
++	int ret;
++	int i;
++
++	/* Set all SELB high to avoid glitching while DVS is changing */
++	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++) {
++		struct gpio_desc *gpio = pd->buck_gpio_selb[i];
++
++		/* OK if some GPIOs aren't defined */
++		if (IS_ERR(gpio))
++			continue;
++
++		ret = gpiod_direction_output_raw(gpio, 1);
++		if (ret) {
++			dev_err(dev, "can't set gpio[%d] dir: %d\n", i, ret);
++			return ret;
++		}
++	}
++
++	/* Set our initial setting */
++	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_dvs); i++) {
++		struct gpio_desc *gpio = pd->buck_gpio_dvs[i];
++
++		/* OK if some GPIOs aren't defined */
++		if (IS_ERR(gpio))
++			continue;
++
++		/* If a GPIO is valid, set it */
++		gpiod_direction_output(gpio, (buck_default_idx >> i) & 1);
++		if (ret) {
++			dev_err(dev, "can't set gpio[%d]: dir %d\n", i, ret);
++			return ret;
++		}
++	}
++
++	/* Now set SELB low to take effect */
++	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++) {
++		struct gpio_desc *gpio = pd->buck_gpio_selb[i];
++
++		if (!IS_ERR(gpio))
++			gpiod_set_value(gpio, 0);
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(max77686_setup_gpios);
++
++/**
++ * max77686_read_gpios() - read the current state of the dvs GPIOs
++ * @pdata: platform data that contains the dvs GPIOs information
++ *
++ * We call this function at bootup to detect what slot the firmware was
++ * using for the DVS GPIOs.  That way we can properly preserve the firmware's
++ * voltage settings
++ *
++ * This function can sleep so must not be called from atomic context.
++ */
++int max77686_read_gpios(struct max77686_platform_data *pdata)
++{
++	int buck_default_idx = pdata->buck_default_idx;
++	int result = 0;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_dvs); i++) {
++		struct gpio_desc *gpio = pdata->buck_gpio_dvs[i];
++
++		/* OK if some GPIOs aren't defined; we'll use default */
++		if (IS_ERR(gpio)) {
++			result |= buck_default_idx & (1 << i);
++			continue;
++		}
++
++		if (gpiod_get_value_cansleep(gpio))
++			result |= 1 << i;
++	}
++
++	return result;
++}
++EXPORT_SYMBOL_GPL(max77686_read_gpios);
++
+ static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+ 								  *dev)
+ {
++	struct device_node *np = dev->of_node;
+ 	struct max77686_platform_data *pd;
+ 
+ 	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
+@@ -111,6 +223,13 @@ static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+ 		return NULL;
+ 
+ 	dev->platform_data = pd;
++
++	/* Read default index and ignore errors, since default is 0 */
++	of_property_read_u32(np, "max77686,pmic-buck-default-dvs-idx",
++			     &pd->buck_default_idx);
++
++	max77686_dt_parse_dvs_gpio(dev);
++
+ 	return pd;
+ }
+ 
+diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
+index 4cbcc13..46a736b 100644
+--- a/include/linux/mfd/max77686.h
++++ b/include/linux/mfd/max77686.h
+@@ -99,15 +99,17 @@ struct max77686_platform_data {
+ 	struct max77686_opmode_data *opmode_data;
+ 
+ 	/*
+-	 * GPIO-DVS feature is not enabled with the current version of
+-	 * MAX77686 driver. Buck2/3/4_voltages[0] is used as the default
+-	 * voltage at probe. DVS/SELB gpios are set as OUTPUT-LOW.
++	 * GPIO-DVS feature is not fully enabled with the current version of
++	 * MAX77686 driver, but the driver does support using a DVS index other
++	 * than the default of 0.
+ 	 */
+-	int buck234_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
+-	int buck234_gpio_selb[3]; /* [0]SELB2, [1]SELB3, [2]SELB4 */
+-	unsigned int buck2_voltage[8]; /* buckx_voltage in uV */
+-	unsigned int buck3_voltage[8];
+-	unsigned int buck4_voltage[8];
++	struct gpio_desc *buck_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
++	int buck_default_idx; /* Default value of DVS1, 2, 3 */
++
++	struct gpio_desc *buck_gpio_selb[3]; /* Buck regulators 2, 3, 4 */
+ };
+ 
++extern int max77686_setup_gpios(struct device *dev);
++extern int max77686_read_gpios(struct max77686_platform_data *pdata);
++
+ #endif /* __LINUX_MFD_MAX77686_H */
 -- 
 2.0.0.rc2
