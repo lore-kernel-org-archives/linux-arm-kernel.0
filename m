@@ -1,37 +1,44 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 4 Jul 2014 20:39:34 +0800
-Subject: [PATCH] arm: pxa: call debug_ll_io_init for earlyprintk
-In-Reply-To: <1401995457-24721-2-git-send-email-andrew.ruder@elecsyscorp.com>
-References: <1401995457-24721-1-git-send-email-andrew.ruder@elecsyscorp.com>
- <1401995457-24721-2-git-send-email-andrew.ruder@elecsyscorp.com>
-Message-ID: <CAN1soZwHjbifY-iNc9d0eiDgwV3T6RMBYK4Ys6UavhOGCHr3dg@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri,  4 Jul 2014 20:43:14 +0800
+Subject: [PATCH] ARM: pxa: remove unnecessary pxa3xx io mapping
+Message-ID: <1404477794-14927-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 6, 2014 at 3:10 AM, Andrew Ruder
-<andrew.ruder@elecsyscorp.com> wrote:
-> This is already done automatically for many other ARM platforms by the
-> ARM core code, but since pxa is using the .map_io callback, it needs to
-> call it explicitely for earlyprintk support.
->
-> Signed-off-by: Andrew Ruder <andrew.ruder@elecsyscorp.com>
-> ---
->  arch/arm/mach-pxa/generic.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-> index 4225417..94f49c2 100644
-> --- a/arch/arm/mach-pxa/generic.c
-> +++ b/arch/arm/mach-pxa/generic.c
-> @@ -93,5 +93,6 @@ static struct map_desc common_io_desc[] __initdata = {
->
->  void __init pxa_map_io(void)
->  {
-> +       debug_ll_io_init();
->         iotable_init(ARRAY_AND_SIZE(common_io_desc));
->  }
-> --
-> 1.9.0.rc3.12.gbc97e2d
->
+[    0.000000] BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc
+space
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+UNCACHED PHYS io mapping is redundant of PXA3xx (PXA930). So remove it
+from pxa3xx/pxa93x series.
+
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mach-pxa/generic.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 94f49c2..b52f8f2 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -83,7 +83,11 @@ static struct map_desc common_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(0x40000000),
+ 		.length		= 0x02000000,
+ 		.type		= MT_DEVICE
+-	}, {	/* UNCACHED_PHYS_0 */
++	}
++};
++
++static struct map_desc pxa2xx_io_desc[] __initdata = {
++	{	/* UNCACHED_PHYS_0 */
+ 		.virtual	= 0xff000000,
+ 		.pfn		= __phys_to_pfn(0x00000000),
+ 		.length		= 0x00100000,
+@@ -95,4 +99,6 @@ void __init pxa_map_io(void)
+ {
+ 	debug_ll_io_init();
+ 	iotable_init(ARRAY_AND_SIZE(common_io_desc));
++	if (cpu_is_pxa2xx())
++		iotable_init(ARRAY_AND_SIZE(pxa2xx_io_desc));
+ }
+-- 
+1.9.1
