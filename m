@@ -1,60 +1,31 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 04 Jul 2014 15:53:32 +0200
-Subject: [GIT PULL v2 FOR v3.17] Renesas CMT, MTU2 and TMU timers DT support
-In-Reply-To: <2296815.Nb0BXfBtnT@avalon>
-References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2296815.Nb0BXfBtnT@avalon>
-Message-ID: <1688088.sd0hOOj9CE@avalon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 4 Jul 2014 10:53:39 -0300
+Subject: [PATCH] ARM: dts: imx: correct sdma compatbile for imx6sl and
+ imx6sx
+In-Reply-To: <1404456361-8197-1-git-send-email-shawn.guo@freescale.com>
+References: <1404456361-8197-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <CAOMZO5DWYxcXi8yRf7Toi-1CCnXgd2z+LQHWpu3yyNTiGPJarg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Fri, Jul 4, 2014 at 3:46 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> The SDMA on imx6sl and imx6sx is more compatible with imx6q one than
+> imx35.  Let's use "fsl,imx6q-sdma" instead of "fsl,imx35-sdma", so that
+> SDMA ROM script on imx6sl and imx6sx can work for audio driver just like
+> the case of imx6q.
+>
+> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Thanks to Robin for finding this out.
 
-Could you please pull the following changes and drop the first version of this 
-pull request ? I've fixed one last typo noticed by Simon in patch 09/19.
+Very good! Now I can play audio on mx6sl and mx6sx without the need of
+loading the external SDMA firmware.
 
-As last time I have board and SoC changes that depend on the driver changes
-and that will need to go through Simon's tree. Could you thus please provide
-a stable branch based on one of the v3.16-rc tags ?
+However, I still have a question: wouldn't it be better to describe
+the compatible string as:
+compatible = "fsl,imx6sl-sdma", "fsl,imx6q-sdma", "fsl,imx35-sdma"; ?
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-
-are available in the git repository at:
-
-  git://linuxtv.org/pinchartl/fbdev.git timers/upstream/drivers
-
-for you to fetch changes up to cca8d0596c4c7acb371ea1bc5eee9b404b30516a:
-
-  clocksource: sh_mtu2: Add DT support (2014-07-04 15:50:29 +0200)
-
-----------------------------------------------------------------
-Laurent Pinchart (10):
-      clocksource: sh_cmt: Drop support for legacy platform data
-      clocksource: sh_cmt: Replace global spinlock with a per-device spinlock
-      clocksource: sh_tmu: Drop support for legacy platform data
-      clocksource: sh_tmu: Replace global spinlock with a per-device spinlock
-      clocksource: sh_mtu2: Drop support for legacy platform data
-      clocksource: sh_mtu2: Replace global spinlock with a per-device spinlock
-      clocksource: shmobile: Remove unused sh_timer_config members
-      clocksource: sh_cmt: Add DT support
-      clocksource: sh_tmu: Add DT support
-      clocksource: sh_mtu2: Add DT support
-
- Documentation/devicetree/bindings/timer/renesas,cmt.txt |  47 +++++
- .../devicetree/bindings/timer/renesas,mtu2.txt          |  39 ++++
- Documentation/devicetree/bindings/timer/renesas,tmu.txt |  39 ++++
- drivers/clocksource/sh_cmt.c                            | 233 ++++++---------
- drivers/clocksource/sh_mtu2.c                           | 146 +++++----------
- drivers/clocksource/sh_tmu.c                            | 127 ++++++-------
- include/linux/sh_timer.h                                |   5 -
- 7 files changed, 309 insertions(+), 327 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
-
--- 
 Regards,
 
-Laurent Pinchart
+Fabio Estevam
