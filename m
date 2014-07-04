@@ -1,71 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 4 Jul 2014 10:05:56 +0200
-Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
-In-Reply-To: <20140704064547.GZ28884@atomide.com>
-References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
- <1403660878-56350-3-git-send-email-s-anna@ti.com>
- <20140628170709.GB23634@xo-6d-61-c0.localdomain>
- <53B18999.2020506@ti.com> <20140630185942.GA5410@amd.pavel.ucw.cz>
- <53B1BBA8.5090507@ti.com> <20140630203225.GA3893@amd.pavel.ucw.cz>
- <20140704064547.GZ28884@atomide.com>
-Message-ID: <20140704080556.GA16274@amd.pavel.ucw.cz>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 04 Jul 2014 10:05:58 +0200
+Subject: [PATCH] ARM: dts: Add I2S dt node for Exynos3250
+In-Reply-To: <1404373939-10510-1-git-send-email-cw00.choi@samsung.com>
+References: <1404373939-10510-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <53B66066.4030202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Chanwoo,
 
-> > > >>>> The non-DT support has to be maintained for now to not break
-> > > >>>> OMAP3 legacy boot, and the legacy-style code will be cleaned
-> > > >>>> up once OMAP3 is also converted to DT-boot only.
-> > > >>>
-> > > >>>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
-> > > >>>>  	return 0;
-> > > >>>>  }
-> > > >>>>  
-> > > >>>> +static const struct omap_mbox_device_data omap2_data = {
-> > > >>>> +	.num_users	= 4,
-> > > >>>> +	.num_fifos	= 6,
-> > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
-> > > >>>> +};
-> > > >>>> +
-> > > >>>> +static const struct omap_mbox_device_data omap3_data = {
-> > > >>>> +	.num_users	= 2,
-> > > >>>> +	.num_fifos	= 2,
-> > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
-> > > >>>> +};
-> > > >>>> +
-> > > >>>> +static const struct omap_mbox_device_data am335x_data = {
-> > > >>>> +	.num_users	= 4,
-> > > >>>> +	.num_fifos	= 8,
-> > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
-> > > >>>> +};
-> > > >>>
-
-> > Aha, ok, then the intr_type should be derived from
-> > compatible-string. Or rather... you should have three
-> > compatible-strings for the three possibilities? (And then subtype,
-> > currently unused, in case there are more hw differences).
+On 03.07.2014 09:52, Chanwoo Choi wrote:
+> From: Tomasz Figa <t.figa@samsung.com>
 > 
-> The compatible string can and should be separate for each revision
-> unless they are the same exacat hardware revision.
-
-ACK.
-
-> > > two are HW IP design parameters, so in general putting them in DT isn't
-> > > completely a bad idea, but I will wait to see if there are any further
-> > > comments on this from Tony or DT maintainers before I make changes.
-> > 
-> > Ok, right... I'd vote for putting them into DT.
+> This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
+> (1 channels) IIS-bus for audio interface with DMA-based operation.
 > 
-> I would avoid adding custom DT properties where possible and let the
-> driver just initialize the right data based on the compatible flag.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> Tested-by: Inha Song <ideal.song@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index 1f8384f..e9017ef 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -644,6 +644,19 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		i2s: i2s at 13970000 {
 
-If these are HW IP design parameters, we can expect to see many
-different combinations. Yet we know ahead of time how to handle
-different parameters HW people select.
+Shouldn't the label be rather called "i2s2" as the pinctrl entry below
+suggests?
 
-Thus IMO we should do it in the device tree.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> +			compatible = "samsung,s3c6410-i2s";
+> +			reg = <0x13970000 0x100>;
+> +			interrupts = <0 126 0>;
+> +			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
+> +			clock-names = "iis", "i2s_opclk0";
+> +			dmas = <&pdma0 14>, <&pdma0 13>;
+> +			dma-names = "tx", "rx";
+> +			pinctrl-0 = <&i2s2_bus>;
+> +			pinctrl-name = "default";
+
+"pinctrl-name" is not a valid property. I suppose it should be
+"pinctrl-names".
+
+Best regards,
+Tomasz
