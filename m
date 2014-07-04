@@ -1,33 +1,32 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Sat, 5 Jul 2014 02:52:53 +0530
-Subject: [PATCH v6] ARM: EXYNOS: Use MCPM call-backs to support S2R on
- Exynos5420
-In-Reply-To: <alpine.LFD.2.11.1407041702310.22282@knanqh.ubzr>
-References: <alpine.LFD.2.11.1407041408120.22282@knanqh.ubzr>
- <CAM4voamqpCj=Zw69DGjzhouwu=6RE6e3Px5WL8akc-TUAts0Xg@mail.gmail.com>
- <CAM4voa=K6s0FFmeuiqWZh6HSQZAfSpxL8A_kMTxCi+2t3tzydw@mail.gmail.com>
- <alpine.LFD.2.11.1407041702310.22282@knanqh.ubzr>
-Message-ID: <CAM4voamyswvgoH7c9ryPXxEtOv4ZHgyuAbuxC6v2FzM6PiMFrQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 4 Jul 2014 23:28:38 +0200
+Subject: [PATCH V5 2/3] Documentation: gpio: Add APM X-Gene SoC GPIO
+ controller DTS binding
+In-Reply-To: <20140630125339.GA21390@leverpostej>
+References: <1403823587-23404-1-git-send-email-fkan@apm.com>
+ <1403823587-23404-3-git-send-email-fkan@apm.com>
+ <20140630125339.GA21390@leverpostej>
+Message-ID: <CACRpkdZ18SsRBBbngSVyxR0GFkC0kLD4OHm9RJmgZDLXbqvOBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Mon, Jun 30, 2014 at 2:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jun 26, 2014 at 11:59:46PM +0100, Feng Kan wrote:
 
-On Sat, Jul 5, 2014 at 2:33 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Sat, 5 Jul 2014, Abhilash Kesavan wrote:
+>> +- #gpio-cells: Should be two.
+>> +     - first cell is the pin number
+>> +     - second cell is used to specify optional parameters (unused)
 >
->> On a different note, I have been using the cpuidle patchset
->> (https://patchwork.kernel.org/patch/4357421/) as base for S2R support
->> and had a question. Rather than making the driver depend on
->> ARCH_EXYNOS should it depend on EXYNOS5420_MCPM which in turn depends
->> on MCPM (like TC2) or should we just be making the bL cpuidle driver
->> depend on MCPM ?
+> Why is there an unused cell?
 >
-> Probably making it depend on MCPM directly is the best approach.
-I'll discuss this with Chander and one of us will post a patch for it.
+> Why not just make this a single cell if the binding defines no valid
+> parameters?
 
-Regards,
-Abhilash
->
->
-> Nicolas
+I don't get this either. The only reason would be that this cell
+should contain flags (such as open collector) the code for using
+it being inplemented later.
+
+If the controller is too primitive to use such flags it should be onecell.
+
+Yours,
+Linus Walleij
