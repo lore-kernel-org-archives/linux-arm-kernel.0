@@ -1,49 +1,41 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 4 Jul 2014 19:15:17 +0200
-Subject: [PATCH v2 2/2] efi/arm64: preserve FP/SIMD registers on UEFI
- runtime services calls
-In-Reply-To: <20140704165955.GL16404@arm.com>
-References: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>
- <1403777346-28629-3-git-send-email-ard.biesheuvel@linaro.org>
- <20140704154522.GJ16404@arm.com>
- <CAKv+Gu947rsPRbWEY=TDBkkvoNanu-P+6Eej7Z3_crysx96F=g@mail.gmail.com>
- <20140704165955.GL16404@arm.com>
-Message-ID: <CAKv+Gu_+fRiGYtZXE7mAPELLF0aa4T+wz85rdSZmhdcetm2Mqw@mail.gmail.com>
+Date: Fri,  4 Jul 2014 19:41:51 +0200
+Subject: [PATCH v3 0/2] efi/arm64: FP/SIMD preserve/restore during UEFI
+ Runtime Services
+Message-ID: <1404495713-10338-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2014 18:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Jul 04, 2014 at 04:51:31PM +0100, Ard Biesheuvel wrote:
->> On 4 July 2014 17:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Thu, Jun 26, 2014 at 11:09:06AM +0100, Ard Biesheuvel wrote:
->> >> According to the UEFI spec section 2.3.6.4, the use of FP/SIMD instructions is
->> >> allowed, and should adhere to the AAPCS64 calling convention, which states that
->> >> 'only the bottom 64 bits of each value stored in registers v8-v15 need to be
->> >> preserved' (section 5.1.2).
->> >>
->> >> This applies equally to UEFI Runtime Services called by the kernel, so make sure
->> >> the FP/SIMD register file is preserved in this case.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > While the code looks fine, I think there is a mismatch between what the
->> > subject says and what the patch does (enabling EFI_RUNTIME_WRAPPERS).
->> >
->>
->> Not entirely. In order to be able to insert calls to
->> kernel_neon_begin()/end() into the runtime services calls, we need
->> a) to supply definitions for efi_call_virt() and __efi_call_virt()
->> that contain those calls to kernel_neon_begin()/end()
->> b) to enable runtime wrappers (which is what uses those definitions)
->>
->> Would you prefer those to be split in 2 patches?
->
-> No, that's fine. You could just add the above explanation to the commit
-> log. Otherwise:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Two patches to add FP/SIMD preserve/restore to UEFI Runtime Services:
+- patch #1 moves runtime services wrappers to generic code so we can reuse them
+  for arm64
+- patch #2 enables the wrappers for arm64 and inserts calls to kernel_neon_begin
+  and kernel_neon_end
 
-OK, thanks. I will add your ack and ask Matt to take it.
+@Matt: please queue up for 3.17
+
+v3:
+- improve commit message for patch #2 and add Catalin's ack
+
+v2:
+- add Kconfig symbol EFI_RUNTIME_WRAPPERS so we don't break ia64 by enabling it
+  unconditionally
+
+Ard Biesheuvel (2):
+  efi/x86: move UEFI Runtime Services wrappers to generic code
+  efi/arm64: preserve FP/SIMD registers on UEFI runtime services calls
+
+ arch/arm64/Kconfig                      |   1 +
+ arch/arm64/include/asm/efi.h            |  21 +++++
+ arch/arm64/kernel/efi.c                 |  14 +--
+ arch/x86/Kconfig                        |   1 +
+ arch/x86/platform/efi/efi.c             | 144 +---------------------------
+ drivers/firmware/efi/Kconfig            |   7 ++
+ drivers/firmware/efi/Makefile           |   1 +
+ drivers/firmware/efi/runtime-wrappers.c | 161 ++++++++++++++++++++++++++++++++
+ include/linux/efi.h                     |   2 +
+ 9 files changed, 197 insertions(+), 155 deletions(-)
+ create mode 100644 drivers/firmware/efi/runtime-wrappers.c
 
 -- 
-Ard.
+1.8.3.2
