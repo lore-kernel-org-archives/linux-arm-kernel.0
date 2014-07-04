@@ -1,49 +1,62 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri,  4 Jul 2014 15:31:34 -0300
-Subject: [PATCH net-next 0/3] Network driver for Armada 375 SoC
-Message-ID: <1404498697-21978-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Fri,  4 Jul 2014 15:31:36 -0300
+Subject: [PATCH 2/3] ARM: mvebu: Add support for the network controller in
+ Armada 375 SoC
+In-Reply-To: <1404498697-21978-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1404498697-21978-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1404498697-21978-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds a new network driver to support the network controller
-in Armada 375 SoC.
+This commit adds the support for the network controller in Marvell
+Armada 375 SoC devicetree.
 
-The network interfaces share a common hardware unit called Packet Processor,
-which contains a common register space and per-port register spaces.
-    
-The new network unit has different RXQ and TXQ management. The ports
-associate so-called per-port "logical queues" which are mapped to "physical
-queues". The latter are shared among the ports.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-375.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Fo the egress part, the mapping for each port is predefined by hardware.
-The egress path incorporates so-called aggregation queues (one per CPU),
-from where the data is passed to the physical queues and then via prefetch
-buffer to the TxDMA.
-    
-The ingress path has a Parser and Classifier (PnC) and a Buffer Manager (BM)
-whose usage is obligatory. We are only implementing a simple configuration
-for the Parser and Classifier, yet the code is considerably large.
-    
-This network unit has other optional features like xPON, WoL, Hardware
-Forwarding, and more. This initial commit doesn't provide support for these.
-    
-The mvpp2 network driver has been written by Marcin Wojtas and then reviewed
-and cleaned up by Ezequiel Garcia.
-
-Ezequiel Garcia (3):
-  ethernet: Add new driver for Marvell Armada 375 network unit
-  ARM: mvebu: Add support for the network controller in Armada 375 SoC
-  ARM: mvebu: Enable the network controller in Armada 375 DB board
-
- .../devicetree/bindings/net/marvell-pp2.txt        |   61 +
- arch/arm/boot/dts/armada-375-db.dts                |   26 +
- arch/arm/boot/dts/armada-375.dtsi                  |   31 +
- drivers/net/ethernet/marvell/Kconfig               |    8 +
- drivers/net/ethernet/marvell/Makefile              |    1 +
- drivers/net/ethernet/marvell/mvpp2.c               | 6378 ++++++++++++++++++++
- 6 files changed, 6505 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/marvell-pp2.txt
- create mode 100644 drivers/net/ethernet/marvell/mvpp2.c
-
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index fb92551..5e897d2 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -151,6 +151,37 @@
+ 				      <0xc100 0x100>;
+ 			};
+ 
++			mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,orion-mdio";
++				reg = <0xc0054 0x4>;
++			};
++
++			/* Network controller */
++			pp2 at f0000 {
++				compatible = "marvell,armada-375-pp2";
++				reg = <0xf0000 0xa000>, /* Packet Processor regs */
++				      <0xc0000 0x3060>, /* LMS regs */
++				      <0xc4000 0x100>,  /* eth0 regs */
++				      <0xc5000 0x100>;  /* eth1 regs */
++				clocks = <&gateclk 3>, <&gateclk 19>;
++				clock-names = "pp_clk", "gop_clk";
++				status = "disabled";
++
++				eth0: ethernet at c4000 {
++					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <0>;
++					status = "disabled";
++				};
++
++				eth1: ethernet at c5000 {
++					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <1>;
++					status = "disabled";
++				};
++			};
++
+ 			spi0: spi at 10600 {
+ 				compatible = "marvell,orion-spi";
+ 				reg = <0x10600 0x50>;
 -- 
 1.9.1
