@@ -1,109 +1,27 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 4 Jul 2014 12:40:04 +0100
-Subject: [PATCH] arm64: PCI(e) arch support
-In-Reply-To: <8557411.iWl9PJdYsS@wuerfel>
-References: <1404422876-1160-1-git-send-email-tinamdar@apm.com>
- <4342569.JSAyWBcJn2@wuerfel>
- <20140704110251.GF6501@e106497-lin.cambridge.arm.com>
- <8557411.iWl9PJdYsS@wuerfel>
-Message-ID: <20140704114004.GG6501@e106497-lin.cambridge.arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 4 Jul 2014 13:42:07 +0200
+Subject: [PATCH v2 3/4] ARM: sti: Add STiH407 Kconfig entry to select
+ STIH407_RESET
+In-Reply-To: <1404310129-14667-4-git-send-email-peter.griffin@linaro.org>
+References: <1404310129-14667-1-git-send-email-peter.griffin@linaro.org>
+ <1404310129-14667-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <53B6930F.50307@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 12:28:09PM +0100, Arnd Bergmann wrote:
-> On Friday 04 July 2014 12:02:51 Liviu Dudau wrote:
-> > > Supporting just one boot loader is of course a bit silly, especially when
-> > > you know that people will be using all sorts of boot loaders.
-> > 
-> > You could also argue that supporting just one kernel is silly as well, but
-> > so far I haven't seen too many Linux people complaining that *BSD is not
-> > officially supported.
-> 
-> I have heard complaints from UEFI people though that want to support
-> more than just Linux ;-)
-> 
-> > It's also a small game of demand and offer: ARM partners that were interested
-> > in ARMv8 have been asked which bootloader solution they are interested in,
-> > and I guess not enough u-boot supporters made their voices heard. Limited
-> > resources leads to limited choices.
-> 
-> I think it's rather a question of whether they'd benefit from ARM doing it.
-> It's fairly easy to port most of the smaller boot-loaders, and there
-> is not much architecture specific code in them.
-> 
-> > > A more interesting aspect of this question is what the kernel can expect
-> > > the boot loader to have done with the PCI host bridge when the kernel
-> > > is entered.
-> > 
-> > Indeed. I'm interested in opinions here.
-> > 
-> > > 
-> > > Traditionally, embedded ARM boot loaders have left the PCI host bridge
-> > > alone unless they were booting from it, and Linux did all the setup.
-> > > With the SBSA class of ARM servers, this is not really practical, and
-> > > whatever runs before Linux (typically UEFI) should already set up the
-> > > PCI bus and do resource allocation like every other server architecture
-> > > does. I would assume that UEFI does this right, and if not we can consider
-> > > that a bug.
-> > 
-> > And at the moment we have UEFI on Juno that can be made SBSA compliant
-> > but by default it's not (yes, it *is* a bug).
-> 
-> Is this because of the PCI config space access or something else?
+Hi Peter,
 
-No, just lack of man power to carry enough work in that area for UEFI.
+On 07/02/2014 04:08 PM, Peter Griffin wrote:
+> The STiH407 is a STMicroelectronics Digital Consumer electronics
+> family, targetted at set-top-box and other audio/video applications.
+>
+> This patch selects the reset controller driver for this family which
+> is essential to take various IP's on the SoC out of powerdown / reset.
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> 
-> The publically announced version of Juno doesn't have any PCI slots,
-> so I guess this is about a future variant, right?
+Applied.
 
-Yes, current chip has an errata on PCI which renders it unable to carry
-device initiated transfers. This will be fixed in the next revision of
-the chip due next year.
-
-> 
-> > > However, what do we do about PCI hosts that can be used with different
-> > > kinds of systems? Do we assume that they all do PCI resource allocation?
-> > > Can we decide this on a per host driver basis, or do we need to introduce
-> > > an extension to the PCI DT binding to make that decision?
-> > 
-> > The PCI code currently should skip the configured devices and only touch
-> > the not configured ones. The question is how to detect if the host bridge
-> > has been initialised by the firmware or not.
-> 
-> On PowerPC we used to have a per platform flag that defined whether PCI was
-> supposed to be initialized by firmware or by the OS, but it makes less
-> sense on ARM64 since we try to avoid introducing the concept of platforms
-> in too many places.
-> 
-> If we can't rely on the firmware to get it right, I think we don't have
-> a choice but to rely on DT information (In the ACPI case, I would definitely
-> mandate that the firmware has to get it right). We may also need to deal
-> with the case of firmware initializing the PCI host bridge incorrectly,
-> though we can try not to do that until we have to.
-> 
-> It should be easy enough to detect the case of a host bridge that has
-> not been touched, but that would fail in case of kexec() when it has
-> been set up by a previously running kernel.
-
-One option would be to have per host controller registers that if at a known
-value it would mean the setup has been done, but that is just giving ammo
-to the hardware guys to screw us up.
-
-Best regards,
-Liviu
-
-> 
-> 	Arnd
-> 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Thanks!
+Maxime
