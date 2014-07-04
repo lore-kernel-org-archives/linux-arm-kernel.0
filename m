@@ -1,102 +1,85 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 4 Jul 2014 10:16:59 +0000
-Subject: [PATCH 5/5] ARM: imx: Add Freescale LS1021A SMP support
-In-Reply-To: <20140702113058.GF14665@leverpostej>
-References: <1404291772-2644-1-git-send-email-jingchang.lu@freescale.com>
- <1404291772-2644-6-git-send-email-jingchang.lu@freescale.com>
- <20140702113058.GF14665@leverpostej>
-Message-ID: <69cc715ea3d54e64a04c3765b02f9ff8@BL2PR03MB467.namprd03.prod.outlook.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 04 Jul 2014 11:21:08 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140704093401.GD21766@n2100.arm.linux.org.uk> (Russell King's
+ message of "Fri, 4 Jul 2014 10:34:02 +0100")
+References: <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+ <20140703170558.GZ32514@n2100.arm.linux.org.uk>
+ <20140703173226.GC17372@arm.com> <yw1xoax6dr67.fsf@unicorn.mansr.com>
+ <20140703224753.GB21766@n2100.arm.linux.org.uk>
+ <CAKv+Gu-taih4ZdWkmup5JVSeWhcYbatzoHqra+=+bdZorTBCvg@mail.gmail.com>
+ <20140704082437.GA16404@arm.com>
+ <CAKv+Gu9id59J-DP9tPLGXxsz5yFdfpCmypgRbtuccVUWLQSsdg@mail.gmail.com>
+ <yw1x8uo9eax9.fsf@unicorn.mansr.com>
+ <20140704093401.GD21766@n2100.arm.linux.org.uk>
+Message-ID: <yw1x4myxe86j.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
+> On Fri, Jul 04, 2014 at 10:21:54AM +0100, M?ns Rullg?rd wrote:
+>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>> >>> foo:
+>> >>> @ args = 0, pretend = 0, frame = 0
+>> >>> @ frame_needed = 0, uses_anonymous_args = 0
+>> >>> @ link register save eliminated.
+>> >>>     mov ip, r0
+>> >>>     ldmia r1, {r0, r1, r2, r3}
+>> >>>     stmia ip, {r0, r1, r2, r3}
+>> >>>     bx lr
+>> >>>
+>> >>> won't it take just a single cast from some unaligned char* to struct
+>> >>> bar* to trigger this?
+>> >>
+>> >> Is this even allowed by the C ABI?
+>> 
+>> No.
+>
+> Sort of.  It isn't that legal, but we /do/ have bits of kernel code
+> (particularly networking) which /do/ make use of this.  Whether it's
+> legal or not really doesn't come into it.
 
->-----Original Message-----
->From: Mark Rutland [mailto:mark.rutland at arm.com]
->Sent: Wednesday, July 02, 2014 7:31 PM
->To: Lu Jingchang-B35083
->Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
->devicetree at vger.kernel.org; Lu Jingchang-B35083
->Subject: Re: [PATCH 5/5] ARM: imx: Add Freescale LS1021A SMP support
->
->On Wed, Jul 02, 2014 at 10:02:52AM +0100, Jingchang Lu wrote:
->> From: Jingchang Lu <b35083@freescale.com>
->>
->> Freescale LS1021A SoC deploys two cortex-A7 processors, this adds
->> bring-up support for the secondary core.
->>
->> Signed-off-by: Jingchang Lu <b35083@freescale.com>
->> ---
->>  arch/arm/mach-imx/common.h       |  2 ++
->>  arch/arm/mach-imx/headsmp.S      | 11 ++++++++++
->>  arch/arm/mach-imx/mach-ls1021a.c |  1 +
->>  arch/arm/mach-imx/platsmp.c      | 44
->++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 58 insertions(+)
->
->[...]
->
->> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
->> index de5047c..fdd93d9 100644
->> --- a/arch/arm/mach-imx/headsmp.S
->> +++ b/arch/arm/mach-imx/headsmp.S
->> @@ -29,3 +29,14 @@ ENTRY(v7_secondary_startup)
->>  	set_diag_reg
->>  	b	secondary_startup
->>  ENDPROC(v7_secondary_startup)
->> +
->> +ENTRY(ls1021a_secondary_startup)
->> +	/* set CNTFREQ of secondary core */
->> +	ldr	r0, =12500000
->> +	mcr 	p15, 0, r0, c14, c0, 0
->> +	/* disable Physical and Virtural Timer */
->> +	mov	r0, #0x0
->> +	mcr	p15, 0, r0, c14, c2, 1
->> +	mcr	p15, 0, r0, c14, c3, 1
->> +	b	secondary_startup
->
->Urrgh...
->
->What about CNTVOFF? That's been a source of problems elsewhere.
->
->Is the boot CPU set up correctly?
->
->Is that frequency always going to be correct?
->
-We use 12.5Mhz as the counter clock, and We have found the virtual counter offset issue.
-We currently use the physical counter as a workaround for this, we are also working on
-to clear the CNTVOFF in u-boot, when it is finished, the virtual counter would be sync
-and work well.
-Thanks.
+You keep saying this, and the netdev guys keep saying that isn't true,
+and if it does happen, it's a bug they want to know about.
 
->[...]
->
->> +static void __init ls1021a_smp_init_cpus(void) {
->> +	int i, ncores;
->> +	/* get number of cores from CP15 L2 controller register(L2CTLR)*/
->> +	asm volatile ("mrc p15, 1, %0, c9, c0, 2" : "=r" (ncores));
->> +
->> +	ncores = ((ncores >> 24) & 0x3) + 1;
->> +	for (i = ncores; i < NR_CPUS; i++)
->> +		set_cpu_possible(i, false);
->> +}
->
->NAK.
->
->This information is _already_ in the DT. This adds more code to do
->redundant work, and it's broken.
->
->The physical<->logical CPU ID mapping is arbitrary, so you set arbitrary
->CPUs as being online despite this not necessarily being the case.
->
->Get rid of this, and rely on the DT being correct. There;s no reason it
->shouldn't be for a new platform.
->
->Thanks,
->Mark.
-I will remove this. Thanks.
+> It falls into the same class as the additional padding of structures
+> which caused soo much pain in the early days, where many people used
+> structures to define the layout of data passed between different
+> systems, expecting (eg) a three char struct to have a size of 3 rather
+> than 4.
 
+It's quite different from that.  Even if the struct layout isn't the
+expected, there's nothing _invalid_ about the code; it just happens to
+do the wrong thing.  Code using unaligned pointers is invalid at a
+fundamental level and can't be expected to work (whatever that means)
+anywhere.
 
+We don't attempt to "fix" code relying on race conditions not coming out
+the wrong way, even if some old version of the scheduler always worked
+in its favour.
 
-Best Regards,
-Jingchang
+> The general rule for "portable" userspace has traditionally been "if it
+> works on x86, then the code is correct."  Unfortunately, you can do lots
+> of things on x86 which aren't legal C.
+
+Now that even compilers generate aligned SSE loads and stores, this has
+changed to some extent.
+
+>> > The point is not whether the C ABI allows it, the point is whether
+>> > a) the current 32-bit ARM kernel allows it, and
+>> 
+>> Unfortunately, it does.  In my opinion, adding the unaligned emulation
+>> code was a mistake, and turning it on by default was a bigger mistake.
+>
+> Different people have differing opinions, and the decision was made
+> more than 14 years ago.  Hindsight is also a wonderful tool that we
+> could all use, but the problem is that's non-causal, so unless you
+> have a tardis or a time machine...
+
+That shouldn't stop us learning from past mistakes.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
