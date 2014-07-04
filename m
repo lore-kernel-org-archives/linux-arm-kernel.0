@@ -1,65 +1,123 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Fri,  4 Jul 2014 04:09:39 +0300
-Subject: [PATCH v2 4/4] USB: PHY: tegra: Call tegra_usb_phy_close only on
- device removal
+Date: Fri,  4 Jul 2014 04:09:38 +0300
+Subject: [PATCH v2 3/4] USB: EHCI: tegra: Fix probe order issue leading to
+ broken USB
 In-Reply-To: <1404436179-10745-1-git-send-email-ttynkkynen@nvidia.com>
 References: <1404436179-10745-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1404436179-10745-5-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1404436179-10745-4-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra_usb_phy_close() is supposed to undo the effects of
-tegra_usb_phy_init(). It is also currently added as the USB PHY shutdown
-callback, which is wrong, since tegra_usb_phy_init() is only called
-during probing wheras the shutdown callback can get called multiple
-times. This then leads to warnings about unbalanced regulator_disable if
-the EHCI driver is unbound and bound again at runtime.
+The Tegra USB complex has a particularly annoying misdesign: some of the
+UTMI pad configuration registers are global for all the 3 USB controllers
+on the chip, but those registers are located in the first controller's
+register space and will be cleared when the reset to the first
+controller is asserted. Currently, this means that if the 1st controller
+were to finish probing after the 2nd or 3rd controller, USB would not
+work at all.
+
+Fix this situation by always resetting the 1st controller before doing
+any other setup to any of the controllers, and then never ever reset the
+first controller again. As the UTMI registers are related to the PHY,
+the PHY driver should probably reset the Tegra controllers instead,
+but since old device trees only have reset phandles in the EHCI nodes,
+do it here, which means a bit of device tree groveling. Those old DTs
+also won't get the reset fix from this commit, so we'll dev_warn() them,
+but the driver will still keep probing successfully.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 ---
-v2 changes: none
- drivers/usb/phy/phy-tegra-usb.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+v2 changes: assume we can find the usb1 reset from the PHY DT node,
+            don't fail if it's not found but just issue a warning
+ drivers/usb/host/ehci-tegra.c |   62 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 59 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-tegra-usb.c b/drivers/usb/phy/phy-tegra-usb.c
-index bbe4f8e..72e04a9 100644
---- a/drivers/usb/phy/phy-tegra-usb.c
-+++ b/drivers/usb/phy/phy-tegra-usb.c
-@@ -686,10 +686,8 @@ static int ulpi_phy_power_off(struct tegra_usb_phy *phy)
- 	return gpio_direction_output(phy->reset_gpio, 0);
- }
+diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+index 5590567..f495775 100644
+--- a/drivers/usb/host/ehci-tegra.c
++++ b/drivers/usb/host/ehci-tegra.c
+@@ -46,6 +46,7 @@
+ #define DRV_NAME "tegra-ehci"
  
--static void tegra_usb_phy_close(struct usb_phy *x)
-+static void tegra_usb_phy_close(struct tegra_usb_phy *phy)
- {
--	struct tegra_usb_phy *phy = container_of(x, struct tegra_usb_phy, u_phy);
--
- 	if (!IS_ERR(phy->vbus))
- 		regulator_disable(phy->vbus);
+ static struct hc_driver __read_mostly tegra_ehci_hc_driver;
++static bool usb1_reset_attempted;
  
-@@ -1061,14 +1059,13 @@ static int tegra_usb_phy_probe(struct platform_device *pdev)
- 	if (err < 0)
- 		return err;
+ struct tegra_ehci_soc_config {
+ 	bool has_hostpc;
+@@ -60,6 +61,61 @@ struct tegra_ehci_hcd {
+ 	enum tegra_usb_phy_port_speed port_speed;
+ };
  
--	tegra_phy->u_phy.shutdown = tegra_usb_phy_close;
- 	tegra_phy->u_phy.set_suspend = tegra_usb_phy_suspend;
++/*
++ * The 1st USB controller contains some UTMI pad registers that are global for
++ * all the controllers on the chip. Those registers are also cleared when
++ * reset is asserted to the 1st controller. This means that the 1st controller
++ * can only be reset when no other controlled has finished probing. So we'll
++ * reset the 1st controller before doing any other setup on any of the
++ * controllers, and then never again.
++ *
++ * Since this is a PHY issue, the Tegra PHY driver should probably be doing
++ * the resetting of the USB controllers. But to keep compatibility with old
++ * device trees that don't have reset phandles in the PHYs, do it here.
++ * Those old DTs will be vulnerable to total USB breakage if the 1st EHCI
++ * device isn't the first one to finish probing, so warn them.
++ */
++static int tegra_reset_usb_controller(struct platform_device *pdev)
++{
++	struct device_node *phy_np;
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct tegra_ehci_hcd *tegra =
++		(struct tegra_ehci_hcd *)hcd_to_ehci(hcd)->priv;
++
++	phy_np = of_parse_phandle(pdev->dev.of_node, "nvidia,phy", 0);
++	if (!phy_np)
++		return -ENOENT;
++
++	if (!usb1_reset_attempted) {
++		struct reset_control *usb1_reset;
++
++		usb1_reset = of_reset_control_get(phy_np, "usb");
++		if (IS_ERR(usb1_reset)) {
++			dev_warn(&pdev->dev,
++				 "can't get utmi-pads reset from the PHY\n");
++			dev_warn(&pdev->dev,
++				 "continuing, but please update your DT\n");
++		} else {
++			reset_control_assert(usb1_reset);
++			udelay(1);
++			reset_control_deassert(usb1_reset);
++		}
++
++		reset_control_put(usb1_reset);
++		usb1_reset_attempted = true;
++	}
++
++	if (!of_property_read_bool(phy_np, "nvidia,has-utmi-pad-registers")) {
++		reset_control_assert(tegra->rst);
++		udelay(1);
++		reset_control_deassert(tegra->rst);
++	}
++
++	of_node_put(phy_np);
++
++	return 0;
++}
++
+ static int tegra_ehci_internal_port_reset(
+ 	struct ehci_hcd	*ehci,
+ 	u32 __iomem	*portsc_reg
+@@ -389,9 +445,9 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto cleanup_hcd_create;
  
- 	platform_set_drvdata(pdev, tegra_phy);
+-	reset_control_assert(tegra->rst);
+-	udelay(1);
+-	reset_control_deassert(tegra->rst);
++	err = tegra_reset_usb_controller(pdev);
++	if (err)
++		goto cleanup_clk_en;
  
- 	err = usb_add_phy_dev(&tegra_phy->u_phy);
- 	if (err < 0) {
--		tegra_usb_phy_close(&tegra_phy->u_phy);
-+		tegra_usb_phy_close(tegra_phy);
- 		return err;
- 	}
- 
-@@ -1080,6 +1077,7 @@ static int tegra_usb_phy_remove(struct platform_device *pdev)
- 	struct tegra_usb_phy *tegra_phy = platform_get_drvdata(pdev);
- 
- 	usb_remove_phy(&tegra_phy->u_phy);
-+	tegra_usb_phy_close(tegra_phy);
- 
- 	return 0;
- }
+ 	u_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "nvidia,phy", 0);
+ 	if (IS_ERR(u_phy)) {
 -- 
 1.7.9.5
