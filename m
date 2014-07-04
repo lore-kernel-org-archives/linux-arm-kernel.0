@@ -1,7 +1,7 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 04 Jul 2014 19:46:22 +0200
+Date: Fri, 04 Jul 2014 19:48:00 +0200
 Subject: [PATCH 00/19] ARM: SAMSUNG: S5PV210 platform clean-up
-Message-ID: <1404496001-26513-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
