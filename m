@@ -1,48 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 4 Jul 2014 16:24:38 +0200
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
-In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140704142438.GA7827@pengutronix.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 04 Jul 2014 10:42:21 -0400
+Subject: [PATCH v2] efi/arm64: handle missing virtual mapping for UEFI
+ System Table
+In-Reply-To: <1404468997-6925-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1404468997-6925-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1404484941.19665.56.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
+On Fri, 2014-07-04 at 12:16 +0200, Ard Biesheuvel wrote:
+> If we cannot resolve the virtual address of the UEFI System Table, its physical
+> offset must be missing from the virtual memory map, and there is really no point
+> in proceeding with installing the virtual memory map and the runtime services
+> dispatch table. So back out gracefully.
 > 
-> We provide a new macro "ret" with all its variants for the condition
-> code which will resolve to the appropriate instruction.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 > 
-> Rather than doing this piecemeal, and miss some instances, change all
-> the "mov pc" instances to use the new macro, with the exception of
-> the "movs" instruction and the kprobes code.  This allows us to detect
-> the "mov pc, lr" case and fix it up - and also gives us the possibility
-> of deploying this for other registers depending on the CPU selection.
+> v2:
+> - release mappings and free virtmap before bailing
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Works fine on my ARM-v7M machine:
+>  arch/arm64/kernel/efi.c | 28 ++++++++++++++++++++++++++--
+>  1 file changed, 26 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 56c3327bbf79..23942158e0f8 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -416,11 +416,23 @@ static int __init arm64_enter_virtual_mode(void)
+>  			continue;
+>  		if (remap_region(md, &virt_md))
+>  			++count;
+> +		else
+> +			goto err_unmap;
 
-$ objdump -d vmlinux | grep -E 'mov.*pc'
-8c000022:	46e7      	mov	pc, ip
-8c000028:	46ef      	mov	pc, sp
-8c000b26:	46af      	movne	pc, r5
-8c0037e0:	4687      	mov	pc, r0
-8c0828d2:	4697      	mov	pc, r2
-8c1213ee:	469f      	mov	pc, r3
+How about:
+		if (!remap_region(md, &virt_md))
+			goto err_unmap;
+		++count;
 
-Also boots fine.
 
-Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>  	}
+>  
+>  	efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
+> -	if (efi.systab)
+> -		set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+> +	if (!efi.systab) {
+> +		/*
+> +		 * If we have no virtual mapping for the System Table at this
+> +		 * point, the memory map doesn't cover the physical offset where
+> +		 * it resides. This means the System Table will be inaccessible
+> +		 * to Runtime Services themselves once the virtual mapping is
+> +		 * installed.
+> +		 */
+> +		pr_err("Failed to remap EFI System Table -- buggy firmware?\n");
+> +		goto err_unmap;
+> +	}
+> +	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+>  
+>  	local_irq_save(flags);
+>  	cpu_switch_mm(idmap_pg_dir, &init_mm);
+> @@ -453,5 +465,17 @@ static int __init arm64_enter_virtual_mode(void)
+>  	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+>  
+>  	return 0;
+> +
+> +err_unmap:
+> +	/* unmap all mappings that succeeded: there are 'count' of those */
+> +	for_each_efi_memory_desc(&memmap, md) {
+> +		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+> +			continue;
+> +		if (!count--)
+> +			break;
+> +		iounmap((__force void *)md->virt_addr);
+> +	}
 
-but I wonder what is the reason to not use bx if \reg != lr.
+This is wrong. memmap still belongs to UEFI and hasn't been touched. The
+new mappings are in virtmap. So, it is even simpler:
 
-Thanks
-Uwe
+	/* unmap all mappings that succeeded: there are 'count' of those */
+	for (virt_md = virtmap; count; virt_md++, count--)
+		iounmap((__force void __iomem *)virt_md->virt_addr);
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> +	kfree(virtmap);
+> +	return -1;
+>  }
+>  early_initcall(arm64_enter_virtual_mode);
