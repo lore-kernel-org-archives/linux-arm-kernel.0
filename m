@@ -1,72 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Jul 2014 13:12:47 +0200
-Subject: [PATCH 2/8] cpufreq: add driver for Armada XP
-In-Reply-To: <CAKohponuvPd1kWDdB66kxd8TxxYqQ219jCq2D2RGhMHAuZTSWA@mail.gmail.com>
-References: <1404467103-29644-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404467103-29644-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAKohponuvPd1kWDdB66kxd8TxxYqQ219jCq2D2RGhMHAuZTSWA@mail.gmail.com>
-Message-ID: <20140704131247.2c8ecde2@free-electrons.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri,  4 Jul 2014 12:13:49 +0100
+Subject: [PATCH 0/3]  Add ST dwc3 glue layer driver.
+Message-ID: <1404472432-24764-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Viresh Kumar,
+This series adds support for the ST glue logic to manage the DWC3 HC
+on STiH407 SoC family chipsets.
 
-Thanks for your feedback!
+Peter Griffin (3):
+  usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+  ARM: dts: sti: Add st-dwc3 devicetree bindings documentation
+  MAINTAINERS: Add dwc3-st.c file to ARCH/STI architecture
 
-On Fri, 4 Jul 2014 15:25:35 +0530, Viresh Kumar wrote:
-> On 4 July 2014 15:14, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > This commit adds a simple cpufreq driver for the Armada XP SoC, which
-> > has one separately controllable clock for each CPU. For this reason,
-> > the existing cpufreq-cpu0 generic driver cannot be used because it
-> > currently assumes that there is only one clock controlling the
-> > frequency of all CPUs.
-> >
-> > There are on-going discussions on extending the cpufreq-cpu0 to cover
-> > the case of having one clock for each CPU, but there are still some
-> > unresolved issues to get this extended cpufreq-cpu0 driver merged.
-> 
-> Exactly, and those changes would get merged in one form or the other.
-> Surely in 3.17 atleast, if not 3.16 as we are already reaching rc4..
-> 
-> So, it would be great if you can test on top of those changes to see if
-> something isn't solved for your platform yet?
-> 
-> git://git.linaro.org/people/viresh.kumar/linux.git cpufreq/cpu0-krait-v3
+ Documentation/devicetree/bindings/usb/dwc3-st.txt |  58 ++++
+ MAINTAINERS                                       |   1 +
+ drivers/usb/dwc3/Kconfig                          |   9 +
+ drivers/usb/dwc3/Makefile                         |   1 +
+ drivers/usb/dwc3/dwc3-st.c                        | 325 ++++++++++++++++++++++
+ 5 files changed, 394 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/dwc3-st.txt
+ create mode 100644 drivers/usb/dwc3/dwc3-st.c
 
-One other problem with cpufreq-cpu0 is that it assumes the Device Tree
-can contain a static OPP table, with the frequency/voltage points.
-Unfortunately, in the case of the Armada XP platform, this is not
-possible, because we cannot hardcode into the Device Tree the possible
-CPU frequencies.
-
-The nominal CPU frequency is selected by Sample on Reset pins (i.e pins
-of the CPUs that are sampled during the reset sequence) and can
-therefore change from one board to the other, and they can also be
-changed via special U-Boot commands. And the frequencies supported by
-cpufreq are the nominal frequency of the CPU as determined by the
-sample at reset pins, and half of this frequency.
-
-That's why the proposed armadaxp-cpufreq driver does not hardcode the
-possible frequencies, but instead creates the frequency table by using
-the current CPU frequency (nominal frequency) and half of it.
-
-This doesn't work very well with the idea of having the OPP table
-statically encoded in to the Device Tree. Options are:
-
- - Improve the cpufreq-cpu0 driver so that the OPP table can be passed
-   through platform_data, and therefore built dynamically by the
-   platform code and passed when registering the cpufreq
-   platform_device.
-
- - Dynamically build/update the OPP table in the Device Tree.
-
-Which option do you think is appropriate here?
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
