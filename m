@@ -1,106 +1,176 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Jul 2014 14:31:35 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140704125615.CC2E2C40A89@trevor.secretlab.ca>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <20140703150008.GX32514@n2100.arm.linux.org.uk>
- <20140703171356.GD28175@arm.com> <4840595.cpHbY6hJKL@wuerfel>
- <20140703183055.GC32514@n2100.arm.linux.org.uk>
- <20140704085745.GB16404@arm.com>
- <20140704092519.GC21766@n2100.arm.linux.org.uk>
- <20140704125615.CC2E2C40A89@trevor.secretlab.ca>
-Message-ID: <20140704133135.GH21766@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 4 Jul 2014 15:35:22 +0200
+Subject: [PATCHv4 5/5] arm64: Add atomic pool for non-coherent and CMA
+ allocations.
+In-Reply-To: <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
+References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
+ <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140704133517.GA9860@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 01:56:15PM +0100, Grant Likely wrote:
-> On Fri, 4 Jul 2014 10:25:19 +0100, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jul 04, 2014 at 09:57:45AM +0100, Catalin Marinas wrote:
-> > > On Thu, Jul 03, 2014 at 07:30:55PM +0100, Russell King - ARM Linux wrote:
-> > > > Even with SWP_EMULATE enabled and with the debug problem fixed... does
-> > > > it help warn people?  Only if you're running on a CPU with virtualisation
-> > > > extensions, because it silently continues to work on CPUs without.
-> > > 
-> > > Some clarification here. The virtualisation extensions made SWP
-> > > _optional_ (i.e. it may not be present at all). The ARMv7
-> > > multiprocessing extensions introduced the possibility to disable/trap
-> > > SWP via the SCTLR.SW bit because it was no longer atomic. So basically
-> > > native SWP only works (as expected, atomically) on ARMv7 UP and earlier.
-> > 
-> > Yes, but we've cocked this up - on ARMv7 SMP, we don't force SWP to be
-> > enabled.  So, you may have SWP in hardware, which may not be atomic,
-> > but as everyone seems to have SWP_EMULATE /disabled/ we don't know
-> > whether the instruction even exists in any programs or libraries.
-> > 
-> > It may be that it's been completely eliminated, but we don't know that,
-> > because we've never had the trapping enabled for SMP systems.
-> > 
-> > On the flip side (as I mentioned to Will) I don't think the situation is
-> > quite as serious as Grant makes it out to be for Android.
-> > 
-> > There, the user base is already used to apps which don't work with new
-> > Android devices.  For example, despite Android scaling the graphics to
-> > the screen size, there are apps that don't work merely because the screen
-> > is bigger, and the play store knows this and doesn't offer them.  However,
-> > it /is/ still possible to install them (and some people have) by
-> > downloading the .apk file and putting that on SD card.  In this case,
-> > the app (a game) worked perfectly except that the game controls were at
-> > an absolute screen position rather than a scaled position, which is why
-> > the game was no longer offered for the later devices.
-> 
-> I don't think I'm wrong about how serious the issue is. Read through
-> Colin's email again. He is talking about exactly the situation that I
-> described.
-> 
-> Nor do I think that "the user base is already used to app which don't
-> work" is even remotely a good justification for allowing things to
-> continue to suck. Android has matured a lot since the early days, and
-> the compatibility problems that plagued the early devices don't happen
-> so much anymore.
+On Wed, Jul 02, 2014 at 11:03:38AM -0700, Laura Abbott wrote:
+[...]
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+[...]
+> +static struct gen_pool *atomic_pool;
+> +
+> +#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
+> +static size_t atomic_pool_size = DEFAULT_DMA_COHERENT_POOL_SIZE;
 
-My points are based upon a lengthy discussion last night with a friend who
-is on the front line support of a major retailer of mobiles and tablets,
-whom I've known for a number of years.
+There doesn't seem to be much use for this since it can't be overridden
+via init_dma_coherent_pool_size like on ARM.
 
-There's lots of cases where apps are not presented for later devices,
-and this is the standard model there.
+> +static int __free_from_pool(void *start, size_t size)
+> +{
+> +	if (!__in_atomic_pool(start, size))
+> +		return 0;
+> +
+> +	gen_pool_free(atomic_pool, (unsigned long)start, size);
+> +
+> +	return 1;
+> +}
+> +
+> +
 
-While we can say that it shouldn't happen, that's not reality.  As I
-pointed out, apps can become incompatible just because your device has
-a different sized screen.  Would you really argue that the screen is
-part of the ABI and thus should never change because it might break
-some Android app?
+There's a gratuituous blank line here.
 
-What I'm pointing out is that the Linux philosophy is a good one (and
-don't get me wrong, it's something that we /should/ strive for -
-especially as we haven't done enough to warn people about SWP going
-away), it doesn't appear to translate to the Android space.
+>  static void *__dma_alloc_coherent(struct device *dev, size_t size,
+>  				  dma_addr_t *dma_handle, gfp_t flags,
+>  				  struct dma_attrs *attrs)
+> @@ -53,7 +103,8 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+>  	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
+>  	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+>  		flags |= GFP_DMA;
+> -	if (IS_ENABLED(CONFIG_DMA_CMA)) {
+> +
+> +	if (!(flags & __GFP_WAIT) && IS_ENABLED(CONFIG_DMA_CMA)) {
 
-I'm pretty sure that there will be a whole truck load of issues which
-will stop apps working on an ARMv8 phone, and the lack of SWP is
-going to be soo drowned out in the noise of everything else.
+I think the diff would be more readable here if this wasn't introducing
+a blank linke and kept the IS_ENABLED() first.
 
-Also, as we haven't forced SWP_EMULATE to be enabled on SMP, if there
-/are/ users of the instruction on SMP kernels, they're already broken
-(though, the instruction may still execute, it won't execute
-atomically there, and so is useless for locking or atomic exchanging
-purposes.)
+>  		struct page *page;
+>  
+>  		size = PAGE_ALIGN(size);
+> @@ -73,50 +124,56 @@ static void __dma_free_coherent(struct device *dev, size_t size,
+>  				void *vaddr, dma_addr_t dma_handle,
+>  				struct dma_attrs *attrs)
+>  {
+> +	bool freed;
+> +	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
+> +
+>  	if (dev == NULL) {
+>  		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+>  		return;
+>  	}
+>  
+> -	if (IS_ENABLED(CONFIG_DMA_CMA)) {
+> -		phys_addr_t paddr = dma_to_phys(dev, dma_handle);
+>  
+> -		dma_release_from_contiguous(dev,
 
-I'm about to push a number of changes out today though:
+The above leaves an unnecessary blank line in place.
 
-1. save where the last kernel misaligned fault happened (we have a
-   64-bit one one in nsm_init_private) and report via /proc/cpu/alignment.
+>  	ptr = __dma_alloc_coherent(dev, size, dma_handle, flags, attrs);
+>  	if (!ptr)
+>  		goto no_mem;
+> -	map = kmalloc(sizeof(struct page *) << order, flags & ~GFP_DMA);
+> -	if (!map)
+> -		goto no_map;
+>  
+>  	/* remove any dirty cache lines on the kernel alias */
+>  	__dma_flush_range(ptr, ptr + size);
+>  
+> +
 
-2. ensure that SWP_EMULATE is forced on for SMP configurations.
+Adds an unnecessary blank line.
 
-3. log and save SWP emulation use via kernel log and /proc/cpu/swp_emulate.
+> @@ -332,6 +391,67 @@ static struct notifier_block amba_bus_nb = {
+>  
+>  extern int swiotlb_late_init_with_default_size(size_t default_size);
+>  
+> +static int __init atomic_pool_init(void)
+> +{
+> +	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
+> +	unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
+> +	struct page *page;
+> +	void *addr;
+> +
+> +
 
-4. kill HWCAP_SWP when we don't want people using the SWP instruction.
+There's another gratuituous blank line here...
 
-(4) is pretty worthless anyway, because we haven't done that from the
-start - which means userspace can't make decisions based upon that
-hwcap whether they can or can't use this instruction.
+> +	if (dev_get_cma_area(NULL))
+> +		page = dma_alloc_from_contiguous(NULL, nr_pages,
+> +					get_order(atomic_pool_size));
+> +	else
+> +		page = alloc_pages(GFP_KERNEL, get_order(atomic_pool_size));
+> +
+> +
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+and here.
+
+> +	if (page) {
+> +		int ret;
+> +
+> +		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+> +		if (!atomic_pool)
+> +			goto free_page;
+> +
+> +		addr = dma_common_contiguous_remap(page, atomic_pool_size,
+> +					VM_USERMAP, prot, atomic_pool_init);
+> +
+> +		if (!addr)
+> +			goto destroy_genpool;
+> +
+> +		memset(addr, 0, atomic_pool_size);
+> +		__dma_flush_range(addr, addr + atomic_pool_size);
+> +
+> +		ret = gen_pool_add_virt(atomic_pool, (unsigned long)addr,
+> +					page_to_phys(page),
+> +					atomic_pool_size, -1);
+> +		if (ret)
+> +			goto remove_mapping;
+> +
+> +		gen_pool_set_algo(atomic_pool,
+> +				  gen_pool_first_fit_order_align, NULL);
+> +
+> +		pr_info("DMA: preallocated %zd KiB pool for atomic allocations\n",
+
+I think this should be "%zu" because atomic_pool_size is a size_t, not a
+ssize_t.
+
+> +			atomic_pool_size / 1024);
+> +		return 0;
+> +	}
+> +	goto out;
+> +
+> +remove_mapping:
+> +	dma_common_free_remap(addr, atomic_pool_size, VM_USERMAP);
+> +destroy_genpool:
+> +	gen_pool_destroy(atomic_pool);
+> +	atomic_pool == NULL;
+
+This probably doesn't belong here.
+
+> +free_page:
+> +	if (!dma_release_from_contiguous(NULL, page, nr_pages))
+> +		__free_pages(page, get_order(atomic_pool_size));
+
+You use get_order(atomic_pool_size) a lot, perhaps it should be a
+temporary variable?
+
+> +out:
+> +	pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
+> +		atomic_pool_size / 1024);
+
+Print in decimal rather than hexadecimal?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/1e719c0a/attachment.sig>
