@@ -1,46 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Jul 2014 13:25:55 +0100
-Subject: [PATCH v3 3/8] component: add support for component match array
-In-Reply-To: <CAK5sBcFof_QvDouNOUD1SVqPucMQ+wW4u_jxguCqDgO=zD7_Og@mail.gmail.com>
-References: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
- <20140704105258.GF21766@n2100.arm.linux.org.uk>
- <CAK5sBcFof_QvDouNOUD1SVqPucMQ+wW4u_jxguCqDgO=zD7_Og@mail.gmail.com>
-Message-ID: <20140704122554.GG21766@n2100.arm.linux.org.uk>
+From: dforsi@gmail.com (Daniele Forsi)
+Date: Fri, 4 Jul 2014 14:27:15 +0200
+Subject: [PATCH 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+In-Reply-To: <1404472432-24764-2-git-send-email-peter.griffin@linaro.org>
+References: <1404472432-24764-1-git-send-email-peter.griffin@linaro.org>
+ <1404472432-24764-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAN_we7O2AMpace_oxBoxBO_jT82MnL9B-mzchozncMzp4_kZ=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 05:00:36PM +0530, Sachin Kamat wrote:
-> On Fri, Jul 4, 2014 at 4:22 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jul 04, 2014 at 04:17:35PM +0530, Sachin Kamat wrote:
-> >> Hi Russell
-> >>
-> >> > +int component_master_add_with_match(struct device *dev,
-> >> > +       const struct component_master_ops *ops,
-> >> > +       struct component_match *match)
-> >> >  {
-> >> >         struct master *master;
-> >> >         int ret;
-> >> >
-> >> > +       if (ops->add_components && match)
-> >> > +               return -EINVAL;
-> >> > +
-> >> > +       /* Reallocate the match array for its true size */
-> >> > +       match = component_match_realloc(dev, match, match->num);
-> >>
-> >>            ^^^^^^^^^^^^^
-> >> This gives a NULL pointer dereference error when match is NULL (as passed
-> >> by component_master_add() below). Observed this while testing linux-next
-> >> kernel (next-20140704) on Exynos based board with DRM enabled.
-> >
-> > Thanks for your report.  Please verify that the patch below resolves it
-> > for you.  Thanks.
-> 
-> Yes, the below patch fixes the crash. Thanks for the fix.
+2014-07-04 13:13 GMT+02:00 Peter Griffin:
 
-Thanks.  I'll add a tested-by and reported-by for your address when
-committing this patch.  Let me know if you want something different.
+> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+> index 8eb996e..f7b0518 100644
+> --- a/drivers/usb/dwc3/Kconfig
+> +++ b/drivers/usb/dwc3/Kconfig
+> @@ -77,6 +77,15 @@ config USB_DWC3_KEYSTONE
+>         default USB_DWC3
+>         help
+>           Support of USB2/3 functionality in TI Keystone2 platforms.
+> +
+> +config USB_DWC3_ST
+> +       tristate "STMicroelectronics Platforms"
+> +       depends on ARCH_STI && OF
+> +       default USB_DWC3_HOST
+> +       help
+> +         STMicroelectronics SoCs chip with one DesignWare Core USB3 IP
+> +         inside (i.e. STiH407).
+> +
+>           Say 'Y' or 'M' here if you have one such device
+>
+>  comment "Debugging features"
+
+you are actually removing the line "Say 'Y' or 'M' here if you have
+one such device" from the previous item
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Daniele Forsi
