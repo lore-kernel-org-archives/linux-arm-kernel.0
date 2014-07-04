@@ -1,32 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Jul 2014 22:11:06 +0200
-Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
- it has exclusives
-In-Reply-To: <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk>
+Date: Fri, 04 Jul 2014 22:12:52 +0200
+Subject: [PATCH 0/4] ABI updates
+In-Reply-To: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
 References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
- <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk>
-Message-ID: <4606711.7KmFAGVNmG@wuerfel>
+Message-ID: <5967772.rMBIs5rqFN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 July 2014 20:52:17 Russell King wrote:
->         /*
->          * HWCAP_TLS is available only on 1136 r1p0 and later,
->          * see also kuser_get_tls_init.
->          */
-> -       if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
-> +       if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&
-> +           ((id >> 20) & 3) == 0) {
->                 elf_hwcap &= ~HWCAP_TLS;
-> +               return;
-> +       }
+On Friday 04 July 2014 20:51:34 Russell King - ARM Linux wrote:
+> As a result of the recent discussions about android, several issues
+> have been identified with existing kernels:
 > 
+> 1. HWCAP_SWP does not properly reflect whether the SWP instruction
+>    should be used.  Turn HWCAP_SWP off on ARMv6+ where the exclusives
+>    are available.
+> 
+> 2. SWP is unsafe when running on a SMP CPU; there is no bus locking
+>    between the read and write parts of the instruction execution.
+>    Force SWP emulation on ARMv7+ where we can disable the SWP
+>    instruction.
+> 
+> 3. Reporting of alignment faults - kernel mode faults are silent due to
+>    the requirements of the network stack, but we can note where the
+>    last one occurs.
+> 
+> Testing reveals that at least my OMAP4430 userspace (supplied from TI)
+> executes lots of SWP instructions, which is something that wasn't known
+> before this patch.
+> 
+> Many systems today are not configured with SWP emulation enabled on SMP.
+> This means that the SWP instruction is available, but unsafe.
 
-Would it make sense to tie this check to the ARMv6K architecture level?
-
-I see that cpu_architecture currently reports the same value for plain
-ARMv6 (1136r0) and for ARMv6K (1136r1+ or any other ARM11), but we already
-distinguish them at compile time in a number of places and it seems you
-make the exact same distinction here at runtime.
+Looks all good to me, just one question for the last patch.
 
 	Arnd
