@@ -1,48 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 4 Jul 2014 11:31:38 +0800
-Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
- suspend/resume
-In-Reply-To: <20140702142620.GJ32514@n2100.arm.linux.org.uk>
-References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
- <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
- <53A9B80B.7020608@samsung.com>
- <20140701144417.GV32514@n2100.arm.linux.org.uk>
- <53B2E11D.5000507@samsung.com> <20140702123444.GB24879@arm.com>
- <20140702140134.GA21091@e102568-lin.cambridge.arm.com>
- <20140702142620.GJ32514@n2100.arm.linux.org.uk>
-Message-ID: <20140704033137.GB1970@dragon>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 3 Jul 2014 20:39:41 -0700
+Subject: ASoC: samsung: MACH_SMDK6450
+In-Reply-To: <023d01cf9720$5ed32fc0$1c798f40$@samsung.com>
+References: <1404287238.12021.7.camel@x220>
+ <20140702092347.GB410@sirena.org.uk> <53B48993.5020809@samsung.com>
+ <20140703111442.GW410@sirena.org.uk>
+ <023d01cf9720$5ed32fc0$1c798f40$@samsung.com>
+Message-ID: <CAOesGMjdVrOfyrF6X3KoMQxBBYzNZskUsaMaHH653LJgwqpA+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 03:26:21PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 02, 2014 at 03:01:34PM +0100, Lorenzo Pieralisi wrote:
-> > On Wed, Jul 02, 2014 at 01:34:44PM +0100, Will Deacon wrote:
-> > > Does anybody have any ideas? We could try `handling' the undef, but it's
-> > > ugly and fragile.
-> > 
-> > You could try to treat it the same way as ACTLR (see cpu_v7_do_resume,
-> > where the ACTLR is first read, if it is already set, ie equal to the
-> > saved value, skip the write); ACTLR suffers from the same issue and IIRC
-> > that's why Russell added the "teq" then "write" test at the time
-> > cpu_suspend was consolidated.
-> 
-> We can't do that now for these, because if they were already correct,
-> then by definition we wouldn't need to restore them except on secure
-> parts.
-> 
-> From the comments that have been made on the subject of these registers,
-> it is already the case that non-secure platforms don't restore this
-> register, instead relying on the platform to jump through hoops to
-> update it _after_ the MMU has been enabled.
-> 
-> Will Deacon raised a point when I discussed this that once the MMU is
-> enabled, the hardware doesn't expect the diagnostic register to be
-> changed.  So, having platform code (which runs after the MMU has been
-> enabled) sounds dodgy to me.
+On Thu, Jul 3, 2014 at 5:39 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Mark Brown wrote:
+>>
+>> On Thu, Jul 03, 2014 at 07:37:07AM +0900, Kukjin Kim wrote:
+>> > On 07/02/14 18:23, Mark Brown wrote:
+>>
+>> > >This also wasn't sent to me for review, please always send patches to
+>> > >maintainers.
+>>
+>> > Mark, I always send patches to regarding maintainers and in this case the
+>> > patch missed the change. I'm resending new patch and if any problems, please
+>> > let me know. Just note, I just wanted to check whether there is no problem
+>> > with other maintainers' tree early in -next tree.
+>>
+>> It looks like you've sent it to broonie at linaro.org not broonie at kernel.org
+>> which is listed in MAINTAINERS and what I use for e-mail - upstream mail
+>> that goes to my work address often just gets dropped on the floor (and
+>> generally ends up at the bottom of my queue to look at) since it ends up
+>> in a completely different place to my personal mail.
+>
+> Mark, oh, I see. But I checked your e-mail address from recent your sign-off
+> in git commit so, just thought it should be fine.
+>
+> I will use kernel.org for your e-mail address next time ;-)
 
-Though it sounds dodgy, restoring the registers at platform level is the
-only choice we have now to get the workaround effectiveness back, due to
-this secure vs. non-secure pain.  Also it seems Exynos has been doing
-this for years (see exynos_cpu_restore_register()).
+Mark is the _only_ linux developer in the world who will give you crap
+for sending him patches to the very same email that he signs off all
+his work with.
 
-Shawn
+I really wish Linaro would just let him sign off with his
+long-standing kernel.org email address instead so the rest of us
+wouldn't have to keep track of this. :(
+
+
+-Olof
