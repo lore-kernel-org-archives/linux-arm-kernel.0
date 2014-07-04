@@ -1,247 +1,218 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 04 Jul 2014 15:13:45 +0200
-Subject: [PATCH V3 2/2] ASoC: samsung: Add machine driver for Odroid X2/U3
-In-Reply-To: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
-References: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1404479625-25385-2-git-send-email-s.nawrocki@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 04 Jul 2014 15:15:37 +0200
+Subject: [PATCH v4 09/19] clocksource: sh_cmt: Add DT support
+In-Reply-To: <1402931251-22581-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1402931251-22581-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1897420.z4gRLGjo6K@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the sound subsystem driver for Odroid-X2 and
-Odroid-U3 boards. The codec works in I2S master mode; there
-are two separate audio routing paths defined, as there are
-differences in the signal routing between the X2 and U3 boards,
-i.e. U3 uses single jack for headphones and microphone.
+On Monday 16 June 2014 17:07:21 Laurent Pinchart wrote:
+> Document DT bindings and parse them in the CMT driver.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  .../devicetree/bindings/timer/renesas,cmt.txt      | 47 +++++++++++++++
+>  drivers/clocksource/sh_cmt.c                       | 66 +++++++++++++------
+>  2 files changed, 95 insertions(+), 18 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> b/Documentation/devicetree/bindings/timer/renesas,cmt.txt new file mode
+> 100644
+> index 0000000..643cfff
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> @@ -0,0 +1,47 @@
+> +* Renesas R-Car Compare Match Timer (CMT)
+> +
+> +The CMT is a multi-channel 16/32/48-bit timer/counter with configurable
+> clock
+> +inputs and programmable compare match.
+> +
+> +Channels share hardware resources but their counter and compare match value
+> +are independent. A particular CMT instance can implement only a subset of
+> the
+> +channels supported by the CMT model. Channel indices represent the hardware
+> +position of the channel in the CMT and don't match the channel numbers in
+> the
+> +datasheets.
+> +
+> +Required Properties:
+> +
+> +  - compatible: must contain one of the following.
+> +    - "renesas,cmt-32" for the 32-bit CMT
+> +		(CMT0 on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+> +		(CMT[234] on sh7372, sh73a0 and r8a7740)
+> +    - "renasas,cmt-48" for the 48-bit CMT
 
-Signed-off-by: Chen Zhen <zhen1.chen@samsung.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-Changes since v2:
- - clock settings moved to late_probe, odroidx2_ops removed;
- - added missing driver.pm ops initialization;
- - minor cleanups.
----
- sound/soc/samsung/Kconfig             |    8 ++
- sound/soc/samsung/Makefile            |    2 +
- sound/soc/samsung/odroidx2_max98090.c |  177 +++++++++++++++++++++++++++++++++
- 3 files changed, 187 insertions(+)
- create mode 100644 sound/soc/samsung/odroidx2_max98090.c
+Simon has spotted a nasty typo here and below in the OF match table. I'll fix 
+that and resubmit the pull request.
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 3be49cd..333d645 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -237,3 +237,11 @@ config SND_SOC_SNOW
- 	help
- 	  Say Y if you want to add audio support for various Snow
- 	  boards based on Exynos5 series of SoCs.
-+
-+config SND_SOC_ODROIDX2
-+	tristate "Audio support for Odroid-X2 and Odroid-U3"
-+	depends on SND_SOC_SAMSUNG
-+	select SND_SOC_MAX98090
-+	select SND_SAMSUNG_I2S
-+	help
-+	  Say Y here to enable audio support for the Odroid-X2/U3.
-diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
-index 6469199..e8d9ccd 100644
---- a/sound/soc/samsung/Makefile
-+++ b/sound/soc/samsung/Makefile
-@@ -44,6 +44,7 @@ snd-soc-tobermory-objs := tobermory.o
- snd-soc-lowland-objs := lowland.o
- snd-soc-littlemill-objs := littlemill.o
- snd-soc-bells-objs := bells.o
-+snd-soc-odroidx2-max98090-objs := odroidx2_max98090.o
+> +		(CMT1 on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+> +		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
+> +
+> +  - reg: base address and length of the registers block for the timer
+> module.
+> +  - interrupts: interrupt-specifier for the timer, one per channel.
+> +  - clocks: a list of phandle + clock-specifier pairs, one for each entry
+> +    in clock-names.
+> +  - clock-names: must contain "fck" for the functional clock.
+> +
+> +  - renesas,channels-mask: bitmask of the available channels.
+> +
+> +
+> +Example: R8A7790 (R-Car H2) CMT0 node
+> +
+> +	CMT0 on R8A7790 implements hardware channels 5 and 6 only and names
+> +	them channels 0 and 1 in the documentation.
+> +
+> +	cmt0: timer at ffca0000 {
+> +		compatible = "renesas,cmt-48-gen2";
+> +		reg = <0 0xffca0000 0 0x1004>;
+> +		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
+> +		clock-names = "fck";
+> +
+> +		renesas,channels-mask = <0x60>;
+> +	};
+> diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> index 4d00e4b..09a93c4 100644
+> --- a/drivers/clocksource/sh_cmt.c
+> +++ b/drivers/clocksource/sh_cmt.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/irq.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_runtime.h>
+> @@ -122,6 +123,7 @@ struct sh_cmt_device {
+> 
+>  	struct sh_cmt_channel *channels;
+>  	unsigned int num_channels;
+> +	unsigned int hw_channels;
+> 
+>  	bool has_clockevent;
+>  	bool has_clocksource;
+> @@ -924,10 +926,35 @@ static int sh_cmt_map_memory(struct sh_cmt_device
+> *cmt) return 0;
+>  }
+> 
+> +static const struct platform_device_id sh_cmt_id_table[] = {
+> +	{ "sh-cmt-16", (kernel_ulong_t)&sh_cmt_info[SH_CMT_16BIT] },
+> +	{ "sh-cmt-32", (kernel_ulong_t)&sh_cmt_info[SH_CMT_32BIT] },
+> +	{ "sh-cmt-32-fast", (kernel_ulong_t)&sh_cmt_info[SH_CMT_32BIT_FAST] },
+> +	{ "sh-cmt-48", (kernel_ulong_t)&sh_cmt_info[SH_CMT_48BIT] },
+> +	{ "sh-cmt-48-gen2", (kernel_ulong_t)&sh_cmt_info[SH_CMT_48BIT_GEN2] },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(platform, sh_cmt_id_table);
+> +
+> +static const struct of_device_id sh_cmt_of_table[] __maybe_unused = {
+> +	{ .compatible = "renesas,cmt-32", .data = &sh_cmt_info[SH_CMT_32BIT] },
+> +	{ .compatible = "renesas,cmt-32-fast", .data =
+> &sh_cmt_info[SH_CMT_32BIT_FAST] }, +	{ .compatible = "renasas,cmt-48",
+> .data = &sh_cmt_info[SH_CMT_48BIT] }, +	{ .compatible =
+> "renesas,cmt-48-gen2", .data = &sh_cmt_info[SH_CMT_48BIT_GEN2] }, +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, sh_cmt_of_table);
+> +
+> +static int sh_cmt_parse_dt(struct sh_cmt_device *cmt)
+> +{
+> +	struct device_node *np = cmt->pdev->dev.of_node;
+> +
+> +	return of_property_read_u32(np, "renesas,channels-mask",
+> +				    &cmt->hw_channels);
+> +}
+> +
+>  static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device
+> *pdev) {
+> -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> -	const struct platform_device_id *id = pdev->id_entry;
+>  	unsigned int mask;
+>  	unsigned int i;
+>  	int ret;
+> @@ -936,13 +963,26 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt,
+> struct platform_device *pdev) cmt->pdev = pdev;
+>  	raw_spin_lock_init(&cmt->lock);
+> 
+> -	if (!cfg) {
+> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
+> +		const struct of_device_id *id;
+> +
+> +		id = of_match_node(sh_cmt_of_table, pdev->dev.of_node);
+> +		cmt->info = id->data;
+> +
+> +		ret = sh_cmt_parse_dt(cmt);
+> +		if (ret < 0)
+> +			return ret;
+> +	} else if (pdev->dev.platform_data) {
+> +		struct sh_timer_config *cfg = pdev->dev.platform_data;
+> +		const struct platform_device_id *id = pdev->id_entry;
+> +
+> +		cmt->info = (const struct sh_cmt_info *)id->driver_data;
+> +		cmt->hw_channels = cfg->channels_mask;
+> +	} else {
+>  		dev_err(&cmt->pdev->dev, "missing platform data\n");
+>  		return -ENXIO;
+>  	}
+> 
+> -	cmt->info = (const struct sh_cmt_info *)id->driver_data;
+> -
+>  	/* Get hold of clock. */
+>  	cmt->clk = clk_get(&cmt->pdev->dev, "fck");
+>  	if (IS_ERR(cmt->clk)) {
+> @@ -960,8 +1000,7 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt,
+> struct platform_device *pdev) goto err_clk_unprepare;
+> 
+>  	/* Allocate and setup the channels. */
+> -	cmt->num_channels = hweight8(cfg->channels_mask);
+> -
+> +	cmt->num_channels = hweight8(cmt->hw_channels);
+>  	cmt->channels = kzalloc(cmt->num_channels * sizeof(*cmt->channels),
+>  				GFP_KERNEL);
+>  	if (cmt->channels == NULL) {
+> @@ -973,7 +1012,7 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt,
+> struct platform_device *pdev) * Use the first channel as a clock event
+> device and the second channel * as a clock source. If only one channel is
+> available use it for both. */
+> -	for (i = 0, mask = cfg->channels_mask; i < cmt->num_channels; ++i) {
+> +	for (i = 0, mask = cmt->hw_channels; i < cmt->num_channels; ++i) {
+>  		unsigned int hwidx = ffs(mask) - 1;
+>  		bool clocksource = i == 1 || cmt->num_channels == 1;
+>  		bool clockevent = i == 0;
+> @@ -1044,21 +1083,12 @@ static int sh_cmt_remove(struct platform_device
+> *pdev) return -EBUSY; /* cannot unregister clockevent and clocksource */ }
+> 
+> -static const struct platform_device_id sh_cmt_id_table[] = {
+> -	{ "sh-cmt-16", (kernel_ulong_t)&sh_cmt_info[SH_CMT_16BIT] },
+> -	{ "sh-cmt-32", (kernel_ulong_t)&sh_cmt_info[SH_CMT_32BIT] },
+> -	{ "sh-cmt-32-fast", (kernel_ulong_t)&sh_cmt_info[SH_CMT_32BIT_FAST] },
+> -	{ "sh-cmt-48", (kernel_ulong_t)&sh_cmt_info[SH_CMT_48BIT] },
+> -	{ "sh-cmt-48-gen2", (kernel_ulong_t)&sh_cmt_info[SH_CMT_48BIT_GEN2] },
+> -	{ }
+> -};
+> -MODULE_DEVICE_TABLE(platform, sh_cmt_id_table);
+> -
+>  static struct platform_driver sh_cmt_device_driver = {
+>  	.probe		= sh_cmt_probe,
+>  	.remove		= sh_cmt_remove,
+>  	.driver		= {
+>  		.name	= "sh_cmt",
+> +		.of_match_table = of_match_ptr(sh_cmt_of_table),
+>  	},
+>  	.id_table	= sh_cmt_id_table,
+>  };
 
- obj-$(CONFIG_SND_SOC_SAMSUNG_JIVE_WM8750) += snd-soc-jive-wm8750.o
- obj-$(CONFIG_SND_SOC_SAMSUNG_NEO1973_WM8753) += snd-soc-neo1973-wm8753.o
-@@ -69,3 +70,4 @@ obj-$(CONFIG_SND_SOC_TOBERMORY) += snd-soc-tobermory.o
- obj-$(CONFIG_SND_SOC_LOWLAND) += snd-soc-lowland.o
- obj-$(CONFIG_SND_SOC_LITTLEMILL) += snd-soc-littlemill.o
- obj-$(CONFIG_SND_SOC_BELLS) += snd-soc-bells.o
-+obj-$(CONFIG_SND_SOC_ODROIDX2) += snd-soc-odroidx2-max98090.o
-diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
-new file mode 100644
-index 0000000..278edf9
---- /dev/null
-+++ b/sound/soc/samsung/odroidx2_max98090.c
-@@ -0,0 +1,177 @@
-+/*
-+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/module.h>
-+#include <sound/soc.h>
-+#include <sound/pcm_params.h>
-+#include "i2s.h"
-+
-+struct odroidx2_drv_data {
-+	const struct snd_soc_dapm_widget *dapm_widgets;
-+	unsigned int num_dapm_widgets;
-+};
-+
-+/* The I2S CDCLK output clock frequency for the MAX98090 codec */
-+#define MAX98090_MCLK 19200000
-+
-+static int odroidx2_late_probe(struct snd_soc_card *card)
-+{
-+	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
-+	struct snd_soc_dai *cpu_dai = card->rtd[0].cpu_dai;
-+	int ret;
-+
-+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
-+						SND_SOC_CLOCK_IN);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Set the cpu DAI configuration in order to use CDCLK */
-+	return snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
-+					0, SND_SOC_CLOCK_OUT);
-+}
-+
-+static const struct snd_soc_dapm_widget odroidx2_dapm_widgets[] = {
-+	SND_SOC_DAPM_HP("Headphone Jack", NULL),
-+	SND_SOC_DAPM_MIC("Mic Jack", NULL),
-+	SND_SOC_DAPM_MIC("DMIC", NULL),
-+};
-+
-+static const struct snd_soc_dapm_widget odroidu3_dapm_widgets[] = {
-+	SND_SOC_DAPM_HP("Headphone Jack", NULL),
-+	SND_SOC_DAPM_SPK("Speakers", NULL),
-+};
-+
-+static struct snd_soc_dai_link odroidx2_dai[] = {
-+	{
-+		.name		= "MAX98090",
-+		.stream_name	= "MAX98090 PCM",
-+		.codec_dai_name	= "HiFi",
-+		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+				  SND_SOC_DAIFMT_CBM_CFM,
-+	}
-+};
-+
-+static struct snd_soc_card odroidx2 = {
-+	.owner			= THIS_MODULE,
-+	.dai_link		= odroidx2_dai,
-+	.num_links		= ARRAY_SIZE(odroidx2_dai),
-+	.fully_routed		= true,
-+	.late_probe		= odroidx2_late_probe,
-+};
-+
-+struct odroidx2_drv_data odroidx2_drvdata = {
-+	.dapm_widgets		= odroidx2_dapm_widgets,
-+	.num_dapm_widgets	= ARRAY_SIZE(odroidx2_dapm_widgets),
-+};
-+
-+struct odroidx2_drv_data odroidu3_drvdata = {
-+	.dapm_widgets		= odroidu3_dapm_widgets,
-+	.num_dapm_widgets	= ARRAY_SIZE(odroidu3_dapm_widgets),
-+};
-+
-+static const struct of_device_id odroidx2_audio_of_match[] = {
-+	{
-+		.compatible	= "samsung,odroidx2-audio",
-+		.data		= &odroidx2_drvdata,
-+	}, {
-+		.compatible	= "samsung,odroidu3-audio",
-+		.data		= &odroidu3_drvdata,
-+	},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, odroidx2_audio_of_match);
-+
-+static int odroidx2_audio_probe(struct platform_device *pdev)
-+{
-+	struct device_node *snd_node = pdev->dev.of_node;
-+	struct snd_soc_card *card = &odroidx2;
-+	struct device_node *i2s_node, *codec_node;
-+	struct odroidx2_drv_data *dd;
-+	const struct of_device_id *of_id;
-+	int ret;
-+
-+	of_id = of_match_node(odroidx2_audio_of_match, snd_node);
-+	dd = (struct odroidx2_drv_data *)of_id->data;
-+
-+	card->num_dapm_widgets = dd->num_dapm_widgets;
-+	card->dapm_widgets = dd->dapm_widgets;
-+
-+	card->dev = &pdev->dev;
-+
-+	ret = snd_soc_of_parse_card_name(card, "samsung,model");
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = snd_soc_of_parse_audio_routing(card, "samsung,audio-routing");
-+	if (ret < 0)
-+		return ret;
-+
-+	codec_node = of_parse_phandle(snd_node, "samsung,audio-codec", 0);
-+	if (!codec_node) {
-+		dev_err(&pdev->dev,
-+			"Failed parsing samsung,i2s-codec property\n");
-+		return -EINVAL;
-+	}
-+
-+	i2s_node = of_parse_phandle(snd_node, "samsung,i2s-controller", 0);
-+	if (!i2s_node) {
-+		dev_err(&pdev->dev,
-+			"Failed parsing samsung,i2s-controller property\n");
-+		ret = -EINVAL;
-+		goto err_put_codec_n;
-+	}
-+
-+	odroidx2_dai[0].codec_of_node = codec_node;
-+	odroidx2_dai[0].cpu_of_node = i2s_node;
-+	odroidx2_dai[0].platform_of_node = i2s_node;
-+
-+	ret = snd_soc_register_card(card);
-+	if (ret) {
-+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
-+			ret);
-+		goto err_put_i2s_n;
-+	}
-+	return 0;
-+
-+err_put_i2s_n:
-+	of_node_put(i2s_node);
-+err_put_codec_n:
-+	of_node_put(codec_node);
-+	return ret;
-+}
-+
-+static int odroidx2_audio_remove(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(card);
-+
-+	of_node_put((struct device_node *)odroidx2_dai[0].cpu_of_node);
-+	of_node_put((struct device_node *)odroidx2_dai[0].codec_of_node);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver odroidx2_audio_driver = {
-+	.driver = {
-+		.name		= "odroidx2-audio",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= odroidx2_audio_of_match,
-+		.pm		= &snd_soc_pm_ops,
-+	},
-+	.probe	= odroidx2_audio_probe,
-+	.remove	= odroidx2_audio_remove,
-+};
-+module_platform_driver(odroidx2_audio_driver);
-+
-+MODULE_AUTHOR("Chen Zhen <zhen1.chen@samsung.com>");
-+MODULE_AUTHOR("Sylwester Nawrocki <s.nawrocki@samsung.com>");
-+MODULE_DESCRIPTION("ALSA SoC Odroid X2/U3 Audio Support");
-+MODULE_LICENSE("GPL v2");
---
-1.7.9.5
+-- 
+Regards,
+
+Laurent Pinchart
