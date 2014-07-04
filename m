@@ -1,28 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 5 Jul 2014 01:01:30 +0200
-Subject: [PATCH v2 1/4] of: Add NVIDIA Tegra XUSB pad controller binding
-In-Reply-To: <1402398708-10722-1-git-send-email-thierry.reding@gmail.com>
+Date: Sat, 5 Jul 2014 01:04:10 +0200
+Subject: [PATCH v2 2/4] pinctrl: Add NVIDIA Tegra XUSB pad controller
+ support
+In-Reply-To: <539A0FE9.1080802@wwwdotorg.org>
 References: <1402398708-10722-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CACRpkdaLG+f41ot0H7sRm0zq+5=HROBKpKeXJC2+JYkq6a4Yog@mail.gmail.com>
+ <1402398708-10722-2-git-send-email-thierry.reding@gmail.com>
+ <539A0FE9.1080802@wwwdotorg.org>
+Message-ID: <CACRpkdZvO-RZZKDtbFY6Uv5Td2NJ828xj0sVbTh2=ehx7Ha6fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 1:11 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
+On Thu, Jun 12, 2014 at 10:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/10/2014 05:11 AM, Thierry Reding wrote:
 
-> From: Thierry Reding <treding@nvidia.com>
+> Aside from the issue Andrew pointed out, this series looks good to me.
+> I'll apply once that one issue is fixed.
 >
-> This patch adds the device tree binding documentation for the XUSB pad
-> controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
-> capabilities.
+> Linus,
 >
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v2:
-> - move header file to this patch and refer to it in the binding
-> - update example to match the latest binding
+> Patch 2 (pinctrl driver) depends on patch 1 (binding header), and there
+> are other patches that will also depend on the binding header in patch
+> 1. I guess I should apply patch 1 in a topic branch and send you a pull
+> request which you can merge before applying patch 2. Does that sound OK
+> to you?
 
-Stephen/Laxman: any comments on this patch?
+Bah I've got some mess in my mailbox.
+
+Please proceed as this Stephen, I trust your pull request will
+be fine.
 
 Yours,
 Linus Walleij
