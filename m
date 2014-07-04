@@ -1,96 +1,201 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 4 Jul 2014 16:51:18 +0200
-Subject: [PATCH v2] efi/arm64: handle missing virtual mapping for UEFI
- System Table
-In-Reply-To: <1404484941.19665.56.camel@deneb.redhat.com>
-References: <1404468997-6925-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404484941.19665.56.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu9U4A-MmgDNw-R0gUxybtR7fhMMXpktimEhB7A0YWzcSQ@mail.gmail.com>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Fri,  4 Jul 2014 15:54:14 +0100
+Subject: [PATCH] arm64: KVM: allow export and import of generic timer regs
+Message-ID: <1404485654-32674-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding Catalin)
+For correct guest suspend/resume behaviour we need to ensure we include
+the generic timer registers for 64 bit guests. As CONFIG_KVM_ARM_TIMER is
+always set for arm64 we don't need to worry about null implementations.
+However I have re-jigged the kvm_arm_timer_set/get_reg declarations to
+be in the common include/kvm/arm_arch_timer.h headers.
 
-On 4 July 2014 16:42, Mark Salter <msalter@redhat.com> wrote:
-> On Fri, 2014-07-04 at 12:16 +0200, Ard Biesheuvel wrote:
->> If we cannot resolve the virtual address of the UEFI System Table, its physical
->> offset must be missing from the virtual memory map, and there is really no point
->> in proceeding with installing the virtual memory map and the runtime services
->> dispatch table. So back out gracefully.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> v2:
->> - release mappings and free virtmap before bailing
->>
->>  arch/arm64/kernel/efi.c | 28 ++++++++++++++++++++++++++--
->>  1 file changed, 26 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index 56c3327bbf79..23942158e0f8 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -416,11 +416,23 @@ static int __init arm64_enter_virtual_mode(void)
->>                       continue;
->>               if (remap_region(md, &virt_md))
->>                       ++count;
->> +             else
->> +                     goto err_unmap;
->
-> How about:
->                 if (!remap_region(md, &virt_md))
->                         goto err_unmap;
->                 ++count;
->
->
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm/include/asm/kvm_host.h |  3 --
+ arch/arm/kvm/guest.c            | 10 ------
+ arch/arm64/kvm/guest.c          | 68 ++++++++++++++++++++++++++++++++++++++++-
+ include/kvm/arm_arch_timer.h    | 14 +++++++++
+ 4 files changed, 81 insertions(+), 14 deletions(-)
 
-Sure.
-
->>       }
->>
->>       efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
->> -     if (efi.systab)
->> -             set_bit(EFI_SYSTEM_TABLES, &efi.flags);
->> +     if (!efi.systab) {
->> +             /*
->> +              * If we have no virtual mapping for the System Table at this
->> +              * point, the memory map doesn't cover the physical offset where
->> +              * it resides. This means the System Table will be inaccessible
->> +              * to Runtime Services themselves once the virtual mapping is
->> +              * installed.
->> +              */
->> +             pr_err("Failed to remap EFI System Table -- buggy firmware?\n");
->> +             goto err_unmap;
->> +     }
->> +     set_bit(EFI_SYSTEM_TABLES, &efi.flags);
->>
->>       local_irq_save(flags);
->>       cpu_switch_mm(idmap_pg_dir, &init_mm);
->> @@ -453,5 +465,17 @@ static int __init arm64_enter_virtual_mode(void)
->>       set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
->>
->>       return 0;
->> +
->> +err_unmap:
->> +     /* unmap all mappings that succeeded: there are 'count' of those */
->> +     for_each_efi_memory_desc(&memmap, md) {
->> +             if (!(md->attribute & EFI_MEMORY_RUNTIME))
->> +                     continue;
->> +             if (!count--)
->> +                     break;
->> +             iounmap((__force void *)md->virt_addr);
->> +     }
->
-> This is wrong. memmap still belongs to UEFI and hasn't been touched. The
-> new mappings are in virtmap. So, it is even simpler:
->
->         /* unmap all mappings that succeeded: there are 'count' of those */
->         for (virt_md = virtmap; count; virt_md++, count--)
->                 iounmap((__force void __iomem *)virt_md->virt_addr);
->
-
-Yes, you're right. Will respin.
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 09af149..bce6d32 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -228,7 +228,4 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
+ 
+-u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+-int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+-
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index b23a59c..986e625 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -124,16 +124,6 @@ static bool is_timer_reg(u64 index)
+ 	return false;
+ }
+ 
+-int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+-{
+-	return 0;
+-}
+-
+-u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
+-{
+-	return 0;
+-}
+-
+ #else
+ 
+ #define NUM_TIMER_REGS 3
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 0874557..205f0d8 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -136,13 +136,67 @@ static unsigned long num_core_regs(void)
+ }
+ 
+ /**
++ * ARM64 versions of the TIMER registers, always available on arm64
++ */
++
++#define NUM_TIMER_REGS 3
++
++static bool is_timer_reg(u64 index)
++{
++	switch (index) {
++	case KVM_REG_ARM_TIMER_CTL:
++	case KVM_REG_ARM_TIMER_CNT:
++	case KVM_REG_ARM_TIMER_CVAL:
++		return true;
++	}
++	return false;
++}
++
++static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
++{
++	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
++		return -EFAULT;
++	uindices++;
++	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
++		return -EFAULT;
++	uindices++;
++	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
++		return -EFAULT;
++
++	return 0;
++}
++
++static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++	int ret;
++
++	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
++	if (ret != 0)
++		return ret;
++
++	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
++}
++
++static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++
++	val = kvm_arm_timer_get_reg(vcpu, reg->id);
++	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
++}
++
++/**
+  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+  *
+  * This is for all registers.
+  */
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+ {
+-	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
++	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
++                + NUM_TIMER_REGS;
+ }
+ 
+ /**
+@@ -154,6 +208,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ {
+ 	unsigned int i;
+ 	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
++	int ret;
+ 
+ 	for (i = 0; i < sizeof(struct kvm_regs) / sizeof(__u32); i++) {
+ 		if (put_user(core_reg | i, uindices))
+@@ -161,6 +216,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 		uindices++;
+ 	}
+ 
++	ret = copy_timer_indices(vcpu, uindices);
++	if (ret)
++		return ret;
++	uindices += NUM_TIMER_REGS;
++
+ 	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
+ }
+ 
+@@ -174,6 +234,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+ 		return get_core_reg(vcpu, reg);
+ 
++	if (is_timer_reg(reg->id))
++		return get_timer_reg(vcpu, reg);
++
+ 	return kvm_arm_sys_reg_get_reg(vcpu, reg);
+ }
+ 
+@@ -187,6 +250,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+ 		return set_core_reg(vcpu, reg);
+ 
++	if (is_timer_reg(reg->id))
++		return set_timer_reg(vcpu, reg);
++
+ 	return kvm_arm_sys_reg_set_reg(vcpu, reg);
+ }
+ 
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 6d9aedd..ad9db60 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -67,6 +67,10 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
++
++u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
++int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
++
+ #else
+ static inline int kvm_timer_hyp_init(void)
+ {
+@@ -84,6 +88,16 @@ static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu) {}
++
++static inline int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
++{
++	return 0;
++}
++
++static inline u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
++{
++	return 0;
++}
+ #endif
+ 
+ #endif
 -- 
-Ard.
+2.0.1
