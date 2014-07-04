@@ -1,64 +1,43 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 04 Jul 2014 10:07:59 +0200
-Subject: [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
-In-Reply-To: <02ca01cf975a$1848aaa0$48d9ffe0$@samsung.com>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
- <1404163947-3105-12-git-send-email-kgene.kim@samsung.com>
- <53B55021.9020307@samsung.com> <02ca01cf975a$1848aaa0$48d9ffe0$@samsung.com>
-Message-ID: <53B660DF.8060100@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Jul 2014 09:13:31 +0100
+Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
+In-Reply-To: <3b9f2103f5c44958a74f1e594a58d58a@BL2PR03MB468.namprd03.prod.outlook.com>
+References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+ <1404125530-17984-3-git-send-email-will.deacon@arm.com>
+ <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140703144341.GC14305@arm.com>
+ <3b9f2103f5c44958a74f1e594a58d58a@BL2PR03MB468.namprd03.prod.outlook.com>
+Message-ID: <20140704081331.GB23379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.07.2014 09:32, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> Hi Kukjin,
->>
-> Hi,
-> 
->> On 30.06.2014 23:32, Kukjin Kim wrote:
->>> This patch removes supporting s5pc100 related pwm codes.
->>>
->>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>> ---
->>>  Documentation/devicetree/bindings/pwm/pwm-samsung.txt |    2 --
->>>  drivers/clocksource/samsung_pwm_timer.c               |   12 ------------
->>>  drivers/pwm/pwm-samsung.c                             |    8 --------
->>>  3 files changed, 22 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
->> b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
->>> index 43925d3..82c7f6b 100644
->>> --- a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
->>> +++ b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
->>> @@ -11,8 +11,6 @@ Required properties:
->>>  - compatible : should be one of following:
->>>      samsung,s3c2410-pwm - for 16-bit timers present on S3C24xx SoCs
->>>      samsung,s3c6400-pwm - for 32-bit timers present on S3C64xx SoCs
->>> -    samsung,s5pc100-pwm - for 32-bit timers present on S5PC100, S5PV210,
->>> -			  Exynos4210 rev0 SoCs
->>
->> As you can see here, this variant is used for more than S5PC100. It is
->> needed for S5PV210 and Exynos4210 rev0 SoCs as well. So this patch
->> should be dropped.
-> 
-> Oh, I just now checked its datasheets and s5pv210 and early exynos4210 are
-> using BIT(5) for tclk_mask. You're right. But I couldn't its usage in mainline
-> when I created the patch. Anyway it can be used for s5pv210 so how about
-> following?
+On Fri, Jul 04, 2014 at 08:41:53AM +0100, Varun Sethi wrote:
+> Hi Will,
 
-Hmm, sorry for the confusion, but actually this seems to be a mistake in
-the binding documentation. On Exynos4210 rev0, "samsung,s5p6440-pwm" is
-supposed to be used and "samsung,s5pc100" supports both S5PC100 and S5PV210.
+Hey Varun,
 
-However I'm not sure why you want to change existing DT bindings. The
-rule is to name the compatible string after first existing SoC for which
-it can be used, so removing support for this SoC doesn't imply removing
-this compatible string because it can be used for future SoCs as well,
-if they turn out to be compatible.
+> > Once Thierry's generic IOMMU binding is sorted, we should look at adding
+> > support for the Stream ID description. Have you looked at that at all?
+> > 
+> Yes, I have looked at the bindings. Would we need to represent the stream
+> ids for PCI devices in the device tree? Why do we want to depend on the
+> firmware to map the requestor id to the stream id? It can be handled using
+> the APIs proposed by Alex Williamson. This is similar to IOMMU group
+> determination, which is handled by the IOMMU driver.
 
-My suggestion is to keep this as it was.
+Well, there could easily be a fixed mapping from the ID at the host controller
+and the ID seem by the SMMU (e.g. two host controllers sharing an SMMU?). I
+don't think walking the PCI buses can help you there.
 
-Best regards,
-Tomasz
+The way I was thinking to handle this is that we express SID = RID +
+offset. In the device-tree, we can then describe a range of RIDs on the host
+controller, a single offset, and we get back a range of SIDs.
+
+In the worst case scenario, each RID maps to a totally random SID, so then
+you have a huge table describing the mapping. I *think* this is actually
+unlikely, and if we ever see such a device we can either have a large
+mapping or put it into C code for that specific SoC (if it's really huge).
+
+FWIW: I believe that the ACPI folks are thinking along similar lines.
+
+Will
