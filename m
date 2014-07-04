@@ -1,30 +1,27 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 4 Jul 2014 03:11:18 -0700
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
-In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140704101118.GC20451@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Jul 2014 12:12:22 +0200
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140704092519.GC21766@n2100.arm.linux.org.uk>
+References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
+ <20140704085745.GB16404@arm.com>
+ <20140704092519.GC21766@n2100.arm.linux.org.uk>
+Message-ID: <7255305.EKPTbfD3OE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
-> 
-> We provide a new macro "ret" with all its variants for the condition
-> code which will resolve to the appropriate instruction.
-> 
-> Rather than doing this piecemeal, and miss some instances, change all
-> the "mov pc" instances to use the new macro, with the exception of
-> the "movs" instruction and the kprobes code.  This allows us to detect
-> the "mov pc, lr" case and fix it up - and also gives us the possibility
-> of deploying this for other registers depending on the CPU selection.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Friday 04 July 2014 10:25:19 Russell King - ARM Linux wrote:
+> Moreover, when you download from the play store, you are only presented
+> with the version which is appropriate for your device - when you buy a
+> new device, and you re-fetch your apps, you don't get the same version
+> that you've had on previous device if there's one more appropriate for
+> your new device.
 
-For the kvm/hyp related changes:
+This is certainly true, but at the same time the device makers have
+a valid interest in making as many apps as possible be enabled without
+requiring a recompile. If it becomes known that device A supports 90%
+of the popular apps while device B only supports 70% of the same apps
+(until they get recompiled), the decision whether to put emulation in
+or not is more about maximizing revenue than about theoretical
+correctness.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+	Arnd
