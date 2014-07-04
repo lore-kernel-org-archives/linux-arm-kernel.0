@@ -1,35 +1,55 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 04 Jul 2014 18:29:31 +0200
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <20140703150401.GE20104@cbox>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
- <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
- <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
- <20140611070352.GC24286@lvm> <53A0EE60.6030508@samsung.com>
- <20140703150401.GE20104@cbox>
-Message-ID: <53B6D66B.9070608@redhat.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri,  4 Jul 2014 18:34:08 +0200
+Subject: [RFC PATCH 1/4] tty: serial: 8250 core: provide a function to export
+ uart_8250_port
+Message-ID: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 03/07/2014 17:04, Christoffer Dall ha scritto:
-> Hmmm, I'm really not an expert in the 'established procedures' for what
-> to put in config files etc., but here's my basic take:
->
-> a) you wouldn't put a config option in Kconfig unless it's comething
-> that's actually configurable or some generic feature/subsystem that
-> should only be enabled if hardware has certain capabilities or other
-> config options enabled.
->
-> b) this seems entirely an implementation issue and not depending on
-> anything users should select.
+There is no access to access a struct uart_8250_port for a specific
+line. This is only required outside of the 8250/uart callbacks like for
+devices' suspend & remove callbacks. For those the 8250-core provides
+wrapper like serial8250_unregister_port() which passes the struct
+to the proper function based on the line argument.
 
-Actually I think Mario's idea is just fine.  Non-user-accessible Kconfig 
-symbols are used a lot to invoke an #ifdef elsewhere in the code; 
-compare this with his proposal is a bit different but not too much.
+For runtime suspend I need access to this struct not only to make
+serial_out() work but also to properly restore up->ier and up->mcr.
 
-Sometimes #defines are used, sometimes Kconfig symbols, but the idea is 
-the same.
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/tty/serial/8250/8250.h      | 2 ++
+ drivers/tty/serial/8250/8250_core.c | 6 ++++++
+ 2 files changed, 8 insertions(+)
 
-Paolo
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index 1ebf853..34c3cd1 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -110,6 +110,8 @@ static inline void serial_dl_write(struct uart_8250_port *up, int value)
+ 	up->dl_write(up, value);
+ }
+ 
++struct uart_8250_port *serial8250_get_port(int line);
++
+ #if defined(__alpha__) && !defined(CONFIG_PCI)
+ /*
+  * Digital did something really horribly wrong with the OUT1 and OUT2
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 7a91c6d..0c90160 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -2755,6 +2755,12 @@ static struct uart_ops serial8250_pops = {
+ 
+ static struct uart_8250_port serial8250_ports[UART_NR];
+ 
++struct uart_8250_port *serial8250_get_port(int line)
++{
++	return &serial8250_ports[line];
++}
++EXPORT_SYMBOL_GPL(serial8250_get_port);
++
+ static void (*serial8250_isa_config)(int port, struct uart_port *up,
+ 	unsigned short *capabilities);
+ 
+-- 
+2.0.0
