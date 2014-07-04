@@ -1,67 +1,90 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 04 Jul 2014 22:51:02 +0400
-Subject: [PATCH 2/3] ARM: mvebu: Add support for the network controller
- in Armada 375 SoC
-In-Reply-To: <1404498697-21978-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1404498697-21978-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1404498697-21978-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <53B6F796.3090004@cogentembedded.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Sat, 5 Jul 2014 00:32:34 +0530
+Subject: [PATCH v6] ARM: EXYNOS: Use MCPM call-backs to support S2R on
+ Exynos5420
+In-Reply-To: <alpine.LFD.2.11.1407041408120.22282@knanqh.ubzr>
+References: <alpine.LFD.2.11.1407041408120.22282@knanqh.ubzr>
+Message-ID: <CAM4voamqpCj=Zw69DGjzhouwu=6RE6e3Px5WL8akc-TUAts0Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Nicolas,
 
-On 07/04/2014 10:31 PM, Ezequiel Garcia wrote:
-
-> This commit adds the support for the network controller in Marvell
-> Armada 375 SoC devicetree.
-
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->   arch/arm/boot/dts/armada-375.dtsi | 31 +++++++++++++++++++++++++++++++
->   1 file changed, 31 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index fb92551..5e897d2 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -151,6 +151,37 @@
->   				      <0xc100 0x100>;
->   			};
+On Sat, Jul 5, 2014 at 12:00 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Fri, 4 Jul 2014, Abhilash Kesavan wrote:
 >
-> +			mdio {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "marvell,orion-mdio";
-> +				reg = <0xc0054 0x4>;
-> +			};
-> +
-> +			/* Network controller */
-> +			pp2 at f0000 {
-> +				compatible = "marvell,armada-375-pp2";
-> +				reg = <0xf0000 0xa000>, /* Packet Processor regs */
-> +				      <0xc0000 0x3060>, /* LMS regs */
-> +				      <0xc4000 0x100>,  /* eth0 regs */
-> +				      <0xc5000 0x100>;  /* eth1 regs */
-
-    Hm, why are the above two ranges not listed under the "ethernet" subnodes?
-
-> +				clocks = <&gateclk 3>, <&gateclk 19>;
-> +				clock-names = "pp_clk", "gop_clk";
-> +				status = "disabled";
-> +
-> +				eth0: ethernet at c4000 {
-> +					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-> +					port-id = <0>;
-> +					status = "disabled";
-> +				};
-> +
-> +				eth1: ethernet at c5000 {
-> +					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-> +					port-id = <1>;
-> +					status = "disabled";
-> +				};
-> +			};
-> +
-
-WBR, Sergei
+>> On Fri, Jul 4, 2014 at 9:43 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > Another suggestion which might possibly be better: why not looking for
+>> > the SYS_PWR_CFG bit in exynos_cpu_power_down() directly?  After all,
+>> > exynos_cpu_power_down() is semantically supposed to do what its name
+>> > suggest and could simply do nothing if the proper conditions are already
+>> > in place.
+>> I have implemented this and it works fine. Patch coming up.
+>
+> On Fri, 4 Jul 2014, Abhilash Kesavan wrote:
+>
+>> Use the MCPM layer to handle core suspend/resume on Exynos5420.
+>> Also, restore the entry address setup code post-resume.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> ---
+>> Changes in v2:
+>>       - Made use of the MCPM suspend/powered_up call-backs
+>> Changes in v3:
+>>       - Used the residency value to indicate the entered state
+>> Changes in v4:
+>>       - Checked if MCPM has been enabled to prevent build error
+>> Changes in v5:
+>>       - Removed the MCPM flags and just used a local flag to
+>>       indicate that we are suspending.
+>> Changes in v6:
+>>       - Read the SYS_PWR_REG value to decide if we are suspending
+>>       the system.
+>>       - Restore the SYS_PWR_REG value post-resume.
+>>       - Modified the comments to reflect the first change.
+>
+> [...]
+>
+>> @@ -150,7 +153,15 @@ static void exynos_power_down(void)
+>>       BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+>>       cpu_use_count[cpu][cluster]--;
+>>       if (cpu_use_count[cpu][cluster] == 0) {
+>> -             exynos_cpu_power_down(cpunr);
+>> +             /*
+>> +              * Bypass power down for CPU0 during suspend. Check for
+>> +              * the SYS_PWR_REG value to decide if we are suspending
+>> +              * the system.
+>> +              */
+>> +             temp = __raw_readl(pmu_base_addr +
+>> +                     EXYNOS5_ARM_CORE0_SYS_PWR_REG);
+>> +             if ((cpu != 0) || ((temp & S5P_CORE_LOCAL_PWR_EN) != 0))
+>> +                     exynos_cpu_power_down(cpunr);
+>
+> Nah...  We're going in circles, aren't we?
+>
+> What I suggested above is:
+>
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 67d383de61..0a48421860 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -110,6 +110,16 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+>   */
+>  void exynos_cpu_power_down(int cpu)
+>  {
+> +       if (soc_is_exynos5250() && cpu == 0) {
+> +               /*
+> +                * Bypass power down for CPU0 during suspend. Check for
+> +                * the SYS_PWR_REG value to decide if we are suspending
+> +                * the system.
+> +                */
+> +               int val = __raw_readl(pmu_base_addr +EXYNOS5_ARM_CORE0_SYS_PWR_REG);
+> +               if (!(val & S5P_CORE_LOCAL_PWR_EN))
+> +                       return;
+> +       }
+>         __raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>  }
+Ah, I get it, much nicer indeed. Will change.
+>
+>
+> Nicolas
