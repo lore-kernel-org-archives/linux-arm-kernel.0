@@ -1,47 +1,40 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  4 Jul 2014 10:30:42 +0200
-Subject: [PATCH 1/5] imx-drm: Drop imx_drm_of_get_next_endpoint wrapper
-In-Reply-To: <1404462646-1769-1-git-send-email-p.zabel@pengutronix.de>
-References: <1404462646-1769-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1404462646-1769-2-git-send-email-p.zabel@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 04 Jul 2014 17:32:52 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix the check for non-smp configuration
+In-Reply-To: <1404363812-26307-1-git-send-email-a.kesavan@samsung.com>
+References: <1404363812-26307-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <032801cf9762$8be518b0$a3af4a10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will decrease the prev node reference count in of_graph_get_next_endpoint
-instead.
+Abhilash Kesavan wrote:
+> 
+> Commit 1754c42e3db5("ARM: exynos: move sysram info to exynos.c") missed
+> out the CONFIG_ prefix causing exynos_sysram_init() to get called twice
+> for SMP configurations.
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index f38cf7c..95cad25 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -297,7 +297,7 @@ static void __init exynos_dt_machine_init(void)
+>  	 * This is called from smp_prepare_cpus if we've built for SMP, but
+>  	 * we still need to set it up for PM and firmware ops if not.
+>  	 */
+> -	if (!IS_ENABLED(SMP))
+> +	if (!IS_ENABLED(CONFIG_SMP))
+>  		exynos_sysram_init();
+> 
+>  	exynos_cpuidle_init();
+> --
+> 1.7.9.5
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/staging/imx-drm/imx-drm-core.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+Oh, OK. will apply into fixes.
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index a5d05b4..e6663dd 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -408,14 +408,6 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
- }
- EXPORT_SYMBOL_GPL(imx_drm_remove_crtc);
- 
--static struct device_node *imx_drm_of_get_next_endpoint(
--		const struct device_node *parent, struct device_node *prev)
--{
--	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
--	of_node_put(prev);
--	return node;
--}
--
- int imx_drm_encoder_parse_of(struct drm_device *drm,
- 	struct drm_encoder *encoder, struct device_node *np)
- {
-@@ -456,7 +448,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
- 		return -EINVAL;
- 
- 	do {
--		ep = imx_drm_of_get_next_endpoint(node, ep);
-+		ep = of_graph_get_next_endpoint(node, ep);
- 		if (!ep)
- 			break;
- 
--- 
-2.0.0
+Thanks,
+Kukjin
