@@ -1,26 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Jul 2014 21:33:24 +0200
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140704192405.GE14896@sirena.org.uk>
-References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140704132250.A2447C40ADD@trevor.secretlab.ca>
- <20140704192405.GE14896@sirena.org.uk>
-Message-ID: <6519224.oaibQ22oiI@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 04 Jul 2014 21:38:30 +0200
+Subject: [PATCH 2/4] dts: add devicetree bindings for pxa27x clocks
+In-Reply-To: <20140703220328.11380.22037@quantum> (Mike Turquette's message of
+ "Thu, 03 Jul 2014 15:03:28 -0700")
+References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
+ <1404066744-13416-3-git-send-email-robert.jarzmik@free.fr>
+ <CAN1soZys4k6g5RgPLbreopOxTwDJ+bfPOq8XPwsNpyt5+YURjg@mail.gmail.com>
+ <20140703220328.11380.22037@quantum>
+Message-ID: <87d2dkoqx5.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 July 2014 20:24:05 Mark Brown wrote:
-> 
-> Another question I think it's worth asking is what the use case for 32
-> bit mode is other than preexisting binaries - I guess there's a case for
-> smaller binaries giving better cache utilisation?
+Mike Turquette <mturquette@linaro.org> writes:
 
-If you wanted that, you'd probably run x32-mode (or whatever it gets called
-on ARM64), which I'd expect to also be more efficient ;-)
+> Quoting Haojian Zhuang (2014-07-02 23:14:33)
+>> Maybe defining these clocks in pxa27x clock driver is better.
+>
+> Agreed. After a long time trying to figure out the best DT binding for
+> clocks it seems that defining the per-clock data in DTS is not the best
+> way. The qcom msm and samsung exynos clock bindings and DTS data are
+> good examples.
 
-Seriously, backwards-compatibility is the only reason I can think of
-really, but that doesn't /have/ to mean existing binaries; there is a large
-amount of source code that can readily be compiled to any CPU as long as
-it's little-endian 32-bit.
+Ah, I see. Would have been a great comment in the former RFC patch serie, sic
+... Maybe a comment in the clock device-tree documentation would prevent others
+to do the same error ?
 
-	Arnd
+Well, it will take me some time to transform the dts data into code, especially
+if I want to have some genericity to handle all PXA variants.
+
+I'll work on it in the next days/week.
+
+Cheers.
+
+-- 
+Robert
