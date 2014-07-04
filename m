@@ -1,41 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Jul 2014 17:53:52 +0100
-Subject: i.MX6 graphics status
-In-Reply-To: <m34myxrsad.fsf@intrepid.localdomain>
-References: <m34myxrsad.fsf@intrepid.localdomain>
-Message-ID: <20140704165352.GI21766@n2100.arm.linux.org.uk>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Fri, 4 Jul 2014 11:57:40 -0500
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <53B6DB74.2050401@linutronix.de>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <53B6DB74.2050401@linutronix.de>
+Message-ID: <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 06:40:42PM +0200, Krzysztof Halasa wrote:
-> Hi,
-> 
-> do any of you have, by chance, information about status of i.MX6
-> graphics? I mean things like GLX and H.264 encoding and decoding.
+On Fri, Jul 4, 2014 at 11:51 AM, Sebastian Andrzej Siewior
+<bigeasy@linutronix.de> wrote:
+> On 07/03/2014 09:34 AM, Tony Lindgren wrote:
+>> Heh. Just to summarize the reason ttyO needs to be a separate name
+>> and device entry from ttyS is because we also have external 8250
+>> devices on GPMC and hotplug busses.
 >
-> I know Freescale has some (partially binary-only) packages which can do,
-> to some degree, GLX and perhaps other things. Is it all I can use, or
-> maybe etnaviv/etc. could be used as well? What about IMX DRM driver?
+> So the GPMC devices will first get a higher minor/device number. The
+> internal serial ports should show up first. I don't see the problem
+> (yet).
+>
+> If you need a separate major number (and name) like we do have it now
+> (between ttySx and ttyOx) then one of requirements would be to tell
+> Kconfig that one driver can be active at a time.
+>
+> For me the ttyS vs ttyO thing is purely cosmetic. I personally don't
+> like that it is different on different platforms like ttymxc, ttySC,
+> ttyTHS, ?
 
-It's still early very days for that.  etnaviv is progressing along,
-and (I hope) there's moves to integrate it as an entirely separate
-DRM driver along side the DRM stuff (but I've not been looking at it.)
-That's something I do need to give some attention so that it works
-between imx-drm and armada-drm.
+Maybe it's time to migrate them all to one name? (ttyS)  Does the end
+user really care if they have a soc with an omap/imx serial port
+driver? Or do they just want to access /dev/ttySx and connect to their
+device?
 
-For the video stuff, there's people working on it.  There are members
-of the Cubox community who have been working away on that side of
-things.  I'm not going to start making any further statements on that
-as there's some issues involved there which I've only been a casual
-observer to the IRC discussions...
-
-Going back to the DRM stuff, there's one annoying thing about it,
-which is the overlay plane doesn't do scaling - which totally screws
-apps which want to do video playback via XVideo overlay.  That's one
-of the biggest reasons that iMX6 video playback isn't that interesting
-for me - at least not until etnaviv progresses to a point where there
-is sane userspace and kernel stuff.
+Regards,
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Robert Nelson
+http://www.rcn-ee.com/
