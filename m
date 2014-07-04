@@ -1,261 +1,75 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Jul 2014 13:30:34 +0200
-Subject: [PATCH v6 17/23] mfd: max77686: Add Maxim 77802 PMIC support
-In-Reply-To: <1404467722-26687-18-git-send-email-javier.martinez@collabora.co.uk>
-References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404467722-26687-18-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1404473434.14069.10.camel@AMDC1943>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Fri, 4 Jul 2014 17:00:36 +0530
+Subject: [PATCH v3 3/8] component: add support for component match array
+In-Reply-To: <20140704105258.GF21766@n2100.arm.linux.org.uk>
+References: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
+ <20140704105258.GF21766@n2100.arm.linux.org.uk>
+Message-ID: <CAK5sBcFof_QvDouNOUD1SVqPucMQ+wW4u_jxguCqDgO=zD7_Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-07-04 at 11:55 +0200, Javier Martinez Canillas wrote:
-> Maxim MAX77802 is a power management chip that contains 10 high
-> efficiency Buck regulators, 32 Low-dropout (LDO) regulators used
-> to power up application processors and peripherals, a 2-channel
-> 32kHz clock outputs, a Real-Time-Clock (RTC) and a I2C interface
-> to program the individual regulators, clocks outputs and the RTC.
-> 
-> This patch adds support for MAX77802 to the MAX77686 driver and is
-> based on a driver added to the Chrome OS kernel 3.8 by Simon Glass.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
-> 
->     NOTE: I didn't carry previous {Review,Acked,Tested}-by tags since
->     this patch extending MAX77686 is quite different than the old one
->     adding a new mfd driver. So review and test is highly appreciated.
-> 
->     Changes since v5:
->      - Extend the 77686 driver to support 77802 instead of adding a new driver.
->        Suggested by Lee Jones.
-> 
->     Changes since v4:
->      - Use consistent expressions when checking for NULL values.
->        Suggested by Krzysztof Kozlowski.
->      - Remove unused defines. Suggested by Krzysztof Kozlowski.
->      - Explain why IRQ is disabled on suspend. Suggested by Krzysztof Kozlowski.
-> 
->     Changes since v3:
->      - Remove unnecessary OOM error message since the mm subsystem already logs it.
-> 
->     Changes since v2:
->      - Split the DT binding docs in a separate patch and improve the documentation.
->        Suggested by Mark Brown.
->      - Add all the devices in the MFD driver instead of doing in separate patches.
->        Suggested by Mark Brown.
-> 
->     Changes since v1:
->      - Convert max77{686,802} to regmap irq API and get rid of max77{686,802}-irq.c
->        Suggested by Krzysztof Kozlowski.
->      - Don't protect max77802 mfd_cells using Kconfig options since mfd core omits
->        devices that don't match. Suggested by Lee Jones.
->      - Change mfd driver to be tristate instead of boolean. Suggested by Mark Brown.
->      - Change binding "voltage-regulators" property to "regulators" to be consistent
->        with other PMIC drivers. Suggested by Mark Brown.
->      - Use regulators node names instead of the deprecated "regulator-compatible"
->        property. Suggested by Mark Brown.
->      - Use the new descriptor-based GPIO interface instead of the deprecated
-> ---
->  drivers/mfd/Kconfig                  |   6 +-
->  drivers/mfd/max77686.c               | 187 ++++++++++++++++++++++++++-----
->  include/linux/mfd/max77686-private.h | 208 ++++++++++++++++++++++++++++++++++-
->  include/linux/mfd/max77686.h         |  60 +++++++++-
->  4 files changed, 428 insertions(+), 33 deletions(-)
-> 
+On Fri, Jul 4, 2014 at 4:22 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jul 04, 2014 at 04:17:35PM +0530, Sachin Kamat wrote:
+>> Hi Russell
+>>
+>> > +int component_master_add_with_match(struct device *dev,
+>> > +       const struct component_master_ops *ops,
+>> > +       struct component_match *match)
+>> >  {
+>> >         struct master *master;
+>> >         int ret;
+>> >
+>> > +       if (ops->add_components && match)
+>> > +               return -EINVAL;
+>> > +
+>> > +       /* Reallocate the match array for its true size */
+>> > +       match = component_match_realloc(dev, match, match->num);
+>>
+>>            ^^^^^^^^^^^^^
+>> This gives a NULL pointer dereference error when match is NULL (as passed
+>> by component_master_add() below). Observed this while testing linux-next
+>> kernel (next-20140704) on Exynos based board with DRM enabled.
+>
+> Thanks for your report.  Please verify that the patch below resolves it
+> for you.  Thanks.
 
-Three comments below, after fixing:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Yes, the below patch fixes the crash. Thanks for the fix.
 
-(...)
 
-> @@ -55,6 +123,17 @@ static struct regmap_config max77686_rtc_regmap_config = {
->  	.val_bits = 8,
->  };
->  
-> +static struct regmap_config max77802_regmap_config = {
-> +	.reg_bits = 8,
-> +	.val_bits = 8,
-> +	.writeable_reg = max77802_is_accessible_reg,
-> +	.readable_reg = max77802_is_accessible_reg,
-> +	.precious_reg = max77802_is_precious_reg,
-> +	.volatile_reg = max77802_is_volatile_reg,
-> +	.name = "max77802-pmic",
-> +	.cache_type = REGCACHE_RBTREE,
-> +};
-> +
->  static const struct regmap_irq max77686_irqs[] = {
->  	/* INT1 interrupts */
->  	{ .reg_offset = 0, .mask = MAX77686_INT1_PWRONF_MSK, },
-> @@ -98,9 +177,34 @@ static const struct regmap_irq_chip max77686_rtc_irq_chip = {
->  	.num_irqs		= ARRAY_SIZE(max77686_rtc_irqs),
->  };
->  
-> +static const struct regmap_irq_chip max77802_irq_chip = {
-> +	.name			= "max77802-pmic",
-> +	.status_base		= MAX77802_REG_INT1,
-> +	.mask_base		= MAX77802_REG_INT1MSK,
-> +	.num_regs		= 2,
-> +	.irqs			= max77686_irqs, /* same masks than 77686 */
+>
+>  drivers/base/component.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/base/component.c b/drivers/base/component.c
+> index b4236daed4fa..f748430bb654 100644
+> --- a/drivers/base/component.c
+> +++ b/drivers/base/component.c
+> @@ -293,10 +293,12 @@ int component_master_add_with_match(struct device *dev,
+>         if (ops->add_components && match)
+>                 return -EINVAL;
+>
+> -       /* Reallocate the match array for its true size */
+> -       match = component_match_realloc(dev, match, match->num);
+> -       if (IS_ERR(match))
+> -               return PTR_ERR(match);
+> +       if (match) {
+> +               /* Reallocate the match array for its true size */
+> +               match = component_match_realloc(dev, match, match->num);
+> +               if (IS_ERR(match))
+> +                       return PTR_ERR(match);
+> +       }
+>
+>         master = kzalloc(sizeof(*master), GFP_KERNEL);
+>         if (!master)
+>
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 
-"same masks as 77686"
 
-> +	.num_irqs		= ARRAY_SIZE(max77686_irqs),
-> +};
-> +
-> +static const struct regmap_irq_chip max77802_rtc_irq_chip = {
-> +	.name			= "max77802-rtc",
-> +	.status_base		= MAX77802_RTC_INT,
-> +	.mask_base		= MAX77802_RTC_INTM,
-> +	.num_regs		= 1,
-> +	.irqs			= max77686_rtc_irqs, /* same masks than 77686 */
 
-Ditto
-
-> +	.num_irqs		= ARRAY_SIZE(max77686_rtc_irqs),
-> +};
-> +
->  static const struct of_device_id max77686_pmic_dt_match[] = {
-> -	{.compatible = "maxim,max77686", .data = NULL},
-> -	{},
-> +	{
-> +		.compatible = "maxim,max77686",
-> +		.data = (void *)TYPE_MAX77686,
-> +	},
-> +	{
-> +		.compatible = "maxim,max77802",
-> +		.data = (void *)TYPE_MAX77802,
-> +	},
-> +	{ },
->  };
->  
->  static void max77686_dt_parse_dvs_gpio(struct device *dev)
-> @@ -236,6 +340,12 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  	struct max77686_platform_data *pdata = dev_get_platdata(&i2c->dev);
->  	unsigned int data;
->  	int ret = 0;
-> +	const struct regmap_config *config;
-> +	const struct regmap_irq_chip *irq_chip;
-> +	const struct regmap_irq_chip *rtc_irq_chip;
-> +	struct regmap **rtc_regmap;
-> +	const struct mfd_cell *cells;
-> +	int n_devs;
->  
->  	if (IS_ENABLED(CONFIG_OF) && i2c->dev.of_node && !pdata)
->  		pdata = max77686_i2c_parse_dt_pdata(&i2c->dev);
-> @@ -258,56 +368,77 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->  	max77686->wakeup = pdata->wakeup;
->  	max77686->irq = i2c->irq;
->  
-> -	max77686->regmap = devm_regmap_init_i2c(i2c, &max77686_regmap_config);
-> +	if (max77686->type == TYPE_MAX77686) {
-> +		config = &max77686_regmap_config;
-> +		irq_chip = &max77686_irq_chip;
-> +		rtc_irq_chip = &max77686_rtc_irq_chip;
-> +		rtc_regmap = &max77686->rtc_regmap;
-> +		cells =  max77686_devs;
-> +		n_devs = ARRAY_SIZE(max77686_devs);
-> +	} else {
-> +		config = &max77802_regmap_config;
-> +		irq_chip = &max77802_irq_chip;
-> +		rtc_irq_chip = &max77802_rtc_irq_chip;
-> +		rtc_regmap = &max77686->regmap;
-> +		cells =  max77802_devs;
-> +		n_devs = ARRAY_SIZE(max77802_devs);
-> +	}
-> +
-> +	max77686->regmap = devm_regmap_init_i2c(i2c, config);
->  	if (IS_ERR(max77686->regmap)) {
->  		ret = PTR_ERR(max77686->regmap);
->  		dev_err(max77686->dev, "Failed to allocate register map: %d\n",
-> -				ret);
-> +			ret);
->  		return ret;
->  	}
->  
->  	ret = regmap_read(max77686->regmap, MAX77686_REG_DEVICE_ID, &data);
->  	if (ret < 0) {
->  		dev_err(max77686->dev,
-> -			"device not found on this channel (this is not an error)\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	max77686->rtc = i2c_new_dummy(i2c->adapter, I2C_ADDR_RTC);
-> -	if (!max77686->rtc) {
-> -		dev_err(max77686->dev, "Failed to allocate I2C device for RTC\n");
-> +			"device not found on this channel\n");
->  		return -ENODEV;
->  	}
-> -	i2c_set_clientdata(max77686->rtc, max77686);
->  
-> -	max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
-> -						    &max77686_rtc_regmap_config);
-> -	if (IS_ERR(max77686->rtc_regmap)) {
-> -		ret = PTR_ERR(max77686->rtc_regmap);
-> -		dev_err(max77686->dev, "failed to allocate RTC regmap: %d\n",
-> -			ret);
-> -		goto err_unregister_i2c;
-> +	if (max77686->type == TYPE_MAX77686) {
-> +		max77686->rtc = i2c_new_dummy(i2c->adapter, I2C_ADDR_RTC);
-> +		if (!max77686->rtc) {
-> +			dev_err(max77686->dev,
-> +				"Failed to allocate I2C device for RTC\n");
-> +			return -ENODEV;
-> +		}
-> +		i2c_set_clientdata(max77686->rtc, max77686);
-> +
-> +		max77686->rtc_regmap =
-> +			devm_regmap_init_i2c(max77686->rtc,
-> +					     &max77686_rtc_regmap_config);
-> +		if (IS_ERR(max77686->rtc_regmap)) {
-> +			ret = PTR_ERR(max77686->rtc_regmap);
-> +			dev_err(max77686->dev,
-> +				"failed to allocate RTC regmap: %d\n",
-> +				ret);
-> +			goto err_unregister_i2c;
-> +		}
->  	}
->  
->  	ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
->  				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-> -				  IRQF_SHARED, 0, &max77686_irq_chip,
-> +				  IRQF_SHARED, 0, irq_chip,
->  				  &max77686->irq_data);
->  	if (ret) {
->  		dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
->  		goto err_unregister_i2c;
->  	}
-> -	ret = regmap_add_irq_chip(max77686->rtc_regmap, max77686->irq,
-> +
-> +	ret = regmap_add_irq_chip(*rtc_regmap, max77686->irq,
->  				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-> -				  IRQF_SHARED, 0, &max77686_rtc_irq_chip,
-> +				  IRQF_SHARED, 0, rtc_irq_chip,
->  				  &max77686->rtc_irq_data);
->  	if (ret) {
->  		dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
->  		goto err_del_irqc;
->  	}
->  
-> -	ret = mfd_add_devices(max77686->dev, -1, max77686_devs,
-> -			      ARRAY_SIZE(max77686_devs), NULL, 0, NULL);
-> +	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0, NULL);
->  	if (ret < 0) {
->  		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
->  		goto err_del_rtc_irqc;
-> @@ -320,7 +451,8 @@ err_del_rtc_irqc:
->  err_del_irqc:
->  	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
->  err_unregister_i2c:
-> -	i2c_unregister_device(max77686->rtc);
-> +	if (max77686->type == TYPE_MAX77686)
-> +		i2c_unregister_device(max77686->rtc);
->  
->  	return ret;
->  }
-> @@ -341,6 +473,7 @@ static int max77686_i2c_remove(struct i2c_client *i2c)
-
-In remove() you should unregister dummy RTC I2C device only on MAX77686
-(77802 does not add it).
-
-Best regards,
-Krzysztof
+-- 
+Regards,
+Sachin.
