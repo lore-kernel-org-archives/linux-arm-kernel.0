@@ -1,260 +1,270 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 04 Jul 2014 19:44:34 +0200
-Subject: [PATCH 00/19] ARM: SAMSUNG: S5PV210 platform clean-up
-Message-ID: <1404495893-26371-1-git-send-email-t.figa@samsung.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Fri,  4 Jul 2014 23:17:04 +0530
+Subject: [PATCH v6] ARM: EXYNOS: Use MCPM call-backs to support S2R on
+ Exynos5420
+In-Reply-To: <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
+References: <1404398818-6859-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1404496024-7113-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This huge series is a (hopefully final) attempt to convert Samsung S5PV210
-into a DT-only and multiplatform-aware platform. It consists of several
-steps to gradually replace legacy code with one meeting current standards
-and then finally remove unused remnants.
+Use the MCPM layer to handle core suspend/resume on Exynos5420.
+Also, restore the entry address setup code post-resume.
 
-Patches 1-6 migrate the platform to fully use the Common Clock Framework
-and get rid of legacy private clock code, of which s5pv210 was the last
-user. Then patch 7 adds generic PHY driver for USB PHY on S5PV210 to allow
-USB to be supported when using DT. Further three patches (8-10) add DT
-support for mach-s5pv210 and necessary DT sources for currently supported
-boards. Patch 11 removes board files and code directly related to them,
-effectively making s5pv210 a DT-only platform. In next step, patches 12-15
-prepare remaining code for multiplatform enablement, which is finally done
-in patch 16. Patches 17-19 are a final clean-up, which remove a lot of
-unused code left after making the last S5P platform DT-only.
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+Changes in v2:
+	- Made use of the MCPM suspend/powered_up call-backs
+Changes in v3:
+	- Used the residency value to indicate the entered state
+Changes in v4:
+	- Checked if MCPM has been enabled to prevent build error
+Changes in v5:
+	- Removed the MCPM flags and just used a local flag to
+	indicate that we are suspending.
+Changes in v6:
+	- Read the SYS_PWR_REG value to decide if we are suspending
+	the system.
+	- Restore the SYS_PWR_REG value post-resume.
+	- Modified the comments to reflect the first change.
 
-Build tested patch by patch on following configs:
- - s3c2410_defconfig (with DT support enabled),
- - s3c6400_defconfig (with DT support enabled),
- - s5pv210_defconfig (with DT support enabled after patches adding it),
- - exynos_defconfig,
- - exynos_defconfig with S5PV210 enabled in multiplatform configuration.
+This has been tested both on an SMDK5420 and Peach Pit Chromebook on
+next-20140704. Nicolas' boot cluster CCI enablement patches are in
+linux-next now.
 
-Boot tested on s5pv210-goni board.
+Here are the dependencies (some of these patches did not apply cleanly):
+1) Cleanup patches for mach-exynos
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/33772
 
-Note that support for smdkc110, smdkv210 and torbreck boards is provided
-by moving data from existing board files to new device tree sources. No
-testing was performed due to mentioned board not being available anymore.
-However I believe we agreed on this approach, because apparently there
-are no active users of them. See the RFC from August 2013 asking for
-removal of the whole platform [1].
+2) PMU cleanup and refactoring for using DT
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg671625.html
 
-[1] http://www.mail-archive.com/linux-samsung-soc%40vger.kernel.org/msg21882.html
+3) Exynos5420 PMU/S2R Series
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/33898
 
-Mateusz Krawczuk (6):
-  clk: samsung: Add clock driver for S5PV210 and compatible SoCs
-  ARM: s5pv210: Migrate clock handling to Common Clock Framework
-  phy: Add support for S5PV210 to the Exynos USB 2.0 PHY driver
-  ARM: s5pv210: Add board file for boot using Device Tree
-  ARM: Samsung: DT: Add Device tree for s5pv210
-  ARM: Samsung: DT: Add Device tree for S5PC110/S5PV210 Boards
+4) Exynos5420 CPUIdle Series which populates MCPM suspend/powered_up
+call-backs.
+www.gossamer-threads.com/lists/linux/kernel/1945347
+https://patchwork.kernel.org/patch/4357461/
 
-Tomasz Figa (13):
-  cpufreq: s3c24xx: Remove some dead code
-  serial: samsung: Remove support for legacy clock code
-  ARM: SAMSUNG: Remove legacy clock code
-  clk: samsung: Add S5PV210 Audio Subsystem clock driver
-  ARM: S5PV210: Remove support for board files
-  ARM: S5PV210: Untie PM support from legacy code
-  ARM: s5pv210: move debug-macro.S into the common space
-  ARM: s5pv210: Register cpufreq platform device
-  cpufreq: s5pv210: Make the driver multiplatform aware
-  ARM: s5pv210: Enable multi-platform build support
-  gpio: samsung: Remove legacy support of S5PV210
-  ARM: SAMSUNG: Remove remaining legacy code
-  clk: samsung: s5pv210: Remove legacy board support
+5) Exynos5420 MCPM cluster power down support
+http://www.spinics.net/lists/arm-kernel/msg339988.html
 
- .../bindings/clock/clk-s5pv210-audss.txt           |   53 +
- .../bindings/clock/samsung,s5pv210-clock.txt       |   78 ++
- .../devicetree/bindings/phy/samsung-phy.txt        |    1 +
- arch/arm/Kconfig                                   |   22 +-
- arch/arm/Kconfig.debug                             |   12 +-
- arch/arm/Makefile                                  |    4 +-
- arch/arm/boot/dts/Makefile                         |    5 +
- arch/arm/boot/dts/s5pv210-aquila.dts               |  392 ++++++
- arch/arm/boot/dts/s5pv210-goni.dts                 |  449 +++++++
- arch/arm/boot/dts/s5pv210-pinctrl.dtsi             |  839 ++++++++++++
- arch/arm/boot/dts/s5pv210-smdkc110.dts             |   78 ++
- arch/arm/boot/dts/s5pv210-smdkv210.dts             |  238 ++++
- arch/arm/boot/dts/s5pv210-torbreck.dts             |   92 ++
- arch/arm/boot/dts/s5pv210.dtsi                     |  633 +++++++++
- arch/arm/include/debug/s5pv210.S                   |   34 +
- arch/arm/mach-exynos/pm.c                          |    1 -
- arch/arm/mach-s3c24xx/common.c                     |    2 -
- arch/arm/mach-s3c24xx/iotiming-s3c2412.c           |    1 -
- arch/arm/mach-s3c24xx/mach-h1940.c                 |    5 +-
- arch/arm/mach-s3c24xx/mach-jive.c                  |    1 -
- arch/arm/mach-s3c24xx/mach-smdk2413.c              |    1 -
- arch/arm/mach-s3c24xx/mach-smdk2416.c              |    1 -
- arch/arm/mach-s3c24xx/mach-smdk2443.c              |    1 -
- arch/arm/mach-s3c24xx/mach-vstms.c                 |    1 -
- arch/arm/mach-s3c24xx/s3c2410.c                    |    6 -
- arch/arm/mach-s3c24xx/s3c2412.c                    |    6 -
- arch/arm/mach-s3c24xx/s3c2442.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c244x.c                    |    6 -
- arch/arm/mach-s3c64xx/mach-anw6410.c               |    1 -
- arch/arm/mach-s3c64xx/mach-crag6410.c              |    1 -
- arch/arm/mach-s3c64xx/mach-hmt.c                   |    1 -
- arch/arm/mach-s3c64xx/mach-ncp.c                   |    1 -
- arch/arm/mach-s3c64xx/mach-smartq.c                |    1 -
- arch/arm/mach-s3c64xx/mach-smdk6400.c              |    1 -
- arch/arm/mach-s3c64xx/mach-smdk6410.c              |    1 -
- arch/arm/mach-s3c64xx/s3c6400.c                    |    1 -
- arch/arm/mach-s3c64xx/s3c6410.c                    |    1 -
- arch/arm/mach-s5pv210/Kconfig                      |  197 +--
- arch/arm/mach-s5pv210/Makefile                     |   29 +-
- arch/arm/mach-s5pv210/Makefile.boot                |    2 -
- arch/arm/mach-s5pv210/clock.c                      | 1365 --------------------
- arch/arm/mach-s5pv210/common.c                     |  279 ----
- arch/arm/mach-s5pv210/common.h                     |   21 +-
- arch/arm/mach-s5pv210/dev-audio.c                  |  246 ----
- arch/arm/mach-s5pv210/dma.c                        |  130 --
- arch/arm/mach-s5pv210/include/mach/debug-macro.S   |   41 -
- arch/arm/mach-s5pv210/include/mach/dma.h           |   26 -
- arch/arm/mach-s5pv210/include/mach/gpio.h          |  140 --
- arch/arm/mach-s5pv210/include/mach/hardware.h      |   18 -
- arch/arm/mach-s5pv210/include/mach/irqs.h          |  137 --
- arch/arm/mach-s5pv210/include/mach/map.h           |  158 ---
- arch/arm/mach-s5pv210/include/mach/memory.h        |   27 -
- arch/arm/mach-s5pv210/include/mach/pm-core.h       |   46 -
- arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    2 +-
- arch/arm/mach-s5pv210/include/mach/regs-gpio.h     |   41 -
- arch/arm/mach-s5pv210/include/mach/regs-irq.h      |   18 -
- arch/arm/mach-s5pv210/mach-aquila.c                |  687 ----------
- arch/arm/mach-s5pv210/mach-goni.c                  |  916 -------------
- arch/arm/mach-s5pv210/mach-smdkc110.c              |  159 ---
- arch/arm/mach-s5pv210/mach-smdkv210.c              |  337 -----
- arch/arm/mach-s5pv210/mach-torbreck.c              |  135 --
- arch/arm/mach-s5pv210/pm.c                         |  147 ++-
- arch/arm/mach-s5pv210/s5pv210.c                    |   77 ++
- arch/arm/mach-s5pv210/setup-fb-24bpp.c             |   49 -
- arch/arm/mach-s5pv210/setup-fimc.c                 |   43 -
- arch/arm/mach-s5pv210/setup-i2c0.c                 |   28 -
- arch/arm/mach-s5pv210/setup-i2c1.c                 |   28 -
- arch/arm/mach-s5pv210/setup-i2c2.c                 |   28 -
- arch/arm/mach-s5pv210/setup-ide.c                  |   39 -
- arch/arm/mach-s5pv210/setup-keypad.c               |   24 -
- arch/arm/mach-s5pv210/setup-sdhci-gpio.c           |  103 --
- arch/arm/mach-s5pv210/setup-spi.c                  |   34 -
- arch/arm/mach-s5pv210/setup-usb-phy.c              |   95 --
- arch/arm/mach-s5pv210/sleep.S                      |   36 +
- arch/arm/plat-samsung/Kconfig                      |  143 +-
- arch/arm/plat-samsung/Makefile                     |   15 -
- arch/arm/plat-samsung/clock-clksrc.c               |  212 ---
- arch/arm/plat-samsung/clock.c                      |  539 --------
- arch/arm/plat-samsung/cpu.c                        |    3 +-
- arch/arm/plat-samsung/devs.c                       |  330 -----
- arch/arm/plat-samsung/include/plat/camport.h       |   28 -
- arch/arm/plat-samsung/include/plat/clock-clksrc.h  |   83 --
- arch/arm/plat-samsung/include/plat/clock.h         |  152 ---
- arch/arm/plat-samsung/include/plat/cpu-freq-core.h |    3 -
- arch/arm/plat-samsung/include/plat/cpu.h           |   13 -
- arch/arm/plat-samsung/include/plat/devs.h          |   42 -
- arch/arm/plat-samsung/include/plat/fb-core.h       |   15 -
- arch/arm/plat-samsung/include/plat/fb.h            |   22 -
- arch/arm/plat-samsung/include/plat/fimc-core.h     |   51 -
- arch/arm/plat-samsung/include/plat/gpio-cfg.h      |   64 -
- arch/arm/plat-samsung/include/plat/hdmi.h          |   16 -
- arch/arm/plat-samsung/include/plat/irqs.h          |   72 --
- arch/arm/plat-samsung/include/plat/mfc.h           |   35 -
- arch/arm/plat-samsung/include/plat/pll.h           |  323 -----
- arch/arm/plat-samsung/include/plat/s5p-clock.h     |   65 -
- arch/arm/plat-samsung/include/plat/sdhci.h         |   47 -
- arch/arm/plat-samsung/include/plat/tv-core.h       |   44 -
- arch/arm/plat-samsung/init.c                       |    1 -
- arch/arm/plat-samsung/pm-gpio.c                    |    4 +-
- arch/arm/plat-samsung/s5p-clock.c                  |  294 -----
- arch/arm/plat-samsung/s5p-dev-mfc.c                |   81 +-
- arch/arm/plat-samsung/s5p-dev-uart.c               |   88 --
- arch/arm/plat-samsung/s5p-irq-eint.c               |  221 ----
- arch/arm/plat-samsung/s5p-irq-gpioint.c            |  218 ----
- arch/arm/plat-samsung/s5p-irq-pm.c                 |   92 --
- arch/arm/plat-samsung/s5p-irq.c                    |   31 -
- arch/arm/plat-samsung/s5p-pm.c                     |   40 -
- arch/arm/plat-samsung/s5p-sleep.S                  |   45 -
- drivers/clk/samsung/Makefile                       |    1 +
- drivers/clk/samsung/clk-s5pv210-audss.c            |  241 ++++
- drivers/clk/samsung/clk-s5pv210.c                  |  856 ++++++++++++
- drivers/cpufreq/s3c2410-cpufreq.c                  |    2 -
- drivers/cpufreq/s3c2412-cpufreq.c                  |    3 -
- drivers/cpufreq/s3c2440-cpufreq.c                  |    3 -
- drivers/cpufreq/s3c24xx-cpufreq.c                  |    1 -
- drivers/cpufreq/s5pv210-cpufreq.c                  |  131 +-
- drivers/gpio/gpio-samsung.c                        |  240 ----
- drivers/phy/Kconfig                                |   10 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-s5pv210-usb2.c                     |  187 +++
- drivers/phy/phy-samsung-usb2.c                     |    6 +
- drivers/phy/phy-samsung-usb2.h                     |    1 +
- drivers/tty/serial/samsung.c                       |    4 -
- include/dt-bindings/clock/s5pv210-audss.h          |   34 +
- include/dt-bindings/clock/s5pv210.h                |  239 ++++
- 125 files changed, 4843 insertions(+), 9409 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/clk-s5pv210-audss.txt
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
- create mode 100644 arch/arm/boot/dts/s5pv210-aquila.dts
- create mode 100644 arch/arm/boot/dts/s5pv210-goni.dts
- create mode 100644 arch/arm/boot/dts/s5pv210-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/s5pv210-smdkc110.dts
- create mode 100644 arch/arm/boot/dts/s5pv210-smdkv210.dts
- create mode 100644 arch/arm/boot/dts/s5pv210-torbreck.dts
- create mode 100644 arch/arm/boot/dts/s5pv210.dtsi
- create mode 100644 arch/arm/include/debug/s5pv210.S
- delete mode 100644 arch/arm/mach-s5pv210/Makefile.boot
- delete mode 100644 arch/arm/mach-s5pv210/clock.c
- delete mode 100644 arch/arm/mach-s5pv210/common.c
- delete mode 100644 arch/arm/mach-s5pv210/dev-audio.c
- delete mode 100644 arch/arm/mach-s5pv210/dma.c
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/dma.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/map.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/memory.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/pm-core.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-gpio.h
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-irq.h
- delete mode 100644 arch/arm/mach-s5pv210/mach-aquila.c
- delete mode 100644 arch/arm/mach-s5pv210/mach-goni.c
- delete mode 100644 arch/arm/mach-s5pv210/mach-smdkc110.c
- delete mode 100644 arch/arm/mach-s5pv210/mach-smdkv210.c
- delete mode 100644 arch/arm/mach-s5pv210/mach-torbreck.c
- create mode 100644 arch/arm/mach-s5pv210/s5pv210.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-fb-24bpp.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-fimc.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-i2c0.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-i2c1.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-i2c2.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-ide.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-keypad.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-sdhci-gpio.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-spi.c
- delete mode 100644 arch/arm/mach-s5pv210/setup-usb-phy.c
- create mode 100644 arch/arm/mach-s5pv210/sleep.S
- delete mode 100644 arch/arm/plat-samsung/clock-clksrc.c
- delete mode 100644 arch/arm/plat-samsung/clock.c
- delete mode 100644 arch/arm/plat-samsung/include/plat/camport.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/clock-clksrc.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/clock.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/fimc-core.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/hdmi.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/irqs.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/mfc.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/pll.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s5p-clock.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/tv-core.h
- delete mode 100644 arch/arm/plat-samsung/s5p-clock.c
- delete mode 100644 arch/arm/plat-samsung/s5p-dev-uart.c
- delete mode 100644 arch/arm/plat-samsung/s5p-irq-eint.c
- delete mode 100644 arch/arm/plat-samsung/s5p-irq-gpioint.c
- delete mode 100644 arch/arm/plat-samsung/s5p-irq-pm.c
- delete mode 100644 arch/arm/plat-samsung/s5p-irq.c
- delete mode 100644 arch/arm/plat-samsung/s5p-pm.c
- delete mode 100644 arch/arm/plat-samsung/s5p-sleep.S
- create mode 100644 drivers/clk/samsung/clk-s5pv210-audss.c
- create mode 100644 drivers/clk/samsung/clk-s5pv210.c
- create mode 100644 drivers/phy/phy-s5pv210-usb2.c
- create mode 100644 include/dt-bindings/clock/s5pv210-audss.h
- create mode 100644 include/dt-bindings/clock/s5pv210.h
+6) TPM reset mask patch
+http://www.spinics.net/lists/arm-kernel/msg341884.html
+ 
+ arch/arm/mach-exynos/mcpm-exynos.c |   55 ++++++++++++++++++++++++++----------
+ arch/arm/mach-exynos/pm.c          |   42 +++++++++++++++++++++++++--
+ 2 files changed, 80 insertions(+), 17 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index 2dd51cc..26670e7 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -15,6 +15,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/of_address.h>
++#include <linux/syscore_ops.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/cp15.h>
+@@ -30,6 +31,8 @@
+ #define EXYNOS5420_USE_ARM_CORE_DOWN_STATE	BIT(29)
+ #define EXYNOS5420_USE_L2_COMMON_UP_STATE	BIT(30)
+ 
++static void __iomem *ns_sram_base_addr;
++
+ /*
+  * The common v7_exit_coherency_flush API could not be used because of the
+  * Erratum 799270 workaround. This macro is the same as the common one (in
+@@ -129,11 +132,11 @@ static int exynos_power_up(unsigned int cpu, unsigned int cluster)
+  * and can only be executed on processors like A15 and A7 that hit the cache
+  * with the C bit clear in the SCTLR register.
+  */
+-static void exynos_power_down(void)
++static void exynos_mcpm_power_down(u64 residency)
+ {
+ 	unsigned int mpidr, cpu, cluster;
+ 	bool last_man = false, skip_wfi = false;
+-	unsigned int cpunr;
++	unsigned int cpunr, temp;
+ 
+ 	mpidr = read_cpuid_mpidr();
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+@@ -150,7 +153,15 @@ static void exynos_power_down(void)
+ 	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+ 	cpu_use_count[cpu][cluster]--;
+ 	if (cpu_use_count[cpu][cluster] == 0) {
+-		exynos_cpu_power_down(cpunr);
++		/*
++		 * Bypass power down for CPU0 during suspend. Check for
++		 * the SYS_PWR_REG value to decide if we are suspending
++		 * the system.
++		 */
++		temp = __raw_readl(pmu_base_addr +
++			EXYNOS5_ARM_CORE0_SYS_PWR_REG);
++		if ((cpu != 0) || ((temp & S5P_CORE_LOCAL_PWR_EN) != 0))
++			exynos_cpu_power_down(cpunr);
+ 
+ 		if (exynos_cluster_unused(cluster)) {
+ 			exynos_cluster_power_down(cluster);
+@@ -209,6 +220,11 @@ static void exynos_power_down(void)
+ 	/* Not dead at this point?  Let our caller cope. */
+ }
+ 
++static void exynos_power_down(void)
++{
++	exynos_mcpm_power_down(0);
++}
++
+ static int exynos_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+ {
+ 	unsigned int tries = 100;
+@@ -250,11 +266,11 @@ static void exynos_suspend(u64 residency)
+ {
+ 	unsigned int mpidr, cpunr;
+ 
+-	exynos_power_down();
++	exynos_mcpm_power_down(residency);
+ 
+ 	/*
+ 	 * Execution reaches here only if cpu did not power down.
+-	 * Hence roll back the changes done in exynos_power_down function.
++	 * Hence roll back the changes done in exynos_mcpm_power_down function.
+ 	 *
+ 	 * CAUTION: "This function requires the stack data to be visible through
+ 	 * power down and can only be executed on processors like A15 and A7
+@@ -319,10 +335,26 @@ static const struct of_device_id exynos_dt_mcpm_match[] = {
+ 	{},
+ };
+ 
++static void exynos_mcpm_setup_entry_point(void)
++{
++	/*
++	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
++	 * as part of secondary_cpu_start().  Let's redirect it to the
++	 * mcpm_entry_point(). This is done during both secondary boot-up as
++	 * well as system resume.
++	 */
++	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
++	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
++	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
++}
++
++static struct syscore_ops exynos_mcpm_syscore_ops = {
++	.resume	= exynos_mcpm_setup_entry_point,
++};
++
+ static int __init exynos_mcpm_init(void)
+ {
+ 	struct device_node *node;
+-	void __iomem *ns_sram_base_addr;
+ 	unsigned int value, i;
+ 	int ret;
+ 
+@@ -389,16 +421,9 @@ static int __init exynos_mcpm_init(void)
+ 		__raw_writel(value, pmu_base_addr + EXYNOS_COMMON_OPTION(i));
+ 	}
+ 
+-	/*
+-	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+-	 * as part of secondary_cpu_start().  Let's redirect it to the
+-	 * mcpm_entry_point().
+-	 */
+-	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+-	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+-	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
++	exynos_mcpm_setup_entry_point();
+ 
+-	iounmap(ns_sram_base_addr);
++	register_syscore_ops(&exynos_mcpm_syscore_ops);
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 69cf678..d2751f4 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -24,6 +24,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/mcpm.h>
+ #include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+ 
+@@ -318,7 +319,10 @@ static void exynos_pm_prepare(void)
+ 
+ 	/* ensure at least INFORM0 has the resume address */
+ 
+-	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
++	if (soc_is_exynos5420() && IS_ENABLED(CONFIG_MCPM))
++		pmu_raw_writel(virt_to_phys(mcpm_entry_point), S5P_INFORM0);
++	else
++		pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+ 
+ 	if (soc_is_exynos5420()) {
+ 		tmp = __raw_readl(pmu_base_addr + EXYNOS5_ARM_L2_OPTION);
+@@ -408,6 +412,11 @@ static void exynos_pm_resume(void)
+ 	unsigned int tmp;
+ 
+ 	if (soc_is_exynos5420()) {
++		/* Restore the CPU0 low power state register */
++		pmu_raw_writel(
++		__raw_readl(pmu_base_addr + EXYNOS5_ARM_CORE0_SYS_PWR_REG) |
++		S5P_CORE_LOCAL_PWR_EN, EXYNOS5_ARM_CORE0_SYS_PWR_REG);
++
+ 		/* Restore the sysram cpu state register */
+ 		__raw_writel(exynos5420_cpu_state,
+ 		sysram_base_addr + EXYNOS5420_CPU_STATE);
+@@ -490,6 +499,28 @@ static struct syscore_ops exynos_pm_syscore_ops = {
+ 	.resume		= exynos_pm_resume,
+ };
+ 
++static int notrace exynos_mcpm_cpu_suspend(unsigned long arg)
++{
++	/* MCPM works with HW CPU identifiers */
++	unsigned int mpidr = read_cpuid_mpidr();
++	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++
++	__raw_writel(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
++
++	mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
++
++	/*
++	 * Residency value passed to mcpm_cpu_suspend back-end
++	 * has to be given clear semantics. Set to 0 as a
++	 * temporary value.
++	 */
++	mcpm_cpu_suspend(0);
++
++	/* return value != 0 means failure */
++	return 1;
++}
++
+ /*
+  * Suspend Ops
+  */
+@@ -517,10 +548,17 @@ static int exynos_suspend_enter(suspend_state_t state)
+ 	flush_cache_all();
+ 	s3c_pm_check_store();
+ 
+-	ret = cpu_suspend(0, exynos_cpu_suspend);
++	/* Use the MCPM layer to suspend 5420 which is a multi-cluster SoC */
++	if (soc_is_exynos5420() && IS_ENABLED(CONFIG_MCPM))
++		ret = cpu_suspend(0, exynos_mcpm_cpu_suspend);
++	else
++		ret = cpu_suspend(0, exynos_cpu_suspend);
+ 	if (ret)
+ 		return ret;
+ 
++	if (soc_is_exynos5420() && IS_ENABLED(CONFIG_MCPM))
++		mcpm_cpu_powered_up();
++
+ 	s3c_pm_restore_uarts();
+ 
+ 	S3C_PMDBG("%s: wakeup stat: %08x\n", __func__,
 -- 
-1.9.3
+1.7.9.5
