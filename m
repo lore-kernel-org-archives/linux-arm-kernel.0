@@ -1,60 +1,50 @@
-From: xuwei5@hisilicon.com (xuwei)
-Date: Fri, 4 Jul 2014 16:35:42 +0800
-Subject: [PATCH] MAINTAINERS:ARM:hisi: add Hisilicon SoC family
-In-Reply-To: <53B6581C.4060001@huawei.com>
-References: <53B65397.40108@hisilicon.com> <53B6581C.4060001@huawei.com>
-Message-ID: <53B6675E.8010101@hisilicon.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 04 Jul 2014 17:41:15 +0900
+Subject: [PATCH RESEND] ARM: EXYNOS: Do not calculate boot address twice
+In-Reply-To: <1403783163-28638-1-git-send-email-k.kozlowski@samsung.com>
+References: <1403783163-28638-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <032901cf9763$b7733150$265993f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2014/7/4 15:30, Li Zefan wrote:
-> On 2014/7/4 15:11, xuwei wrote:
->>
->> Introduce a new mach-hisi that will support Hisilicon SoCs based on ARMv7
->> and I am taking maintainership for it.
->>
->> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
->> ---
->>  MAINTAINERS | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 134483f..c11c89b 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -972,6 +972,14 @@ F:	arch/arm/mach-pxa/hx4700.c
->>  F:	arch/arm/mach-pxa/include/mach/hx4700.h
->>  F:	sound/soc/pxa/hx4700.c
->>  
->> +ARM/Hisilicon SoC support
->> +M:	Wei Xu <xuwei5@hisilicon.com>
->> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> +W:	www.hisilicon.com
->> +S:	Maintained
+Krzysztof Kozlowski wrote:
 > 
-> S:	Supported ?
+> Commit b3205dea8fbf ("ARM: EXYNOS: Map SYSRAM through generic DT
+> bindings") introduced local variable boot_reg where boot address from
+> cpu_boot_reg() call is stored. Re-use it instead calling cpu_boot_reg()
+> again.
 > 
-> Supported:   Someone is actually paid to look after this.
-> Maintained:  Someone actually looks after it.
-
-Hi Zefan,
-
-Thanks!
-I will change it to "Supported".
-
-Best Regards,
-Wei
-
->> +T:	git git://github.com/hisilicon/linux-hisi.git
->> +F:	arch/arm/mach-hisi/
->> +
->>  ARM/HP JORNADA 7XX MACHINE SUPPORT
->>  M:	Kristoffer Ericson <kristoffer.ericson@gmail.com>
->>  W:	www.jlime.com
->>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/mach-exynos/platsmp.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 1c8d31e39520..55ed2e6729c5 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -155,7 +155,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  				ret = PTR_ERR(boot_reg);
+>  				goto fail;
+>  			}
+> -			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+> +			__raw_writel(boot_addr, boot_reg);
+>  		}
 > 
-> .
+>  		call_firmware_op(cpu_boot, phys_cpu);
+> @@ -242,7 +242,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
 > 
+>  			if (IS_ERR(boot_reg))
+>  				break;
+> -			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+> +			__raw_writel(boot_addr, boot_reg);
+>  		}
+>  	}
+>  }
+> --
+> 1.9.1
+
+Oh, good catch. will apply :-)
+
+Thanks,
+Kukjin
