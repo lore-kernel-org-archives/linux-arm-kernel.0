@@ -1,68 +1,217 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  4 Jul 2014 17:25:09 +0200
-Subject: [PATCH v3] efi/arm64: handle missing virtual mapping for UEFI System
- Table
-Message-ID: <1404487509-26084-1-git-send-email-ard.biesheuvel@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  4 Jul 2014 17:29:17 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+Message-ID: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we cannot resolve the virtual address of the UEFI System Table, its physical
-offset must be missing from the virtual memory map, and there is really no point
-in proceeding with installing the virtual memory map and the runtime services
-dispatch table. So back out gracefully.
+From: Thierry Reding <treding@nvidia.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+This commit introduces a generic device tree binding for IOMMU devices.
+Only a very minimal subset is described here, but it is enough to cover
+the requirements of both the Exynos System MMU and Tegra SMMU as
+discussed here:
+
+    https://lkml.org/lkml/2014/4/27/346
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/kernel/efi.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+Changes in v4:
+- clarify that disabling an IOMMU DT node may not disable translation
+- be more explicit that examples are only examples
+- add multi-ID master example
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 56c3327bbf79..e72f3100958f 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -414,13 +414,24 @@ static int __init arm64_enter_virtual_mode(void)
- 	for_each_efi_memory_desc(&memmap, md) {
- 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
- 			continue;
--		if (remap_region(md, &virt_md))
--			++count;
-+		if (!remap_region(md, &virt_md))
-+			goto err_unmap;
-+		++count;
- 	}
- 
- 	efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
--	if (efi.systab)
--		set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-+	if (!efi.systab) {
-+		/*
-+		 * If we have no virtual mapping for the System Table at this
-+		 * point, the memory map doesn't cover the physical offset where
-+		 * it resides. This means the System Table will be inaccessible
-+		 * to Runtime Services themselves once the virtual mapping is
-+		 * installed.
-+		 */
-+		pr_err("Failed to remap EFI System Table -- buggy firmware?\n");
-+		goto err_unmap;
-+	}
-+	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
- 
- 	local_irq_save(flags);
- 	cpu_switch_mm(idmap_pg_dir, &init_mm);
-@@ -453,5 +464,14 @@ static int __init arm64_enter_virtual_mode(void)
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
- 	return 0;
+Changes in v3:
+- use #iommu-cells instead of #address-cells/#size-cells
+- drop optional iommu-names property
+
+Changes in v2:
+- add notes about "dma-ranges" property (drop note from commit message)
+- document priorities of "iommus" property vs. "dma-ranges" property
+- drop #iommu-cells in favour of #address-cells and #size-cells
+- remove multiple-master device example
+
+ Documentation/devicetree/bindings/iommu/iommu.txt | 172 ++++++++++++++++++++++
+ 1 file changed, 172 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
+
+diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+new file mode 100644
+index 000000000000..464a81eaaf61
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+@@ -0,0 +1,172 @@
++This document describes the generic device tree binding for IOMMUs and their
++master(s).
 +
-+err_unmap:
-+	/* unmap all mappings that succeeded: there are 'count' of those */
-+	for (virt_md = virtmap; count--; virt_md += memmap.desc_size) {
-+		md = virt_md;
-+		iounmap((__force void __iomem *)md->virt_addr);
-+	}
-+	kfree(virtmap);
-+	return -1;
- }
- early_initcall(arm64_enter_virtual_mode);
++
++IOMMU device node:
++==================
++
++An IOMMU can provide the following services:
++
++* Remap address space to allow devices to access physical memory ranges that
++  they otherwise wouldn't be capable of accessing.
++
++  Example: 32-bit DMA to 64-bit physical addresses
++
++* Implement scatter-gather at page level granularity so that the device does
++  not have to.
++
++* Provide system protection against "rogue" DMA by forcing all accesses to go
++  through the IOMMU and faulting when encountering accesses to unmapped
++  address regions.
++
++* Provide address space isolation between multiple contexts.
++
++  Example: Virtualization
++
++Device nodes compatible with this binding represent hardware with some of the
++above capabilities.
++
++IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
++typically have a fixed association to the master device, whereas multiple-
++master IOMMU devices can translate accesses from more than one master.
++
++The device tree node of the IOMMU device's parent bus must contain a valid
++"dma-ranges" property that describes how the physical address space of the
++IOMMU maps to memory. An empty "dma-ranges" property means that there is a
++1:1 mapping from IOMMU to memory.
++
++Required properties:
++--------------------
++- #iommu-cells: The number of cells in an IOMMU specifier needed to encode an
++  address.
++
++The meaning of the IOMMU specifier is defined by the device tree binding of
++the specific IOMMU. Below are a few examples of typical use-cases:
++
++- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
++  therefore no additional information needs to be encoded in the specifier.
++  This may also apply to multiple master IOMMU devices that do not allow the
++  association of masters to be configured. Note that an IOMMU can by design
++  be multi-master yet only expose a single master in a given configuration.
++  In such cases the number of cells will usually be 1 as in the next case.
++- #iommu-cells = <1>: Multiple master IOMMU devices may need to be configured
++  in order to enable translation for a given master. In such cases the single
++  address cell corresponds to the master device's ID. In some cases more than
++  one cell can be required to represent a single master ID.
++- #iommu-cells = <4>: Some IOMMU devices allow the DMA window for masters to
++  be configured. The first cell of the address in this may contain the master
++  device's ID for example, while the second cell could contain the start of
++  the DMA window for the given device. The length of the DMA window is given
++  by the third and fourth cells.
++
++Note that these are merely examples and real-world use-cases may use different
++definitions to represent their individual needs. Always refer to the specific
++IOMMU binding for the exact meaning of the cells that make up the specifier.
++
++
++IOMMU master node:
++==================
++
++Devices that access memory through an IOMMU are called masters. A device can
++have multiple master interfaces (to one or more IOMMU devices).
++
++Required properties:
++--------------------
++- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
++  master interfaces of the device. One entry in the list describes one master
++  interface of the device.
++
++When an "iommus" property is specified in a device tree node, the IOMMU will
++be used for address translation. If a "dma-ranges" property exists in the
++device's parent node it will be ignored. An exception to this rule is if the
++referenced IOMMU is disabled, in which case the "dma-ranges" property of the
++parent shall take effect. Note that merely disabling a device tree node does
++not guarantee that the IOMMU is really disabled since the hardware may not
++have a means to turn off translation.
++
++
++Notes:
++======
++
++One possible extension to the above is to use an "iommus" property along with
++a "dma-ranges" property in a bus device node (such as PCI host bridges). This
++can be useful to describe how children on the bus relate to the IOMMU if they
++are not explicitly listed in the device tree (e.g. PCI devices). However, the
++requirements of that use-case haven't been fully determined yet. Implementing
++this is therefore not recommended without further discussion and extension of
++this binding.
++
++
++Examples:
++=========
++
++Single-master IOMMU:
++--------------------
++
++	iommu {
++		#iommu-cells = <0>;
++	};
++
++	master {
++		iommus = <&/iommu>;
++	};
++
++Multiple-master IOMMU with fixed associations:
++----------------------------------------------
++
++	/* multiple-master IOMMU */
++	iommu {
++		/*
++		 * Masters are statically associated with this IOMMU and
++		 * address translation is always enabled.
++		 */
++		#iommu-cells = <0>;
++	};
++
++	/* static association with IOMMU */
++	master at 1 {
++		reg = <1>;
++		iommus = <&/iommu>;
++	};
++
++	/* static association with IOMMU */
++	master at 2 {
++		reg = <2>;
++		iommus = <&/iommu>;
++	};
++
++Multiple-master IOMMU:
++----------------------
++
++	iommu {
++		/* the specifier represents the ID of the master */
++		#iommu-cells = <1>;
++	};
++
++	master at 1 {
++		/* device has master ID 42 in the IOMMU */
++		iommus = <&/iommu 42>;
++	};
++
++	master at 2 {
++		/* device has master IDs 23 and 24 in the IOMMU */
++		iommus = <&/iommu 23>, <&/iommu 24>;
++	};
++
++Multiple-master IOMMU with configurable DMA window:
++---------------------------------------------------
++
++	/ {
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		iommu {
++			/* master ID, address and length of DMA window */
++			#iommu-cells = <4>;
++		};
++
++		master {
++			/* master ID 42, 4 GiB DMA window starting at 0 */
++			iommus = <&/iommu  42  0  0x1 0x0>;
++		};
++	};
 -- 
-1.8.3.2
+2.0.1
