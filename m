@@ -1,42 +1,226 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 4 Jul 2014 14:52:10 +0900
-Subject: [PATCH] regulator: convert to use gpio_desc internally
-In-Reply-To: <CACRpkdb5BNr=c90x1N3foppK8jJ2nRTsr72VmDmxqBdh_hCMAA@mail.gmail.com>
-References: <E1X1IOQ-0007fV-1w@rmk-PC.arm.linux.org.uk>
- <CACRpkdY_w=Vjv0fL5Ay-CkCpvuyjvwyBhOd4wYr0LcmJD6i4qA@mail.gmail.com>
- <20140630163931.GD32514@n2100.arm.linux.org.uk>
- <CACRpkda5BjAwphVEkCg6-oUR0yN=RMhjP6FL=Oripy7bQ-aSng@mail.gmail.com>
- <CAAVeFuK8YPFh3gHRt7_n00SBN6raGj2KxU_rY3GFrQq4dT3LTA@mail.gmail.com>
- <20140701111041.GL23300@sirena.org.uk>
- <CAAVeFuLc9GVMXQt=6oSkcHwH4ZpoOQkpj7uivUHZW+UkmEdDrw@mail.gmail.com>
- <CACRpkdb5BNr=c90x1N3foppK8jJ2nRTsr72VmDmxqBdh_hCMAA@mail.gmail.com>
-Message-ID: <CAAVeFuJU3nGoVkA-Ag7rEf=WM524WD0S+60r05a_H+9+VDz4Hg@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 4 Jul 2014 14:52:44 +0900
+Subject: [PATCH 4/4] drivers: dma-contiguous: add initialization from
+ device tree
+In-Reply-To: <1404298132-6050-5-git-send-email-m.szyprowski@samsung.com>
+References: <1404298132-6050-1-git-send-email-m.szyprowski@samsung.com>
+ <1404298132-6050-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <00b501cf974c$2db1a800$8914f800$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 7:07 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jul 1, 2014 at 2:27 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
->> On Tue, Jul 1, 2014 at 8:10 PM, Mark Brown <broonie@kernel.org> wrote:
->>> On Tue, Jul 01, 2014 at 09:59:01AM +0900, Alexandre Courbot wrote:
->
->>> I don't see security as a big deal - so long as normal, well written
->>> code gets the benefit of the access protection I think we're doing
->>> enough.  If something jumpst through hoops to bypass it then it's buggy
->>> but fundamentally we have to trust the kernel to at least some extent.
->>
->> The security consideration apart, making GPIOs obtained through gpiod
->> shareable seems to be a good way to solve the issue we are having
->> here.
->>
->> Linus, if you agree with the idea I can try to give it a shot sometime
->> this week.
->
-> I'm game for this approach. I hope this can get Russell's original
-> problem out of the way.
 
-Great, I will give it a shot then. Could you let me know what you
-think about my patch series that moves the different GPIO APIs into
-their own files, so I know which base I should work on? IMHO if we are
-to implement different behaviors for the integer and descriptor
-interfaces, it makes all the more sense to have them in different
-source files.
+
+> -----Original Message-----
+> From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
+> Sent: Wednesday, July 02, 2014 7:49 PM
+> To: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linaro-mm-sig at lists.linaro.org; devicetree at vger.kernel.org; linux-
+> doc at vger.kernel.org
+> Cc: Marek Szyprowski; Benjamin Herrenschmidt; Arnd Bergmann; Michal
+> Nazarewicz; Grant Likely; Tomasz Figa; Sascha Hauer; Laura Abbott; Rob
+> Herring; Olof Johansson; Pawel Moll; Mark Rutland; Stephen Warren; Ian
+> Campbell; Tomasz Figa; Kumar Gala; Nishanth Peethambaran; Marc; Josh
+> Cartwright; Catalin Marinas; Will Deacon; Paul Mackerras; Jon Medhurst;
+> Joonsoo Kim; Aneesh Kumar K.V.; Andrew Morton
+> Subject: [PATCH 4/4] drivers: dma-contiguous: add initialization from
+> device tree
+> 
+> Add a code to create CMA region from reserved memory and add support for
+> handling 'shared-dma-pool' reserved-memory device tree nodes.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/base/dma-contiguous.c | 67
+> +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/cma.h           |  3 ++
+>  mm/cma.c                      | 69
+++++++++++++++++++++++++++++++++-----------
+>  3 files changed, 122 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 6606abdf880c..b77ea8bac176 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -211,3 +211,70 @@ bool dma_release_from_contiguous(struct device *dev,
+> struct page *pages,
+>  {
+>  	return cma_release(dev_get_cma_area(dev), pages, count);
+>  }
+> +
+> +/*
+> + * Support for reserved memory regions defined in device tree
+> + */
+> +#ifdef CONFIG_OF_RESERVED_MEM
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/of_reserved_mem.h>
+> +
+> +#undef pr_fmt
+> +#define pr_fmt(fmt) fmt
+> +
+> +static void rmem_cma_device_init(struct reserved_mem *rmem, struct device
+> *dev)
+> +{
+> +	struct cma *cma = rmem->priv;
+> +	dev_set_cma_area(dev, cma);
+> +}
+> +
+> +static void rmem_cma_device_release(struct reserved_mem *rmem,
+> +				    struct device *dev)
+> +{
+> +	dev_set_cma_area(dev, NULL);
+> +}
+> +
+> +static const struct reserved_mem_ops rmem_cma_ops = {
+> +	.device_init	= rmem_cma_device_init,
+> +	.device_release = rmem_cma_device_release,
+> +};
+> +
+> +static int __init rmem_cma_setup(struct reserved_mem *rmem)
+> +{
+> +	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1,
+> pageblock_order);
+> +	phys_addr_t mask = align - 1;
+> +	unsigned long node = rmem->fdt_node;
+> +	struct cma *cma;
+> +	int err;
+> +
+> +	if (!of_get_flat_dt_prop(node, "reusable", NULL) ||
+> +	    of_get_flat_dt_prop(node, "no-map", NULL))
+> +		return -EINVAL;
+> +
+> +	if ((rmem->base & mask) || (rmem->size & mask)) {
+> +		pr_err("Reserved memory: incorrect alignment of CMA
+> region\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
+> +	if (err) {
+> +		pr_err("Reserved memory: unable to setup CMA region\n");
+> +		return err;
+> +	}
+> +	/* Architecture specific contiguous memory fixup. */
+> +	dma_contiguous_early_fixup(rmem->base, rmem->size);
+> +
+> +	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
+> +		dma_contiguous_set_default(cma);
+> +
+> +	rmem->ops = &rmem_cma_ops;
+> +	rmem->priv = cma;
+> +
+> +	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld
+> MiB\n",
+> +		&rmem->base, (unsigned long)rmem->size / SZ_1M);
+> +
+> +	return 0;
+> +}
+> +RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
+> +#endif
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index 32cab7a425f9..9a18a2b1934c 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -16,6 +16,9 @@ extern int __init cma_declare_contiguous(phys_addr_t
+> size,
+>  			phys_addr_t base, phys_addr_t limit,
+>  			phys_addr_t alignment, unsigned int order_per_bit,
+>  			bool fixed, struct cma **res_cma);
+> +extern int cma_init_reserved_mem(phys_addr_t size,
+> +					phys_addr_t base, int order_per_bit,
+> +					struct cma **res_cma);
+>  extern struct page *cma_alloc(struct cma *cma, int count, unsigned int
+> align);
+>  extern bool cma_release(struct cma *cma, struct page *pages, int count);
+>  #endif
+> diff --git a/mm/cma.c b/mm/cma.c
+> index 4b251b037e1b..c3d84016d432 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -140,6 +140,54 @@ static int __init cma_init_reserved_areas(void)
+>  core_initcall(cma_init_reserved_areas);
+> 
+>  /**
+> + * cma_init_reserved_mem() - create custom contiguous area from reserved
+> memory
+> + * @base: Base address of the reserved area
+> + * @size: Size of the reserved area (in bytes),
+> + * @order_per_bit: Order of pages represented by one bit on bitmap.
+> + * @res_cma: Pointer to store the created cma region.
+> + *
+> + * This function creates custom contiguous area from already reserved
+> memory.
+> + */
+> +int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+> +				 int order_per_bit, struct cma **res_cma)
+> +{
+> +	struct cma *cma;
+> +	phys_addr_t alignment;
+> +
+> +	/* Sanity checks */
+> +	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+> +		pr_err("Not enough slots for CMA reserved regions!\n");
+> +		return -ENOSPC;
+> +	}
+> +
+> +	if (!size || !memblock_is_region_reserved(base, size))
+> +		return -EINVAL;
+> +
+> +	/* ensure minimal alignment requied by mm core */
+> +	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+> +
+> +	/* alignment should be aligned with order_per_bit */
+> +	if (!IS_ALIGNED(alignment >> PAGE_SHIFT, 1 << order_per_bit))
+> +		return -EINVAL;
+> +
+> +	if (ALIGN(base, alignment) != base || ALIGN(size, alignment) !=
+> size)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Each reserved area must be initialised later, when more kernel
+> +	 * subsystems (like slab allocator) are available.
+> +	 */
+> +	cma = &cma_areas[cma_area_count];
+> +	cma->base_pfn = PFN_DOWN(base);
+> +	cma->count = size >> PAGE_SHIFT;
+> +	cma->order_per_bit = order_per_bit;
+> +	*res_cma = cma;
+> +	cma_area_count++;
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+>   * cma_declare_contiguous() - reserve custom contiguous area
+>   * @base: Base address of the reserved area optional, use 0 for any
+>   * @size: Size of the reserved area (in bytes),
+> @@ -162,18 +210,12 @@ int __init cma_declare_contiguous(phys_addr_t base,
+>  			phys_addr_t alignment, unsigned int order_per_bit,
+>  			bool fixed, struct cma **res_cma)
+>  {
+> -	struct cma *cma;
+> -	int ret = 0;
+> +	int ret;
+> 
+>  	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
+>  		__func__, (unsigned long)size, (unsigned long)base,
+>  		(unsigned long)limit, (unsigned long)alignment);
+> 
+> -	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+> -		pr_err("Not enough slots for CMA reserved regions!\n");
+> -		return -ENOSPC;
+> -	}
+> -
+
+Hello, Marek.
+
+After this change, if we have not enough cma_areas, memory will leak.
+I think that we need separate function to check constraint and this
+function should be called before reserving memory in
+cma_declare_contiguous().
+
+BTW, this mail doesn't appear in LKML. What happens? :)
+
+Thanks.
