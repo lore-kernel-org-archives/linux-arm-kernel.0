@@ -1,36 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 4 Jul 2014 09:08:53 +0200
-Subject: [PATCH] pinctrl: sunxi: Remove gpio_out function from sun5i-a13
- PG0/1/2 pins
-In-Reply-To: <1404228308-22783-1-git-send-email-wens@csie.org>
-References: <1404228308-22783-1-git-send-email-wens@csie.org>
-Message-ID: <20140704070853.GJ31996@lukather>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 4 Jul 2014 15:11:04 +0800
+Subject: [PATCH] pinctrl: sunxi: Fix multi bank interrupt support in
+ gpio_to_irq
+In-Reply-To: <20140704070355.GI31996@lukather>
+References: <1404144299-740-1-git-send-email-wens@csie.org>
+ <20140704070355.GI31996@lukather>
+Message-ID: <CAGb2v67ZNsq9J1Fs3uURJbDPvCvPUDm6rYXq=FfuZCAo1HtaRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 4, 2014 at 3:03 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Jul 01, 2014 at 12:04:59AM +0800, Chen-Yu Tsai wrote:
+>> When mapping the interrupts, the gpio_to_irq function did not consider
+>> the bank number of the gpio pin in question, only the offset or the
+>> interrupt number in the bank. As a result, requests for interrupts in
+>> the later banks get mapped to the first bank.
+>>
+>> This issue was discovered while enabling mmc on the new sun8i platform.
+>> The tablet I have uses a pin/interrupt from the second bank to do mmc
+>> card detection. Tested on this very device with register inspection and
+>> actual mmc card insertion/removal.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Linus, could this be merged as a fix for 3.16?
 
-On Tue, Jul 01, 2014 at 11:25:08PM +0800, Chen-Yu Tsai wrote:
-> The A13 user manual states pins PG0/1/2 only have GPIO input and
-> interrupt functions. Remove the gpio_out functions for these pins.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Aren't your multi-bank external interrupt patches queued for 3.17?
+This patch applies over them.
 
-Good catch!
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/8008aa6f/attachment.sig>
+ChenYu
