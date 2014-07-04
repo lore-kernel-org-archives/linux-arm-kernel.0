@@ -1,44 +1,46 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 4 Jul 2014 20:37:52 +0530
-Subject: [RFC PATCH 0/2] phy: core: better support for multi-phy in phy-core
-Message-ID: <1404486474-28312-1-git-send-email-kishon@ti.com>
+Date: Fri, 4 Jul 2014 20:37:53 +0530
+Subject: [RFC PATCH 1/2] phy: core: Fix of_phy_provider_lookup to return PHY
+ provider for sub node
+In-Reply-To: <1404486474-28312-1-git-send-email-kishon@ti.com>
+References: <1404486474-28312-1-git-send-email-kishon@ti.com>
+Message-ID: <1404486474-28312-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multi-phy PHY providers, each PHY should be modeled as sub-node of PHY
-provider. So it makes sense for the controller node to have the phandle for
-the sub-node instead of the PHY-provider node in the 'phy' property.
+Fixed of_phy_provider_lookup to return 'phy_provider' if _of_phy_get
+passes the node pointer of the sub-node of phy provider node. This is
+needed when phy provider implements multiple PHYs and each PHY is
+modelled as the sub-node of PHY provider device node.
 
-This patch series added support so that the controller node can have the
-phandle to the sub-node. So if the phy specifier does not have any other
-fields other than the phandle (and the PHY driver uses the default xlate),
-phy_get will return the correct PHY.
-However if the phy_sepcifier has other fields and the PHY driver provides
-its own xlate, the PHY driver can use the *phy->dev.of_node*. (note that
-now phy->dev.of_node will have the node pointer of the sub-node).
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/phy/phy-core.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Kishon Vijay Abraham I (2):
-  phy: core: Fix of_phy_provider_lookup to return PHY provider for sub
-    node
-  phy: core: the node pointer of PHY need not be the same as that of
-    PHY provider
-
- Documentation/phy.txt               |   10 ++++++----
- drivers/phy/phy-bcm-kona-usb2.c     |    2 +-
- drivers/phy/phy-core.c              |   35 +++++++++++++++++++++++++++--------
- drivers/phy/phy-exynos-dp-video.c   |    2 +-
- drivers/phy/phy-exynos-mipi-video.c |    2 +-
- drivers/phy/phy-exynos5-usbdrd.c    |    3 ++-
- drivers/phy/phy-exynos5250-sata.c   |    2 +-
- drivers/phy/phy-mvebu-sata.c        |    2 +-
- drivers/phy/phy-omap-usb2.c         |    2 +-
- drivers/phy/phy-samsung-usb2.c      |    3 ++-
- drivers/phy/phy-sun4i-usb.c         |    2 +-
- drivers/phy/phy-ti-pipe3.c          |    2 +-
- drivers/phy/phy-twl4030-usb.c       |    2 +-
- drivers/phy/phy-xgene.c             |    2 +-
- include/linux/phy/phy.h             |   15 ++++++++++-----
- 15 files changed, 57 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index c64a2f3..a4a1f783 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -86,10 +86,18 @@ static struct phy *phy_lookup(struct device *device, const char *port)
+ static struct phy_provider *of_phy_provider_lookup(struct device_node *node)
+ {
+ 	struct phy_provider *phy_provider;
++	struct device_node *child;
+ 
+ 	list_for_each_entry(phy_provider, &phy_provider_list, list) {
+-		if (phy_provider->dev->of_node == node)
++		if (phy_provider->dev->of_node != node) {
++			for_each_child_of_node(phy_provider->dev->of_node,
++				child) {
++				if (child == node)
++					return phy_provider;
++			}
++		} else {
+ 			return phy_provider;
++		}
+ 	}
+ 
+ 	return ERR_PTR(-EPROBE_DEFER);
 -- 
 1.7.9.5
