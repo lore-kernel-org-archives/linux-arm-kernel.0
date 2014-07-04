@@ -1,27 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Jul 2014 12:12:22 +0200
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140704092519.GC21766@n2100.arm.linux.org.uk>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
- <20140704085745.GB16404@arm.com>
- <20140704092519.GC21766@n2100.arm.linux.org.uk>
-Message-ID: <7255305.EKPTbfD3OE@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 4 Jul 2014 03:13:02 -0700
+Subject: [PATCH] arm64: KVM: export demux regids as KVM_REG_ARM64
+In-Reply-To: <53B2DA42.40604@arm.com>
+References: <1404229993-14522-1-git-send-email-alex.bennee@linaro.org>
+ <53B2DA42.40604@arm.com>
+Message-ID: <20140704101302.GD20451@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 July 2014 10:25:19 Russell King - ARM Linux wrote:
-> Moreover, when you download from the play store, you are only presented
-> with the version which is appropriate for your device - when you buy a
-> new device, and you re-fetch your apps, you don't get the same version
-> that you've had on previous device if there's one more appropriate for
-> your new device.
+On Tue, Jul 01, 2014 at 04:56:50PM +0100, Marc Zyngier wrote:
+> On 01/07/14 16:53, Alex Benn?e wrote:
+> > I suspect this is a -ECUTPASTE fault from the initial implementation. If
+> > we don't declare the register ID to be KVM_REG_ARM64 the KVM_GET_ONE_REG
+> > implementation kvm_arm_get_reg() returns -EINVAL and hilarity ensues.
+> > 
+> > The kvm/api.txt document describes all arm64 registers as starting with
+> > 0x60xx... (i.e KVM_REG_ARM64).
+> > 
+> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/kvm/sys_regs.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> > index 0324458..5ee99e4 100644
+> > --- a/arch/arm64/kvm/sys_regs.c
+> > +++ b/arch/arm64/kvm/sys_regs.c
+> > @@ -962,7 +962,7 @@ static unsigned int num_demux_regs(void)
+> >  
+> >  static int write_demux_regids(u64 __user *uindices)
+> >  {
+> > -	u64 val = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
+> > +	u64 val = KVM_REG_ARM64 | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
+> >  	unsigned int i;
+> >  
+> >  	val |= KVM_REG_ARM_DEMUX_ID_CCSIDR;
+> > 
+> 
+> -EBROWNPAPERBAG.
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+Applied to kvmarm/master,
 
-This is certainly true, but at the same time the device makers have
-a valid interest in making as many apps as possible be enabled without
-requiring a recompile. If it becomes known that device A supports 90%
-of the popular apps while device B only supports 70% of the same apps
-(until they get recompiled), the decision whether to put emulation in
-or not is more about maximizing revenue than about theoretical
-correctness.
-
-	Arnd
+thanks.
