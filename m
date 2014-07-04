@@ -1,39 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Jul 2014 20:51:34 +0100
-Subject: [PATCH 0/4] ABI updates
-Message-ID: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 04 Jul 2014 20:52:02 +0100
+Subject: [PATCH 1/4] ARM: alignment: save last kernel aligned fault location
+In-Reply-To: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+Message-ID: <E1X39Wc-0000lm-Gm@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a result of the recent discussions about android, several issues
-have been identified with existing kernels:
+Save and report (via the procfs file) the last kernel unaligned fault
+location.  This allows us to trivially inspect where the last fault
+happened for cases which we don't expect to occur.
 
-1. HWCAP_SWP does not properly reflect whether the SWP instruction
-   should be used.  Turn HWCAP_SWP off on ARMv6+ where the exclusives
-   are available.
+Since we expect the kernel to generate misalignment faults (due to
+the networking layer), even when warnings are enabled, we don't log
+them for the kernel.
 
-2. SWP is unsafe when running on a SMP CPU; there is no bus locking
-   between the read and write parts of the instruction execution.
-   Force SWP emulation on ARMv7+ where we can disable the SWP
-   instruction.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/alignment.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-3. Reporting of alignment faults - kernel mode faults are silent due to
-   the requirements of the network stack, but we can note where the
-   last one occurs.
-
-Testing reveals that at least my OMAP4430 userspace (supplied from TI)
-executes lots of SWP instructions, which is something that wasn't known
-before this patch.
-
-Many systems today are not configured with SWP emulation enabled on SMP.
-This means that the SWP instruction is available, but unsafe.
-
- arch/arm/kernel/setup.c       | 29 ++++++++++++++++++++++-------
- arch/arm/kernel/swp_emulate.c |  4 ++++
- arch/arm/mm/Kconfig           |  2 +-
- arch/arm/mm/alignment.c       |  4 +++-
- 4 files changed, 30 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index b8cb1a2688a0..0c1ab49e5f7b 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -76,6 +76,7 @@
+ 
+ static unsigned long ai_user;
+ static unsigned long ai_sys;
++static void *ai_sys_last_pc;
+ static unsigned long ai_skipped;
+ static unsigned long ai_half;
+ static unsigned long ai_word;
+@@ -130,7 +131,7 @@ static const char *usermode_action[] = {
+ static int alignment_proc_show(struct seq_file *m, void *v)
+ {
+ 	seq_printf(m, "User:\t\t%lu\n", ai_user);
+-	seq_printf(m, "System:\t\t%lu\n", ai_sys);
++	seq_printf(m, "System:\t\t%lu (%pF)\n", ai_sys, ai_sys_last_pc);
+ 	seq_printf(m, "Skipped:\t%lu\n", ai_skipped);
+ 	seq_printf(m, "Half:\t\t%lu\n", ai_half);
+ 	seq_printf(m, "Word:\t\t%lu\n", ai_word);
+@@ -794,6 +795,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 		goto user;
+ 
+ 	ai_sys += 1;
++	ai_sys_last_pc = (void *)instruction_pointer(regs);
+ 
+  fixup:
+ 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
