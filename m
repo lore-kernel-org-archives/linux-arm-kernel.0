@@ -1,75 +1,42 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Fri, 4 Jul 2014 17:00:36 +0530
-Subject: [PATCH v3 3/8] component: add support for component match array
-In-Reply-To: <20140704105258.GF21766@n2100.arm.linux.org.uk>
-References: <CAK5sBcEupbnzpxskD8D7wXbFRfU+4gh5oDE9X-SvkZEQ2+dQ_w@mail.gmail.com>
- <20140704105258.GF21766@n2100.arm.linux.org.uk>
-Message-ID: <CAK5sBcFof_QvDouNOUD1SVqPucMQ+wW4u_jxguCqDgO=zD7_Og@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 04 Jul 2014 13:32:09 +0200
+Subject: [PATCH] ARM: dts: exynos5410: Fill in CPU clock-frequency
+In-Reply-To: <53A7DCF8.4090108@samsung.com>
+References: <1403466596-3347-1-git-send-email-afaerber@suse.de>
+ <53A7DCF8.4090108@samsung.com>
+Message-ID: <53B690B9.2090906@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 4:22 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 04, 2014 at 04:17:35PM +0530, Sachin Kamat wrote:
->> Hi Russell
+Am 23.06.2014 09:53, schrieb Tarek Dakhran:
+> On 06/22/2014 11:49 PM, Andreas F?rber wrote:
+>> It's 1.6 GHz for the Cortex-A15.
 >>
->> > +int component_master_add_with_match(struct device *dev,
->> > +       const struct component_master_ops *ops,
->> > +       struct component_match *match)
->> >  {
->> >         struct master *master;
->> >         int ret;
->> >
->> > +       if (ops->add_components && match)
->> > +               return -EINVAL;
->> > +
->> > +       /* Reallocate the match array for its true size */
->> > +       match = component_match_realloc(dev, match, match->num);
+>> Avoids warnings like "/cpus/cpu at 0 missing clock-frequency property".
 >>
->>            ^^^^^^^^^^^^^
->> This gives a NULL pointer dereference error when match is NULL (as passed
->> by component_master_add() below). Observed this while testing linux-next
->> kernel (next-20140704) on Exynos based board with DRM enabled.
->
-> Thanks for your report.  Please verify that the patch below resolves it
-> for you.  Thanks.
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>   arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5410.dtsi
+>> b/arch/arm/boot/dts/exynos5410.dtsi
+>> index 3839c26..9d0b8cc 100644
+>> --- a/arch/arm/boot/dts/exynos5410.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+>> @@ -28,24 +28,28 @@
+>>               device_type = "cpu";
+>>               compatible = "arm,cortex-a15";
+>>               reg = <0x0>;
+>> +            clock-frequency = <1600000000>;
+>>   
+> 
+> Reviewed-by: Tarek Dakhran<t.dakhran@samsung.com>
 
-Yes, the below patch fixes the crash. Thanks for the fix.
+Ping? Seems really trivial...
 
-
->
->  drivers/base/component.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/base/component.c b/drivers/base/component.c
-> index b4236daed4fa..f748430bb654 100644
-> --- a/drivers/base/component.c
-> +++ b/drivers/base/component.c
-> @@ -293,10 +293,12 @@ int component_master_add_with_match(struct device *dev,
->         if (ops->add_components && match)
->                 return -EINVAL;
->
-> -       /* Reallocate the match array for its true size */
-> -       match = component_match_realloc(dev, match, match->num);
-> -       if (IS_ERR(match))
-> -               return PTR_ERR(match);
-> +       if (match) {
-> +               /* Reallocate the match array for its true size */
-> +               match = component_match_realloc(dev, match, match->num);
-> +               if (IS_ERR(match))
-> +                       return PTR_ERR(match);
-> +       }
->
->         master = kzalloc(sizeof(*master), GFP_KERNEL);
->         if (!master)
->
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-
-
+Andreas
 
 -- 
-Regards,
-Sachin.
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
