@@ -1,56 +1,85 @@
-From: yibin.gong@freescale.com (Yibin Gong)
-Date: Fri, 4 Jul 2014 06:58:36 +0000
-Subject: [PATCH] ARM: dts: imx: correct sdma compatbile for imx6sl and
- imx6sx
-In-Reply-To: <1404456361-8197-1-git-send-email-shawn.guo@freescale.com>
-References: <1404456361-8197-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <3bc5acd7986946c88860e542a0c07b7c@BLUPR03MB036.namprd03.prod.outlook.com>
+From: mark.roszko@gmail.com (Marek Roszko)
+Date: Fri,  4 Jul 2014 03:03:11 -0400
+Subject: [PATCH] i2c:at91: add bound checking on smbus block length bytes
+Message-ID: <1404457391-22330-1-git-send-email-mark.roszko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Robin Gong <yibin.gong@freescale.com>
+The driver was not bound checking the recieved length byte to ensure it was less than
+the buffer size that is allocated for smbus blocks. This resulted in buffer overflows
+whenever an invalid byte was recieved.
+It also failed to ensure the byte count was not zero. If it recieved zero, it would end up
+in an infinite loop as the at91_twi_read_next_byte function returned immediately without
+allowing RHR to be read to clear the RXRDY interrupt.
 
------Original Message-----
-From: Shawn Guo [mailto:shawn.guo at freescale.com] 
-Sent: Friday, July 04, 2014 2:46 PM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Gong Yibin-B38343; Estevam Fabio-R49496; Guo Shawn-R65073
-Subject: [PATCH] ARM: dts: imx: correct sdma compatbile for imx6sl and imx6sx
+Tested agaisnt a smbus battery.
 
-The SDMA on imx6sl and imx6sx is more compatible with imx6q one than imx35.  Let's use "fsl,imx6q-sdma" instead of "fsl,imx35-sdma", so that SDMA ROM script on imx6sl and imx6sx can work for audio driver just like the case of imx6q.
-
-Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
 ---
-Thanks to Robin for finding this out.
+ drivers/i2c/busses/i2c-at91.c |   28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
 
- arch/arm/boot/dts/imx6sl.dtsi | 2 +-
- arch/arm/boot/dts/imx6sx.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi index c0ee12f1f171..0467ac064e9d 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -608,7 +608,7 @@
- 			};
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index e95f9ba..ec4ff33 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -101,6 +101,7 @@ struct at91_twi_dev {
+ 	unsigned twi_cwgr_reg;
+ 	struct at91_twi_pdata *pdata;
+ 	bool use_dma;
++	bool recv_len_abort;
+ 	struct at91_twi_dma dma;
+ };
  
- 			sdma: sdma at 020ec000 {
--				compatible = "fsl,imx6sl-sdma", "fsl,imx35-sdma";
-+				compatible = "fsl,imx6sl-sdma", "fsl,imx6q-sdma";
- 				reg = <0x020ec000 0x4000>;
- 				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SL_CLK_SDMA>,
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi index 92d48becdb45..0c5094adedfa 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -706,7 +706,7 @@
- 			};
+@@ -267,12 +268,24 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
+ 	*dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
+ 	--dev->buf_len;
  
- 			sdma: sdma at 020ec000 {
--				compatible = "fsl,imx6sx-sdma", "fsl,imx35-sdma";
-+				compatible = "fsl,imx6sx-sdma", "fsl,imx6q-sdma";
- 				reg = <0x020ec000 0x4000>;
- 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_SDMA>,
---
-1.8.3.2
++	/* return if aborting, we only needed to read RHR to clear RXRDY*/
++	if (dev->recv_len_abort)
++		return;
++
+ 	/* handle I2C_SMBUS_BLOCK_DATA */
+ 	if (unlikely(dev->msg->flags & I2C_M_RECV_LEN)) {
+-		dev->msg->flags &= ~I2C_M_RECV_LEN;
+-		dev->buf_len += *dev->buf;
+-		dev->msg->len = dev->buf_len + 1;
+-		dev_dbg(dev->dev, "received block length %d\n", dev->buf_len);
++		/* ensure length byte is a valid value */
++		if (*dev->buf <= I2C_SMBUS_BLOCK_MAX && *dev->buf > 0) {
++			dev->msg->flags &= ~I2C_M_RECV_LEN;
++			dev->buf_len += *dev->buf;
++			dev->msg->len = dev->buf_len + 1;
++			dev_dbg(dev->dev, "received block length %d\n",
++					 dev->buf_len);
++		} else {
++			/* abort and send the stop by reading one more byte */
++			dev->recv_len_abort = true;
++			dev->buf_len = 1;
++		}
+ 	}
+ 
+ 	/* send stop if second but last byte has been read */
+@@ -444,6 +457,12 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 		ret = -EIO;
+ 		goto error;
+ 	}
++	if (dev->recv_len_abort) {
++		dev_err(dev->dev, "invalid smbus block length recvd\n");
++		ret = -EPROTO;
++		goto error;
++	}
++
+ 	dev_dbg(dev->dev, "transfer complete\n");
+ 
+ 	return 0;
+@@ -500,6 +519,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+ 	dev->buf_len = m_start->len;
+ 	dev->buf = m_start->buf;
+ 	dev->msg = m_start;
++	dev->recv_len_abort = false;
+ 
+ 	ret = at91_do_twi_transfer(dev);
+ 
+-- 
+1.7.10.4
