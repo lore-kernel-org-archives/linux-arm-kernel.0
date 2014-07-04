@@ -1,54 +1,30 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 04 Jul 2014 10:05:58 +0200
-Subject: [PATCH] ARM: dts: Add I2S dt node for Exynos3250
-In-Reply-To: <1404373939-10510-1-git-send-email-cw00.choi@samsung.com>
-References: <1404373939-10510-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53B66066.4030202@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Jul 2014 09:07:51 +0100
+Subject: [PATCH RFC] arm64: eBPF JIT compiler
+In-Reply-To: <CABg9mcuCQHXacgq-C7A=G5GH_p7b0TxCYB8A9qXvGJSoSbjs5A@mail.gmail.com>
+References: <1404278424-31176-1-git-send-email-zlim.lnx@gmail.com>
+ <20140703091450.GB12958@arm.com>
+ <CABg9mcuCQHXacgq-C7A=G5GH_p7b0TxCYB8A9qXvGJSoSbjs5A@mail.gmail.com>
+Message-ID: <20140704080751.GA23379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
-
-On 03.07.2014 09:52, Chanwoo Choi wrote:
-> From: Tomasz Figa <t.figa@samsung.com>
+On Fri, Jul 04, 2014 at 07:56:54AM +0100, Z Lim wrote:
+> On Thu, Jul 3, 2014 at 2:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Does this sound remotely feasible?
 > 
-> This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
-> (1 channels) IIS-bus for audio interface with DMA-based operation.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Tested-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index 1f8384f..e9017ef 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -644,6 +644,19 @@
->  			status = "disabled";
->  		};
->  
-> +		i2s: i2s at 13970000 {
+> So I looked at insn.c and the only overlap at this point is B/BL codegen.
+> A whole lot more, e.g. arithmetic, logical, and memory ops, will need
+> to be shuffled in.
 
-Shouldn't the label be rather called "i2s2" as the pinctrl entry below
-suggests?
+Yup, the more the merrier. I just want to avoid having N subtley different
+encoders/decoders, as this stuff tends to be hard to review and easy to make
+small mistakes.
 
-> +			compatible = "samsung,s3c6410-i2s";
-> +			reg = <0x13970000 0x100>;
-> +			interrupts = <0 126 0>;
-> +			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
-> +			clock-names = "iis", "i2s_opclk0";
-> +			dmas = <&pdma0 14>, <&pdma0 13>;
-> +			dma-names = "tx", "rx";
-> +			pinctrl-0 = <&i2s2_bus>;
-> +			pinctrl-name = "default";
+> Let me address Alexei's review comments and send out a v2.
+> After that, I can take a stab at consolidating bpf_jit.h into
+> insn.{c,h}. Sounds good to you?
 
-"pinctrl-name" is not a valid property. I suppose it should be
-"pinctrl-names".
+Perfect.
 
-Best regards,
-Tomasz
+Will
