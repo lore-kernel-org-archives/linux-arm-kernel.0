@@ -1,204 +1,187 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Jul 2014 11:44:58 +0200
-Subject: [PATCH 3/8] clk: mvebu: extend clk-cpu for dynamic frequency scaling
+Date: Fri,  4 Jul 2014 11:44:57 +0200
+Subject: [PATCH 2/8] cpufreq: add driver for Armada XP
 In-Reply-To: <1404467103-29644-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404467103-29644-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404467103-29644-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404467103-29644-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the existing clk-cpu driver used on Marvell Armada
-XP platforms to support the dynamic frequency scaling of the CPU
-clock. Non-dynamic frequency change was already supported (and used
-before secondary CPUs are started), but the dynamic frequency change
-requires a completely different procedure.
+This commit adds a simple cpufreq driver for the Armada XP SoC, which
+has one separately controllable clock for each CPU. For this reason,
+the existing cpufreq-cpu0 generic driver cannot be used because it
+currently assumes that there is only one clock controlling the
+frequency of all CPUs.
 
-In order to achieve this, the clk_cpu_set_rate() function is reworked
-to handle two separate cases:
+There are on-going discussions on extending the cpufreq-cpu0 to cover
+the case of having one clock for each CPU, but there are still some
+unresolved issues to get this extended cpufreq-cpu0 driver merged. In
+the mean time, we propose to have an Armada XP specific cpufreq
+driver, and since the choice of the cpufreq driver does not affect the
+DT binding at all, it will always be time to get rid of this
+SoC-specific driver and use a more generic one when it becomes
+available.
 
- - The case where the clock is enabled, which is the new dynamic
-   frequency change code, implemented in clk_cpu_on_set_rate(). This
-   part will be used for cpufreq activities.
+In terms of implementation, this cpufreq driver supports two
+frequencies: the nominal frequency of the CPU (which cannot be
+hardcoded, since it can be changed through Sample At Reset pins) and
+half of this frequency. The frequency change itself is implemented by
+simply calling clk_set_rate() on the appropriate CPU clock.
 
- - The case where the clock is disabled, which is the existing
-   frequency change code, moved in clk_cpu_off_set_rate(). This part
-   is already used to set the clock frequency of the secondary CPUs
-   before starting them.
-
-In order to implement the dynamic frequency change function, we need
-to access the PMU DFS registers, which are outside the currently
-mapped "Clock Complex" registers, so a new area of registers is now
-mapped. This affects the Device Tree binding, but we are careful to do
-it in a backward-compatible way (by allowing the second pair of
-registers to be non-existent, and in this case, ensuring
-clk_cpu_on_set_rate() returns an error).
-
-Note that technically speaking, the clk_cpu_on_set_rate() does not do
-the entire procedure needed to change the frequency dynamically, as it
-involves touching a number of PMSU registers. This is done through a
-clock notifier registered by the PMSU driver in followup commits.
-
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  5 +-
- drivers/clk/mvebu/clk-cpu.c                        | 79 ++++++++++++++++++++--
- 2 files changed, 77 insertions(+), 7 deletions(-)
+ drivers/cpufreq/Kconfig.arm        |   6 ++
+ drivers/cpufreq/Makefile           |   1 +
+ drivers/cpufreq/armadaxp-cpufreq.c | 112 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 119 insertions(+)
+ create mode 100644 drivers/cpufreq/armadaxp-cpufreq.c
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-index feb8301..99c2146 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-@@ -3,14 +3,15 @@ Device Tree Clock bindings for cpu clock of Marvell EBU platforms
- Required properties:
- - compatible : shall be one of the following:
- 	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
--- reg : Address and length of the clock complex register set
-+- reg : Address and length of the clock complex register set, followed
-+        by address and length of the PMU DFS registers
- - #clock-cells : should be set to 1.
- - clocks : shall be the input parent clock phandle for the clock.
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index ebac671..825b273 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -24,6 +24,12 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+           This add the CPUfreq driver support for Versatile Express
+ 	  big.LITTLE platforms using SPC for power management.
  
- cpuclk: clock-complex at d0018700 {
- 	#clock-cells = <1>;
- 	compatible = "marvell,armada-xp-cpu-clock";
--	reg = <0xd0018700 0xA0>;
-+	reg = <0xd0018700 0xA0>, <0x1c054 0x10>;
- 	clocks = <&coreclk 1>;
- }
++config ARM_ARMADAXP_CPUFREQ
++	bool "Marvell Armada XP"
++	depends on MACH_ARMADA_XP
++	default y
++	help
++	  This adds the CPUFreq driver for Marvell Armada XP SoC.
  
-diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-index 8ebf757..b931e72 100644
---- a/drivers/clk/mvebu/clk-cpu.c
-+++ b/drivers/clk/mvebu/clk-cpu.c
-@@ -16,10 +16,18 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/delay.h>
-+#include <asm/smp_plat.h>
+ config ARM_EXYNOS_CPUFREQ
+ 	bool
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 738c8b7..e260a0c 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -49,6 +49,7 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
+ # LITTLE drivers, so that it is probed last.
+ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
  
--#define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
--#define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
--#define SYS_CTRL_CLK_DIVIDER_MASK	    0x3F
-+#define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET               0x0
-+#define   SYS_CTRL_CLK_DIVIDER_CTRL_RESET_ALL          0xff
-+#define   SYS_CTRL_CLK_DIVIDER_CTRL_RESET_SHIFT        8
-+#define SYS_CTRL_CLK_DIVIDER_CTRL2_OFFSET              0x8
-+#define   SYS_CTRL_CLK_DIVIDER_CTRL2_NBCLK_RATIO_SHIFT 16
-+#define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET              0xC
-+#define SYS_CTRL_CLK_DIVIDER_MASK                      0x3F
++obj-$(CONFIG_ARM_ARMADAXP_CPUFREQ)	+= armadaxp-cpufreq.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= davinci-cpufreq.o
+ obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
+diff --git a/drivers/cpufreq/armadaxp-cpufreq.c b/drivers/cpufreq/armadaxp-cpufreq.c
+new file mode 100644
+index 0000000..e59581f
+--- /dev/null
++++ b/drivers/cpufreq/armadaxp-cpufreq.c
+@@ -0,0 +1,112 @@
++/*
++ * Copyright (C) 2014 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+#define PMU_DFS_RATIO_SHIFT 16
-+#define PMU_DFS_RATIO_MASK  0x3F
- 
- #define MAX_CPU	    4
- struct cpu_clk {
-@@ -28,6 +36,7 @@ struct cpu_clk {
- 	const char *clk_name;
- 	const char *parent_name;
- 	void __iomem *reg_base;
-+	void __iomem *pmu_dfs;
- };
- 
- static struct clk **clks;
-@@ -62,8 +71,9 @@ static long clk_cpu_round_rate(struct clk_hw *hwclk, unsigned long rate,
- 	return *parent_rate / div;
- }
- 
--static int clk_cpu_set_rate(struct clk_hw *hwclk, unsigned long rate,
--			    unsigned long parent_rate)
-+static int clk_cpu_off_set_rate(struct clk_hw *hwclk, unsigned long rate,
-+				unsigned long parent_rate)
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/cpufreq.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
 +
- {
- 	struct cpu_clk *cpuclk = to_cpu_clk(hwclk);
- 	u32 reg, div;
-@@ -95,6 +105,58 @@ static int clk_cpu_set_rate(struct clk_hw *hwclk, unsigned long rate,
- 	return 0;
- }
- 
-+static int clk_cpu_on_set_rate(struct clk_hw *hwclk, unsigned long rate,
-+			       unsigned long parent_rate)
++#define MAX_CPU_CLKS 4
++
++struct priv {
++	struct clk *cpu_clks[MAX_CPU_CLKS];
++} priv;
++
++#define STATE_CPU_FREQ    0x01
++#define STATE_FABRIC_FREQ 0x02
++
++static struct cpufreq_frequency_table armadaxp_freq_table[] = {
++	{0, STATE_CPU_FREQ,	0},
++	{0, STATE_FABRIC_FREQ,	0},
++	{0, 0,			CPUFREQ_TABLE_END},
++};
++
++static unsigned int armadaxp_cpufreq_get_cpu_frequency(unsigned int cpu)
 +{
-+	u32 reg;
-+	unsigned long fabric_div, target_div, cur_rate;
-+	struct cpu_clk *cpuclk = to_cpu_clk(hwclk);
++	return clk_get_rate(priv.cpu_clks[cpu]) / 1000;
++}
 +
-+	/*
-+	 * PMU DFS registers are not mapped, Device Tree does not
-+	 * describes them. We cannot change the frequency dynamically.
-+	 */
-+	if (!cpuclk->pmu_dfs)
-+		return -ENODEV;
-+
-+	cur_rate = __clk_get_rate(hwclk->clk);
-+
-+	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL2_OFFSET);
-+	fabric_div = (reg >> SYS_CTRL_CLK_DIVIDER_CTRL2_NBCLK_RATIO_SHIFT) &
-+		SYS_CTRL_CLK_DIVIDER_MASK;
-+
-+	/* Frequency is going up */
-+	if (rate == 2 * cur_rate)
-+		target_div = fabric_div / 2;
-+	/* Frequency is going down */
-+	else
-+		target_div = fabric_div;
-+
-+	if (target_div == 0)
-+		target_div = 1;
-+
-+	reg = readl(cpuclk->pmu_dfs);
-+	reg &= ~(PMU_DFS_RATIO_MASK << PMU_DFS_RATIO_SHIFT);
-+	reg |= (target_div << PMU_DFS_RATIO_SHIFT);
-+	writel(reg, cpuclk->pmu_dfs);
-+
-+	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
-+	reg |= (SYS_CTRL_CLK_DIVIDER_CTRL_RESET_ALL <<
-+		SYS_CTRL_CLK_DIVIDER_CTRL_RESET_SHIFT);
-+	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
-+
++static int armadaxp_cpufreq_target(struct cpufreq_policy *policy,
++			    unsigned int index)
++{
++	clk_set_rate(priv.cpu_clks[policy->cpu],
++		     armadaxp_freq_table[index].frequency * 1000);
 +	return 0;
 +}
 +
-+static int clk_cpu_set_rate(struct clk_hw *hwclk, unsigned long rate,
-+			    unsigned long parent_rate)
++static int armadaxp_cpufreq_cpu_init(struct cpufreq_policy *policy)
 +{
-+	if (__clk_is_enabled(hwclk->clk))
-+		return clk_cpu_on_set_rate(hwclk, rate, parent_rate);
-+	else
-+		return clk_cpu_off_set_rate(hwclk, rate, parent_rate);
++	if (!cpu_online(policy->cpu))
++		return -ENODEV;
++	policy->cpuinfo.transition_latency = 5000;
++	return cpufreq_table_validate_and_show(policy, armadaxp_freq_table);
 +}
 +
- static const struct clk_ops cpu_ops = {
- 	.recalc_rate = clk_cpu_recalc_rate,
- 	.round_rate = clk_cpu_round_rate,
-@@ -105,6 +167,7 @@ static void __init of_cpu_clk_setup(struct device_node *node)
- {
- 	struct cpu_clk *cpuclk;
- 	void __iomem *clock_complex_base = of_iomap(node, 0);
-+	void __iomem *pmu_dfs_base = of_iomap(node, 1);
- 	int ncpus = 0;
- 	struct device_node *dn;
- 
-@@ -114,6 +177,10 @@ static void __init of_cpu_clk_setup(struct device_node *node)
- 		return;
- 	}
- 
-+	if (pmu_dfs_base == NULL)
-+		pr_warn("%s: pmu-dfs base register not set, dynamic frequency scaling not available\n",
-+			__func__);
++static struct cpufreq_driver armadaxp_cpufreq_driver = {
++	.flags	= CPUFREQ_NEED_INITIAL_FREQ_CHECK,
++	.get	= armadaxp_cpufreq_get_cpu_frequency,
++	.verify	= cpufreq_generic_frequency_table_verify,
++	.target_index = armadaxp_cpufreq_target,
++	.init	= armadaxp_cpufreq_cpu_init,
++	.name	= "armadaxp-cpufreq",
++	.attr	= cpufreq_generic_attr,
++};
 +
- 	for_each_node_by_type(dn, "cpu")
- 		ncpus++;
- 
-@@ -146,6 +213,8 @@ static void __init of_cpu_clk_setup(struct device_node *node)
- 		cpuclk[cpu].clk_name = clk_name;
- 		cpuclk[cpu].cpu = cpu;
- 		cpuclk[cpu].reg_base = clock_complex_base;
-+		if (pmu_dfs_base)
-+			cpuclk[cpu].pmu_dfs = pmu_dfs_base + 4 * cpu;
- 		cpuclk[cpu].hw.init = &init;
- 
- 		init.name = cpuclk[cpu].clk_name;
++static int armadaxp_cpufreq_probe(struct platform_device *pdev)
++{
++	struct device_node *np;
++	unsigned long cpu_freq;
++	int i;
++
++	for (i = 0; i < MAX_CPU_CLKS; i++) {
++		np = of_get_cpu_node(i, NULL);
++		if (!np)
++			continue;
++
++		priv.cpu_clks[i] = of_clk_get(np, 0);
++		of_node_put(np);
++	}
++
++	cpu_freq = clk_get_rate(priv.cpu_clks[0]) / 1000;
++
++	/*
++	 * The available frequencies are the nominal CPU frequency,
++	 * and half of it, which is the fabric frequency.
++	 */
++	armadaxp_freq_table[0].frequency = cpu_freq;
++	armadaxp_freq_table[1].frequency = cpu_freq / 2;
++
++	return cpufreq_register_driver(&armadaxp_cpufreq_driver);
++
++}
++
++static int armadaxp_cpufreq_remove(struct platform_device *pdev)
++{
++	cpufreq_unregister_driver(&armadaxp_cpufreq_driver);
++	return 0;
++}
++
++static struct platform_driver armadaxp_cpufreq_platform_driver = {
++	.probe = armadaxp_cpufreq_probe,
++	.remove = armadaxp_cpufreq_remove,
++	.driver = {
++		.name = "armadaxp-cpufreq",
++		.owner = THIS_MODULE,
++	},
++};
++
++module_platform_driver(armadaxp_cpufreq_platform_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com");
++MODULE_DESCRIPTION("cpufreq driver for Marvell's Armada XP CPU");
++MODULE_ALIAS("platform:armadaxp-cpufreq");
 -- 
 2.0.0
