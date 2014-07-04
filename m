@@ -1,59 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Jul 2014 12:21 +0200
-Subject: [PATCH] arm64: PCI(e) arch support
-In-Reply-To: <20140704094440.GC6501@e106497-lin.cambridge.arm.com>
-References: <1404422876-1160-1-git-send-email-tinamdar@apm.com>
- <53B5F81B.8010801@freescale.com>
- <20140704094440.GC6501@e106497-lin.cambridge.arm.com>
-Message-ID: <4342569.JSAyWBcJn2@wuerfel>
+From: jhbird.choi@samsung.com (Jonghwan Choi)
+Date: Fri, 04 Jul 2014 19:22:40 +0900
+Subject: [PATCH] thermal: Add missing cpumask_clear
+Message-ID: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 July 2014 10:44:40 Liviu Dudau wrote:
-> On Fri, Jul 04, 2014 at 01:40:59AM +0100, Prabhakar Kushwaha wrote:
-> > Hi Tanmay, Liviu,
-> > On 7/4/2014 2:57 AM, Tanmay Inamdar wrote:
-> > > Reposting on request of several people since previously posted one was
-> > > corrupted.
-> > >
-> > > This patch adds the arch support for PCI(e) for arm64. The files
-> > > added or modified in this patch are based on PCI(e) support in
-> > > 32bit arm.
-> > >
-> > > Please note that this patch is just for the reference. Liviu Dudau from ARM
-> > > has posted his v8 series of patch to support PCIe in arm64.
-> > >
-> > > The patch will apply against 3.13 Linux Kernel
-> > >
-> > > Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> > >
-> > 
-> > do we foresee similar type of changes in u-boot  to support PCI(e) for 
-> > ARM64.
-> 
-> I'm afraid I'm not familiar with u-boot's support for PCI(e), so I cannot
-> answer that. As a general matter, ARM has decided to officially support
-> UEFI as a bootloader for ARMv8 and that already has support for PCI(e),
-> one only needs a driver for the specific host bridge.
+Cpumasks should be cleared before using.
 
-Supporting just one boot loader is of course a bit silly, especially when
-you know that people will be using all sorts of boot loaders.
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ drivers/thermal/db8500_cpufreq_cooling.c        |    1 +
+ drivers/thermal/imx_thermal.c                   |    1 +
+ drivers/thermal/samsung/exynos_thermal_common.c |    1 +
+ 3 files changed, 3 insertions(+)
 
-A more interesting aspect of this question is what the kernel can expect
-the boot loader to have done with the PCI host bridge when the kernel
-is entered.
-
-Traditionally, embedded ARM boot loaders have left the PCI host bridge
-alone unless they were booting from it, and Linux did all the setup.
-With the SBSA class of ARM servers, this is not really practical, and
-whatever runs before Linux (typically UEFI) should already set up the
-PCI bus and do resource allocation like every other server architecture
-does. I would assume that UEFI does this right, and if not we can consider
-that a bug.
-
-However, what do we do about PCI hosts that can be used with different
-kinds of systems? Do we assume that they all do PCI resource allocation?
-Can we decide this on a per host driver basis, or do we need to introduce
-an extension to the PCI DT binding to make that decision?
-
-	Arnd
+diff --git a/drivers/thermal/db8500_cpufreq_cooling.c b/drivers/thermal/db8500_cpufreq_cooling.c
+index 786d192..1fa46ff 100644
+--- a/drivers/thermal/db8500_cpufreq_cooling.c
++++ b/drivers/thermal/db8500_cpufreq_cooling.c
+@@ -34,6 +34,7 @@ static int db8500_cpufreq_cooling_probe(struct platform_device *pdev)
+ 	if (!cpufreq_frequency_get_table(0))
+ 		return -EPROBE_DEFER;
+ 
++	cpumask_clear(&mask_val);
+ 	cpumask_set_cpu(0, &mask_val);
+ 	cdev = cpufreq_cooling_register(&mask_val);
+ 
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index a99c631..a21acf8 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -449,6 +449,7 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 	regmap_write(map, MISC0 + REG_SET, MISC0_REFTOP_SELBIASOFF);
+ 	regmap_write(map, TEMPSENSE0 + REG_SET, TEMPSENSE0_POWER_DOWN);
+ 
++	cpumask_clear(&clip_cpus);
+ 	cpumask_set_cpu(0, &clip_cpus);
+ 	data->cdev = cpufreq_cooling_register(&clip_cpus);
+ 	if (IS_ERR(data->cdev)) {
+diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
+index 3f5ad25..47efa4c 100644
+--- a/drivers/thermal/samsung/exynos_thermal_common.c
++++ b/drivers/thermal/samsung/exynos_thermal_common.c
+@@ -361,6 +361,7 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
+ 		return -ENOMEM;
+ 
+ 	th_zone->sensor_conf = sensor_conf;
++	cpumask_clear(&mask_val);
+ 	/*
+ 	 * TODO: 1) Handle multiple cooling devices in a thermal zone
+ 	 *	 2) Add a flag/name in cooling info to map to specific
+-- 
+1.7.10.4
