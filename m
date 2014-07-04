@@ -1,72 +1,282 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 4 Jul 2014 10:39:34 +0800
-Subject: [PATCH 0/4] Migrate PXA27x platforms to clock framework
-In-Reply-To: <87lhsanl7q.fsf@free.fr>
-References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
- <7034630.fvV46PN35C@wuerfel> <877g3yp7ie.fsf@free.fr>
- <CAN1soZyu192Y7z-HJHo+3_bddFcf=H0udgJSWez1=Lmrb5wVfg@mail.gmail.com>
- <87lhsanl7q.fsf@free.fr>
-Message-ID: <CAN1soZwtuyWQhuLO4pK6aB51ibGjAHZN3+VDyAFMfU3gBfxdxg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 4 Jul 2014 10:40:56 +0800
+Subject: [PATCH 05/18] power: reset: Add AT91 reset driver
+In-Reply-To: <20140703145957.GH31996@lukather>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
+ <F9547E0F-AB97-47E6-BA09-135EE4E1BC73@jcrosoft.com>
+ <20140703145957.GH31996@lukather>
+Message-ID: <12CC7818-BC48-4FD2-8663-F30F1AEC5477@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 6:14 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
->
->>> Haojian, are you ok with that ? And BTW, does a combined kernel for PXA
->>> platforms even exists (mixing pxa3xx and pxa2xx for example) ?
->>>
->>
->> It's acceptable to me that different silicons are queued in different stages.
->> I only request that it won't break the compiler building & bootup.
-> OK.
->
->>
->> But I think that the pxa clock driver may be shared among all PXA silicons
->> except for the clock table. What's your opinion?
-> I don't think so because of the core clocks.
-> These ones are specific to each pxa, and so their computation is :
->  - pxa25x plays with CCCR and specific L, M and N2 multiplication tables
->  - pxa27x plays with CCCR and specific L, M and N2 multiplication tables
->  - pxa3xx plays with ASCR, MEMCLKCFG, and AC97 div
->
-> I don't see very well how a clock table could describe that. Do you have
-> something specific in mind ?
->
 
-As I remember, those registers bits are encoded. So we can define a clock mux
-that connected to those fixed clock dividers. Then the clock gate is
-the child of
-the clock mux.
+On Jul 3, 2014, at 10:59 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-In DTS file, peripheral device node could specify a clock rate. In
-peripheral device
-driver, it could also change the clock rate by clk_set_rate().
+> On Thu, Jul 03, 2014 at 10:39:08PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> +++ b/drivers/power/reset/at91-reset.c
+>>> @@ -0,0 +1,202 @@
+>>> +/*
+>>> + * Atmel AT91 SAM9 SoCs reset code
+>>> + *
+>>> + * Copyright (C) 2014 Maxime Ripard
+>>> + *
+>>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> 
+>> you can not own the copyright as it?s basically a copy of other
+>> people code
+> 
+> The previous names are missing, right.
+> 
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2.  This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#include <linux/io.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/reboot.h>
+>>> +
+>>> +#include <asm/system_misc.h>
+>>> +
+>>> +#include <mach/at91sam9_ddrsdr.h>
+>>> +#include <mach/at91sam9_sdramc.h>
+>>> +
+>>> +#define AT91_RSTC_CR	0x00		/* Reset Controller Control Register */
+>>> +#define	AT91_RSTC_PROCRST	BIT(0)		/* Processor Reset */
+>>> +#define	AT91_RSTC_PERRST	BIT(2)		/* Peripheral Reset */
+>>> +#define	AT91_RSTC_EXTRST	BIT(3)		/* External Reset */
+>>> +#define	AT91_RSTC_KEY		(0xa5 << 24)	/* KEY Password */
+>>> +
+>>> +#define AT91_RSTC_SR	0x04		/* Reset Controller Status Register */
+>>> +#define	AT91_RSTC_URSTS		BIT(0)		/* User Reset Status */
+>>> +#define	AT91_RSTC_RSTTYP	GENMASK(10, 8)	/* Reset Type */
+>>> +#define	AT91_RSTC_NRSTL		BIT(16)		/* NRST Pin Level */
+>>> +#define	AT91_RSTC_SRCMP		BIT(17)		/* Software Reset Command in Progress */
+>>> +
+>>> +#define AT91_RSTC_MR	0x08		/* Reset Controller Mode Register */
+>>> +#define	AT91_RSTC_URSTEN	BIT(0)		/* User Reset Enable */
+>>> +#define	AT91_RSTC_URSTIEN	BIT(4)		/* User Reset Interrupt Enable */
+>>> +#define	AT91_RSTC_ERSTL		GENMASK(11, 8)	/* External Reset Length */
+>>> +
+>>> +enum reset_type {
+>>> +	RESET_TYPE_GENERAL	= 0,
+>>> +	RESET_TYPE_WAKEUP	= 1,
+>>> +	RESET_TYPE_WATCHDOG	= 2,
+>>> +	RESET_TYPE_SOFTWARE	= 3,
+>>> +	RESET_TYPE_USER		= 4,
+>>> +};
+>>> +
+>>> +static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+>>> +
+>>> +static void at91sam9_restart(enum reboot_mode mode, const char *cmd)
+>>> +{
+>>> +	asm volatile(
+>>> +		".balign 32\n\t"
+>>> +
+>>> +		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
+>>> +		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
+>>> +		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
+>>> +
+>>> +		"b	.\n\t"
+>>> +		:
+>>> +		: "r" (at91_ramc_base[0]),
+>>> +		  "r" (at91_rstc_base),
+>>> +		  "r" (1),
+>>> +		  "r" (AT91_SDRAMC_LPCB_POWER_DOWN),
+>>> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST));
+>>> +}
+>>> +
+>>> +static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+>>> +{
+>>> +	asm volatile(
+>>> +		"cmp	%1, #0\n\t"
+>>> +		"beq	1f\n\t"
+>>> +
+>>> +		"ldr	r0, [%1]\n\t"
+>>> +		"cmp	r0, #0\n\t"
+>>> +
+>>> +		".balign 32\n\t"
+>>> +
+>>> +		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>>> +		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+>>> +
+>>> +		"	b	.\n\t"
+>>> +		:
+>>> +		: "r" (at91_ramc_base[0]),
+>>> +		  "r" (at91_ramc_base[1]),
+>>> +		  "r" (at91_rstc_base),
+>>> +		  "r" (1),
+>>> +		  "r" (AT91_DDRSDRC_LPCB_POWER_DOWN),
+>>> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST)
+>>> +		: "r0");
+>>> +}
+>>> +
+>> move this to an assembly file more easy to read than a C code
+> 
+> Nope. It's a pain to pass variable to an external assembly file, and
+> this makes the use of global variable pretty much mandatory, which is
+> definitely not great.
 
->>>> Also (for my understanding) when you say that you plan to do
->>>> pxa25x and pxa3xx next, does that include pxa26x and pxa93x?
->>> I don't have the Technical Reference Manuals for these ones so the answer is
->>> no. And Google wasn't a great friend at providing them.
->>>
->>
->> Converting them into new clock driver may not rely on the reference manual.
-> Actually I went through the code and :
->  - pxa26x is only a superset of pxa25x with one more clock : pxa26x-gpio
->  - pxa93x is the same clock set as pxa3xx, right ?
-> So if I convert pxa25x, pxa27x and pxa3xx I'll cover everything, right ?
->
->>>> I assume it does as they are apparently minor revisions of the
->>>> former, but it's not completely clear from your description.
->>> My description doesn't mention them, as I have no information about them, nor
->>> any hardware to test on.
->>>
->>
->> We can request others to help testing in the mailing list.
-> That's exactly what will enable pxa25x and pxa3xx. I have them converted in my
-> tree, but I don't want to mix these patches in as I can't test them, and testing
-> brings in bigger delays.
+Not at all I did for the PM slow clock code just write a function and pas it as a parameter
+you have 3
 
-Delay shouldn't be the block issue.
+so basically you have to use the current and just pass at91_ramc_base[0], at91_ramc_base[1]
+and at91_rstc_base
+it?s 3 lignes of modification, if you have at91_ramc_base and at91_ramc_base same
 
-Regards
-Haojian
+so NACK
+> 
+>> 
+>>> +static void __init at91_reset_status(struct platform_device *pdev)
+>>> +{
+>>> +	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+>>> +	char *reason;
+>>> +
+>>> +	switch ((reg & AT91_RSTC_RSTTYP) >> 8) {
+>>> +	case RESET_TYPE_GENERAL:
+>>> +		reason = "general reset";
+>>> +		break;
+>>> +	case RESET_TYPE_WAKEUP:
+>>> +		reason = "wakeup";
+>>> +		break;
+>>> +	case RESET_TYPE_WATCHDOG:
+>>> +		reason = "watchdog reset";
+>>> +		break;
+>>> +	case RESET_TYPE_SOFTWARE:
+>>> +		reason = "software reset";
+>>> +		break;
+>>> +	case RESET_TYPE_USER:
+>>> +		reason = "user reset";
+>>> +		break;
+>>> +	default:
+>>> +		reason = "unknown reset";
+>>> +		break;
+>>> +	}
+>>> +
+>>> +	pr_info("AT91: Starting after %s\n", reason);
+>>> +}
+>>> +
+>>> +static struct of_device_id at91_ramc_of_match[] = {
+>>> +	{ .compatible = "atmel,at91sam9260-sdramc", },
+>>> +	{ .compatible = "atmel,at91sam9g45-ddramc", },
+>>> +	{ /* sentinel */ }
+>>> +};
+>>> +
+>>> +static struct of_device_id at91_reset_of_match[] = {
+>>> +	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_restart },
+>>> +	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+>>> +	{ /* sentinel */ }
+>>> +};
+>>> +
+>>> +static int at91_reset_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct resource *res;
+>>> +
+>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
+>>> +	if (IS_ERR(at91_rstc_base)) {
+>>> +		dev_err(&pdev->dev, "Could not map reset controller address\n");
+>>> +		return PTR_ERR(at91_rstc_base);
+>>> +	}
+>>> +
+>>> +	if (pdev->dev.of_node) {
+>> 
+>> split in 2 function more easy to ready and less indentation
+> 
+> ok.
+> 
+>>> +		const struct of_device_id *match;
+>>> +		struct device_node *np;
+>>> +		int idx = 0;
+>>> +
+>>> +		for_each_matching_node(np, at91_ramc_of_match) {
+>>> +			at91_ramc_base[idx] = of_iomap(np, 0);
+>>> +			if (!at91_ramc_base[idx]) {
+>>> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+>>> +				return -ENODEV;
+>>> +			}
+>>> +			idx++;
+>>> +		}
+>> 
+>> and if you can not probe the ram controler it?s a panic not a -ENODEV
+>> 
+>> as you have an unstable platform
+> 
+> I don't really see why. That the pm code and the reset code won't be
+> able to work, it's obvious. But making the assumption that the
+> platforms don't have a RAM properly setup just because it doesn't have
+> a DT node seems quite weak.
+
+no as if you do not have the RAMC your reset will cause hardware issue as there is a bug
+in the SoC so yes mandatory as 95% of the people will not known why there board will suddenly
+do not reboot. As this specific reset in assembly was write to run from cache to fix a SoC bug
+in the reset controller
+> 
+>>> +
+>>> +		match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+>>> +		arm_pm_restart = match->data;
+>>> +	} else {
+>>> +		const struct platform_device_id *match;
+>>> +		int idx = 0;
+>>> +
+>>> +		for (idx = 0; idx < 2; idx++) {
+>>> +			res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
+>>> +			at91_ramc_base[idx] = devm_ioremap_resource(&pdev->dev, res);
+>>> +			if (IS_ERR(at91_ramc_base[idx])) {
+>>> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+>>> +				return PTR_ERR(at91_rstc_base);
+>>> +			}
+>>> +		}
+>>> +
+>>> +		match = platform_get_device_id(pdev);
+>>> +		arm_pm_restart = (void (*)(enum reboot_mode, const char*))
+>>> +			match->driver_data;
+>>> +	}
+>>> +
+>>> +	at91_reset_status(pdev);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct platform_device_id at91_reset_plat_match[] = {
+>>> +	{ "at91-sam9-reset", (unsigned long)at91sam9_restart },
+>>> +	{ "at91-g45-reset", (unsigned long)at91sam9g45_restart },
+>> 	    at91-sam9???
+>> 
+>> 	    from the beginning of DT we put the first SoC were the
+>> 	    reset was introduce and why do you change the DT binding?
+> 
+> Except that this is not about DT probing, but the old-style board
+> files one.
+> 
+
+except that in al the other driver such as FBDEV we use the same principle for platform_device
+
+Best Regards,
+J.
+
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 842 bytes
+Desc: Message signed with OpenPGP using GPGMail
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140704/5d81698f/attachment-0001.sig>
