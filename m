@@ -1,44 +1,47 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri,  4 Jul 2014 20:43:14 +0800
-Subject: [PATCH] ARM: pxa: remove unnecessary pxa3xx io mapping
-Message-ID: <1404477794-14927-1-git-send-email-haojian.zhuang@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 04 Jul 2014 16:48:42 +0400
+Subject: [PATCH v2 2/2] ARM: dts: at_xdmac: add bindings documentation
+In-Reply-To: <1404459370-3540-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1404459370-3540-1-git-send-email-ludovic.desroches@atmel.com>
+ <1404459370-3540-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <53B6A2AA.4000202@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[    0.000000] BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc
-space
+Hello.
 
-UNCACHED PHYS io mapping is redundant of PXA3xx (PXA930). So remove it
-from pxa3xx/pxa93x series.
+On 07/04/2014 11:36 AM, Ludovic Desroches wrote:
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mach-pxa/generic.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+> Add bindings documentation for the new Atmel DMA controller (XDMAC)
+> introduced with SAMA5D4.
 
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index 94f49c2..b52f8f2 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -83,7 +83,11 @@ static struct map_desc common_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(0x40000000),
- 		.length		= 0x02000000,
- 		.type		= MT_DEVICE
--	}, {	/* UNCACHED_PHYS_0 */
-+	}
-+};
-+
-+static struct map_desc pxa2xx_io_desc[] __initdata = {
-+	{	/* UNCACHED_PHYS_0 */
- 		.virtual	= 0xff000000,
- 		.pfn		= __phys_to_pfn(0x00000000),
- 		.length		= 0x00100000,
-@@ -95,4 +99,6 @@ void __init pxa_map_io(void)
- {
- 	debug_ll_io_init();
- 	iotable_init(ARRAY_AND_SIZE(common_io_desc));
-+	if (cpu_is_pxa2xx())
-+		iotable_init(ARRAY_AND_SIZE(pxa2xx_io_desc));
- }
--- 
-1.9.1
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>   .../devicetree/bindings/dma/atmel-xdma.txt         |   39 ++++++++++++++++++++
+>   1 file changed, 39 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+
+> diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> new file mode 100644
+> index 0000000..1e09fda
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+[...]
+> +DMA clients connected to the Atmel XDMA controller must use the format
+> +described in the dma.txt file, using a three-cell specifier for each channel:
+> +a phandle plus two integer cells.
+
+    Specifiers do not include phandle.
+
+> +The two cells in order are:
+
+    s/two/three/?
+
+> +
+> +1. A phandle pointing to the DMA controller.
+> +2. The memory interface (16 most significant bits), the peripheral interface
+> +(16 less significant bits).
+> +3. Channel configuration register. Configurable fields are:
+> +  - bit 30-24: PERID, peripheral identifier.
+
+WBR, Sergei
