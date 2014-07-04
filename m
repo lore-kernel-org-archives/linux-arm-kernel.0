@@ -1,25 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 Jul 2014 23:22:44 +0200
-Subject: [PATCH V5 1/3] gpio: Add APM X-Gene SoC GPIO controller support
-In-Reply-To: <CACRpkdY9MYWx5uG0jCb7TR59wd0+nKBhJruyD2TE6YKgeAX6Uw@mail.gmail.com>
-References: <1403823587-23404-1-git-send-email-fkan@apm.com>
- <1403823587-23404-2-git-send-email-fkan@apm.com>
- <CACRpkdY9MYWx5uG0jCb7TR59wd0+nKBhJruyD2TE6YKgeAX6Uw@mail.gmail.com>
-Message-ID: <CACRpkdY-5rqR1pkojJALEu7AZYK6UYeDa7XR_EABOKCJGek2HQ@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Sat, 5 Jul 2014 02:52:53 +0530
+Subject: [PATCH v6] ARM: EXYNOS: Use MCPM call-backs to support S2R on
+ Exynos5420
+In-Reply-To: <alpine.LFD.2.11.1407041702310.22282@knanqh.ubzr>
+References: <alpine.LFD.2.11.1407041408120.22282@knanqh.ubzr>
+ <CAM4voamqpCj=Zw69DGjzhouwu=6RE6e3Px5WL8akc-TUAts0Xg@mail.gmail.com>
+ <CAM4voa=K6s0FFmeuiqWZh6HSQZAfSpxL8A_kMTxCi+2t3tzydw@mail.gmail.com>
+ <alpine.LFD.2.11.1407041702310.22282@knanqh.ubzr>
+Message-ID: <CAM4voamyswvgoH7c9ryPXxEtOv4ZHgyuAbuxC6v2FzM6PiMFrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 11:20 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Jun 27, 2014 at 12:59 AM, Feng Kan <fkan@apm.com> wrote:
->
->> Add APM X-Gene SoC gpio controller driver.
->>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->
-> Patch applied with Alexandre's review tag, good job!
+Hi Nicolas,
 
-Ah wait, Mark still has comments on the DT bindings so
-holding back the set until that has been resolved.
+On Sat, Jul 5, 2014 at 2:33 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Sat, 5 Jul 2014, Abhilash Kesavan wrote:
+>
+>> On a different note, I have been using the cpuidle patchset
+>> (https://patchwork.kernel.org/patch/4357421/) as base for S2R support
+>> and had a question. Rather than making the driver depend on
+>> ARCH_EXYNOS should it depend on EXYNOS5420_MCPM which in turn depends
+>> on MCPM (like TC2) or should we just be making the bL cpuidle driver
+>> depend on MCPM ?
+>
+> Probably making it depend on MCPM directly is the best approach.
+I'll discuss this with Chander and one of us will post a patch for it.
 
-Yours,
-Linus Walleij
+Regards,
+Abhilash
+>
+>
+> Nicolas
