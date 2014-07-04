@@ -1,65 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  4 Jul 2014 16:22:16 +0200
-Subject: [PATCH] ARM: mvebu: Fix the operand list in the inline asm of
- armada_370_xp_pmsu_idle_enter
-Message-ID: <1404483736-16938-1-git-send-email-gregory.clement@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 4 Jul 2014 16:24:38 +0200
+Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
+In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140704142438.GA7827@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the inline asm part of the function armada_370_xp_pmsu_idle_enter()
-the input operand was used. The intent here was to let the compiler
-choose this register so it could do the optimization it
-needed.
+On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
+> 
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
+> 
+> Rather than doing this piecemeal, and miss some instances, change all
+> the "mov pc" instances to use the new macro, with the exception of
+> the "movs" instruction and the kprobes code.  This allows us to detect
+> the "mov pc, lr" case and fix it up - and also gives us the possibility
+> of deploying this for other registers depending on the CPU selection.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Works fine on my ARM-v7M machine:
 
-However an input operand is not supposed to be modified by the inline
-asm code. This can lead to improper generated instructions.
+$ objdump -d vmlinux | grep -E 'mov.*pc'
+8c000022:	46e7      	mov	pc, ip
+8c000028:	46ef      	mov	pc, sp
+8c000b26:	46af      	movne	pc, r5
+8c0037e0:	4687      	mov	pc, r0
+8c0828d2:	4697      	mov	pc, r2
+8c1213ee:	469f      	mov	pc, r3
 
-In some case generated instruction the compiler made the choice to
-reuse the same register to store the return value. But in the assembly
-part this register was modified, so it can lead to return an wrong
-value.
+Also boots fine.
 
-The fix is to use a clobber. Thanks to this the compiler will know
-that the value of this register will be modified.
+Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Hi,
+but I wonder what is the reason to not use bx if \reg != lr.
 
-I found this bug while adding cpu idle support for Armada 370 and only
-recently after rebasing the code on mvebu/soc. So this patch fixes
-something which can really happen even if we didn't notice it on
-Armada XP. Fortunately the code fixed was introduced during this
-release, so there is no need to backport it, just to apply it on
-3.16-rc.
+Thanks
+Uwe
 
-Thanks,
-Gregory
-
- arch/arm/mach-mvebu/pmsu.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 53a55c8520bf..d15b0b346a26 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -206,12 +206,12 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
- 
- 	/* Test the CR_C bit and set it if it was cleared */
- 	asm volatile(
--	"mrc	p15, 0, %0, c1, c0, 0 \n\t"
--	"tst	%0, #(1 << 2) \n\t"
--	"orreq	%0, %0, #(1 << 2) \n\t"
--	"mcreq	p15, 0, %0, c1, c0, 0 \n\t"
-+	"mrc	p15, 0, r0, c1, c0, 0 \n\t"
-+	"tst	r0, #(1 << 2) \n\t"
-+	"orreq	r0, r0, #(1 << 2) \n\t"
-+	"mcreq	p15, 0, r0, c1, c0, 0 \n\t"
- 	"isb	"
--	: : "r" (0));
-+	: : : "r0");
- 
- 	pr_warn("Failed to suspend the system\n");
- 
 -- 
-1.8.1.2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
