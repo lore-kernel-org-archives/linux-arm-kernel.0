@@ -1,32 +1,84 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 04 Jul 2014 10:19:17 +0200
-Subject: [PATCH RFC] imx-drm: convert imx-drm to use the generic DRM OF
- helper
-In-Reply-To: <E1X2kFl-0000us-GN@rmk-PC.arm.linux.org.uk>
-References: <E1X2kFl-0000us-GN@rmk-PC.arm.linux.org.uk>
-Message-ID: <1404461957.2833.3.camel@paszta.hi.pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Jul 2014 01:23:54 -0700
+Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <20140704080556.GA16274@amd.pavel.ucw.cz>
+References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
+ <1403660878-56350-3-git-send-email-s-anna@ti.com>
+ <20140628170709.GB23634@xo-6d-61-c0.localdomain>
+ <53B18999.2020506@ti.com> <20140630185942.GA5410@amd.pavel.ucw.cz>
+ <53B1BBA8.5090507@ti.com> <20140630203225.GA3893@amd.pavel.ucw.cz>
+ <20140704064547.GZ28884@atomide.com>
+ <20140704080556.GA16274@amd.pavel.ucw.cz>
+Message-ID: <20140704082354.GD28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+* Pavel Machek <pavel@ucw.cz> [140704 01:07]:
+> Hi!
+> 
+> > > > >>>> The non-DT support has to be maintained for now to not break
+> > > > >>>> OMAP3 legacy boot, and the legacy-style code will be cleaned
+> > > > >>>> up once OMAP3 is also converted to DT-boot only.
+> > > > >>>
+> > > > >>>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
+> > > > >>>>  	return 0;
+> > > > >>>>  }
+> > > > >>>>  
+> > > > >>>> +static const struct omap_mbox_device_data omap2_data = {
+> > > > >>>> +	.num_users	= 4,
+> > > > >>>> +	.num_fifos	= 6,
+> > > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+> > > > >>>> +};
+> > > > >>>> +
+> > > > >>>> +static const struct omap_mbox_device_data omap3_data = {
+> > > > >>>> +	.num_users	= 2,
+> > > > >>>> +	.num_fifos	= 2,
+> > > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+> > > > >>>> +};
+> > > > >>>> +
+> > > > >>>> +static const struct omap_mbox_device_data am335x_data = {
+> > > > >>>> +	.num_users	= 4,
+> > > > >>>> +	.num_fifos	= 8,
+> > > > >>>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
+> > > > >>>> +};
+> > > > >>>
+> 
+> > > Aha, ok, then the intr_type should be derived from
+> > > compatible-string. Or rather... you should have three
+> > > compatible-strings for the three possibilities? (And then subtype,
+> > > currently unused, in case there are more hw differences).
+> > 
+> > The compatible string can and should be separate for each revision
+> > unless they are the same exacat hardware revision.
+> 
+> ACK.
+> 
+> > > > two are HW IP design parameters, so in general putting them in DT isn't
+> > > > completely a bad idea, but I will wait to see if there are any further
+> > > > comments on this from Tony or DT maintainers before I make changes.
+> > > 
+> > > Ok, right... I'd vote for putting them into DT.
+> > 
+> > I would avoid adding custom DT properties where possible and let the
+> > driver just initialize the right data based on the compatible flag.
+> 
+> If these are HW IP design parameters, we can expect to see many
+> different combinations. Yet we know ahead of time how to handle
+> different parameters HW people select.
+> 
+> Thus IMO we should do it in the device tree.
 
-Am Donnerstag, den 03.07.2014, 17:52 +0100 schrieb Russell King:
-> Use the generic DRM OF helper to locate the possible CRTCs for the
-> encoder, thereby shrinking the imx-drm driver some more.
+Oh you mean from supporting new hardware with just .dts changes?
+>From that point of view it makes sense to have them as DT properties,
+so I'm fine with that.
 
-Great, I especially like that now we don't go -EPROBE_DEFER anymore as
-soon as a single crtc_mask doesn't check out so we can also start adding
-output endpoints to encoders.
+Let's just try to use something that's generic like fifosize. No idea
+how the property for num_fifos should be handled though as that
+implies some knowledge in the driver which num_users have fifos?
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This patch builds upon "drm: add of_graph endpoint helper to find
-> possible CRTCs", converting imx-drm to use this new helper.
+So unless that can be described clearly in a DT property as well,
+the binding might be still unusable for new hardware :)
 
-There's a reference counting issue in the patch mentioned above,
-but I'd like to fix this in of_graph_get_next_endpoint instead.
-For both patches,
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Regards,
 
-regards
-Philipp
+Tony
