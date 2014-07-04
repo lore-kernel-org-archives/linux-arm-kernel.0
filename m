@@ -1,60 +1,130 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  4 Jul 2014 16:31:53 +0900
-Subject: [RESEND PATCH v4 0/2] arm64: Add seccomp support
-Message-ID: <1404459115-8292-1-git-send-email-takahiro.akashi@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 04 Jul 2014 16:32:22 +0900
+Subject: [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
+In-Reply-To: <53B55021.9020307@samsung.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+ <1404163947-3105-12-git-send-email-kgene.kim@samsung.com>
+ <53B55021.9020307@samsung.com>
+Message-ID: <02ca01cf975a$1848aaa0$48d9ffe0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(I don't think that discussions below about ptrace() have impact on
-this patchset.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268923.html
-)
+Tomasz Figa wrote:
+> 
+> Hi Kukjin,
+> 
+Hi,
 
-(Please apply this patch after my audit patch in order to avoid some
-conflict on arm64/Kconfig.)
+> On 30.06.2014 23:32, Kukjin Kim wrote:
+> > This patch removes supporting s5pc100 related pwm codes.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > ---
+> >  Documentation/devicetree/bindings/pwm/pwm-samsung.txt |    2 --
+> >  drivers/clocksource/samsung_pwm_timer.c               |   12 ------------
+> >  drivers/pwm/pwm-samsung.c                             |    8 --------
+> >  3 files changed, 22 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> > index 43925d3..82c7f6b 100644
+> > --- a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> > +++ b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+> > @@ -11,8 +11,6 @@ Required properties:
+> >  - compatible : should be one of following:
+> >      samsung,s3c2410-pwm - for 16-bit timers present on S3C24xx SoCs
+> >      samsung,s3c6400-pwm - for 32-bit timers present on S3C64xx SoCs
+> > -    samsung,s5pc100-pwm - for 32-bit timers present on S5PC100, S5PV210,
+> > -			  Exynos4210 rev0 SoCs
+> 
+> As you can see here, this variant is used for more than S5PC100. It is
+> needed for S5PV210 and Exynos4210 rev0 SoCs as well. So this patch
+> should be dropped.
 
-This patch enables secure computing (system call filtering) on arm64.
-System calls can be allowed or denied by loaded bpf-style rules.
-Architecture specific part is to run secure_computing() on syscall entry
-and check the result. See [2/2]
+Oh, I just now checked its datasheets and s5pv210 and early exynos4210 are
+using BIT(5) for tclk_mask. You're right. But I couldn't its usage in mainline
+when I created the patch. Anyway it can be used for s5pv210 so how about
+following?
 
-This code is tested on ARMv8 fast model using libseccomp v2.1.1 with
-modifications for arm64 and verified by its "live" tests, 20, 21 and 24.
+pwm: samsung: change s5pc100-pwm to s5pv210-pwm for support s5pv210 SoC
 
-Changes v3 -> v4:
-* removed the following patch and moved it to "arm64: prerequisites for
-  audit and ftrace" patchset since it is required for audit and ftrace in
-  case of !COMPAT, too.
-  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
+Reported-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
 
-Changes v2 -> v3:
-* removed unnecessary 'type cast' operations [2/3]
-* check for a return value (-1) of secure_computing() explicitly [2/3]
-* aligned with the patch, "arm64: split syscall_trace() into separate
-  functions for enter/exit" [2/3]
-* changed default of CONFIG_SECCOMP to n [2/3]
-
-Changes v1 -> v2:
-* added generic seccomp.h for arm64 to utilize it [1,2/3] 
-* changed syscall_trace() to return more meaningful value (-EPERM)
-  on seccomp failure case [2/3]
-* aligned with the change in "arm64: make a single hook to syscall_trace()
-  for all syscall features" v2 [2/3]
-* removed is_compat_task() definition from compat.h [3/3]
-
-AKASHI Takahiro (2):
-  asm-generic: Add generic seccomp.h for secure computing mode 1
-  arm64: Add seccomp support
-
- arch/arm64/Kconfig               |   14 ++++++++++++++
- arch/arm64/include/asm/seccomp.h |   25 +++++++++++++++++++++++++
- arch/arm64/include/asm/unistd.h  |    3 +++
- arch/arm64/kernel/entry.S        |    4 ++++
- arch/arm64/kernel/ptrace.c       |    6 ++++++
- include/asm-generic/seccomp.h    |   28 ++++++++++++++++++++++++++++
- 6 files changed, 80 insertions(+)
- create mode 100644 arch/arm64/include/asm/seccomp.h
- create mode 100644 include/asm-generic/seccomp.h
-
--- 
-1.7.9.5
+---
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+index 43925d3..ce005c0 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+@@ -11,8 +11,8 @@ Required properties:
+ - compatible : should be one of following:
+     samsung,s3c2410-pwm - for 16-bit timers present on S3C24xx SoCs
+     samsung,s3c6400-pwm - for 32-bit timers present on S3C64xx SoCs
+-    samsung,s5pc100-pwm - for 32-bit timers present on S5PC100, S5PV210,
+-			  Exynos4210 rev0 SoCs
++    samsung,s5pv210-pwm - for 32-bit timers present on S5PV210 and
++                          Exynos4210 rev0 SoCs
+     samsung,exynos4210-pwm - for 32-bit timers present on Exynos4210,
+                           Exynos4x12, Exynos5250 and Exynos5420 SoCs
+ - reg: base address and size of register area
+diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
+index e35a9b7..f0a5918 100644
+--- a/drivers/clocksource/samsung_pwm_timer.c
++++ b/drivers/clocksource/samsung_pwm_timer.c
+@@ -480,16 +480,16 @@ static void __init s3c64xx_pwm_clocksource_init(struct device_node *np)
+ }
+ CLOCKSOURCE_OF_DECLARE(s3c6400_pwm, "samsung,s3c6400-pwm", s3c64xx_pwm_clocksource_init);
+ 
+-static const struct samsung_pwm_variant s5p_variant = {
++static const struct samsung_pwm_variant s5pv210_variant = {
+ 	.bits		= 32,
+ 	.div_base	= 0,
+ 	.has_tint_cstat	= true,
+ 	.tclk_mask	= (1 << 5),
+ };
+ 
+-static void __init s5p_pwm_clocksource_init(struct device_node *np)
++static void __init s5pv210_pwm_clocksource_init(struct device_node *np)
+ {
+-	samsung_pwm_alloc(np, &s5p_variant);
++	samsung_pwm_alloc(np, &s5pv210_variant);
+ }
+-CLOCKSOURCE_OF_DECLARE(s5pc100_pwm, "samsung,s5pc100-pwm", s5p_pwm_clocksource_init);
++CLOCKSOURCE_OF_DECLARE(s5pv210_pwm, "samsung,s5pv210-pwm", s5pv210_pwm_clocksource_init);
+ #endif
+diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
+index 68f3471..a2bafc9 100644
+--- a/drivers/pwm/pwm-samsung.c
++++ b/drivers/pwm/pwm-samsung.c
+@@ -404,24 +404,24 @@ static const struct samsung_pwm_variant s3c64xx_variant = {
+ 	.tclk_mask	= BIT(7) | BIT(6) | BIT(5),
+ };
+ 
+-static const struct samsung_pwm_variant exynos4210_variant = {
++static const struct samsung_pwm_variant s5pv210_variant = {
+ 	.bits		= 32,
+ 	.div_base	= 0,
+ 	.has_tint_cstat	= true,
+-	.tclk_mask	= 0,
++	.tclk_mask	= BIT(5),
+ };
+ 
+-static const struct samsung_pwm_variant s5pc100_variant = {
++static const struct samsung_pwm_variant exynos4210_variant = {
+ 	.bits		= 32,
+ 	.div_base	= 0,
+ 	.has_tint_cstat	= true,
+-	.tclk_mask	= BIT(5),
++	.tclk_mask	= 0,
+ };
+ 
+ static const struct of_device_id samsung_pwm_matches[] = {
+ 	{ .compatible = "samsung,s3c2410-pwm", .data = &s3c24xx_variant },
+ 	{ .compatible = "samsung,s3c6400-pwm", .data = &s3c64xx_variant },
+-	{ .compatible = "samsung,s5pc100-pwm", .data = &s5pc100_variant },
++	{ .compatible = "samsung,s5pv210-pwm", .data = &s5pv210_variant },
+ 	{ .compatible = "samsung,exynos4210-pwm", .data = &exynos4210_variant },
+ 	{},
+ };
