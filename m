@@ -1,82 +1,56 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Thu, 3 Jul 2014 23:56:54 -0700
-Subject: [PATCH RFC] arm64: eBPF JIT compiler
-In-Reply-To: <20140703091450.GB12958@arm.com>
-References: <1404278424-31176-1-git-send-email-zlim.lnx@gmail.com>
- <20140703091450.GB12958@arm.com>
-Message-ID: <CABg9mcuCQHXacgq-C7A=G5GH_p7b0TxCYB8A9qXvGJSoSbjs5A@mail.gmail.com>
+From: yibin.gong@freescale.com (Yibin Gong)
+Date: Fri, 4 Jul 2014 06:58:36 +0000
+Subject: [PATCH] ARM: dts: imx: correct sdma compatbile for imx6sl and
+ imx6sx
+In-Reply-To: <1404456361-8197-1-git-send-email-shawn.guo@freescale.com>
+References: <1404456361-8197-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <3bc5acd7986946c88860e542a0c07b7c@BLUPR03MB036.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Acked-by: Robin Gong <yibin.gong@freescale.com>
 
-On Thu, Jul 3, 2014 at 2:14 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hello,
->
-> On Wed, Jul 02, 2014 at 06:20:24AM +0100, Zi Shen Lim wrote:
-[...]
->
-> First off, this is really cool. Thanks for putting in the effort to get this
-> supported on arm64! I'm happy to run tests on some real hardware if you tell
-> me how to run them :)
+-----Original Message-----
+From: Shawn Guo [mailto:shawn.guo at freescale.com] 
+Sent: Friday, July 04, 2014 2:46 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Gong Yibin-B38343; Estevam Fabio-R49496; Guo Shawn-R65073
+Subject: [PATCH] ARM: dts: imx: correct sdma compatbile for imx6sl and imx6sx
 
-Thanks for offering to test on real hardware :)
-I'm running test_bpf per Documentations/networking/filter.txt, also
-described by Daniel in his response to you.
+The SDMA on imx6sl and imx6sx is more compatible with imx6q one than imx35.  Let's use "fsl,imx6q-sdma" instead of "fsl,imx35-sdma", so that SDMA ROM script on imx6sl and imx6sx can work for audio driver just like the case of imx6q.
 
->
-> One general observation relates to your instruction encoding logic, e.g:
->
->> +/* 5-bit Register Operand */
->> +#define A64_R(x)       x               /* R0-R30: General purpose */
->> +#define A64_FP         A64_R(29)       /* Frame pointer */
->> +#define A64_LR         A64_R(30)       /* Link register */
->> +#define A64_ZR         31              /* As source register operand */
->> +#define A64_SP         31              /* As load/store base register */
->> +
->> +#define BITSMASK(bits) ((1 << (bits)) - 1)
->> +
->> +/* Compare & branch (immediate) */
->> +static inline u32 A64_COMP_BRANCH_IMM(int sf, int op, int imm19, int Rt)
->> +{
->> +       sf &= BITSMASK(1);
->> +       op &= BITSMASK(1);
->> +       imm19 &= BITSMASK(19);
->> +       Rt &= BITSMASK(5);
->> +       return 0x34000000 | sf << 31 | op << 24 | imm19 << 5 | Rt;
->> +}
->> +#define A64_CBZ(sf, Rt, imm19)  A64_COMP_BRANCH_IMM(sf, 0, imm19, Rt)
->> +#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH_IMM(sf, 1, imm19, Rt)
->
-> We already have some some basic instruction manipulation code in
-> arch/arm64/kernel/insn.c and arch/arm64/include/asm/insn.h. Would you be
-> able to move some of this there please (but only the bits that aren't tied
-> to BPF?
+Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Thanks to Robin for finding this out.
 
-Ah, thanks for pointing that out to me.
+ arch/arm/boot/dts/imx6sl.dtsi | 2 +-
+ arch/arm/boot/dts/imx6sx.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
->
-> The reason I ask, is because we're inevitebly going to need this stuff
-> for other subsystems (e.g. kprobes, dynamic code patching ("alternatives"))
-> and I'd like to avoid a proliferation of magic numbers across the codebase.
-
-Yes, I agree in principle, consolidating this stuff in one place sounds good.
-
->
-> Does this sound remotely feasible?
-
-So I looked at insn.c and the only overlap at this point is B/BL codegen.
-A whole lot more, e.g. arithmetic, logical, and memory ops, will need
-to be shuffled in.
-
-Let me address Alexei's review comments and send out a v2.
-After that, I can take a stab at consolidating bpf_jit.h into
-insn.{c,h}. Sounds good to you?
-
-Thanks,
-z
-
->
-> Cheers,
->
-> Will
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi index c0ee12f1f171..0467ac064e9d 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -608,7 +608,7 @@
+ 			};
+ 
+ 			sdma: sdma at 020ec000 {
+-				compatible = "fsl,imx6sl-sdma", "fsl,imx35-sdma";
++				compatible = "fsl,imx6sl-sdma", "fsl,imx6q-sdma";
+ 				reg = <0x020ec000 0x4000>;
+ 				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6SL_CLK_SDMA>,
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi index 92d48becdb45..0c5094adedfa 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -706,7 +706,7 @@
+ 			};
+ 
+ 			sdma: sdma at 020ec000 {
+-				compatible = "fsl,imx6sx-sdma", "fsl,imx35-sdma";
++				compatible = "fsl,imx6sx-sdma", "fsl,imx6q-sdma";
+ 				reg = <0x020ec000 0x4000>;
+ 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6SX_CLK_SDMA>,
+--
+1.8.3.2
