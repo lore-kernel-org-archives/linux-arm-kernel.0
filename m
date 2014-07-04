@@ -1,39 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Jul 2014 17:07:41 +0200
-Subject: [PATCH] ASoC: sirf: provide pm-runtime functions when needed
-Message-ID: <6778119.KeB0KTehn3@wuerfel>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 4 Jul 2014 20:37:52 +0530
+Subject: [RFC PATCH 0/2] phy: core: better support for multi-phy in phy-core
+Message-ID: <1404486474-28312-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced sirf-usp driver defines sirf_usp_pcm_{suspend,resume}
-functions only when PM_RUNTIME is enabled, but also uses them when that
-is disabled and only PM_SLEEP is turned on, resulting in this error:
+In multi-phy PHY providers, each PHY should be modeled as sub-node of PHY
+provider. So it makes sense for the controller node to have the phandle for
+the sub-node instead of the PHY-provider node in the 'phy' property.
 
-../sound/soc/sirf/sirf-usp.c: In function 'sirf_usp_pcm_suspend':
-../sound/soc/sirf/sirf-usp.c:308:3: error: implicit declaration of function 'sirf_usp_pcm_runtime_suspend' [-Werror=implicit-function-declaration]
-   sirf_usp_pcm_runtime_suspend(dev);
-   ^
-../sound/soc/sirf/sirf-usp.c: In function 'sirf_usp_pcm_resume':
-../sound/soc/sirf/sirf-usp.c:319:3: error: implicit declaration of function 'sirf_usp_pcm_runtime_resume' [-Werror=implicit-function-declaration]
-   ret = sirf_usp_pcm_runtime_resume(dev);
-   ^
-cc1: some warnings being treated as errors
+This patch series added support so that the controller node can have the
+phandle to the sub-node. So if the phy specifier does not have any other
+fields other than the phandle (and the PHY driver uses the default xlate),
+phy_get will return the correct PHY.
+However if the phy_sepcifier has other fields and the PHY driver provides
+its own xlate, the PHY driver can use the *phy->dev.of_node*. (note that
+now phy->dev.of_node will have the node pointer of the sub-node).
 
-To fix that, this patch changes the #ifdef to CONFIG_PM, which
-is enabled when at least one of PM_SLEEP or PM_RUNTIME are enabled.
+Kishon Vijay Abraham I (2):
+  phy: core: Fix of_phy_provider_lookup to return PHY provider for sub
+    node
+  phy: core: the node pointer of PHY need not be the same as that of
+    PHY provider
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+ Documentation/phy.txt               |   10 ++++++----
+ drivers/phy/phy-bcm-kona-usb2.c     |    2 +-
+ drivers/phy/phy-core.c              |   35 +++++++++++++++++++++++++++--------
+ drivers/phy/phy-exynos-dp-video.c   |    2 +-
+ drivers/phy/phy-exynos-mipi-video.c |    2 +-
+ drivers/phy/phy-exynos5-usbdrd.c    |    3 ++-
+ drivers/phy/phy-exynos5250-sata.c   |    2 +-
+ drivers/phy/phy-mvebu-sata.c        |    2 +-
+ drivers/phy/phy-omap-usb2.c         |    2 +-
+ drivers/phy/phy-samsung-usb2.c      |    3 ++-
+ drivers/phy/phy-sun4i-usb.c         |    2 +-
+ drivers/phy/phy-ti-pipe3.c          |    2 +-
+ drivers/phy/phy-twl4030-usb.c       |    2 +-
+ drivers/phy/phy-xgene.c             |    2 +-
+ include/linux/phy/phy.h             |   15 ++++++++++-----
+ 15 files changed, 57 insertions(+), 29 deletions(-)
 
-diff --git a/sound/soc/sirf/sirf-usp.c b/sound/soc/sirf/sirf-usp.c
-index bdf6aae..9693bc2 100644
---- a/sound/soc/sirf/sirf-usp.c
-+++ b/sound/soc/sirf/sirf-usp.c
-@@ -282,7 +282,7 @@ static struct snd_soc_dai_driver sirf_usp_pcm_dai = {
- 	.ops = &sirf_usp_pcm_dai_ops,
- };
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int sirf_usp_pcm_runtime_suspend(struct device *dev)
- {
- 	struct sirf_usp *usp = dev_get_drvdata(dev);
+-- 
+1.7.9.5
