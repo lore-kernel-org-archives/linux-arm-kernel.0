@@ -1,39 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 05 Jul 2014 13:58:37 +0200
-Subject: [PATCH RFC 06/15] drm/armada: move variant initialisation to
- CRTC init
-In-Reply-To: <E1X3NMM-0000A5-N5@rmk-PC.arm.linux.org.uk>
-References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
- <E1X3NMM-0000A5-N5@rmk-PC.arm.linux.org.uk>
-Message-ID: <53B7E86D.5040109@gmail.com>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Sat,  5 Jul 2014 14:19:17 +0200
+Subject: [PATCH] video: fbdev: exynos: exynos_mipi_dsi_common.c: Cleaning up
+ variable that is never used
+Message-ID: <1404562757-19274-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2014 12:38 PM, Russell King wrote:
-> Move the variant initialisation entirely to the CRTC init function -
-> the variant support is really about the CRTC properties than the whole
-> system, and we want to treat each CRTC individually when we support DT.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-[...]
-> diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
-> index 531a9b0bdcfb..3f0e70bb2e9c 100644
-> --- a/drivers/gpu/drm/armada/armada_crtc.h
-> +++ b/drivers/gpu/drm/armada/armada_crtc.h
-> @@ -38,6 +38,7 @@ struct armada_crtc {
->  	unsigned		num;
->  	void __iomem		*base;
->  	struct clk		*clk;
-> +	struct clk		*extclk[2];
+From: Rickard Strandqvist <rickard.strandqvist@sonymobile.com>
 
-Russell,
+Variable ar assigned a value that is never used.
+I have also removed all the code that thereby serves no purpose.
 
-I wonder, if we should rename above array srcclk instead of extclk
-while moving it anyway. That way we can use it for the other variant
-specific clocks, too.
+This was found using a static code analysis program called cppcheck
 
-FWIW, I totally agree the it was the right thing to wait for you
-to sort out the dependencies. Good work, great patience.
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+---
+ drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Sebastian
+diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
+index 85edabf..9e4f9bd 100644
+--- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
++++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
+@@ -219,11 +219,9 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
+ 	case MIPI_DSI_GENERIC_LONG_WRITE:
+ 	case MIPI_DSI_DCS_LONG_WRITE:
+ 	{
+-		unsigned int size, payload = 0;
++		unsigned int payload = 0;
+ 		reinit_completion(&dsim_wr_comp);
+ 
+-		size = data_size * 4;
+-
+ 		/* if data count is less then 4, then send 3bytes data.  */
+ 		if (data_size < 4) {
+ 			payload = data0[0] |
+-- 
+1.7.10.4
