@@ -1,235 +1,87 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat,  5 Jul 2014 13:12:59 +0200
-Subject: [PATCH v2 2/4] clocksource: add device-tree support for PXA timer
-In-Reply-To: <1404558781-9537-1-git-send-email-robert.jarzmik@free.fr>
-References: <1404558781-9537-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1404558781-9537-2-git-send-email-robert.jarzmik@free.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 5 Jul 2014 12:14:07 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140704132250.A2447C40ADD@trevor.secretlab.ca>
+References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140701234800.GA23577@sirena.org.uk>
+ <20140702100133.GE18731@arm.com>
+ <20140702163923.GJ410@sirena.org.uk>
+ <20140702170141.GH24879@arm.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+ <20140703174318.GE28175@arm.com>
+ <20140704132250.A2447C40ADD@trevor.secretlab.ca>
+Message-ID: <20140705111406.GA23692@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree support to PXA platforms.
-The driver still needs to maintain backward non device-tree
-compatibility as well, which implies :
- - a non device-tree init function
- - a static registers base address in the driver
+On Fri, Jul 04, 2014 at 02:22:50PM +0100, Grant Likely wrote:
+> On Thu, 3 Jul 2014 18:43:18 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
+> > > So, no. I completely reject any notion that breaking existing apps is
+> > > okay. If we're going to say that v8 still supports 32-bit apps, then
+> > > it has to be all of v7, not just the 'good' bits. Nor do I think
+> > > saying "it's just a bunch of games" justifies anything. We're kernel
+> > > engineers. Applications are applications and we don't break userspace.
+> > > Period.
+> > 
+> > Here you need to define user-space. OABI?
+> 
+> This is where we can be pragmatic. Listen to our users. Colin was very
+> clear about what some apps need in order to keep working. He's not even
+> asking for old kernels or system libraries to be supported because he
+> has control over those components and they can be fixed. The important
+> ABI is the ABI used by Android applications.
+> 
+> We can drop ABIs that nobody uses. If nobody complains, is it really
+> broken?
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+OK, so I think we now agree that being asked not to break the ABI ever
+is not feasible (and not in the community's interest either; think about
+carrying over NWFPE for ARMv8 just because someone wants to run an old
+distro when there are alternatives already, such requests would need
+proper justification).
 
----
-Since V1: Daniel's review:
-      - comments for registers
-      - registers clean-up
-      - mach includes removed
-      - panic() removed
----
- drivers/clocksource/pxa_timer.c | 129 +++++++++++++++++++++++++++++-----------
- 1 file changed, 93 insertions(+), 36 deletions(-)
+Another aspect is that users don't always know what's good (or bad) for
+them. EABI provided means via kuser helpers to use arch-independent
+barrier code and cmpxchg. Glibc and various threads libraries moved to
+using them but as we can see, not all user space. As Russell pointed
+out, we failed to raise the SWP issue properly in the ARMv7 kernel (more
+warnings, always emulation) and I see this as a valid reason to allow
+for a _transition_ period in ARMv8.
 
-diff --git a/drivers/clocksource/pxa_timer.c b/drivers/clocksource/pxa_timer.c
-index fca174e..5caedd3 100644
---- a/drivers/clocksource/pxa_timer.c
-+++ b/drivers/clocksource/pxa_timer.c
-@@ -15,14 +15,30 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/sched_clock.h>
- 
- #include <asm/div64.h>
--#include <asm/mach/irq.h>
--#include <asm/mach/time.h>
--#include <mach/regs-ost.h>
--#include <mach/irqs.h>
-+
-+#define OSMR0		0x00	/* OS Timer 0 Match Register */
-+#define OSMR1		0x04	/* OS Timer 1 Match Register */
-+#define OSMR2		0x08	/* OS Timer 2 Match Register */
-+#define OSMR3		0x0C	/* OS Timer 3 Match Register */
-+
-+#define OSCR		0x10	/* OS Timer Counter Register */
-+#define OSSR		0x14	/* OS Timer Status Register */
-+#define OWER		0x18	/* OS Timer Watchdog Enable Register */
-+#define OIER		0x1C	/* OS Timer Interrupt Enable Register */
-+
-+#define OSSR_M3		(1 << 3)	/* Match status channel 3 */
-+#define OSSR_M2		(1 << 2)	/* Match status channel 2 */
-+#define OSSR_M1		(1 << 1)	/* Match status channel 1 */
-+#define OSSR_M0		(1 << 0)	/* Match status channel 0 */
-+
-+#define OIER_E0		(1 << 0)	/* Interrupt enable channel 0 */
- 
- /*
-  * This is PXA's sched_clock implementation. This has a resolution
-@@ -33,9 +49,14 @@
-  * calls to sched_clock() which should always be the case in practice.
-  */
- 
-+#define timer_readl(reg) readl_relaxed(timer_base + (reg))
-+#define timer_writel(val, reg) writel_relaxed((val), timer_base + (reg))
-+
-+static void __iomem *timer_base;
-+
- static u64 notrace pxa_read_sched_clock(void)
- {
--	return readl_relaxed(OSCR);
-+	return timer_readl(OSCR);
- }
- 
- 
-@@ -47,8 +68,8 @@ pxa_ost0_interrupt(int irq, void *dev_id)
- 	struct clock_event_device *c = dev_id;
- 
- 	/* Disarm the compare/match, signal the event. */
--	writel_relaxed(readl_relaxed(OIER) & ~OIER_E0, OIER);
--	writel_relaxed(OSSR_M0, OSSR);
-+	timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
-+	timer_writel(OSSR_M0, OSSR);
- 	c->event_handler(c);
- 
- 	return IRQ_HANDLED;
-@@ -59,10 +80,10 @@ pxa_osmr0_set_next_event(unsigned long delta, struct clock_event_device *dev)
- {
- 	unsigned long next, oscr;
- 
--	writel_relaxed(readl_relaxed(OIER) | OIER_E0, OIER);
--	next = readl_relaxed(OSCR) + delta;
--	writel_relaxed(next, OSMR0);
--	oscr = readl_relaxed(OSCR);
-+	timer_writel(timer_readl(OIER) | OIER_E0, OIER);
-+	next = timer_readl(OSCR) + delta;
-+	timer_writel(next, OSMR0);
-+	oscr = timer_readl(OSCR);
- 
- 	return (signed)(next - oscr) <= MIN_OSCR_DELTA ? -ETIME : 0;
- }
-@@ -72,15 +93,15 @@ pxa_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- {
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_ONESHOT:
--		writel_relaxed(readl_relaxed(OIER) & ~OIER_E0, OIER);
--		writel_relaxed(OSSR_M0, OSSR);
-+		timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
-+		timer_writel(OSSR_M0, OSSR);
- 		break;
- 
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 		/* initializing, released, or preparing for suspend */
--		writel_relaxed(readl_relaxed(OIER) & ~OIER_E0, OIER);
--		writel_relaxed(OSSR_M0, OSSR);
-+		timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
-+		timer_writel(OSSR_M0, OSSR);
- 		break;
- 
- 	case CLOCK_EVT_MODE_RESUME:
-@@ -94,12 +115,12 @@ static unsigned long osmr[4], oier, oscr;
- 
- static void pxa_timer_suspend(struct clock_event_device *cedev)
- {
--	osmr[0] = readl_relaxed(OSMR0);
--	osmr[1] = readl_relaxed(OSMR1);
--	osmr[2] = readl_relaxed(OSMR2);
--	osmr[3] = readl_relaxed(OSMR3);
--	oier = readl_relaxed(OIER);
--	oscr = readl_relaxed(OSCR);
-+	osmr[0] = timer_readl(OSMR0);
-+	osmr[1] = timer_readl(OSMR1);
-+	osmr[2] = timer_readl(OSMR2);
-+	osmr[3] = timer_readl(OSMR3);
-+	oier = timer_readl(OIER);
-+	oscr = timer_readl(OSCR);
- }
- 
- static void pxa_timer_resume(struct clock_event_device *cedev)
-@@ -113,12 +134,12 @@ static void pxa_timer_resume(struct clock_event_device *cedev)
- 	if (osmr[0] - oscr < MIN_OSCR_DELTA)
- 		osmr[0] += MIN_OSCR_DELTA;
- 
--	writel_relaxed(osmr[0], OSMR0);
--	writel_relaxed(osmr[1], OSMR1);
--	writel_relaxed(osmr[2], OSMR2);
--	writel_relaxed(osmr[3], OSMR3);
--	writel_relaxed(oier, OIER);
--	writel_relaxed(oscr, OSCR);
-+	timer_writel(osmr[0], OSMR0);
-+	timer_writel(osmr[1], OSMR1);
-+	timer_writel(osmr[2], OSMR2);
-+	timer_writel(osmr[3], OSMR3);
-+	timer_writel(oier, OIER);
-+	timer_writel(oscr, OSCR);
- }
- #else
- #define pxa_timer_suspend NULL
-@@ -142,21 +163,57 @@ static struct irqaction pxa_ost0_irq = {
- 	.dev_id		= &ckevt_pxa_osmr0,
- };
- 
--void __init pxa_timer_init(void)
-+static void pxa_timer_common_init(int irq, unsigned long clock_tick_rate)
- {
--	unsigned long clock_tick_rate = get_clock_tick_rate();
--
--	writel_relaxed(0, OIER);
--	writel_relaxed(OSSR_M0 | OSSR_M1 | OSSR_M2 | OSSR_M3, OSSR);
-+	timer_writel(0, OIER);
-+	timer_writel(OSSR_M0 | OSSR_M1 | OSSR_M2 | OSSR_M3, OSSR);
- 
- 	sched_clock_register(pxa_read_sched_clock, 32, clock_tick_rate);
- 
- 	ckevt_pxa_osmr0.cpumask = cpumask_of(0);
- 
--	setup_irq(IRQ_OST0, &pxa_ost0_irq);
-+	setup_irq(irq, &pxa_ost0_irq);
- 
--	clocksource_mmio_init(OSCR, "oscr0", clock_tick_rate, 200, 32,
--		clocksource_mmio_readl_up);
-+	clocksource_mmio_init(timer_base + OSCR, "oscr0", clock_tick_rate, 200,
-+			      32, clocksource_mmio_readl_up);
- 	clockevents_config_and_register(&ckevt_pxa_osmr0, clock_tick_rate,
--		MIN_OSCR_DELTA * 2, 0x7fffffff);
-+					MIN_OSCR_DELTA * 2, 0x7fffffff);
-+}
-+
-+static void __init pxa_timer_dt_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+	int irq;
-+
-+	/* timer registers are shared with watchdog timer */
-+	timer_base = of_iomap(np, 0);
-+	if (!timer_base)
-+		panic("%s: unable to map resource\n", np->name);
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		pr_crit("%s: unable to get clk\n", np->name);
-+		return;
-+	}
-+	clk_prepare_enable(clk);
-+
-+	/* we are only interested in OS-timer0 irq */
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (irq <= 0) {
-+		pr_crit("%s: unable to parse OS-timer0 irq\n", np->name);
-+		return;
-+	}
-+
-+	pxa_timer_common_init(irq, clk_get_rate(clk));
-+}
-+CLOCKSOURCE_OF_DECLARE(pxa_timer, "marvell,pxa-timer", pxa_timer_dt_init);
-+
-+/*
-+ * Legacy timer init for non device-tree boards.
-+ */
-+void __init pxa_timer_nodt_init(int irq, void __iomem *base,
-+	unsigned long clock_tick_rate)
-+{
-+	timer_base = base;
-+	pxa_timer_common_init(irq, clock_tick_rate);
- }
+But we have to agree on a way to handle deprecated/removed architecture
+features (as I said, some of them are removed for good reasons). And
+that's also for user's benefit, performance wise they should rather use
+native than emulated features.
+
+The timeline I propose would be:
+
+1. Architecture feature deprecation (still present, no way to disable)
+   - In Linux we need to find ways and push for alternatives to be
+     adopted by user space (like we did with kuser helpers)
+2. Architecture feature disabling (still present but needs to be enabled
+   explicitly via SCTLR bit)
+   - Linux disables the feature by default and provides emulation
+     (enabled by default), clear warnings
+   - In certain cases, there may be justification to enable the hardware
+     feature but certainly not in defconfig nor distro Image builds.
+     Otherwise they can't complain that users are still using such
+     feature at point 3 below
+3. Architecture feature removed
+   - Default Linux behaviour changes to SIGILL
+   - Emulation could be still available in the kernel but maybe under
+     a CONFIG_EXPERT option
+4. Eventually remove kernel emulation support entirely (or don't carry
+   it over to a new port, though I don't foresee any arm128 ;))
+
+With SWP, we are currently at 3/4 with the counter arguments that 2
+wasn't entirely clear to users, so the transition needs to be
+carried over for ARMv8 (but I'm against 2 for arm64, 3 is as far as I
+would go). Arguably, with CP15 barriers we are at point 2, in which case
+if we add them to the arm64 kernel, they should be emulated with clear
+warnings (ratelimited).
+
 -- 
-2.0.0.rc2
+Catalin
