@@ -1,43 +1,41 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 05 Jul 2014 11:39:08 +0100
-Subject: [PATCH RFC 15/15] ARM: dts: dove: add DT LCD controllers
-In-Reply-To: <20140705103724.GN21766@n2100.arm.linux.org.uk>
-References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
-Message-ID: <E1X3NN6-0000Ag-PK@rmk-PC.arm.linux.org.uk>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Sat, 5 Jul 2014 11:57:42 +0100
+Subject: [GIT PULL] TDA998x fixes
+Message-ID: <20140705105742.GA1811@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT fragment for the Marvell Dove LCD controllers.
+David,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/dove.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Please incorporate the latest TDA998x fixes, which can be found at:
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 3b891dd20993..a5441d5482a6 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -630,6 +630,20 @@
- 				reg = <0xe8400 0x0c>;
- 				ngpios = <8>;
- 			};
-+
-+			lcd1: lcd-controller at 810000 {
-+				compatible = "marvell,dove-lcd";
-+				reg = <0x810000 0x1000>;
-+				interrupts = <46>;
-+				status = "disabled";
-+			};
-+
-+			lcd0: lcd-controller at 820000 {
-+				compatible = "marvell,dove-lcd";
-+				reg = <0x820000 0x1000>;
-+				interrupts = <47>;
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
--- 
-1.8.3.1
+  git://ftp.arm.linux.org.uk/~rmk/linux-cubox.git tda998x-fixes
+
+with SHA1 de4bf3d51fe38eaf90cb587e4eae1f3f0e056a54.
+
+A number of relatively minor TDA998x fixes, the most serious of which
+is the positioning of the drm_i2c_encoder_destroy call, which is marked
+for inclusion in stable trees.
+
+These changes are based on v3.15, and test merging with your drm-fixes
+(0fcb70c30131) dated 27th June shows no conflicts.
+
+This will update the following files:
+
+ Documentation/devicetree/bindings/drm/i2c/tda998x.txt |  2 ++
+ drivers/gpu/drm/i2c/tda998x_drv.c                     | 12 +++++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+through these changes:
+
+Guido Mart?nez (1):
+      drm/i2c: tda998x: move drm_i2c_encoder_destroy call
+
+Jean-Francois Moine (1):
+      drm/i2c: tda998x: fix lack of required reg in DT documentation
+
+Russell King (2):
+      drm/i2c: tda998x: faster polling for edid
+      drm/i2c: tda998x: add some basic mode validation
+
+Many thanks.
