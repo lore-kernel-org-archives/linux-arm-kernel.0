@@ -1,35 +1,36 @@
-From: jhbird.choi@samsung.com (Jonghwan Choi)
-Date: Sat, 05 Jul 2014 09:40:38 +0900
-Subject: [PATCH] thermal: Add missing cpumask_clear
-In-Reply-To: <53B747FF.5010604@gmail.com>
-References: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
- <CAK5sBcHDTgyj67xVWgtNH-Z7XU1Ykp6m650_mWBVp=Az2P6f=Q@mail.gmail.com>
- <000101cf97e0$f9ba7a50$ed2f6ef0$@samsung.com> <53B747FF.5010604@gmail.com>
-Message-ID: <000801cf97e9$bde80f70$39b82e50$@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 05 Jul 2014 03:06:39 +0200
+Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
+ (part1)
+In-Reply-To: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
+References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
+Message-ID: <53B74F9F.8030604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 5, 2014 at 9:34 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > Console message-> 4.861157] [c6] --ID [ 1] = 0,4-5,7 (4,5,7 cpu bit
-> > was set.)
-> >
-> > And when I tried to register two cooling devices with cpumask_set_cpu(0, &mask_val) and
-> cpumask_set_cpu(4, &mask_val).
-> >
-> > I found that cpu 0 bit is also set in latter cpumask. (I hope latter
-> > cpumask has a cpu 4 bit.)
-> >
-> > So I think that cpumask_clear should be inserted.
+Hi Russell,
+
+On 01.07.2014 18:19, Russell King wrote:
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
 > 
-> I believe Sachin's concern was related to your patch description. A good description should say what
-> the patch changes and what is the rationale behind this change. Also for fixes it is a good practice
-> to specify observed issues in patch description as well.
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
 > 
-> Best regards,
+> Rather than doing this piecemeal, and miss some instances, change all
+> the "mov pc" instances to use the new macro, with the exception of
+> the "movs" instruction and the kprobes code.  This allows us to detect
+> the "mov pc, lr" case and fix it up - and also gives us the possibility
+> of deploying this for other registers depending on the CPU selection.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
--> You are right.
+Build- and boot-tested on mach-s3c64xx.
 
-Thanks for your kind advice.
+Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-
-Best regards.
+Best regards,
+Tomasz
