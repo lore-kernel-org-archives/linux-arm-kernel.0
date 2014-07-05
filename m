@@ -1,29 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Jul 2014 21:50:24 -0700
-Subject: [PATCH] ARM: sunxi: Reintroduce the restart code for A10/A20 SoCs
-In-Reply-To: <1404049733-26226-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404049733-26226-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140705045024.GB5201@quad.lixom.net>
+Date: Fri, 4 Jul 2014 21:51:39 -0700
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.16 (incremental #2)
+In-Reply-To: <20140701120548.GC23978@titan.lakedaemon.net>
+References: <20140701120548.GC23978@titan.lakedaemon.net>
+Message-ID: <20140705045139.GC5201@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 03:48:53PM +0200, Maxime Ripard wrote:
-> This partly reverts commits 553600502b84 (ARM: sunxi: Remove reset code from
-> the platform) and 5e669ec583e2 (ARM: sunxi: Remove init_machine callback) for
-> the sun4i, sun5i and sun7i families.
+On Tue, Jul 01, 2014 at 08:05:48AM -0400, Jason Cooper wrote:
+> Guys,
 > 
-> This is needed because the watchdog counterpart of these commits was dropped,
-> and didn't make it into 3.16. In order to still be able to reboot the board, we
-> need to reintroduce that code. Of course, the long term view is still to get
-> rid of that code in mach-sunxi.
+> Here's a small set of fixes to take care PCIe deadlocks with SMP, and
+> cpuidle on big-endian systems.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Hi Arnd, Kevin, Olof,
+> This is an incremental pull request from tags/mvebu-fixes-3.16 up to
+> tags/mvebu-fixes-3.16-2 on the mvebu/fixes branch.
 > 
-> Could you apply this patch directly and queue this as 3.16 fixes?
+> Please pull.
+> 
+> thx,
+> 
+> Jason.
+> 
+> The following changes since commit 8dbdb8e704db34085f5978c335c10256b0fb9629:
+> 
+>   ARM: mvebu: Fix the improper use of the compatible string armada38x using a wildcard (2014-06-24 11:33:24 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.16-2
+> 
+> for you to fetch changes up to 6509dc74c9f55ffaa558738b96c4da8b98d39571:
+> 
+>   ARM: mvebu: fix cpuidle implementation to work on big-endian systems (2014-06-30 18:15:11 +0000)
 
-Applied (with 3 line offset).
+Pulled.
 
 
 -Olof
