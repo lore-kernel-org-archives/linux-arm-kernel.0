@@ -1,70 +1,27 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  5 Jul 2014 08:51:57 +0400
-Subject: [PATCH] ARM: i.MX: Remove excess symbols ARCH_MX1,
- ARCH_MX25 and MACH_MX27
-Message-ID: <1404535917-20136-1-git-send-email-shc_work@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Jul 2014 21:53:45 -0700
+Subject: [PATCH] MAINTAINERS: Add few more Keystone drivers
+In-Reply-To: <1403467582-7933-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1403467582-7933-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140705045345.GE5201@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes excess symbols ARCH_MX1, ARCH_MX25 and MACH_MX27.
-Instead we use SOC_IMX*.
+On Sun, Jun 22, 2014 at 04:06:22PM -0400, Santosh Shilimkar wrote:
+> Update MAINTAINERS file for recently added reset controller, AEMIF
+> and clocksource driver for Keystone SOCs.
+> 
+> The EMIF memory controller driver is also added along with AEMIF.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/Kconfig         | 12 ------------
- arch/arm/mach-imx/devices/Kconfig |  2 +-
- 2 files changed, 1 insertion(+), 13 deletions(-)
+Applied.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 325a8d32..7cbfc0d 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -65,18 +65,8 @@ config IMX_HAVE_IOMUX_V1
- config ARCH_MXC_IOMUX_V3
- 	bool
- 
--config ARCH_MX1
--	bool
--
--config ARCH_MX25
--	bool
--
--config MACH_MX27
--	bool
--
- config SOC_IMX1
- 	bool
--	select ARCH_MX1
- 	select CPU_ARM920T
- 	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
-@@ -89,7 +79,6 @@ config SOC_IMX21
- 
- config SOC_IMX25
- 	bool
--	select ARCH_MX25
- 	select ARCH_MXC_IOMUX_V3
- 	select CPU_ARM926T
- 	select MXC_AVIC
-@@ -100,7 +89,6 @@ config SOC_IMX27
- 	select ARCH_HAS_OPP
- 	select CPU_ARM926T
- 	select IMX_HAVE_IOMUX_V1
--	select MACH_MX27
- 	select MXC_AVIC
- 	select PINCTRL_IMX27
- 
-diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
-index 73a1dce..1d2cc18 100644
---- a/arch/arm/mach-imx/devices/Kconfig
-+++ b/arch/arm/mach-imx/devices/Kconfig
-@@ -1,6 +1,6 @@
- config IMX_HAVE_PLATFORM_FEC
- 	bool
--	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35
-+	default y if SOC_IMX25 || SOC_IMX27 || SOC_IMX35
- 
- config IMX_HAVE_PLATFORM_FLEXCAN
- 	bool
--- 
-1.8.5.5
+
+-Olof
