@@ -1,29 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Jul 2014 21:47:03 -0700
-Subject: [GIT PULL] omap fixes against v3.16-rc1
-In-Reply-To: <20140630070857.GK28884@atomide.com>
-References: <20140617145854.GT17845@atomide.com>
- <20140630070857.GK28884@atomide.com>
-Message-ID: <20140705044703.GA5201@quad.lixom.net>
+Date: Fri, 4 Jul 2014 21:50:24 -0700
+Subject: [PATCH] ARM: sunxi: Reintroduce the restart code for A10/A20 SoCs
+In-Reply-To: <1404049733-26226-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404049733-26226-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140705045024.GB5201@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 12:08:57AM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140617 08:01]:
-> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-> > 
-> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-against-rc1
-> > 
-> > for you to fetch changes up to edc56f871eefbc56baf1fd981eeff35ef447925c:
-> > 
-> >   ARM: dts: dra7-evm: remove interrupt binding (2014-06-17 01:22:55 -0700)
+On Sun, Jun 29, 2014 at 03:48:53PM +0200, Maxime Ripard wrote:
+> This partly reverts commits 553600502b84 (ARM: sunxi: Remove reset code from
+> the platform) and 5e669ec583e2 (ARM: sunxi: Remove init_machine callback) for
+> the sun4i, sun5i and sun7i families.
+> 
+> This is needed because the watchdog counterpart of these commits was dropped,
+> and didn't make it into 3.16. In order to still be able to reboot the board, we
+> need to reintroduce that code. Of course, the long term view is still to get
+> rid of that code in mach-sunxi.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> Hi Arnd, Kevin, Olof,
+> 
+> Could you apply this patch directly and queue this as 3.16 fixes?
 
-Merged. Apologies for the delay, I was planning on handling this earleir this
-week. I'll send this up tonight or tomorrow.
+Applied (with 3 line offset).
 
 
 -Olof
