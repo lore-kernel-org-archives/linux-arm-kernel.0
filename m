@@ -1,216 +1,236 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 05 Jul 2014 11:38:07 +0100
-Subject: [PATCH RFC 03/15] component: add support for component match array
+Date: Sat, 05 Jul 2014 11:38:12 +0100
+Subject: [PATCH RFC 04/15] drm/armada: move IRQ handling into CRTC
 In-Reply-To: <20140705103724.GN21766@n2100.arm.linux.org.uk>
 References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
-Message-ID: <E1X3NM7-00009s-DL@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X3NMC-00009w-Gd@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for generating a set of component matches at master probe
-time, and submitting them to the component layer.  This allows the
-component layer to perform the matches internally without needing to
-call into the master driver, and allows for further restructuring of
-the component helper.
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/base/component.c  | 120 ++++++++++++++++++++++++++++++++++++++++++++--
- include/linux/component.h |   7 +++
- 2 files changed, 124 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/armada/armada_crtc.c | 36 +++++++++++++++++--
+ drivers/gpu/drm/armada/armada_crtc.h |  4 +--
+ drivers/gpu/drm/armada/armada_drv.c  | 68 +++++-------------------------------
+ 3 files changed, 45 insertions(+), 63 deletions(-)
 
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index 55813e91bf0d..b4236daed4fa 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -18,6 +18,15 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- 
-+struct component_match {
-+	size_t alloc;
-+	size_t num;
-+	struct {
-+		void *data;
-+		int (*fn)(struct device *, void *);
-+	} compare[0];
-+};
-+
- struct master {
- 	struct list_head node;
- 	struct list_head components;
-@@ -25,6 +34,7 @@ struct master {
- 
- 	const struct component_master_ops *ops;
- 	struct device *dev;
-+	struct component_match *match;
- };
- 
- struct component {
-@@ -96,6 +106,34 @@ int component_master_add_child(struct master *master,
+diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
+index 81c34f949dfc..9341a94cc906 100644
+--- a/drivers/gpu/drm/armada/armada_crtc.c
++++ b/drivers/gpu/drm/armada/armada_crtc.c
+@@ -349,7 +349,7 @@ static bool armada_drm_crtc_mode_fixup(struct drm_crtc *crtc,
+ 	return true;
  }
- EXPORT_SYMBOL_GPL(component_master_add_child);
  
-+static int find_components(struct master *master)
+-void armada_drm_crtc_irq(struct armada_crtc *dcrtc, u32 stat)
++static void armada_drm_crtc_irq(struct armada_crtc *dcrtc, u32 stat)
+ {
+ 	struct armada_vbl_event *e, *n;
+ 	void __iomem *base = dcrtc->base;
+@@ -410,6 +410,27 @@ void armada_drm_crtc_irq(struct armada_crtc *dcrtc, u32 stat)
+ 	}
+ }
+ 
++static irqreturn_t armada_drm_irq(int irq, void *arg)
 +{
-+	struct component_match *match = master->match;
-+	size_t i;
-+	int ret = 0;
-+
-+	if (!match) {
-+		/*
-+		 * Search the list of components, looking for components that
-+		 * belong to this master, and attach them to the master.
-+		 */
-+		return master->ops->add_components(master->dev, master);
-+	}
++	struct armada_crtc *dcrtc = arg;
++	u32 v, stat = readl_relaxed(dcrtc->base + LCD_SPU_IRQ_ISR);
 +
 +	/*
-+	 * Scan the array of match functions and attach
-+	 * any components which are found to this master.
++	 * This is rediculous - rather than writing bits to clear, we
++	 * have to set the actual status register value.  This is racy.
 +	 */
-+	for (i = 0; i < match->num; i++) {
-+		ret = component_master_add_child(master,
-+						 match->compare[i].fn,
-+						 match->compare[i].data);
-+		if (ret)
-+			break;
++	writel_relaxed(0, dcrtc->base + LCD_SPU_IRQ_ISR);
++
++	/* Mask out those interrupts we haven't enabled */
++	v = stat & dcrtc->irq_ena;
++
++	if (v & (VSYNC_IRQ|GRA_FRAME_IRQ|DUMB_FRAMEDONE)) {
++		armada_drm_crtc_irq(dcrtc, stat);
++		return IRQ_HANDLED;
 +	}
-+	return ret;
++	return IRQ_NONE;
 +}
 +
- /* Detach all attached components from this master */
- static void master_remove_components(struct master *master)
+ /* These are locked by dev->vbl_lock */
+ void armada_drm_crtc_disable_irq(struct armada_crtc *dcrtc, u32 mask)
  {
-@@ -128,7 +166,7 @@ static int try_to_bring_up_master(struct master *master,
- 	 * Search the list of components, looking for components that
- 	 * belong to this master, and attach them to the master.
- 	 */
--	if (master->ops->add_components(master->dev, master)) {
-+	if (find_components(master)) {
- 		/* Failed to find all components */
- 		ret = 0;
- 		goto out;
-@@ -186,18 +224,87 @@ static void take_down_master(struct master *master)
- 	master_remove_components(master);
+@@ -888,6 +909,8 @@ static void armada_drm_crtc_destroy(struct drm_crtc *crtc)
+ 	if (!IS_ERR(dcrtc->clk))
+ 		clk_disable_unprepare(dcrtc->clk);
+ 
++	writel_relaxed(0, dcrtc->base + LCD_SPU_IRQ_ENA);
++
+ 	kfree(dcrtc);
  }
  
--int component_master_add(struct device *dev,
--	const struct component_master_ops *ops)
-+static size_t component_match_size(size_t num)
-+{
-+	return offsetof(struct component_match, compare[num]);
-+}
-+
-+static struct component_match *component_match_realloc(struct device *dev,
-+	struct component_match *match, size_t num)
-+{
-+	struct component_match *new;
-+
-+	if (match && match->alloc == num)
-+		return match;
-+
-+	new = devm_kmalloc(dev, component_match_size(num), GFP_KERNEL);
-+	if (!new)
-+		return ERR_PTR(-ENOMEM);
-+
-+	if (match) {
-+		memcpy(new, match, component_match_size(min(match->num, num)));
-+		devm_kfree(dev, match);
-+	} else {
-+		new->num = 0;
-+	}
-+
-+	new->alloc = num;
-+
-+	return new;
-+}
-+
-+/*
-+ * Add a component to be matched.
-+ *
-+ * The match array is first created or extended if necessary.
-+ */
-+void component_match_add(struct device *dev, struct component_match **matchptr,
-+	int (*compare)(struct device *, void *), void *compare_data)
-+{
-+	struct component_match *match = *matchptr;
-+
-+	if (IS_ERR(match))
-+		return;
-+
-+	if (!match || match->num == match->alloc) {
-+		size_t new_size = match ? match->alloc + 16 : 15;
-+
-+		match = component_match_realloc(dev, match, new_size);
-+
-+		*matchptr = match;
-+
-+		if (IS_ERR(match))
-+			return;
-+	}
-+
-+	match->compare[match->num].fn = compare;
-+	match->compare[match->num].data = compare_data;
-+	match->num++;
-+}
-+EXPORT_SYMBOL(component_match_add);
-+
-+int component_master_add_with_match(struct device *dev,
-+	const struct component_master_ops *ops,
-+	struct component_match *match)
- {
- 	struct master *master;
- 	int ret;
- 
-+	if (ops->add_components && match)
-+		return -EINVAL;
-+
-+	/* Reallocate the match array for its true size */
-+	match = component_match_realloc(dev, match, match->num);
-+	if (IS_ERR(match))
-+		return PTR_ERR(match);
-+
- 	master = kzalloc(sizeof(*master), GFP_KERNEL);
- 	if (!master)
- 		return -ENOMEM;
- 
- 	master->dev = dev;
- 	master->ops = ops;
-+	master->match = match;
- 	INIT_LIST_HEAD(&master->components);
- 
- 	/* Add to the list of available masters. */
-@@ -215,6 +322,13 @@ int component_master_add(struct device *dev,
- 
- 	return ret < 0 ? ret : 0;
+@@ -1028,7 +1051,7 @@ static int armada_drm_crtc_create_properties(struct drm_device *dev)
  }
-+EXPORT_SYMBOL_GPL(component_master_add_with_match);
-+
-+int component_master_add(struct device *dev,
-+	const struct component_master_ops *ops)
-+{
-+	return component_master_add_with_match(dev, ops, NULL);
-+}
- EXPORT_SYMBOL_GPL(component_master_add);
  
- void component_master_del(struct device *dev,
-diff --git a/include/linux/component.h b/include/linux/component.h
-index 68870182ca1e..c00dcc302611 100644
---- a/include/linux/component.h
-+++ b/include/linux/component.h
-@@ -29,4 +29,11 @@ void component_master_del(struct device *,
- int component_master_add_child(struct master *master,
- 	int (*compare)(struct device *, void *), void *compare_data);
+ int armada_drm_crtc_create(struct drm_device *dev, unsigned num,
+-	struct resource *res)
++	struct resource *res, int irq)
+ {
+ 	struct armada_private *priv = dev->dev_private;
+ 	struct armada_crtc *dcrtc;
+@@ -1074,6 +1097,15 @@ int armada_drm_crtc_create(struct drm_device *dev, unsigned num,
+ 		       CFG_PDWN64x66, dcrtc->base + LCD_SPU_SRAM_PARA1);
+ 	writel_relaxed(0x2032ff81, dcrtc->base + LCD_SPU_DMA_CTRL1);
+ 	writel_relaxed(0x00000000, dcrtc->base + LCD_SPU_GRA_OVSA_HPXL_VLN);
++	writel_relaxed(dcrtc->irq_ena, dcrtc->base + LCD_SPU_IRQ_ENA);
++	writel_relaxed(0, dcrtc->base + LCD_SPU_IRQ_ISR);
++
++	ret = devm_request_irq(dev, irq, armada_drm_irq, 0, "armada_drm_crtc",
++			       dcrtc);
++	if (ret < 0) {
++		kfree(dcrtc);
++		return ret;
++	}
  
-+struct component_match;
+ 	if (priv->variant->crtc_init) {
+ 		ret = priv->variant->crtc_init(dcrtc);
+diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
+index 9c10a07e7492..0e952b271212 100644
+--- a/drivers/gpu/drm/armada/armada_crtc.h
++++ b/drivers/gpu/drm/armada/armada_crtc.h
+@@ -72,10 +72,10 @@ struct armada_crtc {
+ };
+ #define drm_to_armada_crtc(c) container_of(c, struct armada_crtc, crtc)
+ 
+-int armada_drm_crtc_create(struct drm_device *, unsigned, struct resource *);
++int armada_drm_crtc_create(struct drm_device *, unsigned, struct resource *,
++	int);
+ void armada_drm_crtc_gamma_set(struct drm_crtc *, u16, u16, u16, int);
+ void armada_drm_crtc_gamma_get(struct drm_crtc *, u16 *, u16 *, u16 *, int);
+-void armada_drm_crtc_irq(struct armada_crtc *, u32);
+ void armada_drm_crtc_disable_irq(struct armada_crtc *, u32);
+ void armada_drm_crtc_enable_irq(struct armada_crtc *, u32);
+ void armada_drm_crtc_update_regs(struct armada_crtc *, struct armada_regs *);
+diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
+index 8ab3cd1a8cdb..58884d807e6c 100644
+--- a/drivers/gpu/drm/armada/armada_drv.c
++++ b/drivers/gpu/drm/armada/armada_drv.c
+@@ -155,10 +155,16 @@ static int armada_drm_load(struct drm_device *dev, unsigned long flags)
+ 
+ 	/* Create all LCD controllers */
+ 	for (n = 0; n < ARRAY_SIZE(priv->dcrtc); n++) {
++		int irq;
 +
-+int component_master_add_with_match(struct device *,
-+	const struct component_master_ops *, struct component_match *);
-+void component_match_add(struct device *, struct component_match **,
-+	int (*compare)(struct device *, void *), void *compare_data);
+ 		if (!res[n])
+ 			break;
+ 
+-		ret = armada_drm_crtc_create(dev, n, res[n]);
++		irq = platform_get_irq(dev->platformdev, n);
++		if (irq < 0)
++			goto err_kms;
 +
- #endif
++		ret = armada_drm_crtc_create(dev, n, res[n], irq);
+ 		if (ret)
+ 			goto err_kms;
+ 	}
+@@ -173,22 +179,16 @@ static int armada_drm_load(struct drm_device *dev, unsigned long flags)
+ 	if (ret)
+ 		goto err_kms;
+ 
+-	ret = drm_irq_install(dev, platform_get_irq(dev->platformdev, 0));
+-	if (ret)
+-		goto err_kms;
+-
+ 	dev->vblank_disable_allowed = 1;
+ 
+ 	ret = armada_fbdev_init(dev);
+ 	if (ret)
+-		goto err_irq;
++		goto err_kms;
+ 
+ 	drm_kms_helper_poll_init(dev);
+ 
+ 	return 0;
+ 
+- err_irq:
+-	drm_irq_uninstall(dev);
+  err_kms:
+ 	drm_mode_config_cleanup(dev);
+ 	drm_mm_takedown(&priv->linear);
+@@ -203,7 +203,6 @@ static int armada_drm_unload(struct drm_device *dev)
+ 
+ 	drm_kms_helper_poll_fini(dev);
+ 	armada_fbdev_fini(dev);
+-	drm_irq_uninstall(dev);
+ 	drm_mode_config_cleanup(dev);
+ 	drm_mm_takedown(&priv->linear);
+ 	flush_work(&priv->fb_unref_work);
+@@ -259,52 +258,6 @@ static void armada_drm_disable_vblank(struct drm_device *dev, int crtc)
+ 	armada_drm_crtc_disable_irq(priv->dcrtc[crtc], VSYNC_IRQ_ENA);
+ }
+ 
+-static irqreturn_t armada_drm_irq_handler(int irq, void *arg)
+-{
+-	struct drm_device *dev = arg;
+-	struct armada_private *priv = dev->dev_private;
+-	struct armada_crtc *dcrtc = priv->dcrtc[0];
+-	uint32_t v, stat = readl_relaxed(dcrtc->base + LCD_SPU_IRQ_ISR);
+-	irqreturn_t handled = IRQ_NONE;
+-
+-	/*
+-	 * This is rediculous - rather than writing bits to clear, we
+-	 * have to set the actual status register value.  This is racy.
+-	 */
+-	writel_relaxed(0, dcrtc->base + LCD_SPU_IRQ_ISR);
+-
+-	/* Mask out those interrupts we haven't enabled */
+-	v = stat & dcrtc->irq_ena;
+-
+-	if (v & (VSYNC_IRQ|GRA_FRAME_IRQ|DUMB_FRAMEDONE)) {
+-		armada_drm_crtc_irq(dcrtc, stat);
+-		handled = IRQ_HANDLED;
+-	}
+-
+-	return handled;
+-}
+-
+-static int armada_drm_irq_postinstall(struct drm_device *dev)
+-{
+-	struct armada_private *priv = dev->dev_private;
+-	struct armada_crtc *dcrtc = priv->dcrtc[0];
+-
+-	spin_lock_irq(&dev->vbl_lock);
+-	writel_relaxed(dcrtc->irq_ena, dcrtc->base + LCD_SPU_IRQ_ENA);
+-	writel(0, dcrtc->base + LCD_SPU_IRQ_ISR);
+-	spin_unlock_irq(&dev->vbl_lock);
+-
+-	return 0;
+-}
+-
+-static void armada_drm_irq_uninstall(struct drm_device *dev)
+-{
+-	struct armada_private *priv = dev->dev_private;
+-	struct armada_crtc *dcrtc = priv->dcrtc[0];
+-
+-	writel(0, dcrtc->base + LCD_SPU_IRQ_ENA);
+-}
+-
+ static struct drm_ioctl_desc armada_ioctls[] = {
+ 	DRM_IOCTL_DEF_DRV(ARMADA_GEM_CREATE, armada_gem_create_ioctl,
+ 		DRM_UNLOCKED),
+@@ -340,9 +293,6 @@ static struct drm_driver armada_drm_driver = {
+ 	.get_vblank_counter	= drm_vblank_count,
+ 	.enable_vblank		= armada_drm_enable_vblank,
+ 	.disable_vblank		= armada_drm_disable_vblank,
+-	.irq_handler		= armada_drm_irq_handler,
+-	.irq_postinstall	= armada_drm_irq_postinstall,
+-	.irq_uninstall		= armada_drm_irq_uninstall,
+ #ifdef CONFIG_DEBUG_FS
+ 	.debugfs_init		= armada_drm_debugfs_init,
+ 	.debugfs_cleanup	= armada_drm_debugfs_cleanup,
+@@ -362,7 +312,7 @@ static struct drm_driver armada_drm_driver = {
+ 	.desc			= "Armada SoC DRM",
+ 	.date			= "20120730",
+ 	.driver_features	= DRIVER_GEM | DRIVER_MODESET |
+-				  DRIVER_HAVE_IRQ | DRIVER_PRIME,
++				  DRIVER_PRIME,
+ 	.ioctls			= armada_ioctls,
+ 	.fops			= &armada_drm_fops,
+ };
 -- 
 1.8.3.1
