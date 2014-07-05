@@ -1,51 +1,76 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Sat, 5 Jul 2014 20:29:03 +0530
-Subject: [PATCH] thermal: Add missing cpumask_clear
-In-Reply-To: <53B747FF.5010604@gmail.com>
-References: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
- <CAK5sBcHDTgyj67xVWgtNH-Z7XU1Ykp6m650_mWBVp=Az2P6f=Q@mail.gmail.com>
- <000101cf97e0$f9ba7a50$ed2f6ef0$@samsung.com>
- <53B747FF.5010604@gmail.com>
-Message-ID: <CAK5sBcGO1XRUX+bzFykrmj9RA4ku7GNY_OFf5cFP6n6V-6Vpgw@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 5 Jul 2014 12:03:08 -0300
+Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
+In-Reply-To: <1936558.QaAG1bYMuD@avalon>
+References: <20140703135146.GA6898@luxor.wired.org>
+ <53B5C61D.2060308@free-electrons.com>
+ <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
+Message-ID: <20140705150308.GA28791@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 5, 2014 at 6:04 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Jonghwan,
->
-> On 05.07.2014 01:37, Jonghwan Choi wrote:
->> On Fri, Jul 4, 2014 at 8:23 PM, Sachin Kamat <spk.linux@gmail.com> wrote:
->>
->>>> Cpumasks should be cleared before using.
->>>
->>> Please explain why and what is issue observed without this.
->>>
->>
->> -> When I checked the mask value, I knew that unwanted bit is set.
->>
->> Test code without cpumask_clear.
->>
->> +       cpumask_set_cpu(0, &mask_val);
->> +       cpulist_scnprintf(buf, 64, &mask_val);
->> +       printk("--ID [ %d] = %s \n", id, buf);
->> +       th_zone->cool_dev[id] = cpufreq_cooling_register(&mask_val);
->>
->>
->> Console message-> 4.861157] [c6] --ID [ 1] = 0,4-5,7 (4,5,7 cpu bit was set.)
->>
->> And when I tried to register two cooling devices with cpumask_set_cpu(0, &mask_val) and cpumask_set_cpu(4, &mask_val).
->>
->> I found that cpu 0 bit is also set in latter cpumask. (I hope latter cpumask has a cpu 4 bit.)
->>
->> So I think that cpumask_clear should be inserted.
->
-> I believe Sachin's concern was related to your patch description. A good
-> description should say what the patch changes and what is the rationale
-> behind this change. Also for fixes it is a good practice to specify
-> observed issues in patch description as well.
+After following Gregory's stacktrace (also reproduced here):
 
-Yes, that is correct. Sorry if it wasn't clear in my previous mail.
+[<c02451f8>] (iommu_bus_notifier) from [<c00512e8>] (notifier_call_chain+0x64/0x9c)
+[<c00512e8>] (notifier_call_chain) from [<c00514cc>] (__blocking_notifier_call_chain+0x40/0x58)
+[<c00514cc>] (__blocking_notifier_call_chain) from [<c00514f8>] (blocking_notifier_call_chain+0x14/0x1c)
+[<c00514f8>] (blocking_notifier_call_chain) from [<c01d225c>] (device_add+0x424/0x524)
+[<c01d225c>] (device_add) from [<c0186d90>] (pci_device_add+0xec/0x110)
+[<c0186d90>] (pci_device_add) from [<c0186e54>] (pci_scan_single_device+0xa0/0xac)
 
+I added a few printks and found that the problem is that the iommu_bus_notifier is
+called for the 'pci' bus type, which has a null iommu_ops.
+
+On 04 Jul 10:47 AM, Laurent Pinchart wrote:
+[..]
+> 
+> We need a quick fix for v3.16, ...
+
+Therefore, a quick fix would be to simply check for that:
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index e5555fc..b712cb2 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -536,6 +536,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
+        struct iommu_group *group;
+        unsigned long group_action = 0;
+ 
++       if (!ops)
++               return 0;
++
+        /*
+         * ADD/DEL call into iommu driver ops if provided, which may
+         * result in ADD/DEL notifiers to group->notifier
+
+This (nasty workaround?) patch makes the problem go away.
+
+[..]
+> > So it also boot well in 3.15 and then failed in 3.16-rc3. I hope it will
+> > help the developers of the OMAP IOMMU driver to fix it.
+> 
+> Thank you. I've had a look at the OMAP IOMMU driver changes between v3.15 and 
+> v3.16-rc3, and didn't find at first sight any change that could explain the 
+> crash.
+> 
+> 286f600 iommu/omap: Fix map protection value handling
+> 67b779d iommu/omap: Remove comment about supporting single page mappings only
+> f7129a0 iommu/omap: Fix 'no page for' debug message in flush_iotlb_page()
+> 5acc97d iommu/omap: Move to_iommu definition from omap-iopgtable.h
+> 2ac6133 iommu/omap: Remove omap_iommu_domain_has_cap() function
+> d760e3e iommu/omap: Correct init value of iotlb_entry valid field
+> 
+> Could you try reverting those changes and retest ? If the problem doesn't 
+> disappear, we'll need to look somewhere else.
+> 
+
+I reverted the above commits but nothing changed. I'm far from being an expert,
+but it sounds odd to have this bus notifier (that got registered for the
+platform bus type) called by a pci bus type.
+
+This doesn't look like a mvebu-specific problem, other platforms should be
+affected as well. I'm Ccing GregKH, in case he has an idea what's going on.
 -- 
-Regards,
-Sachin.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
