@@ -1,41 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 5 Jul 2014 08:25:35 +0100
-Subject: [PATCH v3] efi/arm64: handle missing virtual mapping for UEFI
- System Table
-In-Reply-To: <CAKv+Gu_-=NtVNFLEh35Pv8OO6nLe1YhPjS13MYZa93YOXFOh6Q@mail.gmail.com>
-References: <1404487509-26084-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404492756.19665.57.camel@deneb.redhat.com>	<20140704170110.GM16404@arm.com>
- <CAKv+Gu_-=NtVNFLEh35Pv8OO6nLe1YhPjS13MYZa93YOXFOh6Q@mail.gmail.com>
-Message-ID: <09C85B92-02BB-45C4-A461-D4E0CD4F7203@arm.com>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Sat, 5 Jul 2014 10:51:02 +0100
+Subject: [GIT PULL] component fix
+Message-ID: <20140705095102.GA26803@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 Jul 2014, at 18:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 4 July 2014 19:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Fri, Jul 04, 2014 at 05:52:36PM +0100, Mark Salter wrote:
->>> On Fri, 2014-07-04 at 17:25 +0200, Ard Biesheuvel wrote:
->>>> If we cannot resolve the virtual address of the UEFI System Table, its physical
->>>> offset must be missing from the virtual memory map, and there is really no point
->>>> in proceeding with installing the virtual memory map and the runtime services
->>>> dispatch table. So back out gracefully.
->>>> 
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>> 
->>> Acked-by: Mark Salter <msalter@redhat.com>
->> 
->> Thanks. Do I take this patch or Matt already has other EFI patches to
->> push? If the latter:
->> 
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> Thanks. You can take it for 3.16 if you like, otherwise it is probably
-> better if we ask Matt to take it through his tree with some other
-> stuff we have in flight at the moment.
+Greg,
 
-OK, I?ll leave it to Matt then together with the other EFI patches
-he?s already queuing.
+Please incorporate a fix for the component helper, which can be found at:
 
-Thanks,
+  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-driver
 
-Catalin
+with SHA1 b509cc802239a8b5ba7d1d2cc5adfb9d984b7ed8.
+
+This fixes a bug reported by Sachin Kamat found with Exynos DRM.
+
+This will update the following files:
+
+ drivers/base/component.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+through these changes:
+
+Russell King (1):
+      component: fix bug with legacy API
+
+Many thanks.
