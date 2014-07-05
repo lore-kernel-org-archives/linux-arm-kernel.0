@@ -1,48 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 5 Jul 2014 12:30:56 +0100
-Subject: [GIT PULL] arm64 fixes for 3.16
-Message-ID: <20140705113050.GA28232@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat,  5 Jul 2014 08:54:45 -0300
+Subject: [PATCH v2 net-next 0/3] Network driver for Armada 375 SoC
+Message-ID: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Changes from v1:
+  * Marcin Wojtas is the author of the driver, so I fixed authorship
+    for patch 1/3:
+    "ethernet: Add new driver for Marvell Armada 375 network unit"
 
-Please pull the arm64 fixes below for 3.16. Thanks.
+This patchset adds a new network driver to support the network controller
+in Armada 375 SoC.
 
+The network interfaces share a common hardware unit called Packet Processor,
+which contains a common register space and per-port register spaces.
+    
+The new network unit has different RXQ and TXQ management. The ports
+associate so-called per-port "logical queues" which are mapped to "physical
+queues". The latter are shared among the ports.
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+Fo the egress part, the mapping for each port is predefined by hardware.
+The egress path incorporates so-called aggregation queues (one per CPU),
+from where the data is passed to the physical queues and then via prefetch
+buffer to the TxDMA.
+    
+The ingress path has a Parser and Classifier (PnC) and a Buffer Manager (BM)
+whose usage is obligatory. We are only implementing a simple configuration
+for the Parser and Classifier, yet the code is considerably large.
+    
+This network unit has other optional features like xPON, WoL, Hardware
+Forwarding, and more. This initial commit doesn't provide support for these.
+    
+The mvpp2 network driver has been written by Marcin Wojtas and then reviewed
+and cleaned up by Ezequiel Garcia.
 
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+Ezequiel Garcia (2):
+  ARM: mvebu: Add support for the network controller in Armada 375 SoC
+  ARM: mvebu: Enable the network controller in Armada 375 DB board
 
-are available in the git repository at:
+Marcin Wojtas (1):
+  ethernet: Add new driver for Marvell Armada 375 network unit
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 974c8e450b9327a03453a4a450a2030b1bd42b5f:
-
-  arm64: fix el2_setup check of CurrentEL (2014-07-04 16:16:52 +0100)
-
-----------------------------------------------------------------
-ARM64 fixes:
-- Exception level check at boot time (for completeness, not triggering
-  any bug before)
-- I/D-cache synchronisation logic for huge pages
-- Config symbol typo
-
-----------------------------------------------------------------
-Marc Zyngier (1):
-      arm64: fix el2_setup check of CurrentEL
-
-Steve Capper (2):
-      arm64: mm: Fix horrendous config typo
-      arm64: mm: Make icache synchronisation logic huge page aware
-
- arch/arm64/include/asm/pgtable.h | 2 +-
- arch/arm64/include/asm/ptrace.h  | 4 ++++
- arch/arm64/kernel/efi-entry.S    | 3 +--
- arch/arm64/kernel/head.S         | 3 +--
- arch/arm64/mm/flush.c            | 3 ++-
- 5 files changed, 9 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/net/marvell-pp2.txt        |   61 +
+ arch/arm/boot/dts/armada-375-db.dts                |   26 +
+ arch/arm/boot/dts/armada-375.dtsi                  |   31 +
+ drivers/net/ethernet/marvell/Kconfig               |    8 +
+ drivers/net/ethernet/marvell/Makefile              |    1 +
+ drivers/net/ethernet/marvell/mvpp2.c               | 6378 ++++++++++++++++++++
+ 6 files changed, 6505 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/marvell-pp2.txt
+ create mode 100644 drivers/net/ethernet/marvell/mvpp2.c
 
 -- 
-Catalin
+1.9.1
