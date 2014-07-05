@@ -1,56 +1,51 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Sat, 5 Jul 2014 20:23:25 +0530
-Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for
- secure mode
-In-Reply-To: <03f301cf906a$ab25d470$01717d50$@samsung.com>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
- <5388CBB9.1050003@suse.de>
- <CAK5sBcETe20PWRV+z5Gb=hQNk13wE0PbmcvEmC9TM6nD2mi=ew@mail.gmail.com>
- <03f301cf906a$ab25d470$01717d50$@samsung.com>
-Message-ID: <CAK5sBcFfd0oe_87j7NcskK9opGQYA0uYA5WyqfHMnp-O0xCJqw@mail.gmail.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Sat, 5 Jul 2014 20:29:03 +0530
+Subject: [PATCH] thermal: Add missing cpumask_clear
+In-Reply-To: <53B747FF.5010604@gmail.com>
+References: <000001cf9771$e2f465c0$a8dd3140$@samsung.com>
+ <CAK5sBcHDTgyj67xVWgtNH-Z7XU1Ykp6m650_mWBVp=Az2P6f=Q@mail.gmail.com>
+ <000101cf97e0$f9ba7a50$ed2f6ef0$@samsung.com>
+ <53B747FF.5010604@gmail.com>
+Message-ID: <CAK5sBcGO1XRUX+bzFykrmj9RA4ku7GNY_OFf5cFP6n6V-6Vpgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 5:13 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Sachin Kamat wrote:
+On Sat, Jul 5, 2014 at 6:04 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Jonghwan,
+>
+> On 05.07.2014 01:37, Jonghwan Choi wrote:
+>> On Fri, Jul 4, 2014 at 8:23 PM, Sachin Kamat <spk.linux@gmail.com> wrote:
 >>
->> On Fri, May 30, 2014 at 11:49 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> > Am 28.05.2014 06:13, schrieb Sachin Kamat:
->> >> Almost all Exynos-series of SoCs that run in secure mode don't need
->> >> additional offset for every CPU, with Exynos4412 being the only
->> >> exception.
->> >>
->> >> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
->> >>
->> >> While at it, fix the coding style (space around *).
->> >>
->> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> >> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> >> ---
->> >>  arch/arm/mach-exynos/firmware.c |    9 +++++++--
->> >>  1 file changed, 7 insertions(+), 2 deletions(-)
->> >
->> > Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
->> > applying the 5410 patches...
->> >
->> > Tested-by: Andreas F?rber <afaerber@suse.de>
->> >
+>>>> Cpumasks should be cleared before using.
+>>>
+>>> Please explain why and what is issue observed without this.
+>>>
 >>
->> Kukjin, this patch is required to bring up 4 A15 cores on some 5410
->> and 5420 based
->> boards. Can you please queue this up for the upcoming rc as fixes?
+>> -> When I checked the mask value, I knew that unwanted bit is set.
+>>
+>> Test code without cpumask_clear.
+>>
+>> +       cpumask_set_cpu(0, &mask_val);
+>> +       cpulist_scnprintf(buf, 64, &mask_val);
+>> +       printk("--ID [ %d] = %s \n", id, buf);
+>> +       th_zone->cool_dev[id] = cpufreq_cooling_register(&mask_val);
+>>
+>>
+>> Console message-> 4.861157] [c6] --ID [ 1] = 0,4-5,7 (4,5,7 cpu bit was set.)
+>>
+>> And when I tried to register two cooling devices with cpumask_set_cpu(0, &mask_val) and cpumask_set_cpu(4, &mask_val).
+>>
+>> I found that cpu 0 bit is also set in latter cpumask. (I hope latter cpumask has a cpu 4 bit.)
+>>
+>> So I think that cpumask_clear should be inserted.
 >
-> Sure, I will take this into fixes.
+> I believe Sachin's concern was related to your patch description. A good
+> description should say what the patch changes and what is the rationale
+> behind this change. Also for fixes it is a good practice to specify
+> observed issues in patch description as well.
 
-Kukjin,
+Yes, that is correct. Sorry if it wasn't clear in my previous mail.
 
-I don't see this patch in your fixes-2 branch yet.
-
-
->
-> Thanks,
-> Kukjin
->
-
+-- 
 Regards,
 Sachin.
