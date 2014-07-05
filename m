@@ -1,49 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 05 Jul 2014 20:43:26 +0200
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <FFC4CCB1-115D-4A20-A79D-78200D02D90F@arm.com>
-References: <20140701234800.GA23577@sirena.org.uk>
- <20140705164348.GM14896@sirena.org.uk>
- <FFC4CCB1-115D-4A20-A79D-78200D02D90F@arm.com>
-Message-ID: <4473002.jGohFvPsvi@wuerfel>
+Date: Sat, 05 Jul 2014 20:46:30 +0200
+Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
+ it has exclusives
+In-Reply-To: <20140704214847.GL21766@n2100.arm.linux.org.uk>
+References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+ <5774249.oWoI3gS2oa@wuerfel> <20140704214847.GL21766@n2100.arm.linux.org.uk>
+Message-ID: <5465358.odbrXXiqgi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 July 2014 18:06:29 Catalin Marinas wrote:
-> On 5 Jul 2014, at 17:43, Mark Brown <broonie@kernel.org> wrote:
-> > On Sat, Jul 05, 2014 at 12:14:07PM +0100, Catalin Marinas wrote:
+On Friday 04 July 2014 22:48:47 Russell King - ARM Linux wrote:
+> On Fri, Jul 04, 2014 at 10:58:04PM +0200, Arnd Bergmann wrote:
+> > On Friday 04 July 2014 21:51:44 Russell King - ARM Linux wrote:
+> > > Hmm, we need guidance from ARM people on that.
+> > > 
+> > > There may well be a better way to detect between ARMv6 and ARMv6K, which
+> > > is given by the architecture spec.  G7.3 of an early DDI0406 says that
+> > > the MPIDR (mp affinity register) aliases to MIDR for ARMv6, but is of
+> > > course implemented for ARMv6K.
+> > > 
+> > > This seems to be carried through to the latest ARM ARM.  So it seems
+> > > this would be a more correct way to tell ARMv6 from ARMv6K.
+> > > 
+> > > If so, we can certainly expand cpu_architecture() to detect between the
+> > > two and add a CPU_ARCH_ARMv6K in there.
+> > > 
+> > > Let's see what Will has to say about that when he's next around...
+> > > though I think it'll require another trawl through lots of
+> > > documentation.
 > > 
-> >> The timeline I propose would be:
-> >> 
-> >> 1. Architecture feature deprecation (still present, no way to disable)
-> >>   - In Linux we need to find ways and push for alternatives to be
-> >>     adopted by user space (like we did with kuser helpers)
-> > 
-> > Is it worth adding a non-default option to either disable and emulate or
-> > just completely disable during this phase rather than at step 2 (perhaps
-> > with a sysctl)?  That would help people who want to test that what they
-> > are doing is going to work going forwards.  The work is going to have to
-> > happen anyway.
+> > I was thinking of a simpler check in __get_cpu_architecture, just
+> > checking if the CPUID is ARM1136r0 since that is the only ARMv6
+> > CPU core we support. Anything else that we currently report as
+> > ARMv6 is actually ARMv6K.
 > 
-> The problem is that when the feature is deprecated, we may not always
-> get the option to disable it (it?s more of an advance warning to think
-> about it, that?s why I added emulation at step 2). For example SWP has
-> been deprecated in ARMv6 but no way to disable it until ARMv7 MP. If we
-> get the option (and we should probably recommend this to the
-> architects), I agree, you can start the emulation work at step 1 but
-> defaulting to native deprecated feature rather than emulation.
+> I'm not prepared to use that as the basis for detecting between V6 and
+> V6K at the moment - we don't know that for sure.  There seems to be
+> some Samsung platforms which are V6 (at least they don't select V6K).
 
-I think if a there is no way to turn off a feature, we can't really
-treat it as "deprecated", since we are lacking the most important tool
-to help users migrate away from it. Do you know why the architecture
-folks believe it makes sense to have distinct steps 1 and 2?
+I believe we looked at that in the past and concluded it was a bug
+and should be changed to V6K to reflect the actual hardware.
 
-Another problem that I see with the way that features are phased out
-on ARM is how the hypervisor architecture makes it really hard to
-run a guest in an older architecture version. For instance on s390,
-you can basically emulate any prior machine from the past 50 years
-by selectively trapping some of the instructions from the guest
-into the hypervisor, at least for any instruction that has had
-a different behavior in the past.
+> Either way, this isn't something we should rush into, because it has
+> the capability to break all sorts of stuff.  For example, merely
+> deciding to add a CPU_ARCH_ARMv6K results in a change to /proc/cpuinfo
+> (changing the "CPU architecture:" line) which is a user visible change.
+
+Agreed, that should certainly not be done as part  of the HWCAP_SWP
+change, regardless of whether we end up doing it later or in what form
+we do it.
+
+> We also have two ways to detect CPU_ARCH_ARMv6 - that needs careful
+> thought as well.  We also have a number of places which test for
+> equality with ARMv6, rather than less than or greater-or-equal.
+> 
+> Then there's all the ifdefs on CPU_V6K...
+
+Right, good point.
+
+> This is not something I want to rush into, and I certainly don't want
+> to make assumptions such as "ARMv6 === ARM1136 r0" - and I certainly
+> don't want to get stuck in a corner by making some changes and then
+> finding out that they're wrong later down the line when we can't then
+> fix it without more user visible churn.
+
+Ok.
 
 	Arnd
