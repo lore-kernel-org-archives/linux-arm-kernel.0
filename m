@@ -1,59 +1,65 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  5 Jul 2014 09:36:08 +0400
-Subject: [PATCH 3/4] ARM: i.MX27 clk: Remove unused definitions
+Date: Sat,  5 Jul 2014 09:36:09 +0400
+Subject: [PATCH 4/4] ARM: i.MX27 clk: Add 26 MHz oscillator circuit clock gate
 In-Reply-To: <1404538569-3076-1-git-send-email-shc_work@mail.ru>
 References: <1404538569-3076-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1404538569-3076-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1404538569-3076-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes definitions which not used anywhere in the driver.
+This patch adds missing 26 MHz oscillator circuit clock gate support.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-imx27.c | 25 -------------------------
- 1 file changed, 25 deletions(-)
+ arch/arm/mach-imx/clk-imx27.c           | 11 ++++++-----
+ include/dt-bindings/clock/imx27-clock.h |  3 ++-
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index ef7001c..fcfb81b 100644
+index fcfb81b..07bc32c 100644
 --- a/arch/arm/mach-imx/clk-imx27.c
 +++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -18,36 +18,11 @@ static void __iomem *ccm __initdata;
- #define CCM_MPCTL1		(ccm + 0x08)
- #define CCM_SPCTL0		(ccm + 0x0c)
- #define CCM_SPCTL1		(ccm + 0x10)
--#define CCM_OSC26MCTL		(ccm + 0x14)
- #define CCM_PCDR0		(ccm + 0x18)
- #define CCM_PCDR1		(ccm + 0x1c)
- #define CCM_PCCR0		(ccm + 0x20)
- #define CCM_PCCR1		(ccm + 0x24)
- #define CCM_CCSR		(ccm + 0x28)
--#define CCM_PMCTL		(ccm + 0x2c)
--#define CCM_PMCOUNT		(ccm + 0x30)
--#define CCM_WKGDCTL		(ccm + 0x34)
--
--#define CCM_CSCR_UPDATE_DIS	(1 << 31)
--#define CCM_CSCR_SSI2		(1 << 23)
--#define CCM_CSCR_SSI1		(1 << 22)
--#define CCM_CSCR_VPU		(1 << 21)
--#define CCM_CSCR_MSHC           (1 << 20)
--#define CCM_CSCR_SPLLRES        (1 << 19)
--#define CCM_CSCR_MPLLRES        (1 << 18)
--#define CCM_CSCR_SP             (1 << 17)
--#define CCM_CSCR_MCU            (1 << 16)
--#define CCM_CSCR_OSC26MDIV      (1 << 4)
--#define CCM_CSCR_OSC26M         (1 << 3)
--#define CCM_CSCR_FPM            (1 << 2)
--#define CCM_CSCR_SPEN           (1 << 1)
--#define CCM_CSCR_MPEN           (1 << 0)
--
--/* i.MX27 TO 2+ */
--#define CCM_CSCR_ARM_SRC        (1 << 15)
--
--#define CCM_SPCTL1_LF           (1 << 15)
--#define CCM_SPCTL1_BRMO         (1 << 6)
- 
+@@ -27,10 +27,10 @@ static void __iomem *ccm __initdata;
  static const char *vpu_sel_clks[] = { "spll", "mpll_main2", };
  static const char *cpu_sel_clks[] = { "mpll_main2", "mpll", };
+ static const char *mpll_sel_clks[] = { "fpm", "mpll_osc_sel", };
+-static const char *mpll_osc_sel_clks[] = { "ckih", "ckih_div1p5", };
++static const char *mpll_osc_sel_clks[] = { "ckih_gate", "ckih_div1p5", };
+ static const char *clko_sel_clks[] = {
+-	"ckil", "fpm", "ckih", "ckih",
+-	"ckih", "mpll", "spll", "cpu_div",
++	"ckil", "fpm", "ckih_gate", "ckih_gate",
++	"ckih_gate", "mpll", "spll", "cpu_div",
+ 	"ahb", "ipg", "per1_div", "per2_div",
+ 	"per3_div", "per4_div", "ssi1_div", "ssi2_div",
+ 	"nfc_div", "mshc_div", "vpu_div", "60m",
+@@ -50,11 +50,12 @@ static void __init _mx27_clocks_init(unsigned long fref)
+ 	clk[IMX27_CLK_CKIH] = imx_clk_fixed("ckih", fref);
+ 	clk[IMX27_CLK_CKIL] = imx_clk_fixed("ckil", 32768);
+ 	clk[IMX27_CLK_FPM] = imx_clk_fixed_factor("fpm", "ckil", 1024, 1);
+-	clk[IMX27_CLK_CKIH_DIV1P5] = imx_clk_fixed_factor("ckih_div1p5", "ckih", 2, 3);
++	clk[IMX27_CLK_CKIH_DIV1P5] = imx_clk_fixed_factor("ckih_div1p5", "ckih_gate", 2, 3);
++	clk[IMX27_CLK_CKIH_GATE] = imx_clk_gate_dis("ckih_gate", "ckih", CCM_CSCR, 3);
+ 	clk[IMX27_CLK_MPLL_OSC_SEL] = imx_clk_mux("mpll_osc_sel", CCM_CSCR, 4, 1, mpll_osc_sel_clks, ARRAY_SIZE(mpll_osc_sel_clks));
+ 	clk[IMX27_CLK_MPLL_SEL] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks, ARRAY_SIZE(mpll_sel_clks));
+ 	clk[IMX27_CLK_MPLL] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
+-	clk[IMX27_CLK_SPLL] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
++	clk[IMX27_CLK_SPLL] = imx_clk_pllv1("spll", "ckih_gate", CCM_SPCTL0);
+ 	clk[IMX27_CLK_SPLL_GATE] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
+ 	clk[IMX27_CLK_MPLL_MAIN2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
+ 
+diff --git a/include/dt-bindings/clock/imx27-clock.h b/include/dt-bindings/clock/imx27-clock.h
+index 6b642d4..148b053 100644
+--- a/include/dt-bindings/clock/imx27-clock.h
++++ b/include/dt-bindings/clock/imx27-clock.h
+@@ -102,6 +102,7 @@
+ #define IMX27_CLK_MSHC_IPG_GATE		89
+ #define IMX27_CLK_RTIC_AHB_GATE		90
+ #define IMX27_CLK_MSHC_BAUD_GATE	91
+-#define IMX27_CLK_MAX			92
++#define IMX27_CLK_CKIH_GATE		92
++#define IMX27_CLK_MAX			93
+ 
+ #endif
 -- 
 1.8.5.5
