@@ -1,67 +1,41 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 05 Jul 2014 12:40:45 +0530
-Subject: [PATCH v5 5/5] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <53B19B42.1040006@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
- <1403705032-14835-6-git-send-email-pankaj.dubey@samsung.com>
- <53B19B42.1040006@samsung.com>
-Message-ID: <001f01cf9820$3f0ee570$bd2cb050$@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 5 Jul 2014 08:25:35 +0100
+Subject: [PATCH v3] efi/arm64: handle missing virtual mapping for UEFI
+ System Table
+In-Reply-To: <CAKv+Gu_-=NtVNFLEh35Pv8OO6nLe1YhPjS13MYZa93YOXFOh6Q@mail.gmail.com>
+References: <1404487509-26084-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1404492756.19665.57.camel@deneb.redhat.com>	<20140704170110.GM16404@arm.com>
+ <CAKv+Gu_-=NtVNFLEh35Pv8OO6nLe1YhPjS13MYZa93YOXFOh6Q@mail.gmail.com>
+Message-ID: <09C85B92-02BB-45C4-A461-D4E0CD4F7203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On Monday, June 30, 2014 Tomasz Figa wrote:
-> Hi Pankaj,
+On 4 Jul 2014, at 18:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 4 July 2014 19:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Fri, Jul 04, 2014 at 05:52:36PM +0100, Mark Salter wrote:
+>>> On Fri, 2014-07-04 at 17:25 +0200, Ard Biesheuvel wrote:
+>>>> If we cannot resolve the virtual address of the UEFI System Table, its physical
+>>>> offset must be missing from the virtual memory map, and there is really no point
+>>>> in proceeding with installing the virtual memory map and the runtime services
+>>>> dispatch table. So back out gracefully.
+>>>> 
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> ---
+>>> 
+>>> Acked-by: Mark Salter <msalter@redhat.com>
+>> 
+>> Thanks. Do I take this patch or Matt already has other EFI patches to
+>> push? If the latter:
+>> 
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> On 25.06.2014 16:03, Pankaj Dubey wrote:
-> > This patch moves PMU specific definitions into a new file as
-> > exynos-pmu.h.
-> > This will help in reducing dependency of common.h in pmu.c.
-> >
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/common.h     |   17 -----------------
-> >  arch/arm/mach-exynos/exynos-pmu.h |   31
-> +++++++++++++++++++++++++++++++
-> >  arch/arm/mach-exynos/pm.c         |    1 +
-> >  arch/arm/mach-exynos/pmu.c        |    2 +-
-> >  4 files changed, 33 insertions(+), 18 deletions(-)  create mode
-> > 100644 arch/arm/mach-exynos/exynos-pmu.h
-> >
-> > diff --git a/arch/arm/mach-exynos/common.h
-> > b/arch/arm/mach-exynos/common.h index 296c6e1..0326ca2 100644
-> > --- a/arch/arm/mach-exynos/common.h
-> > +++ b/arch/arm/mach-exynos/common.h
-> > @@ -135,23 +135,6 @@ extern struct smp_operations exynos_smp_ops;
-> >
-> >  extern void exynos_cpu_die(unsigned int cpu);
-> >
-> > -/* PMU(Power Management Unit) support */
-> > -
-> > -#define PMU_TABLE_END	(-1U)
-> > -
-> > -enum sys_powerdown {
-> > -	SYS_AFTR,
-> > -	SYS_LPA,
-> > -	SYS_SLEEP,
-> > -	NUM_SYS_POWERDOWN,
-> > -};
-> > -
-> > -struct exynos_pmu_conf {
-> > -	unsigned int offset;
-> > -	unsigned int val[NUM_SYS_POWERDOWN];
-> > -};
-> 
-> While at it, I'd say this struct could be moved to pmu.c, along with the
-> PMU_TABLE_END macro as they are both private to this file.
-> 
+> Thanks. You can take it for 3.16 if you like, otherwise it is probably
+> better if we ask Matt to take it through his tree with some other
+> stuff we have in flight at the moment.
 
-OK, I will update this.
-
-> Best regards,
-> Tomasz
+OK, I?ll leave it to Matt then together with the other EFI patches
+he?s already queuing.
 
 Thanks,
-Pankaj Dubey
+
+Catalin
