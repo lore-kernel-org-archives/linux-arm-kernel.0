@@ -1,241 +1,158 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 05 Jul 2014 11:38:27 +0100
-Subject: [PATCH RFC 07/15] drm/armada: make variant a CRTC thing
+Date: Sat, 05 Jul 2014 11:38:32 +0100
+Subject: [PATCH RFC 08/15] drm: add of_graph endpoint helper to find possible
+ CRTCs
 In-Reply-To: <20140705103724.GN21766@n2100.arm.linux.org.uk>
 References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
-Message-ID: <E1X3NMR-0000A9-Qd@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X3NMW-0000AD-TY@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the variant pointer into the armada_crtc structure, and update for
-the resulting changes.
+Add a helper to allow encoders to find their possible CRTCs from the
+OF graph without having to re-implement this functionality.  We add a
+device_node to drm_crtc which corresponds with the port node in the
+DT description of the CRTC device.
+
+We can then scan the DRM device list for CRTCs to find their index,
+matching the appropriate CRTC using the port device_node, thus building
+up the possible CRTC mask.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/armada/armada_510.c  |  4 ++--
- drivers/gpu/drm/armada/armada_crtc.c | 27 ++++++++++++---------------
- drivers/gpu/drm/armada/armada_crtc.h |  5 ++++-
- drivers/gpu/drm/armada/armada_drm.h  |  9 ++++-----
- drivers/gpu/drm/armada/armada_drv.c  |  5 +++--
- 5 files changed, 25 insertions(+), 25 deletions(-)
+ drivers/gpu/drm/Makefile |  1 +
+ drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_crtc.h   |  2 ++
+ include/drm/drm_of.h     | 18 ++++++++++++++
+ 4 files changed, 86 insertions(+)
+ create mode 100644 drivers/gpu/drm/drm_of.c
+ create mode 100644 include/drm/drm_of.h
 
-diff --git a/drivers/gpu/drm/armada/armada_510.c b/drivers/gpu/drm/armada/armada_510.c
-index a9dabcaef92e..1bcf1a8c1915 100644
---- a/drivers/gpu/drm/armada/armada_510.c
-+++ b/drivers/gpu/drm/armada/armada_510.c
-@@ -79,6 +79,6 @@ static int armada510_crtc_compute_clock(struct armada_crtc *dcrtc,
- const struct armada_variant armada510_ops = {
- 	.has_spu_adv_reg = true,
- 	.spu_adv_reg = ADV_HWC32ENABLE | ADV_HWC32ARGB | ADV_HWC32BLEND,
--	.crtc_init = armada510_crtc_init,
--	.crtc_compute_clock = armada510_crtc_compute_clock,
-+	.init = armada510_crtc_init,
-+	.compute_clock = armada510_crtc_compute_clock,
- };
-diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
-index 3adddabc3626..afa497489000 100644
---- a/drivers/gpu/drm/armada/armada_crtc.c
-+++ b/drivers/gpu/drm/armada/armada_crtc.c
-@@ -332,17 +332,16 @@ static void armada_drm_crtc_commit(struct drm_crtc *crtc)
- static bool armada_drm_crtc_mode_fixup(struct drm_crtc *crtc,
- 	const struct drm_display_mode *mode, struct drm_display_mode *adj)
- {
--	struct armada_private *priv = crtc->dev->dev_private;
- 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
- 	int ret;
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index dd2ba4269740..533d011eab3e 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+ drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+ drm-$(CONFIG_PCI) += ati_pcigart.o
+ drm-$(CONFIG_DRM_PANEL) += drm_panel.o
++drm-$(CONFIG_OF) += drm_of.o
  
- 	/* We can't do interlaced modes if we don't have the SPU_ADV_REG */
--	if (!priv->variant->has_spu_adv_reg &&
-+	if (!dcrtc->variant->has_spu_adv_reg &&
- 	    adj->flags & DRM_MODE_FLAG_INTERLACE)
- 		return false;
+ drm-usb-y   := drm_usb.o
  
- 	/* Check whether the display mode is possible */
--	ret = priv->variant->crtc_compute_clock(dcrtc, adj, NULL);
-+	ret = dcrtc->variant->compute_clock(dcrtc, adj, NULL);
- 	if (ret)
- 		return false;
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+new file mode 100644
+index 000000000000..46d967881689
+--- /dev/null
++++ b/drivers/gpu/drm/drm_of.c
+@@ -0,0 +1,65 @@
++#include <linux/export.h>
++#include <linux/list.h>
++#include <linux/of_graph.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_of.h>
++
++/**
++ * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
++ * @dev: DRM device
++ * @port: port OF node
++ *
++ * Given a port OF node, return the possible mask of the corresponding
++ * CRTC within a device's list of CRTCs.  Returns zero if not found.
++ */
++static uint32_t drm_crtc_port_mask(struct drm_device *dev,
++				   struct device_node *port)
++{
++	unsigned int index = 0;
++	struct drm_crtc *tmp;
++
++	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
++		if (tmp->port == port)
++			return 1 << index;
++
++		index++;
++	}
++
++	return 0;
++}
++
++/**
++ * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
++ * @dev: DRM device
++ * @port: encoder port to scan for endpoints
++ *
++ * Scan all endpoints attached to a port, locate their attached CRTCs,
++ * and generate the DRM mask of CRTCs which may be attached to this
++ * encoder.
++ */
++uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
++				    struct device_node *port)
++{
++	struct device_node *remote_port, *ep = NULL;
++	uint32_t possible_crtcs = 0;
++
++	do {
++		ep = of_graph_get_next_endpoint(port, ep);
++		if (!ep)
++			break;
++
++		remote_port = of_graph_get_remote_port(ep);
++		if (!remote_port) {
++			of_node_put(ep);
++			return 0;
++		}
++
++		possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
++
++		of_node_put(remote_port);
++	} while (1);
++
++	return possible_crtcs;
++}
++EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+index 251b75e6bf7a..6a94909f1ca9 100644
+--- a/include/drm/drm_crtc.h
++++ b/include/drm/drm_crtc.h
+@@ -41,6 +41,7 @@ struct drm_framebuffer;
+ struct drm_object_properties;
+ struct drm_file;
+ struct drm_clip_rect;
++struct device_node;
  
-@@ -491,7 +490,6 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
- 	struct drm_display_mode *mode, struct drm_display_mode *adj,
- 	int x, int y, struct drm_framebuffer *old_fb)
- {
--	struct armada_private *priv = crtc->dev->dev_private;
- 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
- 	struct armada_regs regs[17];
- 	uint32_t lm, rm, tm, bm, val, sclk;
-@@ -536,7 +534,7 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
- 	}
+ #define DRM_MODE_OBJECT_CRTC 0xcccccccc
+ #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
+@@ -314,6 +315,7 @@ struct drm_crtc_funcs {
+  */
+ struct drm_crtc {
+ 	struct drm_device *dev;
++	struct device_node *port;
+ 	struct list_head head;
  
- 	/* Now compute the divider for real */
--	priv->variant->crtc_compute_clock(dcrtc, adj, &sclk);
-+	dcrtc->variant->compute_clock(dcrtc, adj, &sclk);
- 
- 	/* Ensure graphic fifo is enabled */
- 	armada_reg_queue_mod(regs, i, 0, CFG_PDWN64x66, LCD_SPU_SRAM_PARA1);
-@@ -558,7 +556,7 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
- 	dcrtc->v[1].spu_v_porch = tm << 16 | bm;
- 	val = adj->crtc_hsync_start;
- 	dcrtc->v[1].spu_adv_reg = val << 20 | val | ADV_VSYNCOFFEN |
--		priv->variant->spu_adv_reg;
-+		dcrtc->variant->spu_adv_reg;
- 
- 	if (interlaced) {
- 		/* Odd interlaced frame */
-@@ -567,7 +565,7 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
- 		dcrtc->v[0].spu_v_porch = dcrtc->v[1].spu_v_porch + 1;
- 		val = adj->crtc_hsync_start - adj->crtc_htotal / 2;
- 		dcrtc->v[0].spu_adv_reg = val << 20 | val | ADV_VSYNCOFFEN |
--			priv->variant->spu_adv_reg;
-+			dcrtc->variant->spu_adv_reg;
- 	} else {
- 		dcrtc->v[0] = dcrtc->v[1];
- 	}
-@@ -582,7 +580,7 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
- 	armada_reg_queue_set(regs, i, dcrtc->v[0].spu_v_h_total,
- 			   LCD_SPUT_V_H_TOTAL);
- 
--	if (priv->variant->has_spu_adv_reg) {
-+	if (dcrtc->variant->has_spu_adv_reg) {
- 		armada_reg_queue_mod(regs, i, dcrtc->v[0].spu_adv_reg,
- 				     ADV_VSYNC_L_OFF | ADV_VSYNC_H_OFF |
- 				     ADV_VSYNCOFFEN, LCD_SPU_ADV_REG);
-@@ -826,12 +824,11 @@ static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
- {
- 	struct drm_device *dev = crtc->dev;
- 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
--	struct armada_private *priv = crtc->dev->dev_private;
- 	struct armada_gem_object *obj = NULL;
- 	int ret;
- 
- 	/* If no cursor support, replicate drm's return value */
--	if (!priv->variant->has_spu_adv_reg)
-+	if (!dcrtc->variant->has_spu_adv_reg)
- 		return -ENXIO;
- 
- 	if (handle && w > 0 && h > 0) {
-@@ -879,11 +876,10 @@ static int armada_drm_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
- {
- 	struct drm_device *dev = crtc->dev;
- 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
--	struct armada_private *priv = crtc->dev->dev_private;
- 	int ret;
- 
- 	/* If no cursor support, replicate drm's return value */
--	if (!priv->variant->has_spu_adv_reg)
-+	if (!dcrtc->variant->has_spu_adv_reg)
- 		return -EFAULT;
- 
- 	mutex_lock(&dev->struct_mutex);
-@@ -1051,7 +1047,7 @@ static int armada_drm_crtc_create_properties(struct drm_device *dev)
- }
- 
- int armada_drm_crtc_create(struct drm_device *dev, struct resource *res,
--	int irq)
-+	int irq, const struct armada_variant *variant)
- {
- 	struct armada_private *priv = dev->dev_private;
- 	struct armada_crtc *dcrtc;
-@@ -1074,6 +1070,7 @@ int armada_drm_crtc_create(struct drm_device *dev, struct resource *res,
- 		return -ENOMEM;
- 	}
- 
-+	dcrtc->variant = variant;
- 	dcrtc->base = base;
- 	dcrtc->num = dev->mode_config.num_crtc;
- 	dcrtc->clk = ERR_PTR(-EINVAL);
-@@ -1107,8 +1104,8 @@ int armada_drm_crtc_create(struct drm_device *dev, struct resource *res,
- 		return ret;
- 	}
- 
--	if (priv->variant->crtc_init) {
--		ret = priv->variant->crtc_init(dcrtc, dev->dev);
-+	if (dcrtc->variant->init) {
-+		ret = dcrtc->variant->init(dcrtc, dev->dev);
- 		if (ret) {
- 			kfree(dcrtc);
- 			return ret;
-diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
-index 3f0e70bb2e9c..73efcfcdf814 100644
---- a/drivers/gpu/drm/armada/armada_crtc.h
-+++ b/drivers/gpu/drm/armada/armada_crtc.h
-@@ -32,9 +32,11 @@ struct armada_regs {
- 	armada_reg_queue_mod(_r, _i, 0, 0, ~0)
- 
- struct armada_frame_work;
-+struct armada_variant;
- 
- struct armada_crtc {
- 	struct drm_crtc		crtc;
-+	const struct armada_variant *variant;
- 	unsigned		num;
- 	void __iomem		*base;
- 	struct clk		*clk;
-@@ -73,7 +75,8 @@ struct armada_crtc {
- };
- #define drm_to_armada_crtc(c) container_of(c, struct armada_crtc, crtc)
- 
--int armada_drm_crtc_create(struct drm_device *, struct resource *, int);
-+int armada_drm_crtc_create(struct drm_device *, struct resource *, int,
-+	const struct armada_variant *);
- void armada_drm_crtc_gamma_set(struct drm_crtc *, u16, u16, u16, int);
- void armada_drm_crtc_gamma_get(struct drm_crtc *, u16 *, u16 *, u16 *, int);
- void armada_drm_crtc_disable_irq(struct armada_crtc *, u32);
-diff --git a/drivers/gpu/drm/armada/armada_drm.h b/drivers/gpu/drm/armada/armada_drm.h
-index a5452ae883d1..ea63c6c7c66f 100644
---- a/drivers/gpu/drm/armada/armada_drm.h
-+++ b/drivers/gpu/drm/armada/armada_drm.h
-@@ -61,17 +61,16 @@ struct armada_private;
- struct armada_variant {
- 	bool has_spu_adv_reg;
- 	uint32_t spu_adv_reg;
--	int (*crtc_init)(struct armada_crtc *, struct device *);
--	int (*crtc_compute_clock)(struct armada_crtc *,
--				  const struct drm_display_mode *,
--				  uint32_t *);
-+	int (*init)(struct armada_crtc *, struct device *);
-+	int (*compute_clock)(struct armada_crtc *,
-+			     const struct drm_display_mode *,
-+			     uint32_t *);
- };
- 
- /* Variant ops */
- extern const struct armada_variant armada510_ops;
- 
- struct armada_private {
--	const struct armada_variant *variant;
- 	struct work_struct	fb_unref_work;
- 	DECLARE_KFIFO(fb_unref, struct drm_framebuffer *, 8);
- 	struct drm_fb_helper	*fbdev;
-diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-index 4939a86a2afc..3995be3c686b 100644
---- a/drivers/gpu/drm/armada/armada_drv.c
-+++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -85,6 +85,7 @@ void armada_drm_queue_unref_work(struct drm_device *dev,
- static int armada_drm_load(struct drm_device *dev, unsigned long flags)
- {
- 	const struct platform_device_id *id;
-+	const struct armada_variant *variant;
- 	struct armada_private *priv;
- 	struct resource *res[ARRAY_SIZE(priv->dcrtc)];
- 	struct resource *mem = NULL;
-@@ -128,7 +129,7 @@ static int armada_drm_load(struct drm_device *dev, unsigned long flags)
- 	if (!id)
- 		return -ENXIO;
- 
--	priv->variant = (struct armada_variant *)id->driver_data;
-+	variant = (const struct armada_variant *)id->driver_data;
- 
- 	INIT_WORK(&priv->fb_unref_work, armada_drm_unref_work);
- 	INIT_KFIFO(priv->fb_unref);
-@@ -160,7 +161,7 @@ static int armada_drm_load(struct drm_device *dev, unsigned long flags)
- 		if (irq < 0)
- 			goto err_kms;
- 
--		ret = armada_drm_crtc_create(dev, res[n], irq);
-+		ret = armada_drm_crtc_create(dev, res[n], irq, variant);
- 		if (ret)
- 			goto err_kms;
- 	}
+ 	/**
+diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+new file mode 100644
+index 000000000000..2441f7112074
+--- /dev/null
++++ b/include/drm/drm_of.h
+@@ -0,0 +1,18 @@
++#ifndef __DRM_OF_H__
++#define __DRM_OF_H__
++
++struct drm_device;
++struct device_node;
++
++#ifdef CONFIG_OF
++extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
++					   struct device_node *port);
++#else
++static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
++						  struct device_node *port)
++{
++	return 0;
++}
++#endif
++
++#endif /* __DRM_OF_H__ */
 -- 
 1.8.3.1
