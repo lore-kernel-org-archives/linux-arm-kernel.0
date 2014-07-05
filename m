@@ -1,64 +1,50 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Sat, 5 Jul 2014 20:56:16 +0200
-Subject: [PATCH v2 2/2] spi: add driver for Rockchip RK3xxx SoCs
- integrated SPI
-In-Reply-To: <20140704183249.GC14896@sirena.org.uk>
-References: <1403582852-9751-1-git-send-email-addy.ke@rock-chips.com>
- <1404176639-3315-1-git-send-email-addy.ke@rock-chips.com>
- <20140704183249.GC14896@sirena.org.uk>
-Message-ID: <CAOiHx=msQraNEiVoAZOoFS0Bf-R65nAN3FXL7qUvuaU-a=PqGw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 5 Jul 2014 14:04:41 -0500
+Subject: [PATCH v8 7/9] pci: of: Parse and map the IRQ when adding the PCI
+ device.
+In-Reply-To: <20140702111748.GJ18731@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-8-git-send-email-Liviu.Dudau@arm.com>
+ <20140702111748.GJ18731@arm.com>
+Message-ID: <CAL_JsqKWm54MjXC60EWVcxOurza=f2V9fwe2vVROa_Mv-6QnHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 8:32 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jul 01, 2014 at 09:03:59AM +0800, addy ke wrote:
->> In order to facilitate understanding, rockchip SPI controller IP design
->> looks similar in its registers to designware. But IC implementation
->> is different from designware, So we need a dedicated driver for Rockchip
->> RK3XXX SoCs integrated SPI. The main differences:
+On Wed, Jul 2, 2014 at 6:17 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 01, 2014 at 07:43:32PM +0100, Liviu Dudau wrote:
+>> Enhance the default implementation of pcibios_add_device() to
+>> parse and map the IRQ of the device if a DT binding is available.
+>>
+>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> ---
+>>  drivers/pci/pci.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index 63a54a3..8e65dc3 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/spinlock.h>
+>>  #include <linux/string.h>
+>>  #include <linux/log2.h>
+>> +#include <linux/of_pci.h>
+>>  #include <linux/pci-aspm.h>
+>>  #include <linux/pm_wakeup.h>
+>>  #include <linux/interrupt.h>
+>> @@ -1453,6 +1454,9 @@ EXPORT_SYMBOL(pcim_pin_device);
+>>   */
+>>  int __weak pcibios_add_device(struct pci_dev *dev)
+>>  {
+>> +#ifdef CONFIG_OF
+>> +     dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>> +#endif
 >
-> This looks good overall, a nice clean driver.  I've applied it but there
-> are a few small issues that need fixing up which I've noted below, can
-> you please send followup patches dealing with these?
->
->> +      * static void spi_set_cs(struct spi_device *spi, bool enable)
->> +      * {
->> +      *              if (spi->mode & SPI_CS_HIGH)
->> +      *                      enable = !enable;
->> +      *
->> +      *              if (spi->cs_gpio >= 0)
->> +      *                      gpio_set_value(spi->cs_gpio, !enable);
->> +      *              else if (spi->master->set_cs)
->> +      *              spi->master->set_cs(spi, !enable);
->> +      * }
->> +      *
->> +      * Note: enable(rockchip_spi_set_cs) = !enable(spi_set_cs)
->> +      */
->
-> So, the point here is that chip select is an active low signal by
-> default which means that if chip select is asserted we have a low logic
-> level and the parameter means "asserted" not "logic level for the
-> output".  It doesn't really matter but it might be clearer to say so
-> directly.
->
->> +     if (spi->mode & SPI_CS_HIGH) {
->> +             dev_err(rs->dev, "spi_cs_hign: not support\n");
->> +             return -EINVAL;
->
-> Typo here (high).
+> You could avoid the #ifdef by only assigning dev->irq if
+> of_irq_parse_and_map_pci returned something > 0.
 
-This whole check looks bogus and should probably be removed. Either
-the driver/hardware does not support SPI_CS_HIGH, then the
-master->mode_bits set in rockchip_spi_probe are wrong and SPI_CS_HIGH
-should be removed. The common code already ensures that spi_device's
-mode match the master's mode_bits, so the condition then could never
-be true.
-Or the driver/hardware does actually support it as it claims with it
-mode_bits, then the check is wrong and it will wrongfully rejects
-spi_devices using/requiring SPI_CS_HIGH.
+Perhaps it could just be unconditional always. Presumably, dev->irq is
+not already set to something valid and setting it to <= 0 should not
+have any consequences.
 
-Going that the rockchip_spi_set_cs has this extra explanation about
-enable being inverted with CS_HIGH, I would guess the latter.
-
-
-Jonas
+Rob
