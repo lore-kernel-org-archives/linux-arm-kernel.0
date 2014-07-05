@@ -1,60 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Jul 2014 12:25:19 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140705111406.GA23692@arm.com>
-References: <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com> <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703174318.GE28175@arm.com>
- <20140704132250.A2447C40ADD@trevor.secretlab.ca>
- <20140705111406.GA23692@arm.com>
-Message-ID: <20140705112519.GO21766@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 5 Jul 2014 12:30:56 +0100
+Subject: [GIT PULL] arm64 fixes for 3.16
+Message-ID: <20140705113050.GA28232@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 05, 2014 at 12:14:07PM +0100, Catalin Marinas wrote:
-> The timeline I propose would be:
-> 
-> 1. Architecture feature deprecation (still present, no way to disable)
->    - In Linux we need to find ways and push for alternatives to be
->      adopted by user space (like we did with kuser helpers)
-> 2. Architecture feature disabling (still present but needs to be enabled
->    explicitly via SCTLR bit)
->    - Linux disables the feature by default and provides emulation
->      (enabled by default), clear warnings
->    - In certain cases, there may be justification to enable the hardware
->      feature but certainly not in defconfig nor distro Image builds.
->      Otherwise they can't complain that users are still using such
->      feature at point 3 below
-> 3. Architecture feature removed
->    - Default Linux behaviour changes to SIGILL
->    - Emulation could be still available in the kernel but maybe under
->      a CONFIG_EXPERT option
-> 4. Eventually remove kernel emulation support entirely (or don't carry
->    it over to a new port, though I don't foresee any arm128 ;))
-> 
-> With SWP, we are currently at 3/4 with the counter arguments that 2
-> wasn't entirely clear to users, so the transition needs to be
-> carried over for ARMv8 (but I'm against 2 for arm64, 3 is as far as I
-> would go).
+Hi Linus,
 
-That's reasonable - the patches I sent out turn off hardware SWP
-where possible when SMP is enabled, switching it to emulation mode.
-Plus we disable HWCAP_SWP where the exclusives are available,
-whether or not the hardware has support for SWP.  This includes
-ARMv6* (which needs careful review.)
+Please pull the arm64 fixes below for 3.16. Thanks.
 
-However, don't forget that even when we disable HWCAP_SWP, that's of
-limited use to userspace because we have soo many kernels which don't.
 
-We still don't log SWP usage - they're still at debug level (which
-means compiled out in standard kernel builds), neither do we log the
-location of SWPs in the user binary (like we do with alignment faults.)
-Both of these still need addressing.
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 974c8e450b9327a03453a4a450a2030b1bd42b5f:
+
+  arm64: fix el2_setup check of CurrentEL (2014-07-04 16:16:52 +0100)
+
+----------------------------------------------------------------
+ARM64 fixes:
+- Exception level check at boot time (for completeness, not triggering
+  any bug before)
+- I/D-cache synchronisation logic for huge pages
+- Config symbol typo
+
+----------------------------------------------------------------
+Marc Zyngier (1):
+      arm64: fix el2_setup check of CurrentEL
+
+Steve Capper (2):
+      arm64: mm: Fix horrendous config typo
+      arm64: mm: Make icache synchronisation logic huge page aware
+
+ arch/arm64/include/asm/pgtable.h | 2 +-
+ arch/arm64/include/asm/ptrace.h  | 4 ++++
+ arch/arm64/kernel/efi-entry.S    | 3 +--
+ arch/arm64/kernel/head.S         | 3 +--
+ arch/arm64/mm/flush.c            | 3 ++-
+ 5 files changed, 9 insertions(+), 6 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Catalin
