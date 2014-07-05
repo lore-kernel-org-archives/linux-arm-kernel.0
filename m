@@ -1,49 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Jul 2014 11:37:24 +0100
-Subject: [PATCH RFC 00/15] Armada DRM updates
-Message-ID: <20140705103724.GN21766@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 05 Jul 2014 11:37:57 +0100
+Subject: [PATCH RFC 01/15] component: fix missed cleanup in case of devres
+ failure
+In-Reply-To: <20140705103724.GN21766@n2100.arm.linux.org.uk>
+References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
+Message-ID: <E1X3NLx-00009k-74@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series updates the Armada DRM driver to be more DT friendly
-by converting it to the component helper.  This is an incomplete
-conversion as we also need to convert the TDA998x as well, hence it
-currently retains the existing method of initialisation using the slave
-encoder mechanism.  The old mechanism will be removed once the
-conversion is complete.
+In try_to_bring_up_master(), we tear down the master's component list
+for each error case, except for devres group failure.  Fix this
+oversight by making the code less prone to such mistakes.
 
-This series includes the component updates (patches 1-3 which have been
-recently merged into Greg's driver tree, patch 9 which is scheduled to
-be merged) and the recently posted DRM OF helper for encoders (patch 8).
-Hence patches 1-3 and 9 are only included for reference purposes.
-Please direct comments for patch 8 to the previously posted RFC for
-that single patch.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/component.c | 62 ++++++++++++++++++++++++------------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
-The general idea here is to permit each CRTC device to exist as a
-separate device node in DT (as it should be) with all the appropriate
-properties such as base address, interrupt and pixel clocks.
-
-The encoders (which may be off-SoC) will be specified separately in DT,
-and the connectivity specified via the DT's graph bindings.
-
-The diffstat below is for the entire series, which includes the
-component helpre updates and the DRM OF helper.
-
- .../bindings/drm/armada/marvell,dove-lcd.txt       |  30 +++
- arch/arm/boot/dts/dove.dtsi                        |  14 ++
- drivers/base/component.c                           | 192 +++++++++++++----
- drivers/gpu/drm/Makefile                           |   1 +
- drivers/gpu/drm/armada/armada_510.c                |  23 +-
- drivers/gpu/drm/armada/armada_crtc.c               | 188 +++++++++++++++--
- drivers/gpu/drm/armada/armada_crtc.h               |   9 +-
- drivers/gpu/drm/armada/armada_drm.h                |  13 +-
- drivers/gpu/drm/armada/armada_drv.c                | 233 ++++++++++++++-------
- drivers/gpu/drm/drm_of.c                           |  65 ++++++
- include/drm/drm_crtc.h                             |   2 +
- include/drm/drm_of.h                               |  18 ++
- include/linux/component.h                          |   7 +
- 13 files changed, 642 insertions(+), 153 deletions(-)
-
+diff --git a/drivers/base/component.c b/drivers/base/component.c
+index c4778995cd72..d0ebd4431736 100644
+--- a/drivers/base/component.c
++++ b/drivers/base/component.c
+@@ -113,44 +113,44 @@ static void master_remove_components(struct master *master)
+ static int try_to_bring_up_master(struct master *master,
+ 	struct component *component)
+ {
+-	int ret = 0;
++	int ret;
+ 
+-	if (!master->bound) {
+-		/*
+-		 * Search the list of components, looking for components that
+-		 * belong to this master, and attach them to the master.
+-		 */
+-		if (master->ops->add_components(master->dev, master)) {
+-			/* Failed to find all components */
+-			master_remove_components(master);
+-			ret = 0;
+-			goto out;
+-		}
++	if (master->bound)
++		return 0;
+ 
+-		if (component && component->master != master) {
+-			master_remove_components(master);
+-			ret = 0;
+-			goto out;
+-		}
++	/*
++	 * Search the list of components, looking for components that
++	 * belong to this master, and attach them to the master.
++	 */
++	if (master->ops->add_components(master->dev, master)) {
++		/* Failed to find all components */
++		ret = 0;
++		goto out;
++	}
+ 
+-		if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
+-			ret = -ENOMEM;
+-			goto out;
+-		}
++	if (component && component->master != master) {
++		ret = 0;
++		goto out;
++	}
+ 
+-		/* Found all components */
+-		ret = master->ops->bind(master->dev);
+-		if (ret < 0) {
+-			devres_release_group(master->dev, NULL);
+-			dev_info(master->dev, "master bind failed: %d\n", ret);
+-			master_remove_components(master);
+-			goto out;
+-		}
++	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
++		ret = -ENOMEM;
++		goto out;
++	}
+ 
+-		master->bound = true;
+-		ret = 1;
++	/* Found all components */
++	ret = master->ops->bind(master->dev);
++	if (ret < 0) {
++		devres_release_group(master->dev, NULL);
++		dev_info(master->dev, "master bind failed: %d\n", ret);
++		goto out;
+ 	}
++
++	master->bound = true;
++	return 1;
++
+ out:
++	master_remove_components(master);
+ 
+ 	return ret;
+ }
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
