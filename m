@@ -1,41 +1,40 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 05 Jul 2014 12:05:39 +0530
-Subject: [PATCH v5 3/5] ARM: EXYNOS: Move "mach/map.h" inclusion from
- regs-pmu.h to platsmp.c
-In-Reply-To: <53B18E52.1060906@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
- <1403705032-14835-4-git-send-email-pankaj.dubey@samsung.com>
- <53B18E52.1060906@samsung.com>
-Message-ID: <001d01cf981b$57829bb0$0687d310$@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 5 Jul 2014 09:08:16 +0200
+Subject: [PATCH] ARM: mvebu: Fix the operand list in the inline asm of
+ armada_370_xp_pmsu_idle_enter
+In-Reply-To: <1404483736-16938-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1404483736-16938-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140705090816.7724961d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Dear Gregory CLEMENT,
 
-On Monday, June 30, 2014 Tomasz Figa wrote:
-> Hi Pankaj,
+On Fri,  4 Jul 2014 16:22:16 +0200, Gregory CLEMENT wrote:
+> In the inline asm part of the function armada_370_xp_pmsu_idle_enter()
+> the input operand was used. The intent here was to let the compiler
+> choose this register so it could do the optimization it
+> needed.
 > 
-> On 25.06.2014 16:03, Pankaj Dubey wrote:
-> > As we have removed static mappings from "regs-pmu.h" it does not need
-> > map.h anymore. But "platsmp.c" needed this and till now it got
-> > included indirectly. So lets move header inclusion of "mach/map.h"
-> > from "regs-pmu.h" to "platsmp.c".
-> >
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/platsmp.c  |    2 ++
-> >  arch/arm/mach-exynos/regs-pmu.h |    2 --
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
-> >
+> However an input operand is not supposed to be modified by the inline
+> asm code. This can lead to improper generated instructions.
 > 
-> IMHO this could be squashed with previous patch.
+> In some case generated instruction the compiler made the choice to
+> reuse the same register to store the return value. But in the assembly
+> part this register was modified, so it can lead to return an wrong
+> value.
 > 
+> The fix is to use a clobber. Thanks to this the compiler will know
+> that the value of this register will be modified.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-OK, will squash this.
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> Best regards,
-> Tomasz
+Thanks!
 
-Thanks,
-Pankaj Dubey
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
