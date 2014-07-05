@@ -1,41 +1,66 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Sat, 5 Jul 2014 11:57:42 +0100
-Subject: [GIT PULL] TDA998x fixes
-Message-ID: <20140705105742.GA1811@rmk-PC.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 05 Jul 2014 13:00:43 +0200
+Subject: [PATCH 00/19] ARM: SAMSUNG: S5PV210 platform clean-up
+In-Reply-To: <CAOh2x==dHrJkKw4h7y2nwYgFCv6s5ndU2DMiga302tzDaiaBWA@mail.gmail.com>
+References: <1404495893-26371-1-git-send-email-t.figa@samsung.com>
+ <CAOh2x==dHrJkKw4h7y2nwYgFCv6s5ndU2DMiga302tzDaiaBWA@mail.gmail.com>
+Message-ID: <53B7DADB.5080700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+On 05.07.2014 06:46, Viresh Kumar wrote:
+> On Fri, Jul 4, 2014 at 11:14 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> This huge series is a (hopefully final) attempt to convert Samsung S5PV210
+>> into a DT-only and multiplatform-aware platform. It consists of several
+>> steps to gradually replace legacy code with one meeting current standards
+>> and then finally remove unused remnants.
+>>
+>> Patches 1-6 migrate the platform to fully use the Common Clock Framework
+>> and get rid of legacy private clock code, of which s5pv210 was the last
+>> user. Then patch 7 adds generic PHY driver for USB PHY on S5PV210 to allow
+>> USB to be supported when using DT. Further three patches (8-10) add DT
+>> support for mach-s5pv210 and necessary DT sources for currently supported
+>> boards. Patch 11 removes board files and code directly related to them,
+>> effectively making s5pv210 a DT-only platform. In next step, patches 12-15
+>> prepare remaining code for multiplatform enablement, which is finally done
+>> in patch 16. Patches 17-19 are a final clean-up, which remove a lot of
+>> unused code left after making the last S5P platform DT-only.
+>>
+>> Build tested patch by patch on following configs:
+>>  - s3c2410_defconfig (with DT support enabled),
+>>  - s3c6400_defconfig (with DT support enabled),
+>>  - s5pv210_defconfig (with DT support enabled after patches adding it),
+>>  - exynos_defconfig,
+>>  - exynos_defconfig with S5PV210 enabled in multiplatform configuration.
+>>
+>> Boot tested on s5pv210-goni board.
+>>
+>> Note that support for smdkc110, smdkv210 and torbreck boards is provided
+>> by moving data from existing board files to new device tree sources. No
+>> testing was performed due to mentioned board not being available anymore.
+>> However I believe we agreed on this approach, because apparently there
+>> are no active users of them. See the RFC from August 2013 asking for
+>> removal of the whole platform [1].
+>>
+>> [1] http://www.mail-archive.com/linux-samsung-soc%40vger.kernel.org/msg21882.html
+> 
+>> Tomasz Figa (13):
+>>   cpufreq: s3c24xx: Remove some dead code
+>>   cpufreq: s5pv210: Make the driver multiplatform aware
+> 
+> Looks like you used --suppress-cc=all while sending these and none of
+> CPUFreq/PM guys received it :(
 
-Please incorporate the latest TDA998x fixes, which can be found at:
+Oops, I had a feeling that I has screwed up something with this series
+and now we know what. Sorry for this. Will resend properly next Tuesday.
 
-  git://ftp.arm.linux.org.uk/~rmk/linux-cubox.git tda998x-fixes
+> 
+> Anyways, for cpufreq part:
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
 
-with SHA1 de4bf3d51fe38eaf90cb587e4eae1f3f0e056a54.
+Thanks. Will add to the patches when resending.
 
-A number of relatively minor TDA998x fixes, the most serious of which
-is the positioning of the drm_i2c_encoder_destroy call, which is marked
-for inclusion in stable trees.
-
-These changes are based on v3.15, and test merging with your drm-fixes
-(0fcb70c30131) dated 27th June shows no conflicts.
-
-This will update the following files:
-
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt |  2 ++
- drivers/gpu/drm/i2c/tda998x_drv.c                     | 12 +++++++++---
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
-through these changes:
-
-Guido Mart?nez (1):
-      drm/i2c: tda998x: move drm_i2c_encoder_destroy call
-
-Jean-Francois Moine (1):
-      drm/i2c: tda998x: fix lack of required reg in DT documentation
-
-Russell King (2):
-      drm/i2c: tda998x: faster polling for edid
-      drm/i2c: tda998x: add some basic mode validation
-
-Many thanks.
+Best regards,
+Tomasz
