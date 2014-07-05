@@ -1,85 +1,232 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 5 Jul 2014 13:59:51 -0700
-Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
-In-Reply-To: <20140705150308.GA28791@arch.cereza>
-References: <20140703135146.GA6898@luxor.wired.org>
- <53B5C61D.2060308@free-electrons.com>
- <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
- <20140705150308.GA28791@arch.cereza>
-Message-ID: <20140705205951.GB3678@kroah.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Sat, 5 Jul 2014 23:03:59 +0200
+Subject: [PATCH 1/3] ethernet: Add new driver for Marvell Armada 375
+ network unit
+In-Reply-To: <1404498697-21978-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1404498697-21978-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1404498697-21978-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140705210359.GA19441@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 05, 2014 at 12:03:08PM -0300, Ezequiel Garcia wrote:
-> After following Gregory's stacktrace (also reproduced here):
-> 
-> [<c02451f8>] (iommu_bus_notifier) from [<c00512e8>] (notifier_call_chain+0x64/0x9c)
-> [<c00512e8>] (notifier_call_chain) from [<c00514cc>] (__blocking_notifier_call_chain+0x40/0x58)
-> [<c00514cc>] (__blocking_notifier_call_chain) from [<c00514f8>] (blocking_notifier_call_chain+0x14/0x1c)
-> [<c00514f8>] (blocking_notifier_call_chain) from [<c01d225c>] (device_add+0x424/0x524)
-> [<c01d225c>] (device_add) from [<c0186d90>] (pci_device_add+0xec/0x110)
-> [<c0186d90>] (pci_device_add) from [<c0186e54>] (pci_scan_single_device+0xa0/0xac)
-> 
-> I added a few printks and found that the problem is that the iommu_bus_notifier is
-> called for the 'pci' bus type, which has a null iommu_ops.
-> 
-> On 04 Jul 10:47 AM, Laurent Pinchart wrote:
-> [..]
-> > 
-> > We need a quick fix for v3.16, ...
-> 
-> Therefore, a quick fix would be to simply check for that:
-> 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index e5555fc..b712cb2 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -536,6 +536,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
->         struct iommu_group *group;
->         unsigned long group_action = 0;
->  
-> +       if (!ops)
-> +               return 0;
+Partial review below.
+
+> diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+> new file mode 100644
+> index 0000000..154b866
+> --- /dev/null
+> +++ b/drivers/net/ethernet/marvell/mvpp2.c
+[...]
+> +static int mvpp2_prs_tcam_first_free(struct mvpp2 *pp2, int start, int end)
+> +{
+> +	int tid;
+> +	bool found = false;
 > +
->         /*
->          * ADD/DEL call into iommu driver ops if provided, which may
->          * result in ADD/DEL notifiers to group->notifier
-> 
-> This (nasty workaround?) patch makes the problem go away.
-> 
-> [..]
-> > > So it also boot well in 3.15 and then failed in 3.16-rc3. I hope it will
-> > > help the developers of the OMAP IOMMU driver to fix it.
-> > 
-> > Thank you. I've had a look at the OMAP IOMMU driver changes between v3.15 and 
-> > v3.16-rc3, and didn't find at first sight any change that could explain the 
-> > crash.
-> > 
-> > 286f600 iommu/omap: Fix map protection value handling
-> > 67b779d iommu/omap: Remove comment about supporting single page mappings only
-> > f7129a0 iommu/omap: Fix 'no page for' debug message in flush_iotlb_page()
-> > 5acc97d iommu/omap: Move to_iommu definition from omap-iopgtable.h
-> > 2ac6133 iommu/omap: Remove omap_iommu_domain_has_cap() function
-> > d760e3e iommu/omap: Correct init value of iotlb_entry valid field
-> > 
-> > Could you try reverting those changes and retest ? If the problem doesn't 
-> > disappear, we'll need to look somewhere else.
-> > 
-> 
-> I reverted the above commits but nothing changed. I'm far from being an expert,
-> but it sounds odd to have this bus notifier (that got registered for the
-> platform bus type) called by a pci bus type.
+> +	if (start < end)
+> +		for (tid = start; tid <= end; tid++) {
+> +			if (!pp2->prs_shadow[tid].valid) {
+> +				found = true;
+> +				break;
+> +			}
+> +		}
+> +	else
+> +		for (tid = start; tid >= end; tid--) {
+> +			if (!pp2->prs_shadow[tid].valid) {
+> +				found = true;
+> +				break;
+> +			}
+> +		}
 
-Why wouldn't the PCI bus set this up for its devices?  Are you
-"assuming" you know the bus type and that's the issue?
+Missing parenthsesis in "if ... else ..." block.
 
-I see the a number of different places this is being initialized for the
-pci bus.
+[...]
+> +static void mvpp2_defaults_set(struct mvpp2_port *pp)
+> +{
+[...]
+> +	/* At default, mask all interrupts to all present cpus */
+> +	for_each_present_cpu(cpu)
+> +		mvpp2_cpu_interrupts_disable(pp, cpu);
 
-Ah, look at drivers/iommu/fsl_pamu_domain.c, odds are, it shouldn't be
-doing that logic in the pamu_domain_init() code, using the same bus ops
-for different bus types, that's ripe for major problems...
+Would it hurt to issue a single write and disable all irqs ?
 
-thanks,
+[...]
+> +static int mvpp2_tx_frag_process(struct mvpp2_port *pp, struct sk_buff *skb,
+> +				 struct mvpp2_tx_queue *aggr_txq,
+> +				 struct mvpp2_tx_queue *txq)
+> +{
+[...]
+> +error:
+> +	/* Release all descriptors that were used to map fragments of
+> +	 * this packet, as well as the corresponding DMA mappings
+> +	 */
+> +	for (i = i - 1; i >= 0; i--) {
 
-greg k-h
+You may consider "while (--i >= 0) {" as an idiom to balance a
+"for (i = 0; .." loop. Your call.
+
+> +		tx_desc = txq->descs + i;
+> +		dma_unmap_single(pp->dev->dev.parent,
+> +				 tx_desc->buf_phys_addr,
+> +				 tx_desc->data_size,
+> +				 DMA_TO_DEVICE);
+
+		dma_unmap_single(pp->dev->dev.parent, tx_desc->buf_phys_addr,
+				 tx_desc->data_size, DMA_TO_DEVICE);
+
+You may also factor out mvpp2_dma_unmap_single(pp, tx_desc) or the whole
+dma_unmap_single + mvpp2_txq_desc_put sequence.
+
+[...]
+> +/* Main tx processing */
+> +static int mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
+> +{
+> +	struct mvpp2_port *pp = netdev_priv(dev);
+> +	struct mvpp2_tx_queue *txq, *aggr_txq;
+> +	struct mvpp2_txq_pcpu *txq_pcpu;
+> +	struct mvpp2_tx_desc *tx_desc;
+> +	dma_addr_t buf_phys_addr;
+> +	int frags = 0;
+> +	u16 txq_id;
+> +	u32 tx_cmd;
+> +
+> +	if (!netif_running(dev))
+> +		goto out;
+
+The driver is expected to netif_stop_queue when the device goes down, not
+the opposite.
+
+[...]
+> +static int mvpp2_poll(struct napi_struct *napi, int budget)
+> +{
+> +	u32 cause_rx_tx, cause_rx;
+> +	int rx_done = 0;
+> +	struct mvpp2_port *pp = netdev_priv(napi->dev);
+> +
+> +	if (!netif_running(pp->dev)) {
+> +		napi_complete(napi);
+> +		return rx_done;
+> +	}
+
+Same thing as above.
+
+[...]
+> +static int mvpp2_ethtool_set_ringparam(struct net_device *dev,
+> +				       struct ethtool_ringparam *ring)
+> +{
+> +	struct mvpp2_port *pp = netdev_priv(dev);
+> +
+> +	if ((ring->rx_pending == 0) || (ring->tx_pending == 0))
+> +		return -EINVAL;
+> +	pp->rx_ring_size = ring->rx_pending < MVPP2_MAX_RXD ?
+> +		ring->rx_pending : MVPP2_MAX_RXD;
+> +	pp->tx_ring_size = ring->tx_pending < MVPP2_MAX_TXD ?
+> +		ring->tx_pending : MVPP2_MAX_TXD;
+> +
+> +	if (netif_running(dev)) {
+> +		mvpp2_stop(dev);
+> +		if (mvpp2_open(dev)) {
+
+You aren't supposed to (ab)use net_device_ops.{ndo_open / stop} like that.
+mvpp2_tx() is still racing with mvpp2_cleanup_txqs(). Even if you go through
+the hassle of (1) avoiding this race, then (2) enforcing a safe double call
+of mvpp2_stop without any mvpp2_open inbetween, nobody wants its device to
+become unresponsive because of a failed ring parameter change: the driver
+must stop and configure the physical device more gently.
+
+Depending on the rework, you may consider postponing ethtool ring change to
+a separate patch series.
+
+[...]
+> +static const struct net_device_ops mvpp2_netdev_ops = {
+> +	.ndo_open            = mvpp2_open,
+> +	.ndo_stop            = mvpp2_stop,
+> +	.ndo_start_xmit      = mvpp2_tx,
+> +	.ndo_set_rx_mode     = mvpp2_set_rx_mode,
+> +	.ndo_set_mac_address = mvpp2_set_mac_address,
+> +	.ndo_change_mtu      = mvpp2_change_mtu,
+> +	.ndo_get_stats64     = mvpp2_get_stats64,
+> +};
+
+Please replace spaces by tabs before "=".
+
+> +
+> +static const struct ethtool_ops mvpp2_eth_tool_ops = {
+> +	.get_link       = ethtool_op_get_link,
+> +	.get_settings   = mvpp2_ethtool_get_settings,
+> +	.set_settings   = mvpp2_ethtool_set_settings,
+> +	.set_coalesce   = mvpp2_ethtool_set_coalesce,
+> +	.get_coalesce   = mvpp2_ethtool_get_coalesce,
+> +	.get_drvinfo    = mvpp2_ethtool_get_drvinfo,
+> +	.get_ringparam  = mvpp2_ethtool_get_ringparam,
+> +	.set_ringparam	= mvpp2_ethtool_set_ringparam,
+> +};
+
+Same as above.
+
+[...]
+> +static int mvpp2_port_init(struct mvpp2_port *pp)
+> +{
+> +	struct device *dev = pp->dev->dev.parent;
+> +	struct mvpp2 *pp2 = pp->pp2;
+> +	struct mvpp2_txq_pcpu *txq_pcpu;
+> +	int queue, txp, cpu;
+> +
+> +	if (pp->first_rxq + rxq_number > MVPP2_RXQ_TOTAL_NUM)
+> +		return -EINVAL;
+> +
+> +	/* Disable port */
+> +	mvpp2_egress_disable(pp);
+> +	mvpp2_port_disable(pp);
+> +
+> +	pp->txqs = devm_kzalloc(dev, pp->txp_num * txq_number *
+> +				sizeof(struct mvpp2_tx_queue *), GFP_KERNEL);
+> +	if (!pp->txqs)
+> +		return -ENOMEM;
+> +
+> +	/* Associate physical Tx queues to this port and initialize.
+> +	 * The mapping is predefined.
+> +	 */
+> +	for (txp = 0; txp < pp->txp_num; txp++) {
+> +		for (queue = 0; queue < txq_number; queue++) {
+> +			int txq_idx = txp * txq_number + queue;
+> +			int queue_phy_id = mvpp2_txq_phys(pp->id, queue);
+> +			struct mvpp2_tx_queue *txq;
+> +
+> +			txq = devm_kzalloc(dev, sizeof(*txq), GFP_KERNEL);
+> +			if (!txq)
+> +				return -ENOMEM;
+> +
+> +			txq->pcpu = alloc_percpu(struct mvpp2_txq_pcpu);
+> +			if (!txq->pcpu)
+> +				return -ENOMEM;
+
+There is a per_cpu leak if mvpp2_port_init fails.
+
+[...]
+> +/* Ports initialization */
+> +static int mvpp2_port_probe(struct platform_device *pdev,
+> +			    struct device_node *port_node,
+> +			    struct mvpp2 *pp2,
+> +			    int *next_first_rxq)
+> +{
+> +	struct device_node *phy_node;
+> +	struct mvpp2_port *pp;
+
+(nit below)
+
+I am not a huge fan of the "pp2" variable as there's no "pp1" but I've seen
+worse. However naming "pp" some completely unrelated data imho verges on
+confusing
+
+[...]
+> +	dev->irq = irq_of_parse_and_map(port_node, 0);
+> +	if (dev->irq == 0) {
+> +		err = -EINVAL;
+> +		goto err_free_netdev;
+> +	}
+
+net_device.irq should be considered legacy. It would be nice to avoid
+more uses of it. You may store it near pp->base for instance.
+
+-- 
+Ueimor
