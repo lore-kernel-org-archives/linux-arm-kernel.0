@@ -1,50 +1,126 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 5 Jul 2014 14:04:41 -0500
-Subject: [PATCH v8 7/9] pci: of: Parse and map the IRQ when adding the PCI
- device.
-In-Reply-To: <20140702111748.GJ18731@arm.com>
+Date: Sat, 5 Jul 2014 14:25:52 -0500
+Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-8-git-send-email-Liviu.Dudau@arm.com>
- <20140702111748.GJ18731@arm.com>
-Message-ID: <CAL_JsqKWm54MjXC60EWVcxOurza=f2V9fwe2vVROa_Mv-6QnHw@mail.gmail.com>
+ <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <CAL_JsqJNfB_jynFQK0Ov6A3wqk6LF3abUFEUjhmzipak26sU5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 6:17 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jul 01, 2014 at 07:43:32PM +0100, Liviu Dudau wrote:
->> Enhance the default implementation of pcibios_add_device() to
->> parse and map the IRQ of the device if a DT binding is available.
->>
->> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> ---
->>  drivers/pci/pci.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index 63a54a3..8e65dc3 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/spinlock.h>
->>  #include <linux/string.h>
->>  #include <linux/log2.h>
->> +#include <linux/of_pci.h>
->>  #include <linux/pci-aspm.h>
->>  #include <linux/pm_wakeup.h>
->>  #include <linux/interrupt.h>
->> @@ -1453,6 +1454,9 @@ EXPORT_SYMBOL(pcim_pin_device);
->>   */
->>  int __weak pcibios_add_device(struct pci_dev *dev)
->>  {
->> +#ifdef CONFIG_OF
->> +     dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
->> +#endif
->
-> You could avoid the #ifdef by only assigning dev->irq if
-> of_irq_parse_and_map_pci returned something > 0.
+On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> The ranges property for a host bridge controller in DT describes
+> the mapping between the PCI bus address and the CPU physical address.
+> The resources framework however expects that the IO resources start
+> at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+> The conversion from pci ranges to resources failed to take that into account.
 
-Perhaps it could just be unconditional always. Presumably, dev->irq is
-not already set to something valid and setting it to <= 0 should not
-have any consequences.
+I don't think this change is right. There are 2 resources: the PCI bus
+addresses and cpu addresses. This function deals with the cpu
+addresses. Returning pci addresses for i/o and cpu addresses for
+memory is going to be error prone. We probably need both cpu and pci
+resources exposed to host controllers.
+
+Making the new function only deal with i/o bus resources and naming it
+of_pci_range_to_io_resource would be better.
 
 Rob
+
+> In the process move the function into drivers/of/address.c as it now
+> depends on pci_address_to_pio() code and make it return an error message.
+>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/of/address.c       | 47 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_address.h | 13 ++-----------
+>  2 files changed, 49 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 1345733..cbbaed2 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -872,3 +872,50 @@ bool of_dma_is_coherent(struct device_node *np)
+>         return false;
+>  }
+>  EXPORT_SYMBOL_GPL(of_dma_is_coherent);
+> +
+> +/*
+> + * of_pci_range_to_resource - Create a resource from an of_pci_range
+> + * @range:     the PCI range that describes the resource
+> + * @np:                device node where the range belongs to
+> + * @res:       pointer to a valid resource that will be updated to
+> + *              reflect the values contained in the range.
+> + *
+> + * Returns EINVAL if the range cannot be converted to resource.
+> + *
+> + * Note that if the range is an IO range, the resource will be converted
+> + * using pci_address_to_pio() which can fail if it is called too early or
+> + * if the range cannot be matched to any host bridge IO space (our case here).
+> + * To guard against that we try to register the IO range first.
+> + * If that fails we know that pci_address_to_pio() will do too.
+> + */
+> +int of_pci_range_to_resource(struct of_pci_range *range,
+> +       struct device_node *np, struct resource *res)
+> +{
+> +       int err;
+> +       res->flags = range->flags;
+> +       res->parent = res->child = res->sibling = NULL;
+> +       res->name = np->full_name;
+> +
+> +       if (res->flags & IORESOURCE_IO) {
+> +               unsigned long port = -1;
+> +               err = pci_register_io_range(range->cpu_addr, range->size);
+> +               if (err)
+> +                       goto invalid_range;
+> +               port = pci_address_to_pio(range->cpu_addr);
+> +               if (port == (unsigned long)-1) {
+> +                       err = -EINVAL;
+> +                       goto invalid_range;
+> +               }
+> +               res->start = port;
+> +       } else {
+> +               res->start = range->cpu_addr;
+> +       }
+> +       res->end = res->start + range->size - 1;
+> +       return 0;
+> +
+> +invalid_range:
+> +       res->start = (resource_size_t)OF_BAD_ADDR;
+> +       res->end = (resource_size_t)OF_BAD_ADDR;
+> +       return err;
+> +}
+> +
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index ac4aac4..33c0420 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -23,17 +23,8 @@ struct of_pci_range {
+>  #define for_each_of_pci_range(parser, range) \
+>         for (; of_pci_range_parser_one(parser, range);)
+>
+> -static inline void of_pci_range_to_resource(struct of_pci_range *range,
+> -                                           struct device_node *np,
+> -                                           struct resource *res)
+> -{
+> -       res->flags = range->flags;
+> -       res->start = range->cpu_addr;
+> -       res->end = range->cpu_addr + range->size - 1;
+> -       res->parent = res->child = res->sibling = NULL;
+> -       res->name = np->full_name;
+> -}
+> -
+> +extern int of_pci_range_to_resource(struct of_pci_range *range,
+> +               struct device_node *np, struct resource *res);
+>  /* Translate a DMA address from device space to CPU space */
+>  extern u64 of_translate_dma_address(struct device_node *dev,
+>                                     const __be32 *in_addr);
+> --
+> 2.0.0
+>
+>
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
