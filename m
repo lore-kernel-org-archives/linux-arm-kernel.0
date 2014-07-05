@@ -1,57 +1,39 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat,  5 Jul 2014 08:54:48 -0300
-Subject: [PATCH v2 3/3] ARM: mvebu: Enable the network controller in Armada
- 375 DB board
-In-Reply-To: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1404561288-11720-4-git-send-email-ezequiel.garcia@free-electrons.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 05 Jul 2014 13:58:37 +0200
+Subject: [PATCH RFC 06/15] drm/armada: move variant initialisation to
+ CRTC init
+In-Reply-To: <E1X3NMM-0000A5-N5@rmk-PC.arm.linux.org.uk>
+References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
+ <E1X3NMM-0000A5-N5@rmk-PC.arm.linux.org.uk>
+Message-ID: <53B7E86D.5040109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables the network controller in the Armada 375 DB board,
-and configures the two available ethernet interfaces.
+On 07/05/2014 12:38 PM, Russell King wrote:
+> Move the variant initialisation entirely to the CRTC init function -
+> the variant support is really about the CRTC properties than the whole
+> system, and we want to treat each CRTC individually when we support DT.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+[...]
+> diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
+> index 531a9b0bdcfb..3f0e70bb2e9c 100644
+> --- a/drivers/gpu/drm/armada/armada_crtc.h
+> +++ b/drivers/gpu/drm/armada/armada_crtc.h
+> @@ -38,6 +38,7 @@ struct armada_crtc {
+>  	unsigned		num;
+>  	void __iomem		*base;
+>  	struct clk		*clk;
+> +	struct clk		*extclk[2];
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-375-db.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Russell,
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index 1e2919d..43ac381 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -123,6 +123,32 @@
- 				cd-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
- 				wp-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
- 			};
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 {
-+					reg = <0>;
-+				};
-+
-+				phy3: ethernet-phy at 3 {
-+					reg = <3>;
-+				};
-+			};
-+
-+			pp2 at f0000 {
-+				status = "okay";
-+
-+				ethernet at c4000 {
-+					status = "okay";
-+					phy = <&phy0>;
-+					phy-mode = "rgmii-id";
-+				};
-+
-+				ethernet at c5000 {
-+					status = "okay";
-+					phy = <&phy3>;
-+					phy-mode = "gmii";
-+				};
-+			};
- 		};
- 
- 		pcie-controller {
--- 
-1.9.1
+I wonder, if we should rename above array srcclk instead of extclk
+while moving it anyway. That way we can use it for the other variant
+specific clocks, too.
+
+FWIW, I totally agree the it was the right thing to wait for you
+to sort out the dependencies. Good work, great patience.
+
+Sebastian
