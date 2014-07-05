@@ -1,65 +1,511 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  5 Jul 2014 09:36:09 +0400
-Subject: [PATCH 4/4] ARM: i.MX27 clk: Add 26 MHz oscillator circuit clock gate
+Date: Sat,  5 Jul 2014 09:36:07 +0400
+Subject: [PATCH 2/4] ARM: i.MX27 clk: dts: Use clock defines in DTS files
 In-Reply-To: <1404538569-3076-1-git-send-email-shc_work@mail.ru>
 References: <1404538569-3076-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1404538569-3076-4-git-send-email-shc_work@mail.ru>
+Message-ID: <1404538569-3076-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing 26 MHz oscillator circuit clock gate support.
+Use clock definitions in i.MX27 DTS files.
+Additional changes included in this patch (imx27.dtsi):
+- Fix IPG clock for UART6.
+- Use EMI_AHB_GATE clock for WEIM.
+- Added GPIO_IPG_GATE clock for GPIO nodes. Currently this clock is
+  not used by the driver, but it can be added in the future.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-imx27.c           | 11 ++++++-----
- include/dt-bindings/clock/imx27-clock.h |  3 ++-
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/imx27-pdk.dts                 |   2 +-
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  |   2 +-
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi |   2 +-
+ arch/arm/boot/dts/imx27.dtsi                    | 115 +++++++++++++++---------
+ 4 files changed, 77 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index fcfb81b..07bc32c 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -27,10 +27,10 @@ static void __iomem *ccm __initdata;
- static const char *vpu_sel_clks[] = { "spll", "mpll_main2", };
- static const char *cpu_sel_clks[] = { "mpll_main2", "mpll", };
- static const char *mpll_sel_clks[] = { "fpm", "mpll_osc_sel", };
--static const char *mpll_osc_sel_clks[] = { "ckih", "ckih_div1p5", };
-+static const char *mpll_osc_sel_clks[] = { "ckih_gate", "ckih_div1p5", };
- static const char *clko_sel_clks[] = {
--	"ckil", "fpm", "ckih", "ckih",
--	"ckih", "mpll", "spll", "cpu_div",
-+	"ckil", "fpm", "ckih_gate", "ckih_gate",
-+	"ckih_gate", "mpll", "spll", "cpu_div",
- 	"ahb", "ipg", "per1_div", "per2_div",
- 	"per3_div", "per4_div", "ssi1_div", "ssi2_div",
- 	"nfc_div", "mshc_div", "vpu_div", "60m",
-@@ -50,11 +50,12 @@ static void __init _mx27_clocks_init(unsigned long fref)
- 	clk[IMX27_CLK_CKIH] = imx_clk_fixed("ckih", fref);
- 	clk[IMX27_CLK_CKIL] = imx_clk_fixed("ckil", 32768);
- 	clk[IMX27_CLK_FPM] = imx_clk_fixed_factor("fpm", "ckil", 1024, 1);
--	clk[IMX27_CLK_CKIH_DIV1P5] = imx_clk_fixed_factor("ckih_div1p5", "ckih", 2, 3);
-+	clk[IMX27_CLK_CKIH_DIV1P5] = imx_clk_fixed_factor("ckih_div1p5", "ckih_gate", 2, 3);
-+	clk[IMX27_CLK_CKIH_GATE] = imx_clk_gate_dis("ckih_gate", "ckih", CCM_CSCR, 3);
- 	clk[IMX27_CLK_MPLL_OSC_SEL] = imx_clk_mux("mpll_osc_sel", CCM_CSCR, 4, 1, mpll_osc_sel_clks, ARRAY_SIZE(mpll_osc_sel_clks));
- 	clk[IMX27_CLK_MPLL_SEL] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks, ARRAY_SIZE(mpll_sel_clks));
- 	clk[IMX27_CLK_MPLL] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
--	clk[IMX27_CLK_SPLL] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
-+	clk[IMX27_CLK_SPLL] = imx_clk_pllv1("spll", "ckih_gate", CCM_SPCTL0);
- 	clk[IMX27_CLK_SPLL_GATE] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
- 	clk[IMX27_CLK_MPLL_MAIN2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
+diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
+index 4c31771..49450db 100644
+--- a/arch/arm/boot/dts/imx27-pdk.dts
++++ b/arch/arm/boot/dts/imx27-pdk.dts
+@@ -28,7 +28,7 @@
+ 		usbphy0: usbphy at 0 {
+ 			compatible = "usb-nop-xceiv";
+ 			reg = <0>;
+-			clocks = <&clks 0>;
++			clocks = <&clks IMX27_CLK_DUMMY>;
+ 			clock-names = "main_clk";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index fe02bc7..538568b 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -61,7 +61,7 @@
+ 			compatible = "usb-nop-xceiv";
+ 			reg = <2>;
+ 			vcc-supply = <&reg_5v0>;
+-			clocks = <&clks 0>;
++			clocks = <&clks IMX27_CLK_DUMMY>;
+ 			clock-names = "main_clk";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 2e376ed..b4e955e 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -51,7 +51,7 @@
+ 			compatible = "usb-nop-xceiv";
+ 			reg = <0>;
+ 			vcc-supply = <&sw3_reg>;
+-			clocks = <&clks 0>;
++			clocks = <&clks IMX27_CLK_DUMMY>;
+ 			clock-names = "main_clk";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index a75555c..107d713 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -11,9 +11,11 @@
  
-diff --git a/include/dt-bindings/clock/imx27-clock.h b/include/dt-bindings/clock/imx27-clock.h
-index 6b642d4..148b053 100644
---- a/include/dt-bindings/clock/imx27-clock.h
-+++ b/include/dt-bindings/clock/imx27-clock.h
-@@ -102,6 +102,7 @@
- #define IMX27_CLK_MSHC_IPG_GATE		89
- #define IMX27_CLK_RTIC_AHB_GATE		90
- #define IMX27_CLK_MSHC_BAUD_GATE	91
--#define IMX27_CLK_MAX			92
-+#define IMX27_CLK_CKIH_GATE		92
-+#define IMX27_CLK_MAX			93
+ #include "skeleton.dtsi"
+ #include "imx27-pinfunc.h"
++
++#include <dt-bindings/clock/imx27-clock.h>
++#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+-#include <dt-bindings/gpio/gpio.h>
  
- #endif
+ / {
+ 	aliases {
+@@ -68,7 +70,7 @@
+ 				399000 1450000
+ 			>;
+ 			clock-latency = <62500>;
+-			clocks = <&clks 18>;
++			clocks = <&clks IMX27_CLK_CPU_DIV>;
+ 			voltage-tolerance = <5>;
+ 		};
+ 	};
+@@ -91,7 +93,8 @@
+ 				compatible = "fsl,imx27-dma";
+ 				reg = <0x10001000 0x1000>;
+ 				interrupts = <32>;
+-				clocks = <&clks 50>, <&clks 70>;
++				clocks = <&clks IMX27_CLK_DMA_IPG_GATE>,
++					 <&clks IMX27_CLK_DMA_AHB_GATE>;
+ 				clock-names = "ipg", "ahb";
+ 				#dma-cells = <1>;
+ 				#dma-channels = <16>;
+@@ -101,14 +104,15 @@
+ 				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
+ 				reg = <0x10002000 0x1000>;
+ 				interrupts = <27>;
+-				clocks = <&clks 74>;
++				clocks = <&clks IMX27_CLK_WDOG_IPG_GATE>;
+ 			};
+ 
+ 			gpt1: timer at 10003000 {
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10003000 0x1000>;
+ 				interrupts = <26>;
+-				clocks = <&clks 46>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_GPT1_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -116,7 +120,8 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10004000 0x1000>;
+ 				interrupts = <25>;
+-				clocks = <&clks 45>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_GPT2_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -124,7 +129,8 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10005000 0x1000>;
+ 				interrupts = <24>;
+-				clocks = <&clks 44>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_GPT3_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -133,7 +139,8 @@
+ 				compatible = "fsl,imx27-pwm";
+ 				reg = <0x10006000 0x1000>;
+ 				interrupts = <23>;
+-				clocks = <&clks 34>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_PWM_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -141,14 +148,14 @@
+ 				compatible = "fsl,imx27-kpp", "fsl,imx21-kpp";
+ 				reg = <0x10008000 0x1000>;
+ 				interrupts = <21>;
+-				clocks = <&clks 37>;
++				clocks = <&clks IMX27_CLK_KPP_IPG_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+ 			owire: owire at 10009000 {
+ 				compatible = "fsl,imx27-owire", "fsl,imx21-owire";
+ 				reg = <0x10009000 0x1000>;
+-				clocks = <&clks 35>;
++				clocks = <&clks IMX27_CLK_OWIRE_IPG_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -156,7 +163,8 @@
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1000a000 0x1000>;
+ 				interrupts = <20>;
+-				clocks = <&clks 81>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_UART1_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -165,7 +173,8 @@
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1000b000 0x1000>;
+ 				interrupts = <19>;
+-				clocks = <&clks 80>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_UART2_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -174,7 +183,8 @@
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1000c000 0x1000>;
+ 				interrupts = <18>;
+-				clocks = <&clks 79>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_UART3_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -183,7 +193,8 @@
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1000d000 0x1000>;
+ 				interrupts = <17>;
+-				clocks = <&clks 78>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_UART4_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -194,7 +205,8 @@
+ 				compatible = "fsl,imx27-cspi";
+ 				reg = <0x1000e000 0x1000>;
+ 				interrupts = <16>;
+-				clocks = <&clks 53>, <&clks 60>;
++				clocks = <&clks IMX27_CLK_CSPI1_IPG_GATE>,
++					 <&clks IMX27_CLK_PER2_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -205,7 +217,8 @@
+ 				compatible = "fsl,imx27-cspi";
+ 				reg = <0x1000f000 0x1000>;
+ 				interrupts = <15>;
+-				clocks = <&clks 52>, <&clks 60>;
++				clocks = <&clks IMX27_CLK_CSPI2_IPG_GATE>,
++					 <&clks IMX27_CLK_PER2_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -215,7 +228,7 @@
+ 				compatible = "fsl,imx27-ssi", "fsl,imx21-ssi";
+ 				reg = <0x10010000 0x1000>;
+ 				interrupts = <14>;
+-				clocks = <&clks 26>;
++				clocks = <&clks IMX27_CLK_SSI1_IPG_GATE>;
+ 				dmas = <&dma 12>, <&dma 13>, <&dma 14>, <&dma 15>;
+ 				dma-names = "rx0", "tx0", "rx1", "tx1";
+ 				fsl,fifo-depth = <8>;
+@@ -227,7 +240,7 @@
+ 				compatible = "fsl,imx27-ssi", "fsl,imx21-ssi";
+ 				reg = <0x10011000 0x1000>;
+ 				interrupts = <13>;
+-				clocks = <&clks 25>;
++				clocks = <&clks IMX27_CLK_SSI2_IPG_GATE>;
+ 				dmas = <&dma 8>, <&dma 9>, <&dma 10>, <&dma 11>;
+ 				dma-names = "rx0", "tx0", "rx1", "tx1";
+ 				fsl,fifo-depth = <8>;
+@@ -240,7 +253,7 @@
+ 				compatible = "fsl,imx27-i2c", "fsl,imx21-i2c";
+ 				reg = <0x10012000 0x1000>;
+ 				interrupts = <12>;
+-				clocks = <&clks 40>;
++				clocks = <&clks IMX27_CLK_I2C1_IPG_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -248,7 +261,8 @@
+ 				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
+ 				reg = <0x10013000 0x1000>;
+ 				interrupts = <11>;
+-				clocks = <&clks 30>, <&clks 60>;
++				clocks = <&clks IMX27_CLK_SDHC1_IPG_GATE>,
++					 <&clks IMX27_CLK_PER2_GATE>;
+ 				clock-names = "ipg", "per";
+ 				dmas = <&dma 7>;
+ 				dma-names = "rx-tx";
+@@ -259,7 +273,8 @@
+ 				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
+ 				reg = <0x10014000 0x1000>;
+ 				interrupts = <10>;
+-				clocks = <&clks 29>, <&clks 60>;
++				clocks = <&clks IMX27_CLK_SDHC2_IPG_GATE>,
++					 <&clks IMX27_CLK_PER2_GATE>;
+ 				clock-names = "ipg", "per";
+ 				dmas = <&dma 6>;
+ 				dma-names = "rx-tx";
+@@ -276,6 +291,7 @@
+ 				gpio1: gpio at 10015000 {
+ 					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 					reg = <0x10015000 0x100>;
++					clocks = <&clks IMX27_CLK_GPIO_IPG_GATE>;
+ 					interrupts = <8>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+@@ -286,6 +302,7 @@
+ 				gpio2: gpio at 10015100 {
+ 					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 					reg = <0x10015100 0x100>;
++					clocks = <&clks IMX27_CLK_GPIO_IPG_GATE>;
+ 					interrupts = <8>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+@@ -296,6 +313,7 @@
+ 				gpio3: gpio at 10015200 {
+ 					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 					reg = <0x10015200 0x100>;
++					clocks = <&clks IMX27_CLK_GPIO_IPG_GATE>;
+ 					interrupts = <8>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+@@ -306,6 +324,7 @@
+ 				gpio4: gpio at 10015300 {
+ 					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 					reg = <0x10015300 0x100>;
++					clocks = <&clks IMX27_CLK_GPIO_IPG_GATE>;
+ 					interrupts = <8>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+@@ -316,6 +335,7 @@
+ 				gpio5: gpio at 10015400 {
+ 					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 					reg = <0x10015400 0x100>;
++					clocks = <&clks IMX27_CLK_GPIO_IPG_GATE>;
+ 					interrupts = <8>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+@@ -326,6 +346,7 @@
+ 				gpio6: gpio at 10015500 {
+ 					compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 					reg = <0x10015500 0x100>;
++					clocks = <&clks IMX27_CLK_GPIO_IPG_GATE>;
+ 					interrupts = <8>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+@@ -337,7 +358,7 @@
+ 			audmux: audmux at 10016000 {
+ 				compatible = "fsl,imx27-audmux", "fsl,imx21-audmux";
+ 				reg = <0x10016000 0x1000>;
+-				clocks = <&clks 0>;
++				clocks = <&clks IMX27_CLK_DUMMY>;
+ 				clock-names = "audmux";
+ 				status = "disabled";
+ 			};
+@@ -348,7 +369,8 @@
+ 				compatible = "fsl,imx27-cspi";
+ 				reg = <0x10017000 0x1000>;
+ 				interrupts = <6>;
+-				clocks = <&clks 51>, <&clks 60>;
++				clocks = <&clks IMX27_CLK_CSPI3_IPG_GATE>,
++					 <&clks IMX27_CLK_PER2_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -357,7 +379,8 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10019000 0x1000>;
+ 				interrupts = <4>;
+-				clocks = <&clks 43>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_GPT4_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -365,7 +388,8 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x1001a000 0x1000>;
+ 				interrupts = <3>;
+-				clocks = <&clks 42>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_GPT5_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+@@ -373,7 +397,8 @@
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1001b000 0x1000>;
+ 				interrupts = <49>;
+-				clocks = <&clks 77>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_UART5_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -382,7 +407,8 @@
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1001c000 0x1000>;
+ 				interrupts = <48>;
+-				clocks = <&clks 78>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_UART6_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -393,7 +419,7 @@
+ 				compatible = "fsl,imx27-i2c", "fsl,imx21-i2c";
+ 				reg = <0x1001d000 0x1000>;
+ 				interrupts = <1>;
+-				clocks = <&clks 39>;
++				clocks = <&clks IMX27_CLK_I2C2_IPG_GATE>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -401,7 +427,8 @@
+ 				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
+ 				reg = <0x1001e000 0x1000>;
+ 				interrupts = <9>;
+-				clocks = <&clks 28>, <&clks 60>;
++				clocks = <&clks IMX27_CLK_SDHC3_IPG_GATE>,
++					 <&clks IMX27_CLK_PER2_GATE>;
+ 				clock-names = "ipg", "per";
+ 				dmas = <&dma 36>;
+ 				dma-names = "rx-tx";
+@@ -412,7 +439,8 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x1001f000 0x1000>;
+ 				interrupts = <2>;
+-				clocks = <&clks 41>, <&clks 61>;
++				clocks = <&clks IMX27_CLK_GPT6_IPG_GATE>,
++					 <&clks IMX27_CLK_PER1_GATE>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 		};
+@@ -428,7 +456,9 @@
+ 				compatible = "fsl,imx27-fb", "fsl,imx21-fb";
+ 				interrupts = <61>;
+ 				reg = <0x10021000 0x1000>;
+-				clocks = <&clks 36>, <&clks 65>, <&clks 59>;
++				clocks = <&clks IMX27_CLK_LCDC_IPG_GATE>,
++					 <&clks IMX27_CLK_LCDC_AHB_GATE>,
++					 <&clks IMX27_CLK_PER3_GATE>;
+ 				clock-names = "ipg", "ahb", "per";
+ 				status = "disabled";
+ 			};
+@@ -437,7 +467,8 @@
+ 				compatible = "fsl,imx27-vpu";
+ 				reg = <0x10023000 0x0200>;
+ 				interrupts = <53>;
+-				clocks = <&clks 57>, <&clks 66>;
++				clocks = <&clks IMX27_CLK_VPU_BAUD_GATE>,
++					 <&clks IMX27_CLK_VPU_AHB_GATE>;
+ 				clock-names = "per", "ahb";
+ 				iram = <&iram>;
+ 			};
+@@ -446,7 +477,7 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024000 0x200>;
+ 				interrupts = <56>;
+-				clocks = <&clks 75>;
++				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				status = "disabled";
+ 			};
+@@ -455,7 +486,7 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024200 0x200>;
+ 				interrupts = <54>;
+-				clocks = <&clks 75>;
++				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				status = "disabled";
+ 			};
+@@ -464,7 +495,7 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024400 0x200>;
+ 				interrupts = <55>;
+-				clocks = <&clks 75>;
++				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				status = "disabled";
+ 			};
+@@ -473,14 +504,15 @@
+ 				#index-cells = <1>;
+ 				compatible = "fsl,imx27-usbmisc";
+ 				reg = <0x10024600 0x200>;
+-				clocks = <&clks 62>;
++				clocks = <&clks IMX27_CLK_USB_AHB_GATE>;
+ 			};
+ 
+ 			sahara2: sahara at 10025000 {
+ 				compatible = "fsl,imx27-sahara";
+ 				reg = <0x10025000 0x1000>;
+ 				interrupts = <59>;
+-				clocks = <&clks 32>, <&clks 64>;
++				clocks = <&clks IMX27_CLK_SAHARA_IPG_GATE>,
++					 <&clks IMX27_CLK_SAHARA_AHB_GATE>;
+ 				clock-names = "ipg", "ahb";
+ 			};
+ 
+@@ -494,14 +526,15 @@
+ 				compatible = "fsl,imx27-iim";
+ 				reg = <0x10028000 0x1000>;
+ 				interrupts = <62>;
+-				clocks = <&clks 38>;
++				clocks = <&clks IMX27_CLK_IIM_IPG_GATE>;
+ 			};
+ 
+ 			fec: ethernet at 1002b000 {
+ 				compatible = "fsl,imx27-fec";
+ 				reg = <0x1002b000 0x4000>;
+ 				interrupts = <50>;
+-				clocks = <&clks 48>, <&clks 67>;
++				clocks = <&clks IMX27_CLK_FEC_IPG_GATE>,
++					 <&clks IMX27_CLK_FEC_AHB_GATE>;
+ 				clock-names = "ipg", "ahb";
+ 				status = "disabled";
+ 			};
+@@ -513,7 +546,7 @@
+ 			compatible = "fsl,imx27-nand";
+ 			reg = <0xd8000000 0x1000>;
+ 			interrupts = <29>;
+-			clocks = <&clks 54>;
++			clocks = <&clks IMX27_CLK_NFC_BAUD_GATE>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -522,7 +555,7 @@
+ 			#size-cells = <1>;
+ 			compatible = "fsl,imx27-weim";
+ 			reg = <0xd8002000 0x1000>;
+-			clocks = <&clks 0>;
++			clocks = <&clks IMX27_CLK_EMI_AHB_GATE>;
+ 			ranges = <
+ 				0 0 0xc0000000 0x08000000
+ 				1 0 0xc8000000 0x08000000
 -- 
 1.8.5.5
