@@ -1,27 +1,156 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Jul 2014 21:53:45 -0700
-Subject: [PATCH] MAINTAINERS: Add few more Keystone drivers
-In-Reply-To: <1403467582-7933-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1403467582-7933-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140705045345.GE5201@quad.lixom.net>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat,  5 Jul 2014 09:00:01 +0400
+Subject: [PATCH] ARM: i.MX: Remove Freescale Logic Product Development i.MX27
+ Lite-Kit board support
+Message-ID: <1404536401-22853-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 04:06:22PM -0400, Santosh Shilimkar wrote:
-> Update MAINTAINERS file for recently added reset controller, AEMIF
-> and clocksource driver for Keystone SOCs.
-> 
-> The EMIF memory controller driver is also added along with AEMIF.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+The board has no insufficient support to be fully functional and seems
+has no users. This patch removes support for this board.
+However, the support may be added in the future by using the devicetree.
 
-Applied.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |  1 -
+ arch/arm/mach-imx/Kconfig            |  9 ----
+ arch/arm/mach-imx/Makefile           |  1 -
+ arch/arm/mach-imx/mach-imx27lite.c   | 83 ------------------------------------
+ 4 files changed, 94 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/mach-imx27lite.c
 
-
--Olof
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 090de01..63bde0e 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -36,7 +36,6 @@ CONFIG_MACH_EUKREA_CPUIMX27_USESDHC2=y
+ CONFIG_MACH_EUKREA_CPUIMX27_USEUART4=y
+ CONFIG_MACH_MX27_3DS=y
+ CONFIG_MACH_IMX27_VISSTRIM_M10=y
+-CONFIG_MACH_IMX27LITE=y
+ CONFIG_MACH_PCA100=y
+ CONFIG_MACH_MXT_TD60=y
+ CONFIG_MACH_IMX27_DT=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 7cbfc0d..2bc7b97 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -342,15 +342,6 @@ config MACH_IMX27_VISSTRIM_M10
+ 	  This includes specific configurations for the board and its
+ 	  peripherals.
+ 
+-config MACH_IMX27LITE
+-	bool "LogicPD MX27 LITEKIT platform"
+-	select IMX_HAVE_PLATFORM_IMX_SSI
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select SOC_IMX27
+-	help
+-	  Include support for MX27 LITEKIT platform. This includes specific
+-	  configurations for the board and its peripherals.
+-
+ config MACH_PCA100
+ 	bool "Phytec phyCARD-s (pca100)"
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index d90d446..1bb358a 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -58,7 +58,6 @@ obj-$(CONFIG_MACH_MX27ADS) += mach-mx27ads.o
+ obj-$(CONFIG_MACH_PCM038) += mach-pcm038.o
+ obj-$(CONFIG_MACH_PCM970_BASEBOARD) += pcm970-baseboard.o
+ obj-$(CONFIG_MACH_MX27_3DS) += mach-mx27_3ds.o
+-obj-$(CONFIG_MACH_IMX27LITE) += mach-imx27lite.o
+ obj-$(CONFIG_MACH_IMX27_VISSTRIM_M10) += mach-imx27_visstrim_m10.o
+ obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
+diff --git a/arch/arm/mach-imx/mach-imx27lite.c b/arch/arm/mach-imx/mach-imx27lite.c
+deleted file mode 100644
+index 9992089..0000000
+--- a/arch/arm/mach-imx/mach-imx27lite.c
++++ /dev/null
+@@ -1,83 +0,0 @@
+-/*
+- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
+- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- * Copyright 2009 Daniel Schaeffer (daniel.schaeffer at timesys.com)
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-#include "devices-imx27.h"
+-#include "hardware.h"
+-#include "iomux-mx27.h"
+-
+-static const int mx27lite_pins[] __initconst = {
+-	/* UART1 */
+-	PE12_PF_UART1_TXD,
+-	PE13_PF_UART1_RXD,
+-	PE14_PF_UART1_CTS,
+-	PE15_PF_UART1_RTS,
+-	/* FEC */
+-	PD0_AIN_FEC_TXD0,
+-	PD1_AIN_FEC_TXD1,
+-	PD2_AIN_FEC_TXD2,
+-	PD3_AIN_FEC_TXD3,
+-	PD4_AOUT_FEC_RX_ER,
+-	PD5_AOUT_FEC_RXD1,
+-	PD6_AOUT_FEC_RXD2,
+-	PD7_AOUT_FEC_RXD3,
+-	PD8_AF_FEC_MDIO,
+-	PD9_AIN_FEC_MDC,
+-	PD10_AOUT_FEC_CRS,
+-	PD11_AOUT_FEC_TX_CLK,
+-	PD12_AOUT_FEC_RXD0,
+-	PD13_AOUT_FEC_RX_DV,
+-	PD14_AOUT_FEC_RX_CLK,
+-	PD15_AOUT_FEC_COL,
+-	PD16_AIN_FEC_TX_ER,
+-	PF23_AIN_FEC_TX_EN,
+-};
+-
+-static const struct imxuart_platform_data uart_pdata __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static void __init mx27lite_init(void)
+-{
+-	imx27_soc_init();
+-
+-	mxc_gpio_setup_multiple_pins(mx27lite_pins, ARRAY_SIZE(mx27lite_pins),
+-		"imx27lite");
+-	imx27_add_imx_uart0(&uart_pdata);
+-	imx27_add_fec(NULL);
+-}
+-
+-static void __init mx27lite_timer_init(void)
+-{
+-	mx27_clocks_init(26000000);
+-}
+-
+-MACHINE_START(IMX27LITE, "LogicPD i.MX27LITE")
+-	.atag_offset = 0x100,
+-	.map_io = mx27_map_io,
+-	.init_early = imx27_init_early,
+-	.init_irq = mx27_init_irq,
+-	.init_time	= mx27lite_timer_init,
+-	.init_machine = mx27lite_init,
+-	.restart	= mxc_restart,
+-MACHINE_END
+-- 
+1.8.5.5
