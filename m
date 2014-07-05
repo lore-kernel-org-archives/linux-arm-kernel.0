@@ -1,123 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 5 Jul 2014 12:49:30 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.16-rc
-Message-ID: <20140705194930.GA26880@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 05 Jul 2014 22:46:09 +0200
+Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <CAL_JsqJNfB_jynFQK0Ov6A3wqk6LF3abUFEUjhmzipak26sU5w@mail.gmail.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJNfB_jynFQK0Ov6A3wqk6LF3abUFEUjhmzipak26sU5w@mail.gmail.com>
+Message-ID: <6122131.ozzYjjjRQi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Saturday 05 July 2014 14:25:52 Rob Herring wrote:
+> On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > The ranges property for a host bridge controller in DT describes
+> > the mapping between the PCI bus address and the CPU physical address.
+> > The resources framework however expects that the IO resources start
+> > at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+> > The conversion from pci ranges to resources failed to take that into account.
+> 
+> I don't think this change is right. There are 2 resources: the PCI bus
+> addresses and cpu addresses. This function deals with the cpu
+> addresses. Returning pci addresses for i/o and cpu addresses for
+> memory is going to be error prone. We probably need both cpu and pci
+> resources exposed to host controllers.
+> 
+> Making the new function only deal with i/o bus resources and naming it
+> of_pci_range_to_io_resource would be better.
 
-The following changes since commit 6c9d16178870315846faa1f59697b801e3fe0531:
+I think you are correct that this change by itself is will break existing
+drivers that rely on the current behavior of of_pci_range_to_resource,
+but there is also something wrong with the existing implementation:
 
-  Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes (2014-06-25 20:27:15 +0200)
+of_pci_range_to_resource() at the moment returns a the address in
+cpu address space (i.e. IORESOURCE_MEM) but sets the res->flags
+value to IORESOURCE_IO, which means it doesn't fit into the resource
+tree. Liviu's version gets that part right, and it would be nice
+to fix that eventually, however we do it here.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to bc6aa56680b07984dc1443ef1a5a1a0fac0e20be:
-
-  MAINTAINERS: Add few more Keystone drivers (2014-07-04 21:53:13 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.16-rc
-
-This week's arm-soc fixes:
-
-- A set of of OMAP patches that we had missed Tony's pull request of:
-  - Reset fix for am43xx
-  - Proper OPP table for omap5
-  - Fix for SoC detection of one of the DRA7 SoCs
-  - hwmod updates to get SATA and OCP to work on omap5 (drivers merged in 3.16)
-  - ... plus a handful of smaller fixes
-- sunxi needed to re-add machine specific restart code that was removed in
-  anticipation of a watchdog driver being merged for 3.16, and it didn't make
-  it in.
-- Marvell fixes for PCIe on SMP and a big-endian fix.
-- A trivial defconfig update to make my capri test board boot with
-  bcm_defconfig again.
-
-... and a couple of MAINTAINERS updates, one to claim new Keystone
-drivers that have been merged, and one to merge MXS and i.MX (both
-Freescale platforms).
-
-The largest diffs come from the hwmod code for omap5 and the re-add of
-the restart code on sunxi. The hwmod stuff is quite late at this point
-but it slipped through cracks repeatedly while coming up the maintainer
-chain and only affects the one SoC so risk is low.
-
-----------------------------------------------------------------
-Brian Norris (1):
-      ARM: OMAP2+: drop unused function
-
-Dave Gerlach (1):
-      ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
-
-David R. Piegdon (1):
-      ARM: OMAP2+: Fix parser-bug in platform muxing code
-
-George Cherian (1):
-      ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for am43x-epos-evm
-
-Keshava Munegowda (1):
-      ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
-
-Maxime Ripard (1):
-      ARM: sunxi: Reintroduce the restart code for A10/A20 SoCs
-
-Nishanth Menon (2):
-      ARM: DRA722: add detection of SoC information
-      ARM: dts: omap5: Update CPU OPP table as per final production Manual
-
-Olof Johansson (3):
-      ARM: bcm: Fix bcm and multi_v7 defconfigs
-      Merge tag 'omap-for-v3.16/fixes-against-rc1' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'mvebu-fixes-3.16-2' of git://git.infradead.org/linux-mvebu into fixes
-
-Peter Ujfalusi (1):
-      ARM: DTS: dra7/dra7xx-clocks: ATL related changes
-
-Santosh Shilimkar (1):
-      MAINTAINERS: Add few more Keystone drivers
-
-Shawn Guo (1):
-      MAINTAINERS: merge MXS entry into IMX one
-
-Sourav Poddar (1):
-      ARM: dts: dra7-evm: remove interrupt binding
-
-Thomas Petazzoni (3):
-      ARM: mvebu: move Armada 375 external abort logic as a quirk
-      ARM: mvebu: update L2/PCIe deadlock workaround after L2CC cleanup
-      ARM: mvebu: fix cpuidle implementation to work on big-endian systems
-
-Tony Lindgren (2):
-      ARM: dts: Enable twl4030 off-idle configuration for selected omaps
-      Merge tag 'for-v3.16-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
-
- MAINTAINERS                                | 34 +++++++++----
- arch/arm/boot/dts/am43x-epos-evm.dts       |  4 ++
- arch/arm/boot/dts/dra7.dtsi                | 12 ++++-
- arch/arm/boot/dts/dra7xx-clocks.dtsi       | 16 +++----
- arch/arm/boot/dts/omap3-beagle-xm.dts      |  6 +++
- arch/arm/boot/dts/omap3-evm-common.dtsi    |  7 +++
- arch/arm/boot/dts/omap3-n900.dts           |  5 ++
- arch/arm/boot/dts/omap5.dtsi               |  1 -
- arch/arm/configs/bcm_defconfig             |  2 +-
- arch/arm/configs/multi_v7_defconfig        |  3 +-
- arch/arm/mach-mvebu/Makefile               |  2 +-
- arch/arm/mach-mvebu/board-v7.c             | 29 +++++++----
- arch/arm/mach-mvebu/pmsu.c                 |  9 +---
- arch/arm/mach-mvebu/pmsu_ll.S              | 25 ++++++++++
- arch/arm/mach-omap2/Makefile               |  6 ++-
- arch/arm/mach-omap2/cm33xx.h               |  2 +-
- arch/arm/mach-omap2/common.h               |  1 -
- arch/arm/mach-omap2/id.c                   | 12 +++++
- arch/arm/mach-omap2/mux.c                  |  6 ++-
- arch/arm/mach-omap2/omap4-common.c         | 20 --------
- arch/arm/mach-omap2/omap_hwmod.c           |  6 +--
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 73 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/soc.h                  |  1 +
- arch/arm/mach-sunxi/sunxi.c                | 77 ++++++++++++++++++++++++++++++
- 24 files changed, 292 insertions(+), 67 deletions(-)
- create mode 100644 arch/arm/mach-mvebu/pmsu_ll.S
+	Arnd
