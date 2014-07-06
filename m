@@ -1,33 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 6 Jul 2014 17:22:00 +0200
-Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
- A31 DMA controller
-In-Reply-To: <20140704075710.GN31996@lukather>
-References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140701124852.GB6064@leverpostej> <20140704075710.GN31996@lukather>
-Message-ID: <201407061722.01279.arnd@arndb.de>
+Date: Sun, 6 Jul 2014 20:17:22 +0200
+Subject: [RFC 01/10] iommu: Add IOMMU device registry
+In-Reply-To: <20140704134928.GA25714@arm.com>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <20140704134709.GA4203@ulmo> <20140704134928.GA25714@arm.com>
+Message-ID: <201407062017.23049.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 July 2014, Maxime Ripard wrote:
-> > > > It feels a little fragile to rely on the organisation of the clock tree
-> > > > and the naming thereof. If the IP block is ever reused on an SoC with a
-> > > > different clock tree layout then we have to handle things differently.
+On Friday 04 July 2014, Will Deacon wrote:
+> On Fri, Jul 04, 2014 at 02:47:10PM +0100, Thierry Reding wrote:
+> > On Fri, Jul 04, 2014 at 01:05:30PM +0200, Joerg Roedel wrote:
+> > > On Thu, Jun 26, 2014 at 10:49:41PM +0200, Thierry Reding wrote:
+> > > > Add an IOMMU device registry for drivers to register with and implement
+> > > > a method for users of the IOMMU API to attach to an IOMMU device. This
+> > > > allows to support deferred probing and gives the IOMMU API a convenient
+> > > > hook to perform early initialization of a device if necessary.
 > > > 
-> > > What do you suggest then?
+> > > Can you elaborate on why exactly you need this? The IOMMU-API is
+> > > designed to hide any details from the user about the available IOMMUs in
+> > > the system and which IOMMU handles which device. This looks like it is
+> > > going in a completly different direction from that.
 > > 
-> > I will admit that I don't have a better suggestion.
-> > 
-> > Without knowing which particular constraint on the mux parent clock we
-> > care about it's difficult to suggest anything useful.
+> > I need this primarily to properly serialize device probing order.
+> > Without it the IOMMU may be probed later than its clients, in which case
+> > the client drivers will assume that there is no IOMMU (iommu_present()
+> > for the parent bus fails).
 > 
-> Well, I first made it into the mach- directory, and then was told to
-> move it in the driver itself, so we're kind of running out of options
-> :)
+> I can also vouch for needing a solution to this problem. The ARM SMMU (and
+> I think others) rely on initcall ordering rather than the driver probing
+> model to ensure the IOMMU is probed before any of its masters.
 
-How about having a property in the clock provider node that forces a
-specific value for the mux? I think that's generally the preferred solution
-for any clock settings that go beyond what an OS can be expected to figure
-out for itself.
+I think it would be best to attach platform devices to IOMMUs from the
+of_dma_configure() we just introduced. That still requires handling
+IOMMUs special though, and I don't know how we should best deal
+with that. It would not be too hard to scan for IOMMUs in DT first
+and register them all in a way that we can later look them up
+by phandle, but that would break down if we ever get nested IOMMUs.
+
+Another possibility might be to register all devices as we do today,
+including IOMMU devices, but return -EPROBE_DEFER from
+platform_drv_probe() before we call into the driver's probe function
+if the IOMMU has not been set up at that point.
+
+For PCI devices, we need a different way of dealing with the IOMMUs,
+some generic PCI code needs to be added to attach the correct IOMMU
+to a newly added PCI device based on how the host bridge is configured.
+
+We can probably for now get away with not worrying about any bus type
+other than platform, amba or PCI: we don't use any other DMA master
+capable bus on ARM, and other architectures can probably rely on
+having only a single IOMMU implementation in the system.
 
 	Arnd
