@@ -1,85 +1,107 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun,  6 Jul 2014 16:38:18 -0700
-Subject: [PATCH v2 5/7] watchdog: moxart: Register restart handler with
+Date: Sun,  6 Jul 2014 16:38:19 -0700
+Subject: [PATCH v2 6/7] watchdog: alim7101: Register restart handler with
  restart notifier
 In-Reply-To: <1404689900-27421-1-git-send-email-linux@roeck-us.net>
 References: <1404689900-27421-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1404689900-27421-6-git-send-email-linux@roeck-us.net>
+Message-ID: <1404689900-27421-7-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel now provides an API to trigger a system restart.
-Register with it instead of setting arm_pm_restart.
+The kernel core now provides an API to trigger a system restart.
+Register with it to restart the system instead of misusing the
+reboot notifier.
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
 v2: No change
 
- drivers/watchdog/moxart_wdt.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+ drivers/watchdog/alim7101_wdt.c | 41 +++++++++++++++++++++++++++++++----------
+ 1 file changed, 31 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-index 4aa3a8a..aef1121 100644
---- a/drivers/watchdog/moxart_wdt.c
-+++ b/drivers/watchdog/moxart_wdt.c
-@@ -15,12 +15,12 @@
- #include <linux/module.h>
- #include <linux/err.h>
- #include <linux/kernel.h>
-+#include <linux/notifier.h>
- #include <linux/platform_device.h>
-+#include <linux/reboot.h>
- #include <linux/watchdog.h>
- #include <linux/moduleparam.h>
+diff --git a/drivers/watchdog/alim7101_wdt.c b/drivers/watchdog/alim7101_wdt.c
+index 996b2f7..239d6b2 100644
+--- a/drivers/watchdog/alim7101_wdt.c
++++ b/drivers/watchdog/alim7101_wdt.c
+@@ -301,6 +301,27 @@ static struct miscdevice wdt_miscdev = {
+ 	.fops	=	&wdt_fops,
+ };
  
--#include <asm/system_misc.h>
--
- #define REG_COUNT			0x4
- #define REG_MODE			0x8
- #define REG_ENABLE			0xC
-@@ -35,13 +35,20 @@ static struct moxart_wdt_dev *moxart_restart_ctx;
- 
- static int heartbeat;
- 
--static void moxart_wdt_restart(enum reboot_mode reboot_mode, const char *cmd)
-+static int moxart_restart_notify(struct notifier_block *this,
-+				 unsigned long mode, void *cmd)
- {
- 	writel(1, moxart_restart_ctx->base + REG_COUNT);
- 	writel(0x5ab9, moxart_restart_ctx->base + REG_MODE);
- 	writel(0x03, moxart_restart_ctx->base + REG_ENABLE);
++static int wdt_restart_notify(struct notifier_block *this, unsigned long mode,
++			      void *cmd)
++{
++	/*
++	 * Cobalt devices have no way of rebooting themselves other
++	 * than getting the watchdog to pull reset, so we restart the
++	 * watchdog on reboot with no heartbeat.
++	 */
++	wdt_change(WDT_ENABLE);
++
++	/* loop until the watchdog fires */
++	while (true)
++		;
 +
 +	return NOTIFY_DONE;
- }
- 
-+static struct notifier_block moxart_restart_notifier = {
-+	.notifier_call = moxart_restart_notify,
++}
++
++static struct notifier_block wdt_restart_notifier = {
++	.notifier_call = wdt_restart_notify,
 +};
 +
- static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
- {
- 	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-@@ -137,7 +144,9 @@ static int moxart_wdt_probe(struct platform_device *pdev)
- 		return err;
+ /*
+  *	Notifier for system down
+  */
+@@ -311,15 +332,6 @@ static int wdt_notify_sys(struct notifier_block *this,
+ 	if (code == SYS_DOWN || code == SYS_HALT)
+ 		wdt_turnoff();
  
- 	moxart_restart_ctx = moxart_wdt;
--	arm_pm_restart = moxart_wdt_restart;
-+	err = register_restart_notifier(&moxart_restart_notifier);
-+	if (err)
-+		dev_err(dev, "cannot register reset notifier (err=%d)\n", err);
- 
- 	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
- 		moxart_wdt->dev.timeout, nowayout);
-@@ -149,9 +158,8 @@ static int moxart_wdt_remove(struct platform_device *pdev)
- {
- 	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
- 
--	arm_pm_restart = NULL;
-+	unregister_restart_notifier(&moxart_restart_notifier);
- 	moxart_wdt_stop(&moxart_wdt->dev);
--	watchdog_unregister_device(&moxart_wdt->dev);
- 
- 	return 0;
+-	if (code == SYS_RESTART) {
+-		/*
+-		 * Cobalt devices have no way of rebooting themselves other
+-		 * than getting the watchdog to pull reset, so we restart the
+-		 * watchdog on reboot with no heartbeat
+-		 */
+-		wdt_change(WDT_ENABLE);
+-		pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
+-	}
+ 	return NOTIFY_DONE;
  }
+ 
+@@ -338,6 +350,7 @@ static void __exit alim7101_wdt_unload(void)
+ 	/* Deregister */
+ 	misc_deregister(&wdt_miscdev);
+ 	unregister_reboot_notifier(&wdt_notifier);
++	unregister_restart_notifier(&wdt_restart_notifier);
+ 	pci_dev_put(alim7101_pmu);
+ }
+ 
+@@ -390,11 +403,17 @@ static int __init alim7101_wdt_init(void)
+ 		goto err_out;
+ 	}
+ 
++	rc = register_restart_notifier(&wdt_restart_notifier);
++	if (rc) {
++		pr_err("cannot register reboot notifier (err=%d)\n", rc);
++		goto err_out_reboot;
++	}
++
+ 	rc = misc_register(&wdt_miscdev);
+ 	if (rc) {
+ 		pr_err("cannot register miscdev on minor=%d (err=%d)\n",
+ 		       wdt_miscdev.minor, rc);
+-		goto err_out_reboot;
++		goto err_out_restart;
+ 	}
+ 
+ 	if (nowayout)
+@@ -404,6 +423,8 @@ static int __init alim7101_wdt_init(void)
+ 		timeout, nowayout);
+ 	return 0;
+ 
++err_out_restart:
++	unregister_restart_notifier(&wdt_restart_notifier);
+ err_out_reboot:
+ 	unregister_reboot_notifier(&wdt_notifier);
+ err_out:
 -- 
 1.9.1
