@@ -1,8 +1,8 @@
 From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sun,  6 Jul 2014 20:29:01 +0200
-Subject: [PATCH] video: fbdev: exynos: exynos_mipi_dsi_common.c: Cleaning up
- variable that is never used
-Message-ID: <1404671341-17941-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Date: Sun,  6 Jul 2014 20:30:03 +0200
+Subject: [PATCH] video: fbdev: exynos: s6e8ax0.c: Cleaning up variable that is
+ never used
+Message-ID: <1404671404-18025-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +13,25 @@ This was found using a static code analysis program called cppcheck
 
 Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 ---
- drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/video/fbdev/exynos/s6e8ax0.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-index 85edabf..9e4f9bd 100644
---- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-+++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-@@ -219,11 +219,9 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
- 	case MIPI_DSI_GENERIC_LONG_WRITE:
- 	case MIPI_DSI_DCS_LONG_WRITE:
- 	{
--		unsigned int size, payload = 0;
-+		unsigned int payload = 0;
- 		reinit_completion(&dsim_wr_comp);
+diff --git a/drivers/video/fbdev/exynos/s6e8ax0.c b/drivers/video/fbdev/exynos/s6e8ax0.c
+index 29e70ed..9bd67e7 100644
+--- a/drivers/video/fbdev/exynos/s6e8ax0.c
++++ b/drivers/video/fbdev/exynos/s6e8ax0.c
+@@ -602,11 +602,10 @@ static void s6e8ax0_acl_ctrl_set(struct s6e8ax0 *lcd)
  
--		size = data_size * 4;
--
- 		/* if data count is less then 4, then send 3bytes data.  */
- 		if (data_size < 4) {
- 			payload = data0[0] |
+ static void s6e8ax0_read_id(struct s6e8ax0 *lcd, u8 *mtp_id)
+ {
+-	unsigned int ret;
+ 	unsigned int addr = 0xd1;	/* MTP ID */
+ 	struct mipi_dsim_master_ops *ops = lcd_to_master_ops(lcd);
+ 
+-	ret = ops->cmd_read(lcd_to_master(lcd),
++	ops->cmd_read(lcd_to_master(lcd),
+ 			MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM,
+ 			addr, 3, mtp_id);
+ }
 -- 
 1.7.10.4
