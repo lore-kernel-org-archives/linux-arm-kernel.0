@@ -1,97 +1,100 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 06 Jul 2014 20:43:35 +0200
-Subject: [RFC PATCH 3/3] clk: rockchip: add restart notifier
-In-Reply-To: <1531376.ijR0PPyvmJ@diego>
-References: <1531376.ijR0PPyvmJ@diego>
-Message-ID: <3525040.Bkx5U4OiQ5@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 6 Jul 2014 19:42:55 +0100
+Subject: [PATCH] machine_power_off: not only local_irq_disable but also
+ do disable preemption
+In-Reply-To: <CAA-nRyqaOoXKs9OfaLGObDAG3=Gey+7UoOYdjLUfv45kprqdFg@mail.gmail.com>
+References: <CAA-nRyp5pPC2qZs7RhAXJdXaK_k4fKNZuq=yRTSTPLQsgPxqxQ@mail.gmail.com>
+ <20140705190105.GR21766@n2100.arm.linux.org.uk>
+ <CAA-nRyo2Ts3o_B1jMS8vvLJanf13u=u2WyoqnL8bCF5svOOCew@mail.gmail.com>
+ <20140705192634.GT21766@n2100.arm.linux.org.uk>
+ <CAA-nRyqHXCBCzKcK83UnS64f_wKcWObzui2xamt=ayVDKX9zEA@mail.gmail.com>
+ <CAA-nRyo3T+JLpfE6M260Ws+Ddu4z3TS2fQy5sv_dETMTcYFscQ@mail.gmail.com>
+ <20140706153542.GU21766@n2100.arm.linux.org.uk>
+ <CAA-nRyppv-LruJK0NySQ_VGORP1+M1w++=k5rqeiC15Wc6Ks9g@mail.gmail.com>
+ <20140706172857.GV21766@n2100.arm.linux.org.uk>
+ <CAA-nRyqaOoXKs9OfaLGObDAG3=Gey+7UoOYdjLUfv45kprqdFg@mail.gmail.com>
+Message-ID: <20140706184255.GW21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add infrastructure to write the correct value to the restart register and
-register the restart notifier for both rk3188 (including rk3066) and rk3188.
+On Sun, Jul 06, 2014 at 11:59:31PM +0530, pawandeep oza wrote:
+> Hi,
+> 
+> thanks for your elaborate inputs.
+> 
+> So, the above code path has at least _three_ potentially very serious
+> bugs in it:
+> 
+> 1. calling i2c_transfer() beneath pm_power_off() due to scheduling
+>    possibility
+> 
+> oza: this I have already fixed in the code by making i2c in poll mode in
+> shutdown case.
+> so it doesnt do schedule_timeout(.....) and it doesnt sleep anymore.
+> so bug 1 is no more there.
+> I have a patch, Can I submit that ?
+> 
+> 2. calling i2c_transfer() beneath pm_power_off() due to deadlock on
+>    bus access
+> 
+> 3. calling the runtime PM callbacks beneath pm_power_off() which result
+>    in interrupts being unexpectedly re-enabled.
+> 
+> if I understood right, you are suggesting to register driver shutdown
+> method ?
+> where syscore_shutdown will call them in order to solve 2 and 3 ?
+> if thats the case, I believe it is too early to trigger poweroff
+> at syscore_shutdown, because kernel_power_off calls it very early.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3188.c |  2 ++
- drivers/clk/rockchip/clk-rk3288.c |  2 ++
- drivers/clk/rockchip/clk.c        | 23 +++++++++++++++++++++++
- drivers/clk/rockchip/clk.h        |  1 +
- 4 files changed, 28 insertions(+)
+You didn't understand right.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index a83a6d8..71b661a 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -631,6 +631,8 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- 
- 	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK2928_GLB_SRST_FST);
- }
- 
- static void __init rk3066a_clk_init(struct device_node *np)
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 0d8c6c5..b604217 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -713,5 +713,7 @@ static void __init rk3288_clk_init(struct device_node *np)
- 
- 	rockchip_register_softrst(np, 9, reg_base + RK3288_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
- }
- CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 278cf9d..0594941 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -25,6 +25,7 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/reboot.h>
- #include "clk.h"
- 
- /**
-@@ -242,3 +243,25 @@ void __init rockchip_clk_register_branches(
- 		rockchip_clk_add_lookup(clk, list->id);
- 	}
- }
-+
-+static unsigned int reg_restart;
-+static int rockchip_restart_notify(struct notifier_block *this,
-+				   unsigned long mode, void *cmd)
-+{
-+	writel(0xfdb9, reg_base + reg_restart);
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block rockchip_restart_notifier = {
-+	.notifier_call = rockchip_restart_notify,
-+};
-+
-+void __init rockchip_register_restart_notifier(unsigned int reg)
-+{
-+	int ret;
-+
-+	reg_restart = reg;
-+	ret = register_restart_notifier(&rockchip_restart_notifier);
-+	if (ret)
-+		pr_err("cannot register restart notifier, %d\n", ret);
-+}
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 887cbde..0b5eab5 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -329,6 +329,7 @@ void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
- 				    unsigned int nr_clk);
- void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
- 				unsigned int nr_pll, int grf_lock_offset);
-+void rockchip_register_restart_notifier(unsigned int reg);
- 
- #define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
- 
+Firstly, there's no need to get involved with the syscore stuff at all.
+All drivers in the system are notified of a clean system shutdown via
+a function in their driver structure.
+
+For example, struct platform_driver has a "shutdown" function pointer
+in it.  This is called fairly early in the shutdown sequence where it
+is still permitted to sleep, where preemption is possible, interrupts
+are still enabled etc.
+
+This is where you need to ensure that (2) and (3) are solved in the
+I2C driver.
+
+What I'm *not* saying is to use the driver shutdown function pointer
+as a replacement for pm_power_off(), as it would be too early, before
+the system has finished quiescing.  You still need to do stuff in
+pm_power_off().
+
+What you need to do is to _prepare_ the system for pm_power_off() so
+that it is in a sane state where you _can_ safely access the I2C bus.
+
+> what I would still think is: even if we make the things right in driver,
+> still the solution would not be generic until make changes in uppermost
+> layer which is machine_power_off.
+
+No changes are needed there.
+
+> if we cut the preemption from there, the things will be taken care at the
+> highest generic kernel layer rather then individual driver taking care of
+> the same.
+
+Please, get this idea of disabling preemption out of you head.  It is
+a /complete/ fallicy that the bug(s) you are seeing are caused by it.
+It's merely a symptom of an incorrectly thought out process.
+
+
+The steps required to power off may have been correctly identified,
+but what has been totally missed by whoever started hitting that
+keyboard is to think about the _context_ which the code gets run.
+
+The answer is *not* to change the context in which the code is run.
+
+As I've already said, disabling preemption does NOT fix the problems.
+It papers over the problem you have found, but leaves other problems.
+
+Fix code properly.  Never paper over problems.  Papering over problems
+is not an acceptable bug fixing strategy.
+
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
