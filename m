@@ -1,38 +1,38 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 06 Jul 2014 12:19:17 +0200
-Subject: [PATCH] kconfig: store default ARCH in .config
-In-Reply-To: <CALYGNiP3EREk4yDqnduuDhOsJLHFwZK4D1QGLd+u5edEk2JFOA@mail.gmail.com>
-References: <20140706080234.19520.96704.stgit@zurg>
- <1404637557.24853.12.camel@x220>
- <CAMuHMdWUpqz0W_znrrm2Qp+QjKExQ5Gcv0OsuA4gJa1Wvjv06A@mail.gmail.com>
- <CALYGNiP3EREk4yDqnduuDhOsJLHFwZK4D1QGLd+u5edEk2JFOA@mail.gmail.com>
-Message-ID: <1404641957.24853.14.camel@x220>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 6 Jul 2014 16:32:10 +0200
+Subject: ARM: shmobile: fix shmobile_smp_apmu_suspend_init build failure
+ for !SUSPEND
+In-Reply-To: <4396372.pxzjeyg4CZ@wuerfel>
+References: <4396372.pxzjeyg4CZ@wuerfel>
+Message-ID: <20140706143210.GI3750@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-07-06 at 14:02 +0400, Konstantin Khlebnikov wrote:
-> On Sun, Jul 6, 2014 at 1:08 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > On Sun, Jul 6, 2014 at 11:05 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> >> Could the same result be had by saving CONFIG_ARCH in .config (I suppose
-> >> it actually already is) and then use its value on builds with
-> >
-> > No, currently it's not saved in .config, so I guess that's why this convoluted
-> > approach is needed.
+On Thu, Jul 03, 2014 at 04:08:30PM +0200, Arnd Bergmann wrote:
+> Patch d6d757c9a4e ("ARM: shmobile: APMU: Add Core-Standby-state for
+> Suspend to RAM") added both an inline wrapper for shmobile_smp_apmu_suspend_init
+> and an empty function in arch/arm/mach-shmobile/platsmp-apmu.c. We get a
+> build failure when both are present, so this patch removes the one in the .c
+> file and keeps the inline version.
 > 
-> Yep, kconfig neither reads nor writres symbols with option env=...
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Thanks Arnd, I will queue this up.
+
+> diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+> index a05b16d..2c06810 100644
+> --- a/arch/arm/mach-shmobile/platsmp-apmu.c
+> +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+> @@ -244,6 +244,4 @@ void __init shmobile_smp_apmu_suspend_init(void)
+>  {
+>  	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
+>  }
+> -#else
+> -void shmobile_smp_apmu_suspend_init(void) {}
+>  #endif
 > 
-> >
-> >> that .config unless ARCH is specified in the environment again? Ie,
-> >> change the "option env=[...]" semantics a bit, perhaps by special casing
-> >> CONFIG_ARCH.
-> >
-> > Indeed.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> If it's saved in config value might be out of sync with actual environment:
-> ARCH != CONFIG_ARCH. So, behaviour becomes too complicated.
-
-So let the environment overrules what is saved in the .config. What
-makes that complicated?
-
-
-Paul Bolle
