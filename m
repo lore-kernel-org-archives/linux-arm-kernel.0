@@ -1,31 +1,30 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Sun, 06 Jul 2014 14:30:54 -0300
-Subject: [PATCH v2 10/8] ARM: sun7i: cubietruck: add an SPIdev device
- for testing
-In-Reply-To: <53B96978.4060001@cogentembedded.com>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-11-git-send-email-emilio@elopez.com.ar>
- <53B96978.4060001@cogentembedded.com>
-Message-ID: <53B987CE.2030307@elopez.com.ar>
+From: himangi774@gmail.com (Himangi Saraogi)
+Date: Sun, 6 Jul 2014 23:16:09 +0530
+Subject: [PATCH 0/5] Introduce a managed function for gpio_request_array
+Message-ID: <cover.1404665589.git.himangi774@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset intoduces a new managed interface devm_gpio_request_array,
+adds it in the documentation and its declaration in the gpio.h include
+file. Some cases of gpio_request_array are changed to
+devm_gpio_request_array.
 
-El 06/07/14 12:21, Sergei Shtylyov escribi?:
-> Hello.
->
-> On 07/06/2014 08:05 AM, Emilio L?pez wrote:
->
->     You need to sign off on your patches, else they couldn't be applied.
+Himangi Saraogi (5):
+  gpiolib: devres: Introduce the function devm_request_gpio_array
+  ASoC: wm1250-ev1: Use devm_gpio_request_array
+  ASoC: pxa: Use devm_gpio_request_array
+  ASoC: pxa: e800_wm9712: Introduce the use of devm_gpio_request_array
+  ASoC: pxa/hx4700: Introduce the use of devm_gpio_request_array
 
-That's kind of the point here. These patches are just intended for 
-testing. From the cover letter:
+ Documentation/driver-model/devres.txt |  1 +
+ drivers/gpio/devres.c                 | 21 +++++++++++++++++++++
+ include/linux/gpio.h                  |  2 ++
+ sound/soc/codecs/wm1250-ev1.c         | 24 +++++-------------------
+ sound/soc/pxa/e740_wm9705.c           |  9 +++------
+ sound/soc/pxa/e800_wm9712.c           |  9 +++------
+ sound/soc/pxa/hx4700.c                | 12 +++---------
+ 7 files changed, 38 insertions(+), 40 deletions(-)
 
-"""Patches nine, ten and eleven are *only intended
-for testing*, and add a dummy SPIdev device to cubieboard, cubietruck
-and A10S-OLinuXino to facilitate testing with spidev_test."""
-
-Cheers,
-
-Emilio
+-- 
+1.9.1
