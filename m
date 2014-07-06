@@ -1,56 +1,37 @@
-From: himangi774@gmail.com (Himangi Saraogi)
-Date: Sun, 6 Jul 2014 23:22:44 +0530
-Subject: [PATCH 5/5] ASoC: pxa/hx4700: Introduce the use of
- devm_gpio_request_array
-In-Reply-To: <cover.1404665589.git.himangi774@gmail.com>
-References: <cover.1404665589.git.himangi774@gmail.com>
-Message-ID: <4001147a17bf23a80be799234ebb5ef3ad985a5f.1404665589.git.himangi774@gmail.com>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Sun,  6 Jul 2014 20:29:01 +0200
+Subject: [PATCH] video: fbdev: exynos: exynos_mipi_dsi_common.c: Cleaning up
+ variable that is never used
+Message-ID: <1404671341-17941-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the resources allocated using gpio_request_array to the
-managed interface and removes the calls to gpio_free_array in the probe
-and remove functions.
+Variable ar assigned a value that is never used.
+I have also removed all the code that thereby serves no purpose.
 
-Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
-Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+This was found using a static code analysis program called cppcheck
+
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 ---
- sound/soc/pxa/hx4700.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/sound/soc/pxa/hx4700.c b/sound/soc/pxa/hx4700.c
-index 05559a7..b624526 100644
---- a/sound/soc/pxa/hx4700.c
-+++ b/sound/soc/pxa/hx4700.c
-@@ -198,18 +198,13 @@ static int hx4700_audio_probe(struct platform_device *pdev)
- 	if (!machine_is_h4700())
- 		return -ENODEV;
+diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
+index 85edabf..9e4f9bd 100644
+--- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
++++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
+@@ -219,11 +219,9 @@ int exynos_mipi_dsi_wr_data(struct mipi_dsim_device *dsim, unsigned int data_id,
+ 	case MIPI_DSI_GENERIC_LONG_WRITE:
+ 	case MIPI_DSI_DCS_LONG_WRITE:
+ 	{
+-		unsigned int size, payload = 0;
++		unsigned int payload = 0;
+ 		reinit_completion(&dsim_wr_comp);
  
--	ret = gpio_request_array(hx4700_audio_gpios,
--				ARRAY_SIZE(hx4700_audio_gpios));
-+	ret = devm_gpio_request_array(&pdev->dev, hx4700_audio_gpios,
-+				      ARRAY_SIZE(hx4700_audio_gpios));
- 	if (ret)
- 		return ret;
- 
- 	snd_soc_card_hx4700.dev = &pdev->dev;
--	ret = snd_soc_register_card(&snd_soc_card_hx4700);
--	if (ret)
--		gpio_free_array(hx4700_audio_gpios,
--				ARRAY_SIZE(hx4700_audio_gpios));
+-		size = data_size * 4;
 -
--	return ret;
-+	return snd_soc_register_card(&snd_soc_card_hx4700);
- }
- 
- static int hx4700_audio_remove(struct platform_device *pdev)
-@@ -219,7 +214,6 @@ static int hx4700_audio_remove(struct platform_device *pdev)
- 	gpio_set_value(GPIO92_HX4700_HP_DRIVER, 0);
- 	gpio_set_value(GPIO107_HX4700_SPK_nSD, 0);
- 
--	gpio_free_array(hx4700_audio_gpios, ARRAY_SIZE(hx4700_audio_gpios));
- 	return 0;
- }
- 
+ 		/* if data count is less then 4, then send 3bytes data.  */
+ 		if (data_size < 4) {
+ 			payload = data0[0] |
 -- 
-1.9.1
+1.7.10.4
