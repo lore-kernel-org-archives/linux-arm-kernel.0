@@ -1,100 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 6 Jul 2014 19:42:55 +0100
-Subject: [PATCH] machine_power_off: not only local_irq_disable but also
- do disable preemption
-In-Reply-To: <CAA-nRyqaOoXKs9OfaLGObDAG3=Gey+7UoOYdjLUfv45kprqdFg@mail.gmail.com>
-References: <CAA-nRyp5pPC2qZs7RhAXJdXaK_k4fKNZuq=yRTSTPLQsgPxqxQ@mail.gmail.com>
- <20140705190105.GR21766@n2100.arm.linux.org.uk>
- <CAA-nRyo2Ts3o_B1jMS8vvLJanf13u=u2WyoqnL8bCF5svOOCew@mail.gmail.com>
- <20140705192634.GT21766@n2100.arm.linux.org.uk>
- <CAA-nRyqHXCBCzKcK83UnS64f_wKcWObzui2xamt=ayVDKX9zEA@mail.gmail.com>
- <CAA-nRyo3T+JLpfE6M260Ws+Ddu4z3TS2fQy5sv_dETMTcYFscQ@mail.gmail.com>
- <20140706153542.GU21766@n2100.arm.linux.org.uk>
- <CAA-nRyppv-LruJK0NySQ_VGORP1+M1w++=k5rqeiC15Wc6Ks9g@mail.gmail.com>
- <20140706172857.GV21766@n2100.arm.linux.org.uk>
- <CAA-nRyqaOoXKs9OfaLGObDAG3=Gey+7UoOYdjLUfv45kprqdFg@mail.gmail.com>
-Message-ID: <20140706184255.GW21766@n2100.arm.linux.org.uk>
+From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
+Date: Sun, 06 Jul 2014 22:05:34 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 3.16-rc
+In-Reply-To: <20140705194930.GA26880@quad.lixom.net>
+References: <20140705194930.GA26880@quad.lixom.net>
+Message-ID: <53B9AC0E.4090606@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 06, 2014 at 11:59:31PM +0530, pawandeep oza wrote:
-> Hi,
+Hi Santosh,
+
+Am 05.07.2014 21:49, schrieb Olof Johansson:
+> The following changes since commit 6c9d16178870315846faa1f59697b801e3fe0531:
 > 
-> thanks for your elaborate inputs.
+>   Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes (2014-06-25 20:27:15 +0200)
 > 
-> So, the above code path has at least _three_ potentially very serious
-> bugs in it:
+> are available in the git repository at:
 > 
-> 1. calling i2c_transfer() beneath pm_power_off() due to scheduling
->    possibility
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 > 
-> oza: this I have already fixed in the code by making i2c in poll mode in
-> shutdown case.
-> so it doesnt do schedule_timeout(.....) and it doesnt sleep anymore.
-> so bug 1 is no more there.
-> I have a patch, Can I submit that ?
+> for you to fetch changes up to bc6aa56680b07984dc1443ef1a5a1a0fac0e20be:
 > 
-> 2. calling i2c_transfer() beneath pm_power_off() due to deadlock on
->    bus access
+>   MAINTAINERS: Add few more Keystone drivers (2014-07-04 21:53:13 -0700)
 > 
-> 3. calling the runtime PM callbacks beneath pm_power_off() which result
->    in interrupts being unexpectedly re-enabled.
+> ----------------------------------------------------------------
+> ARM: SoC fixes for 3.16-rc
 > 
-> if I understood right, you are suggesting to register driver shutdown
-> method ?
-> where syscore_shutdown will call them in order to solve 2 and 3 ?
-> if thats the case, I believe it is too early to trigger poweroff
-> at syscore_shutdown, because kernel_power_off calls it very early.
+> This week's arm-soc fixes:
+> 
+> - A set of of OMAP patches that we had missed Tony's pull request of:
+>   - Reset fix for am43xx
+>   - Proper OPP table for omap5
+>   - Fix for SoC detection of one of the DRA7 SoCs
+>   - hwmod updates to get SATA and OCP to work on omap5 (drivers merged in 3.16)
+>   - ... plus a handful of smaller fixes
+> - sunxi needed to re-add machine specific restart code that was removed in
+>   anticipation of a watchdog driver being merged for 3.16, and it didn't make
+>   it in.
+> - Marvell fixes for PCIe on SMP and a big-endian fix.
+> - A trivial defconfig update to make my capri test board boot with
+>   bcm_defconfig again.
+> 
+> ... and a couple of MAINTAINERS updates, one to claim new Keystone
+> drivers that have been merged, and one to merge MXS and i.MX (both
+> Freescale platforms).
+[...]
+> Santosh Shilimkar (1):
+>       MAINTAINERS: Add few more Keystone drivers
 
-You didn't understand right.
+All four of your new MAINTAINERS entries just merged are lacking the S
+in your company name - "INSTRUMENT". ;) Looks like a copy&paste from an
+already misspelled section?
 
-Firstly, there's no need to get involved with the syscore stuff at all.
-All drivers in the system are notified of a clean system shutdown via
-a function in their driver structure.
-
-For example, struct platform_driver has a "shutdown" function pointer
-in it.  This is called fairly early in the shutdown sequence where it
-is still permitted to sleep, where preemption is possible, interrupts
-are still enabled etc.
-
-This is where you need to ensure that (2) and (3) are solved in the
-I2C driver.
-
-What I'm *not* saying is to use the driver shutdown function pointer
-as a replacement for pm_power_off(), as it would be too early, before
-the system has finished quiescing.  You still need to do stuff in
-pm_power_off().
-
-What you need to do is to _prepare_ the system for pm_power_off() so
-that it is in a sane state where you _can_ safely access the I2C bus.
-
-> what I would still think is: even if we make the things right in driver,
-> still the solution would not be generic until make changes in uppermost
-> layer which is machine_power_off.
-
-No changes are needed there.
-
-> if we cut the preemption from there, the things will be taken care at the
-> highest generic kernel layer rather then individual driver taking care of
-> the same.
-
-Please, get this idea of disabling preemption out of you head.  It is
-a /complete/ fallicy that the bug(s) you are seeing are caused by it.
-It's merely a symptom of an incorrectly thought out process.
-
-
-The steps required to power off may have been correctly identified,
-but what has been totally missed by whoever started hitting that
-keyboard is to think about the _context_ which the code gets run.
-
-The answer is *not* to change the context in which the code is run.
-
-As I've already said, disabling preemption does NOT fix the problems.
-It papers over the problem you have found, but leaves other problems.
-
-Fix code properly.  Never paper over problems.  Papering over problems
-is not an acceptable bug fixing strategy.
+Cheers,
+Andreas
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
