@@ -1,60 +1,267 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Jul 2014 16:25:21 +0200
-Subject: [PATCH v2 08/18] AT91: soc: Introduce register_devices callback
+Date: Mon,  7 Jul 2014 16:25:31 +0200
+Subject: [PATCH v2 18/18] AT91: Remove rstc and shdwc headers
 In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404743131-24569-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404743131-24569-19-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some core devices should be registered by the SoC itself rather than by every
-board using this SoC. Introduce a register_devices callback that should be
-called during the init_machine in order to do that.
+These headers used to provide an "API" to access the rstc and shdwc registers.
+Now that no-one uses this API anymore, we can safely remove those.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/generic.h | 2 ++
- arch/arm/mach-at91/setup.c   | 5 +++++
- arch/arm/mach-at91/soc.h     | 1 +
- 3 files changed, 8 insertions(+)
+ arch/arm/mach-at91/at91_rstc.h          | 53 ---------------------------------
+ arch/arm/mach-at91/at91_shdwc.h         | 50 -------------------------------
+ arch/arm/mach-at91/at91sam9260.c        |  1 -
+ arch/arm/mach-at91/at91sam9261.c        |  1 -
+ arch/arm/mach-at91/at91sam9263.c        |  1 -
+ arch/arm/mach-at91/at91sam9rl.c         |  1 -
+ arch/arm/mach-at91/board-sam9260ek.c    |  1 -
+ arch/arm/mach-at91/board-sam9261ek.c    |  1 -
+ arch/arm/mach-at91/board-sam9263ek.c    |  1 -
+ arch/arm/mach-at91/board-sam9m10g45ek.c |  1 -
+ arch/arm/mach-at91/board-sam9rlek.c     |  1 -
+ arch/arm/mach-at91/setup.c              |  1 -
+ 12 files changed, 113 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/at91_rstc.h
+ delete mode 100644 arch/arm/mach-at91/at91_shdwc.h
 
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 631fa3b8c16d..4c2c96195a50 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -37,6 +37,8 @@ extern int  __init at91_aic5_of_init(struct device_node *node,
- extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
- extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
+diff --git a/arch/arm/mach-at91/at91_rstc.h b/arch/arm/mach-at91/at91_rstc.h
+deleted file mode 100644
+index a600e6992920..000000000000
+--- a/arch/arm/mach-at91/at91_rstc.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/at91_rstc.h
+- *
+- * Copyright (C) 2007 Andrew Victor
+- * Copyright (C) 2007 Atmel Corporation.
+- *
+- * Reset Controller (RSTC) - System peripherals regsters.
+- * Based on AT91SAM9261 datasheet revision D.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef AT91_RSTC_H
+-#define AT91_RSTC_H
+-
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_rstc_base;
+-
+-#define at91_rstc_read(field) \
+-	__raw_readl(at91_rstc_base + field)
+-
+-#define at91_rstc_write(field, value) \
+-	__raw_writel(value, at91_rstc_base + field)
+-#else
+-.extern at91_rstc_base
+-#endif
+-
+-#define AT91_RSTC_CR		0x00			/* Reset Controller Control Register */
+-#define		AT91_RSTC_PROCRST	(1 << 0)		/* Processor Reset */
+-#define		AT91_RSTC_PERRST	(1 << 2)		/* Peripheral Reset */
+-#define		AT91_RSTC_EXTRST	(1 << 3)		/* External Reset */
+-#define		AT91_RSTC_KEY		(0xa5 << 24)		/* KEY Password */
+-
+-#define AT91_RSTC_SR		0x04			/* Reset Controller Status Register */
+-#define		AT91_RSTC_URSTS		(1 << 0)		/* User Reset Status */
+-#define		AT91_RSTC_RSTTYP	(7 << 8)		/* Reset Type */
+-#define			AT91_RSTC_RSTTYP_GENERAL	(0 << 8)
+-#define			AT91_RSTC_RSTTYP_WAKEUP		(1 << 8)
+-#define			AT91_RSTC_RSTTYP_WATCHDOG	(2 << 8)
+-#define			AT91_RSTC_RSTTYP_SOFTWARE	(3 << 8)
+-#define			AT91_RSTC_RSTTYP_USER	(4 << 8)
+-#define		AT91_RSTC_NRSTL		(1 << 16)		/* NRST Pin Level */
+-#define		AT91_RSTC_SRCMP		(1 << 17)		/* Software Reset Command in Progress */
+-
+-#define AT91_RSTC_MR		0x08			/* Reset Controller Mode Register */
+-#define		AT91_RSTC_URSTEN	(1 << 0)		/* User Reset Enable */
+-#define		AT91_RSTC_URSTIEN	(1 << 4)		/* User Reset Interrupt Enable */
+-#define		AT91_RSTC_ERSTL		(0xf << 8)		/* External Reset Length */
+-
+-#endif
+diff --git a/arch/arm/mach-at91/at91_shdwc.h b/arch/arm/mach-at91/at91_shdwc.h
+deleted file mode 100644
+index 9e29f31ec9a6..000000000000
+--- a/arch/arm/mach-at91/at91_shdwc.h
++++ /dev/null
+@@ -1,50 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/at91_shdwc.h
+- *
+- * Copyright (C) 2007 Andrew Victor
+- * Copyright (C) 2007 Atmel Corporation.
+- *
+- * Shutdown Controller (SHDWC) - System peripherals regsters.
+- * Based on AT91SAM9261 datasheet revision D.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef AT91_SHDWC_H
+-#define AT91_SHDWC_H
+-
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_shdwc_base;
+-
+-#define at91_shdwc_read(field) \
+-	__raw_readl(at91_shdwc_base + field)
+-
+-#define at91_shdwc_write(field, value) \
+-	__raw_writel(value, at91_shdwc_base + field)
+-#endif
+-
+-#define AT91_SHDW_CR		0x00			/* Shut Down Control Register */
+-#define		AT91_SHDW_SHDW		(1    << 0)		/* Shut Down command */
+-#define		AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
+-
+-#define AT91_SHDW_MR		0x04			/* Shut Down Mode Register */
+-#define		AT91_SHDW_WKMODE0	(3 << 0)		/* Wake-up 0 Mode Selection */
+-#define			AT91_SHDW_WKMODE0_NONE		0
+-#define			AT91_SHDW_WKMODE0_HIGH		1
+-#define			AT91_SHDW_WKMODE0_LOW		2
+-#define			AT91_SHDW_WKMODE0_ANYLEVEL	3
+-#define		AT91_SHDW_CPTWK0_MAX	0xf			/* Maximum Counter On Wake Up 0 */
+-#define		AT91_SHDW_CPTWK0	(AT91_SHDW_CPTWK0_MAX << 4) /* Counter On Wake Up 0 */
+-#define			AT91_SHDW_CPTWK0_(x)	((x) << 4)
+-#define		AT91_SHDW_RTTWKEN	(1   << 16)		/* Real Time Timer Wake-up Enable */
+-#define		AT91_SHDW_RTCWKEN	(1   << 17)		/* Real Time Clock Wake-up Enable */
+-
+-#define AT91_SHDW_SR		0x08			/* Shut Down Status Register */
+-#define		AT91_SHDW_WAKEUP0	(1 <<  0)		/* Wake-up 0 Status */
+-#define		AT91_SHDW_RTTWK		(1 << 16)		/* Real-time Timer Wake-up */
+-#define		AT91_SHDW_RTCWK		(1 << 17)		/* Real-time Clock Wake-up [SAM9RL] */
+-
+-#endif
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 60a0d37a8134..ab03629d5afa 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -25,7 +25,6 @@
+ #include <mach/hardware.h>
  
-+ /* Devices */
-+extern void __init at91_register_devices(void);
+ #include "at91_aic.h"
+-#include "at91_rstc.h"
+ #include "soc.h"
+ #include "generic.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 80cae8728316..c07339e370ee 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -24,7 +24,6 @@
+ #include <mach/hardware.h>
  
-  /* Timer */
- extern void at91rm9200_ioremap_st(u32 addr);
+ #include "at91_aic.h"
+-#include "at91_rstc.h"
+ #include "soc.h"
+ #include "generic.h"
+ #include "sam9_smc.h"
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 7d4403ed0596..9e8a8c71b320 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -23,7 +23,6 @@
+ #include <mach/hardware.h>
+ 
+ #include "at91_aic.h"
+-#include "at91_rstc.h"
+ #include "soc.h"
+ #include "generic.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 79b5bb793692..48a478cb889e 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -24,7 +24,6 @@
+ #include <mach/hardware.h>
+ 
+ #include "at91_aic.h"
+-#include "at91_rstc.h"
+ #include "soc.h"
+ #include "generic.h"
+ #include "sam9_smc.h"
+diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
+index da9c5f1f2c49..18f49c93f3f3 100644
+--- a/arch/arm/mach-at91/board-sam9260ek.c
++++ b/arch/arm/mach-at91/board-sam9260ek.c
+@@ -45,7 +45,6 @@
+ #include <mach/system_rev.h>
+ 
+ #include "at91_aic.h"
+-#include "at91_shdwc.h"
+ #include "board.h"
+ #include "sam9_smc.h"
+ #include "generic.h"
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index d1be10b09ab3..5a23e7211203 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -49,7 +49,6 @@
+ #include <mach/system_rev.h>
+ 
+ #include "at91_aic.h"
+-#include "at91_shdwc.h"
+ #include "board.h"
+ #include "sam9_smc.h"
+ #include "generic.h"
+diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+index 3f613d962d9b..e2aa41d19fc1 100644
+--- a/arch/arm/mach-at91/board-sam9263ek.c
++++ b/arch/arm/mach-at91/board-sam9263ek.c
+@@ -48,7 +48,6 @@
+ #include <mach/system_rev.h>
+ 
+ #include "at91_aic.h"
+-#include "at91_shdwc.h"
+ #include "board.h"
+ #include "sam9_smc.h"
+ #include "generic.h"
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index 33a7b19f7400..e7d793b7601e 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -46,7 +46,6 @@
+ #include <mach/system_rev.h>
+ 
+ #include "at91_aic.h"
+-#include "at91_shdwc.h"
+ #include "board.h"
+ #include "sam9_smc.h"
+ #include "generic.h"
+diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
+index 262e3f957d9f..5cb82464be1a 100644
+--- a/arch/arm/mach-at91/board-sam9rlek.c
++++ b/arch/arm/mach-at91/board-sam9rlek.c
+@@ -35,7 +35,6 @@
+ 
+ 
+ #include "at91_aic.h"
+-#include "at91_shdwc.h"
+ #include "board.h"
+ #include "sam9_smc.h"
+ #include "generic.h"
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 71003e40f01c..fe0601e0a3c0 100644
+index eb2b922a4adb..61d0b96c31e9 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -508,3 +508,8 @@ void __init at91_initialize(unsigned long main_clock)
+@@ -22,7 +22,6 @@
+ #include <mach/cpu.h>
+ #include <mach/at91_dbgu.h>
  
- 	pinctrl_provide_dummies();
- }
-+
-+void __init at91_register_devices(void)
-+{
-+	at91_boot_soc.register_devices();
-+}
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index a1e1482c6da8..ab983f2cc7dd 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -11,6 +11,7 @@ struct at91_init_soc {
- 	void (*map_io)(void);
- 	void (*ioremap_registers)(void);
- 	void (*register_clocks)(void);
-+	void (*register_devices)(void);
- 	void (*init)(void);
- };
- 
+-#include "at91_shdwc.h"
+ #include "soc.h"
+ #include "generic.h"
+ #include "pm.h"
 -- 
 2.0.1
