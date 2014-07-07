@@ -1,56 +1,67 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Mon, 7 Jul 2014 15:33:37 +0800
-Subject: [PATCH 7/8] arm64/kexec: Add core kexec support
-In-Reply-To: <64ef27888fa70b3e27ddcf4ca594fa71ab7f7777.1399594544.git.geoff@infradead.org>
-References: <cover.1399594544.git.geoff@infradead.org>
- <64ef27888fa70b3e27ddcf4ca594fa71ab7f7777.1399594544.git.geoff@infradead.org>
-Message-ID: <20140707073337.GA1108@dhcp-16-198.nay.redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 7 Jul 2014 15:33:57 +0800
+Subject: [PATCH v2 6/8] ARM: sun4i: enable DMA on SPI
+In-Reply-To: <1404619518-7592-7-git-send-email-emilio@elopez.com.ar>
+References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
+ <1404619518-7592-7-git-send-email-emilio@elopez.com.ar>
+Message-ID: <CAGb2v66x6pse3vFDCKSONbgePMHbSjVw11mNJ8mOFcQ9EGdE_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[snip]
+On Sun, Jul 6, 2014 at 12:05 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> All of our SPI controllers support DMA transfers, so let's add the
+> properties here so they can be used when it's best to do so.
+>
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-> +
-> +/**
-> + * kexec_cpu_info_init - Initialize an array of kexec_cpu_info structures.
-> + *
-> + * Allocates a cpu info array and fills it with info for all cpus found in
-> + * the device tree passed.  The cpu info array is zero terminated.
-> + */
-> +
-> +int kexec_cpu_info_init(const struct device_node *dn,
-> +	struct kexec_dt_info *info)
-> +{
-> +	int result;
-> +	unsigned int cpu;
-> +	const struct device_node *i;
-> +
-> +	info->cpu_info = kmalloc(
-> +		(1 + info->cpu_count) * sizeof(struct kexec_cpu_info),
-> +		GFP_KERNEL);
-> +
-> +	if (!info->cpu_info) {
-> +		pr_debug("%s: out of memory", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	info->spinner_count = 0;
-> +
-> +	for (cpu = 0, i = dn; cpu < info->cpu_count; cpu++) {
-> +		struct kexec_cpu_info *cpu_info = &info->cpu_info[cpu];
-> +
-> +		i = of_find_node_by_type((struct device_node *)i, "cpu");
-> +
-> +		BUG_ON(!i);
-> +
-> +		cpu_info->cpu = cpu;
-> +
-> +		result = cpu_read_ops((struct device_node *)i, cpu,
-> +			&cpu_info->cpu_ops);
+Numbers are good.
 
-cpu_ops memory is not allocated?
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-BTW cpu_read_ops will call cpu_get_ops which is marked as __init
 
-Thanks
-Dave
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index f17cbeb..56d02af 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -353,6 +353,8 @@
+>                         interrupts = <10>;
+>                         clocks = <&ahb_gates 20>, <&spi0_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 27>, <&dma 1 26>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -364,6 +366,8 @@
+>                         interrupts = <11>;
+>                         clocks = <&ahb_gates 21>, <&spi1_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 9>, <&dma 1 8>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -459,6 +463,8 @@
+>                         interrupts = <12>;
+>                         clocks = <&ahb_gates 22>, <&spi2_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 29>, <&dma 1 28>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -498,6 +504,8 @@
+>                         interrupts = <50>;
+>                         clocks = <&ahb_gates 23>, <&spi3_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 31>, <&dma 1 30>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> --
+> 2.0.1
