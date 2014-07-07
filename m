@@ -1,45 +1,36 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon,  7 Jul 2014 17:13:04 +0200
-Subject: [PATCH v10 3/7] dt-bindings: add mtk-timer bindings
-In-Reply-To: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
-References: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1404745988-32558-4-git-send-email-matthias.bgg@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 7 Jul 2014 18:23:09 +0300
+Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
+In-Reply-To: <CACRpkdb1M3-hrSKLKWz21LCJ1sMvsq5E-aqkpmVhy0NwOS5HhA@mail.gmail.com>
+References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
+ <5cc8b89b-20ff-4fa9-92dd-bb2f6d3512d8@BY2FFO11FD030.protection.gbl>
+ <CACRpkdb1M3-hrSKLKWz21LCJ1sMvsq5E-aqkpmVhy0NwOS5HhA@mail.gmail.com>
+Message-ID: <20140707152309.GH4939@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the General Porpose Timer driver of
-the Mediatek SoCs.
+Hi Linux,
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/timer/mediatek,mtk-timer.txt          |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+On Mon, Jul 07, 2014 at 04:51:56PM +0200, Linus Walleij wrote:
+> On Wed, Jun 18, 2014 at 5:36 PM, S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+> > The first is, how is userspace supposed to find the correct offset for a
+> > GPIO pin.
+> 
+> The sysfs interface to GPIO is *NOT* *GOOD* this is universally
+> agreed upon.
+> 
+> This needs someone to step in and provide a replacement, my preferred
+> mechanism would be a /dev/gpiochip0/... hierarchy using char devices.
 
-diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-new file mode 100644
-index 0000000..7c4408f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-@@ -0,0 +1,17 @@
-+Mediatek MT6577, MT6572 and MT6589 Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "mediatek,mt6577-timer"
-+- reg: Should contain location and length for timers register.
-+- clocks: Clocks driving the timer hardware. This list should include two
-+	clocks. The order is system clock and as second clock the RTC clock.
-+
-+Examples:
-+
-+	timer at 10008000 {
-+		compatible = "mediatek,mt6577-timer";
-+		reg = <0x10008000 0x80>;
-+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&system_clk>, <&rtc_clk>;
-+	};
+I really like the ability to control GPIOs from shell, both interactively and 
+scripted. I find it useful for quick hardware level debugging, and for boot 
+time scripting (mainly in initramfs). Do you intend to preserve this 
+capability in the future? Will I need a special utility (or Busybox applet) to 
+do this with char device ioctl?
+
+baruch
+
 -- 
-1.7.9.5
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
