@@ -1,28 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 6 Jul 2014 17:38:54 -0700
-Subject: [GIT PULL 1/3] ARM: tegra: rework PCIe regulators
-In-Reply-To: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+Date: Sun, 6 Jul 2014 17:44:17 -0700
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
 References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140707003854.GD8469@quad.lixom.net>
+ <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140707004417.GE8469@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 03:23:44PM -0600, Stephen Warren wrote:
-> This branch reworks the set of regulators that the Tegra PCIe driver
-> uses, so that the driver and DT bindings more correctly model what's
-> really going on in HW.
-> 
-> I've made this a separate branch in case it needs to be pulled into the
-> PCIe tree to resolve any conflicts. Any branch that adds Tegra124
-> support to the PCIe driver will need to be based on this branch, and
-> such patches might show up for 3.17, and be taken through the ARM tree
-> so we can manage our own dependencies.
+On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+> This branch moves code related to the Tegra fuses out of arch/arm and
+> into a centralized location which could be shared with ARM64. It also
+> adds support for reading the fuse data through sysfs.
 
-Isn't PCI broken if you boot with an older device tree now?
+The new/moved misc driver isn't acked by any misc maintainer, so I can't
+take this branch.
 
-I would like to see this as two branches: One to the PCI driver, and one
-modifying DT contents. The PCI driver should remain working for old DTs,
-so the last couple of commits on this branch can't be there.
+I saw no indication from searching the mailing list of that either,
+so it wasn't just a missed acked-by.
+
+I wonder if this code should go under drivers/soc/ instead?
 
 
 -Olof
