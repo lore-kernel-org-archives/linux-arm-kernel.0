@@ -1,81 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 09:54:27 +0200
-Subject: [PATCH v2 02/30] ARM: shmobile: r8a7778: Add SCIF nodes
+Date: Mon,  7 Jul 2014 09:54:34 +0200
+Subject: [PATCH v2 09/30] ARM: shmobile: ape6evm-reference: Initialise SCIF
+ device using DT
 In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404719695-1634-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404719695-1634-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This describes all of the SCIF hardware of the r8a7778.
-Each node is disabled and may be enabled as necessary
-by board DTS files.
+Initialise SCIF device using DT when booting ape6evm
+using DT reference.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 v2
-* Added ack from Laurent Pinchart
-* Removed interrupt-parent property from each new node
-  as it is inherited from the top-level.
-* Expanded changelog
+* First post
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 14 +++++++++++---
+ arch/arm/mach-shmobile/setup-r8a73a4.c          | 12 ++++++------
+ 2 files changed, 17 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 3af0a21..ecfdf4b 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -156,6 +156,48 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+index 70b1fff..a860f32 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+@@ -16,6 +16,10 @@
+ 	model = "APE6EVM";
+ 	compatible = "renesas,ape6evm-reference", "renesas,r8a73a4";
  
-+	scif0: serial at ffe40000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe40000 0x100>;
-+		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
++	aliases {
++		serial0 = &scifa0;
 +	};
 +
-+	scif1: serial at ffe41000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe41000 0x100>;
-+		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
+ 	chosen {
+ 		bootargs = "console=ttySC0,115200 ignore_loglevel rw";
+ 	};
+@@ -90,9 +94,6 @@
+ };
+ 
+ &pfc {
+-	pinctrl-0 = <&scifa0_pins>;
+-	pinctrl-names = "default";
+-
+ 	scifa0_pins: serial0 {
+ 		renesas,groups = "scifa0_data";
+ 		renesas,function = "scifa0";
+@@ -123,6 +124,13 @@
+ 	status = "okay";
+ };
+ 
++&scifa0 {
++	pinctrl-0 = <&scifa0_pins>;
++	pinctrl-names = "default";
 +
-+	scif2: serial at ffe42000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe42000 0x100>;
-+		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
++	status = "okay";
++};
 +
-+	scif3: serial at ffe43000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe43000 0x100>;
-+		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif4: serial at ffe44000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe44000 0x100>;
-+		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scif5: serial at ffe45000 {
-+		compatible = "renesas,scif-r8a7778", "renesas,scif";
-+		reg = <0xffe45000 0x100>;
-+		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
- 	mmcif: mmc at ffe4e000 {
- 		compatible = "renesas,sh-mmcif";
- 		reg = <0xffe4e000 0x100>;
+ &sdhi0 {
+ 	vmmc-supply = <&vcc_sdhi0>;
+ 	bus-width = <4>;
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index f470b3c..2e1ec5e 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -189,12 +189,6 @@ static struct resource cmt1_resources[] = {
+ 
+ void __init r8a73a4_add_dt_devices(void)
+ {
+-	r8a73a4_register_scif(0);
+-	r8a73a4_register_scif(1);
+-	r8a73a4_register_scif(2);
+-	r8a73a4_register_scif(3);
+-	r8a73a4_register_scif(4);
+-	r8a73a4_register_scif(5);
+ 	r8a7790_register_cmt(1);
+ }
+ 
+@@ -289,6 +283,12 @@ static struct resource dma_resources[] = {
+ void __init r8a73a4_add_standard_devices(void)
+ {
+ 	r8a73a4_add_dt_devices();
++	r8a73a4_register_scif(0);
++	r8a73a4_register_scif(1);
++	r8a73a4_register_scif(2);
++	r8a73a4_register_scif(3);
++	r8a73a4_register_scif(4);
++	r8a73a4_register_scif(5);
+ 	r8a73a4_register_irqc(0);
+ 	r8a73a4_register_irqc(1);
+ 	r8a73a4_register_thermal();
 -- 
 2.0.0.rc2
