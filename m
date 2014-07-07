@@ -1,43 +1,129 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jul 2014 12:53:10 +0200
-Subject: [RFC PATCH 02/11] coresight: add CoreSight TMC driver
-In-Reply-To: <CANLsYky0keX_z0ZggTxst2SfLxB7i1YgcWBOkiV08KHo8mySSw@mail.gmail.com>
-References: <1401457391-12242-1-git-send-email-mathieu.poirier@linaro.org>
- <1401457391-12242-3-git-send-email-mathieu.poirier@linaro.org>
- <CACRpkdYnFBP8RbOhePed+sq+tk=syME4Trwtd+PgfAyht+3Zqg@mail.gmail.com>
- <CANLsYky0keX_z0ZggTxst2SfLxB7i1YgcWBOkiV08KHo8mySSw@mail.gmail.com>
-Message-ID: <CACRpkdYXD=nxBCZdRKah5xjNRCXtFgXDMRq8WyEtjX09wkeS6A@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 7 Jul 2014 07:58:18 -0300
+Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
+In-Reply-To: <20140705205951.GB3678@kroah.com>
+References: <20140703135146.GA6898@luxor.wired.org>
+ <53B5C61D.2060308@free-electrons.com>
+ <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
+ <20140705150308.GA28791@arch.cereza>
+ <20140705205951.GB3678@kroah.com>
+Message-ID: <20140707105818.GA1101@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 1:12 AM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 3 June 2014 03:09, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Fri, May 30, 2014 at 3:43 PM,  <mathieu.poirier@linaro.org> wrote:
+On 05 Jul 01:59 PM, Greg Kroah-Hartman wrote:
+> On Sat, Jul 05, 2014 at 12:03:08PM -0300, Ezequiel Garcia wrote:
+> > After following Gregory's stacktrace (also reproduced here):
+> > 
+> > [<c02451f8>] (iommu_bus_notifier) from [<c00512e8>] (notifier_call_chain+0x64/0x9c)
+> > [<c00512e8>] (notifier_call_chain) from [<c00514cc>] (__blocking_notifier_call_chain+0x40/0x58)
+> > [<c00514cc>] (__blocking_notifier_call_chain) from [<c00514f8>] (blocking_notifier_call_chain+0x14/0x1c)
+> > [<c00514f8>] (blocking_notifier_call_chain) from [<c01d225c>] (device_add+0x424/0x524)
+> > [<c01d225c>] (device_add) from [<c0186d90>] (pci_device_add+0xec/0x110)
+> > [<c0186d90>] (pci_device_add) from [<c0186e54>] (pci_scan_single_device+0xa0/0xac)
+> > 
+> > I added a few printks and found that the problem is that the iommu_bus_notifier is
+> > called for the 'pci' bus type, which has a null iommu_ops.
+> > 
+> > On 04 Jul 10:47 AM, Laurent Pinchart wrote:
+> > [..]
+> > > 
+> > > We need a quick fix for v3.16, ...
+> > 
+> > Therefore, a quick fix would be to simply check for that:
+> > 
+> > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> > index e5555fc..b712cb2 100644
+> > --- a/drivers/iommu/iommu.c
+> > +++ b/drivers/iommu/iommu.c
+> > @@ -536,6 +536,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
+> >         struct iommu_group *group;
+> >         unsigned long group_action = 0;
+> >  
+> > +       if (!ops)
+> > +               return 0;
+> > +
+> >         /*
+> >          * ADD/DEL call into iommu driver ops if provided, which may
+> >          * result in ADD/DEL notifiers to group->notifier
+> > 
+> > This (nasty workaround?) patch makes the problem go away.
+> > 
+> > [..]
+> > > > So it also boot well in 3.15 and then failed in 3.16-rc3. I hope it will
+> > > > help the developers of the OMAP IOMMU driver to fix it.
+> > > 
+> > > Thank you. I've had a look at the OMAP IOMMU driver changes between v3.15 and 
+> > > v3.16-rc3, and didn't find at first sight any change that could explain the 
+> > > crash.
+> > > 
+> > > 286f600 iommu/omap: Fix map protection value handling
+> > > 67b779d iommu/omap: Remove comment about supporting single page mappings only
+> > > f7129a0 iommu/omap: Fix 'no page for' debug message in flush_iotlb_page()
+> > > 5acc97d iommu/omap: Move to_iommu definition from omap-iopgtable.h
+> > > 2ac6133 iommu/omap: Remove omap_iommu_domain_has_cap() function
+> > > d760e3e iommu/omap: Correct init value of iotlb_entry valid field
+> > > 
+> > > Could you try reverting those changes and retest ? If the problem doesn't 
+> > > disappear, we'll need to look somewhere else.
+> > > 
+> > 
+> > I reverted the above commits but nothing changed. I'm far from being an expert,
+> > but it sounds odd to have this bus notifier (that got registered for the
+> > platform bus type) called by a pci bus type.
+> 
+> Why wouldn't the PCI bus set this up for its devices?  Are you
+> "assuming" you know the bus type and that's the issue?
+> 
 
->>> +       int                     read_count;
->>
->> Can this really be negative?
->
-> It is useful for debugging, as an example see "tmc_release()".  If the
-> count drops below '0' there is obviously a problem.  Do you see a cost
-> in keeping this as an 'int'?  What do you advise here?
+Thanks for looking at this.
 
-No big deal, keep it.
+I guess I snipped the thread and lost most of the information about the panic.
+Here's the original bug report:
 
->> This struct overall could use some kerneldoc.
->
-> Would writing a comment for each field qualify?
+http://www.spinics.net/lists/arm-kernel/msg344059.html
 
-Like above the struct, see Documentation/kernel-doc-nano-HOWTO.txt
+The problem reported involves enabling OMAP IOMMU driver and not any other IOMMU
+driver. Doing some tracing and adding a few prints, we found that
+omap_iommu_init() sets a bus notifier for the platform bus type:
 
->>> +       drvdata->base = devm_ioremap(dev, res->start, resource_size(res));
->>
->> Use devm_ioremap_resource() instead.
->
-> I'm working on it.
+omap_iommu_init -> bus_set_iommu -> iommu_bus_init:
 
-Bet it's fininshed now ;-)
+static void iommu_bus_init(struct bus_type *bus, struct iommu_ops *ops)
+{
+        bus_register_notifier(bus, &iommu_bus_nb);
+        bus_for_each_dev(bus, NULL, ops, add_iommu_group);
+}
 
-Yours,
-Linus Walleij
+But the iommu bus notifier gets called for the 'pci' bus type, which
+has the iommu_ops field NULL (since it hasn't been set for iommu).
+
+The panic is here when the NULL field is dereferenced:
+
+static int iommu_bus_notifier(struct notifier_block *nb,
+                              unsigned long action, void *data)
+{
+        struct device *dev = data;
+        struct iommu_ops *ops = dev->bus->iommu_ops;
+
+
+> I see the a number of different places this is being initialized for the
+> pci bus.
+> 
+> Ah, look at drivers/iommu/fsl_pamu_domain.c, odds are, it shouldn't be
+> doing that logic in the pamu_domain_init() code, using the same bus ops
+> for different bus types, that's ripe for major problems...
+> 
+
+Maybe I'm missing something, but since the fsl driver is not enabled it has
+nothing to do. And since the OMAP IOMMU doesn't set the iommu bus notifier
+for the 'pci' bus type, I was wondering if there's a problem with the bus
+notifier itself.
+
+I hope the above makes sense.
+
+Thanks again for helping out,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
