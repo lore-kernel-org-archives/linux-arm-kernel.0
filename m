@@ -1,99 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Jul 2014 09:40:22 +0100
-Subject: [RFC PATCH 2/9] genirq: Allow the state of a forwarded irq to be
- save/restored
-In-Reply-To: <20140627131018.GS26276@arm.com> (Will Deacon's message of "Fri,
- 27 Jun 2014 14:10:18 +0100")
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-3-git-send-email-marc.zyngier@arm.com>
- <20140627131018.GS26276@arm.com>
-Message-ID: <87mwcla7ex.fsf@why.wild-wind.fr.eu.org>
+From: a.heider@gmail.com (Andre Heider)
+Date: Mon, 7 Jul 2014 10:48:24 +0200
+Subject: [PATCH 00/13] uio_pruss: add support for devicetree and am33xx
+In-Reply-To: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+Message-ID: <20140707084824.GA83417@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Sun, Jun 29, 2014 at 06:21:34PM +0200, Andre Heider wrote:
+> Hi,
+> 
+> this series adds PRUv2 support to uio_pruss through devicetree, makes the
+> device usable on am33xx and enables it on beaglebone black.
+> Inspired by old patches from Matt Porter found in a downstream tree.
+> 
+> To archieve that this series:
+> * adds a flag to omap_hwmod.c to get PRUSS out of hardreset (patch 5 and 6)
+> * adds devicetree support to uio_pruss (patch 7 and 9)
+> * adds the device to the am33xx dtsi and boneblack dts (patch 12 and 13)
+> 
+> Bits and pieces:
+> * some cleanup (patch 1-4)
+> * take care of a fact that SRAM on am33xx is not exposed through UIO (patch 8)
+> * add runtime pm support to enable clocks (patch 10)
+> * allow the driver to be compiled on SOC_AM33XX (patch 11)
+> 
+> This is only tested on beaglebone black (as that's the only hardware of the
+> PRUSS enabled families I have) with some basic GPIO and IRQ tests.
+> 
+> Notes:
+> * I just got this hardware and I don't know if this UIO PRUSS business is
+>   desired. Looking at the userspace driver I'd guess not so much ;), but this
+>   interface is there for older generations anyway, and this small series lets
+>   me use the device.
+> * is the hardreset thing I did there the right thing to do? I think the
+>   proper way would be a reset controller (which apparently doesn't yet exist
+>   for this SoC?) and let the driver deassert/assert on probe/remove?
+> * the platform device path has a clk_enable() / clk_put() calls. Are those
+>   now redundant with the introduced pm_runtime_enable() pm_runtime_disable()
+>   calls?
 
-On Fri, Jun 27 2014 at  2:10:18 pm BST, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Marc,
->
-> On Wed, Jun 25, 2014 at 10:28:43AM +0100, Marc Zyngier wrote:
->> When a peripheral is shared between virtual machines, its interrupt
->> state becomes part of the guest's state, and must be switched accordingly.
->> 
->> Introduce a pair of accessors (irq_get_fwd_state/irq_set_fwd_state) to
->> retrieve the bits that can be of interest to KVM: pending, active, and masked.
->> 
->> - irq_get_fwd_state returns the state of the interrupt according to a mask
->> containing any of the IRQ_STATE_PENDING, IRQ_STATE_ACTIVE or IRQ_STATE_MASKED
->> bits.
->> - irq_set_fwd_state sets the state of the interrupt according to a
->> similar mask.
->> 
->> Only a forwarded interrupt can be manipulated in such a way.
->
-> [...]
->
->> +/**
->> + *	irq_set_fwd_state - set the state of a forwarded interrupt.
->> + *	@irq: Interrupt line that is forwarded to a VM
->> + *	@val: State to be restored
->> + *	@mask: Bitmask of IRQ_FWD_STATE_* defining the valid bits in @val
->> + *
->> + *	This call sets the state of a forwarded interrupt, depending
->> + *	on the mask which indicates the valid bits.
->> + *
->> + *	This function should be called with preemption disabled if the
->> + *	interrupt controller has per-cpu registers.
->> + */
->> +int irq_set_fwd_state(unsigned int irq, u32 val, u32 mask)
->> +{
->> +	struct irq_desc *desc;
->> +	struct irq_data *data;
->> +	struct irq_chip *chip;
->> +	unsigned long flags;
->> +
->> +	desc = irq_to_desc(irq);
->> +	if (!desc)
->> +		return -EINVAL;
->> +
->> +	data = irq_desc_get_irq_data(desc);
->> +	if (!irqd_irq_forwarded(data))
->> +		return -EINVAL;
->> +
->> +	chip = irq_desc_get_chip(desc);
->> +	if (!chip->irq_set_fwd_state)
->> +		return -EINVAL;
->> +
->> +	chip_bus_lock(desc);
->> +	raw_spin_lock_irqsave(&desc->lock, flags);
->> +	chip->irq_set_fwd_state(data, val, mask);
->> +	raw_spin_unlock_irqrestore(&desc->lock, flags);
->> +	chip_bus_sync_unlock(desc);
->
-> Having looked at this, I don't think you need to take the desc->lock
-> after all. I thought you might need it for irq_desc_get_chip, but
-> that's not going to change dynamically and you'd end up with a lock
-> ordering problem against chip_bus_lock anyway.
+@OMAP guys: any comments? The series depends on patch 5 and 6; both touch
+common hwmod code.
 
-I think this all depends on the state of the device generating the
-interrupt:
+I noticed that AM437x now comes with 4 PRUSS cores, maybe you had something
+different in mind on how to expose these?
 
-- If we can guarantee that the device is completely off and won't
-  generate an interrupt when the state is save/restored, then the locks
-  can go.
-
-- If the device can generate an interrupt, then we need a more complex
-  locking strategy, similar to the one described in handle.c (the VM
-  should be considered as a form a thread handler itself).
-
-For the particular use case that we have on ARM, the first possibility
-applies (we ensure that the timer is completely off when scheduling the
-VM out).
-
-But can we make this a requirement?
-
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+Thanks in advance,
+Andre
