@@ -1,75 +1,74 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 7 Jul 2014 12:11:33 +0100
-Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <6122131.ozzYjjjRQi@wuerfel>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJNfB_jynFQK0Ov6A3wqk6LF3abUFEUjhmzipak26sU5w@mail.gmail.com>
- <6122131.ozzYjjjRQi@wuerfel>
-Message-ID: <20140707111133.GP6501@e106497-lin.cambridge.arm.com>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Mon, 7 Jul 2014 04:12:15 -0700
+Subject: Issue found in Armada 370: 10Mbps ethernet connection can't get IP
+In-Reply-To: <20140707110014.3cbe98a0@free-electrons.com>
+References: <CAB8gEUtaKwE5ax8_-+jb4pS08CO0V_CFdcEW47ej5YLaU=sb5A@mail.gmail.com>
+ <20140707110014.3cbe98a0@free-electrons.com>
+Message-ID: <CAB8gEUsipA--K8_XYjTO3TQtQEsUj8GHUyE6yLGkDMrqca8fHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 05, 2014 at 09:46:09PM +0100, Arnd Bergmann wrote:
-> On Saturday 05 July 2014 14:25:52 Rob Herring wrote:
-> > On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > > The ranges property for a host bridge controller in DT describes
-> > > the mapping between the PCI bus address and the CPU physical address.
-> > > The resources framework however expects that the IO resources start
-> > > at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
-> > > The conversion from pci ranges to resources failed to take that into account.
-> > 
-> > I don't think this change is right. There are 2 resources: the PCI bus
-> > addresses and cpu addresses. This function deals with the cpu
-> > addresses. Returning pci addresses for i/o and cpu addresses for
-> > memory is going to be error prone. We probably need both cpu and pci
-> > resources exposed to host controllers.
-> > 
-> > Making the new function only deal with i/o bus resources and naming it
-> > of_pci_range_to_io_resource would be better.
-> 
-> I think you are correct that this change by itself is will break existing
-> drivers that rely on the current behavior of of_pci_range_to_resource,
-> but there is also something wrong with the existing implementation:
+Hi Thomas,
+Good day.
 
-Either I'm very confused or I've managed to confuse everyone else. The I/O
-resources described using CPU addresses *are* using "pseudo" port based
-addresses (or at least that is my understanding and my reading of the code).
-Can you point me to a function that is expecting the IO resource to have
-the start address at the physical address of the mapped space?
+Thank you very much for the quick feedback.
+I will apply this patch and send you the results by tomorrow 07/08
+morning (it is currently 07/07 evening as of this e-mail).
 
-I was trying to fix exactly this issue, that you cannot use the resource
-structure returned by this function in any call that is expecting an IO
-resource.
+Regards,
+Maggie Roxas
 
-Rob, you can try this function with two host bridges. Patch [3/9] changes
-pci_address_to_pio() to calculate the offset of the range based on already
-registed ranges, so the first host bridge will have it's IO resources
-starting from zero, but the second host bridge will have .start offseted
-by the size of the IO space of the first bridge. That is not a PCI bus
-address AFAICT.
-
-Best regards,
-Liviu
-
-> 
-> of_pci_range_to_resource() at the moment returns a the address in
-> cpu address space (i.e. IORESOURCE_MEM) but sets the res->flags
-> value to IORESOURCE_IO, which means it doesn't fit into the resource
-> tree. Liviu's version gets that part right, and it would be nice
-> to fix that eventually, however we do it here.
-> 
-> 	Arnd
-> 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+On Mon, Jul 7, 2014 at 2:00 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Maggie Mae Roxas,
+>
+> On Sun, 6 Jul 2014 19:56:27 -0700, Maggie Mae Roxas wrote:
+>
+>> We just found out last week that 10Mbps ethernet (SGMII) connection
+>> can't obtain IP in recent kernel versions (3.10.x and above). Here are
+>> the details:
+>>
+>> Processor: Armada 370 88F6707
+>> Board: Custom
+>> Kernel versions tried:
+>> 3.10.24 (issue exists)
+>> 3.13.9 (issue exists)
+>> 3.2.43 (issue does NOT exist)
+>> U-Boot versions tried: 2012_Q4 and 2013_Q1 from Marvell extranet
+>>
+>> Some more important notes:
+>> Both 100Mbps and 1000Mbps have no issues.
+>> Issue does not exist at u-boot level (via static IP address, confirmed
+>> via ping - results: 'x.x.x.x is alive')
+>> We have different LED configs for 10, 100 and 1000 Mbps - and LED
+>> shows 10Mbps is established (even ethtool does). However, we just
+>> can't obtain IP.
+>> Our kernel version 3.2.43 have patches from Marvell extranet (for Armada 370)
+>>
+>> Is there a known issue for this?
+>
+> Thanks for the report. Can you test the patch below?
+>
+> Thanks,
+>
+> Thomas
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 45beca1..d49f08d 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -2529,7 +2529,7 @@ static void mvneta_adjust_link(struct net_device *ndev)
+>
+>                         if (phydev->speed == SPEED_1000)
+>                                 val |= MVNETA_GMAC_CONFIG_GMII_SPEED;
+> -                       else
+> +                       else if (phydev->speed == SPEED_100)
+>                                 val |= MVNETA_GMAC_CONFIG_MII_SPEED;
+>
+>                         mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+>
+>
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
