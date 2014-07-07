@@ -1,22 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Jul 2014 03:41:58 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: create dsp device only on OMAP3 SoCs
-In-Reply-To: <1403587467-59876-4-git-send-email-s-anna@ti.com>
-References: <1403587467-59876-1-git-send-email-s-anna@ti.com>
- <1403587467-59876-4-git-send-email-s-anna@ti.com>
-Message-ID: <20140707104157.GL28884@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Jul 2014 11:43:30 +0100
+Subject: [RFC PATCH 4/9] irqchip: GIC: add support for forwarded interrupts
+In-Reply-To: <20140627131748.GT26276@arm.com> (Will Deacon's message of "Fri,
+ 27 Jun 2014 14:17:48 +0100")
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
+ <20140627131748.GT26276@arm.com>
+Message-ID: <87egxxa1pp.fsf@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [140623 22:26]:
-> The DSP platform device for TI DSP/Bridge is currently
-> created unconditionally whenever CONFIG_TIDSPBRIDGE is
-> enabled. This device should only be created on OMAP34xx/
-> OMAP36xx SoCs, and not for other OMAP3 derived SoCs or when
-> booting multi-arch images on other SoCs. So, add a check for
-> the SoC family both before creating the device and allocating
-> the carveout memory for the device.
+On Fri, Jun 27 2014 at  2:17:48 pm BST, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Marc,
+>
+> On Wed, Jun 25, 2014 at 10:28:45AM +0100, Marc Zyngier wrote:
+>> Now that we've switched to EOImode == 1, prevent a forwarded interrupt
+>> from being deactivated after its priority has been dropped.
+>> 
+>> Also add support for the interrupt state to be saved/restored.
+>> 
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic.c | 48
+>> +++++++++++++++++++++++++++++++++++++++++------
+>>  1 file changed, 42 insertions(+), 6 deletions(-)
+>
+> [...]
+>
+>> +static void gic_irq_set_fwd_state(struct irq_data *d, u32 val, u32 mask)
+>> +{
+>> +	if (mask & IRQ_FWD_STATE_PENDING)
+>> + gic_poke_irq(d, (val & IRQ_FWD_STATE_PENDING) ?
+>> GIC_DIST_ENABLE_SET : GIC_DIST_ENABLE_CLEAR);
+>> +	if (mask & IRQ_FWD_STATE_ACTIVE)
+>> + gic_poke_irq(d, (val & IRQ_FWD_STATE_ACTIVE) ? GIC_DIST_ACTIVE_SET
+>> : GIC_DIST_ACTIVE_CLEAR);
+>> +	if (mask & IRQ_FWD_STATE_MASKED)
+>> + gic_poke_irq(d, (val & IRQ_FWD_STATE_MASKED) ?
+>> GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET);
+>
+> Given that this isn't atomic and KVM only cares about ACTIVE, why not change
+> mask to be a single state only? Renumbering the states so that's not bits
+> would help to enforce this (i.e. make IRQ_FWD_STATE_ACTIVE 0, PENDING 1,
+> ...).
+>
+> That would also allow you to switch on the state and return early.
 
-Applying this one into omap-for-v3/16/fixes thanks.
+Well, this is atomic from the point of view of the interrupt (we hold
+the descriptor spinlock). Now, given my answer to your remark about the
+locking earlier in this thread and given the KVM use case, we could
+indeed relax this and loose the atomicity. But we need to agree on what
+is the model we want to expose.
 
-Tony
+>> +static u32 gic_irq_get_fwd_state(struct irq_data *d, u32 mask)
+>> +{
+>> +	u32 val = 0;
+>> +
+>> + if (mask & IRQ_FWD_STATE_PENDING && gic_peek_irq(d,
+>> GIC_DIST_ENABLE_SET))
+>> +		val |= IRQ_FWD_STATE_PENDING;
+>> +	if (mask & IRQ_FWD_STATE_ACTIVE && gic_peek_irq(d, GIC_DIST_ACTIVE_SET))
+>> +		val |= IRQ_FWD_STATE_ACTIVE;
+>> + if (mask & IRQ_FWD_STATE_MASKED && !gic_peek_irq(d,
+>> GIC_DIST_ENABLE_SET))
+>> +		val |= IRQ_FWD_STATE_MASKED;
+>
+> *and* you could peek GIC_DIST_ENABLE_SET in one place here.
+
+Ah yes, this is a GIC specificity (MASKED = !ENABLED). Good point.
+
+Thanks,
+
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
