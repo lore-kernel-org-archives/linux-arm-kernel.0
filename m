@@ -1,32 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jul 2014 16:51:42 +0200
-Subject: [PATCHv2 8/8] ARM: configs: add cpufreq-generic in multi_v7_defconfig
+Date: Mon,  7 Jul 2014 16:51:41 +0200
+Subject: [PATCHv2 7/8] ARM: mvebu: update mvebu_v7_defconfig with cpufreq
+ support
 In-Reply-To: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404744702-32010-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404744702-32010-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq-generic driver is going to be used by more and more
-platforms to support dynamic frequency scaling of the CPU. This commit
-enables this driver by default in multi_v7_defconfig.
+Now that the Armada XP supports dynamic CPU frequency scaling, it
+makes sense to enable the cpufreq subsystem in mvebu_v7_defconfig, as
+well as the cpufreq-generic driver used on Armada XP.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/mvebu_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index be1a345..80c1f60 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -82,6 +82,7 @@ CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index b0bfefa..be2b5bc 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -29,6 +29,8 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CPU_FREQ=y
 +CONFIG_CPUFREQ_GENERIC=y
- CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
  CONFIG_NET=y
- CONFIG_PACKET=y
+ CONFIG_INET=y
 -- 
 2.0.0
