@@ -1,64 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jul 2014 10:41:28 +0100
-Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU
- advertises it has exclusives
-In-Reply-To: <20140707093443.GA3676@arm.com>
-References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
- <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk> <4606711.7KmFAGVNmG@wuerfel>
- <20140704205144.GK21766@n2100.arm.linux.org.uk>
- <20140707093443.GA3676@arm.com>
-Message-ID: <20140707094128.GY21766@n2100.arm.linux.org.uk>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon,  7 Jul 2014 11:41:26 +0200
+Subject: [PATCH v4 1/2] ARM: i.MX: allow disabling supervisor protect via DT
+Message-ID: <1404726087-2069-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 10:34:43AM +0100, Will Deacon wrote:
-> Hi Russell,
-> 
-> On Fri, Jul 04, 2014 at 09:51:44PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Jul 04, 2014 at 10:11:06PM +0200, Arnd Bergmann wrote:
-> > > On Friday 04 July 2014 20:52:17 Russell King wrote:
-> > > >         /*
-> > > >          * HWCAP_TLS is available only on 1136 r1p0 and later,
-> > > >          * see also kuser_get_tls_init.
-> > > >          */
-> > > > -       if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
-> > > > +       if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&
-> > > > +           ((id >> 20) & 3) == 0) {
-> > > >                 elf_hwcap &= ~HWCAP_TLS;
-> > > > +               return;
-> > > > +       }
-> > > > 
-> > > 
-> > > Would it make sense to tie this check to the ARMv6K architecture level?
-> > > 
-> > > I see that cpu_architecture currently reports the same value for plain
-> > > ARMv6 (1136r0) and for ARMv6K (1136r1+ or any other ARM11), but we already
-> > > distinguish them at compile time in a number of places and it seems you
-> > > make the exact same distinction here at runtime.
-> > 
-> > Hmm, we need guidance from ARM people on that.
-> > 
-> > There may well be a better way to detect between ARMv6 and ARMv6K, which
-> > is given by the architecture spec.  G7.3 of an early DDI0406 says that
-> > the MPIDR (mp affinity register) aliases to MIDR for ARMv6, but is of
-> > course implemented for ARMv6K.
-> 
-> I don't think MPIDR exists on any 1136 (i.e. probably UNDEFs).
+The i.MX SoCs allow to setup fine grained access rights to peripherals on the
+AIPS bus.
+This is done via the Peripheral Access Register (PAR) in e.g. the i.MX21
+or in later SoC versions the Off-Platform Peripheral Access Control Register
+(OPACR), e.g. i.MX53.
+Under certain circumstances this leads to problems in which bus masters are
+not granted their access rights to peripherals.
+To be able to disable these restrictions on DT platforms, add a helper function
+that looks for AIPS nodes in the DT and disables them for every compatible node
+it finds.
+The compatible has to be declared in the mach-specific entry file, where this
+helper function should then be called.
 
-There has long been a requirement (back to ARMv4 I believe) that
-instructions such as:
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+Changes since v3:
+	- use for_each_compatible_node
 
-	mrc	p15, 0, rd, c0, c0, X
+ arch/arm/mach-imx/common.h |  2 ++
+ arch/arm/mach-imx/cpu.c    | 13 +++++++++++++
+ 2 files changed, 15 insertions(+)
 
-all return the MIDR unless they are implemented.  This is certainly
-carried forward to the latest ARM ARMs.  This is done to explicitly
-allow the presence of additional registers to be detected.
-
-I would be very surprised if the 1136 did undef on this.
-
-If I dig out my 1136 FPGA (which according to the docs would be r0p2)
-I can explicitly verify this... provided Integrator CP still works.
-
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 9ab785c..8c1a305 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -19,6 +19,7 @@ struct pt_regs;
+ struct clk;
+ struct device_node;
+ enum mxc_cpu_pwr_mode;
++struct of_device_id;
+ 
+ void mx1_map_io(void);
+ void mx21_map_io(void);
+@@ -77,6 +78,7 @@ void mxc_arch_reset_init(void __iomem *);
+ void mxc_arch_reset_init_dt(void);
+ int mx53_revision(void);
+ void imx_set_aips(void __iomem *);
++void imx_aips_allow_unprivileged_access(const char *compat);
+ int mxc_device_init(void);
+ void imx_set_soc_revision(unsigned int rev);
+ unsigned int imx_get_soc_revision(void);
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index bbe8ff1..df42c14 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -2,6 +2,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/slab.h>
+ #include <linux/sys_soc.h>
+ 
+@@ -60,6 +61,18 @@ void __init imx_set_aips(void __iomem *base)
+ 	__raw_writel(reg, base + 0x50);
+ }
+ 
++void __init imx_aips_allow_unprivileged_access(
++		const char *compat)
++{
++	void __iomem *aips_base_addr;
++	struct device_node *np;
++
++	for_each_compatible_node(np, NULL, compat) {
++		aips_base_addr = of_iomap(np, 0);
++		imx_set_aips(aips_base_addr);
++	}
++}
++
+ struct device * __init imx_soc_device_init(void)
+ {
+ 	struct soc_device_attribute *soc_dev_attr;
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+2.0.0
