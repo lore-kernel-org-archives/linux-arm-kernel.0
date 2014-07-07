@@ -1,66 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Jul 2014 16:25:20 +0200
-Subject: [PATCH v2 07/18] AT91: DT: Remove the old-style reset probing
+Date: Mon,  7 Jul 2014 16:25:28 +0200
+Subject: [PATCH v2 15/18] AT91: Remove poweroff code
 In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404743131-24569-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404743131-24569-16-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the reset code is a driver of its own, just let the usual DT probing
-mecanism do its job, and remove the code entirely in this case.
+Now that all the SoC have been converted to use the new poweroff driver, we can
+remove the poweroff code defined in mach-at91.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/setup.c | 29 -----------------------------
- 1 file changed, 29 deletions(-)
+ arch/arm/mach-at91/setup.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index cc520596f23b..71003e40f01c 100644
+index ae269291d19d..cdd717a4fa30 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -354,34 +354,6 @@ void __init at91_ioremap_matrix(u32 base_addr)
- }
+@@ -321,17 +321,11 @@ void __init at91_map_io(void)
  
- #if defined(CONFIG_OF) && !defined(CONFIG_ARCH_AT91X40)
--static struct of_device_id rstc_ids[] = {
--	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_alt_restart },
--	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
--	{ /*sentinel*/ }
--};
--
--static void at91_dt_rstc(void)
+ void __iomem *at91_shdwc_base = NULL;
+ 
+-static void at91sam9_poweroff(void)
 -{
--	struct device_node *np;
--	const struct of_device_id *of_id;
--
--	np = of_find_matching_node(NULL, rstc_ids);
--	if (!np)
--		panic(pr_fmt("unable to find compatible rstc node in dtb\n"));
--
--	at91_rstc_base = of_iomap(np, 0);
--	if (!at91_rstc_base)
--		panic(pr_fmt("unable to map rstc cpu registers\n"));
--
--	of_id = of_match_node(rstc_ids, np);
--	if (!of_id)
--		panic(pr_fmt("rtsc no restart function available\n"));
--
--	arm_pm_restart = of_id->data;
--
--	of_node_put(np);
+-	at91_shdwc_write(AT91_SHDW_CR, AT91_SHDW_KEY | AT91_SHDW_SHDW);
 -}
 -
- static struct of_device_id ramc_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
- 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
-@@ -507,7 +479,6 @@ void __init at91rm9200_dt_initialize(void)
- 
- void __init at91_dt_initialize(void)
+ void __init at91_ioremap_shdwc(u32 base_addr)
  {
--	at91_dt_rstc();
- 	at91_dt_ramc();
- 	at91_dt_shdwc();
+ 	at91_shdwc_base = ioremap(base_addr, 16);
+ 	if (!at91_shdwc_base)
+ 		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
+-	pm_power_off = at91sam9_poweroff;
+ }
  
+ void __iomem *at91_rstc_base;
 -- 
 2.0.1
