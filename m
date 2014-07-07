@@ -1,48 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 6 Jul 2014 17:51:45 -0700
-Subject: [PATCH] ARM: integrator: fix OF-related regression
-In-Reply-To: <CACRpkdbr05q4iNG00eX1e1ZWKHEmGZ5exGHR9WRPuyFzrs6Tkg@mail.gmail.com>
-References: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
- <CAL_Jsq+Us51c-6+kP5Y+aML-HPV-=9SooPepD6u13xyrvDfcKw@mail.gmail.com>
- <CACRpkdZr6T65zOmxy9mQdeapMfu=nwfcXRtufb5DU5NO+vwU7A@mail.gmail.com>
- <20140626193938.GA16226@debian>
- <CACRpkdbr05q4iNG00eX1e1ZWKHEmGZ5exGHR9WRPuyFzrs6Tkg@mail.gmail.com>
-Message-ID: <20140707005145.GH8469@quad.lixom.net>
+From: minchan@kernel.org (Minchan Kim)
+Date: Mon,  7 Jul 2014 09:53:57 +0900
+Subject: [PATCH v10 6/7] ARM: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <1404694438-10272-1-git-send-email-minchan@kernel.org>
+References: <1404694438-10272-1-git-send-email-minchan@kernel.org>
+Message-ID: <1404694438-10272-7-git-send-email-minchan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 06:52:58PM +0200, Linus Walleij wrote:
-> On Thu, Jun 26, 2014 at 9:39 PM, Rabin Vincent <rabin@rab.in> wrote:
-> 
-> > earlyprintk doesn't work on Integrator hardware?
-> 
-> It does, but loading the kernel is done over serial line 115200 bps
-> so iterative tests take "some time" :-)
-> 
-> > It does on QEMU's
-> > integratorcp so it's trivial to debug there.
-> 
-> Yeah I should be using QEMU for things like this ... poke self.
-> 
-> > The problem is that integrator_init_sysfs() adds a device attribute
-> > called "fpga" to the soc0 bus, and the soc0 bus device is also used as
-> > the root of the device tree, and the device tree has a node called "fpga".
-> (...)
-> > 07e461cd7e73a84f0e3757932b93cc80976fd749 removed the .0 from the fpga node's
-> > directory, leading to that node (and its subnodes) failing to register due to a
-> > filename conflict with the fpga attribute's file:
-> 
-> Aha! Thanks for root-causing this Rabin. Awesome.
-> 
-> > After Linus' patch, the root is no longer soc0 so the fpga node's directory
-> > becomes /devices/fpga while the attribute file remains at /devices/soc0/fpga.
-> 
-> It appears the patch is doing the right thing, though I had very vague
-> ideas as to why.
+MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+overwrite of the contents since MADV_FREE syscall is called for
+THP page.
 
-Ok, sounds like this is good to go. I'll apply it to the fixes branch, we can
-fairly easily take it out right now if it needs to bake more so please speak up
-quickly if that is the case.
+This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+support.
 
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Minchan Kim <minchan@kernel.org>
+---
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
--Olof
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 579702086488..f3ec01cef04f 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -240,10 +240,12 @@ static inline pmd_t pte_pmd(pte_t pte)
+ #endif
+ 
+ #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
++#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
+ #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
+ #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
+ #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
+ #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
++#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
+ #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
+ #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
+ #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
+-- 
+2.0.0
