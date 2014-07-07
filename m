@@ -1,39 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 07 Jul 2014 09:26:52 +0200
-Subject: [PATCH v2 2/2] spi: add driver for Rockchip RK3xxx SoCs
- integrated SPI
-In-Reply-To: <20140707072140.GB30458@sirena.org.uk>
-References: <1403582852-9751-1-git-send-email-addy.ke@rock-chips.com>
- <5578791.jcBVzrGadW@diego> <20140707072140.GB30458@sirena.org.uk>
-Message-ID: <2620380.GejlhFPJDO@diego>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Jul 2014 00:26:21 -0700
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <53B6DB74.2050401@linutronix.de>
+ <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
+Message-ID: <20140707072621.GE28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 7. Juli 2014, 08:21:40 schrieb Mark Brown:
-> On Mon, Jul 07, 2014 at 09:08:41AM +0200, Heiko St?bner wrote:
-> > Am Montag, 7. Juli 2014, 09:42:52 schrieb addy ke:
-> > > > Your DT binding defined some additional compatible strings, please add
-> > > > those to the driver.
-> > 
-> > citing Mark Rutland (one of the dt maintainers):
-> > 
-> > --
-> > 
-> >   That's why I said in addition to the common one. I'd only expect the
-> >   
-> >   driver to look for "rockchip,rk3066-spi", but a DTB could have:
-> >         compatible = "rockchip,rk3188-spi", "rockchip,rk3066-spi";
-> >   
-> >   Seeding the DTBs with the extra strings early makes it more likely that
-> >   we can rely on them later. If we don't happen to need them they only
-> >   clutter some DTBs.
-> > 
-> > --
-> > 
-> > so it looks like the driver is doing the right thing right now
-> 
-> The driver will work but it's better to list the strings that are
-> supported explicitly if only to document that there's nothing specific
-> Linux should be doing for them.
+* Robert Nelson <robertcnelson@gmail.com> [140704 09:59]:
+> On Fri, Jul 4, 2014 at 11:51 AM, Sebastian Andrzej Siewior
+> <bigeasy@linutronix.de> wrote:
+> > On 07/03/2014 09:34 AM, Tony Lindgren wrote:
+> >> Heh. Just to summarize the reason ttyO needs to be a separate name
+> >> and device entry from ttyS is because we also have external 8250
+> >> devices on GPMC and hotplug busses.
+> >
+> > So the GPMC devices will first get a higher minor/device number. The
+> > internal serial ports should show up first. I don't see the problem
+> > (yet).
+> >
+> > If you need a separate major number (and name) like we do have it now
+> > (between ttySx and ttyOx) then one of requirements would be to tell
+> > Kconfig that one driver can be active at a time.
+> >
+> > For me the ttyS vs ttyO thing is purely cosmetic. I personally don't
+> > like that it is different on different platforms like ttymxc, ttySC,
+> > ttyTHS, ?
 
-ok, makes sense :-)
+The dev entry had to be different with serial-omap as it was not
+using 8250 code. With the code moving back to using 8250 code
+there are no dev conflicts so ttyS is just fine as the 8250 code
+handles allocating the devices.
+ 
+> Maybe it's time to migrate them all to one name? (ttyS)  Does the end
+> user really care if they have a soc with an omap/imx serial port
+> driver? Or do they just want to access /dev/ttySx and connect to their
+> device?
+
+Yes the 8250 code should always use ttyS. Then maybe we could
+have also ttyO dev entries created by the driver for compability.
+
+Earlier serial-omap could not provide the ttyS compability easily
+because they were separate drivers.
+
+Regards,
+
+Tony
