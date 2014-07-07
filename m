@@ -1,36 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 7 Jul 2014 22:43:31 +0200
-Subject: [PATCH 2/2] efi: implement mandatory locking for UEFI Runtime
- Services
-In-Reply-To: <20140707202954.GC27474@console-pimps.org>
-References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404295802-28030-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140707202954.GC27474@console-pimps.org>
-Message-ID: <CAKv+Gu91CQADTQ8KMjXQPwVDvW1XkUYO2E5=Mu=aAtrB8B3q_A@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 07 Jul 2014 23:06:05 +0200
+Subject: [PATCH 1/4] ACPI: ARM64 does not have a BIOS add config for BIOS
+ table scan.
+In-Reply-To: <1404290847-7671-2-git-send-email-hanjun.guo@linaro.org>
+References: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
+ <1404290847-7671-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1430951.SWzYBgFe0M@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 July 2014 22:29, Matt Fleming <matt@console-pimps.org> wrote:
-> On Wed, 02 Jul, at 12:10:02PM, Ard Biesheuvel wrote:
->> According to section 7.1 of the UEFI spec, Runtime Services are not fully
->> reentrant, and there are particular combinations of calls that need to be
->> serialized.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/firmware/efi/runtime-wrappers.c | 109 +++++++++++++++++++++++++++++---
->>  1 file changed, 99 insertions(+), 10 deletions(-)
->
-> Ard, what's going on with this one? I didn't see it resubmitted along
-> with v3 of "efi/arm64: handle missing virtual mapping for UEFI System
-> Table".
->
-> Note that we already have a lock to serialize access to the UEFI
-> variable services in the form of __efivars->lock, see
-> drivers/firmware/efi/vars.c. It's a spinlock because of the context we
-> may need to create variables in from efi_pstore_write().
->
+On Wednesday, July 02, 2014 04:47:23 PM Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+> 
+> With the addition of ARM64 that does not have a traditional BIOS to
+> scan, add a config option which is selected on x86 and ia64 to do
+> the traditional BIOS scanning for tables.
+> 
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/ia64/Kconfig    |    1 +
+>  arch/x86/Kconfig     |    1 +
+>  drivers/acpi/Kconfig |    3 +++
+>  drivers/acpi/osl.c   |    4 +++-
+>  4 files changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> index 2f3abcf..f82b352 100644
+> --- a/arch/ia64/Kconfig
+> +++ b/arch/ia64/Kconfig
+> @@ -47,6 +47,7 @@ config IA64
+>  	select MODULES_USE_ELF_RELA
+>  	select ARCH_USE_CMPXCHG_LOCKREF
+>  	select HAVE_ARCH_AUDITSYSCALL
+> +	select ACPI_SCAN_BIOS_NOT_EFI
 
-As the patch says, the UEFI spec is very clear on which combinations
-of calls are not reentrant.
-I don't think the rtc_lock and the efivars->lock quite cover that completely ...
+I would call this ACPI_LEGACY_TABLES_LOOKUP or something like that.
+
+Also please do
+
++	select ACPI_LEGACY_TABLES_LOOKUP if ACPI
+
+in analogy with patch [3/4] in this series.
+
+>  	default y
+>  	help
+>  	  The Itanium Processor Family is Intel's 64-bit successor to
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index a8f749e..4865d44 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -131,6 +131,7 @@ config X86
+>  	select HAVE_CC_STACKPROTECTOR
+>  	select GENERIC_CPU_AUTOPROBE
+>  	select HAVE_ARCH_AUDITSYSCALL
+> +	select ACPI_SCAN_BIOS_NOT_EFI
+>  
+>  config INSTRUCTION_DECODER
+>  	def_bool y
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index a34a228..70eaf7a 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -2,6 +2,9 @@
+>  # ACPI Configuration
+>  #
+>  
+> +config ACPI_SCAN_BIOS_NOT_EFI
+> +	bool
+> +
+>  menuconfig ACPI
+>  	bool "ACPI (Advanced Configuration and Power Interface) Support"
+>  	depends on !IA64_HP_SIM
+> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+> index bad25b0..5ba0b74 100644
+> --- a/drivers/acpi/osl.c
+> +++ b/drivers/acpi/osl.c
+> @@ -259,12 +259,14 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
+>  			       "System description tables not found\n");
+>  			return 0;
+>  		}
+> -	} else {
+> +	} else if (IS_ENABLED(CONFIG_ACPI_SCAN_BIOS_NOT_EFI)) {
+>  		acpi_physical_address pa = 0;
+>  
+>  		acpi_find_root_pointer(&pa);
+>  		return pa;
+>  	}
+> +
+> +	return 0;
+>  }
+>  
+>  /* Must be called with 'acpi_ioremap_lock' or RCU read lock held. */
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
