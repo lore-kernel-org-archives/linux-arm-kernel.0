@@ -1,43 +1,86 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 07 Jul 2014 23:16:11 +0200
-Subject: [PATCH 4/4] ACPI: Make EC debugfs depend on X86 || IA64 in Kconfig
-In-Reply-To: <1404290847-7671-5-git-send-email-hanjun.guo@linaro.org>
-References: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
- <1404290847-7671-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <200683000.sgUJl2AyWR@vostro.rjw.lan>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 7 Jul 2014 23:03:53 +0200
+Subject: [PATCH] micrel phy: fix typo in define, point people to device tree
+Message-ID: <20140707210353.GA29415@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 02, 2014 04:47:26 PM Hanjun Guo wrote:
-> Since EC (Embedded controller) needs SCI for the interupt which
-> is not available on ARM64, make the EC debugfs depend on X86 || IA64
-> only in the Kconfig file.
-> 
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 0e6f72d..7de5e3f 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -69,6 +69,7 @@ config ACPI_PROCFS_POWER
->  
->  config ACPI_EC_DEBUGFS
->  	tristate "EC read/write access through /sys/kernel/debug/ec"
-> +	depends on X86 || IA64
 
-This is totally inconsistent with the other patches in the series where you
-define per-arch symbols for similar things.  In addition to that, do we need
-to build ec.c on ARM at all?
+There's typo "SCEW" in some defines, which made my greps fail and
+confused me a lot. Plus, Dinh Nguyen pointed out that direct phy
+accesses from board files should no longer be needed -- device tree
+should be able to configure skew.
 
->  	default n
->  	help
->  	  Say N to disable Embedded Controller /sys/kernel/debug interface
-> 
+Signed-off-by: Pavel Machek <pavel@denx.de>
+
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index 075ec05..528d3ce 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -50,12 +50,15 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+ {
+ 	int value;
+ 
++	/* Should probably use dts to configure skew, see 
++	   micrel-ksz90x1.txt */
++
+ 	/* Set delay values */
+-	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000;
++	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW | 0x8000;
+ 	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
+ 	value = 0xF2F4;
+ 	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
+-	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000;
++	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW | 0x8000;
+ 	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
+ 	value = 0x2222;
+ 	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index e60456d..fa6c7ad 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -42,18 +42,19 @@
+ /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
+ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+ {
++	/* Should probably use dt to set these, see micrel-ksz90x1.txt */
+ 	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+ 		/* min rx data delay */
+ 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
+-			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW);
++			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW);
+ 		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
+ 
+ 		/* max rx/tx clock delay, min rx/tx control delay */
+ 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
+-			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
++			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
+ 		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0xf0f0);
+ 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
+-			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
++			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
+ 	}
+ 
+ 	return 0;
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -38,9 +38,12 @@
+ /* struct phy_device dev_flags definitions */
+ #define MICREL_PHY_50MHZ_CLK	0x00000001
+ 
++/* These probably should not be exported; see micrel-ksz90x1.txt on
++   how to configure skew from device tree. */
+ #define MICREL_KSZ9021_EXTREG_CTRL	0xB
+ #define MICREL_KSZ9021_EXTREG_DATA_WRITE	0xC
+-#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW	0x104
+-#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW	0x105
++#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW	0x104
++#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW	0x105
++#define MICREL_KSZ9021_RGMII_TX_DATA_PAD_SKEW	0x106
+ 
+ #endif /* _MICREL_PHY_H */
+
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
