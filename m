@@ -1,34 +1,50 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 7 Jul 2014 10:35:02 -0700
-Subject: [PATCH v2 2/2] devicetree: Add Zynq GPIO devicetree bindings
- documentation
-In-Reply-To: <CACRpkdYZ8gQ_-z3Ue3WZZ4FiV8dhw_BZez2-PLpeiBTs-UnNFQ@mail.gmail.com>
-References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
- <1403091577-10232-2-git-send-email-harinik@xilinx.com>
- <CACRpkdYZ8gQ_-z3Ue3WZZ4FiV8dhw_BZez2-PLpeiBTs-UnNFQ@mail.gmail.com>
-Message-ID: <30b61880-97a0-4e94-a71e-d738f0416d9d@BN1BFFO11FD056.protection.gbl>
+From: xerofoify@gmail.com (Nick Krause)
+Date: Mon, 7 Jul 2014 13:40:40 -0400
+Subject: [PATCH] mach-omap1: Fix call to omap_cfg_reg
+In-Reply-To: <20140707081456.GH28884@atomide.com>
+References: <1404493320-5606-1-git-send-email-xerofoify@gmail.com>
+ <20140707081456.GH28884@atomide.com>
+Message-ID: <CAPDOMVjpqWL-BVUPKig+2d7921105A03c1BX6164RkC=vuXBGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-07-07 at 04:53PM +0200, Linus Walleij wrote:
-> On Wed, Jun 18, 2014 at 1:39 PM, Harini Katakam <harinik@xilinx.com> wrote:
-> 
-> > From: Harini Katakam <harini.katakam@xilinx.com>
-> >
-> > Add gpio-zynq bindings documentation.
-> >
-> > Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >
-> > v2 changes:
-> > Improve description.
-> (...)
-> > +- #gpio-cells          : Should be two. First cell is used to mention
-> > +                         pin number.
-> 
-> Don't call this "pin number", call it "GPIO line number".
-It's also not mentioning the second cell at all. I'll take the part from
-gpio-msm to document this property and replace 'pin' with 'GPIO line'.
+Hey Tony,
+This seems to be a false positive then.Please reply if it is so I can remove the
+Fix me message.
+Cheers Nick
 
-	S?ren
+On Mon, Jul 7, 2014 at 4:14 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Nicholas Krause <xerofoify@gmail.com> [140704 10:03]:
+>> This patch fixes the call to ompa_cfg_reg(USB2_SPEED) in the case
+>> that the cpu is a omap16xx and the nwires are not equal to 3.
+>
+> This is most likely unsafe to do as the pin is probably
+> shared with some other device and we have to rely for
+> the bootloader to do the right thing for the board.
+>
+> Regards,
+>
+> Tony
+>
+>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+>> ---
+>>  arch/arm/mach-omap1/usb.c | 3 +--
+>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+>> index 4118db5..17e3139 100644
+>> --- a/arch/arm/mach-omap1/usb.c
+>> +++ b/arch/arm/mach-omap1/usb.c
+>> @@ -504,8 +504,7 @@ static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+>>               omap_cfg_reg(W9_USB2_TXEN);
+>>               omap_cfg_reg(W5_USB2_SE0);
+>>               if (nwires != 3)
+>> -                     omap_cfg_reg(Y5_USB2_RCV);
+>> -             // FIXME omap_cfg_reg(USB2_SPEED);
+>> +                     omap_cfg_reg(USB2_SPEED)
+>>       } else {
+>>               pr_debug("usb%d cpu unrecognized\n", 1);
+>>               return 0;
+>> --
+>> 1.9.1
+>>
