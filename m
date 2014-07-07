@@ -1,75 +1,25 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 07 Jul 2014 16:29:36 +0900
-Subject: [PATCHv2 2/5] ARM: dts: exynos: unuse the slot-node and deprecated
- the supports-highspeed for dw-mmc
-In-Reply-To: <1404128960-27225-3-git-send-email-jh80.chung@samsung.com>
-References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
- <1404128960-27225-3-git-send-email-jh80.chung@samsung.com>
-Message-ID: <000c01cf99b5$34ccc8c0$9e665a40$%jun@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Jul 2014 08:30:41 +0100
+Subject: [PATCH] arm64: KVM: allow export and import of generic timer regs
+In-Reply-To: <1404485654-32674-1-git-send-email-alex.bennee@linaro.org> ("Alex
+ \=\?utf-8\?Q\?Benn\=C3\=A9e\=22's\?\= message of "Fri,
+ 4 Jul 2014 15:54:14 +0100")
+References: <1404485654-32674-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <87mwclbp7i.fsf@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+On Fri, Jul 04 2014 at  3:54:14 pm BST, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> For correct guest suspend/resume behaviour we need to ensure we include
+> the generic timer registers for 64 bit guests. As CONFIG_KVM_ARM_TIMER is
+> always set for arm64 we don't need to worry about null implementations.
+> However I have re-jigged the kvm_arm_timer_set/get_reg declarations to
+> be in the common include/kvm/arm_arch_timer.h headers.
+>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-Please check one thing below.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On Mon, June 30, 2014, Jaehoon Chung wrote:
-> dw-mmc controller can support multiple slots.
-> But, there are no use-cases anywhere. So we don't need to support the
-> slot-node for dw-mmc controller.
-> And "supports-highspeed" property in dw-mmc is deprecated.
-> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
-> 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Reviewed-by: Tushar Behera <trblinux@gmail.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
-
-> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-
-> octa.dts
-> index 434fd9d..5f37b81 100644
-> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> @@ -50,7 +50,6 @@
->  	mmc at 12200000 {
->  		status = "okay";
->  		broken-cd;
-> -		supports-highspeed;
->  		card-detect-delay = <200>;
->  		samsung,dw-mshc-ciu-div = <3>;
->  		samsung,dw-mshc-sdr-timing = <0 4>;
-> @@ -58,16 +57,12 @@
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->  		vmmc-supply = <&ldo10_reg>;
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <8>;
-> -		};
-> +		bus-width = <8>;
-> +		cap-mmc-highspeed;
->  	};
-> 
->  	mmc at 12220000 {
->  		status = "okay";
-> -		supports-highspeed;
->  		card-detect-delay = <200>;
->  		samsung,dw-mshc-ciu-div = <3>;
->  		samsung,dw-mshc-sdr-timing = <2 3>;
-> @@ -75,11 +70,8 @@
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->  		vmmc-supply = <&ldo10_reg>;
-> -
-> -		slot at 0 {
-> -			reg = <0>;
-> -			bus-width = <4>;
-> -		};
-> +		bus-width = <8>;
-<4> is correct?
-
-> +		cap-mmc-highspeed;
-
-Thanks,
-Seungwon Jeon
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
