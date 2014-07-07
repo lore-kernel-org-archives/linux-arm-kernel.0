@@ -1,38 +1,32 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:31 +0200
-Subject: [PATCHv2 14/32] ARM: at91/dt: tny_a9260: define crystals frequencies
+Date: Mon,  7 Jul 2014 22:23:27 +0200
+Subject: [PATCHv2 10/32] ARM: at91: move at91sam9260 SoCs to the CCF
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-15-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-11-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Calao TNY-A9260 and TNY-A9G20 main and slow crystals frequencies.
+This patch removes the selection of AT91_USE_OLD_CLK when selecting at91sam9260
+SoCs support. This will automatically enable COMMON_CLK_AT91 option and add
+support for at91 common clk implementation.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
 ---
- arch/arm/boot/dts/tny_a9260_common.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-at91/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/tny_a9260_common.dtsi b/arch/arm/boot/dts/tny_a9260_common.dtsi
-index 0e6d3de2e09e..ce7138c3af1b 100644
---- a/arch/arm/boot/dts/tny_a9260_common.dtsi
-+++ b/arch/arm/boot/dts/tny_a9260_common.dtsi
-@@ -24,6 +24,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
- 		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
- 	};
- 
- 	ahb {
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c818136a74b8..a2efe6e1e224 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -119,7 +119,6 @@ config SOC_AT91SAM9260
+ 	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
+ 	select HAVE_AT91_DBGU0
+ 	select SOC_AT91SAM9
+-	select AT91_USE_OLD_CLK
+ 	select HAVE_AT91_USB_CLK
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9260, AT91SAM9XE
 -- 
 1.9.1
