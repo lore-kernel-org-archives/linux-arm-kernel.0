@@ -1,38 +1,32 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:32 +0200
-Subject: [PATCHv2 15/32] ARM: at91/dt: qil_a9260: define crystals frequencies
+Date: Mon,  7 Jul 2014 22:23:40 +0200
+Subject: [PATCHv2 23/32] ARM: at91: move at91sam9g45 SoC to the CCF
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-16-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-24-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Calao QIL-A9260 main and slow crystals frequencies.
+This patch removes the selection of AT91_USE_OLD_CLK when selecting at91sam9g45
+SoC support. This will automatically enable COMMON_CLK_AT91 option and add
+support for at91 common clock implementation.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
 ---
- arch/arm/boot/dts/at91-qil_a9260.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-at91/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
-index 5576ae8786c0..a9aef53ab764 100644
---- a/arch/arm/boot/dts/at91-qil_a9260.dts
-+++ b/arch/arm/boot/dts/at91-qil_a9260.dts
-@@ -28,6 +28,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
- 		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
- 	};
- 
- 	ahb {
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index a2efe6e1e224..461966d0ee4d 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -153,7 +153,6 @@ config SOC_AT91SAM9G45
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
+-	select AT91_USE_OLD_CLK
+ 	select HAVE_AT91_UTMI
+ 	select HAVE_AT91_USB_CLK
+ 	help
 -- 
 1.9.1
