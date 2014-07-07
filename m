@@ -1,48 +1,95 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Jul 2014 08:34:18 +0900
-Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
- Exynos5420
-In-Reply-To: <53B2A2A5.4070203@gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>	<1402464739-19044-3-git-send-email-tushar.b@samsung.com>	<CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>	<7hpphwlgn0.fsf@paris.lan>	<CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>	<7h8uojk61a.fsf@paris.lan>	<53ACE724.7090606@gmail.com>	<CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
- <CAGa+x87LHiYGb03=GRcZisK1=TyakW1htd1E2vOQ6ijZKw8syg@mail.gmail.com>
- <53B2A2A5.4070203@gmail.com>
-Message-ID: <53BB2E7A.5080204@samsung.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 7 Jul 2014 20:37:58 -0300
+Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
+In-Reply-To: <20140707183002.GA5947@kroah.com>
+References: <20140703135146.GA6898@luxor.wired.org>
+ <53B5C61D.2060308@free-electrons.com>
+ <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
+ <20140705150308.GA28791@arch.cereza>
+ <20140705205951.GB3678@kroah.com>
+ <20140707105818.GA1101@arch.cereza>
+ <20140707183002.GA5947@kroah.com>
+Message-ID: <20140707233758.GA1456@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 20:59, Tushar Behera wrote:
-> On 06/27/2014 08:18 PM, Kevin Hilman wrote:
->> On Fri, Jun 27, 2014 at 7:18 AM, Kevin Hilman<khilman@linaro.org>  wrote:
->>> On Thu, Jun 26, 2014 at 8:38 PM, Tushar Behera<trblinux@gmail.com>  wrote:
->>>
->>>> Would you please provide me the environment setting of your u-boot?
->>>> U-boot environment on my board has been over-written, I would like to
->>>> set it same as yours and try to reproduce the issue at my end. With only
->>>> 'sound init', I don't seem to hit this issue anymore.
->>>
->>> Attached is a full boot log using v3.16-rc2 with my patch adding
->>> CLK_IGNORE_UNUSED to mau_epll and Doug's aclk66_peric patch.  In the
->>> boot log, you'll see the output of 'printenv' inside u-boot where the
->>> environment is dumped.
->>
->> Oops, I sent you a boot log for the octa board.  Here's the one for
->> peach-pi with the same kernel (built with upstream exynos_defconfig)
->>
->> Kevin
->>
->
-> The u-boot version is a little different on my Peach-Pi as compared to
-> the market release version. Not sure if that is making any difference.
->
-> Peach # version
->
-> U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
-> armv7a-cros-linux-gnueabi-gcc.real (4.8.1_cos_gg_feea904_4.8.1-r66)
-> 4.8.x-google 20130905 (prerelease)
-> GNU ld (binutils-2.22_cos_gg_2) 2.22
->
+On 07 Jul 11:30 AM, Greg Kroah-Hartman wrote:
+> On Mon, Jul 07, 2014 at 07:58:18AM -0300, Ezequiel Garcia wrote:
+[..]
+> > 
+> > I guess I snipped the thread and lost most of the information about the panic.
+> > Here's the original bug report:
+> > 
+> > http://www.spinics.net/lists/arm-kernel/msg344059.html
+> > 
+> > The problem reported involves enabling OMAP IOMMU driver and not any other IOMMU
+> > driver. Doing some tracing and adding a few prints, we found that
+> > omap_iommu_init() sets a bus notifier for the platform bus type:
+> > 
+> > omap_iommu_init -> bus_set_iommu -> iommu_bus_init:
+> > 
+> > static void iommu_bus_init(struct bus_type *bus, struct iommu_ops *ops)
+> > {
+> >         bus_register_notifier(bus, &iommu_bus_nb);
+> >         bus_for_each_dev(bus, NULL, ops, add_iommu_group);
+> > }
+> > 
+> > But the iommu bus notifier gets called for the 'pci' bus type, which
+> > has the iommu_ops field NULL (since it hasn't been set for iommu).
+> 
+> So this is what needs to be figured out, how is the notifier being
+> called with a PCI device?  Who else called iommu_bus_init() for the PCI
+> bus?
+> 
 
-Note that I've applied this only from this series so I'm not sure how 
-much the problem can be solved...any updates for 1/3 and 3/3?
+Nobody. The only caller of iommu_bus_init() the above OMAP IOMMU.
 
-- Kukjin
+However, I found something interesting. Tried to bisect this without much
+luck; I did two bisects and ended up in the same merge commit:
+
+# good: [0f16aa3c24a216d14d7f0587e1cbd2c1b51a38f3] Merge tag 'samsung-dt-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/dt
+# first bad commit: [755a9ba7bf24a45b6dbf8bb15a5a56c8ed12461a] Merge tag 'dt-for-3.16' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into next
+
+So, after doing a few diff's between that good and bad and searching for
+"bus_notifier" changes, saw something strange in arch/arm/mach-mvebu/coherency.c.
+
+It seems bus_register_notifier() is been called for platform and pci devices
+with the *same* notifier block. Haven't looked close enough, but you mentioned
+that could cause trouble?
+
+This patch fixes the issue here:
+
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 477202f..2bdc323 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -292,6 +292,10 @@ static struct notifier_block mvebu_hwcc_nb = {
+ 	.notifier_call = mvebu_hwcc_notifier,
+ };
+ 
++static struct notifier_block mvebu_hwcc_pci_nb = {
++	.notifier_call = mvebu_hwcc_notifier,
++};
++
+ static void __init armada_370_coherency_init(struct device_node *np)
+ {
+ 	struct resource res;
+@@ -427,7 +431,7 @@ static int __init coherency_pci_init(void)
+ {
+ 	if (coherency_available())
+ 		bus_register_notifier(&pci_bus_type,
+-				       &mvebu_hwcc_nb);
++				       &mvebu_hwcc_pci_nb);
+ 	return 0;
+ }
+ 
+Paolo, can you apply it and confirm it fixes the problem?
+
+Greg, can you confirm using the same notifier block pointer
+for two different bus types makes the bus notifier go nuts?
+
+Thanks for the help,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
