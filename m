@@ -1,62 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 09:54:31 +0200
-Subject: [PATCH v2 06/30] ARM: shmobile: bockw-reference: Initialise TMU
- device using DT
+Date: Mon,  7 Jul 2014 09:54:36 +0200
+Subject: [PATCH v2 11/30] ARM: shmobile: r8a73a4: Add CMT1 node
 In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404719695-1634-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404719695-1634-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise TMU device using DT when booting bockw
-using DT-reference.
+This describes all of the CMT1 hardware of the r8a73a4.
+The node is disabled and may be enabled as necessary by board DTS files.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
-v2
-* Added Ack from Laurent Pinchart
----
- arch/arm/boot/dts/r8a7778-bockw-reference.dts | 4 ++++
- arch/arm/mach-shmobile/setup-r8a7778.c        | 3 +--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+N.B: This only adds cmt1, as per the legacy C code
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-index 3342c74..970237c 100644
---- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -73,6 +73,10 @@
- 	status = "okay";
- };
+v2
+* First post
+---
+ arch/arm/boot/dts/r8a73a4.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index d8ec505..9bf3386 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -50,6 +50,16 @@
+ 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
  
-+&tmu0 {
-+	status = "okay";
-+};
++	cmt1: timer at e6130000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xe6130000 0 0x1004>;
++		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
 +
- &pfc {
- 	scif0_pins: serial0 {
- 		renesas,groups = "scif0_data_a", "scif0_ctrl";
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index e218c46..575148d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -293,8 +293,6 @@ void __init r8a7778_add_dt_devices(void)
- 		l2x0_init(base, 0x00400000, 0xc20f0fff);
- 	}
- #endif
--
--	r8a7778_register_tmu(0);
- }
- 
- /* HPB-DMA */
-@@ -502,6 +500,7 @@ static void __init r8a7778_register_hpb_dmae(void)
- void __init r8a7778_add_standard_devices(void)
- {
- 	r8a7778_add_dt_devices();
-+	r8a7778_register_tmu(0);
- 	r8a7778_register_scif(0);
- 	r8a7778_register_scif(1);
- 	r8a7778_register_scif(2);
++		renesas,channels-mask = <0xff>;
++
++		status = "disabled";
++	};
++
+ 	irqc0: interrupt-controller at e61c0000 {
+ 		compatible = "renesas,irqc";
+ 		#interrupt-cells = <2>;
 -- 
 2.0.0.rc2
