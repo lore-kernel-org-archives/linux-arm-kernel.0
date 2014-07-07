@@ -1,100 +1,104 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 7 Jul 2014 17:01:26 +0200
-Subject: [PATCH v2 00/18] AT91: cleanup of the reset and poweroff code
-In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140707150126.GE3113@piout.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 7 Jul 2014 10:10:24 -0500
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <20140707134008.GU3705@n2100.arm.linux.org.uk>
+References: <20140617131935.GB9070@saruman.home>
+ <20140701194704.GG13396@saruman.home>
+ <20140702081142.GU28884@atomide.com>
+ <20140707104727.GM28884@atomide.com>
+ <20140707104944.GS3705@n2100.arm.linux.org.uk>
+ <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
+ <20140707121512.GT3705@n2100.arm.linux.org.uk>
+ <20140707123925.GW28884@atomide.com>
+ <20140707134008.GU3705@n2100.arm.linux.org.uk>
+Message-ID: <20140707151024.GJ5582@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2014 at 16:25:13 +0200, Maxime Ripard wrote :
-> Hi,
-> 
-> This patchset is an attempt to further cleanup mach-at91 by removing
-> code that can be put into a driver nowadays.
-> 
-> This time, the target is the reset and poweroff code, that can now be
-> put in drivers/power/reset.
-> 
+Hi,
 
-Apart from my two other comments, I'm fine with the full series.
+On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 07, 2014 at 05:39:26AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [140707 05:17]:
+> > > On Mon, Jul 07, 2014 at 05:20:27PM +0530, Sekhar Nori wrote:
+> > > > OMAP4430 had L2 cache controller version r2p0 (per the public TRM) which
+> > > > does not have this register. So unless there is a ROM API that was
+> > > > introduced after OMAP4430, this would not be there even for other
+> > > > OMAP4s. Public TRM of OMAP4470 does not indicate an API for this.
+> > > > 
+> > > > Before creating the patch, I checked with ROM team handling AM437x and
+> > > > they denied an API to write to this register was present in AM437x ROM.
+> > > 
+> > > Okay, so why are we trying to write to this register then...
+> > > 
+> > > Ah, we have a bug in cache-l2x0.c:
+> > > 
+> > > #define L2X0_CACHE_ID_PART_MASK         (0xf << 6)
+> > > #define L2X0_CACHE_ID_RTL_MASK          0x3f
+> > > #define L310_CACHE_ID_RTL_R3P0          0x05
+> > > 
+> > >         unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+> > > 
+> > >         if (rev >= L310_CACHE_ID_RTL_R2P0) {
+> > > ...
+> > >         if (rev >= L310_CACHE_ID_RTL_R3P0) {
+> > >                 l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+> > >                               base, L310_POWER_CTRL);
+> > > 
+> > > So, because we're masking the wrong bits, we end up with these tests
+> > > always succeeding.
+> > > 
+> > > So that's a NACK for the original patch, it's the wrong fix.  The
+> > > right fix is to avoid writing this register by fixing the RTL masking.
+> > 
+> > Okie dokie, dropping the omap specific fix.
+> 
+> Here's the revision mask fix - with the existing code, the revision checks
+> are all useless since they would all pass irrespective of the actual
+> revision.  (Had the L2C series been better tested rather than being largely
+> ignored, this may have been noticed before it was merged...)  Anyway, what
+> isn't clear from Sekhar's message is which revision L2C310 is in the AM437x.
+> 
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH] ARM: l2c: fix revision checking
+> 
+> The revision checking in l2c310_enable() was not correct; we were
+> masking the part number rather than the revision number.  Fix this
+> to use the correct macro.
+> 
+> Fixes: 4374d64933b1 ("ARM: l2c: add automatic enable of early BRESP")
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mm/cache-l2x0.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 948f12cf6180..0b5068256baf 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
+>  
+>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>  {
+> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
+>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
 
-> Maxime
-> 
-> Changes from v1:
->   - Added the missing copyrights in the new reset and poweroff drivers
->   - Renamed the platform names for the reset driver to match the name
->     of the first SoC that introduced them
->   - Fixed a few typos in the commit logs
->   - Added missing comments in the assembly code in the reset driver
->   - Splitted the reset probe to handle the DT and platform probe in
->     separate functions.
-> 
-> Maxime Ripard (18):
->   power: reset: Add if statement isntead of multiple depends on
->   AT91: setup: Switch to pr_fmt
->   AT91: G45: DT: Declare a second ram controller
->   AT91: Rework ramc mapping code
->   AT91: SAMA5D3: DT: Add shutdown controller
->   power: reset: Add AT91 reset driver
->   AT91: DT: Remove the old-style reset probing
->   AT91: soc: Introduce register_devices callback
->   AT91: Probe the reset driver
->   AT91: Call at91_register_devices in the board files
->   AT91: Remove reset code from the machine code
->   power: reset: Add AT91 poweroff driver
->   AT91: DT: Remove poweroff DT probing
->   AT91: Register the poweroff driver
->   AT91: Remove poweroff code
->   AT91: pm: Remove show_reset_status function
->   AT91: Remove rstc and shdwnc global base addresses
->   AT91: Remove rstc and shdwc headers
-> 
->  arch/arm/boot/dts/at91sam9g45.dtsi      |   8 +-
->  arch/arm/boot/dts/sama5d3.dtsi          |   5 +
->  arch/arm/mach-at91/Kconfig              |   8 --
->  arch/arm/mach-at91/Makefile             |   2 -
->  arch/arm/mach-at91/at91_rstc.h          |  53 -------
->  arch/arm/mach-at91/at91_shdwc.h         |  50 -------
->  arch/arm/mach-at91/at91sam9260.c        |  45 +++++-
->  arch/arm/mach-at91/at91sam9261.c        |  45 +++++-
->  arch/arm/mach-at91/at91sam9263.c        |  45 +++++-
->  arch/arm/mach-at91/at91sam9_alt_reset.S |  40 ------
->  arch/arm/mach-at91/at91sam9g45.c        |  49 ++++++-
->  arch/arm/mach-at91/at91sam9g45_reset.S  |  45 ------
->  arch/arm/mach-at91/at91sam9rl.c         |  45 +++++-
->  arch/arm/mach-at91/board-afeb-9260v1.c  |   2 +
->  arch/arm/mach-at91/board-cam60.c        |   2 +
->  arch/arm/mach-at91/board-cpu9krea.c     |   2 +
->  arch/arm/mach-at91/board-flexibity.c    |   2 +
->  arch/arm/mach-at91/board-sam9-l9260.c   |   2 +
->  arch/arm/mach-at91/board-sam9260ek.c    |   3 +-
->  arch/arm/mach-at91/board-sam9261ek.c    |   3 +-
->  arch/arm/mach-at91/board-sam9263ek.c    |   3 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c |   3 +-
->  arch/arm/mach-at91/board-sam9rlek.c     |   3 +-
->  arch/arm/mach-at91/board-snapper9260.c  |   2 +
->  arch/arm/mach-at91/generic.h            |  10 +-
->  arch/arm/mach-at91/pm.c                 |  72 ----------
->  arch/arm/mach-at91/setup.c              | 178 ++++-------------------
->  arch/arm/mach-at91/soc.h                |   1 +
->  drivers/power/reset/Kconfig             |  31 ++--
->  drivers/power/reset/Makefile            |   2 +
->  drivers/power/reset/at91-poweroff.c     | 156 ++++++++++++++++++++
->  drivers/power/reset/at91-reset.c        | 246 ++++++++++++++++++++++++++++++++
->  32 files changed, 701 insertions(+), 462 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/at91_rstc.h
->  delete mode 100644 arch/arm/mach-at91/at91_shdwc.h
->  delete mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
->  delete mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
->  create mode 100644 drivers/power/reset/at91-poweroff.c
->  create mode 100644 drivers/power/reset/at91-reset.c
-> 
-> -- 
-> 2.0.1
-> 
+even with this change, l2c still tries to write to power control
+register, at least on AM437x. Looking a little deeper here, AM437x
+identifies itself as l2c PL310 r3p3, which should have power control
+register, but aparentely there's no way to write that register. I'll
+file a bug to our ROM team, but we will certainly need a way to
+workaround this inside omap4-common.c
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140707/88ccd160/attachment.sig>
