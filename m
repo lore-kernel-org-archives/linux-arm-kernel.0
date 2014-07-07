@@ -1,19 +1,33 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 7 Jul 2014 01:49:48 -0700
-Subject: [PATCH] arm64: KVM: allow export and import of generic timer regs
-In-Reply-To: <1404485654-32674-1-git-send-email-alex.bennee@linaro.org>
-References: <1404485654-32674-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20140707084948.GE20451@cbox>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Jul 2014 10:47:00 +0200
+Subject: [PATCH v3 1/9] clk: sunxi: Add A23 APB0 divider clock support
+In-Reply-To: <1404399349-20237-2-git-send-email-wens@csie.org>
+References: <1404399349-20237-1-git-send-email-wens@csie.org>
+ <1404399349-20237-2-git-send-email-wens@csie.org>
+Message-ID: <20140707084700.GD16262@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 03:54:14PM +0100, Alex Benn?e wrote:
-> For correct guest suspend/resume behaviour we need to ensure we include
-> the generic timer registers for 64 bit guests. As CONFIG_KVM_ARM_TIMER is
-> always set for arm64 we don't need to worry about null implementations.
-> However I have re-jigged the kvm_arm_timer_set/get_reg declarations to
-> be in the common include/kvm/arm_arch_timer.h headers.
+On Thu, Jul 03, 2014 at 10:55:41PM +0800, Chen-Yu Tsai wrote:
+> The A23 has an almost identical PRCM clock tree. The difference in
+> the APB0 clock is the smallest divisor is 1, instead of 2.
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> This patch adds a separate sun8i-a23-apb0-clk driver to support it.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Just applied, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140707/15872668/attachment.sig>
