@@ -1,76 +1,75 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Jul 2014 09:20:50 +0530
-Subject: [PATCH v6 0/6] Cleanup patches for mach-exynos
-Message-ID: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 07 Jul 2014 09:20:51 +0530
+Subject: [PATCH v6 1/6] ARM: EXYNOS: Make exynos machine_ops as static
+In-Reply-To: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1404705056-11965-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is doing code cleanup under arch/arm/mach-exynos.
-These patches have been separated from main exynos pmu v4 patch
-posted here [1].
+As machine function ops are used only in this file let's make
+them static. Also remove unused and unwanted declarations from
+common.h.
 
-[1]: https://lkml.org/lkml/2014/5/10/29
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/common.h |    8 --------
+ arch/arm/mach-exynos/exynos.c |    6 +++---
+ 2 files changed, 3 insertions(+), 11 deletions(-)
 
-Changes Since v5:
- - Rebased on latest for-next of Kukjin Kim's tree.
- - Using of_machine_is_compatible instead of soc_is_exynos in patch 2.
-
-Changes Since v4:
- - Rebased on latest for-next of Kukjin Kim's tree.
- - Removing file path comment from mach-exynos/headsmp.S also.
- - Removed signed-off-by of Young-Gun Jang <yg1004.jang@samsung.com>,
-   as this id is no more valid. Taking ownership of all his patches.
- - Separated these patches from main exynos pmu v4 patch series as
-   suggested by Tomasz Figa.
-
-Changes Since v3:
- - Addressed build fail issue in exynos.c as reported by Sachin Kamat.
- - Rebased on top of Sysram patches by Sachin Kamat.
-
-Changes Since v2:
- - Rebased on top of Daniel Lezcano's Exynos cpuidle refactor patches.
- - Removed exynos_cpuidle_init and exynos_cpufreq_init code as suggested
-   by Tomasz Figa.
-
-Changes Since v1:
- - Rebased on latest for-next of Kukjin Kim's tree.
- - Added patch: "Make exynos machine_ops as static". 
-	For making more cleanup in "mach-exynos/common.h"
-	as suggested by Tomasz Figa.
- - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
- - Updated patch: Remove file path from comment section
-	As suggested by Michel Simek, instead of updating file path
-	lets remove them from each file under "mach-exynos".
-	Even though Kukjin pointed out that there is similar patch pending from
-	Sachin/Tushar but since I could not find I have included this here. If
-	I have missed something please point to any existing such patch.
- - Added patch: Remove "linux/bug.h" from pmu.c.
- - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
-
-
-Pankaj Dubey (6):
-  ARM: EXYNOS: Make exynos machine_ops as static
-  ARM: EXYNOS: Move cpufreq and cpuidle device registration to
-    init_machine
-  ARM: EXYNOS: Move SYSREG definition into sys-reg specific file
-  ARM: EXYNOS: Remove file path from comment section
-  ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
-  ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
-
- arch/arm/mach-exynos/common.h              |    8 --------
- arch/arm/mach-exynos/exynos.c              |   27 ++++++++-------------------
- arch/arm/mach-exynos/headsmp.S             |    1 -
- arch/arm/mach-exynos/hotplug.c             |    3 +--
- arch/arm/mach-exynos/include/mach/map.h    |    3 +--
- arch/arm/mach-exynos/include/mach/memory.h |    3 +--
- arch/arm/mach-exynos/platsmp.c             |    3 +--
- arch/arm/mach-exynos/pm.c                  |    1 +
- arch/arm/mach-exynos/pm_domains.c          |    8 ++++----
- arch/arm/mach-exynos/pmu.c                 |    1 -
- arch/arm/mach-exynos/regs-pmu.h            |    4 ----
- arch/arm/mach-exynos/regs-sys.h            |   22 ++++++++++++++++++++++
- 12 files changed, 39 insertions(+), 45 deletions(-)
- create mode 100644 arch/arm/mach-exynos/regs-sys.h
-
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 3371669..152b464 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -111,17 +111,9 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
+ #define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5410() || \
+ 			  soc_is_exynos5420() || soc_is_exynos5800())
+ 
+-void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
+-
+-struct map_desc;
+ extern void __iomem *sysram_ns_base_addr;
+ extern void __iomem *sysram_base_addr;
+-void exynos_init_io(void);
+-void exynos_restart(enum reboot_mode mode, const char *cmd);
+ void exynos_sysram_init(void);
+-void exynos_cpuidle_init(void);
+-void exynos_cpufreq_init(void);
+-void exynos_init_late(void);
+ 
+ void exynos_firmware_init(void);
+ 
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 471422e..ff60b4c 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -143,7 +143,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	},
+ };
+ 
+-void exynos_restart(enum reboot_mode mode, const char *cmd)
++static void exynos_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	struct device_node *np;
+ 	u32 val = 0x1;
+@@ -206,7 +206,7 @@ void __init exynos_sysram_init(void)
+ 	}
+ }
+ 
+-void __init exynos_init_late(void)
++static void __init exynos_init_late(void)
+ {
+ 	if (of_machine_is_compatible("samsung,exynos5440"))
+ 		/* to be supported later */
+@@ -253,7 +253,7 @@ static void __init exynos_map_io(void)
+ 		iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
+ }
+ 
+-void __init exynos_init_io(void)
++static void __init exynos_init_io(void)
+ {
+ 	debug_ll_io_init();
+ 
 -- 
 1.7.9.5
