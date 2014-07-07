@@ -1,87 +1,65 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 7 Jul 2014 08:49:59 -0700
-Subject: [PATCH v9 3/3] dt-bindings: add mtk-timer bindings
-In-Reply-To: <CABuKBeLv+wC9Fe=P40pBvU+R3KrEUyTWj2Gs3tg2qjjm2HONsA@mail.gmail.com>
-References: <1403264929-21325-1-git-send-email-matthias.bgg@gmail.com>
- <1403264929-21325-4-git-send-email-matthias.bgg@gmail.com>
- <20140620123602.GK30188@leverpostej>
- <CABuKBeKknz7OEyffKOGK=yk7ZH7fj7Jf9fgPhw2VGbTC-p21qw@mail.gmail.com>
- <5b2c6b68-6177-47f4-937a-077b4f3c89a4@BN1AFFO11FD048.protection.gbl>
- <CABuKBeLv+wC9Fe=P40pBvU+R3KrEUyTWj2Gs3tg2qjjm2HONsA@mail.gmail.com>
-Message-ID: <19e012cf-de2f-4bf9-bac3-3b3df051f117@BY2FFO11FD048.protection.gbl>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 7 Jul 2014 15:52:15 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: more fixes for v3.16-rc
+Message-ID: <alpine.DEB.2.02.1407071550570.28318@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-07-05 at 02:28AM +0200, Matthias Brugger wrote:
-> 2014-07-01 20:00 GMT+02:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
-> > On Tue, 2014-07-01 at 07:46PM +0200, Matthias Brugger wrote:
-> >> 2014-06-20 14:36 GMT+02:00 Mark Rutland <mark.rutland@arm.com>:
-> >> > On Fri, Jun 20, 2014 at 12:48:49PM +0100, Matthias Brugger wrote:
-> >> >> Add binding documentation for the General Porpose Timer driver of
-> >> >> the Mediatek SoCs.
-> >> >>
-> >> >> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> >> >> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> >> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> >> ---
-> >> >>  .../bindings/timer/mediatek,mtk-timer.txt          |   18 ++++++++++++++++++
-> >> >>  1 file changed, 18 insertions(+)
-> >> >>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> >> new file mode 100644
-> >> >> index 0000000..10b7e09
-> >> >> --- /dev/null
-> >> >> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> >> @@ -0,0 +1,18 @@
-> >> >> +Mediatek MT6577, MT6572 and MT6589 Timers
-> >> >> +---------------------------------------
-> >> >> +
-> >> >> +Required properties:
-> >> >> +- compatible: Should be "mediatek,mt6577-timer"
-> >> >> +- reg: Should contain location and length for timers register.
-> >> >> +- clocks: Clocks driving the timer hardware. This list should include two
-> >> >> +     clocks. The order is system clock and as second clock the RTC clock.
-> >> >> +
-> >> >> +Examples:
-> >> >> +
-> >> >> +     timer at 10008000 {
-> >> >> +             compatible = "mediatek,mt6577-timer";
-> >> >> +             reg = <0x10008000 0x80>;
-> >> >> +             interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-> >> >> +             clocks = <&system_clk>, <&rtc_clk>;
-> >> >> +             clock-names = "system-clk", "rtc-clk";
-> >> >
-> >> > These names should be mentioned above, or removed.
-> >>
-> >> I added the clock-names to make it the clock order clearer, as it is
-> >> done in the arm sp,804 [1].
-> >> But I think it is clear enough through the phandle names and the
-> >> description of the clocks property.
-> >> So I will delete the clock-names in the v10 round.
-> >
-> > I think I originally advocated for adding those names. And my argument
-> > was that the names in the dts are probably not clearly identifying the
-> > timer IP's clock inputs since they refer to SOC names for the clocks. We
-> > had this argument for a while now and it doesn't seem to get better
-> > than this. But to explain why I try to get IP vs. SOC clock names in
-> > here is, that I had such a case with Zynq's Ethernet core. That IP has
-> > quite a few clock inputs and luckily the mainline driver for that IP
-> > used the proper names from the IP data sheet for the clocks instead
-> > of the SOC names. That made it relatively easy to match things with the
-> > Zynq integration of that IP. Had that driver used SOC clock names,
-> > things would have been more difficult.
-> 
-> S?ren, I get the point. The problem is, that we don't have any
-> documentation other then the SoC datasheet for the timer.
-> Anyway the clock-names property does not help us in this at all. As I
-> already mentioned, the clock-names property was to illustrate the
-> clock order, but as I think, with the comment for the clocks property,
-> the order is clear enough.
-> 
-> Shall I delete your ack, when I resend the patch without the
-> clock-names property?
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-No, it's fine.
+Hi Tony
 
-	S?ren
+The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+
+  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.16-rc/omap-fixes-b
+
+for you to fetch changes up to 6340c8720ce34f35b41a2e15d69fe3d755cb2104:
+
+  ARM: OMAP2+: clock/dpll: fix _dpll_test_fint arithmetics overflow (2014-07-06 15:58:38 -0600)
+
+- ----------------------------------------------------------------
+Some miscellaneous fixes for OMAP clock code, DRA7xx device data, and
+PRCM code (when DSPBridge is used) for v3.16-rc.
+
+Basic build, boot, and PM test logs are available here:
+
+http://www.pwsan.com/omap/testlogs/prcm-a-v3.16-rc/20140706174258/
+
+- ----------------------------------------------------------------
+Roger Quadros (2):
+      ARM: DRA7: hwmod: Fixup SATA hwmod
+      ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
+
+Suman Anna (1):
+      ARM: OMAP3: PRM/CM: Add back macros used by TI DSP/Bridge driver
+
+Tero Kristo (1):
+      ARM: OMAP2+: clock/dpll: fix _dpll_test_fint arithmetics overflow
+
+ arch/arm/mach-omap2/clkt_dpll.c           |  2 +-
+ arch/arm/mach-omap2/cm-regbits-34xx.h     |  3 +++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 18 +++++++++++++-----
+ arch/arm/mach-omap2/prm-regbits-34xx.h    |  6 ++++++
+ 4 files changed, 23 insertions(+), 6 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJTusG4AAoJEMePsQ0LvSpLZvAP/i3f+F5uWBMC4gKuJr6CRf9g
+CbWwyjQrWjrgXKcdKjrfy+OJ8gQnc1JcPL/yhtAZYh3hI8oCNRmqRMfJ2pCmxeIK
+6bb0lOHxiYe0Eymv1kk6fuuY3l/MmUXc5Ot488ogOA/pPuUugKvvKDd5xeH0nPl1
+16oZM804Dky54lVVU7MCKZOm8BaB6xbBLlgpKkBnN2e5N2N5J+it91dYu4l4fFf2
+cMc/CEEXVmEDWPKXQkpOhtIVcCAqVCBfdOewp7VuU/F9/DoEsqO10XE7r+qc8wCC
+89Y3UfbfxOvdi+/MXRqjlNYyNlgfny7HJyZdS7DMorsqWAB+OYp/BBSFo3Ge8Qao
+4Y6RCDbz7hpjOwssIXDzJeQ49vmDq2EZDwAdRdFiLoVeM0l7c70vK8yWRaM7HH1e
+89ncatuKjNyrwsiyNt9euuObhs6XwwX8drkxB7IsCq4rCpjKWitwJJxpaNlvYxby
+Z2uA+WLBDGDRxIqKFOti7G9cKwCg3UuQfmzpwL5paBYTTVM/R51JBAlZ0OeVTvwp
+gSENMUAzPO6rwoyUhkgFaIAQEzJRj8nnMwV+fIh6YdwpoHM54kkXju15hJo49dbe
+iqOlOEiLHndzhk+z7gGalVC/WAkNK7YcGZ8Bcz1/0H1XTzKexuJ2JDGpg95mzdrE
+aGoUb7l0PS1KozHEoQxo
+=Ec2J
+-----END PGP SIGNATURE-----
