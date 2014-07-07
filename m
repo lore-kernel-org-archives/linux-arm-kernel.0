@@ -1,41 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 17:19:12 +0200
-Subject: [PATCH 2/5] ARM: at91: select ATMEL_RAMC when using OF
-In-Reply-To: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404746355-19988-3-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon,  7 Jul 2014 17:19:10 +0200
+Subject: [PATCH 0/5] Add a driver for the atmel ram controller
+Message-ID: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using device tree, select the Atmel RAM controller driver to handle its
-clocks.
+The atmel ram controller needs one or more clocks to work. For now the
+CLK_IGNORE_UNUSED flag is used on those clocks. This patch set introduce a
+driver that will take care of taking those clocks.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+The final goal is also to move the ioremap done in mach-at91 to that driver with
+a proper power management driver.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 45b55e0f0db6..ad6b2b8b6afd 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -49,6 +49,8 @@ config SOC_AT91SAM9
- 	select GENERIC_CLOCKEVENTS
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
-+	select MEMORY if USE_OF
-+	select ATMEL_RAMC if USE_OF
- 
- config SOC_SAMA5
- 	bool
-@@ -58,6 +60,8 @@ config SOC_SAMA5
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
- 	select USE_OF
-+	select MEMORY
-+	select ATMEL_RAMC
- 
- menu "Atmel AT91 System-on-Chip"
- 
+Alexandre Belloni (5):
+  memory: add a driver for atmel ram controllers
+  ARM: at91: select ATMEL_RAMC when using OF
+  ARM: at91/dt: sama5d3: define mpddr clock and ramc clocks
+  ARM: at91/dt: at91sam9: use ddrck in ramc
+  clk: at91: remove the useless CLK_IGNORE_UNUSED flag
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  2 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |  2 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |  9 +-
+ arch/arm/mach-at91/Kconfig                         |  4 +
+ drivers/clk/at91/clk-system.c                      |  8 +-
+ drivers/memory/Kconfig                             |  8 ++
+ drivers/memory/Makefile                            |  1 +
+ drivers/memory/atmel-ramc.c                        | 96 ++++++++++++++++++++++
+ 9 files changed, 123 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/memory/atmel-ramc.c
+
 -- 
 1.9.1
