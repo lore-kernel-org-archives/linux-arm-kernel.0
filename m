@@ -1,25 +1,25 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:29 +0200
-Subject: [PATCHv2 12/32] ARM: at91/dt: foxg20: define crystals frequencies
+Date: Mon,  7 Jul 2014 22:23:33 +0200
+Subject: [PATCHv2 16/32] ARM: at91/dt: mpa1600: define crytals frequencies
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-13-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-17-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Acme Systems srl Fox G20 main and slow crystals frequencies.
+Define Phontech MPA 1600 main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Douglas Gilbert <dgilbert@interlog.com>
+Cc: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/at91-foxg20.dts | 8 ++++++++
+ arch/arm/boot/dts/mpa1600.dts | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
-index cbe967343997..f89598af4c2b 100644
---- a/arch/arm/boot/dts/at91-foxg20.dts
-+++ b/arch/arm/boot/dts/at91-foxg20.dts
-@@ -31,6 +31,14 @@
+diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
+index ccf9ea242f72..f0f5e1098928 100644
+--- a/arch/arm/boot/dts/mpa1600.dts
++++ b/arch/arm/boot/dts/mpa1600.dts
+@@ -25,6 +25,14 @@
  			compatible = "atmel,osc", "fixed-clock";
  			clock-frequency = <18432000>;
  		};
