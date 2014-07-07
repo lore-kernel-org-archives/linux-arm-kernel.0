@@ -1,225 +1,75 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 07 Jul 2014 12:24:03 +0200
-Subject: [PATCH v2 1/1] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <20140707071040.GA18505@shlinux1.ap.freescale.net>
-References: <1404474812-16855-1-git-send-email-b29396@freescale.com>
- <53B69C55.8010901@pengutronix.de>
- <20140707071040.GA18505@shlinux1.ap.freescale.net>
-Message-ID: <53BA7543.70901@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 07 Jul 2014 12:36:40 +0200
+Subject: [PATCH 4/4] drivers: dma-contiguous: add initialization from
+ device tree
+In-Reply-To: <00b501cf974c$2db1a800$8914f800$@lge.com>
+References: <1404298132-6050-1-git-send-email-m.szyprowski@samsung.com>
+ <1404298132-6050-5-git-send-email-m.szyprowski@samsung.com>
+ <00b501cf974c$2db1a800$8914f800$@lge.com>
+Message-ID: <53BA7838.7000706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2014 09:10 AM, Dong Aisheng wrote:
-> On Fri, Jul 04, 2014 at 02:21:41PM +0200, Marc Kleine-Budde wrote:
->> On 07/04/2014 01:53 PM, Dong Aisheng wrote:
->>> The patch adds the basic CAN TX/RX function support for Bosch M_CAN controller.
->>> For TX, only one dedicated tx buffer is used for sending data.
->>> For RX, RXFIFO 0 is used for receiving data to avoid overflow.
->>> Rx FIFO 1 and Rx Buffers are not used currently, as well as Tx Event FIFO.
->>>
->>> Due to the message ram can be shared by multi m_can instances
->>> and the fifo element is configurable which is SoC dependant,
->>> the design is to parse the message ram related configuration data from device
->>> tree rather than hardcode define it in driver which can make the message
->>> ram sharing fully transparent to M_CAN controller driver,
->>> then we can gain better driver maintainability and future features upgrade.
->>>
->>> M_CAN also supports CANFD protocol features like data payload up to 64 bytes
->>> and bitrate switch at runtime, however, this patch still does not add the
->>> support for these features.
->>>
->>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Hello,
+
+On 2014-07-04 07:52, Joonsoo Kim wrote:
+>> -----Original Message-----
+>> From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
+>> Sent: Wednesday, July 02, 2014 7:49 PM
 >>
->> Looks quite god, comments inline.
->> Marc
->>> ---
->>> Changes since v1:
->>> Addressed all comments from Mark Rutland, Hartkopp and Marc Kleine-Budde
->>> - merge three patches into one
->>> - create directory drivers/net/can/m_can
->>> - improve binding doc
->>> - make sure using valid pointer before netif_receive_skb(skb)
->>> - remove debug info a bit
->>> - let the stats are updated even if alloc_can_err_skb() fails
->>> - other small fixes
->>>
->>> Test result:
->>> Passed over night can-utils/canfdtest stress test on iMX6SX SDB board.
->>>
->>> ---
->>>  .../devicetree/bindings/net/can/m_can.txt          |   65 ++
+>> Subject: [PATCH 4/4] drivers: dma-contiguous: add initialization from
+>> device tree
 >>
->> Please put the DT binding doc into a separate patch.
+>> Add a code to create CMA region from reserved memory and add support for
+>> handling 'shared-dma-pool' reserved-memory device tree nodes.
 >>
-> 
-> Okay
-> 
->>>  drivers/net/can/Kconfig                            |    2 +
->>>  drivers/net/can/Makefile                           |    1 +
->>>  drivers/net/can/m_can/Kconfig                      |    4 +
->>>  drivers/net/can/m_can/Makefile                     |    7 +
->>>  drivers/net/can/m_can/m_can.c                      | 1136 ++++++++++++++++++++
->>>  6 files changed, 1215 insertions(+), 0 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
->>>  create mode 100644 drivers/net/can/m_can/Kconfig
->>>  create mode 100644 drivers/net/can/m_can/Makefile
->>>  create mode 100644 drivers/net/can/m_can/m_can.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
->>> new file mode 100644
->>> index 0000000..3422790
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
->>> @@ -0,0 +1,65 @@
->>> +Bosch MCAN controller Device Tree Bindings
->>> +-------------------------------------------------
->>> +
->>> +Required properties:
->>> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
->>> +- reg			: physical base address and size of the M_CAN
->>> +			  registers map and Message RAM
->>> +- reg-names		: Should be "m_can" and "message_ram"
->>> +- interrupts		: Should be the interrupt number of M_CAN interrupt
->>> +			  line 0 and line 1, could be same if sharing
->>> +			  the same interrupt.
->>> +- interrupt-names	: Should contain "int0" and "int1"
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/base/dma-contiguous.c | 67
+>> +++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/cma.h           |  3 ++
+>>   mm/cma.c                      | 69
+> ++++++++++++++++++++++++++++++++-----------
+>>   3 files changed, 122 insertions(+), 17 deletions(-)
 >>
->> You make only use of one interupt in the driver.
+
+...
+
+>> +/**
+>>    * cma_declare_contiguous() - reserve custom contiguous area
+>>    * @base: Base address of the reserved area optional, use 0 for any
+>>    * @size: Size of the reserved area (in bytes),
+>> @@ -162,18 +210,12 @@ int __init cma_declare_contiguous(phys_addr_t base,
+>>   			phys_addr_t alignment, unsigned int order_per_bit,
+>>   			bool fixed, struct cma **res_cma)
+>>   {
+>> -	struct cma *cma;
+>> -	int ret = 0;
+>> +	int ret;
 >>
-> 
-> Yes, that's the purpose.
-> In driver, we will route all interrupts to INT0.
-> So not need parse INT1 currently.
-> However, we still define two interrupts in device tree binding
-> according to hw capability.
-> It could be helpful if anyone want to implement features like
-> separate different type of interrupts to different interrupt line
-> in the future.
-
-Okay, do I understand you correctly, it is possible to configure each
-interrupt source which interrupt shall be triggered?
-
->>> +- clocks		: Clocks used by controller, should be host clock
->>> +			  and CAN clock.
->>> +- clock-names		: Should contain "hclk" and "cclk"
->>> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
->>> +- pinctrl-names		: Names corresponding to the numbered pinctrl states
+>>   	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
+>>   		__func__, (unsigned long)size, (unsigned long)base,
+>>   		(unsigned long)limit, (unsigned long)alignment);
 >>
->> is pinctrl really required?
+>> -	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+>> -		pr_err("Not enough slots for CMA reserved regions!\n");
+>> -		return -ENOSPC;
+>> -	}
+>> -
+> Hello, Marek.
+>
+> After this change, if we have not enough cma_areas, memory will leak.
+> I think that we need separate function to check constraint and this
+> function should be called before reserving memory in
+> cma_declare_contiguous().
 
-> AFAIK yes.
-> Is there an exception?
+Well, I will leave this check to avoid memory leak then.
 
-The driver does not enforce pinctrl, but you will probably have non
-functional CAN, then :). So leave it as required.
+> BTW, this mail doesn't appear in LKML. What happens? :)
 
-[...]
+I have no idea, I will send second version then.
 
->>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
->>> +				u32 rxfs)
->>> +{
->>> +	struct m_can_priv *priv = netdev_priv(dev);
->>> +	u32 flags, fgi;
->>> +	void __iomem *fifo_addr;
->>> +
->>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
->>
->> Just for curiosity, what do the fgi bits tell us?
-
-> It is FIFO Get index.
-> See the following spec definition:
-> Bit 21:16 F0PI[5:0]: Rx FIFO 0 Put Index
-> Rx FIFO 0 write index pointer, range 0 to 63.
-> Bit 13:8 F0GI[5:0]: Rx FIFO 0 Get Index
-> Rx FIFO 0 read index pointer, range 0 to 63.
-> 
-> It tells us the current element index to be read in the FIFO.
-> 
-> When reading from an Rx FIFO, Rx FIFO Get Index RXFnS.FnGI * FIFO Element
-> Size has to be added to the corresponding Rx FIFO start address RXFnC.FnSA.
-
-Thanks for the explanation.
-
->>> +	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
->>> +	flags = readl(fifo_addr);
->>
->> What about a function introducing a function?
->> static inline u32 m_can_fifo_read(const struct m_can_priv *priv priv,
->> u32 fgi, unsgined int offset)
-
-> If do that, this function mostly does the same thing as m_can_read_fifo
-> (we also need pass the cf to it to handle can frame),
-> i'm not sure what obvious benefit we can get.
-> Maybe we could re-range function later when adding FIFO 1 & CANFD Frame
-> support, then we know clear about what we need to do.
-
-I was just thinking about somethink like this:
-
-static inline u32 m_can_fifo_read(const struct m_can_priv *priv priv,
-                                  u32 fgi, unsgined int offset)
-{
-	return m_can_read(priv, priv->mram_base + priv->rxf0_off +
-                          fgi * RXF0_ELEMENT_SIZE + offset)
-}
-
-Regarding the mram and the offsets:
-
-> 	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
-> 	fifo_addr = priv->mram_base + priv->mram_off + priv->txb_off;
-
-Why is rxf0_off used without the mram_off and txb_off with the mram_off?
-Can you please test your driver with a mram offset != in your DT.
-
-If I understand the code in m_can_of_parse_mram() correctly the
-individual *_off are already offsets to the *mram_base, so mram_off
-should not be used within the driver. I even think mram_off should be
-removed from the priv. Do the *_off and *_elems fit into a u8 or u16? If
-so it makes sense to convert the priv accordingly.
-
-What about putting the offset and the number of elements into a struct
-and make use an array for rxf{0,1}?
-
->>> +static struct net_device *alloc_m_can_dev(void)
->>> +{
->>> +	struct net_device *dev;
->>> +	struct m_can_priv *priv;
->>> +
->>> +	dev = alloc_candev(sizeof(struct m_can_priv), 1);
->>> +	if (!dev)
->>> +		return NULL;
->>> +
->>> +	priv = netdev_priv(dev);
->>> +	netif_napi_add(dev, &priv->napi, m_can_poll, M_CAN_NAPI_WEIGHT);
->>> +
->>> +	priv->dev = dev;
->>> +	priv->can.bittiming_const = &m_can_bittiming_const;
->>> +	priv->can.do_set_mode = m_can_set_mode;
->>> +	priv->can.do_get_berr_counter = m_can_get_berr_counter;
->>> +	priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
->>> +					CAN_CTRLMODE_LISTENONLY |
->>> +					CAN_CTRLMODE_BERR_REPORTING;
->>
->> Please take care of CAN_CTRLMODE_BERR_REPORTING, i.e. only enable bus
->> the bus error interrupt if this bit is set.
->>
-> 
-> Okay, BTW, does BERR_REPROTING includes lost message error?
-
-The lost message interrupt should always be enabled and reported via a
-CAN error message.
-
-Marc
-
+Best regards
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140707/58d0024f/attachment-0001.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
