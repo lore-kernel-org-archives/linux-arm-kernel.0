@@ -1,37 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 7 Jul 2014 11:21:42 +0200
-Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
-In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140707092142.GC3118@verge.net.au>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 7 Jul 2014 10:22:48 +0100
+Subject: [PATCH v10 6/7] ARM: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <1404694438-10272-7-git-send-email-minchan@kernel.org>
+References: <1404694438-10272-1-git-send-email-minchan@kernel.org>
+ <1404694438-10272-7-git-send-email-minchan@kernel.org>
+Message-ID: <20140707092247.GA15168@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
-> ARMv6 and greater introduced a new instruction ("bx") which can be used
-> to return from function calls.  Recent CPUs perform better when the
-> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
-> and this sequence is strongly recommended to be used by the ARM
-> architecture manual (section A.4.1.1).
+On Mon, Jul 07, 2014 at 09:53:57AM +0900, Minchan Kim wrote:
+> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+> overwrite of the contents since MADV_FREE syscall is called for
+> THP page.
 > 
-> We provide a new macro "ret" with all its variants for the condition
-> code which will resolve to the appropriate instruction.
+> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+> support.
 > 
-> Rather than doing this piecemeal, and miss some instances, change all
-> the "mov pc" instances to use the new macro, with the exception of
-> the "movs" instruction and the kprobes code.  This allows us to detect
-> the "mov pc, lr" case and fix it up - and also gives us the possibility
-> of deploying this for other registers depending on the CPU selection.
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 579702086488..f3ec01cef04f 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -240,10 +240,12 @@ static inline pmd_t pte_pmd(pte_t pte)
+>  #endif
+>  
+>  #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
+> +#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
+>  #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
+>  #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
+>  #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
+>  #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
+> +#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
+>  #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
+>  #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
+>  #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
+> -- 
+> 2.0.0
+>
 
-A conflict in next notification from Stephen Rothwell tells me that this
-has made it there but regardless I would like to note that I have
-successfully tested this on the following shmobile boards:
-Genmai, Koelsh, Lager, Marzen, Bockw, APE6EVM, KZM9D, KZM9G,
-Armadillo800 EVA and Mackerel. This covers all but one board (I do not
-have access to a Henninger) and all SoCs supported in mainline.
+Hi Minchan,
 
-Accordingly, the shmobile portion:
+This looks good to me too.
+As Will said this applies to arm64, we will also need a version for:
+arch/arm/include/asm/pgtable-3level.h.
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Is there a testcase we can run to check that this patch set is working
+well for arm/arm64?
+
+Cheers,
+-- 
+Steve 
