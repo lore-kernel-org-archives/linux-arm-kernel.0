@@ -1,47 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jul 2014 12:17:12 +0100
-Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU
- advertises it has exclusives
-In-Reply-To: <20140707110248.GA32578@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Jul 2014 04:19:48 -0700
+Subject: [PATCH 0/4] ABI updates
+In-Reply-To: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
 References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
- <4606711.7KmFAGVNmG@wuerfel> <20140704205144.GK21766@n2100.arm.linux.org.uk>
- <5774249.oWoI3gS2oa@wuerfel> <20140707110248.GA32578@arm.com>
-Message-ID: <20140707111712.GZ21766@n2100.arm.linux.org.uk>
+Message-ID: <20140707111947.GP28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 12:02:48PM +0100, Catalin Marinas wrote:
-> I'm not sure that's the right approach. ARM added the CPUID scheme to
-> allow the software to check specific features rather than guessing
-> specific architecture versions. Basically there isn't a clear way to
-> identify whether your CPU is ARMv6K or ARMv7 from a single ID register
-> read (you may be able to infer by reading multiple ID regs).
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [140704 12:56]:
+> As a result of the recent discussions about android, several issues
+> have been identified with existing kernels:
 > 
-> I'm now trying to figure out whether the TPIDR registers actually have a
-> dedicated ID. I think they only come as part of the VMSA version 7 as
-> identified from ID_MMFR0. The ARM1136 r1p1 TRM states that ID_MMFR0[3:0]
-> are 0x3 which mean VMSAv7.
+> 1. HWCAP_SWP does not properly reflect whether the SWP instruction
+>    should be used.  Turn HWCAP_SWP off on ARMv6+ where the exclusives
+>    are available.
+> 
+> 2. SWP is unsafe when running on a SMP CPU; there is no bus locking
+>    between the read and write parts of the instruction execution.
+>    Force SWP emulation on ARMv7+ where we can disable the SWP
+>    instruction.
+> 
+> 3. Reporting of alignment faults - kernel mode faults are silent due to
+>    the requirements of the network stack, but we can note where the
+>    last one occurs.
+> 
+> Testing reveals that at least my OMAP4430 userspace (supplied from TI)
+> executes lots of SWP instructions, which is something that wasn't known
+> before this patch.
+> 
+> Many systems today are not configured with SWP emulation enabled on SMP.
+> This means that the SWP instruction is available, but unsafe.
+> 
+>  arch/arm/kernel/setup.c       | 29 ++++++++++++++++++++++-------
+>  arch/arm/kernel/swp_emulate.c |  4 ++++
+>  arch/arm/mm/Kconfig           |  2 +-
+>  arch/arm/mm/alignment.c       |  4 +++-
+>  4 files changed, 30 insertions(+), 9 deletions(-)
 
-You can't rely on the CPUID registers on 1136, because it doesn't
-advertise them as being present - the architecture field of MIDR is
-0x7, not 0xf.
+Tried testing this on omap2 which is ARMv6 with no K, but got this:
 
-What we know is that if it has the MPIDR, then it must be ARMv6K (the
-ARM tells us that.)  Where there is a hole is where a CPU is ARMv6K
-but does not have the MPIDR, in which case we fall back to treating it
-as a plain ARMv6. I don't think that can be worked around for the reason
-you state above - there isn't a way to reliably identify the two apart.
+arch/arm/kernel/setup.c: In function ?elf_hwcap_fixup?:
+arch/arm/kernel/setup.c:405:2: error: implicit declaration of function ?read_cpuid_part? [-Werror=implicit-function-declaration]
 
-It looks like 1136r1 falls into that category.  It didn't have to had
-the MIDR had been updated to indicate the presence of the CPUID scheme.
-It should be noted that the 1136r1 CPUID registers don't quite have the
-same definition as those specified by the ARM ARM (irrespective of the
-version of the ARM ARM.)
+That should be read_cpuid_part_number instead. After fixing that,
+omap2 booted fine, so for ARMv6 with no K:
 
-So actually, 1136r0 is the architecturally correct version, and 1136r1
-is the slightly cocked up non-standard version where we have to be careful
-how we treat it.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Tested-by: Ton Lindgren <tony@atomide.com>
