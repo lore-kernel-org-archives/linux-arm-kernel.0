@@ -1,34 +1,57 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon,  7 Jul 2014 15:45:51 -0300
-Subject: [PATCH v3 4/4] ARM: mvebu: enable Armada 375 network driver in
- mvebu_v7_defconfig
+Date: Mon,  7 Jul 2014 15:45:50 -0300
+Subject: [PATCH v3 3/4] ARM: mvebu: Enable the network controller in Armada
+ 375 DB board
 In-Reply-To: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1404758751-2346-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1404758751-2346-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+This commit enables the network controller in the Armada 375 DB board,
+and configures the two available ethernet interfaces.
 
-Now that the Armada 375 network driver has been pushed, let's enable it
-in mvebu_v7_defconfig.
-
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/armada-375-db.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index b0bfefa..b477631 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -46,6 +46,7 @@ CONFIG_AHCI_MVEBU=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_MVNETA=y
-+CONFIG_MVPP2=y
- CONFIG_MARVELL_PHY=y
- CONFIG_MWIFIEX=y
- CONFIG_MWIFIEX_SDIO=y
+diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+index 1e2919d..929ae00 100644
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -123,6 +123,32 @@
+ 				cd-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+ 				wp-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+ 			};
++
++			mdio {
++				phy0: ethernet-phy at 0 {
++					reg = <0>;
++				};
++
++				phy3: ethernet-phy at 3 {
++					reg = <3>;
++				};
++			};
++
++			ethernet at f0000 {
++				status = "okay";
++
++				eth0 at c4000 {
++					status = "okay";
++					phy = <&phy0>;
++					phy-mode = "rgmii-id";
++				};
++
++				eth1 at c5000 {
++					status = "okay";
++					phy = <&phy3>;
++					phy-mode = "gmii";
++				};
++			};
+ 		};
+ 
+ 		pcie-controller {
 -- 
 1.9.1
