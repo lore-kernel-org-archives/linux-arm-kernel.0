@@ -1,15 +1,14 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 09:54:41 +0200
-Subject: [PATCH v2 16/30] ARM: shmobile: r8a7740: Add SCIF nodes
+Date: Mon,  7 Jul 2014 09:54:32 +0200
+Subject: [PATCH v2 07/30] ARM: shmobile: r8a73a4: add SCI clock support for DT
 In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404719695-1634-17-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404719695-1634-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This describes all of the SCIF hardware of the r8a7740.
-Each node is disabled and may be enabled as necessary
-by board DTS files.
+This will be used when initialising SCI devices using DT
+until common clock framework support is added.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
@@ -17,82 +16,30 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 v2
 * First post
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 63 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a73a4.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 55d29f4..bda18fb 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -156,6 +156,69 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index 0f43149..49d1397 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -574,11 +574,17 @@ static struct clk_lookup lookups[] = {
  
-+	scifa0: serial at e6c40000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6c40000 0x100>;
-+		interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa1: serial at e6c50000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6c50000 0x100>;
-+		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa2: serial at e6c60000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6c60000 0x100>;
-+		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa3: serial at e6c70000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6c70000 0x100>;
-+		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa4: serial at e6c80000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6c80000 0x100>;
-+		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa5: serial at e6cb0000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6cb0000 0x100>;
-+		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa6: serial at e6cc0000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6cc0000 0x100>;
-+		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa7: serial at e6cd0000 {
-+		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
-+		reg = <0xe6cd0000 0x100>;
-+		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifb8: serial at e6c30000 {
-+		compatible = "renesas,scifb-r8a7740", "renesas,scifb";
-+		reg = <0xe6c30000 0x100>;
-+		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
- 	pfc: pfc at e6050000 {
- 		compatible = "renesas,pfc-r8a7740";
- 		reg = <0xe6050000 0x8000>,
+ 	/* MSTP */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
++	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]),
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
++	CLKDEV_DEV_ID("e6c50000.serial", &mstp_clks[MSTP203]),
+ 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
++	CLKDEV_DEV_ID("e6c20000.serial", &mstp_clks[MSTP206]),
+ 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
++	CLKDEV_DEV_ID("e6c30000.serial", &mstp_clks[MSTP207]),
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
++	CLKDEV_DEV_ID("e6ce0000.serial", &mstp_clks[MSTP216]),
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
++	CLKDEV_DEV_ID("e6cf0000.serial", &mstp_clks[MSTP217]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]),
+ 	CLKDEV_DEV_ID("e6700020.dma-controller", &mstp_clks[MSTP218]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
 -- 
 2.0.0.rc2
