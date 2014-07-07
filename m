@@ -1,29 +1,29 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:33 +0200
-Subject: [PATCHv2 16/32] ARM: at91/dt: mpa1600: define crytals frequencies
+Date: Mon,  7 Jul 2014 22:23:35 +0200
+Subject: [PATCHv2 18/32] ARM: at91/dt: ethernut5: define crystals frequencies
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-17-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-19-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Phontech MPA 1600 main and slow crystals frequencies.
+Define egnite Ethernut 5 main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Joachim Eastwood <manabian@gmail.com>
+Cc: Tim Schendekehl <tim.schendekehl@egnite.de>
 ---
- arch/arm/boot/dts/mpa1600.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/ethernut5.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
-index ccf9ea242f72..f0f5e1098928 100644
---- a/arch/arm/boot/dts/mpa1600.dts
-+++ b/arch/arm/boot/dts/mpa1600.dts
-@@ -25,6 +25,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <18432000>;
- 		};
-+
+diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
+index 143b6d25bc80..8f941c2db7c6 100644
+--- a/arch/arm/boot/dts/ethernut5.dts
++++ b/arch/arm/boot/dts/ethernut5.dts
+@@ -20,6 +20,16 @@
+ 		reg = <0x20000000 0x08000000>;
+ 	};
+ 
++	clocks {
 +		slow_xtal {
 +			clock-frequency = <32768>;
 +		};
@@ -31,8 +31,10 @@ index ccf9ea242f72..f0f5e1098928 100644
 +		main_xtal {
 +			clock-frequency = <18432000>;
 +		};
- 	};
- 
++	};
++
  	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
 -- 
 1.9.1
