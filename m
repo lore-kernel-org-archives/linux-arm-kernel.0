@@ -1,40 +1,97 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Jul 2014 16:25:16 +0200
-Subject: [PATCH v2 03/18] AT91: G45: DT: Declare a second ram controller
+Date: Mon,  7 Jul 2014 16:25:14 +0200
+Subject: [PATCH v2 01/18] power: reset: Add if statement isntead of multiple
+ depends on
 In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404743131-24569-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404743131-24569-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The G45 has two identical ram controller, that are defined as a single one,
-with two reg cells.
-
-The proper way to support such a case is to have two separate DT nodes.
+All the config option so far are depending on the POWER_RESET symbol
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/power/reset/Kconfig | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index ace6bf197b70..6f648b85b725 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -75,8 +75,12 @@
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index bdcf5173e377..19d546c5edfa 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -6,15 +6,17 @@ menuconfig POWER_RESET
  
- 			ramc0: ramc at ffffe400 {
- 				compatible = "atmel,at91sam9g45-ddramc";
--				reg = <0xffffe400 0x200
--				       0xffffe600 0x200>;
-+				reg = <0xffffe400 0x200>;
-+			};
+ 	  Say Y here to enable board reset and power off
+ 
++if POWER_RESET
 +
-+			ramc1: ramc at ffffe600 {
-+				compatible = "atmel,at91sam9g45-ddramc";
-+				reg = <0xffffe600 0x200>;
- 			};
+ config POWER_RESET_AS3722
+ 	bool "ams AS3722 power-off driver"
+-	depends on MFD_AS3722 && POWER_RESET
++	depends on MFD_AS3722
+ 	help
+ 	  This driver supports turning off board via a ams AS3722 power-off.
  
- 			pmc: pmc at fffffc00 {
+ config POWER_RESET_AXXIA
+ 	bool "LSI Axxia reset driver"
+-	depends on POWER_RESET && ARCH_AXXIA
++	depends on ARCH_AXXIA
+ 	help
+ 	  This driver supports restart for Axxia SoC.
+ 
+@@ -22,7 +24,7 @@ config POWER_RESET_AXXIA
+ 
+ config POWER_RESET_GPIO
+ 	bool "GPIO power-off driver"
+-	depends on OF_GPIO && POWER_RESET
++	depends on OF_GPIO
+ 	help
+ 	  This driver supports turning off your board via a GPIO line.
+ 	  If your board needs a GPIO high/low to power down, say Y and
+@@ -30,13 +32,13 @@ config POWER_RESET_GPIO
+ 
+ config POWER_RESET_MSM
+ 	bool "Qualcomm MSM power-off driver"
+-	depends on POWER_RESET && ARCH_QCOM
++	depends on ARCH_QCOM
+ 	help
+ 	  Power off and restart support for Qualcomm boards.
+ 
+ config POWER_RESET_QNAP
+ 	bool "QNAP power-off driver"
+-	depends on OF_GPIO && POWER_RESET && PLAT_ORION
++	depends on OF_GPIO && PLAT_ORION
+ 	help
+ 	  This driver supports turning off QNAP NAS devices by sending
+ 	  commands to the microcontroller which controls the main power.
+@@ -54,14 +56,13 @@ config POWER_RESET_RESTART
+ config POWER_RESET_SUN6I
+ 	bool "Allwinner A31 SoC reset driver"
+ 	depends on ARCH_SUNXI
+-	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the Allwinner A31 SoCs.
+ 
+ config POWER_RESET_VEXPRESS
+ 	bool "ARM Versatile Express power-off and reset driver"
+ 	depends on ARM || ARM64
+-	depends on POWER_RESET && VEXPRESS_CONFIG
++	depends on VEXPRESS_CONFIG
+ 	help
+ 	  Power off and reset support for the ARM Ltd. Versatile
+ 	  Express boards.
+@@ -69,7 +70,6 @@ config POWER_RESET_VEXPRESS
+ config POWER_RESET_XGENE
+ 	bool "APM SoC X-Gene reset driver"
+ 	depends on ARM64
+-	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the APM SoC X-Gene Eval boards.
+ 
+@@ -80,3 +80,4 @@ config POWER_RESET_KEYSTONE
+ 	help
+ 	  Reboot support for the KEYSTONE SoCs.
+ 
++endif
 -- 
 2.0.1
