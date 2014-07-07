@@ -1,49 +1,53 @@
-From: j@jannau.net (Janne Grunau)
-Date: Mon, 7 Jul 2014 13:59:54 +0000 (UTC)
-Subject: Android and compatibility with deprecated armv7 instructions
-References: <20140701234800.GA23577@sirena.org.uk>
- <4473002.jGohFvPsvi@wuerfel> <7B049AD4-78F8-4494-A2CB-57DD346107DA@arm.com>
- <201407061739.22152.arnd@arndb.de>
-Message-ID: <loom.20140707T153253-384@post.gmane.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 7 Jul 2014 22:07:09 +0800
+Subject: [PATCH] ARM: add revision info for PL310 errata 588369 and 727915
+In-Reply-To: <1404285816-3763-1-git-send-email-shawn.guo@freescale.com>
+References: <1404285816-3763-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140707140708.GU30239@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd <at> arndb.de> writes:
+On Wed, Jul 02, 2014 at 03:23:36PM +0800, Shawn Guo wrote:
+> Add revision info for PL310_ERRATA_588369 and PL310_ERRATA_727915 to
+> help people understand if they need to enable the errata for their
+> hardware.
 > 
-> On Saturday 05 July 2014, Catalin Marinas wrote:
-> > On 5 Jul 2014, at 19:43, Arnd Bergmann <arnd <at> arndb.de> wrote:
-> >
-> > > I think if a there is no way to turn off a feature, we can't really
-> > > treat it as "deprecated", since we are lacking the most important tool
-> > > to help users migrate away from it. Do you know why the architecture
-> > > folks believe it makes sense to have distinct steps 1 and 2?
-> > 
-> > During this phase you usually only get compiler warnings which are
-> > clearly not enough for already built apps.
-> > 
-> > But it looks like this is changing with ARMv8. SETEND is deprecated and
-> > disable bit available. IT instruction also deprecated with a disable bit
-> > (basically only allowing for one subsequent conditional instruction,
-> > though I don?t think we can easily get rid of this one in user space).
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+
+Any comments on this patch?  Otherwise, I'm going to throw it into
+the patch system.
+
+Shawn
+
+> ---
+>  arch/arm/mm/Kconfig | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-> Ok. I can also see ways to emulate SETEND from kernel side by modifying
-> the user pt_regs,
-
-The single use of SETEND in FFmpeg/libav is not important and could easily
-be disabled on ARMv8. Is there a better way than parsing AT_PLATFORM for
-runtime detection of the CPU arch? A HWCAP for the missing SETEND would be
-nicer. That of course doesn't fix existing binaries.
-
-> but I don't see how we could emulate IT without anything
-> short of a full interpretation of user instructions from the kernel.
-
-Avoiding deprecated forms of IT would be harder. It's used more often in
-libav (~50 times) so it should be only disabled if it's emulated or not
-available using an explicit HWCAP. Not using Thumb for those functions would
-be another option for libav. Again this doesn't fix existing binaries and it
-doesn't fix compiled code.
-
-Janne
-
--- 
-libav arm/aarch64 developer
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index eda0dd0ab97b..9fb8a02b7e35 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -907,8 +907,8 @@ config PL310_ERRATA_588369
+>  	   They are architecturally defined to behave as the execution of a
+>  	   clean operation followed immediately by an invalidate operation,
+>  	   both performing to the same memory location. This functionality
+> -	   is not correctly implemented in PL310 as clean lines are not
+> -	   invalidated as a result of these operations.
+> +	   is not correctly implemented in PL310 prior to r2p0 (fixed in r2p0)
+> +	   as clean lines are not invalidated as a result of these operations.
+>  
+>  config PL310_ERRATA_727915
+>  	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
+> @@ -919,7 +919,8 @@ config PL310_ERRATA_727915
+>  	  PL310 can handle normal accesses while it is in progress. Under very
+>  	  rare circumstances, due to this erratum, write data can be lost when
+>  	  PL310 treats a cacheable write transaction during a Clean &
+> -	  Invalidate by Way operation.
+> +	  Invalidate by Way operation.  Revisions prior to r3p1 are affected by
+> +	  this errata (fixed in r3p1).
+>  
+>  config PL310_ERRATA_753970
+>  	bool "PL310 errata: cache sync operation may be faulty"
+> -- 
+> 1.8.3.2
+> 
