@@ -1,43 +1,60 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 7 Jul 2014 11:08:45 +0300
-Subject: [PATCH v3] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <CA+E=qVf2QWk+HxPTjwFK8BkD3C+EGbvLDMM4ro1_nYEThe=LtQ@mail.gmail.com>
-References: <1401643329-6460-1-git-send-email-anarsoul@gmail.com>
- <9001585.uuLFNQ0H0y@anarsoul-thinkpad>
- <CA+E=qVf2QWk+HxPTjwFK8BkD3C+EGbvLDMM4ro1_nYEThe=LtQ@mail.gmail.com>
-Message-ID: <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Jul 2014 01:10:11 -0700
+Subject: [GIT PULL] omap fixes against v3.16-rc1
+In-Reply-To: <CAOesGMjT+Sk+EbV40GCtM5GryqbJ7mTYVZRVLc1iCksGYG=kSQ@mail.gmail.com>
+References: <20140617145854.GT17845@atomide.com>
+ <20140630070857.GK28884@atomide.com>
+ <20140705044703.GA5201@quad.lixom.net>
+ <CAOesGMh5faPEA167hqDff=NU0Tk79wt6fhxZgiP5Q4xgsvO6oA@mail.gmail.com>
+ <CAOesGMjT+Sk+EbV40GCtM5GryqbJ7mTYVZRVLc1iCksGYG=kSQ@mail.gmail.com>
+Message-ID: <20140707081011.GG28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:03 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> On Mon, Jun 23, 2014 at 2:31 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->>
->> On 1 June 2014 20:22:09 Vasily Khoruzhick wrote:
->> > Utilise new s3c24xx-dma dmaengine driver for DMA ops.
->> >
->> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> > ---
->> > v2: - Don't store async dma descriptor, it's not used
->> >     - Request DMA channel via dma_request_slave_channel_compat() and use
->> >       hardcoded DMA channel.
->> >     - Add dependency on S3C24XX_DMAC (s3cmci uses filter function from it)
->> > v3: - Use 'depends' instead of 'select' in Kconfig
->> >     - Drop useless controller registers reads from dma completion callback
->>
->> Ping?
->
-> Ping?
+* Olof Johansson <olof@lixom.net> [140705 12:46]:
+> On Fri, Jul 4, 2014 at 11:06 PM, Olof Johansson <olof@lixom.net> wrote:
+> > Hi,
+> >
+> > On Fri, Jul 4, 2014 at 9:47 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> On Mon, Jun 30, 2014 at 12:08:57AM -0700, Tony Lindgren wrote:
+> >>> * Tony Lindgren <tony@atomide.com> [140617 08:01]:
+> >>> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> >>> >
+> >>> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> >>> >
+> >>> > are available in the git repository at:
+> >>> >
+> >>> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-against-rc1
+> >>> >
+> >>> > for you to fetch changes up to edc56f871eefbc56baf1fd981eeff35ef447925c:
+> >>> >
+> >>> >   ARM: dts: dra7-evm: remove interrupt binding (2014-06-17 01:22:55 -0700)
+> >>
+> >> Merged. Apologies for the delay, I was planning on handling this earleir this
+> >> week. I'll send this up tonight or tomorrow.
+> >
+> > Hmm. for-next with this merged in stopped omap5uevm from booting
+> > (Can't find mmcblk1 which I keep the rootfs on), see
+> > http://arm-soc.lixom.net/bootlogs/arm-soc/v3.16-rc1-76-gf5ee1b1/. One
+> > of the three configs had a DHCP timeout, I'm going to rebuild the
+> > network here to reduce the frequency of those.
+> >
+> > I'll try bisecting tomorrow. Not sending it up with this known
+> > breakage, hopefully it's something simple.
+> 
+> Hmm, this fixes branch + current mainline (or -rc3) seems fine, while
+> the -rc1 base we used to have does not. In other words, it seems OK to
+> send up for merge.
+> 
+> Note that the OMAP branch by itself doesn't boot on this machine, so
+> bisectability is lost for a bit. Not quite as worried about it since
+> it's not in the merge window, so we should be OK.
 
-Could anyone tell me through which tree this patch should be merged?
-I'm pretty sure that I've included everyone from get_maintainer.pl
-output
-except LKML, but no response from maintainer so far.
+Sorry just saw these messages. The MMC regulator issue was a known
+problem with v3.16-rc1 unrelated to arm-soc tree that got fixed
+already in the mainline kernel but was not yet merged to the mainline
+kernel few weeks ago when I made this branch.
 
-Regards
-Vasily
+Regards,
 
->> >  drivers/mmc/host/Kconfig  |  10 +--
->> >  drivers/mmc/host/s3cmci.c | 180
->> > +++++++++++++--------------------------------- drivers/mmc/host/s3cmci.h |
->> >  4 +-
->> >  3 files changed, 52 insertions(+), 142 deletions(-)
+Tony
