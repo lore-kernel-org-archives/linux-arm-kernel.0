@@ -1,54 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Jul 2014 00:26:21 -0700
-Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
-References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
- <20140702160932.GF5541@saruman.home>
- <20140702190944.GA567@drone.musicnaut.iki.fi>
- <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
- <20140703073411.GX28884@atomide.com>
- <53B6DB74.2050401@linutronix.de>
- <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
-Message-ID: <20140707072621.GE28884@atomide.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Mon, 07 Jul 2014 16:29:36 +0900
+Subject: [PATCHv2 2/5] ARM: dts: exynos: unuse the slot-node and deprecated
+ the supports-highspeed for dw-mmc
+In-Reply-To: <1404128960-27225-3-git-send-email-jh80.chung@samsung.com>
+References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
+ <1404128960-27225-3-git-send-email-jh80.chung@samsung.com>
+Message-ID: <000c01cf99b5$34ccc8c0$9e665a40$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [140704 09:59]:
-> On Fri, Jul 4, 2014 at 11:51 AM, Sebastian Andrzej Siewior
-> <bigeasy@linutronix.de> wrote:
-> > On 07/03/2014 09:34 AM, Tony Lindgren wrote:
-> >> Heh. Just to summarize the reason ttyO needs to be a separate name
-> >> and device entry from ttyS is because we also have external 8250
-> >> devices on GPMC and hotplug busses.
-> >
-> > So the GPMC devices will first get a higher minor/device number. The
-> > internal serial ports should show up first. I don't see the problem
-> > (yet).
-> >
-> > If you need a separate major number (and name) like we do have it now
-> > (between ttySx and ttyOx) then one of requirements would be to tell
-> > Kconfig that one driver can be active at a time.
-> >
-> > For me the ttyS vs ttyO thing is purely cosmetic. I personally don't
-> > like that it is different on different platforms like ttymxc, ttySC,
-> > ttyTHS, ?
+Hi Jaehoon,
 
-The dev entry had to be different with serial-omap as it was not
-using 8250 code. With the code moving back to using 8250 code
-there are no dev conflicts so ttyS is just fine as the 8250 code
-handles allocating the devices.
- 
-> Maybe it's time to migrate them all to one name? (ttyS)  Does the end
-> user really care if they have a soc with an omap/imx serial port
-> driver? Or do they just want to access /dev/ttySx and connect to their
-> device?
+Please check one thing below.
 
-Yes the 8250 code should always use ttyS. Then maybe we could
-have also ttyO dev entries created by the driver for compability.
+On Mon, June 30, 2014, Jaehoon Chung wrote:
+> dw-mmc controller can support multiple slots.
+> But, there are no use-cases anywhere. So we don't need to support the
+> slot-node for dw-mmc controller.
+> And "supports-highspeed" property in dw-mmc is deprecated.
+> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+> 
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
 
-Earlier serial-omap could not provide the ttyS compability easily
-because they were separate drivers.
+> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-
+> octa.dts
+> index 434fd9d..5f37b81 100644
+> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> @@ -50,7 +50,6 @@
+>  	mmc at 12200000 {
+>  		status = "okay";
+>  		broken-cd;
+> -		supports-highspeed;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+>  		samsung,dw-mshc-sdr-timing = <0 4>;
+> @@ -58,16 +57,12 @@
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>  		vmmc-supply = <&ldo10_reg>;
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <8>;
+> -		};
+> +		bus-width = <8>;
+> +		cap-mmc-highspeed;
+>  	};
+> 
+>  	mmc at 12220000 {
+>  		status = "okay";
+> -		supports-highspeed;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+>  		samsung,dw-mshc-sdr-timing = <2 3>;
+> @@ -75,11 +70,8 @@
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>  		vmmc-supply = <&ldo10_reg>;
+> -
+> -		slot at 0 {
+> -			reg = <0>;
+> -			bus-width = <4>;
+> -		};
+> +		bus-width = <8>;
+<4> is correct?
 
-Regards,
+> +		cap-mmc-highspeed;
 
-Tony
+Thanks,
+Seungwon Jeon
