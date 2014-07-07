@@ -1,109 +1,51 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 7 Jul 2014 11:30:02 -0700
-Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
-In-Reply-To: <20140707105818.GA1101@arch.cereza>
-References: <20140703135146.GA6898@luxor.wired.org>
- <53B5C61D.2060308@free-electrons.com>
- <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
- <20140705150308.GA28791@arch.cereza>
- <20140705205951.GB3678@kroah.com>
- <20140707105818.GA1101@arch.cereza>
-Message-ID: <20140707183002.GA5947@kroah.com>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Mon, 7 Jul 2014 11:26:43 -0700
+Subject: [PATCH] arm64: PCI(e) arch support
+In-Reply-To: <53B5F81B.8010801@freescale.com>
+References: <1404422876-1160-1-git-send-email-tinamdar@apm.com>
+ <53B5F81B.8010801@freescale.com>
+Message-ID: <CACoXjc=0+gkHCX7SkcVrJ6xGNyVLyW-X+ZfDzJwSDn-9QX5zkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 07:58:18AM -0300, Ezequiel Garcia wrote:
-> On 05 Jul 01:59 PM, Greg Kroah-Hartman wrote:
-> > On Sat, Jul 05, 2014 at 12:03:08PM -0300, Ezequiel Garcia wrote:
-> > > After following Gregory's stacktrace (also reproduced here):
-> > > 
-> > > [<c02451f8>] (iommu_bus_notifier) from [<c00512e8>] (notifier_call_chain+0x64/0x9c)
-> > > [<c00512e8>] (notifier_call_chain) from [<c00514cc>] (__blocking_notifier_call_chain+0x40/0x58)
-> > > [<c00514cc>] (__blocking_notifier_call_chain) from [<c00514f8>] (blocking_notifier_call_chain+0x14/0x1c)
-> > > [<c00514f8>] (blocking_notifier_call_chain) from [<c01d225c>] (device_add+0x424/0x524)
-> > > [<c01d225c>] (device_add) from [<c0186d90>] (pci_device_add+0xec/0x110)
-> > > [<c0186d90>] (pci_device_add) from [<c0186e54>] (pci_scan_single_device+0xa0/0xac)
-> > > 
-> > > I added a few printks and found that the problem is that the iommu_bus_notifier is
-> > > called for the 'pci' bus type, which has a null iommu_ops.
-> > > 
-> > > On 04 Jul 10:47 AM, Laurent Pinchart wrote:
-> > > [..]
-> > > > 
-> > > > We need a quick fix for v3.16, ...
-> > > 
-> > > Therefore, a quick fix would be to simply check for that:
-> > > 
-> > > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> > > index e5555fc..b712cb2 100644
-> > > --- a/drivers/iommu/iommu.c
-> > > +++ b/drivers/iommu/iommu.c
-> > > @@ -536,6 +536,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
-> > >         struct iommu_group *group;
-> > >         unsigned long group_action = 0;
-> > >  
-> > > +       if (!ops)
-> > > +               return 0;
-> > > +
-> > >         /*
-> > >          * ADD/DEL call into iommu driver ops if provided, which may
-> > >          * result in ADD/DEL notifiers to group->notifier
-> > > 
-> > > This (nasty workaround?) patch makes the problem go away.
-> > > 
-> > > [..]
-> > > > > So it also boot well in 3.15 and then failed in 3.16-rc3. I hope it will
-> > > > > help the developers of the OMAP IOMMU driver to fix it.
-> > > > 
-> > > > Thank you. I've had a look at the OMAP IOMMU driver changes between v3.15 and 
-> > > > v3.16-rc3, and didn't find at first sight any change that could explain the 
-> > > > crash.
-> > > > 
-> > > > 286f600 iommu/omap: Fix map protection value handling
-> > > > 67b779d iommu/omap: Remove comment about supporting single page mappings only
-> > > > f7129a0 iommu/omap: Fix 'no page for' debug message in flush_iotlb_page()
-> > > > 5acc97d iommu/omap: Move to_iommu definition from omap-iopgtable.h
-> > > > 2ac6133 iommu/omap: Remove omap_iommu_domain_has_cap() function
-> > > > d760e3e iommu/omap: Correct init value of iotlb_entry valid field
-> > > > 
-> > > > Could you try reverting those changes and retest ? If the problem doesn't 
-> > > > disappear, we'll need to look somewhere else.
-> > > > 
-> > > 
-> > > I reverted the above commits but nothing changed. I'm far from being an expert,
-> > > but it sounds odd to have this bus notifier (that got registered for the
-> > > platform bus type) called by a pci bus type.
-> > 
-> > Why wouldn't the PCI bus set this up for its devices?  Are you
-> > "assuming" you know the bus type and that's the issue?
-> > 
-> 
-> Thanks for looking at this.
-> 
-> I guess I snipped the thread and lost most of the information about the panic.
-> Here's the original bug report:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg344059.html
-> 
-> The problem reported involves enabling OMAP IOMMU driver and not any other IOMMU
-> driver. Doing some tracing and adding a few prints, we found that
-> omap_iommu_init() sets a bus notifier for the platform bus type:
-> 
-> omap_iommu_init -> bus_set_iommu -> iommu_bus_init:
-> 
-> static void iommu_bus_init(struct bus_type *bus, struct iommu_ops *ops)
-> {
->         bus_register_notifier(bus, &iommu_bus_nb);
->         bus_for_each_dev(bus, NULL, ops, add_iommu_group);
-> }
-> 
-> But the iommu bus notifier gets called for the 'pci' bus type, which
-> has the iommu_ops field NULL (since it hasn't been set for iommu).
+On Thu, Jul 3, 2014 at 5:40 PM, Prabhakar Kushwaha
+<prabhakar@freescale.com> wrote:
+> Hi Tanmay, Liviu,
+>
+> On 7/4/2014 2:57 AM, Tanmay Inamdar wrote:
+>>
+>> Reposting on request of several people since previously posted one was
+>> corrupted.
+>>
+>> This patch adds the arch support for PCI(e) for arm64. The files
+>> added or modified in this patch are based on PCI(e) support in
+>> 32bit arm.
+>>
+>> Please note that this patch is just for the reference. Liviu Dudau from
+>> ARM
+>> has posted his v8 series of patch to support PCIe in arm64.
+>>
+>> The patch will apply against 3.13 Linux Kernel
+>>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>>
+>
+> do we foresee similar type of changes in u-boot  to support PCI(e) for
+> ARM64.
+>
 
-So this is what needs to be figured out, how is the notifier being
-called with a PCI device?  Who else called iommu_bus_init() for the PCI
-bus?
+Well.. Actually PCI(e) has no dependency on ARM64 architecture. This
+patch is required only because of current Linux structure. Hence
+Liviu's effort to take PCI(e) out of 'arch' makes sense.
 
-thanks,
+In my experience, I don't think any arch specific changes are required
+in u-boot. At least I don't recall making any specific changes in
+u-boot pci layer. However we don't really have a big use case for PCIe
+in u-boot. It just links up and lists the devices discovered during
+enumeration.
 
-greg k-h
+
+> Regards,
+> Prabhakar
+>
+>
