@@ -1,61 +1,63 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 7 Jul 2014 10:22:48 +0100
-Subject: [PATCH v10 6/7] ARM: add pmd_[dirty|mkclean] for THP
-In-Reply-To: <1404694438-10272-7-git-send-email-minchan@kernel.org>
-References: <1404694438-10272-1-git-send-email-minchan@kernel.org>
- <1404694438-10272-7-git-send-email-minchan@kernel.org>
-Message-ID: <20140707092247.GA15168@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Jul 2014 10:34:43 +0100
+Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
+ it has exclusives
+In-Reply-To: <20140704205144.GK21766@n2100.arm.linux.org.uk>
+References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+ <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk>
+ <4606711.7KmFAGVNmG@wuerfel>
+ <20140704205144.GK21766@n2100.arm.linux.org.uk>
+Message-ID: <20140707093443.GA3676@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 09:53:57AM +0900, Minchan Kim wrote:
-> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
-> overwrite of the contents since MADV_FREE syscall is called for
-> THP page.
+Hi Russell,
+
+On Fri, Jul 04, 2014 at 09:51:44PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 04, 2014 at 10:11:06PM +0200, Arnd Bergmann wrote:
+> > On Friday 04 July 2014 20:52:17 Russell King wrote:
+> > >         /*
+> > >          * HWCAP_TLS is available only on 1136 r1p0 and later,
+> > >          * see also kuser_get_tls_init.
+> > >          */
+> > > -       if ((((id >> 4) & 0xfff) == 0xb36) && (((id >> 20) & 3) == 0))
+> > > +       if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&
+> > > +           ((id >> 20) & 3) == 0) {
+> > >                 elf_hwcap &= ~HWCAP_TLS;
+> > > +               return;
+> > > +       }
+> > > 
+> > 
+> > Would it make sense to tie this check to the ARMv6K architecture level?
+> > 
+> > I see that cpu_architecture currently reports the same value for plain
+> > ARMv6 (1136r0) and for ARMv6K (1136r1+ or any other ARM11), but we already
+> > distinguish them at compile time in a number of places and it seems you
+> > make the exact same distinction here at runtime.
 > 
-> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
-> support.
+> Hmm, we need guidance from ARM people on that.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
-> ---
->  arch/arm64/include/asm/pgtable.h | 2 ++
->  1 file changed, 2 insertions(+)
+> There may well be a better way to detect between ARMv6 and ARMv6K, which
+> is given by the architecture spec.  G7.3 of an early DDI0406 says that
+> the MPIDR (mp affinity register) aliases to MIDR for ARMv6, but is of
+> course implemented for ARMv6K.
+
+I don't think MPIDR exists on any 1136 (i.e. probably UNDEFs).
+
+> This seems to be carried through to the latest ARM ARM.  So it seems
+> this would be a more correct way to tell ARMv6 from ARMv6K.
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 579702086488..f3ec01cef04f 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -240,10 +240,12 @@ static inline pmd_t pte_pmd(pte_t pte)
->  #endif
->  
->  #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
-> +#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
->  #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
->  #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
->  #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
->  #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
-> +#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
->  #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
->  #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
->  #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
-> -- 
-> 2.0.0
->
+> If so, we can certainly expand cpu_architecture() to detect between the
+> two and add a CPU_ARCH_ARMv6K in there.
+> 
+> Let's see what Will has to say about that when he's next around...
+> though I think it'll require another trawl through lots of
+> documentation.
 
-Hi Minchan,
+Well, looking at the ARM11 CPUs, I think our get_cpu_architecture()
+implementation will return CPU_ARCH_ARM_V7 for 1176 and 11MPCore whilst
+1136 and 1156 will return CPU_ARCH_ARM_V6. So this really boils down to
+whether we should go out of our way to treat 1136 r1pX as v6k instead of
+v6, I'd be inclined not to bother...
 
-This looks good to me too.
-As Will said this applies to arm64, we will also need a version for:
-arch/arm/include/asm/pgtable-3level.h.
-
-Is there a testcase we can run to check that this patch set is working
-well for arm/arm64?
-
-Cheers,
--- 
-Steve 
+Will
