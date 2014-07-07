@@ -1,36 +1,76 @@
-From: xuwei5@hisilicon.com (xuwei)
-Date: Mon, 7 Jul 2014 11:17:34 +0800
-Subject: [PATCH v3] MAINTAINERS:ARM:hisi: add Hisilicon SoC family
-Message-ID: <53BA114E.4040700@hisilicon.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 07 Jul 2014 09:20:50 +0530
+Subject: [PATCH v6 0/6] Cleanup patches for mach-exynos
+Message-ID: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new mach-hisi that will support Hisilicon SoCs based on ARMv7 and
-I am taking maintainership for it.
+This series is doing code cleanup under arch/arm/mach-exynos.
+These patches have been separated from main exynos pmu v4 patch
+posted here [1].
 
-Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+[1]: https://lkml.org/lkml/2014/5/10/29
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 134483f..d4ac517 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -972,6 +972,14 @@ F:	arch/arm/mach-pxa/hx4700.c
- F:	arch/arm/mach-pxa/include/mach/hx4700.h
- F:	sound/soc/pxa/hx4700.c
- 
-+ARM/HISILICON SOC SUPPORT
-+M:	Wei Xu <xuwei5@hisilicon.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+W:	http://www.hisilicon.com
-+S:	Supported
-+T:	git git://github.com/hisilicon/linux-hisi.git
-+F:	arch/arm/mach-hisi/
-+
- ARM/HP JORNADA 7XX MACHINE SUPPORT
- M:	Kristoffer Ericson <kristoffer.ericson@gmail.com>
- W:	www.jlime.com
+Changes Since v5:
+ - Rebased on latest for-next of Kukjin Kim's tree.
+ - Using of_machine_is_compatible instead of soc_is_exynos in patch 2.
+
+Changes Since v4:
+ - Rebased on latest for-next of Kukjin Kim's tree.
+ - Removing file path comment from mach-exynos/headsmp.S also.
+ - Removed signed-off-by of Young-Gun Jang <yg1004.jang@samsung.com>,
+   as this id is no more valid. Taking ownership of all his patches.
+ - Separated these patches from main exynos pmu v4 patch series as
+   suggested by Tomasz Figa.
+
+Changes Since v3:
+ - Addressed build fail issue in exynos.c as reported by Sachin Kamat.
+ - Rebased on top of Sysram patches by Sachin Kamat.
+
+Changes Since v2:
+ - Rebased on top of Daniel Lezcano's Exynos cpuidle refactor patches.
+ - Removed exynos_cpuidle_init and exynos_cpufreq_init code as suggested
+   by Tomasz Figa.
+
+Changes Since v1:
+ - Rebased on latest for-next of Kukjin Kim's tree.
+ - Added patch: "Make exynos machine_ops as static". 
+	For making more cleanup in "mach-exynos/common.h"
+	as suggested by Tomasz Figa.
+ - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
+ - Updated patch: Remove file path from comment section
+	As suggested by Michel Simek, instead of updating file path
+	lets remove them from each file under "mach-exynos".
+	Even though Kukjin pointed out that there is similar patch pending from
+	Sachin/Tushar but since I could not find I have included this here. If
+	I have missed something please point to any existing such patch.
+ - Added patch: Remove "linux/bug.h" from pmu.c.
+ - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+
+
+Pankaj Dubey (6):
+  ARM: EXYNOS: Make exynos machine_ops as static
+  ARM: EXYNOS: Move cpufreq and cpuidle device registration to
+    init_machine
+  ARM: EXYNOS: Move SYSREG definition into sys-reg specific file
+  ARM: EXYNOS: Remove file path from comment section
+  ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
+  ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
+
+ arch/arm/mach-exynos/common.h              |    8 --------
+ arch/arm/mach-exynos/exynos.c              |   27 ++++++++-------------------
+ arch/arm/mach-exynos/headsmp.S             |    1 -
+ arch/arm/mach-exynos/hotplug.c             |    3 +--
+ arch/arm/mach-exynos/include/mach/map.h    |    3 +--
+ arch/arm/mach-exynos/include/mach/memory.h |    3 +--
+ arch/arm/mach-exynos/platsmp.c             |    3 +--
+ arch/arm/mach-exynos/pm.c                  |    1 +
+ arch/arm/mach-exynos/pm_domains.c          |    8 ++++----
+ arch/arm/mach-exynos/pmu.c                 |    1 -
+ arch/arm/mach-exynos/regs-pmu.h            |    4 ----
+ arch/arm/mach-exynos/regs-sys.h            |   22 ++++++++++++++++++++++
+ 12 files changed, 39 insertions(+), 45 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/regs-sys.h
+
 -- 
-1.8.1.2
+1.7.9.5
