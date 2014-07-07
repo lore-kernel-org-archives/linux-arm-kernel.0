@@ -1,62 +1,34 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon,  7 Jul 2014 15:45:49 -0300
-Subject: [PATCH v3 2/4] ARM: mvebu: Add support for the network controller in
- Armada 375 SoC
+Date: Mon,  7 Jul 2014 15:45:51 -0300
+Subject: [PATCH v3 4/4] ARM: mvebu: enable Armada 375 network driver in
+ mvebu_v7_defconfig
 In-Reply-To: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1404758751-2346-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1404758751-2346-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the support for the network controller in Marvell
-Armada 375 SoC devicetree.
+From: Marcin Wojtas <mw@semihalf.com>
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Now that the Armada 375 network driver has been pushed, let's enable it
+in mvebu_v7_defconfig.
+
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index fb92551..d4619ad 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -151,6 +151,37 @@
- 				      <0xc100 0x100>;
- 			};
- 
-+			mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,orion-mdio";
-+				reg = <0xc0054 0x4>;
-+			};
-+
-+			/* Network controller */
-+			ethernet at f0000 {
-+				compatible = "marvell,armada-375-pp2";
-+				reg = <0xf0000 0xa000>, /* Packet Processor regs */
-+				      <0xc0000 0x3060>, /* LMS regs */
-+				      <0xc4000 0x100>,  /* eth0 regs */
-+				      <0xc5000 0x100>;  /* eth1 regs */
-+				clocks = <&gateclk 3>, <&gateclk 19>;
-+				clock-names = "pp_clk", "gop_clk";
-+				status = "disabled";
-+
-+				eth0: eth0 at c4000 {
-+					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <0>;
-+					status = "disabled";
-+				};
-+
-+				eth1: eth1 at c5000 {
-+					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <1>;
-+					status = "disabled";
-+				};
-+			};
-+
- 			spi0: spi at 10600 {
- 				compatible = "marvell,orion-spi";
- 				reg = <0x10600 0x50>;
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index b0bfefa..b477631 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -46,6 +46,7 @@ CONFIG_AHCI_MVEBU=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_MVNETA=y
++CONFIG_MVPP2=y
+ CONFIG_MARVELL_PHY=y
+ CONFIG_MWIFIEX=y
+ CONFIG_MWIFIEX_SDIO=y
 -- 
 1.9.1
