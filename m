@@ -1,52 +1,53 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Jul 2014 21:55:03 +0800
-Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
-In-Reply-To: <1404724251.4587.20.camel@weser.hi.pengutronix.de>
-References: <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
- <20140625062243.GD3242@dragon>
- <CAOMZO5BuOhWo7SCEPFmNRUQBi=5JhDrVv0yvBQM2d_jMyLkbyw@mail.gmail.com>
- <1403693452.4249.1.camel@weser.hi.pengutronix.de>
- <20140625125306.GB6917@dragon>
- <1403772229.4254.4.camel@weser.hi.pengutronix.de>
- <20140628143712.GA7869@dragon>
- <1404135864.4305.23.camel@weser.hi.pengutronix.de>
- <20140701065105.GE14471@dragon>
- <1404724251.4587.20.camel@weser.hi.pengutronix.de>
-Message-ID: <20140707135502.GR30239@dragon>
+Date: Mon, 7 Jul 2014 21:56:37 +0800
+Subject: [PATCH] ARM: imx: fix shared gate clock
+In-Reply-To: <CAOMZO5CMc6dqzh62cie=Ve_o9QHig=G4VqB11skCip+jXwV-9g@mail.gmail.com>
+References: <1404701631-13870-1-git-send-email-shawn.guo@freescale.com>
+ <CAOMZO5CMc6dqzh62cie=Ve_o9QHig=G4VqB11skCip+jXwV-9g@mail.gmail.com>
+Message-ID: <20140707135636.GS30239@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 11:10:51AM +0200, Lucas Stach wrote:
-> Hi Shawn,
+On Mon, Jul 07, 2014 at 09:49:00AM -0300, Fabio Estevam wrote:
+> On Sun, Jul 6, 2014 at 11:53 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > Let's say clock A and B are two gate clocks that share the same register
+> > bit in hardware.  Therefore they are registered as shared gate clocks
+> > with imx_clk_gate2_shared().
+> >
+> > In a scenario that only clock A is enabled by clk_enable(A) while B is
+> > not used, the shared gate will be unexpectedly disabled in hardware.
+> > It happens because clk_enable(A) increments the share_count from 0 to 1,
+> > while clock B is unused to clock core, and therefore the core function
+> > will just disable B by calling clk->ops->disable() directly.  The
+> > consequence of that call is share_count is decremented to 0 and the gate
+> > is disabled in hardware, even though clock A is still in use.
+> >
+> > The patch fixes the issue by initializing the share_count per hardware
+> > state and returns enable state per share_count from .is_enabled() hook,
+> > in case it's a shared gate.
+> >
+> > While at it, add a check in clk_gate2_disable() to ensure it's never
+> > called with a zero share_count.
+> >
+> > Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> > Fabio,
+> >
+> > Per my testing, it fixes the shared gate clock issue you reported.
+> > But I'd like to get your confirmation before I ask arm-soc folks to
+> > apply it for 3.16-rc.
 > 
-> Over the weekend I tried to reproduce your problem on a SabreSD board,
-> but wasn't able to trigger the issue. 3.16-rc3 with PCIe active works
-> just fine over a suspend and resume cycle for me.
-
-That's strange.  In my setup, PCIe support is enabled in kernel and DT,
-but I do not have a PCIe device connected to the board.
-
+> I can get audio working now and I have also inspected CCGR5 register
+> and it looks correct now:
 > 
-> One possibly relevant difference is that I've booted with NFSroot, while
-> it seems you are using a SATA connected device. Is this right?
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-I have a SATA disk connected, but did boot with NFSroot.
+Thanks, Fabio.
 
-> If so,
-> can you test if it works if you boot from SDcard or the like? This might
-> be relevant as PCIe and SATA share some clocks.
+Arnd, Olof,
 
-I tried to disable SATA support completely, but it doesn't help.
-
-$ echo mem > /sys/power/state
-[  410.052595] PM: Syncing filesystems ... done.
-[  410.150033] PM: Preparing system for mem sleep
-[  410.207963] Freezing user space processes ... (elapsed 0.004 seconds) done.
-[  410.219796] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-[  410.230243] PM: Entering mem sleep
-[  410.316574] PM: suspend of devices complete after 79.461 msecs
-[  410.322498] PM: suspend devices took 0.090 seconds
-[  410.332655] PM: late suspend of devices complete after 5.338 msecs
-
+Can you please apply this patch for 3.16?
 
 Shawn
