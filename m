@@ -1,32 +1,27 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 08 Jul 2014 01:21:50 +0400
-Subject: [PATCH v4 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
-In-Reply-To: <9076479.78BOG4SjZ9@wuerfel>
-References: <201406242207.32790.sergei.shtylyov@cogentembedded.com>
- <9076479.78BOG4SjZ9@wuerfel>
-Message-ID: <53BB0F6E.5080600@cogentembedded.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Mon, 7 Jul 2014 23:22:07 +0200
+Subject: [PATCH 1/3] ethernet: Add new driver for Marvell Armada 375
+ network unit
+In-Reply-To: <20140707142653.GA18910@arch.cereza>
+References: <1404498697-21978-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1404498697-21978-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140705210359.GA19441@electric-eye.fr.zoreil.com>
+ <20140707142653.GA18910@arch.cereza>
+Message-ID: <20140707212207.GB16677@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Ezequiel Garcia <ezequiel.garcia@free-electrons.com> :
+[...]
+> Hm, yes, I see what you mean. These names bother me too, and I think we could
+> probably change it so "pp2" is "dev", and "pp" is "port". But on the other
+> side, I'm not sure it's worth doing such an intrusive change just to fix these
+> names.
+> 
+> What do you think ?
 
-On 06/24/2014 10:22 PM, Arnd Bergmann wrote:
+Yike. Please don't substitute "pp2" with some "dev": it's a "priv" more than
+a "dev". s/pp/port/ would be good enough. Your call.
 
->>     Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
->> 'renesas-devel-v3.16-rc2-20140623' tag. Here we add PCI USB device tree support
->> for the R8A7791-based Koelsch and Henninger boards. As the 'pci-rcar-gen2'
->> driver device tree support has been merged for 3.16, this patchset can now be
->> merged too...
-
->> [1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
->> [2/3] ARM: shmobile: koelsch: enable internal PCI
->> [3/3] ARM: shmobile: henninger: enable internal PCI
-
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-    Simon, what's up with this series? You've merged analogous series for 
-R8A7790 but not this one. You followed up to an older version of it, asking me 
-to re-post when the driver patch gets merged but it already had been merged 
-already (and this version posted), and I got no reply from you then...
-
-WBR, Sergei
+-- 
+Ueimor
