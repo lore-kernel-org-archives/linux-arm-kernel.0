@@ -1,103 +1,184 @@
-From: ccross@google.com (Colin Cross)
-Date: Mon, 7 Jul 2014 11:35:23 -0700
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140707122831.0DCEEC409D5@trevor.secretlab.ca>
-References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk>
- <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk>
- <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703174318.GE28175@arm.com>
- <20140704132250.A2447C40ADD@trevor.secretlab.ca>
- <20140705111406.GA23692@arm.com>
- <20140707122831.0DCEEC409D5@trevor.secretlab.ca>
-Message-ID: <CAMbhsRT64KJeFLjukzJct_K2+GW3d+UJ9R-Cd5ZR-1zS6UkQng@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 7 Jul 2014 20:40:01 +0200
+Subject: [PATCH 05/18] power: reset: Add AT91 reset driver
+In-Reply-To: <20140704090645.GB13487@lukather>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
+ <F9547E0F-AB97-47E6-BA09-135EE4E1BC73@jcrosoft.com>
+ <20140703145957.GH31996@lukather>
+ <B425B925-B75E-4761-8CE6-9B12C5AC0469@jcrosoft.com>
+ <20140704091443.545d1e08@bbrezillon>
+ <20140704090645.GB13487@lukather>
+Message-ID: <20140707184001.GH9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 7, 2014 at 5:28 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sat, 5 Jul 2014 12:14:07 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Fri, Jul 04, 2014 at 02:22:50PM +0100, Grant Likely wrote:
->> > On Thu, 3 Jul 2014 18:43:18 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > > On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
->> > > > So, no. I completely reject any notion that breaking existing apps is
->> > > > okay. If we're going to say that v8 still supports 32-bit apps, then
->> > > > it has to be all of v7, not just the 'good' bits. Nor do I think
->> > > > saying "it's just a bunch of games" justifies anything. We're kernel
->> > > > engineers. Applications are applications and we don't break userspace.
->> > > > Period.
->> > >
->> > > Here you need to define user-space. OABI?
->> >
->> > This is where we can be pragmatic. Listen to our users. Colin was very
->> > clear about what some apps need in order to keep working. He's not even
->> > asking for old kernels or system libraries to be supported because he
->> > has control over those components and they can be fixed. The important
->> > ABI is the ABI used by Android applications.
->> >
->> > We can drop ABIs that nobody uses. If nobody complains, is it really
->> > broken?
->>
->> OK, so I think we now agree that being asked not to break the ABI ever
->> is not feasible (and not in the community's interest either; think about
->> carrying over NWFPE for ARMv8 just because someone wants to run an old
->> distro when there are alternatives already, such requests would need
->> proper justification).
->>
->> Another aspect is that users don't always know what's good (or bad) for
->> them. EABI provided means via kuser helpers to use arch-independent
->> barrier code and cmpxchg. Glibc and various threads libraries moved to
->> using them but as we can see, not all user space. As Russell pointed
->> out, we failed to raise the SWP issue properly in the ARMv7 kernel (more
->> warnings, always emulation) and I see this as a valid reason to allow
->> for a _transition_ period in ARMv8.
->>
->> But we have to agree on a way to handle deprecated/removed architecture
->> features (as I said, some of them are removed for good reasons). And
->> that's also for user's benefit, performance wise they should rather use
->> native than emulated features.
->>
->> The timeline I propose would be:
->>
->> 1. Architecture feature deprecation (still present, no way to disable)
->>    - In Linux we need to find ways and push for alternatives to be
->>      adopted by user space (like we did with kuser helpers)
->> 2. Architecture feature disabling (still present but needs to be enabled
->>    explicitly via SCTLR bit)
->>    - Linux disables the feature by default and provides emulation
->>      (enabled by default), clear warnings
->>    - In certain cases, there may be justification to enable the hardware
->>      feature but certainly not in defconfig nor distro Image builds.
->>      Otherwise they can't complain that users are still using such
->>      feature at point 3 below
->> 3. Architecture feature removed
->>    - Default Linux behaviour changes to SIGILL
->>    - Emulation could be still available in the kernel but maybe under
->>      a CONFIG_EXPERT option
->> 4. Eventually remove kernel emulation support entirely (or don't carry
->>    it over to a new port, though I don't foresee any arm128 ;))
->>
->> With SWP, we are currently at 3/4 with the counter arguments that 2
->> wasn't entirely clear to users, so the transition needs to be
->> carried over for ARMv8 (but I'm against 2 for arm64, 3 is as far as I
->> would go). Arguably, with CP15 barriers we are at point 2, in which case
->> if we add them to the arm64 kernel, they should be emulated with clear
->> warnings (ratelimited).
->
-> I could quibble on details, but I'm fine with that approach.
->
-> It would also be good to have ongoing feedback about if the emulation is
-> getting used in the field. Colin, if the kernel emits warnings on
-> emulation, is that something that Google gathers statistics on for
-> devices in the field?
+On 11:06 Fri 04 Jul     , Maxime Ripard wrote:
+> On Fri, Jul 04, 2014 at 09:14:43AM +0200, Boris BREZILLON wrote:
+> > On Fri, 4 Jul 2014 11:08:20 +0800
+> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > 
+> > > 
+> > > On Jul 3, 2014, at 10:59 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > > 
+> > > > On Thu, Jul 03, 2014 at 10:39:08PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > >>> +++ b/drivers/power/reset/at91-reset.c
+> > > >>> @@ -0,0 +1,202 @@
+> > > >>> +/*
+> > > >>> + * Atmel AT91 SAM9 SoCs reset code
+> > > >>> + *
+> > > >>> + * Copyright (C) 2014 Maxime Ripard
+> > > >>> + *
+> > > >>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > >> 
+> > > >> you can not own the copyright as it?s basically a copy of other
+> > > >> people code
+> > > > 
+> > > > The previous names are missing, right.
+> > > > 
+> > > >>> + *
+> > > >>> + * This file is licensed under the terms of the GNU General Public
+> > > >>> + * License version 2.  This program is licensed "as is" without any
+> > > >>> + * warranty of any kind, whether express or implied.
+> > > >>> + */
+> > > >>> +
+> > > >>> +#include <linux/io.h>
+> > > >>> +#include <linux/module.h>
+> > > >>> +#include <linux/of_address.h>
+> > > >>> +#include <linux/platform_device.h>
+> > > >>> +#include <linux/reboot.h>
+> > > >>> +
+> > > >>> +#include <asm/system_misc.h>
+> > > >>> +
+> > > >>> +#include <mach/at91sam9_ddrsdr.h>
+> > > >>> +#include <mach/at91sam9_sdramc.h>
+> > > >>> +
+> > > >>> +#define AT91_RSTC_CR	0x00		/* Reset Controller Control Register */
+> > > >>> +#define	AT91_RSTC_PROCRST	BIT(0)		/* Processor Reset */
+> > > >>> +#define	AT91_RSTC_PERRST	BIT(2)		/* Peripheral Reset */
+> > > >>> +#define	AT91_RSTC_EXTRST	BIT(3)		/* External Reset */
+> > > >>> +#define	AT91_RSTC_KEY		(0xa5 << 24)	/* KEY Password */
+> > > >>> +
+> > > >>> +#define AT91_RSTC_SR	0x04		/* Reset Controller Status Register */
+> > > >>> +#define	AT91_RSTC_URSTS		BIT(0)		/* User Reset Status */
+> > > >>> +#define	AT91_RSTC_RSTTYP	GENMASK(10, 8)	/* Reset Type */
+> > > >>> +#define	AT91_RSTC_NRSTL		BIT(16)		/* NRST Pin Level */
+> > > >>> +#define	AT91_RSTC_SRCMP		BIT(17)		/* Software Reset Command in Progress */
+> > > >>> +
+> > > >>> +#define AT91_RSTC_MR	0x08		/* Reset Controller Mode Register */
+> > > >>> +#define	AT91_RSTC_URSTEN	BIT(0)		/* User Reset Enable */
+> > > >>> +#define	AT91_RSTC_URSTIEN	BIT(4)		/* User Reset Interrupt Enable */
+> > > >>> +#define	AT91_RSTC_ERSTL		GENMASK(11, 8)	/* External Reset Length */
+> > > >>> +
+> > > >>> +enum reset_type {
+> > > >>> +	RESET_TYPE_GENERAL	= 0,
+> > > >>> +	RESET_TYPE_WAKEUP	= 1,
+> > > >>> +	RESET_TYPE_WATCHDOG	= 2,
+> > > >>> +	RESET_TYPE_SOFTWARE	= 3,
+> > > >>> +	RESET_TYPE_USER		= 4,
+> > > >>> +};
+> > > >>> +
+> > > >>> +static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+> > > >>> +
+> > > >>> +static void at91sam9_restart(enum reboot_mode mode, const char *cmd)
+> > > >>> +{
+> > > >>> +	asm volatile(
+> > > >>> +		".balign 32\n\t"
+> > > >>> +
+> > > >>> +		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
+> > > >>> +		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
+> > > >>> +		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
+> > > >>> +
+> > > >>> +		"b	.\n\t"
+> > > >>> +		:
+> > > >>> +		: "r" (at91_ramc_base[0]),
+> > > >>> +		  "r" (at91_rstc_base),
+> > > >>> +		  "r" (1),
+> > > >>> +		  "r" (AT91_SDRAMC_LPCB_POWER_DOWN),
+> > > >>> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST));
+> > > >>> +}
+> > > >>> +
+> > > >>> +static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+> > > >>> +{
+> > > >>> +	asm volatile(
+> > > >>> +		"cmp	%1, #0\n\t"
+> > > >>> +		"beq	1f\n\t"
+> > > >>> +
+> > > >>> +		"ldr	r0, [%1]\n\t"
+> > > >>> +		"cmp	r0, #0\n\t"
+> > > >>> +
+> > > >>> +		".balign 32\n\t"
+> > > >>> +
+> > > >>> +		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> > > >>> +		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> > > >>> +		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> > > >>> +		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> > > >>> +		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+> > > >>> +
+> > > >>> +		"	b	.\n\t"
+> > > >>> +		:
+> > > >>> +		: "r" (at91_ramc_base[0]),
+> > > >>> +		  "r" (at91_ramc_base[1]),
+> > > >>> +		  "r" (at91_rstc_base),
+> > > >>> +		  "r" (1),
+> > > >>> +		  "r" (AT91_DDRSDRC_LPCB_POWER_DOWN),
+> > > >>> +		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST)
+> > > >>> +		: "r0");
+> > > >>> +}
+> > > >>> +
+> > > >> move this to an assembly file more easy to read than a C code
+> > > > 
+> > > > Nope. It's a pain to pass variable to an external assembly file, and
+> > > > this makes the use of global variable pretty much mandatory, which is
+> > > > definitely not great.
+> > > 
+> > > Not at all I did for the PM slow clock code just write a function and pas it as a parameter
+> > > you have 3
+> > > 
+> > > so basically you have to use the current and just pass at91_ramc_base[0], at91_ramc_base[1]
+> > > and at91_rstc_base
+> > > it?s 3 lignes of modification, if you have at91_ramc_base and at91_ramc_base same
+> > > 
+> > 
+> > Yes, retrieving function parameters from assembly code is not that
+> > complicated (the first 4 pointer values are accessible through r0-r3),
+> > but then you'll have to store your assembly file somewhere.
+> 
+> Like I was saying, there's a strong preference for the inline
+> assembly...
 
-We do capture snapshots of the kernel log on dogfooding and
-experimental devices, but it's not a great source for statistical data
-because it only gets the most recent 64kB.  We do capture per-process
-cpu stats, if we could get it into a
-/proc/<pid>/deprecated_instructions file that would provide the most
-accurate statistics.  I can also talk to our developer relations teams
-about approaching it from the Play Store side.
+inline is horrible to read and maintain NACK
+
+keep it in an assembly file it's so easy to read and follow
+
+and you just have to move the file existing to the driver/power
+
+Best Regards,
+J.
+> 
+> > Subsystem directories (drivers/xxx) are supposed to be architecture
+> > agnostics, and I'm not sure subsystem maintainers will accept these
+> > assembly files in their directory.
+> 
+> ... and I've told that some maintainers don't even want assembly files
+> in their maintainance area.
+> 
+> > ITOH, leaving these assembly files in arch/arm/mach-at91 will just
+> > spread the code over linux src tree and will definitely not help other
+> > people find out the relationship between these files.
+> 
+> Given that the end-goal is to remove most (if not all) of mach-at91,
+> it seems a bit backward to me.
+> 
+> > Regarding the readability concern, I think some comments could help
+> > understanding what's being done here.
+> 
+> Yep, I have been a bit too eager to send the patches, and forgot to
+> reintroduce the comments that were there in the first place.
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
