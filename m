@@ -1,45 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Jul 2014 14:52:59 +0100
-Subject: [PATCH 0/4] ABI updates
-In-Reply-To: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
-References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
-Message-ID: <20140707135259.GB32578@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 07 Jul 2014 17:54:21 +0400
+Subject: [PATCH] ARM: shmobile: Enable R-Car Gen 2 PCIe in
+ shmobile_defconfig
+In-Reply-To: <1404739432-1408-1-git-send-email-horms+renesas@verge.net.au>
+References: <1404739432-1408-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <53BAA68D.609@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 08:51:34PM +0100, Russell King - ARM Linux wrote:
-> As a result of the recent discussions about android, several issues
-> have been identified with existing kernels:
-> 
-> 1. HWCAP_SWP does not properly reflect whether the SWP instruction
->    should be used.  Turn HWCAP_SWP off on ARMv6+ where the exclusives
->    are available.
-> 
-> 2. SWP is unsafe when running on a SMP CPU; there is no bus locking
->    between the read and write parts of the instruction execution.
->    Force SWP emulation on ARMv7+ where we can disable the SWP
->    instruction.
-> 
-> 3. Reporting of alignment faults - kernel mode faults are silent due to
->    the requirements of the network stack, but we can note where the
->    last one occurs.
-> 
-> Testing reveals that at least my OMAP4430 userspace (supplied from TI)
-> executes lots of SWP instructions, which is something that wasn't known
-> before this patch.
-> 
-> Many systems today are not configured with SWP emulation enabled on SMP.
-> This means that the SWP instruction is available, but unsafe.
+Hello.
 
-The patches look fine to me (we are still discussing patch 4 but even if
-it needs changing for TLS, it can be done separately from this series).
+On 07/07/2014 05:23 PM, Simon Horman wrote:
 
-Question - should we go a step further and change the pr_debug() in
-swp_emulate.c to something like pr_warn()?
+> The R-Car Gen 2 PCIe driver provides PCIe host support for
+> Renesas R-Car Gen2 platforms. To increase hardware support enable
+> the driver in the shmobile_defconfig multiplatform configuration.
 
-Another deprecated feature is CP15 barriers (disable bit coming with the
-virtualisation extensions). I think we should start emulating these soon
-as well and print warnings.
+> Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/configs/shmobile_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
 
--- 
-Catalin
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 5f05e98..6bc85a5 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -24,6 +24,7 @@ CONFIG_PL310_ERRATA_588369=y
+>   CONFIG_ARM_ERRATA_754322=y
+>   CONFIG_PCI=y
+>   CONFIG_PCI_RCAR_GEN2=y
+> +CONFIG_PCI_RCAR_GEN2_PCIE=y
+
+    Hmm, I'm not sure why the option has GEN2 -- the driver claims support for 
+R8A7779 as well as R8A779x. Probably the option should be renamed.
+
+WBR, Sergei
