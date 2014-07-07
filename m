@@ -1,15 +1,14 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 09:54:51 +0200
-Subject: [PATCH v2 26/30] ARM: shmobile: sh73a0: Add SCIF nodes
+Date: Mon,  7 Jul 2014 09:54:53 +0200
+Subject: [PATCH v2 28/30] ARM: shmobile: sh73a0: add CMT1 clock support for DT
 In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404719695-1634-27-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404719695-1634-29-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This describes all of the SCIF hardware of the sh73a0.
-Each node is disabled and may be enabled as necessary
-by board DTS files.
+This will be used when initialising CMT1 device using DT
+until common clock framework support is added.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
@@ -17,91 +16,20 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 v2
 * First post
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 72 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+ arch/arm/mach-shmobile/clock-sh73a0.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 5ecf552..910b790 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -235,6 +235,78 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 9433a4e..d8c4048 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -690,6 +690,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.0", &dsi0phy_clk),
+ 	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.1", &dsi1phy_clk),
+ 	CLKDEV_ICK_ID("fck", "sh-cmt-48.1", &mstp_clks[MSTP329]), /* CMT1 */
++	CLKDEV_ICK_ID("fck", "e6138000.timer", &mstp_clks[MSTP329]), /* CMT1 */
+ 	CLKDEV_ICK_ID("fck", "sh-tmu.0", &mstp_clks[MSTP125]), /* TMU0 */
+ };
  
-+	scifa0: serial at e6c40000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6c40000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa1: serial at e6c50000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6c50000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa2: serial at e6c60000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6c60000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa3: serial at e6c70000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6c70000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa4: serial at e6c80000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6c80000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa5: serial at e6cb0000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6cb0000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa6: serial at e6cc0000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6cc0000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifa7: serial at e6cd0000 {
-+		compatible = "renesas,scifa-sh73a0", "renesas,scifa";
-+		reg = <0xe6cd0000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 143 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
-+	scifb8: serial at e6c30000 {
-+		compatible = "renesas,scifb-sh73a0", "renesas,scifb";
-+		reg = <0xe6c30000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
- 	pfc: pfc at e6050000 {
- 		compatible = "renesas,pfc-sh73a0";
- 		reg = <0xe6050000 0x8000>,
 -- 
 2.0.0.rc2
