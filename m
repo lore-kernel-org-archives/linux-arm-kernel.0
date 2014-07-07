@@ -1,50 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Jul 2014 12:02:48 +0100
-Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
- it has exclusives
-In-Reply-To: <5774249.oWoI3gS2oa@wuerfel>
-References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
- <4606711.7KmFAGVNmG@wuerfel>
- <20140704205144.GK21766@n2100.arm.linux.org.uk>
- <5774249.oWoI3gS2oa@wuerfel>
-Message-ID: <20140707110248.GA32578@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 7 Jul 2014 12:11:33 +0100
+Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <6122131.ozzYjjjRQi@wuerfel>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJNfB_jynFQK0Ov6A3wqk6LF3abUFEUjhmzipak26sU5w@mail.gmail.com>
+ <6122131.ozzYjjjRQi@wuerfel>
+Message-ID: <20140707111133.GP6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 10:58:04PM +0200, Arnd Bergmann wrote:
-> On Friday 04 July 2014 21:51:44 Russell King - ARM Linux wrote:
-> > Hmm, we need guidance from ARM people on that.
+On Sat, Jul 05, 2014 at 09:46:09PM +0100, Arnd Bergmann wrote:
+> On Saturday 05 July 2014 14:25:52 Rob Herring wrote:
+> > On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > The ranges property for a host bridge controller in DT describes
+> > > the mapping between the PCI bus address and the CPU physical address.
+> > > The resources framework however expects that the IO resources start
+> > > at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+> > > The conversion from pci ranges to resources failed to take that into account.
 > > 
-> > There may well be a better way to detect between ARMv6 and ARMv6K, which
-> > is given by the architecture spec.  G7.3 of an early DDI0406 says that
-> > the MPIDR (mp affinity register) aliases to MIDR for ARMv6, but is of
-> > course implemented for ARMv6K.
+> > I don't think this change is right. There are 2 resources: the PCI bus
+> > addresses and cpu addresses. This function deals with the cpu
+> > addresses. Returning pci addresses for i/o and cpu addresses for
+> > memory is going to be error prone. We probably need both cpu and pci
+> > resources exposed to host controllers.
 > > 
-> > This seems to be carried through to the latest ARM ARM.  So it seems
-> > this would be a more correct way to tell ARMv6 from ARMv6K.
-> > 
-> > If so, we can certainly expand cpu_architecture() to detect between the
-> > two and add a CPU_ARCH_ARMv6K in there.
-> > 
-> > Let's see what Will has to say about that when he's next around...
-> > though I think it'll require another trawl through lots of
-> > documentation.
+> > Making the new function only deal with i/o bus resources and naming it
+> > of_pci_range_to_io_resource would be better.
 > 
-> I was thinking of a simpler check in __get_cpu_architecture, just
-> checking if the CPUID is ARM1136r0 since that is the only ARMv6
-> CPU core we support. Anything else that we currently report as
-> ARMv6 is actually ARMv6K.
+> I think you are correct that this change by itself is will break existing
+> drivers that rely on the current behavior of of_pci_range_to_resource,
+> but there is also something wrong with the existing implementation:
 
-I'm not sure that's the right approach. ARM added the CPUID scheme to
-allow the software to check specific features rather than guessing
-specific architecture versions. Basically there isn't a clear way to
-identify whether your CPU is ARMv6K or ARMv7 from a single ID register
-read (you may be able to infer by reading multiple ID regs).
+Either I'm very confused or I've managed to confuse everyone else. The I/O
+resources described using CPU addresses *are* using "pseudo" port based
+addresses (or at least that is my understanding and my reading of the code).
+Can you point me to a function that is expecting the IO resource to have
+the start address at the physical address of the mapped space?
 
-I'm now trying to figure out whether the TPIDR registers actually have a
-dedicated ID. I think they only come as part of the VMSA version 7 as
-identified from ID_MMFR0. The ARM1136 r1p1 TRM states that ID_MMFR0[3:0]
-are 0x3 which mean VMSAv7.
+I was trying to fix exactly this issue, that you cannot use the resource
+structure returned by this function in any call that is expecting an IO
+resource.
+
+Rob, you can try this function with two host bridges. Patch [3/9] changes
+pci_address_to_pio() to calculate the offset of the range based on already
+registed ranges, so the first host bridge will have it's IO resources
+starting from zero, but the second host bridge will have .start offseted
+by the size of the IO space of the first bridge. That is not a PCI bus
+address AFAICT.
+
+Best regards,
+Liviu
+
+> 
+> of_pci_range_to_resource() at the moment returns a the address in
+> cpu address space (i.e. IORESOURCE_MEM) but sets the res->flags
+> value to IORESOURCE_IO, which means it doesn't fit into the resource
+> tree. Liviu's version gets that part right, and it would be nice
+> to fix that eventually, however we do it here.
+> 
+> 	Arnd
+> 
+> 
 
 -- 
-Catalin
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
