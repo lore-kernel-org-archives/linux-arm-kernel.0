@@ -1,47 +1,48 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon,  7 Jul 2014 11:41:27 +0200
-Subject: [PATCH v4 2/2] ARM: i.MX53: globally disable supervisor protect
-In-Reply-To: <1404726087-2069-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1404726087-2069-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1404726087-2069-2-git-send-email-s.trumtrar@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Jul 2014 10:51:03 +0100
+Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
+ it has exclusives
+In-Reply-To: <20140707094128.GY21766@n2100.arm.linux.org.uk>
+References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+ <E1X39Wr-0000ly-RF@rmk-PC.arm.linux.org.uk>
+ <4606711.7KmFAGVNmG@wuerfel>
+ <20140704205144.GK21766@n2100.arm.linux.org.uk>
+ <20140707093443.GA3676@arm.com>
+ <20140707094128.GY21766@n2100.arm.linux.org.uk>
+Message-ID: <20140707095103.GC3676@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most peripherals on the i.MX53 have an
-  Off-Platform Peripheral Access Control Register (OPACR)
-in which the access rights (together with the MPROT registers) can be declared.
-However, this does not seem to work for example for SSI1+SDMA, because the
-supervisor bit is not set for the SDMA unit.
-It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
-works because it does NOT have an OPACR.
+On Mon, Jul 07, 2014 at 10:41:28AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 07, 2014 at 10:34:43AM +0100, Will Deacon wrote:
+> > I don't think MPIDR exists on any 1136 (i.e. probably UNDEFs).
+> 
+> There has long been a requirement (back to ARMv4 I believe) that
+> instructions such as:
+> 
+> 	mrc	p15, 0, rd, c0, c0, X
+> 
+> all return the MIDR unless they are implemented.  This is certainly
+> carried forward to the latest ARM ARMs.  This is done to explicitly
+> allow the presence of additional registers to be detected.
 
-The right solution would be to fix the access rights for the SDMA, but the unit
-responsible for this is the Central Security Unit (CSU), which of course is NOT
-documented. So, until documentation for this is openly available, turn off the
-supervisor protection because it cripples the hardware.
+You're right (and I didn't know that); the ARM ARM does indeed suggest that
+opc2 == {4,5,6,7} in the instruction above will alias MIDR.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/mach-imx/mach-imx53.c | 4 ++++
- 1 file changed, 4 insertions(+)
+> I would be very surprised if the 1136 did undef on this.
+> 
+> If I dig out my 1136 FPGA (which according to the docs would be r0p2)
+> I can explicitly verify this... provided Integrator CP still works.
 
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index 2bad387..1fbd77d 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -26,9 +26,13 @@
- 
- static void __init imx53_dt_init(void)
- {
-+	const char *aips_compatible = "fsl,imx53-aipstz";
-+
- 	mxc_arch_reset_init_dt();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+
-+	imx_aips_allow_unprivileged_access(aips_compatible);
- }
- 
- static const char *imx53_dt_board_compat[] __initconst = {
--- 
-2.0.0
+Actually, I managed to find the following in the 1136 TRM, so your plan
+could actually work:
+
+  Note
+
+  If the processor encounters an Opcode_2 value corresponding to an
+  unimplemented or reserved ID register with CRm = c0 and Opcode_1 = 0, the
+  system control coprocessor returns the value of the Main ID Register.
+
+You live and learn!
+
+Will
