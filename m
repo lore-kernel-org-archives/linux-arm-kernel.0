@@ -1,53 +1,66 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Jul 2014 22:07:09 +0800
-Subject: [PATCH] ARM: add revision info for PL310 errata 588369 and 727915
-In-Reply-To: <1404285816-3763-1-git-send-email-shawn.guo@freescale.com>
-References: <1404285816-3763-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140707140708.GU30239@dragon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 7 Jul 2014 19:39:29 +0530
+Subject: [RFC PATCH 2/2] phy: core: the node pointer of PHY need not be
+ the same as that of PHY provider
+In-Reply-To: <20140707131232.GI6407@lee--X1>
+References: <1404486474-28312-1-git-send-email-kishon@ti.com>
+ <1404486474-28312-3-git-send-email-kishon@ti.com>
+ <20140707131232.GI6407@lee--X1>
+Message-ID: <53BAAA19.9050106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 02, 2014 at 03:23:36PM +0800, Shawn Guo wrote:
-> Add revision info for PL310_ERRATA_588369 and PL310_ERRATA_727915 to
-> help people understand if they need to enable the errata for their
-> hardware.
+Hi,
+
+On Monday 07 July 2014 06:42 PM, Lee Jones wrote:
+> On Fri, 04 Jul 2014, Kishon Vijay Abraham I wrote:
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-
-Any comments on this patch?  Otherwise, I'm going to throw it into
-the patch system.
-
-Shawn
-
-> ---
->  arch/arm/mm/Kconfig | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>> In case of multi-phy PHY providers, each PHY should be modeled as a sub
+>> node of the PHY provider. Then each PHY will have a different node pointer
+>> (node pointer of sub node) than that of PHY provider. Added this provision
+>> in the PHY core.
+>> Also fixed all drivers to use the updated API.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/phy.txt               |   10 ++++++----
+>>  drivers/phy/phy-bcm-kona-usb2.c     |    2 +-
+>>  drivers/phy/phy-core.c              |   25 ++++++++++++++++++-------
+>>  drivers/phy/phy-exynos-dp-video.c   |    2 +-
+>>  drivers/phy/phy-exynos-mipi-video.c |    2 +-
+>>  drivers/phy/phy-exynos5-usbdrd.c    |    3 ++-
+>>  drivers/phy/phy-exynos5250-sata.c   |    2 +-
+>>  drivers/phy/phy-mvebu-sata.c        |    2 +-
+>>  drivers/phy/phy-omap-usb2.c         |    2 +-
+>>  drivers/phy/phy-samsung-usb2.c      |    3 ++-
+>>  drivers/phy/phy-sun4i-usb.c         |    2 +-
+>>  drivers/phy/phy-ti-pipe3.c          |    2 +-
+>>  drivers/phy/phy-twl4030-usb.c       |    2 +-
+>>  drivers/phy/phy-xgene.c             |    2 +-
+>>  include/linux/phy/phy.h             |   15 ++++++++++-----
+>>  15 files changed, 48 insertions(+), 28 deletions(-)
 > 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index eda0dd0ab97b..9fb8a02b7e35 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -907,8 +907,8 @@ config PL310_ERRATA_588369
->  	   They are architecturally defined to behave as the execution of a
->  	   clean operation followed immediately by an invalidate operation,
->  	   both performing to the same memory location. This functionality
-> -	   is not correctly implemented in PL310 as clean lines are not
-> -	   invalidated as a result of these operations.
-> +	   is not correctly implemented in PL310 prior to r2p0 (fixed in r2p0)
-> +	   as clean lines are not invalidated as a result of these operations.
->  
->  config PL310_ERRATA_727915
->  	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
-> @@ -919,7 +919,8 @@ config PL310_ERRATA_727915
->  	  PL310 can handle normal accesses while it is in progress. Under very
->  	  rare circumstances, due to this erratum, write data can be lost when
->  	  PL310 treats a cacheable write transaction during a Clean &
-> -	  Invalidate by Way operation.
-> +	  Invalidate by Way operation.  Revisions prior to r3p1 are affected by
-> +	  this errata (fixed in r3p1).
->  
->  config PL310_ERRATA_753970
->  	bool "PL310 errata: cache sync operation may be faulty"
-> -- 
-> 1.8.3.2
+> I wrote a very similar patch already.  I knew I should have sent it on
+> Friday. :(
+
+No problem! you can send your patch along with the MiPHY series.
+
+Cheers
+Kishon
+> 
+> Patch looks good, just a real minor point.
+> 
+>>  	phy->dev.class = phy_class;
+>>  	phy->dev.parent = dev;
+>> -	phy->dev.of_node = dev->of_node;
+>> +	phy->dev.of_node = node?node:dev->of_node;
+> 
+> There should be spaces either side of the '?' and ':', or you can do
+> this more succinctly by:
+> 
+> phy->dev.of_node = node ?: dev->of_node;
+> 
+> Once fixed, feel free to add my:
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 > 
