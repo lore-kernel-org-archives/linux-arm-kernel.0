@@ -1,66 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 7 Jul 2014 08:51:41 +0200
-Subject: [PATCH 3/3] ARM: only select ARM_PATCH_PHYS_VIRT if MMU is enabled
-In-Reply-To: <20140702103512.GG32514@n2100.arm.linux.org.uk>
-References: <1404295043-6661-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1404295043-6661-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140702103512.GG32514@n2100.arm.linux.org.uk>
-Message-ID: <20140707065141.GC7827@pengutronix.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 07 Jul 2014 08:57:41 +0200
+Subject: [PATCH v7 23/24] rtc: Add driver for Maxim 77802 PMIC
+ Real-Time-Clock
+In-Reply-To: <1404713210.4367.0.camel@AMDC1943>
+References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404505467-26526-24-git-send-email-javier.martinez@collabora.co.uk>
+ <1404713210.4367.0.camel@AMDC1943>
+Message-ID: <53BA44E5.6070604@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Krzysztof,
 
-(adding Yann and linux-kbuild to recipents)
-
-On Wed, Jul 02, 2014 at 11:35:12AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 02, 2014 at 11:57:23AM +0200, Uwe Kleine-K?nig wrote:
-> > This fixes the following warning:
-> > 
-> > 	warning: (ARCH_MULTIPLATFORM && ARCH_INTEGRATOR && ARCH_SHMOBILE_LEGACY) selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU && (!ARCH_REALVIEW || !SPARSEMEM))
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > I'm not sure why ARCH_MULTIPLATFORM appears here. It depends on MMU,
-> > isn't selectable at the same time as ARCH_REALVIEW and XIP_KERNEL
-> > depends on !ARCH_MULTIPLATFORM.
+On 07/07/2014 08:06 AM, Krzysztof Kozlowski wrote:
+> On pi?, 2014-07-04 at 22:24 +0200, Javier Martinez Canillas wrote:
+>> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
+>> This patch adds support for the RTC and is based on a driver
+>> added by Simon Glass to the Chrome OS kernel 3.8 tree.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>> 
+>> Changes since v6:
+>>  - Remove unused code for SMPL and WTSR. Suggested by Krzysztof Kozlowski.
+>>  - Don't spam the kernel log with unimportant info and just print for debug.
+>>    Suggested by Krzysztof Kozlowski.
+>>  - Use ARRAY_SIZE() instead of constant value. Suggested by Krzysztof Kozlowski.
+>>  - Remove duplicated register setup. Suggested by Krzysztof Kozlowski.
+>>  - Don't free/unregister managed allocated resources.
+>>    Suggested by Krzysztof Kozlowski.
+>> ---
+>>  drivers/rtc/Kconfig        |  10 +
+>>  drivers/rtc/Makefile       |   1 +
+>>  drivers/rtc/rtc-max77802.c | 508 +++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 519 insertions(+)
+>>  create mode 100644 drivers/rtc/rtc-max77802.c
 > 
-> The message is extremely confusing.  It would read better if those
-> && were || - because ARM_PATCH_PHYS_VIRT is selected by
-> ARCH_MULTIPLATFORM _or_ ARCH_INTEGRATOR _or_ ARCH_SHMOBILE_LEGACY:
-right, so there are two things that could be improved here. The
-resolution I'd prefer is to make this two warnings:
-
-   ARCH_INTEGRATOR selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU)
-   ARCH_SHMOBILE_LEGACY selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU)
-
-ARCH_REALVIEW cannot be selected at the same time as ARCH_INTEGRATOR or
-ARCH_SHMOBILE_LEGACY, so that can be dropped. And as stated above
-ARCH_MULTIPLATFORM isn't an issue.
-
-This doesn't have the natural language problem that ARCH_MULTIPLATFORM
-*and* ARCH_INTEGRATOR *and* ARCH_SHMOBILE_LEGACY all select
-ARM_PATCH_PHYS_VIRT.
-
-> config ARCH_MULTIPLATFORM
->         select ARM_PATCH_PHYS_VIRT
 > 
-> config ARCH_INTEGRATOR
->         select ARM_PATCH_PHYS_VIRT
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > 
-> config ARCH_SHMOBILE_LEGACY
->         select ARM_PATCH_PHYS_VIRT
+
+Thanks a lot for the review and for all the feedback you gave me on each version
+of the series.
+
+> Best regards,
+> Krzysztof
 > 
-(For reference, the patch did:
+> 
 
-	-       select ARM_PATCH_PHYS_VIRT
-	+       select ARM_PATCH_PHYS_VIRT if MMU
-
-for ARCH_INTEGRATOR and ARCH_SHMOBILE_LEGACY)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+Javier
