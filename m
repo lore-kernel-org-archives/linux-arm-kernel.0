@@ -1,69 +1,35 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  7 Jul 2014 12:16:12 +0200
-Subject: [PATCH v9 6/7] ARM: berlin: add the AHCI node for the BG2Q
+Date: Mon,  7 Jul 2014 12:16:13 +0200
+Subject: [PATCH v9 7/7] ARM: berlin: enable the eSATA interface on the BG2Q DMP
 In-Reply-To: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404728173-20263-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1404728173-20263-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding nodes
-(AHCI, PHY) into its device tree.
+The BG2Q has an AHCI SATA controller with an eSATA interface. Enable it.
+Only enable the first port, the BG2Q DMP does not support the second one.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 635a16a64cb4..fa34ae6657ac 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -303,6 +303,45 @@
- 			clock-names = "refclk";
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "generic-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index 995150f93795..385f6af64d0c 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -37,3 +37,11 @@
+ &uart0 {
+ 	status = "okay";
+ };
 +
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy 0>;
-+				status = "disabled";
-+			};
++&sata0 {
++	status = "okay";
++};
 +
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy 1>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin2q-sata-phy";
-+			reg = <0xe900a0 0x200>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+
-+			sata-phy at 0 {
-+				reg = <0>;
-+			};
-+
-+			sata-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++&sata_phy {
++	status = "okay";
++};
 -- 
 1.9.1
