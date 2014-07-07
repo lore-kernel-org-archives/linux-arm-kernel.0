@@ -1,16 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Jul 2014 14:39:18 +0800
-Subject: [PATCH 1/4] ARM: i.MX27 clk: Introduce DT include for clock
- provider
-In-Reply-To: <1404538569-3076-1-git-send-email-shc_work@mail.ru>
-References: <1404538569-3076-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140707063917.GQ30239@dragon>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon,  7 Jul 2014 08:40:17 +0200
+Subject: [PATCH v2] serial: sh-sci: Add device tree support for r8a7{778, 740,
+ 3a4} and sh73a0
+Message-ID: <1404715217-30632-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 05, 2014 at 09:36:06AM +0400, Alexander Shiyan wrote:
-> Use clock defines in order to make devicetrees more human readable.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Simply document new compat strings.
+There appears to be no need for a driver updates.
 
-Applied all 4, thanks.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+--
+v2
+* Added r8a73a4, r8a7740 and sh73a0 support
+---
+ Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+index 64fd7de..b355660 100644
+--- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
++++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+@@ -4,6 +4,13 @@ Required properties:
+ 
+   - compatible: Must contain one of the following:
+ 
++    - "renesas,scifa-sh73a0" for SH73A0 (SH-Mobile AG5) SCIFA compatible UART.
++    - "renesas,scifb-sh73a0" for SH73A0 (SH-Mobile AG5) SCIFB compatible UART.
++    - "renesas,scifa-r8a73a4" for R8A73A4 (R-Mobile APE6) SCIFA compatible UART.
++    - "renesas,scifb-r8a73a4" for R8A73A4 (R-Mobile APE6) SCIFB compatible UART.
++    - "renesas,scifa-r8a7740" for R8A7740 (R-Mobile A1) SCIFA compatible UART.
++    - "renesas,scifb-r8a7740" for R8A7740 (R-Mobile A1) SCIFB compatible UART.
++    - "renesas,scif-r8a7778" for R8A7778 (R-Car M1) SCIF compatible UART.
+     - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
+     - "renesas,scif-r8a7790" for R8A7790 (R-Car H2) SCIF compatible UART.
+     - "renesas,scifa-r8a7790" for R8A7790 (R-Car H2) SCIFA compatible UART.
+-- 
+2.0.0.rc2
