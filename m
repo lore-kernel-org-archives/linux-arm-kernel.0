@@ -1,60 +1,43 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Jul 2014 01:10:11 -0700
-Subject: [GIT PULL] omap fixes against v3.16-rc1
-In-Reply-To: <CAOesGMjT+Sk+EbV40GCtM5GryqbJ7mTYVZRVLc1iCksGYG=kSQ@mail.gmail.com>
-References: <20140617145854.GT17845@atomide.com>
- <20140630070857.GK28884@atomide.com>
- <20140705044703.GA5201@quad.lixom.net>
- <CAOesGMh5faPEA167hqDff=NU0Tk79wt6fhxZgiP5Q4xgsvO6oA@mail.gmail.com>
- <CAOesGMjT+Sk+EbV40GCtM5GryqbJ7mTYVZRVLc1iCksGYG=kSQ@mail.gmail.com>
-Message-ID: <20140707081011.GG28884@atomide.com>
+Date: Mon, 7 Jul 2014 01:14:56 -0700
+Subject: [PATCH] mach-omap1: Fix call to omap_cfg_reg
+In-Reply-To: <1404493320-5606-1-git-send-email-xerofoify@gmail.com>
+References: <1404493320-5606-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20140707081456.GH28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [140705 12:46]:
-> On Fri, Jul 4, 2014 at 11:06 PM, Olof Johansson <olof@lixom.net> wrote:
-> > Hi,
-> >
-> > On Fri, Jul 4, 2014 at 9:47 PM, Olof Johansson <olof@lixom.net> wrote:
-> >> On Mon, Jun 30, 2014 at 12:08:57AM -0700, Tony Lindgren wrote:
-> >>> * Tony Lindgren <tony@atomide.com> [140617 08:01]:
-> >>> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-> >>> >
-> >>> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-> >>> >
-> >>> > are available in the git repository at:
-> >>> >
-> >>> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-against-rc1
-> >>> >
-> >>> > for you to fetch changes up to edc56f871eefbc56baf1fd981eeff35ef447925c:
-> >>> >
-> >>> >   ARM: dts: dra7-evm: remove interrupt binding (2014-06-17 01:22:55 -0700)
-> >>
-> >> Merged. Apologies for the delay, I was planning on handling this earleir this
-> >> week. I'll send this up tonight or tomorrow.
-> >
-> > Hmm. for-next with this merged in stopped omap5uevm from booting
-> > (Can't find mmcblk1 which I keep the rootfs on), see
-> > http://arm-soc.lixom.net/bootlogs/arm-soc/v3.16-rc1-76-gf5ee1b1/. One
-> > of the three configs had a DHCP timeout, I'm going to rebuild the
-> > network here to reduce the frequency of those.
-> >
-> > I'll try bisecting tomorrow. Not sending it up with this known
-> > breakage, hopefully it's something simple.
-> 
-> Hmm, this fixes branch + current mainline (or -rc3) seems fine, while
-> the -rc1 base we used to have does not. In other words, it seems OK to
-> send up for merge.
-> 
-> Note that the OMAP branch by itself doesn't boot on this machine, so
-> bisectability is lost for a bit. Not quite as worried about it since
-> it's not in the merge window, so we should be OK.
+* Nicholas Krause <xerofoify@gmail.com> [140704 10:03]:
+> This patch fixes the call to ompa_cfg_reg(USB2_SPEED) in the case
+> that the cpu is a omap16xx and the nwires are not equal to 3.
 
-Sorry just saw these messages. The MMC regulator issue was a known
-problem with v3.16-rc1 unrelated to arm-soc tree that got fixed
-already in the mainline kernel but was not yet merged to the mainline
-kernel few weeks ago when I made this branch.
+This is most likely unsafe to do as the pin is probably
+shared with some other device and we have to rely for
+the bootloader to do the right thing for the board.
 
 Regards,
 
 Tony
+ 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-omap1/usb.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+> index 4118db5..17e3139 100644
+> --- a/arch/arm/mach-omap1/usb.c
+> +++ b/arch/arm/mach-omap1/usb.c
+> @@ -504,8 +504,7 @@ static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+>  		omap_cfg_reg(W9_USB2_TXEN);
+>  		omap_cfg_reg(W5_USB2_SE0);
+>  		if (nwires != 3)
+> -			omap_cfg_reg(Y5_USB2_RCV);
+> -		// FIXME omap_cfg_reg(USB2_SPEED);
+> +			omap_cfg_reg(USB2_SPEED)
+>  	} else {
+>  		pr_debug("usb%d cpu unrecognized\n", 1);
+>  		return 0;
+> -- 
+> 1.9.1
+> 
