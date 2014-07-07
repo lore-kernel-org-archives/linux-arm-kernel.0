@@ -1,90 +1,88 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 7 Jul 2014 15:40:27 +0200
-Subject: [PATCH 2/3] ARM: perf: disable the pagefault handler when reading
- from user space
-In-Reply-To: <20140703175231.GF17372@arm.com>
+Date: Mon, 7 Jul 2014 15:42:08 +0200
+Subject: [PATCH 3/3] ARM: perf: allow tracing with kernel tracepoints
+ events
+In-Reply-To: <20140703175412.GH17372@arm.com>
 References: <1403881067-22690-1-git-send-email-jean.pihet@linaro.org>
- <1403881067-22690-3-git-send-email-jean.pihet@linaro.org>
- <20140703175231.GF17372@arm.com>
-Message-ID: <CAFrcx1=NWiJ4+qe-cp2t+Cx7Q7dexjbzu-q9fE+HVR2JTOn-SQ@mail.gmail.com>
+ <1403881067-22690-4-git-send-email-jean.pihet@linaro.org>
+ <20140703175412.GH17372@arm.com>
+Message-ID: <CAFrcx1koWdZ=jExBkOYmgowa04HrXy21nwsrO_EXe7gEyb2Lhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Will,
 
-On 3 July 2014 19:52, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Jean,
->
-> On Fri, Jun 27, 2014 at 03:57:46PM +0100, Jean Pihet wrote:
->> As done on other architectures (ARM64, x86, Sparc etc.).
+On 3 July 2014 19:54, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jun 27, 2014 at 03:57:47PM +0100, Jean Pihet wrote:
+>> When tracing with tracepoints events the IP and CPSR are set to 0,
+>> preventing the perf code to resolve the symbols:
 >>
->> This prevents a deadlock on down_read in do_page_fault when unwinding
->> using fp and triggering on kernel tracepoints:
+>> ./perf record -e kmem:kmalloc cal
+>> [ perf record: Woken up 1 times to write data ]
+>> [ perf record: Captured and wrote 0.007 MB perf.data (~321 samples) ]
+>>
+>> ./perf report
+>> Overhead Command Shared Object Symbol
+>> ........ ....... ............. ...........
+>> 40.78%   cal     [unknown]     [.]00000000
+>> 31.6%    cal     [unknown]     [.]00000000
+>>
+>> The examination of the gathered samples (perf report -D) shows the IP
+>> is set to 0 and that the samples are considered as user space samples,
+>> while the IP should be set from the registers and the samples should be
+>> considered as kernel samples.
+>>
+>> The fix is to implement perf_arch_fetch_caller_regs for ARM, which
+>> fills the necessary registers used for the callchain unwinding and
+>> to determine the user/kernel space property of the samples: ip, sp, fp
+>> and cpsr.
+>>
+>> Tested with perf record and tracepoints triggering (-e <tracepoint>), with
+>> unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
+>>
+>> Reported by Sneha Priya on linaro-dev, cf.
+>> http://lists.linaro.org/pipermail/linaro-dev/2014-May/017151.html
+>>
+>> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Reported-by: Sneha Priya <sneha.cse@hotmail.com>
+>> ---
+>>  arch/arm/include/asm/perf_event.h | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+>> index 7558775..b02b5d3 100644
+>> --- a/arch/arm/include/asm/perf_event.h
+>> +++ b/arch/arm/include/asm/perf_event.h
+>> @@ -26,6 +26,25 @@ struct pt_regs;
+>>  extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
+>>  extern unsigned long perf_misc_flags(struct pt_regs *regs);
+>>  #define perf_misc_flags(regs)        perf_misc_flags(regs)
+>> +
+>> +/*
+>> + * Take a snapshot of the regs.
+>> + * We only need a few of the regs:
+>> + * - ip for PERF_SAMPLE_IP,
+>> + * - sp & fp for fp & dwarf based callchain unwinding,
+>> + * - cpsr for user_mode() tests.
+>> + */
+>> +#define perf_arch_fetch_caller_regs(regs, __ip) {    \
+>> +     instruction_pointer(regs)= (__ip);              \
+>> +     __asm__ (                                       \
+>> +             "str    sp, %[_ARM_sp]          \n\t"   \
+>> +             "str    fp, %[_ARM_fp]          \n\t"   \
+>> +             "mrs    %[_ARM_cpsr], cpsr      \n\t"   \
+>> +             : [_ARM_sp]   "=m" (regs->ARM_sp),      \
+>> +               [_ARM_fp]   "=m" (regs->ARM_fp),      \
+>> +               [_ARM_cpsr] "=r" (regs->ARM_cpsr)     \
+>> +     );                                              \
+>> +}
 >
-> So is this an issue because you could try setting tracepoints on the
-> pagefault path? If so, the patch is a little brutal as it would break user
-> backtracing as soon as we take any old page fault, no?
->
-> Or am I missing something obvious?
-The problem is a deadlock between the perf events interrupt and
-copy_from_user, which take the same lock.
-The commit description has been updated to give all the details about it.
-
-Big thanks to Steve on the debugging!
-
-A new patch set is on its way.
+> You don't appear to have addressed my comments from last time. What changed?
+A new patch set it on its way, with the commit description and the
+comments in the code updated.
 
 Jean
 
 >
 > Will
->
->>   INFO: task stress:2116 blocked for more than 120 seconds.
->>         Not tainted 3.15.0-rc4-00364-g3401dfb-dirty #43
->>   "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
->>   stress          D c04b41e8     0  2116   2115 0x00000000
->>   [<c04b41e8>] (__schedule) from [<c04b46dc>] (schedule+0x40/0x90)
->>   [<c04b46dc>] (schedule) from [<c04b6ec8>] (__down_read+0xc4/0xfc)
->>   [<c04b6ec8>] (__down_read) from [<c04b69c0>] (down_read+0x18/0x1c)
->>   [<c04b69c0>] (down_read) from [<c001d41c>] (do_page_fault+0xac/0x420)
->>   [<c001d41c>] (do_page_fault) from [<c0008444>] (do_DataAbort+0x44/0xa8)
->>   [<c0008444>] (do_DataAbort) from [<c00136b8>] (__dabt_svc+0x38/0x60)
->>   Exception stack(0xecbc3af8 to 0xecbc3b40)
->>   3ae0:                                                       ecbc3b74 b6d72ff4
->>   3b00: ffffffec 00000000 b6d72ff4 ec0fc000 00000000 ec0fc000 0000007e 00000000
->>   3b20: ecbc2000 ecbc3bac 00000014 ecbc3b44 c0019e78 c021ef44 00000013 ffffffff
->>   [<c00136b8>] (__dabt_svc) from [<c021ef44>] (__copy_from_user+0xa4/0x3a0)
->>
->> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>  arch/arm/kernel/perf_event.c | 9 +++++++--
->>  1 file changed, 7 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 6493c4c..f5aeca2 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -560,11 +560,16 @@ user_backtrace(struct frame_tail __user *tail,
->>              struct perf_callchain_entry *entry)
->>  {
->>       struct frame_tail buftail;
->> +     unsigned long err;
->>
->> -     /* Also check accessibility of one struct frame_tail beyond */
->>       if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
->>               return NULL;
->> -     if (__copy_from_user_inatomic(&buftail, tail, sizeof(buftail)))
->> +
->> +     pagefault_disable();
->> +     err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
->> +     pagefault_enable();
->> +
->> +     if (err)
->>               return NULL;
->>
->>       perf_callchain_store(entry, buftail.lr);
->> --
->> 1.8.1.2
->>
->>
