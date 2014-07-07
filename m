@@ -1,46 +1,32 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:44 +0200
-Subject: [PATCHv2 27/32] ARM: at91: prepare common clk transition for sam9263
+Date: Mon,  7 Jul 2014 22:23:46 +0200
+Subject: [PATCHv2 29/32] ARM: at91: move at91sam9263 SoC to the CCF
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-28-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-30-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enclose the sam9263 old clk registration in "#if defined(CONFIG_OLD_CLK_AT91)
- #endif"
+This patch removes the selection of AT91_USE_OLD_CLK when selecting
+at91sam9263 SoC support. This will automatically enable COMMON_CLK_AT91
+option and add support for at91 common clock implementation.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9263.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f30290572293..c07465361947 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -25,10 +25,11 @@
- #include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
--#include "clock.h"
- #include "sam9_smc.h"
- #include "pm.h"
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 461966d0ee4d..6cc6f7aebdae 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -138,7 +138,6 @@ config SOC_AT91SAM9263
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
+-	select AT91_USE_OLD_CLK
+ 	select HAVE_AT91_USB_CLK
  
-+#if defined(CONFIG_OLD_CLK_AT91)
-+#include "clock.h"
- /* --------------------------------------------------------------------
-  *  Clocks
-  * -------------------------------------------------------------------- */
-@@ -280,6 +281,9 @@ static void __init at91sam9263_register_clocks(void)
- 	clk_register(&pck2);
- 	clk_register(&pck3);
- }
-+#else
-+#define at91sam9263_register_clocks NULL
-+#endif
- 
- /* --------------------------------------------------------------------
-  *  GPIO
+ config SOC_AT91SAM9RL
 -- 
 1.9.1
