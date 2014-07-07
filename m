@@ -1,38 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 17:19:15 +0200
-Subject: [PATCH 5/5] clk: at91: remove the useless CLK_IGNORE_UNUSED flag
-In-Reply-To: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404746355-19988-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon,  7 Jul 2014 17:13:04 +0200
+Subject: [PATCH v10 3/7] dt-bindings: add mtk-timer bindings
+In-Reply-To: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
+References: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1404745988-32558-4-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_IGNORE_UNUSED flag was added on all the system clocks because of the
-ddrck. Now that it is handled by the ram controller driver, we can drop it.
+Add binding documentation for the General Porpose Timer driver of
+the Mediatek SoCs.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/at91/clk-system.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ .../bindings/timer/mediatek,mtk-timer.txt          |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
 
-diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-index 8c96307d7363..a76d03fd577b 100644
---- a/drivers/clk/at91/clk-system.c
-+++ b/drivers/clk/at91/clk-system.c
-@@ -119,13 +119,7 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
- 	init.ops = &system_ops;
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
--	/*
--	 * CLK_IGNORE_UNUSED is used to avoid ddrck switch off.
--	 * TODO : we should implement a driver supporting at91 ddr controller
--	 * (see drivers/memory) which would request and enable the ddrck clock.
--	 * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
--	 */
--	init.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED;
-+	init.flags = CLK_SET_RATE_PARENT;
- 
- 	sys->id = id;
- 	sys->hw.init = &init;
+diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+new file mode 100644
+index 0000000..7c4408f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+@@ -0,0 +1,17 @@
++Mediatek MT6577, MT6572 and MT6589 Timers
++---------------------------------------
++
++Required properties:
++- compatible: Should be "mediatek,mt6577-timer"
++- reg: Should contain location and length for timers register.
++- clocks: Clocks driving the timer hardware. This list should include two
++	clocks. The order is system clock and as second clock the RTC clock.
++
++Examples:
++
++	timer at 10008000 {
++		compatible = "mediatek,mt6577-timer";
++		reg = <0x10008000 0x80>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&system_clk>, <&rtc_clk>;
++	};
 -- 
-1.9.1
+1.7.9.5
