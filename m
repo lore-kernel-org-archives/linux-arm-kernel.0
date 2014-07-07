@@ -1,41 +1,37 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 07 Jul 2014 18:19:35 +0900
-Subject: [PATCHv2 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
- to host's quirk
-In-Reply-To: <1404128960-27225-6-git-send-email-jh80.chung@samsung.com>
-References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
- <1404128960-27225-6-git-send-email-jh80.chung@samsung.com>
-Message-ID: <000d01cf99c4$920eb1b0$b62c1510$%jun@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 7 Jul 2014 11:21:42 +0200
+Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
+In-Reply-To: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+References: <E1X20Rs-00082S-KI@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140707092142.GC3118@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for late review.
-If you're in progress for next, please consider it.
+On Tue, Jul 01, 2014 at 04:58:24PM +0100, Russell King wrote:
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
+> 
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
+> 
+> Rather than doing this piecemeal, and miss some instances, change all
+> the "mov pc" instances to use the new macro, with the exception of
+> the "movs" instruction and the kprobes code.  This allows us to detect
+> the "mov pc, lr" case and fix it up - and also gives us the possibility
+> of deploying this for other registers depending on the CPU selection.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-On Mon, June 30, 2014, Jaehoon Chung wrote:
-> Replaced the "disable-wp" into host's quirks.
-> (Because the slot-node is removed at dt-file.)
-> 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c |   13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 1ac227c..6c5d696 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -994,10 +994,11 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
->  {
->  	int read_only;
->  	struct dw_mci_slot *slot = mmc_priv(mmc);
-> +	struct dw_mci_board *brd = slot->host->pdata;
->  	int gpio_ro = mmc_gpio_get_ro(mmc);
-> 
->  	/* Use platform get_ro function, else try on board write protect */
-> -	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
-It would be better to use host->quirks instead of brd->quirks
-It's finally updated with host->pdata->quirks on probing.
+A conflict in next notification from Stephen Rothwell tells me that this
+has made it there but regardless I would like to note that I have
+successfully tested this on the following shmobile boards:
+Genmai, Koelsh, Lager, Marzen, Bockw, APE6EVM, KZM9D, KZM9G,
+Armadillo800 EVA and Mackerel. This covers all but one board (I do not
+have access to a Henninger) and all SoCs supported in mainline.
 
-Thanks,
-Seungwon Jeon
+Accordingly, the shmobile portion:
+
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
