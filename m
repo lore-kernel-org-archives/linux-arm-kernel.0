@@ -1,33 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 08:50:09 +0200
-Subject: [PATCH 2/2] ARM: shmobile: kzm9g-reference: Remove early_printk from
- command line
-In-Reply-To: <1404715809-31331-1-git-send-email-horms+renesas@verge.net.au>
-References: <1404715809-31331-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404715809-31331-3-git-send-email-horms+renesas@verge.net.au>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Jul 2014 08:51:41 +0200
+Subject: [PATCH 3/3] ARM: only select ARM_PATCH_PHYS_VIRT if MMU is enabled
+In-Reply-To: <20140702103512.GG32514@n2100.arm.linux.org.uk>
+References: <1404295043-6661-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1404295043-6661-3-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140702103512.GG32514@n2100.arm.linux.org.uk>
+Message-ID: <20140707065141.GC7827@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As early printk is not supported when devices are initialised
-using DT, so remove it from the command line.
+Hello,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+(adding Yann and linux-kbuild to recipents)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index a99171c..838f93e4 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -35,7 +35,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200 rw";
-+		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel rw";
- 	};
- 
- 	memory {
+On Wed, Jul 02, 2014 at 11:35:12AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 02, 2014 at 11:57:23AM +0200, Uwe Kleine-K?nig wrote:
+> > This fixes the following warning:
+> > 
+> > 	warning: (ARCH_MULTIPLATFORM && ARCH_INTEGRATOR && ARCH_SHMOBILE_LEGACY) selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU && (!ARCH_REALVIEW || !SPARSEMEM))
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > I'm not sure why ARCH_MULTIPLATFORM appears here. It depends on MMU,
+> > isn't selectable at the same time as ARCH_REALVIEW and XIP_KERNEL
+> > depends on !ARCH_MULTIPLATFORM.
+> 
+> The message is extremely confusing.  It would read better if those
+> && were || - because ARM_PATCH_PHYS_VIRT is selected by
+> ARCH_MULTIPLATFORM _or_ ARCH_INTEGRATOR _or_ ARCH_SHMOBILE_LEGACY:
+right, so there are two things that could be improved here. The
+resolution I'd prefer is to make this two warnings:
+
+   ARCH_INTEGRATOR selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU)
+   ARCH_SHMOBILE_LEGACY selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU)
+
+ARCH_REALVIEW cannot be selected at the same time as ARCH_INTEGRATOR or
+ARCH_SHMOBILE_LEGACY, so that can be dropped. And as stated above
+ARCH_MULTIPLATFORM isn't an issue.
+
+This doesn't have the natural language problem that ARCH_MULTIPLATFORM
+*and* ARCH_INTEGRATOR *and* ARCH_SHMOBILE_LEGACY all select
+ARM_PATCH_PHYS_VIRT.
+
+> config ARCH_MULTIPLATFORM
+>         select ARM_PATCH_PHYS_VIRT
+> 
+> config ARCH_INTEGRATOR
+>         select ARM_PATCH_PHYS_VIRT
+> 
+> config ARCH_SHMOBILE_LEGACY
+>         select ARM_PATCH_PHYS_VIRT
+> 
+(For reference, the patch did:
+
+	-       select ARM_PATCH_PHYS_VIRT
+	+       select ARM_PATCH_PHYS_VIRT if MMU
+
+for ARCH_INTEGRATOR and ARCH_SHMOBILE_LEGACY)
+
+Best regards
+Uwe
+
 -- 
-2.0.0.rc2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
