@@ -1,109 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Jul 2014 12:00:55 +0100
-Subject: [PATCH v2 2/3] ARM: dts: sti: Add st-dwc3 devicetree bindings
- documentation
-In-Reply-To: <1404541530-27856-3-git-send-email-peter.griffin@linaro.org>
-References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
- <1404541530-27856-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140707110055.GF6407@lee--X1>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 7 Jul 2014 16:31:34 +0530
+Subject: RFC: Leave sysfs nodes alone during hotplug
+In-Reply-To: <53B5D22F.2070308@codeaurora.org>
+References: <53B5D22F.2070308@codeaurora.org>
+Message-ID: <CAKohpomuPshe4HpvWSzmZ3vvAjV-zHucfHBVbhB6dUBrrYH8pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject is wrong, this has nothing to do with ARM.  Should be USB.
+Cc'ing Srivatsa and fixing Rafael's id.
 
-On Sat, 05 Jul 2014, Peter Griffin wrote:
-> This patch documents the device tree documentation required for
-> the ST usb3 controller glue layer found in STiH407 devices.
-> 
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  Documentation/devicetree/bindings/usb/dwc3-st.txt | 58 +++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/dwc3-st.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/dwc3-st.txt b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> new file mode 100644
-> index 0000000..befd964
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-> @@ -0,0 +1,58 @@
-> +ST DWC3 glue logic
-> +
-> +This file documents the parameters for the dwc3-st driver.
+On 4 July 2014 03:29, Saravana Kannan <skannan@codeaurora.org> wrote:
+> The adding and removing of sysfs nodes in cpufreq causes a ton of pain.
+> There's always some stability or deadlock issue every few weeks on our
+> internal tree. We sync up our internal tree fairly often with the upstream
+> cpufreq code. And more of these issues are popping up as we start exercising
+> the cpufreq framework for b.L systems or HMP systems.
+>
+> It looks like we adding a lot of unnecessary complexity by adding and
+> removing these sysfs nodes. The other per CPU sysfs nodes like:
+> /sys/devices/system/cpu/cpu1/power or cpuidle are left alone during hotplug.
+> So, why are we not doing the same for cpufreq too?
 
-Does this line really add anything to do the document, considering the
-name and location of the file and the title above?
+This is how it had been since ever, don't know which method is correct.
+Though these are the requirements I have from them:
+- On hotplug files values should get reset ..
+- On suspend/resume values must be retained.
 
-> +This driver provides the glue logic to use the dwc3 on STiH407 based platforms.
+> Any objections to leaving them alone during hotplug? If those files are
+> read/written to when the entire cluster is hotplugged off, we could just
+> return an error. I'm not saying it would be impossible to fix all these
+> deadlock and race issues in the current code -- but it seems like a lot of
+> pointless effort to remove/add sysfs nodes.
 
-s/This driver/The DWC2 driver/
+Lets understand the problem first and then can take the right decision.
 
-> +Required properties:
-> + - compatible	: must be "st,stih407-dwc3"
-> + - reg		: glue logic base address and USB syscfg ctrl register offset
-> + - reg-names	: should be "reg-glue" and "syscfg-reg"
+> Examples of issues caused by this:
+> 1. Race when changing governor really quickly from userspace. The governors
+> end up getting 2 STOP or 2 START events. This was introduced by [1] when it
+> tried to fix another deadlock issue.
 
-Any reason why you have reg-* and *-reg?  If  you have to put 'reg' in
-the name, it's usually appended, rather than prefixed.
+I was talking about [1] offline with Srivatsa, and one of us might look in
+detail why [1] was actually required.
 
-> + - st,syscon	: should be phandle to system configuration node which
-> +		  encompasses the glue registers
-> + - resets	: phandle pointing to the system powerdown controller
-> +See: Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
-> +See: Documentation/devicetree/bindings/reset/reset.txt
-> +
-> + - #address-cells, #size-cells : should be '1' if the device has sub-nodes
-> +                                 with 'reg' property
-> +
-> + - pinctl-names	: A pinctrl state named "default" must be defined
-> +See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
-> +
-> + - pinctrl-0	: Pin control group
-> +See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
-> +
-> + - ranges	: allows valid 1:1 translation between child's address space and
-> +		  parent's address space
-> +
-> +Optional properties:
-> + - st,dwc3-drd-device: to program the HC as "device" (static setup)
+But I don't know how exactly can we get 2 STOP/START in latest mainline
+code. As we have enough protection against that now.
 
-This will require a DT Ack.
+So, we would really like to see some reports against mainline for this.
 
-> +Sub-nodes:
-> +The dwc3 core should be added as subnode to ST DWC3 glue as shown in the
-> +example below. The DT binding details of dwc3 can be found in:
-> +Documentation/devicetree/bindings/usb/dwc3.txt
-> +
-> +Example:
-> +
-> +st_dwc3: dwc3 at 8f94000 {
-> +	status		= "disabled";
+> 2. Incorrect policy/sysfs handling during suspend/resume. Suspend takes out
+> CPU in the order n, n+1, n+2, etc and resume adds them back in the same
+> order. Both sysfs and policy ownership transfer aren't handled correctly in
+> this case.
 
-Probably not good to disable the node in the example.
+I know few of these, but can you please tell what you have in mind?
 
-> +	compatible	= "st,stih407-dwc3";
-> +	reg		= <0x08f94000 0x1000>, <0x110 0x4>;
-> +	reg-names	= "reg-glue", "syscfg-reg";
-> +	st,syscfg	= <&syscfg_core>;
-> +	resets          = <&powerdown STIH407_USB3_POWERDOWN>;
-> +	#address-cells	= <1>;
-> +	#size-cells	= <1>;
-> +	pinctrl-names	= "default";
-> +	pinctrl-0	= <&pinctrl_usb3>;
-> +	ranges;
-> +
-> +	dwc3: dwc3 at 9900000 {
-> +		compatible	= "synopsys,dwc3";
-> +		reg		= <0x09900000 0x100000>;
-> +		interrupts	=  <GIC_SPI 155 IRQ_TYPE_NONE>;
-> +
-> +		usb-phy = <&usb2_phy>, <&usb3_phy>;
-> +	};
-> +};
+> This obviously applies even outside suspend/resume if the same
+> sequence is repeated using just hotplug.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Again, what's the issue?
+
+> I'd be willing to take a shot at this if there isn't any objection to this.
+> It's a lot of work/refactor -- so I don't want to spend a lot of time on it
+> if there's a strong case for removing these sysfs nodes.
+
+Sure, I fully understand this but still wanna understand the issue first.
+
+> P.S: I always find myself sending emails to the lists close to one holiday
+> or another. Sigh.
+
+Sorry for being late to reply to this. I saw it on friday, but couldn't reply
+whole day. Was following something with ticks core. :(
+
+> [1] -
+> https://kernel.googlesource.com/pub/scm/linux/kernel/git/rafael/linux-pm/+/955ef4833574636819cd269cfbae12f79cbde63a%5E!/
