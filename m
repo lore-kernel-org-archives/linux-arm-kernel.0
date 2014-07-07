@@ -1,50 +1,46 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon,  7 Jul 2014 17:13:08 +0200
-Subject: [PATCH v10 7/7] arm: mediatek: add dts for Aquaris5 mobile phone
-In-Reply-To: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
-References: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1404745988-32558-8-git-send-email-matthias.bgg@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon,  7 Jul 2014 17:19:14 +0200
+Subject: [PATCH 4/5] ARM: at91/dt: at91sam9: use ddrck in ramc
+In-Reply-To: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404746355-19988-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aquaris5 is a mobile phone based on the MT6589 SoC.
+Make the ram controller driver take the ddrck clock for at91sam9n12 and
+at91sam9x5. For at91sam9g45, use mck instead.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/mt6589-aquaris5.dts |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
+ arch/arm/boot/dts/at91sam9n12.dtsi | 2 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-new file mode 100644
-index 0000000..443b446
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (c) 2014 MundoReader S.L.
-+ * Author: Matthias Brugger <matthias.bgg@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "mt6589.dtsi"
-+
-+/ {
-+	model = "bq Aquaris5";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 287795985e32..3d48255c4ed1 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -85,6 +85,8 @@
+ 			ramc0: ramc at ffffe800 {
+ 				compatible = "atmel,at91sam9g45-ddramc";
+ 				reg = <0xffffe800 0x200>;
++				clocks = <&ddrck>;
++				clock-names = "ddrck";
+ 			};
+ 
+ 			pmc: pmc at fffffc00 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index d6133f497207..74722853e667 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -93,6 +93,8 @@
+ 			ramc0: ramc at ffffe800 {
+ 				compatible = "atmel,at91sam9g45-ddramc";
+ 				reg = <0xffffe800 0x200>;
++				clocks = <&ddrck>;
++				clock-names = "ddrck";
+ 			};
+ 
+ 			pmc: pmc at fffffc00 {
 -- 
-1.7.9.5
+1.9.1
