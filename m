@@ -1,42 +1,60 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Mon, 7 Jul 2014 13:59:12 +0000
-Subject: [PATCH] ARM: shmobile: Enable R-Car Gen 2 PCIe in
- shmobile_defconfig
-In-Reply-To: <53BAA68D.609@cogentembedded.com>
-References: <1404739432-1408-1-git-send-email-horms+renesas@verge.net.au>
- <53BAA68D.609@cogentembedded.com>
-Message-ID: <66f679dbac764c329125a8ea50cd9ebd@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 7 Jul 2014 22:04:18 +0800
+Subject: [PATCH v4 2/2] ARM: i.MX53: globally disable supervisor protect
+In-Reply-To: <1404726087-2069-2-git-send-email-s.trumtrar@pengutronix.de>
+References: <1404726087-2069-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1404726087-2069-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20140707140416.GT30239@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei
+On Mon, Jul 07, 2014 at 11:41:27AM +0200, Steffen Trumtrar wrote:
+> Most peripherals on the i.MX53 have an
+>   Off-Platform Peripheral Access Control Register (OPACR)
+> in which the access rights (together with the MPROT registers) can be declared.
+> However, this does not seem to work for example for SSI1+SDMA, because the
+> supervisor bit is not set for the SDMA unit.
+> It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
+> works because it does NOT have an OPACR.
+> 
+> The right solution would be to fix the access rights for the SDMA, but the unit
+> responsible for this is the Central Security Unit (CSU), which of course is NOT
+> documented. So, until documentation for this is openly available, turn off the
+> supervisor protection because it cripples the hardware.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/mach-imx53.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> index 2bad387..1fbd77d 100644
+> --- a/arch/arm/mach-imx/mach-imx53.c
+> +++ b/arch/arm/mach-imx/mach-imx53.c
+> @@ -26,9 +26,13 @@
+>  
+>  static void __init imx53_dt_init(void)
+>  {
+> +	const char *aips_compatible = "fsl,imx53-aipstz";
+> +
 
-On 07 July 2014 14:54, Sergei wrote:
-> On 07/07/2014 05:23 PM, Simon Horman wrote:
-> 
-> > The R-Car Gen 2 PCIe driver provides PCIe host support for
-> > Renesas R-Car Gen2 platforms. To increase hardware support enable
-> > the driver in the shmobile_defconfig multiplatform configuration.
-> 
-> > Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >   arch/arm/configs/shmobile_defconfig | 1 +
-> >   1 file changed, 1 insertion(+)
-> 
-> > diff --git a/arch/arm/configs/shmobile_defconfig
-> b/arch/arm/configs/shmobile_defconfig
-> > index 5f05e98..6bc85a5 100644
-> > --- a/arch/arm/configs/shmobile_defconfig
-> > +++ b/arch/arm/configs/shmobile_defconfig
-> > @@ -24,6 +24,7 @@ CONFIG_PL310_ERRATA_588369=y
-> >   CONFIG_ARM_ERRATA_754322=y
-> >   CONFIG_PCI=y
-> >   CONFIG_PCI_RCAR_GEN2=y
-> > +CONFIG_PCI_RCAR_GEN2_PCIE=y
-> 
->     Hmm, I'm not sure why the option has GEN2 -- the driver claims support for
-> R8A7779 as well as R8A779x. Probably the option should be renamed.
-Technically, you are correct. However, whilst the driver does support R8A7779, that device only supports 32-bit accesses over the PCIe bus so it's only useful for custom cards, not off-the-shelf PCIe cards.
+The variable is not really necessary, since we can just do:
 
-Phil
+	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
+
+I'm going to fix it up and apply both patches.  Let me know if you have
+concern with that.
+
+Shawn
+
+>  	mxc_arch_reset_init_dt();
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +
+> +	imx_aips_allow_unprivileged_access(aips_compatible);
+>  }
+>  
+>  static const char *imx53_dt_board_compat[] __initconst = {
+> -- 
+> 2.0.0
+> 
