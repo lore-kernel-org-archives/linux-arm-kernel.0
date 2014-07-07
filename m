@@ -1,66 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 7 Jul 2014 19:39:29 +0530
-Subject: [RFC PATCH 2/2] phy: core: the node pointer of PHY need not be
- the same as that of PHY provider
-In-Reply-To: <20140707131232.GI6407@lee--X1>
-References: <1404486474-28312-1-git-send-email-kishon@ti.com>
- <1404486474-28312-3-git-send-email-kishon@ti.com>
- <20140707131232.GI6407@lee--X1>
-Message-ID: <53BAAA19.9050106@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 7 Jul 2014 10:16:09 -0400 (EDT)
+Subject: [PATCH v2 3/4] USB: EHCI: tegra: Fix probe order issue leading
+ to broken USB
+In-Reply-To: <1404436179-10745-4-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <Pine.LNX.4.44L0.1407071015470.871-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 4 Jul 2014, Tuomas Tynkkynen wrote:
 
-On Monday 07 July 2014 06:42 PM, Lee Jones wrote:
-> On Fri, 04 Jul 2014, Kishon Vijay Abraham I wrote:
+> The Tegra USB complex has a particularly annoying misdesign: some of the
+> UTMI pad configuration registers are global for all the 3 USB controllers
+> on the chip, but those registers are located in the first controller's
+> register space and will be cleared when the reset to the first
+> controller is asserted. Currently, this means that if the 1st controller
+> were to finish probing after the 2nd or 3rd controller, USB would not
+> work at all.
 > 
->> In case of multi-phy PHY providers, each PHY should be modeled as a sub
->> node of the PHY provider. Then each PHY will have a different node pointer
->> (node pointer of sub node) than that of PHY provider. Added this provision
->> in the PHY core.
->> Also fixed all drivers to use the updated API.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/phy.txt               |   10 ++++++----
->>  drivers/phy/phy-bcm-kona-usb2.c     |    2 +-
->>  drivers/phy/phy-core.c              |   25 ++++++++++++++++++-------
->>  drivers/phy/phy-exynos-dp-video.c   |    2 +-
->>  drivers/phy/phy-exynos-mipi-video.c |    2 +-
->>  drivers/phy/phy-exynos5-usbdrd.c    |    3 ++-
->>  drivers/phy/phy-exynos5250-sata.c   |    2 +-
->>  drivers/phy/phy-mvebu-sata.c        |    2 +-
->>  drivers/phy/phy-omap-usb2.c         |    2 +-
->>  drivers/phy/phy-samsung-usb2.c      |    3 ++-
->>  drivers/phy/phy-sun4i-usb.c         |    2 +-
->>  drivers/phy/phy-ti-pipe3.c          |    2 +-
->>  drivers/phy/phy-twl4030-usb.c       |    2 +-
->>  drivers/phy/phy-xgene.c             |    2 +-
->>  include/linux/phy/phy.h             |   15 ++++++++++-----
->>  15 files changed, 48 insertions(+), 28 deletions(-)
+> Fix this situation by always resetting the 1st controller before doing
+> any other setup to any of the controllers, and then never ever reset the
+> first controller again. As the UTMI registers are related to the PHY,
+> the PHY driver should probably reset the Tegra controllers instead,
+> but since old device trees only have reset phandles in the EHCI nodes,
+> do it here, which means a bit of device tree groveling. Those old DTs
+> also won't get the reset fix from this commit, so we'll dev_warn() them,
+> but the driver will still keep probing successfully.
 > 
-> I wrote a very similar patch already.  I knew I should have sent it on
-> Friday. :(
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> ---
+> v2 changes: assume we can find the usb1 reset from the PHY DT node,
+>             don't fail if it's not found but just issue a warning
+>  drivers/usb/host/ehci-tegra.c |   62 +++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 59 insertions(+), 3 deletions(-)
 
-No problem! you can send your patch along with the MiPHY series.
-
-Cheers
-Kishon
-> 
-> Patch looks good, just a real minor point.
-> 
->>  	phy->dev.class = phy_class;
->>  	phy->dev.parent = dev;
->> -	phy->dev.of_node = dev->of_node;
->> +	phy->dev.of_node = node?node:dev->of_node;
-> 
-> There should be spaces either side of the '?' and ':', or you can do
-> this more succinctly by:
-> 
-> phy->dev.of_node = node ?: dev->of_node;
-> 
-> Once fixed, feel free to add my:
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
