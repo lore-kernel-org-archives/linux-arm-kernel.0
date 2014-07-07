@@ -1,50 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 7 Jul 2014 23:12:39 +0200
-Subject: [PATCH v3] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
-References: <1401643329-6460-1-git-send-email-anarsoul@gmail.com>
- <CA+E=qVf2QWk+HxPTjwFK8BkD3C+EGbvLDMM4ro1_nYEThe=LtQ@mail.gmail.com>
- <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
-Message-ID: <201407072312.40687.arnd@arndb.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 7 Jul 2014 14:14:54 -0700
+Subject: [PATCH v2 1/7] kernel: Add support for restart notifier call chain
+In-Reply-To: <1404689900-27421-2-git-send-email-linux@roeck-us.net>
+References: <1404689900-27421-1-git-send-email-linux@roeck-us.net>
+ <1404689900-27421-2-git-send-email-linux@roeck-us.net>
+Message-ID: <20140707141454.3ca1e2fc2e6a4c985d7d2f35@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 July 2014, Vasily Khoruzhick wrote:
-> On Mon, Jun 30, 2014 at 10:03 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> > On Mon, Jun 23, 2014 at 2:31 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> >>
-> >> On 1 June 2014 20:22:09 Vasily Khoruzhick wrote:
-> >> > Utilise new s3c24xx-dma dmaengine driver for DMA ops.
-> >> >
-> >> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> >> > ---
-> >> > v2: - Don't store async dma descriptor, it's not used
-> >> >     - Request DMA channel via dma_request_slave_channel_compat() and use
-> >> >       hardcoded DMA channel.
-> >> >     - Add dependency on S3C24XX_DMAC (s3cmci uses filter function from it)
-> >> > v3: - Use 'depends' instead of 'select' in Kconfig
-> >> >     - Drop useless controller registers reads from dma completion callback
-> >>
-> >> Ping?
-> >
-> > Ping?
+On Sun,  6 Jul 2014 16:38:14 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+
+> Various drivers implement architecture and/or device specific means
+> to restart (reset) the system. Various mechanisms have been implemented
+> to support those schemes. The best known mechanism is arm_pm_restart,
+> which is a function pointer to be set either from platform specific code
+> or from drivers. Another mechanism is to use hardware watchdogs to issue
+> a reset; this mechanism is used if there is no other method available
+> to reset a board or system. Two examples are alim7101_wdt, which currently
+> uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
+> the arm_pm_restart function.
 > 
-> Could anyone tell me through which tree this patch should be merged?
-> I'm pretty sure that I've included everyone from get_maintainer.pl
-> output
-> except LKML, but no response from maintainer so far.
+> The existing mechanisms have a number of drawbacks. Typically only one scheme
+> to restart the system is supported (at least if arm_pm_restart is used).
+> At least in theory there can be mutliple means to restart the system, some of
+> which may be less desirable (for example one mechanism may only reset the CPU,
+> while another may reset the entire system). Using arm_pm_restart can also be
+> racy if the function pointer is set from a driver, as the driver may be in
+> the process of being unloaded when arm_pm_restart is called.
+> Using the reboot notifier is always racy, as it is unknown if and when
+> other functions using the reboot notifier have completed execution
+> by the time the watchdog fires.
+> 
+> To solve the problem, introduce a system restart notifier. This notifier
+> is expected to be called from the architecture specific machine_restart()
+> function. Drivers providing system restart functionality (such as the watchdog
+> drivers mentioned above) are expected to register with this notifier.
 
-I think you did everything right, Ulf or Chris should really pick up this
-patch. The one thing you could improve is the changeset text which you
-wrote as "Utilise new s3c24xx-dma dmaengine driver for DMA ops." What we
-really need here is an explanation of why we want this, e.g. what problems
-are solved by it etc. I definitely really want this patch as part of 3.17
-so we can enabled multiplatform for the platforms that use this driver.
+It all looks sane to my unfamiliar eye.
 
-You should also list the
+>  /*
+> + *	Notifier list for kernel code which wants to be called
+> + *	to restart the system.
+> + */
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+hm, is this all we have to say?
 
-line under your "Signed-off-by" line.
+> --- a/kernel/reboot.c
+> +++ b/kernel/reboot.c
+> @@ -104,6 +104,38 @@ int unregister_reboot_notifier(struct notifier_block *nb)
+>  }
+>  EXPORT_SYMBOL(unregister_reboot_notifier);
+>  
+> +/**
+> + *	register_restart_notifier - Register function to be called to reset
+> + *				    the system
+> + *	@nb: Info about notifier function to be called
+> + *
+> + *	Registers a function with the list of functions
+> + *	to be called to restart the system.
+> + *
+> + *	Currently always returns zero, as blocking_notifier_chain_register()
+> + *	always returns zero.
+> + */
 
-	Arnd
+This would be a good place to describe what those notifier callbacks
+actually do.  Why they exist, what their role is, under what
+circumstances they are called, what values they should return, etc.
