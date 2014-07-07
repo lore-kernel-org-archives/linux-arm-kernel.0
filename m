@@ -1,31 +1,46 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 15:23:52 +0200
-Subject: [PATCH] ARM: shmobile: Enable R-Car Gen 2 PCIe in shmobile_defconfig
-Message-ID: <1404739432-1408-1-git-send-email-horms+renesas@verge.net.au>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 7 Jul 2014 14:26:34 +0100
+Subject: [RFC PATCH] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
+References: <1404316809-20637-1-git-send-email-bigeasy@linutronix.de>
+ <20140702160932.GF5541@saruman.home>
+ <20140702190944.GA567@drone.musicnaut.iki.fi>
+ <CAOCHtYgxMeA+Arfe40XeFDEKuCJ8qo1RqNR0hYBGr_Wp6sRfdA@mail.gmail.com>
+ <20140703073411.GX28884@atomide.com>
+ <53B6DB74.2050401@linutronix.de>
+ <CAOCHtYhJODfoB10VXKtGC=_UaB4uVSZOtDwYG-XxL1wvcxi+fA@mail.gmail.com>
+Message-ID: <20140707142634.0f5cb8c3@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R-Car Gen 2 PCIe driver provides PCIe host support for
-Renesas R-Car Gen2 platforms. To increase hardware support enable
-the driver in the shmobile_defconfig multiplatform configuration.
+On Fri, 4 Jul 2014 11:57:40 -0500
+Robert Nelson <robertcnelson@gmail.com> wrote:
 
-Cc: Phil Edworthy <phil.edworthy@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> On Fri, Jul 4, 2014 at 11:51 AM, Sebastian Andrzej Siewior
+> <bigeasy@linutronix.de> wrote:
+> > On 07/03/2014 09:34 AM, Tony Lindgren wrote:
+> >> Heh. Just to summarize the reason ttyO needs to be a separate name
+> >> and device entry from ttyS is because we also have external 8250
+> >> devices on GPMC and hotplug busses.
+> >
+> > So the GPMC devices will first get a higher minor/device number. The
+> > internal serial ports should show up first. I don't see the problem
+> > (yet).
+> >
+> > If you need a separate major number (and name) like we do have it now
+> > (between ttySx and ttyOx) then one of requirements would be to tell
+> > Kconfig that one driver can be active at a time.
+> >
+> > For me the ttyS vs ttyO thing is purely cosmetic. I personally don't
+> > like that it is different on different platforms like ttymxc, ttySC,
+> > ttyTHS, ?
+> 
+> Maybe it's time to migrate them all to one name? (ttyS)  Does the end
+> user really care if they have a soc with an omap/imx serial port
+> driver? Or do they just want to access /dev/ttySx and connect to their
+> device?
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 5f05e98..6bc85a5 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -24,6 +24,7 @@ CONFIG_PL310_ERRATA_588369=y
- CONFIG_ARM_ERRATA_754322=y
- CONFIG_PCI=y
- CONFIG_PCI_RCAR_GEN2=y
-+CONFIG_PCI_RCAR_GEN2_PCIE=y
- CONFIG_SMP=y
- CONFIG_SCHED_MC=y
- CONFIG_HAVE_ARM_ARCH_TIMER=y
--- 
-2.0.0.rc2
+Userspace question. Actual userspace visible device naming policy belongs
+to udev.
+
+Alan
