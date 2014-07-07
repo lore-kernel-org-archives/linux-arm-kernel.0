@@ -1,86 +1,89 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 07 Jul 2014 16:33:02 +0900
-Subject: [PATCHv2 2/5] ARM: dts: exynos: unuse the slot-node and deprecated
- the supports-highspeed for dw-mmc
-In-Reply-To: <000c01cf99b5$34ccc8c0$9e665a40$%jun@samsung.com>
-References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
- <1404128960-27225-3-git-send-email-jh80.chung@samsung.com>
- <000c01cf99b5$34ccc8c0$9e665a40$%jun@samsung.com>
-Message-ID: <53BA4D2E.40600@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 7 Jul 2014 15:33:35 +0800
+Subject: [PATCH v2 7/8] ARM: sun5i: enable DMA on SPI
+In-Reply-To: <1404619518-7592-8-git-send-email-emilio@elopez.com.ar>
+References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
+ <1404619518-7592-8-git-send-email-emilio@elopez.com.ar>
+Message-ID: <CAGb2v66oNJSw9_tMWJ1PYo9Nm2ReN-=ocuahAXyn6KABrwqw3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Seungwon.
+On Sun, Jul 6, 2014 at 12:05 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> All of our SPI controllers support DMA transfers, so let's add the
+> properties here so they can be used when it's best to do so.
+>
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-I will fix it, and add  dt-file related with exynos3250. 
+Numbers are good.
 
-Best Regards,
-Jaehoon Chung
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-On 07/07/2014 04:29 PM, Seungwon Jeon wrote:
-> Hi Jaehoon,
-> 
-> Please check one thing below.
-> 
-> On Mon, June 30, 2014, Jaehoon Chung wrote:
->> dw-mmc controller can support multiple slots.
->> But, there are no use-cases anywhere. So we don't need to support the
->> slot-node for dw-mmc controller.
->> And "supports-highspeed" property in dw-mmc is deprecated.
->> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Reviewed-by: Tushar Behera <trblinux@gmail.com>
->> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
-> 
->> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-
->> octa.dts
->> index 434fd9d..5f37b81 100644
->> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
->> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
->> @@ -50,7 +50,6 @@
->>  	mmc at 12200000 {
->>  		status = "okay";
->>  		broken-cd;
->> -		supports-highspeed;
->>  		card-detect-delay = <200>;
->>  		samsung,dw-mshc-ciu-div = <3>;
->>  		samsung,dw-mshc-sdr-timing = <0 4>;
->> @@ -58,16 +57,12 @@
->>  		pinctrl-names = "default";
->>  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->>  		vmmc-supply = <&ldo10_reg>;
->> -
->> -		slot at 0 {
->> -			reg = <0>;
->> -			bus-width = <8>;
->> -		};
->> +		bus-width = <8>;
->> +		cap-mmc-highspeed;
->>  	};
->>
->>  	mmc at 12220000 {
->>  		status = "okay";
->> -		supports-highspeed;
->>  		card-detect-delay = <200>;
->>  		samsung,dw-mshc-ciu-div = <3>;
->>  		samsung,dw-mshc-sdr-timing = <2 3>;
->> @@ -75,11 +70,8 @@
->>  		pinctrl-names = "default";
->>  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->>  		vmmc-supply = <&ldo10_reg>;
->> -
->> -		slot at 0 {
->> -			reg = <0>;
->> -			bus-width = <4>;
->> -		};
->> +		bus-width = <8>;
-> <4> is correct?
-> 
->> +		cap-mmc-highspeed;
-> 
-> Thanks,
-> Seungwon Jeon
-> 
-> 
+> ---
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 6 ++++++
+>  arch/arm/boot/dts/sun5i-a13.dtsi  | 6 ++++++
+>  2 files changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 3708817..12f26f3 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -314,6 +314,8 @@
+>                         interrupts = <10>;
+>                         clocks = <&ahb_gates 20>, <&spi0_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 27>, <&dma 1 26>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -325,6 +327,8 @@
+>                         interrupts = <11>;
+>                         clocks = <&ahb_gates 21>, <&spi1_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 9>, <&dma 1 8>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -411,6 +415,8 @@
+>                         interrupts = <12>;
+>                         clocks = <&ahb_gates 22>, <&spi2_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 29>, <&dma 1 28>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 1f1adf2..4bbf455 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -312,6 +312,8 @@
+>                         interrupts = <10>;
+>                         clocks = <&ahb_gates 20>, <&spi0_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 27>, <&dma 1 26>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -323,6 +325,8 @@
+>                         interrupts = <11>;
+>                         clocks = <&ahb_gates 21>, <&spi1_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 9>, <&dma 1 8>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -384,6 +388,8 @@
+>                         interrupts = <12>;
+>                         clocks = <&ahb_gates 22>, <&spi2_clk>;
+>                         clock-names = "ahb", "mod";
+> +                       dmas = <&dma 1 29>, <&dma 1 28>;
+> +                       dma-names = "rx", "tx";
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> --
+> 2.0.1
