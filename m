@@ -1,64 +1,74 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon,  7 Jul 2014 18:42:56 +0200
-Subject: [RESEND PATCH v3 03/11] pwm: add support for atmel-hlcdc-pwm device
+Date: Mon,  7 Jul 2014 18:42:54 +0200
+Subject: [RESEND PATCH v3 01/11] mfd: add atmel-hlcdc driver
 In-Reply-To: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1404751384-5077-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1404751384-5077-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
-at91sam9x5 family or sama5d3 family) provide a PWM device.
+The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+family or sama5d3 family) exposes 2 subdevices:
+- a display controller (controlled by a DRM driver)
+- a PWM chip
 
-This driver add support for a PWM chip exposing a single PWM device (which
-will most likely be used to drive a backlight device).
+The MFD device provides a regmap and several clocks (those connected
+to this hardware block) to its subdevices.
+
+This way concurrent accesses to the iomem range are handled by the regmap
+framework, and each subdevice can safely access HLCDC registers.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/Kconfig           |   9 ++
- drivers/pwm/Makefile          |   1 +
- drivers/pwm/pwm-atmel-hlcdc.c | 229 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 239 insertions(+)
- create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
+ drivers/mfd/Kconfig             |  12 ++++
+ drivers/mfd/Makefile            |   1 +
+ drivers/mfd/atmel-hlcdc.c       | 119 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/atmel-hlcdc.h |  78 ++++++++++++++++++++++++++
+ 4 files changed, 210 insertions(+)
+ create mode 100644 drivers/mfd/atmel-hlcdc.c
+ create mode 100644 include/linux/mfd/atmel-hlcdc.h
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 5b34ff2..7186242 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -50,6 +50,15 @@ config PWM_ATMEL
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-atmel.
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index ee8204c..75e674f 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -59,6 +59,18 @@ config MFD_AAT2870_CORE
+ 	  additional drivers must be enabled in order to use the
+ 	  functionality of the device.
  
-+config PWM_ATMEL_HLCDC_PWM
-+	tristate "Atmel HLCDC PWM support"
-+	depends on MFD_ATMEL_HLCDC
++config MFD_ATMEL_HLCDC
++	tristate "Atmel HLCDC (HLCD Controller)"
++	select MFD_CORE
++	select REGMAP_MMIO
++	depends on OF
 +	help
-+	  Generic PWM framework driver for Atmel HLCDC PWM.
++	  Choose this option if you have an ATMEL SoC with an HLCDC (HLCD
++	  Controller) IP (i.e. at91sam9n12, at91sam9x5 family or sama5d3
++	  family).
++	  This MFD device exposes two subdevices: a PWM chip and a Display
++	  Controller.
 +
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-atmel.
-+
- config PWM_ATMEL_TCB
- 	tristate "Atmel TC Block PWM support"
- 	depends on ATMEL_TCLIB && OF
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index e57d2c3..a245519 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -2,6 +2,7 @@ obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
- obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
- obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
-+obj-$(CONFIG_PWM_ATMEL_HLCDC_PWM)	+= pwm-atmel-hlcdc.o
- obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_CLPS711X)	+= pwm-clps711x.o
-diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+ config MFD_BCM590XX
+ 	tristate "Broadcom BCM590xx PMUs"
+ 	select MFD_CORE
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 8afedba..5f25b0d 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -156,6 +156,7 @@ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+ obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+ obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+ obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
++obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
+ obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+ obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+ obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
+diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
 new file mode 100644
-index 0000000..7f25197
+index 0000000..381dd06
 --- /dev/null
-+++ b/drivers/pwm/pwm-atmel-hlcdc.c
-@@ -0,0 +1,229 @@
++++ b/drivers/mfd/atmel-hlcdc.c
+@@ -0,0 +1,119 @@
 +/*
 + * Copyright (C) 2014 Free Electrons
 + * Copyright (C) 2014 Atmel
@@ -80,213 +90,187 @@ index 0000000..7f25197
 +
 +#include <linux/clk.h>
 +#include <linux/mfd/atmel-hlcdc.h>
++#include <linux/mfd/core.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/pwm.h>
 +#include <linux/regmap.h>
 +
-+#define ATMEL_HLCDC_PWMCVAL_MASK	GENMASK(15, 8)
-+#define ATMEL_HLCDC_PWMCVAL(x)		((x << 8) & ATMEL_HLCDC_PWMCVAL_MASK)
-+#define ATMEL_HLCDC_PWMPOL		BIT(4)
-+#define ATMEL_HLCDC_PWMPS_MASK		GENMASK(2, 0)
-+#define ATMEL_HLCDC_PWMPS_MAX		0x6
-+#define ATMEL_HLCDC_PWMPS(x)		((x) & ATMEL_HLCDC_PWMPS_MASK)
++#define ATMEL_HLCDC_REG_MAX		(0x4000 - 0x4)
 +
-+struct atmel_hlcdc_pwm_chip {
-+	struct pwm_chip chip;
-+	struct atmel_hlcdc *hlcdc;
-+	struct clk *cur_clk;
++static const struct mfd_cell atmel_hlcdc_cells[] = {
++	{
++		.name = "atmel-hlcdc-pwm",
++		.of_compatible = "atmel,hlcdc-pwm",
++	},
++	{
++		.name = "atmel-hlcdc-dc",
++		.of_compatible = "atmel,hlcdc-dc",
++	},
 +};
 +
-+static inline struct atmel_hlcdc_pwm_chip *
-+pwm_chip_to_atmel_hlcdc_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct atmel_hlcdc_pwm_chip, chip);
-+}
-+
-+static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
-+				  struct pwm_device *pwm,
-+				  int duty_ns, int period_ns)
-+{
-+	struct atmel_hlcdc_pwm_chip *chip =
-+				pwm_chip_to_atmel_hlcdc_pwm_chip(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	struct clk *new_clk = hlcdc->slow_clk;
-+	u64 pwmcval = duty_ns * 256;
-+	unsigned long clk_freq;
-+	u64 clk_period_ns;
-+	u32 pwmcfg;
-+	int pres;
-+
-+	clk_freq = clk_get_rate(new_clk);
-+	clk_period_ns = 1000000000;
-+	clk_period_ns *= 256;
-+	do_div(clk_period_ns, clk_freq);
-+
-+	if (clk_period_ns > period_ns) {
-+		new_clk = hlcdc->sys_clk;
-+		clk_freq = clk_get_rate(new_clk);
-+		clk_period_ns = 1000000000;
-+		clk_period_ns *= 256;
-+		do_div(clk_period_ns, clk_freq);
-+	}
-+
-+	for (pres = ATMEL_HLCDC_PWMPS_MAX; pres >= 0; pres--) {
-+		if ((clk_period_ns << pres) <= period_ns)
-+			break;
-+	}
-+
-+	if (pres > ATMEL_HLCDC_PWMPS_MAX)
-+		return -EINVAL;
-+
-+	pwmcfg = ATMEL_HLCDC_PWMPS(pres);
-+
-+	if (new_clk != chip->cur_clk) {
-+		u32 gencfg = 0;
-+
-+		clk_prepare_enable(new_clk);
-+		clk_disable_unprepare(chip->cur_clk);
-+		chip->cur_clk = new_clk;
-+
-+		if (new_clk != hlcdc->slow_clk)
-+			gencfg = ATMEL_HLCDC_CLKPWMSEL;
-+		regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(0),
-+				   ATMEL_HLCDC_CLKPWMSEL, gencfg);
-+	}
-+
-+	do_div(pwmcval, period_ns);
-+	if (pwmcval > 255)
-+		pwmcval = 255;
-+
-+	pwmcfg |= ATMEL_HLCDC_PWMCVAL(pwmcval);
-+
-+	regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(6),
-+			   ATMEL_HLCDC_PWMCVAL_MASK | ATMEL_HLCDC_PWMPS_MASK,
-+			   pwmcfg);
-+
-+	return 0;
-+}
-+
-+static int atmel_hlcdc_pwm_set_polarity(struct pwm_chip *c,
-+					struct pwm_device *pwm,
-+					enum pwm_polarity polarity)
-+{
-+	struct atmel_hlcdc_pwm_chip *chip =
-+				pwm_chip_to_atmel_hlcdc_pwm_chip(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	u32 cfg = 0;
-+
-+	if (polarity == PWM_POLARITY_NORMAL)
-+		cfg = ATMEL_HLCDC_PWMPOL;
-+
-+	regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(6),
-+			   ATMEL_HLCDC_PWMPOL, cfg);
-+
-+	return 0;
-+}
-+
-+static int atmel_hlcdc_pwm_enable(struct pwm_chip *c,
-+				  struct pwm_device *pwm)
-+{
-+	struct atmel_hlcdc_pwm_chip *chip =
-+				pwm_chip_to_atmel_hlcdc_pwm_chip(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	u32 status;
-+
-+	regmap_write(hlcdc->regmap, ATMEL_HLCDC_EN, ATMEL_HLCDC_PWM);
-+	while (!regmap_read(hlcdc->regmap, ATMEL_HLCDC_SR, &status) &&
-+	       !(status & ATMEL_HLCDC_PWM))
-+		;
-+
-+	return 0;
-+}
-+
-+static void atmel_hlcdc_pwm_disable(struct pwm_chip *c,
-+				    struct pwm_device *pwm)
-+{
-+	struct atmel_hlcdc_pwm_chip *chip =
-+				pwm_chip_to_atmel_hlcdc_pwm_chip(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	u32 status;
-+
-+	regmap_write(hlcdc->regmap, ATMEL_HLCDC_DIS, ATMEL_HLCDC_PWM);
-+	while (!regmap_read(hlcdc->regmap, ATMEL_HLCDC_SR, &status) &&
-+	       (status & ATMEL_HLCDC_PWM))
-+		;
-+}
-+
-+static const struct pwm_ops atmel_hlcdc_pwm_ops = {
-+	.config = atmel_hlcdc_pwm_config,
-+	.set_polarity = atmel_hlcdc_pwm_set_polarity,
-+	.enable = atmel_hlcdc_pwm_enable,
-+	.disable = atmel_hlcdc_pwm_disable,
-+	.owner = THIS_MODULE,
++static const struct regmap_config atmel_hlcdc_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = 4,
++	.max_register = ATMEL_HLCDC_REG_MAX,
 +};
 +
-+static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
++static int atmel_hlcdc_probe(struct platform_device *pdev)
 +{
-+	struct atmel_hlcdc_pwm_chip *chip;
 +	struct device *dev = &pdev->dev;
 +	struct atmel_hlcdc *hlcdc;
-+	int ret;
++	struct resource *res;
++	void __iomem *regs;
 +
-+	hlcdc = dev_get_drvdata(dev->parent);
++	hlcdc = devm_kzalloc(dev, sizeof(*hlcdc), GFP_KERNEL);
 +	if (!hlcdc)
-+		return -EINVAL;
-+
-+	ret = clk_prepare_enable(hlcdc->periph_clk);
-+	if (ret)
-+		return ret;
-+
-+	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
-+	if (!chip)
 +		return -ENOMEM;
 +
-+	chip->hlcdc = hlcdc;
-+	chip->chip.ops = &atmel_hlcdc_pwm_ops;
-+	chip->chip.dev = dev;
-+	chip->chip.base = -1;
-+	chip->chip.npwm = 1;
-+	chip->chip.of_xlate = of_pwm_xlate_with_flags;
-+	chip->chip.of_pwm_n_cells = 3;
-+	chip->chip.can_sleep = 1;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	regs = devm_ioremap_resource(dev, res);
++	if (IS_ERR(regs))
++		return PTR_ERR(regs);
 +
-+	ret = pwmchip_add(&chip->chip);
-+	if (ret)
-+		return ret;
++	hlcdc->periph_clk = devm_clk_get(dev, "periph_clk");
++	if (IS_ERR(hlcdc->periph_clk)) {
++		dev_err(dev, "failed to get peripheral clock\n");
++		return PTR_ERR(hlcdc->periph_clk);
++	}
 +
-+	platform_set_drvdata(pdev, chip);
++	hlcdc->sys_clk = devm_clk_get(dev, "sys_clk");
++	if (IS_ERR(hlcdc->sys_clk)) {
++		dev_err(dev, "failed to get system clock\n");
++		return PTR_ERR(hlcdc->sys_clk);
++	}
++
++	hlcdc->slow_clk = devm_clk_get(dev, "slow_clk");
++	if (IS_ERR(hlcdc->slow_clk)) {
++		dev_err(dev, "failed to get slow clock\n");
++		return PTR_ERR(hlcdc->slow_clk);
++	}
++
++	hlcdc->regmap = devm_regmap_init_mmio(dev, regs,
++					      &atmel_hlcdc_regmap_config);
++	if (IS_ERR(hlcdc->regmap))
++		return PTR_ERR(hlcdc->regmap);
++
++	dev_set_drvdata(dev, hlcdc);
++
++	return mfd_add_devices(dev, -1, atmel_hlcdc_cells,
++			       ARRAY_SIZE(atmel_hlcdc_cells),
++			       NULL, 0, NULL);
++}
++
++static int atmel_hlcdc_remove(struct platform_device *pdev)
++{
++	mfd_remove_devices(&pdev->dev);
 +
 +	return 0;
 +}
 +
-+static int atmel_hlcdc_pwm_remove(struct platform_device *pdev)
-+{
-+	struct atmel_hlcdc_pwm_chip *chip = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(chip->hlcdc->periph_clk);
-+
-+	return pwmchip_remove(&chip->chip);
-+}
-+
-+static const struct of_device_id atmel_hlcdc_pwm_dt_ids[] = {
-+	{ .compatible = "atmel,hlcdc-pwm" },
++static const struct of_device_id atmel_hlcdc_match[] = {
++	{ .compatible = "atmel,sama5d3-hlcdc" },
 +	{ /* sentinel */ },
 +};
 +
-+static struct platform_driver atmel_hlcdc_pwm_driver = {
++static struct platform_driver atmel_hlcdc_driver = {
++	.probe = atmel_hlcdc_probe,
++	.remove = atmel_hlcdc_remove,
 +	.driver = {
-+		.name = "atmel-hlcdc-pwm",
-+		.of_match_table = atmel_hlcdc_pwm_dt_ids,
++		.name = "atmel-hlcdc",
++		.owner = THIS_MODULE,
++		.of_match_table = atmel_hlcdc_match,
 +	},
-+	.probe = atmel_hlcdc_pwm_probe,
-+	.remove = atmel_hlcdc_pwm_remove,
 +};
-+module_platform_driver(atmel_hlcdc_pwm_driver);
++module_platform_driver(atmel_hlcdc_driver);
 +
-+MODULE_ALIAS("platform:atmel-hlcdc-pwm");
++MODULE_ALIAS("platform:atmel-hlcdc");
 +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
-+MODULE_DESCRIPTION("Atmel HLCDC PWM driver");
++MODULE_DESCRIPTION("Atmel HLCDC driver");
 +MODULE_LICENSE("GPL");
+diff --git a/include/linux/mfd/atmel-hlcdc.h b/include/linux/mfd/atmel-hlcdc.h
+new file mode 100644
+index 0000000..e9a503d
+--- /dev/null
++++ b/include/linux/mfd/atmel-hlcdc.h
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2014 Free Electrons
++ * Copyright (C) 2014 Atmel
++ *
++ * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __LINUX_MFD_HLCDC_H
++#define __LINUX_MFD_HLCDC_H
++
++#include <linux/clk.h>
++#include <linux/regmap.h>
++
++#define ATMEL_HLCDC_CFG(i)		((i) * 0x4)
++#define ATMEL_HLCDC_SIG_CFG		LCDCFG(5)
++#define ATMEL_HLCDC_HSPOL		BIT(0)
++#define ATMEL_HLCDC_VSPOL		BIT(1)
++#define ATMEL_HLCDC_VSPDLYS		BIT(2)
++#define ATMEL_HLCDC_VSPDLYE		BIT(3)
++#define ATMEL_HLCDC_DISPPOL		BIT(4)
++#define ATMEL_HLCDC_DITHER		BIT(6)
++#define ATMEL_HLCDC_DISPDLY		BIT(7)
++#define ATMEL_HLCDC_MODE_MASK		GENMASK(9, 8)
++#define ATMEL_HLCDC_PP			BIT(10)
++#define ATMEL_HLCDC_VSPSU		BIT(12)
++#define ATMEL_HLCDC_VSPHO		BIT(13)
++#define ATMEL_HLCDC_GUARDTIME_MASK	GENMASK(20, 16)
++
++#define ATMEL_HLCDC_EN			0x20
++#define ATMEL_HLCDC_DIS			0x24
++#define ATMEL_HLCDC_SR			0x28
++#define ATMEL_HLCDC_IER			0x2c
++#define ATMEL_HLCDC_IDR			0x30
++#define ATMEL_HLCDC_IMR			0x34
++#define ATMEL_HLCDC_ISR			0x38
++
++#define ATMEL_HLCDC_CLKPOL		BIT(0)
++#define ATMEL_HLCDC_CLKSEL		BIT(2)
++#define ATMEL_HLCDC_CLKPWMSEL		BIT(3)
++#define ATMEL_HLCDC_CGDIS(i)		BIT(8 + (i))
++#define ATMEL_HLCDC_CLKDIV_SHFT		16
++#define ATMEL_HLCDC_CLKDIV_MASK		GENMASK(23, 16)
++#define ATMEL_HLCDC_CLKDIV(div)		((div - 2) << ATMEL_HLCDC_CLKDIV_SHFT)
++
++#define ATMEL_HLCDC_PIXEL_CLK		BIT(0)
++#define ATMEL_HLCDC_SYNC		BIT(1)
++#define ATMEL_HLCDC_DISP		BIT(2)
++#define ATMEL_HLCDC_PWM			BIT(3)
++#define ATMEL_HLCDC_SIP			BIT(4)
++
++/**
++ * Structure shared by the MFD device and its subdevices.
++ *
++ * @regmap: register map used to access HLCDC IP registers
++ * @periph_clk: the hlcdc peripheral clock
++ * @sys_clk: the hlcdc system clock
++ * @slow_clk: the system slow clk
++ */
++struct atmel_hlcdc {
++	struct regmap *regmap;
++	struct clk *periph_clk;
++	struct clk *sys_clk;
++	struct clk *slow_clk;
++};
++
++#endif /* __LINUX_MFD_HLCDC_H */
 -- 
 1.8.3.2
