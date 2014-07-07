@@ -1,35 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Jul 2014 16:25:18 +0200
-Subject: [PATCH v2 05/18] AT91: SAMA5D3: DT: Add shutdown controller
+Date: Mon,  7 Jul 2014 16:25:21 +0200
+Subject: [PATCH v2 08/18] AT91: soc: Introduce register_devices callback
 In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404743131-24569-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404743131-24569-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SAMA5D3 has a shutdown controller identical to the sam9x5 SoC family.
-Declare it in the DT.
+Some core devices should be registered by the SoC itself rather than by every
+board using this SoC. Introduce a register_devices callback that should be
+called during the init_machine in order to do that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d3.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-at91/generic.h | 2 ++
+ arch/arm/mach-at91/setup.c   | 5 +++++
+ arch/arm/mach-at91/soc.h     | 1 +
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index e0b15a6e8897..8bcf1c442c96 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1178,6 +1178,11 @@
- 				reg = <0xfffffe00 0x10>;
- 			};
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 631fa3b8c16d..4c2c96195a50 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -37,6 +37,8 @@ extern int  __init at91_aic5_of_init(struct device_node *node,
+ extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
+ extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
  
-+			shutdown-controller at fffffe10 {
-+				compatible = "atmel,at91sam9x5-shdwc";
-+				reg = <0xfffffe10 0x10>;
-+			};
++ /* Devices */
++extern void __init at91_register_devices(void);
+ 
+  /* Timer */
+ extern void at91rm9200_ioremap_st(u32 addr);
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 71003e40f01c..fe0601e0a3c0 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -508,3 +508,8 @@ void __init at91_initialize(unsigned long main_clock)
+ 
+ 	pinctrl_provide_dummies();
+ }
 +
- 			pit: timer at fffffe30 {
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xfffffe30 0xf>;
++void __init at91_register_devices(void)
++{
++	at91_boot_soc.register_devices();
++}
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index a1e1482c6da8..ab983f2cc7dd 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -11,6 +11,7 @@ struct at91_init_soc {
+ 	void (*map_io)(void);
+ 	void (*ioremap_registers)(void);
+ 	void (*register_clocks)(void);
++	void (*register_devices)(void);
+ 	void (*init)(void);
+ };
+ 
 -- 
 2.0.1
