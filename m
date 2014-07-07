@@ -1,52 +1,39 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 07 Jul 2014 08:57:41 +0200
-Subject: [PATCH v7 23/24] rtc: Add driver for Maxim 77802 PMIC
- Real-Time-Clock
-In-Reply-To: <1404713210.4367.0.camel@AMDC1943>
-References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404505467-26526-24-git-send-email-javier.martinez@collabora.co.uk>
- <1404713210.4367.0.camel@AMDC1943>
-Message-ID: <53BA44E5.6070604@collabora.co.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 07 Jul 2014 09:08:41 +0200
+Subject: [PATCH v2 2/2] spi: add driver for Rockchip RK3xxx SoCs
+ integrated SPI
+In-Reply-To: <53B9FB1C.7080008@rock-chips.com>
+References: <1403582852-9751-1-git-send-email-addy.ke@rock-chips.com>
+ <20140704183249.GC14896@sirena.org.uk> <53B9FB1C.7080008@rock-chips.com>
+Message-ID: <5578791.jcBVzrGadW@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Am Montag, 7. Juli 2014, 09:42:52 schrieb addy ke:
+> > On Tue, Jul 01, 2014 at 09:03:59AM +0800, addy ke wrote:
+> >> +static const struct of_device_id rockchip_spi_dt_match[] = {
+> >> +	{ .compatible = "rockchip,rk3066-spi", },
+> >> +	{ },
+> >> +};
+> >> +MODULE_DEVICE_TABLE(of, rockchip_spi_dt_match);
+> > 
+> > Your DT binding defined some additional compatible strings, please add
+> > those to the driver.
 
-On 07/07/2014 08:06 AM, Krzysztof Kozlowski wrote:
-> On pi?, 2014-07-04 at 22:24 +0200, Javier Martinez Canillas wrote:
->> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
->> This patch adds support for the RTC and is based on a driver
->> added by Simon Glass to the Chrome OS kernel 3.8 tree.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->> 
->> Changes since v6:
->>  - Remove unused code for SMPL and WTSR. Suggested by Krzysztof Kozlowski.
->>  - Don't spam the kernel log with unimportant info and just print for debug.
->>    Suggested by Krzysztof Kozlowski.
->>  - Use ARRAY_SIZE() instead of constant value. Suggested by Krzysztof Kozlowski.
->>  - Remove duplicated register setup. Suggested by Krzysztof Kozlowski.
->>  - Don't free/unregister managed allocated resources.
->>    Suggested by Krzysztof Kozlowski.
->> ---
->>  drivers/rtc/Kconfig        |  10 +
->>  drivers/rtc/Makefile       |   1 +
->>  drivers/rtc/rtc-max77802.c | 508 +++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 519 insertions(+)
->>  create mode 100644 drivers/rtc/rtc-max77802.c
-> 
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+citing Mark Rutland (one of the dt maintainers):
 
-Thanks a lot for the review and for all the feedback you gave me on each version
-of the series.
+--
+  That's why I said in addition to the common one. I'd only expect the
+  driver to look for "rockchip,rk3066-spi", but a DTB could have:
 
-> Best regards,
-> Krzysztof
-> 
-> 
+        compatible = "rockchip,rk3188-spi", "rockchip,rk3066-spi";
 
-Best regards,
-Javier
+  Seeding the DTBs with the extra strings early makes it more likely that
+  we can rely on them later. If we don't happen to need them they only
+  clutter some DTBs.
+--
+
+so it looks like the driver is doing the right thing right now
+
+
+Heiko
