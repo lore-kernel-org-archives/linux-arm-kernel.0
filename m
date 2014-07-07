@@ -1,27 +1,26 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 7 Jul 2014 16:43:57 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <loom.20140707T153253-384@post.gmane.org>
-References: <20140701234800.GA23577@sirena.org.uk> <4473002.jGohFvPsvi@wuerfel>
- <7B049AD4-78F8-4494-A2CB-57DD346107DA@arm.com>
- <201407061739.22152.arnd@arndb.de>
- <loom.20140707T153253-384@post.gmane.org>
-Message-ID: <CAFEAcA9e_0hh_H2fmnmrqgu4RyJN5eim=6CD0YEwp4fq-ERZ2w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jul 2014 16:44:26 +0100
+Subject: [PATCH] ARM: add revision info for PL310 errata 588369 and 727915
+In-Reply-To: <20140707140708.GU30239@dragon>
+References: <1404285816-3763-1-git-send-email-shawn.guo@freescale.com>
+ <20140707140708.GU30239@dragon>
+Message-ID: <20140707154426.GD21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 July 2014 14:59, Janne Grunau <j@jannau.net> wrote:
-> Avoiding deprecated forms of IT would be harder. It's used more often in
-> libav (~50 times) so it should be only disabled if it's emulated or not
-> available using an explicit HWCAP. Not using Thumb for those functions would
-> be another option for libav.
+On Mon, Jul 07, 2014 at 10:07:09PM +0800, Shawn Guo wrote:
+> On Wed, Jul 02, 2014 at 03:23:36PM +0800, Shawn Guo wrote:
+> > Add revision info for PL310_ERRATA_588369 and PL310_ERRATA_727915 to
+> > help people understand if they need to enable the errata for their
+> > hardware.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+> Any comments on this patch?  Otherwise, I'm going to throw it into
+> the patch system.
 
-It would probably be worth benchmarking an implementation which
-avoided the deprecated IT forms on current v7/v8 hardware against
-the current code; these things often get deprecated because they're
-hard to implement efficiently, so it's entirely possible you'd find that
-they're better avoided even on some cores where they're still present
-(either now or in future).
+I don't see anything wrong with this change.
 
-thanks
--- PMM
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
