@@ -1,22 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jul 2014 15:17:51 +0200
-Subject: [PATCH v2 15/20] pinctrl: sunxi: Add A23 R_PIO controller support
-In-Reply-To: <1403016777-15121-16-git-send-email-wens@csie.org>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-16-git-send-email-wens@csie.org>
-Message-ID: <CACRpkdZGzEVhEtXhT5KpaR17HWn8gJ=ohG1D_3pdmDSa7XJjTw@mail.gmail.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 7 Jul 2014 14:20:56 +0100
+Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
+References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
+ <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 4:52 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+On Fri,  4 Jul 2014 18:34:10 +0200
+Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
 
-> The A23 has a R_PIO pin controller, similar to the one found on the A31 SoC.
-> Add support for the pins controlled by the R_PIO controller.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> While comparing the OMAP-serial and the 8250 part of this I noticed that
+> the the latter does not use runtime-pm.
 
-Patch applied.
+Yes it does, but 8250 parts (generally - omap presumably is special
+here ?) need to be powered on to transmit/receive not just for register
+access. The core uart layer implements a "pm" operation for this.
 
-Yours,
-Linus Walleij
+As 8250_dw uses runtime pm to implement the pm operation it's not as
+simple as assumign it won't get triggered.
+
+I *think* this is ok because the designware and other cases would take a
+reference on open and drop it on close, so avoiding any confusion, but
+for the register accesses on a closed port it would benefit from a
+further double check with Mika especially as the suspend/resume on the
+LPSS block on some Intel devices is a little bit too "interesting" for
+comfort.
+
+Otherwise however I think this is good.
+
+Alan
