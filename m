@@ -1,64 +1,100 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Jul 2014 09:20:52 +0530
-Subject: [PATCH v6 2/6] ARM: EXYNOS: Move cpufreq and cpuidle device
- registration to init_machine
+Date: Mon, 07 Jul 2014 09:20:53 +0530
+Subject: [PATCH v6 3/6] ARM: EXYNOS: Move SYSREG definition into sys-reg
+ specific file
 In-Reply-To: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1404705056-11965-4-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As exynos_cpuidle_init and exynos_cpufreq_init function have just one lines
-of code for registering platform devices. We can move these lines to
-exynos_dt_machine_init and delete exynos_cpuidle_init and exynos_cpufreq_init
-function. This will help in reducing lines of code in exynos.c, making it
-more cleaner.
+While making PMU implementation to be device tree based, there are
+few register offsets related with SYSREG present in regs-pmu.h, so
+let's make a new header file "regs-sys.h" to keep all such SYSREG
+related register offsets and remove them from "regs-pmu.h"
 
-Suggested-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c |   20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
+ arch/arm/mach-exynos/exynos.c   |    1 +
+ arch/arm/mach-exynos/pm.c       |    1 +
+ arch/arm/mach-exynos/regs-pmu.h |    3 ---
+ arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
+ 4 files changed, 24 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/regs-sys.h
 
 diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index ff60b4c..47170eb 100644
+index 47170eb..186f35d 100644
 --- a/arch/arm/mach-exynos/exynos.c
 +++ b/arch/arm/mach-exynos/exynos.c
-@@ -171,19 +171,6 @@ static struct platform_device exynos_cpuidle = {
- 	.id                = -1,
- };
+@@ -29,6 +29,7 @@
+ #include "common.h"
+ #include "mfc.h"
+ #include "regs-pmu.h"
++#include "regs-sys.h"
  
--void __init exynos_cpuidle_init(void)
--{
--	if (soc_is_exynos5440())
--		return;
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 202ca73..f127c0c 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -35,6 +35,7 @@
+ 
+ #include "common.h"
+ #include "regs-pmu.h"
++#include "regs-sys.h"
+ 
+ /**
+  * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index e1c06b6..e6fa6cf 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -15,7 +15,6 @@
+ #include <mach/map.h>
+ 
+ #define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
+-#define S5P_SYSREG(x)				(S3C_VA_SYS + (x))
+ 
+ #define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
+ 
+@@ -190,8 +189,6 @@
+ 
+ /* For EXYNOS5 */
+ 
+-#define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
 -
--	platform_device_register(&exynos_cpuidle);
--}
--
--void __init exynos_cpufreq_init(void)
--{
--	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
--}
--
- void __iomem *sysram_base_addr;
- void __iomem *sysram_ns_base_addr;
+ #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
+ #define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
  
-@@ -300,10 +287,11 @@ static void __init exynos_dt_machine_init(void)
- 	if (!IS_ENABLED(CONFIG_SMP))
- 		exynos_sysram_init();
- 
--	if (!of_machine_is_compatible("samsung,exynos5420"))
--		exynos_cpuidle_init();
-+	if (!of_machine_is_compatible("samsung,exynos5420") ||
-+			!of_machine_is_compatible("samsung,exynos5440"))
-+		platform_device_register(&exynos_cpuidle);
- 
--	exynos_cpufreq_init();
-+	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
+diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+new file mode 100644
+index 0000000..84332b0
+--- /dev/null
++++ b/arch/arm/mach-exynos/regs-sys.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *             http://www.samsung.com
++ *
++ * EXYNOS - system register definition
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_REGS_SYS_H
++#define __ASM_ARCH_REGS_SYS_H __FILE__
++
++#include <mach/map.h>
++
++#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
++
++/* For EXYNOS5 */
++#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
++
++#endif /* __ASM_ARCH_REGS_SYS_H */
 -- 
 1.7.9.5
