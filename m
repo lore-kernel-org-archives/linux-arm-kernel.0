@@ -1,174 +1,91 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 7 Jul 2014 20:33:40 +0200
-Subject: [PATCH 1/5] memory: add a driver for atmel ram controllers
-In-Reply-To: <1404746355-19988-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404746355-19988-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140707183340.GG9558@ns203013.ovh.net>
+From: linville@tuxdriver.com (John W. Linville)
+Date: Mon, 7 Jul 2014 14:23:02 -0400
+Subject: [PATCH v3 1/4] dt: bindings: add bindings for Broadcom bcm43xx
+ sdio devices
+In-Reply-To: <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
+References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
+ <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140707182302.GA29650@tuxdriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:19 Mon 07 Jul     , Alexandre Belloni wrote:
+Any word from the devicetree folks?
+
+On Sun, Jun 29, 2014 at 04:16:58PM +0200, Hans de Goede wrote:
+> From: Arend van Spriel <arend@broadcom.com>
 > 
-> Atmel SoCs have one or multiple RAM controllers that need one or multiple clocks
-> to run.
-> This driver handle those clocks.
+> The Broadcom bcm43xx sdio devices are fullmac devices that may be
+> integrated in ARM platforms. Currently, the brcmfmac driver for
+> these devices support use of platform data. This patch specifies
+> the bindings that allow this platform data to be expressed in the
+> devicetree.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
+> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
+> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
+> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
+> Signed-off-by: Arend van Spriel <arend@broadcom.com>
+> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
+>  on how to handle this yet]
+> [hdegoede at redhat.com: move from bindings/staging to bindings]
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
->  drivers/memory/Kconfig                             |  8 ++
->  drivers/memory/Makefile                            |  1 +
->  drivers/memory/atmel-ramc.c                        | 96 ++++++++++++++++++++++
->  4 files changed, 106 insertions(+)
->  create mode 100644 drivers/memory/atmel-ramc.c
+>  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index 16f60b41c147..54dc3aefb12a 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -61,6 +61,7 @@ RAMC SDRAM/DDR Controller required properties:
->  - compatible: Should be "atmel,at91rm9200-sdramc",
->  			"atmel,at91sam9260-sdramc",
->  			"atmel,at91sam9g45-ddramc",
-> +			"atmel,sama5d3-mpddramc",
->  - reg: Should contain registers location and length
->    For at91sam9263 and at91sam9g45 you must specify 2 entries.
->  
-> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-> index c59e9c96e86d..e49b9caa1b30 100644
-> --- a/drivers/memory/Kconfig
-> +++ b/drivers/memory/Kconfig
-> @@ -7,6 +7,14 @@ menuconfig MEMORY
->  
->  if MEMORY
->  
-> +config ATMEL_RAMC
-> +	bool "Atmel (Multi-port DDR-)SDRAM Controller"
-> +	default y
-> +	depends on ARCH_AT91 && OF
-> +	help
-> +	  This driver is for Atmel SDRAM Controller or Atmel Multi-port
-> +	  DDR-SDRAM Controller available on Atmel AT91SAM9 and SAMA5 SoCs
-> +
->  config TI_AEMIF
->  	tristate "Texas Instruments AEMIF driver"
->  	depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
-> diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
-> index 71160a2b7313..eb5d7716efa4 100644
-> --- a/drivers/memory/Makefile
-> +++ b/drivers/memory/Makefile
-> @@ -5,6 +5,7 @@
->  ifeq ($(CONFIG_DDR),y)
->  obj-$(CONFIG_OF)		+= of_memory.o
->  endif
-> +obj-$(CONFIG_ATMEL_RAMC)	+= atmel-ramc.o
->  obj-$(CONFIG_TI_AEMIF)		+= ti-aemif.o
->  obj-$(CONFIG_TI_EMIF)		+= emif.o
->  obj-$(CONFIG_FSL_IFC)		+= fsl_ifc.o
-> diff --git a/drivers/memory/atmel-ramc.c b/drivers/memory/atmel-ramc.c
+> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
 > new file mode 100644
-> index 000000000000..1d12d3d01cbd
+> index 0000000..5dbf169
 > --- /dev/null
-> +++ b/drivers/memory/atmel-ramc.c
-> @@ -0,0 +1,96 @@
-> +/*
-> + * Atmel (Multi-port DDR-)SDRAM Controller driver
-> + *
-> + * Copyright (C) 2014 Atmel
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + */
+> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+> @@ -0,0 +1,41 @@
+> +Broadcom BCM43xx Fullmac wireless SDIO devices
 > +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
+> +This node provides properties for controlling the Broadcom wireless device. The
+> +node is expected to be specified as a child node to the SDIO controller that
+> +connects the device to the system.
 > +
-> +struct at91_ramc_caps {
-> +	bool has_ddrck;
-> +	bool has_mpddr_clk;
+> +Required properties:
+> +
+> + - compatible : Should be "brcm,bcm4329-fmac".
+> +
+> +Optional properties:
+> + - brcm,drive-strength : drive strength used for SDIO pins on device in mA
+> +	(default = 6).
+> + - interrupt-parent : the phandle for the interrupt controller to which the
+> +	device interrupts are connected.
+> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
+> +	When not specified the device will use in-band SDIO interrupts.
+> + - interrupt-names : name of the out-of-band interrupt, which must be set
+> +	to "host-wake".
+> +
+> +Example:
+> +
+> +mmc3: mmc at 01c12000 {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc3_pins_a>;
+> +	vmmc-supply = <&reg_vmmc3>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
+> +
+> +	brcmf: bcrmf at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <10 8>; /* PH10 / EINT10 */
+> +		interrupt-names = "host-wake";
+> +	};
 > +};
-> +
-> +static const struct at91_ramc_caps at91rm9200_caps = { };
-> +
-> +static const struct at91_ramc_caps at91sam9g45_caps = {
-> +	.has_ddrck = 1,
-> +	.has_mpddr_clk = 0,
-> +};
-> +
-> +static const struct at91_ramc_caps sama5d3_caps = {
-> +	.has_ddrck = 1,
-> +	.has_mpddr_clk = 1,
-> +};
-> +
-> +static const struct of_device_id atmel_ramc_of_match[] = {
-> +	{ .compatible = "atmel,at91rm9200-sdramc", .data = &at91rm9200_caps, },
-> +	{ .compatible = "atmel,at91sam9260-sdramc", .data = &at91rm9200_caps, },
-> +	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &at91sam9g45_caps, },
-> +	{ .compatible = "atmel,sama5d3-mpddramc", .data = &sama5d3_caps, },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, atmel_ramc_of_match);
-> +
-> +static int atmel_ramc_probe(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *match;
-> +	const struct at91_ramc_caps *caps;
-> +	struct clk *clk;
-> +
-> +	match = of_match_device(atmel_ramc_of_match, &pdev->dev);
-> +	caps = match->data;
-> +
-> +	if (caps->has_ddrck) {
-> +		clk = devm_clk_get(&pdev->dev, "ddrck");
-> +		if (IS_ERR(clk))
-> +			return PTR_ERR(clk);
-> +		clk_prepare_enable(clk);
-> +	}
-> +
-> +	if (caps->has_mpddr_clk) {
-> +		clk = devm_clk_get(&pdev->dev, "mpddr");
-> +		if (WARN_ON(IS_ERR(clk)))
-> +			return 0;
-		I don't like this warn_on this need to be an error
-> +		clk_prepare_enable(clk);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver atmel_ramc_driver = {
-> +	.probe		= atmel_ramc_probe,
-> +	.driver		= {
-> +		.name	= "atmel-ramc",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = atmel_ramc_of_match,
-> +	},
-> +};
-> +
-> +static int __init atmel_ramc_init(void)
-> +{
-> +	return platform_driver_register(&atmel_ramc_driver);
-> +}
-> +module_init(atmel_ramc_init);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-> +MODULE_DESCRIPTION("Atmel (Multi-port DDR-)SDRAM Controller");
 > -- 
-> 1.9.1
+> 2.0.0
 > 
+> 
+
+-- 
+John W. Linville		Someday the world will need a hero, and you
+linville at tuxdriver.com			might be all we have.  Be ready.
