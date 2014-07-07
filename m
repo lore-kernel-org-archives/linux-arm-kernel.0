@@ -1,60 +1,109 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 7 Jul 2014 19:56:27 +0200
-Subject: [PATCH 1/5] memory: add a driver for atmel ram controllers
-In-Reply-To: <20140707174642.65d02082@bbrezillon>
-References: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404746355-19988-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20140707174642.65d02082@bbrezillon>
-Message-ID: <20140707175627.GG3113@piout.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 7 Jul 2014 11:30:02 -0700
+Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
+In-Reply-To: <20140707105818.GA1101@arch.cereza>
+References: <20140703135146.GA6898@luxor.wired.org>
+ <53B5C61D.2060308@free-electrons.com>
+ <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
+ <20140705150308.GA28791@arch.cereza>
+ <20140705205951.GB3678@kroah.com>
+ <20140707105818.GA1101@arch.cereza>
+Message-ID: <20140707183002.GA5947@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/07/2014 at 17:46:42 +0200, Boris Brezillon wrote :
-> On Mon,  7 Jul 2014 17:19:11 +0200
-> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
-> > Atmel SoCs have one or multiple RAM controllers that need one or multiple clocks
-> > to run.
-> > This driver handle those clocks.
+On Mon, Jul 07, 2014 at 07:58:18AM -0300, Ezequiel Garcia wrote:
+> On 05 Jul 01:59 PM, Greg Kroah-Hartman wrote:
+> > On Sat, Jul 05, 2014 at 12:03:08PM -0300, Ezequiel Garcia wrote:
+> > > After following Gregory's stacktrace (also reproduced here):
+> > > 
+> > > [<c02451f8>] (iommu_bus_notifier) from [<c00512e8>] (notifier_call_chain+0x64/0x9c)
+> > > [<c00512e8>] (notifier_call_chain) from [<c00514cc>] (__blocking_notifier_call_chain+0x40/0x58)
+> > > [<c00514cc>] (__blocking_notifier_call_chain) from [<c00514f8>] (blocking_notifier_call_chain+0x14/0x1c)
+> > > [<c00514f8>] (blocking_notifier_call_chain) from [<c01d225c>] (device_add+0x424/0x524)
+> > > [<c01d225c>] (device_add) from [<c0186d90>] (pci_device_add+0xec/0x110)
+> > > [<c0186d90>] (pci_device_add) from [<c0186e54>] (pci_scan_single_device+0xa0/0xac)
+> > > 
+> > > I added a few printks and found that the problem is that the iommu_bus_notifier is
+> > > called for the 'pci' bus type, which has a null iommu_ops.
+> > > 
+> > > On 04 Jul 10:47 AM, Laurent Pinchart wrote:
+> > > [..]
+> > > > 
+> > > > We need a quick fix for v3.16, ...
+> > > 
+> > > Therefore, a quick fix would be to simply check for that:
+> > > 
+> > > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> > > index e5555fc..b712cb2 100644
+> > > --- a/drivers/iommu/iommu.c
+> > > +++ b/drivers/iommu/iommu.c
+> > > @@ -536,6 +536,9 @@ static int iommu_bus_notifier(struct notifier_block *nb,
+> > >         struct iommu_group *group;
+> > >         unsigned long group_action = 0;
+> > >  
+> > > +       if (!ops)
+> > > +               return 0;
+> > > +
+> > >         /*
+> > >          * ADD/DEL call into iommu driver ops if provided, which may
+> > >          * result in ADD/DEL notifiers to group->notifier
+> > > 
+> > > This (nasty workaround?) patch makes the problem go away.
+> > > 
+> > > [..]
+> > > > > So it also boot well in 3.15 and then failed in 3.16-rc3. I hope it will
+> > > > > help the developers of the OMAP IOMMU driver to fix it.
+> > > > 
+> > > > Thank you. I've had a look at the OMAP IOMMU driver changes between v3.15 and 
+> > > > v3.16-rc3, and didn't find at first sight any change that could explain the 
+> > > > crash.
+> > > > 
+> > > > 286f600 iommu/omap: Fix map protection value handling
+> > > > 67b779d iommu/omap: Remove comment about supporting single page mappings only
+> > > > f7129a0 iommu/omap: Fix 'no page for' debug message in flush_iotlb_page()
+> > > > 5acc97d iommu/omap: Move to_iommu definition from omap-iopgtable.h
+> > > > 2ac6133 iommu/omap: Remove omap_iommu_domain_has_cap() function
+> > > > d760e3e iommu/omap: Correct init value of iotlb_entry valid field
+> > > > 
+> > > > Could you try reverting those changes and retest ? If the problem doesn't 
+> > > > disappear, we'll need to look somewhere else.
+> > > > 
+> > > 
+> > > I reverted the above commits but nothing changed. I'm far from being an expert,
+> > > but it sounds odd to have this bus notifier (that got registered for the
+> > > platform bus type) called by a pci bus type.
+> > 
+> > Why wouldn't the PCI bus set this up for its devices?  Are you
+> > "assuming" you know the bus type and that's the issue?
 > > 
 > 
-> Actually this controller is an SDRAM controller which, depending on the
-> SoC, might support SDR SDRAMs, DDR SDRAMs or both.
+> Thanks for looking at this.
 > 
-> This is just a nitpick, but if you don't mind I'd rather replace
-> references to RAMC by SDRAMC (ATMEL_RAMC -> ATMEL_SDRAMC) and just state
-> that in some cases (at least this is the case for the DDRSDRC available
-> in at91sam9g45 SoC) it supports both type of SDRAM (DDR and SDR).
+> I guess I snipped the thread and lost most of the information about the panic.
+> Here's the original bug report:
 > 
-> The same goes for the source file name (atmel-ramc.c -> atmel-sdramc.c).
+> http://www.spinics.net/lists/arm-kernel/msg344059.html
 > 
-
-will do.
-
-
-> > diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> > index 16f60b41c147..54dc3aefb12a 100644
-> > --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> > +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> > @@ -61,6 +61,7 @@ RAMC SDRAM/DDR Controller required properties:
-> >  - compatible: Should be "atmel,at91rm9200-sdramc",
-> >  			"atmel,at91sam9260-sdramc",
-> >  			"atmel,at91sam9g45-ddramc",
-> > +			"atmel,sama5d3-mpddramc",
-> >  - reg: Should contain registers location and length
-> >    For at91sam9263 and at91sam9g45 you must specify 2 entries.
+> The problem reported involves enabling OMAP IOMMU driver and not any other IOMMU
+> driver. Doing some tracing and adding a few prints, we found that
+> omap_iommu_init() sets a bus notifier for the platform bus type:
 > 
-> Shouldn't we move the documentation in
-> Documentation/devicetree/bindings/memory-controllers/ (though this
-> should be done in different patch).
+> omap_iommu_init -> bus_set_iommu -> iommu_bus_init:
 > 
+> static void iommu_bus_init(struct bus_type *bus, struct iommu_ops *ops)
+> {
+>         bus_register_notifier(bus, &iommu_bus_nb);
+>         bus_for_each_dev(bus, NULL, ops, add_iommu_group);
+> }
+> 
+> But the iommu bus notifier gets called for the 'pci' bus type, which
+> has the iommu_ops field NULL (since it hasn't been set for iommu).
 
-I guess we should move it later, to avoid merge conflicts
+So this is what needs to be figured out, how is the notifier being
+called with a PCI device?  Who else called iommu_bus_init() for the PCI
+bus?
 
+thanks,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+greg k-h
