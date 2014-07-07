@@ -1,49 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Jul 2014 08:25:53 +0900
-Subject: [PATCH 0/6] Various Samsung fixes for v3.16-rc3
-In-Reply-To: <53B2BD99.5080704@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <53B2BD99.5080704@samsung.com>
-Message-ID: <53BB2C81.7000108@samsung.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 7 Jul 2014 17:27:49 -0600
+Subject: [PATCH v8 2/9] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140707232749.GA22939@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 22:54, Tomasz Figa wrote:
-> Hi,
->
-> On 24.06.2014 15:57, Tomasz Figa wrote:
->> This series inteds to fix various issues spotted while testing v3.16-rc2.
->> The patches should be reasonably independent from each other and so could be
->> picked to respective trees. See descriptions of individual patches for more
->> information.
->>
->> Tested on Exynos4412-based Trats2 and Exynos4210-based Trats boards.
->>
->> AFAIK there is no need to backport those fixes to stable.
->>
->> Tomasz Figa (6):
->>    mmc: sdhci-s3c: Fix local I/O clock gating
->>    ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
->>    clk: samsung: exynos4: Remove SRC_MASK_ISP gates
->>    ARM: SAMSUNG: Restore Samsung PM Debug functionality
->>    ARM: EXYNOS: Fix suspend/resume sequencies
->>    ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
->>
->>   arch/arm/mach-exynos/exynos.c     |  6 ++----
->>   arch/arm/mach-exynos/hotplug.c    | 10 ++++++----
->>   arch/arm/mach-exynos/platsmp.c    | 34 +++++++++++++++++++---------------
->>   arch/arm/mach-exynos/pm.c         | 20 ++++----------------
->>   arch/arm/plat-samsung/Kconfig     |  8 +++++++-
->>   arch/arm/plat-samsung/pm-debug.c  |  1 +
->>   drivers/clk/samsung/clk-exynos4.c | 16 ++++------------
->>   drivers/mmc/host/sdhci-s3c.c      | 17 ++++++++++-------
->>   8 files changed, 53 insertions(+), 59 deletions(-)
->>
->
-> Gentle ping.
->
-Oops, I missed this fixes from 2nd samsung fixes for 3.16...let me have 
-a look this series today then will send again soon...
+On Tue, Jul 01, 2014 at 07:43:27PM +0100, Liviu Dudau wrote:
+> This is a useful function and we should make it visible outside the
+> generic PCI code. Export it as a GPL symbol.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host-bridge.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 0e5f3c9..36c669e 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -16,12 +16,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+>  	return bus;
+>  }
+>  
+> -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+>  {
+>  	struct pci_bus *root_bus = find_pci_root_bus(bus);
+>  
+>  	return to_pci_host_bridge(root_bus->bridge);
+>  }
+> +EXPORT_SYMBOL_GPL(find_pci_host_bridge);
 
-Thanks,
-Kukjin
+There's nothing in this series that uses find_pci_host_bridge(), so 
+how about we just wait until we have something that needs it?
+
+Also, if/when we export this, I'd prefer a name that starts with "pci_"
+as most of the other interfaces do.
+
+>  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+>  				 void (*release_fn)(struct pci_host_bridge *),
+> -- 
+> 2.0.0
+> 
