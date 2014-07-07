@@ -1,53 +1,33 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:26 +0200
-Subject: [PATCHv2 09/32] ARM: at91/dt: sam9g20: define clocks
+Date: Mon,  7 Jul 2014 22:23:22 +0200
+Subject: [PATCHv2 05/32] ARM: at91: move at91rm9200 SoC to the CCF
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the at91sam9g20 clocks that differ from at91sam9260 in the SoC dtsi file.
+This patch removes the selection of AT91_USE_OLD_CLK when selecting at91rm9200
+SoC support. This will automatically enable COMMON_CLK_AT91 option and add
+support for at91 common clk implementation.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g20.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/mach-at91/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index b8e79466014f..31f7652612fc 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -25,6 +25,30 @@
- 			adc0: adc at fffe0000 {
- 				atmel,adc-startup-time = <40>;
- 			};
-+
-+			pmc: pmc at fffffc00 {
-+				plla: pllack {
-+					atmel,clk-input-range = <2000000 32000000>;
-+					atmel,pll-clk-output-ranges = <745000000 800000000 0 0>,
-+								<695000000 750000000 1 0>,
-+								<645000000 700000000 2 0>,
-+								<595000000 650000000 3 0>,
-+								<545000000 600000000 0 1>,
-+								<495000000 550000000 1 1>,
-+								<445000000 500000000 2 1>,
-+								<400000000 450000000 3 1>;
-+				};
-+
-+				pllb: pllbck {
-+					atmel,clk-input-range = <2000000 32000000>;
-+					atmel,pll-clk-output-ranges = <30000000 100000000 0 0>;
-+				};
-+
-+				mck: masterck {
-+					atmel,clk-output-range = <0 133000000>;
-+					atmel,clk-divisors = <1 2 4 6>;
-+				};
-+			};
- 		};
- 	};
- };
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 45b55e0f0db6..c818136a74b8 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -113,7 +113,6 @@ config SOC_AT91RM9200
+ 	select HAVE_AT91_DBGU0
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+-	select AT91_USE_OLD_CLK
+ 	select HAVE_AT91_USB_CLK
+ 
+ config SOC_AT91SAM9260
 -- 
 1.9.1
