@@ -1,101 +1,83 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 7 Jul 2014 16:47:18 -0700
-Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
-In-Reply-To: <20140707233758.GA1456@arch.cereza>
-References: <20140703135146.GA6898@luxor.wired.org>
- <53B5C61D.2060308@free-electrons.com>
- <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
- <20140705150308.GA28791@arch.cereza>
- <20140705205951.GB3678@kroah.com>
- <20140707105818.GA1101@arch.cereza>
- <20140707183002.GA5947@kroah.com>
- <20140707233758.GA1456@arch.cereza>
-Message-ID: <20140707234718.GA8352@kroah.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 07 Jul 2014 16:44:18 -0700
+Subject: [PATCHv2 1/8] clk: add an APPLY_RATE_CHANGE notifier event during
+ clk_set_rate()
+In-Reply-To: <1404744702-32010-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1404744702-32010-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <53BB30D2.3010908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 08:37:58PM -0300, Ezequiel Garcia wrote:
-> On 07 Jul 11:30 AM, Greg Kroah-Hartman wrote:
-> > On Mon, Jul 07, 2014 at 07:58:18AM -0300, Ezequiel Garcia wrote:
-> [..]
-> > > 
-> > > I guess I snipped the thread and lost most of the information about the panic.
-> > > Here's the original bug report:
-> > > 
-> > > http://www.spinics.net/lists/arm-kernel/msg344059.html
-> > > 
-> > > The problem reported involves enabling OMAP IOMMU driver and not any other IOMMU
-> > > driver. Doing some tracing and adding a few prints, we found that
-> > > omap_iommu_init() sets a bus notifier for the platform bus type:
-> > > 
-> > > omap_iommu_init -> bus_set_iommu -> iommu_bus_init:
-> > > 
-> > > static void iommu_bus_init(struct bus_type *bus, struct iommu_ops *ops)
-> > > {
-> > >         bus_register_notifier(bus, &iommu_bus_nb);
-> > >         bus_for_each_dev(bus, NULL, ops, add_iommu_group);
-> > > }
-> > > 
-> > > But the iommu bus notifier gets called for the 'pci' bus type, which
-> > > has the iommu_ops field NULL (since it hasn't been set for iommu).
-> > 
-> > So this is what needs to be figured out, how is the notifier being
-> > called with a PCI device?  Who else called iommu_bus_init() for the PCI
-> > bus?
-> > 
-> 
-> Nobody. The only caller of iommu_bus_init() the above OMAP IOMMU.
-> 
-> However, I found something interesting. Tried to bisect this without much
-> luck; I did two bisects and ended up in the same merge commit:
-> 
-> # good: [0f16aa3c24a216d14d7f0587e1cbd2c1b51a38f3] Merge tag 'samsung-dt-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/dt
-> # first bad commit: [755a9ba7bf24a45b6dbf8bb15a5a56c8ed12461a] Merge tag 'dt-for-3.16' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into next
-> 
-> So, after doing a few diff's between that good and bad and searching for
-> "bus_notifier" changes, saw something strange in arch/arm/mach-mvebu/coherency.c.
-> 
-> It seems bus_register_notifier() is been called for platform and pci devices
-> with the *same* notifier block. Haven't looked close enough, but you mentioned
-> that could cause trouble?
-> 
-> This patch fixes the issue here:
-> 
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-> index 477202f..2bdc323 100644
-> --- a/arch/arm/mach-mvebu/coherency.c
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -292,6 +292,10 @@ static struct notifier_block mvebu_hwcc_nb = {
->  	.notifier_call = mvebu_hwcc_notifier,
->  };
->  
-> +static struct notifier_block mvebu_hwcc_pci_nb = {
-> +	.notifier_call = mvebu_hwcc_notifier,
-> +};
-> +
->  static void __init armada_370_coherency_init(struct device_node *np)
->  {
->  	struct resource res;
-> @@ -427,7 +431,7 @@ static int __init coherency_pci_init(void)
->  {
->  	if (coherency_available())
->  		bus_register_notifier(&pci_bus_type,
-> -				       &mvebu_hwcc_nb);
-> +				       &mvebu_hwcc_pci_nb);
->  	return 0;
->  }
->  
-> Paolo, can you apply it and confirm it fixes the problem?
-> 
-> Greg, can you confirm using the same notifier block pointer
-> for two different bus types makes the bus notifier go nuts?
+On 07/07/14 07:51, Thomas Petazzoni wrote:
+> The current clk_set_rate() logic allows notifiers to be notified of
+> three different events:
+>
+>  * PRE_RATE_CHANGE: before the clock driver ->set_rate() function is
+>    called.
+>  * ABORT_RATE_CHANGE: called if the rate change failed
+>  * POST_RATE_CHANGE: called after the rate change has been
+>    successfully done, but after ->recalc_rate() has been called, and
+>    only if the rate of the clock has actually changed.
+>
+> This commit adds an additional APPLY_RATE_CHANGE, which we require on
+> Armada XP to implement dynamic frequency scaling of the CPU
+> clocks. The problem is as follows.
+>
+> On Armada XP, there are three hardware blocks involved in the dynamic
+> frequency scaling of the CPU clocks:
+>
+>  - The CPU clocks hardware block itself, whose registers are already
+>    "managed" by drivers/clk/mvebu/clk-cpu.c (compatible string:
+>    marvell,armada-xp-cpu-clock). The driver currently only supports
+>    changing the rate of the CPU clock when the clock is off (i.e
+>    before we boot the secondary CPUs).
+>
+>  - The PMU DFS registers, which are used to configure the target
+>    frequency for a dynamic rate change. Those registers are relatively
+>    well isolated from other PMU registers, so they can also be
+>    "managed" by the drivers/clk/mvebu/clk-cpu.c.
+>
+>  - The PMSU registers, which are used to actually trigger the dynamic
+>    frequency change procedure, which consists in programming a bunch
+>    of PMSU registers, entering the idle state on the CPU we want to
+>    change the frequency, and then again reprogram a bunch of PMSU
+>    registers.
+>
+> The procedure to change the frequency is:
+>
+>  1/ Reset some clocks using the CPU clocks hardware block.
+>  2/ Define the target frequency using the PMU DFS registers.
+>  3/ Do the actual frequency change using the PMSU registers.
+>
+> However, the PMSU registers are already "managed" by a driver in
+> arch/arm/mach-mvebu/pmsu.c, and the code there is needed for a wide
+> variety of power management activities: booting of secondary CPUs, CPU
+> hotplug, cpuidle, cpufreq, and soon suspend/resume. The same registers
+> in the PMSU are used for several of those activities.
+>
+> So, what we need to do is to have steps (1) and (2) above done in the
+> CPU clocks driver, and then step (3) done through a clk notifier.
+>
+> However, the current POST_RATE_CHANGE notifier is called too late
+> (after ->recalc_rate) and only if the rate has changed. So it works
+> fine for a pure notification of a frequency change, but it doesn't
+> work if the notified code is actually involved in the frequency
+> change, which is exactly the case we have here. Until the sequence
+> that uses the PMSU registers has been executed, the rate of the CPU
+> clock has not changed.
+>
+> In order to solve this problem, we propose to add an APPLY_RATE_CHANGE
+> notifier event, which gets called right after ->set_rate(), but before
+> ->recalc_rate(), and therefore regardless of whether there was an
+> actualy frequency change or not.
 
-The bus notifier doesn't "go nuts", but the call back functions must be
-able to handle the devices for that specific bus being passed to the
-function for it.
+Is there any reason why we can't call the pmsu code (part #3) directly
+from the cpu clock driver? It seems like if we just called the
+.set_rate() op we wouldn't actually have changed the clock's rate. That
+doesn't seem very intuitive and it really makes the code flow hard to
+follow.
 
-Again, you shouldn't ever mix bus types with the same notifier unless
-you _really_ know what you are doing, and even then, I wouldn't
-recommend it.
-
-greg k-h
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
