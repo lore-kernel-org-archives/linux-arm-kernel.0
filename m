@@ -1,37 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jul 2014 12:41:01 +0200
-Subject: [PATCH 0/6] pinctrl: rockchip: support rk3288
-In-Reply-To: <1887108.ECBDVhibgn@diego>
-References: <1887108.ECBDVhibgn@diego>
-Message-ID: <CACRpkdaG-FrfQOB0FHeev1D0L8rrOW2-4jW4KufJMb4NneVeHQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Jul 2014 03:41:58 -0700
+Subject: [PATCH 3/3] ARM: OMAP2+: create dsp device only on OMAP3 SoCs
+In-Reply-To: <1403587467-59876-4-git-send-email-s-anna@ti.com>
+References: <1403587467-59876-1-git-send-email-s-anna@ti.com>
+ <1403587467-59876-4-git-send-email-s-anna@ti.com>
+Message-ID: <20140707104157.GL28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 1:35 AM, Heiko St?bner <heiko@sntech.de> wrote:
+* Suman Anna <s-anna@ti.com> [140623 22:26]:
+> The DSP platform device for TI DSP/Bridge is currently
+> created unconditionally whenever CONFIG_TIDSPBRIDGE is
+> enabled. This device should only be created on OMAP34xx/
+> OMAP36xx SoCs, and not for other OMAP3 derived SoCs or when
+> booting multi-arch images on other SoCs. So, add a check for
+> the SoC family both before creating the device and allocating
+> the carveout memory for the device.
 
-> This series adds support for the rk3288 SoC.
->
-> The first patch generalizes the gpio-only handling of the rk3188 into a
-> general quirk-handling making it possible to deprecate the special bank
-> compatible and also to add quirks of later SoCs.
->
-> Patches 2 to 5 enable the driver to handle the quirks of rk3288 and
-> patch 6 then simply adds the description of the rk3288 banks.
->
-> Tested on a rk3288-evb and on a rk3188-radxarock with both the
-> deprecated and new regular notation for bank0.
->
-> Heiko Stuebner (6):
->   pinctrl: rockchip: generalize bank-quirks
->   pinctrl: rockchip: precalculate iomux offsets
->   pinctrl: rockchip: add support for 4bit wide iomux settings
->   pinctrl: rockchip: enable iomuxes from pmu space
->   pinctrl: rockchip: support unrouted iomuxes per bank
->   pinctrl: rockchip: add support for rk3288 pin-controller
+Applying this one into omap-for-v3/16/fixes thanks.
 
-Excellent and nice broken-down patch series Heiko!
-
-All patches applied for v3.17.
-
-Yours,
-Linus Walleij
+Tony
