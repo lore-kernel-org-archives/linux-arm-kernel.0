@@ -1,90 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jul 2014 14:40:08 +0100
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power
- control setting
-In-Reply-To: <20140707123925.GW28884@atomide.com>
-References: <3c3a7a4861df01d0163787a9c18f7b7ac821c5b9.1403000372.git.nsekhar@ti.com>
- <20140617131935.GB9070@saruman.home> <20140701194704.GG13396@saruman.home>
- <20140702081142.GU28884@atomide.com> <20140707104727.GM28884@atomide.com>
- <20140707104944.GS3705@n2100.arm.linux.org.uk>
- <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
-Message-ID: <20140707134008.GU3705@n2100.arm.linux.org.uk>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 7 Jul 2014 15:40:27 +0200
+Subject: [PATCH 2/3] ARM: perf: disable the pagefault handler when reading
+ from user space
+In-Reply-To: <20140703175231.GF17372@arm.com>
+References: <1403881067-22690-1-git-send-email-jean.pihet@linaro.org>
+ <1403881067-22690-3-git-send-email-jean.pihet@linaro.org>
+ <20140703175231.GF17372@arm.com>
+Message-ID: <CAFrcx1=NWiJ4+qe-cp2t+Cx7Q7dexjbzu-q9fE+HVR2JTOn-SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 05:39:26AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140707 05:17]:
-> > On Mon, Jul 07, 2014 at 05:20:27PM +0530, Sekhar Nori wrote:
-> > > OMAP4430 had L2 cache controller version r2p0 (per the public TRM) which
-> > > does not have this register. So unless there is a ROM API that was
-> > > introduced after OMAP4430, this would not be there even for other
-> > > OMAP4s. Public TRM of OMAP4470 does not indicate an API for this.
-> > > 
-> > > Before creating the patch, I checked with ROM team handling AM437x and
-> > > they denied an API to write to this register was present in AM437x ROM.
-> > 
-> > Okay, so why are we trying to write to this register then...
-> > 
-> > Ah, we have a bug in cache-l2x0.c:
-> > 
-> > #define L2X0_CACHE_ID_PART_MASK         (0xf << 6)
-> > #define L2X0_CACHE_ID_RTL_MASK          0x3f
-> > #define L310_CACHE_ID_RTL_R3P0          0x05
-> > 
-> >         unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-> > 
-> >         if (rev >= L310_CACHE_ID_RTL_R2P0) {
-> > ...
-> >         if (rev >= L310_CACHE_ID_RTL_R3P0) {
-> >                 l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
-> >                               base, L310_POWER_CTRL);
-> > 
-> > So, because we're masking the wrong bits, we end up with these tests
-> > always succeeding.
-> > 
-> > So that's a NACK for the original patch, it's the wrong fix.  The
-> > right fix is to avoid writing this register by fixing the RTL masking.
-> 
-> Okie dokie, dropping the omap specific fix.
+Hi Will,
 
-Here's the revision mask fix - with the existing code, the revision checks
-are all useless since they would all pass irrespective of the actual
-revision.  (Had the L2C series been better tested rather than being largely
-ignored, this may have been noticed before it was merged...)  Anyway, what
-isn't clear from Sekhar's message is which revision L2C310 is in the AM437x.
+On 3 July 2014 19:52, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Jean,
+>
+> On Fri, Jun 27, 2014 at 03:57:46PM +0100, Jean Pihet wrote:
+>> As done on other architectures (ARM64, x86, Sparc etc.).
+>>
+>> This prevents a deadlock on down_read in do_page_fault when unwinding
+>> using fp and triggering on kernel tracepoints:
+>
+> So is this an issue because you could try setting tracepoints on the
+> pagefault path? If so, the patch is a little brutal as it would break user
+> backtracing as soon as we take any old page fault, no?
+>
+> Or am I missing something obvious?
+The problem is a deadlock between the perf events interrupt and
+copy_from_user, which take the same lock.
+The commit description has been updated to give all the details about it.
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: [PATCH] ARM: l2c: fix revision checking
+Big thanks to Steve on the debugging!
 
-The revision checking in l2c310_enable() was not correct; we were
-masking the part number rather than the revision number.  Fix this
-to use the correct macro.
+A new patch set is on its way.
 
-Fixes: 4374d64933b1 ("ARM: l2c: add automatic enable of early BRESP")
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-l2x0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Jean
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 948f12cf6180..0b5068256baf 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
- 
- static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- {
--	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-+	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
- 	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
- 
- 	if (rev >= L310_CACHE_ID_RTL_R2P0) {
--- 
-1.8.3.1
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+>
+> Will
+>
+>>   INFO: task stress:2116 blocked for more than 120 seconds.
+>>         Not tainted 3.15.0-rc4-00364-g3401dfb-dirty #43
+>>   "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+>>   stress          D c04b41e8     0  2116   2115 0x00000000
+>>   [<c04b41e8>] (__schedule) from [<c04b46dc>] (schedule+0x40/0x90)
+>>   [<c04b46dc>] (schedule) from [<c04b6ec8>] (__down_read+0xc4/0xfc)
+>>   [<c04b6ec8>] (__down_read) from [<c04b69c0>] (down_read+0x18/0x1c)
+>>   [<c04b69c0>] (down_read) from [<c001d41c>] (do_page_fault+0xac/0x420)
+>>   [<c001d41c>] (do_page_fault) from [<c0008444>] (do_DataAbort+0x44/0xa8)
+>>   [<c0008444>] (do_DataAbort) from [<c00136b8>] (__dabt_svc+0x38/0x60)
+>>   Exception stack(0xecbc3af8 to 0xecbc3b40)
+>>   3ae0:                                                       ecbc3b74 b6d72ff4
+>>   3b00: ffffffec 00000000 b6d72ff4 ec0fc000 00000000 ec0fc000 0000007e 00000000
+>>   3b20: ecbc2000 ecbc3bac 00000014 ecbc3b44 c0019e78 c021ef44 00000013 ffffffff
+>>   [<c00136b8>] (__dabt_svc) from [<c021ef44>] (__copy_from_user+0xa4/0x3a0)
+>>
+>> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>>  arch/arm/kernel/perf_event.c | 9 +++++++--
+>>  1 file changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index 6493c4c..f5aeca2 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -560,11 +560,16 @@ user_backtrace(struct frame_tail __user *tail,
+>>              struct perf_callchain_entry *entry)
+>>  {
+>>       struct frame_tail buftail;
+>> +     unsigned long err;
+>>
+>> -     /* Also check accessibility of one struct frame_tail beyond */
+>>       if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
+>>               return NULL;
+>> -     if (__copy_from_user_inatomic(&buftail, tail, sizeof(buftail)))
+>> +
+>> +     pagefault_disable();
+>> +     err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
+>> +     pagefault_enable();
+>> +
+>> +     if (err)
+>>               return NULL;
+>>
+>>       perf_callchain_store(entry, buftail.lr);
+>> --
+>> 1.8.1.2
+>>
+>>
