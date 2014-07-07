@@ -1,80 +1,129 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Jul 2014 17:31:43 +0100
-Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU
- advertises it has exclusives
-In-Reply-To: <20140707155942.GD32578@arm.com>
-References: <4606711.7KmFAGVNmG@wuerfel>
- <20140704205144.GK21766@n2100.arm.linux.org.uk> <5774249.oWoI3gS2oa@wuerfel>
- <20140707110248.GA32578@arm.com>
- <20140707111712.GZ21766@n2100.arm.linux.org.uk>
- <20140707120552.GB32276@arm.com>
- <20140707131335.GB21766@n2100.arm.linux.org.uk>
- <20140707134624.GC32276@arm.com>
- <20140707153105.GC21766@n2100.arm.linux.org.uk>
- <20140707155942.GD32578@arm.com>
-Message-ID: <20140707163143.GE21766@n2100.arm.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon,  7 Jul 2014 18:42:53 +0200
+Subject: [RESEND PATCH v3 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+Message-ID: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 04:59:42PM +0100, Catalin Marinas wrote:
-> Going on topic again, LDREXB is present in ARM1136 r1 but your changes
-> would not detect it (and it's a different ID_ISAR3 format anyway). If we
-> care about this case, you could either pretend that ARM1136 r1 is ARMv6K
-> and link those decisions to v6K+ tests or check for individual features
-> which for ARM1136 would require a different check from standard CPUID.
+Hello,
 
-Ever since ARMv6 was first added, HWCAP_SWP has been indicated for all
-ARMv6 CPUs and their derivatives.  Indeed, the SWP instruction is
-supported in hardware.
+Sorry for the noise, but I forgot to add the LAKML in Cc.
 
-Hence, indicating HWCAP_SWP on ARMv6 whether or not there is LDREXB
-support is /not/ incorrect in any way.
+This patch series adds support for Atmel HLCDC (HLCD Controller) available
+on some Atmel SoCs (i.e. the sama5d3 family).
 
-ARM1136 r1 added LDREXB as part of the ARMv6K adoption, but it kept
-the SWP instruction (which can't be disabled.)  So, indicating
-HWCAP_SWP also is /not/ incorrect.
+The first two versions of this series didn't receive any reviews from DRM
+maintainers or experienced DRM developers.
+Anyway, I hope I'll get some feedback on this version.
 
-However, when it comes to SMP, we would _prefer_ userspace to use
-the exclusives instructions, though it seems that the SWP behaviour
-on an ARMv6K SMP system with respect to other CPUs is not documented.
-All things being equal, we would prefer SWP not be used there because
-we don't know whether it's safe.  Unfortunately, we can't turn the
-instruction off, so we can't emulate it.
+The HLCDC actually provides a Display Controller and a PWM device, hence I
+decided to declare an MFD device exposing 2 subdevices: a display
+controller and a PWM chip.
+This also solves a circular dependency issue preventing HLCDC driver from
+unloading.
+The HLCDC request a drm_panel device, which request a backlight device
+(a PWM backlight), which depends on a PWM which is provided by the HLCDC
+driver (hlcdc -> panel -> backlight -> hlcdc (pwm part)).
 
-However, we know that some userspace running there may well contain
-SWP instructions.  So, as there aren't any bug reports, it's probably
-safe to assume that SWP is safe on ARMv6K SMP systems.
+The current implementation only supports sama5d3 SoCs but other SoCs should
+be easily ported by defining new compatible strings and adding HLCDC
+description structures for these SoCs.
+
+The drivers supports basic CRTC functionalities, several overlays and an
+hardware cursor.
+
+At the moment, it only supports connection to LCD panels through an RGB
+connector (defined as an LVDS connector in my implementation), though
+connection to other kind of devices (like DRM bridges) can be added later.
+
+It also supports several RGB format on all planes and some YUV formats on
+the HEO overlay plane.
+
+Best Regards,
+
+Boris
+
+Changes since v2:
+- fix coding style issues (macro indentation)
+- make use of GENMASK in several places
+- declare regmap config as a static structure
+- rework hlcdc plane update API
+- rework cursor handling to make use of the new plane update API
+- fix backporch config
+- do not use devm_regmap_init_mmio_clk to avoid extra clk_enable
+  clk disable calls when accessing registers
+- explicitely include regmap and clk headers instead of relying on
+  atmel-hlcdc.h inclusions
+- make the atmel-hlcdc driver depends on CONFIG_OF
+- separate DT bindings documentation from driver implementation
+- support several pin muxing for HLCDC pins on sama5d3 SoCs
+
+Changes since v1:
+- replace the backlight driver by a PWM driver
+- make use of drm_panel infrastructure
+- split driver code in several subsystem: MFD, PWM and DRM
+- add support for overlays
+- add support for hardware cursor
 
 
-So, the upshot of this is:
-* SWP on all ARMv6 is fine.
-* Advertising HWCAP_SWP on all ARMv6 is fine too.
-* We would prefer not to advertise HWCAP_SWP on ARMv6 with support
-  for the exclusives, and we can do that trivially where we can
-  check the CPUID values.
-* ARM1136 is either ARMv6 or ARMv6K depending on its revision -
-  and thus may have LDREXB, but LDREXB is not trivially detectable.
+Boris BREZILLON (11):
+  mfd: add atmel-hlcdc driver
+  mfd: add documentation for atmel-hlcdc DT bindings
+  pwm: add support for atmel-hlcdc-pwm device
+  pwm: add DT bindings documentation for atmel-hlcdc-pwm driver
+  drm: add Atmel HLCDC Display Controller support
+  drm: add DT bindings documentation for atmel-hlcdc-dc driver
+  ARM: AT91/dt: split sama5d3 lcd pin definitions to match RGB mode
+    configs
+  ARM: AT91/dt: add alternative pin muxing for sama5d3 lcd pins
+  ARM: at91/dt: define the HLCDC node available on sama5d3 SoCs
+  ARM: at91/dt: add LCD panel description to sama5d3xdm.dtsi
+  ARM: at91/dt: enable the LCD panel on sama5d3xek boards
 
-
-I believe what I'm doing in this patch is architecturally correct, I
-also believe it to be safe for the troublesome ARM1136 by way of
-defaulting to advertising HWCAP_SWP.
-
-The killer argument for this is that we've been advertising HWCAP_SWP
-for over the last decade on these anyway, and that situation is not
-changing.
-
-What is changing is whether we advertise HWCAP_SWP on CPUs with the
-architected CPUID registers (maybe some ARMv6 if we're lucky, and
-all ARMv7) which also indicate that they have LDREXB support.
-
-Hence, this is the conservative change: we could include ARM1136 r1
-in this, but I don't see the need to complicate the code further
-right now.
-
-Also, adding a CPU_ARCH_ARMv6K doesn't buy us very much, and carries
-many risks that we will end up breaking something.
+ .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     |  59 ++
+ .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  40 ++
+ .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    |  46 ++
+ arch/arm/boot/dts/sama5d31ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d33ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d34ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d36ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d3_lcd.dtsi                 | 197 +++++-
+ arch/arm/boot/dts/sama5d3xdm.dtsi                  |  43 ++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/atmel-hlcdc/Kconfig                |  11 +
+ drivers/gpu/drm/atmel-hlcdc/Makefile               |   7 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 469 +++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c       | 474 ++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       | 210 ++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c    | 706 ++++++++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h    | 422 ++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c    | 351 ++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c    | 729 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |  12 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/atmel-hlcdc.c                          | 119 ++++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-atmel-hlcdc.c                      | 229 +++++++
+ include/linux/mfd/atmel-hlcdc.h                    |  78 +++
+ 27 files changed, 4281 insertions(+), 31 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+ create mode 100644 drivers/mfd/atmel-hlcdc.c
+ create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
+ create mode 100644 include/linux/mfd/atmel-hlcdc.h
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.2
