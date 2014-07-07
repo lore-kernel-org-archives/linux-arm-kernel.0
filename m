@@ -1,79 +1,102 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Jul 2014 09:20:54 +0530
-Subject: [PATCH v6 4/6] ARM: EXYNOS: Remove file path from comment section
-In-Reply-To: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1404705056-11965-5-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 07 Jul 2014 10:49:33 +0530
+Subject: [PATCH v6 1/4] ARM: EXYNOS: Add support for mapping PMU base address
+ via DT
+In-Reply-To: <1404710376-16448-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1404710376-16448-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1404710376-16448-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many files under "arm/mach-exynos" are having file path in file
-comment section which is invalid now.
-So for better code maintainability let's remove them.
+Add support for mapping Samsung Power Management Unit (PMU)
+base address from device tree.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/headsmp.S             |    1 -
- arch/arm/mach-exynos/hotplug.c             |    3 +--
- arch/arm/mach-exynos/include/mach/map.h    |    3 +--
- arch/arm/mach-exynos/include/mach/memory.h |    3 +--
- arch/arm/mach-exynos/platsmp.c             |    3 +--
- 5 files changed, 4 insertions(+), 9 deletions(-)
+ arch/arm/mach-exynos/common.h |    1 +
+ arch/arm/mach-exynos/exynos.c |   37 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-index cdd9d91..b54f970 100644
---- a/arch/arm/mach-exynos/headsmp.S
-+++ b/arch/arm/mach-exynos/headsmp.S
-@@ -1,5 +1,4 @@
- /*
-- *  linux/arch/arm/mach-exynos4/headsmp.S
-  *
-  *  Cloned from linux/arch/arm/mach-realview/headsmp.S
-  *
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 8a134d0..572f6b1 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -1,5 +1,4 @@
--/* linux arch/arm/mach-exynos4/hotplug.c
-- *
-+/*
-  *  Cloned from linux/arch/arm/mach-realview/hotplug.c
-  *
-  *  Copyright (C) 2002 ARM Ltd.
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 548269a..963002f 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos/include/mach/map.h
-- *
-+/*
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-  *
-diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
-index 2a4cdb7..e19df1f 100644
---- a/arch/arm/mach-exynos/include/mach/memory.h
-+++ b/arch/arm/mach-exynos/include/mach/memory.h
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos4/include/mach/memory.h
-- *
-+/*
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 55ed2e6..cd25a9c 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos4/platsmp.c
-- *
-+ /*
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 152b464..f8daa9c 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -113,6 +113,7 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
+ 
+ extern void __iomem *sysram_ns_base_addr;
+ extern void __iomem *sysram_base_addr;
++extern void __iomem *pmu_base_addr;
+ void exynos_sysram_init(void);
+ 
+ void exynos_firmware_init(void);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 186f35d..173aac8 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -19,6 +19,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_domain.h>
++#include <linux/irqchip.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -31,6 +32,8 @@
+ #include "regs-pmu.h"
+ #include "regs-sys.h"
+ 
++void __iomem *pmu_base_addr;
++
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+@@ -253,6 +256,39 @@ static void __init exynos_init_io(void)
+ 	exynos_map_io();
+ }
+ 
++static const struct of_device_id exynos_dt_pmu_match[] = {
++	{ .compatible = "samsung,exynos3250-pmu" },
++	{ .compatible = "samsung,exynos4210-pmu" },
++	{ .compatible = "samsung,exynos4212-pmu" },
++	{ .compatible = "samsung,exynos4412-pmu" },
++	{ .compatible = "samsung,exynos5250-pmu" },
++	{ .compatible = "samsung,exynos5420-pmu" },
++	{ /*sentinel*/ },
++};
++
++static void exynos_map_pmu(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, exynos_dt_pmu_match);
++	if (np)
++		pmu_base_addr = of_iomap(np, 0);
++
++	if (!pmu_base_addr)
++		panic("failed to find exynos pmu register\n");
++}
++
++static void __init exynos_init_irq(void)
++{
++	irqchip_init();
++	/*
++	 * Since platsmp.c needs pmu base address by the time
++	 * DT is not unflatten so we can't use DT APIs before
++	 * init_irq
++	 */
++	exynos_map_pmu();
++}
++
+ static void __init exynos_dt_machine_init(void)
+ {
+ 	struct device_node *i2c_np;
+@@ -336,6 +372,7 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.map_io		= exynos_init_io,
+ 	.init_early	= exynos_firmware_init,
++	.init_irq	= exynos_init_irq,
+ 	.init_machine	= exynos_dt_machine_init,
+ 	.init_late	= exynos_init_late,
+ 	.dt_compat	= exynos_dt_compat,
 -- 
 1.7.9.5
