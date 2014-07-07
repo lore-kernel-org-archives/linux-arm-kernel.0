@@ -1,51 +1,76 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon,  7 Jul 2014 18:43:02 +0200
-Subject: [RESEND PATCH v3 09/11] ARM: at91/dt: define the HLCDC node available
- on sama5d3 SoCs
+Date: Mon,  7 Jul 2014 18:43:03 +0200
+Subject: [RESEND PATCH v3 10/11] ARM: at91/dt: add LCD panel description to
+ sama5d3xdm.dtsi
 In-Reply-To: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1404751384-5077-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1404751384-5077-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the HLCDC (HLCD Controller) IP available on some sama5d3 SoCs
-(i.e. sama5d31, sama5d33, sama5d34 and sama5d36) in sama5d3 dtsi file.
+Add LCD panel related nodes (backlight, regulators and panel) to sama5d3
+Display Module dtsi.
+
+Reference LCD pin muxing used by sama5d3xek boards.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d3_lcd.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/sama5d3xdm.dtsi | 43 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-index 9642eef..f6aa637 100644
---- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-@@ -166,6 +166,26 @@
+diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+index 035ab72..690055e 100644
+--- a/arch/arm/boot/dts/sama5d3xdm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
+@@ -36,6 +36,49 @@
+ 					};
  				};
  			};
- 
++
 +			hlcdc: hlcdc at f0030000 {
-+				compatible = "atmel,sama5d3-hlcdc";
-+				reg = <0xf0030000 0x2000>;
-+				clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
-+				clock-names = "periph_clk","sys_clk", "slow_clk";
-+				status = "disabled";
-+
 +				hlcdc-display-controller {
-+					compatible = "atmel,hlcdc-dc";
-+					interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-+				};
-+
-+				hlcdc_pwm: hlcdc-pwm {
-+					compatible = "atmel,hlcdc-pwm";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_lcd_pwm>;
-+					#pwm-cells = <3>;
++					pinctrl-names = "default", "rgb-444", "rgb-565", "rgb-666", "rgb-888";
++					pinctrl-0 = <&pinctrl_lcd_base>;
++					pinctrl-1 = <&pinctrl_lcd_base &pinctrl_lcd_rgb444>;
++					pinctrl-2 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
++					pinctrl-3 = <&pinctrl_lcd_base &pinctrl_lcd_rgb666_alt>;
++					pinctrl-4 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888_alt>;
 +				};
 +			};
+ 		};
+ 	};
 +
- 			pmc: pmc at fffffc00 {
- 				periphck {
- 					lcdc_clk: lcdc_clk {
++	bl_reg: backlight_regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "backlight-power-supply";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		status = "disabled";
++	};
++
++	panel_reg: panel_regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "panel-power-supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		status = "disabled";
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&hlcdc_pwm 0 50000 0>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++		power-supply = <&bl_reg>;
++		status = "disabled";
++	};
++
++	panel: panel {
++		compatible = "foxlink,fl500wvr00-a0t", "simple-panel";
++		backlight = <&backlight>;
++		power-supply = <&panel_reg>;
++		status = "disabled";
++	};
+ };
 -- 
 1.8.3.2
