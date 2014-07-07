@@ -1,40 +1,63 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Sun, 6 Jul 2014 19:56:27 -0700
-Subject: Issue found in Armada 370: 10Mbps ethernet connection can't get IP
-Message-ID: <CAB8gEUtaKwE5ax8_-+jb4pS08CO0V_CFdcEW47ej5YLaU=sb5A@mail.gmail.com>
+From: xuwei5@hisilicon.com (xuwei)
+Date: Mon, 7 Jul 2014 11:15:30 +0800
+Subject: [PATCH v2] MAINTAINERS:ARM:hisi: add Hisilicon SoC family
+In-Reply-To: <53B6A41D.1030000@cogentembedded.com>
+References: <53B66A9F.6040404@hisilicon.com>
+ <53B6A41D.1030000@cogentembedded.com>
+Message-ID: <53BA10D2.7080409@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-Good day.
 
-We have previously discussed before on Armada 370 ethernet issues (now
-resolved via your suggestion/patches in recent kernel versions).
 
-We just found out last week that 10Mbps ethernet (SGMII) connection
-can't obtain IP in recent kernel versions (3.10.x and above). Here are
-the details:
+On 2014/7/4 20:54, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 07/04/2014 12:49 PM, xuwei wrote:
+> 
+>> Introduce a new mach-hisi that will support Hisilicon SoCs based on ARMv7
+>> and I am taking maintainership for it.
+> 
+>> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+>> ---
+>>   MAINTAINERS | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+> 
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 134483f..a4f700a 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -972,6 +972,14 @@ F:    arch/arm/mach-pxa/hx4700.c
+>>   F:    arch/arm/mach-pxa/include/mach/hx4700.h
+>>   F:    sound/soc/pxa/hx4700.c
+>>
+>> +ARM/Hisilicon SoC support
+> 
+>    This line is traditionally written in upper case.
 
-Processor: Armada 370 88F6707
-Board: Custom
-Kernel versions tried:
-3.10.24 (issue exists)
-3.13.9 (issue exists)
-3.2.43 (issue does NOT exist)
-U-Boot versions tried: 2012_Q4 and 2013_Q1 from Marvell extranet
+Hi Sergei,
 
-Some more important notes:
-Both 100Mbps and 1000Mbps have no issues.
-Issue does not exist at u-boot level (via static IP address, confirmed
-via ping - results: 'x.x.x.x is alive')
-We have different LED configs for 10, 100 and 1000 Mbps - and LED
-shows 10Mbps is established (even ethtool does). However, we just
-can't obtain IP.
-Our kernel version 3.2.43 have patches from Marvell extranet (for Armada 370)
+Thanks!
+I will change it to upper case. 
 
-Is there a known issue for this?
+>> +M:    Wei Xu <xuwei5@hisilicon.com>
+>> +L:    linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> +W:    www.hisilicon.com
+> 
+>    How about http://?
 
-Thank you very much.
+will add it.
 
-Regards,
-Maggie Roxas
+Best Regards,
+Wei
+
+> 
+>> +S:    Supported
+>> +T:    git git://github.com/hisilicon/linux-hisi.git
+>> +F:    arch/arm/mach-hisi/
+>> +
+> 
+> WBR, Sergei
+> 
+> 
+> 
