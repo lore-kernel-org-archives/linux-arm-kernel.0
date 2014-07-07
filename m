@@ -1,32 +1,41 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 7 Jul 2014 21:29:54 +0100
-Subject: [PATCH 2/2] efi: implement mandatory locking for UEFI Runtime
- Services
-In-Reply-To: <1404295802-28030-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404295802-28030-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140707202954.GC27474@console-pimps.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 7 Jul 2014 22:38:13 +0200
+Subject: [PATCH v3] efi/arm64: handle missing virtual mapping for UEFI
+ System Table
+In-Reply-To: <20140707201103.GB27474@console-pimps.org>
+References: <1404487509-26084-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1404492756.19665.57.camel@deneb.redhat.com>
+ <20140704170110.GM16404@arm.com>
+ <CAKv+Gu_-=NtVNFLEh35Pv8OO6nLe1YhPjS13MYZa93YOXFOh6Q@mail.gmail.com>
+ <09C85B92-02BB-45C4-A461-D4E0CD4F7203@arm.com>
+ <20140707201103.GB27474@console-pimps.org>
+Message-ID: <CAKv+Gu9aksvu3kOVt9GAA8jGdR0DkUUJ2iT3RMS-kEZ-OOkH2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Jul, at 12:10:02PM, Ard Biesheuvel wrote:
-> According to section 7.1 of the UEFI spec, Runtime Services are not fully
-> reentrant, and there are particular combinations of calls that need to be
-> serialized.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/runtime-wrappers.c | 109 +++++++++++++++++++++++++++++---
->  1 file changed, 99 insertions(+), 10 deletions(-)
+On 7 July 2014 22:11, Matt Fleming <matt@console-pimps.org> wrote:
+> On Sat, 05 Jul, at 08:25:35AM, Catalin Marinas wrote:
+>>
+>> OK, I?ll leave it to Matt then together with the other EFI patches
+>> he?s already queuing.
+>
+> Thanks guys.
+>
+> What release are we targetting with this patch? Is it a bug fix for
+> something likely to affect people? Have there been reports of users
+> actually hitting this issue?
+>
+> We're at -rc4 now, so there's still time for getting bug fixes to Linus
+> but we may start being asked for justification from the tip folks en
+> route to Linus.
+>
+> If it's just a case of improving the error paths, can it wait until
+> v3.17?
+>
 
-Ard, what's going on with this one? I didn't see it resubmitted along
-with v3 of "efi/arm64: handle missing virtual mapping for UEFI System
-Table".
+This fixes a potential panic under buggy firmware, but no reports of
+this actual bug are known, so there is no justification for a late
+merge for 3.16.
 
-Note that we already have a lock to serialize access to the UEFI
-variable services in the form of __efivars->lock, see
-drivers/firmware/efi/vars.c. It's a spinlock because of the context we
-may need to create variables in from efi_pstore_write().
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+Thanks,
+Ard.
