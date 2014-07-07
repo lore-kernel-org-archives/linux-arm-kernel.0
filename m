@@ -1,51 +1,54 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Mon, 7 Jul 2014 11:26:43 -0700
-Subject: [PATCH] arm64: PCI(e) arch support
-In-Reply-To: <53B5F81B.8010801@freescale.com>
-References: <1404422876-1160-1-git-send-email-tinamdar@apm.com>
- <53B5F81B.8010801@freescale.com>
-Message-ID: <CACoXjc=0+gkHCX7SkcVrJ6xGNyVLyW-X+ZfDzJwSDn-9QX5zkw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 7 Jul 2014 20:32:36 +0200
+Subject: [PATCH 3/5] ARM: at91/dt: sama5d3: define mpddr clock and ramc
+ clocks
+In-Reply-To: <1404746355-19988-4-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404746355-19988-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1404746355-19988-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140707183236.GF9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 3, 2014 at 5:40 PM, Prabhakar Kushwaha
-<prabhakar@freescale.com> wrote:
-> Hi Tanmay, Liviu,
->
-> On 7/4/2014 2:57 AM, Tanmay Inamdar wrote:
->>
->> Reposting on request of several people since previously posted one was
->> corrupted.
->>
->> This patch adds the arch support for PCI(e) for arm64. The files
->> added or modified in this patch are based on PCI(e) support in
->> 32bit arm.
->>
->> Please note that this patch is just for the reference. Liviu Dudau from
->> ARM
->> has posted his v8 series of patch to support PCIe in arm64.
->>
->> The patch will apply against 3.13 Linux Kernel
->>
->> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
->>
->
-> do we foresee similar type of changes in u-boot  to support PCI(e) for
-> ARM64.
->
-
-Well.. Actually PCI(e) has no dependency on ARM64 architecture. This
-patch is required only because of current Linux structure. Hence
-Liviu's effort to take PCI(e) out of 'arch' makes sense.
-
-In my experience, I don't think any arch specific changes are required
-in u-boot. At least I don't recall making any specific changes in
-u-boot pci layer. However we don't really have a big use case for PCIe
-in u-boot. It just links up and lists the devices discovered during
-enumeration.
-
-
-> Regards,
-> Prabhakar
->
->
+On 17:19 Mon 07 Jul     , Alexandre Belloni wrote:
+> 
+> Define the available clock for mprddr and take both mpddr_clk and ddrck in the
+> ram controller driver.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sama5d3.dtsi | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index e0b15a6e8897..3bd8db9e069b 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -402,8 +402,10 @@
+>  			};
+>  
+>  			ramc0: ramc at ffffea00 {
+> -				compatible = "atmel,at91sam9g45-ddramc";
+> +				compatible = "atmel,sama5d3-mpddramc", "atmel,at91sam9g45-ddramc";
+the sama5 ddr controler is not back compitble with 9g45 one the compatible is
+wrong
+>  				reg = <0xffffea00 0x200>;
+> +				clocks = <&ddrck>, <&mpddr_clk>;
+> +				clock-names = "ddrck", "mpddr";
+>  			};
+>  
+>  			dbgu: serial at ffffee00 {
+> @@ -1170,6 +1172,11 @@
+>  						#clock-cells = <0>;
+>  						reg = <48>;
+>  					};
+> +
+> +					mpddr_clk: mpddr_clk {
+> +						#clock-cells = <0>;
+> +						reg = <49>;
+> +					};
+>  				};
+>  			};
+>  
+> -- 
+> 1.9.1
+> 
