@@ -1,91 +1,103 @@
-From: linville@tuxdriver.com (John W. Linville)
-Date: Mon, 7 Jul 2014 14:23:02 -0400
-Subject: [PATCH v3 1/4] dt: bindings: add bindings for Broadcom bcm43xx
- sdio devices
-In-Reply-To: <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
-References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
- <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140707182302.GA29650@tuxdriver.com>
+From: ccross@google.com (Colin Cross)
+Date: Mon, 7 Jul 2014 11:35:23 -0700
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <20140707122831.0DCEEC409D5@trevor.secretlab.ca>
+References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+ <20140701234800.GA23577@sirena.org.uk>
+ <20140702100133.GE18731@arm.com>
+ <20140702163923.GJ410@sirena.org.uk>
+ <20140702170141.GH24879@arm.com>
+ <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
+ <20140703104135.GA28175@arm.com>
+ <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
+ <20140703174318.GE28175@arm.com>
+ <20140704132250.A2447C40ADD@trevor.secretlab.ca>
+ <20140705111406.GA23692@arm.com>
+ <20140707122831.0DCEEC409D5@trevor.secretlab.ca>
+Message-ID: <CAMbhsRT64KJeFLjukzJct_K2+GW3d+UJ9R-Cd5ZR-1zS6UkQng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any word from the devicetree folks?
+On Mon, Jul 7, 2014 at 5:28 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Sat, 5 Jul 2014 12:14:07 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Fri, Jul 04, 2014 at 02:22:50PM +0100, Grant Likely wrote:
+>> > On Thu, 3 Jul 2014 18:43:18 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > > On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
+>> > > > So, no. I completely reject any notion that breaking existing apps is
+>> > > > okay. If we're going to say that v8 still supports 32-bit apps, then
+>> > > > it has to be all of v7, not just the 'good' bits. Nor do I think
+>> > > > saying "it's just a bunch of games" justifies anything. We're kernel
+>> > > > engineers. Applications are applications and we don't break userspace.
+>> > > > Period.
+>> > >
+>> > > Here you need to define user-space. OABI?
+>> >
+>> > This is where we can be pragmatic. Listen to our users. Colin was very
+>> > clear about what some apps need in order to keep working. He's not even
+>> > asking for old kernels or system libraries to be supported because he
+>> > has control over those components and they can be fixed. The important
+>> > ABI is the ABI used by Android applications.
+>> >
+>> > We can drop ABIs that nobody uses. If nobody complains, is it really
+>> > broken?
+>>
+>> OK, so I think we now agree that being asked not to break the ABI ever
+>> is not feasible (and not in the community's interest either; think about
+>> carrying over NWFPE for ARMv8 just because someone wants to run an old
+>> distro when there are alternatives already, such requests would need
+>> proper justification).
+>>
+>> Another aspect is that users don't always know what's good (or bad) for
+>> them. EABI provided means via kuser helpers to use arch-independent
+>> barrier code and cmpxchg. Glibc and various threads libraries moved to
+>> using them but as we can see, not all user space. As Russell pointed
+>> out, we failed to raise the SWP issue properly in the ARMv7 kernel (more
+>> warnings, always emulation) and I see this as a valid reason to allow
+>> for a _transition_ period in ARMv8.
+>>
+>> But we have to agree on a way to handle deprecated/removed architecture
+>> features (as I said, some of them are removed for good reasons). And
+>> that's also for user's benefit, performance wise they should rather use
+>> native than emulated features.
+>>
+>> The timeline I propose would be:
+>>
+>> 1. Architecture feature deprecation (still present, no way to disable)
+>>    - In Linux we need to find ways and push for alternatives to be
+>>      adopted by user space (like we did with kuser helpers)
+>> 2. Architecture feature disabling (still present but needs to be enabled
+>>    explicitly via SCTLR bit)
+>>    - Linux disables the feature by default and provides emulation
+>>      (enabled by default), clear warnings
+>>    - In certain cases, there may be justification to enable the hardware
+>>      feature but certainly not in defconfig nor distro Image builds.
+>>      Otherwise they can't complain that users are still using such
+>>      feature at point 3 below
+>> 3. Architecture feature removed
+>>    - Default Linux behaviour changes to SIGILL
+>>    - Emulation could be still available in the kernel but maybe under
+>>      a CONFIG_EXPERT option
+>> 4. Eventually remove kernel emulation support entirely (or don't carry
+>>    it over to a new port, though I don't foresee any arm128 ;))
+>>
+>> With SWP, we are currently at 3/4 with the counter arguments that 2
+>> wasn't entirely clear to users, so the transition needs to be
+>> carried over for ARMv8 (but I'm against 2 for arm64, 3 is as far as I
+>> would go). Arguably, with CP15 barriers we are at point 2, in which case
+>> if we add them to the arm64 kernel, they should be emulated with clear
+>> warnings (ratelimited).
+>
+> I could quibble on details, but I'm fine with that approach.
+>
+> It would also be good to have ongoing feedback about if the emulation is
+> getting used in the field. Colin, if the kernel emits warnings on
+> emulation, is that something that Google gathers statistics on for
+> devices in the field?
 
-On Sun, Jun 29, 2014 at 04:16:58PM +0200, Hans de Goede wrote:
-> From: Arend van Spriel <arend@broadcom.com>
-> 
-> The Broadcom bcm43xx sdio devices are fullmac devices that may be
-> integrated in ARM platforms. Currently, the brcmfmac driver for
-> these devices support use of platform data. This patch specifies
-> the bindings that allow this platform data to be expressed in the
-> devicetree.
-> 
-> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
-> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
-> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
-> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
-> Signed-off-by: Arend van Spriel <arend@broadcom.com>
-> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
->  on how to handle this yet]
-> [hdegoede at redhat.com: move from bindings/staging to bindings]
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
-> new file mode 100644
-> index 0000000..5dbf169
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
-> @@ -0,0 +1,41 @@
-> +Broadcom BCM43xx Fullmac wireless SDIO devices
-> +
-> +This node provides properties for controlling the Broadcom wireless device. The
-> +node is expected to be specified as a child node to the SDIO controller that
-> +connects the device to the system.
-> +
-> +Required properties:
-> +
-> + - compatible : Should be "brcm,bcm4329-fmac".
-> +
-> +Optional properties:
-> + - brcm,drive-strength : drive strength used for SDIO pins on device in mA
-> +	(default = 6).
-> + - interrupt-parent : the phandle for the interrupt controller to which the
-> +	device interrupts are connected.
-> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
-> +	When not specified the device will use in-band SDIO interrupts.
-> + - interrupt-names : name of the out-of-band interrupt, which must be set
-> +	to "host-wake".
-> +
-> +Example:
-> +
-> +mmc3: mmc at 01c12000 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc3_pins_a>;
-> +	vmmc-supply = <&reg_vmmc3>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	brcmf: bcrmf at 1 {
-> +		reg = <1>;
-> +		compatible = "brcm,bcm4329-fmac";
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <10 8>; /* PH10 / EINT10 */
-> +		interrupt-names = "host-wake";
-> +	};
-> +};
-> -- 
-> 2.0.0
-> 
-> 
-
--- 
-John W. Linville		Someday the world will need a hero, and you
-linville at tuxdriver.com			might be all we have.  Be ready.
+We do capture snapshots of the kernel log on dogfooding and
+experimental devices, but it's not a great source for statistical data
+because it only gets the most recent 64kB.  We do capture per-process
+cpu stats, if we could get it into a
+/proc/<pid>/deprecated_instructions file that would provide the most
+accurate statistics.  I can also talk to our developer relations teams
+about approaching it from the Play Store side.
