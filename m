@@ -1,40 +1,46 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:35 +0200
-Subject: [PATCHv2 18/32] ARM: at91/dt: ethernut5: define crystals frequencies
+Date: Mon,  7 Jul 2014 22:23:38 +0200
+Subject: [PATCHv2 21/32] ARM: at91: prepare common clk transition for sam9g45
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-19-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-22-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define egnite Ethernut 5 main and slow crystals frequencies.
+Enclose the sam9g45 old clk registration in "#if defined(CONFIG_OLD_CLK_AT91)
+ #endif"
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Tim Schendekehl <tim.schendekehl@egnite.de>
 ---
- arch/arm/boot/dts/ethernut5.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-at91/at91sam9g45.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-index 143b6d25bc80..8f941c2db7c6 100644
---- a/arch/arm/boot/dts/ethernut5.dts
-+++ b/arch/arm/boot/dts/ethernut5.dts
-@@ -20,6 +20,16 @@
- 		reg = <0x20000000 0x08000000>;
- 	};
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 9d3d544ac19c..0d5d85797cd6 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -25,10 +25,11 @@
+ #include "at91_aic.h"
+ #include "soc.h"
+ #include "generic.h"
+-#include "clock.h"
+ #include "sam9_smc.h"
+ #include "pm.h"
  
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <18432000>;
-+		};
-+	};
-+
- 	ahb {
- 		apb {
- 			dbgu: serial at fffff200 {
++#if defined(CONFIG_OLD_CLK_AT91)
++#include "clock.h"
+ /* --------------------------------------------------------------------
+  *  Clocks
+  * -------------------------------------------------------------------- */
+@@ -331,6 +332,9 @@ static void __init at91sam9g45_register_clocks(void)
+ 	clk_register(&pck0);
+ 	clk_register(&pck1);
+ }
++#else
++#define at91sam9g45_register_clocks NULL
++#endif
+ 
+ /* --------------------------------------------------------------------
+  *  GPIO
 -- 
 1.9.1
