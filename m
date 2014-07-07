@@ -1,34 +1,119 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jul 2014 16:51:41 +0200
-Subject: [PATCHv2 7/8] ARM: mvebu: update mvebu_v7_defconfig with cpufreq
- support
+Date: Mon,  7 Jul 2014 16:51:39 +0200
+Subject: [PATCHv2 5/8] ARM: mvebu: update Armada XP DT for dynamic frequency
+ scaling
 In-Reply-To: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404744702-32010-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404744702-32010-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Armada XP supports dynamic CPU frequency scaling, it
-makes sense to enable the cpufreq subsystem in mvebu_v7_defconfig, as
-well as the cpufreq-generic driver used on Armada XP.
+In order to support dynamic frequency scaling:
+
+ * the cpuclk Device Tree node needs to be updated to describe a
+   second set of registers describing the PMU DFS registers.
+
+ * the clock-latency property of the CPUs must be filled, otherwise
+   the ondemand and conservative cpufreq governors refuse to work. The
+   latency is high because the cost of a frequency transition is quite
+   high on those CPUs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi | 2 ++
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 ++
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 4 ++++
+ arch/arm/boot/dts/armada-xp.dtsi         | 2 +-
+ 4 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index b0bfefa..be2b5bc 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -29,6 +29,8 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPUFREQ_GENERIC=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_INET=y
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 1257ff1..2592e1c 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -34,6 +34,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <0>;
+ 			clocks = <&cpuclk 0>;
++			clock-latency = <1000000>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -41,6 +42,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <1>;
+ 			clocks = <&cpuclk 1>;
++			clock-latency = <1000000>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 3396b25..480e237 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -36,6 +36,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <0>;
+ 			clocks = <&cpuclk 0>;
++			clock-latency = <1000000>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -43,6 +44,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <1>;
+ 			clocks = <&cpuclk 1>;
++			clock-latency = <1000000>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 6da84bf..2c7b1fe 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -37,6 +37,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <0>;
+ 			clocks = <&cpuclk 0>;
++			clock-latency = <1000000>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -44,6 +45,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <1>;
+ 			clocks = <&cpuclk 1>;
++			clock-latency = <1000000>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -51,6 +53,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <2>;
+ 			clocks = <&cpuclk 2>;
++			clock-latency = <1000000>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -58,6 +61,7 @@
+ 			compatible = "marvell,sheeva-v7";
+ 			reg = <3>;
+ 			clocks = <&cpuclk 3>;
++			clock-latency = <1000000>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 5902e83..bff9f6c 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -99,7 +99,7 @@
+ 			cpuclk: clock-complex at 18700 {
+ 				#clock-cells = <1>;
+ 				compatible = "marvell,armada-xp-cpu-clock";
+-				reg = <0x18700 0xA0>;
++				reg = <0x18700 0xA0>, <0x1c054 0x10>;
+ 				clocks = <&coreclk 1>;
+ 			};
+ 
 -- 
 2.0.0
