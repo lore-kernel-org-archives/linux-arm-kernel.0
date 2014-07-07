@@ -1,52 +1,72 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Jul 2014 17:50:09 +0000 (UTC)
-Subject: [PATCH 00/13] uio_pruss: add support for devicetree and am33xx
-In-Reply-To: <20140707084824.GA83417@localhost>
-References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
- <20140707084824.GA83417@localhost>
-Message-ID: <alpine.DEB.2.02.1407071733500.28318@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Jul 2014 18:50:58 +0100
+Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
+ it has exclusives
+In-Reply-To: <20140707163143.GE21766@n2100.arm.linux.org.uk>
+References: <20140704205144.GK21766@n2100.arm.linux.org.uk>
+ <5774249.oWoI3gS2oa@wuerfel> <20140707110248.GA32578@arm.com>
+ <20140707111712.GZ21766@n2100.arm.linux.org.uk>
+ <20140707120552.GB32276@arm.com>
+ <20140707131335.GB21766@n2100.arm.linux.org.uk>
+ <20140707134624.GC32276@arm.com>
+ <20140707153105.GC21766@n2100.arm.linux.org.uk>
+ <20140707155942.GD32578@arm.com>
+ <20140707163143.GE21766@n2100.arm.linux.org.uk>
+Message-ID: <20140707175058.GM32276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Jul 2014, Andre Heider wrote:
+On Mon, Jul 07, 2014 at 05:31:43PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 07, 2014 at 04:59:42PM +0100, Catalin Marinas wrote:
+> > Going on topic again, LDREXB is present in ARM1136 r1 but your changes
+> > would not detect it (and it's a different ID_ISAR3 format anyway). If we
+> > care about this case, you could either pretend that ARM1136 r1 is ARMv6K
+> > and link those decisions to v6K+ tests or check for individual features
+> > which for ARM1136 would require a different check from standard CPUID.
+> 
+> Ever since ARMv6 was first added, HWCAP_SWP has been indicated for all
+> ARMv6 CPUs and their derivatives.  Indeed, the SWP instruction is
+> supported in hardware.
+> 
+> Hence, indicating HWCAP_SWP on ARMv6 whether or not there is LDREXB
+> support is /not/ incorrect in any way.
+> 
+> ARM1136 r1 added LDREXB as part of the ARMv6K adoption, but it kept
+> the SWP instruction (which can't be disabled.)  So, indicating
+> HWCAP_SWP also is /not/ incorrect.
 
-> On Sun, Jun 29, 2014 at 06:21:34PM +0200, Andre Heider wrote:
-> > 
-> > this series adds PRUv2 support to uio_pruss through devicetree, makes the
-> > device usable on am33xx and enables it on beaglebone black.
-> > Inspired by old patches from Matt Porter found in a downstream tree.
-> > 
-> > To archieve that this series:
-> > * adds a flag to omap_hwmod.c to get PRUSS out of hardreset (patch 5 and 6)
+Fine be me.
 
-...
+> However, when it comes to SMP, we would _prefer_ userspace to use
+> the exclusives instructions, though it seems that the SWP behaviour
+> on an ARMv6K SMP system with respect to other CPUs is not documented.
+> All things being equal, we would prefer SWP not be used there because
+> we don't know whether it's safe.  Unfortunately, we can't turn the
+> instruction off, so we can't emulate it.
 
-> > * is the hardreset thing I did there the right thing to do? I think the
-> >   proper way would be a reset controller (which apparently doesn't yet exist
-> >   for this SoC?) and let the driver deassert/assert on probe/remove?
-> > * the platform device path has a clk_enable() / clk_put() calls. Are those
-> >   now redundant with the introduced pm_runtime_enable() pm_runtime_disable()
-> >   calls?
+IIRC, ARM11MPCore is fine. Certain ARMv7 MP implementations have issues
+with SWP, though not all AFAIK.
 
-Probably you only need pm_runtime_{get,put}_*() calls, unless you're 
-changing clock parents or rates in your driver code.
+> However, we know that some userspace running there may well contain
+> SWP instructions.  So, as there aren't any bug reports, it's probably
+> safe to assume that SWP is safe on ARMv6K SMP systems.
+> 
+> 
+> So, the upshot of this is:
+> * SWP on all ARMv6 is fine.
+> * Advertising HWCAP_SWP on all ARMv6 is fine too.
+> * We would prefer not to advertise HWCAP_SWP on ARMv6 with support
+>   for the exclusives, and we can do that trivially where we can
+>   check the CPUID values.
+> * ARM1136 is either ARMv6 or ARMv6K depending on its revision -
+>   and thus may have LDREXB, but LDREXB is not trivially detectable.
+> 
+> 
+> I believe what I'm doing in this patch is architecturally correct, I
+> also believe it to be safe for the troublesome ARM1136 by way of
+> defaulting to advertising HWCAP_SWP.
 
-> @OMAP guys: any comments? The series depends on patch 5 and 6; both touch
-> common hwmod code.
+I agree. With the above assumptions, feel free to add my ack for the
+whole series.
 
-I'd suggest splitting the series into three independent pieces if 
-possible:
-
-1. UIO code, for the UIO maintainer(s)
-2. DT pieces for Tony
-3. hwmod pieces for me
-
-That way they can be cleanly merged by the respective maintainers.
-
-As far as the hwmod piece goes, I'd be willing to merge your code as a 
-temporary workaround for the issue, and marking it as such; but I'd be 
-concerned about power management-related interactions (i.e., does the 
-PRUSS need to be reset upon return from deep idle states, etc.)
-
-
-- Paul
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
