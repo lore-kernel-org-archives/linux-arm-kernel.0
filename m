@@ -1,93 +1,52 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 07 Jul 2014 13:28:31 +0100
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <20140705111406.GA23692@arm.com>
-References: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
- <20140701234800.GA23577@sirena.org.uk> <20140702100133.GE18731@arm.com>
- <20140702163923.GJ410@sirena.org.uk> <20140702170141.GH24879@arm.com>
- <CACxGe6skyD-dNqR_XgqbWrwFsDs4Stwo81VQ4yviJMZK=kB8tA@mail.gmail.com>
- <20140703104135.GA28175@arm.com>
- <CACxGe6vmNamkAzvL8c5qaVEh9kvmTa=gEyr8KgBS1PW+KFc_=Q@mail.gmail.com>
- <20140703174318.GE28175@arm.com>
- <20140704132250.A2447C40ADD@trevor.secretlab.ca>
- <20140705111406.GA23692@arm.com>
-Message-ID: <20140707122831.0DCEEC409D5@trevor.secretlab.ca>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Jul 2014 05:39:26 -0700
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <20140707121512.GT3705@n2100.arm.linux.org.uk>
+References: <3c3a7a4861df01d0163787a9c18f7b7ac821c5b9.1403000372.git.nsekhar@ti.com>
+ <20140617131935.GB9070@saruman.home>
+ <20140701194704.GG13396@saruman.home>
+ <20140702081142.GU28884@atomide.com>
+ <20140707104727.GM28884@atomide.com>
+ <20140707104944.GS3705@n2100.arm.linux.org.uk>
+ <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
+ <20140707121512.GT3705@n2100.arm.linux.org.uk>
+Message-ID: <20140707123925.GW28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 5 Jul 2014 12:14:07 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Jul 04, 2014 at 02:22:50PM +0100, Grant Likely wrote:
-> > On Thu, 3 Jul 2014 18:43:18 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Thu, Jul 03, 2014 at 05:22:30PM +0100, Grant Likely wrote:
-> > > > So, no. I completely reject any notion that breaking existing apps is
-> > > > okay. If we're going to say that v8 still supports 32-bit apps, then
-> > > > it has to be all of v7, not just the 'good' bits. Nor do I think
-> > > > saying "it's just a bunch of games" justifies anything. We're kernel
-> > > > engineers. Applications are applications and we don't break userspace.
-> > > > Period.
-> > > 
-> > > Here you need to define user-space. OABI?
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [140707 05:17]:
+> On Mon, Jul 07, 2014 at 05:20:27PM +0530, Sekhar Nori wrote:
+> > OMAP4430 had L2 cache controller version r2p0 (per the public TRM) which
+> > does not have this register. So unless there is a ROM API that was
+> > introduced after OMAP4430, this would not be there even for other
+> > OMAP4s. Public TRM of OMAP4470 does not indicate an API for this.
 > > 
-> > This is where we can be pragmatic. Listen to our users. Colin was very
-> > clear about what some apps need in order to keep working. He's not even
-> > asking for old kernels or system libraries to be supported because he
-> > has control over those components and they can be fixed. The important
-> > ABI is the ABI used by Android applications.
-> > 
-> > We can drop ABIs that nobody uses. If nobody complains, is it really
-> > broken?
+> > Before creating the patch, I checked with ROM team handling AM437x and
+> > they denied an API to write to this register was present in AM437x ROM.
 > 
-> OK, so I think we now agree that being asked not to break the ABI ever
-> is not feasible (and not in the community's interest either; think about
-> carrying over NWFPE for ARMv8 just because someone wants to run an old
-> distro when there are alternatives already, such requests would need
-> proper justification).
+> Okay, so why are we trying to write to this register then...
 > 
-> Another aspect is that users don't always know what's good (or bad) for
-> them. EABI provided means via kuser helpers to use arch-independent
-> barrier code and cmpxchg. Glibc and various threads libraries moved to
-> using them but as we can see, not all user space. As Russell pointed
-> out, we failed to raise the SWP issue properly in the ARMv7 kernel (more
-> warnings, always emulation) and I see this as a valid reason to allow
-> for a _transition_ period in ARMv8.
+> Ah, we have a bug in cache-l2x0.c:
 > 
-> But we have to agree on a way to handle deprecated/removed architecture
-> features (as I said, some of them are removed for good reasons). And
-> that's also for user's benefit, performance wise they should rather use
-> native than emulated features.
+> #define L2X0_CACHE_ID_PART_MASK         (0xf << 6)
+> #define L2X0_CACHE_ID_RTL_MASK          0x3f
+> #define L310_CACHE_ID_RTL_R3P0          0x05
 > 
-> The timeline I propose would be:
+>         unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
 > 
-> 1. Architecture feature deprecation (still present, no way to disable)
->    - In Linux we need to find ways and push for alternatives to be
->      adopted by user space (like we did with kuser helpers)
-> 2. Architecture feature disabling (still present but needs to be enabled
->    explicitly via SCTLR bit)
->    - Linux disables the feature by default and provides emulation
->      (enabled by default), clear warnings
->    - In certain cases, there may be justification to enable the hardware
->      feature but certainly not in defconfig nor distro Image builds.
->      Otherwise they can't complain that users are still using such
->      feature at point 3 below
-> 3. Architecture feature removed
->    - Default Linux behaviour changes to SIGILL
->    - Emulation could be still available in the kernel but maybe under
->      a CONFIG_EXPERT option
-> 4. Eventually remove kernel emulation support entirely (or don't carry
->    it over to a new port, though I don't foresee any arm128 ;))
+>         if (rev >= L310_CACHE_ID_RTL_R2P0) {
+> ...
+>         if (rev >= L310_CACHE_ID_RTL_R3P0) {
+>                 l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+>                               base, L310_POWER_CTRL);
 > 
-> With SWP, we are currently at 3/4 with the counter arguments that 2
-> wasn't entirely clear to users, so the transition needs to be
-> carried over for ARMv8 (but I'm against 2 for arm64, 3 is as far as I
-> would go). Arguably, with CP15 barriers we are at point 2, in which case
-> if we add them to the arm64 kernel, they should be emulated with clear
-> warnings (ratelimited).
+> So, because we're masking the wrong bits, we end up with these tests
+> always succeeding.
+> 
+> So that's a NACK for the original patch, it's the wrong fix.  The
+> right fix is to avoid writing this register by fixing the RTL masking.
 
-I could quibble on details, but I'm fine with that approach.
+Okie dokie, dropping the omap specific fix.
 
-It would also be good to have ongoing feedback about if the emulation is
-getting used in the field. Colin, if the kernel emits warnings on
-emulation, is that something that Google gathers statistics on for
-devices in the field?
-
-g.
+Tony
