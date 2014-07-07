@@ -1,106 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Jul 2014 10:53:51 +0800
-Subject: [PATCH] ARM: imx: fix shared gate clock
-Message-ID: <1404701631-13870-1-git-send-email-shawn.guo@freescale.com>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Sun, 6 Jul 2014 20:00:36 -0700
+Subject: Issue found in Armada 370: 10Mbps ethernet connection can't get IP
+In-Reply-To: <CAB8gEUtaKwE5ax8_-+jb4pS08CO0V_CFdcEW47ej5YLaU=sb5A@mail.gmail.com>
+References: <CAB8gEUtaKwE5ax8_-+jb4pS08CO0V_CFdcEW47ej5YLaU=sb5A@mail.gmail.com>
+Message-ID: <CAB8gEUuEkfDbo7YMMXY3R23kj4Bp=50ynv=hWKvMAtJsg40Q9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's say clock A and B are two gate clocks that share the same register
-bit in hardware.  Therefore they are registered as shared gate clocks
-with imx_clk_gate2_shared().
+BTW - our ethernet chip is Marvell 88E1512.
 
-In a scenario that only clock A is enabled by clk_enable(A) while B is
-not used, the shared gate will be unexpectedly disabled in hardware.
-It happens because clk_enable(A) increments the share_count from 0 to 1,
-while clock B is unused to clock core, and therefore the core function
-will just disable B by calling clk->ops->disable() directly.  The
-consequence of that call is share_count is decremented to 0 and the gate
-is disabled in hardware, even though clock A is still in use.
-
-The patch fixes the issue by initializing the share_count per hardware
-state and returns enable state per share_count from .is_enabled() hook,
-in case it's a shared gate.
-
-While at it, add a check in clk_gate2_disable() to ensure it's never
-called with a zero share_count.
-
-Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Fabio,
-
-Per my testing, it fixes the shared gate clock issue you reported.
-But I'd like to get your confirmation before I ask arm-soc folks to
-apply it for 3.16-rc.
-
-Shawn
-
- arch/arm/mach-imx/clk-gate2.c | 31 +++++++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index 4ba587da89d2..84acdfd1d715 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -67,8 +67,12 @@ static void clk_gate2_disable(struct clk_hw *hw)
- 
- 	spin_lock_irqsave(gate->lock, flags);
- 
--	if (gate->share_count && --(*gate->share_count) > 0)
--		goto out;
-+	if (gate->share_count) {
-+		if (WARN_ON(*gate->share_count == 0))
-+			goto out;
-+		else if (--(*gate->share_count) > 0)
-+			goto out;
-+	}
- 
- 	reg = readl(gate->reg);
- 	reg &= ~(3 << gate->bit_idx);
-@@ -78,19 +82,26 @@ out:
- 	spin_unlock_irqrestore(gate->lock, flags);
- }
- 
--static int clk_gate2_is_enabled(struct clk_hw *hw)
-+static int clk_gate2_reg_is_enabled(void __iomem *reg, u8 bit_idx)
- {
--	u32 reg;
--	struct clk_gate2 *gate = to_clk_gate2(hw);
-+	u32 val = readl(reg);
- 
--	reg = readl(gate->reg);
--
--	if (((reg >> gate->bit_idx) & 1) == 1)
-+	if (((val >> bit_idx) & 1) == 1)
- 		return 1;
- 
- 	return 0;
- }
- 
-+static int clk_gate2_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_gate2 *gate = to_clk_gate2(hw);
-+
-+	if (gate->share_count)
-+		return !!(*gate->share_count);
-+	else
-+		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
-+}
-+
- static struct clk_ops clk_gate2_ops = {
- 	.enable = clk_gate2_enable,
- 	.disable = clk_gate2_disable,
-@@ -116,6 +127,10 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- 	gate->bit_idx = bit_idx;
- 	gate->flags = clk_gate2_flags;
- 	gate->lock = lock;
-+
-+	/* Initialize share_count per hardware state */
-+	if (share_count)
-+		*share_count = clk_gate2_reg_is_enabled(reg, bit_idx) ? 1 : 0;
- 	gate->share_count = share_count;
- 
- 	init.name = name;
--- 
-1.8.3.2
+On Sun, Jul 6, 2014 at 7:56 PM, Maggie Mae Roxas
+<maggie.mae.roxas@gmail.com> wrote:
+> Hi Thomas,
+> Good day.
+>
+> We have previously discussed before on Armada 370 ethernet issues (now
+> resolved via your suggestion/patches in recent kernel versions).
+>
+> We just found out last week that 10Mbps ethernet (SGMII) connection
+> can't obtain IP in recent kernel versions (3.10.x and above). Here are
+> the details:
+>
+> Processor: Armada 370 88F6707
+> Board: Custom
+> Kernel versions tried:
+> 3.10.24 (issue exists)
+> 3.13.9 (issue exists)
+> 3.2.43 (issue does NOT exist)
+> U-Boot versions tried: 2012_Q4 and 2013_Q1 from Marvell extranet
+>
+> Some more important notes:
+> Both 100Mbps and 1000Mbps have no issues.
+> Issue does not exist at u-boot level (via static IP address, confirmed
+> via ping - results: 'x.x.x.x is alive')
+> We have different LED configs for 10, 100 and 1000 Mbps - and LED
+> shows 10Mbps is established (even ethtool does). However, we just
+> can't obtain IP.
+> Our kernel version 3.2.43 have patches from Marvell extranet (for Armada 370)
+>
+> Is there a known issue for this?
+>
+> Thank you very much.
+>
+> Regards,
+> Maggie Roxas
