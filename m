@@ -1,37 +1,49 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 08 Jul 2014 00:22:39 +0100
-Subject: [PATCH A 02/12] net: fec: fix ethtool set_pauseparam duplex bug
-In-Reply-To: <20140707232148.GG21766@n2100.arm.linux.org.uk>
-References: <20140707232148.GG21766@n2100.arm.linux.org.uk>
-Message-ID: <E1X4IF5-0004wl-3p@rmk-PC.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 08 Jul 2014 08:25:53 +0900
+Subject: [PATCH 0/6] Various Samsung fixes for v3.16-rc3
+In-Reply-To: <53B2BD99.5080704@samsung.com>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+ <53B2BD99.5080704@samsung.com>
+Message-ID: <53BB2C81.7000108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the pause parameters causes a running network interface to be
-restarted.  However, the restart forces the FEC into half-duplex mode,
-whether or not the remote end is in half-duplex mode.  Misconfigured
-duplex mode is a known source of problems on a link.
+On 07/01/14 22:54, Tomasz Figa wrote:
+> Hi,
+>
+> On 24.06.2014 15:57, Tomasz Figa wrote:
+>> This series inteds to fix various issues spotted while testing v3.16-rc2.
+>> The patches should be reasonably independent from each other and so could be
+>> picked to respective trees. See descriptions of individual patches for more
+>> information.
+>>
+>> Tested on Exynos4412-based Trats2 and Exynos4210-based Trats boards.
+>>
+>> AFAIK there is no need to backport those fixes to stable.
+>>
+>> Tomasz Figa (6):
+>>    mmc: sdhci-s3c: Fix local I/O clock gating
+>>    ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+>>    clk: samsung: exynos4: Remove SRC_MASK_ISP gates
+>>    ARM: SAMSUNG: Restore Samsung PM Debug functionality
+>>    ARM: EXYNOS: Fix suspend/resume sequencies
+>>    ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
+>>
+>>   arch/arm/mach-exynos/exynos.c     |  6 ++----
+>>   arch/arm/mach-exynos/hotplug.c    | 10 ++++++----
+>>   arch/arm/mach-exynos/platsmp.c    | 34 +++++++++++++++++++---------------
+>>   arch/arm/mach-exynos/pm.c         | 20 ++++----------------
+>>   arch/arm/plat-samsung/Kconfig     |  8 +++++++-
+>>   arch/arm/plat-samsung/pm-debug.c  |  1 +
+>>   drivers/clk/samsung/clk-exynos4.c | 16 ++++------------
+>>   drivers/mmc/host/sdhci-s3c.c      | 17 ++++++++++-------
+>>   8 files changed, 53 insertions(+), 59 deletions(-)
+>>
+>
+> Gentle ping.
+>
+Oops, I missed this fixes from 2nd samsung fixes for 3.16...let me have 
+a look this series today then will send again soon...
 
-Fix this by always preserving the duplex mode on configuration changes.
-
-Acked-by: Fugang Duan <B38611@freescale.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/net/ethernet/freescale/fec_main.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index a91fe68030e6..045ea71f2b59 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1897,7 +1897,7 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
- 		phy_start_aneg(fep->phy_dev);
- 	}
- 	if (netif_running(ndev))
--		fec_restart(ndev, 0);
-+		fec_restart(ndev, fep->full_duplex);
- 
- 	return 0;
- }
--- 
-1.8.3.1
+Thanks,
+Kukjin
