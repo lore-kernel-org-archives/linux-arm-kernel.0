@@ -1,97 +1,251 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jul 2014 16:51:34 +0200
-Subject: [PATCHv2 0/8] cpufreq support for Marvell Armada XP
-Message-ID: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon,  7 Jul 2014 16:51:38 +0200
+Subject: [PATCHv2 4/8] ARM: mvebu: extend PMSU code to support dynamic
+ frequency scaling
+In-Reply-To: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404744702-32010-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike, Viresh, Rafael, Jason, Gregory, Andrew, Sebastian,
+This commit adds the necessary code in the Marvell EBU PMSU driver to
+support dynamic frequency scaling. In essence, what this new code does
+is that it:
 
-This series of commits adds cpufreq support for the Marvell Armada XP
-processor.
+ * registers the frequency operating points supported by the CPU;
 
-Changes since v1
-================
+ * registers a clock notifier of the CPU clocks. The notifier function
+   listens to the newly introduced APPLY_RATE_CHANGE event, and uses
+   that to finalize the frequency transition by doing the part of the
+   procedure that involves the PMSU;
 
- - Rework the patch series to use the generalized cpufreq-cpu0
-   (renamed cpufreq-generic) driver instead of having an Armada XP
-   specific cpufreq driver. This was suggested by Viresh
-   Kumar. Basically, it only involved adding a "clock-latency"
-   property in the DT, and changing the PMSU code to register the two
-   OPPs supported by each CPU, and registering the "cpufreq-generic"
-   platform device instead of the "armadaxp-cpufreq" one.
+ * registers a platform device for the cpufreq-generic driver, which
+   will take care of the CPU frequency transitions.
 
-Details of the patches
-======================
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pmsu.c | 184 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 184 insertions(+)
 
- - The core clock framework, to add a new clk_set_rate() notifier. See
-   below for the explanation. This should go through Mike Turquette's
-   tree. This is PATCH 01/08.
-
- - Improvements to the existing Armada XP cpu-clock driver. This
-   should also go through Mike Turquette's tree, probably thanks to a
-   pull request to be sent by the mvebu platform maintainers. This is
-   PATCH 02/08.
-
- - Extension of the Marvell EBU PMSU code in arch/arm/mach-mvebu/ to
-   implement a clock notifier needed for the dynamic frequency change
-   procedure. This patch should go through the mvebu maintainers
-   tree. This is PATCH 04/08. Note that this patch has a build
-   dependency on PATCH 01/08, while all other patches don't have any
-   other build dependency.
-
- - Misc other small changes (defconfigs, Device Tree, SMP
-   initialization code) that are specific to the mvebu platform, also
-   to be handled by the mvebu maintainers. Those are patches 3, 5, 6,
-   7 and 8.
-
-The only tricky part in this series is the addition of the
-APPLY_RATE_CHANGE clock notifier. All the details about why a new
-clock notifier is needed are exposed in the commit log of the first
-patch, "clk: add an APPLY_RATE_CHANGE notifier event during
-clk_set_rate()". Please read carefully this commit log to understand
-the reasons for this proposed clock notifier.
-
-Basically, the issue is that the procedure to change the CPU clock
-frequency involves touching registers managed by the CPU clock driver,
-but also registers from the PMSU which is used for a wide range of
-power management activities, and is therefore handled by platform
-specific code in mach-mvebu.
-
-Jason, this patch series is based on 3.16-rc3, but it applies fine
-even with mvebu/fixes and mvebu/soc merged (which contain some PMSU
-changes), so I haven't based the patch series on those branches. To
-_work_, the code needs the new cpufreq-generic driver which is pending
-in Viresh Kumar's tree for 3.17, but there is no build dependency.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (8):
-  clk: add an APPLY_RATE_CHANGE notifier event during clk_set_rate()
-  clk: mvebu: extend clk-cpu for dynamic frequency scaling
-  ARM: mvebu: ensure CPU clocks are enabled
-  ARM: mvebu: extend PMSU code to support dynamic frequency scaling
-  ARM: mvebu: update Armada XP DT for dynamic frequency scaling
-  ARM: mvebu: allow enabling of cpufreq on Armada XP
-  ARM: mvebu: update mvebu_v7_defconfig with cpufreq support
-  ARM: configs: add cpufreq-generic in multi_v7_defconfig
-
- .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   5 +-
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   2 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   2 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   4 +
- arch/arm/boot/dts/armada-xp.dtsi                   |   2 +-
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/mvebu_v7_defconfig                |   2 +
- arch/arm/mach-mvebu/Kconfig                        |   1 +
- arch/arm/mach-mvebu/platsmp.c                      |   1 +
- arch/arm/mach-mvebu/pmsu.c                         | 184 +++++++++++++++++++++
- drivers/clk/clk.c                                  |   3 +
- drivers/clk/mvebu/clk-cpu.c                        |  79 ++++++++-
- include/linux/clk.h                                |   4 +
- 13 files changed, 282 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 53a55c8..9257b16 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -18,20 +18,26 @@
+ 
+ #define pr_fmt(fmt) "mvebu-pmsu: " fmt
+ 
++#include <linux/clk.h>
+ #include <linux/cpu_pm.h>
++#include <linux/delay.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_opp.h>
+ #include <linux/smp.h>
+ #include <linux/resource.h>
++#include <linux/slab.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/tlbflush.h>
+ #include "common.h"
++#include "armada-370-xp.h"
+ 
+ static void __iomem *pmsu_mp_base;
+ 
+@@ -57,6 +63,10 @@ static void __iomem *pmsu_mp_base;
+ #define PMSU_STATUS_AND_MASK_IRQ_MASK		BIT(24)
+ #define PMSU_STATUS_AND_MASK_FIQ_MASK		BIT(25)
+ 
++#define PMSU_EVENT_STATUS_AND_MASK(cpu)     ((cpu * 0x100) + 0x120)
++#define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE        BIT(1)
++#define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK   BIT(17)
++
+ #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x124)
+ 
+ /* PMSU fabric registers */
+@@ -296,3 +306,177 @@ int __init armada_370_xp_cpu_pm_init(void)
+ 
+ arch_initcall(armada_370_xp_cpu_pm_init);
+ early_initcall(armada_370_xp_pmsu_init);
++
++static void armada_xp_cpufreq_clk_set_local(void *data)
++{
++	u32 reg;
++	u32 cpu = smp_processor_id();
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	/* Prepare to enter idle */
++	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT |
++	       PMSU_STATUS_AND_MASK_IRQ_MASK     |
++	       PMSU_STATUS_AND_MASK_FIQ_MASK;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++
++	/* Request the DFS transition */
++	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
++	reg |= PMSU_CONTROL_AND_CONFIG_DFS_REQ;
++	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
++
++	/* The fact of entering idle will trigger the DFS transition */
++	wfi();
++
++	/*
++	 * We're back from idle, the DFS transition has completed,
++	 * clear the idle wait indication.
++	 */
++	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++
++	local_irq_restore(flags);
++}
++
++struct armada_xp_cpufreq_notifier_block {
++	struct notifier_block nb;
++	int cpu;
++};
++
++static int armada_xp_cpufreq_clk_notify(struct notifier_block *self,
++					unsigned long action, void *data)
++{
++	struct armada_xp_cpufreq_notifier_block *nb =
++		container_of(self, struct armada_xp_cpufreq_notifier_block, nb);
++	unsigned long timeout;
++	int cpu = cpu_logical_map(nb->cpu);
++	u32 reg;
++
++	if (action != APPLY_RATE_CHANGE)
++		return 0;
++
++	/* Clear any previous DFS DONE event */
++	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE;
++	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++
++	/* Mask the DFS done interrupt, since we are going to poll */
++	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++	reg |= PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
++	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++
++	/* Trigger the DFS on the appropriate CPU */
++	smp_call_function_single(get_logical_index(cpu),
++				 armada_xp_cpufreq_clk_set_local, NULL, false);
++
++	/* Poll until the DFS done event is generated */
++	timeout = jiffies + HZ;
++	while (time_before(jiffies, timeout)) {
++		reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++		if (reg & PMSU_EVENT_STATUS_AND_MASK_DFS_DONE)
++			break;
++		udelay(10);
++	}
++
++	/* Restore the DFS mask to its original state */
++	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++	reg &= ~BIT(17);
++	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
++
++	return NOTIFY_DONE;
++}
++
++static int __init armada_xp_pmsu_cpufreq_init(void)
++{
++	struct device_node *np;
++	struct resource res;
++	int ret, cpu;
++
++	if (!of_machine_is_compatible("marvell,armadaxp"))
++		return 0;
++
++	/*
++	 * In order to have proper cpufreq handling, we need to ensure
++	 * that the Device Tree description of the CPU clock includes
++	 * the definition of the PMU DFS registers. If not, we do not
++	 * register the clock notifier and the cpufreq driver. This
++	 * piece of code is only for compatibility with old Device
++	 * Trees.
++	 */
++	np = of_find_compatible_node(NULL, NULL, "marvell,armada-xp-cpu-clock");
++	if (!np)
++		return 0;
++
++	ret = of_address_to_resource(np, 1, &res);
++	if (ret) {
++		pr_warn(FW_WARN "not enabling cpufreq, deprecated armada-xp-cpu-clock binding\n");
++		of_node_put(np);
++		return 0;
++	}
++
++	of_node_put(np);
++
++	/*
++	 * For each CPU, this loop registers the operating points
++	 * supported (which are the nominal CPU frequency and half of
++	 * it), and registers the clock notifier that will take care
++	 * of doing the PMSU part of a frequency transition.
++	 */
++	for_each_possible_cpu(cpu) {
++		struct clk *clk;
++		struct device *cpu_dev;
++		struct armada_xp_cpufreq_notifier_block *nbs;
++		int ret;
++
++		cpu_dev = get_cpu_device(cpu);
++		if (!cpu_dev) {
++			pr_err("Cannot get CPU %d\n", cpu);
++			continue;
++		}
++
++		clk = clk_get(cpu_dev, 0);
++		if (!clk) {
++			pr_err("Cannot get clock for CPU %d\n", cpu);
++			return -ENODEV;
++		}
++
++		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
++		if (ret) {
++			clk_put(clk);
++			return ret;
++		}
++
++		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
++		if (ret) {
++			clk_put(clk);
++			return ret;
++		}
++
++		nbs = kzalloc(sizeof(struct armada_xp_cpufreq_notifier_block),
++			      GFP_KERNEL);
++		if (!nbs) {
++			pr_err("Cannot allocate memory for cpufreq notifier\n");
++			clk_put(clk);
++			return -ENOMEM;
++		}
++
++		nbs->nb.notifier_call = armada_xp_cpufreq_clk_notify;
++		nbs->cpu = cpu;
++
++		ret = clk_notifier_register(clk, &nbs->nb);
++		if (ret) {
++			pr_err("Cannot register clock notifier\n");
++			kfree(nbs);
++			clk_put(clk);
++			return ret;
++		}
++	}
++
++	platform_device_register_simple("cpufreq-generic", -1, NULL, 0);
++	return 0;
++}
++
++device_initcall(armada_xp_pmsu_cpufreq_init);
 -- 
 2.0.0
