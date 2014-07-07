@@ -1,119 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  7 Jul 2014 16:51:39 +0200
-Subject: [PATCHv2 5/8] ARM: mvebu: update Armada XP DT for dynamic frequency
- scaling
-In-Reply-To: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404744702-32010-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Jul 2014 15:52:08 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <loom.20140707T153253-384@post.gmane.org>
+References: <20140701234800.GA23577@sirena.org.uk> <4473002.jGohFvPsvi@wuerfel>
+ <7B049AD4-78F8-4494-A2CB-57DD346107DA@arm.com>
+ <201407061739.22152.arnd@arndb.de>
+ <loom.20140707T153253-384@post.gmane.org>
+Message-ID: <20140707145208.GC32578@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support dynamic frequency scaling:
+On Mon, Jul 07, 2014 at 01:59:54PM +0000, Janne Grunau wrote:
+> Arnd Bergmann <arnd <at> arndb.de> writes:
+> > but I don't see how we could emulate IT without anything
+> > short of a full interpretation of user instructions from the kernel.
+> 
+> Avoiding deprecated forms of IT would be harder. It's used more often in
+> libav (~50 times)
 
- * the cpuclk Device Tree node needs to be updated to describe a
-   second set of registers describing the PMU DFS registers.
+Is this explicitly written IT instructions or in generated code (gas,
+gcc)?
 
- * the clock-latency property of the CPUs must be filled, otherwise
-   the ondemand and conservative cpufreq governors refuse to work. The
-   latency is high because the cost of a frequency transition is quite
-   high on those CPUs.
+> so it should be only disabled if it's emulated or not
+> available using an explicit HWCAP. Not using Thumb for those functions would
+> be another option for libav. Again this doesn't fix existing binaries and it
+> doesn't fix compiled code.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 2 ++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 ++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 4 ++++
- arch/arm/boot/dts/armada-xp.dtsi         | 2 +-
- 4 files changed, 9 insertions(+), 1 deletion(-)
+As I said, I don't see this going away (easily). I've heard the
+toolchain guys adding warnings but they don't help unless you rebuild
+your code. Given the amount of IT instructions, I don't even propose
+adding emulation/warnings to the kernel for the time being (that would
+be step 1 in my "instruction deprecation" proposal, we have to think
+about it; some trapping would be handy to to assess the impact but
+still defaulting to native).
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 1257ff1..2592e1c 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -34,6 +34,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <0>;
- 			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
- 		};
- 
- 		cpu at 1 {
-@@ -41,6 +42,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <1>;
- 			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 3396b25..480e237 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -36,6 +36,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <0>;
- 			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
- 		};
- 
- 		cpu at 1 {
-@@ -43,6 +44,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <1>;
- 			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 6da84bf..2c7b1fe 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -37,6 +37,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <0>;
- 			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
- 		};
- 
- 		cpu at 1 {
-@@ -44,6 +45,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <1>;
- 			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
- 		};
- 
- 		cpu at 2 {
-@@ -51,6 +53,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <2>;
- 			clocks = <&cpuclk 2>;
-+			clock-latency = <1000000>;
- 		};
- 
- 		cpu at 3 {
-@@ -58,6 +61,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <3>;
- 			clocks = <&cpuclk 3>;
-+			clock-latency = <1000000>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 5902e83..bff9f6c 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -99,7 +99,7 @@
- 			cpuclk: clock-complex at 18700 {
- 				#clock-cells = <1>;
- 				compatible = "marvell,armada-xp-cpu-clock";
--				reg = <0x18700 0xA0>;
-+				reg = <0x18700 0xA0>, <0x1c054 0x10>;
- 				clocks = <&coreclk 1>;
- 			};
- 
 -- 
-2.0.0
+Catalin
