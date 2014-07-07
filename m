@@ -1,67 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 7 Jul 2014 15:33:57 +0800
-Subject: [PATCH v2 6/8] ARM: sun4i: enable DMA on SPI
-In-Reply-To: <1404619518-7592-7-git-send-email-emilio@elopez.com.ar>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-7-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAGb2v66x6pse3vFDCKSONbgePMHbSjVw11mNJ8mOFcQ9EGdE_w@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 7 Jul 2014 08:32:44 +0100
+Subject: [PATCH 1/3 v5] spi: s3c64xx: fix broken "cs_gpios" usage in the
+ driver
+In-Reply-To: <CAHfPSqAXs=5VLLEV-XVw5YJo=-9QFn9KA8oG_A0CfNykcVwnCQ@mail.gmail.com>
+References: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
+ <20140702165651.GK410@sirena.org.uk>
+ <CAHfPSqAXs=5VLLEV-XVw5YJo=-9QFn9KA8oG_A0CfNykcVwnCQ@mail.gmail.com>
+Message-ID: <20140707073244.GC30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 6, 2014 at 12:05 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> All of our SPI controllers support DMA transfers, so let's add the
-> properties here so they can be used when it's best to do so.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+On Mon, Jul 07, 2014 at 11:51:38AM +0530, Naveen Krishna Ch wrote:
+> On 2 July 2014 22:26, Mark Brown <broonie@kernel.org> wrote:
+> > On Fri, Jun 13, 2014 at 09:29:50AM +0530, Naveen Krishna Chatradhi wrote:
 
-Numbers are good.
+> >> Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
+> >> considering the time with no compliants about the breakage.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > I'm not clear what the breakage is?  Some boards are broken but what's
+> > the driver issue?
 
+> ToT was broken for few boards
+> exynos4412-trats2.dts, exynos4210-smdkv310.dts and exynos5250-smdk5250.dts
 
-> ---
->  arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index f17cbeb..56d02af 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -353,6 +353,8 @@
->                         interrupts = <10>;
->                         clocks = <&ahb_gates 20>, <&spi0_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 27>, <&dma 1 26>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> @@ -364,6 +366,8 @@
->                         interrupts = <11>;
->                         clocks = <&ahb_gates 21>, <&spi1_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 9>, <&dma 1 8>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> @@ -459,6 +463,8 @@
->                         interrupts = <12>;
->                         clocks = <&ahb_gates 22>, <&spi2_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 29>, <&dma 1 28>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> @@ -498,6 +504,8 @@
->                         interrupts = <50>;
->                         clocks = <&ahb_gates 23>, <&spi3_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 31>, <&dma 1 30>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> --
-> 2.0.1
+> With some DTS changes SPI works well, spi-s3c64xx.c driver had no issues.
+
+No, you're not answering my question - to repeat, what is the breakage?
+
+> > Also I'd need to check but are you sure that GPIO 0 is not valid?
+
+> gpio_is_valid() returns true for
+> "number >= 0 && number < ARCH_NR_GPIOS"
+
+Right, so this means that any board that is using the internal chip
+select with zero as default in their platform data is broken by this
+change.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140707/462d6fc2/attachment.sig>
