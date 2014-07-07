@@ -1,91 +1,89 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  7 Jul 2014 12:16:11 +0200
-Subject: [PATCH v9 5/7] Documentation: bindings: document the sub-nodes AHCI
- bindings
-In-Reply-To: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404728173-20263-6-git-send-email-antoine.tenart@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 7 Jul 2014 18:19:18 +0800
+Subject: [PATCH v3 8/9] ARM: sun8i: Add PRCM clock and reset controller
+ nodes to the DTSI
+In-Reply-To: <20140707085858.GG16262@lukather>
+References: <1404399349-20237-1-git-send-email-wens@csie.org>
+ <1404399349-20237-9-git-send-email-wens@csie.org>
+ <20140707085858.GG16262@lukather>
+Message-ID: <CAGb2v66w8JtA5J3bS0dNsQtYhSnf0nz=Sj871ctwQrKo-Hh6qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The libahci now allows to use multiple PHYs and to represent each port
-as a sub-node. Add these bindings to the documentation.
+Hi,
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- .../devicetree/bindings/ata/ahci-platform.txt      | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+On Mon, Jul 7, 2014 at 4:58 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> It looks mostly fine but...
+>
+> On Thu, Jul 03, 2014 at 10:55:48PM +0800, Chen-Yu Tsai wrote:
+>> With sun8i PRCM support available, we can add the PRCM clock and
+>> reset controller nodes to the DTSI. Also update R_UART's clock
+>> phandle and add it's reset control phandle.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a23.dtsi | 48 +++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 47 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+>> index 79c4083..e10c708 100644
+>> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+>> @@ -262,13 +262,59 @@
+>>                       interrupts = <1 9 0xf04>;
+>>               };
+>>
+>> +             prcm at 01f01400 {
+>> +                     compatible = "allwinner,sun8i-a23-prcm";
+>> +                     reg = <0x01f01400 0x200>;
+>> +
+>> +                     ar100: ar100_clk {
+>> +                             compatible = "fixed-factor-clock";
+>> +                             #clock-cells = <0>;
+>> +                             clock-div = <1>;
+>> +                             clock-mult = <1>;
+>> +                             clocks = <&osc24M>;
+>> +                             clock-output-names = "ar100";
+>> +                     };
+>> +
+>> +                     ahb0: ahb0_clk {
+>> +                             compatible = "fixed-factor-clock";
+>> +                             #clock-cells = <0>;
+>> +                             clock-div = <1>;
+>> +                             clock-mult = <1>;
+>> +                             clocks = <&ar100>;
+>> +                             clock-output-names = "ahb0";
+>> +                     };
+>> +
+>> +                     apb0: apb0_clk {
+>> +                             compatible = "allwinner,sun8i-a23-apb0-clk";
+>> +                             #clock-cells = <0>;
+>> +                             clocks = <&ahb0>;
+>> +                             clock-output-names = "apb0";
+>> +                     };
+>> +
+>> +                     apb0_gates: apb0_gates_clk {
+>> +                             compatible = "allwinner,sun8i-a23-apb0-gates-clk";
+>> +                             #clock-cells = <1>;
+>> +                             clocks = <&apb0>;
+>> +                             clock-indices = <0>, <2>, <3>, <4>, <6>;
+>
+> I realise you're just using the A31 code, but it's actually the only
+> clock so far that uses clock-indices, while all the other clocks
+> relies on a bitmask.
+>
+> I'd prefer to remain consistent and use a bitmask here as well (that
+> would also mean removing the clock-indices related code in the A31
+> driver)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index c96d8dcf98fd..24d95fccfb4a 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -3,6 +3,10 @@
- SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
- 
-+It is possible, but not required, to represent each port as a sub-node.
-+It allows to enable each port independently when dealing with multiple
-+PHYs.
-+
- Required properties:
- - compatible        : compatible string, one of:
-   - "allwinner,sun4i-a10-ahci"
-@@ -14,6 +18,7 @@ Required properties:
-   - "snps,dwc-ahci"
-   - "snps,exynos5440-ahci"
-   - "snps,spear-ahci"
-+  - "generic-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
- 
-@@ -21,11 +26,23 @@ Optional properties:
- - dma-coherent      : Present if dma operations are coherent
- - clocks            : a list of phandle + clock specifier pairs
- - target-supply     : regulator for SATA target power
-+- phys              : reference to the SATA PHY node
-+- phy-names         : must be "sata-phy"
- 
- "fsl,imx53-ahci", "fsl,imx6q-ahci" required properties:
- - clocks            : must contain the sata, sata_ref and ahb clocks
- - clock-names       : must contain "ahb" for the ahb clock
- 
-+Required properties when using sub-nodes:
-+- #address-cells    : number of cells to encode an address
-+- #size-cells       : number of cells representing the size of an address
-+
-+
-+Sub-nodes required properties:
-+- reg               : the port number
-+- phys              : reference to the SATA PHY node
-+
-+
- Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
-@@ -40,3 +57,23 @@ Examples:
- 		clocks = <&pll6 0>, <&ahb_gates 25>;
- 		target-supply = <&reg_ahci_5v>;
- 	};
-+
-+With sub-nodes:
-+	sata at f7e90000 {
-+		compatible = "generic-ahci";
-+		reg = <0xe90000 0x1000>;
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&chip CLKID_SATA>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		sata0: sata-port at 0 {
-+			reg = <0>;
-+			phys = <&sata_phy 0>;
-+		};
-+
-+		sata1: sata-port at 1 {
-+			reg = <1>;
-+			phys = <&sata_phy 1>;
-+		};
-+	};
--- 
-1.9.1
+Sure. Do you prefer a separate driver for sun8i-a23-apb0-gates as well?
+If so, then the mfd driver needs to be updated with the new driver name
+as well. I'll then do a separate patch to remove the cllock-indices code
+from the A31 driver.
+
+
+Cheers
+ChenYu
