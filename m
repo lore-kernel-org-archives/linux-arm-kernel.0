@@ -1,53 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 6 Jul 2014 17:53:17 -0700
-Subject: [PATCH] ARM: integrator: fix OF-related regression
-In-Reply-To: <20140707005145.GH8469@quad.lixom.net>
-References: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
- <CAL_Jsq+Us51c-6+kP5Y+aML-HPV-=9SooPepD6u13xyrvDfcKw@mail.gmail.com>
- <CACRpkdZr6T65zOmxy9mQdeapMfu=nwfcXRtufb5DU5NO+vwU7A@mail.gmail.com>
- <20140626193938.GA16226@debian>
- <CACRpkdbr05q4iNG00eX1e1ZWKHEmGZ5exGHR9WRPuyFzrs6Tkg@mail.gmail.com>
- <20140707005145.GH8469@quad.lixom.net>
-Message-ID: <CAOesGMjC=QkWnsz=XJjQNkFciN-cLhgVxi0Si+NDgmERSbggVA@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 7 Jul 2014 11:28:53 +1000
+Subject: linux-next: manual merge of the mvebu tree with the arm tree
+Message-ID: <20140707112853.7f5a9323@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 6, 2014 at 5:51 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Jun 30, 2014 at 06:52:58PM +0200, Linus Walleij wrote:
->> On Thu, Jun 26, 2014 at 9:39 PM, Rabin Vincent <rabin@rab.in> wrote:
->>
->> > earlyprintk doesn't work on Integrator hardware?
->>
->> It does, but loading the kernel is done over serial line 115200 bps
->> so iterative tests take "some time" :-)
->>
->> > It does on QEMU's
->> > integratorcp so it's trivial to debug there.
->>
->> Yeah I should be using QEMU for things like this ... poke self.
->>
->> > The problem is that integrator_init_sysfs() adds a device attribute
->> > called "fpga" to the soc0 bus, and the soc0 bus device is also used as
->> > the root of the device tree, and the device tree has a node called "fpga".
->> (...)
->> > 07e461cd7e73a84f0e3757932b93cc80976fd749 removed the .0 from the fpga node's
->> > directory, leading to that node (and its subnodes) failing to register due to a
->> > filename conflict with the fpga attribute's file:
->>
->> Aha! Thanks for root-causing this Rabin. Awesome.
->>
->> > After Linus' patch, the root is no longer soc0 so the fpga node's directory
->> > becomes /devices/fpga while the attribute file remains at /devices/soc0/fpga.
->>
->> It appears the patch is doing the right thing, though I had very vague
->> ideas as to why.
->
-> Ok, sounds like this is good to go. I'll apply it to the fixes branch, we can
-> fairly easily take it out right now if it needs to bake more so please speak up
-> quickly if that is the case.
+Hi all,
 
-Hm, nevermind. Looks like Arnd silently applied it already, and it's
-been sent up. Nothing left to do. :)
+Today's linux-next merge of the mvebu tree got a conflict in
+arch/arm/mach-mvebu/headsmp-a9.S between commit 8a3a9dd50dd9 ("ARM:
+convert all "mov.* pc, reg" to "bx reg" for ARMv6+") from the arm tree
+and commit 0e2be4c1121a ("ARM: mvebu: fix SMP boot for Armada 38x and
+Armada 375 Z1 in big endian") from the mvebu tree.
 
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
--Olof
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-mvebu/headsmp-a9.S
+index 7c91ddb6f1f7,da5bb292b91c..000000000000
+--- a/arch/arm/mach-mvebu/headsmp-a9.S
++++ b/arch/arm/mach-mvebu/headsmp-a9.S
+@@@ -14,8 -14,9 +14,10 @@@
+  
+  #include <linux/linkage.h>
+  #include <linux/init.h>
+ +#include <asm/assembler.h>
+  
++ #include <asm/assembler.h>
++ 
+  	__CPUINIT
+  #define CPU_RESUME_ADDR_REG 0xf10182d4
+  
+@@@ -23,9 -24,13 +25,13 @@@
+  .global armada_375_smp_cpu1_enable_code_end
+  
+  armada_375_smp_cpu1_enable_code_start:
+- 	ldr     r0, [pc, #4]
++ ARM_BE8(setend	be)
++ 	adr     r0, 1f
++ 	ldr	r0, [r0]
+  	ldr     r1, [r0]
++ ARM_BE8(rev	r1, r1)
+ -	mov     pc, r1
+ +	ret     r1
++ 1:
+  	.word   CPU_RESUME_ADDR_REG
+  armada_375_smp_cpu1_enable_code_end:
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140707/c8ce4ffb/attachment.sig>
