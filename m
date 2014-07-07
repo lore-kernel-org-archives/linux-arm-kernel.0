@@ -1,83 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 07 Jul 2014 16:44:18 -0700
-Subject: [PATCHv2 1/8] clk: add an APPLY_RATE_CHANGE notifier event during
- clk_set_rate()
-In-Reply-To: <1404744702-32010-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404744702-32010-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53BB30D2.3010908@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 7 Jul 2014 16:52:22 -0700
+Subject: [PATCH] mtd: nand: stm_nand_bch: add new driver
+In-Reply-To: <20140703100522.756f9715@bbrezillon>
+References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
+ <20140703002237.GM3599@ld-irv-0074>
+ <20140703100522.756f9715@bbrezillon>
+Message-ID: <20140707235222.GC7537@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/14 07:51, Thomas Petazzoni wrote:
-> The current clk_set_rate() logic allows notifiers to be notified of
-> three different events:
->
->  * PRE_RATE_CHANGE: before the clock driver ->set_rate() function is
->    called.
->  * ABORT_RATE_CHANGE: called if the rate change failed
->  * POST_RATE_CHANGE: called after the rate change has been
->    successfully done, but after ->recalc_rate() has been called, and
->    only if the rate of the clock has actually changed.
->
-> This commit adds an additional APPLY_RATE_CHANGE, which we require on
-> Armada XP to implement dynamic frequency scaling of the CPU
-> clocks. The problem is as follows.
->
-> On Armada XP, there are three hardware blocks involved in the dynamic
-> frequency scaling of the CPU clocks:
->
->  - The CPU clocks hardware block itself, whose registers are already
->    "managed" by drivers/clk/mvebu/clk-cpu.c (compatible string:
->    marvell,armada-xp-cpu-clock). The driver currently only supports
->    changing the rate of the CPU clock when the clock is off (i.e
->    before we boot the secondary CPUs).
->
->  - The PMU DFS registers, which are used to configure the target
->    frequency for a dynamic rate change. Those registers are relatively
->    well isolated from other PMU registers, so they can also be
->    "managed" by the drivers/clk/mvebu/clk-cpu.c.
->
->  - The PMSU registers, which are used to actually trigger the dynamic
->    frequency change procedure, which consists in programming a bunch
->    of PMSU registers, entering the idle state on the CPU we want to
->    change the frequency, and then again reprogram a bunch of PMSU
->    registers.
->
-> The procedure to change the frequency is:
->
->  1/ Reset some clocks using the CPU clocks hardware block.
->  2/ Define the target frequency using the PMU DFS registers.
->  3/ Do the actual frequency change using the PMSU registers.
->
-> However, the PMSU registers are already "managed" by a driver in
-> arch/arm/mach-mvebu/pmsu.c, and the code there is needed for a wide
-> variety of power management activities: booting of secondary CPUs, CPU
-> hotplug, cpuidle, cpufreq, and soon suspend/resume. The same registers
-> in the PMSU are used for several of those activities.
->
-> So, what we need to do is to have steps (1) and (2) above done in the
-> CPU clocks driver, and then step (3) done through a clk notifier.
->
-> However, the current POST_RATE_CHANGE notifier is called too late
-> (after ->recalc_rate) and only if the rate has changed. So it works
-> fine for a pure notification of a frequency change, but it doesn't
-> work if the notified code is actually involved in the frequency
-> change, which is exactly the case we have here. Until the sequence
-> that uses the PMSU registers has been executed, the rate of the CPU
-> clock has not changed.
->
-> In order to solve this problem, we propose to add an APPLY_RATE_CHANGE
-> notifier event, which gets called right after ->set_rate(), but before
-> ->recalc_rate(), and therefore regardless of whether there was an
-> actualy frequency change or not.
+Hi Boris,
 
-Is there any reason why we can't call the pmsu code (part #3) directly
-from the cpu clock driver? It seems like if we just called the
-.set_rate() op we wouldn't actually have changed the clock's rate. That
-doesn't seem very intuitive and it really makes the code flow hard to
-follow.
+On Thu, Jul 03, 2014 at 10:05:22AM +0200, Boris BREZILLON wrote:
+> On Wed, 2 Jul 2014 17:22:37 -0700 Brian Norris <computersforpeace@gmail.com> wrote:
+> > On Wed, May 28, 2014 at 10:20:05AM +0100, Lee Jones wrote:
+> > > +
+> > > +	nand_timing0: nand-timing {
+> > > +		sig-setup	= <10>;
+> > > +		sig-hold	= <10>;
+> > > +		CE-deassert	= <0>;
+> > > +		WE-to-RBn	= <100>;
+> > > +		wr-on		= <10>;
+> > > +		wr-off		= <30>;
+> > > +		rd-on		= <10>;
+> > > +		rd-off		= <30>;
+> > > +		chip-delay	= <30>;		/* delay in us */
+> > > +	};
+> > 
+> > You didn't document any of this node. And I don't think we want to
+> > specify every single timing parameter in DT; it may make sense to use
+> > Boris Brezillon's approach (I note this further down, in the driver
+> > code) for mapping non-ONFI NAND timings into a compatible ONFI timing
+> > mode. This will greatly simplify the bindings needed, since it's
+> > standardized and auto-detectable in many cases.
+> 
+> 
+> AFAIR, the NAND timing representation for non-ONFI chips question was
+> left unanswered:
+> 
+> https://lkml.org/lkml/2014/5/20/581
+> 
+> I can definitely respin my NAND timings series, but I'd like to be sure
+> this is how you want it done before doing so.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Can we start by supporting ONFI-only (or ONFI-only, plus entries in
+nand_flash_ids[]), and have nand_base provide the translation so drivers
+can retrieve the info? Then we can begin supporting new drivers like
+Lee's, and worry about the DT question separately.
+
+BTW, Lee: you're completely missing the definitions for
+'struct nand_sdr_timings' in this patch, so it doesn't compile.
+
+> Just as a reminder, you and Jason thought NAND timings for non-ONFI
+> chips could be auto detected thanks to READID informations (by storing
+> some sort of "NANDID <-> timings" association table).
+
+Yes, thanks for the reminder. I knew there was more than one reason I
+was wary of Lee's patch (first, that it was duplication of another patch
+set; and second, than I'm not sure it belongs in DT at all).
+
+I think we should attempt to solve this without any need for DT
+bindings, as most other parameters are auto-detectable in some sense
+(even if we have to store some NANDID <-> timings tables). I think going
+forward, we can expect that new NAND will use a JEDEC or ONFI spec, and
+that we shouldn't have to scale nand_flash_ids[] to include too many
+flash chip timings.
+
+Brian
