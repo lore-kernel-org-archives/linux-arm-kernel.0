@@ -1,15 +1,15 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 09:54:48 +0200
-Subject: [PATCH v2 23/30] ARM: shmobile: armadillo800eva-reference: Initialise
- CMT1 device using DT
+Date: Mon,  7 Jul 2014 09:54:42 +0200
+Subject: [PATCH v2 17/30] ARM: shmobile: armadillo800eva-reference: Initialise
+ SCIF device using DT
 In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404719695-1634-24-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404719695-1634-18-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise CMT1 device using DT when booting armadillo800eva
-using DT-reference.
+Initialise SCIF device using DT when booting armadillo800eva
+using DT reference.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
@@ -17,74 +17,74 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 v2
 * First post
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts |  4 ++++
- arch/arm/mach-shmobile/setup-r8a7740.c                  | 11 +----------
- 2 files changed, 5 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 14 +++++++++++---
+ arch/arm/mach-shmobile/setup-r8a7740.c                  |  8 ++++----
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index c430197..346f6ef 100644
+index f6ef73f..f47ab76 100644
 --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
 +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -205,6 +205,10 @@
+@@ -19,6 +19,10 @@
+ 	model = "armadillo 800 eva reference";
+ 	compatible = "renesas,armadillo800eva-reference", "renesas,r8a7740";
+ 
++	aliases {
++		serial1 = &scifa1;
++	};
++
+ 	chosen {
+ 		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
  	};
+@@ -202,9 +206,6 @@
  };
  
-+&cmt1 {
+ &pfc {
+-	pinctrl-0 = <&scifa1_pins>;
+-	pinctrl-names = "default";
+-
+ 	ether_pins: ether {
+ 		renesas,groups = "gether_mii", "gether_int";
+ 		renesas,function = "gether";
+@@ -256,6 +257,13 @@
+ 	status = "okay";
+ };
+ 
++&scifa1 {
++	pinctrl-0 = <&scifa1_pins>;
++	pinctrl-names = "default";
++
 +	status = "okay";
 +};
 +
- &tmu0 {
- 	status = "okay";
- };
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-names = "default";
 diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 3d5eaca..3dcdc8d 100644
+index 348af35..3d5eaca 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7740.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -311,10 +311,6 @@ static struct platform_device ipmmu_device = {
- 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
+@@ -312,6 +312,10 @@ static struct platform_device ipmmu_device = {
  };
  
--static struct platform_device *r8a7740_devices_dt[] __initdata = {
--	&cmt1_device,
--};
--
- static struct platform_device *r8a7740_early_devices[] __initdata = {
+ static struct platform_device *r8a7740_devices_dt[] __initdata = {
++	&cmt1_device,
++};
++
++static struct platform_device *r8a7740_early_devices[] __initdata = {
  	&scif0_device,
  	&scif1_device,
-@@ -325,6 +321,7 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
+ 	&scif2_device,
+@@ -321,10 +325,6 @@ static struct platform_device *r8a7740_devices_dt[] __initdata = {
  	&scif6_device,
  	&scif7_device,
  	&scif8_device,
-+	&cmt1_device,
+-	&cmt1_device,
+-};
+-
+-static struct platform_device *r8a7740_early_devices[] __initdata = {
  	&irqpin0_device,
  	&irqpin1_device,
  	&irqpin2_device,
-@@ -756,8 +753,6 @@ void __init r8a7740_add_standard_devices(void)
- 	/* add devices */
- 	platform_add_devices(r8a7740_early_devices,
- 			    ARRAY_SIZE(r8a7740_early_devices));
--	platform_add_devices(r8a7740_devices_dt,
--			    ARRAY_SIZE(r8a7740_devices_dt));
- 	platform_add_devices(r8a7740_late_devices,
- 			     ARRAY_SIZE(r8a7740_late_devices));
- 
-@@ -779,8 +774,6 @@ void __init r8a7740_add_early_devices(void)
- {
- 	early_platform_add_devices(r8a7740_early_devices,
- 				   ARRAY_SIZE(r8a7740_early_devices));
--	early_platform_add_devices(r8a7740_devices_dt,
--				   ARRAY_SIZE(r8a7740_devices_dt));
- 
- 	/* setup early console here as well */
- 	shmobile_setup_console();
-@@ -790,8 +783,6 @@ void __init r8a7740_add_early_devices(void)
- 
- void __init r8a7740_add_standard_devices_dt(void)
- {
--	platform_add_devices(r8a7740_devices_dt,
--			    ARRAY_SIZE(r8a7740_devices_dt));
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
 -- 
 2.0.0.rc2
