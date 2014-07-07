@@ -1,33 +1,60 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  7 Jul 2014 12:16:10 +0200
-Subject: [PATCH v9 4/7] ata: ahci_platform: add a generic AHCI compatible
+Date: Mon,  7 Jul 2014 12:16:08 +0200
+Subject: [PATCH v9 2/7] Documentation: bindings: add the Berlin SATA PHY
 In-Reply-To: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404728173-20263-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1404728173-20263-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci_platform driver is a generic driver using the libahci_platform
-functions. Add a generic compatible to avoid having an endless list of
-compatibles with no differences for the same driver.
+The Berlin SATA PHY drives the PHY related to the SATA interface. Add
+the corresponding documentation.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- drivers/ata/ahci_platform.c | 2 ++
- 1 file changed, 2 insertions(+)
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index ebe505c17763..a30cecd68609 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -78,6 +78,8 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
- 			 ahci_platform_resume);
- 
- static const struct of_device_id ahci_of_match[] = {
-+	{ .compatible = "generic-ahci", },
-+	/* Keep the following compatibles for device tree compatibility */
- 	{ .compatible = "snps,spear-ahci", },
- 	{ .compatible = "snps,exynos5440-ahci", },
- 	{ .compatible = "ibm,476gtr-ahci", },
+diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+new file mode 100644
+index 000000000000..88f8c23384c0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+@@ -0,0 +1,34 @@
++Berlin SATA PHY
++---------------
++
++Required properties:
++- compatible: should be "marvell,berlin2q-sata-phy"
++- address-cells: should be 1
++- size-cells: should be 0
++- phy-cells: from the generic PHY bindings, must be 1
++- reg: address and length of the register
++- clocks: reference to the clock entry
++
++Sub-nodes:
++Each PHY should be represented as a sub-node.
++
++Sub-nodes required properties:
++- reg: the PHY number
++
++Example:
++	sata_phy: phy at f7e900a0 {
++		compatible = "marvell,berlin2q-sata-phy";
++		reg = <0xf7e900a0 0x200>;
++		clocks = <&chip CLKID_SATA>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#phy-cells = <1>;
++
++		sata-phy at 0 {
++			reg = <0>;
++		};
++
++		sata-phy at 1 {
++			reg = <1>;
++		};
++	};
 -- 
 1.9.1
