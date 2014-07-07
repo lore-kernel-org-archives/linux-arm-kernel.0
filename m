@@ -1,278 +1,137 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Jul 2014 16:25:22 +0200
-Subject: [PATCH v2 09/18] AT91: Probe the reset driver
+Date: Mon,  7 Jul 2014 16:25:30 +0200
+Subject: [PATCH v2 17/18] AT91: Remove rstc and shdwnc global base addresses
 In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404743131-24569-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404743131-24569-18-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the reset device in the right SoCs so that the reset driver is
-actually probed even in the old-style probing case.
+Now that there's no user left for the global variables holding the reset and
+shutdown controllers base address, we can remove these variables and their
+associated mapping function.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9260.c | 26 ++++++++++++++++++++++++++
- arch/arm/mach-at91/at91sam9261.c | 26 ++++++++++++++++++++++++++
- arch/arm/mach-at91/at91sam9263.c | 26 ++++++++++++++++++++++++++
- arch/arm/mach-at91/at91sam9g45.c | 31 +++++++++++++++++++++++++++++++
- arch/arm/mach-at91/at91sam9rl.c  | 26 ++++++++++++++++++++++++++
- 5 files changed, 135 insertions(+)
+ arch/arm/mach-at91/at91sam9260.c |  2 --
+ arch/arm/mach-at91/at91sam9261.c |  2 --
+ arch/arm/mach-at91/at91sam9263.c |  2 --
+ arch/arm/mach-at91/at91sam9g45.c |  2 --
+ arch/arm/mach-at91/at91sam9rl.c  |  2 --
+ arch/arm/mach-at91/generic.h     |  6 ------
+ arch/arm/mach-at91/setup.c       | 18 ------------------
+ 7 files changed, 34 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index c3d22be73b7c..d5568521ae5e 100644
+index f387e831e894..60a0d37a8134 100644
 --- a/arch/arm/mach-at91/at91sam9260.c
 +++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -11,6 +11,7 @@
-  */
+@@ -339,8 +339,6 @@ static void __init at91sam9260_map_io(void)
  
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
-@@ -358,6 +359,30 @@ static void __init at91sam9260_initialize(void)
- 	at91_gpio_init(at91sam9260_gpio, 3);
- }
- 
-+static struct resource rstc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9260_BASE_RSTC,
-+		.end    = AT91SAM9260_BASE_RSTC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = AT91SAM9260_BASE_SDRAMC,
-+		.end    = AT91SAM9260_BASE_SDRAMC + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device rstc_device = {
-+	.name           = "at91-sam9260-reset",
-+	.resource       = rstc_resources,
-+	.num_resources  = ARRAY_SIZE(rstc_resources),
-+};
-+
-+static void __init at91sam9260_register_devices(void)
-+{
-+	platform_device_register(&rstc_device);
-+}
-+
- /* --------------------------------------------------------------------
-  *  Interrupt initialization
-  * -------------------------------------------------------------------- */
-@@ -407,5 +432,6 @@ AT91_SOC_START(at91sam9260)
- 		    | (1 << AT91SAM9260_ID_IRQ2),
- 	.ioremap_registers = at91sam9260_ioremap_registers,
- 	.register_clocks = at91sam9260_register_clocks,
-+	.register_devices = at91sam9260_register_devices,
- 	.init = at91sam9260_initialize,
- AT91_SOC_END
+ static void __init at91sam9260_ioremap_registers(void)
+ {
+-	at91_ioremap_shdwc(AT91SAM9260_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9260_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9260_BASE_SDRAMC, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
 diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index fb164a5d04a9..09c031676229 100644
+index 5e8ac0d271b8..80cae8728316 100644
 --- a/arch/arm/mach-at91/at91sam9261.c
 +++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -11,6 +11,7 @@
-  */
+@@ -302,8 +302,6 @@ static void __init at91sam9261_map_io(void)
  
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
-@@ -321,6 +322,30 @@ static void __init at91sam9261_initialize(void)
- 	at91_gpio_init(at91sam9261_gpio, 3);
- }
- 
-+static struct resource rstc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9261_BASE_RSTC,
-+		.end    = AT91SAM9261_BASE_RSTC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = AT91SAM9261_BASE_SDRAMC,
-+		.end    = AT91SAM9261_BASE_SDRAMC + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device rstc_device = {
-+	.name           = "at91-sam9260-reset",
-+	.resource       = rstc_resources,
-+	.num_resources  = ARRAY_SIZE(rstc_resources),
-+};
-+
-+static void __init at91sam9261_register_devices(void)
-+{
-+	platform_device_register(&rstc_device);
-+}
-+
- /* --------------------------------------------------------------------
-  *  Interrupt initialization
-  * -------------------------------------------------------------------- */
-@@ -370,5 +395,6 @@ AT91_SOC_START(at91sam9261)
- 		    | (1 << AT91SAM9261_ID_IRQ2),
- 	.ioremap_registers = at91sam9261_ioremap_registers,
- 	.register_clocks = at91sam9261_register_clocks,
-+	.register_devices = at91sam9261_register_devices,
- 	.init = at91sam9261_initialize,
- AT91_SOC_END
+ static void __init at91sam9261_ioremap_registers(void)
+ {
+-	at91_ioremap_shdwc(AT91SAM9261_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9261_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9261_BASE_SDRAMC, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
 diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f30290572293..e5f5d48e944a 100644
+index 772485c9e47c..7d4403ed0596 100644
 --- a/arch/arm/mach-at91/at91sam9263.c
 +++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -11,6 +11,7 @@
-  */
+@@ -317,8 +317,6 @@ static void __init at91sam9263_map_io(void)
  
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
-@@ -339,6 +340,30 @@ static void __init at91sam9263_initialize(void)
- 	at91_gpio_init(at91sam9263_gpio, 5);
- }
- 
-+static struct resource rstc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9263_BASE_RSTC,
-+		.end    = AT91SAM9263_BASE_RSTC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = AT91SAM9263_BASE_SDRAMC0,
-+		.end    = AT91SAM9263_BASE_SDRAMC0 + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device rstc_device = {
-+	.name           = "at91-sam9260-reset",
-+	.resource       = rstc_resources,
-+	.num_resources  = ARRAY_SIZE(rstc_resources),
-+};
-+
-+static void __init at91sam9263_register_devices(void)
-+{
-+	platform_device_register(&rstc_device);
-+}
-+
- /* --------------------------------------------------------------------
-  *  Interrupt initialization
-  * -------------------------------------------------------------------- */
-@@ -387,5 +412,6 @@ AT91_SOC_START(at91sam9263)
- 	.extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1),
- 	.ioremap_registers = at91sam9263_ioremap_registers,
- 	.register_clocks = at91sam9263_register_clocks,
-+	.register_devices = at91sam9263_register_devices,
- 	.init = at91sam9263_initialize,
- AT91_SOC_END
+ static void __init at91sam9263_ioremap_registers(void)
+ {
+-	at91_ioremap_shdwc(AT91SAM9263_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9263_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9263_BASE_SDRAMC0, 512);
+ 	at91_ioremap_ramc(1, AT91SAM9263_BASE_SDRAMC1, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
 diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 9d3d544ac19c..ddf1a4c2febb 100644
+index d986cc757cfb..c615f1d3d39c 100644
 --- a/arch/arm/mach-at91/at91sam9g45.c
 +++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
- #include <linux/clk/at91_pmc.h>
-+#include <linux/platform_device.h>
+@@ -367,8 +367,6 @@ static void __init at91sam9g45_map_io(void)
  
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
-@@ -388,6 +389,35 @@ static void __init at91sam9g45_initialize(void)
- 	at91_gpio_init(at91sam9g45_gpio, 5);
- }
- 
-+static struct resource rstc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9G45_BASE_RSTC,
-+		.end    = AT91SAM9G45_BASE_RSTC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = AT91SAM9G45_BASE_DDRSDRC1,
-+		.end    = AT91SAM9G45_BASE_DDRSDRC1 + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[2] = {
-+		.start  = AT91SAM9G45_BASE_DDRSDRC0,
-+		.end    = AT91SAM9G45_BASE_DDRSDRC0 + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device rstc_device = {
-+	.name           = "at91-sam9g45-reset",
-+	.resource       = rstc_resources,
-+	.num_resources  = ARRAY_SIZE(rstc_resources),
-+};
-+
-+static void __init at91sam9g45_register_devices(void)
-+{
-+	platform_device_register(&rstc_device);
-+}
-+
- /* --------------------------------------------------------------------
-  *  Interrupt initialization
-  * -------------------------------------------------------------------- */
-@@ -436,5 +466,6 @@ AT91_SOC_START(at91sam9g45)
- 	.extern_irq = (1 << AT91SAM9G45_ID_IRQ0),
- 	.ioremap_registers = at91sam9g45_ioremap_registers,
- 	.register_clocks = at91sam9g45_register_clocks,
-+	.register_devices = at91sam9g45_register_devices,
- 	.init = at91sam9g45_initialize,
- AT91_SOC_END
+ static void __init at91sam9g45_ioremap_registers(void)
+ {
+-	at91_ioremap_shdwc(AT91SAM9G45_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9G45_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9G45_BASE_DDRSDRC1, 512);
+ 	at91_ioremap_ramc(1, AT91SAM9G45_BASE_DDRSDRC0, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
 diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index a79960f57e6a..0b341e972d69 100644
+index 1fba256502f7..79b5bb793692 100644
 --- a/arch/arm/mach-at91/at91sam9rl.c
 +++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -10,6 +10,7 @@
-  */
+@@ -311,8 +311,6 @@ static void __init at91sam9rl_map_io(void)
  
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/clk/at91_pmc.h>
+ static void __init at91sam9rl_ioremap_registers(void)
+ {
+-	at91_ioremap_shdwc(AT91SAM9RL_BASE_SHDWC);
+-	at91_ioremap_rstc(AT91SAM9RL_BASE_RSTC);
+ 	at91_ioremap_ramc(0, AT91SAM9RL_BASE_SDRAMC, 512);
+ 	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 5d5e55237c41..f42b0490ad98 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -64,12 +64,6 @@ extern void at91_irq_resume(void);
+ /* idle */
+ extern void at91sam9_idle(void);
  
- #include <asm/proc-fns.h>
-@@ -331,6 +332,30 @@ static void __init at91sam9rl_initialize(void)
- 	at91_gpio_init(at91sam9rl_gpio, 4);
+-/* reset */
+-extern void at91_ioremap_rstc(u32 base_addr);
+-
+-/* shutdown */
+-extern void at91_ioremap_shdwc(u32 base_addr);
+-
+ /* Matrix */
+ extern void at91_ioremap_matrix(u32 base_addr);
+ 
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index cdd717a4fa30..eb2b922a4adb 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -319,24 +319,6 @@ void __init at91_map_io(void)
+ 		at91_boot_soc.map_io();
  }
  
-+static struct resource rstc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9RL_BASE_RSTC,
-+		.end    = AT91SAM9RL_BASE_RSTC + SZ_16 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = AT91SAM9RL_BASE_SDRAMC,
-+		.end    = AT91SAM9RL_BASE_SDRAMC + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device rstc_device = {
-+	.name           = "at91-sam9260-reset",
-+	.resource       = rstc_resources,
-+	.num_resources  = ARRAY_SIZE(rstc_resources),
-+};
-+
-+static void __init at91sam9rl_register_devices(void)
-+{
-+	platform_device_register(&rstc_device);
-+}
-+
- /* --------------------------------------------------------------------
-  *  Interrupt initialization
-  * -------------------------------------------------------------------- */
-@@ -381,5 +406,6 @@ AT91_SOC_START(at91sam9rl)
- #if defined(CONFIG_OLD_CLK_AT91)
- 	.register_clocks = at91sam9rl_register_clocks,
- #endif
-+	.register_devices = at91sam9rl_register_devices,
- 	.init = at91sam9rl_initialize,
- AT91_SOC_END
+-void __iomem *at91_shdwc_base = NULL;
+-
+-void __init at91_ioremap_shdwc(u32 base_addr)
+-{
+-	at91_shdwc_base = ioremap(base_addr, 16);
+-	if (!at91_shdwc_base)
+-		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
+-}
+-
+-void __iomem *at91_rstc_base;
+-
+-void __init at91_ioremap_rstc(u32 base_addr)
+-{
+-	at91_rstc_base = ioremap(base_addr, 16);
+-	if (!at91_rstc_base)
+-		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
+-}
+-
+ void __iomem *at91_matrix_base;
+ EXPORT_SYMBOL_GPL(at91_matrix_base);
+ 
 -- 
 2.0.1
