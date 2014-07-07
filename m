@@ -1,23 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 08:47:35 +0200
-Subject: [PATCH 0/3] ARM: shmobile: Consistently use tabs for indentation
-Message-ID: <1404715658-31050-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon,  7 Jul 2014 08:47:36 +0200
+Subject: [PATCH 1/3] ARM: shmobile: henninger: Consistently use tabs for
+ indentation
+In-Reply-To: <1404715658-31050-1-git-send-email-horms+renesas@verge.net.au>
+References: <1404715658-31050-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404715658-31050-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some whitespace fixes for DT.
+Unify white space usage by consistently using tabs for indentation.
 
-These changes are based on renesas-devel-v3.16-rc3-20140706.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791-henninger.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Simon Horman (3):
-  ARM: shmobile: henninger: Consistently use tabs for indentation
-  ARM: shmobile: marzen: Consistently use tabs for indentation
-  ARM: shmobile: r8a7779: Consistently use tabs for indentation
-
- arch/arm/boot/dts/r8a7779-marzen.dts    | 12 ++++++------
- arch/arm/boot/dts/r8a7779.dtsi          | 14 +++++++-------
- arch/arm/boot/dts/r8a7791-henninger.dts |  2 +-
- 3 files changed, 14 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7791-henninger.dts b/arch/arm/boot/dts/r8a7791-henninger.dts
+index bc48bcc..1a8991d 100644
+--- a/arch/arm/boot/dts/r8a7791-henninger.dts
++++ b/arch/arm/boot/dts/r8a7791-henninger.dts
+@@ -151,7 +151,7 @@
+ };
+ 
+ &sata0 {
+-       status = "okay";
++	status = "okay";
+ };
+ 
+ &sdhi0 {
 -- 
 2.0.0.rc2
