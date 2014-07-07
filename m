@@ -1,60 +1,49 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Jul 2014 22:04:18 +0800
-Subject: [PATCH v4 2/2] ARM: i.MX53: globally disable supervisor protect
-In-Reply-To: <1404726087-2069-2-git-send-email-s.trumtrar@pengutronix.de>
-References: <1404726087-2069-1-git-send-email-s.trumtrar@pengutronix.de>
- <1404726087-2069-2-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20140707140416.GT30239@dragon>
+From: j@jannau.net (Janne Grunau)
+Date: Mon, 7 Jul 2014 13:59:54 +0000 (UTC)
+Subject: Android and compatibility with deprecated armv7 instructions
+References: <20140701234800.GA23577@sirena.org.uk>
+ <4473002.jGohFvPsvi@wuerfel> <7B049AD4-78F8-4494-A2CB-57DD346107DA@arm.com>
+ <201407061739.22152.arnd@arndb.de>
+Message-ID: <loom.20140707T153253-384@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 11:41:27AM +0200, Steffen Trumtrar wrote:
-> Most peripherals on the i.MX53 have an
->   Off-Platform Peripheral Access Control Register (OPACR)
-> in which the access rights (together with the MPROT registers) can be declared.
-> However, this does not seem to work for example for SSI1+SDMA, because the
-> supervisor bit is not set for the SDMA unit.
-> It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
-> works because it does NOT have an OPACR.
+Arnd Bergmann <arnd <at> arndb.de> writes:
 > 
-> The right solution would be to fix the access rights for the SDMA, but the unit
-> responsible for this is the Central Security Unit (CSU), which of course is NOT
-> documented. So, until documentation for this is openly available, turn off the
-> supervisor protection because it cripples the hardware.
+> On Saturday 05 July 2014, Catalin Marinas wrote:
+> > On 5 Jul 2014, at 19:43, Arnd Bergmann <arnd <at> arndb.de> wrote:
+> >
+> > > I think if a there is no way to turn off a feature, we can't really
+> > > treat it as "deprecated", since we are lacking the most important tool
+> > > to help users migrate away from it. Do you know why the architecture
+> > > folks believe it makes sense to have distinct steps 1 and 2?
+> > 
+> > During this phase you usually only get compiler warnings which are
+> > clearly not enough for already built apps.
+> > 
+> > But it looks like this is changing with ARMv8. SETEND is deprecated and
+> > disable bit available. IT instruction also deprecated with a disable bit
+> > (basically only allowing for one subsequent conditional instruction,
+> > though I don?t think we can easily get rid of this one in user space).
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/mach-imx/mach-imx53.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index 2bad387..1fbd77d 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -26,9 +26,13 @@
->  
->  static void __init imx53_dt_init(void)
->  {
-> +	const char *aips_compatible = "fsl,imx53-aipstz";
-> +
+> Ok. I can also see ways to emulate SETEND from kernel side by modifying
+> the user pt_regs,
 
-The variable is not really necessary, since we can just do:
+The single use of SETEND in FFmpeg/libav is not important and could easily
+be disabled on ARMv8. Is there a better way than parsing AT_PLATFORM for
+runtime detection of the CPU arch? A HWCAP for the missing SETEND would be
+nicer. That of course doesn't fix existing binaries.
 
-	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
+> but I don't see how we could emulate IT without anything
+> short of a full interpretation of user instructions from the kernel.
 
-I'm going to fix it up and apply both patches.  Let me know if you have
-concern with that.
+Avoiding deprecated forms of IT would be harder. It's used more often in
+libav (~50 times) so it should be only disabled if it's emulated or not
+available using an explicit HWCAP. Not using Thumb for those functions would
+be another option for libav. Again this doesn't fix existing binaries and it
+doesn't fix compiled code.
 
-Shawn
+Janne
 
->  	mxc_arch_reset_init_dt();
->  
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +
-> +	imx_aips_allow_unprivileged_access(aips_compatible);
->  }
->  
->  static const char *imx53_dt_board_compat[] __initconst = {
-> -- 
-> 2.0.0
-> 
+-- 
+libav arm/aarch64 developer
