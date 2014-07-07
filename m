@@ -1,43 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Jul 2014 01:14:56 -0700
-Subject: [PATCH] mach-omap1: Fix call to omap_cfg_reg
-In-Reply-To: <1404493320-5606-1-git-send-email-xerofoify@gmail.com>
-References: <1404493320-5606-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <20140707081456.GH28884@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jul 2014 09:22:36 +0100
+Subject: linux-next: manual merge of the mvebu tree with the arm tree
+In-Reply-To: <20140707112853.7f5a9323@canb.auug.org.au>
+References: <20140707112853.7f5a9323@canb.auug.org.au>
+Message-ID: <20140707082236.GX21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicholas Krause <xerofoify@gmail.com> [140704 10:03]:
-> This patch fixes the call to ompa_cfg_reg(USB2_SPEED) in the case
-> that the cpu is a omap16xx and the nwires are not equal to 3.
+On Mon, Jul 07, 2014 at 11:28:53AM +1000, Stephen Rothwell wrote:
+> diff --cc arch/arm/mach-mvebu/headsmp-a9.S
+> index 7c91ddb6f1f7,da5bb292b91c..000000000000
+> --- a/arch/arm/mach-mvebu/headsmp-a9.S
+> +++ b/arch/arm/mach-mvebu/headsmp-a9.S
+> @@@ -14,8 -14,9 +14,10 @@@
+>   
+>   #include <linux/linkage.h>
+>   #include <linux/init.h>
+>  +#include <asm/assembler.h>
+>   
+> + #include <asm/assembler.h>
+> + 
 
-This is most likely unsafe to do as the pin is probably
-shared with some other device and we have to rely for
-the bootloader to do the right thing for the board.
+Obviously not quite correct - this looks like an automatic merge, something
+that will have to be kept an eye on during the proper merge window.
 
-Regards,
-
-Tony
- 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> ---
->  arch/arm/mach-omap1/usb.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
-> index 4118db5..17e3139 100644
-> --- a/arch/arm/mach-omap1/usb.c
-> +++ b/arch/arm/mach-omap1/usb.c
-> @@ -504,8 +504,7 @@ static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
->  		omap_cfg_reg(W9_USB2_TXEN);
->  		omap_cfg_reg(W5_USB2_SE0);
->  		if (nwires != 3)
-> -			omap_cfg_reg(Y5_USB2_RCV);
-> -		// FIXME omap_cfg_reg(USB2_SPEED);
-> +			omap_cfg_reg(USB2_SPEED)
->  	} else {
->  		pr_debug("usb%d cpu unrecognized\n", 1);
->  		return 0;
-> -- 
-> 1.9.1
-> 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
