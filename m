@@ -1,61 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 Jul 2014 09:54:38 +0200
-Subject: [PATCH v2 13/30] ARM: shmobile: ape6evm-reference: Initialise CMT1
- device using DT
+Date: Mon,  7 Jul 2014 09:54:54 +0200
+Subject: [PATCH v2 29/30] ARM: shmobile: sh73a0: Add CMT1 node
 In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
 References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1404719695-1634-14-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1404719695-1634-30-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise CMT1 device using DT when booting ape6evm
-using DT-reference.
+This describes all of the CMT1 hardware of the sh73a0.
+The node is disabled and may be enabled as necessary by board DTS files.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
+N.B: This only adds cmt1, as per the legacy C code
+
 v2
 * First post
 ---
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 4 ++++
- arch/arm/mach-shmobile/setup-r8a73a4.c          | 3 +--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-index a860f32..a42ba09 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-@@ -93,6 +93,10 @@
- 	voltage-tolerance = <1>; /* 1% */
- };
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 910b790..57e1ed2 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -324,6 +324,17 @@
+ 			<&irqpin3 4 0>, <&irqpin3 5 0>, <&irqpin3 6 0>, <&irqpin3 7 0>;
+ 	};
  
-+&cmt1 {
-+	status = "okay";
-+};
++	cmt1: timer at e6138000 {
++		compatible = "renesas,cmt-48";
++		reg = <0xe6138000 0x200>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 65 IRQ_TYPE_LEVEL_HIGH>;
 +
- &pfc {
- 	scifa0_pins: serial0 {
- 		renesas,groups = "scifa0_data";
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 496ecf3..10e3f14 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -189,7 +189,6 @@ static struct resource cmt1_resources[] = {
- 
- void __init r8a73a4_add_dt_devices(void)
- {
--	r8a73a4_register_cmt(1);
- }
- 
- /* DMA */
-@@ -282,7 +281,7 @@ static struct resource dma_resources[] = {
- 
- void __init r8a73a4_add_standard_devices(void)
- {
--	r8a73a4_add_dt_devices();
-+	r8a73a4_register_cmt(1);
- 	r8a73a4_register_scif(0);
- 	r8a73a4_register_scif(1);
- 	r8a73a4_register_scif(2);
++		renesas,channels-mask = <0x3f>;
++
++		status = "disabled";
++	};
++
+ 	sh_fsi2: sound at ec230000 {
+ 		#sound-dai-cells = <1>;
+ 		compatible = "renesas,sh_fsi2";
 -- 
 2.0.0.rc2
