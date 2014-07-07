@@ -1,69 +1,86 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 7 Jul 2014 15:32:33 +0800
-Subject: [PATCH v2 8/8] ARM: sun7i: enable DMA on SPI
-In-Reply-To: <1404619518-7592-9-git-send-email-emilio@elopez.com.ar>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-9-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAGb2v67vub+Bf9zkUUGB=Kqi5dm7DeGay8HsMbdsx4ZmcfcgPg@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 07 Jul 2014 16:33:02 +0900
+Subject: [PATCHv2 2/5] ARM: dts: exynos: unuse the slot-node and deprecated
+ the supports-highspeed for dw-mmc
+In-Reply-To: <000c01cf99b5$34ccc8c0$9e665a40$%jun@samsung.com>
+References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
+ <1404128960-27225-3-git-send-email-jh80.chung@samsung.com>
+ <000c01cf99b5$34ccc8c0$9e665a40$%jun@samsung.com>
+Message-ID: <53BA4D2E.40600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Seungwon.
 
-On Sun, Jul 6, 2014 at 12:05 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> All of our SPI controllers support DMA transfers, so let's add the
-> properties here so they can be used when it's best to do so.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+I will fix it, and add  dt-file related with exynos3250. 
 
-Numbers are good.
+Best Regards,
+Jaehoon Chung
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
-
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 8cd3534..804dc01 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -437,6 +437,8 @@
->                         interrupts = <0 10 4>;
->                         clocks = <&ahb_gates 20>, <&spi0_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 27>, <&dma 1 26>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> @@ -448,6 +450,8 @@
->                         interrupts = <0 11 4>;
->                         clocks = <&ahb_gates 21>, <&spi1_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 9>, <&dma 1 8>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> @@ -543,6 +547,8 @@
->                         interrupts = <0 12 4>;
->                         clocks = <&ahb_gates 22>, <&spi2_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 29>, <&dma 1 28>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> @@ -582,6 +588,8 @@
->                         interrupts = <0 50 4>;
->                         clocks = <&ahb_gates 23>, <&spi3_clk>;
->                         clock-names = "ahb", "mod";
-> +                       dmas = <&dma 1 31>, <&dma 1 30>;
-> +                       dma-names = "rx", "tx";
->                         status = "disabled";
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> --
-> 2.0.1
+On 07/07/2014 04:29 PM, Seungwon Jeon wrote:
+> Hi Jaehoon,
+> 
+> Please check one thing below.
+> 
+> On Mon, June 30, 2014, Jaehoon Chung wrote:
+>> dw-mmc controller can support multiple slots.
+>> But, there are no use-cases anywhere. So we don't need to support the
+>> slot-node for dw-mmc controller.
+>> And "supports-highspeed" property in dw-mmc is deprecated.
+>> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+>>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+>> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+> 
+>> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-
+>> octa.dts
+>> index 434fd9d..5f37b81 100644
+>> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+>> @@ -50,7 +50,6 @@
+>>  	mmc at 12200000 {
+>>  		status = "okay";
+>>  		broken-cd;
+>> -		supports-highspeed;
+>>  		card-detect-delay = <200>;
+>>  		samsung,dw-mshc-ciu-div = <3>;
+>>  		samsung,dw-mshc-sdr-timing = <0 4>;
+>> @@ -58,16 +57,12 @@
+>>  		pinctrl-names = "default";
+>>  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>>  		vmmc-supply = <&ldo10_reg>;
+>> -
+>> -		slot at 0 {
+>> -			reg = <0>;
+>> -			bus-width = <8>;
+>> -		};
+>> +		bus-width = <8>;
+>> +		cap-mmc-highspeed;
+>>  	};
+>>
+>>  	mmc at 12220000 {
+>>  		status = "okay";
+>> -		supports-highspeed;
+>>  		card-detect-delay = <200>;
+>>  		samsung,dw-mshc-ciu-div = <3>;
+>>  		samsung,dw-mshc-sdr-timing = <2 3>;
+>> @@ -75,11 +70,8 @@
+>>  		pinctrl-names = "default";
+>>  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>>  		vmmc-supply = <&ldo10_reg>;
+>> -
+>> -		slot at 0 {
+>> -			reg = <0>;
+>> -			bus-width = <4>;
+>> -		};
+>> +		bus-width = <8>;
+> <4> is correct?
+> 
+>> +		cap-mmc-highspeed;
+> 
+> Thanks,
+> Seungwon Jeon
+> 
+> 
