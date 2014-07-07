@@ -1,100 +1,77 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Jul 2014 09:20:53 +0530
-Subject: [PATCH v6 3/6] ARM: EXYNOS: Move SYSREG definition into sys-reg
- specific file
+Date: Mon, 07 Jul 2014 09:20:55 +0530
+Subject: [PATCH v6 5/6] ARM: EXYNOS: Remove regs-pmu.h header dependency from
+ pm_domain
 In-Reply-To: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1404705056-11965-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1404705056-11965-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While making PMU implementation to be device tree based, there are
-few register offsets related with SYSREG present in regs-pmu.h, so
-let's make a new header file "regs-sys.h" to keep all such SYSREG
-related register offsets and remove them from "regs-pmu.h"
+Current "pm_domain.c" file uses "S5P_INT_LOCAL_PWR_EN" definition from
+"regs-pmu.h" and hence needs to include this header file. As there is
+no other user of "S5P_INT_LOCAL_PWR_EN" definition other than pm_domain,
+to remove "regs-pmu.h" header file dependency from "pm_domain.c"  it's
+better we define this definition in "pm_domain.c" file itself and thus it
+will help in removing header file inclusion from "pm_domain.c".
+Also removing "S5P_" prefix from macro.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c   |    1 +
- arch/arm/mach-exynos/pm.c       |    1 +
- arch/arm/mach-exynos/regs-pmu.h |    3 ---
- arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
- 4 files changed, 24 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-exynos/regs-sys.h
+ arch/arm/mach-exynos/pm_domains.c |    8 ++++----
+ arch/arm/mach-exynos/regs-pmu.h   |    1 -
+ 2 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 47170eb..186f35d 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -29,6 +29,7 @@
- #include "common.h"
- #include "mfc.h"
- #include "regs-pmu.h"
-+#include "regs-sys.h"
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fe6570e..bcd8dcf 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -22,7 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/sched.h>
  
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 202ca73..f127c0c 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -35,6 +35,7 @@
+-#include "regs-pmu.h"
++#define INT_LOCAL_PWR_EN       0x7
  
- #include "common.h"
- #include "regs-pmu.h"
-+#include "regs-sys.h"
+ /*
+  * Exynos specific wrapper around the generic power domain
+@@ -44,13 +44,13 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+ 	pd = container_of(domain, struct exynos_pm_domain, pd);
+ 	base = pd->base;
  
- /**
-  * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
+-	pwr = power_on ? S5P_INT_LOCAL_PWR_EN : 0;
++	pwr = power_on ? INT_LOCAL_PWR_EN : 0;
+ 	__raw_writel(pwr, base);
+ 
+ 	/* Wait max 1ms */
+ 	timeout = 10;
+ 
+-	while ((__raw_readl(base + 0x4) & S5P_INT_LOCAL_PWR_EN)	!= pwr) {
++	while ((__raw_readl(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
+ 		if (!timeout) {
+ 			op = (power_on) ? "enable" : "disable";
+ 			pr_err("Power domain %s %s failed\n", domain->name, op);
+@@ -172,7 +172,7 @@ static __init int exynos4_pm_init_power_domain(void)
+ 
+ 		platform_set_drvdata(pdev, pd);
+ 
+-		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
++		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
+ 
+ 		pm_genpd_init(&pd->pd, NULL, !on);
+ 	}
 diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index e1c06b6..e6fa6cf 100644
+index e6fa6cf..e5e298c 100644
 --- a/arch/arm/mach-exynos/regs-pmu.h
 +++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -15,7 +15,6 @@
- #include <mach/map.h>
+@@ -128,7 +128,6 @@
+ #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
  
- #define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
--#define S5P_SYSREG(x)				(S3C_VA_SYS + (x))
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+-#define S5P_INT_LOCAL_PWR_EN			0x7
  
- #define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
- 
-@@ -190,8 +189,6 @@
- 
- /* For EXYNOS5 */
- 
--#define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
--
- #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
- #define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
- 
-diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
-new file mode 100644
-index 0000000..84332b0
---- /dev/null
-+++ b/arch/arm/mach-exynos/regs-sys.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *             http://www.samsung.com
-+ *
-+ * EXYNOS - system register definition
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_SYS_H
-+#define __ASM_ARCH_REGS_SYS_H __FILE__
-+
-+#include <mach/map.h>
-+
-+#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
-+
-+/* For EXYNOS5 */
-+#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
-+
-+#endif /* __ASM_ARCH_REGS_SYS_H */
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
 -- 
 1.7.9.5
