@@ -1,137 +1,305 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Jul 2014 16:25:30 +0200
-Subject: [PATCH v2 17/18] AT91: Remove rstc and shdwnc global base addresses
+Date: Mon,  7 Jul 2014 16:25:19 +0200
+Subject: [PATCH v2 06/18] power: reset: Add AT91 reset driver
 In-Reply-To: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404743131-24569-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404743131-24569-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there's no user left for the global variables holding the reset and
-shutdown controllers base address, we can remove these variables and their
-associated mapping function.
+Implement the reset behaviour of the various AT91 SoCS in drivers/power/reset.
+
+It used to be (and still is) located in arch/arm/mach-at91, and in order to
+preserve bisectability is not removed yet, but every board should be converted
+to use this driver instead.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9260.c |  2 --
- arch/arm/mach-at91/at91sam9261.c |  2 --
- arch/arm/mach-at91/at91sam9263.c |  2 --
- arch/arm/mach-at91/at91sam9g45.c |  2 --
- arch/arm/mach-at91/at91sam9rl.c  |  2 --
- arch/arm/mach-at91/generic.h     |  6 ------
- arch/arm/mach-at91/setup.c       | 18 ------------------
- 7 files changed, 34 deletions(-)
+ drivers/power/reset/Kconfig      |   7 ++
+ drivers/power/reset/Makefile     |   1 +
+ drivers/power/reset/at91-reset.c | 246 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 254 insertions(+)
+ create mode 100644 drivers/power/reset/at91-reset.c
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index f387e831e894..60a0d37a8134 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -339,8 +339,6 @@ static void __init at91sam9260_map_io(void)
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 19d546c5edfa..b3fef01d7cbb 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -14,6 +14,13 @@ config POWER_RESET_AS3722
+ 	help
+ 	  This driver supports turning off board via a ams AS3722 power-off.
  
- static void __init at91sam9260_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9260_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9260_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9260_BASE_SDRAMC, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
- 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 5e8ac0d271b8..80cae8728316 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -302,8 +302,6 @@ static void __init at91sam9261_map_io(void)
- 
- static void __init at91sam9261_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9261_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9261_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9261_BASE_SDRAMC, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
- 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 772485c9e47c..7d4403ed0596 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -317,8 +317,6 @@ static void __init at91sam9263_map_io(void)
- 
- static void __init at91sam9263_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9263_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9263_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9263_BASE_SDRAMC0, 512);
- 	at91_ioremap_ramc(1, AT91SAM9263_BASE_SDRAMC1, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index d986cc757cfb..c615f1d3d39c 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -367,8 +367,6 @@ static void __init at91sam9g45_map_io(void)
- 
- static void __init at91sam9g45_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9G45_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9G45_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9G45_BASE_DDRSDRC1, 512);
- 	at91_ioremap_ramc(1, AT91SAM9G45_BASE_DDRSDRC0, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 1fba256502f7..79b5bb793692 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -311,8 +311,6 @@ static void __init at91sam9rl_map_io(void)
- 
- static void __init at91sam9rl_ioremap_registers(void)
- {
--	at91_ioremap_shdwc(AT91SAM9RL_BASE_SHDWC);
--	at91_ioremap_rstc(AT91SAM9RL_BASE_RSTC);
- 	at91_ioremap_ramc(0, AT91SAM9RL_BASE_SDRAMC, 512);
- 	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
- 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 5d5e55237c41..f42b0490ad98 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -64,12 +64,6 @@ extern void at91_irq_resume(void);
- /* idle */
- extern void at91sam9_idle(void);
- 
--/* reset */
--extern void at91_ioremap_rstc(u32 base_addr);
--
--/* shutdown */
--extern void at91_ioremap_shdwc(u32 base_addr);
--
- /* Matrix */
- extern void at91_ioremap_matrix(u32 base_addr);
- 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index cdd717a4fa30..eb2b922a4adb 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -319,24 +319,6 @@ void __init at91_map_io(void)
- 		at91_boot_soc.map_io();
- }
- 
--void __iomem *at91_shdwc_base = NULL;
--
--void __init at91_ioremap_shdwc(u32 base_addr)
--{
--	at91_shdwc_base = ioremap(base_addr, 16);
--	if (!at91_shdwc_base)
--		panic(pr_fmt("Impossible to ioremap at91_shdwc_base\n"));
--}
--
--void __iomem *at91_rstc_base;
--
--void __init at91_ioremap_rstc(u32 base_addr)
--{
--	at91_rstc_base = ioremap(base_addr, 16);
--	if (!at91_rstc_base)
--		panic(pr_fmt("Impossible to ioremap at91_rstc_base\n"));
--}
--
- void __iomem *at91_matrix_base;
- EXPORT_SYMBOL_GPL(at91_matrix_base);
- 
++config POWER_RESET_AT91_RESET
++	bool "Atmel AT91 reset driver"
++	default SOC_AT91SAM9 || SOC_SAMA5
++	help
++	  This driver supports restart for Atmel AT91SAM9 and SAMA5
++	  SoCs
++
+ config POWER_RESET_AXXIA
+ 	bool "LSI Axxia reset driver"
+ 	depends on ARCH_AXXIA
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index dde2e8bbac53..1599214b91d9 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
++obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
+ obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
+ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+new file mode 100644
+index 000000000000..7b91ca82854e
+--- /dev/null
++++ b/drivers/power/reset/at91-reset.c
+@@ -0,0 +1,246 @@
++/*
++ * Atmel AT91 SAM9 SoCs reset code
++ *
++ * Copyright (C) 2007 Atmel Corporation.
++ * Copyright (C) BitBox Ltd 2010
++ * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcosoft.com>
++ * Copyright (C) 2014 Free Electrons
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++
++#include <asm/system_misc.h>
++
++#include <mach/at91sam9_ddrsdr.h>
++#include <mach/at91sam9_sdramc.h>
++
++#define AT91_RSTC_CR	0x00		/* Reset Controller Control Register */
++#define AT91_RSTC_PROCRST	BIT(0)		/* Processor Reset */
++#define AT91_RSTC_PERRST	BIT(2)		/* Peripheral Reset */
++#define AT91_RSTC_EXTRST	BIT(3)		/* External Reset */
++#define AT91_RSTC_KEY		(0xa5 << 24)	/* KEY Password */
++
++#define AT91_RSTC_SR	0x04		/* Reset Controller Status Register */
++#define AT91_RSTC_URSTS		BIT(0)		/* User Reset Status */
++#define AT91_RSTC_RSTTYP	GENMASK(10, 8)	/* Reset Type */
++#define AT91_RSTC_NRSTL		BIT(16)		/* NRST Pin Level */
++#define AT91_RSTC_SRCMP		BIT(17)		/* Software Reset Command in Progress */
++
++#define AT91_RSTC_MR	0x08		/* Reset Controller Mode Register */
++#define AT91_RSTC_URSTEN	BIT(0)		/* User Reset Enable */
++#define AT91_RSTC_URSTIEN	BIT(4)		/* User Reset Interrupt Enable */
++#define AT91_RSTC_ERSTL		GENMASK(11, 8)	/* External Reset Length */
++
++enum reset_type {
++	RESET_TYPE_GENERAL	= 0,
++	RESET_TYPE_WAKEUP	= 1,
++	RESET_TYPE_WATCHDOG	= 2,
++	RESET_TYPE_SOFTWARE	= 3,
++	RESET_TYPE_USER		= 4,
++};
++
++static void __iomem *at91_ramc_base[2], *at91_rstc_base;
++
++static void at91sam9260_restart(enum reboot_mode mode, const char *cmd)
++{
++	asm volatile(
++		/* Align to cache lines */
++		".balign 32\n\t"
++
++		/* Disable SDRAM accesses */
++		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
++
++		/* Power down SDRAM */
++		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
++
++		/* Reset CPU */
++		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
++
++		"b	.\n\t"
++		:
++		: "r" (at91_ramc_base[0]),
++		  "r" (at91_rstc_base),
++		  "r" (1),
++		  "r" (AT91_SDRAMC_LPCB_POWER_DOWN),
++		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST));
++}
++
++static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
++{
++	asm volatile(
++		/*
++		 * Test wether we have a second RAM controller to care
++		 * about.
++		 *
++		 * First, test that we can dereference the virtual address.
++		 */
++		"cmp	%1, #0\n\t"
++		"beq	1f\n\t"
++
++		/* Then, test that the RAM controller is enabled */
++		"ldr	r0, [%1]\n\t"
++		"cmp	r0, #0\n\t"
++
++		/* Align to cache lines */
++		".balign 32\n\t"
++
++		/* Disable SDRAM0 accesses */
++		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
++		/* Power down SDRAM0 */
++		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
++		/* Disable SDRAM1 accesses */
++		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
++		/* Power down SDRAM1 */
++		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
++		/* Reset CPU */
++		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
++
++		"	b	.\n\t"
++		:
++		: "r" (at91_ramc_base[0]),
++		  "r" (at91_ramc_base[1]),
++		  "r" (at91_rstc_base),
++		  "r" (1),
++		  "r" (AT91_DDRSDRC_LPCB_POWER_DOWN),
++		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST)
++		: "r0");
++}
++
++static void __init at91_reset_status(struct platform_device *pdev)
++{
++	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
++	char *reason;
++
++	switch ((reg & AT91_RSTC_RSTTYP) >> 8) {
++	case RESET_TYPE_GENERAL:
++		reason = "general reset";
++		break;
++	case RESET_TYPE_WAKEUP:
++		reason = "wakeup";
++		break;
++	case RESET_TYPE_WATCHDOG:
++		reason = "watchdog reset";
++		break;
++	case RESET_TYPE_SOFTWARE:
++		reason = "software reset";
++		break;
++	case RESET_TYPE_USER:
++		reason = "user reset";
++		break;
++	default:
++		reason = "unknown reset";
++		break;
++	}
++
++	pr_info("AT91: Starting after %s\n", reason);
++}
++
++static struct of_device_id at91_ramc_of_match[] = {
++	{ .compatible = "atmel,at91sam9260-sdramc", },
++	{ .compatible = "atmel,at91sam9g45-ddramc", },
++	{ /* sentinel */ }
++};
++
++static struct of_device_id at91_reset_of_match[] = {
++	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
++	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
++	{ /* sentinel */ }
++};
++
++static int at91_reset_of_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *match;
++	struct device_node *np;
++	int idx = 0;
++
++	at91_rstc_base = of_iomap(pdev->dev.of_node, 0);
++	if (!at91_rstc_base) {
++		dev_err(&pdev->dev, "Could not map reset controller address\n");
++		return -ENODEV;
++	}
++
++	for_each_matching_node(np, at91_ramc_of_match) {
++		at91_ramc_base[idx] = of_iomap(np, 0);
++		if (!at91_ramc_base[idx]) {
++			dev_err(&pdev->dev, "Could not map ram controller address\n");
++			return -ENODEV;
++		}
++		idx++;
++	}
++
++	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
++	arm_pm_restart = match->data;
++
++	return 0;
++}
++
++static int at91_reset_platform_probe(struct platform_device *pdev)
++{
++	const struct platform_device_id *match;
++	struct resource *res;
++	int idx = 0;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(at91_rstc_base)) {
++		dev_err(&pdev->dev, "Could not map reset controller address\n");
++		return PTR_ERR(at91_rstc_base);
++	}
++
++	for (idx = 0; idx < 2; idx++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
++		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
++						   resource_size(res));
++		if (IS_ERR(at91_ramc_base[idx])) {
++			dev_err(&pdev->dev, "Could not map ram controller address\n");
++			return PTR_ERR(at91_rstc_base);
++		}
++	}
++
++	match = platform_get_device_id(pdev);
++	arm_pm_restart = (void (*)(enum reboot_mode, const char*))
++		match->driver_data;
++
++	return 0;
++}
++
++static int at91_reset_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	if (pdev->dev.of_node)
++		ret = at91_reset_of_probe(pdev);
++	else
++		ret = at91_reset_platform_probe(pdev);
++
++	if (ret)
++		return ret;
++
++	at91_reset_status(pdev);
++
++	return 0;
++}
++
++static struct platform_device_id at91_reset_plat_match[] = {
++	{ "at91-sam9260-reset", (unsigned long)at91sam9260_restart },
++	{ "at91-sam9g45-reset", (unsigned long)at91sam9g45_restart },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver at91_reset_driver = {
++	.probe = at91_reset_probe,
++	.driver = {
++		.name = "at91-reset",
++		.of_match_table = at91_reset_of_match,
++	},
++	.id_table = at91_reset_plat_match,
++};
++module_platform_driver(at91_reset_driver);
 -- 
 2.0.1
