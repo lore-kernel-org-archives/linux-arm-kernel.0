@@ -1,2252 +1,1324 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  7 Jul 2014 16:16:50 +0200
-Subject: [PATCH 2/2] ARM: tegra: Convert PMC to a driver
+Date: Mon,  7 Jul 2014 16:16:49 +0200
+Subject: [PATCH 1/2] power: Move power-supply drivers to subdirectory
 In-Reply-To: <1404742610-4951-1-git-send-email-thierry.reding@gmail.com>
 References: <1404742610-4951-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1404742610-4951-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1404742610-4951-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-This commit converts the PMC support code to a platform driver. Because
-the boot process needs to call into this driver very early, set up a
-minimalistic environment via an early initcall.
-
-While at it, also move the driver out to drivers/power so that it can be
-shared with 64-bit SoCs.
+Currently the drivers/power directory almost exclusively contains
+drivers implementing the power-supply class. However not all power-
+related devices are supplies, so in order to give them an appropriate
+home this commit moves supply drivers into a supply subdirectory. That
+allows the base directory to be used for drivers that don't depend on
+the POWER_SUPPLY symbol.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-tegra/Makefile    |   2 -
- arch/arm/mach-tegra/board.h     |   7 -
- arch/arm/mach-tegra/platsmp.c   |   1 -
- arch/arm/mach-tegra/pm.c        |  30 +-
- arch/arm/mach-tegra/pm.h        |  10 +-
- arch/arm/mach-tegra/pmc.c       | 402 -----------------
- arch/arm/mach-tegra/pmc.h       |  62 ---
- arch/arm/mach-tegra/powergate.c | 503 ---------------------
- arch/arm/mach-tegra/tegra.c     |   6 -
- drivers/power/Makefile          |   1 +
- drivers/power/tegra-pmc.c       | 948 ++++++++++++++++++++++++++++++++++++++++
- include/linux/tegra-soc.h       |  46 ++
- 12 files changed, 1018 insertions(+), 1000 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/pmc.c
- delete mode 100644 arch/arm/mach-tegra/pmc.h
- delete mode 100644 arch/arm/mach-tegra/powergate.c
- create mode 100644 drivers/power/tegra-pmc.c
+ drivers/Makefile                                  |   2 +-
+ drivers/power/Kconfig                             | 395 +---------------------
+ drivers/power/Makefile                            |  62 +---
+ drivers/power/{ => supply}/88pm860x_battery.c     |   0
+ drivers/power/{ => supply}/88pm860x_charger.c     |   0
+ drivers/power/supply/Kconfig                      | 392 +++++++++++++++++++++
+ drivers/power/supply/Makefile                     |  58 ++++
+ drivers/power/{ => supply}/ab8500_bmdata.c        |   0
+ drivers/power/{ => supply}/ab8500_btemp.c         |   0
+ drivers/power/{ => supply}/ab8500_charger.c       |   0
+ drivers/power/{ => supply}/ab8500_fg.c            |   0
+ drivers/power/{ => supply}/abx500_chargalg.c      |   0
+ drivers/power/{ => supply}/apm_power.c            |   0
+ drivers/power/{ => supply}/bq2415x_charger.c      |   0
+ drivers/power/{ => supply}/bq24190_charger.c      |   0
+ drivers/power/{ => supply}/bq24735-charger.c      |   0
+ drivers/power/{ => supply}/bq27x00_battery.c      |   0
+ drivers/power/{ => supply}/collie_battery.c       |   0
+ drivers/power/{ => supply}/da9030_battery.c       |   0
+ drivers/power/{ => supply}/da9052-battery.c       |   0
+ drivers/power/{ => supply}/ds2760_battery.c       |   0
+ drivers/power/{ => supply}/ds2780_battery.c       |   0
+ drivers/power/{ => supply}/ds2781_battery.c       |   0
+ drivers/power/{ => supply}/ds2782_battery.c       |   0
+ drivers/power/{ => supply}/generic-adc-battery.c  |   0
+ drivers/power/{ => supply}/goldfish_battery.c     |   0
+ drivers/power/{ => supply}/gpio-charger.c         |   0
+ drivers/power/{ => supply}/intel_mid_battery.c    |   0
+ drivers/power/{ => supply}/isp1704_charger.c      |   0
+ drivers/power/{ => supply}/jz4740-battery.c       |   0
+ drivers/power/{ => supply}/lp8727_charger.c       |   0
+ drivers/power/{ => supply}/lp8788-charger.c       |   0
+ drivers/power/{ => supply}/max14577_charger.c     |   0
+ drivers/power/{ => supply}/max17040_battery.c     |   0
+ drivers/power/{ => supply}/max17042_battery.c     |   0
+ drivers/power/{ => supply}/max8903_charger.c      |   0
+ drivers/power/{ => supply}/max8925_power.c        |   0
+ drivers/power/{ => supply}/max8997_charger.c      |   0
+ drivers/power/{ => supply}/max8998_charger.c      |   0
+ drivers/power/{ => supply}/olpc_battery.c         |   0
+ drivers/power/{ => supply}/pcf50633-charger.c     |   0
+ drivers/power/{ => supply}/pda_power.c            |   0
+ drivers/power/{ => supply}/pm2301_charger.c       |   0
+ drivers/power/{ => supply}/pm2301_charger.h       |   0
+ drivers/power/{ => supply}/pmu_battery.c          |   0
+ drivers/power/{ => supply}/power_supply.h         |   0
+ drivers/power/{ => supply}/power_supply_core.c    |   0
+ drivers/power/{ => supply}/power_supply_leds.c    |   0
+ drivers/power/{ => supply}/power_supply_sysfs.c   |   0
+ drivers/power/{ => supply}/rx51_battery.c         |   0
+ drivers/power/{ => supply}/s3c_adc_battery.c      |   0
+ drivers/power/{ => supply}/sbs-battery.c          |   0
+ drivers/power/{ => supply}/smb347-charger.c       |   0
+ drivers/power/{ => supply}/test_power.c           |   0
+ drivers/power/{ => supply}/tosa_battery.c         |   0
+ drivers/power/{ => supply}/tps65090-charger.c     |   0
+ drivers/power/{ => supply}/twl4030_charger.c      |   0
+ drivers/power/{ => supply}/twl4030_madc_battery.c |   0
+ drivers/power/{ => supply}/wm831x_backup.c        |   0
+ drivers/power/{ => supply}/wm831x_power.c         |   0
+ drivers/power/{ => supply}/wm8350_power.c         |   0
+ drivers/power/{ => supply}/wm97xx_battery.c       |   0
+ drivers/power/{ => supply}/z2_battery.c           |   0
+ 63 files changed, 455 insertions(+), 454 deletions(-)
+ rename drivers/power/{ => supply}/88pm860x_battery.c (100%)
+ rename drivers/power/{ => supply}/88pm860x_charger.c (100%)
+ create mode 100644 drivers/power/supply/Kconfig
+ create mode 100644 drivers/power/supply/Makefile
+ rename drivers/power/{ => supply}/ab8500_bmdata.c (100%)
+ rename drivers/power/{ => supply}/ab8500_btemp.c (100%)
+ rename drivers/power/{ => supply}/ab8500_charger.c (100%)
+ rename drivers/power/{ => supply}/ab8500_fg.c (100%)
+ rename drivers/power/{ => supply}/abx500_chargalg.c (100%)
+ rename drivers/power/{ => supply}/apm_power.c (100%)
+ rename drivers/power/{ => supply}/bq2415x_charger.c (100%)
+ rename drivers/power/{ => supply}/bq24190_charger.c (100%)
+ rename drivers/power/{ => supply}/bq24735-charger.c (100%)
+ rename drivers/power/{ => supply}/bq27x00_battery.c (100%)
+ rename drivers/power/{ => supply}/collie_battery.c (100%)
+ rename drivers/power/{ => supply}/da9030_battery.c (100%)
+ rename drivers/power/{ => supply}/da9052-battery.c (100%)
+ rename drivers/power/{ => supply}/ds2760_battery.c (100%)
+ rename drivers/power/{ => supply}/ds2780_battery.c (100%)
+ rename drivers/power/{ => supply}/ds2781_battery.c (100%)
+ rename drivers/power/{ => supply}/ds2782_battery.c (100%)
+ rename drivers/power/{ => supply}/generic-adc-battery.c (100%)
+ rename drivers/power/{ => supply}/goldfish_battery.c (100%)
+ rename drivers/power/{ => supply}/gpio-charger.c (100%)
+ rename drivers/power/{ => supply}/intel_mid_battery.c (100%)
+ rename drivers/power/{ => supply}/isp1704_charger.c (100%)
+ rename drivers/power/{ => supply}/jz4740-battery.c (100%)
+ rename drivers/power/{ => supply}/lp8727_charger.c (100%)
+ rename drivers/power/{ => supply}/lp8788-charger.c (100%)
+ rename drivers/power/{ => supply}/max14577_charger.c (100%)
+ rename drivers/power/{ => supply}/max17040_battery.c (100%)
+ rename drivers/power/{ => supply}/max17042_battery.c (100%)
+ rename drivers/power/{ => supply}/max8903_charger.c (100%)
+ rename drivers/power/{ => supply}/max8925_power.c (100%)
+ rename drivers/power/{ => supply}/max8997_charger.c (100%)
+ rename drivers/power/{ => supply}/max8998_charger.c (100%)
+ rename drivers/power/{ => supply}/olpc_battery.c (100%)
+ rename drivers/power/{ => supply}/pcf50633-charger.c (100%)
+ rename drivers/power/{ => supply}/pda_power.c (100%)
+ rename drivers/power/{ => supply}/pm2301_charger.c (100%)
+ rename drivers/power/{ => supply}/pm2301_charger.h (100%)
+ rename drivers/power/{ => supply}/pmu_battery.c (100%)
+ rename drivers/power/{ => supply}/power_supply.h (100%)
+ rename drivers/power/{ => supply}/power_supply_core.c (100%)
+ rename drivers/power/{ => supply}/power_supply_leds.c (100%)
+ rename drivers/power/{ => supply}/power_supply_sysfs.c (100%)
+ rename drivers/power/{ => supply}/rx51_battery.c (100%)
+ rename drivers/power/{ => supply}/s3c_adc_battery.c (100%)
+ rename drivers/power/{ => supply}/sbs-battery.c (100%)
+ rename drivers/power/{ => supply}/smb347-charger.c (100%)
+ rename drivers/power/{ => supply}/test_power.c (100%)
+ rename drivers/power/{ => supply}/tosa_battery.c (100%)
+ rename drivers/power/{ => supply}/tps65090-charger.c (100%)
+ rename drivers/power/{ => supply}/twl4030_charger.c (100%)
+ rename drivers/power/{ => supply}/twl4030_madc_battery.c (100%)
+ rename drivers/power/{ => supply}/wm831x_backup.c (100%)
+ rename drivers/power/{ => supply}/wm831x_power.c (100%)
+ rename drivers/power/{ => supply}/wm8350_power.c (100%)
+ rename drivers/power/{ => supply}/wm97xx_battery.c (100%)
+ rename drivers/power/{ => supply}/z2_battery.c (100%)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index c303b55de22e..e48a74458c25 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -2,9 +2,7 @@ asflags-y				+= -march=armv7-a
- 
- obj-y                                   += io.o
- obj-y                                   += irq.o
--obj-y					+= pmc.o
- obj-y					+= flowctrl.o
--obj-y					+= powergate.o
- obj-y					+= pm.o
- obj-y					+= reset.o
- obj-y					+= reset-handler.o
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index bcf5dbf69d58..da90c89296b9 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -28,13 +28,6 @@
- void __init tegra_map_common_io(void);
- void __init tegra_init_irq(void);
- 
--int __init tegra_powergate_init(void);
--#if defined(CONFIG_ARCH_TEGRA_2x_SOC) && defined(CONFIG_DEBUG_FS)
--int __init tegra_powergate_debugfs_init(void);
--#else
--static inline int tegra_powergate_debugfs_init(void) { return 0; }
--#endif
--
- void __init tegra_paz00_wifikill_init(void);
- 
- #endif
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index d9878acae3d2..1862d44cc0d6 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -28,7 +28,6 @@
- 
- #include "flowctrl.h"
- #include "reset.h"
--#include "pmc.h"
- 
- #include "common.h"
- #include "iomap.h"
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index d7e6370ea8dc..41e6b1910dcc 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -39,7 +39,6 @@
- #include "reset.h"
- #include "flowctrl.h"
- #include "pm.h"
--#include "pmc.h"
- #include "sleep.h"
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -166,9 +165,29 @@ static int tegra_sleep_cpu(unsigned long v2p)
- 	return 0;
- }
- 
-+static void tegra_pm_set(enum tegra_suspend_mode mode)
-+{
-+	u32 value;
-+
-+	switch (tegra_chip_id) {
-+	case TEGRA20:
-+	case TEGRA30:
-+		break;
-+	default:
-+		/* Turn off CRAIL */
-+		value = flowctrl_read_cpu_csr(0);
-+		value &= ~FLOW_CTRL_CSR_ENABLE_EXT_MASK;
-+		value |= FLOW_CTRL_CSR_ENABLE_EXT_CRAIL;
-+		flowctrl_write_cpu_csr(0, value);
-+		break;
-+	}
-+
-+	tegra_pmc_enter_suspend_mode(mode);
-+}
-+
- void tegra_idle_lp2_last(void)
- {
--	tegra_pmc_pm_set(TEGRA_SUSPEND_LP2);
-+	tegra_pm_set(TEGRA_SUSPEND_LP2);
- 
- 	cpu_cluster_pm_enter();
- 	suspend_cpu_complex();
-@@ -267,8 +286,6 @@ static bool tegra_sleep_core_init(void)
- 
- static void tegra_suspend_enter_lp1(void)
- {
--	tegra_pmc_suspend();
--
- 	/* copy the reset vector & SDRAM shutdown code into IRAM */
- 	memcpy(iram_save_addr, IO_ADDRESS(TEGRA_IRAM_LPx_RESUME_AREA),
- 		iram_save_size);
-@@ -280,8 +297,6 @@ static void tegra_suspend_enter_lp1(void)
- 
- static void tegra_suspend_exit_lp1(void)
- {
--	tegra_pmc_resume();
--
- 	/* restore IRAM */
- 	memcpy(IO_ADDRESS(TEGRA_IRAM_LPx_RESUME_AREA), iram_save_addr,
- 		iram_save_size);
-@@ -306,7 +321,7 @@ static int tegra_suspend_enter(suspend_state_t state)
- 
- 	pr_info("Entering suspend state %s\n", lp_state[mode]);
- 
--	tegra_pmc_pm_set(mode);
-+	tegra_pm_set(mode);
- 
- 	local_fiq_disable();
- 
-@@ -354,7 +369,6 @@ void __init tegra_init_suspend(void)
- 		return;
- 
- 	tegra_tear_down_cpu_init();
--	tegra_pmc_suspend_init();
- 
- 	if (mode >= TEGRA_SUSPEND_LP1) {
- 		if (!tegra_lp1_iram_hook() || !tegra_sleep_core_init()) {
-diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-index f4a89698e5b0..83bc87583446 100644
---- a/arch/arm/mach-tegra/pm.h
-+++ b/arch/arm/mach-tegra/pm.h
-@@ -21,12 +21,11 @@
- #ifndef _MACH_TEGRA_PM_H_
- #define _MACH_TEGRA_PM_H_
- 
--#include "pmc.h"
--
- struct tegra_lp1_iram {
- 	void	*start_addr;
- 	void	*end_addr;
- };
-+
- extern struct tegra_lp1_iram tegra_lp1_iram;
- extern void (*tegra_sleep_core_finish)(unsigned long v2p);
- 
-@@ -42,15 +41,8 @@ void tegra_idle_lp2_last(void);
- extern void (*tegra_tear_down_cpu)(void);
- 
- #ifdef CONFIG_PM_SLEEP
--enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
--				enum tegra_suspend_mode mode);
- void tegra_init_suspend(void);
- #else
--static inline enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
--				enum tegra_suspend_mode mode)
--{
--	return TEGRA_SUSPEND_NONE;
--}
- static inline void tegra_init_suspend(void) {}
- #endif
- 
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-deleted file mode 100644
-index e1677c0a78db..000000000000
---- a/arch/arm/mach-tegra/pmc.c
-+++ /dev/null
-@@ -1,402 +0,0 @@
--/*
-- * Copyright (C) 2012,2013 NVIDIA CORPORATION. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/tegra-powergate.h>
--#include <linux/tegra-soc.h>
--
--#include "flowctrl.h"
--#include "pm.h"
--#include "pmc.h"
--#include "sleep.h"
--
--#define TEGRA_POWER_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
--#define TEGRA_POWER_SYSCLK_OE		(1 << 11)  /* system clock enable */
--#define TEGRA_POWER_EFFECT_LP0		(1 << 14)  /* LP0 when CPU pwr gated */
--#define TEGRA_POWER_CPU_PWRREQ_POLARITY	(1 << 15)  /* CPU pwr req polarity */
--#define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
--
--#define PMC_CTRL			0x0
--#define PMC_CTRL_INTR_LOW		(1 << 17)
--#define PMC_PWRGATE_TOGGLE		0x30
--#define PMC_PWRGATE_TOGGLE_START	(1 << 8)
--#define PMC_REMOVE_CLAMPING		0x34
--#define PMC_PWRGATE_STATUS		0x38
--
--#define PMC_SCRATCH0			0x50
--#define PMC_SCRATCH0_MODE_RECOVERY	(1 << 31)
--#define PMC_SCRATCH0_MODE_BOOTLOADER	(1 << 30)
--#define PMC_SCRATCH0_MODE_RCM		(1 << 1)
--#define PMC_SCRATCH0_MODE_MASK		(PMC_SCRATCH0_MODE_RECOVERY | \
--					 PMC_SCRATCH0_MODE_BOOTLOADER | \
--					 PMC_SCRATCH0_MODE_RCM)
--
--#define PMC_CPUPWRGOOD_TIMER	0xc8
--#define PMC_CPUPWROFF_TIMER	0xcc
--
--static u8 tegra_cpu_domains[] = {
--	0xFF,			/* not available for CPU0 */
--	TEGRA_POWERGATE_CPU1,
--	TEGRA_POWERGATE_CPU2,
--	TEGRA_POWERGATE_CPU3,
--};
--static DEFINE_SPINLOCK(tegra_powergate_lock);
--
--static bool tegra_pmc_invert_interrupt;
--static struct clk *tegra_pclk;
--void __iomem *tegra_pmc_base;
--
--struct pmc_pm_data {
--	u32 cpu_good_time;	/* CPU power good time in uS */
--	u32 cpu_off_time;	/* CPU power off time in uS */
--	u32 core_osc_time;	/* Core power good osc time in uS */
--	u32 core_pmu_time;	/* Core power good pmu time in uS */
--	u32 core_off_time;	/* Core power off time in uS */
--	bool corereq_high;	/* Core power request active-high */
--	bool sysclkreq_high;	/* System clock request active-high */
--	bool combined_req;	/* Combined pwr req for CPU & Core */
--	bool cpu_pwr_good_en;	/* CPU power good signal is enabled */
--	u32 lp0_vec_phy_addr;	/* The phy addr of LP0 warm boot code */
--	u32 lp0_vec_size;	/* The size of LP0 warm boot code */
--	enum tegra_suspend_mode suspend_mode;
--};
--static struct pmc_pm_data pmc_pm_data;
--
--static int tegra_pmc_get_cpu_powerdomain_id(int cpuid)
--{
--	if (cpuid <= 0 || cpuid >= num_possible_cpus())
--		return -EINVAL;
--	return tegra_cpu_domains[cpuid];
--}
--
--static bool tegra_pmc_powergate_is_powered(int id)
--{
--	return (tegra_pmc_readl(PMC_PWRGATE_STATUS) >> id) & 1;
--}
--
--static int tegra_pmc_powergate_set(int id, bool new_state)
--{
--	bool old_state;
--	unsigned long flags;
--
--	spin_lock_irqsave(&tegra_powergate_lock, flags);
--
--	old_state = tegra_pmc_powergate_is_powered(id);
--	WARN_ON(old_state == new_state);
--
--	tegra_pmc_writel(PMC_PWRGATE_TOGGLE_START | id, PMC_PWRGATE_TOGGLE);
--
--	spin_unlock_irqrestore(&tegra_powergate_lock, flags);
--
--	return 0;
--}
--
--static int tegra_pmc_powergate_remove_clamping(int id)
--{
--	u32 mask;
--
--	/*
--	 * Tegra has a bug where PCIE and VDE clamping masks are
--	 * swapped relatively to the partition ids.
--	 */
--	if (id ==  TEGRA_POWERGATE_VDEC)
--		mask = (1 << TEGRA_POWERGATE_PCIE);
--	else if	(id == TEGRA_POWERGATE_PCIE)
--		mask = (1 << TEGRA_POWERGATE_VDEC);
--	else
--		mask = (1 << id);
--
--	tegra_pmc_writel(mask, PMC_REMOVE_CLAMPING);
--
--	return 0;
--}
--
--bool tegra_pmc_cpu_is_powered(int cpuid)
--{
--	int id;
--
--	id = tegra_pmc_get_cpu_powerdomain_id(cpuid);
--	if (id < 0)
--		return false;
--	return tegra_pmc_powergate_is_powered(id);
--}
--
--int tegra_pmc_cpu_power_on(int cpuid)
--{
--	int id;
--
--	id = tegra_pmc_get_cpu_powerdomain_id(cpuid);
--	if (id < 0)
--		return id;
--	return tegra_pmc_powergate_set(id, true);
--}
--
--int tegra_pmc_cpu_remove_clamping(int cpuid)
--{
--	int id;
--
--	id = tegra_pmc_get_cpu_powerdomain_id(cpuid);
--	if (id < 0)
--		return id;
--	return tegra_pmc_powergate_remove_clamping(id);
--}
--
--void tegra_pmc_restart(enum reboot_mode mode, const char *cmd)
--{
--	u32 val;
--
--	val = tegra_pmc_readl(PMC_SCRATCH0);
--	val &= ~PMC_SCRATCH0_MODE_MASK;
--
--	if (cmd) {
--		if (strcmp(cmd, "recovery") == 0)
--			val |= PMC_SCRATCH0_MODE_RECOVERY;
--
--		if (strcmp(cmd, "bootloader") == 0)
--			val |= PMC_SCRATCH0_MODE_BOOTLOADER;
--
--		if (strcmp(cmd, "forced-recovery") == 0)
--			val |= PMC_SCRATCH0_MODE_RCM;
--	}
--
--	tegra_pmc_writel(val, PMC_SCRATCH0);
--
--	val = tegra_pmc_readl(0);
--	val |= 0x10;
--	tegra_pmc_writel(val, 0);
--}
--
--#ifdef CONFIG_PM_SLEEP
--static void set_power_timers(u32 us_on, u32 us_off, unsigned long rate)
--{
--	unsigned long long ticks;
--	unsigned long long pclk;
--	static unsigned long tegra_last_pclk;
--
--	if (WARN_ON_ONCE(rate <= 0))
--		pclk = 100000000;
--	else
--		pclk = rate;
--
--	if ((rate != tegra_last_pclk)) {
--		ticks = (us_on * pclk) + 999999ull;
--		do_div(ticks, 1000000);
--		tegra_pmc_writel((unsigned long)ticks, PMC_CPUPWRGOOD_TIMER);
--
--		ticks = (us_off * pclk) + 999999ull;
--		do_div(ticks, 1000000);
--		tegra_pmc_writel((unsigned long)ticks, PMC_CPUPWROFF_TIMER);
--		wmb();
--	}
--	tegra_last_pclk = pclk;
--}
--
--enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
--{
--	return pmc_pm_data.suspend_mode;
--}
--
--void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode)
--{
--	if (mode < TEGRA_SUSPEND_NONE || mode >= TEGRA_MAX_SUSPEND_MODE)
--		return;
--
--	pmc_pm_data.suspend_mode = mode;
--}
--
--void tegra_pmc_suspend(void)
--{
--	tegra_pmc_writel(virt_to_phys(tegra_resume), PMC_SCRATCH41);
--}
--
--void tegra_pmc_resume(void)
--{
--	tegra_pmc_writel(0x0, PMC_SCRATCH41);
--}
--
--void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
--{
--	u32 reg, csr_reg;
--	unsigned long rate = 0;
--
--	reg = tegra_pmc_readl(PMC_CTRL);
--	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
--	reg &= ~TEGRA_POWER_EFFECT_LP0;
--
--	switch (tegra_chip_id) {
--	case TEGRA20:
--	case TEGRA30:
--		break;
--	default:
--		/* Turn off CRAIL */
--		csr_reg = flowctrl_read_cpu_csr(0);
--		csr_reg &= ~FLOW_CTRL_CSR_ENABLE_EXT_MASK;
--		csr_reg |= FLOW_CTRL_CSR_ENABLE_EXT_CRAIL;
--		flowctrl_write_cpu_csr(0, csr_reg);
--		break;
--	}
--
--	switch (mode) {
--	case TEGRA_SUSPEND_LP1:
--		rate = 32768;
--		break;
--	case TEGRA_SUSPEND_LP2:
--		rate = clk_get_rate(tegra_pclk);
--		break;
--	default:
--		break;
--	}
--
--	set_power_timers(pmc_pm_data.cpu_good_time, pmc_pm_data.cpu_off_time,
--			 rate);
--
--	tegra_pmc_writel(reg, PMC_CTRL);
--}
--
--void tegra_pmc_suspend_init(void)
--{
--	u32 reg;
--
--	/* Always enable CPU power request */
--	reg = tegra_pmc_readl(PMC_CTRL);
--	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
--	tegra_pmc_writel(reg, PMC_CTRL);
--
--	reg = tegra_pmc_readl(PMC_CTRL);
--
--	if (!pmc_pm_data.sysclkreq_high)
--		reg |= TEGRA_POWER_SYSCLK_POLARITY;
--	else
--		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
--
--	/* configure the output polarity while the request is tristated */
--	tegra_pmc_writel(reg, PMC_CTRL);
--
--	/* now enable the request */
--	reg |= TEGRA_POWER_SYSCLK_OE;
--	tegra_pmc_writel(reg, PMC_CTRL);
--}
--#endif
--
--static const struct of_device_id matches[] __initconst = {
--	{ .compatible = "nvidia,tegra124-pmc" },
--	{ .compatible = "nvidia,tegra114-pmc" },
--	{ .compatible = "nvidia,tegra30-pmc" },
--	{ .compatible = "nvidia,tegra20-pmc" },
--	{ }
--};
--
--void __init tegra_pmc_init_irq(void)
--{
--	struct device_node *np;
--	u32 val;
--
--	np = of_find_matching_node(NULL, matches);
--	BUG_ON(!np);
--
--	tegra_pmc_base = of_iomap(np, 0);
--
--	tegra_pmc_invert_interrupt = of_property_read_bool(np,
--				     "nvidia,invert-interrupt");
--
--	val = tegra_pmc_readl(PMC_CTRL);
--	if (tegra_pmc_invert_interrupt)
--		val |= PMC_CTRL_INTR_LOW;
--	else
--		val &= ~PMC_CTRL_INTR_LOW;
--	tegra_pmc_writel(val, PMC_CTRL);
--}
--
--void __init tegra_pmc_init(void)
--{
--	struct device_node *np;
--	u32 prop;
--	enum tegra_suspend_mode suspend_mode;
--	u32 core_good_time[2] = {0, 0};
--	u32 lp0_vec[2] = {0, 0};
--
--	np = of_find_matching_node(NULL, matches);
--	BUG_ON(!np);
--
--	tegra_pclk = of_clk_get_by_name(np, "pclk");
--	WARN_ON(IS_ERR(tegra_pclk));
--
--	/* Grabbing the power management configurations */
--	if (of_property_read_u32(np, "nvidia,suspend-mode", &prop)) {
--		suspend_mode = TEGRA_SUSPEND_NONE;
--	} else {
--		switch (prop) {
--		case 0:
--			suspend_mode = TEGRA_SUSPEND_LP0;
--			break;
--		case 1:
--			suspend_mode = TEGRA_SUSPEND_LP1;
--			break;
--		case 2:
--			suspend_mode = TEGRA_SUSPEND_LP2;
--			break;
--		default:
--			suspend_mode = TEGRA_SUSPEND_NONE;
--			break;
--		}
--	}
--	suspend_mode = tegra_pm_validate_suspend_mode(suspend_mode);
--
--	if (of_property_read_u32(np, "nvidia,cpu-pwr-good-time", &prop))
--		suspend_mode = TEGRA_SUSPEND_NONE;
--	pmc_pm_data.cpu_good_time = prop;
--
--	if (of_property_read_u32(np, "nvidia,cpu-pwr-off-time", &prop))
--		suspend_mode = TEGRA_SUSPEND_NONE;
--	pmc_pm_data.cpu_off_time = prop;
--
--	if (of_property_read_u32_array(np, "nvidia,core-pwr-good-time",
--			core_good_time, ARRAY_SIZE(core_good_time)))
--		suspend_mode = TEGRA_SUSPEND_NONE;
--	pmc_pm_data.core_osc_time = core_good_time[0];
--	pmc_pm_data.core_pmu_time = core_good_time[1];
--
--	if (of_property_read_u32(np, "nvidia,core-pwr-off-time",
--				 &prop))
--		suspend_mode = TEGRA_SUSPEND_NONE;
--	pmc_pm_data.core_off_time = prop;
--
--	pmc_pm_data.corereq_high = of_property_read_bool(np,
--				"nvidia,core-power-req-active-high");
--
--	pmc_pm_data.sysclkreq_high = of_property_read_bool(np,
--				"nvidia,sys-clock-req-active-high");
--
--	pmc_pm_data.combined_req = of_property_read_bool(np,
--				"nvidia,combined-power-req");
--
--	pmc_pm_data.cpu_pwr_good_en = of_property_read_bool(np,
--				"nvidia,cpu-pwr-good-en");
--
--	if (of_property_read_u32_array(np, "nvidia,lp0-vec", lp0_vec,
--				       ARRAY_SIZE(lp0_vec)))
--		if (suspend_mode == TEGRA_SUSPEND_LP0)
--			suspend_mode = TEGRA_SUSPEND_LP1;
--
--	pmc_pm_data.lp0_vec_phy_addr = lp0_vec[0];
--	pmc_pm_data.lp0_vec_size = lp0_vec[1];
--
--	pmc_pm_data.suspend_mode = suspend_mode;
--}
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-deleted file mode 100644
-index 139a30867cb2..000000000000
---- a/arch/arm/mach-tegra/pmc.h
-+++ /dev/null
-@@ -1,62 +0,0 @@
--/*
-- * Copyright (C) 2012 NVIDIA CORPORATION. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- *
-- */
--
--#ifndef __MACH_TEGRA_PMC_H
--#define __MACH_TEGRA_PMC_H
--
--#include <linux/io.h>
--#include <linux/reboot.h>
--
--enum tegra_suspend_mode {
--	TEGRA_SUSPEND_NONE = 0,
--	TEGRA_SUSPEND_LP2,	/* CPU voltage off */
--	TEGRA_SUSPEND_LP1,	/* CPU voltage off, DRAM self-refresh */
--	TEGRA_SUSPEND_LP0,      /* CPU + core voltage off, DRAM self-refresh */
--	TEGRA_MAX_SUSPEND_MODE,
--};
--
--#ifdef CONFIG_PM_SLEEP
--enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
--void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
--void tegra_pmc_suspend(void);
--void tegra_pmc_resume(void);
--void tegra_pmc_pm_set(enum tegra_suspend_mode mode);
--void tegra_pmc_suspend_init(void);
--#endif
--
--extern void __iomem *tegra_pmc_base;
--
--static inline u32 tegra_pmc_readl(u32 reg)
--{
--	return readl(tegra_pmc_base + reg);
--}
--
--static inline void tegra_pmc_writel(u32 val, u32 reg)
--{
--	writel(val, tegra_pmc_base + reg);
--}
--
--bool tegra_pmc_cpu_is_powered(int cpuid);
--int tegra_pmc_cpu_power_on(int cpuid);
--int tegra_pmc_cpu_remove_clamping(int cpuid);
--
--void tegra_pmc_restart(enum reboot_mode mode, const char *cmd);
--
--void tegra_pmc_init_irq(void);
--void tegra_pmc_init(void);
--
--#endif
-diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
-deleted file mode 100644
-index c90f303aad4a..000000000000
---- a/arch/arm/mach-tegra/powergate.c
-+++ /dev/null
-@@ -1,503 +0,0 @@
--/*
-- * drivers/powergate/tegra-powergate.c
-- *
-- * Copyright (c) 2010 Google, Inc
-- *
-- * Author:
-- *	Colin Cross <ccross@google.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/clk.h>
--#include <linux/debugfs.h>
--#include <linux/delay.h>
--#include <linux/err.h>
--#include <linux/export.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/reset.h>
--#include <linux/seq_file.h>
--#include <linux/spinlock.h>
--#include <linux/clk/tegra.h>
--#include <linux/tegra-powergate.h>
--#include <linux/tegra-soc.h>
--
--#include "pmc.h"
--
--#define DPD_SAMPLE		0x020
--#define  DPD_SAMPLE_ENABLE	(1 << 0)
--#define  DPD_SAMPLE_DISABLE	(0 << 0)
--
--#define PWRGATE_TOGGLE		0x30
--#define  PWRGATE_TOGGLE_START	(1 << 8)
--
--#define REMOVE_CLAMPING		0x34
--
--#define PWRGATE_STATUS		0x38
--
--#define IO_DPD_REQ		0x1b8
--#define  IO_DPD_REQ_CODE_IDLE	(0 << 30)
--#define  IO_DPD_REQ_CODE_OFF	(1 << 30)
--#define  IO_DPD_REQ_CODE_ON	(2 << 30)
--#define  IO_DPD_REQ_CODE_MASK	(3 << 30)
--
--#define IO_DPD_STATUS		0x1bc
--#define IO_DPD2_REQ		0x1c0
--#define IO_DPD2_STATUS		0x1c4
--#define SEL_DPD_TIM		0x1c8
--
--#define GPU_RG_CNTRL		0x2d4
--
--static int tegra_num_powerdomains;
--static int tegra_num_cpu_domains;
--static const u8 *tegra_cpu_domains;
--
--static const u8 tegra30_cpu_domains[] = {
--	TEGRA_POWERGATE_CPU,
--	TEGRA_POWERGATE_CPU1,
--	TEGRA_POWERGATE_CPU2,
--	TEGRA_POWERGATE_CPU3,
--};
--
--static const u8 tegra114_cpu_domains[] = {
--	TEGRA_POWERGATE_CPU0,
--	TEGRA_POWERGATE_CPU1,
--	TEGRA_POWERGATE_CPU2,
--	TEGRA_POWERGATE_CPU3,
--};
--
--static const u8 tegra124_cpu_domains[] = {
--	TEGRA_POWERGATE_CPU0,
--	TEGRA_POWERGATE_CPU1,
--	TEGRA_POWERGATE_CPU2,
--	TEGRA_POWERGATE_CPU3,
--};
--
--static DEFINE_SPINLOCK(tegra_powergate_lock);
--
--static int tegra_powergate_set(int id, bool new_state)
--{
--	bool status;
--	unsigned long flags;
--
--	spin_lock_irqsave(&tegra_powergate_lock, flags);
--
--	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
--
--	if (status == new_state) {
--		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
--		return 0;
--	}
--
--	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
--
--	spin_unlock_irqrestore(&tegra_powergate_lock, flags);
--
--	return 0;
--}
--
--int tegra_powergate_power_on(int id)
--{
--	if (id < 0 || id >= tegra_num_powerdomains)
--		return -EINVAL;
--
--	return tegra_powergate_set(id, true);
--}
--
--int tegra_powergate_power_off(int id)
--{
--	if (id < 0 || id >= tegra_num_powerdomains)
--		return -EINVAL;
--
--	return tegra_powergate_set(id, false);
--}
--EXPORT_SYMBOL(tegra_powergate_power_off);
--
--int tegra_powergate_is_powered(int id)
--{
--	u32 status;
--
--	if (id < 0 || id >= tegra_num_powerdomains)
--		return -EINVAL;
--
--	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
--	return !!status;
--}
--
--int tegra_powergate_remove_clamping(int id)
--{
--	u32 mask;
--
--	if (id < 0 || id >= tegra_num_powerdomains)
--		return -EINVAL;
--
--	/*
--	 * The Tegra124 GPU has a separate register (with different semantics)
--	 * to remove clamps.
--	 */
--	if (tegra_chip_id == TEGRA124) {
--		if (id == TEGRA_POWERGATE_3D) {
--			tegra_pmc_writel(0, GPU_RG_CNTRL);
--			return 0;
--		}
--	}
--
--	/*
--	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
--	 * swapped relatively to the partition ids
--	 */
--	if (id == TEGRA_POWERGATE_VDEC)
--		mask = (1 << TEGRA_POWERGATE_PCIE);
--	else if (id == TEGRA_POWERGATE_PCIE)
--		mask = (1 << TEGRA_POWERGATE_VDEC);
--	else
--		mask = (1 << id);
--
--	tegra_pmc_writel(mask, REMOVE_CLAMPING);
--
--	return 0;
--}
--EXPORT_SYMBOL(tegra_powergate_remove_clamping);
--
--/* Must be called with clk disabled, and returns with clk enabled */
--int tegra_powergate_sequence_power_up(int id, struct clk *clk,
--					struct reset_control *rst)
--{
--	int ret;
--
--	reset_control_assert(rst);
--
--	ret = tegra_powergate_power_on(id);
--	if (ret)
--		goto err_power;
--
--	ret = clk_prepare_enable(clk);
--	if (ret)
--		goto err_clk;
--
--	udelay(10);
--
--	ret = tegra_powergate_remove_clamping(id);
--	if (ret)
--		goto err_clamp;
--
--	udelay(10);
--	reset_control_deassert(rst);
--
--	return 0;
--
--err_clamp:
--	clk_disable_unprepare(clk);
--err_clk:
--	tegra_powergate_power_off(id);
--err_power:
--	return ret;
--}
--EXPORT_SYMBOL(tegra_powergate_sequence_power_up);
--
--int tegra_cpu_powergate_id(int cpuid)
--{
--	if (cpuid > 0 && cpuid < tegra_num_cpu_domains)
--		return tegra_cpu_domains[cpuid];
--
--	return -EINVAL;
--}
--
--int __init tegra_powergate_init(void)
--{
--	switch (tegra_chip_id) {
--	case TEGRA20:
--		tegra_num_powerdomains = 7;
--		break;
--	case TEGRA30:
--		tegra_num_powerdomains = 14;
--		tegra_num_cpu_domains = 4;
--		tegra_cpu_domains = tegra30_cpu_domains;
--		break;
--	case TEGRA114:
--		tegra_num_powerdomains = 23;
--		tegra_num_cpu_domains = 4;
--		tegra_cpu_domains = tegra114_cpu_domains;
--		break;
--	case TEGRA124:
--		tegra_num_powerdomains = 25;
--		tegra_num_cpu_domains = 4;
--		tegra_cpu_domains = tegra124_cpu_domains;
--		break;
--	default:
--		/* Unknown Tegra variant. Disable powergating */
--		tegra_num_powerdomains = 0;
--		break;
--	}
--
--	return 0;
--}
--
--#ifdef CONFIG_DEBUG_FS
--
--static const char * const *powergate_name;
--
--static const char * const powergate_name_t20[] = {
--	[TEGRA_POWERGATE_CPU]	= "cpu",
--	[TEGRA_POWERGATE_3D]	= "3d",
--	[TEGRA_POWERGATE_VENC]	= "venc",
--	[TEGRA_POWERGATE_VDEC]	= "vdec",
--	[TEGRA_POWERGATE_PCIE]	= "pcie",
--	[TEGRA_POWERGATE_L2]	= "l2",
--	[TEGRA_POWERGATE_MPE]	= "mpe",
--};
--
--static const char * const powergate_name_t30[] = {
--	[TEGRA_POWERGATE_CPU]	= "cpu0",
--	[TEGRA_POWERGATE_3D]	= "3d0",
--	[TEGRA_POWERGATE_VENC]	= "venc",
--	[TEGRA_POWERGATE_VDEC]	= "vdec",
--	[TEGRA_POWERGATE_PCIE]	= "pcie",
--	[TEGRA_POWERGATE_L2]	= "l2",
--	[TEGRA_POWERGATE_MPE]	= "mpe",
--	[TEGRA_POWERGATE_HEG]	= "heg",
--	[TEGRA_POWERGATE_SATA]	= "sata",
--	[TEGRA_POWERGATE_CPU1]	= "cpu1",
--	[TEGRA_POWERGATE_CPU2]	= "cpu2",
--	[TEGRA_POWERGATE_CPU3]	= "cpu3",
--	[TEGRA_POWERGATE_CELP]	= "celp",
--	[TEGRA_POWERGATE_3D1]	= "3d1",
--};
--
--static const char * const powergate_name_t114[] = {
--	[TEGRA_POWERGATE_CPU]	= "crail",
--	[TEGRA_POWERGATE_3D]	= "3d",
--	[TEGRA_POWERGATE_VENC]	= "venc",
--	[TEGRA_POWERGATE_VDEC]	= "vdec",
--	[TEGRA_POWERGATE_MPE]	= "mpe",
--	[TEGRA_POWERGATE_HEG]	= "heg",
--	[TEGRA_POWERGATE_CPU1]	= "cpu1",
--	[TEGRA_POWERGATE_CPU2]	= "cpu2",
--	[TEGRA_POWERGATE_CPU3]	= "cpu3",
--	[TEGRA_POWERGATE_CELP]	= "celp",
--	[TEGRA_POWERGATE_CPU0]	= "cpu0",
--	[TEGRA_POWERGATE_C0NC]	= "c0nc",
--	[TEGRA_POWERGATE_C1NC]	= "c1nc",
--	[TEGRA_POWERGATE_DIS]	= "dis",
--	[TEGRA_POWERGATE_DISB]	= "disb",
--	[TEGRA_POWERGATE_XUSBA]	= "xusba",
--	[TEGRA_POWERGATE_XUSBB]	= "xusbb",
--	[TEGRA_POWERGATE_XUSBC]	= "xusbc",
--};
--
--static const char * const powergate_name_t124[] = {
--	[TEGRA_POWERGATE_CPU]	= "crail",
--	[TEGRA_POWERGATE_3D]	= "3d",
--	[TEGRA_POWERGATE_VENC]	= "venc",
--	[TEGRA_POWERGATE_PCIE]	= "pcie",
--	[TEGRA_POWERGATE_VDEC]	= "vdec",
--	[TEGRA_POWERGATE_L2]	= "l2",
--	[TEGRA_POWERGATE_MPE]	= "mpe",
--	[TEGRA_POWERGATE_HEG]	= "heg",
--	[TEGRA_POWERGATE_SATA]	= "sata",
--	[TEGRA_POWERGATE_CPU1]	= "cpu1",
--	[TEGRA_POWERGATE_CPU2]	= "cpu2",
--	[TEGRA_POWERGATE_CPU3]	= "cpu3",
--	[TEGRA_POWERGATE_CELP]	= "celp",
--	[TEGRA_POWERGATE_CPU0]	= "cpu0",
--	[TEGRA_POWERGATE_C0NC]	= "c0nc",
--	[TEGRA_POWERGATE_C1NC]	= "c1nc",
--	[TEGRA_POWERGATE_SOR]	= "sor",
--	[TEGRA_POWERGATE_DIS]	= "dis",
--	[TEGRA_POWERGATE_DISB]	= "disb",
--	[TEGRA_POWERGATE_XUSBA]	= "xusba",
--	[TEGRA_POWERGATE_XUSBB]	= "xusbb",
--	[TEGRA_POWERGATE_XUSBC]	= "xusbc",
--	[TEGRA_POWERGATE_VIC]	= "vic",
--	[TEGRA_POWERGATE_IRAM]	= "iram",
--};
--
--static int powergate_show(struct seq_file *s, void *data)
--{
--	int i;
--
--	seq_printf(s, " powergate powered\n");
--	seq_printf(s, "------------------\n");
--
--	for (i = 0; i < tegra_num_powerdomains; i++) {
--		if (!powergate_name[i])
--			continue;
--
--		seq_printf(s, " %9s %7s\n", powergate_name[i],
--			tegra_powergate_is_powered(i) ? "yes" : "no");
--	}
--
--	return 0;
--}
--
--static int powergate_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, powergate_show, inode->i_private);
--}
--
--static const struct file_operations powergate_fops = {
--	.open		= powergate_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--};
--
--int __init tegra_powergate_debugfs_init(void)
--{
--	struct dentry *d;
--
--	switch (tegra_chip_id) {
--	case TEGRA20:
--		powergate_name = powergate_name_t20;
--		break;
--	case TEGRA30:
--		powergate_name = powergate_name_t30;
--		break;
--	case TEGRA114:
--		powergate_name = powergate_name_t114;
--		break;
--	case TEGRA124:
--		powergate_name = powergate_name_t124;
--		break;
--	}
--
--	if (powergate_name) {
--		d = debugfs_create_file("powergate", S_IRUGO, NULL, NULL,
--			&powergate_fops);
--		if (!d)
--			return -ENOMEM;
--	}
--
--	return 0;
--}
--
--#endif
--
--static int tegra_io_rail_prepare(int id, unsigned long *request,
--				 unsigned long *status, unsigned int *bit)
--{
--	unsigned long rate, value;
--	struct clk *clk;
--
--	*bit = id % 32;
--
--	/*
--	 * There are two sets of 30 bits to select IO rails, but bits 30 and
--	 * 31 are control bits rather than IO rail selection bits.
--	 */
--	if (id > 63 || *bit == 30 || *bit == 31)
--		return -EINVAL;
--
--	if (id < 32) {
--		*status = IO_DPD_STATUS;
--		*request = IO_DPD_REQ;
--	} else {
--		*status = IO_DPD2_STATUS;
--		*request = IO_DPD2_REQ;
--	}
--
--	clk = clk_get_sys(NULL, "pclk");
--	if (IS_ERR(clk))
--		return PTR_ERR(clk);
--
--	rate = clk_get_rate(clk);
--	clk_put(clk);
--
--	tegra_pmc_writel(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
--
--	/* must be at least 200 ns, in APB (PCLK) clock cycles */
--	value = DIV_ROUND_UP(1000000000, rate);
--	value = DIV_ROUND_UP(200, value);
--	tegra_pmc_writel(value, SEL_DPD_TIM);
--
--	return 0;
--}
--
--static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
--			      unsigned long val, unsigned long timeout)
--{
--	unsigned long value;
--
--	timeout = jiffies + msecs_to_jiffies(timeout);
--
--	while (time_after(timeout, jiffies)) {
--		value = tegra_pmc_readl(offset);
--		if ((value & mask) == val)
--			return 0;
--
--		usleep_range(250, 1000);
--	}
--
--	return -ETIMEDOUT;
--}
--
--static void tegra_io_rail_unprepare(void)
--{
--	tegra_pmc_writel(DPD_SAMPLE_DISABLE, DPD_SAMPLE);
--}
--
--int tegra_io_rail_power_on(int id)
--{
--	unsigned long request, status, value;
--	unsigned int bit, mask;
--	int err;
--
--	err = tegra_io_rail_prepare(id, &request, &status, &bit);
--	if (err < 0)
--		return err;
--
--	mask = 1 << bit;
--
--	value = tegra_pmc_readl(request);
--	value |= mask;
--	value &= ~IO_DPD_REQ_CODE_MASK;
--	value |= IO_DPD_REQ_CODE_OFF;
--	tegra_pmc_writel(value, request);
--
--	err = tegra_io_rail_poll(status, mask, 0, 250);
--	if (err < 0)
--		return err;
--
--	tegra_io_rail_unprepare();
--
--	return 0;
--}
--EXPORT_SYMBOL(tegra_io_rail_power_on);
--
--int tegra_io_rail_power_off(int id)
--{
--	unsigned long request, status, value;
--	unsigned int bit, mask;
--	int err;
--
--	err = tegra_io_rail_prepare(id, &request, &status, &bit);
--	if (err < 0)
--		return err;
--
--	mask = 1 << bit;
--
--	value = tegra_pmc_readl(request);
--	value |= mask;
--	value &= ~IO_DPD_REQ_CODE_MASK;
--	value |= IO_DPD_REQ_CODE_ON;
--	tegra_pmc_writel(value, request);
--
--	err = tegra_io_rail_poll(status, mask, mask, 250);
--	if (err < 0)
--		return err;
--
--	tegra_io_rail_unprepare();
--
--	return 0;
--}
--EXPORT_SYMBOL(tegra_io_rail_power_off);
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index ab6544576eac..087b66a77c34 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -49,7 +49,6 @@
- #include "flowctrl.h"
- #include "iomap.h"
- #include "irq.h"
--#include "pmc.h"
- #include "pm.h"
- #include "reset.h"
- #include "sleep.h"
-@@ -75,14 +74,12 @@ static void __init tegra_init_early(void)
- 	of_register_trusted_foundations();
- 	tegra_init_fuse();
- 	tegra_cpu_reset_handler_init();
--	tegra_powergate_init();
- 	tegra_hotplug_init();
- 	tegra_flowctrl_init();
- }
- 
- static void __init tegra_dt_init_irq(void)
- {
--	tegra_pmc_init_irq();
- 	tegra_init_irq();
- 	irqchip_init();
- 	tegra_legacy_irq_syscore_init();
-@@ -94,8 +91,6 @@ static void __init tegra_dt_init(void)
- 	struct soc_device *soc_dev;
- 	struct device *parent = NULL;
- 
--	tegra_pmc_init();
--
- 	tegra_clocks_apply_init_table();
- 
- 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-@@ -145,7 +140,6 @@ static void __init tegra_dt_init_late(void)
- 
- 	tegra_init_suspend();
- 	tegra_cpuidle_init();
--	tegra_powergate_debugfs_init();
- 
- 	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
- 		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 37b9ed4cd2d6..47ae273b0917 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -100,7 +100,7 @@ obj-y				+= i2c/ media/
+ obj-$(CONFIG_PPS)		+= pps/
+ obj-$(CONFIG_PTP_1588_CLOCK)	+= ptp/
+ obj-$(CONFIG_W1)		+= w1/
+-obj-$(CONFIG_POWER_SUPPLY)	+= power/
++obj-y				+= power/
+ obj-$(CONFIG_HWMON)		+= hwmon/
+ obj-$(CONFIG_THERMAL)		+= thermal/
+ obj-$(CONFIG_WATCHDOG)		+= watchdog/
+diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+index ba6975123071..5d4833f779ae 100644
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@ -1,396 +1,3 @@
+-menuconfig POWER_SUPPLY
+-	bool "Power supply class support"
+-	help
+-	  Say Y here to enable power supply class support. This allows
+-	  power supply (batteries, AC, USB) monitoring by userspace
+-	  via sysfs and uevent (if available) and/or APM kernel interface
+-	  (if selected below).
+-
+-if POWER_SUPPLY
+-
+-config POWER_SUPPLY_DEBUG
+-	bool "Power supply debug"
+-	help
+-	  Say Y here to enable debugging messages for power supply class
+-	  and drivers.
+-
+-config PDA_POWER
+-	tristate "Generic PDA/phone power driver"
+-	depends on !S390
+-	help
+-	  Say Y here to enable generic power driver for PDAs and phones with
+-	  one or two external power supplies (AC/USB) connected to main and
+-	  backup batteries, and optional builtin charger.
+-
+-config APM_POWER
+-	tristate "APM emulation for class batteries"
+-	depends on APM_EMULATION
+-	help
+-	  Say Y here to enable support APM status emulation using
+-	  battery class devices.
+-
+-config GENERIC_ADC_BATTERY
+-	tristate "Generic battery support using IIO"
+-	depends on IIO
+-	help
+-	  Say Y here to enable support for the generic battery driver
+-	  which uses IIO framework to read adc.
+-
+-config MAX8925_POWER
+-	tristate "MAX8925 battery charger support"
+-	depends on MFD_MAX8925
+-	help
+-	  Say Y here to enable support for the battery charger in the Maxim
+-	  MAX8925 PMIC.
+-
+-config WM831X_BACKUP
+-	tristate "WM831X backup battery charger support"
+-	depends on MFD_WM831X
+-	help
+-	  Say Y here to enable support for the backup battery charger
+-	  in the Wolfson Microelectronics WM831x PMICs.
+-
+-config WM831X_POWER
+-	tristate "WM831X PMU support"
+-	depends on MFD_WM831X
+-	help
+-	  Say Y here to enable support for the power management unit
+-	  provided by Wolfson Microelectronics WM831x PMICs.
+-
+-config WM8350_POWER
+-        tristate "WM8350 PMU support"
+-        depends on MFD_WM8350
+-        help
+-          Say Y here to enable support for the power management unit
+-	  provided by the Wolfson Microelectronics WM8350 PMIC.
+-
+-config TEST_POWER
+-	tristate "Test power driver"
+-	help
+-	  This driver is used for testing. It's safe to say M here.
+-
+-config BATTERY_88PM860X
+-	tristate "Marvell 88PM860x battery driver"
+-	depends on MFD_88PM860X
+-	help
+-	  Say Y here to enable battery monitor for Marvell 88PM860x chip.
+-
+-config BATTERY_DS2760
+-	tristate "DS2760 battery driver (HP iPAQ & others)"
+-	depends on W1 && W1_SLAVE_DS2760
+-	help
+-	  Say Y here to enable support for batteries with ds2760 chip.
+-
+-config BATTERY_DS2780
+-	tristate "DS2780 battery driver"
+-	depends on HAS_IOMEM
+-	select W1
+-	select W1_SLAVE_DS2780
+-	help
+-	  Say Y here to enable support for batteries with ds2780 chip.
+-
+-config BATTERY_DS2781
+-	tristate "DS2781 battery driver"
+-	depends on HAS_IOMEM
+-	select W1
+-	select W1_SLAVE_DS2781
+-	help
+-	  If you enable this you will have the DS2781 battery driver support.
+-
+-	  The battery monitor chip is used in many batteries/devices
+-	  as the one who is responsible for charging/discharging/monitoring
+-	  Li+ batteries.
+-
+-	  If you are unsure, say N.
+-
+-config BATTERY_DS2782
+-	tristate "DS2782/DS2786 standalone gas-gauge"
+-	depends on I2C
+-	help
+-	  Say Y here to enable support for the DS2782/DS2786 standalone battery
+-	  gas-gauge.
+-
+-config BATTERY_PMU
+-	tristate "Apple PMU battery"
+-	depends on PPC32 && ADB_PMU
+-	help
+-	  Say Y here to expose battery information on Apple machines
+-	  through the generic battery class.
+-
+-config BATTERY_OLPC
+-	tristate "One Laptop Per Child battery"
+-	depends on X86_32 && OLPC
+-	help
+-	  Say Y to enable support for the battery on the OLPC laptop.
+-
+-config BATTERY_TOSA
+-	tristate "Sharp SL-6000 (tosa) battery"
+-	depends on MACH_TOSA && MFD_TC6393XB && TOUCHSCREEN_WM97XX
+-	help
+-	  Say Y to enable support for the battery on the Sharp Zaurus
+-	  SL-6000 (tosa) models.
+-
+-config BATTERY_COLLIE
+-	tristate "Sharp SL-5500 (collie) battery"
+-	depends on SA1100_COLLIE && MCP_UCB1200
+-	help
+-	  Say Y to enable support for the battery on the Sharp Zaurus
+-	  SL-5500 (collie) models.
+-
+-config BATTERY_WM97XX
+-	bool "WM97xx generic battery driver"
+-	depends on TOUCHSCREEN_WM97XX=y
+-	help
+-	  Say Y to enable support for battery measured by WM97xx aux port.
+-
+-config BATTERY_SBS
+-        tristate "SBS Compliant gas gauge"
+-        depends on I2C
+-        help
+-	  Say Y to include support for SBS battery driver for SBS-compliant
+-	  gas gauges.
+-
+-config BATTERY_BQ27x00
+-	tristate "BQ27x00 battery driver"
+-	depends on I2C || I2C=n
+-	help
+-	  Say Y here to enable support for batteries with BQ27x00 (I2C/HDQ) chips.
+-
+-config BATTERY_BQ27X00_I2C
+-	bool "BQ27200/BQ27500 support"
+-	depends on BATTERY_BQ27x00
+-	depends on I2C
+-	default y
+-	help
+-	  Say Y here to enable support for batteries with BQ27x00 (I2C) chips.
+-
+-config BATTERY_BQ27X00_PLATFORM
+-	bool "BQ27000 support"
+-	depends on BATTERY_BQ27x00
+-	default y
+-	help
+-	  Say Y here to enable support for batteries with BQ27000 (HDQ) chips.
+-
+-config BATTERY_DA9030
+-	tristate "DA9030 battery driver"
+-	depends on PMIC_DA903X
+-	help
+-	  Say Y here to enable support for batteries charger integrated into
+-	  DA9030 PMIC.
+-
+-config BATTERY_DA9052
+-	tristate "Dialog DA9052 Battery"
+-	depends on PMIC_DA9052
+-	help
+-	  Say Y here to enable support for batteries charger integrated into
+-	  DA9052 PMIC.
+-
+-config BATTERY_MAX17040
+-	tristate "Maxim MAX17040 Fuel Gauge"
+-	depends on I2C
+-	help
+-	  MAX17040 is fuel-gauge systems for lithium-ion (Li+) batteries
+-	  in handheld and portable equipment. The MAX17040 is configured
+-	  to operate with a single lithium cell
+-
+-config BATTERY_MAX17042
+-	tristate "Maxim MAX17042/17047/17050/8997/8966 Fuel Gauge"
+-	depends on I2C
+-	select REGMAP_I2C
+-	help
+-	  MAX17042 is fuel-gauge systems for lithium-ion (Li+) batteries
+-	  in handheld and portable equipment. The MAX17042 is configured
+-	  to operate with a single lithium cell. MAX8997 and MAX8966 are
+-	  multi-function devices that include fuel gauages that are compatible
+-	  with MAX17042. This driver also supports max17047/50 chips which are
+-	  improved version of max17042.
+-
+-config BATTERY_Z2
+-	tristate "Z2 battery driver"
+-	depends on I2C && MACH_ZIPIT2
+-	help
+-	  Say Y to include support for the battery on the Zipit Z2.
+-
+-config BATTERY_S3C_ADC
+-	tristate "Battery driver for Samsung ADC based monitoring"
+-	depends on S3C_ADC
+-	help
+-	  Say Y here to enable support for iPAQ h1930/h1940/rx1950 battery
+-
+-config BATTERY_TWL4030_MADC
+-	tristate "TWL4030 MADC battery driver"
+-	depends on TWL4030_MADC
+-	help
+-	  Say Y here to enable this dumb driver for batteries managed
+-	  through the TWL4030 MADC.
+-
+-config CHARGER_88PM860X
+-	tristate "Marvell 88PM860x Charger driver"
+-	depends on MFD_88PM860X && BATTERY_88PM860X
+-	help
+-	  Say Y here to enable charger for Marvell 88PM860x chip.
+-
+-config CHARGER_PCF50633
+-	tristate "NXP PCF50633 MBC"
+-	depends on MFD_PCF50633
+-	help
+-	 Say Y to include support for NXP PCF50633 Main Battery Charger.
+-
+-config BATTERY_JZ4740
+-	tristate "Ingenic JZ4740 battery"
+-	depends on MACH_JZ4740
+-	depends on MFD_JZ4740_ADC
+-	help
+-	  Say Y to enable support for the battery on Ingenic JZ4740 based
+-	  boards.
+-
+-	  This driver can be build as a module. If so, the module will be
+-	  called jz4740-battery.
+-
+-config BATTERY_INTEL_MID
+-	tristate "Battery driver for Intel MID platforms"
+-	depends on INTEL_SCU_IPC && SPI
+-	help
+-	  Say Y here to enable the battery driver on Intel MID
+-	  platforms.
+-
+-config BATTERY_RX51
+-	tristate "Nokia RX-51 (N900) battery driver"
+-	depends on TWL4030_MADC
+-	help
+-	  Say Y here to enable support for battery information on Nokia
+-	  RX-51, also known as N900 tablet.
+-
+-config CHARGER_ISP1704
+-	tristate "ISP1704 USB Charger Detection"
+-	depends on USB_PHY
+-	help
+-	  Say Y to enable support for USB Charger Detection with
+-	  ISP1707/ISP1704 USB transceivers.
+-
+-config CHARGER_MAX8903
+-	tristate "MAX8903 Battery DC-DC Charger for USB and Adapter Power"
+-	help
+-	  Say Y to enable support for the MAX8903 DC-DC charger and sysfs.
+-	  The driver supports controlling charger-enable and current-limit
+-	  pins based on the status of charger connections with interrupt
+-	  handlers.
+-
+-config CHARGER_TWL4030
+-	tristate "OMAP TWL4030 BCI charger driver"
+-	depends on TWL4030_CORE
+-	help
+-	  Say Y here to enable support for TWL4030 Battery Charge Interface.
+-
+-config CHARGER_LP8727
+-	tristate "TI/National Semiconductor LP8727 charger driver"
+-	depends on I2C
+-	help
+-	  Say Y here to enable support for LP8727 Charger Driver.
+-
+-config CHARGER_LP8788
+-	tristate "TI LP8788 charger driver"
+-	depends on MFD_LP8788
+-	depends on LP8788_ADC
+-	depends on IIO
+-	help
+-	  Say Y to enable support for the LP8788 linear charger.
+-
+-config CHARGER_GPIO
+-	tristate "GPIO charger"
+-	depends on GPIOLIB
+-	help
+-	  Say Y to include support for chargers which report their online status
+-	  through a GPIO pin.
+-
+-	  This driver can be build as a module. If so, the module will be
+-	  called gpio-charger.
+-
+-config CHARGER_MANAGER
+-	bool "Battery charger manager for multiple chargers"
+-	depends on REGULATOR && RTC_CLASS
+-	select EXTCON
+-	help
+-          Say Y to enable charger-manager support, which allows multiple
+-          chargers attached to a battery and multiple batteries attached to a
+-          system. The charger-manager also can monitor charging status in
+-          runtime and in suspend-to-RAM by waking up the system periodically
+-          with help of suspend_again support.
+-
+-config CHARGER_MAX14577
+-	tristate "Maxim MAX14577 MUIC battery charger driver"
+-	depends on MFD_MAX14577
+-	help
+-	  Say Y to enable support for the battery charger control sysfs and
+-	  platform data of MAX14577 MUICs.
+-
+-config CHARGER_MAX8997
+-	tristate "Maxim MAX8997/MAX8966 PMIC battery charger driver"
+-	depends on MFD_MAX8997 && REGULATOR_MAX8997
+-	help
+-	  Say Y to enable support for the battery charger control sysfs and
+-	  platform data of MAX8997/LP3974 PMICs.
+-
+-config CHARGER_MAX8998
+-	tristate "Maxim MAX8998/LP3974 PMIC battery charger driver"
+-	depends on MFD_MAX8998 && REGULATOR_MAX8998
+-	help
+-	  Say Y to enable support for the battery charger control sysfs and
+-	  platform data of MAX8998/LP3974 PMICs.
+-
+-config CHARGER_BQ2415X
+-	tristate "TI BQ2415x battery charger driver"
+-	depends on I2C
+-	help
+-	  Say Y to enable support for the TI BQ2415x battery charger
+-	  PMICs.
+-
+-	  You'll need this driver to charge batteries on e.g. Nokia
+-	  RX-51/N900.
+-
+-config CHARGER_BQ24190
+-	tristate "TI BQ24190 battery charger driver"
+-	depends on I2C && GPIOLIB
+-	help
+-	  Say Y to enable support for the TI BQ24190 battery charger.
+-
+-config CHARGER_BQ24735
+-	tristate "TI BQ24735 battery charger support"
+-	depends on I2C && GPIOLIB
+-	help
+-	  Say Y to enable support for the TI BQ24735 battery charger.
+-
+-config CHARGER_SMB347
+-	tristate "Summit Microelectronics SMB347 Battery Charger"
+-	depends on I2C
+-	select REGMAP_I2C
+-	help
+-	  Say Y to include support for Summit Microelectronics SMB347
+-	  Battery Charger.
+-
+-config CHARGER_TPS65090
+-	tristate "TPS65090 battery charger driver"
+-	depends on MFD_TPS65090
+-	help
+-	 Say Y here to enable support for battery charging with TPS65090
+-	 PMIC chips.
+-
+-config AB8500_BM
+-	bool "AB8500 Battery Management Driver"
+-	depends on AB8500_CORE && AB8500_GPADC
+-	help
+-	  Say Y to include support for AB8500 battery management.
+-
+-config BATTERY_GOLDFISH
+-	tristate "Goldfish battery driver"
+-	depends on GOLDFISH || COMPILE_TEST
+-	depends on HAS_IOMEM
+-	help
+-	  Say Y to enable support for the battery and AC power in the
+-	  Goldfish emulator.
+-
++source "drivers/power/supply/Kconfig"
+ source "drivers/power/reset/Kconfig"
+-
+-endif # POWER_SUPPLY
+-
+ source "drivers/power/avs/Kconfig"
 diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-index d7a0b9dfd7ad..12b874b01dfb 100644
+index ee54a3e4c90a..d7a0b9dfd7ad 100644
 --- a/drivers/power/Makefile
 +++ b/drivers/power/Makefile
-@@ -2,3 +2,4 @@ obj-$(CONFIG_POWER_SUPPLY) += supply/
- obj-$(CONFIG_POWER_RESET) += reset/
- obj-$(CONFIG_POWER_AVS) += avs/
+@@ -1,60 +1,4 @@
+-ccflags-$(CONFIG_POWER_SUPPLY_DEBUG) := -DDEBUG
++obj-$(CONFIG_POWER_SUPPLY) += supply/
++obj-$(CONFIG_POWER_RESET) += reset/
++obj-$(CONFIG_POWER_AVS) += avs/
  
-+obj-$(CONFIG_ARCH_TEGRA) += tegra-pmc.o
-diff --git a/drivers/power/tegra-pmc.c b/drivers/power/tegra-pmc.c
+-power_supply-y				:= power_supply_core.o
+-power_supply-$(CONFIG_SYSFS)		+= power_supply_sysfs.o
+-power_supply-$(CONFIG_LEDS_TRIGGERS)	+= power_supply_leds.o
+-
+-obj-$(CONFIG_POWER_SUPPLY)	+= power_supply.o
+-obj-$(CONFIG_GENERIC_ADC_BATTERY)	+= generic-adc-battery.o
+-
+-obj-$(CONFIG_PDA_POWER)		+= pda_power.o
+-obj-$(CONFIG_APM_POWER)		+= apm_power.o
+-obj-$(CONFIG_MAX8925_POWER)	+= max8925_power.o
+-obj-$(CONFIG_WM831X_BACKUP)	+= wm831x_backup.o
+-obj-$(CONFIG_WM831X_POWER)	+= wm831x_power.o
+-obj-$(CONFIG_WM8350_POWER)	+= wm8350_power.o
+-obj-$(CONFIG_TEST_POWER)	+= test_power.o
+-
+-obj-$(CONFIG_BATTERY_88PM860X)	+= 88pm860x_battery.o
+-obj-$(CONFIG_BATTERY_DS2760)	+= ds2760_battery.o
+-obj-$(CONFIG_BATTERY_DS2780)	+= ds2780_battery.o
+-obj-$(CONFIG_BATTERY_DS2781)	+= ds2781_battery.o
+-obj-$(CONFIG_BATTERY_DS2782)	+= ds2782_battery.o
+-obj-$(CONFIG_BATTERY_GOLDFISH)	+= goldfish_battery.o
+-obj-$(CONFIG_BATTERY_PMU)	+= pmu_battery.o
+-obj-$(CONFIG_BATTERY_OLPC)	+= olpc_battery.o
+-obj-$(CONFIG_BATTERY_TOSA)	+= tosa_battery.o
+-obj-$(CONFIG_BATTERY_COLLIE)	+= collie_battery.o
+-obj-$(CONFIG_BATTERY_WM97XX)	+= wm97xx_battery.o
+-obj-$(CONFIG_BATTERY_SBS)	+= sbs-battery.o
+-obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
+-obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
+-obj-$(CONFIG_BATTERY_DA9052)	+= da9052-battery.o
+-obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
+-obj-$(CONFIG_BATTERY_MAX17042)	+= max17042_battery.o
+-obj-$(CONFIG_BATTERY_Z2)	+= z2_battery.o
+-obj-$(CONFIG_BATTERY_S3C_ADC)	+= s3c_adc_battery.o
+-obj-$(CONFIG_BATTERY_TWL4030_MADC)	+= twl4030_madc_battery.o
+-obj-$(CONFIG_CHARGER_88PM860X)	+= 88pm860x_charger.o
+-obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
+-obj-$(CONFIG_BATTERY_JZ4740)	+= jz4740-battery.o
+-obj-$(CONFIG_BATTERY_INTEL_MID)	+= intel_mid_battery.o
+-obj-$(CONFIG_BATTERY_RX51)	+= rx51_battery.o
+-obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_fg.o ab8500_btemp.o abx500_chargalg.o pm2301_charger.o
+-obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
+-obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
+-obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
+-obj-$(CONFIG_CHARGER_LP8727)	+= lp8727_charger.o
+-obj-$(CONFIG_CHARGER_LP8788)	+= lp8788-charger.o
+-obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
+-obj-$(CONFIG_CHARGER_MANAGER)	+= charger-manager.o
+-obj-$(CONFIG_CHARGER_MAX14577)	+= max14577_charger.o
+-obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
+-obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
+-obj-$(CONFIG_CHARGER_BQ2415X)	+= bq2415x_charger.o
+-obj-$(CONFIG_CHARGER_BQ24190)	+= bq24190_charger.o
+-obj-$(CONFIG_CHARGER_BQ24735)	+= bq24735-charger.o
+-obj-$(CONFIG_POWER_AVS)		+= avs/
+-obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
+-obj-$(CONFIG_CHARGER_TPS65090)	+= tps65090-charger.o
+-obj-$(CONFIG_POWER_RESET)	+= reset/
+diff --git a/drivers/power/88pm860x_battery.c b/drivers/power/supply/88pm860x_battery.c
+similarity index 100%
+rename from drivers/power/88pm860x_battery.c
+rename to drivers/power/supply/88pm860x_battery.c
+diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/supply/88pm860x_charger.c
+similarity index 100%
+rename from drivers/power/88pm860x_charger.c
+rename to drivers/power/supply/88pm860x_charger.c
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
 new file mode 100644
-index 000000000000..fa587028dc3c
+index 000000000000..a1dea66f024c
 --- /dev/null
-+++ b/drivers/power/tegra-pmc.c
-@@ -0,0 +1,948 @@
-+/*
-+ * drivers/soc/tegra/pmc.c
-+ *
-+ * Copyright (c) 2010 Google, Inc
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/clk/tegra.h>
-+#include <linux/debugfs.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/export.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/reboot.h>
-+#include <linux/reset.h>
-+#include <linux/seq_file.h>
-+#include <linux/spinlock.h>
-+#include <linux/tegra-powergate.h>
-+#include <linux/tegra-soc.h>
-+
-+#define PMC_CNTRL			0x0
-+#define  PMC_CNTRL_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
-+#define  PMC_CNTRL_SYSCLK_OE		(1 << 11)  /* system clock enable */
-+#define  PMC_CNTRL_SIDE_EFFECT_LP0	(1 << 14)  /* LP0 when CPU pwr gated */
-+#define  PMC_CNTRL_CPU_PWRREQ_POLARITY	(1 << 15)  /* CPU pwr req polarity */
-+#define  PMC_CNTRL_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
-+#define  PMC_CNTRL_INTR_POLARITY	(1 << 17)  /* inverts INTR polarity */
-+
-+#define DPD_SAMPLE			0x020
-+#define  DPD_SAMPLE_ENABLE		(1 << 0)
-+#define  DPD_SAMPLE_DISABLE		(0 << 0)
-+
-+#define PWRGATE_TOGGLE			0x30
-+#define  PWRGATE_TOGGLE_START		(1 << 8)
-+
-+#define REMOVE_CLAMPING			0x34
-+
-+#define PWRGATE_STATUS			0x38
-+
-+#define PMC_SCRATCH0			0x50
-+#define  PMC_SCRATCH0_MODE_RECOVERY	(1 << 31)
-+#define  PMC_SCRATCH0_MODE_BOOTLOADER	(1 << 30)
-+#define  PMC_SCRATCH0_MODE_RCM		(1 << 1)
-+#define  PMC_SCRATCH0_MODE_MASK		(PMC_SCRATCH0_MODE_RECOVERY | \
-+					 PMC_SCRATCH0_MODE_BOOTLOADER | \
-+					 PMC_SCRATCH0_MODE_RCM)
-+
-+#define PMC_CPUPWRGOOD_TIMER		0xc8
-+#define PMC_CPUPWROFF_TIMER		0xcc
-+
-+#define PMC_SCRATCH41			0x140
-+
-+#define IO_DPD_REQ			0x1b8
-+#define  IO_DPD_REQ_CODE_IDLE		(0 << 30)
-+#define  IO_DPD_REQ_CODE_OFF		(1 << 30)
-+#define  IO_DPD_REQ_CODE_ON		(2 << 30)
-+#define  IO_DPD_REQ_CODE_MASK		(3 << 30)
-+
-+#define IO_DPD_STATUS			0x1bc
-+#define IO_DPD2_REQ			0x1c0
-+#define IO_DPD2_STATUS			0x1c4
-+#define SEL_DPD_TIM			0x1c8
-+
-+#define GPU_RG_CNTRL			0x2d4
-+
-+struct tegra_pmc_soc {
-+	unsigned int num_powergates;
-+	const char *const *powergates;
-+	unsigned int num_cpu_powergates;
-+	const u8 *cpu_powergates;
-+};
-+
-+/**
-+ * struct tegra_pmc - NVIDIA Tegra PMC
-+ * @base: pointer to I/O remapped register region
-+ * @clk: pointer to pclk clock
-+ * @rate: currently configured rate of pclk
-+ * @suspend_mode: lowest suspend mode available
-+ * @cpu_good_time: CPU power good time (in microseconds)
-+ * @cpu_off_time: CPU power off time (in microsecends)
-+ * @core_osc_time: core power good OSC time (in microseconds)
-+ * @core_pmu_time: core power good PMU time (in microseconds)
-+ * @core_off_time: core power off time (in microseconds)
-+ * @corereq_high: core power request is active-high
-+ * @sysclkreq_high: system clock request is active-high
-+ * @combined_req: combined power request for CPU & core
-+ * @cpu_pwr_good_en: CPU power good signal is enabled
-+ * @lp0_vec_phys: physical base address of the LP0 warm boot code
-+ * @lp0_vec_size: size of the LP0 warm boot code
-+ * @powergates_lock: mutex for power gate register access
-+ */
-+struct tegra_pmc {
-+	void __iomem *base;
-+	struct clk *clk;
-+
-+	const struct tegra_pmc_soc *soc;
-+
-+	unsigned long rate;
-+
-+	enum tegra_suspend_mode suspend_mode;
-+	u32 cpu_good_time;
-+	u32 cpu_off_time;
-+	u32 core_osc_time;
-+	u32 core_pmu_time;
-+	u32 core_off_time;
-+	bool corereq_high;
-+	bool sysclkreq_high;
-+	bool combined_req;
-+	bool cpu_pwr_good_en;
-+	u32 lp0_vec_phys;
-+	u32 lp0_vec_size;
-+
-+	struct mutex powergates_lock;
-+};
-+
-+static struct tegra_pmc *pmc = &(struct tegra_pmc) {
-+	.base = NULL,
-+	.suspend_mode = TEGRA_SUSPEND_NONE,
-+};
-+
-+static u32 tegra_pmc_readl(unsigned long offset)
-+{
-+	return readl(pmc->base + offset);
-+}
-+
-+static void tegra_pmc_writel(u32 value, unsigned long offset)
-+{
-+	writel(value, pmc->base + offset);
-+}
-+
-+/**
-+ * tegra_powergate_set() - set the state of a partition
-+ * @id: partition ID
-+ * @new_state: new state of the partition
-+ */
-+static int tegra_powergate_set(int id, bool new_state)
-+{
-+	bool status;
-+
-+	mutex_lock(&pmc->powergates_lock);
-+
-+	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
-+
-+	if (status == new_state) {
-+		mutex_unlock(&pmc->powergates_lock);
-+		return 0;
-+	}
-+
-+	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
-+
-+	mutex_unlock(&pmc->powergates_lock);
-+
-+	return 0;
-+}
-+
-+/**
-+ * tegra_powergate_power_on() - power on partition
-+ * @id: partition ID
-+ */
-+int tegra_powergate_power_on(int id)
-+{
-+	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
-+		return -EINVAL;
-+
-+	return tegra_powergate_set(id, true);
-+}
-+
-+/**
-+ * tegra_powergate_power_off() - power off partition
-+ * @id: partition ID
-+ */
-+int tegra_powergate_power_off(int id)
-+{
-+	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
-+		return -EINVAL;
-+
-+	return tegra_powergate_set(id, false);
-+}
-+EXPORT_SYMBOL(tegra_powergate_power_off);
-+
-+/**
-+ * tegra_powergate_is_powered() - check if partition is powered
-+ * @id: partition ID
-+ */
-+int tegra_powergate_is_powered(int id)
-+{
-+	u32 status;
-+
-+	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
-+		return -EINVAL;
-+
-+	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
-+	return !!status;
-+}
-+
-+/**
-+ * tegra_powergate_remove_clamping() - remove power clamps for partition
-+ * @id: partition ID
-+ */
-+int tegra_powergate_remove_clamping(int id)
-+{
-+	u32 mask;
-+
-+	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
-+		return -EINVAL;
-+
-+	/*
-+	 * The Tegra124 GPU has a separate register (with different semantics)
-+	 * to remove clamps.
-+	 */
-+	if (tegra_chip_id == TEGRA124) {
-+		if (id == TEGRA_POWERGATE_3D) {
-+			tegra_pmc_writel(0, GPU_RG_CNTRL);
-+			return 0;
-+		}
-+	}
-+
-+	/*
-+	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
-+	 * swapped relatively to the partition ids
-+	 */
-+	if (id == TEGRA_POWERGATE_VDEC)
-+		mask = (1 << TEGRA_POWERGATE_PCIE);
-+	else if (id == TEGRA_POWERGATE_PCIE)
-+		mask = (1 << TEGRA_POWERGATE_VDEC);
-+	else
-+		mask = (1 << id);
-+
-+	tegra_pmc_writel(mask, REMOVE_CLAMPING);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(tegra_powergate_remove_clamping);
-+
-+/**
-+ * tegra_powergate_sequence_power_up() - power up partition
-+ * @id: partition ID
-+ * @clk: clock for partition
-+ * @rst: reset for partition
-+ *
-+ * Must be called with clk disabled, and returns with clk enabled.
-+ */
-+int tegra_powergate_sequence_power_up(int id, struct clk *clk,
-+				      struct reset_control *rst)
-+{
-+	int ret;
-+
-+	reset_control_assert(rst);
-+
-+	ret = tegra_powergate_power_on(id);
-+	if (ret)
-+		goto err_power;
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		goto err_clk;
-+
-+	usleep_range(10, 20);
-+
-+	ret = tegra_powergate_remove_clamping(id);
-+	if (ret)
-+		goto err_clamp;
-+
-+	usleep_range(10, 20);
-+	reset_control_deassert(rst);
-+
-+	return 0;
-+
-+err_clamp:
-+	clk_disable_unprepare(clk);
-+err_clk:
-+	tegra_powergate_power_off(id);
-+err_power:
-+	return ret;
-+}
-+EXPORT_SYMBOL(tegra_powergate_sequence_power_up);
-+
-+/**
-+ * tegra_get_cpu_powergate_id() - convert from CPU ID to partition ID
-+ * @cpuid: CPU partition ID
-+ *
-+ * Returns the partition ID corresponding to the CPU partition ID or a
-+ * negative error code on failure.
-+ */
-+static int tegra_get_cpu_powergate_id(int cpuid)
-+{
-+	if (pmc->soc && cpuid > 0 && cpuid < pmc->soc->num_cpu_powergates)
-+		return pmc->soc->cpu_powergates[cpuid];
-+
-+	return -EINVAL;
-+}
-+
-+/**
-+ * tegra_pmc_cpu_is_powered() - check if CPU partition is powered
-+ * @cpuid: CPU partition ID
-+ */
-+bool tegra_pmc_cpu_is_powered(int cpuid)
-+{
-+	int id;
-+
-+	id = tegra_get_cpu_powergate_id(cpuid);
-+	if (id < 0)
-+		return false;
-+
-+	return tegra_powergate_is_powered(id);
-+}
-+
-+/**
-+ * tegra_pmc_cpu_power_on() - power on CPU partition
-+ * @cpuid: CPU partition ID
-+ */
-+int tegra_pmc_cpu_power_on(int cpuid)
-+{
-+	int id;
-+
-+	id = tegra_get_cpu_powergate_id(cpuid);
-+	if (id < 0)
-+		return id;
-+
-+	return tegra_powergate_set(id, true);
-+}
-+
-+/**
-+ * tegra_pmc_cpu_remove_clamping() - remove power clamps for CPU partition
-+ * @cpuid: CPU partition ID
-+ */
-+int tegra_pmc_cpu_remove_clamping(int cpuid)
-+{
-+	int id;
-+
-+	id = tegra_get_cpu_powergate_id(cpuid);
-+	if (id < 0)
-+		return id;
-+
-+	return tegra_powergate_remove_clamping(id);
-+}
-+
-+/**
-+ * tegra_pmc_restart() - reboot the system
-+ * @mode: which mode to reboot in
-+ * @cmd: reboot command
-+ */
-+void tegra_pmc_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	u32 value;
-+
-+	value = tegra_pmc_readl(PMC_SCRATCH0);
-+	value &= ~PMC_SCRATCH0_MODE_MASK;
-+
-+	if (cmd) {
-+		if (strcmp(cmd, "recovery") == 0)
-+			value |= PMC_SCRATCH0_MODE_RECOVERY;
-+
-+		if (strcmp(cmd, "bootloader") == 0)
-+			value |= PMC_SCRATCH0_MODE_BOOTLOADER;
-+
-+		if (strcmp(cmd, "forced-recovery") == 0)
-+			value |= PMC_SCRATCH0_MODE_RCM;
-+	}
-+
-+	tegra_pmc_writel(value, PMC_SCRATCH0);
-+
-+	value = tegra_pmc_readl(0);
-+	value |= 0x10;
-+	tegra_pmc_writel(value, 0);
-+}
-+
-+static int powergate_show(struct seq_file *s, void *data)
-+{
-+	unsigned int i;
-+
-+	seq_printf(s, " powergate powered\n");
-+	seq_printf(s, "------------------\n");
-+
-+	for (i = 0; i < pmc->soc->num_powergates; i++) {
-+		if (!pmc->soc->powergates[i])
-+			continue;
-+
-+		seq_printf(s, " %9s %7s\n", pmc->soc->powergates[i],
-+			   tegra_powergate_is_powered(i) ? "yes" : "no");
-+	}
-+
-+	return 0;
-+}
-+
-+static int powergate_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, powergate_show, inode->i_private);
-+}
-+
-+static const struct file_operations powergate_fops = {
-+	.open = powergate_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static int tegra_powergate_debugfs_init(void)
-+{
-+	struct dentry *d;
-+
-+	d = debugfs_create_file("powergate", S_IRUGO, NULL, NULL,
-+				&powergate_fops);
-+	if (!d)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+static int tegra_io_rail_prepare(int id, unsigned long *request,
-+				 unsigned long *status, unsigned int *bit)
-+{
-+	unsigned long rate, value;
-+	struct clk *clk;
-+
-+	*bit = id % 32;
-+
-+	/*
-+	 * There are two sets of 30 bits to select IO rails, but bits 30 and
-+	 * 31 are control bits rather than IO rail selection bits.
-+	 */
-+	if (id > 63 || *bit == 30 || *bit == 31)
-+		return -EINVAL;
-+
-+	if (id < 32) {
-+		*status = IO_DPD_STATUS;
-+		*request = IO_DPD_REQ;
-+	} else {
-+		*status = IO_DPD2_STATUS;
-+		*request = IO_DPD2_REQ;
-+	}
-+
-+	clk = clk_get_sys(NULL, "pclk");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	rate = clk_get_rate(clk);
-+	clk_put(clk);
-+
-+	tegra_pmc_writel(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
-+
-+	/* must be@least 200 ns, in APB (PCLK) clock cycles */
-+	value = DIV_ROUND_UP(1000000000, rate);
-+	value = DIV_ROUND_UP(200, value);
-+	tegra_pmc_writel(value, SEL_DPD_TIM);
-+
-+	return 0;
-+}
-+
-+static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
-+			      unsigned long val, unsigned long timeout)
-+{
-+	unsigned long value;
-+
-+	timeout = jiffies + msecs_to_jiffies(timeout);
-+
-+	while (time_after(timeout, jiffies)) {
-+		value = tegra_pmc_readl(offset);
-+		if ((value & mask) == val)
-+			return 0;
-+
-+		usleep_range(250, 1000);
-+	}
-+
-+	return -ETIMEDOUT;
-+}
-+
-+static void tegra_io_rail_unprepare(void)
-+{
-+	tegra_pmc_writel(DPD_SAMPLE_DISABLE, DPD_SAMPLE);
-+}
-+
-+int tegra_io_rail_power_on(int id)
-+{
-+	unsigned long request, status, value;
-+	unsigned int bit, mask;
-+	int err;
-+
-+	err = tegra_io_rail_prepare(id, &request, &status, &bit);
-+	if (err < 0)
-+		return err;
-+
-+	mask = 1 << bit;
-+
-+	value = tegra_pmc_readl(request);
-+	value |= mask;
-+	value &= ~IO_DPD_REQ_CODE_MASK;
-+	value |= IO_DPD_REQ_CODE_OFF;
-+	tegra_pmc_writel(value, request);
-+
-+	err = tegra_io_rail_poll(status, mask, 0, 250);
-+	if (err < 0)
-+		return err;
-+
-+	tegra_io_rail_unprepare();
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(tegra_io_rail_power_on);
-+
-+int tegra_io_rail_power_off(int id)
-+{
-+	unsigned long request, status, value;
-+	unsigned int bit, mask;
-+	int err;
-+
-+	err = tegra_io_rail_prepare(id, &request, &status, &bit);
-+	if (err < 0)
-+		return err;
-+
-+	mask = 1 << bit;
-+
-+	value = tegra_pmc_readl(request);
-+	value |= mask;
-+	value &= ~IO_DPD_REQ_CODE_MASK;
-+	value |= IO_DPD_REQ_CODE_ON;
-+	tegra_pmc_writel(value, request);
-+
-+	err = tegra_io_rail_poll(status, mask, mask, 250);
-+	if (err < 0)
-+		return err;
-+
-+	tegra_io_rail_unprepare();
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(tegra_io_rail_power_off);
-+
-+enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
-+{
-+	return pmc->suspend_mode;
-+}
-+
-+void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode)
-+{
-+	if (mode < TEGRA_SUSPEND_NONE || mode >= TEGRA_MAX_SUSPEND_MODE)
-+		return;
-+
-+	pmc->suspend_mode = mode;
-+}
-+
-+void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
-+{
-+	unsigned long long rate = 0;
-+	u32 value;
-+
-+	switch (mode) {
-+	case TEGRA_SUSPEND_LP1:
-+		rate = 32768;
-+		break;
-+
-+	case TEGRA_SUSPEND_LP2:
-+		rate = clk_get_rate(pmc->clk);
-+		break;
-+
-+	default:
-+		break;
-+	}
-+
-+	if (WARN_ON_ONCE(rate == 0))
-+		rate = 100000000;
-+
-+	if (rate != pmc->rate) {
-+		u64 ticks;
-+
-+		ticks = pmc->cpu_good_time * rate + USEC_PER_SEC - 1;
-+		do_div(ticks, USEC_PER_SEC);
-+		tegra_pmc_writel(ticks, PMC_CPUPWRGOOD_TIMER);
-+
-+		ticks = pmc->cpu_off_time * rate + USEC_PER_SEC - 1;
-+		do_div(ticks, USEC_PER_SEC);
-+		tegra_pmc_writel(ticks, PMC_CPUPWROFF_TIMER);
-+
-+		wmb();
-+
-+		pmc->rate = rate;
-+	}
-+
-+	value = tegra_pmc_readl(PMC_CNTRL);
-+	value &= ~PMC_CNTRL_SIDE_EFFECT_LP0;
-+	value |= PMC_CNTRL_CPU_PWRREQ_OE;
-+	tegra_pmc_writel(value, PMC_CNTRL);
-+}
-+
-+static int tegra_pmc_parse_dt(struct tegra_pmc *pmc, struct device_node *np)
-+{
-+	u32 value, values[2];
-+
-+	if (of_property_read_u32(np, "nvidia,suspend-mode", &value)) {
-+	} else {
-+		switch (value) {
-+		case 0:
-+			pmc->suspend_mode = TEGRA_SUSPEND_LP0;
-+			break;
-+
-+		case 1:
-+			pmc->suspend_mode = TEGRA_SUSPEND_LP1;
-+			break;
-+
-+		case 2:
-+			pmc->suspend_mode = TEGRA_SUSPEND_LP2;
-+			break;
-+
-+		default:
-+			pmc->suspend_mode = TEGRA_SUSPEND_NONE;
-+			break;
-+		}
-+	}
-+
-+	pmc->suspend_mode = tegra_pm_validate_suspend_mode(pmc->suspend_mode);
-+
-+	if (of_property_read_u32(np, "nvidia,cpu-pwr-good-time", &value))
-+		pmc->suspend_mode = TEGRA_SUSPEND_NONE;
-+
-+	pmc->cpu_good_time = value;
-+
-+	if (of_property_read_u32(np, "nvidia,cpu-pwr-off-time", &value))
-+		pmc->suspend_mode = TEGRA_SUSPEND_NONE;
-+
-+	pmc->cpu_off_time = value;
-+
-+	if (of_property_read_u32_array(np, "nvidia,core-pwr-good-time",
-+				       values, ARRAY_SIZE(values)))
-+		pmc->suspend_mode = TEGRA_SUSPEND_NONE;
-+
-+	pmc->core_osc_time = values[0];
-+	pmc->core_pmu_time = values[1];
-+
-+	if (of_property_read_u32(np, "nvidia,core-pwr-off-time", &value))
-+		pmc->suspend_mode = TEGRA_SUSPEND_NONE;
-+
-+	pmc->core_off_time = value;
-+
-+	pmc->corereq_high = of_property_read_bool(np,
-+				"nvidia,core-power-req-active-high");
-+
-+	pmc->sysclkreq_high = of_property_read_bool(np,
-+				"nvidia,sys-clock-req-active-high");
-+
-+	pmc->combined_req = of_property_read_bool(np,
-+				"nvidia,combined-power-req");
-+
-+	pmc->cpu_pwr_good_en = of_property_read_bool(np,
-+				"nvidia,cpu-pwr-good-en");
-+
-+	if (of_property_read_u32_array(np, "nvidia,lp0-vec", values,
-+				       ARRAY_SIZE(values)))
-+		if (pmc->suspend_mode == TEGRA_SUSPEND_LP0)
-+			pmc->suspend_mode = TEGRA_SUSPEND_LP1;
-+
-+	pmc->lp0_vec_phys = values[0];
-+	pmc->lp0_vec_size = values[1];
-+
-+	return 0;
-+}
-+
-+static void tegra_pmc_init(struct tegra_pmc *pmc)
-+{
-+	u32 value;
-+
-+	/* Always enable CPU power request */
-+	value = tegra_pmc_readl(PMC_CNTRL);
-+	value |= PMC_CNTRL_CPU_PWRREQ_OE;
-+	tegra_pmc_writel(value, PMC_CNTRL);
-+
-+	value = tegra_pmc_readl(PMC_CNTRL);
-+
-+	if (pmc->sysclkreq_high)
-+		value &= ~PMC_CNTRL_SYSCLK_POLARITY;
-+	else
-+		value |= PMC_CNTRL_SYSCLK_POLARITY;
-+
-+	/* configure the output polarity while the request is tristated */
-+	tegra_pmc_writel(value, PMC_CNTRL);
-+
-+	/* now enable the request */
-+	value = tegra_pmc_readl(PMC_CNTRL);
-+	value |= PMC_CNTRL_SYSCLK_OE;
-+	tegra_pmc_writel(value, PMC_CNTRL);
-+}
-+
-+static int tegra_pmc_probe(struct platform_device *pdev)
-+{
-+	void __iomem *base = pmc->base;
-+	struct resource *res;
-+	int err;
-+
-+	err = tegra_pmc_parse_dt(pmc, pdev->dev.of_node);
-+	if (err < 0)
-+		return err;
-+
-+	/* take over the memory region from the early initialization */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	pmc->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(pmc->base))
-+		return PTR_ERR(pmc->base);
-+
-+	iounmap(base);
-+
-+	pmc->clk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(pmc->clk)) {
-+		err = PTR_ERR(pmc->clk);
-+		dev_err(&pdev->dev, "failed to get pclk: %d\n", err);
-+		return err;
-+	}
-+
-+	tegra_pmc_init(pmc);
-+
-+	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
-+		err = tegra_powergate_debugfs_init();
-+		if (err < 0)
-+			return err;
-+	}
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int tegra_pmc_suspend(struct device *dev)
-+{
-+	tegra_pmc_writel(virt_to_phys(tegra_resume), PMC_SCRATCH41);
-+
-+	return 0;
-+}
-+
-+static int tegra_pmc_resume(struct device *dev)
-+{
-+	tegra_pmc_writel(0x0, PMC_SCRATCH41);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(tegra_pmc_pm_ops, tegra_pmc_suspend, tegra_pmc_resume);
-+
-+static const char * const tegra20_powergates[] = {
-+	[TEGRA_POWERGATE_CPU] = "cpu",
-+	[TEGRA_POWERGATE_3D] = "3d",
-+	[TEGRA_POWERGATE_VENC] = "venc",
-+	[TEGRA_POWERGATE_VDEC] = "vdec",
-+	[TEGRA_POWERGATE_PCIE] = "pcie",
-+	[TEGRA_POWERGATE_L2] = "l2",
-+	[TEGRA_POWERGATE_MPE] = "mpe",
-+};
-+
-+static const struct tegra_pmc_soc tegra20_pmc_soc = {
-+	.num_powergates = ARRAY_SIZE(tegra20_powergates),
-+	.powergates = tegra20_powergates,
-+	.num_cpu_powergates = 0,
-+	.cpu_powergates = NULL,
-+};
-+
-+static const char * const tegra30_powergates[] = {
-+	[TEGRA_POWERGATE_CPU] = "cpu0",
-+	[TEGRA_POWERGATE_3D] = "3d0",
-+	[TEGRA_POWERGATE_VENC] = "venc",
-+	[TEGRA_POWERGATE_VDEC] = "vdec",
-+	[TEGRA_POWERGATE_PCIE] = "pcie",
-+	[TEGRA_POWERGATE_L2] = "l2",
-+	[TEGRA_POWERGATE_MPE] = "mpe",
-+	[TEGRA_POWERGATE_HEG] = "heg",
-+	[TEGRA_POWERGATE_SATA] = "sata",
-+	[TEGRA_POWERGATE_CPU1] = "cpu1",
-+	[TEGRA_POWERGATE_CPU2] = "cpu2",
-+	[TEGRA_POWERGATE_CPU3] = "cpu3",
-+	[TEGRA_POWERGATE_CELP] = "celp",
-+	[TEGRA_POWERGATE_3D1] = "3d1",
-+};
-+
-+static const u8 tegra30_cpu_powergates[] = {
-+	TEGRA_POWERGATE_CPU,
-+	TEGRA_POWERGATE_CPU1,
-+	TEGRA_POWERGATE_CPU2,
-+	TEGRA_POWERGATE_CPU3,
-+};
-+
-+static const struct tegra_pmc_soc tegra30_pmc_soc = {
-+	.num_powergates = ARRAY_SIZE(tegra20_powergates),
-+	.powergates = tegra30_powergates,
-+	.num_cpu_powergates = ARRAY_SIZE(tegra30_cpu_powergates),
-+	.cpu_powergates = tegra30_cpu_powergates,
-+};
-+
-+static const char * const tegra114_powergates[] = {
-+	[TEGRA_POWERGATE_CPU] = "crail",
-+	[TEGRA_POWERGATE_3D] = "3d",
-+	[TEGRA_POWERGATE_VENC] = "venc",
-+	[TEGRA_POWERGATE_VDEC] = "vdec",
-+	[TEGRA_POWERGATE_MPE] = "mpe",
-+	[TEGRA_POWERGATE_HEG] = "heg",
-+	[TEGRA_POWERGATE_CPU1] = "cpu1",
-+	[TEGRA_POWERGATE_CPU2] = "cpu2",
-+	[TEGRA_POWERGATE_CPU3] = "cpu3",
-+	[TEGRA_POWERGATE_CELP] = "celp",
-+	[TEGRA_POWERGATE_CPU0] = "cpu0",
-+	[TEGRA_POWERGATE_C0NC] = "c0nc",
-+	[TEGRA_POWERGATE_C1NC] = "c1nc",
-+	[TEGRA_POWERGATE_DIS] = "dis",
-+	[TEGRA_POWERGATE_DISB] = "disb",
-+	[TEGRA_POWERGATE_XUSBA] = "xusba",
-+	[TEGRA_POWERGATE_XUSBB] = "xusbb",
-+	[TEGRA_POWERGATE_XUSBC] = "xusbc",
-+};
-+
-+static const u8 tegra114_cpu_powergates[] = {
-+	TEGRA_POWERGATE_CPU0,
-+	TEGRA_POWERGATE_CPU1,
-+	TEGRA_POWERGATE_CPU2,
-+	TEGRA_POWERGATE_CPU3,
-+};
-+
-+static const struct tegra_pmc_soc tegra114_pmc_soc = {
-+	.num_powergates = ARRAY_SIZE(tegra114_powergates),
-+	.powergates = tegra114_powergates,
-+	.num_cpu_powergates = ARRAY_SIZE(tegra114_cpu_powergates),
-+	.cpu_powergates = tegra114_cpu_powergates,
-+};
-+
-+static const char * const tegra124_powergates[] = {
-+	[TEGRA_POWERGATE_CPU] = "crail",
-+	[TEGRA_POWERGATE_3D] = "3d",
-+	[TEGRA_POWERGATE_VENC] = "venc",
-+	[TEGRA_POWERGATE_PCIE] = "pcie",
-+	[TEGRA_POWERGATE_VDEC] = "vdec",
-+	[TEGRA_POWERGATE_L2] = "l2",
-+	[TEGRA_POWERGATE_MPE] = "mpe",
-+	[TEGRA_POWERGATE_HEG] = "heg",
-+	[TEGRA_POWERGATE_SATA] = "sata",
-+	[TEGRA_POWERGATE_CPU1] = "cpu1",
-+	[TEGRA_POWERGATE_CPU2] = "cpu2",
-+	[TEGRA_POWERGATE_CPU3] = "cpu3",
-+	[TEGRA_POWERGATE_CELP] = "celp",
-+	[TEGRA_POWERGATE_CPU0] = "cpu0",
-+	[TEGRA_POWERGATE_C0NC] = "c0nc",
-+	[TEGRA_POWERGATE_C1NC] = "c1nc",
-+	[TEGRA_POWERGATE_SOR] = "sor",
-+	[TEGRA_POWERGATE_DIS] = "dis",
-+	[TEGRA_POWERGATE_DISB] = "disb",
-+	[TEGRA_POWERGATE_XUSBA] = "xusba",
-+	[TEGRA_POWERGATE_XUSBB] = "xusbb",
-+	[TEGRA_POWERGATE_XUSBC] = "xusbc",
-+	[TEGRA_POWERGATE_VIC] = "vic",
-+	[TEGRA_POWERGATE_IRAM] = "iram",
-+};
-+
-+static const u8 tegra124_cpu_powergates[] = {
-+	TEGRA_POWERGATE_CPU0,
-+	TEGRA_POWERGATE_CPU1,
-+	TEGRA_POWERGATE_CPU2,
-+	TEGRA_POWERGATE_CPU3,
-+};
-+
-+static const struct tegra_pmc_soc tegra124_pmc_soc = {
-+	.num_powergates = ARRAY_SIZE(tegra124_powergates),
-+	.powergates = tegra124_powergates,
-+	.num_cpu_powergates = ARRAY_SIZE(tegra124_cpu_powergates),
-+	.cpu_powergates = tegra124_cpu_powergates,
-+};
-+
-+static const struct of_device_id tegra_pmc_match[] = {
-+	{ .compatible = "nvidia,tegra124-pmc", .data = &tegra124_pmc_soc },
-+	{ .compatible = "nvidia,tegra114-pmc", .data = &tegra114_pmc_soc },
-+	{ .compatible = "nvidia,tegra30-pmc", .data = &tegra30_pmc_soc },
-+	{ .compatible = "nvidia,tegra20-pmc", .data = &tegra20_pmc_soc },
-+	{ }
-+};
-+
-+static struct platform_driver tegra_pmc_driver = {
-+	.driver = {
-+		.name = "tegra-pmc",
-+		.suppress_bind_attrs = true,
-+		.of_match_table = tegra_pmc_match,
-+		.pm = &tegra_pmc_pm_ops,
-+	},
-+	.probe = tegra_pmc_probe,
-+};
-+module_platform_driver(tegra_pmc_driver);
-+
-+/*
-+ * Early initialization to allow access to registers in the very early boot
-+ * process.
-+ */
-+static int __init tegra_pmc_early_init(void)
-+{
-+	const struct of_device_id *match;
-+	struct device_node *np;
-+	struct resource regs;
-+	bool invert;
-+	u32 value;
-+
-+	np = of_find_matching_node_and_match(NULL, tegra_pmc_match, &match);
-+	if (!np) {
-+		pr_warn("PMC device node not found, disabling powergating\n");
-+
-+		regs.start = 0x7000e400;
-+		regs.end = 0x7000e7ff;
-+		regs.flags = IORESOURCE_MEM;
-+
-+		pr_warn("Using memory region %pR\n", &regs);
-+	} else {
-+		pmc->soc = match->data;
-+	}
-+
-+	if (of_address_to_resource(np, 0, &regs) < 0) {
-+		pr_err("failed to get PMC registers\n");
-+		return -ENXIO;
-+	}
-+
-+	pmc->base = ioremap_nocache(regs.start, resource_size(&regs));
-+	if (!pmc->base) {
-+		pr_err("failed to map PMC registers\n");
-+		return -ENXIO;
-+	}
-+
-+	mutex_init(&pmc->powergates_lock);
-+
-+	invert = of_property_read_bool(np, "nvidia,invert-interrupt");
-+
-+	value = tegra_pmc_readl(PMC_CNTRL);
-+
-+	if (invert)
-+		value |= PMC_CNTRL_INTR_POLARITY;
-+	else
-+		value &= ~PMC_CNTRL_INTR_POLARITY;
-+
-+	tegra_pmc_writel(value, PMC_CNTRL);
-+
-+	return 0;
-+}
-+early_initcall(tegra_pmc_early_init);
-diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
-index fcf65ecbecca..c9013eaa167b 100644
---- a/include/linux/tegra-soc.h
-+++ b/include/linux/tegra-soc.h
-@@ -27,6 +27,8 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/reboot.h>
-+
- enum tegra_revision {
- 	TEGRA_REVISION_UNKNOWN = 0,
- 	TEGRA_REVISION_A01,
-@@ -59,6 +61,50 @@ int tegra_fuse_readl(u32 offset, u32 *val);
- extern int tegra_chip_id;
- extern struct tegra_sku_info tegra_sku_info;
- 
-+/*
-+ * PMC
-+ */
-+enum tegra_suspend_mode {
-+	TEGRA_SUSPEND_NONE = 0,
-+	TEGRA_SUSPEND_LP2,      /* CPU voltage off */
-+	TEGRA_SUSPEND_LP1,      /* CPU voltage off, DRAM self-refresh */
-+	TEGRA_SUSPEND_LP0,      /* CPU + core voltage off, DRAM self-refresh */
-+	TEGRA_MAX_SUSPEND_MODE,
-+};
-+
-+#ifdef CONFIG_PM_SLEEP
-+enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
-+void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
-+void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode);
-+
-+bool tegra_pmc_cpu_is_powered(int cpuid);
-+int tegra_pmc_cpu_power_on(int cpuid);
-+int tegra_pmc_cpu_remove_clamping(int cpuid);
-+
-+void tegra_pmc_restart(enum reboot_mode mode, const char *cmd);
-+#endif
-+
-+/*
-+ * PM
-+ */
-+#ifdef CONFIG_PM_SLEEP
-+enum tegra_suspend_mode
-+tegra_pm_validate_suspend_mode(enum tegra_suspend_mode mode);
-+
-+/* low-level resume entry point */
-+void tegra_resume(void);
-+#else
-+static inline enum tegra_suspend_mode
-+tegra_pm_validate_suspend_mode(enum tegra_suspend_mode mode)
-+{
-+	return TEGRA_SUSPEND_NONE;
-+}
-+
-+static inline void tegra_resume(void)
-+{
-+}
-+#endif
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* __LINUX_TEGRA_SOC_H_ */
++++ b/drivers/power/supply/Kconfig
+@@ -0,0 +1,392 @@
++menuconfig POWER_SUPPLY
++	bool "Power supply class support"
++	help
++	  Say Y here to enable power supply class support. This allows
++	  power supply (batteries, AC, USB) monitoring by userspace
++	  via sysfs and uevent (if available) and/or APM kernel interface
++	  (if selected below).
++
++if POWER_SUPPLY
++
++config POWER_SUPPLY_DEBUG
++	bool "Power supply debug"
++	help
++	  Say Y here to enable debugging messages for power supply class
++	  and drivers.
++
++config PDA_POWER
++	tristate "Generic PDA/phone power driver"
++	depends on !S390
++	help
++	  Say Y here to enable generic power driver for PDAs and phones with
++	  one or two external power supplies (AC/USB) connected to main and
++	  backup batteries, and optional builtin charger.
++
++config APM_POWER
++	tristate "APM emulation for class batteries"
++	depends on APM_EMULATION
++	help
++	  Say Y here to enable support APM status emulation using
++	  battery class devices.
++
++config GENERIC_ADC_BATTERY
++	tristate "Generic battery support using IIO"
++	depends on IIO
++	help
++	  Say Y here to enable support for the generic battery driver
++	  which uses IIO framework to read adc.
++
++config MAX8925_POWER
++	tristate "MAX8925 battery charger support"
++	depends on MFD_MAX8925
++	help
++	  Say Y here to enable support for the battery charger in the Maxim
++	  MAX8925 PMIC.
++
++config WM831X_BACKUP
++	tristate "WM831X backup battery charger support"
++	depends on MFD_WM831X
++	help
++	  Say Y here to enable support for the backup battery charger
++	  in the Wolfson Microelectronics WM831x PMICs.
++
++config WM831X_POWER
++	tristate "WM831X PMU support"
++	depends on MFD_WM831X
++	help
++	  Say Y here to enable support for the power management unit
++	  provided by Wolfson Microelectronics WM831x PMICs.
++
++config WM8350_POWER
++        tristate "WM8350 PMU support"
++        depends on MFD_WM8350
++        help
++          Say Y here to enable support for the power management unit
++	  provided by the Wolfson Microelectronics WM8350 PMIC.
++
++config TEST_POWER
++	tristate "Test power driver"
++	help
++	  This driver is used for testing. It's safe to say M here.
++
++config BATTERY_88PM860X
++	tristate "Marvell 88PM860x battery driver"
++	depends on MFD_88PM860X
++	help
++	  Say Y here to enable battery monitor for Marvell 88PM860x chip.
++
++config BATTERY_DS2760
++	tristate "DS2760 battery driver (HP iPAQ & others)"
++	depends on W1 && W1_SLAVE_DS2760
++	help
++	  Say Y here to enable support for batteries with ds2760 chip.
++
++config BATTERY_DS2780
++	tristate "DS2780 battery driver"
++	depends on HAS_IOMEM
++	select W1
++	select W1_SLAVE_DS2780
++	help
++	  Say Y here to enable support for batteries with ds2780 chip.
++
++config BATTERY_DS2781
++	tristate "DS2781 battery driver"
++	depends on HAS_IOMEM
++	select W1
++	select W1_SLAVE_DS2781
++	help
++	  If you enable this you will have the DS2781 battery driver support.
++
++	  The battery monitor chip is used in many batteries/devices
++	  as the one who is responsible for charging/discharging/monitoring
++	  Li+ batteries.
++
++	  If you are unsure, say N.
++
++config BATTERY_DS2782
++	tristate "DS2782/DS2786 standalone gas-gauge"
++	depends on I2C
++	help
++	  Say Y here to enable support for the DS2782/DS2786 standalone battery
++	  gas-gauge.
++
++config BATTERY_PMU
++	tristate "Apple PMU battery"
++	depends on PPC32 && ADB_PMU
++	help
++	  Say Y here to expose battery information on Apple machines
++	  through the generic battery class.
++
++config BATTERY_OLPC
++	tristate "One Laptop Per Child battery"
++	depends on X86_32 && OLPC
++	help
++	  Say Y to enable support for the battery on the OLPC laptop.
++
++config BATTERY_TOSA
++	tristate "Sharp SL-6000 (tosa) battery"
++	depends on MACH_TOSA && MFD_TC6393XB && TOUCHSCREEN_WM97XX
++	help
++	  Say Y to enable support for the battery on the Sharp Zaurus
++	  SL-6000 (tosa) models.
++
++config BATTERY_COLLIE
++	tristate "Sharp SL-5500 (collie) battery"
++	depends on SA1100_COLLIE && MCP_UCB1200
++	help
++	  Say Y to enable support for the battery on the Sharp Zaurus
++	  SL-5500 (collie) models.
++
++config BATTERY_WM97XX
++	bool "WM97xx generic battery driver"
++	depends on TOUCHSCREEN_WM97XX=y
++	help
++	  Say Y to enable support for battery measured by WM97xx aux port.
++
++config BATTERY_SBS
++        tristate "SBS Compliant gas gauge"
++        depends on I2C
++        help
++	  Say Y to include support for SBS battery driver for SBS-compliant
++	  gas gauges.
++
++config BATTERY_BQ27x00
++	tristate "BQ27x00 battery driver"
++	depends on I2C || I2C=n
++	help
++	  Say Y here to enable support for batteries with BQ27x00 (I2C/HDQ) chips.
++
++config BATTERY_BQ27X00_I2C
++	bool "BQ27200/BQ27500 support"
++	depends on BATTERY_BQ27x00
++	depends on I2C
++	default y
++	help
++	  Say Y here to enable support for batteries with BQ27x00 (I2C) chips.
++
++config BATTERY_BQ27X00_PLATFORM
++	bool "BQ27000 support"
++	depends on BATTERY_BQ27x00
++	default y
++	help
++	  Say Y here to enable support for batteries with BQ27000 (HDQ) chips.
++
++config BATTERY_DA9030
++	tristate "DA9030 battery driver"
++	depends on PMIC_DA903X
++	help
++	  Say Y here to enable support for batteries charger integrated into
++	  DA9030 PMIC.
++
++config BATTERY_DA9052
++	tristate "Dialog DA9052 Battery"
++	depends on PMIC_DA9052
++	help
++	  Say Y here to enable support for batteries charger integrated into
++	  DA9052 PMIC.
++
++config BATTERY_MAX17040
++	tristate "Maxim MAX17040 Fuel Gauge"
++	depends on I2C
++	help
++	  MAX17040 is fuel-gauge systems for lithium-ion (Li+) batteries
++	  in handheld and portable equipment. The MAX17040 is configured
++	  to operate with a single lithium cell
++
++config BATTERY_MAX17042
++	tristate "Maxim MAX17042/17047/17050/8997/8966 Fuel Gauge"
++	depends on I2C
++	select REGMAP_I2C
++	help
++	  MAX17042 is fuel-gauge systems for lithium-ion (Li+) batteries
++	  in handheld and portable equipment. The MAX17042 is configured
++	  to operate with a single lithium cell. MAX8997 and MAX8966 are
++	  multi-function devices that include fuel gauages that are compatible
++	  with MAX17042. This driver also supports max17047/50 chips which are
++	  improved version of max17042.
++
++config BATTERY_Z2
++	tristate "Z2 battery driver"
++	depends on I2C && MACH_ZIPIT2
++	help
++	  Say Y to include support for the battery on the Zipit Z2.
++
++config BATTERY_S3C_ADC
++	tristate "Battery driver for Samsung ADC based monitoring"
++	depends on S3C_ADC
++	help
++	  Say Y here to enable support for iPAQ h1930/h1940/rx1950 battery
++
++config BATTERY_TWL4030_MADC
++	tristate "TWL4030 MADC battery driver"
++	depends on TWL4030_MADC
++	help
++	  Say Y here to enable this dumb driver for batteries managed
++	  through the TWL4030 MADC.
++
++config CHARGER_88PM860X
++	tristate "Marvell 88PM860x Charger driver"
++	depends on MFD_88PM860X && BATTERY_88PM860X
++	help
++	  Say Y here to enable charger for Marvell 88PM860x chip.
++
++config CHARGER_PCF50633
++	tristate "NXP PCF50633 MBC"
++	depends on MFD_PCF50633
++	help
++	 Say Y to include support for NXP PCF50633 Main Battery Charger.
++
++config BATTERY_JZ4740
++	tristate "Ingenic JZ4740 battery"
++	depends on MACH_JZ4740
++	depends on MFD_JZ4740_ADC
++	help
++	  Say Y to enable support for the battery on Ingenic JZ4740 based
++	  boards.
++
++	  This driver can be build as a module. If so, the module will be
++	  called jz4740-battery.
++
++config BATTERY_INTEL_MID
++	tristate "Battery driver for Intel MID platforms"
++	depends on INTEL_SCU_IPC && SPI
++	help
++	  Say Y here to enable the battery driver on Intel MID
++	  platforms.
++
++config BATTERY_RX51
++	tristate "Nokia RX-51 (N900) battery driver"
++	depends on TWL4030_MADC
++	help
++	  Say Y here to enable support for battery information on Nokia
++	  RX-51, also known as N900 tablet.
++
++config CHARGER_ISP1704
++	tristate "ISP1704 USB Charger Detection"
++	depends on USB_PHY
++	help
++	  Say Y to enable support for USB Charger Detection with
++	  ISP1707/ISP1704 USB transceivers.
++
++config CHARGER_MAX8903
++	tristate "MAX8903 Battery DC-DC Charger for USB and Adapter Power"
++	help
++	  Say Y to enable support for the MAX8903 DC-DC charger and sysfs.
++	  The driver supports controlling charger-enable and current-limit
++	  pins based on the status of charger connections with interrupt
++	  handlers.
++
++config CHARGER_TWL4030
++	tristate "OMAP TWL4030 BCI charger driver"
++	depends on TWL4030_CORE
++	help
++	  Say Y here to enable support for TWL4030 Battery Charge Interface.
++
++config CHARGER_LP8727
++	tristate "TI/National Semiconductor LP8727 charger driver"
++	depends on I2C
++	help
++	  Say Y here to enable support for LP8727 Charger Driver.
++
++config CHARGER_LP8788
++	tristate "TI LP8788 charger driver"
++	depends on MFD_LP8788
++	depends on LP8788_ADC
++	depends on IIO
++	help
++	  Say Y to enable support for the LP8788 linear charger.
++
++config CHARGER_GPIO
++	tristate "GPIO charger"
++	depends on GPIOLIB
++	help
++	  Say Y to include support for chargers which report their online status
++	  through a GPIO pin.
++
++	  This driver can be build as a module. If so, the module will be
++	  called gpio-charger.
++
++config CHARGER_MANAGER
++	bool "Battery charger manager for multiple chargers"
++	depends on REGULATOR && RTC_CLASS
++	select EXTCON
++	help
++          Say Y to enable charger-manager support, which allows multiple
++          chargers attached to a battery and multiple batteries attached to a
++          system. The charger-manager also can monitor charging status in
++          runtime and in suspend-to-RAM by waking up the system periodically
++          with help of suspend_again support.
++
++config CHARGER_MAX14577
++	tristate "Maxim MAX14577 MUIC battery charger driver"
++	depends on MFD_MAX14577
++	help
++	  Say Y to enable support for the battery charger control sysfs and
++	  platform data of MAX14577 MUICs.
++
++config CHARGER_MAX8997
++	tristate "Maxim MAX8997/MAX8966 PMIC battery charger driver"
++	depends on MFD_MAX8997 && REGULATOR_MAX8997
++	help
++	  Say Y to enable support for the battery charger control sysfs and
++	  platform data of MAX8997/LP3974 PMICs.
++
++config CHARGER_MAX8998
++	tristate "Maxim MAX8998/LP3974 PMIC battery charger driver"
++	depends on MFD_MAX8998 && REGULATOR_MAX8998
++	help
++	  Say Y to enable support for the battery charger control sysfs and
++	  platform data of MAX8998/LP3974 PMICs.
++
++config CHARGER_BQ2415X
++	tristate "TI BQ2415x battery charger driver"
++	depends on I2C
++	help
++	  Say Y to enable support for the TI BQ2415x battery charger
++	  PMICs.
++
++	  You'll need this driver to charge batteries on e.g. Nokia
++	  RX-51/N900.
++
++config CHARGER_BQ24190
++	tristate "TI BQ24190 battery charger driver"
++	depends on I2C && GPIOLIB
++	help
++	  Say Y to enable support for the TI BQ24190 battery charger.
++
++config CHARGER_BQ24735
++	tristate "TI BQ24735 battery charger support"
++	depends on I2C && GPIOLIB
++	help
++	  Say Y to enable support for the TI BQ24735 battery charger.
++
++config CHARGER_SMB347
++	tristate "Summit Microelectronics SMB347 Battery Charger"
++	depends on I2C
++	select REGMAP_I2C
++	help
++	  Say Y to include support for Summit Microelectronics SMB347
++	  Battery Charger.
++
++config CHARGER_TPS65090
++	tristate "TPS65090 battery charger driver"
++	depends on MFD_TPS65090
++	help
++	 Say Y here to enable support for battery charging with TPS65090
++	 PMIC chips.
++
++config AB8500_BM
++	bool "AB8500 Battery Management Driver"
++	depends on AB8500_CORE && AB8500_GPADC
++	help
++	  Say Y to include support for AB8500 battery management.
++
++config BATTERY_GOLDFISH
++	tristate "Goldfish battery driver"
++	depends on GOLDFISH || COMPILE_TEST
++	depends on HAS_IOMEM
++	help
++	  Say Y to enable support for the battery and AC power in the
++	  Goldfish emulator.
++
++endif
+diff --git a/drivers/power/supply/Makefile b/drivers/power/supply/Makefile
+new file mode 100644
+index 000000000000..14597bba1852
+--- /dev/null
++++ b/drivers/power/supply/Makefile
+@@ -0,0 +1,58 @@
++ccflags-$(CONFIG_POWER_SUPPLY_DEBUG) := -DDEBUG
++
++power_supply-y				:= power_supply_core.o
++power_supply-$(CONFIG_SYSFS)		+= power_supply_sysfs.o
++power_supply-$(CONFIG_LEDS_TRIGGERS)	+= power_supply_leds.o
++
++obj-$(CONFIG_POWER_SUPPLY)	+= power_supply.o
++obj-$(CONFIG_GENERIC_ADC_BATTERY)	+= generic-adc-battery.o
++
++obj-$(CONFIG_PDA_POWER)		+= pda_power.o
++obj-$(CONFIG_APM_POWER)		+= apm_power.o
++obj-$(CONFIG_MAX8925_POWER)	+= max8925_power.o
++obj-$(CONFIG_WM831X_BACKUP)	+= wm831x_backup.o
++obj-$(CONFIG_WM831X_POWER)	+= wm831x_power.o
++obj-$(CONFIG_WM8350_POWER)	+= wm8350_power.o
++obj-$(CONFIG_TEST_POWER)	+= test_power.o
++
++obj-$(CONFIG_BATTERY_88PM860X)	+= 88pm860x_battery.o
++obj-$(CONFIG_BATTERY_DS2760)	+= ds2760_battery.o
++obj-$(CONFIG_BATTERY_DS2780)	+= ds2780_battery.o
++obj-$(CONFIG_BATTERY_DS2781)	+= ds2781_battery.o
++obj-$(CONFIG_BATTERY_DS2782)	+= ds2782_battery.o
++obj-$(CONFIG_BATTERY_GOLDFISH)	+= goldfish_battery.o
++obj-$(CONFIG_BATTERY_PMU)	+= pmu_battery.o
++obj-$(CONFIG_BATTERY_OLPC)	+= olpc_battery.o
++obj-$(CONFIG_BATTERY_TOSA)	+= tosa_battery.o
++obj-$(CONFIG_BATTERY_COLLIE)	+= collie_battery.o
++obj-$(CONFIG_BATTERY_WM97XX)	+= wm97xx_battery.o
++obj-$(CONFIG_BATTERY_SBS)	+= sbs-battery.o
++obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
++obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
++obj-$(CONFIG_BATTERY_DA9052)	+= da9052-battery.o
++obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
++obj-$(CONFIG_BATTERY_MAX17042)	+= max17042_battery.o
++obj-$(CONFIG_BATTERY_Z2)	+= z2_battery.o
++obj-$(CONFIG_BATTERY_S3C_ADC)	+= s3c_adc_battery.o
++obj-$(CONFIG_BATTERY_TWL4030_MADC)	+= twl4030_madc_battery.o
++obj-$(CONFIG_CHARGER_88PM860X)	+= 88pm860x_charger.o
++obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
++obj-$(CONFIG_BATTERY_JZ4740)	+= jz4740-battery.o
++obj-$(CONFIG_BATTERY_INTEL_MID)	+= intel_mid_battery.o
++obj-$(CONFIG_BATTERY_RX51)	+= rx51_battery.o
++obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_fg.o ab8500_btemp.o abx500_chargalg.o pm2301_charger.o
++obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
++obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
++obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
++obj-$(CONFIG_CHARGER_LP8727)	+= lp8727_charger.o
++obj-$(CONFIG_CHARGER_LP8788)	+= lp8788-charger.o
++obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
++obj-$(CONFIG_CHARGER_MANAGER)	+= charger-manager.o
++obj-$(CONFIG_CHARGER_MAX14577)	+= max14577_charger.o
++obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
++obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
++obj-$(CONFIG_CHARGER_BQ2415X)	+= bq2415x_charger.o
++obj-$(CONFIG_CHARGER_BQ24190)	+= bq24190_charger.o
++obj-$(CONFIG_CHARGER_BQ24735)	+= bq24735-charger.o
++obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
++obj-$(CONFIG_CHARGER_TPS65090)	+= tps65090-charger.o
+diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/supply/ab8500_bmdata.c
+similarity index 100%
+rename from drivers/power/ab8500_bmdata.c
+rename to drivers/power/supply/ab8500_bmdata.c
+diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/supply/ab8500_btemp.c
+similarity index 100%
+rename from drivers/power/ab8500_btemp.c
+rename to drivers/power/supply/ab8500_btemp.c
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/supply/ab8500_charger.c
+similarity index 100%
+rename from drivers/power/ab8500_charger.c
+rename to drivers/power/supply/ab8500_charger.c
+diff --git a/drivers/power/ab8500_fg.c b/drivers/power/supply/ab8500_fg.c
+similarity index 100%
+rename from drivers/power/ab8500_fg.c
+rename to drivers/power/supply/ab8500_fg.c
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/supply/abx500_chargalg.c
+similarity index 100%
+rename from drivers/power/abx500_chargalg.c
+rename to drivers/power/supply/abx500_chargalg.c
+diff --git a/drivers/power/apm_power.c b/drivers/power/supply/apm_power.c
+similarity index 100%
+rename from drivers/power/apm_power.c
+rename to drivers/power/supply/apm_power.c
+diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/supply/bq2415x_charger.c
+similarity index 100%
+rename from drivers/power/bq2415x_charger.c
+rename to drivers/power/supply/bq2415x_charger.c
+diff --git a/drivers/power/bq24190_charger.c b/drivers/power/supply/bq24190_charger.c
+similarity index 100%
+rename from drivers/power/bq24190_charger.c
+rename to drivers/power/supply/bq24190_charger.c
+diff --git a/drivers/power/bq24735-charger.c b/drivers/power/supply/bq24735-charger.c
+similarity index 100%
+rename from drivers/power/bq24735-charger.c
+rename to drivers/power/supply/bq24735-charger.c
+diff --git a/drivers/power/bq27x00_battery.c b/drivers/power/supply/bq27x00_battery.c
+similarity index 100%
+rename from drivers/power/bq27x00_battery.c
+rename to drivers/power/supply/bq27x00_battery.c
+diff --git a/drivers/power/collie_battery.c b/drivers/power/supply/collie_battery.c
+similarity index 100%
+rename from drivers/power/collie_battery.c
+rename to drivers/power/supply/collie_battery.c
+diff --git a/drivers/power/da9030_battery.c b/drivers/power/supply/da9030_battery.c
+similarity index 100%
+rename from drivers/power/da9030_battery.c
+rename to drivers/power/supply/da9030_battery.c
+diff --git a/drivers/power/da9052-battery.c b/drivers/power/supply/da9052-battery.c
+similarity index 100%
+rename from drivers/power/da9052-battery.c
+rename to drivers/power/supply/da9052-battery.c
+diff --git a/drivers/power/ds2760_battery.c b/drivers/power/supply/ds2760_battery.c
+similarity index 100%
+rename from drivers/power/ds2760_battery.c
+rename to drivers/power/supply/ds2760_battery.c
+diff --git a/drivers/power/ds2780_battery.c b/drivers/power/supply/ds2780_battery.c
+similarity index 100%
+rename from drivers/power/ds2780_battery.c
+rename to drivers/power/supply/ds2780_battery.c
+diff --git a/drivers/power/ds2781_battery.c b/drivers/power/supply/ds2781_battery.c
+similarity index 100%
+rename from drivers/power/ds2781_battery.c
+rename to drivers/power/supply/ds2781_battery.c
+diff --git a/drivers/power/ds2782_battery.c b/drivers/power/supply/ds2782_battery.c
+similarity index 100%
+rename from drivers/power/ds2782_battery.c
+rename to drivers/power/supply/ds2782_battery.c
+diff --git a/drivers/power/generic-adc-battery.c b/drivers/power/supply/generic-adc-battery.c
+similarity index 100%
+rename from drivers/power/generic-adc-battery.c
+rename to drivers/power/supply/generic-adc-battery.c
+diff --git a/drivers/power/goldfish_battery.c b/drivers/power/supply/goldfish_battery.c
+similarity index 100%
+rename from drivers/power/goldfish_battery.c
+rename to drivers/power/supply/goldfish_battery.c
+diff --git a/drivers/power/gpio-charger.c b/drivers/power/supply/gpio-charger.c
+similarity index 100%
+rename from drivers/power/gpio-charger.c
+rename to drivers/power/supply/gpio-charger.c
+diff --git a/drivers/power/intel_mid_battery.c b/drivers/power/supply/intel_mid_battery.c
+similarity index 100%
+rename from drivers/power/intel_mid_battery.c
+rename to drivers/power/supply/intel_mid_battery.c
+diff --git a/drivers/power/isp1704_charger.c b/drivers/power/supply/isp1704_charger.c
+similarity index 100%
+rename from drivers/power/isp1704_charger.c
+rename to drivers/power/supply/isp1704_charger.c
+diff --git a/drivers/power/jz4740-battery.c b/drivers/power/supply/jz4740-battery.c
+similarity index 100%
+rename from drivers/power/jz4740-battery.c
+rename to drivers/power/supply/jz4740-battery.c
+diff --git a/drivers/power/lp8727_charger.c b/drivers/power/supply/lp8727_charger.c
+similarity index 100%
+rename from drivers/power/lp8727_charger.c
+rename to drivers/power/supply/lp8727_charger.c
+diff --git a/drivers/power/lp8788-charger.c b/drivers/power/supply/lp8788-charger.c
+similarity index 100%
+rename from drivers/power/lp8788-charger.c
+rename to drivers/power/supply/lp8788-charger.c
+diff --git a/drivers/power/max14577_charger.c b/drivers/power/supply/max14577_charger.c
+similarity index 100%
+rename from drivers/power/max14577_charger.c
+rename to drivers/power/supply/max14577_charger.c
+diff --git a/drivers/power/max17040_battery.c b/drivers/power/supply/max17040_battery.c
+similarity index 100%
+rename from drivers/power/max17040_battery.c
+rename to drivers/power/supply/max17040_battery.c
+diff --git a/drivers/power/max17042_battery.c b/drivers/power/supply/max17042_battery.c
+similarity index 100%
+rename from drivers/power/max17042_battery.c
+rename to drivers/power/supply/max17042_battery.c
+diff --git a/drivers/power/max8903_charger.c b/drivers/power/supply/max8903_charger.c
+similarity index 100%
+rename from drivers/power/max8903_charger.c
+rename to drivers/power/supply/max8903_charger.c
+diff --git a/drivers/power/max8925_power.c b/drivers/power/supply/max8925_power.c
+similarity index 100%
+rename from drivers/power/max8925_power.c
+rename to drivers/power/supply/max8925_power.c
+diff --git a/drivers/power/max8997_charger.c b/drivers/power/supply/max8997_charger.c
+similarity index 100%
+rename from drivers/power/max8997_charger.c
+rename to drivers/power/supply/max8997_charger.c
+diff --git a/drivers/power/max8998_charger.c b/drivers/power/supply/max8998_charger.c
+similarity index 100%
+rename from drivers/power/max8998_charger.c
+rename to drivers/power/supply/max8998_charger.c
+diff --git a/drivers/power/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+similarity index 100%
+rename from drivers/power/olpc_battery.c
+rename to drivers/power/supply/olpc_battery.c
+diff --git a/drivers/power/pcf50633-charger.c b/drivers/power/supply/pcf50633-charger.c
+similarity index 100%
+rename from drivers/power/pcf50633-charger.c
+rename to drivers/power/supply/pcf50633-charger.c
+diff --git a/drivers/power/pda_power.c b/drivers/power/supply/pda_power.c
+similarity index 100%
+rename from drivers/power/pda_power.c
+rename to drivers/power/supply/pda_power.c
+diff --git a/drivers/power/pm2301_charger.c b/drivers/power/supply/pm2301_charger.c
+similarity index 100%
+rename from drivers/power/pm2301_charger.c
+rename to drivers/power/supply/pm2301_charger.c
+diff --git a/drivers/power/pm2301_charger.h b/drivers/power/supply/pm2301_charger.h
+similarity index 100%
+rename from drivers/power/pm2301_charger.h
+rename to drivers/power/supply/pm2301_charger.h
+diff --git a/drivers/power/pmu_battery.c b/drivers/power/supply/pmu_battery.c
+similarity index 100%
+rename from drivers/power/pmu_battery.c
+rename to drivers/power/supply/pmu_battery.c
+diff --git a/drivers/power/power_supply.h b/drivers/power/supply/power_supply.h
+similarity index 100%
+rename from drivers/power/power_supply.h
+rename to drivers/power/supply/power_supply.h
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/supply/power_supply_core.c
+similarity index 100%
+rename from drivers/power/power_supply_core.c
+rename to drivers/power/supply/power_supply_core.c
+diff --git a/drivers/power/power_supply_leds.c b/drivers/power/supply/power_supply_leds.c
+similarity index 100%
+rename from drivers/power/power_supply_leds.c
+rename to drivers/power/supply/power_supply_leds.c
+diff --git a/drivers/power/power_supply_sysfs.c b/drivers/power/supply/power_supply_sysfs.c
+similarity index 100%
+rename from drivers/power/power_supply_sysfs.c
+rename to drivers/power/supply/power_supply_sysfs.c
+diff --git a/drivers/power/rx51_battery.c b/drivers/power/supply/rx51_battery.c
+similarity index 100%
+rename from drivers/power/rx51_battery.c
+rename to drivers/power/supply/rx51_battery.c
+diff --git a/drivers/power/s3c_adc_battery.c b/drivers/power/supply/s3c_adc_battery.c
+similarity index 100%
+rename from drivers/power/s3c_adc_battery.c
+rename to drivers/power/supply/s3c_adc_battery.c
+diff --git a/drivers/power/sbs-battery.c b/drivers/power/supply/sbs-battery.c
+similarity index 100%
+rename from drivers/power/sbs-battery.c
+rename to drivers/power/supply/sbs-battery.c
+diff --git a/drivers/power/smb347-charger.c b/drivers/power/supply/smb347-charger.c
+similarity index 100%
+rename from drivers/power/smb347-charger.c
+rename to drivers/power/supply/smb347-charger.c
+diff --git a/drivers/power/test_power.c b/drivers/power/supply/test_power.c
+similarity index 100%
+rename from drivers/power/test_power.c
+rename to drivers/power/supply/test_power.c
+diff --git a/drivers/power/tosa_battery.c b/drivers/power/supply/tosa_battery.c
+similarity index 100%
+rename from drivers/power/tosa_battery.c
+rename to drivers/power/supply/tosa_battery.c
+diff --git a/drivers/power/tps65090-charger.c b/drivers/power/supply/tps65090-charger.c
+similarity index 100%
+rename from drivers/power/tps65090-charger.c
+rename to drivers/power/supply/tps65090-charger.c
+diff --git a/drivers/power/twl4030_charger.c b/drivers/power/supply/twl4030_charger.c
+similarity index 100%
+rename from drivers/power/twl4030_charger.c
+rename to drivers/power/supply/twl4030_charger.c
+diff --git a/drivers/power/twl4030_madc_battery.c b/drivers/power/supply/twl4030_madc_battery.c
+similarity index 100%
+rename from drivers/power/twl4030_madc_battery.c
+rename to drivers/power/supply/twl4030_madc_battery.c
+diff --git a/drivers/power/wm831x_backup.c b/drivers/power/supply/wm831x_backup.c
+similarity index 100%
+rename from drivers/power/wm831x_backup.c
+rename to drivers/power/supply/wm831x_backup.c
+diff --git a/drivers/power/wm831x_power.c b/drivers/power/supply/wm831x_power.c
+similarity index 100%
+rename from drivers/power/wm831x_power.c
+rename to drivers/power/supply/wm831x_power.c
+diff --git a/drivers/power/wm8350_power.c b/drivers/power/supply/wm8350_power.c
+similarity index 100%
+rename from drivers/power/wm8350_power.c
+rename to drivers/power/supply/wm8350_power.c
+diff --git a/drivers/power/wm97xx_battery.c b/drivers/power/supply/wm97xx_battery.c
+similarity index 100%
+rename from drivers/power/wm97xx_battery.c
+rename to drivers/power/supply/wm97xx_battery.c
+diff --git a/drivers/power/z2_battery.c b/drivers/power/supply/z2_battery.c
+similarity index 100%
+rename from drivers/power/z2_battery.c
+rename to drivers/power/supply/z2_battery.c
 -- 
 2.0.1
