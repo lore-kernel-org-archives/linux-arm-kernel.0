@@ -1,91 +1,87 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 07 Jul 2014 23:08:16 +0200
-Subject: [PATCH 2/4] ACPI: Don't use acpi_lapic in ACPI core code
-In-Reply-To: <1404290847-7671-3-git-send-email-hanjun.guo@linaro.org>
+Date: Mon, 07 Jul 2014 23:13:05 +0200
+Subject: [PATCH 3/4] ACPI / processor: Introduce ARCH_HAS_ACPI_PDC
+In-Reply-To: <1404290847-7671-4-git-send-email-hanjun.guo@linaro.org>
 References: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
- <1404290847-7671-3-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <2058650.s5vKv1ibCp@vostro.rjw.lan>
+ <1404290847-7671-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2064691.ZpxCs0gfL8@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 02, 2014 04:47:24 PM Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Wednesday, July 02, 2014 04:47:25 PM Hanjun Guo wrote:
+> The use of _PDC is deprecated in ACPI 3.0 in favor of _OSC,
+> as ARM platform is supported only in ACPI 5.0 or higher version,
+> _PDC will not be used in ARM platform, so make Make _PDC only for
+> platforms with Intel CPUs.
 > 
-> Now ARM64 support is being added to ACPI so architecture specific
-> values can not be used in core ACPI code.
+> Introduce ARCH_HAS_ACPI_PDC and move _PDC related code in ACPI
+> processor driver into a single file processor_pdc.c, make x86
+> and ia64 select ARCH_HAS_ACPI_PDC when ACPI is enabled.
 > 
-> Following on the patch "ACPI / processor: Check if LAPIC is present
-> during initialization" which uses acpi_lapic in acpi_processor.c,
-> on ARM64 platform, GIC is used instead of local APIC, so acpi_lapic
-> is not a suitable value for ARM64.
+> This patch also use pr_* to replace printk to fix the checkpatch
+> warning and factor acpi_processor_alloc_pdc() a little bit to
+> avoid duplicate pr_err() code.
 > 
-> What is actually important at this point is the SMPness of the system,
-> so introduce acpi_arch_is_smp() to be arch specific and generic.
-> 
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Suggested-by: Robert Richter <rric@kernel.org>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
->  arch/ia64/include/asm/acpi.h  |    5 +++++
->  arch/x86/include/asm/acpi.h   |    5 +++++
->  drivers/acpi/acpi_processor.c |    2 +-
->  3 files changed, 11 insertions(+), 1 deletion(-)
+>  arch/ia64/Kconfig             |    1 +
+>  arch/x86/Kconfig              |    1 +
+>  drivers/acpi/Kconfig          |   10 ++
+>  drivers/acpi/Makefile         |    1 +
+>  drivers/acpi/internal.h       |    5 +
+>  drivers/acpi/processor_core.c |  198 ---------------------------------------
+>  drivers/acpi/processor_pdc.c  |  206 +++++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 224 insertions(+), 198 deletions(-)
+>  create mode 100644 drivers/acpi/processor_pdc.c
 > 
-> diff --git a/arch/ia64/include/asm/acpi.h b/arch/ia64/include/asm/acpi.h
-> index 75dc59a..2fc0757 100644
-> --- a/arch/ia64/include/asm/acpi.h
-> +++ b/arch/ia64/include/asm/acpi.h
-> @@ -40,6 +40,11 @@ extern int acpi_lapic;
->  #define acpi_noirq 0	/* ACPI always enabled on IA64 */
->  #define acpi_pci_disabled 0 /* ACPI PCI always enabled on IA64 */
->  #define acpi_strict 1	/* no ACPI spec workarounds on IA64 */
-> +
-> +static inline bool acpi_arch_is_smp(void)
+> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> index f82b352..cde2626 100644
+> --- a/arch/ia64/Kconfig
+> +++ b/arch/ia64/Kconfig
+> @@ -10,6 +10,7 @@ config IA64
+>  	select ARCH_MIGHT_HAVE_PC_SERIO
+>  	select PCI if (!IA64_HP_SIM)
+>  	select ACPI if (!IA64_HP_SIM)
+> +	select ARCH_HAS_ACPI_PDC if ACPI
 
-Why this name?  In particular, local APIC being present doesn't imply SMP.
+The ARCH_HAS part doesn't seem to be particularly consistent with
+the existing naming.  ARCH_MIGHT_HAVE_ACPI_PDC would be better IMO.
 
-> +{
-> +	return acpi_lapic;
-
-Also
-
-	return !!acpi_lapic;
-
-would be cleaner IMO.
-
-> +}
->  #endif
->  #define acpi_processor_cstate_check(x) (x) /* no idle limits on IA64 :) */
->  static inline void disable_acpi(void) { }
-> diff --git a/arch/x86/include/asm/acpi.h b/arch/x86/include/asm/acpi.h
-> index e06225e..939d377 100644
-> --- a/arch/x86/include/asm/acpi.h
-> +++ b/arch/x86/include/asm/acpi.h
-> @@ -121,6 +121,11 @@ static inline void arch_acpi_set_pdc_bits(u32 *buf)
->  		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
->  }
+>  	select PM if (!IA64_HP_SIM)
+>  	select HAVE_UNSTABLE_SCHED_CLOCK
+>  	select HAVE_IDE
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index 4865d44..d60cec7 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -21,6 +21,7 @@ config X86_64
+>  ### Arch settings
+>  config X86
+>  	def_bool y
+> +	select ARCH_HAS_ACPI_PDC if ACPI
+>  	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
+>  	select ARCH_MIGHT_HAVE_PC_PARPORT
+>  	select ARCH_MIGHT_HAVE_PC_SERIO
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 70eaf7a..0e6f72d 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -367,6 +367,16 @@ config ACPI_REDUCED_HARDWARE_ONLY
 >  
-> +static inline bool acpi_arch_is_smp(void)
-> +{
-> +	return acpi_lapic;
-> +}
-> +
->  #else /* !CONFIG_ACPI */
+>  	If you are unsure what to do, do not enable this option.
 >  
->  #define acpi_lapic 0
-> diff --git a/drivers/acpi/acpi_processor.c b/drivers/acpi/acpi_processor.c
-> index 1c08574..8622a0e 100644
-> --- a/drivers/acpi/acpi_processor.c
-> +++ b/drivers/acpi/acpi_processor.c
-> @@ -268,7 +268,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
->  	pr->apic_id = apic_id;
->  
->  	cpu_index = acpi_map_cpuid(pr->apic_id, pr->acpi_id);
-> -	if (!cpu0_initialized && !acpi_lapic) {
-> +	if (!cpu0_initialized && !acpi_arch_is_smp()) {
->  		cpu0_initialized = 1;
->  		/* Handle UP system running SMP kernel, with no LAPIC in MADT */
->  		if ((cpu_index == -1) && (num_online_cpus() == 1))
-> 
+> +config ARCH_HAS_ACPI_PDC
+> +	bool
+> +	help
+> +	  The _PDC object provides OSPM a mechanism to convey to the platform
+> +	  the capabilities supported by OSPM for processor power management.
+> +	  This allows the platform to modify the ACPI namespace objects returning
+> +	  configuration information for processor power management based on the
+> +	  level of support provided by OSPM.The use of _PDC is deprecated in
+> +	  ACPI 3.0 in favor of _OSC.
+
+Is the help actually useful?  This doesn't seem to be user-selectable, does it?
 
 -- 
 I speak only for myself.
