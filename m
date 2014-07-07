@@ -1,26 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Jul 2014 22:23:36 +0200
-Subject: [PATCHv2 19/32] ARM: at91/dt: animeo_ip: define crystals frequencies
+Date: Mon,  7 Jul 2014 22:23:43 +0200
+Subject: [PATCHv2 26/32] ARM: at91/dt: cosino define crystals frequencies
 In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404764629-29136-20-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404764629-29136-27-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Somfy Animeo IP main and slow crystals frequencies.
+Define Cosino boards main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Rodolfo Giometti <giometti@linux.it>
 ---
- arch/arm/boot/dts/animeo_ip.dts | 8 ++++++++
+ arch/arm/boot/dts/at91-cosino.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index 3c4f6d983cbd..4e0ad3b82796 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -40,6 +40,14 @@
+diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
+index df4b78695695..b6ea3f4a7206 100644
+--- a/arch/arm/boot/dts/at91-cosino.dtsi
++++ b/arch/arm/boot/dts/at91-cosino.dtsi
+@@ -34,6 +34,14 @@
  			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <18432000>;
+ 			clock-frequency = <12000000>;
  		};
 +
 +		slow_xtal {
@@ -28,7 +29,7 @@ index 3c4f6d983cbd..4e0ad3b82796 100644
 +		};
 +
 +		main_xtal {
-+			clock-frequency = <18432000>;
++			clock-frequency = <12000000>;
 +		};
  	};
  
