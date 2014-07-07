@@ -1,30 +1,23 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 07 Jul 2014 17:34:56 +0200
-Subject: [PATCH] ARM: EXYNOS: add EXYNOS3250 PMU support
-In-Reply-To: <2031373.hXVBStNvpj@amdc1032>
-References: <2031373.hXVBStNvpj@amdc1032>
-Message-ID: <1807423.y4ukxv9Bv7@amdc1032>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Jul 2014 17:36:41 +0200
+Subject: [PATCH] pinctrl: pinctrl-at91.c: Cleaning up if unsigned is less
+ than zero
+In-Reply-To: <1403782005-9853-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1403782005-9853-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <CACRpkdZBCo9pw4sOiUaFQ2sJG5egEZ_VLekdCZ-PkyaTdL87gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 26, 2014 at 1:26 PM, Rickard Strandqvist
+<rickard_strandqvist@spectrumdigital.se> wrote:
 
-Hi Kukjin,
+> Remove checking if a unsigned is less than zero
+>
+> This was found using a static code analysis program called cppcheck.
+>
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 
-On Monday, June 02, 2014 06:54:07 PM Bartlomiej Zolnierkiewicz wrote:
-> 
-> This is needed for suspend/resume and cpuidle AFTR mode support.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> against next-20140602
+Patch applied. Thanks!
 
-Could this patch be applied for v3.17 please?
-
-[ It still applies fine to next-20140707. ]
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Yours,
+Linus Walleij
