@@ -1,35 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 7 Jul 2014 15:34:47 +0800
-Subject: [PATCH v2 5/8] ARM: sun7i: Add node to represent the DMA
- controller
-In-Reply-To: <1404619518-7592-6-git-send-email-emilio@elopez.com.ar>
+Date: Mon, 7 Jul 2014 15:35:33 +0800
+Subject: [PATCH v2 4/8] ARM: sun5i: Add nodes to represent the DMA
+ controllers
+In-Reply-To: <1404619518-7592-5-git-send-email-emilio@elopez.com.ar>
 References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-6-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAGb2v66WN0nErRhtF5ZEVujf8NycmwZZfU_XVcn=7sxpWO4g2g@mail.gmail.com>
+ <1404619518-7592-5-git-send-email-emilio@elopez.com.ar>
+Message-ID: <CAGb2v67sk1WP+8Zga+SE-ojzy0Q8eEMkwCNruSEYvWZmpWtmZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Jul 6, 2014 at 12:05 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> The A20 SoC has a sun4i-compatible DMA controller. Let's add a node to
-> represent it on the device tree.
+> The A10S and A13 SoCs have sun4i-compatible DMA controllers. Let's add
+> the corresponding nodes to represent them on the device tree.
 >
 > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 > ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 01e9466..8cd3534 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -423,6 +423,14 @@
->                         interrupts = <0 0 4>;
->                 };
+> Note that I have only tested on A10S, if anyone with an A13 device could
+> test as well, that would be great!
+>
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 8 ++++++++
+>  arch/arm/boot/dts/sun5i-a13.dtsi  | 8 ++++++++
+>  2 files changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index b64f705..3708817 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -300,6 +300,14 @@
+>                 #size-cells = <1>;
+>                 ranges;
 >
 > +               dma: dma-controller at 01c02000 {
 > +                       compatible = "allwinner,sun4i-a10-dma";
 > +                       reg = <0x01c02000 0x1000>;
-> +                       interrupts = <0 27 4>;
+> +                       interrupts = <27>;
+> +                       clocks = <&ahb_gates 6>;
+> +                       #dma-cells = <2>;
+> +               };
+> +
+>                 spi0: spi at 01c05000 {
+>                         compatible = "allwinner,sun4i-a10-spi";
+>                         reg = <0x01c05000 0x1000>;
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 3b2a94c..1f1adf2 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -298,6 +298,14 @@
+>                 #size-cells = <1>;
+>                 ranges;
+>
+> +               dma: dma-controller at 01c02000 {
+> +                       compatible = "allwinner,sun4i-a10-dma";
+> +                       reg = <0x01c02000 0x1000>;
+> +                       interrupts = <27>;
 > +                       clocks = <&ahb_gates 6>;
 > +                       #dma-cells = <2>;
 > +               };
