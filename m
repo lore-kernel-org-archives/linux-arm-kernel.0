@@ -1,86 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 7 Jul 2014 23:03:53 +0200
-Subject: [PATCH] micrel phy: fix typo in define, point people to device tree
-Message-ID: <20140707210353.GA29415@amd.pavel.ucw.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 7 Jul 2014 23:12:39 +0200
+Subject: [PATCH v3] s3cmci: port DMA code to dmaengine API
+In-Reply-To: <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
+References: <1401643329-6460-1-git-send-email-anarsoul@gmail.com>
+ <CA+E=qVf2QWk+HxPTjwFK8BkD3C+EGbvLDMM4ro1_nYEThe=LtQ@mail.gmail.com>
+ <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
+Message-ID: <201407072312.40687.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 07 July 2014, Vasily Khoruzhick wrote:
+> On Mon, Jun 30, 2014 at 10:03 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> > On Mon, Jun 23, 2014 at 2:31 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> >>
+> >> On 1 June 2014 20:22:09 Vasily Khoruzhick wrote:
+> >> > Utilise new s3c24xx-dma dmaengine driver for DMA ops.
+> >> >
+> >> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> >> > ---
+> >> > v2: - Don't store async dma descriptor, it's not used
+> >> >     - Request DMA channel via dma_request_slave_channel_compat() and use
+> >> >       hardcoded DMA channel.
+> >> >     - Add dependency on S3C24XX_DMAC (s3cmci uses filter function from it)
+> >> > v3: - Use 'depends' instead of 'select' in Kconfig
+> >> >     - Drop useless controller registers reads from dma completion callback
+> >>
+> >> Ping?
+> >
+> > Ping?
+> 
+> Could anyone tell me through which tree this patch should be merged?
+> I'm pretty sure that I've included everyone from get_maintainer.pl
+> output
+> except LKML, but no response from maintainer so far.
 
-There's typo "SCEW" in some defines, which made my greps fail and
-confused me a lot. Plus, Dinh Nguyen pointed out that direct phy
-accesses from board files should no longer be needed -- device tree
-should be able to configure skew.
+I think you did everything right, Ulf or Chris should really pick up this
+patch. The one thing you could improve is the changeset text which you
+wrote as "Utilise new s3c24xx-dma dmaengine driver for DMA ops." What we
+really need here is an explanation of why we want this, e.g. what problems
+are solved by it etc. I definitely really want this patch as part of 3.17
+so we can enabled multiplatform for the platforms that use this driver.
 
-Signed-off-by: Pavel Machek <pavel@denx.de>
+You should also list the
 
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index 075ec05..528d3ce 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -50,12 +50,15 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
- {
- 	int value;
- 
-+	/* Should probably use dts to configure skew, see 
-+	   micrel-ksz90x1.txt */
-+
- 	/* Set delay values */
--	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000;
-+	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW | 0x8000;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
- 	value = 0xF2F4;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
--	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000;
-+	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW | 0x8000;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
- 	value = 0x2222;
- 	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e60456d..fa6c7ad 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -42,18 +42,19 @@
- /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
- static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- {
-+	/* Should probably use dt to set these, see micrel-ksz90x1.txt */
- 	if (IS_BUILTIN(CONFIG_PHYLIB)) {
- 		/* min rx data delay */
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
--			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW);
-+			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW);
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
- 
- 		/* max rx/tx clock delay, min rx/tx control delay */
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
--			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
-+			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0xf0f0);
- 		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
--			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
-+			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW);
- 	}
- 
- 	return 0;
---- a/include/linux/micrel_phy.h
-+++ b/include/linux/micrel_phy.h
-@@ -38,9 +38,12 @@
- /* struct phy_device dev_flags definitions */
- #define MICREL_PHY_50MHZ_CLK	0x00000001
- 
-+/* These probably should not be exported; see micrel-ksz90x1.txt on
-+   how to configure skew from device tree. */
- #define MICREL_KSZ9021_EXTREG_CTRL	0xB
- #define MICREL_KSZ9021_EXTREG_DATA_WRITE	0xC
--#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW	0x104
--#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW	0x105
-+#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SKEW	0x104
-+#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SKEW	0x105
-+#define MICREL_KSZ9021_RGMII_TX_DATA_PAD_SKEW	0x106
- 
- #endif /* _MICREL_PHY_H */
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
+line under your "Signed-off-by" line.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	Arnd
