@@ -1,32 +1,32 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 7 Jul 2014 14:16:54 -0700
-Subject: [PATCH v2 2/7] arm64: Support restart through restart notifier
- call chain
-In-Reply-To: <1404689900-27421-3-git-send-email-linux@roeck-us.net>
-References: <1404689900-27421-1-git-send-email-linux@roeck-us.net>
- <1404689900-27421-3-git-send-email-linux@roeck-us.net>
-Message-ID: <20140707141654.d7fb9f8839cdf58822cd43b9@linux-foundation.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 08 Jul 2014 01:21:50 +0400
+Subject: [PATCH v4 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
+In-Reply-To: <9076479.78BOG4SjZ9@wuerfel>
+References: <201406242207.32790.sergei.shtylyov@cogentembedded.com>
+ <9076479.78BOG4SjZ9@wuerfel>
+Message-ID: <53BB0F6E.5080600@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  6 Jul 2014 16:38:15 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+Hello.
 
-> The kernel core now supports a notifier call chain to restart
-> the system. Call it if arm_pm_restart is not set.
-> 
-> ...
->
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -174,6 +174,9 @@ void machine_restart(char *cmd)
->  	/* Now call the architecture specific reboot code. */
->  	if (arm_pm_restart)
->  		arm_pm_restart(reboot_mode, cmd);
-> +	else
-> +		blocking_notifier_call_chain(&restart_notifier_list,
-> +					     reboot_mode, cmd);
+On 06/24/2014 10:22 PM, Arnd Bergmann wrote:
 
-It would be a bit neater to have a helper function to perform the call,
-rather than directly accessing the notifier list.  Apart from anything
-else, this hides the fact that the core code (presently!) uses the
-blocking_ style notifiers.
+>>     Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+>> 'renesas-devel-v3.16-rc2-20140623' tag. Here we add PCI USB device tree support
+>> for the R8A7791-based Koelsch and Henninger boards. As the 'pci-rcar-gen2'
+>> driver device tree support has been merged for 3.16, this patchset can now be
+>> merged too...
+
+>> [1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
+>> [2/3] ARM: shmobile: koelsch: enable internal PCI
+>> [3/3] ARM: shmobile: henninger: enable internal PCI
+
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+    Simon, what's up with this series? You've merged analogous series for 
+R8A7790 but not this one. You followed up to an older version of it, asking me 
+to re-post when the driver patch gets merged but it already had been merged 
+already (and this version posted), and I got no reply from you then...
+
+WBR, Sergei
