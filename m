@@ -1,47 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Jul 2014 13:05:52 +0100
-Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU advertises
- it has exclusives
-In-Reply-To: <20140707111712.GZ21766@n2100.arm.linux.org.uk>
-References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
- <4606711.7KmFAGVNmG@wuerfel>
- <20140704205144.GK21766@n2100.arm.linux.org.uk>
- <5774249.oWoI3gS2oa@wuerfel> <20140707110248.GA32578@arm.com>
- <20140707111712.GZ21766@n2100.arm.linux.org.uk>
-Message-ID: <20140707120552.GB32276@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jul 2014 13:15:13 +0100
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power
+ control setting
+In-Reply-To: <53BA8983.3030803@ti.com>
+References: <3c3a7a4861df01d0163787a9c18f7b7ac821c5b9.1403000372.git.nsekhar@ti.com>
+ <20140617131935.GB9070@saruman.home> <20140701194704.GG13396@saruman.home>
+ <20140702081142.GU28884@atomide.com> <20140707104727.GM28884@atomide.com>
+ <20140707104944.GS3705@n2100.arm.linux.org.uk>
+ <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
+Message-ID: <20140707121512.GT3705@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 12:17:12PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 07, 2014 at 12:02:48PM +0100, Catalin Marinas wrote:
-> > I'm not sure that's the right approach. ARM added the CPUID scheme to
-> > allow the software to check specific features rather than guessing
-> > specific architecture versions. Basically there isn't a clear way to
-> > identify whether your CPU is ARMv6K or ARMv7 from a single ID register
-> > read (you may be able to infer by reading multiple ID regs).
-> > 
-> > I'm now trying to figure out whether the TPIDR registers actually have a
-> > dedicated ID. I think they only come as part of the VMSA version 7 as
-> > identified from ID_MMFR0. The ARM1136 r1p1 TRM states that ID_MMFR0[3:0]
-> > are 0x3 which mean VMSAv7.
+On Mon, Jul 07, 2014 at 05:20:27PM +0530, Sekhar Nori wrote:
+> OMAP4430 had L2 cache controller version r2p0 (per the public TRM) which
+> does not have this register. So unless there is a ROM API that was
+> introduced after OMAP4430, this would not be there even for other
+> OMAP4s. Public TRM of OMAP4470 does not indicate an API for this.
 > 
-> You can't rely on the CPUID registers on 1136, because it doesn't
-> advertise them as being present - the architecture field of MIDR is
-> 0x7, not 0xf.
+> Before creating the patch, I checked with ROM team handling AM437x and
+> they denied an API to write to this register was present in AM437x ROM.
 
-I was hoping they changed it with r1 but looking at the TRM that's not
-the case.
+Okay, so why are we trying to write to this register then...
 
-> So actually, 1136r0 is the architecturally correct version, and 1136r1
-> is the slightly cocked up non-standard version where we have to be careful
-> how we treat it.
+Ah, we have a bug in cache-l2x0.c:
 
-Yes. Looking at ARM1176, it seems to be using the full CPUID scheme and
-reporting VMSAv7. So I guess we can safely assume TLS presence if VMSAv7
-(actually what __get_cpu_architecture checks) or ARM1136 r1+. This would
-be slightly different from the current assumption that TLS is present on
-ARMv6+ except ARM1136r0 but I'm not aware of any other ARMv6 non-CPUID
-processor without TLS (ARM1156 has CPUID and reports PMSAv6).
+#define L2X0_CACHE_ID_PART_MASK         (0xf << 6)
+#define L2X0_CACHE_ID_RTL_MASK          0x3f
+#define L310_CACHE_ID_RTL_R3P0          0x05
+
+        unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+
+        if (rev >= L310_CACHE_ID_RTL_R2P0) {
+...
+        if (rev >= L310_CACHE_ID_RTL_R3P0) {
+                l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+                              base, L310_POWER_CTRL);
+
+So, because we're masking the wrong bits, we end up with these tests
+always succeeding.
+
+So that's a NACK for the original patch, it's the wrong fix.  The
+right fix is to avoid writing this register by fixing the RTL masking.
 
 -- 
-Catalin
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
