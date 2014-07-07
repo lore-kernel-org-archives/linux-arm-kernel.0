@@ -1,82 +1,68 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Jul 2014 07:48:10 +0900
-Subject: [PATCH v6 0/6] Cleanup patches for mach-exynos
-In-Reply-To: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Tue, 08 Jul 2014 07:56:55 +0900
+Subject: [PATCH v6 2/6] ARM: EXYNOS: Move cpufreq and cpuidle device
+ registration to init_machine
+In-Reply-To: <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
 References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53BB23AA.6060105@samsung.com>
+ <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <53BB25B7.6000500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/07/14 12:50, Pankaj Dubey wrote:
-> This series is doing code cleanup under arch/arm/mach-exynos.
-> These patches have been separated from main exynos pmu v4 patch
-> posted here [1].
+> As exynos_cpuidle_init and exynos_cpufreq_init function have just one lines
+> of code for registering platform devices. We can move these lines to
+> exynos_dt_machine_init and delete exynos_cpuidle_init and exynos_cpufreq_init
+> function. This will help in reducing lines of code in exynos.c, making it
+> more cleaner.
 >
-> [1]: https://lkml.org/lkml/2014/5/10/29
+> Suggested-by: Tomasz Figa<t.figa@samsung.com>
+> Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
+> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/mach-exynos/exynos.c |   20 ++++----------------
+>   1 file changed, 4 insertions(+), 16 deletions(-)
 >
-> Changes Since v5:
->   - Rebased on latest for-next of Kukjin Kim's tree.
->   - Using of_machine_is_compatible instead of soc_is_exynos in patch 2.
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index ff60b4c..47170eb 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -171,19 +171,6 @@ static struct platform_device exynos_cpuidle = {
+>   	.id                = -1,
+>   };
 >
-> Changes Since v4:
->   - Rebased on latest for-next of Kukjin Kim's tree.
->   - Removing file path comment from mach-exynos/headsmp.S also.
->   - Removed signed-off-by of Young-Gun Jang<yg1004.jang@samsung.com>,
->     as this id is no more valid. Taking ownership of all his patches.
->   - Separated these patches from main exynos pmu v4 patch series as
->     suggested by Tomasz Figa.
+> -void __init exynos_cpuidle_init(void)
+> -{
+> -	if (soc_is_exynos5440())
+> -		return;
+> -
+> -	platform_device_register(&exynos_cpuidle);
+> -}
+> -
+> -void __init exynos_cpufreq_init(void)
+> -{
+> -	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> -}
+> -
+>   void __iomem *sysram_base_addr;
+>   void __iomem *sysram_ns_base_addr;
 >
-> Changes Since v3:
->   - Addressed build fail issue in exynos.c as reported by Sachin Kamat.
->   - Rebased on top of Sysram patches by Sachin Kamat.
+> @@ -300,10 +287,11 @@ static void __init exynos_dt_machine_init(void)
+>   	if (!IS_ENABLED(CONFIG_SMP))
+>   		exynos_sysram_init();
 >
-> Changes Since v2:
->   - Rebased on top of Daniel Lezcano's Exynos cpuidle refactor patches.
->   - Removed exynos_cpuidle_init and exynos_cpufreq_init code as suggested
->     by Tomasz Figa.
+> -	if (!of_machine_is_compatible("samsung,exynos5420"))
+> -		exynos_cpuidle_init();
+> +	if (!of_machine_is_compatible("samsung,exynos5420") ||
+> +			!of_machine_is_compatible("samsung,exynos5440"))
+> +		platform_device_register(&exynos_cpuidle);
 >
-> Changes Since v1:
->   - Rebased on latest for-next of Kukjin Kim's tree.
->   - Added patch: "Make exynos machine_ops as static".
-> 	For making more cleanup in "mach-exynos/common.h"
-> 	as suggested by Tomasz Figa.
->   - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
->   - Updated patch: Remove file path from comment section
-> 	As suggested by Michel Simek, instead of updating file path
-> 	lets remove them from each file under "mach-exynos".
-> 	Even though Kukjin pointed out that there is similar patch pending from
-> 	Sachin/Tushar but since I could not find I have included this here. If
-> 	I have missed something please point to any existing such patch.
->   - Added patch: Remove "linux/bug.h" from pmu.c.
->   - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+> -	exynos_cpufreq_init();
+> +	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
 >
->
-> Pankaj Dubey (6):
->    ARM: EXYNOS: Make exynos machine_ops as static
->    ARM: EXYNOS: Move cpufreq and cpuidle device registration to
->      init_machine
->    ARM: EXYNOS: Move SYSREG definition into sys-reg specific file
->    ARM: EXYNOS: Remove file path from comment section
->    ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
->    ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
->
->   arch/arm/mach-exynos/common.h              |    8 --------
->   arch/arm/mach-exynos/exynos.c              |   27 ++++++++-------------------
->   arch/arm/mach-exynos/headsmp.S             |    1 -
->   arch/arm/mach-exynos/hotplug.c             |    3 +--
->   arch/arm/mach-exynos/include/mach/map.h    |    3 +--
->   arch/arm/mach-exynos/include/mach/memory.h |    3 +--
->   arch/arm/mach-exynos/platsmp.c             |    3 +--
->   arch/arm/mach-exynos/pm.c                  |    1 +
->   arch/arm/mach-exynos/pm_domains.c          |    8 ++++----
->   arch/arm/mach-exynos/pmu.c                 |    1 -
->   arch/arm/mach-exynos/regs-pmu.h            |    4 ----
->   arch/arm/mach-exynos/regs-sys.h            |   22 ++++++++++++++++++++++
->   12 files changed, 39 insertions(+), 45 deletions(-)
->   create mode 100644 arch/arm/mach-exynos/regs-sys.h
->
-OK, looks good to me, I think we don't need 4/6 patch though :-)
+>   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>   }
 
-I've applied this whole series, thanks.
+This cannot be applied in my tree now....
 
 - Kukjin
