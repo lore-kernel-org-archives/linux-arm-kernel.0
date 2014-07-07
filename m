@@ -1,64 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Jul 2014 16:45:28 +0200
-Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
-In-Reply-To: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
-References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
-Message-ID: <CACRpkdbc=NDmmjLi_FKvXaQ7H6gY+xHWso=Vi=tgubME4JUfyg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon,  7 Jul 2014 16:51:37 +0200
+Subject: [PATCHv2 3/8] ARM: mvebu: ensure CPU clocks are enabled
+In-Reply-To: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404744702-32010-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 1:39 PM, Harini Katakam <harinik@xilinx.com> wrote:
+In the Armada XP SMP support code, we are reading the clock frequency
+of the booting CPU, and use that to assign the same frequency to the
+other CPUs, and we do this while the clocks are disabled.
 
-> From: Harini Katakam <harini.katakam@xilinx.com>
->
-> Add support for GPIO controller used by Xilinx Zynq.
->
-> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->
-> v2 changes:
->  - convert to pm_runtime_force_(suspend|resume)
->  - add pm_runtime_set_active in probe()
->  - also (un)prepare clocks when they are dis-/enabled
->  - add some missing calls to pm_runtime_get()
->  - use pm_runtime_put() instead of sync variant
->  - remove gpio chip in driver remove()
->  - remove redundant type casts
->  - directly use IO helpers
->  - use BIT macro to set/clear bits
->  - migrate to GPIOLIB_IRQCHIP
+However, the CPU clocks are in fact never prepared/enabled, and to
+support cpufreq, we now have two code paths to change the frequency of
+the CPU clocks in the CPU clock driver: one when the clock is enabled
+(dynamic frequency scaling), one when the clock is disabled (adjusting
+the CPU frequency before starting the CPU). In order for this to work,
+the CPU clocks now have to be prepared and enabled after the initial
+synchronization of the clock frequencies is done, so that all future
+rate changes of the CPU clocks will trigger a dynamic frequency
+scaling transition.
 
-This is a great improvement! Only small stuff remains.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/platsmp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> +#include <linux/bitops.h>
-> +#include <linux/clk.h>
-> +#include <linux/gpio.h>
-
-This should be:
-#include <linux/gpio/driver.h>
-
-If that doesn't work ... why?
-
-> +/**
-> + * struct zynq_gpio - gpio device private data structure
-> + * @chip:      instance of the gpio_chip
-> + * @base_addr: base address of the GPIO device
-> + * @irq:       irq associated with the controller
-> + * @clk:       clock resource for this controller
-> + */
-> +struct zynq_gpio {
-> +       struct gpio_chip chip;
-> +       void __iomem *base_addr;
-> +       int irq;
-
-Why is irq kept around in this struct? It looks like it could just
-be a local variable in probe()?
-
-> +       struct clk *clk;
-> +};
-
-Apart from that this nitpicking the driver looks very nice.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 88b976b3..4880b0f 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -67,6 +67,7 @@ static void __init set_secondary_cpus_clock(void)
+ 		if (!cpu_clk)
+ 			return;
+ 		clk_set_rate(cpu_clk, rate);
++		clk_prepare_enable(cpu_clk);
+ 	}
+ }
+ 
+-- 
+2.0.0
