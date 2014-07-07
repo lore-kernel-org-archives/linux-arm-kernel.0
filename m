@@ -1,56 +1,47 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 7 Jul 2014 12:12:52 +0100
-Subject: [PATCH v8 0/9] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
-Message-ID: <20140707111252.GQ6501@e106497-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Jul 2014 12:17:12 +0100
+Subject: [PATCH 4/4] ARM: hwcap: disable HWCAP_SWP if the CPU
+ advertises it has exclusives
+In-Reply-To: <20140707110248.GA32578@arm.com>
+References: <20140704195134.GJ21766@n2100.arm.linux.org.uk>
+ <4606711.7KmFAGVNmG@wuerfel> <20140704205144.GK21766@n2100.arm.linux.org.uk>
+ <5774249.oWoI3gS2oa@wuerfel> <20140707110248.GA32578@arm.com>
+Message-ID: <20140707111712.GZ21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 06, 2014 at 04:23:43PM +0100, Rob Herring wrote:
-> On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > This is my resurected attempt at adding support for generic PCI host
-> > bridge controllers that make use of device tree information to
-> > configure themselves. I've tagged it as v8 although the patches
-> > have now been reshuffled in order to ease adoption so referring to
-> > the older versions might be a bit of a hoop jumping exercise.
-> >
-> > Changes from v7:
-> >   - Reordered the patches so that fixes and non-controversial patches
-> >     from v7 can be accepted more easily. If agreed I can split the
-> >     series again into patches that can be upstreamed easily and ones
-> >     that still need discussion.
-> >   - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
-> >     to better reflect its target use.
-> >   - Added the function to remap the bus I/O resources that used to be
-> >     provided in my arm64 patch series and (re)named it pci_remap_iospace()
-> >   - Removed error code checking from parsing and mapping of IRQ from DT
-> >     in recognition that some PCI devices will not have legacy IRQ mappings.
-> >
-> > v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
+On Mon, Jul 07, 2014 at 12:02:48PM +0100, Catalin Marinas wrote:
+> I'm not sure that's the right approach. ARM added the CPUID scheme to
+> allow the software to check specific features rather than guessing
+> specific architecture versions. Basically there isn't a clear way to
+> identify whether your CPU is ARMv6K or ARMv7 from a single ID register
+> read (you may be able to infer by reading multiple ID regs).
 > 
-> Can you publish a branch for this series please.
+> I'm now trying to figure out whether the TPIDR registers actually have a
+> dedicated ID. I think they only come as part of the VMSA version 7 as
+> identified from ID_MMFR0. The ARM1136 r1p1 TRM states that ID_MMFR0[3:0]
+> are 0x3 which mean VMSAv7.
 
-Do you want a branch that has the series as publised (+the one obvious miss
-on the header include) or a branch that has the comments rolled in, but is
-is not published yet as I'm waiting on answers from Bjorn regarding domain
-number handling?
+You can't rely on the CPUID registers on 1136, because it doesn't
+advertise them as being present - the architecture field of MIDR is
+0x7, not 0xf.
 
-Best regards,
-Liviu
+What we know is that if it has the MPIDR, then it must be ARMv6K (the
+ARM tells us that.)  Where there is a hole is where a CPU is ARMv6K
+but does not have the MPIDR, in which case we fall back to treating it
+as a plain ARMv6. I don't think that can be worked around for the reason
+you state above - there isn't a way to reliably identify the two apart.
 
-> 
-> Rob
-> 
+It looks like 1136r1 falls into that category.  It didn't have to had
+the MIDR had been updated to indicate the presence of the CPUID scheme.
+It should be noted that the 1136r1 CPUID registers don't quite have the
+same definition as those specified by the ARM ARM (irrespective of the
+version of the ARM ARM.)
+
+So actually, 1136r0 is the architecturally correct version, and 1136r1
+is the slightly cocked up non-standard version where we have to be careful
+how we treat it.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
