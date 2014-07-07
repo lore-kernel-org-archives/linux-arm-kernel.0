@@ -1,33 +1,106 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 07 Jul 2014 10:53:11 +0900
-Subject: [PATCH] ARM: Use 'model' property to set machine_name from Device Tree
-Message-ID: <1404697991-32191-1-git-send-email-cw00.choi@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 7 Jul 2014 10:53:51 +0800
+Subject: [PATCH] ARM: imx: fix shared gate clock
+Message-ID: <1404701631-13870-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch use 'model' property from Device Tree to set machine_name.
-The arm64 has already got the machine_name from Device Tree.
+Let's say clock A and B are two gate clocks that share the same register
+bit in hardware.  Therefore they are registered as shared gate clocks
+with imx_clk_gate2_shared().
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+In a scenario that only clock A is enabled by clk_enable(A) while B is
+not used, the shared gate will be unexpectedly disabled in hardware.
+It happens because clk_enable(A) increments the share_count from 0 to 1,
+while clock B is unused to clock core, and therefore the core function
+will just disable B by calling clk->ops->disable() directly.  The
+consequence of that call is share_count is decremented to 0 and the gate
+is disabled in hardware, even though clock A is still in use.
+
+The patch fixes the issue by initializing the share_count per hardware
+state and returns enable state per share_count from .is_enabled() hook,
+in case it's a shared gate.
+
+While at it, add a check in clk_gate2_disable() to ensure it's never
+called with a zero share_count.
+
+Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+Fixes: f9f28cdf2167 ("ARM: imx: add shared gate clock support")
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/kernel/setup.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Fabio,
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 8a16ee5..698616f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -878,7 +878,11 @@ void __init setup_arch(char **cmdline_p)
- 	if (!mdesc)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
-+#if CONFIG_OF
-+	machine_name = of_flat_dt_get_machine_name();
-+#else
- 	machine_name = mdesc->name;
-+#endif
+Per my testing, it fixes the shared gate clock issue you reported.
+But I'd like to get your confirmation before I ask arm-soc folks to
+apply it for 3.16-rc.
+
+Shawn
+
+ arch/arm/mach-imx/clk-gate2.c | 31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+index 4ba587da89d2..84acdfd1d715 100644
+--- a/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-gate2.c
+@@ -67,8 +67,12 @@ static void clk_gate2_disable(struct clk_hw *hw)
  
- 	if (mdesc->reboot_mode != REBOOT_HARD)
- 		reboot_mode = mdesc->reboot_mode;
+ 	spin_lock_irqsave(gate->lock, flags);
+ 
+-	if (gate->share_count && --(*gate->share_count) > 0)
+-		goto out;
++	if (gate->share_count) {
++		if (WARN_ON(*gate->share_count == 0))
++			goto out;
++		else if (--(*gate->share_count) > 0)
++			goto out;
++	}
+ 
+ 	reg = readl(gate->reg);
+ 	reg &= ~(3 << gate->bit_idx);
+@@ -78,19 +82,26 @@ out:
+ 	spin_unlock_irqrestore(gate->lock, flags);
+ }
+ 
+-static int clk_gate2_is_enabled(struct clk_hw *hw)
++static int clk_gate2_reg_is_enabled(void __iomem *reg, u8 bit_idx)
+ {
+-	u32 reg;
+-	struct clk_gate2 *gate = to_clk_gate2(hw);
++	u32 val = readl(reg);
+ 
+-	reg = readl(gate->reg);
+-
+-	if (((reg >> gate->bit_idx) & 1) == 1)
++	if (((val >> bit_idx) & 1) == 1)
+ 		return 1;
+ 
+ 	return 0;
+ }
+ 
++static int clk_gate2_is_enabled(struct clk_hw *hw)
++{
++	struct clk_gate2 *gate = to_clk_gate2(hw);
++
++	if (gate->share_count)
++		return !!(*gate->share_count);
++	else
++		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
++}
++
+ static struct clk_ops clk_gate2_ops = {
+ 	.enable = clk_gate2_enable,
+ 	.disable = clk_gate2_disable,
+@@ -116,6 +127,10 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ 	gate->bit_idx = bit_idx;
+ 	gate->flags = clk_gate2_flags;
+ 	gate->lock = lock;
++
++	/* Initialize share_count per hardware state */
++	if (share_count)
++		*share_count = clk_gate2_reg_is_enabled(reg, bit_idx) ? 1 : 0;
+ 	gate->share_count = share_count;
+ 
+ 	init.name = name;
 -- 
-1.8.0
+1.8.3.2
