@@ -1,45 +1,40 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Wed,  9 Jul 2014 15:22:28 +0900
-Subject: [PATCH v12 7/8] arm64: add pmd_[dirty|mkclean] for THP
-In-Reply-To: <1404886949-17695-1-git-send-email-minchan@kernel.org>
-References: <1404886949-17695-1-git-send-email-minchan@kernel.org>
-Message-ID: <1404886949-17695-8-git-send-email-minchan@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Jul 2014 16:14:17 +0200
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140708104050.GA6501@e106497-lin.cambridge.arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140708001418.GB22939@google.com>
+ <20140708104050.GA6501@e106497-lin.cambridge.arm.com>
+Message-ID: <201407081614.18304.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
-overwrite of the contents since MADV_FREE syscall is called for
-THP page.
+On Tuesday 08 July 2014, Liviu Dudau wrote:
+> > Here's what these look like in /proc/iomem and /proc/ioports (note that
+> > there are two resource structs for each memory-mapped IO port space: one
+> > IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
+> > driver), and one IORESOURCE_IO for the I/O port space (this becomes the
+> > parent of a region used by a regular device driver):
+> > 
+> >   /proc/iomem:
+> >     PCI Bus 0000:00 I/O Ports 00000000-00000fff
+> >     PCI Bus 0001:00 I/O Ports 01000000-01000fff
+> > 
+> >   /proc/ioports:
+> >     00000000-00000fff : PCI Bus 0000:00
+> >     01000000-01000fff : PCI Bus 0001:00
+> 
+> OK, I have a question that might be ovbious to you but I have missed the answer
+> so far: how does the IORESOURCE_MEM area gets created? Is it the host bridge
+> driver's job to do it? Is it something that the framework should do when it
+> notices that the IORESOURCE_IO is memory mapped?
 
-This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
-support.
+The host bridge driver should either register the IORESOURCE_MEM resource
+itself from its probe or setup function, or it should get registered behind
+the covers in drivers using of_create_pci_host_bridge().
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Minchan Kim <minchan@kernel.org>
----
- arch/arm64/include/asm/pgtable.h | 2 ++
- 1 file changed, 2 insertions(+)
+Your new pci_host_bridge_of_get_ranges already loops over all the 
+resources, so it would be a good place to put that.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 579702086488..f3ec01cef04f 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -240,10 +240,12 @@ static inline pmd_t pte_pmd(pte_t pte)
- #endif
- 
- #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
-+#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
- #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
- #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
- #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
- #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
-+#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
- #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
- #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
- #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
--- 
-2.0.0
+	Arnd
