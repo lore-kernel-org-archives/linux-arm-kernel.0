@@ -1,132 +1,128 @@
-From: amartin@nvidia.com (Allen Martin)
-Date: Tue, 8 Jul 2014 12:14:20 -0700
-Subject: [PATCH] arm64: Get the number of bits in ASID from the CPU
-Message-ID: <1404846860-15055-1-git-send-email-amartin@nvidia.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 08 Jul 2014 12:46:34 -0700
+Subject: [RFC PATCH 2/3] arm64: add C struct definition for Image header
+In-Reply-To: <1404823803-7317-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1404823803-7317-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1404848794.26155.31.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Van Brunt <avanbrunt@nvidia.com>
+Hi Ard,
 
-Instead of hard coding the number of ASID bits to 16, read the value
-from the CPU through the register ID_AA64MMFR0_EL1 at boot time.  This
-is required on Tegra132 Denver CPU which implements 8 bits.
+On Tue, 2014-07-08 at 14:50 +0200, Ard Biesheuvel wrote:
+> In order to be able to interpret the Image header from C code, we need a
+> struct definition that reflects the specification for Image headers as laid
+> out in Documentation/arm64/booting.txt.
 
-Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
-Signed-off-by: Allen Martin <amartin@nvidia.com>
-Reviewed-by: Peng Du <pdu@nvidia.com>
-Reviewed-by: Bo Yan <byan@nvidia.com>
----
- arch/arm64/include/asm/mmu_context.h |  4 ++--
- arch/arm64/kernel/setup.c            | 13 ++++++++++++-
- arch/arm64/mm/context.c              | 13 ++++++-------
- 3 files changed, 20 insertions(+), 10 deletions(-)
+I think the duplication of the structure definition in booting.txt
+and in image_hdr.h will not be maintained, so I recommend we remove
+the definition in booting.txt and replace it with something like:
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index a9eee33dfa62..ddd78cad98a5 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -28,7 +28,7 @@
- #include <asm/cputype.h>
- #include <asm/pgtable.h>
+-The decompressed kernel image contains a 64-byte header as follows:
+...
++The decompressed kernel image contains a 64-byte header as described in
++arch/arm64/include/asm/image_hdr.h.
+
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/image_hdr.h | 53 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/image_hdr.h
+> 
+> diff --git a/arch/arm64/include/asm/image_hdr.h b/arch/arm64/include/asm/image_hdr.h
+> new file mode 100644
+> index 000000000000..16d32600fb18
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/image_hdr.h
+> @@ -0,0 +1,53 @@
+> +/*
+> + * image_hdr.h - C struct definition of the Image header format
+> + *
+> + * Copyright (C) 2014 Linaro Ltd  <ard.biesheuvel@linaro.org>
+
+Are you really a copyright holder of this code?
+
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_IMAGE_HDR_H
+> +#define __ASM_IMAGE_HDR_H
+> +
+> +#include <linux/bug.h>
+> +#include <linux/byteorder/generic.h>
+> +#include <linux/types.h>
+> +
+> +/*
+> + * As defined in Documentation/arm64/booting.txt
+> + */
+> +#define IMAGE_HDR_SIZE		64
+
+I can't see any use for this IMAGE_HDR_SIZE.  We have the
+structure def, so use sizeof.
+
+
+Please add a comment here to document this structure and the
+members, not in the structure itself.  Something like:
+
++/**
++ * struct arm64_image_header - arm64 kernel image header.
++ *
++ * @code0: ...
+
+> +
+> +struct image_hdr {
+
+Since this is a global def, and possibly exported to user space,
+I think arm64_image_hdr would be more appropriate.
+
+> +	u32	code0;		/* Executable code */
+> +	u32	code1;		/* Executable code */
+> +	__le64	text_offset;	/* Image load offset */
+> +	u64	res0;		/* Reserved, must be 0 */
+> +	u64	res1;		/* Reserved, must be 0 */
+> +	u64	res2;		/* Reserved, must be 0 */
+> +	u64	res3;		/* Reserved, must be 0 */
+> +	u64	res4;		/* Reserved, must be 0 */
+> +	__le32	magic;		/* Magic number, little endian, "ARM\x64" */
+> +	__le32	pehdr_offset;	/* PE header offset, only used by EFI */
+> +};
+
+These are kernel types.  If we used standard C types then this header
+could also be exported for user space programs, so replace u32 with
+uint32_t, etc.  We can use helper routines to like image_hdr_text_offset()
+to wrap the little endian members.
+
+To export it we would need to add this to arch/arm64/include/asm/Kbuild:
+
++header-y += image_hrd.h
+
+> +
+> +/*
+> + * bool image_hdr_check() - checks the Image header for inconsistencies.
+> + */
+> +static inline bool image_hdr_check(struct image_hdr const *hdr)
+
+> +{
+> +	BUILD_BUG_ON(sizeof(struct image_hdr) != IMAGE_HDR_SIZE);
+> +
+> +	if (hdr->res0 | hdr->res1 | hdr->res2 | hdr->res3 | hdr->res4)
+> +		return false;
+
+I don't think we should check these reserved members, as it will limit
+forward compatibility of this routine.  The magic check should be a
+sufficient check.  If it is not, then we need a better magic value.
  
--#define MAX_ASID_BITS	16
-+extern unsigned int max_asid_bits;
- 
- extern unsigned int cpu_last_asid;
- 
-@@ -84,7 +84,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
- 	 */
- 	cpu_set_reserved_ttbr0();
- 
--	if (!((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS))
-+	if (!((mm->context.id ^ cpu_last_asid) >> max_asid_bits))
- 		/*
- 		 * The ASID is from the current generation, just switch to the
- 		 * new pgd. This condition is only true for calls from
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 46d1125571f6..420fb6662309 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -58,6 +58,7 @@
- #include <asm/memblock.h>
- #include <asm/psci.h>
- #include <asm/efi.h>
-+#include <asm/mmu_context.h>
- 
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
-@@ -200,7 +201,7 @@ static void __init smp_build_mpidr_hash(void)
- static void __init setup_processor(void)
- {
- 	struct cpu_info *cpu_info;
--	u64 features, block;
-+	u64 features, block, reg_value;
- 	u32 cwg;
- 	int cls;
- 
-@@ -219,6 +220,16 @@ static void __init setup_processor(void)
- 	sprintf(init_utsname()->machine, ELF_PLATFORM);
- 	elf_hwcap = 0;
- 
-+	/* Read the number of ASID bits */
-+	reg_value = read_cpuid(ID_AA64MMFR0_EL1) & 0xf0;
-+	if (reg_value == 0x00)
-+		max_asid_bits = 8;
-+	else if (reg_value == 0x20)
-+		max_asid_bits = 16;
-+	else
-+		BUG_ON(1);
-+	cpu_last_asid = 1 << max_asid_bits;
-+
- 	/*
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index baa758d37021..fbc4256d66ac 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -30,10 +30,9 @@
- #define asid_bits(reg) \
- 	(((read_cpuid(ID_AA64MMFR0_EL1) & 0xf0) >> 2) + 8)
- 
--#define ASID_FIRST_VERSION	(1 << MAX_ASID_BITS)
--
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
--unsigned int cpu_last_asid = ASID_FIRST_VERSION;
-+unsigned int max_asid_bits;
-+unsigned int cpu_last_asid;
- 
- /*
-  * We fork()ed a process, and we need a new context for the child to run in.
-@@ -66,7 +65,7 @@ static void set_mm_context(struct mm_struct *mm, unsigned int asid)
- 	 * mm->context.id_lock has to be IRQ-safe.
- 	 */
- 	raw_spin_lock_irqsave(&mm->context.id_lock, flags);
--	if (likely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS)) {
-+	if (likely((mm->context.id ^ cpu_last_asid) >> max_asid_bits)) {
- 		/*
- 		 * Old version of ASID found. Set the new one and reset
- 		 * mm_cpumask(mm).
-@@ -123,7 +122,7 @@ void __new_context(struct mm_struct *mm)
- 	 * Check the ASID again, in case the change was broadcast from another
- 	 * CPU before we acquired the lock.
- 	 */
--	if (!unlikely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS)) {
-+	if (!unlikely((mm->context.id ^ cpu_last_asid) >> max_asid_bits)) {
- 		cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
- 		raw_spin_unlock(&cpu_asid_lock);
- 		return;
-@@ -142,9 +141,9 @@ void __new_context(struct mm_struct *mm)
- 	 */
- 	if (unlikely((asid & ((1 << bits) - 1)) == 0)) {
- 		/* increment the ASID version */
--		cpu_last_asid += (1 << MAX_ASID_BITS) - (1 << bits);
-+		cpu_last_asid += (1 << max_asid_bits) - (1 << bits);
- 		if (cpu_last_asid == 0)
--			cpu_last_asid = ASID_FIRST_VERSION;
-+			cpu_last_asid = 1 << max_asid_bits;
- 		asid = cpu_last_asid + smp_processor_id();
- 		flush_context();
- #ifdef CONFIG_SMP
--- 
-1.8.1.5
+> +	return hdr->magic == cpu_to_le32(0x644d5241);
+> +}
+> +
+> +static inline u64 image_hdr_text_offset(struct image_hdr const *hdr)
+> +{
+> +	return le64_to_cpu(hdr->text_offset);
+> +}
+
+-Geoff
