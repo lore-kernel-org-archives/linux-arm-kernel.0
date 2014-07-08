@@ -1,85 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Jul 2014 12:19:52 -0400
-Subject: [PATCH] ARM: dts: keystone: fix netcp's clocks definitions
-In-Reply-To: <1404834184-5411-1-git-send-email-grygorii.strashko@ti.com>
-References: <1404834184-5411-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <53BC1A28.3080608@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 8 Jul 2014 09:21:18 -0700
+Subject: [RFC PATCH 1/3] watchdog: s3c2410: add restart notifier
+In-Reply-To: <53BBFE55.4080202@samsung.com>
+References: <1531376.ijR0PPyvmJ@diego> <10183342.ZfePbPvRx9@diego>
+ <53BBFE55.4080202@samsung.com>
+Message-ID: <20140708162118.GA9157@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 July 2014 11:43 AM, Grygorii Strashko wrote:
-> The clocks tree for Keystone 2 NTCP devices should be
-> defined as following:
-> [refclk] - board dependent
->  |- <papllclk> - PLL clock
->     |- <paclk13> - fixed factor clock div=3 mul=1
->        |- <clkpa> - gated clock
->        |- <clkcpgmac> - gated clock
->        |- <clksa> - gated clock
+On Tue, Jul 08, 2014 at 04:21:09PM +0200, Tomasz Figa wrote:
+> Hi Heiko,
 > 
-> Hence, update Keystone 2 DT to follow HW specification.
+> On 06.07.2014 20:42, Heiko St?bner wrote:
+> > On a lot of Samsung systems the watchdog is responsible for restarting the
+> > system and until now this code was contained in plat-samsung/watchdog-reset.c .
+> > 
+> > With the introduction of the restart notifiers, this code can now move into
+> > driver itself, removing the need for arch-specific code.
+> > 
+> > Tested on a S3C2442 based GTA02
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  drivers/watchdog/s3c2410_wdt.c | 33 +++++++++++++++++++++++++++++++++
+> >  1 file changed, 33 insertions(+)
+> > 
+> > diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> > index 7c6ccd0..3f89912 100644
+> > --- a/drivers/watchdog/s3c2410_wdt.c
+> > +++ b/drivers/watchdog/s3c2410_wdt.c
+> > @@ -41,6 +41,7 @@
+> >  #include <linux/of.h>
+> >  #include <linux/mfd/syscon.h>
+> >  #include <linux/regmap.h>
+> > +#include <linux/reboot.h>
+> >  
+> >  #define S3C2410_WTCON		0x00
+> >  #define S3C2410_WTDAT		0x04
+> > @@ -438,6 +439,31 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
+> >  }
+> >  #endif
+> >  
+> > +static struct s3c2410_wdt *s3c2410wdt_restart_ctx;
 > 
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-Thanks for the patch. Queuing it up for 3.17
+> This isn't the most elegant way to store context data. Maybe you could
+> embed the notifier_block struct into s3c2410_wdt struct and then use
+> container of to retrieve it from s3c2410wdt_restart_notify()?
+> 
+Excellent idea. I'll do that for the moxart handler as well.
 
->  arch/arm/boot/dts/k2e-clocks.dtsi      |    2 +-
->  arch/arm/boot/dts/k2hk-clocks.dtsi     |    2 +-
->  arch/arm/boot/dts/k2l-clocks.dtsi      |    2 +-
->  arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/k2e-clocks.dtsi b/arch/arm/boot/dts/k2e-clocks.dtsi
-> index 90774d6..598afe9 100644
-> --- a/arch/arm/boot/dts/k2e-clocks.dtsi
-> +++ b/arch/arm/boot/dts/k2e-clocks.dtsi
-> @@ -22,7 +22,7 @@ clocks {
->  		#clock-cells = <0>;
->  		compatible = "ti,keystone,pll-clock";
->  		clocks = <&refclkpass>;
-> -		clock-output-names = "pa-pll-clk";
-> +		clock-output-names = "papllclk";
->  		reg = <0x02620358 4>;
->  		reg-names = "control";
->  	};
-> diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
-> index 96e6536..d5adee3 100644
-> --- a/arch/arm/boot/dts/k2hk-clocks.dtsi
-> +++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
-> @@ -31,7 +31,7 @@ clocks {
->  		#clock-cells = <0>;
->  		compatible = "ti,keystone,pll-clock";
->  		clocks = <&refclkpass>;
-> -		clock-output-names = "pa-pll-clk";
-> +		clock-output-names = "papllclk";
->  		reg = <0x02620358 4>;
->  		reg-names = "control";
->  	};
-> diff --git a/arch/arm/boot/dts/k2l-clocks.dtsi b/arch/arm/boot/dts/k2l-clocks.dtsi
-> index f584b80..eb1e3e2 100644
-> --- a/arch/arm/boot/dts/k2l-clocks.dtsi
-> +++ b/arch/arm/boot/dts/k2l-clocks.dtsi
-> @@ -31,7 +31,7 @@ clocks {
->  		#clock-cells = <0>;
->  		compatible = "ti,keystone,pll-clock";
->  		clocks = <&refclksys>;
-> -		clock-output-names = "pa-pll-clk";
-> +		clock-output-names = "papllclk";
->  		reg = <0x02620358 4>;
->  		reg-names = "control";
->  	};
-> diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
-> index 93f82c7..0c334b2 100644
-> --- a/arch/arm/boot/dts/keystone-clocks.dtsi
-> +++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-> @@ -215,7 +215,7 @@ clocks {
->  	clkpa: clkpa {
->  		#clock-cells = <0>;
->  		compatible = "ti,keystone,psc-clock";
-> -		clocks = <&chipclk16>;
-> +		clocks = <&paclk13>;
->  		clock-output-names = "pa";
->  		reg = <0x0235001c 0xb00>, <0x02350008 0x400>;
->  		reg-names = "control", "domain";
-> 
+Guenter
