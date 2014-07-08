@@ -1,64 +1,119 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  8 Jul 2014 12:08:59 +0100
-Subject: [PATCH v3 0/9] arm/arm64: KVM: dynamic VGIC sizing
-Message-ID: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 8 Jul 2014 12:09:24 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140708092100.GA21320@arm.com>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <20140708092100.GA21320@arm.com>
+Message-ID: <20140708110923.GO4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the VGIC data structures have been statically sized, meaning
-that we always have to support more interrupts than we actually want,
-and more CPU interfaces than we should. This is a waste of resource,
-and is the kind of things that should be tuneable.
+On Tue, Jul 08, 2014 at 10:21:00AM +0100, Catalin Marinas wrote:
+> I forgot about this thread. I think we need it sorted in some way.
 
-This series addresses that issue by changing the data structures to be
-dynamically allocated, and adds a new configuration attribute to
-allocate the number of interrupts. When the attribute is not used, we
-fallback to the old behaviour of allocating a fixed number of
-interrupts.
+Agreed.
+ 
+> On Fri, May 23, 2014 at 04:03:31PM +0100, Leif Lindholm wrote:
+> > My view is that this should be fixed in fdt_find_uefi_params(). A
+> > single info message that we can't find evidence of UEFI should be
+> > printed in the non-error case.
+> [...]
+> > diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> > index cd36deb..4bb42e1e 100644
+> > --- a/drivers/firmware/efi/efi.c
+> > +++ b/drivers/firmware/efi/efi.c
+> > @@ -366,11 +366,8 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+> >  
+> >  	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+> >  		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+> > -		if (!prop) {
+> > -			pr_err("Can't find %s in device tree!\n",
+> > -			       dt_params[i].name);
+> > -			return 0;
+> > -		}
+> > +		if (!prop)
+> > +			goto fail;
+> >  		dest = info->params + dt_params[i].offset;
+> >  
+> >  		val = of_read_number(prop, len / sizeof(u32));
+> > @@ -385,6 +382,14 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+> >  				dt_params[i].size * 2, val);
+> >  	}
+> >  	return 1;
+> > +
+> > +	fail:
+> > +	if (i == 0)
+> > +		pr_info("  UEFI not found.\n");
+> > +	else
+> > +		pr_err("Can't find %s in device tree!\n", dt_params[i].name);
+> > +
+> > +	return 0;
+> 
+> I'm ok with the idea but I don't particularly like the implementation.
+> Does this look any better (functionally the same as yours)?
 
-The last patch of the series is a bit out of context, but tends to fit
-well here code-wise. It solves an interesting issue having to do with
-the placement of the GICV interface in Stage-2 when using 64k pages
-(if the HW is not 64k aligned, we need to tell userspace about the
-"sub-page offset" so it can correctly place the guest's GICC
-region). This allows (together with the right userspace fix) to
-correctly boot a guest on a 64k host kernel on a Juno platform.
+It solves the problem, so sure.
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
 
-This series is also the base for Andre Przywara's GICv3 distributor
-emulation code (which can support far more than 8 vcpus and 1020
-interrupts).
-
-This has been tested on both ARM (TC2) and arm64 (model and Juno).
-
-* From v2 [2]
-  - Fixed bug that broke QEMU (register access can trigger allocation)
-  - irq_pending_on_cpu is now dynamic (needed for more than 32 or 64 vcpus)
-  - Rebased on top of Victor's BE patches
-
-* From v1 [1]
-  - Rebased on top of 3.16-rc1
-  - Lots of cleanup
-  
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/005879.html
-[2]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010050.html
-
-Marc Zyngier (9):
-  KVM: ARM: vgic: plug irq injection race
-  arm/arm64: KVM: vgic: switch to dynamic allocation
-  arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
-  arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
-  arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
-  arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
-  arm/arm64: KVM: vgic: delay vgic allocation until init time
-  arm/arm64: KVM: vgic: make number of irqs a configurable attribute
-  arm64: KVM: vgic: deal with GIC sub-page alignment
-
- arch/arm/include/uapi/asm/kvm.h   |   2 +
- arch/arm/kvm/arm.c                |  10 +-
- arch/arm64/include/uapi/asm/kvm.h |   2 +
- include/kvm/arm_vgic.h            |  56 +++---
- virt/kvm/arm/vgic.c               | 390 ++++++++++++++++++++++++++++++++------
- 5 files changed, 368 insertions(+), 92 deletions(-)
-
--- 
-2.0.0
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index eff1a2f22f09..dc79346689e6 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -346,6 +346,7 @@ static __initdata struct {
+>  
+>  struct param_info {
+>  	int verbose;
+> +	int found;
+>  	void *params;
+>  };
+>  
+> @@ -362,16 +363,12 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>  	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
+>  		return 0;
+>  
+> -	pr_info("Getting parameters from FDT:\n");
+> -
+>  	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+>  		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+> -		if (!prop) {
+> -			pr_err("Can't find %s in device tree!\n",
+> -			       dt_params[i].name);
+> +		if (!prop)
+>  			return 0;
+> -		}
+>  		dest = info->params + dt_params[i].offset;
+> +		info->found++;
+>  
+>  		val = of_read_number(prop, len / sizeof(u32));
+>  
+> @@ -390,10 +387,21 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>  int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+>  {
+>  	struct param_info info;
+> +	int ret;
+> +
+> +	pr_info("Getting EFI parameters from FDT:\n");
+>  
+>  	info.verbose = verbose;
+> +	info.found = 0;
+>  	info.params = params;
+>  
+> -	return of_scan_flat_dt(fdt_find_uefi_params, &info);
+> +	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+> +	if (!info.found)
+> +		pr_info("UEFI not found.\n");
+> +	else if (!ret)
+> +		pr_err("Can't find '%s' in device tree!\n",
+> +		       dt_params[info.found].name);
+> +
+> +	return ret;
+>  }
+>  #endif /* CONFIG_EFI_PARAMS_FROM_FDT */
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
