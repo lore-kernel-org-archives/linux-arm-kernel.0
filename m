@@ -1,40 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Jul 2014 21:49:53 -0700
-Subject: [GIT PULL] ARM: versatile: DT IRQ and clock support
-In-Reply-To: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
-References: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
-Message-ID: <20140708044953.GB28931@quad.lixom.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 8 Jul 2014 10:24:24 +0530
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <20140707151024.GJ5582@saruman.home>
+References: <20140617131935.GB9070@saruman.home>
+ <20140701194704.GG13396@saruman.home> <20140702081142.GU28884@atomide.com>
+ <20140707104727.GM28884@atomide.com>
+ <20140707104944.GS3705@n2100.arm.linux.org.uk>
+ <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
+ <20140707121512.GT3705@n2100.arm.linux.org.uk>
+ <20140707123925.GW28884@atomide.com>
+ <20140707134008.GU3705@n2100.arm.linux.org.uk>
+ <20140707151024.GJ5582@saruman.home>
+Message-ID: <53BB7980.2060909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 02:35:18PM -0500, Rob Herring wrote:
-> Arnd, Olof,
+On Monday 07 July 2014 08:40 PM, Felipe Balbi wrote:
+> Hi,
 > 
-> Please pull for 3.17.
+> On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Jul 07, 2014 at 05:39:26AM -0700, Tony Lindgren wrote:
+>>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140707 05:17]:
+>>>> On Mon, Jul 07, 2014 at 05:20:27PM +0530, Sekhar Nori wrote:
+>>>>> OMAP4430 had L2 cache controller version r2p0 (per the public TRM) which
+>>>>> does not have this register. So unless there is a ROM API that was
+>>>>> introduced after OMAP4430, this would not be there even for other
+>>>>> OMAP4s. Public TRM of OMAP4470 does not indicate an API for this.
+>>>>>
+>>>>> Before creating the patch, I checked with ROM team handling AM437x and
+>>>>> they denied an API to write to this register was present in AM437x ROM.
+>>>>
+>>>> Okay, so why are we trying to write to this register then...
+>>>>
+>>>> Ah, we have a bug in cache-l2x0.c:
+>>>>
+>>>> #define L2X0_CACHE_ID_PART_MASK         (0xf << 6)
+>>>> #define L2X0_CACHE_ID_RTL_MASK          0x3f
+>>>> #define L310_CACHE_ID_RTL_R3P0          0x05
+>>>>
+>>>>         unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+>>>>
+>>>>         if (rev >= L310_CACHE_ID_RTL_R2P0) {
+>>>> ...
+>>>>         if (rev >= L310_CACHE_ID_RTL_R3P0) {
+>>>>                 l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+>>>>                               base, L310_POWER_CTRL);
+>>>>
+>>>> So, because we're masking the wrong bits, we end up with these tests
+>>>> always succeeding.
+>>>>
+>>>> So that's a NACK for the original patch, it's the wrong fix.  The
+>>>> right fix is to avoid writing this register by fixing the RTL masking.
+>>>
+>>> Okie dokie, dropping the omap specific fix.
+>>
+>> Here's the revision mask fix - with the existing code, the revision checks
+>> are all useless since they would all pass irrespective of the actual
+>> revision.  (Had the L2C series been better tested rather than being largely
+>> ignored, this may have been noticed before it was merged...)  Anyway, what
+>> isn't clear from Sekhar's message is which revision L2C310 is in the AM437x.
+>>
+>> From: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Subject: [PATCH] ARM: l2c: fix revision checking
+>>
+>> The revision checking in l2c310_enable() was not correct; we were
+>> masking the part number rather than the revision number.  Fix this
+>> to use the correct macro.
+>>
+>> Fixes: 4374d64933b1 ("ARM: l2c: add automatic enable of early BRESP")
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+>>  arch/arm/mm/cache-l2x0.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+>> index 948f12cf6180..0b5068256baf 100644
+>> --- a/arch/arm/mm/cache-l2x0.c
+>> +++ b/arch/arm/mm/cache-l2x0.c
+>> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
+>>  
+>>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>>  {
+>> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+>> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
+>>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
 > 
-> I've tested this on qemu, but still need Linus to test on h/w. He did
-> test an earlier version.
-> 
-> Rob
-> 
-> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
-> 
->   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
-> tags/versatile-for-3.17
-> 
-> for you to fetch changes up to a54c959d8be9d057b1a192e34a378b74dd81c5f6:
-> 
->   clk: versatile: add versatile OSC support (2014-06-24 14:21:22 -0500)
-> 
-> ----------------------------------------------------------------
-> DT IRQ and clock support for Versatile platforms
+> even with this change, l2c still tries to write to power control
+> register, at least on AM437x. Looking a little deeper here, AM437x
+> identifies itself as l2c PL310 r3p3, which should have power control
+> register, but aparentely there's no way to write that register. I'll
+> file a bug to our ROM team, but we will certainly need a way to
+> workaround this inside omap4-common.c
 
-Merged into next/soc, but so far you are the front-runner for the award
-for worst tag description this release.
+Looks like we need both my patch as well as Russell's patch. I can
+respin my patch with the pr_info_once() dropped if it helps further
+reduce boot noise.
 
-
--Olof
+Thanks,
+Sekhar
