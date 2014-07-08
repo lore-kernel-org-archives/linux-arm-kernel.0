@@ -1,104 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Jul 2014 19:33:24 +0200
-Subject: [PATCH v2 01/18] power: reset: Add if statement isntead of
- multiple depends on
-In-Reply-To: <1404743131-24569-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404743131-24569-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404743131-24569-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <53BC2B64.8070502@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Jul 2014 18:39:16 +0100
+Subject: [PATCH] arm64/dma: Flush the coherent mapping in
+ __dma_alloc_noncoherent
+In-Reply-To: <20140707160303.30884.66565.stgit@tlendack-t1.amdoffice.net>
+References: <20140707160303.30884.66565.stgit@tlendack-t1.amdoffice.net>
+Message-ID: <20140708173916.GA14329@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nit-pik: In subject: s/isntead/instead/
+On Mon, Jul 07, 2014 at 05:03:03PM +0100, Tom Lendacky wrote:
+> In 3.15 (-rc3) the default arm64 DMA operations changed from coherent
+> to non-coherent operations. This change broke some devices. The
+> associated devices were specifying AXI domain and cache coherency
+> signals equal to write-back, no-allocate. Given that the non-coherent
+> operations resulted in un-cached operations, the device should have
+> succeeded even with those cache coherency signals (the DMA should not
+> have found anything in cache and went to memory). But this was not the
+> case. Not until the coherent mapping range was flushed did the device
+> work properly.
+> 
+> In __dma_alloc_noncoherent the allocated memory is flushed but
+> the coherent mapping is not.  If a device is performing DMA
+> with non-allocating caching hints (will look in cache, but if
+> not found will go to memory and not allocate a cache entry) this
+> could result in unpredictable results.  So flush the coherent
+> mapping as well.
 
-On 07/07/2014 16:25, Maxime Ripard :
-> All the config option so far are depending on the POWER_RESET symbol
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/power/reset/Kconfig | 17 +++++++++--------
->  1 file changed, 9 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> index bdcf5173e377..19d546c5edfa 100644
-> --- a/drivers/power/reset/Kconfig
-> +++ b/drivers/power/reset/Kconfig
-> @@ -6,15 +6,17 @@ menuconfig POWER_RESET
->  
->  	  Say Y here to enable board reset and power off
->  
-> +if POWER_RESET
-> +
->  config POWER_RESET_AS3722
->  	bool "ams AS3722 power-off driver"
-> -	depends on MFD_AS3722 && POWER_RESET
-> +	depends on MFD_AS3722
->  	help
->  	  This driver supports turning off board via a ams AS3722 power-off.
->  
->  config POWER_RESET_AXXIA
->  	bool "LSI Axxia reset driver"
-> -	depends on POWER_RESET && ARCH_AXXIA
-> +	depends on ARCH_AXXIA
->  	help
->  	  This driver supports restart for Axxia SoC.
->  
-> @@ -22,7 +24,7 @@ config POWER_RESET_AXXIA
->  
->  config POWER_RESET_GPIO
->  	bool "GPIO power-off driver"
-> -	depends on OF_GPIO && POWER_RESET
-> +	depends on OF_GPIO
->  	help
->  	  This driver supports turning off your board via a GPIO line.
->  	  If your board needs a GPIO high/low to power down, say Y and
-> @@ -30,13 +32,13 @@ config POWER_RESET_GPIO
->  
->  config POWER_RESET_MSM
->  	bool "Qualcomm MSM power-off driver"
-> -	depends on POWER_RESET && ARCH_QCOM
-> +	depends on ARCH_QCOM
->  	help
->  	  Power off and restart support for Qualcomm boards.
->  
->  config POWER_RESET_QNAP
->  	bool "QNAP power-off driver"
-> -	depends on OF_GPIO && POWER_RESET && PLAT_ORION
-> +	depends on OF_GPIO && PLAT_ORION
->  	help
->  	  This driver supports turning off QNAP NAS devices by sending
->  	  commands to the microcontroller which controls the main power.
-> @@ -54,14 +56,13 @@ config POWER_RESET_RESTART
->  config POWER_RESET_SUN6I
->  	bool "Allwinner A31 SoC reset driver"
->  	depends on ARCH_SUNXI
-> -	depends on POWER_RESET
->  	help
->  	  Reboot support for the Allwinner A31 SoCs.
->  
->  config POWER_RESET_VEXPRESS
->  	bool "ARM Versatile Express power-off and reset driver"
->  	depends on ARM || ARM64
-> -	depends on POWER_RESET && VEXPRESS_CONFIG
-> +	depends on VEXPRESS_CONFIG
->  	help
->  	  Power off and reset support for the ARM Ltd. Versatile
->  	  Express boards.
-> @@ -69,7 +70,6 @@ config POWER_RESET_VEXPRESS
->  config POWER_RESET_XGENE
->  	bool "APM SoC X-Gene reset driver"
->  	depends on ARM64
-> -	depends on POWER_RESET
->  	help
->  	  Reboot support for the APM SoC X-Gene Eval boards.
->  
-> @@ -80,3 +80,4 @@ config POWER_RESET_KEYSTONE
->  	help
->  	  Reboot support for the KEYSTONE SoCs.
->  
-> +endif
-> 
+The __dma_alloc_noncoherent() function flushes the allocated memory.
+Since the CPU caches are PIPT, the CPU should no longer have any dirty
+cache lines (that's actually the only aim here). Flushing the coherent
+mapping as well does not bring us anything new, just double flushing of
+the same physical address.
 
+Since we don't unmap the cacheable mapping (kernel linear address), the
+CPU could always allocate entries in the cache speculatively. The
+architecture says that the CPU would not hit in such caches, so it's
+fine from the CPU perspective.
+
+In your case, it seems that the device will look into the CPU cache. In
+this case, the device should only use the coherent DMA ops (with
+cacheable mappings). I know we changed the default but you should be
+able to specify in the DT whether your device/bus in 'dma-coherent'. We
+are currently missing a notifier for PCIe to set up the dma ops (but
+mainline arm64 does not support PCIe yet).
+
+(what we do with ACPI I have no idea. Probably always assuming I/O
+coherency)
 
 -- 
-Nicolas Ferre
+Catalin
