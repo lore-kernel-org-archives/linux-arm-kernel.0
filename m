@@ -1,63 +1,38 @@
-From: harinik@xilinx.com (Harini Katakam)
-Date: Tue,  8 Jul 2014 16:32:36 +0530
-Subject: [PATCH v3 2/2] devicetree: Add Zynq GPIO devicetree bindings
- documentation
-In-Reply-To: <1404817356-21568-1-git-send-email-harinik@xilinx.com>
-References: <1404817356-21568-1-git-send-email-harinik@xilinx.com>
-Message-ID: <1404817356-21568-2-git-send-email-harinik@xilinx.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 8 Jul 2014 12:06:53 +0100
+Subject: [Xen-devel] [RFC PATCH 0/2] xen/arm: fix
+ "xen_add_mach_to_phys_entry: cannot add" problem
+In-Reply-To: <53BBCCEF.1080704@citrix.com>
+References: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
+ <53BBCCEF.1080704@citrix.com>
+Message-ID: <1404817613.11945.1.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Harini Katakam <harini.katakam@xilinx.com>
+On Tue, 2014-07-08 at 11:50 +0100, David Vrabel wrote:
+> On 07/07/14 21:24, Stefano Stabellini wrote:
+> > Hi all,
+> > Xen support in Linux for ARM and ARM64 suffers from lack of support for
+> > multiple mfn to pfn mappings: whenever a frontend grants the same page
+> > multiple times to the backend, the mfn to pfn accounting in
+> > arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+> > when xen-netfront/xen-netback switched from grant copies to grant
+> > mappings, therefore causing the issue to happen much more often.
+> > 
+> > Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+> > therefore we are looking for alternative solutions. One idea is avoiding
+> > mfn to pfn conversions altogether. The only code path that needs them is
+> > swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
+> > 
+> > To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+> > Xen, see the attached patch. In Linux we use it to perform the cache
+> > maintenance operations without mfns conversions.
+> 
+> This will only work with PIPT caches (or certain types of VIPT that also
+> have alias detection).  Do all the CPUs that Xen runs on have these type
+> of cache?
 
-Add gpio-zynq bindings documentation.
+v7 (at least, didn't check/don't care about v6) mandates PIPT for data
+caches, yes.
 
-Signed-off-by: Harini Katakam <harinik@xilinx.com>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-
-v3 changes:
-Change description of #gpio-cells - use 'gpio-line' instead of 'pin'
-
-v2 changes:
-Improve description.
-
----
- .../devicetree/bindings/gpio/gpio-zynq.txt         |   26 ++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-zynq.txt
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-zynq.txt b/Documentation/devicetree/bindings/gpio/gpio-zynq.txt
-new file mode 100644
-index 0000000..986371a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-zynq.txt
-@@ -0,0 +1,26 @@
-+Xilinx Zynq GPIO controller Device Tree Bindings
-+-------------------------------------------
-+
-+Required properties:
-+- #gpio-cells 		: Should be two
-+			  - First cell is the GPIO line number
-+			  - Second cell is used to specify optional
-+			    parameters (unused)
-+- compatible		: Should be "xlnx,zynq-gpio-1.0"
-+- clocks		: Clock specifier (see clock bindings for details)
-+- gpio-controller	: Marks the device node as a GPIO controller.
-+- interrupts		: Interrupt specifier (see interrupt bindings for
-+			  details)
-+- interrupt-parent	: Must be core interrupt controller
-+- reg			: Address and length of the register set for the device
-+
-+Example:
-+	gpio at e000a000 {
-+		#gpio-cells = <2>;
-+		compatible = "xlnx,zynq-gpio-1.0";
-+		clocks = <&clkc 42>;
-+		gpio-controller;
-+		interrupt-parent = <&intc>;
-+		interrupts = <0 20 4>;
-+		reg = <0xe000a000 0x1000>;
-+	};
--- 
-1.7.9.5
+Ian.
