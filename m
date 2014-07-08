@@ -1,117 +1,55 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Jul 2014 23:45:29 +0100
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140708212951.GA4555@google.com>
+Date: Tue, 8 Jul 2014 23:48:47 +0100
+Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
- <20140708001418.GB22939@google.com>
- <201407080900.44882.arnd@arndb.de>
- <20140708212951.GA4555@google.com>
-Message-ID: <20140708224529.GB4980@e106497-lin.cambridge.arm.com>
+ <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
+ <20140708005954.GC22939@google.com>
+ <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
+ <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
+Message-ID: <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 10:29:51PM +0100, Bjorn Helgaas wrote:
-> On Tue, Jul 8, 2014 at 1:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 08 July 2014, Bjorn Helgaas wrote:
-> >> On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
-> >> > +static LIST_HEAD(io_range_list);
-> >> > +
-> >> > +/*
-> >> > + * Record the PCI IO range (expressed as CPU physical address + size).
-> >> > + * Return a negative value if an error has occured, zero otherwise
-> >> > + */
-> >> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+On Tue, Jul 08, 2014 at 07:41:50PM +0100, Bjorn Helgaas wrote:
+> On Tue, Jul 8, 2014 at 4:46 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Tue, Jul 08, 2014 at 01:59:54AM +0100, Bjorn Helgaas wrote:
+> 
+> >> I wonder if it would help to make a weak pci_domain_nr() function that
+> >> returns "bridge->domain_nr".  Then each arch could individually drop its
+> >> pci_domain_nr() definition as it was converted, e.g., something like this:
 > >>
-> >> I don't understand the interface here.  What's the mapping from CPU
-> >> physical address to bus I/O port?  For example, I have the following
-> >> machine in mind:
-> >>
-> >>   HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
-> >>   HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
-> >>   HWP0002:00: host bridge window [io  0x0000-0x0fff]
-> >>
-> >>   HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
-> >>   HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
-> >>   HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
-> >>
-> >> The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
-> >> the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
-> >> e.g., "inb(0)" to access it.
-> >>
-> >> Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
-> >> bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
-> >> "inb(0x1000000)" to access it.
+> >>   - Convert every arch pci_domain_nr() from a #define to a non-inline
+> >>     function
+> >>   - Add bridge.domain_nr, initialized from pci_domain_nr()
+> >>   - Add a weak generic pci_domain_nr() that returns bridge.domain_nr
+> >>   - Add a way to create a host bridge in a specified domain, so we can
+> >>     initialize bridge.domain_nr without using pci_domain_nr()
+> >>   - Convert each arch to use the new creation mechanism and drop its
+> >>     pci_domain_nr() implementation
 > >
-> > I guess you are thinking of the IA64 model here where you keep the virtual
-> > I/O port numbers in a per-bus lookup table that gets accessed for each
-> > inb() call. I've thought about this some more, and I believe there are good
-> > reasons for sticking with the model used on arm32 and powerpc for the
-> > generic OF implementation.
-> >
-> > The idea is that there is a single virtual memory range for all I/O port
-> > mappings and we use the MMU to do the translation rather than computing
-> > it manually in the inb() implemnetation. The main advantage is that all
-> > functions used in device drivers to (potentially) access I/O ports
-> > become trivial this way, which helps for code size and in some cases
-> > (e.g. SoC-internal registers with a low latency) it may even be performance
-> > relevant.
+> > I will try to propose a patch implementing this.
 > 
-> My example is from ia64, but I'm not advocating for the lookup table.
-> The point is that the hardware works similarly (at least for dense ia64
-> I/O port spaces) in terms of mapping CPU physical addresses to PCI I/O
-> space.
-> 
-> I think my confusion is because your pci_register_io_range() and
-> pci_addess_to_pci() implementations assume that every io_range starts at
-> I/O port 0 on PCI (correct me if I'm wrong).  I suspect that's why you
-> don't save the I/O port number in struct io_range.
-> 
-> Maybe that assumption is guaranteed by OF, but it doesn't hold for ACPI;
-> ACPI can describe several I/O port apertures for a single bridge, each
-> associated with a different CPU physical memory region.
+> I think this is more of an extra credit, cleanup sort of thing.  I
+> don't think it advances your primary goal of (I think) getting arm64
+> PCI support in.  So my advice is to not worry about unifying domain
+> handling until later.
 
-That is actually a good catch, I've completely missed the fact that
-io_range->pci_addr could be non-zero.
-
-> 
-> If my speculation here is correct, a comment to the effect that each
-> io_range corresponds to a PCI I/O space range that starts at 0 might be
-> enough.
-> 
-> If you did add a PCI I/O port number argument to pci_register_io_range(),
-> we might be able to make an ACPI-based implementation of it.  But I guess
-> that could be done if/when anybody ever wants to do that.
-
-No, I think you are right, the PCI I/O port number needs to be recorded. I
-need to add that to pci_register_io_range().
-
-> 
-> >> Here's what these look like in /proc/iomem and /proc/ioports (note that
-> >> there are two resource structs for each memory-mapped IO port space: one
-> >> IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
-> >> driver), and one IORESOURCE_IO for the I/O port space (this becomes the
-> >> parent of a region used by a regular device driver):
-> >>
-> >>   /proc/iomem:
-> >>     PCI Bus 0000:00 I/O Ports 00000000-00000fff
-> >>     PCI Bus 0001:00 I/O Ports 01000000-01000fff
-> 
-> Oops, I forgot the actual physical memory addresses here, but you got
-> the idea anyway.  It should have been something like this:
-> 
->   /proc/iomem:
->     f8010000000-f8010000fff PCI Bus 0000:00 I/O Ports 00000000-00000fff
->     f8110000000-f8110000fff PCI Bus 0001:00 I/O Ports 01000000-01000fff
-> 
-> Bjorn
-> 
-
-Thanks for being thorough with your review.
+Getting arm64 supported *is* my main goal. But like you have stated in your
+review of v7, you wanted to see another architecture converted as a guarantee
+of "genericity" (for lack of a better word) for my patches. The one architecture
+I've set my eyes on is microblaze, and that one uses pci_scan_root_bus()
+rather than pci_create_root_bus() so I don't have any opportunity to pass the
+domain number or any additional info (like the sysdata pointer that we were
+talking about) to the pci_host_bridge structure unless I do this cleanup.
 
 Best regards,
 Liviu
+
+
+> 
+> Bjorn
+> 
 
 -- 
 ====================
