@@ -1,163 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 8 Jul 2014 22:59:04 +0200
-Subject: [RFC PATCH 2/3] arm64: add C struct definition for Image header
-In-Reply-To: <1404848794.26155.31.camel@smoke>
-References: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404823803-7317-2-git-send-email-ard.biesheuvel@linaro.org>
- <1404848794.26155.31.camel@smoke>
-Message-ID: <CAKv+Gu8Qa86N7OSWXTp7XjJvPVa6_rKE_mnMBLJKWjoaabeH+A@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 8 Jul 2014 15:29:51 -0600
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <201407080900.44882.arnd@arndb.de>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140708001418.GB22939@google.com>
+ <201407080900.44882.arnd@arndb.de>
+Message-ID: <20140708212951.GA4555@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 July 2014 21:46, Geoff Levand <geoff@infradead.org> wrote:
-> Hi Ard,
->
-> On Tue, 2014-07-08 at 14:50 +0200, Ard Biesheuvel wrote:
->> In order to be able to interpret the Image header from C code, we need a
->> struct definition that reflects the specification for Image headers as laid
->> out in Documentation/arm64/booting.txt.
->
-> I think the duplication of the structure definition in booting.txt
-> and in image_hdr.h will not be maintained, so I recommend we remove
-> the definition in booting.txt and replace it with something like:
->
-> -The decompressed kernel image contains a 64-byte header as follows:
-> ...
-> +The decompressed kernel image contains a 64-byte header as described in
-> +arch/arm64/include/asm/image_hdr.h.
->
->
-
-I see what you mean, but I will let the maintainers decide on that one.
-
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/image_hdr.h | 53 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 53 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/image_hdr.h
+On Tue, Jul 8, 2014 at 1:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 July 2014, Bjorn Helgaas wrote:
+>> On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
+>> > +static LIST_HEAD(io_range_list);
+>> > +
+>> > +/*
+>> > + * Record the PCI IO range (expressed as CPU physical address + size).
+>> > + * Return a negative value if an error has occured, zero otherwise
+>> > + */
+>> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
 >>
->> diff --git a/arch/arm64/include/asm/image_hdr.h b/arch/arm64/include/asm/image_hdr.h
->> new file mode 100644
->> index 000000000000..16d32600fb18
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/image_hdr.h
->> @@ -0,0 +1,53 @@
->> +/*
->> + * image_hdr.h - C struct definition of the Image header format
->> + *
->> + * Copyright (C) 2014 Linaro Ltd  <ard.biesheuvel@linaro.org>
+>> I don't understand the interface here.  What's the mapping from CPU
+>> physical address to bus I/O port?  For example, I have the following
+>> machine in mind:
+>>
+>>   HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
+>>   HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
+>>   HWP0002:00: host bridge window [io  0x0000-0x0fff]
+>>
+>>   HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
+>>   HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
+>>   HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
+>>
+>> The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
+>> the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
+>> e.g., "inb(0)" to access it.
+>>
+>> Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
+>> bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
+>> "inb(0x1000000)" to access it.
 >
-> Are you really a copyright holder of this code?
+> I guess you are thinking of the IA64 model here where you keep the virtual
+> I/O port numbers in a per-bus lookup table that gets accessed for each
+> inb() call. I've thought about this some more, and I believe there are good
+> reasons for sticking with the model used on arm32 and powerpc for the
+> generic OF implementation.
 >
+> The idea is that there is a single virtual memory range for all I/O port
+> mappings and we use the MMU to do the translation rather than computing
+> it manually in the inb() implemnetation. The main advantage is that all
+> functions used in device drivers to (potentially) access I/O ports
+> become trivial this way, which helps for code size and in some cases
+> (e.g. SoC-internal registers with a low latency) it may even be performance
+> relevant.
 
-I am the author of this file. Will is the author of booting.txt. I am
-not a lawyer so whether that makes Linaro a copyright holder, I am not
-sure ...
-But as I understand it, someone needs to claim copyright in order for
-others to be bound to the license.
+My example is from ia64, but I'm not advocating for the lookup table.
+The point is that the hardware works similarly (at least for dense ia64
+I/O port spaces) in terms of mapping CPU physical addresses to PCI I/O
+space.
 
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef __ASM_IMAGE_HDR_H
->> +#define __ASM_IMAGE_HDR_H
->> +
->> +#include <linux/bug.h>
->> +#include <linux/byteorder/generic.h>
->> +#include <linux/types.h>
->> +
->> +/*
->> + * As defined in Documentation/arm64/booting.txt
->> + */
->> +#define IMAGE_HDR_SIZE               64
->
-> I can't see any use for this IMAGE_HDR_SIZE.  We have the
-> structure def, so use sizeof.
->
+I think my confusion is because your pci_register_io_range() and
+pci_addess_to_pci() implementations assume that every io_range starts at
+I/O port 0 on PCI (correct me if I'm wrong).  I suspect that's why you
+don't save the I/O port number in struct io_range.
 
-I am using it in the BUILD_BUG_ON() below. Do you think that is overkill?
+Maybe that assumption is guaranteed by OF, but it doesn't hold for ACPI;
+ACPI can describe several I/O port apertures for a single bridge, each
+associated with a different CPU physical memory region.
 
->
-> Please add a comment here to document this structure and the
-> members, not in the structure itself.  Something like:
->
-> +/**
-> + * struct arm64_image_header - arm64 kernel image header.
-> + *
-> + * @code0: ...
->
+If my speculation here is correct, a comment to the effect that each
+io_range corresponds to a PCI I/O space range that starts at 0 might be
+enough.
 
-Is this coding style documented somewhere? Documentation/CodingStyle
-does not seem to cover it ...
+If you did add a PCI I/O port number argument to pci_register_io_range(),
+we might be able to make an ACPI-based implementation of it.  But I guess
+that could be done if/when anybody ever wants to do that.
 
->> +
->> +struct image_hdr {
->
-> Since this is a global def, and possibly exported to user space,
-> I think arm64_image_hdr would be more appropriate.
->
+>> Here's what these look like in /proc/iomem and /proc/ioports (note that
+>> there are two resource structs for each memory-mapped IO port space: one
+>> IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
+>> driver), and one IORESOURCE_IO for the I/O port space (this becomes the
+>> parent of a region used by a regular device driver):
+>>
+>>   /proc/iomem:
+>>     PCI Bus 0000:00 I/O Ports 00000000-00000fff
+>>     PCI Bus 0001:00 I/O Ports 01000000-01000fff
 
-Agreed.
+Oops, I forgot the actual physical memory addresses here, but you got
+the idea anyway.  It should have been something like this:
 
->> +     u32     code0;          /* Executable code */
->> +     u32     code1;          /* Executable code */
->> +     __le64  text_offset;    /* Image load offset */
->> +     u64     res0;           /* Reserved, must be 0 */
->> +     u64     res1;           /* Reserved, must be 0 */
->> +     u64     res2;           /* Reserved, must be 0 */
->> +     u64     res3;           /* Reserved, must be 0 */
->> +     u64     res4;           /* Reserved, must be 0 */
->> +     __le32  magic;          /* Magic number, little endian, "ARM\x64" */
->> +     __le32  pehdr_offset;   /* PE header offset, only used by EFI */
->> +};
->
-> These are kernel types.  If we used standard C types then this header
-> could also be exported for user space programs, so replace u32 with
-> uint32_t, etc.  We can use helper routines to like image_hdr_text_offset()
-> to wrap the little endian members.
->
+  /proc/iomem:
+    f8010000000-f8010000fff PCI Bus 0000:00 I/O Ports 00000000-00000fff
+    f8110000000-f8110000fff PCI Bus 0001:00 I/O Ports 01000000-01000fff
 
-I see how that would be useful.
-
-> To export it we would need to add this to arch/arm64/include/asm/Kbuild:
->
-> +header-y += image_hrd.h
->
->> +
->> +/*
->> + * bool image_hdr_check() - checks the Image header for inconsistencies.
->> + */
->> +static inline bool image_hdr_check(struct image_hdr const *hdr)
->
->> +{
->> +     BUILD_BUG_ON(sizeof(struct image_hdr) != IMAGE_HDR_SIZE);
->> +
->> +     if (hdr->res0 | hdr->res1 | hdr->res2 | hdr->res3 | hdr->res4)
->> +             return false;
->
-> I don't think we should check these reserved members, as it will limit
-> forward compatibility of this routine.  The magic check should be a
-> sufficient check.  If it is not, then we need a better magic value.
->
-
-If exporting to user space, I agree.
-
->> +     return hdr->magic == cpu_to_le32(0x644d5241);
->> +}
-
-Perhaps I should use a define here ...
-
->> +
->> +static inline u64 image_hdr_text_offset(struct image_hdr const *hdr)
->> +{
->> +     return le64_to_cpu(hdr->text_offset);
->> +}
->
-
-Thanks Geoff.
-
--- 
-Ard.
+Bjorn
