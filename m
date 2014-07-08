@@ -1,51 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Jul 2014 18:39:16 +0100
-Subject: [PATCH] arm64/dma: Flush the coherent mapping in
- __dma_alloc_noncoherent
-In-Reply-To: <20140707160303.30884.66565.stgit@tlendack-t1.amdoffice.net>
-References: <20140707160303.30884.66565.stgit@tlendack-t1.amdoffice.net>
-Message-ID: <20140708173916.GA14329@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 8 Jul 2014 10:47:16 -0700
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+ <20140707004417.GE8469@quad.lixom.net>
+ <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+Message-ID: <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 05:03:03PM +0100, Tom Lendacky wrote:
-> In 3.15 (-rc3) the default arm64 DMA operations changed from coherent
-> to non-coherent operations. This change broke some devices. The
-> associated devices were specifying AXI domain and cache coherency
-> signals equal to write-back, no-allocate. Given that the non-coherent
-> operations resulted in un-cached operations, the device should have
-> succeeded even with those cache coherency signals (the DMA should not
-> have found anything in cache and went to memory). But this was not the
-> case. Not until the coherent mapping range was flushed did the device
-> work properly.
-> 
-> In __dma_alloc_noncoherent the allocated memory is flushed but
-> the coherent mapping is not.  If a device is performing DMA
-> with non-allocating caching hints (will look in cache, but if
-> not found will go to memory and not allocate a cache entry) this
-> could result in unpredictable results.  So flush the coherent
-> mapping as well.
+On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
+>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+>> > This branch moves code related to the Tegra fuses out of arch/arm and
+>> > into a centralized location which could be shared with ARM64. It also
+>> > adds support for reading the fuse data through sysfs.
+>>
+>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
+>> take this branch.
+>>
+>> I saw no indication from searching the mailing list of that either,
+>> so it wasn't just a missed acked-by.
+>>
+>> I wonder if this code should go under drivers/soc/ instead?
+>
+> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
+> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
+> and therefore it was moved to drivers/misc/fuse. I think that's the right
+> place still.
 
-The __dma_alloc_noncoherent() function flushes the allocated memory.
-Since the CPU caches are PIPT, the CPU should no longer have any dirty
-cache lines (that's actually the only aim here). Flushing the coherent
-mapping as well does not bring us anything new, just double flushing of
-the same physical address.
+I disagree, I think this belongs under drivers/soc. Especially since
+you're adding dependencies on this misc driver from other parts of the
+kernel / other drivers.
 
-Since we don't unmap the cacheable mapping (kernel linear address), the
-CPU could always allocate entries in the cache speculatively. The
-architecture says that the CPU would not hit in such caches, so it's
-fine from the CPU perspective.
+I also don't like seeing init calls form platform code down into
+drivers/misc like you're adding here. Can you please look at doing
+that as a regular init call setup?
 
-In your case, it seems that the device will look into the CPU cache. In
-this case, the device should only use the coherent DMA ops (with
-cacheable mappings). I know we changed the default but you should be
-able to specify in the DT whether your device/bus in 'dma-coherent'. We
-are currently missing a notifier for PCIe to set up the dma ops (but
-mainline arm64 does not support PCIe yet).
+The fact that you provide data to the rest of the kernel again really
+says drivers/soc to me, not drivers/misc.
 
-(what we do with ACPI I have no idea. Probably always assuming I/O
-coherency)
+> We anyway need this driver for sata and xhci.
 
--- 
-Catalin
+Yes?
+
+
+-Olof
