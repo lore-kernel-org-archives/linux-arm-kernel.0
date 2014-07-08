@@ -1,111 +1,377 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 08 Jul 2014 16:20:29 -0700
-Subject: [PATCH 1/3] mfd: pm8921: Expose pm8xxx_read_irq_status
-In-Reply-To: <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <53BC7CBD.2060901@codeaurora.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 09 Jul 2014 01:26:13 +0200
+Subject: [PATCH 1/2] iio: adc: add driver for Rockchip saradc
+Message-ID: <2959154.xc8BQActsn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/14 18:26, Bjorn Andersson wrote:
-> @@ -65,6 +66,41 @@ struct pm_irq_chip {
->  	u8			config[0];
->  };
->  
-> +int pm8xxx_read_irq_status(int irq)
-> +{
-> +	struct irq_data *d = irq_get_irq_data(irq);
-> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int pmirq = irqd_to_hwirq(d);
-> +	unsigned int bits;
-> +	int irq_bit;
-> +	u8 block;
-> +	int rc;
-> +
-> +	if (!chip) {
-> +		pr_err("Failed to resolve pm_irq_chip\n");
-> +		return -EINVAL;
-> +	}
+The ADC is a 3-channel signal-ended 10-bit Successive Approximation
+Register (SAR) A/D Converter. It uses the supply and ground as it reference
+and converts the analog input signal into 10-bit binary digital codes.
 
-Is this actually necessary? Presumably the driver wouldn't have even
-probed unless there was a pmic to begin with.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/iio/adc/Kconfig           |  10 ++
+ drivers/iio/adc/Makefile          |   1 +
+ drivers/iio/adc/rockchip_saradc.c | 317 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 328 insertions(+)
+ create mode 100644 drivers/iio/adc/rockchip_saradc.c
 
-> +
-> +	block = pmirq / 8;
-> +	irq_bit = pmirq % 8;
-> +
-> +	spin_lock(&chip->pm_irq_lock);
-> +	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, block);
-> +	if (rc) {
-> +		pr_err("Failed Selecting Block %d rc=%d\n", block, rc);
-> +		goto bail;
-> +	}
-> +
-> +	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
-> +	if (rc)
-> +		pr_err("Failed Reading Status rc=%d\n", rc);
-> +bail:
-> +	spin_unlock(&chip->pm_irq_lock);
-> +
-> +	return rc ? rc : !!(bits & BIT(irq_bit));
-> +}
-> +EXPORT_SYMBOL(pm8xxx_read_irq_status);
-> +
->  static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, unsigned int bp,
->  				 unsigned int *ip)
->  {
-> diff --git a/include/linux/mfd/pm8921-core.h b/include/linux/mfd/pm8921-core.h
-> new file mode 100644
-> index 0000000..77f7cb5
-> --- /dev/null
-> +++ b/include/linux/mfd/pm8921-core.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Copyright (c) 2014, Sony Mobile Communications AB
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __MFD_PM8921_CORE_H
-> +#define __MFD_PM8921_CORE_H
-> +
-> +#include <linux/err.h>
-> +
-> +#ifdef CONFIG_MFD_PM8921_CORE
-> +
-> +int pm8xxx_read_irq_status(int irq);
-> +
-> +#else
-> +
-> +static inline int pm8xxx_read_irq_status(int irq)
-> +{
-> +	return -ENOSYS;
-> +}
-> +
-> +#endif
-
-Sad, the header file came back. I guess there isn't a way to put the
-pinctrl driver inside the core mfd driver? Then we wouldn't need to
-expose an "irq read line" function.
-
-Actually Abhijeet proposed such an API in 2011 but it didn't go
-anywhere[1]. If we had that API we should be able to call
-read_irq_line() from the pinctrl driver whenever we want to get the
-state of the gpio, plus the API is generic. We're going to need that API
-anyway for things like USB insertion detection so it might make sense to
-add it sooner rather than later.
-
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/048319.html
-
+diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+index a80d236..5d36bdb 100644
+--- a/drivers/iio/adc/Kconfig
++++ b/drivers/iio/adc/Kconfig
+@@ -187,6 +187,16 @@ config NAU7802
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called nau7802.
+ 
++config ROCKCHIP_SARADC
++	tristate "Rockchip SARADC driver"
++	depends on ARCH_ROCKCHIP || (OF && COMPILE_TEST)
++	help
++	  Say yes here to build support for the SARADC found in SoCs from
++	  Rockchip.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called rockchip_saradc.
++
+ config TI_ADC081C
+ 	tristate "Texas Instruments ADC081C021/027"
+ 	depends on I2C
+diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+index 9d60f2d..8e2932d 100644
+--- a/drivers/iio/adc/Makefile
++++ b/drivers/iio/adc/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_MCP320X) += mcp320x.o
+ obj-$(CONFIG_MCP3422) += mcp3422.o
+ obj-$(CONFIG_MEN_Z188_ADC) += men_z188_adc.o
+ obj-$(CONFIG_NAU7802) += nau7802.o
++obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
+ obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
+ obj-$(CONFIG_TI_AM335X_ADC) += ti_am335x_adc.o
+ obj-$(CONFIG_TWL4030_MADC) += twl4030-madc.o
+diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+new file mode 100644
+index 0000000..dc4029d
+--- /dev/null
++++ b/drivers/iio/adc/rockchip_saradc.c
+@@ -0,0 +1,317 @@
++/*
++ * Rockchip Successive Approximation Register (SAR) A/D Converter
++ * Copyright (C) 2014 ROCKCHIP, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/clk.h>
++#include <linux/completion.h>
++#include <linux/regulator/consumer.h>
++#include <linux/iio/iio.h>
++
++#define SARADC_DATA			0x00
++#define SARADC_DATA_MASK		0x3ff
++
++#define SARADC_STAS			0x04
++#define SARADC_STAS_BUSY		BIT(0)
++
++#define SARADC_CTRL			0x08
++#define SARADC_CTRL_IRQ_STATUS		BIT(6)
++#define SARADC_CTRL_IRQ_ENABLE		BIT(5)
++#define SARADC_CTRL_POWER_CTRL		BIT(3)
++#define SARADC_CTRL_CHN_MASK		0x7
++
++#define SARADC_DLY_PU_SOC		0x0c
++#define SARADC_DLY_PU_SOC_MASK		0x3f
++
++#define SARADC_BITS			10
++#define SARADC_TIMEOUT			(msecs_to_jiffies(100))
++
++struct rockchip_saradc {
++	void __iomem		*regs;
++	struct clk		*pclk;
++	struct clk		*clk;
++	struct completion	completion;
++	struct regulator	*vref;
++	int			vref_mv;
++	u32			last_val;
++};
++
++static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
++				    struct iio_chan_spec const *chan,
++				    int *val, int *val2, long mask)
++{
++	struct rockchip_saradc *info = iio_priv(indio_dev);
++
++	switch (mask) {
++	case IIO_CHAN_INFO_RAW:
++		mutex_lock(&indio_dev->mlock);
++
++		/* Select the channel to be used and Trigger conversion */
++		writel_relaxed(0x08, info->regs + SARADC_DLY_PU_SOC);
++		writel(SARADC_CTRL_POWER_CTRL
++				| (chan->channel & SARADC_CTRL_CHN_MASK)
++				| SARADC_CTRL_IRQ_ENABLE,
++		       info->regs + SARADC_CTRL);
++
++		if (!wait_for_completion_timeout(&info->completion,
++						 SARADC_TIMEOUT)) {
++			writel_relaxed(0, info->regs + SARADC_CTRL);
++			mutex_unlock(&indio_dev->mlock);
++			return -ETIMEDOUT;
++		}
++
++		*val = info->last_val;
++		mutex_unlock(&indio_dev->mlock);
++		return IIO_VAL_INT;
++	case IIO_CHAN_INFO_SCALE:
++		*val = info->vref_mv;
++		*val2 = SARADC_BITS;
++		return IIO_VAL_FRACTIONAL_LOG2;
++	default:
++		break;
++	}
++	return -EINVAL;
++}
++
++static irqreturn_t rockchip_saradc_isr(int irq, void *dev_id)
++{
++	struct rockchip_saradc *info = (struct rockchip_saradc *)dev_id;
++
++	/* Read value */
++	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
++	info->last_val &= SARADC_DATA_MASK;
++
++	/* clear irq & power down adc*/
++	writel_relaxed(0, info->regs + SARADC_CTRL);
++
++	complete(&info->completion);
++
++	return IRQ_HANDLED;
++}
++
++static const struct iio_info rockchip_saradc_iio_info = {
++	.read_raw = rockchip_saradc_read_raw,
++	.driver_module = THIS_MODULE,
++};
++
++#define ADC_CHANNEL(_index, _id) {			\
++	.type = IIO_VOLTAGE,				\
++	.indexed = 1,					\
++	.channel = _index,				\
++	.address = _index,				\
++	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),	\
++	.datasheet_name = _id,				\
++}
++
++static const struct iio_chan_spec rockchip_saradc_iio_channels[] = {
++	ADC_CHANNEL(0, "adc0"),
++	ADC_CHANNEL(1, "adc1"),
++	ADC_CHANNEL(2, "adc2"),
++};
++
++static int rockchip_saradc_probe(struct platform_device *pdev)
++{
++	struct rockchip_saradc *info = NULL;
++	struct device_node *np = pdev->dev.of_node;
++	struct iio_dev *indio_dev = NULL;
++	struct resource	*mem;
++	int ret = -ENODEV;
++	int irq;
++	u32 rate;
++
++	if (!np)
++		return ret;
++
++	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
++	if (!indio_dev) {
++		dev_err(&pdev->dev, "failed allocating iio device\n");
++		return -ENOMEM;
++	}
++	info = iio_priv(indio_dev);
++
++	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	info->regs = devm_request_and_ioremap(&pdev->dev, mem);
++	if (!info->regs)
++		return -ENOMEM;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "no irq resource?\n");
++		return irq;
++	}
++
++	ret = devm_request_irq(&pdev->dev, irq, rockchip_saradc_isr,
++					0, dev_name(&pdev->dev), info);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed requesting irq, %d\n", ret);
++		return ret;
++	}
++
++	init_completion(&info->completion);
++
++	info->pclk = devm_clk_get(&pdev->dev, "apb_pclk");
++	if (IS_ERR(info->pclk)) {
++		dev_err(&pdev->dev, "failed to get pclk\n");
++		return PTR_ERR(info->pclk);
++	}
++
++	info->clk = devm_clk_get(&pdev->dev, "saradc");
++	if (IS_ERR(info->clk)) {
++		dev_err(&pdev->dev, "failed to get adc clock\n");
++		return PTR_ERR(info->clk);
++	}
++
++	info->vref = devm_regulator_get(&pdev->dev, "vref");
++	if (IS_ERR(info->vref)) {
++		dev_err(&pdev->dev, "failed to get regulator, %ld\n",
++			PTR_ERR(info->vref));
++		return PTR_ERR(info->vref);
++	}
++
++	/* use a default of 1MHz for the converter clock */
++	if (of_property_read_u32(np, "clock-frequency", &rate))
++		rate = 1000000;
++
++	ret = clk_set_rate(info->clk, rate);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to set adc clk rate, %d\n", ret);
++		return ret;
++	}
++
++	ret = regulator_enable(info->vref);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to enable vref regulator\n");
++		return ret;
++	}
++
++	info->vref_mv = regulator_get_voltage(info->vref);
++	if (info->vref_mv < 0) {
++		dev_err(&pdev->dev, "failed to get regulator voltage, %d\n",
++			info->vref_mv);
++		ret = info->vref_mv;
++		goto err_reg_voltage;
++	}
++	info->vref_mv /= 1000;
++
++	ret = clk_prepare_enable(info->pclk);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to enable pclk\n");
++		goto err_reg_voltage;
++	}
++
++	ret = clk_prepare_enable(info->clk);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to enable converter clock\n");
++		goto err_pclk;
++	}
++
++	platform_set_drvdata(pdev, indio_dev);
++
++	indio_dev->name = dev_name(&pdev->dev);
++	indio_dev->dev.parent = &pdev->dev;
++	indio_dev->dev.of_node = pdev->dev.of_node;
++	indio_dev->info = &rockchip_saradc_iio_info;
++	indio_dev->modes = INDIO_DIRECT_MODE;
++
++	indio_dev->channels = rockchip_saradc_iio_channels;
++	indio_dev->num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels);
++
++	ret = iio_device_register(indio_dev);
++	if (ret)
++		goto err_clk;
++
++	return 0;
++
++err_clk:
++	clk_disable_unprepare(info->clk);
++err_pclk:
++	clk_disable_unprepare(info->pclk);
++err_reg_voltage:
++	regulator_disable(info->vref);
++	return ret;
++}
++
++static int rockchip_saradc_remove(struct platform_device *pdev)
++{
++	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
++	struct rockchip_saradc *info = iio_priv(indio_dev);
++
++	iio_device_unregister(indio_dev);
++	clk_disable_unprepare(info->clk);
++	clk_disable_unprepare(info->pclk);
++	regulator_disable(info->vref);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int rockchip_saradc_suspend(struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct rockchip_saradc *info = iio_priv(indio_dev);
++
++	clk_disable_unprepare(info->clk);
++	clk_disable_unprepare(info->pclk);
++	regulator_disable(info->vref);
++
++	return 0;
++}
++
++static int rockchip_saradc_resume(struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct rockchip_saradc *info = iio_priv(indio_dev);
++	int ret;
++
++	ret = regulator_enable(info->vref);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(info->pclk);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(info->clk);
++	if (ret)
++		return ret;
++
++	return ret;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(rockchip_saradc_pm_ops,
++			 rockchip_saradc_suspend, rockchip_saradc_resume);
++
++static const struct of_device_id rockchip_saradc_match[] = {
++	{ .compatible = "rockchip,saradc" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
++
++static struct platform_driver rockchip_saradc_driver = {
++	.probe		= rockchip_saradc_probe,
++	.remove		= rockchip_saradc_remove,
++	.driver		= {
++		.name	= "rockchip-saradc",
++		.owner	= THIS_MODULE,
++		.of_match_table = rockchip_saradc_match,
++		.pm	= &rockchip_saradc_pm_ops,
++	},
++};
++
++module_platform_driver(rockchip_saradc_driver);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.0
