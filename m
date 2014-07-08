@@ -1,54 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Jul 2014 23:15:21 +0900
-Subject: [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on
- Exynos4210 and 5250
-In-Reply-To: <1403618235-19353-7-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-7-git-send-email-t.figa@samsung.com>
-Message-ID: <038b01cf9ab7$0de5a440$29b0ecc0$@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Jul 2014 16:14:59 +0200
+Subject: [PATCH v5 4/5] ARM: EXYNOS: Add platform driver support for Exynos
+ PMU
+In-Reply-To: <001e01cf9820$18f29440$4ad7bcc0$@samsung.com>
+References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
+ <1403705032-14835-5-git-send-email-pankaj.dubey@samsung.com>
+ <53B198EB.80502@samsung.com> <001e01cf9820$18f29440$4ad7bcc0$@samsung.com>
+Message-ID: <53BBFCE3.4050806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+On 05.07.2014 09:09, Pankaj Dubey wrote:
+> On Monday, June 30, 2014 Tomasz Figa wrote:
+>> On 25.06.2014 16:03, Pankaj Dubey wrote:
+>>> +
+>>> +	if (pmu_context->pmu_data && pmu_context->pmu_data->pmu_init)
+>>
+>> In what conditions pmu_data will be NULL?
+>>
 > 
-> Currently, the Exynos cpuidle driver works correctly only on Exynos4210
-> and 5250. Trying to use it with just one CPU online on any other Exynos
-> SoC will lead to system failure, due to unsupported AFTR mode on other
-> SoCs. This patch fixes the problem by registering the driver only on
-> supported SoCs and letting others simply use default WFI mode until
-> support for them is added.
+> What if we want driver to be probed but no data has been given?
+> If driver gets probed it still can act as syscon provider, and other IPs can
+> access
+> PMU registers, but PMU functionality itself will not be available, for same
+> reason
+> I have put a check for pmu_data in powerdown_conf also.
 > 
-Hmm...I thought other SoCs have no problem on cpuidle except exynos5420 and
-exynos5440....something like this would be helpful to avoid system failure.
-But unfortunately this conflicts with Pankaj's cleanup cpufreq_init() and
-cpuidle_init() patch you've reviewed and I've applied in my local...
 
-I'm going to check which exynos is ok on cpuidle and then sort them out.
+Is there any point in probing this driver just to register the syscon?
+AFAIK if this driver errors out, the syscon platform driver will take
+over and do what we want. That's why we have the second "syscon"
+compatible string.
 
-Thanks,
-Kukjin
-
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index f38cf7c..176bbf5 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -173,10 +173,8 @@ static struct platform_device exynos_cpuidle = {
-> 
->  void __init exynos_cpuidle_init(void)
->  {
-> -	if (soc_is_exynos5440())
-> -		return;
-> -
-> -	platform_device_register(&exynos_cpuidle);
-> +	if (soc_is_exynos4210() || soc_is_exynos5250())
-> +		platform_device_register(&exynos_cpuidle);
->  }
-> 
->  void __init exynos_cpufreq_init(void)
-> --
-> 1.9.3
+Best regards,
+Tomasz
