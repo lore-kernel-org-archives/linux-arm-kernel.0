@@ -1,79 +1,40 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 8 Jul 2014 16:43:50 -0700
-Subject: [PATCH 1/3] mfd: pm8921: Expose pm8xxx_read_irq_status
-In-Reply-To: <53BC7CBD.2060901@codeaurora.org>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
- <53BC7CBD.2060901@codeaurora.org>
-Message-ID: <CAJAp7Ogy3=tZvMAUojbf5sy8EMmQOT+imA3=TRVcGXXA_y7CtA@mail.gmail.com>
+From: fitzsim@fitzsim.org (Thomas Fitzsimmons)
+Date: Tue, 08 Jul 2014 19:44:07 -0400
+Subject: [PATCH resend] net: mvneta: Fix big endian issue in
+ mvneta_txq_desc_csum()
+Message-ID: <m3wqbnpgag.fsf@fitzsim.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 4:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 07/07/14 18:26, Bjorn Andersson wrote:
->> @@ -65,6 +66,41 @@ struct pm_irq_chip {
->>       u8                      config[0];
->>  };
->>
->> +int pm8xxx_read_irq_status(int irq)
->> +{
->> +     struct irq_data *d = irq_get_irq_data(irq);
->> +     struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
->> +     unsigned int pmirq = irqd_to_hwirq(d);
->> +     unsigned int bits;
->> +     int irq_bit;
->> +     u8 block;
->> +     int rc;
->> +
->> +     if (!chip) {
->> +             pr_err("Failed to resolve pm_irq_chip\n");
->> +             return -EINVAL;
->> +     }
->
-> Is this actually necessary? Presumably the driver wouldn't have even
-> probed unless there was a pmic to begin with.
->
+This commit fixes the command value generated for CSUM calculation
+when running in big endian mode.  The Ethernet protocol ID for IP was
+being unconditionally byte-swapped in the layer 3 protocol check (with
+swab16), which caused the mvneta driver to not function correctly in
+big endian mode.  This patch byte-swaps the ID conditionally with
+htons.
 
-I had a bug in the calling driver, passing the wrong irq down to this
-function. But now that I think more about it I should probably check
-for "d" being non-NULL. On the other hand, that will still just catch
-a minor set of bugs as both of those will in most cases produce
-"valid" pointers.
+Cc: <stable@vger.kernel.org> # v3.13+
+Signed-off-by: Thomas Fitzsimmons <fitzsim@fitzsim.org>
+---
+The mvneta driver existed prior to v3.13, but it has only supported big
+endian from v3.13 onward.  If it's accepted, this patch needs to be
+backported for stable only as far back as v3.13.
 
-Maybe it's okay to just trust the caller to pass a valid irq? Or do
-you have any other suggestion of sanity checking the input value?
-Preferably without also passing the pm_irq_chip pointer.
+ drivers/net/ethernet/marvell/mvneta.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-[...]
-> Sad, the header file came back. I guess there isn't a way to put the
-> pinctrl driver inside the core mfd driver? Then we wouldn't need to
-> expose an "irq read line" function.
->
-
-I continued my search and this needs to be accessed by gpio, mpp, adc,
-charger, bms and usb(?). So we have to expose it in some form.
-
-> Actually Abhijeet proposed such an API in 2011 but it didn't go
-> anywhere[1]. If we had that API we should be able to call
-> read_irq_line() from the pinctrl driver whenever we want to get the
-> state of the gpio, plus the API is generic. We're going to need that API
-> anyway for things like USB insertion detection so it might make sense to
-> add it sooner rather than later.
->
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/048319.html
-
->From what I can see of this thread it was exposed as a way for drivers
-to be able to query if an interrupt handler was called on raising or
-falling edge. And based on the locking limitations of the
-implementation we couldn't have used it anyways.
-
-Our use case is different in that we're at any point in time
-interested in reading out the status of the irq line, as the only way
-of getting that status.
-
-It might be a long shot, but let's spin a patch for our purpose and
-run it by Tomas again.
-
-Regards,
-Bjorn
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 45beca1..667cf65 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1207,7 +1207,7 @@ static u32 mvneta_txq_desc_csum(int l3_offs, int l3_proto,
+ 	command =  l3_offs    << MVNETA_TX_L3_OFF_SHIFT;
+ 	command |= ip_hdr_len << MVNETA_TX_IP_HLEN_SHIFT;
+ 
+-	if (l3_proto == swab16(ETH_P_IP))
++	if (l3_proto == htons(ETH_P_IP))
+ 		command |= MVNETA_TXD_IP_CSUM;
+ 	else
+ 		command |= MVNETA_TX_L3_IP6;
+-- 
+1.7.1
