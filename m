@@ -1,39 +1,36 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue,  8 Jul 2014 12:14:41 +0200
-Subject: [PATCH 2/2] usb: ci_hdrc_imx doc: fsl,usbphy is required
-In-Reply-To: <1404814481-7652-1-git-send-email-mpa@pengutronix.de>
-References: <1404814481-7652-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1404814481-7652-2-git-send-email-mpa@pengutronix.de>
+Date: Tue,  8 Jul 2014 12:14:40 +0200
+Subject: [PATCH 1/2] usb: ci_hdrc_imx: Return -EINVAL for missing USB PHY
+Message-ID: <1404814481-7652-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fsl,usbphy is no optional property. This patch moves it to the list of
-required properties.
+-ENODEV is interpreted by the generic driver probing function as a
+non-matching driver. This leads to a missing probe failure message.
+
+Also a missing USB PHY is more of an invalid configuration of the usb
+driver because it is necessary.
+
+This patch returns -EINVAL if devm_usb_get_phy_by_phandle() returned -ENODEV.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-index a6a32cb7f777..8014d0d050f8 100644
---- a/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: Should be "fsl,imx27-usb"
- - reg: Should contain registers location and length
- - interrupts: Should contain controller interrupt
-+- fsl,usbphy: phandler of usb phy that connects to the only one port
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index 2e58f8dfd311..65444b02bd68 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -133,6 +133,9 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
+ 	if (IS_ERR(data->phy)) {
+ 		ret = PTR_ERR(data->phy);
++		/* Return -EINVAL if no usbphy is available */
++		if (ret == -ENODEV)
++			ret = -EINVAL;
+ 		goto err_clk;
+ 	}
  
- Recommended properies:
- - phy_type: the type of the phy connected to the core. Should be one
-@@ -12,7 +13,6 @@ Recommended properies:
- - dr_mode: One of "host", "peripheral" or "otg". Defaults to "otg"
- 
- Optional properties:
--- fsl,usbphy: phandler of usb phy that connects to the only one port
- - fsl,usbmisc: phandler of non-core register device, with one argument
-   that indicate usb controller index
- - vbus-supply: regulator for vbus
 -- 
 2.0.0
