@@ -1,42 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Jul 2014 13:12:52 +0100
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <20140708115727.GR23978@titan.lakedaemon.net>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140708053434.GH28931@quad.lixom.net>
- <20140708115727.GR23978@titan.lakedaemon.net>
-Message-ID: <20140708121252.GK21766@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Jul 2014 08:20:27 -0400
+Subject: [PATCH 1/2] ARM: mvebu: add appended DTB support in
+ mvebu_v5_defconfig
+In-Reply-To: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404375830-22169-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140708122027.GV23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 07:57:27AM -0400, Jason Cooper wrote:
-> Can you offer any suggestions as to how you would like this resolved?  I
-> thought when I voiced my opinion as above, and Russell didn't reply,
-> there was implied acknowledgement...
+Thomas,
 
-I didn't reply probably because I didn't see the message and/or I'm busy
-with other stuff.
+On Thu, Jul 03, 2014 at 10:23:49AM +0200, Thomas Petazzoni wrote:
+> The mvebu_v5_defconfig is currently used for Kirkwood platforms, and
+> in the future hopefully used for Orion5x platforms. Those platforms
+> use fairly old bootloaders that don't have Device Tree support, so it
+> makes sense to enable appended DTB support by default, as well as the
+> backward compatibility with ATAGS passed by the bootloader for those
+> platforms. It helps having a defconfig that works fine out of the box
+> for most Kirkwood platforms.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/configs/mvebu_v5_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-I know that Sebastian asked Rabeeh on IRC yesterday whether the flash
-chip type could be used to detect the difference between the two, but
-has not yet received an answer.
+Both applied to mvebu/defconfig with Andrew's Ack.
 
-As the two DT descriptions are mutually incompatible, there isn't much
-choice.  And (afaik) there's no choice of updating the boot loader to
-a version which can deal with DT - yes it may be u-boot, but I've no
-idea if modern u-boot works on it, and I really would not like to try.
+thx,
 
-While SolidRun tried to make changing u-boot easy and recoverable, I've
-had personal experience of trying to help people restore their cuboxes.
-It's a total nightmare (mainly seems to be down to the wide variation
-in USB hardware which causes the on-board USB-serial for the console to
-be unreliable.)  That's why on their later iMX6 hardware (Cubox-i & HB)
-they decided to have zero on-board non-volatile storage.
-
-So, even if it was possible to detect the difference in u-boot between
-the Cubox models, getting the updated u-boot on the machine is far from
-trivial.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Jason.
