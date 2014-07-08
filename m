@@ -1,24 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Jul 2014 09:52:03 +0200
-Subject: [RFC PATCH v3] reset: Add a defer reset object to send board
- specific reset
-In-Reply-To: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
-References: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
-Message-ID: <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 8 Jul 2014 08:53:32 +0100
+Subject: [PATCH v2 3/3] MAINTAINERS: Add dwc3-st.c file to ARCH/STI
+ architecture
+In-Reply-To: <53BBA075.9040204@st.com>
+References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
+ <1404541530-27856-4-git-send-email-peter.griffin@linaro.org>
+ <53BBA075.9040204@st.com>
+Message-ID: <20140708075332.GM6407@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 3:37 PM, Houcheng Lin <houcheng@gmail.com> wrote:
+On Tue, 08 Jul 2014, Maxime Coquelin wrote:
+> On 07/05/2014 08:25 AM, Peter Griffin wrote:
+> >Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> 
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-> The Problem
-> -----------
-> The reset signal on a hardware board is send either:
->     - during machine initialization
->     - during bus master's initialization
+Maxime,
+  Once Acked by Felipe, I think this should go in via your tree to
+avoid conflicts with other ARM/STI ARCHITECTURE additions.
 
-I just thought about this a bit, since there isn't already a generic GPIO
-reset driver, just call this drivers/reset/reset-gpio.c and make the
-ability to deferral just a configuration detail of the GPIO reset driver.
+> >---
+> >  MAINTAINERS | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> >diff --git a/MAINTAINERS b/MAINTAINERS
+> >index 702ca10..269ad3b 100644
+> >--- a/MAINTAINERS
+> >+++ b/MAINTAINERS
+> >@@ -1325,6 +1325,7 @@ F:	drivers/pinctrl/pinctrl-st.c
+> >  F:	drivers/media/rc/st_rc.c
+> >  F:	drivers/i2c/busses/i2c-st.c
+> >  F:	drivers/tty/serial/st-asc.c
+> >+F:	drivers/usb/dwc3/dwc3-st.c
+> >
+> >  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+> >  M:	Lennert Buytenhek <kernel@wantstofly.org>
+> >
 
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
