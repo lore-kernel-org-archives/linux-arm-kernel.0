@@ -1,47 +1,53 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue,  8 Jul 2014 18:54:26 +0300
-Subject: [PATCH 0/3] Support for Qualcomm QPNP PMIC's
-Message-ID: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 8 Jul 2014 16:54:20 +0100
+Subject: [PATCH v2 1/3] xen/arm: introduce XENFEAT_grant_map_11
+In-Reply-To: <1404834562.25940.8.camel@kazak.uk.xensource.com>
+References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+ <1404834132-15847-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1404834562.25940.8.camel@kazak.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1407081653220.27641@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello to all,
+On Tue, 8 Jul 2014, Ian Campbell wrote:
+> On Tue, 2014-07-08 at 16:42 +0100, Stefano Stabellini wrote:
+> > The flag tells us that the hypervisor maps a grant page to guest
+> > physical address == machine address of the page in addition to the
+> > normal grant mapping address. It is needed to properly issue cache
+> > maintenance operation at the completion of a DMA operation involving a
+> > foreign grant.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/xen/enlighten.c         |    6 ++++++
+> >  include/xen/interface/features.h |    3 +++
+> >  2 files changed, 9 insertions(+)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index b96723e..ee3135a 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
+> >  	xen_domain_type = XEN_HVM_DOMAIN;
+> >  
+> >  	xen_setup_features();
+> > +
+> > +	if (!xen_feature(XENFEAT_grant_map_11)) {
+> > +		pr_warn("Please upgrade your Xen.\n"
+> > +				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
+> > +	}
+> 
+> Unfortunately this isn't quite complete. On a system where all devices
+> are behind an SMMU then we would want to be able to disable the 1:1
+> workaround, which in turn would imply disabling this feature flag too
+> (since it is no longer necessary and also impossible to implement in
+> that case).
 
-Here is patch set which adds Qualcomm QPNP PMIC's support.
-I've removed RFC tag and sending as regular set hoping that
-this time more comments will come out. The link to the RFCv2
-at [1].
+That is true, but in such a system we would have to tell the kernel that
+DMAing is safe, so this will turn into:
 
-The first patch in the set implements an *of* based parsing of
-PMIC peripheral resources and adding mfd cell for it.
-The devicetree node should contain a compatible and reg
-proparties. The intention was to keep things simple and similar
-to the other mfd drivers. 
-
-The second patch adds binding document for qpnp-spmi.
-
-The third patch describes the devicetree binding of the slave
-devices attached to the SPMI interface. 
-
-Comments are welcome.
-
-regards,
-Stan
-
-[1] https://lkml.org/lkml/2014/7/3/443
-
-Ivan T. Ivanov (2):
-  mfd: qpnp-spmi: document DT bindings for Qualcomm QPNP PMICs
-  dt: qcom: msm8974: add qpnp-spmi device nodes
-
-Josh Cartwright (1):
-  mfd: qpnp-spmi: add support for Qualcomm QPNP PMICs
-
- .../devicetree/bindings/qpnp/qcom,qpnp-spmi.txt    |   53 +++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi                |   45 ++++++
- drivers/mfd/Kconfig                                |   15 ++
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/qpnp-spmi.c                            |  145 ++++++++++++++++++++
- 5 files changed, 259 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/qpnp/qcom,qpnp-spmi.txt
- create mode 100644 drivers/mfd/qpnp-spmi.c
+if (!xen_feature(XENFEAT_grant_map_11) &&
+    !xen_feature(XENFEAT_safe_dma)) {
+	pr_warn("Please upgrade your Xen.\n"
+			"If your platform has any non-coherent DMA devices, they won't work properly.\n");
+}
