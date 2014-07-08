@@ -1,32 +1,49 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 8 Jul 2014 13:46:36 +0300
-Subject: [PATCH 1/3] ARM: edma: Set default queue to lowest priority
+Date: Tue, 8 Jul 2014 13:46:38 +0300
+Subject: [PATCH 3/3] dma: edma: Serve cyclic (audio) channels with high
+ priority queue
 In-Reply-To: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1404816398-12338-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1404816398-12338-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1404816398-12338-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the lowest priority queue as default for clients.
+Move the DMA channel used in cyclic mode (audio) to the highest priority
+event queue which helps to reduce audio problems.
+When the channel is terminated, move it back to the default queue.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/common/edma.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/dma/edma.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 485be42519b9..f834aae7720f 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1470,7 +1470,8 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
- 	queue_priority_map[i][1] = -1;
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index b512caf46944..fe55f78ea137 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -256,8 +256,13 @@ static int edma_terminate_all(struct edma_chan *echan)
+ 	 * echan->edesc is NULL and exit.)
+ 	 */
+ 	if (echan->edesc) {
++		int cyclic = echan->edesc->cyclic;
+ 		echan->edesc = NULL;
+ 		edma_stop(echan->ch_num);
++		/* Move the cyclic channel back to default queue */
++		if (cyclic)
++			edma_assign_channel_eventq(echan->ch_num,
++						   EVENTQ_DEFAULT);
+ 	}
  
- 	pdata->queue_priority_mapping = queue_priority_map;
--	pdata->default_queue = 0;
-+	/* Default queue has the lowest priority */
-+	pdata->default_queue = i - 1;
+ 	vchan_get_all_descriptors(&echan->vchan, &head);
+@@ -724,6 +729,9 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 		edesc->pset[i].param.opt |= TCINTEN;
+ 	}
  
- 	return 0;
++	/* Place the cyclic channel to highest priority queue */
++	edma_assign_channel_eventq(echan->ch_num, EVENTQ_0);
++
+ 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
  }
+ 
 -- 
 2.0.0
