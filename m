@@ -1,169 +1,304 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 8 Jul 2014 16:42:12 +0100
-Subject: [PATCH v2 3/3] xen/arm: remove mach_to_phys rbtree
+Date: Tue, 8 Jul 2014 16:42:11 +0100
+Subject: [PATCH v2 2/3] xen/arm: reimplement xen_dma_unmap_page & friends
 In-Reply-To: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
-Message-ID: <1404834132-15847-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1404834132-15847-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the rbtree used to keep track of machine to physical mappings:
-the frontend can grant the same page multiple times, leading to errors
-inserting or removing entries from the mach_to_phys tree.
+xen_dma_unmap_page, xen_dma_sync_single_for_cpu and
+xen_dma_sync_single_for_device are currently implemented by calling into
+the corresponding generic ARM implementation of these functions. In
+order to do this, firstly the dma_addr_t handle, that on Xen is a
+machine address, needs to be translated into a physical address.  The
+operation is expensive and inaccurate, given that a single machine
+address can correspond to multiple physical addresses in one domain,
+because the same page can be granted multiple times by the frontend.
 
-Linux only needed to know the physical address corresponding to a given
-machine address in swiotlb-xen. Now that swiotlb-xen can call the
-xen_dma_* functions passing the machine address directly, we can remove
-it.
+To avoid this problem, we introduce a Xen specific implementation of
+xen_dma_unmap_page, xen_dma_sync_single_for_cpu and
+xen_dma_sync_single_for_device, that can operate on machine addresses
+directly.
+
+The new implementation relies on the fact that the hypervisor creates a
+second p2m mapping of any grant pages at physical address == machine
+address of the page for dom0. Therefore we can access memory at physical
+address == dma_addr_r handle and perform the cache flushing there. Some
+cache maintenance operations require a virtual address. Instead of using
+ioremap_cache, that is not safe in interrupt context, we allocate a
+per-cpu PAGE_KERNEL scratch page and we manually update the pte for it.
+
+arm64 doesn't need cache maintenance operations on unmap for now.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 
 Changes in v2:
-- do not check for mfn in xen_add_phys_to_mach_entry.
+- check for XENFEAT_grant_map_11;
+- remeber the ptep corresponding to scratch pages so that we don't need
+to calculate it again every time;
+- do not acutally unmap the page on xen_mm32_unmap;
+- properly account preempt_enable/disable.
 ---
- arch/arm/include/asm/xen/page.h |    9 ------
- arch/arm/xen/p2m.c              |   66 +--------------------------------------
- 2 files changed, 1 insertion(+), 74 deletions(-)
+ arch/arm/include/asm/xen/page-coherent.h |   25 ++--
+ arch/arm/xen/Makefile                    |    2 +-
+ arch/arm/xen/mm32.c                      |  202 ++++++++++++++++++++++++++++++
+ 3 files changed, 210 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/xen/mm32.c
 
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index ded062f..135c24a 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -33,7 +33,6 @@ typedef struct xpaddr {
- #define INVALID_P2M_ENTRY      (~0UL)
- 
- unsigned long __pfn_to_mfn(unsigned long pfn);
--unsigned long __mfn_to_pfn(unsigned long mfn);
- extern struct rb_root phys_to_mach;
- 
- static inline unsigned long pfn_to_mfn(unsigned long pfn)
-@@ -51,14 +50,6 @@ static inline unsigned long pfn_to_mfn(unsigned long pfn)
- 
- static inline unsigned long mfn_to_pfn(unsigned long mfn)
- {
--	unsigned long pfn;
--
--	if (phys_to_mach.rb_node != NULL) {
--		pfn = __mfn_to_pfn(mfn);
--		if (pfn != INVALID_P2M_ENTRY)
--			return pfn;
--	}
--
- 	return mfn;
+diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+index 1109017..e8275ea 100644
+--- a/arch/arm/include/asm/xen/page-coherent.h
++++ b/arch/arm/include/asm/xen/page-coherent.h
+@@ -26,25 +26,14 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
  }
  
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-index 97baf44..0548577 100644
---- a/arch/arm/xen/p2m.c
-+++ b/arch/arm/xen/p2m.c
-@@ -21,14 +21,12 @@ struct xen_p2m_entry {
- 	unsigned long pfn;
- 	unsigned long mfn;
- 	unsigned long nr_pages;
--	struct rb_node rbnode_mach;
- 	struct rb_node rbnode_phys;
- };
- 
- static rwlock_t p2m_lock;
- struct rb_root phys_to_mach = RB_ROOT;
- EXPORT_SYMBOL_GPL(phys_to_mach);
--static struct rb_root mach_to_phys = RB_ROOT;
- 
- static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
- {
-@@ -41,8 +39,6 @@ static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
- 		parent = *link;
- 		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_phys);
- 
--		if (new->mfn == entry->mfn)
--			goto err_out;
- 		if (new->pfn == entry->pfn)
- 			goto err_out;
- 
-@@ -88,64 +84,6 @@ unsigned long __pfn_to_mfn(unsigned long pfn)
- }
- EXPORT_SYMBOL_GPL(__pfn_to_mfn);
- 
--static int xen_add_mach_to_phys_entry(struct xen_p2m_entry *new)
+-static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
 -{
--	struct rb_node **link = &mach_to_phys.rb_node;
--	struct rb_node *parent = NULL;
--	struct xen_p2m_entry *entry;
--	int rc = 0;
--
--	while (*link) {
--		parent = *link;
--		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_mach);
--
--		if (new->mfn == entry->mfn)
--			goto err_out;
--		if (new->pfn == entry->pfn)
--			goto err_out;
--
--		if (new->mfn < entry->mfn)
--			link = &(*link)->rb_left;
--		else
--			link = &(*link)->rb_right;
--	}
--	rb_link_node(&new->rbnode_mach, parent, link);
--	rb_insert_color(&new->rbnode_mach, &mach_to_phys);
--	goto out;
--
--err_out:
--	rc = -EINVAL;
--	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
--			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
--out:
--	return rc;
+-	if (__generic_dma_ops(hwdev)->unmap_page)
+-		__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
 -}
--
--unsigned long __mfn_to_pfn(unsigned long mfn)
--{
--	struct rb_node *n = mach_to_phys.rb_node;
--	struct xen_p2m_entry *entry;
--	unsigned long irqflags;
--
--	read_lock_irqsave(&p2m_lock, irqflags);
--	while (n) {
--		entry = rb_entry(n, struct xen_p2m_entry, rbnode_mach);
--		if (entry->mfn <= mfn &&
--				entry->mfn + entry->nr_pages > mfn) {
--			read_unlock_irqrestore(&p2m_lock, irqflags);
--			return entry->pfn + (mfn - entry->mfn);
--		}
--		if (mfn < entry->mfn)
--			n = n->rb_left;
--		else
--			n = n->rb_right;
--	}
--	read_unlock_irqrestore(&p2m_lock, irqflags);
--
--	return INVALID_P2M_ENTRY;
--}
--EXPORT_SYMBOL_GPL(__mfn_to_pfn);
--
- int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
- 			    struct gnttab_map_grant_ref *kmap_ops,
- 			    struct page **pages, unsigned int count)
-@@ -192,7 +130,6 @@ bool __set_phys_to_machine_multi(unsigned long pfn,
- 			p2m_entry = rb_entry(n, struct xen_p2m_entry, rbnode_phys);
- 			if (p2m_entry->pfn <= pfn &&
- 					p2m_entry->pfn + p2m_entry->nr_pages > pfn) {
--				rb_erase(&p2m_entry->rbnode_mach, &mach_to_phys);
- 				rb_erase(&p2m_entry->rbnode_phys, &phys_to_mach);
- 				write_unlock_irqrestore(&p2m_lock, irqflags);
- 				kfree(p2m_entry);
-@@ -217,8 +154,7 @@ bool __set_phys_to_machine_multi(unsigned long pfn,
- 	p2m_entry->mfn = mfn;
++		struct dma_attrs *attrs);
  
- 	write_lock_irqsave(&p2m_lock, irqflags);
--	if ((rc = xen_add_phys_to_mach_entry(p2m_entry) < 0) ||
--		(rc = xen_add_mach_to_phys_entry(p2m_entry) < 0)) {
-+	if ((rc = xen_add_phys_to_mach_entry(p2m_entry)) < 0) {
- 		write_unlock_irqrestore(&p2m_lock, irqflags);
- 		return false;
- 	}
+-static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-	if (__generic_dma_ops(hwdev)->sync_single_for_cpu)
+-		__generic_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
+-}
++void xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir);
++
++void xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir);
+ 
+-static inline void xen_dma_sync_single_for_device(struct device *hwdev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-	if (__generic_dma_ops(hwdev)->sync_single_for_device)
+-		__generic_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
+-}
+ #endif /* _ASM_ARM_XEN_PAGE_COHERENT_H */
+diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+index 1296952..1f85bfe 100644
+--- a/arch/arm/xen/Makefile
++++ b/arch/arm/xen/Makefile
+@@ -1 +1 @@
+-obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o
++obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o mm32.o
+diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
+new file mode 100644
+index 0000000..964d0af
+--- /dev/null
++++ b/arch/arm/xen/mm32.c
+@@ -0,0 +1,202 @@
++#include <linux/cpu.h>
++#include <linux/dma-mapping.h>
++#include <linux/gfp.h>
++#include <linux/highmem.h>
++
++#include <xen/features.h>
++
++static DEFINE_PER_CPU(unsigned long, xen_mm32_scratch_virt);
++static DEFINE_PER_CPU(pte_t *, xen_mm32_scratch_ptep);
++
++static int alloc_xen_mm32_scratch_page(int cpu)
++{
++	struct page *page;
++	unsigned long virt;
++	pmd_t *pmdp;
++	pte_t *ptep;
++
++	if (per_cpu(xen_mm32_scratch_ptep, cpu) != NULL)
++		return 0;
++
++	page = alloc_page(GFP_KERNEL);
++	if (page == NULL) {
++		pr_warn("Failed to allocate xen_mm32_scratch_page for cpu %d\n", cpu);
++		return -ENOMEM;
++	}
++
++	virt = (unsigned long)__va(page_to_phys(page));
++	pmdp = pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
++	ptep = pte_offset_kernel(pmdp, virt);
++
++	per_cpu(xen_mm32_scratch_virt, cpu) = virt;
++	per_cpu(xen_mm32_scratch_ptep, cpu) = ptep;
++
++	return 0;
++}
++
++static int xen_mm32_cpu_notify(struct notifier_block *self,
++				    unsigned long action, void *hcpu)
++{
++	int cpu = (long)hcpu;
++	switch (action) {
++	case CPU_UP_PREPARE:
++		if (alloc_xen_mm32_scratch_page(cpu))
++			return NOTIFY_BAD;
++		break;
++	default:
++		break;
++	}
++	return NOTIFY_OK;
++}
++
++static struct notifier_block xen_mm32_cpu_notifier = {
++	.notifier_call	= xen_mm32_cpu_notify,
++};
++
++static void* xen_mm32_remap_page(dma_addr_t handle)
++{
++	unsigned long virt = get_cpu_var(xen_mm32_scratch_virt);
++	pte_t *ptep = __get_cpu_var(xen_mm32_scratch_ptep);
++
++	*ptep = pfn_pte(handle >> PAGE_SHIFT, PAGE_KERNEL);
++	local_flush_tlb_kernel_page(virt);
++
++	return (void*)virt;
++}
++
++static void xen_mm32_unmap(void *vaddr)
++{
++	put_cpu_var(xen_mm32_scratch_virt);
++}
++
++
++/* functions called by SWIOTLB */
++
++static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
++	size_t size, enum dma_data_direction dir,
++	void (*op)(const void *, size_t, int))
++{
++	unsigned long pfn;
++	size_t left = size;
++
++	pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
++	offset %= PAGE_SIZE;
++
++	do {
++		size_t len = left;
++		void *vaddr;
++	
++		if (!pfn_valid(pfn))
++		{
++			/* Cannot map the page, we don't know its physical address.
++			 * Return and hope for the best */
++			if (!xen_feature(XENFEAT_grant_map_11))
++				return;
++			vaddr = xen_mm32_remap_page(handle) + offset;
++			op(vaddr, len, dir);
++			xen_mm32_unmap(vaddr - offset);
++		} else {
++			struct page *page = pfn_to_page(pfn);
++
++			if (PageHighMem(page)) {
++				if (len + offset > PAGE_SIZE)
++					len = PAGE_SIZE - offset;
++
++				if (cache_is_vipt_nonaliasing()) {
++					vaddr = kmap_atomic(page);
++					op(vaddr + offset, len, dir);
++					kunmap_atomic(vaddr);
++				} else {
++					vaddr = kmap_high_get(page);
++					if (vaddr) {
++						op(vaddr + offset, len, dir);
++						kunmap_high(page);
++					}
++				}
++			} else {
++				vaddr = page_address(page) + offset;
++				op(vaddr, len, dir);
++			}
++		}
++
++		offset = 0;
++		pfn++;
++		left -= len;
++	} while (left);
++}
++
++static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir)
++{
++	/* Cannot use __dma_page_dev_to_cpu because we don't have a
++	 * struct page for handle */
++
++	if (dir == DMA_TO_DEVICE)
++		outer_inv_range(handle, handle + size);
++
++	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
++}
++
++static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir)
++{
++
++	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
++
++	if (dir == DMA_FROM_DEVICE) {
++		outer_inv_range(handle, handle + size);
++	} else {
++		outer_clean_range(handle, handle + size);
++	}
++}
++
++void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs)
++
++{
++	if (!__generic_dma_ops(hwdev)->unmap_page)
++		return;
++	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
++		return;
++
++	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
++}
++
++void xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	if (!__generic_dma_ops(hwdev)->sync_single_for_cpu)
++		return;
++	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
++}
++
++void xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	if (!__generic_dma_ops(hwdev)->sync_single_for_device)
++		return;
++	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
++}
++
++int __init xen_mm32_init(void)
++{
++	int cpu;
++
++	if (!xen_initial_domain())
++		return 0;
++
++	register_cpu_notifier(&xen_mm32_cpu_notifier);
++	get_online_cpus();
++	for_each_online_cpu(cpu) {
++		if (alloc_xen_mm32_scratch_page(cpu)) {
++			put_online_cpus();
++			unregister_cpu_notifier(&xen_mm32_cpu_notifier);
++			return -ENOMEM;
++		}
++	}
++	put_online_cpus();
++
++	return 0;
++}
++arch_initcall(xen_mm32_init);
 -- 
 1.7.10.4
