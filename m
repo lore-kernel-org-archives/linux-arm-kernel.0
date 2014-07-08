@@ -1,65 +1,71 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Tue, 8 Jul 2014 14:04:32 +0200
-Subject: [PATCHv7 3/3] edac: altera: Add EDAC support for Altera SoC
- SDRAM Controller.
-In-Reply-To: <20140708115458.GC27659@pd.tnic>
-References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
- <1403730927-16163-4-git-send-email-tthayer@altera.com>
- <20140708113109.GC8100@amd.pavel.ucw.cz>
- <20140708114227.GB27659@pd.tnic>
- <20140708115205.GA8628@amd.pavel.ucw.cz>
- <20140708115458.GC27659@pd.tnic>
-Message-ID: <20140708120432.GB8628@amd.pavel.ucw.cz>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Jul 2014 08:10:10 -0400
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <53B116C6.80601@gmail.com>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140627130430.GH32514@n2100.arm.linux.org.uk>
+ <53AD724D.4020704@gmail.com>
+ <20140627133933.GJ23978@titan.lakedaemon.net>
+ <53AD7544.2060701@gmail.com>
+ <D0DC98AD-E460-42C9-B2F4-51EDDE371E31@lakedaemon.net>
+ <53ADAB8C.6070609@gmail.com>
+ <20140628145424.GK23978@titan.lakedaemon.net>
+ <53B116C6.80601@gmail.com>
+Message-ID: <20140708121010.GT23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2014-07-08 13:54:58, Borislav Petkov wrote:
-> On Tue, Jul 08, 2014 at 01:52:05PM +0200, Pavel Machek wrote:
-> > I'm not joking. Try to understand and verify the code above. You
-> > can't. The "descriptive macro names" are useless; all the code does is
-> > split register in pieces. With the numbers it would be  very obvious.
+Sebastian,
+
+On Mon, Jun 30, 2014 at 09:50:30AM +0200, Sebastian Hesselbarth wrote:
+> On 06/28/2014 04:54 PM, Jason Cooper wrote:
+> > On Fri, Jun 27, 2014 at 07:36:12PM +0200, Sebastian Hesselbarth wrote:
+> >> On 06/27/2014 06:49 PM, Jason Cooper wrote:
+> >>>> On Jun 27, 2014, at 9:44, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> >>> ...
+> >>>> And I am not sure, if we want to rely on some six numbers stored on
+> >>>> SPI flash, i.e. there is no magic nor header to be really sure, it
+> >>>> is a MAC address.
+> >>>
+> >>> It couldn't be compared with the MAC address of the nic?
+> >>
+> >> Sure, but if it is not equal it tells you nothing.
+> >>
+> >> You can change the NICs MAC in your bootloader, it will be different
+> >> from the numbers you read from SPI, and some mechanism will assume you
+> >> just made your production version into ES.
+> >>
+> >> We really want to introduce such a crutch?
+> > 
+> > Well, we need to keep in mind distro's concerns, but we don't need to
+> > (and shouldn't) attempt to solve them.
+> > 
+> > That's why I wanted to add a comment expressing the facts as best we
+> > know them.  We could also now add a link to this thread to assist future
+> > distro maintainers.
+> > 
+> > As this patch sits, it is an accurate description of the two variants of
+> > dove-based CuBoxes.  The fact that SolidRun didn't leave a clear
+> > differentiator is unfortunate, but we can't magic a solution out of our
+> > ass.  Nor should we block a patch because we can't.
 > 
-> No, you need to fix the names not switch to naked numbers.
+> Ok, I'll look through my eMails and Web again to collect some
+> differences and prepare a "add comment" only patch for the CuBox DTSs.
 
-Hiding numbers that are used just once into defines to put them out of
-sight does not really help readability.
+No rush, just a gentle ping.  ;-)
 
-Compare:
+> > It also might be worth reaching out to Rabeeh one more time and asking
+> > explicitly if there is a programmatic way to differentiate the two
+> > boards on the board itself.
+> 
+> Yeah, I remember someone said that there is a different SPI vendor on
+> production CuBox. That could be a way to tell them apart _if_ it is
+> used exclusively on production boxes.
+> 
+> But I'll ask Rabeeh about it again.
 
-+#define DRAMADDRW_COLBIT_MASK	0x001F
-+#define DRAMADDRW_COLBIT_LSB	0
-+#define DRAMADDRW_ROWBIT_MASK	0x02E0
-+#define DRAMADDRW_ROWBIT_LSB	5
-+#define DRAMADDRW_BANKBIT_MASK	0x1C00
-+#define DRAMADDRW_BANKBIT_LSB	10
-+#define DRAMADDRW_CSBIT_MASK	0xE000
-+#define DRAMADDRW_CSBIT_LSB	13
+any word from Rabeeh?
 
-(Insert few screens of code so that you have to scroll or split
-window).
+thx,
 
-What information do the define names have? None, I already know how
-hardware registers work.
-
-+	col = (read_reg & DRAMADDRW_COLBIT_MASK) >>
-+	     DRAMADDRW_COLBIT_LSB;
-+	row = (read_reg & DRAMADDRW_ROWBIT_MASK) >>
-+	     	 DRAMADDRW_ROWBIT_LSB;
-+	bank = (read_reg & DRAMADDRW_BANKBIT_MASK) >>
-+		      DRAMADDRW_BANKBIT_LSB;
-+	cs = (read_reg & DRAMADDRW_CSBIT_MASK) >>
-+		      	 DRAMADDRW_CSBIT_LSB;
-
-Instead, we could have:
-
-	 col = read_reg & 0x001F;
-	 row = (read_reg & 0x02E0) >> 5;
-	 bank = (read_reg & 0x1C00) >> 10;
-	 cs = (read_reg & 0xE000) >> 13;
-
-All information is preserved, code is shorter and easier to understand.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jason.
