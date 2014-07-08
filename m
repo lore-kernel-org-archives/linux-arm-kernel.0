@@ -1,39 +1,48 @@
-From: fitzsim@fitzsim.org (Thomas Fitzsimmons)
-Date: Tue, 08 Jul 2014 18:30:54 -0400
-Subject: [PATCH] net: mvneta: Fix big endian issue in mvneta_txq_desc_csum()
-Message-ID: <m31ttvqy8x.fsf@fitzsim.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Jul 2014 18:31:45 -0400
+Subject: [PATCH v6 01/21] irqchip: ARM: GIC: Move some bits of GICv2 to
+ a library-type file
+In-Reply-To: <1404140510-5382-2-git-send-email-marc.zyngier@arm.com>
+References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
+ <1404140510-5382-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140708223145.GG13433@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the command value generated for CSUM calculation
-when running in big endian mode.  The Ethernet protocol ID for IP was
-being unconditionally byte-swapped in the layer 3 protocol check (with
-swab16), which caused the mvneta driver to not function correctly in
-big endian mode.  This patch byte-swaps the ID conditionally with
-htons.
+Marc,
 
-Cc: <stable@vger.kernel.org> # v3.13+
-Signed-off-by: Thomas Fitzsimmons <fitzsim@fitzsim.org>
----
-The mvneta driver existed prior to v3.13, but it has only supported big
-endian from v3.13 onward.  If it's accepted, this patch needs to be
-backported for stable only as far back as v3.13.
+On Mon, Jun 30, 2014 at 04:01:30PM +0100, Marc Zyngier wrote:
+> A few GICv2 low-level function are actually very useful to GICv3,
+> and it makes some sense to share them across the two drivers.
+> They end-up in their own file, with an additional parameter used
+> to ensure an optional synchronization (unused on GICv2).
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/Makefile         |   2 +-
+>  drivers/irqchip/irq-gic-common.c | 115 +++++++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-common.h |  29 ++++++++++
+>  drivers/irqchip/irq-gic.c        |  59 ++------------------
+>  4 files changed, 149 insertions(+), 56 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-gic-common.c
+>  create mode 100644 drivers/irqchip/irq-gic-common.h
 
- drivers/net/ethernet/marvell/mvneta.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I've now applied this and patch #2 to irqchip/gic.  It'll be in -next
+tonight, and I'll merge it into /core at some point in the future.
+Probably after the other gic changes go on top of this.
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 45beca1..667cf65 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1207,7 +1207,7 @@ static u32 mvneta_txq_desc_csum(int l3_offs, int l3_proto,
- 	command =  l3_offs    << MVNETA_TX_L3_OFF_SHIFT;
- 	command |= ip_hdr_len << MVNETA_TX_IP_HLEN_SHIFT;
- 
--	if (l3_proto == swab16(ETH_P_IP))
-+	if (l3_proto == htons(ETH_P_IP))
- 		command |= MVNETA_TXD_IP_CSUM;
- 	else
- 		command |= MVNETA_TX_L3_IP6;
--- 
-1.7.1
+At any rate, unless you tell me it's all fouled up, this branch is
+stable.  Since I'll be adding more stuff on top, I've tagged this for
+you guys to pull:
+
+  git://git.infradead.org/users/jcooper/linux.git  tags/deps-irqchip-gic-3.17
+
+Please wait to send your pull request for changes depending on this
+branch until after you see Thomas send Linus the request for irq/core.
+
+thx,
+
+Jason.
