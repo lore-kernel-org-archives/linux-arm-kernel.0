@@ -1,71 +1,116 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 8 Jul 2014 19:49:00 +0200
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140708171817.GH4979@htj.dyndns.org>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
- <20140708170353.GA16148@kwain>
- <20140708171817.GH4979@htj.dyndns.org>
-Message-ID: <20140708174900.GC16148@kwain>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 8 Jul 2014 12:55:13 -0500
+Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <20140704082354.GD28884@atomide.com>
+References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
+ <1403660878-56350-3-git-send-email-s-anna@ti.com>
+ <20140628170709.GB23634@xo-6d-61-c0.localdomain> <53B18999.2020506@ti.com>
+ <20140630185942.GA5410@amd.pavel.ucw.cz> <53B1BBA8.5090507@ti.com>
+ <20140630203225.GA3893@amd.pavel.ucw.cz> <20140704064547.GZ28884@atomide.com>
+ <20140704080556.GA16274@amd.pavel.ucw.cz>
+ <20140704082354.GD28884@atomide.com>
+Message-ID: <53BC3081.9010402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 01:18:17PM -0400, Tejun Heo wrote:
-> Hello,
+Hi Tony, Pavel,
+
+On 07/04/2014 03:23 AM, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [140704 01:07]:
+>> Hi!
+>>
+>>>>>>>>> The non-DT support has to be maintained for now to not break
+>>>>>>>>> OMAP3 legacy boot, and the legacy-style code will be cleaned
+>>>>>>>>> up once OMAP3 is also converted to DT-boot only.
+>>>>>>>>
+>>>>>>>>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
+>>>>>>>>>  	return 0;
+>>>>>>>>>  }
+>>>>>>>>>  
+>>>>>>>>> +static const struct omap_mbox_device_data omap2_data = {
+>>>>>>>>> +	.num_users	= 4,
+>>>>>>>>> +	.num_fifos	= 6,
+>>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+>>>>>>>>> +};
+>>>>>>>>> +
+>>>>>>>>> +static const struct omap_mbox_device_data omap3_data = {
+>>>>>>>>> +	.num_users	= 2,
+>>>>>>>>> +	.num_fifos	= 2,
+>>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+>>>>>>>>> +};
+>>>>>>>>> +
+>>>>>>>>> +static const struct omap_mbox_device_data am335x_data = {
+>>>>>>>>> +	.num_users	= 4,
+>>>>>>>>> +	.num_fifos	= 8,
+>>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
+>>>>>>>>> +};
+>>>>>>>>
+>>
+>>>> Aha, ok, then the intr_type should be derived from
+>>>> compatible-string. Or rather... you should have three
+>>>> compatible-strings for the three possibilities? (And then subtype,
+>>>> currently unused, in case there are more hw differences).
+>>>
+>>> The compatible string can and should be separate for each revision
+>>> unless they are the same exacat hardware revision.
+>>
+>> ACK.
+
+I checked the revision register from all SoCs. OMAP2 and OMAP3 have
+different revisions compared to OMAP4+. All of OMAP4, OMAP5, DRA7,
+AM335x and AM437x have the same version, but with different num-fifos
+and num-users.  So, I can switch back to using omap4-mailbox for all of
+these SoCs only if we encode the num-fifos and num-users in DT.
+
+>>
+>>>>> two are HW IP design parameters, so in general putting them in DT isn't
+>>>>> completely a bad idea, but I will wait to see if there are any further
+>>>>> comments on this from Tony or DT maintainers before I make changes.
+>>>>
+>>>> Ok, right... I'd vote for putting them into DT.
+>>>
+>>> I would avoid adding custom DT properties where possible and let the
+>>> driver just initialize the right data based on the compatible flag.
+>>
+>> If these are HW IP design parameters, we can expect to see many
+>> different combinations. Yet we know ahead of time how to handle
+>> different parameters HW people select.
+
+That's right, the above OMAP4+ SoCs already demonstrate this behavior.
+
+>>
+>> Thus IMO we should do it in the device tree.
 > 
-> On Tue, Jul 08, 2014 at 07:03:53PM +0200, Antoine T?nart wrote:
-> > > So, hpriv->port is both input and output?  This is messy and can lead
-> > > to confusing failures and there now are multiple ways to modify
-> > > port_map.  If carrying this information through ahci_host_priv is
-> > > necessary, let's remove the direct params and introduce new input
-> > > fields to the struct.
-> > 
-> > We just use hpriv->port_map to check port_map is valid and describes
-> > available ports there.
-> > 
-> > hpriv->port_map is filed by the generic ahci_platform_get_resources()
-> > function when using the new bindings and not by the drivers. port_map is
-> > the input from the drivers.
+> Oh you mean from supporting new hardware with just .dts changes?
+> From that point of view it makes sense to have them as DT properties,
+> so I'm fine with that.
 > 
-> So, yeah, it's being used both as input and output and we also have
-> the arguments which affect port_map, right?  It does seem confusing.
+> Let's just try to use something that's generic like fifosize. No idea
+> how the property for num_fifos should be handled though as that
+> implies some knowledge in the driver which num_users have fifos?
 
-I do see priv->port_map as being automatically set and then restricted
-if needed by the port_map input here. I don't see how that's confusing.
-The only modification is we restrict the port_map parameter to the set
-of available ports. The port_map argument affected priv->port_map before
-this patch.
+The fifos are not per num_users, but rather the total number of fifos
+within the IP block. The num_users will be the number of targets the IP
+block can interrupt. I tried looking for generic properties, but there
+weren't any that seem to fit the description. If you want generic names,
+I can use num-fifos and num-users, otherwise will stick to the
+names defined in the previous series.
 
 > 
-> > Well, a had a review a week ago about in the PHY driver saying I should
-> > avoid using fixed sized arrays... And it was in a driver were we know
-> > the maximum number of PHY available.
-> > 
-> > I think in this case were the number of PHYs depends on the h/w, we should
-> > use a dynamically allocated array.
+> So unless that can be described clearly in a DT property as well,
+> the binding might be still unusable for new hardware :)
 > 
-> Well, so does clk.  Let's say clk is more restricted and phy can be
-> one or more per port and thus needs to be dynamic.  If so, shouldn't
-> we at least have some correlation between phys and ports?  It bothers
-> me that now libahci is carrying random number of resources that it has
-> no idea how to associate with the ports it manages.  What if later we
-> want to involve phy driver in power managing unoccupied ports?
 
-I see. This is a first (working) attempt to have a one node per port. I
-agree that would be nice to have a correlation between ports and PHYs.
-This can definitively be added when needed without changing the dt
-bindings as only the internal representation changes. This would also
-require to get all phys from the port nodes, which is again internal
-stuff.
+I don't expect the OMAP mailbox IP to change much in the future. There
+is a FIFO depth parameter as well, but that's constant in all the
+current versions, and even if they change it, I can already use the
+generic property for that.
 
-Don't you think we can go by steps, and have a following up series for
-this when needed (like in a power managing series for unoccupied ports)?
+Tony,
+Depending on the agreement here, I may have to respin the OMAP
+mailbox DT/hwmod cleanup series [1]
 
+regards
+Suman
 
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+[1] http://marc.info/?l=linux-omap&m=140365833121612&w=2
