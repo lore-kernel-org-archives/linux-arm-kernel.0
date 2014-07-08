@@ -1,82 +1,84 @@
 From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue,  8 Jul 2014 18:54:28 +0300
-Subject: [PATCH 2/3] mfd: qpnp-spmi: document DT bindings for Qualcomm QPNP
- PMICs
+Date: Tue,  8 Jul 2014 18:54:29 +0300
+Subject: [PATCH 3/3] dt: qcom: msm8974: add qpnp-spmi device nodes
 In-Reply-To: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
 References: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <1404834869-23049-3-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <1404834869-23049-4-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ivan T. Ivanov <iivanov@mm-sol.com>
 
-Document DT bindings used to describe the Qualcomm QPNP PMICs.
+The qpnp-spmi device nodes are childrens of spmi pmic arbiter.
+msm8974 SoC using two pmic chips pm8941 and pm8841. Every chip
+has two spmi-qpnp bus id's.
 
-Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 ---
- .../devicetree/bindings/qpnp/qcom,qpnp-spmi.txt    |   53 ++++++++++++++++++++
- 1 files changed, 53 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/qpnp/qcom,qpnp-spmi.txt
+ arch/arm/boot/dts/qcom-msm8974.dtsi |   45 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 45 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/qpnp/qcom,qpnp-spmi.txt b/Documentation/devicetree/bindings/qpnp/qcom,qpnp-spmi.txt
-new file mode 100644
-index 0000000..24cde34
---- /dev/null
-+++ b/Documentation/devicetree/bindings/qpnp/qcom,qpnp-spmi.txt
-@@ -0,0 +1,53 @@
-+Qualcomm QPNP partitioned PMIC multi-function device bindings
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 69dca2a..9166b8e 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -3,6 +3,7 @@
+ #include "skeleton.dtsi"
+ 
+ #include <dt-bindings/clock/qcom,gcc-msm8974.h>
++#include <dt-bindings/spmi/spmi.h>
+ 
+ / {
+ 	model = "Qualcomm MSM8974";
+@@ -236,5 +237,49 @@
+ 			#interrupt-cells = <2>;
+ 			interrupts = <0 208 0>;
+ 		};
 +
-+QPNP is effectively a partitioning scheme for dividing the SPMI extended
-+register space up into logical pieces, and set of fixed register
-+locations/definitions within these regions, with some of these regions
-+specifically used for interrupt handling.
++		spmi at fc4cf000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg-names = "core", "intr", "cnfg";
++			reg = <0xfc4cf000 0x1000>,
++			      <0xfc4cb000 0x1000>,
++			      <0xfc4ca000 0x1000>;
++			interrupt-names = "periph_irq";
++			interrupts = <0 190 0>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
 +
-+The QPNP PMICs are used with the Qualcomm Snapdragon series SoCs, and are
-+interfaced to the chip via the SPMI (System Power Management Interface) bus.
-+Support for multiple independent functions are implemented by splitting the
-+16-bit SPMI slave address space into 256 smaller fixed-size regions, 256 bytes
-+each. A function can consume one or more of these fixed-size register regions.
++			usid0: pm8941 at 0 {
++				compatible = "qcom,qpnp-spmi";
++				reg = <0x0 SPMI_USID>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
 +
-+Required properties:
-+- compatible:      Should contain "qcom,qpnp-spmi"
-+- reg:             Specifies the SPMI USID slave address for this device.
-+                   For more information see:
-+                   Documentation/devicetree/bindings/spmi/spmi.txt
-+- #address-cells:  Defines address cells for peripheral nodes - should be 1
-+- #size-cells:     Defines size cells for peripheral nodes - should be 0
++			usid1: pm8941 at 1 {
++				compatible = "qcom,qpnp-spmi";
++				reg = <0x1 SPMI_USID>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
 +
-+Required properties for peripheral child nodes:
-+- compatible:      Should constain "qcom,qpnp-xxx"
-+- reg:             One or more 16bits peripheral address(es)
++			usid4: pm8841 at 4 {
++				compatible = "qcom,qpnp-spmi";
++				reg = <0x4 SPMI_USID>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
 +
-+Optional properties for peripheral child nodes:
-+- reg-names:       Shall be a string describing the reg resource.
-+- interrupts:      Interrupts are specified as a 4-tuple. For more information
-+                   see:
-+                   Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
-+- interrupt-names: Corresponding interrupt name to the interrupts property
-+
-+Each child node represents a function of the QPNP.  Each child 'reg' entry
-+describes a QPNP peripheral address within the USID slave address space where
-+the region starts.
-+
-+Example:
-+
-+	pm8941 at 0 {
-+		compatible = "qcom,qpnp-spmi";
-+		reg = <0x0 SPMI_USID>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rtc at 6000 {
-+			compatible = "qcom,qpnp-rtc";
-+			reg = <0x6000 0x6100>;
-+			reg-names = "rtc", "alarm";
-+			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
++			usid5: pm8841 at 5 {
++				compatible = "qcom,qpnp-spmi";
++				reg = <0x5 SPMI_USID>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
 +		};
-+	};
-+
+ 	};
+ };
 -- 
 1.7.0.4
