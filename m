@@ -1,155 +1,55 @@
-From: matthew.d.roper@intel.com (Matt Roper)
-Date: Tue, 8 Jul 2014 16:51:24 -0700
-Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display
- Controller support
-In-Reply-To: <20140708190820.2a94723f@bbrezillon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
- <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
- <20140708092348.4ecdbb8f@bbrezillon>
- <CAF6AEGuUz7Td-9Hh31rYpn_Zros=ozK_ttv9FadHot6qAuaq1Q@mail.gmail.com>
- <20140708163731.6693a883@bbrezillon>
- <CAF6AEGuOYQbZ_Mgv+Y7oQO4kKmOEF=gwi0YcBXERE80nS2QL+g@mail.gmail.com>
- <20140708190820.2a94723f@bbrezillon>
-Message-ID: <20140708235124.GM31728@intel.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 8 Jul 2014 16:50:53 -0700
+Subject: timers & suspend
+In-Reply-To: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
+References: <f270ad9c-9906-445d-9e9a-4d3618787455@BY2FFO11FD039.protection.gbl>
+Message-ID: <2489e9cb-51c2-4901-9ab5-c952877d8a9d@BL2FFO11FD057.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 07:08:20PM +0200, Boris BREZILLON wrote:
-> On Tue, 8 Jul 2014 11:41:32 -0400
-> Rob Clark <robdclark@gmail.com> wrote:
+Let me extend the audience a bit.
+
+On Mon, 2014-06-30 at 11:39AM -0700, S?ren Brinkmann wrote:
+> Hi,
 > 
-> > On Tue, Jul 8, 2014 at 10:37 AM, Boris BREZILLON
-> > <boris.brezillon@free-electrons.com> wrote:
-> > > On Tue, 8 Jul 2014 08:49:41 -0400
-> > > Rob Clark <robdclark@gmail.com> wrote:
-> > >
-> > >> On Tue, Jul 8, 2014 at 3:23 AM, Boris BREZILLON
-> > >> <boris.brezillon@free-electrons.com> wrote:
-> > >> > Hello Rob,
-> > >> >
-> > >> > On Mon, 7 Jul 2014 23:45:54 -0400
-> > >> > Rob Clark <robdclark@gmail.com> wrote:
-> > >> >
-> > >> >> On Mon, Jul 7, 2014 at 12:42 PM, Boris BREZILLON
-> > >> >> <boris.brezillon@free-electrons.com> wrote:
-...
-> > >> >> > +/**
-> > >> >> > + * Atmel HLCDC Plane update request structure.
-> > >> >> > + *
-> > >> >> > + * @crtc_x: x position of the plane relative to the CRTC
-> > >> >> > + * @crtc_y: y position of the plane relative to the CRTC
-> > >> >> > + * @crtc_w: visible width of the plane
-> > >> >> > + * @crtc_h: visible height of the plane
-> > >> >> > + * @src_x: x buffer position
-> > >> >> > + * @src_y: y buffer position
-> > >> >> > + * @src_w: buffer width
-> > >> >> > + * @src_h: buffer height
-> > >> >> > + * @pixel_format: pixel format
-> > >> >> > + * @gems: GEM object object containing image buffers
-> > >> >> > + * @offsets: offsets to apply to the GEM buffers
-> > >> >> > + * @pitches: line size in bytes
-> > >> >> > + * @crtc: crtc to display on
-> > >> >> > + * @finished: finished callback
-> > >> >> > + * @finished_data: data passed to the finished callback
-> > >> >> > + * @bpp: bytes per pixel deduced from pixel_format
-> > >> >> > + * @xstride: value to add to the pixel pointer between each line
-> > >> >> > + * @pstride: value to add to the pixel pointer between each pixel
-> > >> >> > + * @nplanes: number of planes (deduced from pixel_format)
-> > >> >> > + */
-> > >> >> > +struct atmel_hlcdc_plane_update_req {
-> > >> >> > +       int crtc_x;
-> > >> >> > +       int crtc_y;
-> > >> >> > +       unsigned int crtc_w;
-> > >> >> > +       unsigned int crtc_h;
-> > >> >> > +       uint32_t src_x;
-> > >> >> > +       uint32_t src_y;
-> > >> >> > +       uint32_t src_w;
-> > >> >> > +       uint32_t src_h;
-> > >> >> > +       uint32_t pixel_format;
-> > >> >> > +       struct drm_gem_cma_object *gems[ATMEL_HLCDC_MAX_PLANES];
-> > >> >> > +       unsigned int offsets[ATMEL_HLCDC_MAX_PLANES];
-> > >> >> > +       unsigned int pitches[ATMEL_HLCDC_MAX_PLANES];
-> > >> >>
-> > >> >> tbh, I've only looked closely, but I don't completely follow all the
-> > >> >> layering here..  I wonder if we'd be better off just moving 'struct
-> > >> >> drm_fb_cma' to header file so you could get the gem objects / pixel
-> > >> >> fmt / width / height directly from the fb object (and then you can
-> > >> >> reference count things at the fb level, rather than at the individual
-> > >> >> gem obj level, too)
-> > >> >>
-> > >> >
-> > >> > Actually, the HW cursor is a drm_plane too, and in this case I cannot
-> > >> > retrieve a drm_fb_cma object, but just a single GEM object (see
-> > >> > atmel_hlcdc_crtc_cursor_set function in atmel_hlcdc_crtc.c).
-> > >>
-> > >> oh, right..  well maybe for the cursor case it would be possible to
-> > >> wrap up the gem bo with an internally created fb?  Not sure if that
-> > >> ends up simplifying things or not, so it is definitely your call.  But
-> > >> at least my experience with other drivers (that did not use a plane as
-> > >> a cursor internally) was that I could simplify things after fb gained
-> > >> refcnt'ing.
-> > >
-> > > Unless I'm missing something, I'd say moving to fb objects instead of
-> > > GEM objects won't simplify the code much (I'm already refcnt'ing GEM
-> > > objects when launching a DMA transfer for a plane update).
-> > 
-> > yeah, mostly just saves you a bit of bookkeeping.  Ie. ref/unref one
-> > thing instead of loop over N objects, etc.  Nothing earth-shattering.
-> > 
+> I'm currently working on suspend for Zynq and try to track down some
+> spurious wakes. It looks like the spurious wakes are caused by timers,
+> hence I was wondering whether there are any special requirements for
+> timer drivers when it comes to suspend support or if I just missed
+> something.
 > 
-> Okay, my bad, this is definitely simpler with fb objects (I made use of
-> drm_fb_cma_create to create an fb object when cursor_set is called)
-> than it was when using GEM objects.
+> Zynq sets the 'IRQCHIP_MASK_ON_SUSPEND' flag, which should mask all
+> interrupts but the wake source. Reading through kernel/irq/pm.c
+> indicates, that timer interrupts get some special treatment though.
+> Therefore I implemented some suspend/resume callbacks for the
+> cadence_ttc which disable and clear the timer's interrupts when going
+> into suspend. That seems to mitigate the issue quite a bit, but I still
+> saw spurious wakes - just a lot less often.
+> Digging a little deeper revealed, the spurious wakes are caused by the
+> ARM's smp_twd timer now. Given that that driver is probably used by a few
+> more ARM platforms, I get the feeling that I'm missing something.
 > 
-> I might even be able to simplify the layer update mechanism with this
-> approach.
-> 
-> Thanks for the advice.
-> 
-> Best Regards,
-> 
-> Boris
+> It's probably worth mentioning that the suspend state in Zynq does not
+> power off the CPU cores. It just asserts the resets on secondary cores
+> and the primary one waits in wfi.
 
-Hi Boris.
+I think I found the issue. When going into suspend, all device
+interrupts get disabled, but timers are kept running until very late.
+Then in kernel/power/suspend.c:
+ - arch_suspend_disable_irqs() disables interrupts (locally)
+ - syscore_suspend is called, which disables timers through
+   tick_suspend()
 
-I haven't really looked at any of your driver in depth, but from a quick
-glance it looks like you're registering a cursor drm_plane (i.e., making
-use of the new universal plane infrastructure), but you're also
-providing an implementation of the legacy cursor ioctls (cursor_set and
-cursor_move).  There's some patches working their way through the
-pipeline that should make this unnecessary and hopefully simplify your
-life a bit:
+I think what happens is: The interrupts get disabled locally, but the
+timers are still running and generating interrupts.
+Such an interrupt happens and stays pending since interrupts are already
+disabled and no longer handled.
+Then, since Zynq does not power off but only goes into wfi, it
+immediately resumes due to a pending timer IRQ.
 
-        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=c394c2b08e247c32ef292b75fd8b34312465f8ae
-        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=b36552b32aa9c69e83a3a20bda56379fb9e52435
-        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=161d0dc1dccb17ff7a38f462c7c0d4ef8bcc5662
-        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=fc1d3e44ef7c1db93384150fdbf8948dcf949f15
+Especially with the TTC this can happen quite often since it is only
+16 bit wide. But I also see spurious wakes caused by the twd.
 
-The third patch there is the one that's really important for your work.
-When a driver provides a cursor plane via the universal plane interface,
-cursor_set and cursor_move are automatically implemented for you by
-drm_mode_cursor_universal() in drivers/gpu/drm/drm_crtc.c and your
-legacy handlers will never get called.  drm_mode_cursor_universal() will
-take care of wrapping the bo's into a drm_framebuffer for you.
+Does that sound like a possible scenario?
 
-When I added the universal cursor stuff, I wanted to make sure that as
-soon as a driver starts supporting universal planes it can stop
-supporting the legacy ioctls directly; otherwise handling refcounting
-when userspace switches back and forth between calling legacy ioctl's
-and calling setplane() on a cursor plane would be a nightmare.
-
-I think those patches are only available in drm-intel-nightly at the
-moment and haven't moved on to drm-next and such yet, since i915 is the
-only driver that currently has patches to make use of cursors via the
-univeral plane interface (probably landing for kernel 3.17).
-
-
-Matt
-
--- 
-Matt Roper
-Graphics Software Engineer
-IoTG Platform Enabling & Development
-Intel Corporation
-(916) 356-2795
+	S?ren
