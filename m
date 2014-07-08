@@ -1,175 +1,71 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 8 Jul 2014 09:23:48 +0200
-Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display Controller
- support
-In-Reply-To: <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
- <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
-Message-ID: <20140708092348.4ecdbb8f@bbrezillon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 8 Jul 2014 09:24:08 +0200 (CEST)
+Subject: [PATCH] of: Use proper types for checking memory overflow
+In-Reply-To: <1404780343-32188-1-git-send-email-lauraa@codeaurora.org>
+References: <1404780343-32188-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <alpine.DEB.2.10.1407080923001.2561@Yrabib>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+On Mon, 7 Jul 2014, Laura Abbott wrote:
 
-On Mon, 7 Jul 2014 23:45:54 -0400
-Rob Clark <robdclark@gmail.com> wrote:
-
-> On Mon, Jul 7, 2014 at 12:42 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
-> > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> > controller device.
-> >
-> > This display controller supports at least one primary plane and might
-> > provide several overlays and an hardware cursor depending on the IP
-> > version.
-> >
-> > At the moment, this driver only implements an RGB connector to interface
-> > with LCD panels, but support for other kind of external devices (like DRM
-> > bridges) might be added later.
-> >
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/Kconfig                         |   2 +
-> >  drivers/gpu/drm/Makefile                        |   1 +
-> >  drivers/gpu/drm/atmel-hlcdc/Kconfig             |  11 +
-> >  drivers/gpu/drm/atmel-hlcdc/Makefile            |   7 +
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c  | 469 +++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c    | 474 +++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 210 +++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c | 706 +++++++++++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h | 422 ++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c | 351 ++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 729 ++++++++++++++++++++++++
-> >  11 files changed, 3382 insertions(+)
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> >
-> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-> > index d1cc2f6..df6f0c1 100644
-> > --- a/drivers/gpu/drm/Kconfig
-> > +++ b/drivers/gpu/drm/Kconfig
-> > @@ -182,6 +182,8 @@ source "drivers/gpu/drm/cirrus/Kconfig"
-
-[...]
-
-> > +
-> > +/**
-> > + * Atmel HLCDC Plane properties.
-> > + *
-> > + * This structure stores plane property definitions.
-> > + *
-> > + * @alpha: alpha blending (or transparency) property
-> > + * @csc: YUV to RGB conversion factors property
-> > + */
-> > +struct atmel_hlcdc_plane_properties {
-> > +       struct drm_property *alpha;
-> > +       struct drm_property *csc;
+> Commit a67a6ed15513541579d38bcbd127e7be170710e5
+> (of: Check for phys_addr_t overflows in early_init_dt_add_memory_arch)
+> corrected early_init_dt_add_memory_arch to account for overflows
+> but did so in an unclean way using ULONG_MAX. There is no
+> guarantee that sizeof(unsigned long) == sizeof(phys_addr_t).
+> Check against phys_addr_t instead.
 > 
-> appears like csc is not used yet, so I suppose you can drop it for
-> now..  when you do add it, don't forget to update drm.tmp.  But for
-> now it at least makes review easier when the driver doesn't add new
-> userspace interfaces :-)
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Sure, I guess this is a leftover from another patch I made to add Color
-Space Conversion configuration.
-
-I'll remove it for the next version.
-
+> ---
+>  drivers/of/fdt.c | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
 > 
-> > +};
-> > +
-> > +/**
-> > + * Atmel HLCDC Plane.
-> > + *
-> > + * @base: base DRM plane structure
-> > + * @layer: HLCDC layer structure
-> > + * @properties: pointer to the property definitions structure
-> > + * @alpha: current alpha blending (or transparency) status
-> > + */
-> > +struct atmel_hlcdc_plane {
-> > +       struct drm_plane base;
-> > +       struct atmel_hlcdc_layer layer;
-> > +       struct atmel_hlcdc_plane_properties *properties;
-> > +};
-> > +
-> > +static inline struct atmel_hlcdc_plane *
-> > +drm_plane_to_atmel_hlcdc_plane(struct drm_plane *p)
-> > +{
-> > +       return container_of(p, struct atmel_hlcdc_plane, base);
-> > +}
-> > +
-> > +static inline struct atmel_hlcdc_plane *
-> > +atmel_hlcdc_layer_to_plane(struct atmel_hlcdc_layer *l)
-> > +{
-> > +       return container_of(l, struct atmel_hlcdc_plane, layer);
-> > +}
-> > +
-> > +/**
-> > + * Atmel HLCDC Plane update request structure.
-> > + *
-> > + * @crtc_x: x position of the plane relative to the CRTC
-> > + * @crtc_y: y position of the plane relative to the CRTC
-> > + * @crtc_w: visible width of the plane
-> > + * @crtc_h: visible height of the plane
-> > + * @src_x: x buffer position
-> > + * @src_y: y buffer position
-> > + * @src_w: buffer width
-> > + * @src_h: buffer height
-> > + * @pixel_format: pixel format
-> > + * @gems: GEM object object containing image buffers
-> > + * @offsets: offsets to apply to the GEM buffers
-> > + * @pitches: line size in bytes
-> > + * @crtc: crtc to display on
-> > + * @finished: finished callback
-> > + * @finished_data: data passed to the finished callback
-> > + * @bpp: bytes per pixel deduced from pixel_format
-> > + * @xstride: value to add to the pixel pointer between each line
-> > + * @pstride: value to add to the pixel pointer between each pixel
-> > + * @nplanes: number of planes (deduced from pixel_format)
-> > + */
-> > +struct atmel_hlcdc_plane_update_req {
-> > +       int crtc_x;
-> > +       int crtc_y;
-> > +       unsigned int crtc_w;
-> > +       unsigned int crtc_h;
-> > +       uint32_t src_x;
-> > +       uint32_t src_y;
-> > +       uint32_t src_w;
-> > +       uint32_t src_h;
-> > +       uint32_t pixel_format;
-> > +       struct drm_gem_cma_object *gems[ATMEL_HLCDC_MAX_PLANES];
-> > +       unsigned int offsets[ATMEL_HLCDC_MAX_PLANES];
-> > +       unsigned int pitches[ATMEL_HLCDC_MAX_PLANES];
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index b777d8f..b88a68e 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -875,24 +875,24 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+>  }
+>  
+>  #ifdef CONFIG_HAVE_MEMBLOCK
+> +#define MAX_PHYS_ADDR	((phys_addr_t)~0)
+> +
+>  void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+>  {
+>  	const u64 phys_offset = __pa(PAGE_OFFSET);
+>  	base &= PAGE_MASK;
+>  	size &= PAGE_MASK;
+>  
+> -	if (sizeof(phys_addr_t) < sizeof(u64)) {
+> -		if (base > ULONG_MAX) {
+> -			pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> -					base, base + size);
+> -			return;
+> -		}
+> +	if (base > MAX_PHYS_ADDR) {
+> +		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> +				base, base + size);
+> +		return;
+> +	}
+>  
+> -		if (base + size > ULONG_MAX) {
+> -			pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
+> -					ULONG_MAX, base + size);
+> -			size = ULONG_MAX - base;
+> -		}
+> +	if (base + size > MAX_PHYS_ADDR) {
+> +		pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
+> +				ULONG_MAX, base + size);
+> +		size = MAX_PHYS_ADDR - base;
+>  	}
+>  
+>  	if (base + size < phys_offset) {
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> tbh, I've only looked closely, but I don't completely follow all the
-> layering here..  I wonder if we'd be better off just moving 'struct
-> drm_fb_cma' to header file so you could get the gem objects / pixel
-> fmt / width / height directly from the fb object (and then you can
-> reference count things at the fb level, rather than at the individual
-> gem obj level, too)
 > 
-
-Actually, the HW cursor is a drm_plane too, and in this case I cannot
-retrieve a drm_fb_cma object, but just a single GEM object (see
-atmel_hlcdc_crtc_cursor_set function in atmel_hlcdc_crtc.c).
-
-Let me know if you see a better solution.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
