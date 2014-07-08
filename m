@@ -1,65 +1,64 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 8 Jul 2014 14:59:15 -0700
-Subject: a case for a common efuse API?
-In-Reply-To: <53BC4DD7.20906@codeaurora.org>
-References: <53BC4DD7.20906@codeaurora.org>
-Message-ID: <CAJAp7OhUE4LmLtu5AMui_0ws-K_H__07VN=g2Frr0JCMn+Q5Gg@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Tue, 08 Jul 2014 15:24:05 -0700
+Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable coherent
+ HTW
+In-Reply-To: <20140703174321.GE17372@arm.com>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-8-git-send-email-ohaugan@codeaurora.org>
+ <e64e7ca617d64093bbe5dc7caf9283e1@BL2PR03MB468.namprd03.prod.outlook.com>
+ <53B48381.9050707@codeaurora.org> <20140703174321.GE17372@arm.com>
+Message-ID: <53BC6F85.5090301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 1:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Hi,
->
-> On MSM chips we have some efuses (called qfprom) where we store things
-> like calibration data, speed bins, etc. We need to read out data from
-> the efuses in various drivers like the cpufreq, thermal, etc. This
-> essentially boils down to a bunch of readls on the efuse from a handful
-> of different drivers. In devicetree this looks a little odd because
-> these drivers end up having an extra reg property (or two) that points
-> to a register in the efuse and some length, i.e you see this:
+On 7/3/2014 10:43 AM, Will Deacon wrote:
+> On Wed, Jul 02, 2014 at 11:11:13PM +0100, Olav Haugan wrote:
+>> On 7/1/2014 1:49 AM, Varun Sethi wrote:
+>>>
+>>>
+>>>> -----Original Message-----
+>>>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+>>>> bounces at lists.linux-foundation.org] On Behalf Of Olav Haugan
+>>>> Sent: Monday, June 30, 2014 10:22 PM
+>>>> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
+>>>> foundation.org
+>>>> Cc: linux-arm-msm at vger.kernel.org; will.deacon at arm.com;
+>>>> thierry.reding at gmail.com; vgandhi at codeaurora.org
+>>>> Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable
+>>>> coherent HTW
+>>>>
+>>>> Add a new iommu domain attribute that can be used to enable cache
+>>>> coherent hardware table walks (HTW) by the SMMU. HTW might be supported
+>>>> by the SMMU HW but depending on the use case and the usage of the SMMU in
+>>>> the SoC it might not be always beneficial to always turn on coherent HTW
+>>>> for all domains/iommu's.
+>>>>
+>>> [Sethi Varun-B16395] Why won't you want to use the coherent table walk feature?
+>>
+>> Very good question. We have found that turning on IOMMU coherent HTW is
+>> not always beneficial to performance (performance either the same or
+>> slightly worse in some cases). Even if the perf. is the same we would
+>> like to avoid using precious L2 cache for no benefit to the IOMMU.
+>> Although our HW supports this feature we don't always want to turn this
+>> on for a specific use case/domain (bus master).
+> 
+> Could we at least invert the feature flag, please? i.e. you set an attribute
+> to *disable* coherent walks? I'd also be interested to see some performance
+> numbers, as the added cacheflushing overhead from non-coherent walks is
+> going to be non-trivial.
+> 
 
-Not only does it look odd, but it limits the possible use to devices on the
-mmio bus.
+Yes, agree that we can do the inverse. On one SoC I saw about 5%
+degradation in performance with coherent table walk enabled for a
+specific bus master. However, we have seen improved performance also
+with other SMMUs/bus masters. It just depends on the SMMU/bus master and
+how it is being used. Hence the need to be able to disable this on a
+per-domain basis.
 
-[...]
-> It's been suggested that we use syscon for this, but I wonder if that is
-> the right thing to do. With a syscon you're usually writing some
-> registers that got lumped together with other registers that aren't
-> directly related to your driver. It doesn't seem like syscon is made for
-> reading fuses or other things like eeproms. Maybe I'm wrong though.
->
+Thanks,
 
-I've been thinking further about this since we discussed it; and I agree with
-you that this probably wasn't in the original plans for syscon.
+Olav Haugan
 
-But looking at the qfprom hardware, we have a span of 32 bit registers that's
-supposed to be accessed from various drivers. All these registers are the same
-size, so abstracting them with a mmio-regmap makes sense. All we need is a way
-for drivers to get a handle to this regmap.
-
-This was exactly what I implemented and then I realized that I had only created
-a copy of syscon (although readonly) and given it a different name.
-
-
-A potential addition to this would be to expose a (preferrably separate) api to
-fuse things, for factory use. But looking at the qfprom this is done by writing
-to different parts of the register space, so we could simply add a factory fuse
-driver on the side - once one is desired.
-
-> Using syscon would probably work if we could add a way to point to
-> offsets within the syscon node (the 0x18 part in the example). In my
-> specific use-case the calibration data may have different offsets
-> depending on which SoC the hardware is instantiated in so we could also
-> make syscon work if the compatible field for the sensor node indicates
-> which SoC it is.
->
-
-I'm not sure if other users of syscon would find a use for an xlate, if not
-then we could just have that as a separate property that lists the reg offsets
-within the syscon.
-
-Maybe there's some benefits of common naming of said property so we could put
-some common accessor functions somewhere?
-
-Regards,
-Bjorn
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
