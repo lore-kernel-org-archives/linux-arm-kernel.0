@@ -1,61 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jul 2014 08:46:53 -0400
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <20140708121252.GK21766@n2100.arm.linux.org.uk>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140708053434.GH28931@quad.lixom.net>
- <20140708115727.GR23978@titan.lakedaemon.net>
- <20140708121252.GK21766@n2100.arm.linux.org.uk>
-Message-ID: <20140708124653.GX23978@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 08 Jul 2014 05:49:10 -0700
+Subject: pull request for Tegra clock updates for 3.17 (update)
+In-Reply-To: <20140708105811.GA23132@tbergstrom-lnx.Nvidia.com>
+References: <20140708105811.GA23132@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140708124910.9850.46945@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 01:12:52PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 08, 2014 at 07:57:27AM -0400, Jason Cooper wrote:
-> > Can you offer any suggestions as to how you would like this resolved?  I
-> > thought when I voiced my opinion as above, and Russell didn't reply,
-> > there was implied acknowledgement...
+Quoting Peter De Schrijver (2014-07-08 03:58:12)
+> Hi Mike,
 > 
-> I didn't reply probably because I didn't see the message and/or I'm busy
-> with other stuff.
+> A few bug fixes for Tegra124 clocks and some updates for the SATA driver.
+> This pull request includes 1 more patch PLLE clocking to make it work for
+> both SATA and XUSB.
 
-Fair enough.
+Pulled.
 
-> I know that Sebastian asked Rabeeh on IRC yesterday whether the flash
-> chip type could be used to detect the difference between the two, but
-> has not yet received an answer.
+Thanks,
+Mike
 
-Ok.
-
-> As the two DT descriptions are mutually incompatible, there isn't much
-> choice.  And (afaik) there's no choice of updating the boot loader to
-> a version which can deal with DT - yes it may be u-boot, but I've no
-> idea if modern u-boot works on it, and I really would not like to try.
-
-Right, what I'm arguing for (since trimmed), is *not* bootloader
-upgrades.  I think Sebastian's changes are ok because:
-
- - Most users have production boxes (Sebastian's patches provide their
-   sane default)
-
- - Most users of mainline or distro kernels are appending the dtb, so
-   swapping out a dtb, while not ideal, isn't earth-shattering.
-
-The *only* failure condition I can see is what you already highlighted,
-people who don't know they have an engineering sample.  Sebastian's
-patches work for most people, and on the odd chance of the failure, the
-user simply appends the other dtb and reboots.
-
-Once we hear back from Rabeeh, at a minimum, we'll add a comment to the
-dts file for distro maintainers and users to find.  If possible, we'll
-add a hook in arch code to read from SPI and adjust the dtb accordingly.
-
-In either case, comment or code, the dts files changed in this series
-are correct and won't change.
-
-I'm sorry to be dense, Russell, but what am I missing from your
-objection?
-
-thx,
-
-Jason.
+> 
+> Thanks,
+> 
+> Peter.
+> 
+> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+> 
+>   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+> 
+> are available in the git repository at:
+>   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-3.17-1
+> 
+> Mikko Perttunen (3):
+>       clk: tegra: Enable hardware control of SATA PLL
+>       clk: tegra: Add SATA clocks to Tegra124 initialization table
+>       clk: tegra: Use XUSB-compatible SATA PLL sequence
+> 
+> Peter De Schrijver (3):
+>       clk: tegra: fix vi_sensor clocks on Tegra124
+>       clk: tegra124: init table updates
+>       clk: tegra: export clock names for debugging
+> 
+>  drivers/clk/tegra/clk-pll.c          |   19 +++++++++++++++++++
+>  drivers/clk/tegra/clk-tegra-periph.c |    4 ++--
+>  drivers/clk/tegra/clk-tegra114.c     |   31 ++++++++++++++++++++++++++++++-
+>  drivers/clk/tegra/clk-tegra124.c     |   10 +++++++++-
+>  drivers/clk/tegra/clk.c              |    6 ++++++
+>  5 files changed, 66 insertions(+), 4 deletions(-)
