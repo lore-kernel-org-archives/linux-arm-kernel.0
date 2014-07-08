@@ -1,41 +1,79 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 8 Jul 2014 20:40:24 -0300
-Subject: [PATCH v2 1/3] ethernet: Add new driver for Marvell Armada 375
- network unit
-In-Reply-To: <20140708.152655.619472955292197550.davem@davemloft.net>
-References: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1404561288-11720-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140708.152655.619472955292197550.davem@davemloft.net>
-Message-ID: <20140708234024.GA28830@arch.cereza>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 8 Jul 2014 16:43:50 -0700
+Subject: [PATCH 1/3] mfd: pm8921: Expose pm8xxx_read_irq_status
+In-Reply-To: <53BC7CBD.2060901@codeaurora.org>
+References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <53BC7CBD.2060901@codeaurora.org>
+Message-ID: <CAJAp7Ogy3=tZvMAUojbf5sy8EMmQOT+imA3=TRVcGXXA_y7CtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08 Jul 03:26 PM, David Miller wrote:
-> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date: Sat,  5 Jul 2014 08:54:46 -0300
-> 
-> > +module_param(rxq_number, int, S_IRUGO);
-> > +module_param(txq_number, int, S_IRUGO);
-> 
-> Please don't use module parameters (undocumented ones at that) for things
-> like this.
-> 
-> Instead, use or create standard interfaces which other drivers can use as
-> well, so that the user interface is consistent for setting things of this
-> nature regardless of device type.
-> 
+On Tue, Jul 8, 2014 at 4:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/07/14 18:26, Bjorn Andersson wrote:
+>> @@ -65,6 +66,41 @@ struct pm_irq_chip {
+>>       u8                      config[0];
+>>  };
+>>
+>> +int pm8xxx_read_irq_status(int irq)
+>> +{
+>> +     struct irq_data *d = irq_get_irq_data(irq);
+>> +     struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+>> +     unsigned int pmirq = irqd_to_hwirq(d);
+>> +     unsigned int bits;
+>> +     int irq_bit;
+>> +     u8 block;
+>> +     int rc;
+>> +
+>> +     if (!chip) {
+>> +             pr_err("Failed to resolve pm_irq_chip\n");
+>> +             return -EINVAL;
+>> +     }
+>
+> Is this actually necessary? Presumably the driver wouldn't have even
+> probed unless there was a pmic to begin with.
+>
 
-Hm... in fact these two parameters should be removed. They are redundant in
-this and the mvneta driver. The Rx queue number should be fixed and none of
-the drivers support more than 1.
+I had a bug in the calling driver, passing the wrong irq down to this
+function. But now that I think more about it I should probably check
+for "d" being non-NULL. On the other hand, that will still just catch
+a minor set of bugs as both of those will in most cases produce
+"valid" pointers.
 
-The Tx queue number should be set to the hardware supported one, there's no
-reason to use something different.
+Maybe it's okay to just trust the caller to pass a valid irq? Or do
+you have any other suggestion of sanity checking the input value?
+Preferably without also passing the pm_irq_chip pointer.
 
-So, unless someone objects, we'll remove them in v4.
+[...]
+> Sad, the header file came back. I guess there isn't a way to put the
+> pinctrl driver inside the core mfd driver? Then we wouldn't need to
+> expose an "irq read line" function.
+>
 
-Thanks for the feedback,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+I continued my search and this needs to be accessed by gpio, mpp, adc,
+charger, bms and usb(?). So we have to expose it in some form.
+
+> Actually Abhijeet proposed such an API in 2011 but it didn't go
+> anywhere[1]. If we had that API we should be able to call
+> read_irq_line() from the pinctrl driver whenever we want to get the
+> state of the gpio, plus the API is generic. We're going to need that API
+> anyway for things like USB insertion detection so it might make sense to
+> add it sooner rather than later.
+>
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/048319.html
+
+>From what I can see of this thread it was exposed as a way for drivers
+to be able to query if an interrupt handler was called on raising or
+falling edge. And based on the locking limitations of the
+implementation we couldn't have used it anyways.
+
+Our use case is different in that we're at any point in time
+interested in reading out the status of the irq line, as the only way
+of getting that status.
+
+It might be a long shot, but let's spin a patch for our purpose and
+run it by Tomas again.
+
+Regards,
+Bjorn
