@@ -1,183 +1,33 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Jul 2014 11:46:56 +0100
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140708005954.GC22939@google.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
- <20140708005954.GC22939@google.com>
-Message-ID: <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 8 Jul 2014 11:50:23 +0100
+Subject: [Xen-devel] [RFC PATCH 0/2] xen/arm: fix
+ "xen_add_mach_to_phys_entry: cannot add" problem
+In-Reply-To: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
+Message-ID: <53BBCCEF.1080704@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 01:59:54AM +0100, Bjorn Helgaas wrote:
-> On Tue, Jul 01, 2014 at 07:43:31PM +0100, Liviu Dudau wrote:
-> > Make it easier to discover the domain number of a bus by storing
-> > the number in pci_host_bridge for the root bus. Several architectures
-> > have their own way of storing this information, so it makes sense
-> > to try to unify the code. While at this, add a new function that
-> > creates a root bus in a given domain and make pci_create_root_bus()
-> > a wrapper around this function.
+On 07/07/14 21:24, Stefano Stabellini wrote:
+> Hi all,
+> Xen support in Linux for ARM and ARM64 suffers from lack of support for
+> multiple mfn to pfn mappings: whenever a frontend grants the same page
+> multiple times to the backend, the mfn to pfn accounting in
+> arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+> when xen-netfront/xen-netback switched from grant copies to grant
+> mappings, therefore causing the issue to happen much more often.
 > 
-> "While at this" is always a good clue that maybe something should be
-> split into a separate patch :)  This is a very good example, since it
-> adds a new interface that deserves its own changelog.
+> Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+> therefore we are looking for alternative solutions. One idea is avoiding
+> mfn to pfn conversions altogether. The only code path that needs them is
+> swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
+> 
+> To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+> Xen, see the attached patch. In Linux we use it to perform the cache
+> maintenance operations without mfns conversions.
 
-Yes, I'm coming to the same conclusion. :)
+This will only work with PIPT caches (or certain types of VIPT that also
+have alias detection).  Do all the CPUs that Xen runs on have these type
+of cache?
 
-> 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  drivers/pci/probe.c | 41 +++++++++++++++++++++++++++++++++--------
-> >  include/linux/pci.h |  4 ++++
-> >  2 files changed, 37 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 2c92662..abf5e82 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1748,8 +1748,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
-> >  {
-> >  }
-> >  
-> > -struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> > -		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-> > +struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
-> > +		int domain, int bus, struct pci_ops *ops, void *sysdata,
-> > +		struct list_head *resources)
-> 
-> I don't think we should do it this way; this makes it possible to have a
-> host bridge where "bridge->domain_nr != pci_domain_nr(bridge->bus)".
-> 
-> I wonder if it would help to make a weak pci_domain_nr() function that
-> returns "bridge->domain_nr".  Then each arch could individually drop its
-> pci_domain_nr() definition as it was converted, e.g., something like this:
-> 
->   - Convert every arch pci_domain_nr() from a #define to a non-inline
->     function
->   - Add bridge.domain_nr, initialized from pci_domain_nr()
->   - Add a weak generic pci_domain_nr() that returns bridge.domain_nr
->   - Add a way to create a host bridge in a specified domain, so we can
->     initialize bridge.domain_nr without using pci_domain_nr()
->   - Convert each arch to use the new creation mechanism and drop its
->     pci_domain_nr() implementation
-
-I will try to propose a patch implementing this.
-
-Best regards,
-Liviu
-
-> 
-> >  {
-> >  	int error;
-> >  	struct pci_host_bridge *bridge;
-> > @@ -1762,27 +1763,31 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >  
-> >  	bridge = pci_alloc_host_bridge();
-> >  	if (!bridge)
-> > -		return NULL;
-> > +		return ERR_PTR(-ENOMEM);
-> >  
-> >  	bridge->dev.parent = parent;
-> >  	bridge->dev.release = pci_release_host_bridge_dev;
-> > +	bridge->domain_nr = domain;
-> >  
-> >  	b = pci_alloc_bus();
-> > -	if (!b)
-> > +	if (!b) {
-> > +		error = -ENOMEM;
-> >  		goto err_out;
-> > +	}
-> >  
-> >  	b->sysdata = sysdata;
-> >  	b->ops = ops;
-> >  	b->number = b->busn_res.start = bus;
-> > -	b2 = pci_find_bus(pci_domain_nr(b), bus);
-> > +	b2 = pci_find_bus(bridge->domain_nr, bus);
-> >  	if (b2) {
-> >  		/* If we already got to this bus through a different bridge, ignore it */
-> >  		dev_dbg(&b2->dev, "bus already known\n");
-> > +		error = -EEXIST;
-> >  		goto err_bus_out;
-> >  	}
-> >  
-> >  	bridge->bus = b;
-> > -	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-> > +	dev_set_name(&bridge->dev, "pci%04x:%02x", bridge->domain_nr, bus);
-> >  	error = pcibios_root_bridge_prepare(bridge);
-> >  	if (error)
-> >  		goto err_out;
-> > @@ -1801,7 +1806,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >  
-> >  	b->dev.class = &pcibus_class;
-> >  	b->dev.parent = b->bridge;
-> > -	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
-> > +	dev_set_name(&b->dev, "%04x:%02x", bridge->domain_nr, bus);
-> >  	error = device_register(&b->dev);
-> >  	if (error)
-> >  		goto class_dev_reg_err;
-> > @@ -1851,7 +1856,27 @@ err_bus_out:
-> >  	kfree(b);
-> >  err_out:
-> >  	kfree(bridge);
-> > -	return NULL;
-> > +	return ERR_PTR(error);
-> > +}
-> > +
-> > +struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> > +		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-> > +{
-> > +	int domain_nr;
-> > +	struct pci_bus *b = pci_alloc_bus();
-> > +	if (!b)
-> > +		return NULL;
-> > +
-> > +	b->sysdata = sysdata;
-> > +	domain_nr = pci_domain_nr(b);
-> > +	kfree(b);
-> > +
-> > +	b = pci_create_root_bus_in_domain(parent, domain_nr, bus,
-> > +				ops, sysdata, resources);
-> > +	if (IS_ERR(b))
-> > +		return NULL;
-> > +
-> > +	return b;
-> >  }
-> >  
-> >  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
-> > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > index 466bcd1..7e7b939 100644
-> > --- a/include/linux/pci.h
-> > +++ b/include/linux/pci.h
-> > @@ -401,6 +401,7 @@ struct pci_host_bridge_window {
-> >  struct pci_host_bridge {
-> >  	struct device dev;
-> >  	struct pci_bus *bus;		/* root bus */
-> > +	int domain_nr;
-> >  	struct list_head windows;	/* pci_host_bridge_windows */
-> >  	void (*release_fn)(struct pci_host_bridge *);
-> >  	void *release_data;
-> > @@ -769,6 +770,9 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
-> >  struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >  				    struct pci_ops *ops, void *sysdata,
-> >  				    struct list_head *resources);
-> > +struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
-> > +			int domain, int bus, struct pci_ops *ops,
-> > +			void *sysdata, struct list_head *resources);
-> >  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
-> >  int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
-> >  void pci_bus_release_busn_res(struct pci_bus *b);
-> > -- 
-> > 2.0.0
-> > 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+David
