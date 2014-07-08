@@ -1,47 +1,42 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jul 2014 18:31:45 -0400
-Subject: [PATCH v6 01/21] irqchip: ARM: GIC: Move some bits of GICv2 to
- a library-type file
-In-Reply-To: <1404140510-5382-2-git-send-email-marc.zyngier@arm.com>
-References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
- <1404140510-5382-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140708223145.GG13433@titan.lakedaemon.net>
+Date: Tue, 8 Jul 2014 18:37:09 -0400
+Subject: [PATCH 0/3 V2] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+In-Reply-To: <1404314468-7674-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1404314468-7674-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <20140708223709.GH13433@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Suravee,
 
-On Mon, Jun 30, 2014 at 04:01:30PM +0100, Marc Zyngier wrote:
-> A few GICv2 low-level function are actually very useful to GICv3,
-> and it makes some sense to share them across the two drivers.
-> They end-up in their own file, with an additional parameter used
-> to ensure an optional synchronization (unused on GICv2).
+On Wed, Jul 02, 2014 at 10:21:05AM -0500, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/Makefile         |   2 +-
->  drivers/irqchip/irq-gic-common.c | 115 +++++++++++++++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-common.h |  29 ++++++++++
->  drivers/irqchip/irq-gic.c        |  59 ++------------------
->  4 files changed, 149 insertions(+), 56 deletions(-)
->  create mode 100644 drivers/irqchip/irq-gic-common.c
->  create mode 100644 drivers/irqchip/irq-gic-common.h
+> This patch set introduces support for MSI(-X) in GICv2m specification,
+> which is implemented in some variation of GIC400 (e.g. gic-400+).
+> 
+> This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
+> (https://lkml.org/lkml/2014/3/14/320).
+> 
+> Changes in V2:
+> Re-architect the code to:
+>     * Use irq_chip for gicv2m instead of using the gic_chip (per Marc suggestion).
+>     * Remove the overwriting of arch_setup_msi_irq and arch_setup_msi_irqs
+>       (per Marc suggestion).
+>     * Add devicetree matching for gic-400-plus for v2m stuff instread of
+>       re-using gic-400 just to be clear.
+>     * Misc fix/clean up per Mark Rutland and Marc Zyngier comments
+> 
+> Suravee Suthikulpanit (3):
+>   irqchip: gic: Add binding probe for ARM GIC400
+>   irqchip: gic: Restructuring ARM GIC code
+>   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
 
-I've now applied this and patch #2 to irqchip/gic.  It'll be in -next
-tonight, and I'll merge it into /core at some point in the future.
-Probably after the other gic changes go on top of this.
+I've now pulled in the first two patches of Marc's series into
+irqchip/gic.  Could you please rebase your changes on top of that?
 
-At any rate, unless you tell me it's all fouled up, this branch is
-stable.  Since I'll be adding more stuff on top, I've tagged this for
-you guys to pull:
-
-  git://git.infradead.org/users/jcooper/linux.git  tags/deps-irqchip-gic-3.17
-
-Please wait to send your pull request for changes depending on this
-branch until after you see Thomas send Linus the request for irq/core.
+Also, please get a handle on git send-email.  This series had broken
+threading and was sent out of order.
 
 thx,
 
