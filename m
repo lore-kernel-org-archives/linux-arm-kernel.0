@@ -1,52 +1,21 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 12:50:59 +0200
-Subject: [PATCH 4/6] pinctrl: exynos: Lock GPIOs as interrupts when used as
- EINTs
-In-Reply-To: <CACRpkdYD=6iV0qFRQrAf2TJc7tg=m2ZEr6SvhruEwsGQLzskSA@mail.gmail.com>
-References: <1404315664-3174-1-git-send-email-t.figa@samsung.com>
- <1404315664-3174-5-git-send-email-t.figa@samsung.com>
- <CACRpkdYD=6iV0qFRQrAf2TJc7tg=m2ZEr6SvhruEwsGQLzskSA@mail.gmail.com>
-Message-ID: <53BBCD13.7020902@samsung.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 8 Jul 2014 13:52:39 +0300
+Subject: pull request for Tegra clock updates for 3.17
+In-Reply-To: <20140703161740.GA6078@tbergstrom-lnx.Nvidia.com>
+References: <20140703161740.GA6078@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140708105239.GY3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 08.07.2014 11:03, Linus Walleij wrote:
-> On Wed, Jul 2, 2014 at 5:41 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+On Thu, Jul 03, 2014 at 06:17:40PM +0200, Peter De Schrijver wrote:
+> Hi Mike,
 > 
->> Currently after configuring a GPIO pin as an interrupt related pinmux
->> registers are changed, but there is no protection from calling
->> gpio_direction_*() in a badly written driver, which would cause the same
->> pinmux register to be reconfigured for regular input/output and this
->> disabling interrupt capability of the pin.
->>
->> This patch addresses this issue by moving pinmux reconfiguration to
->> .irq_startup() callback of irq_chip and calling gpio_lock_as_irq()
->> helper to prevent reconfiguration of pin direction.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> (...)
->> +               .irq_startup = exynos_irq_startup,
->> +               .irq_shutdown = exynos_irq_shutdown,
+> A few bug fixes for Tegra124 clocks and some updates for the SATA driver
 > 
-> I think you should be using the
-> .irq_request_resources and .irq_release_resources callbacks instead.
 > 
-> The reason is that startup and shutdown cannot really fail (ret code
-> is unsigned...), so using the other callbacks is safer.
 
-Hmm, I used the at91 pinctrl driver as an example, but I agree that
-request/release_resources would be better. I guess it should be changed
-there as well. [Ccing Jean-Jacques and Jean-Christophe]
+Did you pull this already? If not discard this pull request.
 
-> 
-> Can you have a quick look at this before I apply any more of the
-> Samsung patches?
+Thanks,
 
-The two remaining patches are pretty much independent from this one and
-rest of this series so please take a look at them while I prepare new
-version of this patch.
-
-Best regards,
-Tomasz
+Peter.
