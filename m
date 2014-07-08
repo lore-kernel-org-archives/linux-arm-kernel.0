@@ -1,25 +1,29 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 16:24:34 +0200
-Subject: [RFC PATCH 2/3] clk: samsung: register restart notifiers for
- s3c2412 and s3c2443
-In-Reply-To: <1436436.XH2jFxzQOf@diego>
-References: <1531376.ijR0PPyvmJ@diego> <1436436.XH2jFxzQOf@diego>
-Message-ID: <53BBFF22.10904@samsung.com>
+Date: Tue, 08 Jul 2014 16:25:49 +0200
+Subject: [PATCH v6 1/4] ARM: EXYNOS: Add support for mapping PMU base
+ address via DT
+In-Reply-To: <1404710376-16448-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1404710376-16448-1-git-send-email-pankaj.dubey@samsung.com>
+ <1404710376-16448-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <53BBFF6D.8070203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 06.07.2014 20:43, Heiko St?bner wrote:
-> S3C2412, S3C2443 and their derivatives contain a special software-reset
-> register in their system-controller.
+On 07.07.2014 07:19, Pankaj Dubey wrote:
+> Add support for mapping Samsung Power Management Unit (PMU)
+> base address from device tree.
 > 
-> Therefore register a restart-notifier for those.
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.h |    1 +
+>  arch/arm/mach-exynos/exynos.c |   37 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
+> 
 
-I wonder if we really need to differentiate between these SoCs instead
-of just using the watchdog reset for all of them. If there is no reason
-to prefer software reset, then some code could be removed and things
-would be more unified.
+Thanks for keeping up with addressing the comments.
 
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+--
 Best regards,
 Tomasz
