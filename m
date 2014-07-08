@@ -1,90 +1,41 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 08 Jul 2014 16:33:04 -0700
-Subject: [RFC PATCH 2/3] arm64: add C struct definition for Image header
-In-Reply-To: <CAKv+Gu8Qa86N7OSWXTp7XjJvPVa6_rKE_mnMBLJKWjoaabeH+A@mail.gmail.com>
-References: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404823803-7317-2-git-send-email-ard.biesheuvel@linaro.org>
- <1404848794.26155.31.camel@smoke>
- <CAKv+Gu8Qa86N7OSWXTp7XjJvPVa6_rKE_mnMBLJKWjoaabeH+A@mail.gmail.com>
-Message-ID: <1404862384.26155.49.camel@smoke>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 8 Jul 2014 20:40:24 -0300
+Subject: [PATCH v2 1/3] ethernet: Add new driver for Marvell Armada 375
+ network unit
+In-Reply-To: <20140708.152655.619472955292197550.davem@davemloft.net>
+References: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1404561288-11720-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140708.152655.619472955292197550.davem@davemloft.net>
+Message-ID: <20140708234024.GA28830@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, 2014-07-08 at 22:59 +0200, Ard Biesheuvel wrote:
-> On 8 July 2014 21:46, Geoff Levand <geoff@infradead.org> wrote:
-> > On Tue, 2014-07-08 at 14:50 +0200, Ard Biesheuvel wrote:
-> >
-> > I think the duplication of the structure definition in booting.txt
-> > and in image_hdr.h will not be maintained, so I recommend we remove
-> > the definition in booting.txt and replace it with something like:
-> >
-> > -The decompressed kernel image contains a 64-byte header as follows:
-> > ...
-> > +The decompressed kernel image contains a 64-byte header as described in
-> > +arch/arm64/include/asm/image_hdr.h.
-> >
-> >
+On 08 Jul 03:26 PM, David Miller wrote:
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Date: Sat,  5 Jul 2014 08:54:46 -0300
 > 
-> I see what you mean, but I will let the maintainers decide on that one.
-
-Why don't you make a separate patch that does it, then their
-decision on that won't effect this patch. 
-
-> >> + *
-> >> + * Copyright (C) 2014 Linaro Ltd  <ard.biesheuvel@linaro.org>
-> >
-> > Are you really a copyright holder of this code?
-> >
+> > +module_param(rxq_number, int, S_IRUGO);
+> > +module_param(txq_number, int, S_IRUGO);
 > 
-> I am the author of this file. Will is the author of booting.txt. I am
-> not a lawyer so whether that makes Linaro a copyright holder, I am not
-> sure ...
-> But as I understand it, someone needs to claim copyright in order for
-> others to be bound to the license.
-
-Well, authorship and ownership (copyright holder) are different
-things.  My guess is that your employment agreement makes everything
-you create the property of Linaro, so they are the copyright holder.
-You are just an author, so you shouldn't put yourself in the copyright
-notice.  Probably just add another line like:
-
-+ Author: <ard.biesheuvel@linaro.org>
-
-> >> +#define IMAGE_HDR_SIZE               64
-> >
-> > I can't see any use for this IMAGE_HDR_SIZE.  We have the
-> > structure def, so use sizeof.
-> >
+> Please don't use module parameters (undocumented ones at that) for things
+> like this.
 > 
-> I am using it in the BUILD_BUG_ON() below. Do you think that is overkill?
-
-Yes.  Even if someone changed something to make the size incorrect,
-what really matters is the offset of things.
-
-> > Please add a comment here to document this structure and the
-> > members, not in the structure itself.  Something like:
-> >
-> > +/**
-> > + * struct arm64_image_header - arm64 kernel image header.
-> > + *
-> > + * @code0: ...
-> >
+> Instead, use or create standard interfaces which other drivers can use as
+> well, so that the user interface is consistent for setting things of this
+> nature regardless of device type.
 > 
-> Is this coding style documented somewhere? Documentation/CodingStyle
-> does not seem to cover it ...
 
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kernel-doc-nano-HOWTO.txt
+Hm... in fact these two parameters should be removed. They are redundant in
+this and the mvneta driver. The Rx queue number should be fixed and none of
+the drivers support more than 1.
 
+The Tx queue number should be set to the hardware supported one, there's no
+reason to use something different.
 
-> >> +     return hdr->magic == cpu_to_le32(0x644d5241);
-> >> +}
-> 
-> Perhaps I should use a define here ...
+So, unless someone objects, we'll remove them in v4.
 
-Or a constant, which would have a type.  Something like this?
-
-+static const uint32_t magic_le = 0x644d5241U;
-
--Geoff
+Thanks for the feedback,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
