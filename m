@@ -1,100 +1,121 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 08 Jul 2014 08:55:10 +0200
-Subject: [linux-sunxi] Re: [PATCH v3 1/4] dt: bindings: add bindings for
- Broadcom bcm43xx sdio devices
-In-Reply-To: <20140707182302.GA29650@tuxdriver.com>
-References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
- <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
- <20140707182302.GA29650@tuxdriver.com>
-Message-ID: <53BB95CE.1010502@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Jul 2014 09:00:44 +0200
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140708001418.GB22939@google.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140708001418.GB22939@google.com>
+Message-ID: <201407080900.44882.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/07/2014 08:23 PM, John W. Linville wrote:
-> Any word from the devicetree folks?
-
-We changed the compatible string from brcm,bcm43xx-fmac to brcm,bcm4329-fmac
-at their request, that is the only feedback we've gotten from them AFAIK.
-
-Regards,
-
-Hans
-
+On Tuesday 08 July 2014, Bjorn Helgaas wrote:
+> On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
+> > +static LIST_HEAD(io_range_list);
+> > +
+> > +/*
+> > + * Record the PCI IO range (expressed as CPU physical address + size).
+> > + * Return a negative value if an error has occured, zero otherwise
+> > + */
+> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
 > 
-> On Sun, Jun 29, 2014 at 04:16:58PM +0200, Hans de Goede wrote:
->> From: Arend van Spriel <arend@broadcom.com>
->>
->> The Broadcom bcm43xx sdio devices are fullmac devices that may be
->> integrated in ARM platforms. Currently, the brcmfmac driver for
->> these devices support use of platform data. This patch specifies
->> the bindings that allow this platform data to be expressed in the
->> devicetree.
->>
->> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
->> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
->> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
->> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
->> Signed-off-by: Arend van Spriel <arend@broadcom.com>
->> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
->>  on how to handle this yet]
->> [hdegoede at redhat.com: move from bindings/staging to bindings]
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 41 ++++++++++++++++++++++
->>  1 file changed, 41 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->> new file mode 100644
->> index 0000000..5dbf169
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->> @@ -0,0 +1,41 @@
->> +Broadcom BCM43xx Fullmac wireless SDIO devices
->> +
->> +This node provides properties for controlling the Broadcom wireless device. The
->> +node is expected to be specified as a child node to the SDIO controller that
->> +connects the device to the system.
->> +
->> +Required properties:
->> +
->> + - compatible : Should be "brcm,bcm4329-fmac".
->> +
->> +Optional properties:
->> + - brcm,drive-strength : drive strength used for SDIO pins on device in mA
->> +	(default = 6).
->> + - interrupt-parent : the phandle for the interrupt controller to which the
->> +	device interrupts are connected.
->> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
->> +	When not specified the device will use in-band SDIO interrupts.
->> + - interrupt-names : name of the out-of-band interrupt, which must be set
->> +	to "host-wake".
->> +
->> +Example:
->> +
->> +mmc3: mmc at 01c12000 {
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->> +
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc3_pins_a>;
->> +	vmmc-supply = <&reg_vmmc3>;
->> +	bus-width = <4>;
->> +	non-removable;
->> +	status = "okay";
->> +
->> +	brcmf: bcrmf at 1 {
->> +		reg = <1>;
->> +		compatible = "brcm,bcm4329-fmac";
->> +		interrupt-parent = <&pio>;
->> +		interrupts = <10 8>; /* PH10 / EINT10 */
->> +		interrupt-names = "host-wake";
->> +	};
->> +};
->> -- 
->> 2.0.0
->>
->>
+> I don't understand the interface here.  What's the mapping from CPU
+> physical address to bus I/O port?  For example, I have the following
+> machine in mind:
 > 
+>   HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
+>   HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
+>   HWP0002:00: host bridge window [io  0x0000-0x0fff]
+> 
+>   HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
+>   HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
+>   HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
+> 
+> The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
+> the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
+> e.g., "inb(0)" to access it.
+> 
+> Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
+> bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
+> "inb(0x1000000)" to access it.
+
+I guess you are thinking of the IA64 model here where you keep the virtual
+I/O port numbers in a per-bus lookup table that gets accessed for each
+inb() call. I've thought about this some more, and I believe there are good
+reasons for sticking with the model used on arm32 and powerpc for the
+generic OF implementation.
+
+The idea is that there is a single virtual memory range for all I/O port
+mappings and we use the MMU to do the translation rather than computing
+it manually in the inb() implemnetation. The main advantage is that all
+functions used in device drivers to (potentially) access I/O ports
+become trivial this way, which helps for code size and in some cases
+(e.g. SoC-internal registers with a low latency) it may even be performance
+relevant.
+
+What this scheme gives you is a set of functions that literally do:
+
+/* architecture specific virtual address */
+#define PCI_IOBASE (void __iomem *)0xabcd00000000000
+
+static inline u32 inl(unsigned long port)
+{
+	return readl(port + PCI_IOBASE);
+}
+
+static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+{
+	return port + PCI_IOBASE;
+}
+
+static inline unsigned int ioread32(void __iomem *p)
+{
+	return readl(p);
+}
+
+Since we want this to work on 32-bit machines, the virtual I/O space has
+to be rather tightly packed, so Liviu's algorithm just picks the next
+available address for each new I/O space.
+
+> pci_register_io_range() seems sort of like it's intended to track the
+> memory-mapped IO port spaces, e.g., [mem 0xf8010000000-0xf8010000fff].
+> But I would think you'd want to keep track of at least the base port
+> number on the PCI bus, too.  Or is that why it's weak?
+
+The PCI bus start address only gets factored in when the window is registered
+with the PCI core in patch 8/9, where we go over all ranges doing
+
++               pci_add_resource_offset(resources, res,
++                               res->start - range.pci_addr);
+
+With Liviu's patch, this can be done in exactly the same way for both
+MMIO and PIO spaces.
+
+> Here's what these look like in /proc/iomem and /proc/ioports (note that
+> there are two resource structs for each memory-mapped IO port space: one
+> IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
+> driver), and one IORESOURCE_IO for the I/O port space (this becomes the
+> parent of a region used by a regular device driver):
+> 
+>   /proc/iomem:
+>     PCI Bus 0000:00 I/O Ports 00000000-00000fff
+>     PCI Bus 0001:00 I/O Ports 01000000-01000fff
+> 
+>   /proc/ioports:
+>     00000000-00000fff : PCI Bus 0000:00
+>     01000000-01000fff : PCI Bus 0001:00
+
+The only difference I'd expect here is that the last line would make it
+packed more tightly, so it's instead
+
+  /proc/ioports:
+     00000000-00000fff : PCI Bus 0000:00
+     00001000-00001fff : PCI Bus 0001:00
+
+In practice we'd probably have 64KB per host controller, and each of them 
+would be a separate domain. I think we normally don't register the
+IORESOURCE_MEM resource, but I agree it's a good idea and we should
+always do that.
+
+	Arnd
