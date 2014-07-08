@@ -1,33 +1,108 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 8 Jul 2014 16:43:59 +0300
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <20140707004417.GE8469@quad.lixom.net>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
-Message-ID: <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  8 Jul 2014 14:45:40 +0100
+Subject: [PATCH v2 02/15] ARM: pass IRQ domain to the core IRQ handler
+Message-ID: <1404827141-30381-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
-> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
-> > This branch moves code related to the Tegra fuses out of arch/arm and
-> > into a centralized location which could be shared with ARM64. It also
-> > adds support for reading the fuse data through sysfs.
-> 
-> The new/moved misc driver isn't acked by any misc maintainer, so I can't
-> take this branch.
-> 
-> I saw no indication from searching the mailing list of that either,
-> so it wasn't just a missed acked-by.
-> 
-> I wonder if this code should go under drivers/soc/ instead?
+Calling irq_find_mapping from outside a irq_{enter,exit} section is
+unsafe and produces ugly messages if CONFIG_PROVE_RCU is enabled:
+If coming from the idle state, the rcu_read_lock call in irq_find_mapping
+will generate an an unpleasant warning.
 
-It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
-Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
-and therefore it was moved to drivers/misc/fuse. I think that's the right
-place still. We anyway need this driver for sata and xhci.
+A solution is to add a new handle_domain_irq entry point into
+the arm code that the interrupt controller code can call.
+This new function takes an irq_domain, and calls into irq_find_domain
+inside the irq_{enter,exit} block.
 
-Cheers,
+Interrupt controllers can then be updated to use the new mechanism.
 
-Peter.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+Sending the right patch this time, with the missing includes that would
+otherwise break the build...
+
+ arch/arm/include/asm/irq.h |  2 ++
+ arch/arm/kernel/irq.c      | 25 +++++++++++++++++++++----
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 53c15de..8578811 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -24,10 +24,12 @@
+ #ifndef __ASSEMBLY__
+ struct irqaction;
+ struct pt_regs;
++struct irq_domain;
+ extern void migrate_irqs(void);
+ 
+ extern void asm_do_IRQ(unsigned int, struct pt_regs *);
+ void handle_IRQ(unsigned int, struct pt_regs *);
++void handle_domain_irq(struct irq_domain *, unsigned int, struct pt_regs *);
+ void init_IRQ(void);
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c42576..a9e37434 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -27,7 +27,9 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/irqchip.h>
++#include <linux/irqdomain.h>
+ #include <linux/random.h>
++#include <linux/ratelimit.h>
+ #include <linux/smp.h>
+ #include <linux/init.h>
+ #include <linux/seq_file.h>
+@@ -62,20 +64,30 @@ int arch_show_interrupts(struct seq_file *p, int prec)
+  * not come via this function.  Instead, they should provide their
+  * own 'handler'.  Used by platform code implementing C-based 1st
+  * level decoding.
++ *
++ * handle_domain_irq does the same thing, but also converts the HW
++ * interrupt number into a logical one using the provided domain. A
++ * NULL domain indicates that this conversion has already been done.
+  */
+-void handle_IRQ(unsigned int irq, struct pt_regs *regs)
++void handle_domain_irq(struct irq_domain *domain,
++		       unsigned int hwirq, struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
++	unsigned int irq;
+ 
+ 	irq_enter();
+ 
++	if (domain)
++		irq = irq_find_mapping(domain, hwirq);
++	else
++		irq = hwirq;
++
+ 	/*
+ 	 * Some hardware gives randomly wrong interrupts.  Rather
+ 	 * than crashing, do something sensible.
+ 	 */
+-	if (unlikely(irq >= nr_irqs)) {
+-		if (printk_ratelimit())
+-			printk(KERN_WARNING "Bad IRQ%u\n", irq);
++	if (unlikely(!irq || irq >= nr_irqs)) {
++		pr_warn_ratelimited("Bad IRQ%u (%u)\n", irq, hwirq);
+ 		ack_bad_irq(irq);
+ 	} else {
+ 		generic_handle_irq(irq);
+@@ -85,6 +97,11 @@ void handle_IRQ(unsigned int irq, struct pt_regs *regs)
+ 	set_irq_regs(old_regs);
+ }
+ 
++void handle_IRQ(unsigned int irq, struct pt_regs *regs)
++{
++	handle_domain_irq(NULL, irq, regs);
++}
++
+ /*
+  * asm_do_IRQ is the interface to be used from assembly code.
+  */
+-- 
+2.0.0
