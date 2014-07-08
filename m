@@ -1,39 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Jul 2014 01:13:28 -0700
-Subject: [PATCH V2] ARM: dts: OMAP5: Add device nodes for ABB
-In-Reply-To: <CAGo_u6peyH=VScObgLJxX5kS2J77y5WMsE0O71W4GPDpKaMV=g@mail.gmail.com>
-References: <1402017072-12599-1-git-send-email-nm@ti.com>
- <20140707113220.GQ28884@atomide.com>
- <CAGo_u6peyH=VScObgLJxX5kS2J77y5WMsE0O71W4GPDpKaMV=g@mail.gmail.com>
-Message-ID: <20140708081327.GB28884@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Jul 2014 10:12:59 +0200
+Subject: [PATCH 05/18] power: reset: Add AT91 reset driver
+In-Reply-To: <20140708080814.GL13423@lukather>
+References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
+ <F9547E0F-AB97-47E6-BA09-135EE4E1BC73@jcrosoft.com>
+ <20140703145957.GH31996@lukather>
+ <B425B925-B75E-4761-8CE6-9B12C5AC0469@jcrosoft.com>
+ <20140704091443.545d1e08@bbrezillon>
+ <20140704090645.GB13487@lukather>
+ <20140707184001.GH9558@ns203013.ovh.net>
+ <20140708080814.GL13423@lukather>
+Message-ID: <20140708081259.GM13423@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140707 07:25]:
-> On Mon, Jul 7, 2014 at 6:32 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Nishanth Menon <nm@ti.com> [140605 18:12]:
-> >> From: "Andrii.Tseglytskyi" <andrii.tseglytskyi@ti.com>
-> >>
-> >> Add ABB device nodes for OMAP5 family of devices. Data is based on
-> >> final production OMAP543x Technical Reference Manual revision Z (April 2013).
-> >> Final production Data Manual for OMAP5432 SWPS050F(APRIL 2014).
-> >>
-> >> [nm at ti.com: co-developer and updates to latest documentation]
-> >> Signed-off-by: Nishanth Menon <nm@ti.com>
-> >> Signed-off-by: Andrii.Tseglytskyi <andrii.tseglytskyi@ti.com>
-> >> ---
-> >> Original patch (v1): https://patchwork.kernel.org/patch/3555191/
-> >>
-> >> Rest of the series was accepted, however, I had to drop this
-> >> previously to ensure that the data we introduce is compatible with
-> >> production samples and existing pre-production samples on various
-> >> OMAP5uEVMs already in circulation.
-> >
-> > Is this OK to queue for v3.17 or do we need it for the -rc cycle?
-> >
+On Tue, Jul 08, 2014 at 10:08:14AM +0200, Maxime Ripard wrote:
+> On Mon, Jul 07, 2014 at 08:40:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > >> move this to an assembly file more easy to read than a C code
+> > > > > > 
+> > > > > > Nope. It's a pain to pass variable to an external assembly file, and
+> > > > > > this makes the use of global variable pretty much mandatory, which is
+> > > > > > definitely not great.
+> > > > > 
+> > > > > Not at all I did for the PM slow clock code just write a function and pas it as a parameter
+> > > > > you have 3
+> > > > > 
+> > > > > so basically you have to use the current and just pass at91_ramc_base[0], at91_ramc_base[1]
+> > > > > and at91_rstc_base
+> > > > > it?s 3 lignes of modification, if you have at91_ramc_base and at91_ramc_base same
+> > > > > 
+> > > > 
+> > > > Yes, retrieving function parameters from assembly code is not that
+> > > > complicated (the first 4 pointer values are accessible through r0-r3),
+> > > > but then you'll have to store your assembly file somewhere.
+> > > 
+> > > Like I was saying, there's a strong preference for the inline
+> > > assembly...
+> > 
+> > inline is horrible to read and maintain NACK
+> > 
+> > keep it in an assembly file it's so easy to read and follow
+> > 
+> > and you just have to move the file existing to the driver/power
 > 
-> .17 should be fine Tony. Thanks for following up.
+> Well, the whole rest of the kernel community feels otherwise.
 
-OK applying into omap-for-v3.17/fixes-not-urgent thanks.
+Thinking a bit more about this, would using symbolic names instead of
+the indices in the inline assembly work for you?
 
-Tony
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/d5341fb2/attachment.sig>
