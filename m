@@ -1,60 +1,81 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 8 Jul 2014 08:27:47 -0700
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
-References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
- <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
-Message-ID: <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Jul 2014 17:34:39 +0200
+Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
+In-Reply-To: <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
+References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
+ <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
+ <53A12EA3.5010007@samsung.com>
+ <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
+ <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
+Message-ID: <53BC0F8F.4010106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rahul,
 
-On Tue, Jul 8, 2014 at 12:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->
->> From: Doug Anderson <dianders@chromium.org>
+On 07.07.2014 15:37, Rahul Sharma wrote:
+> Hi Andrej, Inki,
+> 
+> On 18 June 2014 12:06, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>> Hi Andrej,
 >>
->> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
->> being reset across sleep/wake.  If we don't set it to anything then
->> the TPM will be reset.  U-Boot will detect this as invalid
->> and will reset the system on resume time. This GPIO can always be low
->> and not hurt anything.  It will get pulled back high again during a
->> normal warm reset when it will default back to an input.
+>> On 18 June 2014 11:46, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
+>>>> Hi All,
+>>>>
+>>>> Please review this patch.
+>>>>
+>>>> Regards,
+>>>> Rahul Sharma
+>>>>
+>>>> On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>>>>> Display domain is removed due to instability issues. Explaining
+>>>>> the problem below:
+>>>>>
+>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
+>>>>> powers off the unused power domains. This call hits before
+>>>>> the trigger to deferred probes.
+>>>>>
+>>>>> DRM DP Panel defers the probe due to supply get failure. By the
+>>>>> time, deferred probe is scheduled again, Display Power Domain is
+>>>>> powered off by pm_genpd_poweroff_unused.
+>>>>>
+>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
+>>>>> callbacks. If display domain is enabled/disabled around register
+>>>>> accesses, display domain gets unstable and we are getting Power
+>>>>> Domain Disable fail notification. Increasing the Timeout also
+>>>>> didn't help.
+>>>
+>>> As I understand the problem is that fimd and dp drivers access hw
+>>> registers without enabling power domain. So the proper solution is to
+>>> fix these drivers.
 >>
->> To properly preserve the TPM state across suspend/resume and to make
->> the chrome U-Boot happy, properly set the GPIO to mask the
->> reset to the TPM.
+>> That is also a problem but I fixed those accesses in my local kernel before
+>> hitting this issue. If we do register accesses in FIMD/DP probe/bind we
+>> observes "Prefetch abort" exception. But here the problem is that 'DP
+>> domain disable' starts failing if we enable/disable multiple times.
 >>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> (...)
->> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
->> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
->> +       compatible = "regulator-fixed";
->
-> No matter how the discussion ends up, regulator-fixed is wrong.
+>>>
+>>> Btw. there are already patches removing hw access from probe/bind of
+>>> fimd. I guess removing also hw access from dp probe/bind could be a good
+>>> solution.
+>>
+>> Please let me know the links for posted patches. I will test with those patches.
+> 
+> Is there any update on this? Please share the patches which fixes the
+> above issue or avoid the above scenario of multiple PM Domain enable/disable.
+> I will test them for exynos5 based boards. Otherwise we should get this change
+> merged else display will remain broken for exynos5 based boards.
 
-OK, fair enough.
+Andrzej is on holidays right now, so he won't be able to reply in this
+thread until he's back. Here are two patches I was able to find on the
+related MLs that might be fixing the cause of your issues:
 
+[PATCH] drm/exynos: remove hardware overlays disable from fimd probe
+(https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
 
-> Either folding it into the TPM driver or using a separate reset driver
-> is fine with me.
+[PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
+(https://lkml.org/lkml/2014/7/4/188)
 
-OK, Vikas: do you want to code up the driver?
-
-
-> So what about the generic delayed reset GPIO thing?
-> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
-
-That's a neat concept and could be useful in other cases, but I think
-it's just as much of a hack as using a regulator.  This is not a reset
-signal for the TPM.  This is a signal that will mask the CPU's reset
-signal (using a special bit of board-specific logic).
-
-
-Personally I think Tomasz's idea of using hogs (after his patches
-allowing a default output level) is the cleanest, but I think Stephen
-didn't like that.
-
--Doug
+Best regards,
+Tomasz
