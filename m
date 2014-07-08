@@ -1,27 +1,110 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  8 Jul 2014 17:11:40 +0200
-Subject: [PATCH 0/3] minor MSM cleanup
-Message-ID: <1404832303-14850-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue,  8 Jul 2014 17:11:41 +0200
+Subject: [PATCH 1/3] ARM: msm: delete dangling mahimahi board file
+In-Reply-To: <1404832303-14850-1-git-send-email-linus.walleij@linaro.org>
+References: <1404832303-14850-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1404832303-14850-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi MSM folks,
+This board file is not compiled, and includes header files that
+do not even exist so it can't be made to compile easily either.
+I assume it is a merge mistake, thus deleting it.
 
-here are some weird things I found when looking through the mach-msm
-folder, can you have a look at this and see if it's as unused as it
-looks to me?
-
-Linus Walleij (3):
-  ARM: msm: delete dangling mahimahi board file
-  ARM: msm: remove reference to MSM_SERIAL_DEBUGGER
-  ARM: msm: delete dangling debug UART code
-
- arch/arm/mach-msm/board-mahimahi.c   | 83 ------------------------------------
- arch/arm/mach-msm/board-msm7x30.c    |  2 +-
- arch/arm/mach-msm/board-trout-gpio.c |  5 ---
- arch/arm/mach-msm/board-trout.c      |  5 ---
- 4 files changed, 1 insertion(+), 94 deletions(-)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-msm/board-mahimahi.c | 83 --------------------------------------
+ 1 file changed, 83 deletions(-)
  delete mode 100644 arch/arm/mach-msm/board-mahimahi.c
 
+diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
+deleted file mode 100644
+index 873c3ca3cd7e..000000000000
+--- a/arch/arm/mach-msm/board-mahimahi.c
++++ /dev/null
+@@ -1,83 +0,0 @@
+-/* linux/arch/arm/mach-msm/board-mahimahi.c
+- *
+- * Copyright (C) 2009 Google, Inc.
+- * Copyright (C) 2009 HTC Corporation.
+- * Author: Dima Zavin <dima@android.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/gpio.h>
+-#include <linux/init.h>
+-#include <linux/input.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <linux/platform_device.h>
+-#include <linux/memblock.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/setup.h>
+-
+-#include <mach/hardware.h>
+-
+-#include "board-mahimahi.h"
+-#include "devices.h"
+-#include "proc_comm.h"
+-#include "common.h"
+-
+-static uint debug_uart;
+-
+-module_param_named(debug_uart, debug_uart, uint, 0);
+-
+-static struct platform_device *devices[] __initdata = {
+-#if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
+-	&msm_device_uart1,
+-#endif
+-	&msm_device_uart_dm1,
+-	&msm_device_nand,
+-};
+-
+-static void __init mahimahi_init(void)
+-{
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-}
+-
+-static void __init mahimahi_fixup(struct tag *tags, char **cmdline)
+-{
+-	memblock_add(PHYS_OFFSET, 219*SZ_1M);
+-	memblock_add(MSM_HIGHMEM_BASE, MSM_HIGHMEM_SIZE);
+-}
+-
+-static void __init mahimahi_map_io(void)
+-{
+-	msm_map_common_io();
+-	msm_clock_init();
+-}
+-
+-static void __init mahimahi_init_late(void)
+-{
+-	smd_debugfs_init();
+-}
+-
+-void msm_timer_init(void);
+-
+-MACHINE_START(MAHIMAHI, "mahimahi")
+-	.atag_offset	= 0x100,
+-	.fixup		= mahimahi_fixup,
+-	.map_io		= mahimahi_map_io,
+-	.init_irq	= msm_init_irq,
+-	.init_machine	= mahimahi_init,
+-	.init_late	= mahimahi_init_late,
+-	.init_time	= msm_timer_init,
+-MACHINE_END
 -- 
 1.9.3
