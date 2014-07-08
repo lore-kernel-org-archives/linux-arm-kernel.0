@@ -1,119 +1,178 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 8 Jul 2014 12:09:24 +0100
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140708092100.GA21320@arm.com>
-References: <20140523094513.GC9252@arm.com>
- <20140523131656.GR4179@bivouac.eciton.net>
- <20140523134720.GA9256@arm.com>
- <20140523150331.GS4179@bivouac.eciton.net>
- <20140708092100.GA21320@arm.com>
-Message-ID: <20140708110923.GO4179@bivouac.eciton.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  8 Jul 2014 12:09:06 +0100
+Subject: [PATCH v3 7/9] arm/arm64: KVM: vgic: delay vgic allocation until init
+ time
+In-Reply-To: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404817748-31302-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 10:21:00AM +0100, Catalin Marinas wrote:
-> I forgot about this thread. I think we need it sorted in some way.
+It is now quite easy to delay the allocation of the vgic tables
+until we actually require it to be up and running (when the first
+starting to kick around).
 
-Agreed.
+This allow us to allocate memory for the exact number of CPUs we
+have. As nobody configures the number of interrupts just yet,
+use a fallback to VGIC_NR_IRQS_LEGACY.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c     |  7 -------
+ include/kvm/arm_vgic.h |  1 -
+ virt/kvm/arm/vgic.c    | 42 +++++++++++++++++++++++++++++-------------
+ 3 files changed, 29 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 782632e..9b3957d 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -308,16 +308,9 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
  
-> On Fri, May 23, 2014 at 04:03:31PM +0100, Leif Lindholm wrote:
-> > My view is that this should be fixed in fdt_find_uefi_params(). A
-> > single info message that we can't find evidence of UEFI should be
-> > printed in the non-error case.
-> [...]
-> > diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> > index cd36deb..4bb42e1e 100644
-> > --- a/drivers/firmware/efi/efi.c
-> > +++ b/drivers/firmware/efi/efi.c
-> > @@ -366,11 +366,8 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
-> >  
-> >  	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-> >  		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
-> > -		if (!prop) {
-> > -			pr_err("Can't find %s in device tree!\n",
-> > -			       dt_params[i].name);
-> > -			return 0;
-> > -		}
-> > +		if (!prop)
-> > +			goto fail;
-> >  		dest = info->params + dt_params[i].offset;
-> >  
-> >  		val = of_read_number(prop, len / sizeof(u32));
-> > @@ -385,6 +382,14 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
-> >  				dt_params[i].size * 2, val);
-> >  	}
-> >  	return 1;
-> > +
-> > +	fail:
-> > +	if (i == 0)
-> > +		pr_info("  UEFI not found.\n");
-> > +	else
-> > +		pr_err("Can't find %s in device tree!\n", dt_params[i].name);
-> > +
-> > +	return 0;
-> 
-> I'm ok with the idea but I don't particularly like the implementation.
-> Does this look any better (functionally the same as yours)?
-
-It solves the problem, so sure.
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
-
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index eff1a2f22f09..dc79346689e6 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -346,6 +346,7 @@ static __initdata struct {
->  
->  struct param_info {
->  	int verbose;
-> +	int found;
->  	void *params;
->  };
->  
-> @@ -362,16 +363,12 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
->  	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
->  		return 0;
->  
-> -	pr_info("Getting parameters from FDT:\n");
-> -
->  	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
->  		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
-> -		if (!prop) {
-> -			pr_err("Can't find %s in device tree!\n",
-> -			       dt_params[i].name);
-> +		if (!prop)
->  			return 0;
-> -		}
->  		dest = info->params + dt_params[i].offset;
-> +		info->found++;
->  
->  		val = of_read_number(prop, len / sizeof(u32));
->  
-> @@ -390,10 +387,21 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
->  int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
->  {
->  	struct param_info info;
-> +	int ret;
-> +
-> +	pr_info("Getting EFI parameters from FDT:\n");
->  
->  	info.verbose = verbose;
-> +	info.found = 0;
->  	info.params = params;
->  
-> -	return of_scan_flat_dt(fdt_find_uefi_params, &info);
-> +	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
-> +	if (!info.found)
-> +		pr_info("UEFI not found.\n");
-> +	else if (!ret)
-> +		pr_err("Can't find '%s' in device tree!\n",
-> +		       dt_params[info.found].name);
-> +
-> +	return ret;
->  }
->  #endif /* CONFIG_EFI_PARAMS_FROM_FDT */
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+-	int ret;
+-
+ 	/* Force users to call KVM_ARM_VCPU_INIT */
+ 	vcpu->arch.target = -1;
+ 
+-	/* Set up VGIC */
+-	ret = kvm_vgic_vcpu_init(vcpu);
+-	if (ret)
+-		return ret;
+-
+ 	/* Set up the timer */
+ 	kvm_timer_vcpu_init(vcpu);
+ 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 9feb7fe..311a0f0 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -233,7 +233,6 @@ int kvm_vgic_hyp_init(void);
+ int kvm_vgic_init(struct kvm *kvm);
+ int kvm_vgic_create(struct kvm *kvm);
+ void kvm_vgic_destroy(struct kvm *kvm);
+-int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 47a14a1..708aed9 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1612,15 +1612,12 @@ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+  * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
+  * this vcpu and enable the VGIC for this VCPU
+  */
+-int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
++static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int i;
+ 
+-	if (vcpu->vcpu_id >= dist->nr_cpus)
+-		return -EBUSY;
+-
+ 	for (i = 0; i < dist->nr_irqs; i++) {
+ 		if (i < VGIC_NR_PPIS)
+ 			vgic_bitmap_set_irq_val(&dist->irq_enabled,
+@@ -1640,8 +1637,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	vgic_cpu->nr_lr = vgic->nr_lr;
+ 
+ 	vgic_enable(vcpu);
+-
+-	return 0;
+ }
+ 
+ static void vgic_init_maintenance_interrupt(void *info)
+@@ -1759,8 +1754,17 @@ static int vgic_init_maps(struct kvm *kvm)
+ 	int nr_cpus, nr_irqs;
+ 	int ret, i;
+ 
+-	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
++	if (dist->nr_cpus)	/* Already allocated */
++		return 0;
++
++	nr_cpus = dist->nr_cpus = atomic_read(&kvm->online_vcpus);
++	if (!nr_cpus)		/* No vcpus? Can't be good... */
++		return -EINVAL;
+ 
++	/*
++	 * If nobody configured the number of interrupts, use the
++	 * legacy one.
++	 */
+ 	if (!dist->nr_irqs)
+ 		dist->nr_irqs = VGIC_NR_IRQS_LEGACY;
+ 
+@@ -1804,6 +1808,9 @@ static int vgic_init_maps(struct kvm *kvm)
+ 		}
+ 	}
+ 
++	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
++		vgic_set_target_reg(kvm, 0, i);
++
+ out:
+ 	if (ret)
+ 		kvm_vgic_destroy(kvm);
+@@ -1822,6 +1829,7 @@ out:
+  */
+ int kvm_vgic_init(struct kvm *kvm)
+ {
++	struct kvm_vcpu *vcpu;
+ 	int ret = 0, i;
+ 
+ 	if (!irqchip_in_kernel(kvm))
+@@ -1839,6 +1847,12 @@ int kvm_vgic_init(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
++	ret = vgic_init_maps(kvm);
++	if (ret) {
++		kvm_err("Unable to allocate maps\n");
++		goto out;
++	}
++
+ 	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+ 				    vgic->vcpu_base, KVM_VGIC_V2_CPU_SIZE);
+ 	if (ret) {
+@@ -1846,11 +1860,13 @@ int kvm_vgic_init(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
+-	for (i = VGIC_NR_PRIVATE_IRQS; i < kvm->arch.vgic.nr_irqs; i += 4)
+-		vgic_set_target_reg(kvm, 0, i);
++	kvm_for_each_vcpu(i, vcpu, kvm)
++		kvm_vgic_vcpu_init(vcpu);
+ 
+ 	kvm->arch.vgic.ready = true;
+ out:
++	if (ret)
++		kvm_vgic_destroy(kvm);
+ 	mutex_unlock(&kvm->lock);
+ 	return ret;
+ }
+@@ -1891,10 +1907,6 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 
+-	ret = vgic_init_maps(kvm);
+-	if (ret)
+-		kvm_err("Unable to allocate maps\n");
+-
+ out_unlock:
+ 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+ 		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+@@ -2095,6 +2107,10 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 
+ 	mutex_lock(&dev->kvm->lock);
+ 
++	ret = vgic_init_maps(dev->kvm);
++	if (ret)
++		goto out;
++
+ 	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
+ 		ret = -EINVAL;
+ 		goto out;
+-- 
+2.0.0
