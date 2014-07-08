@@ -1,49 +1,54 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 8 Jul 2014 16:40:46 +0100
-Subject: [PATCH v2 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot add"
- problem
-Message-ID: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+Date: Tue, 8 Jul 2014 16:42:10 +0100
+Subject: [PATCH v2 1/3] xen/arm: introduce XENFEAT_grant_map_11
+In-Reply-To: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+Message-ID: <1404834132-15847-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-Xen support in Linux for ARM and ARM64 suffers from lack of support for
-multiple mfn to pfn mappings: whenever a frontend grants the same page
-multiple times to the backend, the mfn to pfn accounting in
-arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
-when xen-netfront/xen-netback switched from grant copies to grant
-mappings, therefore causing the issue to happen much more often.
+The flag tells us that the hypervisor maps a grant page to guest
+physical address == machine address of the page in addition to the
+normal grant mapping address. It is needed to properly issue cache
+maintenance operation at the completion of a DMA operation involving a
+foreign grant.
 
-Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
-therefore we are looking for alternative solutions. One idea is avoiding
-mfn to pfn conversions altogether. The only code path that needs them is
-swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c         |    6 ++++++
+ include/xen/interface/features.h |    3 +++
+ 2 files changed, 9 insertions(+)
 
-To avoid mfn to pfn conversions we rely on a second p2m mapping done by
-Xen (a separate patch series will be sent for Xen). In Linux we use it
-to perform the cache maintenance operations without mfns conversions.
-
-
-Changes in v2:
-- introduce XENFEAT_grant_map_11;
-- remeber the ptep corresponding to scratch pages so that we don't need
-to calculate it again every time;
-- do not acutally unmap the page on xen_mm32_unmap;
-- properly account preempt_enable/disable;
-- do not check for mfn in xen_add_phys_to_mach_entry.
-
-
-Stefano Stabellini (3):
-      xen/arm: introduce XENFEAT_grant_map_11
-      xen/arm: reimplement xen_dma_unmap_page & friends
-      xen/arm: remove mach_to_phys rbtree
-
- arch/arm/include/asm/xen/page-coherent.h |   25 ++--
- arch/arm/include/asm/xen/page.h          |    9 --
- arch/arm/xen/Makefile                    |    2 +-
- arch/arm/xen/enlighten.c                 |    6 +
- arch/arm/xen/mm32.c                      |  202 ++++++++++++++++++++++++++++++
- arch/arm/xen/p2m.c                       |   66 +---------
- include/xen/interface/features.h         |    3 +
- 7 files changed, 220 insertions(+), 93 deletions(-)
- create mode 100644 arch/arm/xen/mm32.c
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index b96723e..ee3135a 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+ 	xen_setup_features();
++
++	if (!xen_feature(XENFEAT_grant_map_11)) {
++		pr_warn("Please upgrade your Xen.\n"
++				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
++	}
++
+ 	if (xen_feature(XENFEAT_dom0))
+ 		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+ 	else
+diff --git a/include/xen/interface/features.h b/include/xen/interface/features.h
+index 131a6cc..6517dd5 100644
+--- a/include/xen/interface/features.h
++++ b/include/xen/interface/features.h
+@@ -53,6 +53,9 @@
+ /* operation as Dom0 is supported */
+ #define XENFEAT_dom0                      11
+ 
++/* Xen also maps grant references at pfn = mfn */
++#define XENFEAT_grant_map_11              12
++
+ #define XENFEAT_NR_SUBMAPS 1
+ 
+ #endif /* __XEN_PUBLIC_FEATURES_H__ */
+-- 
+1.7.10.4
