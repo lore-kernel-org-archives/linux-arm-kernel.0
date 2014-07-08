@@ -1,48 +1,132 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 8 Jul 2014 11:49:09 +0530
-Subject: [PATCH 1/1] ARM: imx: use PTR_ERR_OR_ZERO
-In-Reply-To: <20140708051916.GB26257@dragon>
-References: <1404500590-21712-1-git-send-email-fabf@skynet.be>
- <20140707055521.GM30239@dragon>
- <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
- <20140708051916.GB26257@dragon>
-Message-ID: <CAK5sBcEfL2oXBW+fiNwMeTxeBckmxtjQL52+-OXwj2nrMvhy4A@mail.gmail.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Tue, 8 Jul 2014 06:25:13 +0000
+Subject: [PATCH 4/5] [RFC] ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
+References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
+ <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAFC085@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 10:49 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Tue, Jul 08, 2014 at 09:18:56AM +0530, Sachin Kamat wrote:
->> Hi Shawn,
->>
->> On Mon, Jul 7, 2014 at 11:25 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
->> > On Fri, Jul 04, 2014 at 09:03:10PM +0200, Fabian Frederick wrote:
->> >> replace IS_ERR/PTR_ERR
->> >>
->> >> Cc: Shawn Guo <shawn.guo@freescale.com>
->> >> Cc: Sascha Hauer <kernel@pengutronix.de>
->> >> Cc: linux-arm-kernel at lists.infradead.org
->> >> Signed-off-by: Fabian Frederick <fabf@skynet.be>
->> >
->> > Applied, thanks.
->>
->>
->> I had sent a similar series [1] in May which you rejected. Just
->> curious if something
->> changed between then and now?
->
-> The main difference is this is the second attempt from a different
-> person to "clean up" the code.  I'm still not fond of the change, but
-> I'm getting tied to tell people about that, so just applied the change,
-> since after all it at least gives some good diffstat.
->
-> I would prefer Fabian's patch over yours because it's really good
-> enough to have one patch than 5 patches in a series to do the change for
-> IMX platform.
+Hi Cristoph,
 
-Doesn't really matter whose patches are in. I was just curious to know
-the change
-in logic at this point of time. Thanks for clarification.
+>From: Pekon Gupta <Pekon@ti.com>
+>>From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
+>>
+>>Most dt omap3 boards configure nand-ecc-opt as bch8. Due
+>>to lack of hardware elm support, bch8 software implementation
+>>gets set.
+>>
+>>Since commit 0611c41934ab35ce84dea "ARM: OMAP2+: gpmc: update
+>>gpmc_hwecc_bch_capable() for new platforms and ECC schemes",
+>>nand support stops working.
+>>
+>>This patch allows ecc software fallback.
+>
+>Pleas add following tag at top of commit message.
+>
+>Fixes: commit 0611c41934ab35ce84dea34ab291897ad3cbc7be
+>ARM: OMAP2+: gpmc: update gpmc_hwecc_bch_capable() for new platforms and ECC schemes
+>
+>And please mark it for 3.15 stable if this gets accepted after 3.15-rcx.
+>Cc: <stable@vger.kernel.org> # 3.15.x+
+>
+>
+>>---
+>> arch/arm/mach-omap2/gpmc-nand.c |   16 ++++++----------
+>> 1 file changed, 6 insertions(+), 10 deletions(-)
+>>
+>>diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+>>index 4349e82..52c4834 100644
+>>--- a/arch/arm/mach-omap2/gpmc-nand.c
+>>+++ b/arch/arm/mach-omap2/gpmc-nand.c
+>>@@ -43,13 +43,17 @@ static struct platform_device gpmc_nand_device = {
+>> 	.resource	= gpmc_nand_resource,
+>> };
+>>
+>>-static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+>>+static bool gpmc_ecc_bch_capable(enum omap_ecc ecc_opt)
+>
+>I don't think this renaming is really required with this fix, so please
+>drop it and just keep it simple only for OMAP3 fix.
+>
+>
+>> {
+>> 	/* platforms which support all ECC schemes */
+>> 	if (soc_is_am33xx() || cpu_is_omap44xx() ||
+>> 		 soc_is_omap54xx() || soc_is_dra7xx())
+>> 		return 1;
+>>
+>>+	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
+>>+		(ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))
+>>+		return 1;
+>>+
+>
+>Note: Some very old legacy platforms have initial version of GPMC engine
+>which only supports Hamming ECC, and not BCH ECC scheme, so lets
+>filter them out to maintain backward compatibility.
+>
+>(1) As per TRM, OMAP2 platform does not support BCH ECC schemes,
+>      So please filter out OMAP2 devices from this check ...
+>
+>(2) I don't know the history but below comment says:
+>"* For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1"
+>
+>if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
+>	 (ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))  {
+>	if (cpu_is_omap24xx())
+>		return 0;
+>	else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
+>		return 0;
+>	else
+>		return 1;
+>}
+>
+>
+>> 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
+>> 	 * which require H/W based ECC error detection */
+>> 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
+>>@@ -57,14 +61,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+>> 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
+>> 		return 0;
+>>
+>>-	/*
+>>-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
+>>-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
+>>-	 */
+>>-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
+>>-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
+>>-		return 0;
+>>-
+>Thanks for removing this, I too wasn't confident of this either.
+>
+>
+>> 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
+>> 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
+>> 		return 1;
+>>@@ -140,7 +136,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+>>
+>> 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
+>>
+>>-	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
+>>+	if (!gpmc_ecc_bch_capable(gpmc_nand_data->ecc_opt)) {
+>
+>Please drop this renaming from this patch.
+>
+>> 		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
+>> 		return -EINVAL;
+>> 	}
+>>--
+>>1.7.10.4
+>
+>You may send this patch separately apart from the series, so that
+>this gets accepted in current 3.15-rcx.
+>
+>with regards, Pekon
 
--- 
-Regards,
-Sachin.
+Do you plan to re-spin this patch with above comments, and mark it for stable?
+It would be helpful for all OMAP3 users.
+
+
+with regards, pekon
