@@ -1,61 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 8 Jul 2014 14:33:09 +0200
-Subject: [PATCH] s3cmci: Move to clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <1404155466-2971-1-git-send-email-anarsoul@gmail.com>
-References: <1404155466-2971-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <CAPDyKFqqgCPp6j_nnAs_2PoyGhEubN_sKv8zWd8UkLy6mAXVVA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 8 Jul 2014 13:53:26 +0200
+Subject: [PATCH] regulator: core: Still free GPIOs using gpio_free()
+In-Reply-To: <CACRpkdZ7ai0AShAen=AkaorHt0ObhYCDC-OuHG-9nVb3LLt3KQ@mail.gmail.com>
+References: <1404215726-2480-1-git-send-email-broonie@kernel.org>
+ <20140701120622.GJ32514@n2100.arm.linux.org.uk>
+ <20140701121142.GM23300@sirena.org.uk>
+ <CAAVeFuJqRW0ih8Mg9MFwLf=wQ7eVK5+pm8deW0vTUdozJ16FfQ@mail.gmail.com>
+ <20140701122717.GN23300@sirena.org.uk>
+ <CACRpkdZ7ai0AShAen=AkaorHt0ObhYCDC-OuHG-9nVb3LLt3KQ@mail.gmail.com>
+Message-ID: <20140708115326.GU30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2014 21:11, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> Use clk_prepare_enable/clk_disable_unprepare to make the driver
-> work properly with common clock framework.
->
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On Tue, Jul 08, 2014 at 10:33:23AM +0200, Linus Walleij wrote:
+> On Tue, Jul 1, 2014 at 2:27 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Thanks! Applied for next.
+> > Right, but Linus said we didn't need this conversion to descriptors so
+> > I'm a bit confused as to what the issue he was raising was.
 
-I took the liberty to add the prefix "mmc" to heading of the commit msg.
+> Now I'm probably confusing myself...
 
-Kind regards
-Uffe
+> All drivers should as far as possible use descriptors internally, doing
+> things like gpio_to_desc() only for backward-compatibility where
+> necessary, with the intent of eventually ridding the integer interfaces
+> entirely.
 
+> It may be an eternal project, but hey, we are atleast two of us
+> pursuing it.
 
-> ---
->  drivers/mmc/host/s3cmci.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-> index 0d115a8..e5516a2 100644
-> --- a/drivers/mmc/host/s3cmci.c
-> +++ b/drivers/mmc/host/s3cmci.c
-> @@ -1707,7 +1707,7 @@ static int s3cmci_probe(struct platform_device *pdev)
->                 goto probe_free_dma;
->         }
->
-> -       ret = clk_enable(host->clk);
-> +       ret = clk_prepare_enable(host->clk);
->         if (ret) {
->                 dev_err(&pdev->dev, "failed to enable clock source.\n");
->                 goto clk_free;
-> @@ -1765,7 +1765,7 @@ static int s3cmci_probe(struct platform_device *pdev)
->         s3cmci_cpufreq_deregister(host);
->
->   free_dmabuf:
-> -       clk_disable(host->clk);
-> +       clk_disable_unprepare(host->clk);
->
->   clk_free:
->         clk_put(host->clk);
-> @@ -1817,7 +1817,7 @@ static void s3cmci_shutdown(struct platform_device *pdev)
->         s3cmci_debugfs_remove(host);
->         s3cmci_cpufreq_deregister(host);
->         mmc_remove_host(mmc);
-> -       clk_disable(host->clk);
-> +       clk_disable_unprepare(host->clk);
->  }
->
->  static int s3cmci_remove(struct platform_device *pdev)
-> --
-> 2.0.0
->
+OK, so in that case Russell's code should be fine then and we don't need
+to do anything - great!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/7ce51eba/attachment.sig>
