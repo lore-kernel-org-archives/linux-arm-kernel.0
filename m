@@ -1,43 +1,37 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 8 Jul 2014 15:09:14 -0400
-Subject: [PATCH v2 1/8] dma: sun4i: Add support for the DMA engine on
- sun[457]i SoCs
-In-Reply-To: <1404619518-7592-2-git-send-email-emilio@elopez.com.ar>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-2-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAKON4Ow4qNrOoHAiT3E62D4Tw3kKe7FNmXEP=OO+qfxdU8mFmQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Jul 2014 14:09:12 -0500
+Subject: [PATCH 1/3] regulators: tps65218: fix DCDC4 linear voltage range
+Message-ID: <1404846554-4095-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 6, 2014 at 12:05 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> This patch adds support for the DMA engine present on Allwinner A10,
+The second range of this particular regulator,
+starts at 1.60V, not as 1.55V as it was originally
+implied by code.
 
-ALSA only programs in the destination bus width and burst. So the
-source buswidth is DMA_SLAVE_BUSWIDTH_UNDEFINED = 0.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-In this driver that results in the source buswidth being set to 8 and
-burst set to 1 for the source which disagree with what the Allwinner
-code does. To agree with the Allwinner code
-DMA_SLAVE_BUSWIDTH_UNDEFINED should cause the dest width/burst to get
-copied to the src width/burst.
+based on datasheet only. Also boot tested on another,
+yet-to-be-released HW.?A 50mV difference is probably
+not a big deal for any users of DCDC4 but it's still
+good to be correct.
 
-void snd_dmaengine_pcm_set_config_from_dai_data(
-const struct snd_pcm_substream *substream,
-const struct snd_dmaengine_dai_dma_data *dma_data,
-struct dma_slave_config *slave_config)
-{
-if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-slave_config->dst_addr = dma_data->addr;
-slave_config->dst_maxburst = dma_data->maxburst;
-if (dma_data->addr_width != DMA_SLAVE_BUSWIDTH_UNDEFINED)
-slave_config->dst_addr_width = dma_data->addr_width;
-} else {
-slave_config->src_addr = dma_data->addr;
-slave_config->src_maxburst = dma_data->maxburst;
-if (dma_data->addr_width != DMA_SLAVE_BUSWIDTH_UNDEFINED)
-slave_config->src_addr_width = dma_data->addr_width;
-}
+ drivers/regulator/tps65218-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-slave_config->slave_id = dma_data->slave_id;
-}
-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_set_config_from_dai_data);
+diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+index 9effe48..8b7a0a9 100644
+--- a/drivers/regulator/tps65218-regulator.c
++++ b/drivers/regulator/tps65218-regulator.c
+@@ -68,7 +68,7 @@ static const struct regulator_linear_range ldo1_dcdc3_ranges[] = {
+ 
+ static const struct regulator_linear_range dcdc4_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1175000, 0x0, 0xf, 25000),
+-	REGULATOR_LINEAR_RANGE(1550000, 0x10, 0x34, 50000),
++	REGULATOR_LINEAR_RANGE(1600000, 0x10, 0x34, 50000),
+ };
+ 
+ static struct tps_info tps65218_pmic_regs[] = {
+-- 
+2.0.0.390.gcb682f8
