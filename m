@@ -1,169 +1,137 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 7 Jul 2014 18:14:18 -0600
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140708001418.GB22939@google.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 7 Jul 2014 17:16:51 -0700
+Subject: [PATCH] mtd: nand: stm_nand_bch: add new driver
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAFAFF1@DBDE04.ent.ti.com>
+References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
+ <20140703002237.GM3599@ld-irv-0074>
+ <20980858CB6D3A4BAE95CA194937D5E73EAFAFF1@DBDE04.ent.ti.com>
+Message-ID: <20140708001651.GD7537@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
-> Some architectures do not have a simple view of the PCI I/O space
-> and instead use a range of CPU addresses that map to bus addresses. For
-> some architectures these ranges will be expressed by OF bindings
-> in a device tree file.
+Hi Lee, Pekon,
+
+A few additions/corrections to Pekon's comments.
+
+On Thu, Jul 03, 2014 at 09:09:27AM +0000, Pekon Gupta wrote:
+> >From: Brian Norris [mailto:computersforpeace at gmail.com]
+> >On Wed, May 28, 2014 at 10:20:05AM +0100, Lee Jones wrote:
+> >> diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
+> >> index bc5818d..7a6a6e8 100644
+> >> --- a/arch/arm/boot/dts/stih41x-b2020.dtsi
+> >> +++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
+> >> @@ -52,5 +52,45 @@
+> >>  			pinctrl-0	= <&pinctrl_rgmii1>;
+> >>  		};
+> >>
+> >> +		nandbch: nand-bch {
+> >
+> >Shouldn't this be named 'nand at xxxxxxxx', 'flash at xxxxxxxx', or similar?
+> >
+> >> +			compatible = "st,nand-bch";
+> >> +			reg = <0xfe901000 0x1000>, <0xfef00800 0x0800>;
+> >> +			reg-names = "nand_mem", "nand_dma";
+> >> +			interrupts = <0 139 0x0>;
+> >> +			interrupt-names = "nand_irq";
+> >> +			st,nand-banks = <&nand_banks>;
+> >> +			nand-ecc-strength = <0xFF>;
 > 
-> Introduce a pci_register_io_range() helper function with a generic
-> implementation that can be used by such architectures to keep track
-> of the I/O ranges described by the PCI bindings. If the PCI_IOBASE
-> macro is not defined that signals lack of support for PCI and we
-> return an error.
+> nit-pick to save yourself from another patch re-spin, Please use lower-case hex :-)
+
+Or in this case, drop the property altogether. I believe
+nand-ecc-strength = 255 is a misuse of the binding, as Lee intended it
+to mean "automatic". (It makes more sense to say that a missing
+"nand-ecc-strength" property means Linux can 'automatically' choose.)
+
+> >> +
+> >> +			status = "okay";
+> >> +		};
+> >> +
+...
+
+> >> +static void bch_wait_seq(struct nandi_controller *nandi)
+> >> +{
+> >> +	int ret;
+> >> +
+> >> +	ret = wait_for_completion_timeout(&nandi->seq_completed, HZ/2);
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  drivers/of/address.c       | 61 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_address.h |  1 +
->  2 files changed, 62 insertions(+)
+> Are you sure you want to use same timeout value for all operations
+> like ERASE, READ, WRITE ? because
+> (1) There is wide variance between:
+> - BLOCK_ERASE:  max(tBER) = 10ms) for MT29F4G08 Micron NAND
+> - PAGE_ERASE: max(tPROG) = 600usec for same Micron part.
 > 
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 5edfcb0..1345733 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -5,6 +5,7 @@
->  #include <linux/module.h>
->  #include <linux/of_address.h>
->  #include <linux/pci_regs.h>
-> +#include <linux/slab.h>
->  #include <linux/string.h>
->  
->  /* Max address size we deal with */
-> @@ -601,12 +602,72 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
->  }
->  EXPORT_SYMBOL(of_get_address);
->  
-> +struct io_range {
-> +	struct list_head list;
-> +	phys_addr_t start;
-> +	resource_size_t size;
-> +};
-> +
-> +static LIST_HEAD(io_range_list);
-> +
-> +/*
-> + * Record the PCI IO range (expressed as CPU physical address + size).
-> + * Return a negative value if an error has occured, zero otherwise
-> + */
-> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> (2) The value of HZ varies across kernel versions and hardware platforms.
 
-I don't understand the interface here.  What's the mapping from CPU
-physical address to bus I/O port?  For example, I have the following
-machine in mind:
+Lee's use of HZ is correct. HZ represents one second, and it is useful
+for giving an (approximate) timeout that is independent of timer tick
+rate. It is equivalent to msecs_to_jiffies(1000), for example.
 
-  HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
-  HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
-  HWP0002:00: host bridge window [io  0x0000-0x0fff]
+> I suggest you pass the timeout value in call to bch_wait_seq().
+> And this timeout value should be like 2x of typical value of which you found
+> during ONFI parsing, or from DT
 
-  HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
-  HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
-  HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
+I'm not sure it's very important to get a precise timeout value. It's
+especially not worth a DT binding. Timeouts should be the exception, not
+the rule, and should not be relied on (for example) for good performance.
 
-The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
-the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
-e.g., "inb(0)" to access it.
-
-Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
-bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
-"inb(0x1000000)" to access it.
-
-pci_register_io_range() seems sort of like it's intended to track the
-memory-mapped IO port spaces, e.g., [mem 0xf8010000000-0xf8010000fff].
-But I would think you'd want to keep track of at least the base port
-number on the PCI bus, too.  Or is that why it's weak?
-
-Here's what these look like in /proc/iomem and /proc/ioports (note that
-there are two resource structs for each memory-mapped IO port space: one
-IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
-driver), and one IORESOURCE_IO for the I/O port space (this becomes the
-parent of a region used by a regular device driver):
-
-  /proc/iomem:
-    PCI Bus 0000:00 I/O Ports 00000000-00000fff
-    PCI Bus 0001:00 I/O Ports 01000000-01000fff
-
-  /proc/ioports:
-    00000000-00000fff : PCI Bus 0000:00
-    01000000-01000fff : PCI Bus 0001:00
-
-> +{
-> +#ifdef PCI_IOBASE
-> +	struct io_range *res;
-> +	resource_size_t allocated_size = 0;
-> +
-> +	/* check if the range hasn't been previously recorded */
-> +	list_for_each_entry(res, &io_range_list, list) {
-> +		if (addr >= res->start && addr + size <= res->start + size)
-> +			return 0;
-> +		allocated_size += res->size;
-> +	}
-> +
-> +	/* range not registed yet, check for available space */
-> +	if (allocated_size + size - 1 > IO_SPACE_LIMIT)
-> +		return -E2BIG;
-> +
-> +	/* add the range to the list */
-> +	res = kzalloc(sizeof(*res), GFP_KERNEL);
-> +	if (!res)
-> +		return -ENOMEM;
-> +
-> +	res->start = addr;
-> +	res->size = size;
-> +
-> +	list_add_tail(&res->list, &io_range_list);
-> +
-> +	return 0;
-> +#else
-> +	return -EINVAL;
-> +#endif
-> +}
-> +
->  unsigned long __weak pci_address_to_pio(phys_addr_t address)
->  {
-> +#ifdef PCI_IOBASE
-> +	struct io_range *res;
-> +	resource_size_t offset = 0;
-> +
-> +	list_for_each_entry(res, &io_range_list, list) {
-> +		if (address >= res->start &&
-> +			address < res->start + res->size) {
-> +			return res->start - address + offset;
-> +		}
-> +		offset += res->size;
-> +	}
-> +
-> +	return (unsigned long)-1;
-> +#else
->  	if (address > IO_SPACE_LIMIT)
->  		return (unsigned long)-1;
->  
->  	return (unsigned long) address;
-> +#endif
->  }
->  
->  static int __of_address_to_resource(struct device_node *dev,
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index c13b878..ac4aac4 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -55,6 +55,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
->  extern const __be32 *of_get_address(struct device_node *dev, int index,
->  			   u64 *size, unsigned int *flags);
->  
-> +extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
->  extern unsigned long pci_address_to_pio(phys_addr_t addr);
->  
->  extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
-> -- 
-> 2.0.0
+> >> +	if (!ret)
+> >> +		dev_err(nandi->dev, "BCH Seq timeout\n");
+> >> +}
+> >> +
+...
+> >> +	/* Load last page of block */
+> >> +	offs = (loff_t)block << chip->phys_erase_shift;
+> >> +	offs += mtd->erasesize - mtd->writesize;
+> >> +	if (bch_read_page(nandi, offs, buf) < 0) {
 > 
+> *Important*: You shouldn't call internal functions directly here..
+> Instead use chip->_read() OR mtd-read() that will:
+
+Probably looking for mtd_read()?
+
+> - keep this code independent of ECC modes added in your driver in future.
+> - implicitly handle updating mtd->ecc_stat (like ecc_failed, bits_corrected).
+> - implicitly take care of address alignments checks and offset calculations.
+> 
+> <Same applies to other places where you have directly used bch_read_page())
+
+I agree. And this would help with my request that you separate your ST
+BBT code from the rest of your driver.
+
+> >> +struct stm_plat_nand_bch_data {
+> >> +	struct stm_nand_bank_data *bank;
+> >> +	enum stm_nand_bch_ecc_config bch_ecc_cfg;
+> >> +
+> >> +	/* The threshold at which the number of corrected bit-flips per sector
+> >> +	 * is deemed to have reached an excessive level (triggers '-EUCLEAN' to
+> >> +	 * be returned to the caller).  The value should be in the range 1 to
+> >> +	 * <ecc-strength> where <ecc-strength> is 18 or 30, depending on the BCH
+> >> +	 * ECC mode in operation.  A value of 0 is interpreted by the driver as
+> >> +	 * <ecc-strength>.
+> >> +	 */
+> >> +	unsigned int bch_bitflip_threshold;
+> >
+> >This field is never set or used...
+> >
+> >> +	bool flashss;
+> >
+> >Ditto.
+> >
+> Probably answered in [2]
+
+OK, then mark it with a FIXME or TODO comment. Don't let every reader
+come across this driver with the same questions.
+
+> Please re-send the next version in similar squashed format, as its easy for review.
+
+Yes.
+
+> And once Brian is okay, may be then you can re-send individual patches.
+
+I don't see any need to send individual sub-patches for the driver (you
+do, however, need to split out the DTS and Documentation/ portions as
+separate patches). If you want to include the splitting, just link to a
+git tree where patches can be found.
+
+Brian
