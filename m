@@ -1,64 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 08 Jul 2014 13:00:23 -0700
-Subject: a case for a common efuse API?
-Message-ID: <53BC4DD7.20906@codeaurora.org>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Tue,  8 Jul 2014 13:16:10 -0700
+Subject: [PATCH 0/6] LLVMLinux: Patches to enable the kernel to be compiled
+ with clang/LLVM
+Message-ID: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Behan Webster <behanw@converseincode.com>
 
-On MSM chips we have some efuses (called qfprom) where we store things
-like calibration data, speed bins, etc. We need to read out data from
-the efuses in various drivers like the cpufreq, thermal, etc. This
-essentially boils down to a bunch of readls on the efuse from a handful
-of different drivers. In devicetree this looks a little odd because
-these drivers end up having an extra reg property (or two) that points
-to a register in the efuse and some length, i.e you see this:
+The LLVMLinux project aims to fully build the Linux kernel using both gcc and
+clang (the C front end for the LLVM compiler infrastructure project). 
 
-	thermal-sensor at 34000 {
-		compatible = "sensor";
-		reg = <0x34000 0x1000>, <0x10018 0xc>;
-		reg-names = "sensor", "efuse_calib";
-	}
+Clang only supports global named registers for non-allocatable registers like
+the stack pointer. By centralizing the definition of current_stack_pointer, the
+use of named registers for ARM remains largely unchanged while working for both
+gcc and clang.
 
+Behan Webster (6):
+  arm: LLVMLinux: Add global named register current_stack_pointer for
+    ARM
+  arm: LLVMLinux: Use current_stack_pointer to calculate pt_regs address
+  arm: LLVMLinux: Use current_stack_pointer for return_address
+  arm: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
+  arm: LLVMLinux: Calculate current_thread_info from
+    current_stack_pointer
+  arm: LLVMLinux: Use current_stack_pointer in unwind_backtrace
 
-I imagine in DT we want something more like this:
-
-	efuse: efuse at 10000 {
-		compatible = "efuse";
-		reg = <0x10000 0x1000>;
-	}
-
-	thermal-sensor at 34000 {
-		compatible = "sensor";
-		reg = <0x34000 0x1000>;
-		efuse = <&efuse 0x18>;
-	}
-
-
-Where we can point to the efuse and give an address offset. From code we
-could then call some efuse_read() function to read the sensor's
-calibration data.
-
-It's been suggested that we use syscon for this, but I wonder if that is
-the right thing to do. With a syscon you're usually writing some
-registers that got lumped together with other registers that aren't
-directly related to your driver. It doesn't seem like syscon is made for
-reading fuses or other things like eeproms. Maybe I'm wrong though.
-
-Using syscon would probably work if we could add a way to point to
-offsets within the syscon node (the 0x18 part in the example). In my
-specific use-case the calibration data may have different offsets
-depending on which SoC the hardware is instantiated in so we could also
-make syscon work if the compatible field for the sensor node indicates
-which SoC it is.
-
-I added Tegra folks because I see that on Tegra this hardware is exposed
-via an SoC specific API, tegra_fuse_readl(), and an associated driver in
-drivers/misc/fuse/tegra/. Unfortunately I don't see any users of the API
-outside of the speedo code in the same directory and the sysfs bin
-attribute that may or may not be in use by some userspace code.
+ arch/arm/include/asm/ptrace.h      | 5 ++---
+ arch/arm/include/asm/thread_info.h | 9 +++++++--
+ arch/arm/kernel/return_address.c   | 3 +--
+ arch/arm/kernel/stacktrace.c       | 4 +---
+ arch/arm/kernel/unwind.c           | 3 +--
+ 5 files changed, 12 insertions(+), 12 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
