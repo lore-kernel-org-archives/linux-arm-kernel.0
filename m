@@ -1,75 +1,86 @@
-From: thomas.lendacky@amd.com (Tom Lendacky)
-Date: Tue, 8 Jul 2014 16:48:15 -0500
-Subject: [PATCH] arm64/dma: Flush the coherent mapping in
- __dma_alloc_noncoherent
-In-Reply-To: <20140708173916.GA14329@arm.com>
-References: <20140707160303.30884.66565.stgit@tlendack-t1.amdoffice.net>
- <20140708173916.GA14329@arm.com>
-Message-ID: <53BC671F.3020501@amd.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 8 Jul 2014 14:52:10 -0700
+Subject: [PATCH v1 6/9] usb: xhci: Add NVIDIA Tegra XHCI host-controller
+ driver
+In-Reply-To: <CAODwPW-HSY3RoBi9VEhHSJ98drTsdche-2=mKfAViXWaUa3X1g@mail.gmail.com>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
+ <1403072180-4944-7-git-send-email-abrestic@chromium.org>
+ <CAODwPW-HSY3RoBi9VEhHSJ98drTsdche-2=mKfAViXWaUa3X1g@mail.gmail.com>
+Message-ID: <CAL1qeaHT8Yz7kRY3Qm5i+bYCF4D5BT=BVZ6BMfQufyaQFkt0mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2014 12:39 PM, Catalin Marinas wrote:
-> On Mon, Jul 07, 2014 at 05:03:03PM +0100, Tom Lendacky wrote:
->> In 3.15 (-rc3) the default arm64 DMA operations changed from coherent
->> to non-coherent operations. This change broke some devices. The
->> associated devices were specifying AXI domain and cache coherency
->> signals equal to write-back, no-allocate. Given that the non-coherent
->> operations resulted in un-cached operations, the device should have
->> succeeded even with those cache coherency signals (the DMA should not
->> have found anything in cache and went to memory). But this was not the
->> case. Not until the coherent mapping range was flushed did the device
->> work properly.
->>
->> In __dma_alloc_noncoherent the allocated memory is flushed but
->> the coherent mapping is not.  If a device is performing DMA
->> with non-allocating caching hints (will look in cache, but if
->> not found will go to memory and not allocate a cache entry) this
->> could result in unpredictable results.  So flush the coherent
->> mapping as well.
+On Fri, Jun 20, 2014 at 9:58 AM, Julius Werner <jwerner@chromium.org> wrote:
+>> +static const struct hc_driver tegra_xhci_hc_driver = {
+>> +       .description =          "tegra-xhci-hcd",
+>> +       .product_desc =         "Tegra xHCI Host Controller",
+>> +       .hcd_priv_size =        sizeof(struct xhci_hcd *),
+>> +
+>> +       /*
+>> +        * generic hardware linkage
+>> +        */
+>> +       .irq =                  xhci_irq,
+>> +       .flags =                HCD_MEMORY | HCD_USB3 | HCD_SHARED,
+>> +
+>> +       /*
+>> +        * basic lifecycle operations
+>> +        */
+>> +       .reset =                tegra_xhci_setup,
+>> +       .start =                xhci_run,
+>> +       .stop =                 xhci_stop,
+>> +       .shutdown =             xhci_shutdown,
+>> +
+>> +       /*
+>> +        * managing i/o requests and associated device resources
+>> +        */
+>> +       .urb_enqueue =          xhci_urb_enqueue,
+>> +       .urb_dequeue =          xhci_urb_dequeue,
+>> +       .alloc_dev =            xhci_alloc_dev,
+>> +       .free_dev =             xhci_free_dev,
+>> +       .alloc_streams =        xhci_alloc_streams,
+>> +       .free_streams =         xhci_free_streams,
+>> +       .add_endpoint =         xhci_add_endpoint,
+>> +       .drop_endpoint =        xhci_drop_endpoint,
+>> +       .endpoint_reset =       xhci_endpoint_reset,
+>> +       .check_bandwidth =      xhci_check_bandwidth,
+>> +       .reset_bandwidth =      xhci_reset_bandwidth,
+>> +       .address_device =       xhci_address_device,
+>> +       .enable_device =        xhci_enable_device,
+>> +       .update_hub_device =    xhci_update_hub_device,
+>> +       .reset_device =         xhci_discover_or_reset_device,
+>> +
+>> +       /*
+>> +        * scheduling support
+>> +        */
+>> +       .get_frame_number =     xhci_get_frame,
+>> +
+>> +       /* Root hub support */
+>> +       .hub_control =          xhci_hub_control,
+>> +       .hub_status_data =      xhci_hub_status_data,
+>> +       .bus_suspend =          xhci_bus_suspend,
+>> +       .bus_resume =           xhci_bus_resume,
+>> +};
 >
-> The __dma_alloc_noncoherent() function flushes the allocated memory.
-> Since the CPU caches are PIPT, the CPU should no longer have any dirty
-> cache lines (that's actually the only aim here). Flushing the coherent
-> mapping as well does not bring us anything new, just double flushing of
-> the same physical address.
+> I know I missed the first round of discussion where this was
+> suggested, but I don't think it's a good idea to pull the whole
+> hc_driver structure out into every platform implementation. It will
+> lead to duplication, then to future additions only being applied to
+> some of the implementations and everything getting out of sync. This
+> is already a problem with the PCI/plat split (e.g. the LPM functions
+> were only added to xhci-pci even though they should apply to both).
+> Also, if I'm not mistaken this code would fail to compile as a module
+> (you are referencing lots of symbols that are internal to the xhci-hcd
+> module).
 
-That makes sense.  Doing a quick test by moving the original flush to
-just before the return allowed the device to work properly also.
+You're right Julius, this won't build as a module without a few EXPORT_SYMBOLs.
 
->
-> Since we don't unmap the cacheable mapping (kernel linear address), the
-> CPU could always allocate entries in the cache speculatively. The
-> architecture says that the CPU would not hit in such caches, so it's
-> fine from the CPU perspective.
+> I think at the very least you should add a function
+> "xhci_default_driver(struct hc_driver *driver)" to xhci-plat.c (or
+> even better to xhci.c and use it for PCI as well) that initializes all
+> function pointers to the default (internal) symbols, and can then be
+> overridden afterwards.
 
-I think that I've just been lucky in my testing of the late flush with
-the device using the cacheable settings.  It's quite possible that
-eventually that scenario would break also should a speculative cache
-entry be allocated.
-
->
-> In your case, it seems that the device will look into the CPU cache. In
-> this case, the device should only use the coherent DMA ops (with
-> cacheable mappings). I know we changed the default but you should be
-> able to specify in the DT whether your device/bus in 'dma-coherent'. We
-> are currently missing a notifier for PCIe to set up the dma ops (but
-> mainline arm64 does not support PCIe yet).
-
-I have since added the 'dma-coherent' property to the device tree node
-to restore the old behavior.
-
-The device I am working with allows me to set the AXI domain and cache
-attributes so I also updated the driver code to specify AXI domain and
-cache attributes based on whether or not the 'dma-coherent' property is
-present in the device tree node.  I have verified (using the original
-dma-mapping.c file) that I get correct behavior from the device in both
-scenarios.
-
-Thanks,
-Tom
-
->
-> (what we do with ACPI I have no idea. Probably always assuming I/O
-> coherency)
->
+Currently all XHCI host drivers (PCI, platform, MVEBU) will be built
+into the xhci-hcd module.  I could append the Tegra driver to that
+module or introduce a xhci_init_driver() like EHCI does as Julius
+suggests.  USB folks, do you have a preference?
