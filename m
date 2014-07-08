@@ -1,56 +1,63 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Jul 2014 18:18:28 +0100
-Subject: [PATCH v8 0/9] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
-Message-ID: <20140708171828.GM6501@e106497-lin.cambridge.arm.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 8 Jul 2014 12:05:47 -0400
+Subject: [Xen-devel] [PATCH v2 0/3] xen/arm: fix
+ "xen_add_mach_to_phys_entry: cannot add" problem
+In-Reply-To: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+Message-ID: <20140708160547.GA9519@laptop.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 06, 2014 at 04:23:43PM +0100, Rob Herring wrote:
-> On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > This is my resurected attempt at adding support for generic PCI host
-> > bridge controllers that make use of device tree information to
-> > configure themselves. I've tagged it as v8 although the patches
-> > have now been reshuffled in order to ease adoption so referring to
-> > the older versions might be a bit of a hoop jumping exercise.
-> >
-> > Changes from v7:
-> >   - Reordered the patches so that fixes and non-controversial patches
-> >     from v7 can be accepted more easily. If agreed I can split the
-> >     series again into patches that can be upstreamed easily and ones
-> >     that still need discussion.
-> >   - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
-> >     to better reflect its target use.
-> >   - Added the function to remap the bus I/O resources that used to be
-> >     provided in my arm64 patch series and (re)named it pci_remap_iospace()
-> >   - Removed error code checking from parsing and mapping of IRQ from DT
-> >     in recognition that some PCI devices will not have legacy IRQ mappings.
-> >
-> > v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
+On Tue, Jul 08, 2014 at 04:40:46PM +0100, Stefano Stabellini wrote:
+> Hi all,
+> Xen support in Linux for ARM and ARM64 suffers from lack of support for
+> multiple mfn to pfn mappings: whenever a frontend grants the same page
+> multiple times to the backend, the mfn to pfn accounting in
+> arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+> when xen-netfront/xen-netback switched from grant copies to grant
+> mappings, therefore causing the issue to happen much more often.
 > 
-> Can you publish a branch for this series please.
+> Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+> therefore we are looking for alternative solutions. One idea is avoiding
+> mfn to pfn conversions altogether. The only code path that needs them is
+> swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
+
+I seem to have lost track of that patch? Or is it in now in the kernel?
+
+Could you include the git commit id or URL for it in the cover letter please?
+
+Thanks
 > 
-> Rob
+> To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+> Xen (a separate patch series will be sent for Xen). In Linux we use it
+> to perform the cache maintenance operations without mfns conversions.
 > 
-
-Hi Rob,
-
-I have pushed a brach that matches my v8 patchset +1 obvious missing header include
-here: http://www.linux-arm.org/git?p=linux-ld.git;a=shortlog;h=refs/heads/for-upstream/pci_v8
-
-Best regards,
-Liviu
-
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> 
+> Changes in v2:
+> - introduce XENFEAT_grant_map_11;
+> - remeber the ptep corresponding to scratch pages so that we don't need
+> to calculate it again every time;
+> - do not acutally unmap the page on xen_mm32_unmap;
+> - properly account preempt_enable/disable;
+> - do not check for mfn in xen_add_phys_to_mach_entry.
+> 
+> 
+> Stefano Stabellini (3):
+>       xen/arm: introduce XENFEAT_grant_map_11
+>       xen/arm: reimplement xen_dma_unmap_page & friends
+>       xen/arm: remove mach_to_phys rbtree
+> 
+>  arch/arm/include/asm/xen/page-coherent.h |   25 ++--
+>  arch/arm/include/asm/xen/page.h          |    9 --
+>  arch/arm/xen/Makefile                    |    2 +-
+>  arch/arm/xen/enlighten.c                 |    6 +
+>  arch/arm/xen/mm32.c                      |  202 ++++++++++++++++++++++++++++++
+>  arch/arm/xen/p2m.c                       |   66 +---------
+>  include/xen/interface/features.h         |    3 +
+>  7 files changed, 220 insertions(+), 93 deletions(-)
+>  create mode 100644 arch/arm/xen/mm32.c
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
