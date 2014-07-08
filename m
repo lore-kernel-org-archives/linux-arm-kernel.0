@@ -1,45 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 08 Jul 2014 20:28:59 +0400
-Subject: [PATCH 2/2] usb: ci_hdrc_imx doc: fsl,usbphy is required
-In-Reply-To: <1404814481-7652-2-git-send-email-mpa@pengutronix.de>
-References: <1404814481-7652-1-git-send-email-mpa@pengutronix.de>
- <1404814481-7652-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <53BC1C4B.6060207@cogentembedded.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Jul 2014 18:39:25 +0200
+Subject: [PATCHv2 0/6] Add a driver for the atmel ram controller
+In-Reply-To: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <53BC1EBD.3030306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 08/07/2014 18:21, Alexandre Belloni :
+> The atmel ram controller needs one or more clocks to work. For now the
+> CLK_IGNORE_UNUSED flag is used on those clocks. This patch set introduce a
+> driver that will take care of taking those clocks.
+> 
+> The final goal is also to move the ioremap done in mach-at91 to that driver with
+> a proper power management driver.
 
-On 07/08/2014 02:14 PM, Markus Pargmann wrote:
+Yes, okay for that series:
 
-> fsl,usbphy is no optional property. This patch moves it to the list of
-> required properties.
-
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->   Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-
-> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-> index a6a32cb7f777..8014d0d050f8 100644
-> --- a/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-> @@ -4,6 +4,7 @@ Required properties:
->   - compatible: Should be "fsl,imx27-usb"
->   - reg: Should contain registers location and length
->   - interrupts: Should contain controller interrupt
-> +- fsl,usbphy: phandler of usb phy that connects to the only one port
-
-    s/phandler/phandle/. Can fix, while at it...
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 
-> @@ -12,7 +13,6 @@ Recommended properies:
->   - dr_mode: One of "host", "peripheral" or "otg". Defaults to "otg"
->
->   Optional properties:
-> -- fsl,usbphy: phandler of usb phy that connects to the only one port
->   - fsl,usbmisc: phandler of non-core register device, with one argument
->     that indicate usb controller index
->   - vbus-supply: regulator for vbus
+> Changes in v2:
+>  - use ATMEL_SDRAMC instead of ATMEL_RAMC
+>  - use "atmel,sama5d3-ddramc" instead of "atmel,sama5d3-mpddramc"
+>  - not getting mpddrck is now an error
+>  - handle "atmel,sama5d3-ddramc" in mach-at91/setup.c
+> 
+> Alexandre Belloni (6):
+>   ARM: at91: Add new binding for sama5d3-ddramc
+>   memory: add a driver for atmel ram controllers
+>   ARM: at91: select ATMEL_SDRAMC when using OF
+>   ARM: at91/dt: sama5d3: define mpddr clock and ramc clocks
+>   ARM: at91/dt: at91sam9: use ddrck in ramc
+>   clk: at91: remove the useless CLK_IGNORE_UNUSED flag
+> 
+>  .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 |  2 +
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |  2 +
+>  arch/arm/boot/dts/sama5d3.dtsi                     |  9 +-
+>  arch/arm/mach-at91/Kconfig                         |  4 +
+>  arch/arm/mach-at91/setup.c                         |  1 +
+>  drivers/clk/at91/clk-system.c                      |  8 +-
+>  drivers/memory/Kconfig                             | 10 +++
+>  drivers/memory/Makefile                            |  1 +
+>  drivers/memory/atmel-sdramc.c                      | 98 ++++++++++++++++++++++
+>  10 files changed, 128 insertions(+), 8 deletions(-)
+>  create mode 100644 drivers/memory/atmel-sdramc.c
+> 
 
-WBR, Sergei
+
+-- 
+Nicolas Ferre
