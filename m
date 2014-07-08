@@ -1,36 +1,63 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 16:14:59 +0200
-Subject: [PATCH v5 4/5] ARM: EXYNOS: Add platform driver support for Exynos
- PMU
-In-Reply-To: <001e01cf9820$18f29440$4ad7bcc0$@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
- <1403705032-14835-5-git-send-email-pankaj.dubey@samsung.com>
- <53B198EB.80502@samsung.com> <001e01cf9820$18f29440$4ad7bcc0$@samsung.com>
-Message-ID: <53BBFCE3.4050806@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jul 2014 15:17:31 +0100
+Subject: [PATCH 0/2] cpuidle fixes and cleanup
+In-Reply-To: <53BBF8A0.1050005@samsung.com>
+References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
+ <20140701145244.GX32514@n2100.arm.linux.org.uk>
+ <CADWw7OgCgg8aE4W6LwmU3axDdmt-5uH=a+0fSSErfqDci3nNUA@mail.gmail.com>
+ <53BBF8A0.1050005@samsung.com>
+Message-ID: <20140708141731.GL21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.07.2014 09:09, Pankaj Dubey wrote:
-> On Monday, June 30, 2014 Tomasz Figa wrote:
->> On 25.06.2014 16:03, Pankaj Dubey wrote:
->>> +
->>> +	if (pmu_context->pmu_data && pmu_context->pmu_data->pmu_init)
->>
->> In what conditions pmu_data will be NULL?
->>
+On Tue, Jul 08, 2014 at 03:56:48PM +0200, Tomasz Figa wrote:
+> On 02.07.2014 05:11, Chander Kashyap wrote:
+> > On Tue, Jul 1, 2014 at 8:22 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Tue, Jul 01, 2014 at 08:02:36PM +0530, Chander Kashyap wrote:
+> >>> This patch series fixes the cpuidle for different states. Also removes arm
+> >>> diagnostic and power register save/restore code as it is made generic.
+> >>>
+> >>> Based on:
+> >>> ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
+> >>>  http://www.spinics.net/lists/arm-kernel/msg340506.html
 > 
-> What if we want driver to be probed but no data has been given?
-> If driver gets probed it still can act as syscon provider, and other IPs can
-> access
-> PMU registers, but PMU functionality itself will not be available, for same
-> reason
-> I have put a check for pmu_data in powerdown_conf also.
+> [Ccing people who participated in discussion in that thread]
 > 
+> >>
+> >> As there is an outstanding issue with this patch, we can't proceed with
+> >> this set of changes until we know what's going on there.
+> > 
+> > Sure, I will wait for the conclusion.
+> 
+> So I believe the conclusion was that this can't be handled in generic
+> way, because on systems running in non-secure mode writing to those
+> registers faults.
 
-Is there any point in probing this driver just to register the syscon?
-AFAIK if this driver errors out, the syscon platform driver will take
-over and do what we want. That's why we have the second "syscon"
-compatible string.
+That is, unfortunately, correct.
 
-Best regards,
-Tomasz
+There is a way around this, but people aren't going to like it.  That
+is - we move it to the suspend and resume paths anyway.
+
+In the resume path, we read the register, compare it with the value
+which we would update it to, and if it's identical, we avoid the write.
+
+This gets secure-mode platforms working.
+
+For non-secure mode platforms, we have to require them to insert some
+assembly code into the early resume path which calls their secure
+monitor to restore these registers before continuing on to cpu_resume,
+thereby ensuring that the CPU specific code sees that the value in the
+register is identical with the saved value, and omitting the write.
+
+This isn't really a new principle - we already have this requirement
+for non-secure mode platforms when they're booting a kernel with
+various errata enabled.
+
+I can't see any other alternative which satisfies everyone (by
+everyone, I'm including the requirements from the hardware folk who
+expect these registers to be static once the MMU is enabled.)
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
