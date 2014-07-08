@@ -1,132 +1,39 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Jul 2014 23:27:38 +0100
-Subject: [PATCH v8 8/9] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <20140708213305.GB4555@google.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
- <20140708010103.GD22939@google.com>
- <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
- <20140708213305.GB4555@google.com>
-Message-ID: <20140708222738.GA4980@e106497-lin.cambridge.arm.com>
+From: fitzsim@fitzsim.org (Thomas Fitzsimmons)
+Date: Tue, 08 Jul 2014 18:30:54 -0400
+Subject: [PATCH] net: mvneta: Fix big endian issue in mvneta_txq_desc_csum()
+Message-ID: <m31ttvqy8x.fsf@fitzsim.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 10:33:05PM +0100, Bjorn Helgaas wrote:
-> On Tue, Jul 08, 2014 at 11:29:40AM +0100, Liviu Dudau wrote:
-> > On Tue, Jul 08, 2014 at 02:01:04AM +0100, Bjorn Helgaas wrote:
-> > > On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
-> > > > ...
-> > > > +     for_each_of_pci_range(&parser, &range) {
-> > > > +             /* Read next ranges element */
-> > > > +             pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
-> > > > +                     range.pci_space, range.pci_addr, range.cpu_addr, range.size);
-> > > 
-> > > If you're not trying to match other printk formats, you could try to match
-> > > the %pR format used elsewhere, e.g., "%#010llx-%#010llx" with
-> > > range.cpu_addr, range.cpu_addr + range.size - 1.
-> > 
-> > Yes, not a big fan of the ugly output it generates, but the output matches closely the ranges
-> > definition in the device tree file so it is easy to validate that you are parsing the right
-> > entry. I am happy to change it to shorten the cpu range message.
-> 
-> If it already matches other device tree stuff, that's perfect.  I'm not
-> familiar with that.
-> 
-> > > > +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
-> > > > +{
-> > > > +     return 0;
-> > > > +}
-> > > 
-> > > I'd wait to add this until there's a platform that needs to implement it.
-> > > Splitting it out will make this patch that much smaller and easier to
-> > > understand.
-> > 
-> > I need this as this is the default implementation (i.e. do nothing). Otherwise the
-> > link phase will give errors. 
-> 
-> I meant that you could remove the default implementation *and* the call of
-> it, since it currently does nothing.
+This commit fixes the command value generated for CSUM calculation
+when running in big endian mode.  The Ethernet protocol ID for IP was
+being unconditionally byte-swapped in the layer 3 protocol check (with
+swab16), which caused the mvneta driver to not function correctly in
+big endian mode.  This patch byte-swaps the ID conditionally with
+htons.
 
-True. But it looks like converting Will's pci-host-generic.c driver will make use of this.
+Cc: <stable@vger.kernel.org> # v3.13+
+Signed-off-by: Thomas Fitzsimmons <fitzsim@fitzsim.org>
+---
+The mvneta driver existed prior to v3.13, but it has only supported big
+endian from v3.13 onward.  If it's accepted, this patch needs to be
+backported for stable only as far back as v3.13.
 
-> 
-> > > > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> > > > index dde3a4a..71e36d0 100644
-> > > > --- a/include/linux/of_pci.h
-> > > > +++ b/include/linux/of_pci.h
-> > > > @@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
-> > > >  int of_pci_get_devfn(struct device_node *np);
-> > > >  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
-> > > >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-> > > > +struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
-> > > > +                                     struct pci_ops *ops, void *host_data);
-> > > > +
-> > > >  #else
-> > > >  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
-> > > >  {
-> > > > @@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> > > >  {
-> > > >       return -EINVAL;
-> > > >  }
-> > > > +
-> > > > +static inline struct pci_host_bridge *
-> > > > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
-> > > > +                     void *host_data)
-> > > > +{
-> > > > +     return NULL;
-> > > > +}
-> > > >  #endif
-> > > >
-> > > >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> > > > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > > > index 7e7b939..556dc5f 100644
-> > > > --- a/include/linux/pci.h
-> > > > +++ b/include/linux/pci.h
-> > > > @@ -402,6 +402,7 @@ struct pci_host_bridge {
-> > > >       struct device dev;
-> > > >       struct pci_bus *bus;            /* root bus */
-> > > >       int domain_nr;
-> > > > +     resource_size_t io_base;        /* physical address for the start of I/O area */
-> > > 
-> > > I don't see where this is used yet.
-> > 
-> > It's used in pci_host_bridge_of_get_ranges() (earlier in this patch).
-> 
-> of_create_pci_host_bridge() fills in bridge->io_base, but I don't see
-> anything that ever *reads* bridge->io_base.
+ drivers/net/ethernet/marvell/mvneta.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Ah, understood. It is used by the host bridge drivers to set their ATR registers to the
-correct CPU address values.
-
-> 
-> > > As far as I know, there's nothing that prevents a host bridge from having
-> > > several I/O port apertures (or several memory-mapped I/O port spaces).
-> > 
-> > The pci_register_io_range() will give different offsets for each apperture.
-> > I just need to make sure I don't overwrite io_base when parsing multiple IO
-> > ranges.
-> 
-> Let's continue this in the other thread where I'm trying to understand the
-> I/O apertures.  Obviously I'm still missing something if you can indeed
-> have multiple I/O apertures per bridge (because then only one of them can
-> start at I/O address 0 on PCI).
-
-Sure.
-
-Thanks,
-Liviu
-
-> 
-> Bjorn
-> 
-
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 45beca1..667cf65 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1207,7 +1207,7 @@ static u32 mvneta_txq_desc_csum(int l3_offs, int l3_proto,
+ 	command =  l3_offs    << MVNETA_TX_L3_OFF_SHIFT;
+ 	command |= ip_hdr_len << MVNETA_TX_IP_HLEN_SHIFT;
+ 
+-	if (l3_proto == swab16(ETH_P_IP))
++	if (l3_proto == htons(ETH_P_IP))
+ 		command |= MVNETA_TXD_IP_CSUM;
+ 	else
+ 		command |= MVNETA_TX_L3_IP6;
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.7.1
