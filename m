@@ -1,70 +1,116 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Tue, 8 Jul 2014 11:20:28 +0200
-Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
-In-Reply-To: <20140708094149.0ad6ab13@free-electrons.com>
-References: <20140703135146.GA6898@luxor.wired.org>
- <53B5C61D.2060308@free-electrons.com>
- <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
- <20140705150308.GA28791@arch.cereza>
- <20140705205951.GB3678@kroah.com>
- <20140707105818.GA1101@arch.cereza>
- <20140707183002.GA5947@kroah.com>
- <20140707233758.GA1456@arch.cereza>
- <20140708094149.0ad6ab13@free-electrons.com>
-Message-ID: <CAMmgNdY-BZvGQL=1_7ANgSbV0TJfcqFRXgmLgyYCk+nAnNkT7w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Jul 2014 10:21:00 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523150331.GS4179@bivouac.eciton.net>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+Message-ID: <20140708092100.GA21320@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 9:41 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Ezequiel Garcia,
->
-> On Mon, 7 Jul 2014 20:37:58 -0300, Ezequiel Garcia wrote:
->
->> It seems bus_register_notifier() is been called for platform and pci devices
->> with the *same* notifier block. Haven't looked close enough, but you mentioned
->> that could cause trouble?
->>
->> This patch fixes the issue here:
->>
->> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
->> index 477202f..2bdc323 100644
->> --- a/arch/arm/mach-mvebu/coherency.c
->> +++ b/arch/arm/mach-mvebu/coherency.c
->> @@ -292,6 +292,10 @@ static struct notifier_block mvebu_hwcc_nb = {
->>       .notifier_call = mvebu_hwcc_notifier,
->>  };
->>
->> +static struct notifier_block mvebu_hwcc_pci_nb = {
->> +     .notifier_call = mvebu_hwcc_notifier,
->> +};
->> +
->>  static void __init armada_370_coherency_init(struct device_node *np)
->>  {
->>       struct resource res;
->> @@ -427,7 +431,7 @@ static int __init coherency_pci_init(void)
->>  {
->>       if (coherency_available())
->>               bus_register_notifier(&pci_bus_type,
->> -                                    &mvebu_hwcc_nb);
->> +                                    &mvebu_hwcc_pci_nb);
->>       return 0;
->>  }
->>
->> Paolo, can you apply it and confirm it fixes the problem?
->>
->> Greg, can you confirm using the same notifier block pointer
->> for two different bus types makes the bus notifier go nuts?
->
-> Looking at how notifier_chain_register() is implemented (which gets
-> called by bus_register_notifier() ->
-> blocking_notifier_chain_register()), I indeed don't see how a single
-> 'struct notifier_block' can be registered on multiple notifier chains,
-> so I believe your patch is correct.
->
+I forgot about this thread. I think we need it sorted in some way.
 
-yes, i confim this patch fixes my issue, thanks!
+On Fri, May 23, 2014 at 04:03:31PM +0100, Leif Lindholm wrote:
+> On Fri, May 23, 2014 at 02:47:20PM +0100, Catalin Marinas wrote:
+> > Can we add another of detecting whether it's an EFI application and
+> > avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+> > string in exit_boot() and checks against it later when calling
+> > efi_init().
 
--- 
-bye,
-p.
+So, to be in line with 32-bit arm, the only way to tell the uncompressed
+kernel image that it was started as an EFI application is via FDT.
+
+> My view is that this should be fixed in fdt_find_uefi_params(). A
+> single info message that we can't find evidence of UEFI should be
+> printed in the non-error case.
+[...]
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index cd36deb..4bb42e1e 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -366,11 +366,8 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>  
+>  	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+>  		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+> -		if (!prop) {
+> -			pr_err("Can't find %s in device tree!\n",
+> -			       dt_params[i].name);
+> -			return 0;
+> -		}
+> +		if (!prop)
+> +			goto fail;
+>  		dest = info->params + dt_params[i].offset;
+>  
+>  		val = of_read_number(prop, len / sizeof(u32));
+> @@ -385,6 +382,14 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>  				dt_params[i].size * 2, val);
+>  	}
+>  	return 1;
+> +
+> +	fail:
+> +	if (i == 0)
+> +		pr_info("  UEFI not found.\n");
+> +	else
+> +		pr_err("Can't find %s in device tree!\n", dt_params[i].name);
+> +
+> +	return 0;
+
+I'm ok with the idea but I don't particularly like the implementation.
+Does this look any better (functionally the same as yours)?
+
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index eff1a2f22f09..dc79346689e6 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -346,6 +346,7 @@ static __initdata struct {
+ 
+ struct param_info {
+ 	int verbose;
++	int found;
+ 	void *params;
+ };
+ 
+@@ -362,16 +363,12 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
+ 		return 0;
+ 
+-	pr_info("Getting parameters from FDT:\n");
+-
+ 	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+ 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+-		if (!prop) {
+-			pr_err("Can't find %s in device tree!\n",
+-			       dt_params[i].name);
++		if (!prop)
+ 			return 0;
+-		}
+ 		dest = info->params + dt_params[i].offset;
++		info->found++;
+ 
+ 		val = of_read_number(prop, len / sizeof(u32));
+ 
+@@ -390,10 +387,21 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+ {
+ 	struct param_info info;
++	int ret;
++
++	pr_info("Getting EFI parameters from FDT:\n");
+ 
+ 	info.verbose = verbose;
++	info.found = 0;
+ 	info.params = params;
+ 
+-	return of_scan_flat_dt(fdt_find_uefi_params, &info);
++	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
++	if (!info.found)
++		pr_info("UEFI not found.\n");
++	else if (!ret)
++		pr_err("Can't find '%s' in device tree!\n",
++		       dt_params[info.found].name);
++
++	return ret;
+ }
+ #endif /* CONFIG_EFI_PARAMS_FROM_FDT */
