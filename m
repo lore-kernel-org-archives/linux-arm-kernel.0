@@ -1,38 +1,46 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  8 Jul 2014 18:21:16 +0200
-Subject: [PATCHv2 6/6] clk: at91: remove the useless CLK_IGNORE_UNUSED flag
+Date: Tue,  8 Jul 2014 18:21:15 +0200
+Subject: [PATCHv2 5/6] ARM: at91/dt: at91sam9: use ddrck in ramc
 In-Reply-To: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404836476-23787-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404836476-23787-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_IGNORE_UNUSED flag was added on all the system clocks because of the
-ddrck. Now that it is handled by the ram controller driver, we can drop it.
+Make the ram controller driver take the ddrck clock for at91sam9n12 and
+at91sam9x5.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/clk-system.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ arch/arm/boot/dts/at91sam9n12.dtsi | 2 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-index 8c96307d7363..a76d03fd577b 100644
---- a/drivers/clk/at91/clk-system.c
-+++ b/drivers/clk/at91/clk-system.c
-@@ -119,13 +119,7 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
- 	init.ops = &system_ops;
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
--	/*
--	 * CLK_IGNORE_UNUSED is used to avoid ddrck switch off.
--	 * TODO : we should implement a driver supporting at91 ddr controller
--	 * (see drivers/memory) which would request and enable the ddrck clock.
--	 * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
--	 */
--	init.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED;
-+	init.flags = CLK_SET_RATE_PARENT;
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 287795985e32..3d48255c4ed1 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -85,6 +85,8 @@
+ 			ramc0: ramc at ffffe800 {
+ 				compatible = "atmel,at91sam9g45-ddramc";
+ 				reg = <0xffffe800 0x200>;
++				clocks = <&ddrck>;
++				clock-names = "ddrck";
+ 			};
  
- 	sys->id = id;
- 	sys->hw.init = &init;
+ 			pmc: pmc at fffffc00 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index d6133f497207..74722853e667 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -93,6 +93,8 @@
+ 			ramc0: ramc at ffffe800 {
+ 				compatible = "atmel,at91sam9g45-ddramc";
+ 				reg = <0xffffe800 0x200>;
++				clocks = <&ddrck>;
++				clock-names = "ddrck";
+ 			};
+ 
+ 			pmc: pmc at fffffc00 {
 -- 
 1.9.1
