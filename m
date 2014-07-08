@@ -1,61 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 8 Jul 2014 10:54:13 +0200
-Subject: [PATCH 2/2] efi: implement mandatory locking for UEFI Runtime
- Services
-In-Reply-To: <CAKv+Gu91CQADTQ8KMjXQPwVDvW1XkUYO2E5=Mu=aAtrB8B3q_A@mail.gmail.com>
-References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404295802-28030-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140707202954.GC27474@console-pimps.org>
- <CAKv+Gu91CQADTQ8KMjXQPwVDvW1XkUYO2E5=Mu=aAtrB8B3q_A@mail.gmail.com>
-Message-ID: <CAKv+Gu8LbfuuEYyhAeu3dUiKHqzN_UFMbOjY0agVihbmmVL9CA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Jul 2014 10:54:19 +0200
+Subject: [PATCH 1/6] pinctrl: samsung: Decouple direction setting from
+ pinctrl
+In-Reply-To: <1404315664-3174-2-git-send-email-t.figa@samsung.com>
+References: <1404315664-3174-1-git-send-email-t.figa@samsung.com>
+ <1404315664-3174-2-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkdZ_Ec-1BNOema4Y4GfQnpQ931b9DKg4ngndQD_8GSuW7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 July 2014 22:43, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 7 July 2014 22:29, Matt Fleming <matt@console-pimps.org> wrote:
->> On Wed, 02 Jul, at 12:10:02PM, Ard Biesheuvel wrote:
->>> According to section 7.1 of the UEFI spec, Runtime Services are not fully
->>> reentrant, and there are particular combinations of calls that need to be
->>> serialized.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  drivers/firmware/efi/runtime-wrappers.c | 109 +++++++++++++++++++++++++++++---
->>>  1 file changed, 99 insertions(+), 10 deletions(-)
->>
->> Ard, what's going on with this one? I didn't see it resubmitted along
->> with v3 of "efi/arm64: handle missing virtual mapping for UEFI System
->> Table".
->>
->> Note that we already have a lock to serialize access to the UEFI
->> variable services in the form of __efivars->lock, see
->> drivers/firmware/efi/vars.c. It's a spinlock because of the context we
->> may need to create variables in from efi_pstore_write().
->>
+On Wed, Jul 2, 2014 at 5:40 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+
+> This patch makes the pinctrl-samsung driver configure GPIO direction on
+> its own, without using the pinctrl_gpio_direction_*() "helpers". The
+> rationale behind this change is as follows:
+>  - pinctrl-samsung does not need translation from GPIO namespace to
+>    pinctrl namespace to handle GPIO operations - GPIO chip and offset
+>    therein are enough to calculate necessary offsets and bit masks in
+>    constant time,
+>  - the pinctrl_gpio_direction_*() functions do not do anything useful
+>    other than translating the pin into pinctrl namespace and calling the
+>    .gpio_set_direction() from pinmux_ops of the controller,
+>  - the undesirable side effect of using those helpers is losing the
+>    ability to change GPIO direction in atomic context, because they
+>    explicitly use a mutex for synchronization,
 >
-> As the patch says, the UEFI spec is very clear on which combinations
-> of calls are not reentrant.
-> I don't think the rtc_lock and the efivars->lock quite cover that completely ...
+> Results of this patch are:
+>  - fixed warnings about scheduling while atomic in code that needs to
+>    set GPIO direction in atomic context (e.g. interrupt handler),
+>  - reduced overhead of bitbanging drivers that use gpio_direction_*(),
+>    e.g. i2c-gpio.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 
-After doing a bit more research, I still think there is work needed if
-we aim to adhere to the UEFI spec, or at least be safe from the
-hazards it points out.
+Well the cross-call function is actually mostly for the case when
+the pinctrl and GPIO drivers are in different files, or you combine
+two IP blocks arbitrarily. It's a bit messy anyway.
 
-So the current status is:
-- get/set time calls are serialized with respect to one another using
-rtc_lock at the wrapper level
-- get/set variable calls are serialized using the efivars->lock in the
-efivars module
-- get_next_variable() calls use the BKL
+Patch applied.
 
-The two things I am most concerned with are:
-- reset system while other calls are in flight; is this handled
-implicitly in some other way?
-- things like settime()/setwakeuptime() and setvariable() poking into
-the flash at the same time.
-
-Perhaps it would be sufficient to have a single spinlock cover all
-these cases? Or just let efivars grab the rtc_lock as well?
-
--- 
-Ard.
+Yours,
+Linus Walleij
