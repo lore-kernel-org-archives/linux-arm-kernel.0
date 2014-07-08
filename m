@@ -1,46 +1,48 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Tue, 08 Jul 2014 08:11:29 +0200
-Subject: [PATCHv2 17/32] ARM: at91/dt: ge863-pro3: define crystals
- frequencies
-In-Reply-To: <1404764629-29136-18-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404764629-29136-18-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <53BB8B91.8020501@aksignal.cz>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 8 Jul 2014 11:49:09 +0530
+Subject: [PATCH 1/1] ARM: imx: use PTR_ERR_OR_ZERO
+In-Reply-To: <20140708051916.GB26257@dragon>
+References: <1404500590-21712-1-git-send-email-fabf@skynet.be>
+ <20140707055521.GM30239@dragon>
+ <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
+ <20140708051916.GB26257@dragon>
+Message-ID: <CAK5sBcEfL2oXBW+fiNwMeTxeBckmxtjQL52+-OXwj2nrMvhy4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-the slow crystal is not on the module "ge863-pro3", but it's usually on application board. So I think this clock should 
-be in board dts.
+On Tue, Jul 8, 2014 at 10:49 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Tue, Jul 08, 2014 at 09:18:56AM +0530, Sachin Kamat wrote:
+>> Hi Shawn,
+>>
+>> On Mon, Jul 7, 2014 at 11:25 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+>> > On Fri, Jul 04, 2014 at 09:03:10PM +0200, Fabian Frederick wrote:
+>> >> replace IS_ERR/PTR_ERR
+>> >>
+>> >> Cc: Shawn Guo <shawn.guo@freescale.com>
+>> >> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> >> Cc: linux-arm-kernel at lists.infradead.org
+>> >> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+>> >
+>> > Applied, thanks.
+>>
+>>
+>> I had sent a similar series [1] in May which you rejected. Just
+>> curious if something
+>> changed between then and now?
+>
+> The main difference is this is the second attempt from a different
+> person to "clean up" the code.  I'm still not fond of the change, but
+> I'm getting tied to tell people about that, so just applied the change,
+> since after all it at least gives some good diffstat.
+>
+> I would prefer Fabian's patch over yours because it's really good
+> enough to have one patch than 5 patches in a series to do the change for
+> IMX platform.
 
-Dne 7.7.2014 22:23, Alexandre Belloni napsal(a):
-> Define Telit GE863-PRO3, AK signal CDU and Telit EVK-PRO3 main and slow
-> crystals frequencies.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
-> Cc: Jiri Prchal <jiri.prchal@aksignal.cz>
-> ---
->   arch/arm/boot/dts/ge863-pro3.dtsi | 8 ++++++++
->   1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
-> index 230099bb31c8..a32fdbefbbd9 100644
-> --- a/arch/arm/boot/dts/ge863-pro3.dtsi
-> +++ b/arch/arm/boot/dts/ge863-pro3.dtsi
-> @@ -19,6 +19,14 @@
->   			compatible = "atmel,osc", "fixed-clock";
->   			clock-frequency = <6000000>;
->   		};
-> +
-> +		slow_xtal {
-> +			clock-frequency = <32768>;
-> +		};
-> +
-> +		main_xtal {
-> +			clock-frequency = <6000000>;
-> +		};
->   	};
->
->   	ahb {
->
+Doesn't really matter whose patches are in. I was just curious to know
+the change
+in logic at this point of time. Thanks for clarification.
+
+-- 
+Regards,
+Sachin.
