@@ -1,90 +1,38 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Tue, 08 Jul 2014 08:43:45 +0530
-Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
-In-Reply-To: <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <53BB61E9.80200@linux.vnet.ibm.com>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Tue, 8 Jul 2014 03:30:04 -0000
+Subject: RFC: Leave sysfs nodes alone during hotplug
+In-Reply-To: <CAKohpokvRnLU+DQBX39odAf5wxuzWjLi=sy5t2fYReoHCfshwQ@mail.gmail.com>
+References: <53B5D22F.2070308@codeaurora.org>
+ <CAKohpomuPshe4HpvWSzmZ3vvAjV-zHucfHBVbhB6dUBrrYH8pw@mail.gmail.com>
+ <53BAF540.9080904@codeaurora.org>
+ <CAAW3Ypa690EKmDzwx94CaHeR4j_F6_yFmFrn6xTYuLv=pH7B3g@mail.gmail.com>
+ <CAKohpokvRnLU+DQBX39odAf5wxuzWjLi=sy5t2fYReoHCfshwQ@mail.gmail.com>
+Message-ID: <533b04020d15a2f9ac0c582652f6e70f.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 09:35 PM, Vincent Guittot wrote:
-> The imbalance flag can stay set whereas there is no imbalance.
-> 
-> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
-> We will have some idle load balance which are triggered during tick.
-> Unfortunately, the tick is also used to queue background work so we can reach
-> the situation where short work has been queued on a CPU which already runs a
-> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
-> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
-> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
-> detected and the imbalance flag is set.
-> Then, we will not be able to clear the flag because we have at most 1 task on
-> each CPU but the imbalance flag will trig to useless active load balance
-> between the idle CPU and the busy CPU.
-> 
-> We need to reset of the imbalance flag as soon as we have reached a balanced
-> state.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/fair.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index d3c73122..0c48dff 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -6615,10 +6615,8 @@ more_balance:
->  		if (sd_parent) {
->  			int *group_imbalance = &sd_parent->groups->sgc->imbalance;
-> 
-> -			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
-> +			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0)
->  				*group_imbalance = 1;
-> -			} else if (*group_imbalance)
-> -				*group_imbalance = 0;
->  		}
-> 
->  		/* All tasks on this runqueue were pinned by CPU affinity */
-> @@ -6703,6 +6701,16 @@ more_balance:
->  	goto out;
-> 
->  out_balanced:
-> +	/*
-> +	 * We reach balance although we may have faced some affinity
-> +	 * constraints. Clear the imbalance flag if it was set.
-> +	 */
-> +	if (sd_parent) {
-> +		int *group_imbalance = &sd_parent->groups->sgc->imbalance;
-> +		if (*group_imbalance)
-> +			*group_imbalance = 0;
-> +	}
-> +
->  	schedstat_inc(sd, lb_balanced[idle]);
-> 
->  	sd->nr_balance_failed = 0;
-> 
-I am not convinced that we can clear the imbalance flag here. Lets take
-a simple example. Assume at a particular level of sched_domain, there
-are two sched_groups with one cpu each. There are 2 tasks on the source
-cpu, one of which is running(t1) and the other thread(t2) does not have
-the dst_cpu in the tsk_allowed_mask. Now no task can be migrated to the
-dst_cpu due to affinity constraints. Note that t2 is *not pinned, it
-just cannot run on the dst_cpu*. In this scenario also we reach the
-out_balanced tag right? If we set the group_imbalance flag to 0, we are
-ruling out the possibility of migrating t2 to any other cpu in a higher
-level sched_domain by saying that all is well, there is no imbalance.
-This is wrong, isn't it?
 
-My point is that by clearing the imbalance flag in the out_balanced
-case, you might be overlooking the fact that the tsk_cpus_allowed mask
-of the tasks on the src_cpu may not be able to run on the dst_cpu in
-*this* level of sched_domain, but can potentially run on a cpu at any
-higher level of sched_domain. By clearing the flag, we are not
-encouraging load balance at that level for t2.
+Viresh Kumar wrote:
+> On 8 July 2014 04:10, Todd Poynor <toddpoynor@google.com> wrote:
+>> For Android's usage we're also interested in both:
+>>
+>> 1. not removing and recreating the cpufreq sysfs files for a CPU on
+>> hotplug events (we currently use hotplug uevents to reset file
+>> ownership such that power policy can be controlled by non-root).
+>>
+>> 2. not resetting the contents of policy files such as scaling_max_freq
+>> (also fixed up from uevents) or stats files (we currently keep a
+>> separate persistent time_in_state for battery accounting purposes).
+>
+> So, we actually need to retain all the files. I will try to see this
+> separately. Will add it in my todo list.
+>
 
-Am I missing something?
+Looks like there's enough interest. I'll also try to send out a patch of
+what I think a simplified CPUfreq should look like.
 
-Regards
-Preeti U Murthy
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
