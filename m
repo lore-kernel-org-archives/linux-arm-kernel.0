@@ -1,31 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Jul 2014 12:47:18 +0100
-Subject: [PATCH CFT 02/30] net: fec: iMX6 FEC does not support
- half-duplex gigabit
-In-Reply-To: <20140708064611.GF7827@pengutronix.de>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
- <E1X0Xvb-0001Mu-JB@rmk-PC.arm.linux.org.uk>
- <20140708064611.GF7827@pengutronix.de>
-Message-ID: <20140708114718.GI21766@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Jul 2014 13:47:41 +0200
+Subject: [PATCH 1/3] ARM: exynos: remove unused <mach/memory.h>
+In-Reply-To: <1404295043-6661-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1404295043-6661-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <53BBDA5D.1020605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 08:46:11AM +0200, Uwe Kleine-K?nig wrote:
-> Hi Russell,
+Hi Uwe,
+
+On 02.07.2014 11:57, Uwe Kleine-K?nig wrote:
+> ARCH_EXYNOS doesn't select NEED_MACH_MEMORY_H, so <asm/memory.h> doesn't
+> include <mach/memory.h> and so this file is not used and can go away.
 > 
-> On Fri, Jun 27, 2014 at 04:19:03PM +0100, Russell King wrote:
-> > The iMX6 gigabit FEC does not support half-duplex gigabit operation.
-> > Phys attacked to the FEC may support this, and we currently do nothing
-> Even if it might be interpreted as an attack to connect such a phy to
-> the FEC, I'd still call it "attach" here :-)
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> ---
+>  arch/arm/mach-exynos/include/mach/memory.h | 27 ---------------------------
+>  1 file changed, 27 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/memory.h
 
-You are right, but unfortunately your comment comes too late; this is
-the actual submission for David to integrate the patches into net-next
-rather than for review, and David has already integrated the change into
-his tree.  Hence, the comment is unable to be fixed now.
+Thanks for the patch.
 
-Thanks anyway.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+[boot tested on Exynos4412-based Trats2 board]
+Tested-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
