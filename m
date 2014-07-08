@@ -1,104 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  8 Jul 2014 12:09:07 +0100
-Subject: [PATCH v3 8/9] arm/arm64: KVM: vgic: make number of irqs a
- configurable attribute
+Date: Tue,  8 Jul 2014 12:09:00 +0100
+Subject: [PATCH v3 1/9] KVM: ARM: vgic: plug irq injection race
 In-Reply-To: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
 References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1404817748-31302-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404817748-31302-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make the number of interrupt configurable, use the new
-fancy device management API to add KVM_DEV_ARM_VGIC_GRP_NR_IRQS as
-a VGIC configurable attribute.
+As it stands, nothing prevents userspace from injecting an interrupt
+before the guest's GIC is actually initialized.
 
-Userspace can now specify the exact size of the GIC (by increments
-of 32 interrupts).
+This goes unnoticed so far (as everything is pretty much statically
+allocated), but ends up exploding in a spectacular way once we switch
+to a more dynamic allocation (the GIC data structure isn't there yet).
+
+The fix is to test for the "ready" flag in the VGIC distributor before
+trying to inject the interrupt. Note that in order to avoid breaking
+userspace, we have to ignore what is essentially an error.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- virt/kvm/arm/vgic.c               | 29 +++++++++++++++++++++++++++++
- 3 files changed, 31 insertions(+)
+ virt/kvm/arm/vgic.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..8b51c1a 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -173,6 +173,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
- #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
- #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index e633ff8..b5cd6ed 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -159,6 +159,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
- #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
- #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 708aed9..aee10da 100644
+index ede8f64..eebaf54 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -2208,6 +2208,28 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+@@ -1466,7 +1466,8 @@ out:
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level)
+ {
+-	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
++	if (likely(vgic_initialized(kvm)) &&
++	    vgic_update_irq_state(kvm, cpuid, irq_num, level))
+ 		vgic_kick_vcpus(kvm);
  
- 		return vgic_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 val;
-+		int ret = 0;
-+
-+		if (get_user(val, uaddr))
-+			return -EFAULT;
-+
-+		if (val > 1024 || (val & 31))
-+			return -EINVAL;
-+
-+		mutex_lock(&dev->kvm->lock);
-+
-+		if (vgic_initialized(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
-+			ret = -EBUSY;
-+		else
-+			dev->kvm->arch.vgic.nr_irqs = val;
-+
-+		mutex_unlock(&dev->kvm->lock);
-+
-+		return ret;
-+	}
- 
- 	}
- 
-@@ -2244,6 +2266,11 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		r = put_user(reg, uaddr);
- 		break;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
-+		break;
-+	}
- 
- 	}
- 
-@@ -2280,6 +2307,8 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
- 		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
- 		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
- 	}
- 	return -ENXIO;
- }
+ 	return 0;
 -- 
 2.0.0
