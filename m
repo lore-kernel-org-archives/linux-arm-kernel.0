@@ -1,106 +1,41 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 7 Jul 2014 19:11:36 -0600
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140704145752.GJ6501@e106497-lin.cambridge.arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <20140405000007.GD15806@google.com>
- <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
- <1396862058.3671.40.camel@pasglop>
- <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
- <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
- <20140704145752.GJ6501@e106497-lin.cambridge.arm.com>
-Message-ID: <20140708011136.GE22939@google.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 07 Jul 2014 18:12:23 -0700
+Subject: [PATCH v2 2/7] arm64: Support restart through restart notifier
+ call chain
+In-Reply-To: <20140707141654.d7fb9f8839cdf58822cd43b9@linux-foundation.org>
+References: <1404689900-27421-1-git-send-email-linux@roeck-us.net>	<1404689900-27421-3-git-send-email-linux@roeck-us.net>
+ <20140707141654.d7fb9f8839cdf58822cd43b9@linux-foundation.org>
+Message-ID: <53BB4577.3020601@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 8:57 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> On Mon, Apr 07, 2014 at 11:44:51PM +0100, Bjorn Helgaas wrote:
->> On Mon, Apr 7, 2014 at 4:07 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > On Mon, Apr 07, 2014 at 10:14:18AM +0100, Benjamin Herrenschmidt wrote:
->> >> On Mon, 2014-04-07 at 09:46 +0100, Liviu Dudau wrote:
->> >> >
->> >> > *My* strategy is to get rid of pci_domain_nr(). I don't see why we need
->> >> > to have arch specific way of providing the number, specially after looking
->> >> > at the existing implementations that return a value from a variable that
->> >> > is never touched or incremented. My guess is that pci_domain_nr() was
->> >> > created to work around the fact that there was no domain_nr maintainance in
->> >> > the generic code.
->> >>
->> >> Well, there was no generic host bridge structure. There is one now, it should
->> >> go there.
->> >
->> > Exactly! Hence my patch. After it gets accepted I will go through architectures
->> > and remove their version of pci_domain_nr().
->>
->> Currently the arch has to supply pci_domain_nr() because that's the
->> only way for the generic code to learn the domain.  After you add
->> pci_create_root_bus_in_domain(), the arch can supply the domain that
->> way, and we won't need the arch-specific pci_domain_nr().  Right?
->> That makes more sense to me; thanks for the explanation.
->>
->> Let me try to explain my concern about the
->> pci_create_root_bus_in_domain() interface.  We currently have these
->> interfaces:
->>
->>   pci_scan_root_bus()
->>   pci_scan_bus()
->>   pci_scan_bus_parented()
->>   pci_create_root_bus()
->>
->> pci_scan_root_bus() is a higher-level interface than
->> pci_create_root_bus(), so I'm trying to migrate toward it because it
->> lets us remove a little code from the arch, e.g., pci_scan_child_bus()
->> and pci_bus_add_devices().
->>
->> I think we can only remove the arch-specific pci_domain_nr() if that
->> arch uses pci_create_root_bus_in_domain().  When we convert an arch
->> from using scan_bus interfaces to using
->> pci_create_root_bus_in_domain(), we will have to move the rest of the
->> scan_bus code (pci_scan_child_bus(), pci_bus_add_devices()) back into
->> the arch code.
->>
->> One alternative is to add an _in_domain() variant of each of these
->> interfaces, but that doesn't seem very convenient either.  My idea of
->> passing in a structure would also require adding variants, so there's
->> not really an advantage there, but I am thinking of the next
->> unification effort, e.g., for NUMA node info.  I don't really want to
->> have to change all the _in_domain() interfaces to also take yet
->> another parameter for the node number.
+On 07/07/2014 02:16 PM, Andrew Morton wrote:
+> On Sun,  6 Jul 2014 16:38:15 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
 >
-> ...
-> My understanding is that when pci_host_bridge structure was introduced
-> you were trying to keep the APIs unchanged and hence the creation of a
-> bridge was hidden inside the pci_create_root_bus() function.
+>> The kernel core now supports a notifier call chain to restart
+>> the system. Call it if arm_pm_restart is not set.
+>>
+>> ...
+>>
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -174,6 +174,9 @@ void machine_restart(char *cmd)
+>>   	/* Now call the architecture specific reboot code. */
+>>   	if (arm_pm_restart)
+>>   		arm_pm_restart(reboot_mode, cmd);
+>> +	else
+>> +		blocking_notifier_call_chain(&restart_notifier_list,
+>> +					     reboot_mode, cmd);
+>
+> It would be a bit neater to have a helper function to perform the call,
+> rather than directly accessing the notifier list.  Apart from anything
+> else, this hides the fact that the core code (presently!) uses the
+> blocking_ style notifiers.
+>
 
-You mean pci_alloc_host_bridge()?  Right; ideally I would have used
-pci_scan_root_bus() everywhere and gotten rid of pci_create_root_bus().
-The outline of pci_scan_root_bus() is:
+Introduced kernel_restart_notify (proposals for better names welcome).
+As a side effect, moved restart_notifier_list into kernel/reboot.c and
+made it static.
 
-    pci_create_root_bus()
-    pci_scan_child_bus()
-    pci_bus_add_devices()
-
-The problem was that several arches do interesting things scattered among
-that core.  The ACPI host bridge driver used on x86 and ia64 does resource
-allocation before pci_bus_add_devices(), as does parisc.  Probably all
-arches should do this, but they don't.
-
-And powerpc and sparc use of_scan_bus() or something similar instead of
-pci_scan_child_bus().  They probably *could* provide config space accessors
-that talk to OF and would allow pci_scan_child_bus() to work.  But that
-seemed like too much work at the time.
-
-> If we want to store the domain_nr information in the host bridge structure,
-> together with a pointer to sysdata, then we need to break up the creation
-> of the pci_host_bridge from the creation of a root bus. At that moment,
-> pci_scan_root_bus() will need to be changed to accept a pci_host_bridge
-> pointer, while pci_scan_bus() and pci_scan_bus_parented() will create
-> the host bridge in the body of their function.
-
-It's hard to change an existing interface like pci_scan_root_bus() because
-it's called from so many places and you have to change them all at once.
-Then if something goes wrong, the revert makes a mess for everybody.  But
-I think it makes sense to add a new interface that does what you want.
-
-Bjorn
+Thanks,
+Guenter
