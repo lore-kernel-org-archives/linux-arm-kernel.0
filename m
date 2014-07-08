@@ -1,45 +1,40 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Tue,  8 Jul 2014 13:16:16 -0700
-Subject: [PATCH 6/6] arm: LLVMLinux: Use current_stack_pointer in
- unwind_backtrace
-In-Reply-To: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
-References: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1404850576-2006-7-git-send-email-behanw@converseincode.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 08 Jul 2014 13:18:54 -0700
+Subject: [PATCHv2 1/8] clk: add an APPLY_RATE_CHANGE notifier event during
+ clk_set_rate()
+In-Reply-To: <20140708091540.0f886cfc@free-electrons.com>
+References: <1404744702-32010-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1404744702-32010-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <53BB30D2.3010908@codeaurora.org>
+ <20140708091540.0f886cfc@free-electrons.com>
+Message-ID: <53BC522E.8080302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+On 07/08/14 00:15, Thomas Petazzoni wrote:
+> Dear Stephen Boyd,
+>
+> On Mon, 07 Jul 2014 16:44:18 -0700, Stephen Boyd wrote:
+>
+>>> In order to solve this problem, we propose to add an APPLY_RATE_CHANGE
+>>> notifier event, which gets called right after ->set_rate(), but before
+>>> ->recalc_rate(), and therefore regardless of whether there was an
+>>> actualy frequency change or not.
+>> Is there any reason why we can't call the pmsu code (part #3) directly
+>> from the cpu clock driver? It seems like if we just called the
+>> .set_rate() op we wouldn't actually have changed the clock's rate. That
+>> doesn't seem very intuitive and it really makes the code flow hard to
+>> follow.
+> Right, but what solution would you propose to achieve that? These days,
+> a direct call from drivers/ code to arch/arm/mach-<foo>/ code is
+> frowned upon, no? (The code handling the PMSU is in
+> arch/arm/mach-mvebu/pmsu.c).
+>
 
-Use the global current_stack_pointer to get the value of the stack pointer.
-This change supports being able to compile the kernel with both gcc and clang.
+I don't see a problem with having an include file in include/linux/ for
+this, maybe others do though. If it actually is a problem then perhaps
+moving the pmsu.c code into drivers/ is the right solution.
 
-Signed-off-by: Behan Webster <behanw@converseincode.com>
-Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-Reviewed-by: Jan-Simon M??ller <dl9pf@gmx.de>
----
- arch/arm/kernel/unwind.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index e67682f..e20e8dc 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -471,7 +471,6 @@ int unwind_frame(struct stackframe *frame)
- void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- {
- 	struct stackframe frame;
--	register unsigned long current_sp asm ("sp");
- 
- 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
- 
-@@ -487,7 +486,7 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 			 ? regs->ARM_pc : regs->ARM_lr;
- 	} else if (tsk == current) {
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
--		frame.sp = current_sp;
-+		frame.sp = current_stack_pointer;
- 		frame.lr = (unsigned long)__builtin_return_address(0);
- 		frame.pc = (unsigned long)unwind_backtrace;
- 	} else {
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
