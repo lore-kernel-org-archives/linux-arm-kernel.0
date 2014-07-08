@@ -1,43 +1,66 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jul 2014 18:37:09 -0400
-Subject: [PATCH 0/3 V2] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <1404314468-7674-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1404314468-7674-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140708223709.GH13433@titan.lakedaemon.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 8 Jul 2014 16:37:37 -0600
+Subject: [PATCH v8 8/9] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <20140708222738.GA4980@e106497-lin.cambridge.arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140708010103.GD22939@google.com>
+ <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
+ <20140708213305.GB4555@google.com>
+ <20140708222738.GA4980@e106497-lin.cambridge.arm.com>
+Message-ID: <20140708223737.GA19512@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suravee,
-
-On Wed, Jul 02, 2014 at 10:21:05AM -0500, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Tue, Jul 08, 2014 at 11:27:38PM +0100, Liviu Dudau wrote:
+> On Tue, Jul 08, 2014 at 10:33:05PM +0100, Bjorn Helgaas wrote:
+> > On Tue, Jul 08, 2014 at 11:29:40AM +0100, Liviu Dudau wrote:
+> > > On Tue, Jul 08, 2014 at 02:01:04AM +0100, Bjorn Helgaas wrote:
+> > > > On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
+> > > > > ...
+> > > > > +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
+> > > > > +{
+> > > > > +     return 0;
+> > > > > +}
+> > > > 
+> > > > I'd wait to add this until there's a platform that needs to implement it.
+> > > > Splitting it out will make this patch that much smaller and easier to
+> > > > understand.
+> > > 
+> > > I need this as this is the default implementation (i.e. do nothing). Otherwise the
+> > > link phase will give errors. 
+> > 
+> > I meant that you could remove the default implementation *and* the call of
+> > it, since it currently does nothing.
 > 
-> This patch set introduces support for MSI(-X) in GICv2m specification,
-> which is implemented in some variation of GIC400 (e.g. gic-400+).
+> True. But it looks like converting Will's pci-host-generic.c driver will make use of this.
+
+I think we should move this part of the patch to the conversion of
+that driver.  That will keep related changes grouped together, which 
+makes them easier to review and easier to backport, e.g., to distro
+kernels.
+
+> > > > > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > > > > index 7e7b939..556dc5f 100644
+> > > > > --- a/include/linux/pci.h
+> > > > > +++ b/include/linux/pci.h
+> > > > > @@ -402,6 +402,7 @@ struct pci_host_bridge {
+> > > > >       struct device dev;
+> > > > >       struct pci_bus *bus;            /* root bus */
+> > > > >       int domain_nr;
+> > > > > +     resource_size_t io_base;        /* physical address for the start of I/O area */
+> > > > 
+> > > > I don't see where this is used yet.
+> > > 
+> > > It's used in pci_host_bridge_of_get_ranges() (earlier in this patch).
+> > 
+> > of_create_pci_host_bridge() fills in bridge->io_base, but I don't see
+> > anything that ever *reads* bridge->io_base.
 > 
-> This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
-> (https://lkml.org/lkml/2014/3/14/320).
-> 
-> Changes in V2:
-> Re-architect the code to:
->     * Use irq_chip for gicv2m instead of using the gic_chip (per Marc suggestion).
->     * Remove the overwriting of arch_setup_msi_irq and arch_setup_msi_irqs
->       (per Marc suggestion).
->     * Add devicetree matching for gic-400-plus for v2m stuff instread of
->       re-using gic-400 just to be clear.
->     * Misc fix/clean up per Mark Rutland and Marc Zyngier comments
-> 
-> Suravee Suthikulpanit (3):
->   irqchip: gic: Add binding probe for ARM GIC400
->   irqchip: gic: Restructuring ARM GIC code
->   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+> Ah, understood. It is used by the host bridge drivers to set their ATR registers to the
+> correct CPU address values.
 
-I've now pulled in the first two patches of Marc's series into
-irqchip/gic.  Could you please rebase your changes on top of that?
+Same applies here.
 
-Also, please get a handle on git send-email.  This series had broken
-threading and was sent out of order.
-
-thx,
-
-Jason.
+Bjorn
