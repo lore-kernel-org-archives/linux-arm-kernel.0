@@ -1,47 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Jul 2014 01:29:48 -0700
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <53BB7980.2060909@ti.com>
-References: <20140702081142.GU28884@atomide.com>
- <20140707104727.GM28884@atomide.com>
- <20140707104944.GS3705@n2100.arm.linux.org.uk>
- <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
- <20140707134008.GU3705@n2100.arm.linux.org.uk>
- <20140707151024.GJ5582@saruman.home> <53BB7980.2060909@ti.com>
-Message-ID: <20140708082948.GE28884@atomide.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Tue, 8 Jul 2014 09:32:02 +0100
+Subject: [PATCH 0/3] Deterministic UART numbering on Samsung SoCs
+In-Reply-To: <53AC0BCC.1010608@samsung.com>
+References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
+ <20140626113939.GP32514@n2100.arm.linux.org.uk>
+ <53AC0BCC.1010608@samsung.com>
+Message-ID: <CAD8Lp45MvDLsxehayx8uuGt3w3O0vGskiFjb1vdvtOyOv2nG2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sekhar Nori <nsekhar@ti.com> [140707 21:56]:
-> On Monday 07 July 2014 08:40 PM, Felipe Balbi wrote:
-> > On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
-> >> --- a/arch/arm/mm/cache-l2x0.c
-> >> +++ b/arch/arm/mm/cache-l2x0.c
-> >> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
-> >>  
-> >>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
-> >>  {
-> >> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-> >> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
-> >>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
-> > 
-> > even with this change, l2c still tries to write to power control
-> > register, at least on AM437x. Looking a little deeper here, AM437x
-> > identifies itself as l2c PL310 r3p3, which should have power control
-> > register, but aparentely there's no way to write that register. I'll
-> > file a bug to our ROM team, but we will certainly need a way to
-> > workaround this inside omap4-common.c
-> 
-> Looks like we need both my patch as well as Russell's patch. I can
-> respin my patch with the pr_info_once() dropped if it helps further
-> reduce boot noise.
+Hi,
 
-In that case I'm fine with the original patch in this series. Russell,
-got any better ideas?
+How can we move forward here?
 
-Regards,
+On Thu, Jun 26, 2014 at 1:02 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> - basically Samsung UART already has its own namespace (ttySAC) and the
+> order inside it is well-defined - instance ID shall be the hardware
+> instance number as specified by documentation. The ports vary in certain
+> aspects and the ID is important knowledge of the driver. The problem
+> here was broken implementation of assigning IDs based on probe order,
+> which worked only because on all Exynos platforms all ports have been
+> always registered (which we want to change now and keep unused ones
+> "disabled" in DT),
 
-Tony
+Yes, the kernel help text documents this quite well:
+
+config SERIAL_SAMSUNG
+    tristate "Samsung SoC serial support"
+    depends on PLAT_SAMSUNG
+    select SERIAL_CORE
+    help
+      Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
+      providing /dev/ttySAC0, 1 and 2 (note, some machines may not
+      provide all of these ports, depending on how the serial port
+      pins are configured.
+
+> - we already have a lot of userspace depending on the aforementioned
+> ttySAC namespace and proper ordering of instances there. While I believe
+> the proper solution as of today would be to go back to standard ttyS
+> namespace and make userspace use a smarter way of identifying the
+> instances (e.g. by path or id, as you suggested), I don't think this
+> will make anyone's life easier with current assumptions,
+
+I like the sound of going to the standard ttyS notation and only
+providing ports for ones that exist, but is this userspace-visible
+naming change OK? You could argue that userspace that relies on fixed
+device paths is a bit broken, but that argument would be a bit cloudy
+given the kernel documentation for the ttySAC devices above.
+
+> - correct me if I'm wrong, but I don't think the
+> /dev/serial/by-{path,id} would be handled in kernel's console= parameter.
+
+That's right, that problem is left to the user, but at least we'd be
+consistent with other SoCs (and open to generic solutions to that
+inconvenience).
+
+Daniel
