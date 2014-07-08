@@ -1,70 +1,81 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue,  8 Jul 2014 09:49:23 -0500
-Subject: [PATCH 2/2] ARM: dts: add initial Rex Basic board support
-In-Reply-To: <1404830963-18274-1-git-send-email-robertcnelson@gmail.com>
-References: <1404830963-18274-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <1404830963-18274-2-git-send-email-robertcnelson@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 8 Jul 2014 18:43:04 +0300
+Subject: [PATCH] ARM: dts: keystone: fix netcp's clocks definitions
+Message-ID: <1404834184-5411-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial Rex Pro i.mx6dl board support. Ethernet, UART, USB, I2C, SPI, HDMI,
-Audio, and SDHC cards are working.  Currently no mainline u-boot, so boot with
-cat zImage imx6dl-rex-basic.dtb > zImage.dtb, then using mkimage create uImage
+The clocks tree for Keystone 2 NTCP devices should be
+defined as following:
+[refclk] - board dependent
+ |- <papllclk> - PLL clock
+    |- <paclk13> - fixed factor clock div=3 mul=1
+       |- <clkpa> - gated clock
+       |- <clkcpgmac> - gated clock
+       |- <clksa> - gated clock
 
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+Hence, update Keystone 2 DT to follow HW specification.
+
+Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/imx6dl-rex-basic.dts | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-rex-basic.dts
+ arch/arm/boot/dts/k2e-clocks.dtsi      |    2 +-
+ arch/arm/boot/dts/k2hk-clocks.dtsi     |    2 +-
+ arch/arm/boot/dts/k2l-clocks.dtsi      |    2 +-
+ arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fb79bf5..cee0067 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -199,6 +199,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6dl-hummingboard.dtb \
- 	imx6dl-nitrogen6x.dtb \
- 	imx6dl-phytec-pbab01.dtb \
-+	imx6dl-rex-basic.dtb \
- 	imx6dl-riotboard.dtb \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabrelite.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-rex-basic.dts b/arch/arm/boot/dts/imx6dl-rex-basic.dts
-new file mode 100644
-index 0000000..b13845c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-rex-basic.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright 2014 FEDEVEL, Inc.
-+ *
-+ * Author: Robert Nelson <robertcnelson@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-rex.dtsi"
-+
-+/ {
-+	model = "Rex Basic i.MX6 Dual Lite Board";
-+	compatible = "rex,imx6dl-rex-basic", "fsl,imx6dl";
-+
-+	memory {
-+		reg = <0x10000000 0x20000000>;
-+	};
-+};
-+
-+&ecspi3 {
-+	flash: m25p80 at 0 {
-+		compatible = "sst,sst25vf016b";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
+diff --git a/arch/arm/boot/dts/k2e-clocks.dtsi b/arch/arm/boot/dts/k2e-clocks.dtsi
+index 90774d6..598afe9 100644
+--- a/arch/arm/boot/dts/k2e-clocks.dtsi
++++ b/arch/arm/boot/dts/k2e-clocks.dtsi
+@@ -22,7 +22,7 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-clock";
+ 		clocks = <&refclkpass>;
+-		clock-output-names = "pa-pll-clk";
++		clock-output-names = "papllclk";
+ 		reg = <0x02620358 4>;
+ 		reg-names = "control";
+ 	};
+diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
+index 96e6536..d5adee3 100644
+--- a/arch/arm/boot/dts/k2hk-clocks.dtsi
++++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
+@@ -31,7 +31,7 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-clock";
+ 		clocks = <&refclkpass>;
+-		clock-output-names = "pa-pll-clk";
++		clock-output-names = "papllclk";
+ 		reg = <0x02620358 4>;
+ 		reg-names = "control";
+ 	};
+diff --git a/arch/arm/boot/dts/k2l-clocks.dtsi b/arch/arm/boot/dts/k2l-clocks.dtsi
+index f584b80..eb1e3e2 100644
+--- a/arch/arm/boot/dts/k2l-clocks.dtsi
++++ b/arch/arm/boot/dts/k2l-clocks.dtsi
+@@ -31,7 +31,7 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,pll-clock";
+ 		clocks = <&refclksys>;
+-		clock-output-names = "pa-pll-clk";
++		clock-output-names = "papllclk";
+ 		reg = <0x02620358 4>;
+ 		reg-names = "control";
+ 	};
+diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+index 93f82c7..0c334b2 100644
+--- a/arch/arm/boot/dts/keystone-clocks.dtsi
++++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+@@ -215,7 +215,7 @@ clocks {
+ 	clkpa: clkpa {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+-		clocks = <&chipclk16>;
++		clocks = <&paclk13>;
+ 		clock-output-names = "pa";
+ 		reg = <0x0235001c 0xb00>, <0x02350008 0x400>;
+ 		reg-names = "control", "domain";
 -- 
-2.0.0
+1.7.9.5
