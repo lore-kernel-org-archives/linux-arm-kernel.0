@@ -1,32 +1,52 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 8 Jul 2014 09:27:45 +0200
-Subject: [PATCH] pinctrl: st: add IRQCHIP_SKIP_SET_WAKE flag
-In-Reply-To: <CACRpkdY64C0PNEK+E_AVhhxvJMXOiesFHOcvFpRpoTrfb0dtMw@mail.gmail.com>
-References: <1403711344-17335-1-git-send-email-patrice.chotard@st.com>
- <CACRpkdY64C0PNEK+E_AVhhxvJMXOiesFHOcvFpRpoTrfb0dtMw@mail.gmail.com>
-Message-ID: <53BB9D71.3060203@st.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 8 Jul 2014 10:30:15 +0300
+Subject: [PATCH] clk: tegra: Use XUSB-compatible SATA PLL sequence
+In-Reply-To: <CAL1qeaHo_HEoXoCQjQuqux_BNPtz4BtOnrYTa4=vcNQCYxiDSg@mail.gmail.com>
+References: <CAL1qeaHo_HEoXoCQjQuqux_BNPtz4BtOnrYTa4=vcNQCYxiDSg@mail.gmail.com>
+Message-ID: <1404804615-23587-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use a sequence for enabling hardware control of the SATA PLL
+that works both when using the SATA lane with SATA and when
+using it with XUSB.
 
-On 07/07/2014 05:32 PM, Linus Walleij wrote:
-> On Wed, Jun 25, 2014 at 5:49 PM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
->
->> From: David PARIS <david.paris@st.com>
->>
->> no .irq_set_wake API is available for pinctrl-st driver.
->> Add the IRQCHIP_SKIP_SET_WAKE flag to inform irq handler
->> not to call this API.
->>
->> Signed-off-by: David Paris <david.paris@st.com>
-> Patch applied - had to rebase it, strangely the struct is different in
-> my tree (check that you're in sync).
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+Andrew: yes, it does :)
+Peter: Feel free to squash if that works for you.
 
-My bad, you are right, i haven't forgotten to rebase on top of your tree.
+ drivers/clk/tegra/clk-pll.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Sorry Linus
-
-Patrice
->
-> Yours,
-> Linus Walleij
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index f070c36..c7c6d8f 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -112,6 +112,9 @@
+ 
+ #define SATA_PLL_CFG0		0x490
+ #define SATA_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
++#define SATA_PLL_CFG0_PADPLL_USE_LOCKDET	BIT(2)
++#define SATA_PLL_CFG0_SEQ_ENABLE		BIT(24)
++#define SATA_PLL_CFG0_SEQ_START_STATE		BIT(25)
+ 
+ #define PLLE_MISC_PLLE_PTS	BIT(8)
+ #define PLLE_MISC_IDDQ_SW_VALUE	BIT(13)
+@@ -1367,6 +1370,14 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
+ 	/* Enable hw control of SATA pll */
+ 	val = pll_readl(SATA_PLL_CFG0, pll);
+ 	val &= ~SATA_PLL_CFG0_PADPLL_RESET_SWCTL;
++	val |= SATA_PLL_CFG0_PADPLL_USE_LOCKDET;
++	val |= SATA_PLL_CFG0_SEQ_START_STATE;
++	pll_writel(val, SATA_PLL_CFG0, pll);
++
++	udelay(1);
++
++	val = pll_readl(SATA_PLL_CFG0, pll);
++	val |= SATA_PLL_CFG0_SEQ_ENABLE;
+ 	pll_writel(val, SATA_PLL_CFG0, pll);
+ 
+ out:
+-- 
+1.8.1.5
