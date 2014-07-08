@@ -1,38 +1,71 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Tue, 8 Jul 2014 12:06:53 +0100
-Subject: [Xen-devel] [RFC PATCH 0/2] xen/arm: fix
- "xen_add_mach_to_phys_entry: cannot add" problem
-In-Reply-To: <53BBCCEF.1080704@citrix.com>
-References: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
- <53BBCCEF.1080704@citrix.com>
-Message-ID: <1404817613.11945.1.camel@hastur.hellion.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  8 Jul 2014 12:09:03 +0100
+Subject: [PATCH v3 4/9] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+In-Reply-To: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404817748-31302-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-08 at 11:50 +0100, David Vrabel wrote:
-> On 07/07/14 21:24, Stefano Stabellini wrote:
-> > Hi all,
-> > Xen support in Linux for ARM and ARM64 suffers from lack of support for
-> > multiple mfn to pfn mappings: whenever a frontend grants the same page
-> > multiple times to the backend, the mfn to pfn accounting in
-> > arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
-> > when xen-netfront/xen-netback switched from grant copies to grant
-> > mappings, therefore causing the issue to happen much more often.
-> > 
-> > Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
-> > therefore we are looking for alternative solutions. One idea is avoiding
-> > mfn to pfn conversions altogether. The only code path that needs them is
-> > swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
-> > 
-> > To avoid mfn to pfn conversions we rely on a second p2m mapping done by
-> > Xen, see the attached patch. In Linux we use it to perform the cache
-> > maintenance operations without mfns conversions.
-> 
-> This will only work with PIPT caches (or certain types of VIPT that also
-> have alias detection).  Do all the CPUs that Xen runs on have these type
-> of cache?
+We now have the information about the number of CPU interfaces in
+the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
+rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
 
-v7 (at least, didn't check/don't care about v6) mandates PIPT for data
-caches, yes.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h | 3 +--
+ virt/kvm/arm/vgic.c    | 6 +++---
+ 2 files changed, 4 insertions(+), 5 deletions(-)
 
-Ian.
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index b8a6337..99ad8af 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -29,13 +29,12 @@
+ #define VGIC_NR_SGIS		16
+ #define VGIC_NR_PPIS		16
+ #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+-#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
+ 
+ #define VGIC_V2_MAX_LRS		(1 << 6)
+ #define VGIC_V3_MAX_LRS		16
+ 
+ /* Sanity checks... */
+-#if (VGIC_MAX_CPUS > 8)
++#if (KVM_MAX_VCPUS > 8)
+ #error	Invalid number of CPU interfaces
+ #endif
+ 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 6f7cf85..3cb667c 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1206,7 +1206,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ 
+ 	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
+ 
+-	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
++	for_each_set_bit(c, &sources, dist->nr_cpus) {
+ 		if (vgic_queue_irq(vcpu, c, irq))
+ 			clear_bit(c, &sources);
+ 	}
+@@ -1583,7 +1583,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int i;
+ 
+-	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
++	if (vcpu->vcpu_id >= dist->nr_cpus)
+ 		return -EBUSY;
+ 
+ 	for (i = 0; i < VGIC_NR_IRQS; i++) {
+@@ -1724,7 +1724,7 @@ static int vgic_init_maps(struct kvm *kvm)
+ 	int nr_cpus, nr_irqs;
+ 	int ret, i;
+ 
+-	nr_cpus = dist->nr_cpus = VGIC_MAX_CPUS;
++	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
+ 	nr_irqs = dist->nr_irqs = VGIC_NR_IRQS;
+ 
+ 	ret  = vgic_init_bitmap(&dist->irq_enabled, nr_cpus, nr_irqs);
+-- 
+2.0.0
