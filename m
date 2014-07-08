@@ -1,54 +1,90 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 09 Jul 2014 01:26:46 +0200
-Subject: [PATCH 2/2] dt-bindings: document Rockchip saradc
-In-Reply-To: <2959154.xc8BQActsn@diego>
-References: <2959154.xc8BQActsn@diego>
-Message-ID: <3591595.sBj6Zqo42A@diego>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 08 Jul 2014 16:33:04 -0700
+Subject: [RFC PATCH 2/3] arm64: add C struct definition for Image header
+In-Reply-To: <CAKv+Gu8Qa86N7OSWXTp7XjJvPVa6_rKE_mnMBLJKWjoaabeH+A@mail.gmail.com>
+References: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1404823803-7317-2-git-send-email-ard.biesheuvel@linaro.org>
+ <1404848794.26155.31.camel@smoke>
+ <CAKv+Gu8Qa86N7OSWXTp7XjJvPVa6_rKE_mnMBLJKWjoaabeH+A@mail.gmail.com>
+Message-ID: <1404862384.26155.49.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add the necessary binding documentation for the saradc found in all recent
-processors from Rockchip.
+Hi,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- .../bindings/iio/adc/rockchip-saradc.txt           | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+On Tue, 2014-07-08 at 22:59 +0200, Ard Biesheuvel wrote:
+> On 8 July 2014 21:46, Geoff Levand <geoff@infradead.org> wrote:
+> > On Tue, 2014-07-08 at 14:50 +0200, Ard Biesheuvel wrote:
+> >
+> > I think the duplication of the structure definition in booting.txt
+> > and in image_hdr.h will not be maintained, so I recommend we remove
+> > the definition in booting.txt and replace it with something like:
+> >
+> > -The decompressed kernel image contains a 64-byte header as follows:
+> > ...
+> > +The decompressed kernel image contains a 64-byte header as described in
+> > +arch/arm64/include/asm/image_hdr.h.
+> >
+> >
+> 
+> I see what you mean, but I will let the maintainers decide on that one.
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-new file mode 100644
-index 0000000..603ac9c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-@@ -0,0 +1,28 @@
-+Rockhip Successive Approximation Register (SAR) A/D Converter bindings
-+
-+Required properties:
-+- compatible: Should be "rockchip,saradc"
-+- reg: physical base address of the controller and length of memory mapped
-+       region.
-+- interrupts: The interrupt number to the cpu. The interrupt specifier format
-+              depends on the interrupt controller.
-+- clocks: Must contain an entry for each entry in clock-names.
-+- clock-names: Shall be "saradc" for the converter-clock, and "apb_pclk" for
-+               the peripheral clock.
-+- vref-supply: The regulator supply ADC refrence voltage.
-+- #io-channel-cells: Should be 1, see ../iio-bindings.txt
-+
-+Optional properties :
-+- clock-frequency : converter frequency in Hz. If omitted, 1MHz is used.
-+
-+Example:
-+	saradc: saradc at 2006c000 {
-+		compatible = "rockchip,saradc";
-+		reg = <0x2006c000 0x100>;
-+		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
-+		clock-names = "saradc", "apb_pclk";
-+		#io-channel-cells = <1>;
-+		vref-supply = <&vcc18>;
-+		clock-frequency = <1000000>;
-+	};
--- 
-1.9.0
+Why don't you make a separate patch that does it, then their
+decision on that won't effect this patch. 
+
+> >> + *
+> >> + * Copyright (C) 2014 Linaro Ltd  <ard.biesheuvel@linaro.org>
+> >
+> > Are you really a copyright holder of this code?
+> >
+> 
+> I am the author of this file. Will is the author of booting.txt. I am
+> not a lawyer so whether that makes Linaro a copyright holder, I am not
+> sure ...
+> But as I understand it, someone needs to claim copyright in order for
+> others to be bound to the license.
+
+Well, authorship and ownership (copyright holder) are different
+things.  My guess is that your employment agreement makes everything
+you create the property of Linaro, so they are the copyright holder.
+You are just an author, so you shouldn't put yourself in the copyright
+notice.  Probably just add another line like:
+
++ Author: <ard.biesheuvel@linaro.org>
+
+> >> +#define IMAGE_HDR_SIZE               64
+> >
+> > I can't see any use for this IMAGE_HDR_SIZE.  We have the
+> > structure def, so use sizeof.
+> >
+> 
+> I am using it in the BUILD_BUG_ON() below. Do you think that is overkill?
+
+Yes.  Even if someone changed something to make the size incorrect,
+what really matters is the offset of things.
+
+> > Please add a comment here to document this structure and the
+> > members, not in the structure itself.  Something like:
+> >
+> > +/**
+> > + * struct arm64_image_header - arm64 kernel image header.
+> > + *
+> > + * @code0: ...
+> >
+> 
+> Is this coding style documented somewhere? Documentation/CodingStyle
+> does not seem to cover it ...
+
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kernel-doc-nano-HOWTO.txt
+
+
+> >> +     return hdr->magic == cpu_to_le32(0x644d5241);
+> >> +}
+> 
+> Perhaps I should use a define here ...
+
+Or a constant, which would have a type.  Something like this?
+
++static const uint32_t magic_le = 0x644d5241U;
+
+-Geoff
