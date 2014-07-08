@@ -1,34 +1,51 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 8 Jul 2014 10:52:47 +0100
-Subject: [PATCH 2/2] efi: implement mandatory locking for UEFI Runtime
- Services
-In-Reply-To: <CAKv+Gu9HkJgsnzUAROVwPKaHGHRU9FwAp+eOT8N8kYDR3Dda+w@mail.gmail.com>
-References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
- <1404295802-28030-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140707202954.GC27474@console-pimps.org>
- <CAKv+Gu91CQADTQ8KMjXQPwVDvW1XkUYO2E5=Mu=aAtrB8B3q_A@mail.gmail.com>
- <CAKv+Gu8LbfuuEYyhAeu3dUiKHqzN_UFMbOjY0agVihbmmVL9CA@mail.gmail.com>
- <20140708092958.GD27474@console-pimps.org>
- <CAKv+Gu9HkJgsnzUAROVwPKaHGHRU9FwAp+eOT8N8kYDR3Dda+w@mail.gmail.com>
-Message-ID: <20140708095247.GE27474@console-pimps.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 08 Jul 2014 17:55:38 +0800
+Subject: [PATCH 1/4] ACPI: ARM64 does not have a BIOS add config for BIOS
+ table scan.
+In-Reply-To: <1430951.SWzYBgFe0M@vostro.rjw.lan>
+References: <1404290847-7671-1-git-send-email-hanjun.guo@linaro.org>
+ <1404290847-7671-2-git-send-email-hanjun.guo@linaro.org>
+ <1430951.SWzYBgFe0M@vostro.rjw.lan>
+Message-ID: <53BBC01A.4030704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 08 Jul, at 11:45:03AM, Ard Biesheuvel wrote:
-> 
-> Well, that is what is says in the comment:
->          * ops.get_next_variable() is only called from register_efivars()
->          * or efivar_update_sysfs_entries(),
->          * which is protected by the BKL, so that path is safe.
- 
-Oops, so it does. That's a stale comment. I'll update it.
+On 2014?07?08? 05:06, Rafael J. Wysocki wrote:
+> On Wednesday, July 02, 2014 04:47:23 PM Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> With the addition of ARM64 that does not have a traditional BIOS to
+>> scan, add a config option which is selected on x86 and ia64 to do
+>> the traditional BIOS scanning for tables.
+>>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/ia64/Kconfig    |    1 +
+>>  arch/x86/Kconfig     |    1 +
+>>  drivers/acpi/Kconfig |    3 +++
+>>  drivers/acpi/osl.c   |    4 +++-
+>>  4 files changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+>> index 2f3abcf..f82b352 100644
+>> --- a/arch/ia64/Kconfig
+>> +++ b/arch/ia64/Kconfig
+>> @@ -47,6 +47,7 @@ config IA64
+>>  	select MODULES_USE_ELF_RELA
+>>  	select ARCH_USE_CMPXCHG_LOCKREF
+>>  	select HAVE_ARCH_AUDITSYSCALL
+>> +	select ACPI_SCAN_BIOS_NOT_EFI
+> I would call this ACPI_LEGACY_TABLES_LOOKUP or something like that.
+>
+> Also please do
+>
+> +	select ACPI_LEGACY_TABLES_LOOKUP if ACPI
+>
+> in analogy with patch [3/4] in this series.
 
-> I agree. So shall I update my patch to add a single spin_lock that is
-> used by all wrappers?
-> We will likely need the wrappers on ARM as well, only ia64 needs
-> another approach (if desired)
+OK, I will update this patch accordingly, thanks for the great config
+name :)
 
-Please do, that would be great!
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+Thanks
+Hanjun
