@@ -1,74 +1,41 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 8 Jul 2014 15:11:36 +0200
-Subject: [PATCH v3 2/2] ARM: dts: at_xdmac: add bindings documentation
-In-Reply-To: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1404825096-15724-3-git-send-email-ludovic.desroches@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 8 Jul 2014 18:43:26 +0530
+Subject: [PATCH v9 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <53BBEB84.50904@gmail.com>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-2-git-send-email-antoine.tenart@free-electrons.com>
+ <53BBE419.8080107@ti.com> <53BBEB84.50904@gmail.com>
+Message-ID: <53BBEE76.7090100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings documentation for the new Atmel DMA controller (XDMAC)
-introduced with SAMA5D4.
+Hi,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- .../devicetree/bindings/dma/atmel-xdma.txt         |   48 ++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+On Tuesday 08 July 2014 06:30 PM, Sebastian Hesselbarth wrote:
+> On 07/08/2014 02:29 PM, Kishon Vijay Abraham I wrote:
+>> On Monday 07 July 2014 03:46 PM, Antoine T?nart wrote:
+>>> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+>>>
+>>> The mode selection can let us think this PHY can be configured to fit
+>>> other purposes. But there are reasons to think the SATA mode will be
+>>> the only one usable: the PHY registers are only accessible indirectly
+>>> through two registers in the SATA range, the PHY seems to be integrated
+>>> and no information tells us the contrary. For these reasons, make the
+>>> driver a SATA PHY driver.
+>>
+>> Thanks for doing multiple revisions of this. Looks good to be merged for me now.
+> 
+> I'd like to see some Acked-by from Tejun on the AHCI patches first, but
+> if he agrees, should I prepare a stable branch for each of us to pull
+> their patches from?
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-new file mode 100644
-index 0000000..647f099
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-@@ -0,0 +1,48 @@
-+* Atmel Extensible Direct Memory Access Controller (XDMAC)
-+
-+* XDMA Controller
-+Required properties:
-+- compatible: Should be "atmel,<chip>-dma".
-+- reg: Should contain DMA registers location and length.
-+- interrupts: Should contain DMA interrupt.
-+- #dma-cells: Must be <2>, used to represent the number of integer cells in
-+the dmas property of client devices.
-+  - The 1st cell specifies the memory interface (16 most significant bits) and
-+  the peripheral interface (16 less significant bits) to use.
-+  - The 2nd cell specifies the channel configuration register:
-+    - bit 30-24: PERID, peripheral identifier.
-+
-+Example:
-+
-+dma1: dma-controller at f0004000 {
-+	compatible = "atmel,sama5d4-dma";
-+	reg = <0xf0004000 0x200>;
-+	interrupts = <50 4 0>;
-+	#dma-cells = <2>;
-+};
-+
-+
-+* DMA clients
-+DMA clients connected to the Atmel XDMA controller must use the format
-+described in the dma.txt file, using a two-cell specifier for each channel.
-+The three cells in order are:
-+1. A phandle pointing to the DMA controller.
-+2. The memory interface (16 most significant bits), the peripheral interface
-+(16 less significant bits).
-+3. Channel configuration register. Configurable fields are:
-+  - bit 30-24: PERID, peripheral identifier.
-+
-+Example:
-+
-+i2c2: i2c at f8024000 {
-+	compatible = "atmel,at91sam9x5-i2c";
-+	reg = <0xf8024000 0x4000>;
-+	interrupts = <34 4 6>;
-+	dmas = <&dma1
-+		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-+		AT91_XDMAC_DT_PERID(6)>,
-+	       <&dma1
-+		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-+		AT91_XDMAC_DT_PERID(7)>;
-+	dma-names = "tx", "rx";
-+};
--- 
-1.7.9.5
+I don't think that's needed. As long as there are no build breaks, each of us
+should be able to take it independently.
+> 
+> AFAIKS, that would be 1+2 for you, 3-5 for Tejun, and the DT crap 6+7
+> for me.
+
+right, I'll take 1 and 2 in my tree.
+
+Cheers
+Kishon
