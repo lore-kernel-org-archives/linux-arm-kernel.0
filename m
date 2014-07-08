@@ -1,188 +1,43 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 8 Jul 2014 08:49:41 -0400
-Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display Controller
- support
-In-Reply-To: <20140708092348.4ecdbb8f@bbrezillon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
- <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
- <20140708092348.4ecdbb8f@bbrezillon>
-Message-ID: <CAF6AEGuUz7Td-9Hh31rYpn_Zros=ozK_ttv9FadHot6qAuaq1Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  8 Jul 2014 14:50:01 +0200
+Subject: [RFC PATCH 1/3] arm64: clarify Image header requirement for EFI
+ booting
+Message-ID: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 3:23 AM, Boris BREZILLON
-<boris.brezillon@free-electrons.com> wrote:
-> Hello Rob,
->
-> On Mon, 7 Jul 2014 23:45:54 -0400
-> Rob Clark <robdclark@gmail.com> wrote:
->
->> On Mon, Jul 7, 2014 at 12:42 PM, Boris BREZILLON
->> <boris.brezillon@free-electrons.com> wrote:
->> > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
->> > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
->> > controller device.
->> >
->> > This display controller supports at least one primary plane and might
->> > provide several overlays and an hardware cursor depending on the IP
->> > version.
->> >
->> > At the moment, this driver only implements an RGB connector to interface
->> > with LCD panels, but support for other kind of external devices (like DRM
->> > bridges) might be added later.
->> >
->> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> > ---
->> >  drivers/gpu/drm/Kconfig                         |   2 +
->> >  drivers/gpu/drm/Makefile                        |   1 +
->> >  drivers/gpu/drm/atmel-hlcdc/Kconfig             |  11 +
->> >  drivers/gpu/drm/atmel-hlcdc/Makefile            |   7 +
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c  | 469 +++++++++++++++
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c    | 474 +++++++++++++++
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 210 +++++++
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c | 706 +++++++++++++++++++++++
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h | 422 ++++++++++++++
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c | 351 ++++++++++++
->> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 729 ++++++++++++++++++++++++
->> >  11 files changed, 3382 insertions(+)
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c
->> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
->> >
->> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
->> > index d1cc2f6..df6f0c1 100644
->> > --- a/drivers/gpu/drm/Kconfig
->> > +++ b/drivers/gpu/drm/Kconfig
->> > @@ -182,6 +182,8 @@ source "drivers/gpu/drm/cirrus/Kconfig"
->
-> [...]
->
->> > +
->> > +/**
->> > + * Atmel HLCDC Plane properties.
->> > + *
->> > + * This structure stores plane property definitions.
->> > + *
->> > + * @alpha: alpha blending (or transparency) property
->> > + * @csc: YUV to RGB conversion factors property
->> > + */
->> > +struct atmel_hlcdc_plane_properties {
->> > +       struct drm_property *alpha;
->> > +       struct drm_property *csc;
->>
->> appears like csc is not used yet, so I suppose you can drop it for
->> now..  when you do add it, don't forget to update drm.tmp.  But for
->> now it at least makes review easier when the driver doesn't add new
->> userspace interfaces :-)
->
->
-> Sure, I guess this is a leftover from another patch I made to add Color
-> Space Conversion configuration.
->
-> I'll remove it for the next version.
->
->>
->> > +};
->> > +
->> > +/**
->> > + * Atmel HLCDC Plane.
->> > + *
->> > + * @base: base DRM plane structure
->> > + * @layer: HLCDC layer structure
->> > + * @properties: pointer to the property definitions structure
->> > + * @alpha: current alpha blending (or transparency) status
->> > + */
->> > +struct atmel_hlcdc_plane {
->> > +       struct drm_plane base;
->> > +       struct atmel_hlcdc_layer layer;
->> > +       struct atmel_hlcdc_plane_properties *properties;
->> > +};
->> > +
->> > +static inline struct atmel_hlcdc_plane *
->> > +drm_plane_to_atmel_hlcdc_plane(struct drm_plane *p)
->> > +{
->> > +       return container_of(p, struct atmel_hlcdc_plane, base);
->> > +}
->> > +
->> > +static inline struct atmel_hlcdc_plane *
->> > +atmel_hlcdc_layer_to_plane(struct atmel_hlcdc_layer *l)
->> > +{
->> > +       return container_of(l, struct atmel_hlcdc_plane, layer);
->> > +}
->> > +
->> > +/**
->> > + * Atmel HLCDC Plane update request structure.
->> > + *
->> > + * @crtc_x: x position of the plane relative to the CRTC
->> > + * @crtc_y: y position of the plane relative to the CRTC
->> > + * @crtc_w: visible width of the plane
->> > + * @crtc_h: visible height of the plane
->> > + * @src_x: x buffer position
->> > + * @src_y: y buffer position
->> > + * @src_w: buffer width
->> > + * @src_h: buffer height
->> > + * @pixel_format: pixel format
->> > + * @gems: GEM object object containing image buffers
->> > + * @offsets: offsets to apply to the GEM buffers
->> > + * @pitches: line size in bytes
->> > + * @crtc: crtc to display on
->> > + * @finished: finished callback
->> > + * @finished_data: data passed to the finished callback
->> > + * @bpp: bytes per pixel deduced from pixel_format
->> > + * @xstride: value to add to the pixel pointer between each line
->> > + * @pstride: value to add to the pixel pointer between each pixel
->> > + * @nplanes: number of planes (deduced from pixel_format)
->> > + */
->> > +struct atmel_hlcdc_plane_update_req {
->> > +       int crtc_x;
->> > +       int crtc_y;
->> > +       unsigned int crtc_w;
->> > +       unsigned int crtc_h;
->> > +       uint32_t src_x;
->> > +       uint32_t src_y;
->> > +       uint32_t src_w;
->> > +       uint32_t src_h;
->> > +       uint32_t pixel_format;
->> > +       struct drm_gem_cma_object *gems[ATMEL_HLCDC_MAX_PLANES];
->> > +       unsigned int offsets[ATMEL_HLCDC_MAX_PLANES];
->> > +       unsigned int pitches[ATMEL_HLCDC_MAX_PLANES];
->>
->> tbh, I've only looked closely, but I don't completely follow all the
->> layering here..  I wonder if we'd be better off just moving 'struct
->> drm_fb_cma' to header file so you could get the gem objects / pixel
->> fmt / width / height directly from the fb object (and then you can
->> reference count things at the fb level, rather than at the individual
->> gem obj level, too)
->>
->
-> Actually, the HW cursor is a drm_plane too, and in this case I cannot
-> retrieve a drm_fb_cma object, but just a single GEM object (see
-> atmel_hlcdc_crtc_cursor_set function in atmel_hlcdc_crtc.c).
+The 'res5' field in the Image header is defined as 'reserved, should be 0',
+while it serves a specific purpose when booting via the EFI stub, in which
+case it should contain the offset of the PE header. So update the doc to
+reflect this.
 
-oh, right..  well maybe for the cursor case it would be possible to
-wrap up the gem bo with an internally created fb?  Not sure if that
-ends up simplifying things or not, so it is definitely your call.  But
-at least my experience with other drivers (that did not use a plane as
-a cursor internally) was that I could simplify things after fb gained
-refcnt'ing.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ Documentation/arm64/booting.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-BR,
--R
-
-> Let me know if you see a better solution.
->
-> Best Regards,
->
-> Boris
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 37fc4f632176..52a07a8d2cfa 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -79,15 +79,15 @@ The decompressed kernel image contains a 64-byte header as follows:
+   u64 res3	= 0;		/* reserved */
+   u64 res4	= 0;		/* reserved */
+   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
+-  u32 res5 = 0;      		/* reserved */
++  u32 pehdr_offset;		/* PE header offset, only used by EFI */
+ 
+ 
+ Header notes:
+ 
+ - code0/code1 are responsible for branching to stext.
+ - when booting through EFI, code0/code1 are initially skipped.
+-  res5 is an offset to the PE header and the PE header has the EFI
+-  entry point (efi_stub_entry). When the stub has done its work, it
++  pehdr_offset is an offset to the PE header and the PE header has the
++  EFI entry point (efi_stub_entry). When the stub has done its work, it
+   jumps to code0 to resume the normal boot process.
+ 
+ The image must be placed at the specified offset (currently 0x80000)
+-- 
+1.8.3.2
