@@ -1,116 +1,44 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 8 Jul 2014 12:55:13 -0500
-Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
-In-Reply-To: <20140704082354.GD28884@atomide.com>
-References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
- <1403660878-56350-3-git-send-email-s-anna@ti.com>
- <20140628170709.GB23634@xo-6d-61-c0.localdomain> <53B18999.2020506@ti.com>
- <20140630185942.GA5410@amd.pavel.ucw.cz> <53B1BBA8.5090507@ti.com>
- <20140630203225.GA3893@amd.pavel.ucw.cz> <20140704064547.GZ28884@atomide.com>
- <20140704080556.GA16274@amd.pavel.ucw.cz>
- <20140704082354.GD28884@atomide.com>
-Message-ID: <53BC3081.9010402@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Jul 2014 20:26:20 +0200
+Subject: [PATCH 1/2] ARM: efm32: switch to properly namespaced location
+ property
+In-Reply-To: <CAOesGMjJJPJr7GnB=aoydGqtoaTd8wdBYDD92S0+5-y1PJepsA@mail.gmail.com>
+References: <20140630154030.GJ14781@pengutronix.de>
+ <1404142889-20740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAOesGMjzzYwXKXZLvUVp-nAGf+R4G8eUjK+3CumB8i5LkoRCow@mail.gmail.com>
+ <20140708064135.GE7827@pengutronix.de>
+ <CAOesGMjJJPJr7GnB=aoydGqtoaTd8wdBYDD92S0+5-y1PJepsA@mail.gmail.com>
+Message-ID: <20140708182620.GH7827@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Pavel,
+Hi Olof,
 
-On 07/04/2014 03:23 AM, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [140704 01:07]:
->> Hi!
->>
->>>>>>>>> The non-DT support has to be maintained for now to not break
->>>>>>>>> OMAP3 legacy boot, and the legacy-style code will be cleaned
->>>>>>>>> up once OMAP3 is also converted to DT-boot only.
->>>>>>>>
->>>>>>>>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
->>>>>>>>>  	return 0;
->>>>>>>>>  }
->>>>>>>>>  
->>>>>>>>> +static const struct omap_mbox_device_data omap2_data = {
->>>>>>>>> +	.num_users	= 4,
->>>>>>>>> +	.num_fifos	= 6,
->>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
->>>>>>>>> +};
->>>>>>>>> +
->>>>>>>>> +static const struct omap_mbox_device_data omap3_data = {
->>>>>>>>> +	.num_users	= 2,
->>>>>>>>> +	.num_fifos	= 2,
->>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
->>>>>>>>> +};
->>>>>>>>> +
->>>>>>>>> +static const struct omap_mbox_device_data am335x_data = {
->>>>>>>>> +	.num_users	= 4,
->>>>>>>>> +	.num_fifos	= 8,
->>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
->>>>>>>>> +};
->>>>>>>>
->>
->>>> Aha, ok, then the intr_type should be derived from
->>>> compatible-string. Or rather... you should have three
->>>> compatible-strings for the three possibilities? (And then subtype,
->>>> currently unused, in case there are more hw differences).
->>>
->>> The compatible string can and should be separate for each revision
->>> unless they are the same exacat hardware revision.
->>
->> ACK.
-
-I checked the revision register from all SoCs. OMAP2 and OMAP3 have
-different revisions compared to OMAP4+. All of OMAP4, OMAP5, DRA7,
-AM335x and AM437x have the same version, but with different num-fifos
-and num-users.  So, I can switch back to using omap4-mailbox for all of
-these SoCs only if we encode the num-fifos and num-users in DT.
-
->>
->>>>> two are HW IP design parameters, so in general putting them in DT isn't
->>>>> completely a bad idea, but I will wait to see if there are any further
->>>>> comments on this from Tony or DT maintainers before I make changes.
->>>>
->>>> Ok, right... I'd vote for putting them into DT.
->>>
->>> I would avoid adding custom DT properties where possible and let the
->>> driver just initialize the right data based on the compatible flag.
->>
->> If these are HW IP design parameters, we can expect to see many
->> different combinations. Yet we know ahead of time how to handle
->> different parameters HW people select.
-
-That's right, the above OMAP4+ SoCs already demonstrate this behavior.
-
->>
->> Thus IMO we should do it in the device tree.
+On Tue, Jul 08, 2014 at 09:06:13AM -0700, Olof Johansson wrote:
+> I really don't want a hodge-podge of whatever someone felt like
+> picking as a name at the time. It makes it really hard for newcomers
+> to find a good best practices to follow, and over time will result in
+> total chaos.
+That's right. I did it in good faith. If you think it would be worth to
+switch to say "energymicro,location" I think it wouldn't be that hard,
+because I think there are no boards in the wild that use a device tree
+and don't use the BSP I'm providing where switching is a no brainer.
 > 
-> Oh you mean from supporting new hardware with just .dts changes?
-> From that point of view it makes sense to have them as DT properties,
-> so I'm fine with that.
-> 
-> Let's just try to use something that's generic like fifosize. No idea
-> how the property for num_fifos should be handled though as that
-> implies some knowledge in the driver which num_users have fifos?
+> What's this binding for anyway? It looks a lot like an ad-hoc pinctrl
+> binding for configuring pinout, is that accurate?
+Well, it has to do with pinctrl, but it was agreed that managing it with
+a single pinctrl device would complicate things considerably and in the
+end the device tree wouldn't describe how the hardware looks like but
+would result in a lot of complexity just to fit into the Linux pinctrl
+model.
 
-The fifos are not per num_users, but rather the total number of fifos
-within the IP block. The num_users will be the number of targets the IP
-block can interrupt. I tried looking for generic properties, but there
-weren't any that seem to fit the description. If you want generic names,
-I can use num-fifos and num-users, otherwise will stick to the
-names defined in the previous series.
+See the thread around
+http://marc.info/?l=linux-spi&m=137485291802157&w=2 for the glory
+details.
 
-> 
-> So unless that can be described clearly in a DT property as well,
-> the binding might be still unusable for new hardware :)
-> 
+Best regards
+Uwe
 
-I don't expect the OMAP mailbox IP to change much in the future. There
-is a FIFO depth parameter as well, but that's constant in all the
-current versions, and even if they change it, I can already use the
-generic property for that.
-
-Tony,
-Depending on the agreement here, I may have to respin the OMAP
-mailbox DT/hwmod cleanup series [1]
-
-regards
-Suman
-
-[1] http://marc.info/?l=linux-omap&m=140365833121612&w=2
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
