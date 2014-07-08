@@ -1,45 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Jul 2014 22:28:47 -0700
-Subject: [GIT PULL V2] ARM: mvebu: SoC changes for v3.17
-In-Reply-To: <20140701121119.GD23978@titan.lakedaemon.net>
-References: <20140627124655.GF23978@titan.lakedaemon.net>
- <20140701121119.GD23978@titan.lakedaemon.net>
-Message-ID: <20140708052847.GF28931@quad.lixom.net>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 08 Jul 2014 06:28:41 +0100
+Subject: Android and compatibility with deprecated armv7 instructions
+In-Reply-To: <loom.20140707T153253-384@post.gmane.org> (Janne Grunau's message
+ of "Mon, 7 Jul 2014 13:59:54 +0000 (UTC)")
+References: <20140701234800.GA23577@sirena.org.uk> <4473002.jGohFvPsvi@wuerfel>
+ <7B049AD4-78F8-4494-A2CB-57DD346107DA@arm.com>
+ <201407061739.22152.arnd@arndb.de>
+ <loom.20140707T153253-384@post.gmane.org>
+Message-ID: <yw1xlhs4ctbq.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 08:11:19AM -0400, Jason Cooper wrote:
-> Guys,
-> 
-> Here's most of the SoC changes for mvebu so far.  It's looking to be a
-> slow cycle for us this time around (famous last words ;-) ).
-> 
-> The only unusual item here is the setup file for the kirkwood netxbig
-> board.  Andrew is working on a DT binding for the LEDs, but it is
-> non-trivial.  By accepting this now, we can delete mach-kirkwood/, which
-> is a good thing. :)  I hope to see patches from Andrew on this soon.
-> 
-> As usual, based on v3.16-rc1, no dependencies, been in -next several
-> days.
-> 
-> Changes for V2: move three patches out of mvebu/soc and into mvebu/fixes
-> for inclusion in v3.16.
-> 
-> Please pull.
-> 
-> thx,
-> 
-> Jason.
-> 
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-> 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.17
+Janne Grunau <j@jannau.net> writes:
 
-Merged.
+> Arnd Bergmann <arnd <at> arndb.de> writes:
+>> 
+>> On Saturday 05 July 2014, Catalin Marinas wrote:
+>> > On 5 Jul 2014, at 19:43, Arnd Bergmann <arnd <at> arndb.de> wrote:
+>> >
+>> > > I think if a there is no way to turn off a feature, we can't really
+>> > > treat it as "deprecated", since we are lacking the most important tool
+>> > > to help users migrate away from it. Do you know why the architecture
+>> > > folks believe it makes sense to have distinct steps 1 and 2?
+>> > 
+>> > During this phase you usually only get compiler warnings which are
+>> > clearly not enough for already built apps.
+>> > 
+>> > But it looks like this is changing with ARMv8. SETEND is deprecated and
+>> > disable bit available. IT instruction also deprecated with a disable bit
+>> > (basically only allowing for one subsequent conditional instruction,
+>> > though I don?t think we can easily get rid of this one in user space).
+>> 
+>> Ok. I can also see ways to emulate SETEND from kernel side by modifying
+>> the user pt_regs,
+>
+> The single use of SETEND in FFmpeg/libav is not important and could easily
+> be disabled on ARMv8. Is there a better way than parsing AT_PLATFORM for
+> runtime detection of the CPU arch? A HWCAP for the missing SETEND would be
+> nicer. That of course doesn't fix existing binaries.
 
+SETEND is serialising on some v7 cores as well, so it really shouldn't
+be used at all.
 
--Olof
+>> but I don't see how we could emulate IT without anything
+>> short of a full interpretation of user instructions from the kernel.
+>
+> Avoiding deprecated forms of IT would be harder. It's used more often in
+> libav (~50 times) so it should be only disabled if it's emulated or not
+> available using an explicit HWCAP. Not using Thumb for those functions would
+> be another option for libav. Again this doesn't fix existing binaries and it
+> doesn't fix compiled code.
+
+IT covering more than one conditional instruction is trivial to fix by
+either a) adding IT before each instruction, b) replacing it with a
+branch, or in some cases c) making all but the last instruction
+conditional because the rest don't actually need to be.  Long runs of
+conditional instructions have been frowned upon for quite some time
+anyway.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
