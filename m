@@ -1,76 +1,24 @@
 From: tj@kernel.org (Tejun Heo)
-Date: Tue, 8 Jul 2014 09:40:00 -0400
+Date: Tue, 8 Jul 2014 09:42:03 -0400
 Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
 In-Reply-To: <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
 References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
  <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140708134000.GC4979@htj.dyndns.org>
+Message-ID: <20140708134203.GD4979@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Cc'ing Hans.)
+One more thing.
 
 On Mon, Jul 07, 2014 at 12:16:09PM +0200, Antoine T?nart wrote:
-> @@ -482,6 +482,13 @@ void ahci_save_initial_config(struct device *dev,
->  		port_map &= mask_port_map;
->  	}
->  
-> +	/*
-> +	 * If port_map was filled automatically when finding port sub-nodes,
-> +	 * make sure we get the right set here.
-> +	 */
-> +	if (hpriv->port_map)
-> +		port_map &= hpriv->port_map;
-> +
+> This introduce a new way of defining SATA ports in the device tree, with
+> one port per sub-node. This as the advantage of allowing a per port
+> configuration. Because some ports may be accessible but disabled in the
+> device tree, the default port_map is computed automatically when using
+> this.
 
-So, hpriv->port is both input and output?  This is messy and can lead
-to confusing failures and there now are multiple ways to modify
-port_map.  If carrying this information through ahci_host_priv is
-necessary, let's remove the direct params and introduce new input
-fields to the struct.
-
->  /**
-> + * ahci_platform_enable_phys - Enable PHYs
-> + * @hpriv: host private area to store config values
-> + *
-> + * This function enables all the PHYs found in hpriv->phys, if any.
-> + * If a PHY fails to be enabled, it disables all the PHYs already
-> + * enabled in reverse order and returns an error.
-> + *
-> + * RETURNS:
-> + * 0 on success otherwise a negative error code
-> + */
-> +int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
-> +{
-> +	int i, rc = 0;
-> +
-> +	for (i = 0; i < hpriv->nphys; i++) {
-> +		rc = phy_init(hpriv->phys[i]);
-> +		if (rc)
-> +			goto disable_phys;
-> +
-> +		rc = phy_power_on(hpriv->phys[i]);
-> +		if (rc) {
-> +			phy_exit(hpriv->phys[i]);
-> +			goto disable_phys;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +disable_phys:
-> +	while (--i >= 0) {
-> +		phy_power_off(hpriv->phys[i]);
-> +		phy_exit(hpriv->phys[i]);
-> +	}
-> +	return rc;
-> +}
-> +EXPORT_SYMBOL_GPL(ahci_platform_enable_phys);
-
-Do we need to make hpriv->phys[] dynamically allocated?  We already
-have hpriv->clks[AHCI_MAX_CLKS] and it's unlikely that we're gonna
-need more than several phys per host.  Let's go with a simpler fixed
-array.
+Any chance the old one phy config can be moved over to this scheme so
+that we don't have to carry two separate mechanisms?
 
 Thanks.
 
