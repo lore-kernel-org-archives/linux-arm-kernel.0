@@ -1,111 +1,155 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 8 Jul 2014 19:49:59 -0400
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
-In-Reply-To: <53BC6866.30803@codeaurora.org>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
- <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
- <53BC6866.30803@codeaurora.org>
-Message-ID: <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
+From: matthew.d.roper@intel.com (Matt Roper)
+Date: Tue, 8 Jul 2014 16:51:24 -0700
+Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display
+ Controller support
+In-Reply-To: <20140708190820.2a94723f@bbrezillon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
+ <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
+ <20140708092348.4ecdbb8f@bbrezillon>
+ <CAF6AEGuUz7Td-9Hh31rYpn_Zros=ozK_ttv9FadHot6qAuaq1Q@mail.gmail.com>
+ <20140708163731.6693a883@bbrezillon>
+ <CAF6AEGuOYQbZ_Mgv+Y7oQO4kKmOEF=gwi0YcBXERE80nS2QL+g@mail.gmail.com>
+ <20140708190820.2a94723f@bbrezillon>
+Message-ID: <20140708235124.GM31728@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
-> Hi Hiroshi,
->
-> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
->> Hi Olav,
->>
->> Olav Haugan <ohaugan@codeaurora.org> writes:
->>
->>> Mapping and unmapping are more often than not in the critical path.
->>> map_range and unmap_range allows SMMU driver implementations to optimize
->>> the process of mapping and unmapping buffers into the SMMU page tables.
->>> Instead of mapping one physical address, do TLB operation (expensive),
->>> mapping, do TLB operation, mapping, do TLB operation the driver can map
->>> a scatter-gatherlist of physically contiguous pages into one virtual
->>> address space and then at the end do one TLB operation.
->>>
->>> Additionally, the mapping operation would be faster in general since
->>> clients does not have to keep calling map API over and over again for
->>> each physically contiguous chunk of memory that needs to be mapped to a
->>> virtually contiguous region.
->>>
->>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->>> ---
->>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
->>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
->>>  2 files changed, 48 insertions(+)
->>>
->>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>> index e5555fc..f2a6b80 100644
->>> --- a/drivers/iommu/iommu.c
->>> +++ b/drivers/iommu/iommu.c
->>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>>
->>>
->>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
->>> +                struct scatterlist *sg, unsigned int len, int prot)
->>> +{
->>> +    if (unlikely(domain->ops->map_range == NULL))
->>> +            return -ENODEV;
->>> +
->>> +    BUG_ON(iova & (~PAGE_MASK));
->>> +
->>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
->>> +}
->>> +EXPORT_SYMBOL_GPL(iommu_map_range);
->>
->> We have the similar one internally, which is named, "iommu_map_sg()",
->> called from DMA API.
->
-> Great, so this new API will be useful to more people!
->
->>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
->>> +                  unsigned int len)
->>> +{
->>> +    if (unlikely(domain->ops->unmap_range == NULL))
->>> +            return -ENODEV;
->>> +
->>> +    BUG_ON(iova & (~PAGE_MASK));
->>> +
->>> +    return domain->ops->unmap_range(domain, iova, len);
->>> +}
->>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
->>
->> Can the existing iommu_unmap() do the same?
->
-> I believe iommu_unmap() behaves a bit differently because it will keep
-> on calling domain->ops->unmap() until everything is unmapped instead of
-> letting the iommu implementation take care of unmapping everything in
-> one call.
->
-> I am abandoning the patch series since our driver was not accepted.
-> However, if there are no objections I will resubmit this patch (PATCH
-> 2/7) as an independent patch to add this new map_range API.
+On Tue, Jul 08, 2014 at 07:08:20PM +0200, Boris BREZILLON wrote:
+> On Tue, 8 Jul 2014 11:41:32 -0400
+> Rob Clark <robdclark@gmail.com> wrote:
+> 
+> > On Tue, Jul 8, 2014 at 10:37 AM, Boris BREZILLON
+> > <boris.brezillon@free-electrons.com> wrote:
+> > > On Tue, 8 Jul 2014 08:49:41 -0400
+> > > Rob Clark <robdclark@gmail.com> wrote:
+> > >
+> > >> On Tue, Jul 8, 2014 at 3:23 AM, Boris BREZILLON
+> > >> <boris.brezillon@free-electrons.com> wrote:
+> > >> > Hello Rob,
+> > >> >
+> > >> > On Mon, 7 Jul 2014 23:45:54 -0400
+> > >> > Rob Clark <robdclark@gmail.com> wrote:
+> > >> >
+> > >> >> On Mon, Jul 7, 2014 at 12:42 PM, Boris BREZILLON
+> > >> >> <boris.brezillon@free-electrons.com> wrote:
+...
+> > >> >> > +/**
+> > >> >> > + * Atmel HLCDC Plane update request structure.
+> > >> >> > + *
+> > >> >> > + * @crtc_x: x position of the plane relative to the CRTC
+> > >> >> > + * @crtc_y: y position of the plane relative to the CRTC
+> > >> >> > + * @crtc_w: visible width of the plane
+> > >> >> > + * @crtc_h: visible height of the plane
+> > >> >> > + * @src_x: x buffer position
+> > >> >> > + * @src_y: y buffer position
+> > >> >> > + * @src_w: buffer width
+> > >> >> > + * @src_h: buffer height
+> > >> >> > + * @pixel_format: pixel format
+> > >> >> > + * @gems: GEM object object containing image buffers
+> > >> >> > + * @offsets: offsets to apply to the GEM buffers
+> > >> >> > + * @pitches: line size in bytes
+> > >> >> > + * @crtc: crtc to display on
+> > >> >> > + * @finished: finished callback
+> > >> >> > + * @finished_data: data passed to the finished callback
+> > >> >> > + * @bpp: bytes per pixel deduced from pixel_format
+> > >> >> > + * @xstride: value to add to the pixel pointer between each line
+> > >> >> > + * @pstride: value to add to the pixel pointer between each pixel
+> > >> >> > + * @nplanes: number of planes (deduced from pixel_format)
+> > >> >> > + */
+> > >> >> > +struct atmel_hlcdc_plane_update_req {
+> > >> >> > +       int crtc_x;
+> > >> >> > +       int crtc_y;
+> > >> >> > +       unsigned int crtc_w;
+> > >> >> > +       unsigned int crtc_h;
+> > >> >> > +       uint32_t src_x;
+> > >> >> > +       uint32_t src_y;
+> > >> >> > +       uint32_t src_w;
+> > >> >> > +       uint32_t src_h;
+> > >> >> > +       uint32_t pixel_format;
+> > >> >> > +       struct drm_gem_cma_object *gems[ATMEL_HLCDC_MAX_PLANES];
+> > >> >> > +       unsigned int offsets[ATMEL_HLCDC_MAX_PLANES];
+> > >> >> > +       unsigned int pitches[ATMEL_HLCDC_MAX_PLANES];
+> > >> >>
+> > >> >> tbh, I've only looked closely, but I don't completely follow all the
+> > >> >> layering here..  I wonder if we'd be better off just moving 'struct
+> > >> >> drm_fb_cma' to header file so you could get the gem objects / pixel
+> > >> >> fmt / width / height directly from the fb object (and then you can
+> > >> >> reference count things at the fb level, rather than at the individual
+> > >> >> gem obj level, too)
+> > >> >>
+> > >> >
+> > >> > Actually, the HW cursor is a drm_plane too, and in this case I cannot
+> > >> > retrieve a drm_fb_cma object, but just a single GEM object (see
+> > >> > atmel_hlcdc_crtc_cursor_set function in atmel_hlcdc_crtc.c).
+> > >>
+> > >> oh, right..  well maybe for the cursor case it would be possible to
+> > >> wrap up the gem bo with an internally created fb?  Not sure if that
+> > >> ends up simplifying things or not, so it is definitely your call.  But
+> > >> at least my experience with other drivers (that did not use a plane as
+> > >> a cursor internally) was that I could simplify things after fb gained
+> > >> refcnt'ing.
+> > >
+> > > Unless I'm missing something, I'd say moving to fb objects instead of
+> > > GEM objects won't simplify the code much (I'm already refcnt'ing GEM
+> > > objects when launching a DMA transfer for a plane update).
+> > 
+> > yeah, mostly just saves you a bit of bookkeeping.  Ie. ref/unref one
+> > thing instead of loop over N objects, etc.  Nothing earth-shattering.
+> > 
+> 
+> Okay, my bad, this is definitely simpler with fb objects (I made use of
+> drm_fb_cma_create to create an fb object when cursor_set is called)
+> than it was when using GEM objects.
+> 
+> I might even be able to simplify the layer update mechanism with this
+> approach.
+> 
+> Thanks for the advice.
+> 
+> Best Regards,
+> 
+> Boris
 
-+1 for map_range().. I've seen for gpu workloads, at least, it is the
-downstream map_range() API is quite beneficial.   It was worth at
-least a few fps in xonotic.
+Hi Boris.
 
-And, possibly getting off the subject a bit, but I was wondering about
-the possibility of going one step further and batching up mapping
-and/or unmapping multiple buffers (ranges) at once.  I have a pretty
-convenient sync point in drm/msm to flush out multiple mappings before
-kicking gpu.
+I haven't really looked at any of your driver in depth, but from a quick
+glance it looks like you're registering a cursor drm_plane (i.e., making
+use of the new universal plane infrastructure), but you're also
+providing an implementation of the legacy cursor ioctls (cursor_set and
+cursor_move).  There's some patches working their way through the
+pipeline that should make this unnecessary and hopefully simplify your
+life a bit:
 
-BR,
--R
+        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=c394c2b08e247c32ef292b75fd8b34312465f8ae
+        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=b36552b32aa9c69e83a3a20bda56379fb9e52435
+        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=161d0dc1dccb17ff7a38f462c7c0d4ef8bcc5662
+        http://cgit.freedesktop.org/drm-intel/commit/?h=drm-intel-nightly&id=fc1d3e44ef7c1db93384150fdbf8948dcf949f15
 
-> Thanks,
->
-> Olav Haugan
->
-> --
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The third patch there is the one that's really important for your work.
+When a driver provides a cursor plane via the universal plane interface,
+cursor_set and cursor_move are automatically implemented for you by
+drm_mode_cursor_universal() in drivers/gpu/drm/drm_crtc.c and your
+legacy handlers will never get called.  drm_mode_cursor_universal() will
+take care of wrapping the bo's into a drm_framebuffer for you.
+
+When I added the universal cursor stuff, I wanted to make sure that as
+soon as a driver starts supporting universal planes it can stop
+supporting the legacy ioctls directly; otherwise handling refcounting
+when userspace switches back and forth between calling legacy ioctl's
+and calling setplane() on a cursor plane would be a nightmare.
+
+I think those patches are only available in drm-intel-nightly at the
+moment and haven't moved on to drm-next and such yet, since i915 is the
+only driver that currently has patches to make use of cursors via the
+univeral plane interface (probably landing for kernel 3.17).
+
+
+Matt
+
+-- 
+Matt Roper
+Graphics Software Engineer
+IoTG Platform Enabling & Development
+Intel Corporation
+(916) 356-2795
