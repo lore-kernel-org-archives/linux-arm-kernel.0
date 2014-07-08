@@ -1,79 +1,55 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 08 Jul 2014 13:05:39 +0530
-Subject: [PATCH v6 2/6] ARM: EXYNOS: Move cpufreq and cpuidle device
- registration to init_machine
-In-Reply-To: <53BB25B7.6000500@samsung.com>
-References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
- <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
- <53BB25B7.6000500@samsung.com>
-Message-ID: <000801cf9a7f$3896e150$a9c4a3f0$@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Jul 2014 09:39:40 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <CAKfTPtBPR9QA9h4bF3EkCZufpF+X84N7JzjU88CptR1RtiNrdg@mail.gmail.com>
+References: <20140630124919.GC28647@lukather>
+ <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
+ <20140630140146.GD28647@lukather>
+ <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
+ <20140630145847.GE28647@lukather>
+ <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
+ <20140703071016.GB31996@lukather>
+ <CAKfTPtBonwH0PoEkKazUS9bPaR631Vu7p7qZ0AF1whmXq_53wg@mail.gmail.com>
+ <20140704080255.GO31996@lukather>
+ <CAKfTPtBPR9QA9h4bF3EkCZufpF+X84N7JzjU88CptR1RtiNrdg@mail.gmail.com>
+Message-ID: <20140708073940.GH13423@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
+On Fri, Jul 04, 2014 at 11:22:33AM +0200, Vincent Guittot wrote:
+> >>  I still think that using the current rate with clk_get_rate is not a
+> >> good solution.
+> >
+> > Well, it's just as good as using clock-frequency, really. If you want
+> > the CPU max frequency, it's not the right property (plus, since the
+> > changed behaviour is not documented in Linux anywhere, the only
+> > reference we have is the ePAPR on this).
+> >
+> >> Could you give us more details about why you nee to use current clock ?
+> >
+> > Honestly, I just want to remove that big warning at boot on the
+> > A7-based SoCs we have :)
 > 
-> On 07/07/14 12:50, Pankaj Dubey wrote:
-> > As exynos_cpuidle_init and exynos_cpufreq_init function have just one
-> > lines of code for registering platform devices. We can move these
-> > lines to exynos_dt_machine_init and delete exynos_cpuidle_init and
-> > exynos_cpufreq_init function. This will help in reducing lines of code
-> > in exynos.c, making it more cleaner.
-> >
-> > Suggested-by: Tomasz Figa<t.figa@samsung.com>
-> > Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
-> > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
-> > ---
-> >   arch/arm/mach-exynos/exynos.c |   20 ++++----------------
-> >   1 file changed, 4 insertions(+), 16 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/exynos.c
-> > b/arch/arm/mach-exynos/exynos.c index ff60b4c..47170eb 100644
-> > --- a/arch/arm/mach-exynos/exynos.c
-> > +++ b/arch/arm/mach-exynos/exynos.c
-> > @@ -171,19 +171,6 @@ static struct platform_device exynos_cpuidle = {
-> >   	.id                = -1,
-> >   };
-> >
-> > -void __init exynos_cpuidle_init(void) -{
-> > -	if (soc_is_exynos5440())
-> > -		return;
-> > -
-> > -	platform_device_register(&exynos_cpuidle);
-> > -}
-> > -
-> > -void __init exynos_cpufreq_init(void) -{
-> > -	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> > -}
-> > -
-> >   void __iomem *sysram_base_addr;
-> >   void __iomem *sysram_ns_base_addr;
-> >
-> > @@ -300,10 +287,11 @@ static void __init exynos_dt_machine_init(void)
-> >   	if (!IS_ENABLED(CONFIG_SMP))
-> >   		exynos_sysram_init();
-> >
-> > -	if (!of_machine_is_compatible("samsung,exynos5420"))
-> > -		exynos_cpuidle_init();
-> > +	if (!of_machine_is_compatible("samsung,exynos5420") ||
-> > +			!of_machine_is_compatible("samsung,exynos5440"))
-> > +		platform_device_register(&exynos_cpuidle);
-> >
-> > -	exynos_cpufreq_init();
-> > +	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> >
-> >   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >   }
-> 
-> This cannot be applied in my tree now....
-> 
+> so Why not changing the log message ? It's clearly not an error to not
+> have clock-frequency
 
-May I know what the issue is? As I am able to rebase this patch on today's
-kgene/for-next
-and could not see any merge conflict. 
-If you think I need to respin this patch please let me know.
+Because the next SoCs we're going to support will be HMP, so we're
+only delaying the issue by a few month if we're doing so.
 
-Thanks,
-Pankaj Dubey
+It doesn't fix the underlying issue where you're using a standard
+property for a (slightly) different usage.
 
-> - Kukjin
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/32eb41b8/attachment.sig>
