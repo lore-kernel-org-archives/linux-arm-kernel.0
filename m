@@ -1,84 +1,78 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue,  8 Jul 2014 18:54:29 +0300
-Subject: [PATCH 3/3] dt: qcom: msm8974: add qpnp-spmi device nodes
-In-Reply-To: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
-References: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <1404834869-23049-4-git-send-email-svarbanov@mm-sol.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 8 Jul 2014 08:55:52 -0700
+Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
+In-Reply-To: <CACRpkdYSU6NdFuab6rJS7eADSqORNDBzbFfJ65nFoJj3EZVd-g@mail.gmail.com>
+References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
+ <5cc8b89b-20ff-4fa9-92dd-bb2f6d3512d8@BY2FFO11FD030.protection.gbl>
+ <CACRpkdb1M3-hrSKLKWz21LCJ1sMvsq5E-aqkpmVhy0NwOS5HhA@mail.gmail.com>
+ <d1af864d-bf78-48bb-a545-8de3f9def75f@BL2FFO11FD037.protection.gbl>
+ <CACRpkdYSU6NdFuab6rJS7eADSqORNDBzbFfJ65nFoJj3EZVd-g@mail.gmail.com>
+Message-ID: <3adb614c-38ae-4b0c-9e50-99f071bbf4c5@BL2FFO11FD038.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ivan T. Ivanov <iivanov@mm-sol.com>
+Hi Linus,
 
-The qpnp-spmi device nodes are childrens of spmi pmic arbiter.
-msm8974 SoC using two pmic chips pm8941 and pm8841. Every chip
-has two spmi-qpnp bus id's.
+On Tue, 2014-07-08 at 11:34AM +0200, Linus Walleij wrote:
+> On Mon, Jul 7, 2014 at 6:08 PM, S?ren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+> 
+> >> So: what is the usecase for these GPIOs?
+> >
+> > Yea, in this case it was a button. I have to look at these drivers. It's
+> > very likely that they cover what I want. But this case is trivial. I
+> > really don't do anything but enabling the IRQ by writing to the edge
+> > attribute and press the push-button connected to that GPIO line.
+> 
+> In case of a system using device tree it is very trivial to add a gpio
+> key binding. After compiling in the gpio keys driver this small
+> snipper type is all that is really needed in most cases:
+> 
+>         /* User key mapped in as "escape" */
+>         gpio-keys {
+>                 compatible = "gpio-keys";
+>                 user-button {
+>                         label = "user_button";
+>                         gpios = <&gpio0 3 0x1>;
+>                         linux,code = <1>; /* KEY_ESC */
+>                         gpio-key,wakeup;
+>                 };
+>         };
 
-Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi |   45 +++++++++++++++++++++++++++++++++++
- 1 files changed, 45 insertions(+), 0 deletions(-)
+Thanks for the example. I think for my cases these drivers are exactly
+the right thing.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 69dca2a..9166b8e 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -3,6 +3,7 @@
- #include "skeleton.dtsi"
- 
- #include <dt-bindings/clock/qcom,gcc-msm8974.h>
-+#include <dt-bindings/spmi/spmi.h>
- 
- / {
- 	model = "Qualcomm MSM8974";
-@@ -236,5 +237,49 @@
- 			#interrupt-cells = <2>;
- 			interrupts = <0 208 0>;
- 		};
-+
-+		spmi at fc4cf000 {
-+			compatible = "qcom,spmi-pmic-arb";
-+			reg-names = "core", "intr", "cnfg";
-+			reg = <0xfc4cf000 0x1000>,
-+			      <0xfc4cb000 0x1000>,
-+			      <0xfc4ca000 0x1000>;
-+			interrupt-names = "periph_irq";
-+			interrupts = <0 190 0>;
-+			qcom,ee = <0>;
-+			qcom,channel = <0>;
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+			interrupt-controller;
-+			#interrupt-cells = <4>;
-+
-+			usid0: pm8941 at 0 {
-+				compatible = "qcom,qpnp-spmi";
-+				reg = <0x0 SPMI_USID>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			usid1: pm8941 at 1 {
-+				compatible = "qcom,qpnp-spmi";
-+				reg = <0x1 SPMI_USID>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			usid4: pm8841 at 4 {
-+				compatible = "qcom,qpnp-spmi";
-+				reg = <0x4 SPMI_USID>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			usid5: pm8841 at 5 {
-+				compatible = "qcom,qpnp-spmi";
-+				reg = <0x5 SPMI_USID>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
- 	};
- };
--- 
-1.7.0.4
+> 
+> 
+> > But as a general note: I think we have quite some customers trying to do
+> > GPIO in userspace.
+> 
+> For what? I mean the use cases. Usually it is a bad idea, and
+> as shown above, just using the right existing device driver with
+> device tree is much easier, also for an end user, given they know
+> how to alter DTs and compile in kernel modules.
+> 
+> > With Zynq's FPGA portion, a lot of things come down
+> > to make signals accessible in Linux and a lot of people do not want or
+> > need a full blown kernel driver and use GPIO. The request for 'how to
+> > handle GPIO IRQs in userspace' is pretty common. Often this gets passed
+> > on to UIO though.
+> 
+> The short answer is don't handle GPIO IRQs in userspace.
+> 
+> Userspace drivers is generally a bad idea and should not be written.
+> The kernel is intended to handle hardware.
+> 
+> The above is doubly true for anything involving IRQs. Just think
+> of what IRQs are. They are one of the reasons why we have a
+> kernel and not just write all software on a system from scratch
+> ourselves.
+
+I fully agree and you don't have to convince me. But to a lot of our
+customers that are used to use FPGAs, SOCs and Linux are pretty new. You
+see a lot of scary stuff. Accessing /dev/mem seems to be a lot of
+people's big hammer solution for everything. Then I always perceive it
+as great progress if things like the sysfs interface are used instead.
+
+	Thanks,
+	S?ren
