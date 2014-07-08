@@ -1,266 +1,87 @@
-From: george.joseph@fairview5.com (George Joseph)
-Date: Mon, 7 Jul 2014 19:40:16 -0600
-Subject: [PATCH RESEND] ARM: dts: Restructure imx6qdl-wandboard.dtsi for new
- rev C1 board.
-Message-ID: <CAHKv19A+WcOqJxSe4EcO32ou+sk22=3jsxqby5gPP1v1Y2nUWA@mail.gmail.com>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Mon, 7 Jul 2014 18:47:44 -0700
+Subject: Issue found in Armada 370: 10Mbps ethernet connection can't get IP
+In-Reply-To: <CAB8gEUsipA--K8_XYjTO3TQtQEsUj8GHUyE6yLGkDMrqca8fHg@mail.gmail.com>
+References: <CAB8gEUtaKwE5ax8_-+jb4pS08CO0V_CFdcEW47ej5YLaU=sb5A@mail.gmail.com>
+ <20140707110014.3cbe98a0@free-electrons.com>
+ <CAB8gEUsipA--K8_XYjTO3TQtQEsUj8GHUyE6yLGkDMrqca8fHg@mail.gmail.com>
+Message-ID: <CAB8gEUvnMwPEe25bKbfFBYnCQ5TroAExSC=x+sM5wMtBOna12Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rev C1 Wandboard uses the Broadcom 4330 for WiFi and Bluetooth instead of
-the 4329.  This changes the PADS assigned for the control lines.  Another
-side effect of the change is that on the rev C1 board, usdhc driver can't
-detect the chip presence correctly so usdhc2 now needs its 'non-removeable'
-property removed.
+Hi Thomas,
+Good day.
 
-So that rev B1 and earlier can continue to work, this patch splits the
-board-specific definitions from imx6qdl-wandboard.dtsi into
-imx6qdl-wandboard-revb1.dtsi and imx6qdl-wandboard-revc1.dtsi.  The new files
-include the original base imx6qdl-wandboard.dtsi which retains the common
-definitions.
+This is to confirm that "can't get IP at 10Mbps" issue is resolved
+after I applied your patch in v3.13.9.
+Thanks a lot for the help!
 
-The existing imx6dl-wandboard.dts includes imx6qdl-wandboard-revc1.dtsi and
-imx6dl-wandboard-revb1.dts (new) includes imx6qdl-wandboard-revb1.dtsi.
-This makes the rev C1 board the new default.  The same pattern is used for
-imx6q-wandboard.dts.
+Regards,
+Maggie Roxas
 
-So, from U-Boot on a WB-Quad you use imxq-wandboard-revb1.dtb for the older B1
-board and imxq-wandboard.dtb for the current rev C1 board.
-
-Signed-off-by: George Joseph <george.joseph@fairview5.com>
----
- arch/arm/boot/dts/imx6dl-wandboard-revb1.dts   | 22 ++++++++++++++
- arch/arm/boot/dts/imx6dl-wandboard.dts         |  2 +-
- arch/arm/boot/dts/imx6q-wandboard-revb1.dts    | 26 ++++++++++++++++
- arch/arm/boot/dts/imx6q-wandboard.dts          |  2 +-
- arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi | 39 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi | 41 ++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi       | 21 -------------
- 7 files changed, 130 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
-b/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
-new file mode 100644
-index 0000000..f607d4f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-wandboard-revb1.dtsi"
-+
-+/ {
-+ model = "Wandboard i.MX6 Dual Lite Board";
-+ compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
-+
-+ memory {
-+ reg = <0x10000000 0x40000000>;
-+ };
-+};
-diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts
-b/arch/arm/boot/dts/imx6dl-wandboard.dts
-index e672891..bbb6167 100644
---- a/arch/arm/boot/dts/imx6dl-wandboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
-@@ -10,7 +10,7 @@
-  */
- /dts-v1/;
- #include "imx6dl.dtsi"
--#include "imx6qdl-wandboard.dtsi"
-+#include "imx6qdl-wandboard-revc1.dtsi"
-
- / {
-  model = "Wandboard i.MX6 Dual Lite Board";
-diff --git a/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
-b/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
-new file mode 100644
-index 0000000..20bf3c2
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-wandboard-revb1.dtsi"
-+
-+/ {
-+ model = "Wandboard i.MX6 Quad Board";
-+ compatible = "wand,imx6q-wandboard", "fsl,imx6q";
-+
-+ memory {
-+ reg = <0x10000000 0x80000000>;
-+ };
-+};
-+
-+&sata {
-+ status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-wandboard.dts
-b/arch/arm/boot/dts/imx6q-wandboard.dts
-index 36be17f..4a8a6ee 100644
---- a/arch/arm/boot/dts/imx6q-wandboard.dts
-+++ b/arch/arm/boot/dts/imx6q-wandboard.dts
-@@ -10,7 +10,7 @@
-  */
- /dts-v1/;
- #include "imx6q.dtsi"
--#include "imx6qdl-wandboard.dtsi"
-+#include "imx6qdl-wandboard-revc1.dtsi"
-
- / {
-  model = "Wandboard i.MX6 Quad Board";
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi
-b/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi
-new file mode 100644
-index 0000000..e44d982
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include "imx6qdl-wandboard.dtsi"
-+
-+&iomuxc {
-+ pinctrl-0 = <&pinctrl_hog>;
-+
-+ imx6qdl-wandboard {
-+ pinctrl_hog: hoggrp {
-+ fsl,pins = <
-+ MX6QDL_PAD_GPIO_0__CCM_CLKO1 0x130b0 /* GPIO_0_CLKO */
-+ MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000 /* uSDHC1 CD */
-+ MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x80000000 /* uSDHC3 CD */
-+ MX6QDL_PAD_EIM_EB1__GPIO2_IO29 0x80000000 /* WL_REF_ON */
-+ MX6QDL_PAD_EIM_A25__GPIO5_IO02 0x80000000 /* WL_RST_N */
-+ MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON */
-+ MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE */
-+ MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE */
-+ MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x80000000 /* RGMII_nRST */
-+ >;
-+ };
-+ };
-+};
-+
-+&usdhc2 {
-+ pinctrl-names = "default";
-+ pinctrl-0 = <&pinctrl_usdhc2>;
-+ non-removable;
-+ status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi
-b/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi
-new file mode 100644
-index 0000000..1d9b1db
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include "imx6qdl-wandboard.dtsi"
-+
-+&iomuxc {
-+ pinctrl-0 = <&pinctrl_hog>;
-+
-+ imx6qdl-wandboard {
-+ pinctrl_hog: hoggrp {
-+ fsl,pins = <
-+ MX6QDL_PAD_GPIO_0__CCM_CLKO1 0x130b0 /* GPIO_0_CLKO */
-+ MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000 /* uSDHC1 CD */
-+ MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x80000000 /* uSDHC3 CD */
-+ MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00 0x80000000 /* WIFI_ON (reset, active low) */
-+ MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON (unused) */
-+ MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE, input */
-+ MX6QDL_PAD_CSI0_DAT13__GPIO5_IO31 0x80000000 /* GPIO5_IO31 (Wifi
-Power Enable) */
-+ MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE (unused) */
-+ MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21 0x80000000 /* BT_ON */
-+ MX6QDL_PAD_CSI0_DAT12__GPIO5_IO30 0x80000000 /* BT_WAKE */
-+ MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20 0x80000000 /* BT_HOST_WAKE */
-+ MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x80000000 /* RGMII_nRST */
-+ >;
-+ };
-+ };
-+};
-+
-+&usdhc2 {
-+ pinctrl-names = "default";
-+ pinctrl-0 = <&pinctrl_usdhc2>;
-+ status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index bdfdf89..2aa9fbf 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -79,22 +79,8 @@
-
- &iomuxc {
-  pinctrl-names = "default";
-- pinctrl-0 = <&pinctrl_hog>;
-
-  imx6qdl-wandboard {
-- pinctrl_hog: hoggrp {
-- fsl,pins = <
-- MX6QDL_PAD_GPIO_0__CCM_CLKO1 0x130b0
-- MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
-- MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x80000000
-- MX6QDL_PAD_EIM_EB1__GPIO2_IO29   0x80000000 /* WL_REF_ON */
-- MX6QDL_PAD_EIM_A25__GPIO5_IO02   0x80000000 /* WL_RST_N */
-- MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON */
-- MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE */
-- MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE */
-- MX6QDL_PAD_EIM_D29__GPIO3_IO29   0x80000000
-- >;
-- };
-
-  pinctrl_audmux: audmuxgrp {
-  fsl,pins = <
-@@ -250,13 +236,6 @@
-  status = "okay";
- };
-
--&usdhc2 {
-- pinctrl-names = "default";
-- pinctrl-0 = <&pinctrl_usdhc2>;
-- non-removable;
-- status = "okay";
--};
--
- &usdhc3 {
-  pinctrl-names = "default";
-  pinctrl-0 = <&pinctrl_usdhc3>;
+On Mon, Jul 7, 2014 at 4:12 AM, Maggie Mae Roxas
+<maggie.mae.roxas@gmail.com> wrote:
+> Hi Thomas,
+> Good day.
+>
+> Thank you very much for the quick feedback.
+> I will apply this patch and send you the results by tomorrow 07/08
+> morning (it is currently 07/07 evening as of this e-mail).
+>
+> Regards,
+> Maggie Roxas
+>
+> On Mon, Jul 7, 2014 at 2:00 AM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+>> Dear Maggie Mae Roxas,
+>>
+>> On Sun, 6 Jul 2014 19:56:27 -0700, Maggie Mae Roxas wrote:
+>>
+>>> We just found out last week that 10Mbps ethernet (SGMII) connection
+>>> can't obtain IP in recent kernel versions (3.10.x and above). Here are
+>>> the details:
+>>>
+>>> Processor: Armada 370 88F6707
+>>> Board: Custom
+>>> Kernel versions tried:
+>>> 3.10.24 (issue exists)
+>>> 3.13.9 (issue exists)
+>>> 3.2.43 (issue does NOT exist)
+>>> U-Boot versions tried: 2012_Q4 and 2013_Q1 from Marvell extranet
+>>>
+>>> Some more important notes:
+>>> Both 100Mbps and 1000Mbps have no issues.
+>>> Issue does not exist at u-boot level (via static IP address, confirmed
+>>> via ping - results: 'x.x.x.x is alive')
+>>> We have different LED configs for 10, 100 and 1000 Mbps - and LED
+>>> shows 10Mbps is established (even ethtool does). However, we just
+>>> can't obtain IP.
+>>> Our kernel version 3.2.43 have patches from Marvell extranet (for Armada 370)
+>>>
+>>> Is there a known issue for this?
+>>
+>> Thanks for the report. Can you test the patch below?
+>>
+>> Thanks,
+>>
+>> Thomas
+>>
+>> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+>> index 45beca1..d49f08d 100644
+>> --- a/drivers/net/ethernet/marvell/mvneta.c
+>> +++ b/drivers/net/ethernet/marvell/mvneta.c
+>> @@ -2529,7 +2529,7 @@ static void mvneta_adjust_link(struct net_device *ndev)
+>>
+>>                         if (phydev->speed == SPEED_1000)
+>>                                 val |= MVNETA_GMAC_CONFIG_GMII_SPEED;
+>> -                       else
+>> +                       else if (phydev->speed == SPEED_100)
+>>                                 val |= MVNETA_GMAC_CONFIG_MII_SPEED;
+>>
+>>                         mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+>>
+>>
+>> --
+>> Thomas Petazzoni, CTO, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
