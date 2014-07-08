@@ -1,64 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Jul 2014 10:12:59 +0200
-Subject: [PATCH 05/18] power: reset: Add AT91 reset driver
-In-Reply-To: <20140708080814.GL13423@lukather>
-References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404396906-25194-8-git-send-email-maxime.ripard@free-electrons.com>
- <F9547E0F-AB97-47E6-BA09-135EE4E1BC73@jcrosoft.com>
- <20140703145957.GH31996@lukather>
- <B425B925-B75E-4761-8CE6-9B12C5AC0469@jcrosoft.com>
- <20140704091443.545d1e08@bbrezillon>
- <20140704090645.GB13487@lukather>
- <20140707184001.GH9558@ns203013.ovh.net>
- <20140708080814.GL13423@lukather>
-Message-ID: <20140708081259.GM13423@lukather>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 8 Jul 2014 10:15:44 +0200
+Subject: [PATCH] ARM: shmobile: Enable R-Car Gen 2 PCIe in
+ shmobile_defconfig
+In-Reply-To: <66f679dbac764c329125a8ea50cd9ebd@HKXPR06MB168.apcprd06.prod.outlook.com>
+References: <1404739432-1408-1-git-send-email-horms+renesas@verge.net.au>
+ <53BAA68D.609@cogentembedded.com>
+ <66f679dbac764c329125a8ea50cd9ebd@HKXPR06MB168.apcprd06.prod.outlook.com>
+Message-ID: <20140708081542.GA23642@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 10:08:14AM +0200, Maxime Ripard wrote:
-> On Mon, Jul 07, 2014 at 08:40:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > >> move this to an assembly file more easy to read than a C code
-> > > > > > 
-> > > > > > Nope. It's a pain to pass variable to an external assembly file, and
-> > > > > > this makes the use of global variable pretty much mandatory, which is
-> > > > > > definitely not great.
-> > > > > 
-> > > > > Not at all I did for the PM slow clock code just write a function and pas it as a parameter
-> > > > > you have 3
-> > > > > 
-> > > > > so basically you have to use the current and just pass at91_ramc_base[0], at91_ramc_base[1]
-> > > > > and at91_rstc_base
-> > > > > it?s 3 lignes of modification, if you have at91_ramc_base and at91_ramc_base same
-> > > > > 
-> > > > 
-> > > > Yes, retrieving function parameters from assembly code is not that
-> > > > complicated (the first 4 pointer values are accessible through r0-r3),
-> > > > but then you'll have to store your assembly file somewhere.
-> > > 
-> > > Like I was saying, there's a strong preference for the inline
-> > > assembly...
-> > 
-> > inline is horrible to read and maintain NACK
-> > 
-> > keep it in an assembly file it's so easy to read and follow
-> > 
-> > and you just have to move the file existing to the driver/power
+On Mon, Jul 07, 2014 at 01:59:12PM +0000, Phil Edworthy wrote:
+> Hi Sergei
 > 
-> Well, the whole rest of the kernel community feels otherwise.
+> On 07 July 2014 14:54, Sergei wrote:
+> > On 07/07/2014 05:23 PM, Simon Horman wrote:
+> > 
+> > > The R-Car Gen 2 PCIe driver provides PCIe host support for
+> > > Renesas R-Car Gen2 platforms. To increase hardware support enable
+> > > the driver in the shmobile_defconfig multiplatform configuration.
+> > 
+> > > Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > >   arch/arm/configs/shmobile_defconfig | 1 +
+> > >   1 file changed, 1 insertion(+)
+> > 
+> > > diff --git a/arch/arm/configs/shmobile_defconfig
+> > b/arch/arm/configs/shmobile_defconfig
+> > > index 5f05e98..6bc85a5 100644
+> > > --- a/arch/arm/configs/shmobile_defconfig
+> > > +++ b/arch/arm/configs/shmobile_defconfig
+> > > @@ -24,6 +24,7 @@ CONFIG_PL310_ERRATA_588369=y
+> > >   CONFIG_ARM_ERRATA_754322=y
+> > >   CONFIG_PCI=y
+> > >   CONFIG_PCI_RCAR_GEN2=y
+> > > +CONFIG_PCI_RCAR_GEN2_PCIE=y
+> > 
+> >     Hmm, I'm not sure why the option has GEN2 -- the driver claims support for
+> > R8A7779 as well as R8A779x. Probably the option should be renamed.
+> Technically, you are correct. However, whilst the driver does support R8A7779, that device only supports 32-bit
+> accesses over the PCIe bus so it's only useful for custom cards, not off-the-shelf PCIe cards.
 
-Thinking a bit more about this, would using symbolic names instead of
-the indices in the inline assembly work for you?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/d5341fb2/attachment.sig>
+It seems to me that dropping GEN2 from the config option may be a good idea.
+But I believe that conversation is orthogonal to enabling the driver
+in the defconfig. At this stage I plan to apply this patch.
