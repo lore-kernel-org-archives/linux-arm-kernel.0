@@ -1,36 +1,46 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Tue, 8 Jul 2014 10:15:22 +0100
-Subject: [PATCH V3 2/2] ASoC: samsung: Add machine driver for Odroid X2/U3
-In-Reply-To: <1404479625-25385-2-git-send-email-s.nawrocki@samsung.com>
-References: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
- <1404479625-25385-2-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAD8Lp44JFtbcD22c+0PVb5S4U1kVTTxHD=PgqiKzhVypFW5Prg@mail.gmail.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Tue, 08 Jul 2014 10:17:58 +0100
+Subject: [alsa-devel] [PATCH v2] ASoC: tda998x: add a codec to the HDMI
+ transmitter
+In-Reply-To: <20140704091733.10258cfe@armhf>
+References: <20140704091733.10258cfe@armhf>
+Message-ID: <53BBB746.1000201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On 07/04/14 08:17, Jean-Francois Moine wrote:
+> This patch adds a CODEC function to the NXP TDA998x HDMI transmitter.
+> 
+> The CODEC handles both I2S and S/PDIF input and does dynamic input
+> switch in the TDA998x I2C driver on start/stop audio streaming.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
 
-On Fri, Jul 4, 2014 at 2:13 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> This patch adds the sound subsystem driver for Odroid-X2 and
-> Odroid-U3 boards. The codec works in I2S master mode; there
-> are two separate audio routing paths defined, as there are
-> differences in the signal routing between the X2 and U3 boards,
-> i.e. U3 uses single jack for headphones and microphone.
->
-> Signed-off-by: Chen Zhen <zhen1.chen@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+[snip]
 
-Testing on ODROID-U2, v3 is not quite working for me, but v2 of the
-patch was fine.
-I boot up, run:
-# speaker-test -c 2 -t wav
+> +++ b/drivers/gpu/drm/i2c/tda998x_codec.c
 
-As soon as I hear the word "front" I press ctrl+c and then run the
-command again.
-Now the command hangs with no audible output.
+[snip]
 
-Any ideas? Let me know if you have trouble reproducing.
+> +static int tda_startup(struct snd_pcm_substream *substream,
+> +                       struct snd_soc_dai *dai)
+> +{
+> +       struct tda998x_priv *priv = snd_soc_codec_get_drvdata(dai->codec);
+> +       u8 *eld = priv->eld;
+> +       struct snd_pcm_runtime *runtime = substream->runtime;
+> +       u8 *sad;
+> +       int sad_count;
+> +       unsigned eld_ver, mnl, rate_mask;
+> +       unsigned max_channels, fmt;
+> +       u64 formats;
+> +       struct snd_pcm_hw_constraint_list *rate_constraints =
+> +                       &priv->rate_constraints;
+> +       static const u32 hdmi_rates[] = {
+> +               32000, 44100, 48000, 88200, 9600, 176400, 192000
+> +       };
+> +
 
-Thanks
-Daniel
+Shouldn't this be 96000, not 9600?  Assuming that the table is ordered in terms of increasing frequencies.
+
+    Andrew
