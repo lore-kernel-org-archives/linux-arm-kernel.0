@@ -1,48 +1,49 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 8 Jul 2014 16:34:23 +0300
-Subject: [PATCH 0/9] Serial ATA support for NVIDIA Tegra124
-In-Reply-To: <20140708130827.GD9516@ulmo>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <5390A8F9.2090408@wwwdotorg.org> <53915F3B.6050806@nvidia.com>
- <5395FE0E.80105@wwwdotorg.org> <539601B4.1010707@kapsi.fi>
- <20140708130827.GD9516@ulmo>
-Message-ID: <53BBF35F.6040809@nvidia.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue,  8 Jul 2014 10:37:37 -0300
+Subject: [PATCH for v3.16] ARM: mvebu: Fix coherency bus notifiers by using
+ separate notifiers
+Message-ID: <1404826657-6977-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/14 16:08, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Mon, Jun 09, 2014 at 09:49:24PM +0300, Mikko Perttunen wrote:
->> On 06/09/2014 09:33 PM, Stephen Warren wrote:
->>> On 06/06/2014 12:27 AM, Mikko Perttunen wrote:
->>>> The only compile-time dependencies here should be that:
->>>> - patch 8 of 9 which contains the actual driver depends on patch 6 of 9
->>>> (though only when building as a module) and the efuse series
->>>
->>>> - patch 2 of 9 refers to the DT node called "padctl", so it requires the
->>>> xusb series. (in the submitted xusb series, the node isn't actually
->>>> named, though. I will fix this in v2)
->>>
->>> Isn't that dependency a run-time dependency?
->>
->> Well, the kernel will compile but the DTC step will fail if building for
->> Tegra.
->
-> Since this is all changes to the DTS files, we can resolve that
-> dependency in the Tegra tree by applying the XUSB padctl series
-> immediately before this patch, right?
+Currently, the coherency fabric support registers two bus notifiers;
+one for platform, one for pci bus types, with the same notifier block.
+However, this is illegal and can cause serious issues: the notifier
+block is also a link in the notifier list and cannot be inserted twice.
 
-Yes.
+This commit fixes this by using different notifier blocks (with the same
+notifier callback) to set the platform and pci bus types notifiers.
 
-(Also I just realized that though the fuse series is in -next, the pull 
-request was NAK'd for now, so don't merge this before that is sorted out.)
+Fixes: b0063aad5dd8 ("ARM: mvebu: use hardware I/O coherency also for PCI devices")
+Reported-by: Paolo Pisati <p.pisati@gmail.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
-
-- Mikko
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 477202f..2bdc323 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -292,6 +292,10 @@ static struct notifier_block mvebu_hwcc_nb = {
+ 	.notifier_call = mvebu_hwcc_notifier,
+ };
+ 
++static struct notifier_block mvebu_hwcc_pci_nb = {
++	.notifier_call = mvebu_hwcc_notifier,
++};
++
+ static void __init armada_370_coherency_init(struct device_node *np)
+ {
+ 	struct resource res;
+@@ -427,7 +431,7 @@ static int __init coherency_pci_init(void)
+ {
+ 	if (coherency_available())
+ 		bus_register_notifier(&pci_bus_type,
+-				       &mvebu_hwcc_nb);
++				       &mvebu_hwcc_pci_nb);
+ 	return 0;
+ }
+ 
+-- 
+1.9.1
