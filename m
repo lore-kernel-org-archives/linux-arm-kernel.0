@@ -1,29 +1,32 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 08 Jul 2014 15:56:14 +0300
-Subject: [PATCH v3] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <CAPDyKFoVtJLyBrjwyQYKK6h=8aNd7+SMYU9bS8iStcSZkWs3Fw@mail.gmail.com>
-References: <1401643329-6460-1-git-send-email-anarsoul@gmail.com>
- <201407072312.40687.arnd@arndb.de>
- <CAPDyKFoVtJLyBrjwyQYKK6h=8aNd7+SMYU9bS8iStcSZkWs3Fw@mail.gmail.com>
-Message-ID: <2209409.5C7y4zWhxp@vasilykh-desktop-i5>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 08 Jul 2014 15:00:52 +0200
+Subject: [PATCH v9 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <53BBE419.8080107@ti.com>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-2-git-send-email-antoine.tenart@free-electrons.com>
+ <53BBE419.8080107@ti.com>
+Message-ID: <53BBEB84.50904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 July 2014 14:51:01 Ulf Hansson wrote:
+On 07/08/2014 02:29 PM, Kishon Vijay Abraham I wrote:
+> On Monday 07 July 2014 03:46 PM, Antoine T?nart wrote:
+>> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+>>
+>> The mode selection can let us think this PHY can be configured to fit
+>> other purposes. But there are reasons to think the SATA mode will be
+>> the only one usable: the PHY registers are only accessible indirectly
+>> through two registers in the SATA range, the PHY seems to be integrated
+>> and no information tells us the contrary. For these reasons, make the
+>> driver a SATA PHY driver.
+>
+> Thanks for doing multiple revisions of this. Looks good to be merged for me now.
 
-> Sorry for the delay.
-> 
-> Thanks! Applied for next with Arnd's ack.
-> 
-> Kind regards
-> Uffe
+I'd like to see some Acked-by from Tejun on the AHCI patches first, but
+if he agrees, should I prepare a stable branch for each of us to pull
+their patches from?
 
-Thank you!
+AFAIKS, that would be 1+2 for you, 3-5 for Tejun, and the DT crap 6+7
+for me.
 
-And since now old s3c24xx DMA (non-dmaengine) has no users we can remove it 
-completely.
-
-I'll send a patch soon.
-
-Regards
-Vasily
+Sebastian
