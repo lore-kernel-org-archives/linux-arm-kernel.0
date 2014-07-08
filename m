@@ -1,72 +1,17 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 8 Jul 2014 12:37:38 +0100
-Subject: [PATCH v11 6/7] ARM: add pmd_[dirty|mkclean] for THP
-In-Reply-To: <1404799424-1120-7-git-send-email-minchan@kernel.org>
-References: <1404799424-1120-1-git-send-email-minchan@kernel.org>
- <1404799424-1120-7-git-send-email-minchan@kernel.org>
-Message-ID: <20140708113737.GA2958@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jul 2014 12:39:11 +0100
+Subject: [PATCH B 00/10] Freescale ethernet driver updates (part 2)
+Message-ID: <20140708113911.GH21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 03:03:43PM +0900, Minchan Kim wrote:
-> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
-> overwrite of the contents since MADV_FREE syscall is called for
-> THP page.
-> 
-> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
-> support.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
-> ---
->  arch/arm/include/asm/pgtable-3level.h | 3 +++
->  arch/arm64/include/asm/pgtable.h      | 2 ++
->  2 files changed, 5 insertions(+)
+David,
 
-Hi Minchan,
-arch/arm and arch/arm64 are handled separately.
-Could you please split this patch into arm and arm64 versions?
+Here's the second batch of patches for the Freescale FEC ethernet driver,
+based upon the previous set of patches.  One further set of 7 patches
+remains.
 
+Many thanks.
 
-> 
-> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> index 85c60adc8b60..3a7bb8dc7d05 100644
-> --- a/arch/arm/include/asm/pgtable-3level.h
-> +++ b/arch/arm/include/asm/pgtable-3level.h
-> @@ -220,6 +220,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
->  #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
->  #endif
->  
-> +#define pmd_dirty	(pmd_val(pmd) & PMD_SECT_DIRTY)
-
-This macro is missing the parameter definition, and will generate a
-compile errror when CONFIG_ARM_LPAE=y
-
-For 32-bit ARM with CONFIG_ARM_LPAE=n, we don't have THP support and I noticed
-some compiler errors in mm/madvise.c:
-
-  CC      mm/madvise.o
-mm/madvise.c: In function ?madvise_free_pte_range?:
-mm/madvise.c:279:3: error: implicit declaration of function ?pmdp_get_and_clear? [-Werror=implicit-function-declaration]
-   orig_pmd = pmdp_get_and_clear(mm, addr, pmd);
-   ^
-mm/madvise.c:285:3: error: implicit declaration of function ?pmd_mkold? [-Werror=implicit-function-declaration]
-   orig_pmd = pmd_mkold(orig_pmd);
-   ^
-mm/madvise.c:286:3: error: implicit declaration of function ?pmd_mkclean? [-Werror=implicit-function-declaration]
-   orig_pmd = pmd_mkclean(orig_pmd);
-   ^
-mm/madvise.c:288:3: error: implicit declaration of function ?set_pmd_at? [-Werror=implicit-function-declaration]
-   set_pmd_at(mm, addr, pmd, orig_pmd);
-   ^
-cc1: some warnings being treated as errors
-make[1]: *** [mm/madvise.o] Error 1
-
-
-Cheers,
--- 
-Steve 
+ drivers/net/ethernet/freescale/fec_main.c | 127 ++++++++++++++++++++----------
+ 1 file changed, 84 insertions(+), 43 deletions(-)
