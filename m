@@ -1,132 +1,55 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 8 Jul 2014 06:25:13 +0000
-Subject: [PATCH 4/5] [RFC] ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
-References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
- <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAFC085@DBDE04.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Jul 2014 08:41:35 +0200
+Subject: [PATCH 1/2] ARM: efm32: switch to properly namespaced location
+ property
+In-Reply-To: <CAOesGMjzzYwXKXZLvUVp-nAGf+R4G8eUjK+3CumB8i5LkoRCow@mail.gmail.com>
+References: <20140630154030.GJ14781@pengutronix.de>
+ <1404142889-20740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAOesGMjzzYwXKXZLvUVp-nAGf+R4G8eUjK+3CumB8i5LkoRCow@mail.gmail.com>
+Message-ID: <20140708064135.GE7827@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cristoph,
+Hi Olof,
 
->From: Pekon Gupta <Pekon@ti.com>
->>From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
->>
->>Most dt omap3 boards configure nand-ecc-opt as bch8. Due
->>to lack of hardware elm support, bch8 software implementation
->>gets set.
->>
->>Since commit 0611c41934ab35ce84dea "ARM: OMAP2+: gpmc: update
->>gpmc_hwecc_bch_capable() for new platforms and ECC schemes",
->>nand support stops working.
->>
->>This patch allows ecc software fallback.
->
->Pleas add following tag at top of commit message.
->
->Fixes: commit 0611c41934ab35ce84dea34ab291897ad3cbc7be
->ARM: OMAP2+: gpmc: update gpmc_hwecc_bch_capable() for new platforms and ECC schemes
->
->And please mark it for 3.15 stable if this gets accepted after 3.15-rcx.
->Cc: <stable@vger.kernel.org> # 3.15.x+
->
->
->>---
->> arch/arm/mach-omap2/gpmc-nand.c |   16 ++++++----------
->> 1 file changed, 6 insertions(+), 10 deletions(-)
->>
->>diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
->>index 4349e82..52c4834 100644
->>--- a/arch/arm/mach-omap2/gpmc-nand.c
->>+++ b/arch/arm/mach-omap2/gpmc-nand.c
->>@@ -43,13 +43,17 @@ static struct platform_device gpmc_nand_device = {
->> 	.resource	= gpmc_nand_resource,
->> };
->>
->>-static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->>+static bool gpmc_ecc_bch_capable(enum omap_ecc ecc_opt)
->
->I don't think this renaming is really required with this fix, so please
->drop it and just keep it simple only for OMAP3 fix.
->
->
->> {
->> 	/* platforms which support all ECC schemes */
->> 	if (soc_is_am33xx() || cpu_is_omap44xx() ||
->> 		 soc_is_omap54xx() || soc_is_dra7xx())
->> 		return 1;
->>
->>+	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
->>+		(ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))
->>+		return 1;
->>+
->
->Note: Some very old legacy platforms have initial version of GPMC engine
->which only supports Hamming ECC, and not BCH ECC scheme, so lets
->filter them out to maintain backward compatibility.
->
->(1) As per TRM, OMAP2 platform does not support BCH ECC schemes,
->      So please filter out OMAP2 devices from this check ...
->
->(2) I don't know the history but below comment says:
->"* For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1"
->
->if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
->	 (ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))  {
->	if (cpu_is_omap24xx())
->		return 0;
->	else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
->		return 0;
->	else
->		return 1;
->}
->
->
->> 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
->> 	 * which require H/W based ECC error detection */
->> 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
->>@@ -57,14 +61,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->> 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
->> 		return 0;
->>
->>-	/*
->>-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
->>-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
->>-	 */
->>-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
->>-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
->>-		return 0;
->>-
->Thanks for removing this, I too wasn't confident of this either.
->
->
->> 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
->> 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
->> 		return 1;
->>@@ -140,7 +136,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
->>
->> 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
->>
->>-	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
->>+	if (!gpmc_ecc_bch_capable(gpmc_nand_data->ecc_opt)) {
->
->Please drop this renaming from this patch.
->
->> 		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
->> 		return -EINVAL;
->> 	}
->>--
->>1.7.10.4
->
->You may send this patch separately apart from the series, so that
->this gets accepted in current 3.15-rcx.
->
->with regards, Pekon
+On Mon, Jul 07, 2014 at 10:46:52PM -0700, Olof Johansson wrote:
+> On Mon, Jun 30, 2014 at 8:41 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > Now that both spi and serial driver support these (commits f2bb31057a42
+> > (spi: efm32: properly namespace location property) and
+> > 74be65a3cff5 (serial: efm32: properly namespace location property)) use
+> > the better names.
+> >
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/efm32gg-dk3750.dts | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+> > index b4031fa4a567..d5dd2a2a7970 100644
+> > --- a/arch/arm/boot/dts/efm32gg-dk3750.dts
+> > +++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+> > @@ -43,7 +43,7 @@
+> >
+> >                 spi0: spi at 4000c000 { /* USART0 */
+> >                         cs-gpios = <&gpio 68 1>; // E4
+> > -                       location = <1>;
+> > +                       efm32,location = <1>;
+> 
+> Hrm, the prefix is normally the vendor, not the platform. I see that
+Don't considering what it used normally (and I didn't do it wrong on
+purpose) I consider a string identifying the platform to be more
+sensible here. For one thing because the vendor can change (as it did with
+efm32). Another reason is that the vendor can create another platform
+that also needs some devices with a location property that has a
+completely different semantic but would get the same name.
+(Ok, if the semantic on the different platform is similar
+$vendor,location would be more appropriate. Probably the decision on
+what name to pick should be considered case by case.)
 
-Do you plan to re-spin this patch with above comments, and mark it for stable?
-It would be helpful for all OMAP3 users.
+Just my 0.02 ?,
+Uwe
 
-
-with regards, pekon
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
