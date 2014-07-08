@@ -1,106 +1,55 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 8 Jul 2014 15:33:05 -0600
-Subject: [PATCH v8 8/9] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
- <20140708010103.GD22939@google.com>
- <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
-Message-ID: <20140708213305.GB4555@google.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 8 Jul 2014 17:40:10 -0400
+Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
+In-Reply-To: <20140708174900.GC16148@kwain>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140708134000.GC4979@htj.dyndns.org>
+ <20140708170353.GA16148@kwain>
+ <20140708171817.GH4979@htj.dyndns.org>
+ <20140708174900.GC16148@kwain>
+Message-ID: <20140708214010.GI4979@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 11:29:40AM +0100, Liviu Dudau wrote:
-> On Tue, Jul 08, 2014 at 02:01:04AM +0100, Bjorn Helgaas wrote:
-> > On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
-> > > ...
-> > > +     for_each_of_pci_range(&parser, &range) {
-> > > +             /* Read next ranges element */
-> > > +             pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
-> > > +                     range.pci_space, range.pci_addr, range.cpu_addr, range.size);
-> > 
-> > If you're not trying to match other printk formats, you could try to match
-> > the %pR format used elsewhere, e.g., "%#010llx-%#010llx" with
-> > range.cpu_addr, range.cpu_addr + range.size - 1.
+Hey,
+
+On Tue, Jul 08, 2014 at 07:49:00PM +0200, Antoine T?nart wrote:
+> > So, yeah, it's being used both as input and output and we also have
+> > the arguments which affect port_map, right?  It does seem confusing.
 > 
-> Yes, not a big fan of the ugly output it generates, but the output matches closely the ranges
-> definition in the device tree file so it is easy to validate that you are parsing the right
-> entry. I am happy to change it to shorten the cpu range message.
+> I do see priv->port_map as being automatically set and then restricted
+> if needed by the port_map input here. I don't see how that's confusing.
+> The only modification is we restrict the port_map parameter to the set
+> of available ports. The port_map argument affected priv->port_map before
+> this patch.
 
-If it already matches other device tree stuff, that's perfect.  I'm not
-familiar with that.
+It is confusing.  If you wanna pass around available ports in hpriv,
+please add a separate field and replace the arguments to
+save_initial_config().
 
-> > > +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
-> > > +{
-> > > +     return 0;
-> > > +}
-> > 
-> > I'd wait to add this until there's a platform that needs to implement it.
-> > Splitting it out will make this patch that much smaller and easier to
-> > understand.
+> > Well, so does clk.  Let's say clk is more restricted and phy can be
+> > one or more per port and thus needs to be dynamic.  If so, shouldn't
+> > we at least have some correlation between phys and ports?  It bothers
+> > me that now libahci is carrying random number of resources that it has
+> > no idea how to associate with the ports it manages.  What if later we
+> > want to involve phy driver in power managing unoccupied ports?
 > 
-> I need this as this is the default implementation (i.e. do nothing). Otherwise the
-> link phase will give errors. 
-
-I meant that you could remove the default implementation *and* the call of
-it, since it currently does nothing.
-
-> > > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> > > index dde3a4a..71e36d0 100644
-> > > --- a/include/linux/of_pci.h
-> > > +++ b/include/linux/of_pci.h
-> > > @@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
-> > >  int of_pci_get_devfn(struct device_node *np);
-> > >  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
-> > >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-> > > +struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
-> > > +                                     struct pci_ops *ops, void *host_data);
-> > > +
-> > >  #else
-> > >  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
-> > >  {
-> > > @@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> > >  {
-> > >       return -EINVAL;
-> > >  }
-> > > +
-> > > +static inline struct pci_host_bridge *
-> > > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
-> > > +                     void *host_data)
-> > > +{
-> > > +     return NULL;
-> > > +}
-> > >  #endif
-> > >
-> > >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> > > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > > index 7e7b939..556dc5f 100644
-> > > --- a/include/linux/pci.h
-> > > +++ b/include/linux/pci.h
-> > > @@ -402,6 +402,7 @@ struct pci_host_bridge {
-> > >       struct device dev;
-> > >       struct pci_bus *bus;            /* root bus */
-> > >       int domain_nr;
-> > > +     resource_size_t io_base;        /* physical address for the start of I/O area */
-> > 
-> > I don't see where this is used yet.
+> I see. This is a first (working) attempt to have a one node per port. I
+> agree that would be nice to have a correlation between ports and PHYs.
+> This can definitively be added when needed without changing the dt
+> bindings as only the internal representation changes. This would also
+> require to get all phys from the port nodes, which is again internal
+> stuff.
 > 
-> It's used in pci_host_bridge_of_get_ranges() (earlier in this patch).
+> Don't you think we can go by steps, and have a following up series for
+> this when needed (like in a power managing series for unoccupied ports)?
 
-of_create_pci_host_bridge() fills in bridge->io_base, but I don't see
-anything that ever *reads* bridge->io_base.
+I don't know.  It isn't exactly difficult to make it per-port, is it?
+We already have ahci_port_priv and wouldn't the code actually be
+simpler that way?
 
-> > As far as I know, there's nothing that prevents a host bridge from having
-> > several I/O port apertures (or several memory-mapped I/O port spaces).
-> 
-> The pci_register_io_range() will give different offsets for each apperture.
-> I just need to make sure I don't overwrite io_base when parsing multiple IO
-> ranges.
+Thanks.
 
-Let's continue this in the other thread where I'm trying to understand the
-I/O apertures.  Obviously I'm still missing something if you can indeed
-have multiple I/O apertures per bridge (because then only one of them can
-start at I/O address 0 on PCI).
-
-Bjorn
+-- 
+tejun
