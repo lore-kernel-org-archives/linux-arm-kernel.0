@@ -1,44 +1,48 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 8 Jul 2014 09:22:16 -0400
-Subject: [PATCH v2 6/7] ata: Add support for the Tegra124 SATA controller
-In-Reply-To: <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
-References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
- <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140708132216.GA4979@htj.dyndns.org>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 8 Jul 2014 16:34:23 +0300
+Subject: [PATCH 0/9] Serial ATA support for NVIDIA Tegra124
+In-Reply-To: <20140708130827.GD9516@ulmo>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <5390A8F9.2090408@wwwdotorg.org> <53915F3B.6050806@nvidia.com>
+ <5395FE0E.80105@wwwdotorg.org> <539601B4.1010707@kapsi.fi>
+ <20140708130827.GD9516@ulmo>
+Message-ID: <53BBF35F.6040809@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Hans)
+On 08/07/14 16:08, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Mon, Jun 09, 2014 at 09:49:24PM +0300, Mikko Perttunen wrote:
+>> On 06/09/2014 09:33 PM, Stephen Warren wrote:
+>>> On 06/06/2014 12:27 AM, Mikko Perttunen wrote:
+>>>> The only compile-time dependencies here should be that:
+>>>> - patch 8 of 9 which contains the actual driver depends on patch 6 of 9
+>>>> (though only when building as a module) and the efuse series
+>>>
+>>>> - patch 2 of 9 refers to the DT node called "padctl", so it requires the
+>>>> xusb series. (in the submitted xusb series, the node isn't actually
+>>>> named, though. I will fix this in v2)
+>>>
+>>> Isn't that dependency a run-time dependency?
+>>
+>> Well, the kernel will compile but the DTC step will fail if building for
+>> Tegra.
+>
+> Since this is all changes to the DTS files, we can resolve that
+> dependency in the Tegra tree by applying the XUSB padctl series
+> immediately before this patch, right?
 
-Hans, can you please review this patch?
+Yes.
 
-On Wed, Jun 18, 2014 at 05:23:25PM +0300, Mikko Perttunen wrote:
-> +#define SATA_CONFIGURATION_0				0x180
-> +#define		SATA_CONFIGURATION_EN_FPCI		BIT(0)
+(Also I just realized that though the fuse series is in -next, the pull 
+request was NAK'd for now, so don't merge this before that is sorted out.)
 
-Let's just indent uniformly.  The new line should give enough visual
-hint on grouping.
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
 
-> +struct tegra_ahci_priv {
-> +	struct platform_device *pdev;
-> +	void __iomem *sata_regs;
-> +	struct reset_control *sata_rst;
-> +	struct reset_control *sata_oob_rst;
-> +	struct reset_control *sata_cold_rst;
-> +	struct clk *sata_clk;
-> +	struct clk *sata_oob_clk;
-> +	struct clk *cml1_clk;
-> +	struct clk *plle_clk;
-> +	struct regulator_bulk_data supplies[5];
-> +	struct phy *padctl_phy;
-> +};
-
-And please indent the declared fields uniformly too.
-
-Except for the above nitpicks, generally looks good to me but let's
-wait for Hans' review.
-
-Thanks.
-
--- 
-tejun
+- Mikko
