@@ -1,98 +1,106 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 8 Jul 2014 15:29:51 -0600
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <201407080900.44882.arnd@arndb.de>
+Date: Tue, 8 Jul 2014 15:33:05 -0600
+Subject: [PATCH v8 8/9] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
- <20140708001418.GB22939@google.com>
- <201407080900.44882.arnd@arndb.de>
-Message-ID: <20140708212951.GA4555@google.com>
+ <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140708010103.GD22939@google.com>
+ <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
+Message-ID: <20140708213305.GB4555@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 1:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 08 July 2014, Bjorn Helgaas wrote:
->> On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
->> > +static LIST_HEAD(io_range_list);
->> > +
->> > +/*
->> > + * Record the PCI IO range (expressed as CPU physical address + size).
->> > + * Return a negative value if an error has occured, zero otherwise
->> > + */
->> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
->>
->> I don't understand the interface here.  What's the mapping from CPU
->> physical address to bus I/O port?  For example, I have the following
->> machine in mind:
->>
->>   HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
->>   HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
->>   HWP0002:00: host bridge window [io  0x0000-0x0fff]
->>
->>   HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
->>   HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
->>   HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
->>
->> The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
->> the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
->> e.g., "inb(0)" to access it.
->>
->> Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
->> bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
->> "inb(0x1000000)" to access it.
->
-> I guess you are thinking of the IA64 model here where you keep the virtual
-> I/O port numbers in a per-bus lookup table that gets accessed for each
-> inb() call. I've thought about this some more, and I believe there are good
-> reasons for sticking with the model used on arm32 and powerpc for the
-> generic OF implementation.
->
-> The idea is that there is a single virtual memory range for all I/O port
-> mappings and we use the MMU to do the translation rather than computing
-> it manually in the inb() implemnetation. The main advantage is that all
-> functions used in device drivers to (potentially) access I/O ports
-> become trivial this way, which helps for code size and in some cases
-> (e.g. SoC-internal registers with a low latency) it may even be performance
-> relevant.
+On Tue, Jul 08, 2014 at 11:29:40AM +0100, Liviu Dudau wrote:
+> On Tue, Jul 08, 2014 at 02:01:04AM +0100, Bjorn Helgaas wrote:
+> > On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
+> > > ...
+> > > +     for_each_of_pci_range(&parser, &range) {
+> > > +             /* Read next ranges element */
+> > > +             pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
+> > > +                     range.pci_space, range.pci_addr, range.cpu_addr, range.size);
+> > 
+> > If you're not trying to match other printk formats, you could try to match
+> > the %pR format used elsewhere, e.g., "%#010llx-%#010llx" with
+> > range.cpu_addr, range.cpu_addr + range.size - 1.
+> 
+> Yes, not a big fan of the ugly output it generates, but the output matches closely the ranges
+> definition in the device tree file so it is easy to validate that you are parsing the right
+> entry. I am happy to change it to shorten the cpu range message.
 
-My example is from ia64, but I'm not advocating for the lookup table.
-The point is that the hardware works similarly (at least for dense ia64
-I/O port spaces) in terms of mapping CPU physical addresses to PCI I/O
-space.
+If it already matches other device tree stuff, that's perfect.  I'm not
+familiar with that.
 
-I think my confusion is because your pci_register_io_range() and
-pci_addess_to_pci() implementations assume that every io_range starts at
-I/O port 0 on PCI (correct me if I'm wrong).  I suspect that's why you
-don't save the I/O port number in struct io_range.
+> > > +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
+> > > +{
+> > > +     return 0;
+> > > +}
+> > 
+> > I'd wait to add this until there's a platform that needs to implement it.
+> > Splitting it out will make this patch that much smaller and easier to
+> > understand.
+> 
+> I need this as this is the default implementation (i.e. do nothing). Otherwise the
+> link phase will give errors. 
 
-Maybe that assumption is guaranteed by OF, but it doesn't hold for ACPI;
-ACPI can describe several I/O port apertures for a single bridge, each
-associated with a different CPU physical memory region.
+I meant that you could remove the default implementation *and* the call of
+it, since it currently does nothing.
 
-If my speculation here is correct, a comment to the effect that each
-io_range corresponds to a PCI I/O space range that starts at 0 might be
-enough.
+> > > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> > > index dde3a4a..71e36d0 100644
+> > > --- a/include/linux/of_pci.h
+> > > +++ b/include/linux/of_pci.h
+> > > @@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+> > >  int of_pci_get_devfn(struct device_node *np);
+> > >  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+> > >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+> > > +struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
+> > > +                                     struct pci_ops *ops, void *host_data);
+> > > +
+> > >  #else
+> > >  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+> > >  {
+> > > @@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> > >  {
+> > >       return -EINVAL;
+> > >  }
+> > > +
+> > > +static inline struct pci_host_bridge *
+> > > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
+> > > +                     void *host_data)
+> > > +{
+> > > +     return NULL;
+> > > +}
+> > >  #endif
+> > >
+> > >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> > > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > > index 7e7b939..556dc5f 100644
+> > > --- a/include/linux/pci.h
+> > > +++ b/include/linux/pci.h
+> > > @@ -402,6 +402,7 @@ struct pci_host_bridge {
+> > >       struct device dev;
+> > >       struct pci_bus *bus;            /* root bus */
+> > >       int domain_nr;
+> > > +     resource_size_t io_base;        /* physical address for the start of I/O area */
+> > 
+> > I don't see where this is used yet.
+> 
+> It's used in pci_host_bridge_of_get_ranges() (earlier in this patch).
 
-If you did add a PCI I/O port number argument to pci_register_io_range(),
-we might be able to make an ACPI-based implementation of it.  But I guess
-that could be done if/when anybody ever wants to do that.
+of_create_pci_host_bridge() fills in bridge->io_base, but I don't see
+anything that ever *reads* bridge->io_base.
 
->> Here's what these look like in /proc/iomem and /proc/ioports (note that
->> there are two resource structs for each memory-mapped IO port space: one
->> IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
->> driver), and one IORESOURCE_IO for the I/O port space (this becomes the
->> parent of a region used by a regular device driver):
->>
->>   /proc/iomem:
->>     PCI Bus 0000:00 I/O Ports 00000000-00000fff
->>     PCI Bus 0001:00 I/O Ports 01000000-01000fff
+> > As far as I know, there's nothing that prevents a host bridge from having
+> > several I/O port apertures (or several memory-mapped I/O port spaces).
+> 
+> The pci_register_io_range() will give different offsets for each apperture.
+> I just need to make sure I don't overwrite io_base when parsing multiple IO
+> ranges.
 
-Oops, I forgot the actual physical memory addresses here, but you got
-the idea anyway.  It should have been something like this:
-
-  /proc/iomem:
-    f8010000000-f8010000fff PCI Bus 0000:00 I/O Ports 00000000-00000fff
-    f8110000000-f8110000fff PCI Bus 0001:00 I/O Ports 01000000-01000fff
+Let's continue this in the other thread where I'm trying to understand the
+I/O apertures.  Obviously I'm still missing something if you can indeed
+have multiple I/O apertures per bridge (because then only one of them can
+start at I/O address 0 on PCI).
 
 Bjorn
