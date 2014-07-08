@@ -1,55 +1,58 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 8 Jul 2014 17:40:10 -0400
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140708174900.GC16148@kwain>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
- <20140708170353.GA16148@kwain>
- <20140708171817.GH4979@htj.dyndns.org>
- <20140708174900.GC16148@kwain>
-Message-ID: <20140708214010.GI4979@htj.dyndns.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Jul 2014 22:42:17 +0100
+Subject: [PATCH] arm64: Get the number of bits in ASID from the CPU
+In-Reply-To: <1404846860-15055-1-git-send-email-amartin@nvidia.com>
+References: <1404846860-15055-1-git-send-email-amartin@nvidia.com>
+Message-ID: <FDB72495-5071-4A82-A7D0-17BA1DF10D84@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
-
-On Tue, Jul 08, 2014 at 07:49:00PM +0200, Antoine T?nart wrote:
-> > So, yeah, it's being used both as input and output and we also have
-> > the arguments which affect port_map, right?  It does seem confusing.
+On 8 Jul 2014, at 20:14, Allen Martin <amartin@nvidia.com> wrote:
+> From: Alex Van Brunt <avanbrunt@nvidia.com>
 > 
-> I do see priv->port_map as being automatically set and then restricted
-> if needed by the port_map input here. I don't see how that's confusing.
-> The only modification is we restrict the port_map parameter to the set
-> of available ports. The port_map argument affected priv->port_map before
-> this patch.
+> Instead of hard coding the number of ASID bits to 16, read the value
+> from the CPU through the register ID_AA64MMFR0_EL1 at boot time.  This
+> is required on Tegra132 Denver CPU which implements 8 bits.
 
-It is confusing.  If you wanna pass around available ports in hpriv,
-please add a separate field and replace the arguments to
-save_initial_config().
+Did you actually find a bug in the existing code?
 
-> > Well, so does clk.  Let's say clk is more restricted and phy can be
-> > one or more per port and thus needs to be dynamic.  If so, shouldn't
-> > we at least have some correlation between phys and ports?  It bothers
-> > me that now libahci is carrying random number of resources that it has
-> > no idea how to associate with the ports it manages.  What if later we
-> > want to involve phy driver in power managing unoccupied ports?
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+[?]
+> @@ -219,6 +220,16 @@ static void __init setup_processor(void)
+> 	sprintf(init_utsname()->machine, ELF_PLATFORM);
+> 	elf_hwcap = 0;
 > 
-> I see. This is a first (working) attempt to have a one node per port. I
-> agree that would be nice to have a correlation between ports and PHYs.
-> This can definitively be added when needed without changing the dt
-> bindings as only the internal representation changes. This would also
-> require to get all phys from the port nodes, which is again internal
-> stuff.
+> +	/* Read the number of ASID bits */
+> +	reg_value = read_cpuid(ID_AA64MMFR0_EL1) & 0xf0;
+> +	if (reg_value == 0x00)
+> +		max_asid_bits = 8;
+> +	else if (reg_value == 0x20)
+> +		max_asid_bits = 16;
+> +	else
+> +		BUG_ON(1);
+> +	cpu_last_asid = 1 << max_asid_bits;
+
+There is even a macro called asid_bits() in arch/arm64/mm/context.c.
+
+> --- a/arch/arm64/mm/context.c
+> +++ b/arch/arm64/mm/context.c
+[?]
 > 
-> Don't you think we can go by steps, and have a following up series for
-> this when needed (like in a power managing series for unoccupied ports)?
+> @@ -142,9 +141,9 @@ void __new_context(struct mm_struct *mm)
+> 	 */
+> 	if (unlikely((asid & ((1 << bits) - 1)) == 0)) {
 
-I don't know.  It isn't exactly difficult to make it per-port, is it?
-We already have ahci_port_priv and wouldn't the code actually be
-simpler that way?
+That?s the part where it uses the actual number of bits supported by
+the hardware (bits is computed higher up in this function based on
+ID_AA64MMFR0_EL1).
 
-Thanks.
+> 		/* increment the ASID version */
+> -		cpu_last_asid += (1 << MAX_ASID_BITS) - (1 << bits);
 
--- 
-tejun
+And here it bumps the generation@bit 16 onwards.
+
+So unless you find some bug in the existing logic, I don?t think your
+patch is needed.
+
+Catalin
