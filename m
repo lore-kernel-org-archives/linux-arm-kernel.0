@@ -1,56 +1,72 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 8 Jul 2014 13:31:57 +0200
-Subject: [PATCHv2 17/32] ARM: at91/dt: ge863-pro3: define crystals
- frequencies
-In-Reply-To: <53BB8B91.8020501@aksignal.cz>
-References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1404764629-29136-18-git-send-email-alexandre.belloni@free-electrons.com>
- <53BB8B91.8020501@aksignal.cz>
-Message-ID: <20140708113157.GK3113@piout.net>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 8 Jul 2014 12:37:38 +0100
+Subject: [PATCH v11 6/7] ARM: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <1404799424-1120-7-git-send-email-minchan@kernel.org>
+References: <1404799424-1120-1-git-send-email-minchan@kernel.org>
+ <1404799424-1120-7-git-send-email-minchan@kernel.org>
+Message-ID: <20140708113737.GA2958@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2014 at 08:11:29 +0200, Ji?? Prchal wrote :
-> Hi,
-> the slow crystal is not on the module "ge863-pro3", but it's usually
-> on application board. So I think this clock should be in board dts.
+On Tue, Jul 08, 2014 at 03:03:43PM +0900, Minchan Kim wrote:
+> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+> overwrite of the contents since MADV_FREE syscall is called for
+> THP page.
 > 
+> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+> support.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
+> ---
+>  arch/arm/include/asm/pgtable-3level.h | 3 +++
+>  arch/arm64/include/asm/pgtable.h      | 2 ++
+>  2 files changed, 5 insertions(+)
 
-Right, I'll move the 32kHz crystal to the board dts.
+Hi Minchan,
+arch/arm and arch/arm64 are handled separately.
+Could you please split this patch into arm and arm64 versions?
 
-> Dne 7.7.2014 22:23, Alexandre Belloni napsal(a):
-> >Define Telit GE863-PRO3, AK signal CDU and Telit EVK-PRO3 main and slow
-> >crystals frequencies.
-> >
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
-> >Cc: Jiri Prchal <jiri.prchal@aksignal.cz>
-> >---
-> >  arch/arm/boot/dts/ge863-pro3.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> >diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
-> >index 230099bb31c8..a32fdbefbbd9 100644
-> >--- a/arch/arm/boot/dts/ge863-pro3.dtsi
-> >+++ b/arch/arm/boot/dts/ge863-pro3.dtsi
-> >@@ -19,6 +19,14 @@
-> >  			compatible = "atmel,osc", "fixed-clock";
-> >  			clock-frequency = <6000000>;
-> >  		};
-> >+
-> >+		slow_xtal {
-> >+			clock-frequency = <32768>;
-> >+		};
-> >+
-> >+		main_xtal {
-> >+			clock-frequency = <6000000>;
-> >+		};
-> >  	};
-> >
-> >  	ahb {
-> >
 
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 85c60adc8b60..3a7bb8dc7d05 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -220,6 +220,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>  #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+>  #endif
+>  
+> +#define pmd_dirty	(pmd_val(pmd) & PMD_SECT_DIRTY)
+
+This macro is missing the parameter definition, and will generate a
+compile errror when CONFIG_ARM_LPAE=y
+
+For 32-bit ARM with CONFIG_ARM_LPAE=n, we don't have THP support and I noticed
+some compiler errors in mm/madvise.c:
+
+  CC      mm/madvise.o
+mm/madvise.c: In function ?madvise_free_pte_range?:
+mm/madvise.c:279:3: error: implicit declaration of function ?pmdp_get_and_clear? [-Werror=implicit-function-declaration]
+   orig_pmd = pmdp_get_and_clear(mm, addr, pmd);
+   ^
+mm/madvise.c:285:3: error: implicit declaration of function ?pmd_mkold? [-Werror=implicit-function-declaration]
+   orig_pmd = pmd_mkold(orig_pmd);
+   ^
+mm/madvise.c:286:3: error: implicit declaration of function ?pmd_mkclean? [-Werror=implicit-function-declaration]
+   orig_pmd = pmd_mkclean(orig_pmd);
+   ^
+mm/madvise.c:288:3: error: implicit declaration of function ?set_pmd_at? [-Werror=implicit-function-declaration]
+   set_pmd_at(mm, addr, pmd, orig_pmd);
+   ^
+cc1: some warnings being treated as errors
+make[1]: *** [mm/madvise.o] Error 1
+
+
+Cheers,
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Steve 
