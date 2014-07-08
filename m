@@ -1,44 +1,74 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 8 Jul 2014 16:49:22 +0100
-Subject: [PATCH v2 1/3] xen/arm: introduce XENFEAT_grant_map_11
-In-Reply-To: <1404834132-15847-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
- <1404834132-15847-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1404834562.25940.8.camel@kazak.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue,  8 Jul 2014 16:54:18 +0100
+Subject: [PATCH] efi: fdt: Do not report an error during boot if UEFI is not
+ available
+Message-ID: <1404834858-10706-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-08 at 16:42 +0100, Stefano Stabellini wrote:
-> The flag tells us that the hypervisor maps a grant page to guest
-> physical address == machine address of the page in addition to the
-> normal grant mapping address. It is needed to properly issue cache
-> maintenance operation at the completion of a DMA operation involving a
-> foreign grant.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/xen/enlighten.c         |    6 ++++++
->  include/xen/interface/features.h |    3 +++
->  2 files changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index b96723e..ee3135a 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
->  	xen_domain_type = XEN_HVM_DOMAIN;
->  
->  	xen_setup_features();
-> +
-> +	if (!xen_feature(XENFEAT_grant_map_11)) {
-> +		pr_warn("Please upgrade your Xen.\n"
-> +				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
-> +	}
+Currently, fdt_find_uefi_params() reports an error if no EFI parameters
+are found in the DT. This is however a valid case for non-UEFI kernel
+booting. This patch checks changes the error reporting to a
+pr_info("UEFI not found") when no EFI parameters are found in the DT.
 
-Unfortunately this isn't quite complete. On a system where all devices
-are behind an SMMU then we would want to be able to disable the 1:1
-workaround, which in turn would imply disabling this feature flag too
-(since it is no longer necessary and also impossible to implement in
-that case).
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ drivers/firmware/efi/efi.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
-Ian.
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index eff1a2f22f09..dc79346689e6 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -346,6 +346,7 @@ static __initdata struct {
+ 
+ struct param_info {
+ 	int verbose;
++	int found;
+ 	void *params;
+ };
+ 
+@@ -362,16 +363,12 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
+ 		return 0;
+ 
+-	pr_info("Getting parameters from FDT:\n");
+-
+ 	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+ 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+-		if (!prop) {
+-			pr_err("Can't find %s in device tree!\n",
+-			       dt_params[i].name);
++		if (!prop)
+ 			return 0;
+-		}
+ 		dest = info->params + dt_params[i].offset;
++		info->found++;
+ 
+ 		val = of_read_number(prop, len / sizeof(u32));
+ 
+@@ -390,10 +387,21 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+ {
+ 	struct param_info info;
++	int ret;
++
++	pr_info("Getting EFI parameters from FDT:\n");
+ 
+ 	info.verbose = verbose;
++	info.found = 0;
+ 	info.params = params;
+ 
+-	return of_scan_flat_dt(fdt_find_uefi_params, &info);
++	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
++	if (!info.found)
++		pr_info("UEFI not found.\n");
++	else if (!ret)
++		pr_err("Can't find '%s' in device tree!\n",
++		       dt_params[info.found].name);
++
++	return ret;
+ }
+ #endif /* CONFIG_EFI_PARAMS_FROM_FDT */
