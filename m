@@ -1,82 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  8 Jul 2014 14:50:03 +0200
-Subject: [RFC PATCH 3/3] arm64/efi: efistub: get TEXT_OFFSET from the Image
- header at runtime
-In-Reply-To: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1404823803-7317-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1404823803-7317-3-git-send-email-ard.biesheuvel@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 8 Jul 2014 14:51:01 +0200
+Subject: [PATCH v3] s3cmci: port DMA code to dmaengine API
+In-Reply-To: <201407072312.40687.arnd@arndb.de>
+References: <1401643329-6460-1-git-send-email-anarsoul@gmail.com>
+ <CA+E=qVf2QWk+HxPTjwFK8BkD3C+EGbvLDMM4ro1_nYEThe=LtQ@mail.gmail.com>
+ <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
+ <201407072312.40687.arnd@arndb.de>
+Message-ID: <CAPDyKFoVtJLyBrjwyQYKK6h=8aNd7+SMYU9bS8iStcSZkWs3Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EFI stub for arm64 needs to behave like an ordinary bootloader in the sense
-that it needs to inspect the Image header at runtime and not rely on the linker
-or preprocessor to produce a value for TEXT_OFFSET.
+On 7 July 2014 23:12, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 07 July 2014, Vasily Khoruzhick wrote:
+>> On Mon, Jun 30, 2014 at 10:03 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>> > On Mon, Jun 23, 2014 at 2:31 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>> >>
+>> >> On 1 June 2014 20:22:09 Vasily Khoruzhick wrote:
+>> >> > Utilise new s3c24xx-dma dmaengine driver for DMA ops.
+>> >> >
+>> >> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> >> > ---
+>> >> > v2: - Don't store async dma descriptor, it's not used
+>> >> >     - Request DMA channel via dma_request_slave_channel_compat() and use
+>> >> >       hardcoded DMA channel.
+>> >> >     - Add dependency on S3C24XX_DMAC (s3cmci uses filter function from it)
+>> >> > v3: - Use 'depends' instead of 'select' in Kconfig
+>> >> >     - Drop useless controller registers reads from dma completion callback
+>> >>
+>> >> Ping?
+>> >
+>> > Ping?
+>>
+>> Could anyone tell me through which tree this patch should be merged?
+>> I'm pretty sure that I've included everyone from get_maintainer.pl
+>> output
+>> except LKML, but no response from maintainer so far.
+>
+> I think you did everything right, Ulf or Chris should really pick up this
+> patch. The one thing you could improve is the changeset text which you
+> wrote as "Utilise new s3c24xx-dma dmaengine driver for DMA ops." What we
+> really need here is an explanation of why we want this, e.g. what problems
+> are solved by it etc. I definitely really want this patch as part of 3.17
+> so we can enabled multiplatform for the platforms that use this driver.
+>
+> You should also list the
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> line under your "Signed-off-by" line.
+>
+>         Arnd
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/Makefile   |  2 --
- arch/arm64/kernel/efi-stub.c | 19 +++++++++++++++----
- 2 files changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index cdaedad3afe5..99b676eeeb0f 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -4,8 +4,6 @@
- 
- CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
--CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET) \
--			   -I$(src)/../../../scripts/dtc/libfdt
- 
- CFLAGS_REMOVE_ftrace.o = -pg
- CFLAGS_REMOVE_insn.o = -pg
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index 12456a7d3fa2..01581d332858 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -11,6 +11,7 @@
-  */
- #include <linux/efi.h>
- #include <asm/efi.h>
-+#include <asm/image_hdr.h>
- #include <asm/sections.h>
- 
- 
-@@ -24,20 +25,30 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
- {
- 	efi_status_t status;
- 	unsigned long kernel_size, kernel_memsize = 0;
-+	struct image_hdr *hdr = (struct image_hdr *)*image_addr;
-+	unsigned long image_base;
-+
-+	/* make sure image_addr points to an arm64 kernel Image */
-+	if (!image_hdr_check(hdr)) {
-+		pr_efi_err(sys_table, "Kernel Image header corrupt\n");
-+		return EFI_LOAD_ERROR;
-+	}
-+
-+	/* put the image at the offset specified in the Image header */
-+	image_base = dram_base + image_hdr_text_offset(hdr);
- 
- 	/* Relocate the image, if required. */
- 	kernel_size = _edata - _text;
--	if (*image_addr != (dram_base + TEXT_OFFSET)) {
-+	if (*image_addr != image_base) {
- 		kernel_memsize = kernel_size + (_end - _edata);
- 		status = efi_relocate_kernel(sys_table, image_addr,
- 					     kernel_size, kernel_memsize,
--					     dram_base + TEXT_OFFSET,
--					     PAGE_SIZE);
-+					     image_base, PAGE_SIZE);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
- 			return status;
- 		}
--		if (*image_addr != (dram_base + TEXT_OFFSET)) {
-+		if (*image_addr != image_base) {
- 			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
- 			efi_free(sys_table, kernel_memsize, *image_addr);
- 			return EFI_LOAD_ERROR;
--- 
-1.8.3.2
+Sorry for the delay.
+
+Thanks! Applied for next with Arnd's ack.
+
+Kind regards
+Uffe
