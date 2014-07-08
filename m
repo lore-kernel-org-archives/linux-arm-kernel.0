@@ -1,77 +1,41 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 10:40:38 +0200
-Subject: [PATCH 0/3] Deterministic UART numbering on Samsung SoCs
-In-Reply-To: <CAD8Lp45MvDLsxehayx8uuGt3w3O0vGskiFjb1vdvtOyOv2nG2w@mail.gmail.com>
-References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>	<20140626113939.GP32514@n2100.arm.linux.org.uk>	<53AC0BCC.1010608@samsung.com>
- <CAD8Lp45MvDLsxehayx8uuGt3w3O0vGskiFjb1vdvtOyOv2nG2w@mail.gmail.com>
-Message-ID: <53BBAE86.6090500@gmail.com>
+Date: Tue, 08 Jul 2014 10:43:07 +0200
+Subject: [PATCH v5 3/3] clk: samsung: exynos5420: Setup clocks before
+ system suspend
+In-Reply-To: <CAGm_ybgLdPrXX-kZJdTeFZxxNZ-Ehtn7M3JxYb0ZYfDZnfszUw@mail.gmail.com>
+References: <1403781135-6538-1-git-send-email-vikas.sajjan@samsung.com>	<1403781135-6538-4-git-send-email-vikas.sajjan@samsung.com>	<53B1A562.6000300@samsung.com>
+ <CAGm_ybgLdPrXX-kZJdTeFZxxNZ-Ehtn7M3JxYb0ZYfDZnfszUw@mail.gmail.com>
+Message-ID: <53BBAF1B.9080309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.07.2014 10:32, Daniel Drake wrote:
-> Hi,
-> 
-> How can we move forward here?
+Vikas,
 
-Greg, Jiri, what do you think?
+On 08.07.2014 06:34, Vikas Sajjan wrote:
+> Hi Kukjin,
+> 
+> On Mon, Jun 30, 2014 at 11:28 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hi Vikas, Abhilash,
+>>
+>> On 26.06.2014 13:12, Vikas Sajjan wrote:
+>>> Prior to suspending the system, we need to ensure that certain
+>>> clock source and gate registers are unmasked.
+>>>
+>>> while at it, add these clks to save/restore list also.
+>>>
+>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> ---
+>>>  drivers/clk/samsung/clk-exynos5420.c |   29 +++++++++++++++++++++++++++++
+>>>  1 file changed, 29 insertions(+)
+>>
+>> Looks good. Will apply.
+>>
+> 
+> Can you apply this patch.
 
-> 
-> On Thu, Jun 26, 2014 at 1:02 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->> - basically Samsung UART already has its own namespace (ttySAC) and the
->> order inside it is well-defined - instance ID shall be the hardware
->> instance number as specified by documentation. The ports vary in certain
->> aspects and the ID is important knowledge of the driver. The problem
->> here was broken implementation of assigning IDs based on probe order,
->> which worked only because on all Exynos platforms all ports have been
->> always registered (which we want to change now and keep unused ones
->> "disabled" in DT),
-> 
-> Yes, the kernel help text documents this quite well:
-> 
-> config SERIAL_SAMSUNG
->     tristate "Samsung SoC serial support"
->     depends on PLAT_SAMSUNG
->     select SERIAL_CORE
->     help
->       Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
->       providing /dev/ttySAC0, 1 and 2 (note, some machines may not
->       provide all of these ports, depending on how the serial port
->       pins are configured.
-> 
->> - we already have a lot of userspace depending on the aforementioned
->> ttySAC namespace and proper ordering of instances there. While I believe
->> the proper solution as of today would be to go back to standard ttyS
->> namespace and make userspace use a smarter way of identifying the
->> instances (e.g. by path or id, as you suggested), I don't think this
->> will make anyone's life easier with current assumptions,
-> 
-> I like the sound of going to the standard ttyS notation and only
-> providing ports for ones that exist, but is this userspace-visible
-> naming change OK? You could argue that userspace that relies on fixed
-> device paths is a bit broken, but that argument would be a bit cloudy
-> given the kernel documentation for the ttySAC devices above.
-
-I'd say such argument would be completely invalid as this is most likely
-almost all of the userspace for Samsung SoCs and, in addition to this,
-quite a lot of firmware which pass console=ttySACx through command line.
-
-> 
->> - correct me if I'm wrong, but I don't think the
->> /dev/serial/by-{path,id} would be handled in kernel's console= parameter.
-> 
-> That's right, that problem is left to the user, but at least we'd be
-> consistent with other SoCs (and open to generic solutions to that
-> inconvenience).
-
-And so the point of this series is to make this no longer be left to the
-user, making hardware UART 2 always UART 2 (which is supposed to be the
-current behavior, but not always due to broken implementation) which is
-completely orthogonal to raised issues.
-
-Regardless of whether we stick to ttySAC or move back to ttyS, we still
-need a deterministic way to assign the ID (even for internal driver
-purposes) and that's why this series adds parsing of aliases. No user
-visible behavior should be changed by this series.
+As I said, I will take this through the samsung-clk tree. The patch
+should appear there soon.
 
 Best regards,
 Tomasz
