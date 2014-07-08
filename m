@@ -1,56 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Jul 2014 22:12:49 -0700
-Subject: [GIT PULL] Versatile/Integrator base cleanup patches
-In-Reply-To: <CACRpkdbMA2oCFJmKH91MSg4hA0dxGcgAzy=ph1YOBLkN6-KxZA@mail.gmail.com>
-References: <CACRpkdbMA2oCFJmKH91MSg4hA0dxGcgAzy=ph1YOBLkN6-KxZA@mail.gmail.com>
-Message-ID: <20140708051249.GE28931@quad.lixom.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 8 Jul 2014 13:19:17 +0800
+Subject: [PATCH 1/1] ARM: imx: use PTR_ERR_OR_ZERO
+In-Reply-To: <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
+References: <1404500590-21712-1-git-send-email-fabf@skynet.be>
+ <20140707055521.GM30239@dragon>
+ <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
+Message-ID: <20140708051916.GB26257@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 10:23:42AM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Tue, Jul 08, 2014 at 09:18:56AM +0530, Sachin Kamat wrote:
+> Hi Shawn,
 > 
-> these are the first basic patches at the very bottom of my
-> multiplatform stack, getting some infrastructure in place to
-> do the final transition to multiplatform for Integrator (still
-> working on the final patch) and also paving the road a bit
-> for Versatile and RealView but continuing to depopulate
-> plat-versatile.
-> 
-> Please pull it in as a starter, I'd recommend a common
-> Versatile branch to be shared with e.g. Rob Herrings Versatile
-> devicetree stuff.
-> 
-> Yours,
-> Linus Walleij
+> On Mon, Jul 7, 2014 at 11:25 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > On Fri, Jul 04, 2014 at 09:03:10PM +0200, Fabian Frederick wrote:
+> >> replace IS_ERR/PTR_ERR
+> >>
+> >> Cc: Shawn Guo <shawn.guo@freescale.com>
+> >> Cc: Sascha Hauer <kernel@pengutronix.de>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> >
+> > Applied, thanks.
 > 
 > 
-> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
-> 
->   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/versatile-1
-> 
-> for you to fetch changes up to 11c32d7b6274cb0f554943d65bd4a126c4a86dcd:
-> 
->   video: move Versatile CLCD helpers (2014-06-27 10:15:22 +0200)
-> 
-> ----------------------------------------------------------------
-> First pull request of Versatile family clean-ups for v3.17:
-> 
-> - Remove <mach/memory.h> from the Integrator, paving the
->   road for multiplatform.
-> - Push the CLCD helper code down into the framebuffer subsystem,
->   removing the last hook in plat-versatile for the Integrator,
->   also paving the road for multiplatform.
-> 
-> Patches tested on Integrator/AP, Integrator/CP and Versatile AB
-> (all real hardware).
+> I had sent a similar series [1] in May which you rejected. Just
+> curious if something
+> changed between then and now?
 
-Merged, thanks!
+The main difference is this is the second attempt from a different
+person to "clean up" the code.  I'm still not fond of the change, but
+I'm getting tied to tell people about that, so just applied the change,
+since after all it at least gives some good diffstat.
 
+I would prefer Fabian's patch over yours because it's really good
+enough to have one patch than 5 patches in a series to do the change for
+IMX platform.
 
--Olof
+Shawn
