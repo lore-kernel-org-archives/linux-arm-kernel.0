@@ -1,36 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Jul 2014 10:30:24 +0100
-Subject: [PATCH resend] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <CAKv+Gu_n7QV+_nUpeV8LH-i4eSGTHbaxU4OLwWuyaTHAGXqOjA@mail.gmail.com>
-References: <1404297277-28295-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9QuHcV4+8Sx--HEXOCfFDqZw0JWvJJjHYAHS6Y1xF9qg@mail.gmail.com>
- <20140708091513.GC8235@arm.com>
- <CAKv+Gu_n7QV+_nUpeV8LH-i4eSGTHbaxU4OLwWuyaTHAGXqOjA@mail.gmail.com>
-Message-ID: <20140708093024.GE8235@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  8 Jul 2014 11:34:14 +0200
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.17
+Message-ID: <cover.1404811926.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 10:27:06AM +0100, Ard Biesheuvel wrote:
-> On 8 July 2014 11:15, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jul 08, 2014 at 09:55:53AM +0100, Ard Biesheuvel wrote:
-> >> > +#include <linux/slab.h>
-> >> > +#include <linux/efi.h>
-> >> > +
-> >> > +/* Use efi mappings for DMI */
-> >> > +#define dmi_early_remap(x, l)          efi_lookup_mapped_addr(x)
-> >
-> > Throwing away the length doesn't feel right, especially since the efi map
-> > *does* have a size field.
-> >
-> 
-> The thing to realize here is that, instead of doing actual ioremap()
-> or early_ioremap() calls, we just reuse an existing EFI mapping here.
-> (On x86, DMI/SMBIOS and EFI are not as tightly coupled, whereas on
-> arm64, the former implies the latter). So would you prefer some kind
-> of test against the size of the mapping before doing that?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Yeah, might not be a bad idea. Even if the thing happens to work by
-construction, we still have an API that takes a size, so checking it's what
-we have mapped sounds sensible.
+Please consider these third round of Renesas ARM based SoC updates for v3.17.
 
-Will
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc2-for-v3.17,
+which I have already sent a pull-request for.
+
+
+The following changes since commit bfe4cfa8ae21628267f2b879b4396ee17ea4fd3a:
+
+  ARM: shmobile: Allow r8a7791 to build non-SMP APMU code (2014-06-26 16:01:34 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc3-for-v3.17
+
+for you to fetch changes up to d358c99838f3cf63ad7536124be4318cc84b11fa:
+
+  ARM: shmobile: fix shmobile_smp_apmu_suspend_init build failure for !SUSPEND (2014-07-06 16:31:56 +0200)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC Updates for v3.17
+
+* Correct build failure in APMU code in the case of !SUSPEND
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: shmobile: fix shmobile_smp_apmu_suspend_init build failure for !SUSPEND
+
+ arch/arm/mach-shmobile/platsmp-apmu.c | 2 --
+ 1 file changed, 2 deletions(-)
