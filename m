@@ -1,51 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 8 Jul 2014 09:21:18 -0700
-Subject: [RFC PATCH 1/3] watchdog: s3c2410: add restart notifier
-In-Reply-To: <53BBFE55.4080202@samsung.com>
-References: <1531376.ijR0PPyvmJ@diego> <10183342.ZfePbPvRx9@diego>
- <53BBFE55.4080202@samsung.com>
-Message-ID: <20140708162118.GA9157@roeck-us.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  8 Jul 2014 18:21:10 +0200
+Subject: [PATCHv2 0/6] Add a driver for the atmel ram controller
+Message-ID: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 04:21:09PM +0200, Tomasz Figa wrote:
-> Hi Heiko,
-> 
-> On 06.07.2014 20:42, Heiko St?bner wrote:
-> > On a lot of Samsung systems the watchdog is responsible for restarting the
-> > system and until now this code was contained in plat-samsung/watchdog-reset.c .
-> > 
-> > With the introduction of the restart notifiers, this code can now move into
-> > driver itself, removing the need for arch-specific code.
-> > 
-> > Tested on a S3C2442 based GTA02
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  drivers/watchdog/s3c2410_wdt.c | 33 +++++++++++++++++++++++++++++++++
-> >  1 file changed, 33 insertions(+)
-> > 
-> > diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> > index 7c6ccd0..3f89912 100644
-> > --- a/drivers/watchdog/s3c2410_wdt.c
-> > +++ b/drivers/watchdog/s3c2410_wdt.c
-> > @@ -41,6 +41,7 @@
-> >  #include <linux/of.h>
-> >  #include <linux/mfd/syscon.h>
-> >  #include <linux/regmap.h>
-> > +#include <linux/reboot.h>
-> >  
-> >  #define S3C2410_WTCON		0x00
-> >  #define S3C2410_WTDAT		0x04
-> > @@ -438,6 +439,31 @@ static inline void s3c2410wdt_cpufreq_deregister(struct s3c2410_wdt *wdt)
-> >  }
-> >  #endif
-> >  
-> > +static struct s3c2410_wdt *s3c2410wdt_restart_ctx;
-> 
-> This isn't the most elegant way to store context data. Maybe you could
-> embed the notifier_block struct into s3c2410_wdt struct and then use
-> container of to retrieve it from s3c2410wdt_restart_notify()?
-> 
-Excellent idea. I'll do that for the moxart handler as well.
+The atmel ram controller needs one or more clocks to work. For now the
+CLK_IGNORE_UNUSED flag is used on those clocks. This patch set introduce a
+driver that will take care of taking those clocks.
 
-Guenter
+The final goal is also to move the ioremap done in mach-at91 to that driver with
+a proper power management driver.
+
+Changes in v2:
+ - use ATMEL_SDRAMC instead of ATMEL_RAMC
+ - use "atmel,sama5d3-ddramc" instead of "atmel,sama5d3-mpddramc"
+ - not getting mpddrck is now an error
+ - handle "atmel,sama5d3-ddramc" in mach-at91/setup.c
+
+Alexandre Belloni (6):
+  ARM: at91: Add new binding for sama5d3-ddramc
+  memory: add a driver for atmel ram controllers
+  ARM: at91: select ATMEL_SDRAMC when using OF
+  ARM: at91/dt: sama5d3: define mpddr clock and ramc clocks
+  ARM: at91/dt: at91sam9: use ddrck in ramc
+  clk: at91: remove the useless CLK_IGNORE_UNUSED flag
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  2 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |  2 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |  9 +-
+ arch/arm/mach-at91/Kconfig                         |  4 +
+ arch/arm/mach-at91/setup.c                         |  1 +
+ drivers/clk/at91/clk-system.c                      |  8 +-
+ drivers/memory/Kconfig                             | 10 +++
+ drivers/memory/Makefile                            |  1 +
+ drivers/memory/atmel-sdramc.c                      | 98 ++++++++++++++++++++++
+ 10 files changed, 128 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/memory/atmel-sdramc.c
+
+-- 
+1.9.1
