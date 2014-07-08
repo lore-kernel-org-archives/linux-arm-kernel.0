@@ -1,212 +1,123 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 8 Jul 2014 19:08:20 +0200
-Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display Controller
- support
-In-Reply-To: <CAF6AEGuOYQbZ_Mgv+Y7oQO4kKmOEF=gwi0YcBXERE80nS2QL+g@mail.gmail.com>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
- <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
- <20140708092348.4ecdbb8f@bbrezillon>
- <CAF6AEGuUz7Td-9Hh31rYpn_Zros=ozK_ttv9FadHot6qAuaq1Q@mail.gmail.com>
- <20140708163731.6693a883@bbrezillon>
- <CAF6AEGuOYQbZ_Mgv+Y7oQO4kKmOEF=gwi0YcBXERE80nS2QL+g@mail.gmail.com>
-Message-ID: <20140708190820.2a94723f@bbrezillon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Jul 2014 19:11:37 +0200
+Subject: [PATCHv2 00/32] ARM: at91: Switch remaining SoCs and boards to CCF
+In-Reply-To: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <53BC2649.7080109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Jul 2014 11:41:32 -0400
-Rob Clark <robdclark@gmail.com> wrote:
-
-> On Tue, Jul 8, 2014 at 10:37 AM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
-> > On Tue, 8 Jul 2014 08:49:41 -0400
-> > Rob Clark <robdclark@gmail.com> wrote:
-> >
-> >> On Tue, Jul 8, 2014 at 3:23 AM, Boris BREZILLON
-> >> <boris.brezillon@free-electrons.com> wrote:
-> >> > Hello Rob,
-> >> >
-> >> > On Mon, 7 Jul 2014 23:45:54 -0400
-> >> > Rob Clark <robdclark@gmail.com> wrote:
-> >> >
-> >> >> On Mon, Jul 7, 2014 at 12:42 PM, Boris BREZILLON
-> >> >> <boris.brezillon@free-electrons.com> wrote:
-> >> >> > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> >> >> > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> >> >> > controller device.
-> >> >> >
-> >> >> > This display controller supports at least one primary plane and might
-> >> >> > provide several overlays and an hardware cursor depending on the IP
-> >> >> > version.
-> >> >> >
-> >> >> > At the moment, this driver only implements an RGB connector to interface
-> >> >> > with LCD panels, but support for other kind of external devices (like DRM
-> >> >> > bridges) might be added later.
-> >> >> >
-> >> >> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> >> >> > ---
-> >> >> >  drivers/gpu/drm/Kconfig                         |   2 +
-> >> >> >  drivers/gpu/drm/Makefile                        |   1 +
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/Kconfig             |  11 +
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/Makefile            |   7 +
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c  | 469 +++++++++++++++
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c    | 474 +++++++++++++++
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 210 +++++++
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c | 706 +++++++++++++++++++++++
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h | 422 ++++++++++++++
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c | 351 ++++++++++++
-> >> >> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 729 ++++++++++++++++++++++++
-> >> >> >  11 files changed, 3382 insertions(+)
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c
-> >> >> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> >> >> >
-> >> >> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-> >> >> > index d1cc2f6..df6f0c1 100644
-> >> >> > --- a/drivers/gpu/drm/Kconfig
-> >> >> > +++ b/drivers/gpu/drm/Kconfig
-> >> >> > @@ -182,6 +182,8 @@ source "drivers/gpu/drm/cirrus/Kconfig"
-> >> >
-> >> > [...]
-> >> >
-> >> >> > +
-> >> >> > +/**
-> >> >> > + * Atmel HLCDC Plane properties.
-> >> >> > + *
-> >> >> > + * This structure stores plane property definitions.
-> >> >> > + *
-> >> >> > + * @alpha: alpha blending (or transparency) property
-> >> >> > + * @csc: YUV to RGB conversion factors property
-> >> >> > + */
-> >> >> > +struct atmel_hlcdc_plane_properties {
-> >> >> > +       struct drm_property *alpha;
-> >> >> > +       struct drm_property *csc;
-> >> >>
-> >> >> appears like csc is not used yet, so I suppose you can drop it for
-> >> >> now..  when you do add it, don't forget to update drm.tmp.  But for
-> >> >> now it at least makes review easier when the driver doesn't add new
-> >> >> userspace interfaces :-)
-> >> >
-> >> >
-> >> > Sure, I guess this is a leftover from another patch I made to add Color
-> >> > Space Conversion configuration.
-> >> >
-> >> > I'll remove it for the next version.
-> >> >
-> >> >>
-> >> >> > +};
-> >> >> > +
-> >> >> > +/**
-> >> >> > + * Atmel HLCDC Plane.
-> >> >> > + *
-> >> >> > + * @base: base DRM plane structure
-> >> >> > + * @layer: HLCDC layer structure
-> >> >> > + * @properties: pointer to the property definitions structure
-> >> >> > + * @alpha: current alpha blending (or transparency) status
-> >> >> > + */
-> >> >> > +struct atmel_hlcdc_plane {
-> >> >> > +       struct drm_plane base;
-> >> >> > +       struct atmel_hlcdc_layer layer;
-> >> >> > +       struct atmel_hlcdc_plane_properties *properties;
-> >> >> > +};
-> >> >> > +
-> >> >> > +static inline struct atmel_hlcdc_plane *
-> >> >> > +drm_plane_to_atmel_hlcdc_plane(struct drm_plane *p)
-> >> >> > +{
-> >> >> > +       return container_of(p, struct atmel_hlcdc_plane, base);
-> >> >> > +}
-> >> >> > +
-> >> >> > +static inline struct atmel_hlcdc_plane *
-> >> >> > +atmel_hlcdc_layer_to_plane(struct atmel_hlcdc_layer *l)
-> >> >> > +{
-> >> >> > +       return container_of(l, struct atmel_hlcdc_plane, layer);
-> >> >> > +}
-> >> >> > +
-> >> >> > +/**
-> >> >> > + * Atmel HLCDC Plane update request structure.
-> >> >> > + *
-> >> >> > + * @crtc_x: x position of the plane relative to the CRTC
-> >> >> > + * @crtc_y: y position of the plane relative to the CRTC
-> >> >> > + * @crtc_w: visible width of the plane
-> >> >> > + * @crtc_h: visible height of the plane
-> >> >> > + * @src_x: x buffer position
-> >> >> > + * @src_y: y buffer position
-> >> >> > + * @src_w: buffer width
-> >> >> > + * @src_h: buffer height
-> >> >> > + * @pixel_format: pixel format
-> >> >> > + * @gems: GEM object object containing image buffers
-> >> >> > + * @offsets: offsets to apply to the GEM buffers
-> >> >> > + * @pitches: line size in bytes
-> >> >> > + * @crtc: crtc to display on
-> >> >> > + * @finished: finished callback
-> >> >> > + * @finished_data: data passed to the finished callback
-> >> >> > + * @bpp: bytes per pixel deduced from pixel_format
-> >> >> > + * @xstride: value to add to the pixel pointer between each line
-> >> >> > + * @pstride: value to add to the pixel pointer between each pixel
-> >> >> > + * @nplanes: number of planes (deduced from pixel_format)
-> >> >> > + */
-> >> >> > +struct atmel_hlcdc_plane_update_req {
-> >> >> > +       int crtc_x;
-> >> >> > +       int crtc_y;
-> >> >> > +       unsigned int crtc_w;
-> >> >> > +       unsigned int crtc_h;
-> >> >> > +       uint32_t src_x;
-> >> >> > +       uint32_t src_y;
-> >> >> > +       uint32_t src_w;
-> >> >> > +       uint32_t src_h;
-> >> >> > +       uint32_t pixel_format;
-> >> >> > +       struct drm_gem_cma_object *gems[ATMEL_HLCDC_MAX_PLANES];
-> >> >> > +       unsigned int offsets[ATMEL_HLCDC_MAX_PLANES];
-> >> >> > +       unsigned int pitches[ATMEL_HLCDC_MAX_PLANES];
-> >> >>
-> >> >> tbh, I've only looked closely, but I don't completely follow all the
-> >> >> layering here..  I wonder if we'd be better off just moving 'struct
-> >> >> drm_fb_cma' to header file so you could get the gem objects / pixel
-> >> >> fmt / width / height directly from the fb object (and then you can
-> >> >> reference count things at the fb level, rather than at the individual
-> >> >> gem obj level, too)
-> >> >>
-> >> >
-> >> > Actually, the HW cursor is a drm_plane too, and in this case I cannot
-> >> > retrieve a drm_fb_cma object, but just a single GEM object (see
-> >> > atmel_hlcdc_crtc_cursor_set function in atmel_hlcdc_crtc.c).
-> >>
-> >> oh, right..  well maybe for the cursor case it would be possible to
-> >> wrap up the gem bo with an internally created fb?  Not sure if that
-> >> ends up simplifying things or not, so it is definitely your call.  But
-> >> at least my experience with other drivers (that did not use a plane as
-> >> a cursor internally) was that I could simplify things after fb gained
-> >> refcnt'ing.
-> >
-> > Unless I'm missing something, I'd say moving to fb objects instead of
-> > GEM objects won't simplify the code much (I'm already refcnt'ing GEM
-> > objects when launching a DMA transfer for a plane update).
+On 07/07/2014 22:23, Alexandre Belloni :
+> This patch set adds support for the common clock framwork to the remaining atml
+> SoCs: at91rm9200, at91sam9260, at91sam9263, at91sam9g45.
 > 
-> yeah, mostly just saves you a bit of bookkeeping.  Ie. ref/unref one
-> thing instead of loop over N objects, etc.  Nothing earth-shattering.
+> It also defines the necessary main crystal and slow crystal frequencies.
 > 
+> I couldn't find datasheets for the following boards:
+>  - mpa1600
+>  - ge863-pro3
+>  - animeo_ip
+>  - tny_a9260
+> 
+> For those, I assumed the 32kHz crystal is present on the board as this is the
+> most common implementation (only one board doesn't have it). Please correct me
+> if this is wrong.
+> 
+> I could not test at91rm9200 as I don't own any board with that chip.
 
-Okay, my bad, this is definitely simpler with fb objects (I made use of
-drm_fb_cma_create to create an fb object when cursor_set is called)
-than it was when using GEM objects.
+It seems okay and I am looking forward to see these board converted:
+Nice job!
 
-I might even be able to simplify the layer update mechanism with this
-approach.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks for the advice.
+BTW, can you send me pull-requests for the 3.17 material? It can be even
+more convenient for me to organize series and dependancis for pushing
+upstream. It seems that we have quite a few "cleanup" patches for this
+development cycle.
 
-Best Regards,
+Best regards,
 
-Boris
+> Changes in v2:
+>  - Drop patch 3 that has been taken in the clock tree
+>  - rename tcb*_clk in tc*_clk for rm9200 an sam9260
+>  - rename tc0_clk in tcb_clk for sam9263
+> 
+> Cc: Douglas Gilbert <dgilbert@interlog.com>
+> Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Jiri Prchal <jiri.prchal@aksignal.cz>
+> Cc: Tim Schendekehl <tim.schendekehl@egnite.de>
+> Cc: Gael Portay <g.portay@overkiz.com>
+> Cc: Rodolfo Giometti <giometti@linux.it>
+> 
+> Alexandre Belloni (33):
+> Alexandre Belloni (32):
+>   Documentation: dt: document all the atmel pmc compatibles
+>   ARM: at91/dt: ariag25: define crystals frequencies
+>   ARM: at91: prepare common clk transition for rm9200
+>   ARM: at91/dt: rm9200: define clocks
+>   ARM: at91: move at91rm9200 SoC to the CCF
+>   ARM: at91/dt: at91rm9200ek: define crystals frequencies
+>   ARM: at91: prepare common clk transition for sam9260
+>   ARM: at91/dt: sam9260: define clocks
+>   ARM: at91/dt: sam9g20: define clocks
+>   ARM: at91: move at91sam9260 SoCs to the CCF
+>   ARM: at91/dt: at91sam9g20ek: define crystals frequencies
+>   ARM: at91/dt: foxg20: define crystals frequencies
+>   ARM: at91/dt: usb_a9260: define crystals frequencies
+>   ARM: at91/dt: tny_a9260: define crystals frequencies
+>   ARM: at91/dt: qil_a9260: define crystals frequencies
+>   ARM: at91/dt: mpa1600: define crytals frequencies
+>   ARM: at91/dt: ge863-pro3: define crystals frequencies
+>   ARM: at91/dt: ethernut5: define crystals frequencies
+>   ARM: at91/dt: animeo_ip: define crystals frequencies
+>   ARM: at91/dt: kizbox: define main crystal frequency
+>   ARM: at91: prepare common clk transition for sam9g45
+>   ARM: at91/dt: sam9g45: define clocks
+>   ARM: at91: move at91sam9g45 SoC to the CCF
+>   ARM: at91/dt: sam9m10g45ek: define crystals frequencies
+>   ARM: at91/dt: pm9g45: crystals frequencies
+>   ARM: at91/dt: cosino define crystals frequencies
+>   ARM: at91: prepare common clk transition for sam9263
+>   ARM: at91/dt: sam9263: define clocks
+>   ARM: at91: move at91sam9263 SoC to the CCF
+>   ARM: at91/dt: sam9263ek: define crystals frequencies
+>   ARM: at91/dt: tny_a9263: define crystals frequencies
+>   ARM: at91/dt: usb_a9263: define crystals frequencies
+> 
+>  .../devicetree/bindings/arm/atmel-pmc.txt          |   5 +-
+>  arch/arm/boot/dts/animeo_ip.dts                    |   8 +
+>  arch/arm/boot/dts/at91-ariag25.dts                 |   8 +
+>  arch/arm/boot/dts/at91-cosino.dtsi                 |   8 +
+>  arch/arm/boot/dts/at91-foxg20.dts                  |   8 +
+>  arch/arm/boot/dts/at91-qil_a9260.dts               |   8 +
+>  arch/arm/boot/dts/at91rm9200.dtsi                  | 304 ++++++++++++++++++
+>  arch/arm/boot/dts/at91rm9200ek.dts                 |   8 +
+>  arch/arm/boot/dts/at91sam9260.dtsi                 | 314 ++++++++++++++++++-
+>  arch/arm/boot/dts/at91sam9263.dtsi                 | 311 +++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9263ek.dts                |   8 +
+>  arch/arm/boot/dts/at91sam9g20.dtsi                 |  24 ++
+>  arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |   8 +
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 | 340 ++++++++++++++++++++-
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts             |   8 +
+>  arch/arm/boot/dts/ethernut5.dts                    |  10 +
+>  arch/arm/boot/dts/ge863-pro3.dtsi                  |   8 +
+>  arch/arm/boot/dts/kizbox.dts                       |   4 +
+>  arch/arm/boot/dts/mpa1600.dts                      |   8 +
+>  arch/arm/boot/dts/pm9g45.dts                       |   8 +
+>  arch/arm/boot/dts/tny_a9260_common.dtsi            |   8 +
+>  arch/arm/boot/dts/tny_a9263.dts                    |   8 +
+>  arch/arm/boot/dts/usb_a9260_common.dtsi            |   8 +
+>  arch/arm/boot/dts/usb_a9263.dts                    |   8 +
+>  arch/arm/mach-at91/Kconfig                         |   4 -
+>  arch/arm/mach-at91/at91rm9200.c                    |   6 +-
+>  arch/arm/mach-at91/at91sam9260.c                   |   6 +-
+>  arch/arm/mach-at91/at91sam9263.c                   |   6 +-
+>  arch/arm/mach-at91/at91sam9g45.c                   |   6 +-
+>  29 files changed, 1457 insertions(+), 11 deletions(-)
+> 
 
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Nicolas Ferre
