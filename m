@@ -1,71 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jul 2014 08:10:10 -0400
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jul 2014 13:12:52 +0100
 Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <53B116C6.80601@gmail.com>
+In-Reply-To: <20140708115727.GR23978@titan.lakedaemon.net>
 References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140627130430.GH32514@n2100.arm.linux.org.uk>
- <53AD724D.4020704@gmail.com>
- <20140627133933.GJ23978@titan.lakedaemon.net>
- <53AD7544.2060701@gmail.com>
- <D0DC98AD-E460-42C9-B2F4-51EDDE371E31@lakedaemon.net>
- <53ADAB8C.6070609@gmail.com>
- <20140628145424.GK23978@titan.lakedaemon.net>
- <53B116C6.80601@gmail.com>
-Message-ID: <20140708121010.GT23978@titan.lakedaemon.net>
+ <20140708053434.GH28931@quad.lixom.net>
+ <20140708115727.GR23978@titan.lakedaemon.net>
+Message-ID: <20140708121252.GK21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+On Tue, Jul 08, 2014 at 07:57:27AM -0400, Jason Cooper wrote:
+> Can you offer any suggestions as to how you would like this resolved?  I
+> thought when I voiced my opinion as above, and Russell didn't reply,
+> there was implied acknowledgement...
 
-On Mon, Jun 30, 2014 at 09:50:30AM +0200, Sebastian Hesselbarth wrote:
-> On 06/28/2014 04:54 PM, Jason Cooper wrote:
-> > On Fri, Jun 27, 2014 at 07:36:12PM +0200, Sebastian Hesselbarth wrote:
-> >> On 06/27/2014 06:49 PM, Jason Cooper wrote:
-> >>>> On Jun 27, 2014, at 9:44, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> >>> ...
-> >>>> And I am not sure, if we want to rely on some six numbers stored on
-> >>>> SPI flash, i.e. there is no magic nor header to be really sure, it
-> >>>> is a MAC address.
-> >>>
-> >>> It couldn't be compared with the MAC address of the nic?
-> >>
-> >> Sure, but if it is not equal it tells you nothing.
-> >>
-> >> You can change the NICs MAC in your bootloader, it will be different
-> >> from the numbers you read from SPI, and some mechanism will assume you
-> >> just made your production version into ES.
-> >>
-> >> We really want to introduce such a crutch?
-> > 
-> > Well, we need to keep in mind distro's concerns, but we don't need to
-> > (and shouldn't) attempt to solve them.
-> > 
-> > That's why I wanted to add a comment expressing the facts as best we
-> > know them.  We could also now add a link to this thread to assist future
-> > distro maintainers.
-> > 
-> > As this patch sits, it is an accurate description of the two variants of
-> > dove-based CuBoxes.  The fact that SolidRun didn't leave a clear
-> > differentiator is unfortunate, but we can't magic a solution out of our
-> > ass.  Nor should we block a patch because we can't.
-> 
-> Ok, I'll look through my eMails and Web again to collect some
-> differences and prepare a "add comment" only patch for the CuBox DTSs.
+I didn't reply probably because I didn't see the message and/or I'm busy
+with other stuff.
 
-No rush, just a gentle ping.  ;-)
+I know that Sebastian asked Rabeeh on IRC yesterday whether the flash
+chip type could be used to detect the difference between the two, but
+has not yet received an answer.
 
-> > It also might be worth reaching out to Rabeeh one more time and asking
-> > explicitly if there is a programmatic way to differentiate the two
-> > boards on the board itself.
-> 
-> Yeah, I remember someone said that there is a different SPI vendor on
-> production CuBox. That could be a way to tell them apart _if_ it is
-> used exclusively on production boxes.
-> 
-> But I'll ask Rabeeh about it again.
+As the two DT descriptions are mutually incompatible, there isn't much
+choice.  And (afaik) there's no choice of updating the boot loader to
+a version which can deal with DT - yes it may be u-boot, but I've no
+idea if modern u-boot works on it, and I really would not like to try.
 
-any word from Rabeeh?
+While SolidRun tried to make changing u-boot easy and recoverable, I've
+had personal experience of trying to help people restore their cuboxes.
+It's a total nightmare (mainly seems to be down to the wide variation
+in USB hardware which causes the on-board USB-serial for the console to
+be unreliable.)  That's why on their later iMX6 hardware (Cubox-i & HB)
+they decided to have zero on-board non-volatile storage.
 
-thx,
+So, even if it was possible to detect the difference in u-boot between
+the Cubox models, getting the updated u-boot on the machine is far from
+trivial.
 
-Jason.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
