@@ -1,68 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Jul 2014 09:41:49 +0200
-Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
-In-Reply-To: <20140707233758.GA1456@arch.cereza>
-References: <20140703135146.GA6898@luxor.wired.org>
- <53B5C61D.2060308@free-electrons.com>
- <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
- <20140705150308.GA28791@arch.cereza>
- <20140705205951.GB3678@kroah.com>
- <20140707105818.GA1101@arch.cereza>
- <20140707183002.GA5947@kroah.com>
- <20140707233758.GA1456@arch.cereza>
-Message-ID: <20140708094149.0ad6ab13@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Jul 2014 09:46:21 +0200
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
 
-On Mon, 7 Jul 2014 20:37:58 -0300, Ezequiel Garcia wrote:
+> From: Doug Anderson <dianders@chromium.org>
+>
+> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+> being reset across sleep/wake.  If we don't set it to anything then
+> the TPM will be reset.  U-Boot will detect this as invalid
+> and will reset the system on resume time. This GPIO can always be low
+> and not hurt anything.  It will get pulled back high again during a
+> normal warm reset when it will default back to an input.
+>
+> To properly preserve the TPM state across suspend/resume and to make
+> the chrome U-Boot happy, properly set the GPIO to mask the
+> reset to the TPM.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+(...)
+> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
+> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+> +       compatible = "regulator-fixed";
 
-> It seems bus_register_notifier() is been called for platform and pci devices
-> with the *same* notifier block. Haven't looked close enough, but you mentioned
-> that could cause trouble?
-> 
-> This patch fixes the issue here:
-> 
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-> index 477202f..2bdc323 100644
-> --- a/arch/arm/mach-mvebu/coherency.c
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -292,6 +292,10 @@ static struct notifier_block mvebu_hwcc_nb = {
->  	.notifier_call = mvebu_hwcc_notifier,
->  };
->  
-> +static struct notifier_block mvebu_hwcc_pci_nb = {
-> +	.notifier_call = mvebu_hwcc_notifier,
-> +};
-> +
->  static void __init armada_370_coherency_init(struct device_node *np)
->  {
->  	struct resource res;
-> @@ -427,7 +431,7 @@ static int __init coherency_pci_init(void)
->  {
->  	if (coherency_available())
->  		bus_register_notifier(&pci_bus_type,
-> -				       &mvebu_hwcc_nb);
-> +				       &mvebu_hwcc_pci_nb);
->  	return 0;
->  }
->  
-> Paolo, can you apply it and confirm it fixes the problem?
-> 
-> Greg, can you confirm using the same notifier block pointer
-> for two different bus types makes the bus notifier go nuts?
+No matter how the discussion ends up, regulator-fixed is wrong.
 
-Looking at how notifier_chain_register() is implemented (which gets
-called by bus_register_notifier() ->
-blocking_notifier_chain_register()), I indeed don't see how a single
-'struct notifier_block' can be registered on multiple notifier chains,
-so I believe your patch is correct.
+Either folding it into the TPM driver or using a separate reset driver
+is fine with me.
 
-Thanks for the investigation!
+So what about the generic delayed reset GPIO thing?
+http://marc.info/?l=linux-kernel&m=140309916607115&w=2
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
