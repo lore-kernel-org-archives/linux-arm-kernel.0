@@ -1,92 +1,65 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Tue, 08 Jul 2014 14:53:42 -0700
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
-In-Reply-To: <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
- <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
-Message-ID: <53BC6866.30803@codeaurora.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 8 Jul 2014 14:59:15 -0700
+Subject: a case for a common efuse API?
+In-Reply-To: <53BC4DD7.20906@codeaurora.org>
+References: <53BC4DD7.20906@codeaurora.org>
+Message-ID: <CAJAp7OhUE4LmLtu5AMui_0ws-K_H__07VN=g2Frr0JCMn+Q5Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hiroshi,
+On Tue, Jul 8, 2014 at 1:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Hi,
+>
+> On MSM chips we have some efuses (called qfprom) where we store things
+> like calibration data, speed bins, etc. We need to read out data from
+> the efuses in various drivers like the cpufreq, thermal, etc. This
+> essentially boils down to a bunch of readls on the efuse from a handful
+> of different drivers. In devicetree this looks a little odd because
+> these drivers end up having an extra reg property (or two) that points
+> to a register in the efuse and some length, i.e you see this:
 
-On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
-> Hi Olav,
-> 
-> Olav Haugan <ohaugan@codeaurora.org> writes:
-> 
->> Mapping and unmapping are more often than not in the critical path.
->> map_range and unmap_range allows SMMU driver implementations to optimize
->> the process of mapping and unmapping buffers into the SMMU page tables.
->> Instead of mapping one physical address, do TLB operation (expensive),
->> mapping, do TLB operation, mapping, do TLB operation the driver can map
->> a scatter-gatherlist of physically contiguous pages into one virtual
->> address space and then at the end do one TLB operation.
->>
->> Additionally, the mapping operation would be faster in general since
->> clients does not have to keep calling map API over and over again for
->> each physically contiguous chunk of memory that needs to be mapped to a
->> virtually contiguous region.
->>
->> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->> ---
->>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
->>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
->>  2 files changed, 48 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index e5555fc..f2a6b80 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>  
->>  
->> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
->> +		    struct scatterlist *sg, unsigned int len, int prot)
->> +{
->> +	if (unlikely(domain->ops->map_range == NULL))
->> +		return -ENODEV;
->> +
->> +	BUG_ON(iova & (~PAGE_MASK));
->> +
->> +	return domain->ops->map_range(domain, iova, sg, len, prot);
->> +}
->> +EXPORT_SYMBOL_GPL(iommu_map_range);
-> 
-> We have the similar one internally, which is named, "iommu_map_sg()",
-> called from DMA API.
+Not only does it look odd, but it limits the possible use to devices on the
+mmio bus.
 
-Great, so this new API will be useful to more people!
+[...]
+> It's been suggested that we use syscon for this, but I wonder if that is
+> the right thing to do. With a syscon you're usually writing some
+> registers that got lumped together with other registers that aren't
+> directly related to your driver. It doesn't seem like syscon is made for
+> reading fuses or other things like eeproms. Maybe I'm wrong though.
+>
 
->> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
->> +		      unsigned int len)
->> +{
->> +	if (unlikely(domain->ops->unmap_range == NULL))
->> +		return -ENODEV;
->> +
->> +	BUG_ON(iova & (~PAGE_MASK));
->> +
->> +	return domain->ops->unmap_range(domain, iova, len);
->> +}
->> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
-> 
-> Can the existing iommu_unmap() do the same?
+I've been thinking further about this since we discussed it; and I agree with
+you that this probably wasn't in the original plans for syscon.
 
-I believe iommu_unmap() behaves a bit differently because it will keep
-on calling domain->ops->unmap() until everything is unmapped instead of
-letting the iommu implementation take care of unmapping everything in
-one call.
+But looking at the qfprom hardware, we have a span of 32 bit registers that's
+supposed to be accessed from various drivers. All these registers are the same
+size, so abstracting them with a mmio-regmap makes sense. All we need is a way
+for drivers to get a handle to this regmap.
 
-I am abandoning the patch series since our driver was not accepted.
-However, if there are no objections I will resubmit this patch (PATCH
-2/7) as an independent patch to add this new map_range API.
+This was exactly what I implemented and then I realized that I had only created
+a copy of syscon (although readonly) and given it a different name.
 
-Thanks,
 
-Olav Haugan
+A potential addition to this would be to expose a (preferrably separate) api to
+fuse things, for factory use. But looking at the qfprom this is done by writing
+to different parts of the register space, so we could simply add a factory fuse
+driver on the side - once one is desired.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Using syscon would probably work if we could add a way to point to
+> offsets within the syscon node (the 0x18 part in the example). In my
+> specific use-case the calibration data may have different offsets
+> depending on which SoC the hardware is instantiated in so we could also
+> make syscon work if the compatible field for the sensor node indicates
+> which SoC it is.
+>
+
+I'm not sure if other users of syscon would find a use for an xlate, if not
+then we could just have that as a separate property that lists the reg offsets
+within the syscon.
+
+Maybe there's some benefits of common naming of said property so we could put
+some common accessor functions somewhere?
+
+Regards,
+Bjorn
