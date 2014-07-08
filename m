@@ -1,30 +1,61 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 08 Jul 2014 05:31:08 -0700
-Subject: pull request for Tegra clock updates for 3.17
-In-Reply-To: <20140708105239.GY3679@tbergstrom-lnx.Nvidia.com>
-References: <20140703161740.GA6078@tbergstrom-lnx.Nvidia.com>
- <20140708105239.GY3679@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140708123108.9850.16107@quantum>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 8 Jul 2014 14:33:09 +0200
+Subject: [PATCH] s3cmci: Move to clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <1404155466-2971-1-git-send-email-anarsoul@gmail.com>
+References: <1404155466-2971-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <CAPDyKFqqgCPp6j_nnAs_2PoyGhEubN_sKv8zWd8UkLy6mAXVVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2014-07-08 03:52:39)
-> On Thu, Jul 03, 2014 at 06:17:40PM +0200, Peter De Schrijver wrote:
-> > Hi Mike,
-> > 
-> > A few bug fixes for Tegra124 clocks and some updates for the SATA driver
-> > 
-> > 
-> 
-> Did you pull this already? If not discard this pull request.
+On 30 June 2014 21:11, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> Use clk_prepare_enable/clk_disable_unprepare to make the driver
+> work properly with common clock framework.
+>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Discarded!
+Thanks! Applied for next.
 
-Thanks,
-Mike
+I took the liberty to add the prefix "mmc" to heading of the commit msg.
 
-> 
-> Thanks,
-> 
-> Peter.
-> 
+Kind regards
+Uffe
+
+
+> ---
+>  drivers/mmc/host/s3cmci.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+> index 0d115a8..e5516a2 100644
+> --- a/drivers/mmc/host/s3cmci.c
+> +++ b/drivers/mmc/host/s3cmci.c
+> @@ -1707,7 +1707,7 @@ static int s3cmci_probe(struct platform_device *pdev)
+>                 goto probe_free_dma;
+>         }
+>
+> -       ret = clk_enable(host->clk);
+> +       ret = clk_prepare_enable(host->clk);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "failed to enable clock source.\n");
+>                 goto clk_free;
+> @@ -1765,7 +1765,7 @@ static int s3cmci_probe(struct platform_device *pdev)
+>         s3cmci_cpufreq_deregister(host);
+>
+>   free_dmabuf:
+> -       clk_disable(host->clk);
+> +       clk_disable_unprepare(host->clk);
+>
+>   clk_free:
+>         clk_put(host->clk);
+> @@ -1817,7 +1817,7 @@ static void s3cmci_shutdown(struct platform_device *pdev)
+>         s3cmci_debugfs_remove(host);
+>         s3cmci_cpufreq_deregister(host);
+>         mmc_remove_host(mmc);
+> -       clk_disable(host->clk);
+> +       clk_disable_unprepare(host->clk);
+>  }
+>
+>  static int s3cmci_remove(struct platform_device *pdev)
+> --
+> 2.0.0
+>
