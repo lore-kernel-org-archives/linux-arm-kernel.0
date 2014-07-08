@@ -1,48 +1,25 @@
-From: himangi774@gmail.com (Himangi Saraogi)
-Date: Wed, 9 Jul 2014 03:56:34 +0530
-Subject: [PATCH] xen/arm: use BUG_ON
-Message-ID: <20140708222634.GA11976@himangi-Dell>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 08 Jul 2014 15:26:55 -0700 (PDT)
+Subject: [PATCH v2 1/3] ethernet: Add new driver for Marvell Armada 375
+ network unit
+In-Reply-To: <1404561288-11720-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1404561288-11720-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140708.152655.619472955292197550.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use BUG_ON(x) rather than if(x) BUG();
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date: Sat,  5 Jul 2014 08:54:46 -0300
 
-The semantic patch that fixes this problem is as follows:
+> +module_param(rxq_number, int, S_IRUGO);
+> +module_param(txq_number, int, S_IRUGO);
 
-// <smpl>
-@@ identifier x; @@
--if (x) BUG();
-+BUG_ON(x);
-// </smpl>
+Please don't use module parameters (undocumented ones at that) for things
+like this.
 
-Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
----
- arch/arm/xen/enlighten.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+Instead, use or create standard interfaces which other drivers can use as
+well, so that the user interface is consistent for setting things of this
+nature regardless of device type.
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 1e63243..98544c5 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -181,8 +181,7 @@ static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
- 	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
- 	int rc;
- 	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
--	if (rc)
--		BUG();
-+	BUG_ON(rc);
- }
- 
- static void xen_power_off(void)
-@@ -190,8 +189,7 @@ static void xen_power_off(void)
- 	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
- 	int rc;
- 	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
--	if (rc)
--		BUG();
-+	BUG_ON(rc);
- }
- 
- static int xen_cpu_notification(struct notifier_block *self,
--- 
-1.9.1
+Thanks.
