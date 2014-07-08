@@ -1,81 +1,79 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 17:34:39 +0200
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
- <53A12EA3.5010007@samsung.com>
- <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
- <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
-Message-ID: <53BC0F8F.4010106@samsung.com>
+From: olivier.martin@arm.com (Olivier Martin)
+Date: Tue, 8 Jul 2014 16:33:32 +0100
+Subject: [PATCH v2 0/2] efi: preserve NEON registers on UEFI services calls
+In-Reply-To: <CAKv+Gu8yb=H2734e-Wai3npK_qwsq7SWHumn+1gjkmJhF-2QQA@mail.gmail.com>
+References: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>	<20140701132638.GC7539@console-pimps.org>
+ <CAKv+Gu8yb=H2734e-Wai3npK_qwsq7SWHumn+1gjkmJhF-2QQA@mail.gmail.com>
+Message-ID: <005f01cf9ac1$f9f01460$edd03d20$@martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+It is correct the UEFI 2.4 spec says 'Floating point and SIMD instructions may be used'. And it is also correct these registers are not preserved in the current UEFI EDK2 implementation.
+I will keep track in ARM UEFI todo list.
 
-On 07.07.2014 15:37, Rahul Sharma wrote:
-> Hi Andrej, Inki,
+Acked-by: Olivier Martin <olivier.martin@arm.com>
+
+Thanks Ard for your patch,
+Olivier
+
+> -----Original Message-----
+> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> Sent: 01 July 2014 14:46
+> To: Matt Fleming
+> Cc: Matt Fleming; x86 at kernel.org; Catalin Marinas; linux-
+> efi at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> hpa at zytor.com; Leif Lindholm; Roy Franz; msalter at redhat.com; Olivier
+> Martin
+> Subject: Re: [PATCH v2 0/2] efi: preserve NEON registers on UEFI
+> services calls
 > 
-> On 18 June 2014 12:06, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->> Hi Andrej,
->>
->> On 18 June 2014 11:46, Andrzej Hajda <a.hajda@samsung.com> wrote:
->>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
->>>> Hi All,
->>>>
->>>> Please review this patch.
->>>>
->>>> Regards,
->>>> Rahul Sharma
->>>>
->>>> On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->>>>> Display domain is removed due to instability issues. Explaining
->>>>> the problem below:
->>>>>
->>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
->>>>> powers off the unused power domains. This call hits before
->>>>> the trigger to deferred probes.
->>>>>
->>>>> DRM DP Panel defers the probe due to supply get failure. By the
->>>>> time, deferred probe is scheduled again, Display Power Domain is
->>>>> powered off by pm_genpd_poweroff_unused.
->>>>>
->>>>> FIMD and DP drivers are accessing registers during Probe and Bind
->>>>> callbacks. If display domain is enabled/disabled around register
->>>>> accesses, display domain gets unstable and we are getting Power
->>>>> Domain Disable fail notification. Increasing the Timeout also
->>>>> didn't help.
->>>
->>> As I understand the problem is that fimd and dp drivers access hw
->>> registers without enabling power domain. So the proper solution is to
->>> fix these drivers.
->>
->> That is also a problem but I fixed those accesses in my local kernel before
->> hitting this issue. If we do register accesses in FIMD/DP probe/bind we
->> observes "Prefetch abort" exception. But here the problem is that 'DP
->> domain disable' starts failing if we enable/disable multiple times.
->>
->>>
->>> Btw. there are already patches removing hw access from probe/bind of
->>> fimd. I guess removing also hw access from dp probe/bind could be a good
->>> solution.
->>
->> Please let me know the links for posted patches. I will test with those patches.
+> On 1 July 2014 15:26, Matt Fleming <matt@console-pimps.org> wrote:
+> > On Thu, 26 Jun, at 12:09:04PM, Ard Biesheuvel wrote:
+> >> The current UEFI implementation for arm64 fails to preserve/restore
+> the contents
+> >> of the NEON register file, which may result in data corruption,
+> especially now
+> >> that those contents are lazily restored for user processes.
+> >>
+> >> This series proposes to fix this by wrapping all runtime services
+> calls, and
+> >> adding kernel_neon_begin()/kernel_neon_end() pairs to the wrappers.
+> >>
+> >> The first patch moves the existing x86 versions of those wrappers to
+> generic
+> >> code, so that the second patch can easily enable them by supplying a
+> definition
+> >> for efi_call_virt and adding a call to efi_native_runtime_setup().
+> >>
+> >> Changes since v1:
+> >> - rename runtime.c -> runtime-wrappers.c
+> >> - make build depend on new Kconfig symbol EFI_RUNTIME_WRAPPERS to
+> fix ia64
+> >>   breakage
+> >> - remove default #defines for efi_call_virt()/__efi_call_virt(),
+> they are not
+> >>   needed anymore now that it is built conditionally
+> >> - add references to applicable UEFI/AAPCS spec sections
+> >>
+> >> Ard Biesheuvel (2):
+> >>   efi/x86: move UEFI Runtime Services wrappers to generic code
+> >>   efi/arm64: preserve FP/SIMD registers on UEFI runtime services
+> calls
+> >
+> > Thanks Ard. These patches look OK to me, and I've now pulled them
+> into
+> > my 'next' branch.
+> >
+> > It'd be nice if we could get some ACKs from other people since this
+> is
+> > an ABI issue.
 > 
-> Is there any update on this? Please share the patches which fixes the
-> above issue or avoid the above scenario of multiple PM Domain enable/disable.
-> I will test them for exynos5 based boards. Otherwise we should get this change
-> merged else display will remain broken for exynos5 based boards.
-
-Andrzej is on holidays right now, so he won't be able to reply in this
-thread until he's back. Here are two patches I was able to find on the
-related MLs that might be fixing the cause of your issues:
-
-[PATCH] drm/exynos: remove hardware overlays disable from fimd probe
-(https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
-
-[PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
-(https://lkml.org/lkml/2014/7/4/188)
-
-Best regards,
-Tomasz
+> Yes, they have been awfully quiet, haven't they?
+> 
+> At least Roy has volunteered to get involved in the USWG to get the
+> spec clarified.
+> 
+> @Leif, Catalin, Olivier: care to chime in?
+> 
+> --
+> Ard.
