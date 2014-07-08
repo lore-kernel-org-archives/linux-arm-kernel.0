@@ -1,51 +1,105 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Mon, 7 Jul 2014 19:27:22 -0700
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
-References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
-Message-ID: <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 8 Jul 2014 08:06:56 +0530
+Subject: RFC: Leave sysfs nodes alone during hotplug
+In-Reply-To: <53BAF540.9080904@codeaurora.org>
+References: <53B5D22F.2070308@codeaurora.org>
+ <CAKohpomuPshe4HpvWSzmZ3vvAjV-zHucfHBVbhB6dUBrrYH8pw@mail.gmail.com>
+ <53BAF540.9080904@codeaurora.org>
+Message-ID: <CAKohponkZrJNeFxTTDi9bsbvFfey2K_guCGZGsraA1qeeRW3pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, correcting typo:
+On 8 July 2014 01:00, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Rafael's email is bounced. Looks like I used a stale ID. Fixing it in this
+> email.
 
-- 3.13.9 (issue exists)
-- 3.10.24 (issue does NOT exist)
-- 3.13.5 (issue does NOT exist)
+Because you have the wrong address initially, which I fixed and told you
+below. You missed that and again added the wrong address :)
 
-On Mon, Jul 7, 2014 at 7:20 PM, Maggie Mae Roxas
-<maggie.mae.roxas@gmail.com> wrote:
-> Hi Thomas,
-> Good day.
+Fixing it yet again. Don't change it now :)
+
+> On 07/07/2014 04:01 AM, Viresh Kumar wrote:
+>> Though these are the requirements I have from them:
+>> - On hotplug files values should get reset ..
+>> - On suspend/resume values must be retained.
 >
-> We have previously discussed before on Armada 370 ethernet issues
-> (resolved via your suggestion/patches).
 >
-> We just found out recently that ethernet (SGMII) connection encounters
-> "No buffer space available" error during continuous ping to other
-> nodes in the same network (ie, even ping to the server). It is
-> frequently around the 17th packet.
-> # Please see attached log (ping_error.txt) for more info.
+> Hmm... There's actually enough interest in NOT reseting across hotplug
+> because it's also used by thermal when a CPU gets too hot and then it's
+> plugged in later. So, userspace has no way to cleanly restore the values.
+> But that's a separate topic.
+
+Okay, will think about it more and see what's the right thing to do apart
+from the requirements we have.
+
+> My point is more of a, do we even need to allow this problem to happen
+> instead of trying and fixing it. I see no benefit at all in removing/adding
+> the files during hotplug.
+
+We can surely think separately if leaving these sysfs directories is the
+right thing to do, but we need to see why this bug is shown up again.
+
+>> I was talking about [1] offline with Srivatsa, and one of us might look in
+>> detail why [1] was actually required.
 >
-> Here are the details:
 >
-> Processor: Marvell Armada 370 88F6707
-> Ethernet module: Marvell 88E1512
-> Board: Custom
-> Kernel versions tried:
-> - 3.13.9 (issue exists)
-> - 3.10.24 (issue does NOT exist)
-> - 3.13.9 (issue does NOT exist)
-> U-Boot versions tried: 2013_Q1 and 2013_Q3 from Marvell extranet
+> I believe it has to do with a race that's something along these lines:
+> 1. Echo/store into a sysfs node grabbing a sysfs lock (inside sysfs code)
+> before trying to grab one of the cpufreq locks
+> 2. The hotplug path grabbing one of the cpufreq locks before trying to
+> remove the sysfs group.
 >
-> Some more important notes:
-> - This does not happen in wlan connections.
-> - This happens in 10, 100 and 1000Mbps connections.
+> The two START/STOP happens because of [1]. It can happen when userspace is
+> quickly changes governors back to back. Or say, multiple threads trying to
+> store the same governor. The double START/STOP happens because the 2nd
+> request is able to slip in when you unlock the rwsem for sending the policy
+> INIT/EXIT.
+
+Yeah, we still need to see how can we avoid dropping of locks before exit.
+
+>> But I don't know how exactly can we get 2 STOP/START in latest mainline
+>> code. As we have enough protection against that now.
+>>
+>> So, we would really like to see some reports against mainline for this.
 >
-> Is there a known issue for this?
 >
-> As always, thank you very much.
->
-> Regards,
-> Maggie Roxas
+> Is the above sufficient enough? It's really easy to trigger if you have a
+> b.L system. Just slam scaling_governor between performance and another
+> governor (or it might have been the same value). b.L is important because if
+> you don't have multi-cluster, you don't get POLICY_EXIT often.
+
+Hmm, b.L. isn't new to cpufreq. I did worked a lot with it over one and half
+year back which working on TC2, and that's when I came very close to
+cpufreq internals.
+
+There were lots of problems around hotplug paths, etc, but all are fixed
+now and nothing pending is in my knowledge.
+
+And inside Linaro we do have automated testing going on TC2 with
+hotplug/suspend/resume tests and nothing is reported since sometime.
+We also have Juno (64 bit b.L.) onboard now, and nothing reported on
+that as well.
+
+> Not sure what you mean by "what you have in mind". Just simple
+
+I meant the problem you are trying to mention.
+
+> suspend/resume is broken. Again, easier to reproduce in b.L system since you
+> need to actually have POLICY_EXIT happen.
+
+Oh, I want to believe that but couldn't. This has been tested well on
+TC2. Can you show something against mainline to prove this issue?
+I tend to believe that you are working with some old version of tree..
+
+> Just hotplug all CPUs in a cluster in one order and bring it up in another.
+> It should crash or panic about sysfs. Basically, the kobj of the real sysfs
+> stays with the last CPU that went down, but the first CPU that comes up owns
+> the policy without owning the real kobj.
+
+These issues were already fixed, can you try mainline please?
+
+> We might be able to throw around more locks, etc to fix this. But again, my
+> main point is that all this seems pointless.
+
+No more locks. But I do agree that we need some simplicity in code here.
+Will address that separately, lets fix your issues first.
