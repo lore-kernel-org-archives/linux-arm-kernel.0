@@ -1,102 +1,85 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 8 Jul 2014 10:24:24 +0530
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <20140707151024.GJ5582@saruman.home>
-References: <20140617131935.GB9070@saruman.home>
- <20140701194704.GG13396@saruman.home> <20140702081142.GU28884@atomide.com>
- <20140707104727.GM28884@atomide.com>
- <20140707104944.GS3705@n2100.arm.linux.org.uk>
- <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
- <20140707134008.GU3705@n2100.arm.linux.org.uk>
- <20140707151024.GJ5582@saruman.home>
-Message-ID: <53BB7980.2060909@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Jul 2014 22:07:08 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v3.17
+In-Reply-To: <cover.1403681315.git.horms+renesas@verge.net.au>
+References: <cover.1403681315.git.horms+renesas@verge.net.au>
+Message-ID: <20140708050708.GC28931@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 July 2014 08:40 PM, Felipe Balbi wrote:
-> Hi,
+On Wed, Jun 25, 2014 at 04:35:24PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
->> On Mon, Jul 07, 2014 at 05:39:26AM -0700, Tony Lindgren wrote:
->>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140707 05:17]:
->>>> On Mon, Jul 07, 2014 at 05:20:27PM +0530, Sekhar Nori wrote:
->>>>> OMAP4430 had L2 cache controller version r2p0 (per the public TRM) which
->>>>> does not have this register. So unless there is a ROM API that was
->>>>> introduced after OMAP4430, this would not be there even for other
->>>>> OMAP4s. Public TRM of OMAP4470 does not indicate an API for this.
->>>>>
->>>>> Before creating the patch, I checked with ROM team handling AM437x and
->>>>> they denied an API to write to this register was present in AM437x ROM.
->>>>
->>>> Okay, so why are we trying to write to this register then...
->>>>
->>>> Ah, we have a bug in cache-l2x0.c:
->>>>
->>>> #define L2X0_CACHE_ID_PART_MASK         (0xf << 6)
->>>> #define L2X0_CACHE_ID_RTL_MASK          0x3f
->>>> #define L310_CACHE_ID_RTL_R3P0          0x05
->>>>
->>>>         unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
->>>>
->>>>         if (rev >= L310_CACHE_ID_RTL_R2P0) {
->>>> ...
->>>>         if (rev >= L310_CACHE_ID_RTL_R3P0) {
->>>>                 l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
->>>>                               base, L310_POWER_CTRL);
->>>>
->>>> So, because we're masking the wrong bits, we end up with these tests
->>>> always succeeding.
->>>>
->>>> So that's a NACK for the original patch, it's the wrong fix.  The
->>>> right fix is to avoid writing this register by fixing the RTL masking.
->>>
->>> Okie dokie, dropping the omap specific fix.
->>
->> Here's the revision mask fix - with the existing code, the revision checks
->> are all useless since they would all pass irrespective of the actual
->> revision.  (Had the L2C series been better tested rather than being largely
->> ignored, this may have been noticed before it was merged...)  Anyway, what
->> isn't clear from Sekhar's message is which revision L2C310 is in the AM437x.
->>
->> From: Russell King <rmk+kernel@arm.linux.org.uk>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: [PATCH] ARM: l2c: fix revision checking
->>
->> The revision checking in l2c310_enable() was not correct; we were
->> masking the part number rather than the revision number.  Fix this
->> to use the correct macro.
->>
->> Fixes: 4374d64933b1 ("ARM: l2c: add automatic enable of early BRESP")
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> ---
->>  arch/arm/mm/cache-l2x0.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index 948f12cf6180..0b5068256baf 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
->>  
->>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
->>  {
->> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
->> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
->>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
+> Please consider these Renesas ARM based SoC updates for v3.17.
 > 
-> even with this change, l2c still tries to write to power control
-> register, at least on AM437x. Looking a little deeper here, AM437x
-> identifies itself as l2c PL310 r3p3, which should have power control
-> register, but aparentely there's no way to write that register. I'll
-> file a bug to our ROM team, but we will certainly need a way to
-> workaround this inside omap4-common.c
+> This pull request is based on 'Renesas ARM Based SoC Header Cleanup for v3.17',
+> tagged as header-cleanup-for-v3.17, which I have already sent a
+> pull-request for. 
+> 
+> The following changes since commit 62872989bdbf1245d7239b9f4c05a8ee7c775ed5:
+> 
+>   ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case (2014-06-17 17:09:40 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-for-v3.17
+> 
+> for you to fetch changes up to 3ed66ec5ced8b801cb851b2b8548301df94f8f54:
+> 
+>   ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile (2014-06-23 09:53:55 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Updates for v3.17
+> 
+> * Use shmobile_init_late on r8a7791 and r8a7790 whien booting using DT-only
+> * Support Core-Standby for Suspend to RAM on r8a7791 and r8a7790 SoCs
+> * Shared CMA reservation for R-Car Gen2 SoCs
+> * Add r8a7791 SYSC power management support
 
-Looks like we need both my patch as well as Russell's patch. I can
-respin my patch with the pr_info_once() dropped if it helps further
-reduce boot noise.
+This branch also seems to contain a bunch of bugfixes? Did they get merged into
+the wrong base, or what's going on?
 
-Thanks,
-Sekhar
+> Benoit Cousson (1):
+>       ARM: shmobile: Mark all SoCs in shmobile as CPUFreq, capable
+> 
+> Gaku Inami (1):
+>       ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile
+
+The latter patch fixes the former, why not just fold them in?
+
+> Geert Uytterhoeven (3):
+>       ARM: shmobile: rcar-gen2: Update for of_get_flat_dt_prop() update
+>       ARM: shmobile: rcar-gen2: Use "1ULL" instead of "(u64)1"
+>       ARM: shmobile: rcar-gen2: Remove useless copied section for LongTrail
+
+The last two seem to be small bug fixes/cleanups. They should probably go in a
+cleanup branch unless there are conflicts with new development. Even then, we
+tend to prefer to order it with the cleanups/fixes before new development
+(where it doesn't cause extra complications).
+
+> 
+> Magnus Damm (3):
+>       ARM: shmobile: Use shmobile_init_late() on r8a7790 DT-only
+>       ARM: shmobile: Use shmobile_init_late() on r8a7791 DT-only
+>       ARM: shmobile: Add shared R-Car Gen2 CMA reservation code
+> 
+> Simon Horman (1):
+>       ARM: shmobile: rcar-gen2: correct return value of shmobile_smp_apmu_suspend_init
+> 
+> Vincent Stehl? (1):
+>       ARM: shmobile: rcar-gen2: update call to dma_contiguous_reserve_area
+
+Again those two patches seem to be fixes, the former to a patch in this very
+branch.
+
+> keita kobayashi (4):
+>       ARM: shmobile: r8a7791 SYSC setup code
+>       ARM: shmobile: APMU: Add Core-Standby-state for Suspend to RAM
+>       ARM: shmobile: r8a7790: Support Core-Standby for Suspend to RAM
+>       ARM: shmobile: r8a7791: Support Core-Standby for Suspend to RAM
+
+Anyway, I've merged it in as it is. Keep some of the above stuff in mind
+for future releases though.
+
+
+-Olof
