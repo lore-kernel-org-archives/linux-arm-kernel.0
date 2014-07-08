@@ -1,286 +1,116 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 7 Jul 2014 19:01:04 -0600
-Subject: [PATCH v8 8/9] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140708010103.GD22939@google.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Tue, 8 Jul 2014 10:09:36 +0900
+Subject: [PATCH v10 6/7] ARM: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <20140707092247.GA15168@linaro.org>
+References: <1404694438-10272-1-git-send-email-minchan@kernel.org>
+ <1404694438-10272-7-git-send-email-minchan@kernel.org>
+ <20140707092247.GA15168@linaro.org>
+Message-ID: <20140708010936.GC6076@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
-> Several platforms use a rather generic version of parsing
-> the device tree to find the host bridge ranges. Move the common code
-> into the generic PCI code and use it to create a pci_host_bridge
-> structure that can be used by arch code.
+On Mon, Jul 07, 2014 at 10:22:48AM +0100, Steve Capper wrote:
+> On Mon, Jul 07, 2014 at 09:53:57AM +0900, Minchan Kim wrote:
+> > MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+> > overwrite of the contents since MADV_FREE syscall is called for
+> > THP page.
+> > 
+> > This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+> > support.
+> > 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Steve Capper <steve.capper@linaro.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Minchan Kim <minchan@kernel.org>
+> > ---
+> >  arch/arm64/include/asm/pgtable.h | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> > index 579702086488..f3ec01cef04f 100644
+> > --- a/arch/arm64/include/asm/pgtable.h
+> > +++ b/arch/arm64/include/asm/pgtable.h
+> > @@ -240,10 +240,12 @@ static inline pmd_t pte_pmd(pte_t pte)
+> >  #endif
+> >  
+> >  #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
+> > +#define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
+> >  #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
+> >  #define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
+> >  #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
+> >  #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
+> > +#define pmd_mkclean(pmd)	pte_pmd(pte_mkclean(pmd_pte(pmd)))
+> >  #define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
+> >  #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
+> >  #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
+> > -- 
+> > 2.0.0
+> >
 > 
-> Based on early attempts by Andrew Murray to unify the code.
-> Used powerpc and microblaze PCI code as starting point.
+> Hi Minchan,
+
+Hello Steve and Will,
+
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  drivers/of/of_pci.c       | 135 ++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/host-bridge.c |  18 +++++++
->  include/linux/of_pci.h    |  10 ++++
->  include/linux/pci.h       |   8 +++
->  4 files changed, 171 insertions(+)
+> This looks good to me too.
+> As Will said this applies to arm64, we will also need a version for:
+> arch/arm/include/asm/pgtable-3level.h.
+
+Does it work?
+
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 85c60adc8b60..3a7bb8dc7d05 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -220,6 +220,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+ #endif
+ 
++#define pmd_dirty	(pmd_val(pmd) & PMD_SECT_DIRTY)
++
+ #define PMD_BIT_FUNC(fn,op) \
+ static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+ 
+@@ -228,6 +230,7 @@ PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
+ PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
+ PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
+ PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
++PMD_BIT_FUNC(mkclean,   &= ~PMD_SECT_DIRTY);
+ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+ 
+ #define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
+-- 
+2.0.0
+
 > 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 8481996..55d8320 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -89,6 +89,141 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  }
->  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
->  
-> +/**
-> + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from DT
-> + * @dev: device node of the host bridge having the range property
-> + * @resources: list where the range of resources will be added after DT parsing
-> + * @io_base: pointer to a variable that will contain the physical address for
-> + * the start of the I/O range.
-> + *
-> + * It is the callers job to free the @resources list if an error is returned.
-> + *
-> + * This function will parse the "ranges" property of a PCI host bridge device
-> + * node and setup the resource mapping based on its content. It is expected
-> + * that the property conforms with the Power ePAPR document.
-> + *
-> + * Each architecture is then offered the chance of applying their own
-> + * filtering of pci_host_bridge_windows based on their own restrictions by
-> + * calling pcibios_fixup_bridge_ranges(). The filtered list of windows
-> + * can then be used when creating a pci_host_bridge structure.
-> + */
-> +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
-> +		struct list_head *resources, resource_size_t *io_base)
-> +{
-> +	struct resource *res;
-> +	struct of_pci_range range;
-> +	struct of_pci_range_parser parser;
-> +	int err;
-> +
-> +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> +
-> +	/* Check for ranges property */
-> +	err = of_pci_range_parser_init(&parser, dev);
-> +	if (err)
-> +		return err;
-> +
-> +	pr_debug("Parsing ranges property...\n");
-> +	for_each_of_pci_range(&parser, &range) {
-> +		/* Read next ranges element */
-> +		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
-> +			range.pci_space, range.pci_addr, range.cpu_addr, range.size);
+> Is there a testcase we can run to check that this patch set is working
+> well for arm/arm64?
 
-If you're not trying to match other printk formats, you could try to match
-the %pR format used elsewhere, e.g., "%#010llx-%#010llx" with
-range.cpu_addr, range.cpu_addr + range.size - 1.
+I just run several instance of attached simple stress with heavy kernel
+build in parallel on 1G RAM machine.
 
-> +
-> +		/*
-> +		 * If we failed translation or got a zero-sized region
-> +		 * then skip this range
-> +		 */
-> +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> +			continue;
-> +
-> +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> +		if (!res)
-> +			return -ENOMEM;
-> +
-> +		err = of_pci_range_to_resource(&range, dev, res);
-> +		if (err)
-> +			return err;
-> +
-> +		if (resource_type(res) == IORESOURCE_IO)
-> +			*io_base = range.cpu_addr;
-> +
-> +		pci_add_resource_offset(resources, res,
-> +				res->start - range.pci_addr);
-> +	}
-> +
-> +	/* Apply architecture specific fixups for the ranges */
-> +	return pcibios_fixup_bridge_ranges(resources);
-> +}
-> +
-> +static atomic_t domain_nr = ATOMIC_INIT(-1);
-> +
-> +/**
-> + * of_create_pci_host_bridge - Create a PCI host bridge structure using
-> + * information passed in the DT.
-> + * @parent: device owning this host bridge
-> + * @ops: pci_ops associated with the host controller
-> + * @host_data: opaque data structure used by the host controller.
-> + *
-> + * returns a pointer to the newly created pci_host_bridge structure, or
-> + * NULL if the call failed.
-> + *
-> + * This function will try to obtain the host bridge domain number by
-> + * using of_alias_get_id() call with "pci-domain" as a stem. If that
-> + * fails, a local allocator will be used that will put each host bridge
-> + * in a new domain.
-> + */
-> +struct pci_host_bridge *
-> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
-> +{
-> +	int err, domain, busno;
-> +	struct resource *bus_range;
-> +	struct pci_bus *root_bus;
-> +	struct pci_host_bridge *bridge;
-> +	resource_size_t io_base;
-> +	LIST_HEAD(res);
-> +
-> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> +	if (!bus_range)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	domain = of_alias_get_id(parent->of_node, "pci-domain");
-> +	if (domain == -ENODEV)
-> +		domain = atomic_inc_return(&domain_nr);
-> +
-> +	err = of_pci_parse_bus_range(parent->of_node, bus_range);
-> +	if (err) {
-> +		dev_info(parent, "No bus range for %s, using default [0-255]\n",
-> +			parent->of_node->full_name);
-> +		bus_range->start = 0;
-> +		bus_range->end = 255;
-> +		bus_range->flags = IORESOURCE_BUS;
+Thanks for the review!
 
-If you put the dev_info() down here, you can print &bus_range with %pR.
-
-> +	}
-> +	busno = bus_range->start;
-> +	pci_add_resource(&res, bus_range);
-> +
-> +	/* now parse the rest of host bridge bus ranges */
-> +	err = pci_host_bridge_of_get_ranges(parent->of_node, &res, &io_base);
-> +	if (err)
-> +		goto err_create;
-> +
-> +	/* then create the root bus */
-> +	root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
-> +						ops, host_data, &res);
-> +	if (IS_ERR(root_bus)) {
-> +		err = PTR_ERR(root_bus);
-> +		goto err_create;
-> +	}
-> +
-> +	bridge = to_pci_host_bridge(root_bus->bridge);
-> +	bridge->io_base = io_base;
-> +
-> +	return bridge;
-> +
-> +err_create:
-> +	pci_free_resource_list(&res);
-> +	return ERR_PTR(err);
-> +}
-> +EXPORT_SYMBOL_GPL(of_create_pci_host_bridge);
-> +
->  #ifdef CONFIG_PCI_MSI
->  
->  static LIST_HEAD(of_pci_msi_chip_list);
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index 36c669e..cfee5d1 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -5,6 +5,9 @@
->  #include <linux/kernel.h>
->  #include <linux/pci.h>
->  #include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/slab.h>
->  
->  #include "pci.h"
->  
-> @@ -83,3 +86,18 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
->  	res->end = region->end + offset;
->  }
->  EXPORT_SYMBOL(pcibios_bus_to_resource);
-> +
-> +/**
-> + * Simple version of the platform specific code for filtering the list
-> + * of resources obtained from the ranges declaration in DT.
-> + *
-> + * Platforms can override this function in order to impose stronger
-> + * constraints onto the list of resources that a host bridge can use.
-> + * The filtered list will then be used to create a root bus and associate
-> + * it with the host bridge.
-> + *
-> + */
-> +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
-> +{
-> +	return 0;
-> +}
-
-I'd wait to add this until there's a platform that needs to implement it.
-Splitting it out will make this patch that much smaller and easier to
-understand.
-
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index dde3a4a..71e36d0 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
->  int of_pci_get_devfn(struct device_node *np);
->  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
->  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-> +struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
-> +					struct pci_ops *ops, void *host_data);
-> +
->  #else
->  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
->  {
-> @@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  {
->  	return -EINVAL;
->  }
-> +
-> +static inline struct pci_host_bridge *
-> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
-> +			void *host_data)
-> +{
-> +	return NULL;
-> +}
->  #endif
->  
->  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 7e7b939..556dc5f 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -402,6 +402,7 @@ struct pci_host_bridge {
->  	struct device dev;
->  	struct pci_bus *bus;		/* root bus */
->  	int domain_nr;
-> +	resource_size_t io_base;	/* physical address for the start of I/O area */
-
-I don't see where this is used yet.
-
-As far as I know, there's nothing that prevents a host bridge from having
-several I/O port apertures (or several memory-mapped I/O port spaces).
-
->  	struct list_head windows;	/* pci_host_bridge_windows */
->  	void (*release_fn)(struct pci_host_bridge *);
->  	void *release_data;
-> @@ -1809,8 +1810,15 @@ static inline void pci_set_of_node(struct pci_dev *dev) { }
->  static inline void pci_release_of_node(struct pci_dev *dev) { }
->  static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
->  static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
-> +
->  #endif  /* CONFIG_OF */
->  
-> +/* Used by architecture code to apply any quirks to the list of
-> + * pci_host_bridge resource ranges before they are being used
-> + * by of_create_pci_host_bridge()
-> + */
-> +extern int pcibios_fixup_bridge_ranges(struct list_head *resources);
-> +
->  #ifdef CONFIG_EEH
->  static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
->  {
+> 
+> Cheers,
 > -- 
-> 2.0.0
+> Steve 
 > 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+
+-- 
+Kind regards,
+Minchan Kim
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: thp_alloc.c
+Type: text/x-csrc
+Size: 1328 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/db0fab14/attachment.bin>
