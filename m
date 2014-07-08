@@ -1,33 +1,27 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 8 Jul 2014 09:18:56 +0530
-Subject: [PATCH 1/1] ARM: imx: use PTR_ERR_OR_ZERO
-In-Reply-To: <20140707055521.GM30239@dragon>
-References: <1404500590-21712-1-git-send-email-fabf@skynet.be>
- <20140707055521.GM30239@dragon>
-Message-ID: <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Jul 2014 21:19:37 -0700
+Subject: [GIT PULL] Samsung fixes-2 for v3.16
+In-Reply-To: <53BB2933.3050309@samsung.com>
+References: <53BB2933.3050309@samsung.com>
+Message-ID: <CAOesGMibDu3xTw32dbLYAPjLmrzUVisnwOZZEw1ssLPx78kmZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Mon, Jul 7, 2014 at 11:25 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Fri, Jul 04, 2014 at 09:03:10PM +0200, Fabian Frederick wrote:
->> replace IS_ERR/PTR_ERR
->>
->> Cc: Shawn Guo <shawn.guo@freescale.com>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+On Mon, Jul 7, 2014 at 4:11 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
 >
-> Applied, thanks.
+>   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-2
+>
+> for you to fetch changes up to 35e75645f16c86918f26df1bfc2c24ad8ebb5a17:
+>
+>   ARM: EXYNOS: Update secondary boot addr for secure mode (2014-07-08
+> 08:03:49 +0900)
 
+Merged.
 
-I had sent a similar series [1] in May which you rejected. Just
-curious if something
-changed between then and now?
-
-[1] http://patchwork.ozlabs.org/patch/353653/
-
--- 
-Regards,
-Sachin.
+-Olof
