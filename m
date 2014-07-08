@@ -1,58 +1,80 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 8 Jul 2014 16:59:10 +0100
-Subject: [PATCH v2 1/3] xen/arm: introduce XENFEAT_grant_map_11
-In-Reply-To: <alpine.DEB.2.02.1407081653220.27641@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
- <1404834132-15847-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1404834562.25940.8.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1407081653220.27641@kaball.uk.xensource.com>
-Message-ID: <1404835150.25940.9.camel@kazak.uk.xensource.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 8 Jul 2014 09:06:13 -0700
+Subject: [PATCH 1/2] ARM: efm32: switch to properly namespaced location
+ property
+In-Reply-To: <20140708064135.GE7827@pengutronix.de>
+References: <20140630154030.GJ14781@pengutronix.de>
+ <1404142889-20740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAOesGMjzzYwXKXZLvUVp-nAGf+R4G8eUjK+3CumB8i5LkoRCow@mail.gmail.com>
+ <20140708064135.GE7827@pengutronix.de>
+Message-ID: <CAOesGMjJJPJr7GnB=aoydGqtoaTd8wdBYDD92S0+5-y1PJepsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-08 at 16:54 +0100, Stefano Stabellini wrote:
-> On Tue, 8 Jul 2014, Ian Campbell wrote:
-> > On Tue, 2014-07-08 at 16:42 +0100, Stefano Stabellini wrote:
-> > > The flag tells us that the hypervisor maps a grant page to guest
-> > > physical address == machine address of the page in addition to the
-> > > normal grant mapping address. It is needed to properly issue cache
-> > > maintenance operation at the completion of a DMA operation involving a
-> > > foreign grant.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > ---
-> > >  arch/arm/xen/enlighten.c         |    6 ++++++
-> > >  include/xen/interface/features.h |    3 +++
-> > >  2 files changed, 9 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > > index b96723e..ee3135a 100644
-> > > --- a/arch/arm/xen/enlighten.c
-> > > +++ b/arch/arm/xen/enlighten.c
-> > > @@ -262,6 +262,12 @@ static int __init xen_guest_init(void)
-> > >  	xen_domain_type = XEN_HVM_DOMAIN;
-> > >  
-> > >  	xen_setup_features();
-> > > +
-> > > +	if (!xen_feature(XENFEAT_grant_map_11)) {
-> > > +		pr_warn("Please upgrade your Xen.\n"
-> > > +				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
-> > > +	}
-> > 
-> > Unfortunately this isn't quite complete. On a system where all devices
-> > are behind an SMMU then we would want to be able to disable the 1:1
-> > workaround, which in turn would imply disabling this feature flag too
-> > (since it is no longer necessary and also impossible to implement in
-> > that case).
-> 
-> That is true, but in such a system we would have to tell the kernel that
-> DMAing is safe, so this will turn into:
+On Mon, Jul 7, 2014 at 11:41 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hi Olof,
+>
+> On Mon, Jul 07, 2014 at 10:46:52PM -0700, Olof Johansson wrote:
+>> On Mon, Jun 30, 2014 at 8:41 AM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>> > Now that both spi and serial driver support these (commits f2bb31057a42
+>> > (spi: efm32: properly namespace location property) and
+>> > 74be65a3cff5 (serial: efm32: properly namespace location property)) use
+>> > the better names.
+>> >
+>> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> > ---
+>> >  arch/arm/boot/dts/efm32gg-dk3750.dts | 6 +++---
+>> >  1 file changed, 3 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+>> > index b4031fa4a567..d5dd2a2a7970 100644
+>> > --- a/arch/arm/boot/dts/efm32gg-dk3750.dts
+>> > +++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+>> > @@ -43,7 +43,7 @@
+>> >
+>> >                 spi0: spi at 4000c000 { /* USART0 */
+>> >                         cs-gpios = <&gpio 68 1>; // E4
+>> > -                       location = <1>;
+>> > +                       efm32,location = <1>;
+>>
+>> Hrm, the prefix is normally the vendor, not the platform. I see that
+> Don't considering what it used normally (and I didn't do it wrong on
+> purpose) I consider a string identifying the platform to be more
+> sensible here.
 
-Oh right, yes. Good then ;-)
+It's long-standing practice (20 years or so) to always use the vendor
+as prefix, not the platform.
 
-> 
-> if (!xen_feature(XENFEAT_grant_map_11) &&
->     !xen_feature(XENFEAT_safe_dma)) {
-> 	pr_warn("Please upgrade your Xen.\n"
-> 			"If your platform has any non-coherent DMA devices, they won't work properly.\n");
-> }
+> For one thing because the vendor can change (as it did with
+> efm32).
+
+Then we keep the previous vendor, that's a long-standing practice too.
+Sun didn't switch from SUNW to JAVA as prefix just because their stock
+ticker was renamed.
+
+> Another reason is that the vendor can create another platform
+> that also needs some devices with a location property that has a
+> completely different semantic but would get the same name.
+
+Then the new binding will use a different name, or they will be
+managed in some compatible way. The same argument could be said in the
+other way: the same vendor might introduce a new platform that uses
+the same binding but isn't called efm32. That's equally wrong (and
+it's actually a quite common situation these days).
+
+> (Ok, if the semantic on the different platform is similar
+> $vendor,location would be more appropriate. Probably the decision on
+> what name to pick should be considered case by case.)
+
+I really don't want a hodge-podge of whatever someone felt like
+picking as a name at the time. It makes it really hard for newcomers
+to find a good best practices to follow, and over time will result in
+total chaos.
+
+What's this binding for anyway? It looks a lot like an ad-hoc pinctrl
+binding for configuring pinout, is that accurate?
+
+
+-Olof
