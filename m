@@ -1,71 +1,178 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  8 Jul 2014 12:09:03 +0100
-Subject: [PATCH v3 4/9] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+Date: Tue,  8 Jul 2014 12:09:04 +0100
+Subject: [PATCH v3 5/9] arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
 In-Reply-To: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
 References: <1404817748-31302-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1404817748-31302-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404817748-31302-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have the information about the number of CPU interfaces in
-the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
-rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
+Now that we can (almost) dynamically size the number of interrupts,
+we're facing an interesting issue:
+
+We have to evaluate at runtime whether or not an access hits a valid
+register, based on the sizing of this particular instance of the
+distributor. Furthermore, the GIC spec says that accessing a reserved
+register is RAZ/WI.
+
+For this, add a new field to our range structure, indicating the number
+of bits a single interrupts uses. That allows us to find out whether or
+not the access is in range.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h | 3 +--
- virt/kvm/arm/vgic.c    | 6 +++---
- 2 files changed, 4 insertions(+), 5 deletions(-)
+ include/kvm/arm_vgic.h |  3 ++-
+ virt/kvm/arm/vgic.c    | 56 ++++++++++++++++++++++++++++++++++++++++----------
+ 2 files changed, 47 insertions(+), 12 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b8a6337..99ad8af 100644
+index 99ad8af..98ab604 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -29,13 +29,12 @@
- #define VGIC_NR_SGIS		16
- #define VGIC_NR_PPIS		16
- #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
--#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
+@@ -32,6 +32,7 @@
  
  #define VGIC_V2_MAX_LRS		(1 << 6)
  #define VGIC_V3_MAX_LRS		16
++#define VGIC_MAX_IRQS		1024
  
  /* Sanity checks... */
--#if (VGIC_MAX_CPUS > 8)
-+#if (KVM_MAX_VCPUS > 8)
- #error	Invalid number of CPU interfaces
+ #if (KVM_MAX_VCPUS > 8)
+@@ -42,7 +43,7 @@
+ #error "VGIC_NR_IRQS must be a multiple of 32"
+ #endif
+ 
+-#if (VGIC_NR_IRQS > 1024)
++#if (VGIC_NR_IRQS > VGIC_MAX_IRQS)
+ #error "VGIC_NR_IRQS must be <= 1024"
  #endif
  
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6f7cf85..3cb667c 100644
+index 3cb667c..b2ef7ff 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1206,7 +1206,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+@@ -804,6 +804,7 @@ static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+ struct mmio_range {
+ 	phys_addr_t base;
+ 	unsigned long len;
++	int bits_per_irq;
+ 	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+ 			    phys_addr_t offset);
+ };
+@@ -812,56 +813,67 @@ static const struct mmio_range vgic_dist_ranges[] = {
+ 	{
+ 		.base		= GIC_DIST_CTRL,
+ 		.len		= 12,
++		.bits_per_irq	= 0,
+ 		.handle_mmio	= handle_mmio_misc,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_IGROUP,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ENABLE_SET,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_set_enable_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ENABLE_CLEAR,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_clear_enable_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_PENDING_SET,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_set_pending_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_PENDING_CLEAR,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_clear_pending_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ACTIVE_SET,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ACTIVE_CLEAR,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_PRI,
+-		.len		= VGIC_NR_IRQS,
++		.len		= VGIC_MAX_IRQS,
++		.bits_per_irq	= 8,
+ 		.handle_mmio	= handle_mmio_priority_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_TARGET,
+-		.len		= VGIC_NR_IRQS,
++		.len		= VGIC_MAX_IRQS,
++		.bits_per_irq	= 8,
+ 		.handle_mmio	= handle_mmio_target_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_CONFIG,
+-		.len		= VGIC_NR_IRQS / 4,
++		.len		= VGIC_MAX_IRQS / 4,
++		.bits_per_irq	= 2,
+ 		.handle_mmio	= handle_mmio_cfg_reg,
+ 	},
+ 	{
+@@ -899,6 +911,22 @@ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+ 	return NULL;
+ }
  
- 	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
++static bool vgic_validate_access(const struct vgic_dist *dist,
++				 const struct mmio_range *range,
++				 unsigned long offset)
++{
++	int irq;
++
++	if (!range->bits_per_irq)
++		return true;	/* Not an irq-based access */
++
++	irq = offset * 8 / range->bits_per_irq;
++	if (irq >= dist->nr_irqs)
++		return false;
++
++	return true;
++}
++
+ /**
+  * vgic_handle_mmio - handle an in-kernel MMIO access
+  * @vcpu:	pointer to the vcpu performing the access
+@@ -938,7 +966,13 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
  
--	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
-+	for_each_set_bit(c, &sources, dist->nr_cpus) {
- 		if (vgic_queue_irq(vcpu, c, irq))
- 			clear_bit(c, &sources);
- 	}
-@@ -1583,7 +1583,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int i;
- 
--	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
-+	if (vcpu->vcpu_id >= dist->nr_cpus)
- 		return -EBUSY;
- 
- 	for (i = 0; i < VGIC_NR_IRQS; i++) {
-@@ -1724,7 +1724,7 @@ static int vgic_init_maps(struct kvm *kvm)
- 	int nr_cpus, nr_irqs;
- 	int ret, i;
- 
--	nr_cpus = dist->nr_cpus = VGIC_MAX_CPUS;
-+	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
- 	nr_irqs = dist->nr_irqs = VGIC_NR_IRQS;
- 
- 	ret  = vgic_init_bitmap(&dist->irq_enabled, nr_cpus, nr_irqs);
+ 	spin_lock(&vcpu->kvm->arch.vgic.lock);
+ 	offset = mmio->phys_addr - range->base - base;
+-	updated_state = range->handle_mmio(vcpu, mmio, offset);
++	if (vgic_validate_access(dist, range, offset)) {
++		updated_state = range->handle_mmio(vcpu, mmio, offset);
++	} else {
++		vgic_reg_access(mmio, NULL, offset,
++				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
++		updated_state = false;
++	}
+ 	spin_unlock(&vcpu->kvm->arch.vgic.lock);
+ 	kvm_prepare_mmio(run, mmio);
+ 	kvm_handle_mmio_return(vcpu, run);
 -- 
 2.0.0
