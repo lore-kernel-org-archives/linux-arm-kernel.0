@@ -1,49 +1,56 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 8 Jul 2014 13:18:17 -0400
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140708170353.GA16148@kwain>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
- <20140708170353.GA16148@kwain>
-Message-ID: <20140708171817.GH4979@htj.dyndns.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Jul 2014 18:18:28 +0100
+Subject: [PATCH v8 0/9] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
+Message-ID: <20140708171828.GM6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Jul 08, 2014 at 07:03:53PM +0200, Antoine T?nart wrote:
-> > So, hpriv->port is both input and output?  This is messy and can lead
-> > to confusing failures and there now are multiple ways to modify
-> > port_map.  If carrying this information through ahci_host_priv is
-> > necessary, let's remove the direct params and introduce new input
-> > fields to the struct.
+On Sun, Jul 06, 2014 at 04:23:43PM +0100, Rob Herring wrote:
+> On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > This is my resurected attempt at adding support for generic PCI host
+> > bridge controllers that make use of device tree information to
+> > configure themselves. I've tagged it as v8 although the patches
+> > have now been reshuffled in order to ease adoption so referring to
+> > the older versions might be a bit of a hoop jumping exercise.
+> >
+> > Changes from v7:
+> >   - Reordered the patches so that fixes and non-controversial patches
+> >     from v7 can be accepted more easily. If agreed I can split the
+> >     series again into patches that can be upstreamed easily and ones
+> >     that still need discussion.
+> >   - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
+> >     to better reflect its target use.
+> >   - Added the function to remap the bus I/O resources that used to be
+> >     provided in my arm64 patch series and (re)named it pci_remap_iospace()
+> >   - Removed error code checking from parsing and mapping of IRQ from DT
+> >     in recognition that some PCI devices will not have legacy IRQ mappings.
+> >
+> > v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
 > 
-> We just use hpriv->port_map to check port_map is valid and describes
-> available ports there.
+> Can you publish a branch for this series please.
 > 
-> hpriv->port_map is filed by the generic ahci_platform_get_resources()
-> function when using the new bindings and not by the drivers. port_map is
-> the input from the drivers.
-
-So, yeah, it's being used both as input and output and we also have
-the arguments which affect port_map, right?  It does seem confusing.
-
-> Well, a had a review a week ago about in the PHY driver saying I should
-> avoid using fixed sized arrays... And it was in a driver were we know
-> the maximum number of PHY available.
+> Rob
 > 
-> I think in this case were the number of PHYs depends on the h/w, we should
-> use a dynamically allocated array.
 
-Well, so does clk.  Let's say clk is more restricted and phy can be
-one or more per port and thus needs to be dynamic.  If so, shouldn't
-we at least have some correlation between phys and ports?  It bothers
-me that now libahci is carrying random number of resources that it has
-no idea how to associate with the ports it manages.  What if later we
-want to involve phy driver in power managing unoccupied ports?
+Hi Rob,
 
-Thanks.
+I have pushed a brach that matches my v8 patchset +1 obvious missing header include
+here: http://www.linux-arm.org/git?p=linux-ld.git;a=shortlog;h=refs/heads/for-upstream/pci_v8
+
+Best regards,
+Liviu
+
 
 -- 
-tejun
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
