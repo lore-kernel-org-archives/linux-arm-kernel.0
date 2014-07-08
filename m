@@ -1,24 +1,100 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Jul 2014 08:46:11 +0200
-Subject: [PATCH CFT 02/30] net: fec: iMX6 FEC does not support
- half-duplex gigabit
-In-Reply-To: <E1X0Xvb-0001Mu-JB@rmk-PC.arm.linux.org.uk>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
- <E1X0Xvb-0001Mu-JB@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140708064611.GF7827@pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 08 Jul 2014 08:55:10 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 1/4] dt: bindings: add bindings for
+ Broadcom bcm43xx sdio devices
+In-Reply-To: <20140707182302.GA29650@tuxdriver.com>
+References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
+ <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
+ <20140707182302.GA29650@tuxdriver.com>
+Message-ID: <53BB95CE.1010502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On Fri, Jun 27, 2014 at 04:19:03PM +0100, Russell King wrote:
-> The iMX6 gigabit FEC does not support half-duplex gigabit operation.
-> Phys attacked to the FEC may support this, and we currently do nothing
-Even if it might be interpreted as an attack to connect such a phy to
-the FEC, I'd still call it "attach" here :-)
+On 07/07/2014 08:23 PM, John W. Linville wrote:
+> Any word from the devicetree folks?
 
-Uwe
+We changed the compatible string from brcm,bcm43xx-fmac to brcm,bcm4329-fmac
+at their request, that is the only feedback we've gotten from them AFAIK.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+
+Hans
+
+> 
+> On Sun, Jun 29, 2014 at 04:16:58PM +0200, Hans de Goede wrote:
+>> From: Arend van Spriel <arend@broadcom.com>
+>>
+>> The Broadcom bcm43xx sdio devices are fullmac devices that may be
+>> integrated in ARM platforms. Currently, the brcmfmac driver for
+>> these devices support use of platform data. This patch specifies
+>> the bindings that allow this platform data to be expressed in the
+>> devicetree.
+>>
+>> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
+>> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
+>> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
+>> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
+>> Signed-off-by: Arend van Spriel <arend@broadcom.com>
+>> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
+>>  on how to handle this yet]
+>> [hdegoede at redhat.com: move from bindings/staging to bindings]
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 41 ++++++++++++++++++++++
+>>  1 file changed, 41 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>> new file mode 100644
+>> index 0000000..5dbf169
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>> @@ -0,0 +1,41 @@
+>> +Broadcom BCM43xx Fullmac wireless SDIO devices
+>> +
+>> +This node provides properties for controlling the Broadcom wireless device. The
+>> +node is expected to be specified as a child node to the SDIO controller that
+>> +connects the device to the system.
+>> +
+>> +Required properties:
+>> +
+>> + - compatible : Should be "brcm,bcm4329-fmac".
+>> +
+>> +Optional properties:
+>> + - brcm,drive-strength : drive strength used for SDIO pins on device in mA
+>> +	(default = 6).
+>> + - interrupt-parent : the phandle for the interrupt controller to which the
+>> +	device interrupts are connected.
+>> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
+>> +	When not specified the device will use in-band SDIO interrupts.
+>> + - interrupt-names : name of the out-of-band interrupt, which must be set
+>> +	to "host-wake".
+>> +
+>> +Example:
+>> +
+>> +mmc3: mmc at 01c12000 {
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&mmc3_pins_a>;
+>> +	vmmc-supply = <&reg_vmmc3>;
+>> +	bus-width = <4>;
+>> +	non-removable;
+>> +	status = "okay";
+>> +
+>> +	brcmf: bcrmf at 1 {
+>> +		reg = <1>;
+>> +		compatible = "brcm,bcm4329-fmac";
+>> +		interrupt-parent = <&pio>;
+>> +		interrupts = <10 8>; /* PH10 / EINT10 */
+>> +		interrupt-names = "host-wake";
+>> +	};
+>> +};
+>> -- 
+>> 2.0.0
+>>
+>>
+> 
