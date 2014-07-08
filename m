@@ -1,40 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Jul 2014 11:27:57 +0200
-Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
-In-Reply-To: <20140707152309.GH4939@tarshish>
-References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
- <5cc8b89b-20ff-4fa9-92dd-bb2f6d3512d8@BY2FFO11FD030.protection.gbl>
- <CACRpkdb1M3-hrSKLKWz21LCJ1sMvsq5E-aqkpmVhy0NwOS5HhA@mail.gmail.com>
- <20140707152309.GH4939@tarshish>
-Message-ID: <CACRpkdY+3hy5iw=uRdmu665NWsoGacTMgjUq97219kEcfn7Dqw@mail.gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 8 Jul 2014 10:29:58 +0100
+Subject: [PATCH 2/2] efi: implement mandatory locking for UEFI Runtime
+ Services
+In-Reply-To: <CAKv+Gu8LbfuuEYyhAeu3dUiKHqzN_UFMbOjY0agVihbmmVL9CA@mail.gmail.com>
+References: <1404295802-28030-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1404295802-28030-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140707202954.GC27474@console-pimps.org>
+ <CAKv+Gu91CQADTQ8KMjXQPwVDvW1XkUYO2E5=Mu=aAtrB8B3q_A@mail.gmail.com>
+ <CAKv+Gu8LbfuuEYyhAeu3dUiKHqzN_UFMbOjY0agVihbmmVL9CA@mail.gmail.com>
+Message-ID: <20140708092958.GD27474@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 7, 2014 at 5:23 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> On Mon, Jul 07, 2014 at 04:51:56PM +0200, Linus Walleij wrote:
+On Tue, 08 Jul, at 10:54:13AM, Ard Biesheuvel wrote:
+> 
+> After doing a bit more research, I still think there is work needed if
+> we aim to adhere to the UEFI spec, or at least be safe from the
+> hazards it points out.
+ 
+Note that I never claimed there wasn't a need for an EFI runtime lock, I
+was just pointing out that you need to consider the efi-pstore scenario,
+and that a mutex isn't suitable in that case.
 
->> This needs someone to step in and provide a replacement, my preferred
->> mechanism would be a /dev/gpiochip0/... hierarchy using char devices.
->
-> I really like the ability to control GPIOs from shell, both interactively and
-> scripted. I find it useful for quick hardware level debugging,
+I did in fact make a half-arsed attempt at introducing a runtime lock
+here,
 
-I would be happy to carry it in the unstable-ABI debugfs for sure.
-It's the supported ABI that bothers me.
+  http://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=capsule-blkdev&id=c0a88ac5b21f3c837121748be2e59e995126a6cb
 
-> and for boot
-> time scripting (mainly in initramfs).
+Provided we can get away with a single EFI runtime lock like that patch,
+your recent efi_call_virt() changes actually make the required patch
+much simpler, at least for arm64 and x86.
 
-What is the usecase here?
+> So the current status is:
+> - get/set time calls are serialized with respect to one another using
+> rtc_lock at the wrapper level
 
-> Do you intend to preserve this
-> capability in the future? Will I need a special utility (or Busybox applet) to
-> do this with char device ioctl?
+The time functions are completely unused on x86, which is why no proper
+runtime locking exists. It's basically dead code.
 
-It is ABI so we have to preserve it. But sometimes people come with
-new zuper-complex userspace usecases and want to add this or
-that crazy ABI to do stuff in userspace that the kernel can do better.
-And all that I intend to just NACK.
+> - get/set variable calls are serialized using the efivars->lock in the
+> efivars module
+> - get_next_variable() calls use the BKL
 
-Yours,
-Linus Walleij
+It uses __efivars->lock just like the other variable services. Is that
+what you meant by BKL?
+ 
+> The two things I am most concerned with are:
+> - reset system while other calls are in flight; is this handled
+> implicitly in some other way?
+
+No, it isn't handled, so yeah, it needs fixing. I think on x86 we
+actually wait for other cpus to shutdown before issuing the reset but
+it's obviously not possible to make that guarantee across architectures.
+
+> - things like settime()/setwakeuptime() and setvariable() poking into
+> the flash at the same time.
+> 
+> Perhaps it would be sufficient to have a single spinlock cover all
+> these cases? Or just let efivars grab the rtc_lock as well?
+
+I think we need to introduce a separate lock, logically below all other
+subsystem specific ones (rtc_lock, __efivars->lock, etc). It needs to be
+the final lock you grab before invoking the runtime services.
+
+I don't think the additional complexity of introducing multiple locks to
+parallelise access to, say, GetTime() and GetVariable(), is really worth
+the headache. Definitely not without someone making a really compelling
+case for why they need to squeeze every ounce of performance out of that
+scenario.
+
+-- 
+Matt Fleming, Intel Open Source Technology Center
