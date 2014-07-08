@@ -1,41 +1,41 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 8 Jul 2014 18:43:26 +0530
-Subject: [PATCH v9 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <53BBEB84.50904@gmail.com>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-2-git-send-email-antoine.tenart@free-electrons.com>
- <53BBE419.8080107@ti.com> <53BBEB84.50904@gmail.com>
-Message-ID: <53BBEE76.7090100@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  8 Jul 2014 14:10:37 +0100
+Subject: [PATCH 14/15] irqchip: vt8500: convert to handle_domain_irq
+In-Reply-To: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
+References: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404825038-547-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use the new handle_domain_irq method to handle interrupts.
 
-On Tuesday 08 July 2014 06:30 PM, Sebastian Hesselbarth wrote:
-> On 07/08/2014 02:29 PM, Kishon Vijay Abraham I wrote:
->> On Monday 07 July 2014 03:46 PM, Antoine T?nart wrote:
->>> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
->>>
->>> The mode selection can let us think this PHY can be configured to fit
->>> other purposes. But there are reasons to think the SATA mode will be
->>> the only one usable: the PHY registers are only accessible indirectly
->>> through two registers in the SATA range, the PHY seems to be integrated
->>> and no information tells us the contrary. For these reasons, make the
->>> driver a SATA PHY driver.
->>
->> Thanks for doing multiple revisions of this. Looks good to be merged for me now.
-> 
-> I'd like to see some Acked-by from Tejun on the AHCI patches first, but
-> if he agrees, should I prepare a stable branch for each of us to pull
-> their patches from?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-vt8500.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-I don't think that's needed. As long as there are no build breaks, each of us
-should be able to take it independently.
-> 
-> AFAIKS, that would be 1+2 for you, 3-5 for Tejun, and the DT crap 6+7
-> for me.
-
-right, I'll take 1 and 2 in my tree.
-
-Cheers
-Kishon
+diff --git a/drivers/irqchip/irq-vt8500.c b/drivers/irqchip/irq-vt8500.c
+index eb6e91e..b7af816 100644
+--- a/drivers/irqchip/irq-vt8500.c
++++ b/drivers/irqchip/irq-vt8500.c
+@@ -181,7 +181,7 @@ static struct irq_domain_ops vt8500_irq_domain_ops = {
+ static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 stat, i;
+-	int irqnr, virq;
++	int irqnr;
+ 	void __iomem *base;
+ 
+ 	/* Loop through each active controller */
+@@ -198,8 +198,7 @@ static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
+ 				continue;
+ 		}
+ 
+-		virq = irq_find_mapping(intc[i].domain, irqnr);
+-		handle_IRQ(virq, regs);
++		handle_domain_irq(intc[i].domain, irqnr, regs);
+ 	}
+ }
+ 
+-- 
+2.0.0
