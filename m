@@ -1,19 +1,19 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 8 Jul 2014 09:51:38 +0530
-Subject: RFC: Leave sysfs nodes alone during hotplug
-In-Reply-To: <533b04020d15a2f9ac0c582652f6e70f.squirrel@www.codeaurora.org>
-References: <53B5D22F.2070308@codeaurora.org>
- <CAKohpomuPshe4HpvWSzmZ3vvAjV-zHucfHBVbhB6dUBrrYH8pw@mail.gmail.com>
- <53BAF540.9080904@codeaurora.org>
- <CAAW3Ypa690EKmDzwx94CaHeR4j_F6_yFmFrn6xTYuLv=pH7B3g@mail.gmail.com>
- <CAKohpokvRnLU+DQBX39odAf5wxuzWjLi=sy5t2fYReoHCfshwQ@mail.gmail.com>
- <533b04020d15a2f9ac0c582652f6e70f.squirrel@www.codeaurora.org>
-Message-ID: <CAKohpon968V4WF76frJOm=Y2Ses22GMrWLWNO4NaafYbvMZsXQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 07 Jul 2014 21:22:07 -0700 (PDT)
+Subject: [PATCH A 00/12] Freescale ethernet driver updates
+In-Reply-To: <20140707232148.GG21766@n2100.arm.linux.org.uk>
+References: <20140707232148.GG21766@n2100.arm.linux.org.uk>
+Message-ID: <20140707.212207.2183324359841756924.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 July 2014 09:00,  <skannan@codeaurora.org> wrote:
-> Looks like there's enough interest. I'll also try to send out a patch of
-> what I think a simplified CPUfreq should look like.
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Date: Tue, 8 Jul 2014 00:21:48 +0100
 
-Okay, will wait for it then.
+> Here's the first batch of patches for the Freescale FEC ethernet driver.
+> They require the previously applied "net: fec: Don't clear IPV6 header
+> checksum field when IP accelerator enable" patch.
+> 
+> I'll mail further patches tomorrow, once I hear back from you.
+
+Applied to net-next, thanks.
