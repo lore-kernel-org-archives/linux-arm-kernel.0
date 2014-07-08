@@ -1,34 +1,56 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Tue, 8 Jul 2014 13:31:09 +0200
-Subject: [PATCHv7 3/3] edac: altera: Add EDAC support for Altera SoC
- SDRAM Controller.
-In-Reply-To: <1403730927-16163-4-git-send-email-tthayer@altera.com>
-References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
- <1403730927-16163-4-git-send-email-tthayer@altera.com>
-Message-ID: <20140708113109.GC8100@amd.pavel.ucw.cz>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 8 Jul 2014 13:31:57 +0200
+Subject: [PATCHv2 17/32] ARM: at91/dt: ge863-pro3: define crystals
+ frequencies
+In-Reply-To: <53BB8B91.8020501@aksignal.cz>
+References: <1404764629-29136-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1404764629-29136-18-git-send-email-alexandre.belloni@free-electrons.com>
+ <53BB8B91.8020501@aksignal.cz>
+Message-ID: <20140708113157.GK3113@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	read_reg = readl(mc_vbase + DRAMADDRW);
-> +
-> +	width = readl(mc_vbase + DRAMIFWIDTH);
-> +
-> +	col = (read_reg & DRAMADDRW_COLBIT_MASK) >>
-> +		DRAMADDRW_COLBIT_LSB;
-> +	row = (read_reg & DRAMADDRW_ROWBIT_MASK) >>
-> +		DRAMADDRW_ROWBIT_LSB;
-> +	bank = (read_reg & DRAMADDRW_BANKBIT_MASK) >>
-> +		DRAMADDRW_BANKBIT_LSB;
-> +	cs = (read_reg & DRAMADDRW_CSBIT_MASK) >>
-> +		DRAMADDRW_CSBIT_LSB;
+On 08/07/2014 at 08:11:29 +0200, Ji?? Prchal wrote :
+> Hi,
+> the slow crystal is not on the module "ge863-pro3", but it's usually
+> on application board. So I think this clock should be in board dts.
+> 
 
-As I said, all the defines only make this harder to read. The code is
-pretty obvious if you put numbers in here...
+Right, I'll move the 32kHz crystal to the board dts.
 
-Plus I'd like an explanation/comment of how the error injection works.
+> Dne 7.7.2014 22:23, Alexandre Belloni napsal(a):
+> >Define Telit GE863-PRO3, AK signal CDU and Telit EVK-PRO3 main and slow
+> >crystals frequencies.
+> >
+> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
+> >Cc: Jiri Prchal <jiri.prchal@aksignal.cz>
+> >---
+> >  arch/arm/boot/dts/ge863-pro3.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
+> >index 230099bb31c8..a32fdbefbbd9 100644
+> >--- a/arch/arm/boot/dts/ge863-pro3.dtsi
+> >+++ b/arch/arm/boot/dts/ge863-pro3.dtsi
+> >@@ -19,6 +19,14 @@
+> >  			compatible = "atmel,osc", "fixed-clock";
+> >  			clock-frequency = <6000000>;
+> >  		};
+> >+
+> >+		slow_xtal {
+> >+			clock-frequency = <32768>;
+> >+		};
+> >+
+> >+		main_xtal {
+> >+			clock-frequency = <6000000>;
+> >+		};
+> >  	};
+> >
+> >  	ahb {
+> >
 
-Thanks,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
