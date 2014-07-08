@@ -1,79 +1,92 @@
-From: olivier.martin@arm.com (Olivier Martin)
-Date: Tue, 8 Jul 2014 16:33:32 +0100
-Subject: [PATCH v2 0/2] efi: preserve NEON registers on UEFI services calls
-In-Reply-To: <CAKv+Gu8yb=H2734e-Wai3npK_qwsq7SWHumn+1gjkmJhF-2QQA@mail.gmail.com>
-References: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>	<20140701132638.GC7539@console-pimps.org>
- <CAKv+Gu8yb=H2734e-Wai3npK_qwsq7SWHumn+1gjkmJhF-2QQA@mail.gmail.com>
-Message-ID: <005f01cf9ac1$f9f01460$edd03d20$@martin@arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 8 Jul 2014 10:37:56 -0500
+Subject: [PATCHv5 04/15] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAK=WgbbZYwfOyeZuDTX2RXtEdYzsZc++crHZ-ZAqeiWds0BCcg@mail.gmail.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-5-git-send-email-s-anna@ti.com>
+ <CAK=WgbbZvBLT7U638fBfPjF7-MJaP=4WJcrT_fEg6Uu3cXRAyg@mail.gmail.com>
+ <53B47626.4040506@ti.com>
+ <CAK=WgbbJ6a17wrsEcvNq6tPiaciQ=E+22QE06t9EA8RFqicNRg@mail.gmail.com>
+ <53B59471.30703@ti.com>
+ <CAK=WgbbZYwfOyeZuDTX2RXtEdYzsZc++crHZ-ZAqeiWds0BCcg@mail.gmail.com>
+Message-ID: <53BC1054.5090201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is correct the UEFI 2.4 spec says 'Floating point and SIMD instructions may be used'. And it is also correct these registers are not preserved in the current UEFI EDK2 implementation.
-I will keep track in ARM UEFI todo list.
+Hi Ohad,
 
-Acked-by: Olivier Martin <olivier.martin@arm.com>
+On 07/03/2014 11:58 PM, Ohad Ben-Cohen wrote:
+> Hi Suman,
+> 
+> On Thu, Jul 3, 2014 at 8:35 PM, Suman Anna <s-anna@ti.com> wrote:
+>> Not at the moment, with the existing platform implementations. So, if I
+>> understand you correctly, you are asking to leave out the xlate ops and
+>> make the of_hwspin_lock_simple_xlate() internal until a need for an
+>> xlate method arises.
+> 
+> Yes, please. It seems to me this way we're reducing complexity without
+> compromising anything.
 
-Thanks Ard for your patch,
-Olivier
+OK, will make this change and add a comment in the code in the next version.
 
-> -----Original Message-----
-> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> Sent: 01 July 2014 14:46
-> To: Matt Fleming
-> Cc: Matt Fleming; x86 at kernel.org; Catalin Marinas; linux-
-> efi at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> hpa at zytor.com; Leif Lindholm; Roy Franz; msalter at redhat.com; Olivier
-> Martin
-> Subject: Re: [PATCH v2 0/2] efi: preserve NEON registers on UEFI
-> services calls
 > 
-> On 1 July 2014 15:26, Matt Fleming <matt@console-pimps.org> wrote:
-> > On Thu, 26 Jun, at 12:09:04PM, Ard Biesheuvel wrote:
-> >> The current UEFI implementation for arm64 fails to preserve/restore
-> the contents
-> >> of the NEON register file, which may result in data corruption,
-> especially now
-> >> that those contents are lazily restored for user processes.
-> >>
-> >> This series proposes to fix this by wrapping all runtime services
-> calls, and
-> >> adding kernel_neon_begin()/kernel_neon_end() pairs to the wrappers.
-> >>
-> >> The first patch moves the existing x86 versions of those wrappers to
-> generic
-> >> code, so that the second patch can easily enable them by supplying a
-> definition
-> >> for efi_call_virt and adding a call to efi_native_runtime_setup().
-> >>
-> >> Changes since v1:
-> >> - rename runtime.c -> runtime-wrappers.c
-> >> - make build depend on new Kconfig symbol EFI_RUNTIME_WRAPPERS to
-> fix ia64
-> >>   breakage
-> >> - remove default #defines for efi_call_virt()/__efi_call_virt(),
-> they are not
-> >>   needed anymore now that it is built conditionally
-> >> - add references to applicable UEFI/AAPCS spec sections
-> >>
-> >> Ard Biesheuvel (2):
-> >>   efi/x86: move UEFI Runtime Services wrappers to generic code
-> >>   efi/arm64: preserve FP/SIMD registers on UEFI runtime services
-> calls
-> >
-> > Thanks Ard. These patches look OK to me, and I've now pulled them
-> into
-> > my 'next' branch.
-> >
-> > It'd be nice if we could get some ACKs from other people since this
-> is
-> > an ABI issue.
+>> This also means, we only support a value of 1 for #hwlock-cells.
 > 
-> Yes, they have been awfully quiet, haven't they?
+> When a different #hwlock-cells value shows up, someone would have to
+> write a new xlate implementation anyway. At the same time, the xlate
+> ops could be brought back quite easily.
 > 
-> At least Roy has volunteered to get involved in the USWG to get the
-> spec clarified.
+> Since we're not imposing anything on the DT data, this doesn't affect
+> our ability to support these scenarios in the future, but unless I'm
+> missing a current use case, these scenarios right now seems somewhat
+> fictional.
+
+OK, fair enough.
+
 > 
-> @Leif, Catalin, Olivier: care to chime in?
+>> But, that would mean DT-based client users would have to invoke two
+>> function calls to request a hwspinlock. We already have an API to get
+>> the lock id given a hwspinlock - hwspin_lock_get_id(), so I added the OF
+>> API for requesting a lock directly rather than giving an OF API for
+>> getting the lock id. This is in keeping in convention with what other
+>> drivers do normally - a regular get and an OF get. I can modify it if
+>> you still prefer the OF API for getting a global lock id, but I feel its
+>> a burden for client users.
 > 
-> --
-> Ard.
+> Let's discuss this.
+> 
+> I was actually thinking of the more general use case of an heterogenous system:
+> 
+> - driver gets the global lock id from a remote processor
+> - driver then requests the specific lock
+> 
+> Looking at these cases, the OF scenario only differs in the small part
+> of fetching the lock id, and if we keep the regular request_specific
+> API we'll have more common code between drivers.
+> 
+> What do you think?
+
+We should also be thinking about the how to add the support for the
+reserved locks. Please take a look at the added RFC patches 9 through
+13, specifically the reworked Patch 12 [1]. I moved away from adding a
+reserved property to the controller node, as it means updating both
+controller and client nodes. Depending on where we enforce the check (in
+the OF API or in the common request_specific, the behavior would change.
+
+> 
+>> Also, do you prefer an open property-name in client users (like I am
+>> doing at the moment) or imposing a standard property name "hwlocks"?
+> 
+> Good point - I think we can start with an imposed "hwlocks" name, and
+> evolve in the future as needed (again, only because we're not really
+> imposing anything on the DT data - this is just kernel code that we
+> could always extend as needed).
+> 
+
+OK. Actually, I didn't realize that I had already made this change as
+part of the reserved locks RFC patch.
+
+regards
+Suman
+
+[1] http://marc.info/?l=linux-omap&m=139968467307977&w=2
