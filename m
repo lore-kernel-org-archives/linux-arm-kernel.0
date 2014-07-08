@@ -1,58 +1,44 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Tue, 8 Jul 2014 09:32:02 +0100
-Subject: [PATCH 0/3] Deterministic UART numbering on Samsung SoCs
-In-Reply-To: <53AC0BCC.1010608@samsung.com>
-References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
- <20140626113939.GP32514@n2100.arm.linux.org.uk>
- <53AC0BCC.1010608@samsung.com>
-Message-ID: <CAD8Lp45MvDLsxehayx8uuGt3w3O0vGskiFjb1vdvtOyOv2nG2w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Jul 2014 10:33:23 +0200
+Subject: [PATCH] regulator: core: Still free GPIOs using gpio_free()
+In-Reply-To: <20140701122717.GN23300@sirena.org.uk>
+References: <1404215726-2480-1-git-send-email-broonie@kernel.org>
+ <20140701120622.GJ32514@n2100.arm.linux.org.uk>
+ <20140701121142.GM23300@sirena.org.uk>
+ <CAAVeFuJqRW0ih8Mg9MFwLf=wQ7eVK5+pm8deW0vTUdozJ16FfQ@mail.gmail.com>
+ <20140701122717.GN23300@sirena.org.uk>
+Message-ID: <CACRpkdZ7ai0AShAen=AkaorHt0ObhYCDC-OuHG-9nVb3LLt3KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 1, 2014 at 2:27 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Jul 01, 2014 at 09:24:22PM +0900, Alexandre Courbot wrote:
+>> On Tue, Jul 1, 2014 at 9:11 PM, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > Huh, good point (though it still seems a bit neater to match up the
+>> > request and release functions I guess).  Linus?
+>
+>> Yeah it's a nice habit to free the GPIOs using the same interface as
+>> the one used to obtain them. Although if we are to allow the regulator
+>> framework to request GPIO through both the integer and descriptor
+>> interfaces, we certainly don't want to track that information forever.
+>
+>> On top of that we want to limit the use of gpio_to_desc() and
+>> desc_to_gpio() in drivers as much as possible, so I'd say I prefer to
+>> see gpiod_free() used no matter where the GPIO came from.
+>
+> Right, but Linus said we didn't need this conversion to descriptors so
+> I'm a bit confused as to what the issue he was raising was.
 
-How can we move forward here?
+Now I'm probably confusing myself...
 
-On Thu, Jun 26, 2014 at 1:02 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> - basically Samsung UART already has its own namespace (ttySAC) and the
-> order inside it is well-defined - instance ID shall be the hardware
-> instance number as specified by documentation. The ports vary in certain
-> aspects and the ID is important knowledge of the driver. The problem
-> here was broken implementation of assigning IDs based on probe order,
-> which worked only because on all Exynos platforms all ports have been
-> always registered (which we want to change now and keep unused ones
-> "disabled" in DT),
+All drivers should as far as possible use descriptors internally, doing
+things like gpio_to_desc() only for backward-compatibility where
+necessary, with the intent of eventually ridding the integer interfaces
+entirely.
 
-Yes, the kernel help text documents this quite well:
+It may be an eternal project, but hey, we are atleast two of us
+pursuing it.
 
-config SERIAL_SAMSUNG
-    tristate "Samsung SoC serial support"
-    depends on PLAT_SAMSUNG
-    select SERIAL_CORE
-    help
-      Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
-      providing /dev/ttySAC0, 1 and 2 (note, some machines may not
-      provide all of these ports, depending on how the serial port
-      pins are configured.
-
-> - we already have a lot of userspace depending on the aforementioned
-> ttySAC namespace and proper ordering of instances there. While I believe
-> the proper solution as of today would be to go back to standard ttyS
-> namespace and make userspace use a smarter way of identifying the
-> instances (e.g. by path or id, as you suggested), I don't think this
-> will make anyone's life easier with current assumptions,
-
-I like the sound of going to the standard ttyS notation and only
-providing ports for ones that exist, but is this userspace-visible
-naming change OK? You could argue that userspace that relies on fixed
-device paths is a bit broken, but that argument would be a bit cloudy
-given the kernel documentation for the ttySAC devices above.
-
-> - correct me if I'm wrong, but I don't think the
-> /dev/serial/by-{path,id} would be handled in kernel's console= parameter.
-
-That's right, that problem is left to the user, but at least we'd be
-consistent with other SoCs (and open to generic solutions to that
-inconvenience).
-
-Daniel
+Yours,
+Linus Walleij
