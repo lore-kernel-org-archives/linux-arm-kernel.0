@@ -1,25 +1,132 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 08 Jul 2014 15:26:55 -0700 (PDT)
-Subject: [PATCH v2 1/3] ethernet: Add new driver for Marvell Armada 375
- network unit
-In-Reply-To: <1404561288-11720-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1404561288-11720-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1404561288-11720-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140708.152655.619472955292197550.davem@davemloft.net>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Jul 2014 23:27:38 +0100
+Subject: [PATCH v8 8/9] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <20140708213305.GB4555@google.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140708010103.GD22939@google.com>
+ <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
+ <20140708213305.GB4555@google.com>
+Message-ID: <20140708222738.GA4980@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date: Sat,  5 Jul 2014 08:54:46 -0300
+On Tue, Jul 08, 2014 at 10:33:05PM +0100, Bjorn Helgaas wrote:
+> On Tue, Jul 08, 2014 at 11:29:40AM +0100, Liviu Dudau wrote:
+> > On Tue, Jul 08, 2014 at 02:01:04AM +0100, Bjorn Helgaas wrote:
+> > > On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
+> > > > ...
+> > > > +     for_each_of_pci_range(&parser, &range) {
+> > > > +             /* Read next ranges element */
+> > > > +             pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
+> > > > +                     range.pci_space, range.pci_addr, range.cpu_addr, range.size);
+> > > 
+> > > If you're not trying to match other printk formats, you could try to match
+> > > the %pR format used elsewhere, e.g., "%#010llx-%#010llx" with
+> > > range.cpu_addr, range.cpu_addr + range.size - 1.
+> > 
+> > Yes, not a big fan of the ugly output it generates, but the output matches closely the ranges
+> > definition in the device tree file so it is easy to validate that you are parsing the right
+> > entry. I am happy to change it to shorten the cpu range message.
+> 
+> If it already matches other device tree stuff, that's perfect.  I'm not
+> familiar with that.
+> 
+> > > > +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
+> > > > +{
+> > > > +     return 0;
+> > > > +}
+> > > 
+> > > I'd wait to add this until there's a platform that needs to implement it.
+> > > Splitting it out will make this patch that much smaller and easier to
+> > > understand.
+> > 
+> > I need this as this is the default implementation (i.e. do nothing). Otherwise the
+> > link phase will give errors. 
+> 
+> I meant that you could remove the default implementation *and* the call of
+> it, since it currently does nothing.
 
-> +module_param(rxq_number, int, S_IRUGO);
-> +module_param(txq_number, int, S_IRUGO);
+True. But it looks like converting Will's pci-host-generic.c driver will make use of this.
 
-Please don't use module parameters (undocumented ones at that) for things
-like this.
+> 
+> > > > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> > > > index dde3a4a..71e36d0 100644
+> > > > --- a/include/linux/of_pci.h
+> > > > +++ b/include/linux/of_pci.h
+> > > > @@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+> > > >  int of_pci_get_devfn(struct device_node *np);
+> > > >  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+> > > >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+> > > > +struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
+> > > > +                                     struct pci_ops *ops, void *host_data);
+> > > > +
+> > > >  #else
+> > > >  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+> > > >  {
+> > > > @@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> > > >  {
+> > > >       return -EINVAL;
+> > > >  }
+> > > > +
+> > > > +static inline struct pci_host_bridge *
+> > > > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
+> > > > +                     void *host_data)
+> > > > +{
+> > > > +     return NULL;
+> > > > +}
+> > > >  #endif
+> > > >
+> > > >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> > > > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > > > index 7e7b939..556dc5f 100644
+> > > > --- a/include/linux/pci.h
+> > > > +++ b/include/linux/pci.h
+> > > > @@ -402,6 +402,7 @@ struct pci_host_bridge {
+> > > >       struct device dev;
+> > > >       struct pci_bus *bus;            /* root bus */
+> > > >       int domain_nr;
+> > > > +     resource_size_t io_base;        /* physical address for the start of I/O area */
+> > > 
+> > > I don't see where this is used yet.
+> > 
+> > It's used in pci_host_bridge_of_get_ranges() (earlier in this patch).
+> 
+> of_create_pci_host_bridge() fills in bridge->io_base, but I don't see
+> anything that ever *reads* bridge->io_base.
 
-Instead, use or create standard interfaces which other drivers can use as
-well, so that the user interface is consistent for setting things of this
-nature regardless of device type.
+Ah, understood. It is used by the host bridge drivers to set their ATR registers to the
+correct CPU address values.
 
-Thanks.
+> 
+> > > As far as I know, there's nothing that prevents a host bridge from having
+> > > several I/O port apertures (or several memory-mapped I/O port spaces).
+> > 
+> > The pci_register_io_range() will give different offsets for each apperture.
+> > I just need to make sure I don't overwrite io_base when parsing multiple IO
+> > ranges.
+> 
+> Let's continue this in the other thread where I'm trying to understand the
+> I/O apertures.  Obviously I'm still missing something if you can indeed
+> have multiple I/O apertures per bridge (because then only one of them can
+> start at I/O address 0 on PCI).
+
+Sure.
+
+Thanks,
+Liviu
+
+> 
+> Bjorn
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
