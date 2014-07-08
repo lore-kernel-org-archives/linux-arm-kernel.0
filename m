@@ -1,71 +1,38 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 18:20:51 +0200
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
-References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
- <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
- <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
-Message-ID: <53BC1A63.80900@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  8 Jul 2014 18:21:16 +0200
+Subject: [PATCHv2 6/6] clk: at91: remove the useless CLK_IGNORE_UNUSED flag
+In-Reply-To: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404836476-23787-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.07.2014 17:27, Doug Anderson wrote:
-> Hi,
-> 
-> On Tue, Jul 8, 2014 at 12:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->>
->>> From: Doug Anderson <dianders@chromium.org>
->>>
->>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
->>> being reset across sleep/wake.  If we don't set it to anything then
->>> the TPM will be reset.  U-Boot will detect this as invalid
->>> and will reset the system on resume time. This GPIO can always be low
->>> and not hurt anything.  It will get pulled back high again during a
->>> normal warm reset when it will default back to an input.
->>>
->>> To properly preserve the TPM state across suspend/resume and to make
->>> the chrome U-Boot happy, properly set the GPIO to mask the
->>> reset to the TPM.
->>>
->>> Signed-off-by: Doug Anderson <dianders@chromium.org>
->>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->> (...)
->>> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
->>> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
->>> +       compatible = "regulator-fixed";
->>
->> No matter how the discussion ends up, regulator-fixed is wrong.
-> 
-> OK, fair enough.
-> 
-> 
->> Either folding it into the TPM driver or using a separate reset driver
->> is fine with me.
-> 
-> OK, Vikas: do you want to code up the driver?
-> 
-> 
->> So what about the generic delayed reset GPIO thing?
->> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
-> 
-> That's a neat concept and could be useful in other cases, but I think
-> it's just as much of a hack as using a regulator.  This is not a reset
-> signal for the TPM.  This is a signal that will mask the CPU's reset
-> signal (using a special bit of board-specific logic).
-> 
-> 
-> Personally I think Tomasz's idea of using hogs (after his patches
-> allowing a default output level) is the cleanest, but I think Stephen
-> didn't like that.
+The CLK_IGNORE_UNUSED flag was added on all the system clocks because of the
+ddrck. Now that it is handled by the ram controller driver, we can drop it.
 
-I don't see any benefits of using complex interfaces over simply
-initializing the pin to the right value once at boot-up or at
-suspend/resume. As far as I understand Doug's explanation of the
-problem, nothing else is expected from the OS with respect to this pin.
-Moreover it doesn't affect operation of any drivers.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/clk/at91/clk-system.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-So I'm still for the simplest and effective solution, i.e. hogs.
-
-Best regards,
-Tomasz
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+index 8c96307d7363..a76d03fd577b 100644
+--- a/drivers/clk/at91/clk-system.c
++++ b/drivers/clk/at91/clk-system.c
+@@ -119,13 +119,7 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+ 	init.ops = &system_ops;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+-	/*
+-	 * CLK_IGNORE_UNUSED is used to avoid ddrck switch off.
+-	 * TODO : we should implement a driver supporting at91 ddr controller
+-	 * (see drivers/memory) which would request and enable the ddrck clock.
+-	 * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
+-	 */
+-	init.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED;
++	init.flags = CLK_SET_RATE_PARENT;
+ 
+ 	sys->id = id;
+ 	sys->hw.init = &init;
+-- 
+1.9.1
