@@ -1,60 +1,83 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 8 Jul 2014 14:51:01 +0200
-Subject: [PATCH v3] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <201407072312.40687.arnd@arndb.de>
-References: <1401643329-6460-1-git-send-email-anarsoul@gmail.com>
- <CA+E=qVf2QWk+HxPTjwFK8BkD3C+EGbvLDMM4ro1_nYEThe=LtQ@mail.gmail.com>
- <CA+E=qVeS8DXTz6b9NnVNi4gFufMkf+iUrOU1A0+Ja8ehnBsrhQ@mail.gmail.com>
- <201407072312.40687.arnd@arndb.de>
-Message-ID: <CAPDyKFoVtJLyBrjwyQYKK6h=8aNd7+SMYU9bS8iStcSZkWs3Fw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 08 Jul 2014 14:53:37 +0200
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <20140708121252.GK21766@n2100.arm.linux.org.uk>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140708053434.GH28931@quad.lixom.net>
+ <20140708115727.GR23978@titan.lakedaemon.net>
+ <20140708121252.GK21766@n2100.arm.linux.org.uk>
+Message-ID: <53BBE9D1.9050109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 July 2014 23:12, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 07 July 2014, Vasily Khoruzhick wrote:
->> On Mon, Jun 30, 2014 at 10:03 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> > On Mon, Jun 23, 2014 at 2:31 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> >>
->> >> On 1 June 2014 20:22:09 Vasily Khoruzhick wrote:
->> >> > Utilise new s3c24xx-dma dmaengine driver for DMA ops.
->> >> >
->> >> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> >> > ---
->> >> > v2: - Don't store async dma descriptor, it's not used
->> >> >     - Request DMA channel via dma_request_slave_channel_compat() and use
->> >> >       hardcoded DMA channel.
->> >> >     - Add dependency on S3C24XX_DMAC (s3cmci uses filter function from it)
->> >> > v3: - Use 'depends' instead of 'select' in Kconfig
->> >> >     - Drop useless controller registers reads from dma completion callback
->> >>
->> >> Ping?
->> >
->> > Ping?
->>
->> Could anyone tell me through which tree this patch should be merged?
->> I'm pretty sure that I've included everyone from get_maintainer.pl
->> output
->> except LKML, but no response from maintainer so far.
+On 07/08/2014 02:12 PM, Russell King - ARM Linux wrote:
+> On Tue, Jul 08, 2014 at 07:57:27AM -0400, Jason Cooper wrote:
+>> Can you offer any suggestions as to how you would like this resolved?  I
+>> thought when I voiced my opinion as above, and Russell didn't reply,
+>> there was implied acknowledgement...
 >
-> I think you did everything right, Ulf or Chris should really pick up this
-> patch. The one thing you could improve is the changeset text which you
-> wrote as "Utilise new s3c24xx-dma dmaengine driver for DMA ops." What we
-> really need here is an explanation of why we want this, e.g. what problems
-> are solved by it etc. I definitely really want this patch as part of 3.17
-> so we can enabled multiplatform for the platforms that use this driver.
+> I didn't reply probably because I didn't see the message and/or I'm busy
+> with other stuff.
 >
-> You should also list the
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> line under your "Signed-off-by" line.
->
->         Arnd
+> I know that Sebastian asked Rabeeh on IRC yesterday whether the flash
+> chip type could be used to detect the difference between the two, but
+> has not yet received an answer.
 
+Yeah, I asked him by mail too to give him more time to reply on it.
+I looked through my emails and found a request to update kernel's
+dove-cubox.dts for a different SPI flash type on 1G production.
 
-Sorry for the delay.
+My ES box has a Winbond W25Q32BV (compatible = "st,w25q32", obviously
+wrong vendor prefix) and the request was to add "n25q032" to make
+Linux MTD happy again.
 
-Thanks! Applied for next with Arnd's ack.
+The question I asked Rabeeh basically is, if above difference is true
+for all production CuBoxes. If it is, we can use it to tell them apart
+without user intervention.
 
-Kind regards
-Uffe
+As soon as I get a reply, I'll cook a patch for it (either compatible
+fix or comment about indiscrimination).
+
+> As the two DT descriptions are mutually incompatible, there isn't much
+> choice.  And (afaik) there's no choice of updating the boot loader to
+> a version which can deal with DT - yes it may be u-boot, but I've no
+> idea if modern u-boot works on it, and I really would not like to try.
+
+Most current MVEBU bootloader work is probably done on barebox. I have
+currently pending patches for usb and sdhci on Dove, eth is supported
+already. Let's say it is close to be considered as a replacement for
+u-boot. Of course, some of the voltage optimization is missing. Anyway,
+we cannot expect users to jump on barebox and update their boxes for
+obvious reasons you stated below.
+
+And yes, the two DT descriptions are mutually incompatible, but the
+perceived impact may be low. I'd expect most users to have their
+rootfs on SDHCI, so hot-plugging is not an option. Even if it is on
+a different medium, the SD card slot is well hidden under the HDMI
+jack.
+
+Considering the low impact and given that most users will have a
+production version, I copy Jason's statement. As said above, I'll
+either add a comment or fix the SPI compatible in a follow-up patch.
+
+> While SolidRun tried to make changing u-boot easy and recoverable, I've
+> had personal experience of trying to help people restore their cuboxes.
+> It's a total nightmare (mainly seems to be down to the wide variation
+> in USB hardware which causes the on-board USB-serial for the console to
+> be unreliable.)  That's why on their later iMX6 hardware (Cubox-i & HB)
+> they decided to have zero on-board non-volatile storage.
+>
+> So, even if it was possible to detect the difference in u-boot between
+> the Cubox models, getting the updated u-boot on the machine is far from
+> trivial.
+
+I agree that bootloader replacement isn't trivial, but compared to other
+SoCs the UART boot button makes it quite easy to deal with. But it is no
+fool-proof method of course.
+
+The reason I was conservative about using any stored information on SPI
+flash as indicator for CuBox revision was also driven by those issues
+reported on IRC, i.e. if somebody erased the SPI MAC address, it would
+have been identified as ES.
+
+Sebastian
