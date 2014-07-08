@@ -1,47 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 8 Jul 2014 10:15:44 +0200
-Subject: [PATCH] ARM: shmobile: Enable R-Car Gen 2 PCIe in
- shmobile_defconfig
-In-Reply-To: <66f679dbac764c329125a8ea50cd9ebd@HKXPR06MB168.apcprd06.prod.outlook.com>
-References: <1404739432-1408-1-git-send-email-horms+renesas@verge.net.au>
- <53BAA68D.609@cogentembedded.com>
- <66f679dbac764c329125a8ea50cd9ebd@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <20140708081542.GA23642@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Jul 2014 01:16:07 -0700
+Subject: [PATCH] omap16xx: Removes fixme no longer needed in ocpi_enable()
+In-Reply-To: <1404351079-5117-1-git-send-email-xerofoify@gmail.com>
+References: <1404351079-5117-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20140708081606.GC28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 01:59:12PM +0000, Phil Edworthy wrote:
-> Hi Sergei
+* Nicholas Krause <xerofoify@gmail.com> [140702 18:33]:
+> This removes the FIXME message above ocpi_enable being declared
+> for proper locking in this function. As of the current kernel
+> verisons there is no need for locking as only one driver uses
+> this function currently and therefore there is no need for real
+> locking requirements.
 > 
-> On 07 July 2014 14:54, Sergei wrote:
-> > On 07/07/2014 05:23 PM, Simon Horman wrote:
-> > 
-> > > The R-Car Gen 2 PCIe driver provides PCIe host support for
-> > > Renesas R-Car Gen2 platforms. To increase hardware support enable
-> > > the driver in the shmobile_defconfig multiplatform configuration.
-> > 
-> > > Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >   arch/arm/configs/shmobile_defconfig | 1 +
-> > >   1 file changed, 1 insertion(+)
-> > 
-> > > diff --git a/arch/arm/configs/shmobile_defconfig
-> > b/arch/arm/configs/shmobile_defconfig
-> > > index 5f05e98..6bc85a5 100644
-> > > --- a/arch/arm/configs/shmobile_defconfig
-> > > +++ b/arch/arm/configs/shmobile_defconfig
-> > > @@ -24,6 +24,7 @@ CONFIG_PL310_ERRATA_588369=y
-> > >   CONFIG_ARM_ERRATA_754322=y
-> > >   CONFIG_PCI=y
-> > >   CONFIG_PCI_RCAR_GEN2=y
-> > > +CONFIG_PCI_RCAR_GEN2_PCIE=y
-> > 
-> >     Hmm, I'm not sure why the option has GEN2 -- the driver claims support for
-> > R8A7779 as well as R8A779x. Probably the option should be renamed.
-> Technically, you are correct. However, whilst the driver does support R8A7779, that device only supports 32-bit
-> accesses over the PCIe bus so it's only useful for custom cards, not off-the-shelf PCIe cards.
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
 
-It seems to me that dropping GEN2 from the config option may be a good idea.
-But I believe that conversation is orthogonal to enabling the driver
-in the defconfig. At this stage I plan to apply this patch.
+Thanks applying into omap-for-v3.17/fixes-not-urgent.
+
+Tony
+
+> ---
+>  arch/arm/mach-omap1/ocpi.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap1/ocpi.c b/arch/arm/mach-omap1/ocpi.c
+> index 238170c..44a3d19 100644
+> --- a/arch/arm/mach-omap1/ocpi.c
+> +++ b/arch/arm/mach-omap1/ocpi.c
+> @@ -55,7 +55,6 @@ static struct clk *ocpi_ck;
+>  
+>  /*
+>   * Enables device access to OMAP buses via the OCPI bridge
+> - * FIXME: Add locking
+>   */
+>  int ocpi_enable(void)
+>  {
+> -- 
+> 1.9.1
+> 
