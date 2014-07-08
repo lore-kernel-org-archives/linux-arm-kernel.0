@@ -1,63 +1,121 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 8 Jul 2014 12:03:30 +0200
-Subject: [PATCH/RESEND 0/9] drm: tilcdc driver fixes
-In-Reply-To: <CAF6AEGvp+A7eKWXf8uBoqXHb0Dtnt_Wz_dgFZ7Ua=UaD7yKBDw@mail.gmail.com>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
- <53ADEB73.8090301@ti.com>
- <CAF6AEGvp+A7eKWXf8uBoqXHb0Dtnt_Wz_dgFZ7Ua=UaD7yKBDw@mail.gmail.com>
-Message-ID: <20140708100330.GU17271@phenom.ffwll.local>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Jul 2014 11:03:32 +0100
+Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <201407072322.00990.arnd@arndb.de>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <6122131.ozzYjjjRQi@wuerfel>
+ <20140707111133.GP6501@e106497-lin.cambridge.arm.com>
+ <201407072322.00990.arnd@arndb.de>
+Message-ID: <20140708100332.GW6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 06:51:15AM -0400, Rob Clark wrote:
-> On Fri, Jun 27, 2014 at 6:08 PM, Darren Etheridge <detheridge@ti.com> wrote:
-> > Guido,
-> >
-> >
-> > On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
-> >>
-> >> The tilcdc driver could be compiled as a module, but was severely broken
-> >> and could not be used as such. This patchset attempts to fix the issues
-> >> preventing a proper load/unload of the module.
-> >>
-> >> Issues included dangling sysfs nodes, dangling devices, memory leaks and
-> >> a double kfree.
-> >>
-> >> It now seems to be working ok. We have tested this by loading and
-> >> unloading the driver repeteadly, with both panel and slave connectors
-> >> and found no flaws.
-> >>
-> >> There is still one warning left on tilcdc_crtc_destroy, caused by
-> >> destroying the connector while still in an ON status. We don't know why
-> >> this happens or why it's an issue, so we did not fix it.
-> >>
-> >
-> > Yes I see what you mean, it triggers the WARN_ON in tilcdc_crtc_destroy
-> > because DRM_MODE_DPMS_ON is still set.  This WARN_ON does make some sense
-> > because DPMS_OFF would have the effect of turning off clocks and putting the
-> > monitor to sleep which seems logical considering we have torn down the
-> > display.  Adding a tilcdc_crtc_dpms(DPMS_OFF) right before the WARN_ON
-> > confirms this, but it seems strange that this hasn't happened automatically
-> > (+ Russell doesn't need to do it in his Armada driver) - so I suspect there
-> > is a better way.
+On Mon, Jul 07, 2014 at 10:22:00PM +0100, Arnd Bergmann wrote:
+> On Monday 07 July 2014, Liviu Dudau wrote:
+> > On Sat, Jul 05, 2014 at 09:46:09PM +0100, Arnd Bergmann wrote:
+> > > On Saturday 05 July 2014 14:25:52 Rob Herring wrote:
+> > > > On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > > > The ranges property for a host bridge controller in DT describes
+> > > > > the mapping between the PCI bus address and the CPU physical address.
+> > > > > The resources framework however expects that the IO resources start
+> > > > > at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+> > > > > The conversion from pci ranges to resources failed to take that into account.
+> > > > 
+> > > > I don't think this change is right. There are 2 resources: the PCI bus
+> > > > addresses and cpu addresses. This function deals with the cpu
+> > > > addresses. Returning pci addresses for i/o and cpu addresses for
+> > > > memory is going to be error prone. We probably need both cpu and pci
+> > > > resources exposed to host controllers.
+> > > > 
+> > > > Making the new function only deal with i/o bus resources and naming it
+> > > > of_pci_range_to_io_resource would be better.
+> > > 
+> > > I think you are correct that this change by itself is will break existing
+> > > drivers that rely on the current behavior of of_pci_range_to_resource,
+> > > but there is also something wrong with the existing implementation:
+> > 
+> > Either I'm very confused or I've managed to confuse everyone else. The I/O
+> > resources described using CPU addresses *are* using "pseudo" port based
+> > addresses (or at least that is my understanding and my reading of the code).
+> > Can you point me to a function that is expecting the IO resource to have
+> > the start address at the physical address of the mapped space?
 > 
-> tbh, I'm not entirely sure offhand why drm_mode_config_cleanup()
-> doesn't remove the fb's first (which should have the effect of
-> shutting down any lit crtc/encoder/connector)..  that would seem like
-> the sensible way to shut down..
+> pci_v3_preinit() in arch/arm/mach-integrator/pci_v3.c for instance takes
+> the resource returned by of_pci_range_to_resource and programs the
+> start and size into hardware registers that expect a physical address
+> as far as I can tell.
+> 
+> > I was trying to fix exactly this issue, that you cannot use the resource
+> > structure returned by this function in any call that is expecting an IO
+> > resource.
+> 
+> I looked at the other drivers briefly, and I think you indeed fix the Tegra
+> driver with this but break the integrator driver as mentioned above.
+> The other callers of of_pci_range_to_resource() are apparently not
+> impacted as they recalculate the values they get.
 
-All userspace fbs should be cleared already before going into the driver
-unload. Which only leaves you with driver internal fbs (usually just one
-for fbdev emulation). It's the driver's job to clean that up explicitly.
-Then you can call mode_config_cleanup and the WARN_ON in there is a really
-nice space leak check.
+I would argue that integrator version is having broken assumptions. If it would
+try to allocate that IO range or request the resource as returned currently by
+of_pci_range_to_resource (without my patch) it would fail. I know because I did
+the same thing in my host bridge driver and it failed miserably. That's why I
+tried to patch it.
 
-If we'd unconditionally clean up all fbs we'd have trouble with
-driver-private embedded fbs and their refcounting and would loose the
-space leak check.
--Daniel
+I will lay out my argument here and people can tell me if I am wrong:
+
+PCI IO resources (even if they are memory mapped on certain architectures) need
+to emulate the x86 world "port" concept. Why do I think this? Because of this
+structure at the beginning of kernel/resource.c:
+
+struct resource ioport_resource = {
+	.name	= "PCI IO",
+	.start	= 0,
+	.end	= IO_SPACE_LIMIT,
+	.flags	= IORESOURCE_IO,
+};
+EXPORT_SYMBOL(ioport_resource);
+
+The other resource that people seem to confuse it with is the next one in that
+file:
+
+struct resource iomem_resource = {
+	.name	= "PCI mem",
+	.start	= 0,
+	.end	= -1,
+	.flags	= IORESOURCE_MEM,
+};
+EXPORT_SYMBOL(iomem_resource);
+
+Now, there are architecture that override the .start and .end values, but arm
+is not one of those, and mach-integrator doesn't change it either. So one can
+play with the ioport_resource values to move the "port" window wherever he/she
+wants, but it doesn't change the "port access" way of addressing it.
+
+If the IO space is memory mapped, then we use the port number, the io_offset
+and the PCI_IOBASE to get to the virtual address that, when accessed, will
+generate the correct addresses on the bus, based on what the host bridge has
+been configured.
+
+This is the current level of my understanding of PCI IO.
+
+Now, I believe Rob has switched entirely to using my series in some test that
+he has run and he hasn't encountered any issues, as long as one remembers in
+the host bridge driver to add the io_base offset to the .start resource. If
+not then I need to patch pci_v3.c.
+
+Best regards,
+Liviu
+
+> 
+> 	Arnd
+> 
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
