@@ -1,39 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Jul 2014 11:34:14 +0200
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.17
-Message-ID: <cover.1404811926.git.horms+renesas@verge.net.au>
+Date: Tue,  8 Jul 2014 11:34:16 +0200
+Subject: [PATCH] ARM: shmobile: fix shmobile_smp_apmu_suspend_init build
+ failure for !SUSPEND
+In-Reply-To: <cover.1404811926.git.horms+renesas@verge.net.au>
+References: <cover.1404811926.git.horms+renesas@verge.net.au>
+Message-ID: <d358c99838f3cf63ad7536124be4318cc84b11fa.1404811926.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Arnd Bergmann <arnd@arndb.de>
 
-Please consider these third round of Renesas ARM based SoC updates for v3.17.
+Patch d6d757c9a4e ("ARM: shmobile: APMU: Add Core-Standby-state for
+Suspend to RAM") added both an inline wrapper for shmobile_smp_apmu_suspend_init
+and an empty function in arch/arm/mach-shmobile/platsmp-apmu.c. We get a
+build failure when both are present, so this patch removes the one in the .c
+file and keeps the inline version.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc2-for-v3.17,
-which I have already sent a pull-request for.
-
-
-The following changes since commit bfe4cfa8ae21628267f2b879b4396ee17ea4fd3a:
-
-  ARM: shmobile: Allow r8a7791 to build non-SMP APMU code (2014-06-26 16:01:34 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc3-for-v3.17
-
-for you to fetch changes up to d358c99838f3cf63ad7536124be4318cc84b11fa:
-
-  ARM: shmobile: fix shmobile_smp_apmu_suspend_init build failure for !SUSPEND (2014-07-06 16:31:56 +0200)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC Updates for v3.17
-
-* Correct build failure in APMU code in the case of !SUSPEND
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: shmobile: fix shmobile_smp_apmu_suspend_init build failure for !SUSPEND
-
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/platsmp-apmu.c | 2 --
  1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index a05b16d..2c06810 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -244,6 +244,4 @@ void __init shmobile_smp_apmu_suspend_init(void)
+ {
+ 	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
+ }
+-#else
+-void shmobile_smp_apmu_suspend_init(void) {}
+ #endif
+-- 
+2.0.0.rc2
