@@ -1,322 +1,284 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Jul 2014 11:29:40 +0100
-Subject: [PATCH v8 8/9] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <20140708010103.GD22939@google.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
- <20140708010103.GD22939@google.com>
-Message-ID: <20140708102940.GZ6501@e106497-lin.cambridge.arm.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 8 Jul 2014 18:30:11 +0800
+Subject: [PATCH v2 1/1] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <53BA7543.70901@pengutronix.de>
+References: <1404474812-16855-1-git-send-email-b29396@freescale.com>
+ <53B69C55.8010901@pengutronix.de>
+ <20140707071040.GA18505@shlinux1.ap.freescale.net>
+ <53BA7543.70901@pengutronix.de>
+Message-ID: <20140708103009.GA21754@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 02:01:04AM +0100, Bjorn Helgaas wrote:
-> On Tue, Jul 01, 2014 at 07:43:33PM +0100, Liviu Dudau wrote:
-> > Several platforms use a rather generic version of parsing
-> > the device tree to find the host bridge ranges. Move the common code
-> > into the generic PCI code and use it to create a pci_host_bridge
-> > structure that can be used by arch code.
-> >
-> > Based on early attempts by Andrew Murray to unify the code.
-> > Used powerpc and microblaze PCI code as starting point.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  drivers/of/of_pci.c       | 135 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/pci/host-bridge.c |  18 +++++++
-> >  include/linux/of_pci.h    |  10 ++++
-> >  include/linux/pci.h       |   8 +++
-> >  4 files changed, 171 insertions(+)
-> >
-> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > index 8481996..55d8320 100644
-> > --- a/drivers/of/of_pci.c
-> > +++ b/drivers/of/of_pci.c
-> > @@ -89,6 +89,141 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-> >
-> > +/**
-> > + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from DT
-> > + * @dev: device node of the host bridge having the range property
-> > + * @resources: list where the range of resources will be added after DT parsing
-> > + * @io_base: pointer to a variable that will contain the physical address for
-> > + * the start of the I/O range.
-> > + *
-> > + * It is the callers job to free the @resources list if an error is returned.
-> > + *
-> > + * This function will parse the "ranges" property of a PCI host bridge device
-> > + * node and setup the resource mapping based on its content. It is expected
-> > + * that the property conforms with the Power ePAPR document.
-> > + *
-> > + * Each architecture is then offered the chance of applying their own
-> > + * filtering of pci_host_bridge_windows based on their own restrictions by
-> > + * calling pcibios_fixup_bridge_ranges(). The filtered list of windows
-> > + * can then be used when creating a pci_host_bridge structure.
-> > + */
-> > +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
-> > +             struct list_head *resources, resource_size_t *io_base)
-> > +{
-> > +     struct resource *res;
-> > +     struct of_pci_range range;
-> > +     struct of_pci_range_parser parser;
-> > +     int err;
-> > +
-> > +     pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> > +
-> > +     /* Check for ranges property */
-> > +     err = of_pci_range_parser_init(&parser, dev);
-> > +     if (err)
-> > +             return err;
-> > +
-> > +     pr_debug("Parsing ranges property...\n");
-> > +     for_each_of_pci_range(&parser, &range) {
-> > +             /* Read next ranges element */
-> > +             pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
-> > +                     range.pci_space, range.pci_addr, range.cpu_addr, range.size);
+On Mon, Jul 07, 2014 at 12:24:03PM +0200, Marc Kleine-Budde wrote:
+> On 07/07/2014 09:10 AM, Dong Aisheng wrote:
+> > On Fri, Jul 04, 2014 at 02:21:41PM +0200, Marc Kleine-Budde wrote:
+> >> On 07/04/2014 01:53 PM, Dong Aisheng wrote:
+> >>> The patch adds the basic CAN TX/RX function support for Bosch M_CAN controller.
+> >>> For TX, only one dedicated tx buffer is used for sending data.
+> >>> For RX, RXFIFO 0 is used for receiving data to avoid overflow.
+> >>> Rx FIFO 1 and Rx Buffers are not used currently, as well as Tx Event FIFO.
+> >>>
+> >>> Due to the message ram can be shared by multi m_can instances
+> >>> and the fifo element is configurable which is SoC dependant,
+> >>> the design is to parse the message ram related configuration data from device
+> >>> tree rather than hardcode define it in driver which can make the message
+> >>> ram sharing fully transparent to M_CAN controller driver,
+> >>> then we can gain better driver maintainability and future features upgrade.
+> >>>
+> >>> M_CAN also supports CANFD protocol features like data payload up to 64 bytes
+> >>> and bitrate switch at runtime, however, this patch still does not add the
+> >>> support for these features.
+> >>>
+> >>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> >>
+> >> Looks quite god, comments inline.
+> >> Marc
+> >>> ---
+> >>> Changes since v1:
+> >>> Addressed all comments from Mark Rutland, Hartkopp and Marc Kleine-Budde
+> >>> - merge three patches into one
+> >>> - create directory drivers/net/can/m_can
+> >>> - improve binding doc
+> >>> - make sure using valid pointer before netif_receive_skb(skb)
+> >>> - remove debug info a bit
+> >>> - let the stats are updated even if alloc_can_err_skb() fails
+> >>> - other small fixes
+> >>>
+> >>> Test result:
+> >>> Passed over night can-utils/canfdtest stress test on iMX6SX SDB board.
+> >>>
+> >>> ---
+> >>>  .../devicetree/bindings/net/can/m_can.txt          |   65 ++
+> >>
+> >> Please put the DT binding doc into a separate patch.
+> >>
+> > 
+> > Okay
+> > 
+> >>>  drivers/net/can/Kconfig                            |    2 +
+> >>>  drivers/net/can/Makefile                           |    1 +
+> >>>  drivers/net/can/m_can/Kconfig                      |    4 +
+> >>>  drivers/net/can/m_can/Makefile                     |    7 +
+> >>>  drivers/net/can/m_can/m_can.c                      | 1136 ++++++++++++++++++++
+> >>>  6 files changed, 1215 insertions(+), 0 deletions(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+> >>>  create mode 100644 drivers/net/can/m_can/Kconfig
+> >>>  create mode 100644 drivers/net/can/m_can/Makefile
+> >>>  create mode 100644 drivers/net/can/m_can/m_can.c
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+> >>> new file mode 100644
+> >>> index 0000000..3422790
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+> >>> @@ -0,0 +1,65 @@
+> >>> +Bosch MCAN controller Device Tree Bindings
+> >>> +-------------------------------------------------
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
+> >>> +- reg			: physical base address and size of the M_CAN
+> >>> +			  registers map and Message RAM
+> >>> +- reg-names		: Should be "m_can" and "message_ram"
+> >>> +- interrupts		: Should be the interrupt number of M_CAN interrupt
+> >>> +			  line 0 and line 1, could be same if sharing
+> >>> +			  the same interrupt.
+> >>> +- interrupt-names	: Should contain "int0" and "int1"
+> >>
+> >> You make only use of one interupt in the driver.
+> >>
+> > 
+> > Yes, that's the purpose.
+> > In driver, we will route all interrupts to INT0.
+> > So not need parse INT1 currently.
+> > However, we still define two interrupts in device tree binding
+> > according to hw capability.
+> > It could be helpful if anyone want to implement features like
+> > separate different type of interrupts to different interrupt line
+> > in the future.
 > 
-> If you're not trying to match other printk formats, you could try to match
-> the %pR format used elsewhere, e.g., "%#010llx-%#010llx" with
-> range.cpu_addr, range.cpu_addr + range.size - 1.
-
-Yes, not a big fan of the ugly output it generates, but the output matches closely the ranges
-definition in the device tree file so it is easy to validate that you are parsing the right
-entry. I am happy to change it to shorten the cpu range message.
-
-> 
-> > +
-> > +             /*
-> > +              * If we failed translation or got a zero-sized region
-> > +              * then skip this range
-> > +              */
-> > +             if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> > +                     continue;
-> > +
-> > +             res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> > +             if (!res)
-> > +                     return -ENOMEM;
-> > +
-> > +             err = of_pci_range_to_resource(&range, dev, res);
-> > +             if (err)
-> > +                     return err;
-> > +
-> > +             if (resource_type(res) == IORESOURCE_IO)
-> > +                     *io_base = range.cpu_addr;
-> > +
-> > +             pci_add_resource_offset(resources, res,
-> > +                             res->start - range.pci_addr);
-> > +     }
-> > +
-> > +     /* Apply architecture specific fixups for the ranges */
-> > +     return pcibios_fixup_bridge_ranges(resources);
-> > +}
-> > +
-> > +static atomic_t domain_nr = ATOMIC_INIT(-1);
-> > +
-> > +/**
-> > + * of_create_pci_host_bridge - Create a PCI host bridge structure using
-> > + * information passed in the DT.
-> > + * @parent: device owning this host bridge
-> > + * @ops: pci_ops associated with the host controller
-> > + * @host_data: opaque data structure used by the host controller.
-> > + *
-> > + * returns a pointer to the newly created pci_host_bridge structure, or
-> > + * NULL if the call failed.
-> > + *
-> > + * This function will try to obtain the host bridge domain number by
-> > + * using of_alias_get_id() call with "pci-domain" as a stem. If that
-> > + * fails, a local allocator will be used that will put each host bridge
-> > + * in a new domain.
-> > + */
-> > +struct pci_host_bridge *
-> > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
-> > +{
-> > +     int err, domain, busno;
-> > +     struct resource *bus_range;
-> > +     struct pci_bus *root_bus;
-> > +     struct pci_host_bridge *bridge;
-> > +     resource_size_t io_base;
-> > +     LIST_HEAD(res);
-> > +
-> > +     bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> > +     if (!bus_range)
-> > +             return ERR_PTR(-ENOMEM);
-> > +
-> > +     domain = of_alias_get_id(parent->of_node, "pci-domain");
-> > +     if (domain == -ENODEV)
-> > +             domain = atomic_inc_return(&domain_nr);
-> > +
-> > +     err = of_pci_parse_bus_range(parent->of_node, bus_range);
-> > +     if (err) {
-> > +             dev_info(parent, "No bus range for %s, using default [0-255]\n",
-> > +                     parent->of_node->full_name);
-> > +             bus_range->start = 0;
-> > +             bus_range->end = 255;
-> > +             bus_range->flags = IORESOURCE_BUS;
-> 
-> If you put the dev_info() down here, you can print &bus_range with %pR.
-
-Sure, will do.
-
-> 
-> > +     }
-> > +     busno = bus_range->start;
-> > +     pci_add_resource(&res, bus_range);
-> > +
-> > +     /* now parse the rest of host bridge bus ranges */
-> > +     err = pci_host_bridge_of_get_ranges(parent->of_node, &res, &io_base);
-> > +     if (err)
-> > +             goto err_create;
-> > +
-> > +     /* then create the root bus */
-> > +     root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
-> > +                                             ops, host_data, &res);
-> > +     if (IS_ERR(root_bus)) {
-> > +             err = PTR_ERR(root_bus);
-> > +             goto err_create;
-> > +     }
-> > +
-> > +     bridge = to_pci_host_bridge(root_bus->bridge);
-> > +     bridge->io_base = io_base;
-> > +
-> > +     return bridge;
-> > +
-> > +err_create:
-> > +     pci_free_resource_list(&res);
-> > +     return ERR_PTR(err);
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_create_pci_host_bridge);
-> > +
-> >  #ifdef CONFIG_PCI_MSI
-> >
-> >  static LIST_HEAD(of_pci_msi_chip_list);
-> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> > index 36c669e..cfee5d1 100644
-> > --- a/drivers/pci/host-bridge.c
-> > +++ b/drivers/pci/host-bridge.c
-> > @@ -5,6 +5,9 @@
-> >  #include <linux/kernel.h>
-> >  #include <linux/pci.h>
-> >  #include <linux/module.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_pci.h>
-> > +#include <linux/slab.h>
-> >
-> >  #include "pci.h"
-> >
-> > @@ -83,3 +86,18 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
-> >       res->end = region->end + offset;
-> >  }
-> >  EXPORT_SYMBOL(pcibios_bus_to_resource);
-> > +
-> > +/**
-> > + * Simple version of the platform specific code for filtering the list
-> > + * of resources obtained from the ranges declaration in DT.
-> > + *
-> > + * Platforms can override this function in order to impose stronger
-> > + * constraints onto the list of resources that a host bridge can use.
-> > + * The filtered list will then be used to create a root bus and associate
-> > + * it with the host bridge.
-> > + *
-> > + */
-> > +int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
-> > +{
-> > +     return 0;
-> > +}
-> 
-> I'd wait to add this until there's a platform that needs to implement it.
-> Splitting it out will make this patch that much smaller and easier to
-> understand.
-
-I need this as this is the default implementation (i.e. do nothing). Otherwise the
-link phase will give errors. 
-
-> 
-> > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> > index dde3a4a..71e36d0 100644
-> > --- a/include/linux/of_pci.h
-> > +++ b/include/linux/of_pci.h
-> > @@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
-> >  int of_pci_get_devfn(struct device_node *np);
-> >  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
-> >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-> > +struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
-> > +                                     struct pci_ops *ops, void *host_data);
-> > +
-> >  #else
-> >  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
-> >  {
-> > @@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> >  {
-> >       return -EINVAL;
-> >  }
-> > +
-> > +static inline struct pci_host_bridge *
-> > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
-> > +                     void *host_data)
-> > +{
-> > +     return NULL;
-> > +}
-> >  #endif
-> >
-> >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > index 7e7b939..556dc5f 100644
-> > --- a/include/linux/pci.h
-> > +++ b/include/linux/pci.h
-> > @@ -402,6 +402,7 @@ struct pci_host_bridge {
-> >       struct device dev;
-> >       struct pci_bus *bus;            /* root bus */
-> >       int domain_nr;
-> > +     resource_size_t io_base;        /* physical address for the start of I/O area */
-> 
-> I don't see where this is used yet.
-
-It's used in pci_host_bridge_of_get_ranges() (earlier in this patch).
-
-> 
-> As far as I know, there's nothing that prevents a host bridge from having
-> several I/O port apertures (or several memory-mapped I/O port spaces).
-
-The pci_register_io_range() will give different offsets for each apperture.
-I just need to make sure I don't overwrite io_base when parsing multiple IO
-ranges.
-
-Thanks for reviewing this,
-Liviu
-
-> 
-> >       struct list_head windows;       /* pci_host_bridge_windows */
-> >       void (*release_fn)(struct pci_host_bridge *);
-> >       void *release_data;
-> > @@ -1809,8 +1810,15 @@ static inline void pci_set_of_node(struct pci_dev *dev) { }
-> >  static inline void pci_release_of_node(struct pci_dev *dev) { }
-> >  static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
-> >  static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
-> > +
-> >  #endif  /* CONFIG_OF */
-> >
-> > +/* Used by architecture code to apply any quirks to the list of
-> > + * pci_host_bridge resource ranges before they are being used
-> > + * by of_create_pci_host_bridge()
-> > + */
-> > +extern int pcibios_fixup_bridge_ranges(struct list_head *resources);
-> > +
-> >  #ifdef CONFIG_EEH
-> >  static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
-> >  {
-> > --
-> > 2.0.0
-> >
+> Okay, do I understand you correctly, it is possible to configure each
+> interrupt source which interrupt shall be triggered?
 > 
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Yes, we configure them in Interrupt Enable (IE) register, each bit represents
+one interrupt source.
+Besides IE register, there's Interrupt Line Select (ILS) register which
+controls each interrupt source is routed to which interrupt line (int0 or int1).
+Be default, we route all interrupts source to int0.
+
+> >>> +- clocks		: Clocks used by controller, should be host clock
+> >>> +			  and CAN clock.
+> >>> +- clock-names		: Should contain "hclk" and "cclk"
+> >>> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> >>> +- pinctrl-names		: Names corresponding to the numbered pinctrl states
+> >>
+> >> is pinctrl really required?
+> 
+> > AFAIK yes.
+> > Is there an exception?
+> 
+> The driver does not enforce pinctrl, but you will probably have non
+> functional CAN, then :). So leave it as required.
+> 
+> [...]
+> 
+> >>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> >>> +				u32 rxfs)
+> >>> +{
+> >>> +	struct m_can_priv *priv = netdev_priv(dev);
+> >>> +	u32 flags, fgi;
+> >>> +	void __iomem *fifo_addr;
+> >>> +
+> >>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> >>
+> >> Just for curiosity, what do the fgi bits tell us?
+> 
+> > It is FIFO Get index.
+> > See the following spec definition:
+> > Bit 21:16 F0PI[5:0]: Rx FIFO 0 Put Index
+> > Rx FIFO 0 write index pointer, range 0 to 63.
+> > Bit 13:8 F0GI[5:0]: Rx FIFO 0 Get Index
+> > Rx FIFO 0 read index pointer, range 0 to 63.
+> > 
+> > It tells us the current element index to be read in the FIFO.
+> > 
+> > When reading from an Rx FIFO, Rx FIFO Get Index RXFnS.FnGI * FIFO Element
+> > Size has to be added to the corresponding Rx FIFO start address RXFnC.FnSA.
+> 
+> Thanks for the explanation.
+> 
+> >>> +	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
+> >>> +	flags = readl(fifo_addr);
+> >>
+> >> What about a function introducing a function?
+> >> static inline u32 m_can_fifo_read(const struct m_can_priv *priv priv,
+> >> u32 fgi, unsgined int offset)
+> 
+> > If do that, this function mostly does the same thing as m_can_read_fifo
+> > (we also need pass the cf to it to handle can frame),
+> > i'm not sure what obvious benefit we can get.
+> > Maybe we could re-range function later when adding FIFO 1 & CANFD Frame
+> > support, then we know clear about what we need to do.
+> 
+> I was just thinking about somethink like this:
+> 
+> static inline u32 m_can_fifo_read(const struct m_can_priv *priv priv,
+>                                   u32 fgi, unsgined int offset)
+> {
+> 	return m_can_read(priv, priv->mram_base + priv->rxf0_off +
+>                           fgi * RXF0_ELEMENT_SIZE + offset)
+> }
+> 
+
+Understand, i'm fine with this way.
+
+> Regarding the mram and the offsets:
+> 
+> > 	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
+> > 	fifo_addr = priv->mram_base + priv->mram_off + priv->txb_off;
+> 
+> Why is rxf0_off used without the mram_off and txb_off with the mram_off?
+> Can you please test your driver with a mram offset != in your DT.
+> 
+> If I understand the code in m_can_of_parse_mram() correctly the
+> individual *_off are already offsets to the *mram_base, so mram_off
+> should not be used within the driver.
+
+Good catch!
+You're right! I aslo found this recently!
+txb_off already includes the mram_off so should not plus mram_off again.
+The former test did not find it because it's still not exceed the 16K ram
+size for m_can0. But m_can1 has such issue.
+
+> I even think mram_off should be removed from the priv.
+
+Right, i also think so.
+
+It is used for debug information formerly that we need mram_off
+to calculate each element address in the fifo.
+
+By removing mram_off, i'm going to change the debug information to:
+dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 %x %d rxf1 %x %d rxb %x %d txe %x %d txb %x %d\n",
+	priv->mram_base, priv->sidf_off, priv->sidf_elems,
+	priv->xidf_off, priv->xidf_elems, priv->rxf0_off,
+	priv->rxf0_elems, priv->rxf1_off, priv->rxf1_elems,
+	priv->rxb_off, priv->rxb_elems, priv->txe_off,
+	priv->txe_elems, priv->txb_off, priv->txb_elems);
+
+The annoying thing is the line has to be a much bigger one to avoid
+checkpatch warning of "WARNING: quoted string split across lines".
+
+What's your suggestion for such issue?
+Keeping the big line or split into two lines and leave checkpatch warning there?
+
+> Do the *_off and *_elems fit into a u8 or u16? If
+> so it makes sense to convert the priv accordingly.
+> 
+
+Yes, *_off fit into u16 since MRAM has a maximum of 4352 words(17K).
+And *_elems fit into u8 since the max number is 128.
+I will change them accordingly.
+
+> What about putting the offset and the number of elements into a struct
+> and make use an array for rxf{0,1}?
+> 
+
+You mean something like below?
+struct mram_cfg {
+	u16 off;
+	u8  elements;
+};
+
+struct m_can_priv {
+	........
+
+        struct mram_cfg sidf;
+        struct mram_cfg xidf;
+        struct mram_cfg rxf0;
+        struct mram_cfg rxf1;
+	......
+        struct mram_cfg txb;
+};
+
+Regards
+Dong Aisheng
+
+> >>> +static struct net_device *alloc_m_can_dev(void)
+> >>> +{
+> >>> +	struct net_device *dev;
+> >>> +	struct m_can_priv *priv;
+> >>> +
+> >>> +	dev = alloc_candev(sizeof(struct m_can_priv), 1);
+> >>> +	if (!dev)
+> >>> +		return NULL;
+> >>> +
+> >>> +	priv = netdev_priv(dev);
+> >>> +	netif_napi_add(dev, &priv->napi, m_can_poll, M_CAN_NAPI_WEIGHT);
+> >>> +
+> >>> +	priv->dev = dev;
+> >>> +	priv->can.bittiming_const = &m_can_bittiming_const;
+> >>> +	priv->can.do_set_mode = m_can_set_mode;
+> >>> +	priv->can.do_get_berr_counter = m_can_get_berr_counter;
+> >>> +	priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
+> >>> +					CAN_CTRLMODE_LISTENONLY |
+> >>> +					CAN_CTRLMODE_BERR_REPORTING;
+> >>
+> >> Please take care of CAN_CTRLMODE_BERR_REPORTING, i.e. only enable bus
+> >> the bus error interrupt if this bit is set.
+> >>
+> > 
+> > Okay, BTW, does BERR_REPROTING includes lost message error?
+> 
+> The lost message interrupt should always be enabled and reported via a
+> CAN error message.
+> 
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
