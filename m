@@ -1,71 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Jul 2014 08:01:06 -0400
-Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
-In-Reply-To: <20140707233758.GA1456@arch.cereza>
-References: <20140703135146.GA6898@luxor.wired.org>
- <53B5C61D.2060308@free-electrons.com>
- <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
- <20140705150308.GA28791@arch.cereza>
- <20140705205951.GB3678@kroah.com>
- <20140707105818.GA1101@arch.cereza>
- <20140707183002.GA5947@kroah.com>
- <20140707233758.GA1456@arch.cereza>
-Message-ID: <20140708120106.GS23978@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jul 2014 13:01:17 +0100
+Subject: [PATCH C 0/7] Freescale ethernet driver updates (part 3)
+Message-ID: <20140708120117.GJ21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
+David,
 
-On Mon, Jul 07, 2014 at 08:37:58PM -0300, Ezequiel Garcia wrote:
-> On 07 Jul 11:30 AM, Greg Kroah-Hartman wrote:
-> > On Mon, Jul 07, 2014 at 07:58:18AM -0300, Ezequiel Garcia wrote:
-> [..]
-> > > 
-> > > I guess I snipped the thread and lost most of the information about the panic.
-> > > Here's the original bug report:
-> > > 
-> > > http://www.spinics.net/lists/arm-kernel/msg344059.html
-> > > 
-> > > The problem reported involves enabling OMAP IOMMU driver and not any other IOMMU
-> > > driver. Doing some tracing and adding a few prints, we found that
-> > > omap_iommu_init() sets a bus notifier for the platform bus type:
-> > > 
-> > > omap_iommu_init -> bus_set_iommu -> iommu_bus_init:
-> > > 
-> > > static void iommu_bus_init(struct bus_type *bus, struct iommu_ops *ops)
-> > > {
-> > >         bus_register_notifier(bus, &iommu_bus_nb);
-> > >         bus_for_each_dev(bus, NULL, ops, add_iommu_group);
-> > > }
-> > > 
-> > > But the iommu bus notifier gets called for the 'pci' bus type, which
-> > > has the iommu_ops field NULL (since it hasn't been set for iommu).
-> > 
-> > So this is what needs to be figured out, how is the notifier being
-> > called with a PCI device?  Who else called iommu_bus_init() for the PCI
-> > bus?
-> > 
-> 
-> Nobody. The only caller of iommu_bus_init() the above OMAP IOMMU.
-> 
-> However, I found something interesting. Tried to bisect this without much
-> luck; I did two bisects and ended up in the same merge commit:
-> 
-> # good: [0f16aa3c24a216d14d7f0587e1cbd2c1b51a38f3] Merge tag 'samsung-dt-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/dt
-> # first bad commit: [755a9ba7bf24a45b6dbf8bb15a5a56c8ed12461a] Merge tag 'dt-for-3.16' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into next
-> 
-> So, after doing a few diff's between that good and bad and searching for
-> "bus_notifier" changes, saw something strange in arch/arm/mach-mvebu/coherency.c.
-> 
-> It seems bus_register_notifier() is been called for platform and pci devices
-> with the *same* notifier block. Haven't looked close enough, but you mentioned
-> that could cause trouble?
-> 
-> This patch fixes the issue here:
+Here's the third batch of patches for the Freescale FEC ethernet driver,
+based upon the previous set of patches.  This concludes the changes I
+currently have prepared and have been reviewed for the next merge window
+at this time.
 
-Thanks for digging in to this!  Please submit this as patch on it's own
-and I'll merge it in.
+Many thanks.
 
-thx,
+ drivers/net/ethernet/freescale/fec.h      |   9 +-
+ drivers/net/ethernet/freescale/fec_main.c | 139 ++++++++++++++----------------
+ 2 files changed, 68 insertions(+), 80 deletions(-)
 
-Jason.
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
