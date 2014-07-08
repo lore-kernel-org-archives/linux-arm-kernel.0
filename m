@@ -1,104 +1,72 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 08 Jul 2014 12:41:41 +0200
-Subject: [PATCH v2 1/1] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <20140708103009.GA21754@shlinux1.ap.freescale.net>
-References: <1404474812-16855-1-git-send-email-b29396@freescale.com>
- <53B69C55.8010901@pengutronix.de>
- <20140707071040.GA18505@shlinux1.ap.freescale.net>
- <53BA7543.70901@pengutronix.de>
- <20140708103009.GA21754@shlinux1.ap.freescale.net>
-Message-ID: <53BBCAE5.7040404@pengutronix.de>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Jul 2014 11:42:48 +0100
+Subject: [PATCH v8 2/9] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <20140707232749.GA22939@google.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-3-git-send-email-Liviu.Dudau@arm.com>
+ <20140707232749.GA22939@google.com>
+Message-ID: <20140708104248.GB6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2014 12:30 PM, Dong Aisheng wrote:
->> Regarding the mram and the offsets:
->>
->>> 	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
->>> 	fifo_addr = priv->mram_base + priv->mram_off + priv->txb_off;
->>
->> Why is rxf0_off used without the mram_off and txb_off with the mram_off?
->> Can you please test your driver with a mram offset != in your DT.
->>
->> If I understand the code in m_can_of_parse_mram() correctly the
->> individual *_off are already offsets to the *mram_base, so mram_off
->> should not be used within the driver.
+On Tue, Jul 08, 2014 at 12:27:49AM +0100, Bjorn Helgaas wrote:
+> On Tue, Jul 01, 2014 at 07:43:27PM +0100, Liviu Dudau wrote:
+> > This is a useful function and we should make it visible outside the
+> > generic PCI code. Export it as a GPL symbol.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  drivers/pci/host-bridge.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> > index 0e5f3c9..36c669e 100644
+> > --- a/drivers/pci/host-bridge.c
+> > +++ b/drivers/pci/host-bridge.c
+> > @@ -16,12 +16,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+> >  	return bus;
+> >  }
+> >  
+> > -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> > +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> >  {
+> >  	struct pci_bus *root_bus = find_pci_root_bus(bus);
+> >  
+> >  	return to_pci_host_bridge(root_bus->bridge);
+> >  }
+> > +EXPORT_SYMBOL_GPL(find_pci_host_bridge);
 > 
-> Good catch!
-> You're right! I aslo found this recently!
-> txb_off already includes the mram_off so should not plus mram_off again.
-> The former test did not find it because it's still not exceed the 16K ram
-> size for m_can0. But m_can1 has such issue.
+> There's nothing in this series that uses find_pci_host_bridge(), so 
+> how about we just wait until we have something that needs it?
 > 
->> I even think mram_off should be removed from the priv.
-> 
-> Right, i also think so.
-> 
-> It is used for debug information formerly that we need mram_off
-> to calculate each element address in the fifo.
-> 
-> By removing mram_off, i'm going to change the debug information to:
-> dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 %x %d rxf1 %x %d rxb %x %d txe %x %d txb %x %d\n",
-> 	priv->mram_base, priv->sidf_off, priv->sidf_elems,
-> 	priv->xidf_off, priv->xidf_elems, priv->rxf0_off,
-> 	priv->rxf0_elems, priv->rxf1_off, priv->rxf1_elems,
-> 	priv->rxb_off, priv->rxb_elems, priv->txe_off,
-> 	priv->txe_elems, priv->txb_off, priv->txb_elems);
-> 
-> The annoying thing is the line has to be a much bigger one to avoid
-> checkpatch warning of "WARNING: quoted string split across lines".
-> 
-> What's your suggestion for such issue?
-> Keeping the big line or split into two lines and leave checkpatch warning there?
+> Also, if/when we export this, I'd prefer a name that starts with "pci_"
+> as most of the other interfaces do.
 
-The idea behind the warning is, that you can grep for error messages
-better, as normal grep wouldn't find an error string which spans two
-lines. So make it a long line.
+Understood.
 
->> Do the *_off and *_elems fit into a u8 or u16? If
->> so it makes sense to convert the priv accordingly.
->>
-> 
-> Yes, *_off fit into u16 since MRAM has a maximum of 4352 words(17K).
-> And *_elems fit into u8 since the max number is 128.
-> I will change them accordingly.
-> 
->> What about putting the offset and the number of elements into a struct
->> and make use an array for rxf{0,1}?
->>
-> 
-> You mean something like below?
-> struct mram_cfg {
-> 	u16 off;
-> 	u8  elements;
-> };
-> 
-> struct m_can_priv {
-> 	........
-> 
->         struct mram_cfg sidf;
->         struct mram_cfg xidf;
->         struct mram_cfg rxf0;
->         struct mram_cfg rxf1;
+I was using the function in the other patch series that adds PCIe support to arm64
+in order to provide a pci_domain_nr() implementation. But I might not need it
+in the end if I go ahead with separating pci_host_bridge creation from bus
+creation.
 
-struct mram_cfg rxf[2];
+Best regards,
+Liviu
 
-> 	......
->         struct mram_cfg txb;
-> };
-
-Marc
+> 
+> >  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+> >  				 void (*release_fn)(struct pci_host_bridge *),
+> > -- 
+> > 2.0.0
+> > 
+> 
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/ef535101/attachment.sig>
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
