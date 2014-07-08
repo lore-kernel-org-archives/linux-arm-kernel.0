@@ -1,89 +1,34 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 08 Jul 2014 13:02:09 +0100
-Subject: [PATCH C 7/7] net: fec: consolidate hwtstamp implementation
-In-Reply-To: <20140708120117.GJ21766@n2100.arm.linux.org.uk>
-References: <20140708120117.GJ21766@n2100.arm.linux.org.uk>
-Message-ID: <E1X4U65-0005uM-HG@rmk-PC.arm.linux.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 08 Jul 2014 14:03:37 +0200
+Subject: [PATCH] ARM: EXYNOS: use u8 for val[] in struct exynos_pmu_conf
+Message-ID: <2379473.Yu7PYOQ3m0@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both transmit and receive use the same infrastructure for calculating
-the packet timestamp.  Rather than duplicating the code, provide a
-function to do this common work.  Model this function in the Intel
-e1000e version which avoids calling ns_to_ktime() within the spinlock;
-the spinlock is critical for timecounter_cyc2time() but not
-ns_to_ktime().
+Values stored in val[] are never bigger than a byte.
 
-Acked-by: Richard Cochran <richardcochran@gmail.com>
-Acked-by: Fugang Duan <B38611@freescale.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+   text    data     bss     dec     hex filename
+   5264       4       4    5272    1498 arch/arm/mach-exynos/pmu.o.before
+   2992       4       4    3000     bb8 arch/arm/mach-exynos/pmu.o.after
+
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 37 ++++++++++++++++---------------
- 1 file changed, 19 insertions(+), 18 deletions(-)
+ arch/arm/mach-exynos/common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 8679c919419c..e0efb212223f 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1065,6 +1065,21 @@ static void fec_enet_timeout_work(struct work_struct *work)
- }
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index b850db4..55ff019 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -101,7 +101,7 @@ enum sys_powerdown {
  
- static void
-+fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
-+	struct skb_shared_hwtstamps *hwtstamps)
-+{
-+	unsigned long flags;
-+	u64 ns;
-+
-+	spin_lock_irqsave(&fep->tmreg_lock, flags);
-+	ns = timecounter_cyc2time(&fep->tc, ts);
-+	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
-+
-+	memset(hwtstamps, 0, sizeof(*hwtstamps));
-+	hwtstamps->hwtstamp = ns_to_ktime(ns);
-+}
-+
-+static void
- fec_enet_tx(struct net_device *ndev)
- {
- 	struct	fec_enet_private *fep;
-@@ -1122,14 +1137,9 @@ fec_enet_tx(struct net_device *ndev)
- 		if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS) &&
- 			fep->bufdesc_ex) {
- 			struct skb_shared_hwtstamps shhwtstamps;
--			unsigned long flags;
- 			struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
+ struct exynos_pmu_conf {
+ 	void __iomem *reg;
+-	unsigned int val[NUM_SYS_POWERDOWN];
++	u8 val[NUM_SYS_POWERDOWN];
+ };
  
--			memset(&shhwtstamps, 0, sizeof(shhwtstamps));
--			spin_lock_irqsave(&fep->tmreg_lock, flags);
--			shhwtstamps.hwtstamp = ns_to_ktime(
--				timecounter_cyc2time(&fep->tc, ebdp->ts));
--			spin_unlock_irqrestore(&fep->tmreg_lock, flags);
-+			fec_enet_hwtstamp(fep, ebdp->ts, &shhwtstamps);
- 			skb_tstamp_tx(skb, &shhwtstamps);
- 		}
- 
-@@ -1288,18 +1298,9 @@ fec_enet_rx(struct net_device *ndev, int budget)
- 			skb->protocol = eth_type_trans(skb, ndev);
- 
- 			/* Get receive timestamp from the skb */
--			if (fep->hwts_rx_en && fep->bufdesc_ex) {
--				struct skb_shared_hwtstamps *shhwtstamps =
--							    skb_hwtstamps(skb);
--				unsigned long flags;
--
--				memset(shhwtstamps, 0, sizeof(*shhwtstamps));
--
--				spin_lock_irqsave(&fep->tmreg_lock, flags);
--				shhwtstamps->hwtstamp = ns_to_ktime(
--				    timecounter_cyc2time(&fep->tc, ebdp->ts));
--				spin_unlock_irqrestore(&fep->tmreg_lock, flags);
--			}
-+			if (fep->hwts_rx_en && fep->bufdesc_ex)
-+				fec_enet_hwtstamp(fep, ebdp->ts,
-+						  skb_hwtstamps(skb));
- 
- 			if (fep->bufdesc_ex &&
- 			    (fep->csum_flags & FLAG_RX_CSUM_ENABLED)) {
+ extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
 -- 
-1.8.3.1
+1.8.2.3
