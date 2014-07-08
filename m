@@ -1,37 +1,68 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 8 Jul 2014 09:40:37 +0200
-Subject: [PATCH v2 3/3] MAINTAINERS: Add dwc3-st.c file to ARCH/STI
- architecture
-In-Reply-To: <1404541530-27856-4-git-send-email-peter.griffin@linaro.org>
-References: <1404541530-27856-1-git-send-email-peter.griffin@linaro.org>
- <1404541530-27856-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <53BBA075.9040204@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Jul 2014 09:41:49 +0200
+Subject: 3.16rc3 multiplatform, Armada 370 and IOMMU: unbootable kernel
+In-Reply-To: <20140707233758.GA1456@arch.cereza>
+References: <20140703135146.GA6898@luxor.wired.org>
+ <53B5C61D.2060308@free-electrons.com>
+ <53B5CA26.7050405@free-electrons.com> <1936558.QaAG1bYMuD@avalon>
+ <20140705150308.GA28791@arch.cereza>
+ <20140705205951.GB3678@kroah.com>
+ <20140707105818.GA1101@arch.cereza>
+ <20140707183002.GA5947@kroah.com>
+ <20140707233758.GA1456@arch.cereza>
+Message-ID: <20140708094149.0ad6ab13@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Dear Ezequiel Garcia,
 
-On 07/05/2014 08:25 AM, Peter Griffin wrote:
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+On Mon, 7 Jul 2014 20:37:58 -0300, Ezequiel Garcia wrote:
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> It seems bus_register_notifier() is been called for platform and pci devices
+> with the *same* notifier block. Haven't looked close enough, but you mentioned
+> that could cause trouble?
+> 
+> This patch fixes the issue here:
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index 477202f..2bdc323 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -292,6 +292,10 @@ static struct notifier_block mvebu_hwcc_nb = {
+>  	.notifier_call = mvebu_hwcc_notifier,
+>  };
+>  
+> +static struct notifier_block mvebu_hwcc_pci_nb = {
+> +	.notifier_call = mvebu_hwcc_notifier,
+> +};
+> +
+>  static void __init armada_370_coherency_init(struct device_node *np)
+>  {
+>  	struct resource res;
+> @@ -427,7 +431,7 @@ static int __init coherency_pci_init(void)
+>  {
+>  	if (coherency_available())
+>  		bus_register_notifier(&pci_bus_type,
+> -				       &mvebu_hwcc_nb);
+> +				       &mvebu_hwcc_pci_nb);
+>  	return 0;
+>  }
+>  
+> Paolo, can you apply it and confirm it fixes the problem?
+> 
+> Greg, can you confirm using the same notifier block pointer
+> for two different bus types makes the bus notifier go nuts?
 
-Thanks,
-Maxime
-> ---
->   MAINTAINERS | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 702ca10..269ad3b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1325,6 +1325,7 @@ F:	drivers/pinctrl/pinctrl-st.c
->   F:	drivers/media/rc/st_rc.c
->   F:	drivers/i2c/busses/i2c-st.c
->   F:	drivers/tty/serial/st-asc.c
-> +F:	drivers/usb/dwc3/dwc3-st.c
->
->   ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
->   M:	Lennert Buytenhek <kernel@wantstofly.org>
->
+Looking at how notifier_chain_register() is implemented (which gets
+called by bus_register_notifier() ->
+blocking_notifier_chain_register()), I indeed don't see how a single
+'struct notifier_block' can be registered on multiple notifier chains,
+so I believe your patch is correct.
+
+Thanks for the investigation!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
