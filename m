@@ -1,69 +1,91 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Jul 2014 16:04:17 +0200
-Subject: [PATCH v2 0/4] Add support for Exynos clock output configuration
-In-Reply-To: <20140703001452.7440.8476@quantum>
-References: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
- <026001cf9061$5fef9d00$1fced700$@samsung.com>
- <20140703001452.7440.8476@quantum>
-Message-ID: <53BBFA61.1030602@samsung.com>
+Date: Tue, 08 Jul 2014 16:06:18 +0200
+Subject: [PATCH] ARM: dts: Add I2S dt node for Exynos3250
+In-Reply-To: <53B67156.2020702@samsung.com>
+References: <1404373939-10510-1-git-send-email-cw00.choi@samsung.com>
+ <53B66066.4030202@gmail.com> <53B67156.2020702@samsung.com>
+Message-ID: <53BBFADA.1080603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.07.2014 02:14, Mike Turquette wrote:
-> Quoting Kukjin Kim (2014-06-25 03:36:51)
->> Tomasz Figa wrote:
->>>
->> Hi Tomasz,
->>
->>> On all Exynos SoCs there is a dedicated CLKOUT pin that allows many of
->>> internal SoC clocks to be output from the SoC. The hardware structure
->>
->> Yeah, because the CLKOUT pin is used for measure of the clock for debug on all
->> of exynos SoCs commonly.
->>
->>> of CLKOUT related clocks looks as follows:
->>>
->>>       CMU     |---> clock0 ---------> |       PMU     |
->>>               |                       |               |
->>>     several   |---> clock1 ---------> |       mux     |
->>>     muxes     |                       |       +       |---> CLKOUT
->>>     dividers  |       ...             |       gate    |
->>>     and gates |                       |               |
->>>               |---> clockN ---------> |               |
->>>
->>> Since the block responsible for handling the pin is PMU, not CMU,
->>> a separate driver, that binds to PMU node is required and acquires
->>> all input clocks by standard DT clock look-up. This way we don't need
->>> any cross-IP block drivers and cross-driver register sharing or
->>> nodes for fake devices.
->>>
->> BTW, upcoming exynos5 SoCs have two muxs for CLKOUT and each mux is controlled
->> by CMU and PMU, so
->>
->> The mux1 for CLKOUT in CMU is used to decide which clock in each sub-domain
->> will be out and the mux2 in PMU is used to decide which sub-domain will be out
->> via CLKOUT. So I want you to consider of all of exynos SoCs including upcoming
->> SoCs.
+Hi Chanwoo,
+
+On 04.07.2014 11:18, Chanwoo Choi wrote:
+> Dear Kukjin and Tomasz,
 > 
-> clkout for debug is very useful indeed. For SoCs with high speed clocks
-> that I have worked with, I have often observed that the clkout logic
-> introduces buffers or dividers. This is needed so that you can get a
-> (relatively) clean clock signal on your oscilloscope. Otherwise that
-> 2GHz ARM clk is just going to be noise ;-)
+> On 07/04/2014 05:05 PM, Tomasz Figa wrote:
+>> Hi Chanwoo,
+>>
+>> On 03.07.2014 09:52, Chanwoo Choi wrote:
+>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>
+>>> This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
+>>> (1 channels) IIS-bus for audio interface with DMA-based operation.
+>>>
+>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>> Signed-off-by: Inha Song <ideal.song@samsung.com>
+>>> Tested-by: Inha Song <ideal.song@samsung.com>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
+>>>  1 file changed, 13 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>>> index 1f8384f..e9017ef 100644
+>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>>> @@ -644,6 +644,19 @@
+>>>  			status = "disabled";
+>>>  		};
+>>>  
+>>> +		i2s: i2s at 13970000 {
+>>
+>> Shouldn't the label be rather called "i2s2" as the pinctrl entry below
+>> suggests?
+>>
+>>> +			compatible = "samsung,s3c6410-i2s";
+>>> +			reg = <0x13970000 0x100>;
+>>> +			interrupts = <0 126 0>;
+>>> +			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
+>>> +			clock-names = "iis", "i2s_opclk0";
+>>> +			dmas = <&pdma0 14>, <&pdma0 13>;
+>>> +			dma-names = "tx", "rx";
+>>> +			pinctrl-0 = <&i2s2_bus>;
+>>> +			pinctrl-name = "default";
+>>
+>> "pinctrl-name" is not a valid property. I suppose it should be
+>> "pinctrl-names".
 > 
-> These divider values can modeled in the clk framework. Do you know if
-> you have such stuff on your chip?
+> I modify this patch as following. If you confirm following patch, I'll re-send patchset(v2).
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index 3e678fa..77a06df 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -425,6 +425,19 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		i2s2: i2s at 13970000 {
+> +			compatible = "samsung,s3c6410-i2s";
+> +			reg = <0x13970000 0x100>;
+> +			interrupts = <0 126 0>;
+> +			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
+> +			clock-names = "iis", "i2s_opclk0";
+> +			dmas = <&pdma0 14>, <&pdma0 13>;
+> +			dma-names = "tx", "rx";
+> +			pinctrl-0 = <&i2s2_bus>;
+> +			pinctrl-names = "default";
+> +			status = "disabled";
+> +		};
+> +
+>  		pwm: pwm at 139D0000 {
+>  			compatible = "samsung,exynos4210-pwm";
+>  			reg = <0x139D0000 0x1000>;
+> 
 
-I believe this is what I have already implemented in my series.
-
-The final CLKOUT mux and gates are implemented by separate driver,
-because they reside in another IP block, while per-domain CLKOUT
-dividers along with muxes and gates are registered by normal SoC clock
-driver, because they are part of the clock controller. See patch 2/4
-adding the whole hierarchy for Exynos4 SoCs.
-
-I don't have boards to test CLKOUT on Exynos5 SoCs, so they are up to
-interested people.
+Looks good.
 
 Best regards,
 Tomasz
