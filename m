@@ -1,60 +1,90 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Tue, 08 Jul 2014 08:30:13 +0530
-Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
- Exynos5420
-In-Reply-To: <53BB2E7A.5080204@samsung.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>	<1402464739-19044-3-git-send-email-tushar.b@samsung.com>	<CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>	<7hpphwlgn0.fsf@paris.lan>	<CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>	<7h8uojk61a.fsf@paris.lan>	<53ACE724.7090606@gmail.com>	<CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
- <CAGa+x87LHiYGb03=GRcZisK1=TyakW1htd1E2vOQ6ijZKw8syg@mail.gmail.com>
- <53B2A2A5.4070203@gmail.com> <53BB2E7A.5080204@samsung.com>
-Message-ID: <53BB5EBD.5030607@gmail.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Tue, 08 Jul 2014 08:43:45 +0530
+Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
+In-Reply-To: <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <53BB61E9.80200@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2014 05:04 AM, Kukjin Kim wrote:
-> On 07/01/14 20:59, Tushar Behera wrote:
->> On 06/27/2014 08:18 PM, Kevin Hilman wrote:
->>> On Fri, Jun 27, 2014 at 7:18 AM, Kevin Hilman<khilman@linaro.org> 
->>> wrote:
->>>> On Thu, Jun 26, 2014 at 8:38 PM, Tushar Behera<trblinux@gmail.com> 
->>>> wrote:
->>>>
->>>>> Would you please provide me the environment setting of your u-boot?
->>>>> U-boot environment on my board has been over-written, I would like to
->>>>> set it same as yours and try to reproduce the issue at my end. With
->>>>> only
->>>>> 'sound init', I don't seem to hit this issue anymore.
->>>>
->>>> Attached is a full boot log using v3.16-rc2 with my patch adding
->>>> CLK_IGNORE_UNUSED to mau_epll and Doug's aclk66_peric patch.  In the
->>>> boot log, you'll see the output of 'printenv' inside u-boot where the
->>>> environment is dumped.
->>>
->>> Oops, I sent you a boot log for the octa board.  Here's the one for
->>> peach-pi with the same kernel (built with upstream exynos_defconfig)
->>>
->>> Kevin
->>>
->>
->> The u-boot version is a little different on my Peach-Pi as compared to
->> the market release version. Not sure if that is making any difference.
->>
->> Peach # version
->>
->> U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
->> armv7a-cros-linux-gnueabi-gcc.real (4.8.1_cos_gg_feea904_4.8.1-r66)
->> 4.8.x-google 20130905 (prerelease)
->> GNU ld (binutils-2.22_cos_gg_2) 2.22
->>
+On 06/30/2014 09:35 PM, Vincent Guittot wrote:
+> The imbalance flag can stay set whereas there is no imbalance.
 > 
-> Note that I've applied this only from this series so I'm not sure how
-> much the problem can be solved...any updates for 1/3 and 3/3?
+> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+> We will have some idle load balance which are triggered during tick.
+> Unfortunately, the tick is also used to queue background work so we can reach
+> the situation where short work has been queued on a CPU which already runs a
+> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+> detected and the imbalance flag is set.
+> Then, we will not be able to clear the flag because we have at most 1 task on
+> each CPU but the imbalance flag will trig to useless active load balance
+> between the idle CPU and the busy CPU.
 > 
-> - Kukjin
+> We need to reset of the imbalance flag as soon as we have reached a balanced
+> state.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index d3c73122..0c48dff 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6615,10 +6615,8 @@ more_balance:
+>  		if (sd_parent) {
+>  			int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+> 
+> -			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
+> +			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0)
+>  				*group_imbalance = 1;
+> -			} else if (*group_imbalance)
+> -				*group_imbalance = 0;
+>  		}
+> 
+>  		/* All tasks on this runqueue were pinned by CPU affinity */
+> @@ -6703,6 +6701,16 @@ more_balance:
+>  	goto out;
+> 
+>  out_balanced:
+> +	/*
+> +	 * We reach balance although we may have faced some affinity
+> +	 * constraints. Clear the imbalance flag if it was set.
+> +	 */
+> +	if (sd_parent) {
+> +		int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+> +		if (*group_imbalance)
+> +			*group_imbalance = 0;
+> +	}
+> +
+>  	schedstat_inc(sd, lb_balanced[idle]);
+> 
+>  	sd->nr_balance_failed = 0;
+> 
+I am not convinced that we can clear the imbalance flag here. Lets take
+a simple example. Assume at a particular level of sched_domain, there
+are two sched_groups with one cpu each. There are 2 tasks on the source
+cpu, one of which is running(t1) and the other thread(t2) does not have
+the dst_cpu in the tsk_allowed_mask. Now no task can be migrated to the
+dst_cpu due to affinity constraints. Note that t2 is *not pinned, it
+just cannot run on the dst_cpu*. In this scenario also we reach the
+out_balanced tag right? If we set the group_imbalance flag to 0, we are
+ruling out the possibility of migrating t2 to any other cpu in a higher
+level sched_domain by saying that all is well, there is no imbalance.
+This is wrong, isn't it?
 
-Thanks for applying 2/3. I am working on 1/3 to see if we are following
-the right approach to fix Kevin's issue (unfortunately, I am not hitting
-the bug on my board ATM). 3/3 has already been merged through a
-different patchset.
+My point is that by clearing the imbalance flag in the out_balanced
+case, you might be overlooking the fact that the tsk_cpus_allowed mask
+of the tasks on the src_cpu may not be able to run on the dst_cpu in
+*this* level of sched_domain, but can potentially run on a cpu at any
+higher level of sched_domain. By clearing the flag, we are not
+encouraging load balance at that level for t2.
 
--- 
-Tushar Behera
+Am I missing something?
+
+Regards
+Preeti U Murthy
