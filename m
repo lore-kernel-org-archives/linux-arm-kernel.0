@@ -1,74 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue,  8 Jul 2014 16:54:18 +0100
-Subject: [PATCH] efi: fdt: Do not report an error during boot if UEFI is not
- available
-Message-ID: <1404834858-10706-1-git-send-email-catalin.marinas@arm.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Tue,  8 Jul 2014 18:54:26 +0300
+Subject: [PATCH 0/3] Support for Qualcomm QPNP PMIC's
+Message-ID: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, fdt_find_uefi_params() reports an error if no EFI parameters
-are found in the DT. This is however a valid case for non-UEFI kernel
-booting. This patch checks changes the error reporting to a
-pr_info("UEFI not found") when no EFI parameters are found in the DT.
+Hello to all,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- drivers/firmware/efi/efi.c | 22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+Here is patch set which adds Qualcomm QPNP PMIC's support.
+I've removed RFC tag and sending as regular set hoping that
+this time more comments will come out. The link to the RFCv2
+at [1].
 
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index eff1a2f22f09..dc79346689e6 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -346,6 +346,7 @@ static __initdata struct {
- 
- struct param_info {
- 	int verbose;
-+	int found;
- 	void *params;
- };
- 
-@@ -362,16 +363,12 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
- 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
- 		return 0;
- 
--	pr_info("Getting parameters from FDT:\n");
--
- 	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
- 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
--		if (!prop) {
--			pr_err("Can't find %s in device tree!\n",
--			       dt_params[i].name);
-+		if (!prop)
- 			return 0;
--		}
- 		dest = info->params + dt_params[i].offset;
-+		info->found++;
- 
- 		val = of_read_number(prop, len / sizeof(u32));
- 
-@@ -390,10 +387,21 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
- int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
- {
- 	struct param_info info;
-+	int ret;
-+
-+	pr_info("Getting EFI parameters from FDT:\n");
- 
- 	info.verbose = verbose;
-+	info.found = 0;
- 	info.params = params;
- 
--	return of_scan_flat_dt(fdt_find_uefi_params, &info);
-+	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
-+	if (!info.found)
-+		pr_info("UEFI not found.\n");
-+	else if (!ret)
-+		pr_err("Can't find '%s' in device tree!\n",
-+		       dt_params[info.found].name);
-+
-+	return ret;
- }
- #endif /* CONFIG_EFI_PARAMS_FROM_FDT */
+The first patch in the set implements an *of* based parsing of
+PMIC peripheral resources and adding mfd cell for it.
+The devicetree node should contain a compatible and reg
+proparties. The intention was to keep things simple and similar
+to the other mfd drivers. 
+
+The second patch adds binding document for qpnp-spmi.
+
+The third patch describes the devicetree binding of the slave
+devices attached to the SPMI interface. 
+
+Comments are welcome.
+
+regards,
+Stan
+
+[1] https://lkml.org/lkml/2014/7/3/443
+
+Ivan T. Ivanov (2):
+  mfd: qpnp-spmi: document DT bindings for Qualcomm QPNP PMICs
+  dt: qcom: msm8974: add qpnp-spmi device nodes
+
+Josh Cartwright (1):
+  mfd: qpnp-spmi: add support for Qualcomm QPNP PMICs
+
+ .../devicetree/bindings/qpnp/qcom,qpnp-spmi.txt    |   53 +++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |   45 ++++++
+ drivers/mfd/Kconfig                                |   15 ++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/qpnp-spmi.c                            |  145 ++++++++++++++++++++
+ 5 files changed, 259 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/qpnp/qcom,qpnp-spmi.txt
+ create mode 100644 drivers/mfd/qpnp-spmi.c
