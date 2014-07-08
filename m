@@ -1,87 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Jul 2014 23:02:33 +0900
-Subject: [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
-In-Reply-To: <1403618235-19353-6-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-6-git-send-email-t.figa@samsung.com>
-Message-ID: <036c01cf9ab5$43c5d370$cb517a50$@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Jul 2014 16:04:17 +0200
+Subject: [PATCH v2 0/4] Add support for Exynos clock output configuration
+In-Reply-To: <20140703001452.7440.8476@quantum>
+References: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
+ <026001cf9061$5fef9d00$1fced700$@samsung.com>
+ <20140703001452.7440.8476@quantum>
+Message-ID: <53BBFA61.1030602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+On 03.07.2014 02:14, Mike Turquette wrote:
+> Quoting Kukjin Kim (2014-06-25 03:36:51)
+>> Tomasz Figa wrote:
+>>>
+>> Hi Tomasz,
+>>
+>>> On all Exynos SoCs there is a dedicated CLKOUT pin that allows many of
+>>> internal SoC clocks to be output from the SoC. The hardware structure
+>>
+>> Yeah, because the CLKOUT pin is used for measure of the clock for debug on all
+>> of exynos SoCs commonly.
+>>
+>>> of CLKOUT related clocks looks as follows:
+>>>
+>>>       CMU     |---> clock0 ---------> |       PMU     |
+>>>               |                       |               |
+>>>     several   |---> clock1 ---------> |       mux     |
+>>>     muxes     |                       |       +       |---> CLKOUT
+>>>     dividers  |       ...             |       gate    |
+>>>     and gates |                       |               |
+>>>               |---> clockN ---------> |               |
+>>>
+>>> Since the block responsible for handling the pin is PMU, not CMU,
+>>> a separate driver, that binds to PMU node is required and acquires
+>>> all input clocks by standard DT clock look-up. This way we don't need
+>>> any cross-IP block drivers and cross-driver register sharing or
+>>> nodes for fake devices.
+>>>
+>> BTW, upcoming exynos5 SoCs have two muxs for CLKOUT and each mux is controlled
+>> by CMU and PMU, so
+>>
+>> The mux1 for CLKOUT in CMU is used to decide which clock in each sub-domain
+>> will be out and the mux2 in PMU is used to decide which sub-domain will be out
+>> via CLKOUT. So I want you to consider of all of exynos SoCs including upcoming
+>> SoCs.
 > 
-> Due to recent consolidation of Exynos suspend and cpuidle code, some
-> parts of suspend and resume sequences are executed two times, once from
-> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
-> breaks suspend, at least on Exynos4-based boards.
+> clkout for debug is very useful indeed. For SoCs with high speed clocks
+> that I have worked with, I have often observed that the clkout logic
+> introduces buffers or dividers. This is needed so that you can get a
+> (relatively) clean clock signal on your oscilloscope. Otherwise that
+> 2GHz ARM clk is just going to be noise ;-)
 > 
-+ Jonghwan Choi
+> These divider values can modeled in the clk framework. Do you know if
+> you have such stuff on your chip?
 
-Yes, right. We moved the functionality into cpu_pm notifier in the commit ID
-0ebc13e2 ("ARM: EXYNOS: Move the power sequence call in the cpu_pm notifier"),
-so this should be fixed as you pointed out. But I talked to my colleague
-Jonghwan about this and we need more time to have a look in detail for every
-exynos SoCs. Will be back soon.
+I believe this is what I have already implemented in my series.
 
-Thanks,
-Kukjin
+The final CLKOUT mux and gates are implemented by separate driver,
+because they reside in another IP block, while per-domain CLKOUT
+dividers along with muxes and gates are registered by normal SoC clock
+driver, because they are part of the clock controller. See patch 2/4
+adding the whole hierarchy for Exynos4 SoCs.
 
-> This patch fixes the issue by removing exynos_pm_syscore_ops completely
-> and making the code rely only on CPU PM notifier.
-> 
-> Tested on Exynos4210-based Trats board.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c | 20 ++++----------------
->  1 file changed, 4 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 87c0d34..98d4926 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -364,11 +364,6 @@ early_wakeup:
->  	return;
->  }
-> 
-> -static struct syscore_ops exynos_pm_syscore_ops = {
-> -	.suspend	= exynos_pm_suspend,
-> -	.resume		= exynos_pm_resume,
-> -};
-> -
->  /*
->   * Suspend Ops
->   */
-> @@ -438,19 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
-> 
->  	switch (cmd) {
->  	case CPU_PM_ENTER:
-> -		if (cpu == 0) {
-> -			exynos_pm_central_suspend();
-> -			exynos_cpu_save_register();
-> -		}
-> +		if (cpu == 0)
-> +			exynos_pm_suspend();
->  		break;
-> 
->  	case CPU_PM_EXIT:
-> -		if (cpu == 0) {
-> -			if (!soc_is_exynos5250())
-> -				scu_enable(S5P_VA_SCU);
-> -			exynos_cpu_restore_register();
-> -			exynos_pm_central_resume();
-> -		}
-> +		if (cpu == 0)
-> +			exynos_pm_resume();
->  		break;
->  	}
-> 
-> @@ -475,6 +464,5 @@ void __init exynos_pm_init(void)
->  	tmp |= ((0xFF << 8) | (0x1F << 1));
->  	__raw_writel(tmp, S5P_WAKEUP_MASK);
-> 
-> -	register_syscore_ops(&exynos_pm_syscore_ops);
->  	suspend_set_ops(&exynos_suspend_ops);
->  }
-> --
-> 1.9.3
+I don't have boards to test CLKOUT on Exynos5 SoCs, so they are up to
+interested people.
+
+Best regards,
+Tomasz
