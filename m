@@ -1,39 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 8 Jul 2014 13:53:26 +0200
-Subject: [PATCH] regulator: core: Still free GPIOs using gpio_free()
-In-Reply-To: <CACRpkdZ7ai0AShAen=AkaorHt0ObhYCDC-OuHG-9nVb3LLt3KQ@mail.gmail.com>
-References: <1404215726-2480-1-git-send-email-broonie@kernel.org>
- <20140701120622.GJ32514@n2100.arm.linux.org.uk>
- <20140701121142.GM23300@sirena.org.uk>
- <CAAVeFuJqRW0ih8Mg9MFwLf=wQ7eVK5+pm8deW0vTUdozJ16FfQ@mail.gmail.com>
- <20140701122717.GN23300@sirena.org.uk>
- <CACRpkdZ7ai0AShAen=AkaorHt0ObhYCDC-OuHG-9nVb3LLt3KQ@mail.gmail.com>
-Message-ID: <20140708115326.GU30458@sirena.org.uk>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Tue, 8 Jul 2014 14:36:37 +0200
+Subject: [PATCH v9 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <53BBE419.8080107@ti.com>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-2-git-send-email-antoine.tenart@free-electrons.com>
+ <53BBE419.8080107@ti.com>
+Message-ID: <20140708123637.GA5330@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 10:33:23AM +0200, Linus Walleij wrote:
-> On Tue, Jul 1, 2014 at 2:27 PM, Mark Brown <broonie@kernel.org> wrote:
+Hi,
 
-> > Right, but Linus said we didn't need this conversion to descriptors so
-> > I'm a bit confused as to what the issue he was raising was.
+On Tue, Jul 08, 2014 at 05:59:13PM +0530, Kishon Vijay Abraham I wrote:
+> Hi Antoine,
+> 
+> On Monday 07 July 2014 03:46 PM, Antoine T?nart wrote:
+> > The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+> > 
+> > The mode selection can let us think this PHY can be configured to fit
+> > other purposes. But there are reasons to think the SATA mode will be
+> > the only one usable: the PHY registers are only accessible indirectly
+> > through two registers in the SATA range, the PHY seems to be integrated
+> > and no information tells us the contrary. For these reasons, make the
+> > driver a SATA PHY driver.
+> 
+> Thanks for doing multiple revisions of this. Looks good to be merged for me now.
 
-> Now I'm probably confusing myself...
+Great!
 
-> All drivers should as far as possible use descriptors internally, doing
-> things like gpio_to_desc() only for backward-compatibility where
-> necessary, with the intent of eventually ridding the integer interfaces
-> entirely.
+Thanks,
+Antoine
 
-> It may be an eternal project, but hey, we are atleast two of us
-> pursuing it.
-
-OK, so in that case Russell's code should be fine then and we don't need
-to do anything - great!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/7ce51eba/attachment.sig>
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
