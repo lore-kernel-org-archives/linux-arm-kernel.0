@@ -1,50 +1,71 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 8 Jul 2014 10:47:16 -0700
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
- <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Tue, 8 Jul 2014 19:49:00 +0200
+Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
+In-Reply-To: <20140708171817.GH4979@htj.dyndns.org>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140708134000.GC4979@htj.dyndns.org>
+ <20140708170353.GA16148@kwain>
+ <20140708171817.GH4979@htj.dyndns.org>
+Message-ID: <20140708174900.GC16148@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
->> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
->> > This branch moves code related to the Tegra fuses out of arch/arm and
->> > into a centralized location which could be shared with ARM64. It also
->> > adds support for reading the fuse data through sysfs.
->>
->> The new/moved misc driver isn't acked by any misc maintainer, so I can't
->> take this branch.
->>
->> I saw no indication from searching the mailing list of that either,
->> so it wasn't just a missed acked-by.
->>
->> I wonder if this code should go under drivers/soc/ instead?
->
-> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
-> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
-> and therefore it was moved to drivers/misc/fuse. I think that's the right
-> place still.
+On Tue, Jul 08, 2014 at 01:18:17PM -0400, Tejun Heo wrote:
+> Hello,
+> 
+> On Tue, Jul 08, 2014 at 07:03:53PM +0200, Antoine T?nart wrote:
+> > > So, hpriv->port is both input and output?  This is messy and can lead
+> > > to confusing failures and there now are multiple ways to modify
+> > > port_map.  If carrying this information through ahci_host_priv is
+> > > necessary, let's remove the direct params and introduce new input
+> > > fields to the struct.
+> > 
+> > We just use hpriv->port_map to check port_map is valid and describes
+> > available ports there.
+> > 
+> > hpriv->port_map is filed by the generic ahci_platform_get_resources()
+> > function when using the new bindings and not by the drivers. port_map is
+> > the input from the drivers.
+> 
+> So, yeah, it's being used both as input and output and we also have
+> the arguments which affect port_map, right?  It does seem confusing.
 
-I disagree, I think this belongs under drivers/soc. Especially since
-you're adding dependencies on this misc driver from other parts of the
-kernel / other drivers.
+I do see priv->port_map as being automatically set and then restricted
+if needed by the port_map input here. I don't see how that's confusing.
+The only modification is we restrict the port_map parameter to the set
+of available ports. The port_map argument affected priv->port_map before
+this patch.
 
-I also don't like seeing init calls form platform code down into
-drivers/misc like you're adding here. Can you please look at doing
-that as a regular init call setup?
+> 
+> > Well, a had a review a week ago about in the PHY driver saying I should
+> > avoid using fixed sized arrays... And it was in a driver were we know
+> > the maximum number of PHY available.
+> > 
+> > I think in this case were the number of PHYs depends on the h/w, we should
+> > use a dynamically allocated array.
+> 
+> Well, so does clk.  Let's say clk is more restricted and phy can be
+> one or more per port and thus needs to be dynamic.  If so, shouldn't
+> we at least have some correlation between phys and ports?  It bothers
+> me that now libahci is carrying random number of resources that it has
+> no idea how to associate with the ports it manages.  What if later we
+> want to involve phy driver in power managing unoccupied ports?
 
-The fact that you provide data to the rest of the kernel again really
-says drivers/soc to me, not drivers/misc.
+I see. This is a first (working) attempt to have a one node per port. I
+agree that would be nice to have a correlation between ports and PHYs.
+This can definitively be added when needed without changing the dt
+bindings as only the internal representation changes. This would also
+require to get all phys from the port nodes, which is again internal
+stuff.
 
-> We anyway need this driver for sata and xhci.
+Don't you think we can go by steps, and have a following up series for
+this when needed (like in a power managing series for unoccupied ports)?
 
-Yes?
 
+Antoine
 
--Olof
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
