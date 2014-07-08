@@ -1,47 +1,36 @@
-From: fabf@skynet.be (Fabian Frederick)
-Date: Tue, 8 Jul 2014 07:08:08 +0200
-Subject: [PATCH 1/1] ARM: imx: use PTR_ERR_OR_ZERO
-In-Reply-To: <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
-References: <1404500590-21712-1-git-send-email-fabf@skynet.be>
- <20140707055521.GM30239@dragon>
- <CAK5sBcE2xxb1NGegn1L_CFH27vzx8kLg06u9fVTo6SZk8_6qJQ@mail.gmail.com>
-Message-ID: <20140708070808.07c7f690e82c9bcf822f772e@skynet.be>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Jul 2014 22:09:35 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Updates for v3.17
+In-Reply-To: <cover.1403681531.git.horms+renesas@verge.net.au>
+References: <cover.1403681531.git.horms+renesas@verge.net.au>
+Message-ID: <20140708050935.GD28931@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Jul 2014 09:18:56 +0530
-Sachin Kamat <spk.linux@gmail.com> wrote:
+On Wed, Jun 25, 2014 at 04:35:34PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC boards updates for v3.17.
+> 
+> This pull request is based on commits included in 'Renesas ARM Based SoC
+> Updates for v3.17", which is tagged as renesas-soc-for-v3.17 and I have
+> sent a pull-request for.  That pull requests includes a few extra commits
+> which were added after the board code was added on top.
+> 
+> 
+> The following changes since commit ecdaca48629bd99609fdc612685363330967dce2:
+> 
+>   ARM: shmobile: rcar-gen2: correct return value of shmobile_smp_apmu_suspend_init (2014-06-17 19:33:22 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-boards-for-v3.17
+> 
+> for you to fetch changes up to 5f65c5bd58bf027eb2bacc2294a98e7aea81c630:
+> 
+>   ARM: shmobile: Enable R-Car Gen2 CMA code in board files (2014-06-17 19:35:59 +0900)
 
-> Hi Shawn,
-> 
-> On Mon, Jul 7, 2014 at 11:25 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Fri, Jul 04, 2014 at 09:03:10PM +0200, Fabian Frederick wrote:
-> >> replace IS_ERR/PTR_ERR
-> >>
-> >> Cc: Shawn Guo <shawn.guo@freescale.com>
-> >> Cc: Sascha Hauer <kernel@pengutronix.de>
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Signed-off-by: Fabian Frederick <fabf@skynet.be>
-> >
-> > Applied, thanks.
-> 
-> 
-> I had sent a similar series [1] in May which you rejected. Just
-> curious if something
-> changed between then and now?
+Merged, thanks.
 
-Hi Sachin,
 
-	I still don't see anything from you for those files in linux-next lately.
-If it was already in some other tree, you can remove my patch or update signed-off-by as it seems
-you made it before me :)
- 
-Regards,
-Fabian
-
-> 
-> [1] http://patchwork.ozlabs.org/patch/353653/
-> 
-> -- 
-> Regards,
-> Sachin.
+-Olof
