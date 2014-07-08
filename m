@@ -1,135 +1,305 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 8 Jul 2014 19:18:41 +0800
-Subject: [PATCH v2 1/1] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <53BBD3F2.5010806@pengutronix.de>
-References: <1404474812-16855-1-git-send-email-b29396@freescale.com>
- <53B69C55.8010901@pengutronix.de>
- <20140707071040.GA18505@shlinux1.ap.freescale.net>
- <53BA7543.70901@pengutronix.de>
- <20140708103009.GA21754@shlinux1.ap.freescale.net>
- <53BBCAE5.7040404@pengutronix.de>
- <20140708110820.GC21754@shlinux1.ap.freescale.net>
- <53BBD3F2.5010806@pengutronix.de>
-Message-ID: <20140708111840.GD21754@shlinux1.ap.freescale.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  8 Jul 2014 13:21:48 +0200
+Subject: [PATCH v2] efi: implement mandatory locking for UEFI Runtime Services
+Message-ID: <1404818508-17537-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 01:20:18PM +0200, Marc Kleine-Budde wrote:
-> On 07/08/2014 01:08 PM, Dong Aisheng wrote:
-> > On Tue, Jul 08, 2014 at 12:41:41PM +0200, Marc Kleine-Budde wrote:
-> >> On 07/08/2014 12:30 PM, Dong Aisheng wrote:
-> >>>> Regarding the mram and the offsets:
-> >>>>
-> >>>>> 	fifo_addr = priv->mram_base + priv->rxf0_off + fgi * RXF0_ELEMENT_SIZE;
-> >>>>> 	fifo_addr = priv->mram_base + priv->mram_off + priv->txb_off;
-> >>>>
-> >>>> Why is rxf0_off used without the mram_off and txb_off with the mram_off?
-> >>>> Can you please test your driver with a mram offset != in your DT.
-> >>>>
-> >>>> If I understand the code in m_can_of_parse_mram() correctly the
-> >>>> individual *_off are already offsets to the *mram_base, so mram_off
-> >>>> should not be used within the driver.
-> >>>
-> >>> Good catch!
-> >>> You're right! I aslo found this recently!
-> >>> txb_off already includes the mram_off so should not plus mram_off again.
-> >>> The former test did not find it because it's still not exceed the 16K ram
-> >>> size for m_can0. But m_can1 has such issue.
-> >>>
-> >>>> I even think mram_off should be removed from the priv.
-> >>>
-> >>> Right, i also think so.
-> >>>
-> >>> It is used for debug information formerly that we need mram_off
-> >>> to calculate each element address in the fifo.
-> >>>
-> >>> By removing mram_off, i'm going to change the debug information to:
-> >>> dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 %x %d rxf1 %x %d rxb %x %d txe %x %d txb %x %d\n",
-> >>> 	priv->mram_base, priv->sidf_off, priv->sidf_elems,
-> >>> 	priv->xidf_off, priv->xidf_elems, priv->rxf0_off,
-> >>> 	priv->rxf0_elems, priv->rxf1_off, priv->rxf1_elems,
-> >>> 	priv->rxb_off, priv->rxb_elems, priv->txe_off,
-> >>> 	priv->txe_elems, priv->txb_off, priv->txb_elems);
-> >>>
-> >>> The annoying thing is the line has to be a much bigger one to avoid
-> >>> checkpatch warning of "WARNING: quoted string split across lines".
-> >>>
-> >>> What's your suggestion for such issue?
-> >>> Keeping the big line or split into two lines and leave checkpatch warning there?
-> >>
-> >> The idea behind the warning is, that you can grep for error messages
-> >> better, as normal grep wouldn't find an error string which spans two
-> >> lines. So make it a long line.
-> >>
-> >>>> Do the *_off and *_elems fit into a u8 or u16? If
-> >>>> so it makes sense to convert the priv accordingly.
-> >>>>
-> >>>
-> >>> Yes, *_off fit into u16 since MRAM has a maximum of 4352 words(17K).
-> >>> And *_elems fit into u8 since the max number is 128.
-> >>> I will change them accordingly.
-> >>>
-> >>>> What about putting the offset and the number of elements into a struct
-> >>>> and make use an array for rxf{0,1}?
-> >>>>
-> >>>
-> >>> You mean something like below?
-> >>> struct mram_cfg {
-> >>> 	u16 off;
-> >>> 	u8  elements;
-> >>> };
-> >>>
-> >>> struct m_can_priv {
-> >>> 	........
-> >>>
-> >>>         struct mram_cfg sidf;
-> >>>         struct mram_cfg xidf;
-> >>>         struct mram_cfg rxf0;
-> >>>         struct mram_cfg rxf1;
-> >>
-> >> struct mram_cfg rxf[2];
-> >>
-> > 
-> > It does not help too much and a bit strange for only make
-> > rxf0/rxf1 into array,
-> > 
-> > How about making them all:
-> > enum m_can_mram_cfg {
-> > 	SIDF = 0,
-> > 	XIDF,
-> > 	RXF0,
-> > 	RXF1,
-> > 	RXB,
-> > 	TXE,
-> > 	TXB,
-> > 	CFG_NUM,
-> > };
-> > 
-> > struct m_can_priv {
-> > 	........
-> > 	struct mram_cfg mcfg[CFG_NUM];
-> > };
-> > 
-> > Then in code:
-> > 
-> > priv->cfg[SIDF].off = 
-> > priv->cfg[SIDF].elements = 
-> > 
-> > But it could make code become much longer...
-> 
-> I like the idea, but can you add a common prefix to the enums. Though
-> makes the code even longer :)
-> 
+According to section 7.1 of the UEFI spec, Runtime Services are not fully
+reentrant, and there are particular combinations of calls that need to be
+serialized.
 
-Okay, got it. :-)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-Regards
-Dong Aisheng
-> Marc
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+So this is v2 of the UEFI Runtime Services serialization patch: this time, I use
+a single spinlock rather than a set of mutexes, resulting in all services to be
+serialized with respect to all others. Also added handling of NMI state, as this
+results in some of the restrictions being lifted (x86, ia64 only)
+
+One question remains: with the NMI deadlock handling in place, is it really
+necessary to disable interrupts in all cases? 
+
+ drivers/firmware/efi/runtime-wrappers.c | 167 +++++++++++++++++++++++++++++---
+ 1 file changed, 155 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/firmware/efi/runtime-wrappers.c b/drivers/firmware/efi/runtime-wrappers.c
+index 10daa4bbb258..5ee3b16498a2 100644
+--- a/drivers/firmware/efi/runtime-wrappers.c
++++ b/drivers/firmware/efi/runtime-wrappers.c
+@@ -14,11 +14,76 @@
+  * This file is released under the GPLv2.
+  */
+ 
++#include <linux/bug.h>
+ #include <linux/efi.h>
+-#include <linux/spinlock.h>             /* spinlock_t */
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
+ #include <asm/efi.h>
+ 
+ /*
++ * According to section 7.1 of the UEFI spec, Runtime Services are not fully
++ * reentrant, and there are particular combinations of calls that need to be
++ * serialized.
++ *
++ * Table 31. Rules for Reentry Into Runtime Services
++ * +------------------------------------+-------------------------------+
++ * | If previous call is busy in	| Forbidden to call		|
++ * +------------------------------------+-------------------------------+
++ * | Any				| SetVirtualAddressMap()	|
++ * +------------------------------------+-------------------------------+
++ * | ConvertPointer()			| ConvertPointer()		|
++ * +------------------------------------+-------------------------------+
++ * | SetVariable()			| ResetSystem()			|
++ * | UpdateCapsule()			|				|
++ * | SetTime()				|				|
++ * | SetWakeupTime()			|				|
++ * | GetNextHighMonotonicCount()	|				|
++ * +------------------------------------+-------------------------------+
++ * | GetVariable()			| GetVariable()			|
++ * | GetNextVariableName()		| GetNextVariableName()		|
++ * | SetVariable()			| SetVariable()			|
++ * | QueryVariableInfo()		| QueryVariableInfo()		|
++ * | UpdateCapsule()			| UpdateCapsule()		|
++ * | QueryCapsuleCapabilities()		| QueryCapsuleCapabilities()	|
++ * | GetNextHighMonotonicCount()	| GetNextHighMonotonicCount()	|
++ * +------------------------------------+-------------------------------+
++ * | GetTime()				| GetTime()			|
++ * | SetTime()				| SetTime()			|
++ * | GetWakeupTime()			| GetWakeupTime()		|
++ * | SetWakeupTime()			| SetWakeupTime()		|
++ * +------------------------------------+-------------------------------+
++ *
++ * Instead of adding locks for each of the groups, we add a single spinlock
++ * that serializes all runtime services calls with respect to all others.
++ */
++static DEFINE_SPINLOCK(efi_runtime_lock);
++
++/*
++ * Some runtime services calls can be reentrant under NMI, even if the table
++ * above says they are not.
++ *
++ * Table 32. Functions that may be called after Machine Check ,INIT and NMI
++ * +----------------------------+------------------------------------------+
++ * | Function			| Called after Machine Check, INIT and NMI |
++ * +----------------------------+------------------------------------------+
++ * | GetTime()			| Yes, even if previously busy.		   |
++ * | GetVariable()		| Yes, even if previously busy		   |
++ * | GetNextVariableName()	| Yes, even if previously busy		   |
++ * | QueryVariableInfo()	| Yes, even if previously busy		   |
++ * | SetVariable()		| Yes, even if previously busy		   |
++ * | UpdateCapsule()		| Yes, even if previously busy		   |
++ * | QueryCapsuleCapabilities()	| Yes, even if previously busy		   |
++ * | ResetSystem()		| Yes, even if previously busy		   |
++ * +----------------------------+------------------------------------------+
++ *
++ * In order to prevent deadlocks under NMI, the wrappers for these functions
++ * only grab the efi_runtime_lock or rtc_lock spinlocks if !efi_in_nmi().
++ */
++#ifndef efi_in_nmi
++#define efi_in_nmi()	(0)
++#endif
++
++/*
+  * As per commit ef68c8f87ed1 ("x86: Serialize EFI time accesses on rtc_lock"),
+  * the EFI specification requires that callers of the time related runtime
+  * functions serialize with other CMOS accesses in the kernel, as the EFI time
+@@ -31,9 +96,15 @@ static efi_status_t virt_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+ 	unsigned long flags;
+ 	efi_status_t status;
+ 
+-	spin_lock_irqsave(&rtc_lock, flags);
++	if (!efi_in_nmi()) {
++		spin_lock_irqsave(&rtc_lock, flags);
++		spin_lock(&efi_runtime_lock);
++	}
+ 	status = efi_call_virt(get_time, tm, tc);
+-	spin_unlock_irqrestore(&rtc_lock, flags);
++	if (!efi_in_nmi()) {
++		spin_unlock(&efi_runtime_lock);
++		spin_unlock_irqrestore(&rtc_lock, flags);
++	}
+ 	return status;
+ }
+ 
+@@ -42,8 +113,11 @@ static efi_status_t virt_efi_set_time(efi_time_t *tm)
+ 	unsigned long flags;
+ 	efi_status_t status;
+ 
++	BUG_ON(efi_in_nmi());
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(set_time, tm);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -55,8 +129,11 @@ static efi_status_t virt_efi_get_wakeup_time(efi_bool_t *enabled,
+ 	unsigned long flags;
+ 	efi_status_t status;
+ 
++	BUG_ON(efi_in_nmi());
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(get_wakeup_time, enabled, pending, tm);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -66,8 +143,11 @@ static efi_status_t virt_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+ 	unsigned long flags;
+ 	efi_status_t status;
+ 
++	BUG_ON(efi_in_nmi());
+ 	spin_lock_irqsave(&rtc_lock, flags);
++	spin_lock(&efi_runtime_lock);
+ 	status = efi_call_virt(set_wakeup_time, enabled, tm);
++	spin_unlock(&efi_runtime_lock);
+ 	spin_unlock_irqrestore(&rtc_lock, flags);
+ 	return status;
+ }
+@@ -78,14 +158,31 @@ static efi_status_t virt_efi_get_variable(efi_char16_t *name,
+ 					  unsigned long *data_size,
+ 					  void *data)
+ {
+-	return efi_call_virt(get_variable, name, vendor, attr, data_size, data);
++	unsigned long flags;
++	efi_status_t status;
++
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(get_variable, name, vendor, attr, data_size,
++			       data);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_get_next_variable(unsigned long *name_size,
+ 					       efi_char16_t *name,
+ 					       efi_guid_t *vendor)
+ {
+-	return efi_call_virt(get_next_variable, name_size, name, vendor);
++	unsigned long flags;
++	efi_status_t status;
++
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(get_next_variable, name_size, name, vendor);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_set_variable(efi_char16_t *name,
+@@ -94,7 +191,16 @@ static efi_status_t virt_efi_set_variable(efi_char16_t *name,
+ 					  unsigned long data_size,
+ 					  void *data)
+ {
+-	return efi_call_virt(set_variable, name, vendor, attr, data_size, data);
++	unsigned long flags;
++	efi_status_t status;
++
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(set_variable, name, vendor, attr, data_size,
++			       data);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_query_variable_info(u32 attr,
+@@ -102,16 +208,31 @@ static efi_status_t virt_efi_query_variable_info(u32 attr,
+ 						 u64 *remaining_space,
+ 						 u64 *max_variable_size)
+ {
++	unsigned long flags;
++	efi_status_t status;
++
+ 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+ 		return EFI_UNSUPPORTED;
+ 
+-	return efi_call_virt(query_variable_info, attr, storage_space,
+-			     remaining_space, max_variable_size);
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(query_variable_info, attr, storage_space,
++			       remaining_space, max_variable_size);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_get_next_high_mono_count(u32 *count)
+ {
+-	return efi_call_virt(get_next_high_mono_count, count);
++	unsigned long flags;
++	efi_status_t status;
++
++	BUG_ON(efi_in_nmi());
++	spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(get_next_high_mono_count, count);
++	spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static void virt_efi_reset_system(int reset_type,
+@@ -119,17 +240,31 @@ static void virt_efi_reset_system(int reset_type,
+ 				  unsigned long data_size,
+ 				  efi_char16_t *data)
+ {
++	unsigned long flags;
++
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
+ 	__efi_call_virt(reset_system, reset_type, status, data_size, data);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
+ }
+ 
+ static efi_status_t virt_efi_update_capsule(efi_capsule_header_t **capsules,
+ 					    unsigned long count,
+ 					    unsigned long sg_list)
+ {
++	unsigned long flags;
++	efi_status_t status;
++
+ 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+ 		return EFI_UNSUPPORTED;
+ 
+-	return efi_call_virt(update_capsule, capsules, count, sg_list);
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(update_capsule, capsules, count, sg_list);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+@@ -137,11 +272,19 @@ static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+ 						u64 *max_size,
+ 						int *reset_type)
+ {
++	unsigned long flags;
++	efi_status_t status;
++
+ 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+ 		return EFI_UNSUPPORTED;
+ 
+-	return efi_call_virt(query_capsule_caps, capsules, count, max_size,
+-			     reset_type);
++	if (!efi_in_nmi())
++		spin_lock_irqsave(&efi_runtime_lock, flags);
++	status = efi_call_virt(query_capsule_caps, capsules, count, max_size,
++			       reset_type);
++	if (!efi_in_nmi())
++		spin_unlock_irqrestore(&efi_runtime_lock, flags);
++	return status;
+ }
+ 
+ void efi_native_runtime_setup(void)
+-- 
+1.8.3.2
