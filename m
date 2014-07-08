@@ -1,42 +1,31 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 8 Jul 2014 13:42:28 +0200
-Subject: [PATCHv7 3/3] edac: altera: Add EDAC support for Altera SoC
- SDRAM Controller.
-In-Reply-To: <20140708113109.GC8100@amd.pavel.ucw.cz>
-References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
- <1403730927-16163-4-git-send-email-tthayer@altera.com>
- <20140708113109.GC8100@amd.pavel.ucw.cz>
-Message-ID: <20140708114227.GB27659@pd.tnic>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Jul 2014 12:47:18 +0100
+Subject: [PATCH CFT 02/30] net: fec: iMX6 FEC does not support
+ half-duplex gigabit
+In-Reply-To: <20140708064611.GF7827@pengutronix.de>
+References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+ <E1X0Xvb-0001Mu-JB@rmk-PC.arm.linux.org.uk>
+ <20140708064611.GF7827@pengutronix.de>
+Message-ID: <20140708114718.GI21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 01:31:09PM +0200, Pavel Machek wrote:
-> > +	read_reg = readl(mc_vbase + DRAMADDRW);
-> > +
-> > +	width = readl(mc_vbase + DRAMIFWIDTH);
-> > +
-> > +	col = (read_reg & DRAMADDRW_COLBIT_MASK) >>
-> > +		DRAMADDRW_COLBIT_LSB;
-> > +	row = (read_reg & DRAMADDRW_ROWBIT_MASK) >>
-> > +		DRAMADDRW_ROWBIT_LSB;
-> > +	bank = (read_reg & DRAMADDRW_BANKBIT_MASK) >>
-> > +		DRAMADDRW_BANKBIT_LSB;
-> > +	cs = (read_reg & DRAMADDRW_CSBIT_MASK) >>
-> > +		DRAMADDRW_CSBIT_LSB;
+On Tue, Jul 08, 2014 at 08:46:11AM +0200, Uwe Kleine-K?nig wrote:
+> Hi Russell,
 > 
-> As I said, all the defines only make this harder to read. The code is
-> pretty obvious if you put numbers in here...
+> On Fri, Jun 27, 2014 at 04:19:03PM +0100, Russell King wrote:
+> > The iMX6 gigabit FEC does not support half-duplex gigabit operation.
+> > Phys attacked to the FEC may support this, and we currently do nothing
+> Even if it might be interpreted as an attack to connect such a phy to
+> the FEC, I'd still call it "attach" here :-)
 
-Since when it is a good coding practice to put naked numbers instead of
-descriptive macro names??!
+You are right, but unfortunately your comment comes too late; this is
+the actual submission for David to integrate the patches into net-next
+rather than for review, and David has already integrated the change into
+his tree.  Hence, the comment is unable to be fixed now.
 
-Now, I can understand that the macro names could be made more
-descriptive so that you can understand what they mean, but naked
-numbers?! You must be joking although 1st of April is long gone.
+Thanks anyway.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
