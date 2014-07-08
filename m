@@ -1,81 +1,26 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 8 Jul 2014 18:43:04 +0300
-Subject: [PATCH] ARM: dts: keystone: fix netcp's clocks definitions
-Message-ID: <1404834184-5411-1-git-send-email-grygorii.strashko@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 8 Jul 2014 16:56:05 +0200
+Subject: [PATCH v3 2/2] spi: add driver for Rockchip RK3xxx SoCs
+ integrated SPI
+In-Reply-To: <1404784397-5157-1-git-send-email-addy.ke@rock-chips.com>
+References: <1404176639-3315-1-git-send-email-addy.ke@rock-chips.com>
+ <1404784397-5157-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20140708145605.GZ30458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks tree for Keystone 2 NTCP devices should be
-defined as following:
-[refclk] - board dependent
- |- <papllclk> - PLL clock
-    |- <paclk13> - fixed factor clock div=3 mul=1
-       |- <clkpa> - gated clock
-       |- <clkcpgmac> - gated clock
-       |- <clksa> - gated clock
+On Tue, Jul 08, 2014 at 09:53:17AM +0800, Addy Ke wrote:
+> In order to facilitate understanding, rockchip SPI controller IP design
+> looks similar in its registers to designware. But IC implementation
+> is different from designware, So we need a dedicated driver for Rockchip
+> RK3XXX SoCs integrated SPI. The main differences:
 
-Hence, update Keystone 2 DT to follow HW specification.
-
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2e-clocks.dtsi      |    2 +-
- arch/arm/boot/dts/k2hk-clocks.dtsi     |    2 +-
- arch/arm/boot/dts/k2l-clocks.dtsi      |    2 +-
- arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/k2e-clocks.dtsi b/arch/arm/boot/dts/k2e-clocks.dtsi
-index 90774d6..598afe9 100644
---- a/arch/arm/boot/dts/k2e-clocks.dtsi
-+++ b/arch/arm/boot/dts/k2e-clocks.dtsi
-@@ -22,7 +22,7 @@ clocks {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,pll-clock";
- 		clocks = <&refclkpass>;
--		clock-output-names = "pa-pll-clk";
-+		clock-output-names = "papllclk";
- 		reg = <0x02620358 4>;
- 		reg-names = "control";
- 	};
-diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
-index 96e6536..d5adee3 100644
---- a/arch/arm/boot/dts/k2hk-clocks.dtsi
-+++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
-@@ -31,7 +31,7 @@ clocks {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,pll-clock";
- 		clocks = <&refclkpass>;
--		clock-output-names = "pa-pll-clk";
-+		clock-output-names = "papllclk";
- 		reg = <0x02620358 4>;
- 		reg-names = "control";
- 	};
-diff --git a/arch/arm/boot/dts/k2l-clocks.dtsi b/arch/arm/boot/dts/k2l-clocks.dtsi
-index f584b80..eb1e3e2 100644
---- a/arch/arm/boot/dts/k2l-clocks.dtsi
-+++ b/arch/arm/boot/dts/k2l-clocks.dtsi
-@@ -31,7 +31,7 @@ clocks {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,pll-clock";
- 		clocks = <&refclksys>;
--		clock-output-names = "pa-pll-clk";
-+		clock-output-names = "papllclk";
- 		reg = <0x02620358 4>;
- 		reg-names = "control";
- 	};
-diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
-index 93f82c7..0c334b2 100644
---- a/arch/arm/boot/dts/keystone-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-@@ -215,7 +215,7 @@ clocks {
- 	clkpa: clkpa {
- 		#clock-cells = <0>;
- 		compatible = "ti,keystone,psc-clock";
--		clocks = <&chipclk16>;
-+		clocks = <&paclk13>;
- 		clock-output-names = "pa";
- 		reg = <0x0235001c 0xb00>, <0x02350008 0x400>;
- 		reg-names = "control", "domain";
--- 
-1.7.9.5
+This driver is already applied, please send updates as incremental
+patches against the current code not as a completely new patch.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/9500a827/attachment.sig>
