@@ -1,41 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Jul 2014 01:16:07 -0700
-Subject: [PATCH] omap16xx: Removes fixme no longer needed in ocpi_enable()
-In-Reply-To: <1404351079-5117-1-git-send-email-xerofoify@gmail.com>
-References: <1404351079-5117-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <20140708081606.GC28884@atomide.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 8 Jul 2014 11:16:47 +0300
+Subject: [PATCH] clk: tegra: Use XUSB-compatible SATA PLL sequence
+In-Reply-To: <1404804615-23587-1-git-send-email-mperttunen@nvidia.com>
+References: <CAL1qeaHo_HEoXoCQjQuqux_BNPtz4BtOnrYTa4=vcNQCYxiDSg@mail.gmail.com>
+ <1404804615-23587-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140708081647.GV3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicholas Krause <xerofoify@gmail.com> [140702 18:33]:
-> This removes the FIXME message above ocpi_enable being declared
-> for proper locking in this function. As of the current kernel
-> verisons there is no need for locking as only one driver uses
-> this function currently and therefore there is no need for real
-> locking requirements.
+On Tue, Jul 08, 2014 at 09:30:15AM +0200, Mikko Perttunen wrote:
+> Use a sequence for enabling hardware control of the SATA PLL
+> that works both when using the SATA lane with SATA and when
+> using it with XUSB.
 > 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
 
-Thanks applying into omap-for-v3.17/fixes-not-urgent.
+I'm going to take it as a separate patch on top of what's there now.
 
-Tony
+Cheers,
 
-> ---
->  arch/arm/mach-omap1/ocpi.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap1/ocpi.c b/arch/arm/mach-omap1/ocpi.c
-> index 238170c..44a3d19 100644
-> --- a/arch/arm/mach-omap1/ocpi.c
-> +++ b/arch/arm/mach-omap1/ocpi.c
-> @@ -55,7 +55,6 @@ static struct clk *ocpi_ck;
->  
->  /*
->   * Enables device access to OMAP buses via the OCPI bridge
-> - * FIXME: Add locking
->   */
->  int ocpi_enable(void)
->  {
-> -- 
-> 1.9.1
-> 
+Peter.
