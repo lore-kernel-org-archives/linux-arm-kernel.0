@@ -1,160 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  8 Jul 2014 18:21:12 +0200
-Subject: [PATCHv2 2/6] memory: add a driver for atmel ram controllers
-In-Reply-To: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404836476-23787-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404836476-23787-3-git-send-email-alexandre.belloni@free-electrons.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Jul 2014 18:20:51 +0200
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+ <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
+ <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
+Message-ID: <53BC1A63.80900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Atmel SoCs have one or multiple RAM controllers that need one or multiple clocks
-to run.
-This driver handle those clocks.
+On 08.07.2014 17:27, Doug Anderson wrote:
+> Hi,
+> 
+> On Tue, Jul 8, 2014 at 12:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>>
+>>> From: Doug Anderson <dianders@chromium.org>
+>>>
+>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>>> being reset across sleep/wake.  If we don't set it to anything then
+>>> the TPM will be reset.  U-Boot will detect this as invalid
+>>> and will reset the system on resume time. This GPIO can always be low
+>>> and not hurt anything.  It will get pulled back high again during a
+>>> normal warm reset when it will default back to an input.
+>>>
+>>> To properly preserve the TPM state across suspend/resume and to make
+>>> the chrome U-Boot happy, properly set the GPIO to mask the
+>>> reset to the TPM.
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>> (...)
+>>> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
+>>> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+>>> +       compatible = "regulator-fixed";
+>>
+>> No matter how the discussion ends up, regulator-fixed is wrong.
+> 
+> OK, fair enough.
+> 
+> 
+>> Either folding it into the TPM driver or using a separate reset driver
+>> is fine with me.
+> 
+> OK, Vikas: do you want to code up the driver?
+> 
+> 
+>> So what about the generic delayed reset GPIO thing?
+>> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
+> 
+> That's a neat concept and could be useful in other cases, but I think
+> it's just as much of a hack as using a regulator.  This is not a reset
+> signal for the TPM.  This is a signal that will mask the CPU's reset
+> signal (using a special bit of board-specific logic).
+> 
+> 
+> Personally I think Tomasz's idea of using hogs (after his patches
+> allowing a default output level) is the cleanest, but I think Stephen
+> didn't like that.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/memory/Kconfig        | 10 +++++
- drivers/memory/Makefile       |  1 +
- drivers/memory/atmel-sdramc.c | 98 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 109 insertions(+)
- create mode 100644 drivers/memory/atmel-sdramc.c
+I don't see any benefits of using complex interfaces over simply
+initializing the pin to the right value once at boot-up or at
+suspend/resume. As far as I understand Doug's explanation of the
+problem, nothing else is expected from the OS with respect to this pin.
+Moreover it doesn't affect operation of any drivers.
 
-diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-index c59e9c96e86d..257061c3c816 100644
---- a/drivers/memory/Kconfig
-+++ b/drivers/memory/Kconfig
-@@ -7,6 +7,16 @@ menuconfig MEMORY
- 
- if MEMORY
- 
-+config ATMEL_SDRAMC
-+	bool "Atmel (Multi-port DDR-)SDRAM Controller"
-+	default y
-+	depends on ARCH_AT91 && OF
-+	help
-+	  This driver is for Atmel SDRAM Controller or Atmel Multi-port
-+	  DDR-SDRAM Controller available on Atmel AT91SAM9 and SAMA5 SoCs.
-+	  Starting with the at91sam9g45, this controller supports SDR, DDR and
-+	  LP-DDR memories.
-+
- config TI_AEMIF
- 	tristate "Texas Instruments AEMIF driver"
- 	depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
-diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
-index 71160a2b7313..b8637261e1a1 100644
---- a/drivers/memory/Makefile
-+++ b/drivers/memory/Makefile
-@@ -5,6 +5,7 @@
- ifeq ($(CONFIG_DDR),y)
- obj-$(CONFIG_OF)		+= of_memory.o
- endif
-+obj-$(CONFIG_ATMEL_SDRAMC)	+= atmel-sdramc.o
- obj-$(CONFIG_TI_AEMIF)		+= ti-aemif.o
- obj-$(CONFIG_TI_EMIF)		+= emif.o
- obj-$(CONFIG_FSL_IFC)		+= fsl_ifc.o
-diff --git a/drivers/memory/atmel-sdramc.c b/drivers/memory/atmel-sdramc.c
-new file mode 100644
-index 000000000000..fed04e8efe75
---- /dev/null
-+++ b/drivers/memory/atmel-sdramc.c
-@@ -0,0 +1,98 @@
-+/*
-+ * Atmel (Multi-port DDR-)SDRAM Controller driver
-+ *
-+ * Copyright (C) 2014 Atmel
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+
-+struct at91_ramc_caps {
-+	bool has_ddrck;
-+	bool has_mpddr_clk;
-+};
-+
-+static const struct at91_ramc_caps at91rm9200_caps = { };
-+
-+static const struct at91_ramc_caps at91sam9g45_caps = {
-+	.has_ddrck = 1,
-+	.has_mpddr_clk = 0,
-+};
-+
-+static const struct at91_ramc_caps sama5d3_caps = {
-+	.has_ddrck = 1,
-+	.has_mpddr_clk = 1,
-+};
-+
-+static const struct of_device_id atmel_ramc_of_match[] = {
-+	{ .compatible = "atmel,at91rm9200-sdramc", .data = &at91rm9200_caps, },
-+	{ .compatible = "atmel,at91sam9260-sdramc", .data = &at91rm9200_caps, },
-+	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &at91sam9g45_caps, },
-+	{ .compatible = "atmel,sama5d3-ddramc", .data = &sama5d3_caps, },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, atmel_ramc_of_match);
-+
-+static int atmel_ramc_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+	const struct at91_ramc_caps *caps;
-+	struct clk *clk;
-+
-+	match = of_match_device(atmel_ramc_of_match, &pdev->dev);
-+	caps = match->data;
-+
-+	if (caps->has_ddrck) {
-+		clk = devm_clk_get(&pdev->dev, "ddrck");
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
-+		clk_prepare_enable(clk);
-+	}
-+
-+	if (caps->has_mpddr_clk) {
-+		clk = devm_clk_get(&pdev->dev, "mpddr");
-+		if (IS_ERR(clk)) {
-+			pr_err("AT91 RAMC: couldn't get mpddr clock\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_prepare_enable(clk);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver atmel_ramc_driver = {
-+	.probe		= atmel_ramc_probe,
-+	.driver		= {
-+		.name	= "atmel-ramc",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = atmel_ramc_of_match,
-+	},
-+};
-+
-+static int __init atmel_ramc_init(void)
-+{
-+	return platform_driver_register(&atmel_ramc_driver);
-+}
-+module_init(atmel_ramc_init);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-+MODULE_DESCRIPTION("Atmel (Multi-port DDR-)SDRAM Controller");
--- 
-1.9.1
+So I'm still for the simplest and effective solution, i.e. hogs.
+
+Best regards,
+Tomasz
