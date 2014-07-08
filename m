@@ -1,33 +1,52 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 8 Jul 2014 11:50:23 +0100
-Subject: [Xen-devel] [RFC PATCH 0/2] xen/arm: fix
- "xen_add_mach_to_phys_entry: cannot add" problem
-In-Reply-To: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
-Message-ID: <53BBCCEF.1080704@citrix.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Jul 2014 12:50:59 +0200
+Subject: [PATCH 4/6] pinctrl: exynos: Lock GPIOs as interrupts when used as
+ EINTs
+In-Reply-To: <CACRpkdYD=6iV0qFRQrAf2TJc7tg=m2ZEr6SvhruEwsGQLzskSA@mail.gmail.com>
+References: <1404315664-3174-1-git-send-email-t.figa@samsung.com>
+ <1404315664-3174-5-git-send-email-t.figa@samsung.com>
+ <CACRpkdYD=6iV0qFRQrAf2TJc7tg=m2ZEr6SvhruEwsGQLzskSA@mail.gmail.com>
+Message-ID: <53BBCD13.7020902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/14 21:24, Stefano Stabellini wrote:
-> Hi all,
-> Xen support in Linux for ARM and ARM64 suffers from lack of support for
-> multiple mfn to pfn mappings: whenever a frontend grants the same page
-> multiple times to the backend, the mfn to pfn accounting in
-> arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
-> when xen-netfront/xen-netback switched from grant copies to grant
-> mappings, therefore causing the issue to happen much more often.
-> 
-> Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
-> therefore we are looking for alternative solutions. One idea is avoiding
-> mfn to pfn conversions altogether. The only code path that needs them is
-> swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
-> 
-> To avoid mfn to pfn conversions we rely on a second p2m mapping done by
-> Xen, see the attached patch. In Linux we use it to perform the cache
-> maintenance operations without mfns conversions.
+Hi Linus,
 
-This will only work with PIPT caches (or certain types of VIPT that also
-have alias detection).  Do all the CPUs that Xen runs on have these type
-of cache?
+On 08.07.2014 11:03, Linus Walleij wrote:
+> On Wed, Jul 2, 2014 at 5:41 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> 
+>> Currently after configuring a GPIO pin as an interrupt related pinmux
+>> registers are changed, but there is no protection from calling
+>> gpio_direction_*() in a badly written driver, which would cause the same
+>> pinmux register to be reconfigured for regular input/output and this
+>> disabling interrupt capability of the pin.
+>>
+>> This patch addresses this issue by moving pinmux reconfiguration to
+>> .irq_startup() callback of irq_chip and calling gpio_lock_as_irq()
+>> helper to prevent reconfiguration of pin direction.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> (...)
+>> +               .irq_startup = exynos_irq_startup,
+>> +               .irq_shutdown = exynos_irq_shutdown,
+> 
+> I think you should be using the
+> .irq_request_resources and .irq_release_resources callbacks instead.
+> 
+> The reason is that startup and shutdown cannot really fail (ret code
+> is unsigned...), so using the other callbacks is safer.
 
-David
+Hmm, I used the at91 pinctrl driver as an example, but I agree that
+request/release_resources would be better. I guess it should be changed
+there as well. [Ccing Jean-Jacques and Jean-Christophe]
+
+> 
+> Can you have a quick look at this before I apply any more of the
+> Samsung patches?
+
+The two remaining patches are pretty much independent from this one and
+rest of this series so please take a look at them while I prepare new
+version of this patch.
+
+Best regards,
+Tomasz
