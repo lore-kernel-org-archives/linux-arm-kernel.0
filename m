@@ -1,63 +1,111 @@
-From: pintu_agarwal@yahoo.com (PINTU KUMAR)
-Date: Tue, 8 Jul 2014 16:41:40 -0700
-Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
-Message-ID: <1404862900.76779.YahooMailNeo@web160102.mail.bf1.yahoo.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 8 Jul 2014 19:49:59 -0400
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <53BC6866.30803@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+ <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
+ <53BC6866.30803@codeaurora.org>
+Message-ID: <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
+> Hi Hiroshi,
+>
+> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
+>> Hi Olav,
+>>
+>> Olav Haugan <ohaugan@codeaurora.org> writes:
+>>
+>>> Mapping and unmapping are more often than not in the critical path.
+>>> map_range and unmap_range allows SMMU driver implementations to optimize
+>>> the process of mapping and unmapping buffers into the SMMU page tables.
+>>> Instead of mapping one physical address, do TLB operation (expensive),
+>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
+>>> a scatter-gatherlist of physically contiguous pages into one virtual
+>>> address space and then at the end do one TLB operation.
+>>>
+>>> Additionally, the mapping operation would be faster in general since
+>>> clients does not have to keep calling map API over and over again for
+>>> each physically contiguous chunk of memory that needs to be mapped to a
+>>> virtually contiguous region.
+>>>
+>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+>>> ---
+>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
+>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
+>>>  2 files changed, 48 insertions(+)
+>>>
+>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>> index e5555fc..f2a6b80 100644
+>>> --- a/drivers/iommu/iommu.c
+>>> +++ b/drivers/iommu/iommu.c
+>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
+>>>
+>>>
+>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
+>>> +                struct scatterlist *sg, unsigned int len, int prot)
+>>> +{
+>>> +    if (unlikely(domain->ops->map_range == NULL))
+>>> +            return -ENODEV;
+>>> +
+>>> +    BUG_ON(iova & (~PAGE_MASK));
+>>> +
+>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
+>>
+>> We have the similar one internally, which is named, "iommu_map_sg()",
+>> called from DMA API.
+>
+> Great, so this new API will be useful to more people!
+>
+>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
+>>> +                  unsigned int len)
+>>> +{
+>>> +    if (unlikely(domain->ops->unmap_range == NULL))
+>>> +            return -ENODEV;
+>>> +
+>>> +    BUG_ON(iova & (~PAGE_MASK));
+>>> +
+>>> +    return domain->ops->unmap_range(domain, iova, len);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
+>>
+>> Can the existing iommu_unmap() do the same?
+>
+> I believe iommu_unmap() behaves a bit differently because it will keep
+> on calling domain->ops->unmap() until everything is unmapped instead of
+> letting the iommu implementation take care of unmapping everything in
+> one call.
+>
+> I am abandoning the patch series since our driver was not accepted.
+> However, if there are no objections I will resubmit this patch (PATCH
+> 2/7) as an independent patch to add this new map_range API.
 
-We are facing one problem on linux 3.10 when we try to use CMA as large as 56MB for 256MB RAM device.
-We found that after certain point of time (during boot), min watermark check is failing when "free_pages" and "free_cma_pages" are almost equal and falls below the min level.
++1 for map_range().. I've seen for gpu workloads, at least, it is the
+downstream map_range() API is quite beneficial.   It was worth at
+least a few fps in xonotic.
 
-system details:
-ARM embedded device: RAM: 256MB
-Kernel version: 3.10.17
-Fixed Reserved memory: ~40MB
-Available memory: 217MB
-CMA reserved 1 : 56MB
-ZRAM configured: 128MB or 64MB
-min_free_kbytes: 1625 (default)
-Memory controller group enabled (MEMCG)
+And, possibly getting off the subject a bit, but I was wondering about
+the possibility of going one step further and batching up mapping
+and/or unmapping multiple buffers (ranges) at once.  I have a pretty
+convenient sync point in drm/msm to flush out multiple mappings before
+kicking gpu.
 
+BR,
+-R
 
-After boot-up the "free -tm" command shows free memory as: ~50MB
-CMA is used for all UI display purposes. CMA used during bootup is close to ~6MB.
-Thus most of the free memory is in the form of CMA free memory.
-ZRAM getting uses was around ~5MB.
-
-
-During boot-up itself we observe that the following conditions are met.
-
-
-if (free_pages - free_cma <= min + lowmem_reserve) {
-??? printk"[PINTU]: __zone_watermark_ok: failed !\n");
-
-??? return false;
-}
-Here: free_pages was: 12940, free_cma was: 12380, min: 566, lowmem: 0
-
-
-Thus is condition is met most of the time.
-And because of this watermark failure, Kswapd is waking up frequently.
-The /proc/pagetypeinfo reports that most of the higher order pages are from CMA regions.
-
-
-We also observed that ZRAM is trying to allocate memory from CMA region and failing.
-
-We also tried by decreasing the CMA region to 20MB. With this the watermark failure is not happening in boot time. But if we launch more than 3 apps {Browser, music-player etc}, again the watermark started failing.
-
-Also we tried decreasing the min_free_kbytes=256, and with this also watermark is passed.
-
-Our observation is that ZRAM/zsmalloc trying to allocate memory from CMA areas and failed.
-
-
-Please let us know if anybody have come across the same problem and how to resolve this issue.
-
-
-
-
-
-Thank You!
-Regards,
-Pintu
+> Thanks,
+>
+> Olav Haugan
+>
+> --
+> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
