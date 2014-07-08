@@ -1,40 +1,35 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 8 Jul 2014 13:58:12 +0300
-Subject: pull request for Tegra clock updates for 3.17 (update)
-Message-ID: <20140708105811.GA23132@tbergstrom-lnx.Nvidia.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 8 Jul 2014 12:00:52 +0100
+Subject: [Xen-devel] [RFC PATCH 0/2] xen/arm: fix
+ "xen_add_mach_to_phys_entry: cannot add" problem
+In-Reply-To: <53BBCCEF.1080704@citrix.com>
+References: <alpine.DEB.2.02.1407072007470.27641@kaball.uk.xensource.com>
+ <53BBCCEF.1080704@citrix.com>
+Message-ID: <alpine.DEB.2.02.1407081158250.27641@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Tue, 8 Jul 2014, David Vrabel wrote:
+> On 07/07/14 21:24, Stefano Stabellini wrote:
+> > Hi all,
+> > Xen support in Linux for ARM and ARM64 suffers from lack of support for
+> > multiple mfn to pfn mappings: whenever a frontend grants the same page
+> > multiple times to the backend, the mfn to pfn accounting in
+> > arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+> > when xen-netfront/xen-netback switched from grant copies to grant
+> > mappings, therefore causing the issue to happen much more often.
+> > 
+> > Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+> > therefore we are looking for alternative solutions. One idea is avoiding
+> > mfn to pfn conversions altogether. The only code path that needs them is
+> > swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
+> > 
+> > To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+> > Xen, see the attached patch. In Linux we use it to perform the cache
+> > maintenance operations without mfns conversions.
+> 
+> This will only work with PIPT caches (or certain types of VIPT that also
+> have alias detection).  Do all the CPUs that Xen runs on have these type
+> of cache?
 
-A few bug fixes for Tegra124 clocks and some updates for the SATA driver.
-This pull request includes 1 more patch PLLE clocking to make it work for
-both SATA and XUSB.
-
-Thanks,
-
-Peter.
-
-The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
-
-  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-
-are available in the git repository at:
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-3.17-1
-
-Mikko Perttunen (3):
-      clk: tegra: Enable hardware control of SATA PLL
-      clk: tegra: Add SATA clocks to Tegra124 initialization table
-      clk: tegra: Use XUSB-compatible SATA PLL sequence
-
-Peter De Schrijver (3):
-      clk: tegra: fix vi_sensor clocks on Tegra124
-      clk: tegra124: init table updates
-      clk: tegra: export clock names for debugging
-
- drivers/clk/tegra/clk-pll.c          |   19 +++++++++++++++++++
- drivers/clk/tegra/clk-tegra-periph.c |    4 ++--
- drivers/clk/tegra/clk-tegra114.c     |   31 ++++++++++++++++++++++++++++++-
- drivers/clk/tegra/clk-tegra124.c     |   10 +++++++++-
- drivers/clk/tegra/clk.c              |    6 ++++++
- 5 files changed, 66 insertions(+), 4 deletions(-)
+Given that Xen only runs on v7 or newer I think we should be safe.
