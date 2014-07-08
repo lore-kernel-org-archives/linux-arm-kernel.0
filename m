@@ -1,33 +1,36 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Jul 2014 10:06:36 +0200
-Subject: [PATCH 09/18] AT91: Call at91_register_devices in the board files
-In-Reply-To: <20140707184239.GI9558@ns203013.ovh.net>
-References: <1404396906-25194-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404396906-25194-15-git-send-email-maxime.ripard@free-electrons.com>
- <D103F102-4B04-4CC6-8F20-58CEB0EC8E36@jcrosoft.com>
- <20140703145222.GE31996@lukather>
- <20140707184239.GI9558@ns203013.ovh.net>
-Message-ID: <20140708080636.GK13423@lukather>
+Date: Tue, 8 Jul 2014 10:05:35 +0200
+Subject: [RFC PATCH v3] reset: Add a defer reset object to send board
+ specific reset
+In-Reply-To: <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
+References: <1403098673-3058-1-git-send-email-houcheng@gmail.com>
+ <CACRpkdYfu8HmVCkn9JFh+YP5OPdr8o9nTfoCnkJ7SSpGoenQUg@mail.gmail.com>
+Message-ID: <20140708080535.GJ13423@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 08:42:39PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 16:52 Thu 03 Jul     , Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Thu, Jul 03, 2014 at 10:29:58PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > no do this at SoC level
-> > 
-> > Since it has to be done at init_machine, I don't see any other easy
-> > way to do this at the SoC level.
-> > 
-> > What is your suggestion?
+On Tue, Jul 08, 2014 at 09:52:03AM +0200, Linus Walleij wrote:
+> On Wed, Jun 18, 2014 at 3:37 PM, Houcheng Lin <houcheng@gmail.com> wrote:
 > 
-> do it earlier as there is not driver it will not change anything
+> > The Problem
+> > -----------
+> > The reset signal on a hardware board is send either:
+> >     - during machine initialization
+> >     - during bus master's initialization
+> 
+> I just thought about this a bit, since there isn't already a generic GPIO
+> reset driver, just call this drivers/reset/reset-gpio.c and make the
+> ability to deferral just a configuration detail of the GPIO reset driver.
 
-My question remains. When should I do so?
+Philipp has been working on one for quite some time. See
+http://www.spinics.net/lists/arm-kernel/msg321927.html
 
-at91_initialize is too early to register any devices.
+However, it seems to progress slowly, and we don't seem to be able to
+reach a consensus here.
+
+If you ask me, having to set a few extra properties like this just
+advocates for a regular reset driver and DT node for the reset GPIO,
+but I'm pretty sure Philipp will feel otherwise :)
 
 Maxime
 
@@ -41,4 +44,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/d18dec9c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/0509ca19/attachment.sig>
