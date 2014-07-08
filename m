@@ -1,69 +1,169 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 7 Jul 2014 16:52:22 -0700
-Subject: [PATCH] mtd: nand: stm_nand_bch: add new driver
-In-Reply-To: <20140703100522.756f9715@bbrezillon>
-References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
- <20140703002237.GM3599@ld-irv-0074>
- <20140703100522.756f9715@bbrezillon>
-Message-ID: <20140707235222.GC7537@ld-irv-0074>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 7 Jul 2014 18:14:18 -0600
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140708001418.GB22939@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Thu, Jul 03, 2014 at 10:05:22AM +0200, Boris BREZILLON wrote:
-> On Wed, 2 Jul 2014 17:22:37 -0700 Brian Norris <computersforpeace@gmail.com> wrote:
-> > On Wed, May 28, 2014 at 10:20:05AM +0100, Lee Jones wrote:
-> > > +
-> > > +	nand_timing0: nand-timing {
-> > > +		sig-setup	= <10>;
-> > > +		sig-hold	= <10>;
-> > > +		CE-deassert	= <0>;
-> > > +		WE-to-RBn	= <100>;
-> > > +		wr-on		= <10>;
-> > > +		wr-off		= <30>;
-> > > +		rd-on		= <10>;
-> > > +		rd-off		= <30>;
-> > > +		chip-delay	= <30>;		/* delay in us */
-> > > +	};
-> > 
-> > You didn't document any of this node. And I don't think we want to
-> > specify every single timing parameter in DT; it may make sense to use
-> > Boris Brezillon's approach (I note this further down, in the driver
-> > code) for mapping non-ONFI NAND timings into a compatible ONFI timing
-> > mode. This will greatly simplify the bindings needed, since it's
-> > standardized and auto-detectable in many cases.
+On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
+> Some architectures do not have a simple view of the PCI I/O space
+> and instead use a range of CPU addresses that map to bus addresses. For
+> some architectures these ranges will be expressed by OF bindings
+> in a device tree file.
 > 
+> Introduce a pci_register_io_range() helper function with a generic
+> implementation that can be used by such architectures to keep track
+> of the I/O ranges described by the PCI bindings. If the PCI_IOBASE
+> macro is not defined that signals lack of support for PCI and we
+> return an error.
 > 
-> AFAIR, the NAND timing representation for non-ONFI chips question was
-> left unanswered:
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  drivers/of/address.c       | 61 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_address.h |  1 +
+>  2 files changed, 62 insertions(+)
 > 
-> https://lkml.org/lkml/2014/5/20/581
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 5edfcb0..1345733 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -5,6 +5,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_address.h>
+>  #include <linux/pci_regs.h>
+> +#include <linux/slab.h>
+>  #include <linux/string.h>
+>  
+>  /* Max address size we deal with */
+> @@ -601,12 +602,72 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+>  }
+>  EXPORT_SYMBOL(of_get_address);
+>  
+> +struct io_range {
+> +	struct list_head list;
+> +	phys_addr_t start;
+> +	resource_size_t size;
+> +};
+> +
+> +static LIST_HEAD(io_range_list);
+> +
+> +/*
+> + * Record the PCI IO range (expressed as CPU physical address + size).
+> + * Return a negative value if an error has occured, zero otherwise
+> + */
+> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+
+I don't understand the interface here.  What's the mapping from CPU
+physical address to bus I/O port?  For example, I have the following
+machine in mind:
+
+  HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
+  HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
+  HWP0002:00: host bridge window [io  0x0000-0x0fff]
+
+  HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
+  HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
+  HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
+
+The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
+the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
+e.g., "inb(0)" to access it.
+
+Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
+bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
+"inb(0x1000000)" to access it.
+
+pci_register_io_range() seems sort of like it's intended to track the
+memory-mapped IO port spaces, e.g., [mem 0xf8010000000-0xf8010000fff].
+But I would think you'd want to keep track of at least the base port
+number on the PCI bus, too.  Or is that why it's weak?
+
+Here's what these look like in /proc/iomem and /proc/ioports (note that
+there are two resource structs for each memory-mapped IO port space: one
+IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
+driver), and one IORESOURCE_IO for the I/O port space (this becomes the
+parent of a region used by a regular device driver):
+
+  /proc/iomem:
+    PCI Bus 0000:00 I/O Ports 00000000-00000fff
+    PCI Bus 0001:00 I/O Ports 01000000-01000fff
+
+  /proc/ioports:
+    00000000-00000fff : PCI Bus 0000:00
+    01000000-01000fff : PCI Bus 0001:00
+
+> +{
+> +#ifdef PCI_IOBASE
+> +	struct io_range *res;
+> +	resource_size_t allocated_size = 0;
+> +
+> +	/* check if the range hasn't been previously recorded */
+> +	list_for_each_entry(res, &io_range_list, list) {
+> +		if (addr >= res->start && addr + size <= res->start + size)
+> +			return 0;
+> +		allocated_size += res->size;
+> +	}
+> +
+> +	/* range not registed yet, check for available space */
+> +	if (allocated_size + size - 1 > IO_SPACE_LIMIT)
+> +		return -E2BIG;
+> +
+> +	/* add the range to the list */
+> +	res = kzalloc(sizeof(*res), GFP_KERNEL);
+> +	if (!res)
+> +		return -ENOMEM;
+> +
+> +	res->start = addr;
+> +	res->size = size;
+> +
+> +	list_add_tail(&res->list, &io_range_list);
+> +
+> +	return 0;
+> +#else
+> +	return -EINVAL;
+> +#endif
+> +}
+> +
+>  unsigned long __weak pci_address_to_pio(phys_addr_t address)
+>  {
+> +#ifdef PCI_IOBASE
+> +	struct io_range *res;
+> +	resource_size_t offset = 0;
+> +
+> +	list_for_each_entry(res, &io_range_list, list) {
+> +		if (address >= res->start &&
+> +			address < res->start + res->size) {
+> +			return res->start - address + offset;
+> +		}
+> +		offset += res->size;
+> +	}
+> +
+> +	return (unsigned long)-1;
+> +#else
+>  	if (address > IO_SPACE_LIMIT)
+>  		return (unsigned long)-1;
+>  
+>  	return (unsigned long) address;
+> +#endif
+>  }
+>  
+>  static int __of_address_to_resource(struct device_node *dev,
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index c13b878..ac4aac4 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -55,6 +55,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+>  extern const __be32 *of_get_address(struct device_node *dev, int index,
+>  			   u64 *size, unsigned int *flags);
+>  
+> +extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+>  extern unsigned long pci_address_to_pio(phys_addr_t addr);
+>  
+>  extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+> -- 
+> 2.0.0
 > 
-> I can definitely respin my NAND timings series, but I'd like to be sure
-> this is how you want it done before doing so.
-
-Can we start by supporting ONFI-only (or ONFI-only, plus entries in
-nand_flash_ids[]), and have nand_base provide the translation so drivers
-can retrieve the info? Then we can begin supporting new drivers like
-Lee's, and worry about the DT question separately.
-
-BTW, Lee: you're completely missing the definitions for
-'struct nand_sdr_timings' in this patch, so it doesn't compile.
-
-> Just as a reminder, you and Jason thought NAND timings for non-ONFI
-> chips could be auto detected thanks to READID informations (by storing
-> some sort of "NANDID <-> timings" association table).
-
-Yes, thanks for the reminder. I knew there was more than one reason I
-was wary of Lee's patch (first, that it was duplication of another patch
-set; and second, than I'm not sure it belongs in DT at all).
-
-I think we should attempt to solve this without any need for DT
-bindings, as most other parameters are auto-detectable in some sense
-(even if we have to store some NANDID <-> timings tables). I think going
-forward, we can expect that new NAND will use a JEDEC or ONFI spec, and
-that we shouldn't have to scale nand_flash_ids[] to include too many
-flash chip timings.
-
-Brian
