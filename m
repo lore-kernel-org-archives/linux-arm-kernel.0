@@ -1,255 +1,129 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jul 2014 16:13:36 +0100
-Subject: [PATCH v7 08/24] mfd: max77686: Add Dynamic Voltage Scaling
- (DVS) support
-In-Reply-To: <1404505467-26526-9-git-send-email-javier.martinez@collabora.co.uk>
-References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404505467-26526-9-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140709151336.GI2635@lee--X1>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 9 Jul 2014 10:15:52 -0500
+Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <20140709082906.GG28884@atomide.com>
+References: <1403660878-56350-3-git-send-email-s-anna@ti.com>
+ <20140628170709.GB23634@xo-6d-61-c0.localdomain> <53B18999.2020506@ti.com>
+ <20140630185942.GA5410@amd.pavel.ucw.cz> <53B1BBA8.5090507@ti.com>
+ <20140630203225.GA3893@amd.pavel.ucw.cz> <20140704064547.GZ28884@atomide.com>
+ <20140704080556.GA16274@amd.pavel.ucw.cz>
+ <20140704082354.GD28884@atomide.com> <53BC3081.9010402@ti.com>
+ <20140709082906.GG28884@atomide.com>
+Message-ID: <53BD5CA8.1080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'd really like Linus Walleij to look over this if possible.
-
-On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
-> Some regulators on the MAX77686 PMIC have Dynamic Voltage Scaling
-> (DVS) support that allows output voltage to change dynamically.
+On 07/09/2014 03:29 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [140708 10:57]:
+>> Hi Tony, Pavel,
+>>
+>> On 07/04/2014 03:23 AM, Tony Lindgren wrote:
+>>> * Pavel Machek <pavel@ucw.cz> [140704 01:07]:
+>>>> Hi!
+>>>>
+>>>>>>>>>>> The non-DT support has to be maintained for now to not break
+>>>>>>>>>>> OMAP3 legacy boot, and the legacy-style code will be cleaned
+>>>>>>>>>>> up once OMAP3 is also converted to DT-boot only.
+>>>>>>>>>>
+>>>>>>>>>>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
+>>>>>>>>>>>  	return 0;
+>>>>>>>>>>>  }
+>>>>>>>>>>>  
+>>>>>>>>>>> +static const struct omap_mbox_device_data omap2_data = {
+>>>>>>>>>>> +	.num_users	= 4,
+>>>>>>>>>>> +	.num_fifos	= 6,
+>>>>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+>>>>>>>>>>> +};
+>>>>>>>>>>> +
+>>>>>>>>>>> +static const struct omap_mbox_device_data omap3_data = {
+>>>>>>>>>>> +	.num_users	= 2,
+>>>>>>>>>>> +	.num_fifos	= 2,
+>>>>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+>>>>>>>>>>> +};
+>>>>>>>>>>> +
+>>>>>>>>>>> +static const struct omap_mbox_device_data am335x_data = {
+>>>>>>>>>>> +	.num_users	= 4,
+>>>>>>>>>>> +	.num_fifos	= 8,
+>>>>>>>>>>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
+>>>>>>>>>>> +};
+>>>>>>>>>>
+>>>>
+>>>>>> Aha, ok, then the intr_type should be derived from
+>>>>>> compatible-string. Or rather... you should have three
+>>>>>> compatible-strings for the three possibilities? (And then subtype,
+>>>>>> currently unused, in case there are more hw differences).
+>>>>>
+>>>>> The compatible string can and should be separate for each revision
+>>>>> unless they are the same exacat hardware revision.
+>>>>
+>>>> ACK.
+>>
+>> I checked the revision register from all SoCs. OMAP2 and OMAP3 have
+>> different revisions compared to OMAP4+. All of OMAP4, OMAP5, DRA7,
+>> AM335x and AM437x have the same version, but with different num-fifos
+>> and num-users.  So, I can switch back to using omap4-mailbox for all of
+>> these SoCs only if we encode the num-fifos and num-users in DT.
+>>
+>>>>
+>>>>>>> two are HW IP design parameters, so in general putting them in DT isn't
+>>>>>>> completely a bad idea, but I will wait to see if there are any further
+>>>>>>> comments on this from Tony or DT maintainers before I make changes.
+>>>>>>
+>>>>>> Ok, right... I'd vote for putting them into DT.
+>>>>>
+>>>>> I would avoid adding custom DT properties where possible and let the
+>>>>> driver just initialize the right data based on the compatible flag.
+>>>>
+>>>> If these are HW IP design parameters, we can expect to see many
+>>>> different combinations. Yet we know ahead of time how to handle
+>>>> different parameters HW people select.
+>>
+>> That's right, the above OMAP4+ SoCs already demonstrate this behavior.
+>>
+>>>>
+>>>> Thus IMO we should do it in the device tree.
+>>>
+>>> Oh you mean from supporting new hardware with just .dts changes?
+>>> From that point of view it makes sense to have them as DT properties,
+>>> so I'm fine with that.
+>>>
+>>> Let's just try to use something that's generic like fifosize. No idea
+>>> how the property for num_fifos should be handled though as that
+>>> implies some knowledge in the driver which num_users have fifos?
+>>
+>> The fifos are not per num_users, but rather the total number of fifos
+>> within the IP block. The num_users will be the number of targets the IP
+>> block can interrupt. I tried looking for generic properties, but there
+>> weren't any that seem to fit the description. If you want generic names,
+>> I can use num-fifos and num-users, otherwise will stick to the
+>> names defined in the previous series.
 > 
-> For MAX77686, these regulators are Buck regulators 2, 3 and 4.
+> OK since we already have some .dts entries with ti,mbox-num-fifos and
+> ti,mbox-num-users I'd use those for now. Adding parsing for a generic
+> property can be done later on.
+
+Alright, will stick to the existing properties.
+
 > 
-> Each Buck output voltage is selected using a set of external
-> inputs: DVS1-3 and SELB2-4.
+>>> So unless that can be described clearly in a DT property as well,
+>>> the binding might be still unusable for new hardware :)
+>>>
+>>
+>> I don't expect the OMAP mailbox IP to change much in the future. There
+>> is a FIFO depth parameter as well, but that's constant in all the
+>> current versions, and even if they change it, I can already use the
+>> generic property for that.
 > 
-> DVS registers can be used to configure the output voltages for each
-> Buck regulator and which one is active is controled by DVSx lines.
+> OK
+>  
+>> Tony,
+>> Depending on the agreement here, I may have to respin the OMAP
+>> mailbox DT/hwmod cleanup series [1]
 > 
-> SELBx lines are used to control if individual Buck lines are ON or OFF.
-> 
-> This patch adds support to configure the DVSx and SELBx lines
-> from DT and to setup and read the GPIO lines connected to them.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
-> 
-> Changes since v6:
->  - Add a comment that max77686_read_gpios() function can sleep.
->    Sugggested by Krzysztof Kozlowski
-> ---
->  drivers/mfd/max77686.c       | 119 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/max77686.h |  18 ++++---
->  2 files changed, 129 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-> index 8650832..d193873 100644
-> --- a/drivers/mfd/max77686.c
-> +++ b/drivers/mfd/max77686.c
-> @@ -32,8 +32,10 @@
->  #include <linux/mfd/core.h>
->  #include <linux/mfd/max77686.h>
->  #include <linux/mfd/max77686-private.h>
-> +#include <linux/gpio/consumer.h>
->  #include <linux/err.h>
->  #include <linux/of.h>
-> +#include <linux/export.h>
->  
->  #define I2C_ADDR_RTC	(0x0C >> 1)
->  
-> @@ -101,9 +103,119 @@ static const struct of_device_id max77686_pmic_dt_match[] = {
->  	{},
->  };
->  
-> +static void max77686_dt_parse_dvs_gpio(struct device *dev)
-> +{
-> +	struct max77686_platform_data *pd = dev_get_platdata(dev);
-> +	int i;
-> +
-> +	/*
-> +	 * NOTE: we don't consider GPIO errors fatal; board may have some lines
-> +	 * directly pulled high or low and thus doesn't specify them.
-> +	 */
-> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_dvs); i++)
-> +		pd->buck_gpio_dvs[i] =
-> +			devm_gpiod_get_index(dev, "max77686,pmic-buck-dvs", i);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++)
-> +		pd->buck_gpio_selb[i] =
-> +			devm_gpiod_get_index(dev, "max77686,pmic-buck-selb", i);
-> +}
+> OK let me know.
 
-Not sure why you've pulled this out for parse_dt_pdata()?
+I will refresh both this series and the mailbox DT/hwmod cleanup with
+these changes, and post the patches tomorrow.
 
-> +/**
-> + * max77686_setup_gpios() - init DVS-related GPIOs
-> + * @dev: device whose platform data contains the dvs GPIOs information
-> + *
-> + * This function claims / initalizations GPIOs related to DVS if they are
-
-s/initialzations/initialises
-
-> + * defined. This may have the effect of switching voltages if the
-
-s/if the/if
-
-> + * pdata->buck_default_idx does not match the boot time state of pins.
-> + */
-> +int max77686_setup_gpios(struct device *dev)
-> +{
-> +	struct max77686_platform_data *pd = dev_get_platdata(dev);
-> +	int buck_default_idx = pd->buck_default_idx;
-
-You're saving 4 characters once here.  Just use the variable in pd.
-
-> +	int ret;
-> +	int i;
-
-Don't you want some locking around this?
-
-> +	/* Set all SELB high to avoid glitching while DVS is changing */
-> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++) {
-> +		struct gpio_desc *gpio = pd->buck_gpio_selb[i];
-> +
-> +		/* OK if some GPIOs aren't defined */
-> +		if (IS_ERR(gpio))
-> +			continue;
-> +
-> +		ret = gpiod_direction_output_raw(gpio, 1);
-> +		if (ret) {
-> +			dev_err(dev, "can't set gpio[%d] dir: %d\n", i, ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	/* Set our initial setting */
-> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_dvs); i++) {
-> +		struct gpio_desc *gpio = pd->buck_gpio_dvs[i];
-> +
-> +		/* OK if some GPIOs aren't defined */
-> +		if (IS_ERR(gpio))
-> +			continue;
-> +
-> +		/* If a GPIO is valid, set it */
-> +		gpiod_direction_output(gpio, (buck_default_idx >> i) & 1);
-> +		if (ret) {
-> +			dev_err(dev, "can't set gpio[%d]: dir %d\n", i, ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	/* Now set SELB low to take effect */
-> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++) {
-> +		struct gpio_desc *gpio = pd->buck_gpio_selb[i];
-> +
-> +		if (!IS_ERR(gpio))
-> +			gpiod_set_value(gpio, 0);
-> +	}
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(max77686_setup_gpios);
-> +
-> +/**
-> + * max77686_read_gpios() - read the current state of the dvs GPIOs
-> + * @pdata: platform data that contains the dvs GPIOs information
-> + *
-> + * We call this function at bootup to detect what slot the firmware was
-> + * using for the DVS GPIOs.  That way we can properly preserve the firmware's
-> + * voltage settings
-> + *
-> + * This function can sleep so must not be called from atomic context.
-> + */
-> +int max77686_read_gpios(struct max77686_platform_data *pdata)
-> +{
-> +	int buck_default_idx = pdata->buck_default_idx;
-
-Remove this, it adds very little.
-
-> +	int result = 0;
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_dvs); i++) {
-> +		struct gpio_desc *gpio = pdata->buck_gpio_dvs[i];
-> +
-> +		/* OK if some GPIOs aren't defined; we'll use default */
-> +		if (IS_ERR(gpio)) {
-> +			result |= buck_default_idx & (1 << i);
-
-s/(1 << i)/BIT(i)/
-
-> +			continue;
-> +		}
-> +
-> +		if (gpiod_get_value_cansleep(gpio))
-> +			result |= 1 << i;
-
-Same here.
-
-> +	}
-> +
-> +	return result;
-> +}
-> +EXPORT_SYMBOL_GPL(max77686_read_gpios);
-> +
->  static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
->  								  *dev)
->  {
-> +	struct device_node *np = dev->of_node;
->  	struct max77686_platform_data *pd;
->  
->  	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
-> @@ -111,6 +223,13 @@ static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
->  		return NULL;
->  
->  	dev->platform_data = pd;
-> +
-> +	/* Read default index and ignore errors, since default is 0 */
-> +	of_property_read_u32(np, "max77686,pmic-buck-default-dvs-idx",
-
-If it doesn't already have one, this needs a DT Ack and associated
-documentation.
-
-> +			     &pd->buck_default_idx);
-> +
-> +	max77686_dt_parse_dvs_gpio(dev);
-
-Bring code back into here and remove the call.
-
->  	return pd;
->  }
->  
-> diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
-> index 4cbcc13..46a736b 100644
-> --- a/include/linux/mfd/max77686.h
-> +++ b/include/linux/mfd/max77686.h
-> @@ -99,15 +99,17 @@ struct max77686_platform_data {
->  	struct max77686_opmode_data *opmode_data;
->  
->  	/*
-> -	 * GPIO-DVS feature is not enabled with the current version of
-> -	 * MAX77686 driver. Buck2/3/4_voltages[0] is used as the default
-> -	 * voltage at probe. DVS/SELB gpios are set as OUTPUT-LOW.
-> +	 * GPIO-DVS feature is not fully enabled with the current version of
-> +	 * MAX77686 driver, but the driver does support using a DVS index other
-> +	 * than the default of 0.
->  	 */
-> -	int buck234_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
-> -	int buck234_gpio_selb[3]; /* [0]SELB2, [1]SELB3, [2]SELB4 */
-> -	unsigned int buck2_voltage[8]; /* buckx_voltage in uV */
-> -	unsigned int buck3_voltage[8];
-> -	unsigned int buck4_voltage[8];
-> +	struct gpio_desc *buck_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
-> +	int buck_default_idx; /* Default value of DVS1, 2, 3 */
-> +
-> +	struct gpio_desc *buck_gpio_selb[3]; /* Buck regulators 2, 3, 4 */
->  };
->  
-> +extern int max77686_setup_gpios(struct device *dev);
-> +extern int max77686_read_gpios(struct max77686_platform_data *pdata);
-> +
->  #endif /* __LINUX_MFD_MAX77686_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+regards
+Suman
