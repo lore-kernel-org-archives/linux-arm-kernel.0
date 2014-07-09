@@ -1,193 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  9 Jul 2014 14:01:43 +0200
-Subject: [PATCH v2] pinctrl: msm: move all qualcomm drivers to subdir
-Message-ID: <1404907303-21243-1-git-send-email-linus.walleij@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 9 Jul 2014 14:04:02 +0200
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
+References: <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+ <53A3096B.1040409@wwwdotorg.org>
+ <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
+ <20140708130501.GC9516@ulmo>
+ <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+ <20140709063130.GA3170@ulmo>
+ <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
+ <20140709102551.GA19357@ulmo>
+ <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140709120400.GA3819@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have four Qualcomm-related pin control drivers, and now there
-are drivers coming in for the PMICs on these systems, so let's
-create a qcom subdirectory to hold all the Qualcomm stuff.
+On Wed, Jul 09, 2014 at 02:08:16PM +0300, Peter De Schrijver wrote:
+> On Wed, Jul 09, 2014 at 12:25:52PM +0200, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Wed, Jul 09, 2014 at 11:33:11AM +0300, Peter De Schrijver wrote:
+> > > On Wed, Jul 09, 2014 at 08:31:32AM +0200, Thierry Reding wrote:
+> > > > > Old Signed by an unknown key
+> > > > 
+> > > > On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
+> > > > > > > 
+> > > > > > > Yes, but the problem is that you also need clocks and reset of other modules
+> > > > > > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
+> > > > > > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
+> > > > > > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
+> > > > > > > someday which means we would need to control the domain and therefore would
+> > > > > > > need to tell that driver about the ISPs clocks and resets even though the
+> > > > > > > driver doesn't know anything about the ISP hw otherwise.
+> > > > > > 
+> > > > > > Can't we make powergates reference counted so that they don't get
+> > > > > > disabled as long as there are any users? Looking for example at the
+> > > > > 
+> > > > > We could, but then why not switch to the powerdomain code and make powering
+> > > > > off a domain a NOP until we sorted out the context save/restore or fixed
+> > > > > the framework to allow for suspend without turning off the domains?
+> > > > 
+> > > > Well, one of the reasons why I'm not sure it's worth the effort at this
+> > > > point is that we can't get rid of the tegra_powergate_*() API anyway
+> > > > because of backwards compatibility. So we're going to add code (without
+> > > > getting rid of old code) merely to support some generic framework. That
+> > > > doesn't sound very useful to me.
+> > > > 
+> > > 
+> > > We can also convert the existing users to genpd. Today there are only 2 users
+> > > (gpu/drm/tegra/gr3d.c and pci/host/pci-tegra.c), so that doesn't seem to be
+> > > an impossible task.
+> > 
+> > We can certainly do that. What I'm trying to say is that since people
+> > may be running newer versions of the kernel with a DTB that doesn't have
+> > the necessary properties to hook up power domains, we have to keep calls
+> > to tegra_powergate_*() functions as-is, lest we break those setups.
+> > 
+> 
+> For those 2 domains we can find the necessary clocks and resets by parsing
+> the relevant existing DT nodes for PCIe and gr3d. For clocks, this isn't
+> even needed as we can always register some extra clkdev's to get them. There
+> is no equivalent for resets so we have to parse the gr3d and pcie DT nodes,
+> but that's not too bad I think.
 
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Actually add the new Kconfig and Makefile to the commit,
-  duh.
----
- drivers/pinctrl/Kconfig                      | 40 +-------------------------
- drivers/pinctrl/Makefile                     |  5 ----
- drivers/pinctrl/qcom/Kconfig                 | 42 ++++++++++++++++++++++++++++
- drivers/pinctrl/qcom/Makefile                |  6 ++++
- drivers/pinctrl/{ => qcom}/pinctrl-apq8064.c |  0
- drivers/pinctrl/{ => qcom}/pinctrl-ipq8064.c |  0
- drivers/pinctrl/{ => qcom}/pinctrl-msm.c     |  0
- drivers/pinctrl/{ => qcom}/pinctrl-msm8960.c |  0
- drivers/pinctrl/{ => qcom}/pinctrl-msm8x74.c |  0
- 9 files changed, 49 insertions(+), 44 deletions(-)
- create mode 100644 drivers/pinctrl/qcom/Kconfig
- create mode 100644 drivers/pinctrl/qcom/Makefile
- rename drivers/pinctrl/{ => qcom}/pinctrl-apq8064.c (100%)
- rename drivers/pinctrl/{ => qcom}/pinctrl-ipq8064.c (100%)
- rename drivers/pinctrl/{ => qcom}/pinctrl-msm.c (100%)
- rename drivers/pinctrl/{ => qcom}/pinctrl-msm8960.c (100%)
- rename drivers/pinctrl/{ => qcom}/pinctrl-msm8x74.c (100%)
+Even if we could really do this, at this point I don't see an advantage.
+All that it would be doing is move to some subsystem that doesn't quite
+match what we need just for the sake of moving to that subsystem. Having
+a Tegra-specific API doesn't sound so bad anymore.
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index c0f49fb3276c..e2c7e09783fa 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -233,45 +233,6 @@ config PINCTRL_IMX28
- 	bool
- 	select PINCTRL_MXS
- 
--config PINCTRL_MSM
--	bool
--	select PINMUX
--	select PINCONF
--	select GENERIC_PINCONF
--	select GPIOLIB_IRQCHIP
--
--config PINCTRL_APQ8064
--	tristate "Qualcomm APQ8064 pin controller driver"
--	depends on GPIOLIB && OF
--	select PINCTRL_MSM
--	help
--	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
--	  Qualcomm TLMM block found in the Qualcomm APQ8064 platform.
--
--config PINCTRL_IPQ8064
--	tristate "Qualcomm IPQ8064 pin controller driver"
--	depends on GPIOLIB && OF
--	select PINCTRL_MSM
--	help
--	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
--	  Qualcomm TLMM block found in the Qualcomm IPQ8064 platform.
--
--config PINCTRL_MSM8960
--	tristate "Qualcomm 8960 pin controller driver"
--	depends on GPIOLIB && OF
--	select PINCTRL_MSM
--	help
--	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
--	  Qualcomm TLMM block found in the Qualcomm 8960 platform.
--
--config PINCTRL_MSM8X74
--	tristate "Qualcomm 8x74 pin controller driver"
--	depends on GPIOLIB && OF && (ARCH_QCOM || COMPILE_TEST)
--	select PINCTRL_MSM
--	help
--	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
--	  Qualcomm TLMM block found in the Qualcomm 8974 platform.
--
- config PINCTRL_NOMADIK
- 	bool "Nomadik pin controller driver"
- 	depends on ARCH_U8500 || ARCH_NOMADIK
-@@ -410,6 +371,7 @@ config PINCTRL_S3C64XX
- 
- source "drivers/pinctrl/berlin/Kconfig"
- source "drivers/pinctrl/mvebu/Kconfig"
-+source "drivers/pinctrl/qcom/Kconfig"
- source "drivers/pinctrl/sh-pfc/Kconfig"
- source "drivers/pinctrl/spear/Kconfig"
- source "drivers/pinctrl/sunxi/Kconfig"
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 80bced77446a..a7b8a9e62a14 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -39,11 +39,6 @@ obj-$(CONFIG_PINCTRL_MXS)	+= pinctrl-mxs.o
- obj-$(CONFIG_PINCTRL_IMX23)	+= pinctrl-imx23.o
- obj-$(CONFIG_PINCTRL_IMX25)	+= pinctrl-imx25.o
- obj-$(CONFIG_PINCTRL_IMX28)	+= pinctrl-imx28.o
--obj-$(CONFIG_PINCTRL_MSM)	+= pinctrl-msm.o
--obj-$(CONFIG_PINCTRL_APQ8064)	+= pinctrl-apq8064.o
--obj-$(CONFIG_PINCTRL_IPQ8064)	+= pinctrl-ipq8064.o
--obj-$(CONFIG_PINCTRL_MSM8960)	+= pinctrl-msm8960.o
--obj-$(CONFIG_PINCTRL_MSM8X74)	+= pinctrl-msm8x74.o
- obj-$(CONFIG_PINCTRL_NOMADIK)	+= pinctrl-nomadik.o
- obj-$(CONFIG_PINCTRL_STN8815)	+= pinctrl-nomadik-stn8815.o
- obj-$(CONFIG_PINCTRL_DB8500)	+= pinctrl-nomadik-db8500.o
-diff --git a/drivers/pinctrl/qcom/Kconfig b/drivers/pinctrl/qcom/Kconfig
-new file mode 100644
-index 000000000000..d160a710d704
---- /dev/null
-+++ b/drivers/pinctrl/qcom/Kconfig
-@@ -0,0 +1,42 @@
-+if (ARCH_QCOM || COMPILE_TEST)
-+
-+config PINCTRL_MSM
-+	bool
-+	select PINMUX
-+	select PINCONF
-+	select GENERIC_PINCONF
-+	select GPIOLIB_IRQCHIP
-+
-+config PINCTRL_APQ8064
-+	tristate "Qualcomm APQ8064 pin controller driver"
-+	depends on GPIOLIB && OF
-+	select PINCTRL_MSM
-+	help
-+	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
-+	  Qualcomm TLMM block found in the Qualcomm APQ8064 platform.
-+
-+config PINCTRL_IPQ8064
-+	tristate "Qualcomm IPQ8064 pin controller driver"
-+	depends on GPIOLIB && OF
-+	select PINCTRL_MSM
-+	help
-+	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
-+	  Qualcomm TLMM block found in the Qualcomm IPQ8064 platform.
-+
-+config PINCTRL_MSM8960
-+	tristate "Qualcomm 8960 pin controller driver"
-+	depends on GPIOLIB && OF
-+	select PINCTRL_MSM
-+	help
-+	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
-+	  Qualcomm TLMM block found in the Qualcomm 8960 platform.
-+
-+config PINCTRL_MSM8X74
-+	tristate "Qualcomm 8x74 pin controller driver"
-+	depends on GPIOLIB && OF
-+	select PINCTRL_MSM
-+	help
-+	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
-+	  Qualcomm TLMM block found in the Qualcomm 8974 platform.
-+
-+endif
-diff --git a/drivers/pinctrl/qcom/Makefile b/drivers/pinctrl/qcom/Makefile
-new file mode 100644
-index 000000000000..2a02602d715c
---- /dev/null
-+++ b/drivers/pinctrl/qcom/Makefile
-@@ -0,0 +1,6 @@
-+# Qualcomm pin control drivers
-+obj-$(CONFIG_PINCTRL_MSM)	+= pinctrl-msm.o
-+obj-$(CONFIG_PINCTRL_APQ8064)	+= pinctrl-apq8064.o
-+obj-$(CONFIG_PINCTRL_IPQ8064)	+= pinctrl-ipq8064.o
-+obj-$(CONFIG_PINCTRL_MSM8960)	+= pinctrl-msm8960.o
-+obj-$(CONFIG_PINCTRL_MSM8X74)	+= pinctrl-msm8x74.o
-diff --git a/drivers/pinctrl/pinctrl-apq8064.c b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-similarity index 100%
-rename from drivers/pinctrl/pinctrl-apq8064.c
-rename to drivers/pinctrl/qcom/pinctrl-apq8064.c
-diff --git a/drivers/pinctrl/pinctrl-ipq8064.c b/drivers/pinctrl/qcom/pinctrl-ipq8064.c
-similarity index 100%
-rename from drivers/pinctrl/pinctrl-ipq8064.c
-rename to drivers/pinctrl/qcom/pinctrl-ipq8064.c
-diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-similarity index 100%
-rename from drivers/pinctrl/pinctrl-msm.c
-rename to drivers/pinctrl/qcom/pinctrl-msm.c
-diff --git a/drivers/pinctrl/pinctrl-msm8960.c b/drivers/pinctrl/qcom/pinctrl-msm8960.c
-similarity index 100%
-rename from drivers/pinctrl/pinctrl-msm8960.c
-rename to drivers/pinctrl/qcom/pinctrl-msm8960.c
-diff --git a/drivers/pinctrl/pinctrl-msm8x74.c b/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-similarity index 100%
-rename from drivers/pinctrl/pinctrl-msm8x74.c
-rename to drivers/pinctrl/qcom/pinctrl-msm8x74.c
--- 
-1.9.3
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/5d6547f7/attachment.sig>
