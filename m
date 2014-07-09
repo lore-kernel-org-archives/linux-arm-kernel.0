@@ -1,49 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 03:50:56 -0700
-Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <53BD1AF8.2060609@ti.com>
-References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
- <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
- <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
- <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
- <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
-Message-ID: <20140709105055.GP28884@atomide.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 9 Jul 2014 06:56:14 -0400
+Subject: [GIT PULL] msm drm update for component changes
+In-Reply-To: <20140709093458.GA17540@rmk-PC.arm.linux.org.uk>
+References: <20140709093458.GA17540@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAF6AEGv+hzSKuD2mRDbz-hqN1H09tW5C4a2EYuZ5sN44RABe8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <a0393675@ti.com> [140709 03:39]:
-> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
-> >* Keerthy <a0393675@ti.com> [140709 02:36]:
-> >>On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
-> >>>* Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
-> >>>>--- a/arch/arm/boot/dts/dra7-evm.dts
-> >>>>+++ b/arch/arm/boot/dts/dra7-evm.dts
-> >>>>@@ -249,6 +249,7 @@
-> >>>>  					regulator-min-microvolt = <1050000>;
-> >>>>  					regulator-max-microvolt = <1050000>;
-> >>>>  					regulator-boot-on;
-> >>>>+					regulator-always-on;
-> >>>>  				};
-> >>>Is this regulator really always on?
-> >>This feeds on to RTC which is a free running clock. So i guess always on is
-> >>justified no?
-> >Well the dts entries should describe the hardware. If the
-> >regulator can be enabled and disabled, we should not claim it's
-> >always on.
-> 
-> From the PMIC perspective every regulator can be enabled and
-> disabled. From a Board perspective there are some which need
-> to be always on. For Ex: SMPS123 which feeds on to the MPU.
+On Wed, Jul 9, 2014 at 5:34 AM, Russell King <rmk@arm.linux.org.uk> wrote:
+> David,
+>
+> Please incorporate the latest msm drm update for component changes, which can be found at:
+>
+>   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-drm
+>
+> with SHA1 84448288546d13d7e06fd6638fb78ddff559b399.
+>
+> This updates the MSM's DRM driver for the updates merged in Greg's
+> driver-core tree, converting MSM to use the pre-declared array of
+> matches rather than walking the device tree each time we try to bind.
 
-Right, and we already have regulator-boot-on for those. Or are
-you seeing some issue with that?
+Hey Russell, do you want me to take this for my v3.17 pull req?  I
+expect there will be some minor conflicts with the DT support I'm
+working on at the moment.
 
-> I guess RTC also needs the supply to be on as long as we want
-> the clock to be ticking.
+Or does this need to be applied together with the rest of the series?
+In which case, maybe it should go first, and then I'd rebase msm-next
+on top.
 
-Sure, but if somebody wants shut it off regulator-boot-on is
-better from driver point of view.
+BR,
+-R
 
-Regards,
 
-Tony
+> This will update the following files:
+>
+>  drivers/base/component.c      | 192 ++++++++++++++++++++++++++++++++++--------
+>  drivers/gpu/drm/msm/msm_drv.c |  83 ++++++++----------
+>  include/linux/component.h     |   7 ++
+>  3 files changed, 199 insertions(+), 83 deletions(-)
+>
+> through these changes:
+>
+> Russell King (5):
+>       component: fix missed cleanup in case of devres failure
+>       component: ignore multiple additions of the same component
+>       component: add support for component match array
+>       component: fix bug with legacy API
+>       drm: msm: update to use component match support
+>
+> Many thanks.
