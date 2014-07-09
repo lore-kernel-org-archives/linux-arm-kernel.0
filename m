@@ -1,75 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed,  9 Jul 2014 10:50:25 +0200
-Subject: [PATCH] BCM2835: Add I2S driver to device tree
-Message-ID: <1404895825-25668-1-git-send-email-broonie@kernel.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 9 Jul 2014 09:59:11 +0100
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <201407081614.18304.arnd@arndb.de>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140708001418.GB22939@google.com>
+ <20140708104050.GA6501@e106497-lin.cambridge.arm.com>
+ <201407081614.18304.arnd@arndb.de>
+Message-ID: <20140709085910.GP6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Tue, Jul 08, 2014 at 03:14:17PM +0100, Arnd Bergmann wrote:
+> On Tuesday 08 July 2014, Liviu Dudau wrote:
+> > > Here's what these look like in /proc/iomem and /proc/ioports (note that
+> > > there are two resource structs for each memory-mapped IO port space: one
+> > > IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
+> > > driver), and one IORESOURCE_IO for the I/O port space (this becomes the
+> > > parent of a region used by a regular device driver):
+> > > 
+> > >   /proc/iomem:
+> > >     PCI Bus 0000:00 I/O Ports 00000000-00000fff
+> > >     PCI Bus 0001:00 I/O Ports 01000000-01000fff
+> > > 
+> > >   /proc/ioports:
+> > >     00000000-00000fff : PCI Bus 0000:00
+> > >     01000000-01000fff : PCI Bus 0001:00
+> > 
+> > OK, I have a question that might be ovbious to you but I have missed the answer
+> > so far: how does the IORESOURCE_MEM area gets created? Is it the host bridge
+> > driver's job to do it? Is it something that the framework should do when it
+> > notices that the IORESOURCE_IO is memory mapped?
+> 
+> The host bridge driver should either register the IORESOURCE_MEM resource
+> itself from its probe or setup function, or it should get registered behind
+> the covers in drivers using of_create_pci_host_bridge().
+> 
+> Your new pci_host_bridge_of_get_ranges already loops over all the 
+> resources, so it would be a good place to put that.
 
-[Tweaked slightly to disable by default -- broonie]
+OK, so it is not something that I've missed, just something that x86-64 does and
+my version doesn't yet.
 
-Signed-off-by: Florian Meier <florian.meier@koalo.de>
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm/boot/dts/bcm2835-rpi-b.dts |  8 +++++++-
- arch/arm/boot/dts/bcm2835.dtsi      | 11 +++++++++++
- 2 files changed, 18 insertions(+), 1 deletion(-)
+Thanks for confirming that.
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 2a3b1c1..58a0d60 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -23,7 +23,7 @@
- 
- &gpio {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&gpioout &alt0 &alt3>;
-+	pinctrl-0 = <&gpioout &alt0 &alt2 &alt3>;
- 
- 	gpioout: gpioout {
- 		brcm,pins = <6>;
-@@ -39,6 +39,12 @@
- 		brcm,pins = <48 49 50 51 52 53>;
- 		brcm,function = <7>; /* alt3 */
- 	};
-+
-+	/* I2S interface */
-+	alt2: alt2 {
-+		brcm,pins = <28 29 30 31>;
-+		brcm,function = <6>; /* alt2 */
-+	};
- };
- 
- &i2c0 {
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index b8473c4..a0aff1f 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -99,6 +99,7 @@
- 			dmas = <&dma 2>,
- 			       <&dma 3>;
- 			dma-names = "tx", "rx";
-+			status = "disabled";
- 		};
- 
- 		spi: spi at 7e204000 {
-@@ -148,6 +149,16 @@
- 		arm-pmu {
- 			compatible = "arm,arm1176-pmu";
- 		};
-+
-+		bcm2835_i2s: i2s at 7e203000 {
-+			compatible = "brcm,bcm2835-i2s";
-+			reg = <0x7e203000 0x20>,
-+			      <0x7e101098 0x02>;
-+
-+			dmas = <&dma 2>,
-+			       <&dma 3>;
-+			dma-names = "tx", "rx";
-+		};
- 	};
- 
- 	clocks {
+Liviu
+
+> 
+> 	Arnd
+> 
+
 -- 
-2.0.0
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
