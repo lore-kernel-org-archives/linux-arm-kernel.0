@@ -1,91 +1,104 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Wed, 09 Jul 2014 17:11:20 +0530
-Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
-In-Reply-To: <20140709104332.GS19379@twins.programming.kicks-ass.net>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
- <53BB61E9.80200@linux.vnet.ibm.com>
- <CAKfTPtA8BVPtRRLzomqnGp7_uaSbFYmFTrrt4fpQTOb7qyjddg@mail.gmail.com>
- <53BCBD0E.2070609@linux.vnet.ibm.com>
- <20140709104332.GS19379@twins.programming.kicks-ass.net>
-Message-ID: <53BD2A60.3060106@linux.vnet.ibm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  9 Jul 2014 12:41:14 +0100
+Subject: [PATCH v3 5/5] ARM: DT: STi: STiH416: Add DT node for MiPHY365x
+In-Reply-To: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1404906074-31992-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 04:13 PM, Peter Zijlstra wrote:
-> On Wed, Jul 09, 2014 at 09:24:54AM +0530, Preeti U Murthy wrote:
->> In the example that I mention above, t1 and t2 are on the rq of cpu0;
->> while t1 is running on cpu0, t2 is on the rq but does not have cpu1 in
->> its cpus allowed mask. So during load balance, cpu1 tries to pull t2,
->> cannot do so, and hence LBF_ALL_PINNED flag is set and it jumps to
->> out_balanced. Note that there are only two sched groups at this level of
->> sched domain.one with cpu0 and the other with cpu1. In this scenario we
->> do not try to do active load balancing, atleast thats what the code does
->> now if LBF_ALL_PINNED flag is set.
-> 
-> I think Vince is right in saying that in this scenario ALL_PINNED won't
-> be set. move_tasks() will iterate cfs_rq::cfs_tasks, that list will also
-> include the current running task.
+The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+devices. It has 2 ports which it can use for either; both SATA, both
+PCIe or one of each in any configuration.
 
-Hmm.. really? Because while dequeueing a task from the rq so as to
-schedule it on a cpu, we delete its entry from the list of cfs_tasks on
-the rq.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih416-b2020-revE.dts | 10 ++++++++++
+ arch/arm/boot/dts/stih416-b2020.dts      | 12 ++++++++++++
+ arch/arm/boot/dts/stih416.dtsi           | 22 ++++++++++++++++++++++
+ 3 files changed, 44 insertions(+)
 
-list_del_init(&se->group_node) in account_entity_dequeue() does that.
-
-> 
-> And can_migrate_task() only checks for current after the pinning bits.
-> 
->> Continuing with the above explanation; when LBF_ALL_PINNED flag is
->> set,and we jump to out_balanced, we clear the imbalance flag for the
->> sched_group comprising of cpu0 and cpu1,although there is actually an
->> imbalance. t2 could still be migrated to say cpu2/cpu3 (t2 has them in
->> its cpus allowed mask) in another sched group when load balancing is
->> done at the next sched domain level.
-> 
-> And this is where Vince is wrong; note how
-> update_sg_lb_stats()/sg_imbalance() uses group->sgc->imbalance, but
-> load_balance() sets: sd_parent->groups->sgc->imbalance, so explicitly
-> one level up.
-
-One level up? The group->sgc->imbalance flag is checked during
-update_sg_lb_stats(). This flag is *set during the load balancing at a
-lower level sched domain*.IOW, when the 'group' formed the sched domain.
-
-> 
-> So what we can do I suppose is clear 'group->sgc->imbalance' at
-> out_balanced.
-
-You mean 'set'? If we clear it we will have no clue about imbalances at
-lower level sched domains due to pinning. Specifically in LBF_ALL_PINNED
-case. This might prevent us from balancing out these tasks to other
-groups at a higher level domain. update_sd_pick_busiest() specifically
-relies on this flag to choose the busiest group.
-
-> 
-> In any case, the entirely of this group imbalance crap is just that,
-> crap. Its a terribly difficult situation and the current bits more or
-> less fudge around some of the common cases. Also see the comment near
-> sg_imbalanced(). Its not a solid and 'correct' anything. Its a bunch of
-> hacks trying to deal with hard cases.
-> 
-> A 'good' solution would be prohibitively expensive I fear.
-
-So the problem that Vincent is trying to bring to the fore with this
-patchset is that, when the busy group has cpus with only 1 running task
-but imbalance flag set due to affinity constraints, we unnecessarily try
-to do active balancing on this group. Active load balancing will not
-succeed when there is only one task. To solve this issue will a simple
-check on (busiest->nr_running > 1) in addition to !(ld_moved) before
-doing active load balancing not work?
-
-
-Thanks
-
-Regards
-Preeti U Murthy
-
-
-
-
-> 
+diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+index ba0fa2c..80aff0f 100644
+--- a/arch/arm/boot/dts/stih416-b2020-revE.dts
++++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+@@ -31,5 +31,15 @@
+ 		ethernet1: dwmac at fef08000 {
+ 			snps,reset-gpio = <&PIO0 7>;
+ 		};
++
++		miphy365x_phy: miphy365x at fe382000 {
++			phy_port0: port at fe382000 {
++				st,sata-gen = <3>;
++			};
++
++			phy_port1: port at fe38a000 {
++				st,pcie-tx-pol-inv;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+index 4e2df66..c3c2ac6 100644
+--- a/arch/arm/boot/dts/stih416-b2020.dts
++++ b/arch/arm/boot/dts/stih416-b2020.dts
+@@ -12,4 +12,16 @@
+ / {
+ 	model = "STiH416 B2020";
+ 	compatible = "st,stih416-b2020", "st,stih416";
++
++	soc {
++		miphy365x_phy: miphy365x at fe382000 {
++			phy_port0: port at fe382000 {
++				st,sata-gen = <3>;
++			};
++
++			phy_port1: port at fe38a000 {
++				st,pcie-tx-pol-inv;
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 06473c5..e62fdd3 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -9,6 +9,8 @@
+ #include "stih41x.dtsi"
+ #include "stih416-clock.dtsi"
+ #include "stih416-pinctrl.dtsi"
++
++#include <dt-bindings/phy/phy-miphy365x.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset-controller/stih416-resets.h>
+ / {
+@@ -236,5 +238,25 @@
+ 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
+ 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
+ 		};
++
++		miphy365x_phy: miphy365x at fe382000 {
++			compatible      = "st,miphy365x-phy";
++			st,syscfg  	= <&syscfg_rear>;
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			ranges;
++
++			phy_port0: port at fe382000 {
++				#phy-cells = <1>;
++				reg = <0xfe382000 0x100>, <0xfe394000 0x100>, <0x824 0x4>;
++				reg-names = "sata", "pcie", "syscfg";
++			};
++
++			phy_port1: port at fe38a000 {
++				#phy-cells = <1>;
++				reg = <0xfe38a000 0x100>, <0xfe804000 0x100>, <0x828 0x4>;
++				reg-names = "sata", "pcie", "syscfg";
++			};
++		};
+ 	};
+ };
+-- 
+1.8.3.2
