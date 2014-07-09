@@ -1,34 +1,32 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 17:45:14 +0200
-Subject: [PATCHv3 6/7] ARM: mvebu: update mvebu_v7_defconfig with cpufreq
- support
+Date: Wed,  9 Jul 2014 17:45:13 +0200
+Subject: [PATCHv3 5/7] ARM: mvebu: allow enabling of cpufreq on Armada XP
 In-Reply-To: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404920715-19834-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404920715-19834-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Armada XP supports dynamic CPU frequency scaling, it
-makes sense to enable the cpufreq subsystem in mvebu_v7_defconfig, as
-well as the cpufreq-generic driver used on Armada XP.
+Now that all the pieces to enable cpufreq on Armada XP are in place,
+we can make MACH_ARMADA_XP select ARCH_HAS_CPUFREQ to allow the usage
+of dynamic frequency scaling on this platform.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-mvebu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index b0bfefa..be2b5bc 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -29,6 +29,8 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPUFREQ_GENERIC=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_INET=y
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index b9bc599..1ff60ef 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -66,6 +66,7 @@ config MACH_ARMADA_XP
+ 	select CPU_PJ4B
+ 	select MACH_MVEBU_V7
+ 	select PINCTRL_ARMADA_XP
++	select ARCH_HAS_CPUFREQ
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada XP SoC with device tree.
 -- 
 2.0.0
