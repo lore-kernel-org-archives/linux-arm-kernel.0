@@ -1,36 +1,47 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:29 +0200
-Subject: [PATCHv3 01/34] Documentation: dt: document all the atmel pmc
- compatibles
+Date: Wed,  9 Jul 2014 17:06:31 +0200
+Subject: [PATCHv3 03/34] ARM: at91: prepare common clk transition for rm9200
 In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation for atmel-pmc only list one compatible, add the remaining
-compatible strings.
+Enclose the rm9200 old clk registration in "#if defined(CONFIG_OLD_CLK_AT91)
+ #endif"
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/atmel-pmc.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/at91rm9200.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-pmc.txt b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-index 389bed5056e8..795cc78543fe 100644
---- a/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-@@ -1,7 +1,10 @@
- * Power Management Controller (PMC)
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 787bb50a4dff..038702ee8bc6 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -26,10 +26,11 @@
+ #include "at91_aic.h"
+ #include "soc.h"
+ #include "generic.h"
+-#include "clock.h"
+ #include "sam9_smc.h"
+ #include "pm.h"
  
- Required properties:
--- compatible: Should be "atmel,at91rm9200-pmc"
-+- compatible: Should be "atmel,<chip>-pmc".
-+	<chip> can be: at91rm9200, at91sam9260, at91sam9g45, at91sam9n12,
-+	at91sam9x5, sama5d3
-+
- - reg: Should contain PMC registers location and length
++#if defined(CONFIG_OLD_CLK_AT91)
++#include "clock.h"
+ /* --------------------------------------------------------------------
+  *  Clocks
+  * -------------------------------------------------------------------- */
+@@ -277,6 +278,9 @@ static void __init at91rm9200_register_clocks(void)
+ 	clk_register(&pck2);
+ 	clk_register(&pck3);
+ }
++#else
++#define at91rm9200_register_clocks NULL
++#endif
  
- Examples:
+ /* --------------------------------------------------------------------
+  *  GPIO
 -- 
 1.9.1
