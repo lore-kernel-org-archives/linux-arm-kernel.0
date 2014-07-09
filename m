@@ -1,102 +1,33 @@
-From: rob.jones@codethink.co.uk (Rob Jones)
-Date: Wed, 09 Jul 2014 12:18:33 +0100
-Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
- devm_request_gpio_array
-In-Reply-To: <1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>
-References: <cover.1404665589.git.himangi774@gmail.com>
- <1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>
-Message-ID: <53BD2509.6070803@codethink.co.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 Jul 2014 14:20:23 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <1404901907.5766.3.camel@weser.hi.pengutronix.de>
+References: <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+ <53A3096B.1040409@wwwdotorg.org>
+ <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
+ <20140708130501.GC9516@ulmo>
+ <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+ <20140709063130.GA3170@ulmo>
+ <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
+ <20140709102551.GA19357@ulmo>
+ <1404901907.5766.3.camel@weser.hi.pengutronix.de>
+Message-ID: <20140709112023.GH23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please note that I submitted a patch on 02/07/14 to create this
-function which was acked by Linus Walleij on 05/07/14.
+On Wed, Jul 09, 2014 at 12:31:47PM +0200, Lucas Stach wrote:
+> > 
+> You could also take the easy way out and enable all power domains by
+> default. So drivers won't be able to disable the power domain on old
+> DTBs where they aren't hooked up, but the will continue to function
+> without calling into the old Tegra specific power domain code.
+> 
 
-Great minds think alike, and all that.
+If the bootloader turned some domains off, the kernel would have to turn them
+back on again. However that requires knowledge about the clocks and resets of
+the peripherals in the domain.
 
-However, I think that the version I submitted better replicates the
-original (non devm) functionality, see below.
+Cheers,
 
-I didn't, however, add it to the documentation. +1 on that.
-
-On 06/07/14 18:47, Himangi Saraogi wrote:
-> This patch introduces the function devm_request_gpio_array that
-> allocates multiple GPIOs in a single call in a managed manner. The
-> function is also included in the documentation and a declaration is
-> added in include/linux/gpio.h.
->
-> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
-> ---
->   Documentation/driver-model/devres.txt |  1 +
->   drivers/gpio/devres.c                 | 21 +++++++++++++++++++++
->   include/linux/gpio.h                  |  2 ++
->   3 files changed, 24 insertions(+)
->
-> diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-> index 9e2098e..756f6cf 100644
-> --- a/Documentation/driver-model/devres.txt
-> +++ b/Documentation/driver-model/devres.txt
-> @@ -337,6 +337,7 @@ GPIO
->     devm_gpiod_put()
->     devm_gpio_request()
->     devm_gpio_request_one()
-> +  devm_gpio_request_array()
->     devm_gpio_free()
->
->   SND
-> diff --git a/drivers/gpio/devres.c b/drivers/gpio/devres.c
-> index 65978cf..adae7fa 100644
-> --- a/drivers/gpio/devres.c
-> +++ b/drivers/gpio/devres.c
-> @@ -229,6 +229,27 @@ int devm_gpio_request_one(struct device *dev, unsigned gpio,
->   EXPORT_SYMBOL(devm_gpio_request_one);
->
->   /**
-> + *	devm_gpio_request_array - request multiple GPIOs in a single call
-> + *	@dev:   device to request for
-> + *	@array:	array of the 'struct gpio'
-> + *	@num:	how many GPIOs in the array
-> + */
-> +int devm_gpio_request_array(struct device *dev, const struct gpio *array,
-> +			    size_t num)
-> +{
-> +	int i, err;
-> +
-> +	for (i = 0; i < num; i++, array++) {
-> +		err = devm_gpio_request_one(dev, array->gpio, array->flags,
-> +					    array->label);
-> +		if (err)
-> +			return err;
-
-The failure path in the version I submitted frees up any already
-allocated gpios on the first failure.
-
-> +	}
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(devm_gpio_request_array);
-> +
-> +/**
->    *      devm_gpio_free - free a GPIO
->    *      @dev: device to free GPIO for
->    *      @gpio: GPIO to free
-> diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-> index 85aa5d0..c85f243 100644
-> --- a/include/linux/gpio.h
-> +++ b/include/linux/gpio.h
-> @@ -84,6 +84,8 @@ struct device;
->   int devm_gpio_request(struct device *dev, unsigned gpio, const char *label);
->   int devm_gpio_request_one(struct device *dev, unsigned gpio,
->   			  unsigned long flags, const char *label);
-> +int devm_gpio_request_array(struct device *dev, const struct gpio *array,
-> +			    size_t num);
->   void devm_gpio_free(struct device *dev, unsigned int gpio);
->
->   #else /* ! CONFIG_GPIOLIB */
->
-
--- 
-Rob Jones
-Codethink Ltd
-mailto:rob.jones at codethink.co.uk
-tel:+44 161 236 5575
+Peter.
