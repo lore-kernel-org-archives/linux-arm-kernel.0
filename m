@@ -1,75 +1,156 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Tue, 08 Jul 2014 18:07:38 -0700
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140630095220.GA25779@arm.com>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
- <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
- <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
- <20140624181150.GB4067@arm.com> <53A9EF3A.2070704@codeaurora.org>
- <20140625091858.GG6153@arm.com> <53ADEEDF.7060902@codeaurora.org>
- <20140630095220.GA25779@arm.com>
-Message-ID: <53BC95DA.1010500@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  8 Jul 2014 18:19:00 -0700
+Subject: [PATCH] clk: qcom: Fix MN frequency tables, parent map, and jpegd
+Message-ID: <1404868740-10847-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/30/2014 2:52 AM, Will Deacon wrote:
-> Hi Olav,
-> 
-> On Fri, Jun 27, 2014 at 11:23:27PM +0100, Olav Haugan wrote:
->> On 6/25/2014 2:18 AM, Will Deacon wrote:
->>> Why can't it be dynamically detected? Whilst the StreamIDs are fixed in
->>> hardware (from the SMMU architecture perspective), the SMRs are completely
->>> programmable. Why doesn't something like Andreas's proposal work for you?
->>> The idea there was to find the constant bits among the StreamIDs for a
->>> master and create the mask accordingly.
->>>
->> Lets say I have an IOMMU with 2 masters and 2 SMRn slots with the
->> following stream IDs coming from the masters:
->>
->> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
->> Master 2: 0x30
->>
->> To make this work I would program SMR[0] with StreamID 0x20 and mask 0xF
->> to ignore lower 4 bits. SMR[1] would just be StreamID 0x30 with mask 0x0.
->>
->> However, I could also have an IOMMU with 2 masters and 9 SMRn slots with
->> the following stream IDs:
->>
->> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
->> Master 2: 0x29
->>
->> Here I would program all SMRn and leave the mask to be 0 for all SMRn's.
->> So how do I detect when to apply a mask or not?
-> 
-> You would aim to use the smallest number of SMRs per master possible.
-> You could probably use:
-> 
->   Master 1: SMR[0].id == 0x20, SMR[0].mask = 0x07
->             SMR[1].id == 0x28, SMR[1].mask = 0x00
-> 
->   Master 2: SMR[2].id == 0x29, SMR[2].mask = 0x00
+Clocks that don't have a pre-divider don't list any pre-divider
+in their frequency tables, but their tables are initialized using
+aggregate initializers. Use tagged initializers so we properly
+assign the m and n values for each frequency. Furthermore, the
+mmcc_pxo_pll8_pll2_pll3 array improperly mapped the second
+element to pll2 instead of pll8, causing the clock driver to
+recalculate the wrong rate for any clocks using this array along
+with a rate that uses pll2. Finally I noticed that the jpegd
+clock improperly indicates that the pre-divider width is only 2,
+when it's actually 4 bits wide.
 
-So how does an algorithm figure this out in both my examples? The
-algorithm would have to know about both (all) bus masters and their
-stream IDs for a specific SMMU. If the algorithm operates on the set of
-stream IDs for one bus master at a time the algorithm has no way of
-knowing which bits can be ignored since it doesn't know the value of the
-other stream IDs for the other bus masters and thus could potentially
-create a mask that could cause a stream ID to match in two different
-entries.
+Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia
+clock controller (MMCC)"
 
->> I am not familiar with Andreas's proposal. Do you have a link?
-> 
->   http://marc.info/?l=linux-arm-kernel&m=139110598005846&w=2
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/mmcc-msm8960.c | 80 +++++++++++++++++++++--------------------
+ 1 file changed, 41 insertions(+), 39 deletions(-)
 
-Unless I am mistaken the algorithm works on one bus master at a time. I
-don't think that will work.
-
-Thanks,
-
-Olav Haugan
-
+diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
+index 12f3c0b64fcd..de8ee19160f7 100644
+--- a/drivers/clk/qcom/mmcc-msm8960.c
++++ b/drivers/clk/qcom/mmcc-msm8960.c
+@@ -38,6 +38,8 @@
+ #define P_PLL2	2
+ #define P_PLL3	3
+ 
++#define F_MN(f, s, _m, _n) { .freq = f, .src = s, .m = _m, .n = _n }
++
+ static u8 mmcc_pxo_pll8_pll2_map[] = {
+ 	[P_PXO]		= 0,
+ 	[P_PLL8]	= 2,
+@@ -59,8 +61,8 @@ static u8 mmcc_pxo_pll8_pll2_pll3_map[] = {
+ 
+ static const char *mmcc_pxo_pll8_pll2_pll3[] = {
+ 	"pxo",
+-	"pll2",
+ 	"pll8_vote",
++	"pll2",
+ 	"pll3",
+ };
+ 
+@@ -710,18 +712,18 @@ static struct clk_branch csiphy2_timer_clk = {
+ };
+ 
+ static struct freq_tbl clk_tbl_gfx2d[] = {
+-	{  27000000, P_PXO,  1,  0 },
+-	{  48000000, P_PLL8, 1,  8 },
+-	{  54857000, P_PLL8, 1,  7 },
+-	{  64000000, P_PLL8, 1,  6 },
+-	{  76800000, P_PLL8, 1,  5 },
+-	{  96000000, P_PLL8, 1,  4 },
+-	{ 128000000, P_PLL8, 1,  3 },
+-	{ 145455000, P_PLL2, 2, 11 },
+-	{ 160000000, P_PLL2, 1,  5 },
+-	{ 177778000, P_PLL2, 2,  9 },
+-	{ 200000000, P_PLL2, 1,  4 },
+-	{ 228571000, P_PLL2, 2,  7 },
++	F_MN( 27000000, P_PXO,  1,  0),
++	F_MN( 48000000, P_PLL8, 1,  8),
++	F_MN( 54857000, P_PLL8, 1,  7),
++	F_MN( 64000000, P_PLL8, 1,  6),
++	F_MN( 76800000, P_PLL8, 1,  5),
++	F_MN( 96000000, P_PLL8, 1,  4),
++	F_MN(128000000, P_PLL8, 1,  3),
++	F_MN(145455000, P_PLL2, 2, 11),
++	F_MN(160000000, P_PLL2, 1,  5),
++	F_MN(177778000, P_PLL2, 2,  9),
++	F_MN(200000000, P_PLL2, 1,  4),
++	F_MN(228571000, P_PLL2, 2,  7),
+ 	{ }
+ };
+ 
+@@ -842,22 +844,22 @@ static struct clk_branch gfx2d1_clk = {
+ };
+ 
+ static struct freq_tbl clk_tbl_gfx3d[] = {
+-	{  27000000, P_PXO,  1,  0 },
+-	{  48000000, P_PLL8, 1,  8 },
+-	{  54857000, P_PLL8, 1,  7 },
+-	{  64000000, P_PLL8, 1,  6 },
+-	{  76800000, P_PLL8, 1,  5 },
+-	{  96000000, P_PLL8, 1,  4 },
+-	{ 128000000, P_PLL8, 1,  3 },
+-	{ 145455000, P_PLL2, 2, 11 },
+-	{ 160000000, P_PLL2, 1,  5 },
+-	{ 177778000, P_PLL2, 2,  9 },
+-	{ 200000000, P_PLL2, 1,  4 },
+-	{ 228571000, P_PLL2, 2,  7 },
+-	{ 266667000, P_PLL2, 1,  3 },
+-	{ 300000000, P_PLL3, 1,  4 },
+-	{ 320000000, P_PLL2, 2,  5 },
+-	{ 400000000, P_PLL2, 1,  2 },
++	F_MN( 27000000, P_PXO,  1,  0),
++	F_MN( 48000000, P_PLL8, 1,  8),
++	F_MN( 54857000, P_PLL8, 1,  7),
++	F_MN( 64000000, P_PLL8, 1,  6),
++	F_MN( 76800000, P_PLL8, 1,  5),
++	F_MN( 96000000, P_PLL8, 1,  4),
++	F_MN(128000000, P_PLL8, 1,  3),
++	F_MN(145455000, P_PLL2, 2, 11),
++	F_MN(160000000, P_PLL2, 1,  5),
++	F_MN(177778000, P_PLL2, 2,  9),
++	F_MN(200000000, P_PLL2, 1,  4),
++	F_MN(228571000, P_PLL2, 2,  7),
++	F_MN(266667000, P_PLL2, 1,  3),
++	F_MN(300000000, P_PLL3, 1,  4),
++	F_MN(320000000, P_PLL2, 2,  5),
++	F_MN(400000000, P_PLL2, 1,  2),
+ 	{ }
+ };
+ 
+@@ -995,7 +997,7 @@ static struct clk_rcg jpegd_src = {
+ 	.ns_reg = 0x00ac,
+ 	.p = {
+ 		.pre_div_shift = 12,
+-		.pre_div_width = 2,
++		.pre_div_width = 4,
+ 	},
+ 	.s = {
+ 		.src_sel_shift = 0,
+@@ -1342,15 +1344,15 @@ static struct clk_branch hdmi_app_clk = {
+ };
+ 
+ static struct freq_tbl clk_tbl_vcodec[] = {
+-	{  27000000, P_PXO,  1,  0 },
+-	{  32000000, P_PLL8, 1, 12 },
+-	{  48000000, P_PLL8, 1,  8 },
+-	{  54860000, P_PLL8, 1,  7 },
+-	{  96000000, P_PLL8, 1,  4 },
+-	{ 133330000, P_PLL2, 1,  6 },
+-	{ 200000000, P_PLL2, 1,  4 },
+-	{ 228570000, P_PLL2, 2,  7 },
+-	{ 266670000, P_PLL2, 1,  3 },
++	F_MN( 27000000, P_PXO,  1,  0),
++	F_MN( 32000000, P_PLL8, 1, 12),
++	F_MN( 48000000, P_PLL8, 1,  8),
++	F_MN( 54860000, P_PLL8, 1,  7),
++	F_MN( 96000000, P_PLL8, 1,  4),
++	F_MN(133330000, P_PLL2, 1,  6),
++	F_MN(200000000, P_PLL2, 1,  4),
++	F_MN(228570000, P_PLL2, 2,  7),
++	F_MN(266670000, P_PLL2, 1,  3),
+ 	{ }
+ };
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
