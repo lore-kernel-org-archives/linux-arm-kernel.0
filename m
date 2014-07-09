@@ -1,119 +1,257 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 17:45:12 +0200
-Subject: [PATCHv3 4/7] ARM: mvebu: update Armada XP DT for dynamic frequency
- scaling
+Date: Wed,  9 Jul 2014 17:45:10 +0200
+Subject: [PATCHv3 2/7] ARM: mvebu: extend PMSU code to support dynamic
+ frequency scaling
 In-Reply-To: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404920715-19834-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404920715-19834-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support dynamic frequency scaling:
+This commit adds the necessary code in the Marvell EBU PMSU driver to
+support dynamic frequency scaling. In essence, what this new code does
+is that it:
 
- * the cpuclk Device Tree node needs to be updated to describe a
-   second set of registers describing the PMU DFS registers.
+ * registers the frequency operating points supported by the CPU;
 
- * the clock-latency property of the CPUs must be filled, otherwise
-   the ondemand and conservative cpufreq governors refuse to work. The
-   latency is high because the cost of a frequency transition is quite
-   high on those CPUs.
+ * registers a clock notifier of the CPU clocks. The notifier function
+   listens to the newly introduced APPLY_RATE_CHANGE event, and uses
+   that to finalize the frequency transition by doing the part of the
+   procedure that involves the PMSU;
+
+ * registers a platform device for the cpufreq-generic driver, which
+   will take care of the CPU frequency transitions.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 2 ++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 2 ++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 4 ++++
- arch/arm/boot/dts/armada-xp.dtsi         | 2 +-
- 4 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/pmsu.c | 162 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mvebu-pmsu.h |  20 ++++++
+ 2 files changed, 182 insertions(+)
+ create mode 100644 include/linux/mvebu-pmsu.h
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 1257ff1..2592e1c 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -34,6 +34,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <0>;
- 			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
- 		};
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 53a55c8..db7d9ab 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -18,20 +18,26 @@
  
- 		cpu at 1 {
-@@ -41,6 +42,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <1>;
- 			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
- 		};
- 	};
+ #define pr_fmt(fmt) "mvebu-pmsu: " fmt
  
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 3396b25..480e237 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -36,6 +36,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <0>;
- 			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
- 		};
++#include <linux/clk.h>
+ #include <linux/cpu_pm.h>
++#include <linux/delay.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_opp.h>
+ #include <linux/smp.h>
+ #include <linux/resource.h>
++#include <linux/slab.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/tlbflush.h>
+ #include "common.h"
++#include "armada-370-xp.h"
  
- 		cpu at 1 {
-@@ -43,6 +44,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <1>;
- 			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
- 		};
- 	};
+ static void __iomem *pmsu_mp_base;
  
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 6da84bf..2c7b1fe 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -37,6 +37,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <0>;
- 			clocks = <&cpuclk 0>;
-+			clock-latency = <1000000>;
- 		};
+@@ -57,6 +63,10 @@ static void __iomem *pmsu_mp_base;
+ #define PMSU_STATUS_AND_MASK_IRQ_MASK		BIT(24)
+ #define PMSU_STATUS_AND_MASK_FIQ_MASK		BIT(25)
  
- 		cpu at 1 {
-@@ -44,6 +45,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <1>;
- 			clocks = <&cpuclk 1>;
-+			clock-latency = <1000000>;
- 		};
++#define PMSU_EVENT_STATUS_AND_MASK(cpu)     ((cpu * 0x100) + 0x120)
++#define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE        BIT(1)
++#define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK   BIT(17)
++
+ #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x124)
  
- 		cpu at 2 {
-@@ -51,6 +53,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <2>;
- 			clocks = <&cpuclk 2>;
-+			clock-latency = <1000000>;
- 		};
+ /* PMSU fabric registers */
+@@ -296,3 +306,155 @@ int __init armada_370_xp_cpu_pm_init(void)
  
- 		cpu at 3 {
-@@ -58,6 +61,7 @@
- 			compatible = "marvell,sheeva-v7";
- 			reg = <3>;
- 			clocks = <&cpuclk 3>;
-+			clock-latency = <1000000>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 5902e83..bff9f6c 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -99,7 +99,7 @@
- 			cpuclk: clock-complex at 18700 {
- 				#clock-cells = <1>;
- 				compatible = "marvell,armada-xp-cpu-clock";
--				reg = <0x18700 0xA0>;
-+				reg = <0x18700 0xA0>, <0x1c054 0x10>;
- 				clocks = <&coreclk 1>;
- 			};
- 
+ arch_initcall(armada_370_xp_cpu_pm_init);
+ early_initcall(armada_370_xp_pmsu_init);
++
++static void mvebu_pmsu_dfs_request_local(void *data)
++{
++	u32 reg;
++	u32 cpu = smp_processor_id();
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	/* Prepare to enter idle */
++	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT |
++	       PMSU_STATUS_AND_MASK_IRQ_MASK     |
++	       PMSU_STATUS_AND_MASK_FIQ_MASK;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++
++	/* Request the DFS transition */
++	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
++	reg |= PMSU_CONTROL_AND_CONFIG_DFS_REQ;
++	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
++
++	/* The fact of entering idle will trigger the DFS transition */
++	wfi();
++
++	/*
++	 * We're back from idle, the DFS transition has completed,
++	 * clear the idle wait indication.
++	 */
++	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++
++	local_irq_restore(flags);
++}
++
++int mvebu_pmsu_dfs_request(int cpu)
++{
++	unsigned long timeout;
++	int hwcpu = cpu_logical_map(cpu);
++	u32 reg;
++
++	/* Clear any previous DFS DONE event */
++	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE;
++	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++
++	/* Mask the DFS done interrupt, since we are going to poll */
++	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++	reg |= PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
++	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++
++	/* Trigger the DFS on the appropriate CPU */
++	smp_call_function_single(cpu, mvebu_pmsu_dfs_request_local,
++				 NULL, false);
++
++	/* Poll until the DFS done event is generated */
++	timeout = jiffies + HZ;
++	while (time_before(jiffies, timeout)) {
++		reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++		if (reg & PMSU_EVENT_STATUS_AND_MASK_DFS_DONE)
++			break;
++		udelay(10);
++	}
++
++	if (time_after(jiffies, timeout))
++		return -ETIME;
++
++	/* Restore the DFS mask to its original state */
++	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
++	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
++
++	return 0;
++}
++
++static int __init armada_xp_pmsu_cpufreq_init(void)
++{
++	struct device_node *np;
++	struct resource res;
++	int ret, cpu;
++
++	if (!of_machine_is_compatible("marvell,armadaxp"))
++		return 0;
++
++	/*
++	 * In order to have proper cpufreq handling, we need to ensure
++	 * that the Device Tree description of the CPU clock includes
++	 * the definition of the PMU DFS registers. If not, we do not
++	 * register the clock notifier and the cpufreq driver. This
++	 * piece of code is only for compatibility with old Device
++	 * Trees.
++	 */
++	np = of_find_compatible_node(NULL, NULL, "marvell,armada-xp-cpu-clock");
++	if (!np)
++		return 0;
++
++	ret = of_address_to_resource(np, 1, &res);
++	if (ret) {
++		pr_warn(FW_WARN "not enabling cpufreq, deprecated armada-xp-cpu-clock binding\n");
++		of_node_put(np);
++		return 0;
++	}
++
++	of_node_put(np);
++
++	/*
++	 * For each CPU, this loop registers the operating points
++	 * supported (which are the nominal CPU frequency and half of
++	 * it), and registers the clock notifier that will take care
++	 * of doing the PMSU part of a frequency transition.
++	 */
++	for_each_possible_cpu(cpu) {
++		struct device *cpu_dev;
++		struct clk *clk;
++		int ret;
++
++		cpu_dev = get_cpu_device(cpu);
++		if (!cpu_dev) {
++			pr_err("Cannot get CPU %d\n", cpu);
++			continue;
++		}
++
++		clk = clk_get(cpu_dev, 0);
++		if (!clk) {
++			pr_err("Cannot get clock for CPU %d\n", cpu);
++			return -ENODEV;
++		}
++
++		/*
++		 * In case of a failure of dev_pm_opp_add(), we don't
++		 * bother with cleaning up the registered OPP (there's
++		 * no function to do so), and simply cancel the
++		 * registration of the cpufreq device.
++		 */
++		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
++		if (ret) {
++			clk_put(clk);
++			return ret;
++		}
++
++		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
++		if (ret) {
++			clk_put(clk);
++			return ret;
++		}
++	}
++
++	platform_device_register_simple("cpufreq-generic", -1, NULL, 0);
++	return 0;
++}
++
++device_initcall(armada_xp_pmsu_cpufreq_init);
+diff --git a/include/linux/mvebu-pmsu.h b/include/linux/mvebu-pmsu.h
+new file mode 100644
+index 0000000..b918d07
+--- /dev/null
++++ b/include/linux/mvebu-pmsu.h
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2012 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MVEBU_PMSU_H__
++#define __MVEBU_PMSU_H__
++
++#ifdef CONFIG_MACH_MVEBU_V7
++int mvebu_pmsu_dfs_request(int cpu);
++#else
++static inline int mvebu_pmsu_dfs_request(int cpu) { return -ENODEV; }
++#endif
++
++#endif /* __MVEBU_PMSU_H__ */
 -- 
 2.0.0
