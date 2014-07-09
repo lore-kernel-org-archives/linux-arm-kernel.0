@@ -1,158 +1,102 @@
-From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Wed,  9 Jul 2014 14:21:19 +0200
-Subject: [PATCH RESEND] ARM: omap2+: gpmc-nand: Use dynamic
- platform_device_alloc()
-Message-ID: <1404908479-11196-1-git-send-email-lisovy@merica.cz>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  9 Jul 2014 14:23:40 +0200
+Subject: [PATCH 10/13] [RFC] ARM: dts: Add shmobile platform device tree
+ bindings documentation
+In-Reply-To: <1404908623-909-1-git-send-email-geert+renesas@glider.be>
+References: <1404908623-909-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1404908623-909-11-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPMC controller supports up to 8 memory devices connected to it.
-Since there is one statically allocated "struct platform_device
-gpmc_nand_device" it is not possible to configure the system to
-use more than one NAND device connected to the GPMC. This
-modification makes it possible to use up to 8 NAND devices
-connected to the GPMC controller.
+Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+Documentation, listing supported SoCs and boards.
 
-Signed-off-by: Rostislav Lisovy <lisovy@merica.cz>
+This allows to use checkpatch to validate DTSes referring to Renesas
+shmobile SoCs, and boards containing those SoCs.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 71 ++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
 
-Tested on custom AM335x board with two different NAND chips
-(128 + 256 MiB) using GPMC configuration in FDT -- behaves
-correctly.
-
-
- arch/arm/mach-omap2/gpmc-nand.c | 79 +++++++++++++++++++----------------------
- 1 file changed, 37 insertions(+), 42 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index 4349e82..c5481a8 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -24,25 +24,6 @@
- /* minimum size for IO mapping */
- #define	NAND_IO_SIZE	4
- 
--static struct resource gpmc_nand_resource[] = {
--	{
--		.flags		= IORESOURCE_MEM,
--	},
--	{
--		.flags		= IORESOURCE_IRQ,
--	},
--	{
--		.flags		= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device gpmc_nand_device = {
--	.name		= "omap2-nand",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(gpmc_nand_resource),
--	.resource	= gpmc_nand_resource,
--};
--
- static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
- {
- 	/* platforms which support all ECC schemes */
-@@ -93,43 +74,41 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- {
- 	int err	= 0;
- 	struct gpmc_settings s;
--	struct device *dev = &gpmc_nand_device.dev;
--
--	memset(&s, 0, sizeof(struct gpmc_settings));
-+	struct platform_device *pdev;
-+	struct resource gpmc_nand_res[] = {
-+		{ .flags = IORESOURCE_MEM, },
-+		{ .flags = IORESOURCE_IRQ, },
-+		{ .flags = IORESOURCE_IRQ, },
-+	};
- 
--	gpmc_nand_device.dev.platform_data = gpmc_nand_data;
-+	BUG_ON(gpmc_nand_data->cs >= GPMC_CS_NUM);
- 
- 	err = gpmc_cs_request(gpmc_nand_data->cs, NAND_IO_SIZE,
--				(unsigned long *)&gpmc_nand_resource[0].start);
-+			      (unsigned long *)&gpmc_nand_res[0].start);
- 	if (err < 0) {
--		dev_err(dev, "Cannot request GPMC CS %d, error %d\n",
--			gpmc_nand_data->cs, err);
-+		pr_err("omap2-gpmc: Cannot request GPMC CS %d, error %d\n",
-+		       gpmc_nand_data->cs, err);
- 		return err;
- 	}
--
--	gpmc_nand_resource[0].end = gpmc_nand_resource[0].start +
--							NAND_IO_SIZE - 1;
--
--	gpmc_nand_resource[1].start =
--				gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
--	gpmc_nand_resource[2].start =
--				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
-+	gpmc_nand_res[0].end = gpmc_nand_res[0].start + NAND_IO_SIZE - 1;
-+	gpmc_nand_res[1].start = gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
-+	gpmc_nand_res[2].start = gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
- 
- 	if (gpmc_t) {
- 		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
- 		if (err < 0) {
--			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
-+			pr_err("omap2-gpmc: Unable to set gpmc timings: %d\n", err);
- 			return err;
- 		}
- 	}
- 
-+	memset(&s, 0, sizeof(struct gpmc_settings));
- 	if (gpmc_nand_data->of_node)
- 		gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
- 	else
- 		gpmc_set_legacy(gpmc_nand_data, &s);
- 
- 	s.device_nand = true;
--
- 	err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
- 	if (err < 0)
- 		goto out_free_cs;
-@@ -141,18 +120,34 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
- 
- 	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
--		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
--		return -EINVAL;
-+		pr_err("omap2-nand: Unsupported NAND ECC scheme selected\n");
-+		err = -EINVAL;
-+		goto out_free_cs;
- 	}
- 
--	err = platform_device_register(&gpmc_nand_device);
--	if (err < 0) {
--		dev_err(dev, "Unable to register NAND device\n");
--		goto out_free_cs;
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+new file mode 100644
+index 000000000000..baa25c92597d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -0,0 +1,71 @@
++Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
++--------------------------------------------------------------------
 +
-+	pdev = platform_device_alloc("omap2-nand", gpmc_nand_data->cs);
-+	if (pdev) {
-+		err = platform_device_add_resources(pdev, gpmc_nand_res,
-+						    ARRAY_SIZE(gpmc_nand_res));
-+		if (!err)
-+			pdev->dev.platform_data = gpmc_nand_data;
-+	} else {
-+		err = -ENOMEM;
-+	}
-+	if (err)
-+		goto out_free_pdev;
++SoCs:
 +
-+	err = platform_device_add(pdev);
-+	if (err) {
-+		dev_err(&pdev->dev, "Unable to register NAND device\n");
-+		goto out_free_pdev;
- 	}
- 
- 	return 0;
- 
-+out_free_pdev:
-+	platform_device_put(pdev);
- out_free_cs:
- 	gpmc_cs_free(gpmc_nand_data->cs);
- 
++  - Emma Mobile EV2
++    compatible = "renesas,emev2"
++  - RZ/A1H (R7S72100)
++    compatible = "renesas,r7s72100"
++  - R-Mobile APE6 (R8A73A40)
++    compatible = "renesas,r8a73a4"
++  - R-Mobile A1 (R8A77400)
++    compatible = "renesas,r8a7740"
++  - R-Car M1A (R8A77781)
++    compatible = "renesas,r8a7778"
++  - R-Car H1 (R8A77790)
++    compatible = "renesas,r8a7779"
++  - R-Car H2 (R8A77900)
++    compatible = "renesas,r8a7790"
++  - R-Car M2-W (R8A77910)
++    compatible = "renesas,r8a7791"
++  - R-Car V2H (R8A77920)
++    compatible = "renesas,r8a7792"
++  - R-Car M2-N (R8A77930)
++    compatible = "renesas,r8a7793"
++  - R-Car E2 (R8A77940)
++    compatible = "renesas,r8a7794"
++  - SH-Mobile AP4 (R8A73720/SH7372)
++    compatible = "renesas,sh7372"
++  - SH-Mobile AG5 (R8A73A00/SH73A0)
++    compatible = "renesas,sh73a0"
++
++
++Boards:
++
++  - Alt
++    compatible = "renesas,alt", "renesas,r8a7794"
++  - APE6-EVM
++    compatible = "renesas,ape6evm", "renesas,r8a73a4"
++  - APE6-EVM - Reference Device Tree Implementation
++    compatible = "renesas,ape6evm-reference", "renesas,r8a73a4"
++  - Atmark Techno Armadillo-800 EVA
++    compatible = "renesas,armadillo800eva"
++  - Atmark Techno Armadillo-800 EVA - Reference Device Tree Implementation
++    compatible = "renesas,armadillo800eva-reference", "renesas,r8a7740"
++  - BOCK-W
++    compatible = "renesas,bockw", "renesas,r8a7778"
++  - BOCK-W - Reference Device Tree Implementation
++    compatible = "renesas,bockw-reference", "renesas,r8a7778"
++  - Genmai (RTK772100BC00000BR)
++    compatible = "renesas,genmai", "renesas,r7s72100"
++  - Henninger
++    compatible = "renesas,henninger", "renesas,r8a7791"
++  - Koelsch (RTP0RC7791SEB00010S)
++    compatible = "renesas,koelsch", "renesas,r8a7791"
++  - EMEV2 KZM9D
++    compatible = "renesas,kzm9d", "renesas,emev2"
++  - KZM-A9-GT
++    compatible = "renesas,kzm9g", "renesas,sh73a0"
++  - KZM-A9-GT - Reference Device Tree Implementation
++    compatible = "renesas,kzm9g-reference", "renesas,sh73a0"
++  - Lager (RTP0RC7790SEB00010S)
++    compatible = "renesas,lager", "renesas,r8a7790"
++  - Mackerel (R0P7372LC0016RL, AP4 EVM 2nd)
++    compatible = "renesas,mackerel"
++  - Marzen
++    compatible = "renesas,marzen", "renesas,r8a7779"
++
++Note: Reference Device Tree Implementations are temporary implementations
++      to ease the migration from platform devices to Device Tree, and are
++      intended to be removed in the future.
 -- 
 1.9.1
