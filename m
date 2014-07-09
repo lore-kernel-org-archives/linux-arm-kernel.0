@@ -1,131 +1,169 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed,  9 Jul 2014 15:12:43 +0200
-Subject: [PATCH v5 7/8] ARM: shmobile: marzen-reference: Enable TMU0 in device
+Date: Wed,  9 Jul 2014 15:12:44 +0200
+Subject: [PATCH v5 8/8] ARM: shmobile: genmai-reference: Enable MTU2 in device
  tree
 In-Reply-To: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1404911564-17380-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1404911564-17380-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 No more device needs to be added from platform code when booting the
-reference platform, remove the now empty
-r8a7779_add_standard_devices_dt() function completely.
+reference platform, move MTU2 registration from setup-r7s72100.c to
+board-genmai.c and remove the now empty r7s72100_add_dt_devices()
+function.
+
+As the genmai_add_standard_devices() function is now identical to the
+default init_machine implementation, remove it as well.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen.dts            |  4 ++++
- arch/arm/mach-shmobile/board-marzen-reference.c | 10 ----------
- arch/arm/mach-shmobile/r8a7779.h                |  1 -
- arch/arm/mach-shmobile/setup-r8a7779.c          | 17 +++++------------
- 4 files changed, 9 insertions(+), 23 deletions(-)
+ arch/arm/boot/dts/r7s72100-genmai.dts           |  4 ++++
+ arch/arm/mach-shmobile/board-genmai-reference.c | 20 --------------------
+ arch/arm/mach-shmobile/board-genmai.c           | 14 +++++++++++++-
+ arch/arm/mach-shmobile/r7s72100.h               |  1 -
+ arch/arm/mach-shmobile/setup-r7s72100.c         | 21 ---------------------
+ 5 files changed, 17 insertions(+), 43 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 20b1768..6025822 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -78,6 +78,10 @@
- 	clock-frequency = <31250000>;
+diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
+index 56849b5..a352734 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai.dts
+@@ -43,6 +43,10 @@
+ 	clock-frequency = <48000000>;
  };
  
-+&tmu0 {
-+	status = "okay";
++&mtu2 {
++	status = "ok";
 +};
 +
- &pfc {
- 	lan0_pins: lan0 {
- 		intc {
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index 21b3e1c..f671003 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -37,18 +37,8 @@ static void __init marzen_init_timer(void)
- 	clocksource_of_init();
- }
+ &i2c2 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index e5448f7..bc52677 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -19,29 +19,10 @@
+  */
  
+ #include <linux/kernel.h>
+-#include <linux/of_platform.h>
+ 
+-#include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-#include "clock.h"
+ #include "common.h"
+-#include "r7s72100.h"
+-
 -/*
 - * This is a really crude hack to provide clkdev support to platform
 - * devices until they get moved to DT.
 - */
--static const struct clk_name clk_names[] __initconst = {
--	{ "tmu0", "fck", "sh-tmu.0" },
+-static const struct clk_name clk_names[] = {
+-	{ "mtu2", "fck", "sh-mtu2" },
 -};
 -
- static void __init marzen_init(void)
- {
--	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
--	r8a7779_add_standard_devices_dt();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
- }
-diff --git a/arch/arm/mach-shmobile/r8a7779.h b/arch/arm/mach-shmobile/r8a7779.h
-index 5415c71..19f9704 100644
---- a/arch/arm/mach-shmobile/r8a7779.h
-+++ b/arch/arm/mach-shmobile/r8a7779.h
-@@ -17,7 +17,6 @@ extern void r8a7779_map_io(void);
- extern void r8a7779_earlytimer_init(void);
- extern void r8a7779_add_early_devices(void);
- extern void r8a7779_add_standard_devices(void);
--extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_init_late(void);
- extern u32 r8a7779_read_mode_pins(void);
- extern void r8a7779_clock_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 8dbc407..8c0530d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -641,7 +641,7 @@ static void __init r8a7779_register_hpb_dmae(void)
- 					  sizeof(dma_platform_data));
- }
- 
--static struct platform_device *r8a7779_devices_dt[] __initdata = {
-+static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&tmu0_device,
- };
- 
-@@ -669,8 +669,8 @@ void __init r8a7779_add_standard_devices(void)
- 
- 	r8a7779_init_pm_domains();
- 
--	platform_add_devices(r8a7779_devices_dt,
--			    ARRAY_SIZE(r8a7779_devices_dt));
-+	platform_add_devices(r8a7779_early_devices,
-+			    ARRAY_SIZE(r8a7779_early_devices));
- 	platform_add_devices(r8a7779_standard_devices,
- 			    ARRAY_SIZE(r8a7779_standard_devices));
- 	r8a7779_register_hpb_dmae();
-@@ -678,8 +678,8 @@ void __init r8a7779_add_standard_devices(void)
- 
- void __init r8a7779_add_early_devices(void)
- {
--	early_platform_add_devices(r8a7779_devices_dt,
--				   ARRAY_SIZE(r8a7779_devices_dt));
-+	early_platform_add_devices(r8a7779_early_devices,
-+				   ARRAY_SIZE(r8a7779_early_devices));
- 
- 	/* Early serial console setup is not included here due to
- 	 * memory map collisions. The SCIF serial ports in r8a7779
-@@ -739,12 +739,6 @@ void __init r8a7779_init_irq_dt(void)
- 	__raw_writel(0x003fee3f, INT2SMSKCR4);
- }
- 
--void __init r8a7779_add_standard_devices_dt(void)
+-static void __init genmai_add_standard_devices(void)
 -{
--	platform_add_devices(r8a7779_devices_dt,
--			     ARRAY_SIZE(r8a7779_devices_dt));
+-	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
+-	r7s72100_add_dt_devices();
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -}
--
- #define MODEMR		0xffcc0020
  
- u32 __init r8a7779_read_mode_pins(void)
-@@ -773,7 +767,6 @@ DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
+ static const char * const genmai_boards_compat_dt[] __initconst = {
+ 	"renesas,genmai",
+@@ -50,6 +31,5 @@ static const char * const genmai_boards_compat_dt[] __initconst = {
+ 
+ DT_MACHINE_START(GENMAI_DT, "genmai")
  	.init_early	= shmobile_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= r8a7779_init_irq_dt,
--	.init_machine	= r8a7779_add_standard_devices_dt,
- 	.init_late	= r8a7779_init_late,
- 	.dt_compat	= r8a7779_compat_dt,
+-	.init_machine	= genmai_add_standard_devices,
+ 	.dt_compat	= genmai_boards_compat_dt,
  MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+index e2a3ba4..b5dee53 100644
+--- a/arch/arm/mach-shmobile/board-genmai.c
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -23,6 +23,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/serial_sci.h>
+ #include <linux/sh_eth.h>
++#include <linux/sh_timer.h>
+ #include <linux/spi/rspi.h>
+ #include <linux/spi/spi.h>
+ 
+@@ -126,10 +127,21 @@ R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
+ 					  &scif##index##_platform_data,	       \
+ 					  sizeof(scif##index##_platform_data))
+ 
++static struct resource mtu2_resources[] __initdata = {
++	DEFINE_RES_MEM(0xfcff0000, 0x400),
++	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
++};
++
++#define r7s72100_register_mtu2()					\
++	platform_device_register_resndata(&platform_bus, "sh-mtu2",	\
++					  -1, mtu2_resources,		\
++					  ARRAY_SIZE(mtu2_resources),	\
++					  NULL, 0)
++
+ static void __init genmai_add_standard_devices(void)
+ {
+ 	r7s72100_clock_init();
+-	r7s72100_add_dt_devices();
++	r7s72100_register_mtu2();
+ 
+ 	platform_device_register_full(&ether_info);
+ 
+diff --git a/arch/arm/mach-shmobile/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
+index efb723c..321ae4e 100644
+--- a/arch/arm/mach-shmobile/r7s72100.h
++++ b/arch/arm/mach-shmobile/r7s72100.h
+@@ -1,7 +1,6 @@
+ #ifndef __ASM_R7S72100_H__
+ #define __ASM_R7S72100_H__
+ 
+-void r7s72100_add_dt_devices(void);
+ void r7s72100_clock_init(void);
+ 
+ #endif /* __ASM_R7S72100_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index 4a98b23..d898cef 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -18,32 +18,11 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+-#include <linux/irq.h>
+ #include <linux/kernel.h>
+-#include <linux/of_platform.h>
+-#include <linux/sh_timer.h>
+ 
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
+-#include "irqs.h"
+-#include "r7s72100.h"
+-
+-static struct resource mtu2_resources[] __initdata = {
+-	DEFINE_RES_MEM(0xfcff0000, 0x400),
+-	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
+-};
+-
+-#define r7s72100_register_mtu2()					\
+-	platform_device_register_resndata(&platform_bus, "sh-mtu2",	\
+-					  -1, mtu2_resources,		\
+-					  ARRAY_SIZE(mtu2_resources),	\
+-					  NULL, 0)
+-
+-void __init r7s72100_add_dt_devices(void)
+-{
+-	r7s72100_register_mtu2();
+-}
+ 
+ #ifdef CONFIG_USE_OF
+ static const char *r7s72100_boards_compat_dt[] __initdata = {
 -- 
 1.8.5.5
