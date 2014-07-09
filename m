@@ -1,100 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jul 2014 08:20:49 +0200
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140708212951.GA4555@google.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <201407080900.44882.arnd@arndb.de> <20140708212951.GA4555@google.com>
-Message-ID: <201407090820.49418.arnd@arndb.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 9 Jul 2014 08:31:32 +0200
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+References: <20140617121313.GE18816@ulmo>
+ <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
+ <20140617215119.GC24743@mithrandir>
+ <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
+ <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+ <53A3096B.1040409@wwwdotorg.org>
+ <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
+ <20140708130501.GC9516@ulmo>
+ <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140709063130.GA3170@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 July 2014, Bjorn Helgaas wrote:
-> On Tue, Jul 8, 2014 at 1:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 08 July 2014, Bjorn Helgaas wrote:
-> >> On Tue, Jul 01, 2014 at 07:43:28PM +0100, Liviu Dudau wrote:
-> >> > +static LIST_HEAD(io_range_list);
-> >> > +
-> >> > +/*
-> >> > + * Record the PCI IO range (expressed as CPU physical address + size).
-> >> > + * Return a negative value if an error has occured, zero otherwise
-> >> > + */
-> >> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> >>
-> >> I don't understand the interface here.  What's the mapping from CPU
-> >> physical address to bus I/O port?  For example, I have the following
-> >> machine in mind:
-> >>
-> >>   HWP0002:00: PCI Root Bridge (domain 0000 [bus 00-1b])
-> >>   HWP0002:00: memory-mapped IO port space [mem 0xf8010000000-0xf8010000fff]
-> >>   HWP0002:00: host bridge window [io  0x0000-0x0fff]
-> >>
-> >>   HWP0002:09: PCI Root Bridge (domain 0001 [bus 00-1b])
-> >>   HWP0002:09: memory-mapped IO port space [mem 0xf8110000000-0xf8110000fff]
-> >>   HWP0002:09: host bridge window [io  0x1000000-0x1000fff] (PCI address [0x0-0xfff])
-> >>
-> >> The CPU physical memory [mem 0xf8010000000-0xf8010000fff] is translated by
-> >> the bridge to I/O ports 0x0000-0x0fff on PCI bus 0000:00.  Drivers use,
-> >> e.g., "inb(0)" to access it.
-> >>
-> >> Similarly, [mem 0xf8110000000-0xf8110000fff] is translated by the second
-> >> bridge to I/O ports 0x0000-0x0fff on PCI bus 0001:00.  Drivers use
-> >> "inb(0x1000000)" to access it.
-> >
-> > I guess you are thinking of the IA64 model here where you keep the virtual
-> > I/O port numbers in a per-bus lookup table that gets accessed for each
-> > inb() call. I've thought about this some more, and I believe there are good
-> > reasons for sticking with the model used on arm32 and powerpc for the
-> > generic OF implementation.
-> >
-> > The idea is that there is a single virtual memory range for all I/O port
-> > mappings and we use the MMU to do the translation rather than computing
-> > it manually in the inb() implemnetation. The main advantage is that all
-> > functions used in device drivers to (potentially) access I/O ports
-> > become trivial this way, which helps for code size and in some cases
-> > (e.g. SoC-internal registers with a low latency) it may even be performance
-> > relevant.
+On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
+> > > 
+> > > Yes, but the problem is that you also need clocks and reset of other modules
+> > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
+> > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
+> > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
+> > > someday which means we would need to control the domain and therefore would
+> > > need to tell that driver about the ISPs clocks and resets even though the
+> > > driver doesn't know anything about the ISP hw otherwise.
+> > 
+> > Can't we make powergates reference counted so that they don't get
+> > disabled as long as there are any users? Looking for example at the
 > 
-> My example is from ia64, but I'm not advocating for the lookup table.
-> The point is that the hardware works similarly (at least for dense ia64
-> I/O port spaces) in terms of mapping CPU physical addresses to PCI I/O
-> space.
+> We could, but then why not switch to the powerdomain code and make powering
+> off a domain a NOP until we sorted out the context save/restore or fixed
+> the framework to allow for suspend without turning off the domains?
+
+Well, one of the reasons why I'm not sure it's worth the effort at this
+point is that we can't get rid of the tegra_powergate_*() API anyway
+because of backwards compatibility. So we're going to add code (without
+getting rid of old code) merely to support some generic framework. That
+doesn't sound very useful to me.
+
+> > display controller driver, modules don't seem to care overly much about
+> > the powergate's state except that it needs to be turned on before they
+> > touch some of the registers.
+> > 
+> > From a bit of experimentation it also seems like the sequence encoded
+> > within tegra_powergate_sequence_power_up() isn't at all necessary. I
+> > couldn't find an authoritative reference for that either, so I'm tempted
+> > to conclude that it was simply cargo-culted from the dark-ages.
+> > 
+> > So I'm thinking that if we ever move to use power domains for this, we
+> > may be able to just drop any extra handling (well, we'd need to keep it
+> > for backwards-compatibility... *sigh*) and let drivers handle the clock
+> > and reset resources.
+> > 
+> > On the other hand, given that we already need to keep the existing code
+> > for backwards-compatibility, I'm not sure there's a real advantage in
+> > turning them into power domains, since we'd be adding extra code without
+> > an clear gains (especially since it seems like we'd need even more code
+> > to properly handle suspend/resume in drivers that need powergates).
+> > 
 > 
-> I think my confusion is because your pci_register_io_range() and
-> pci_addess_to_pci() implementations assume that every io_range starts at
-> I/O port 0 on PCI (correct me if I'm wrong).  I suspect that's why you
-> don't save the I/O port number in struct io_range.
+> Unless we fix the framework to require context save/restore for suspend.
+> There is a good reason to do that. context save/restore requires energy
+> as well, so it's not a given that turning off domains in system suspend
+> will save power.
 
-I think you are just misreading the code, but I agree it's hard to
-understand and I made the same mistake in my initial reply to the
-first version.
+I'm not sure I follow. "require context save/restore for suspend" is
+what many drivers currently don't support, hence we can't use the
+generic PM domains. Perhaps what you're saying is that the PM domain
+core code should be enhanced so that domains can be marked so that they
+stay on during a suspend/resume cycle.
 
-pci_register_io_range and pci_address_to_pci only worry about the mapping
-between CPU physical and Linux I/O address, they do not care which PCI
-port numbers are behind that. The mapping between PCI port numbers and
-Linux port numbers is done correctly in patch 8/9 in the
-pci_host_bridge_of_get_ranges() function.
+Such functionality could be part of a specifier in a DT binding. It's
+technically not a description of the hardware, but it encodes a device's
+requirements regarding suspend/resume latency.
 
-> Maybe that assumption is guaranteed by OF, but it doesn't hold for ACPI;
-> ACPI can describe several I/O port apertures for a single bridge, each
-> associated with a different CPU physical memory region.
-
-DT can have the same, although the common case is that each PCI host
-bridge has 64KB of I/O ports starting at address 0. Most driver writers
-get it wrong for the case where it starts at a different address, so
-I really want to have a generic implementation that gets it right.
-
-> If my speculation here is correct, a comment to the effect that each
-> io_range corresponds to a PCI I/O space range that starts at 0 might be
-> enough.
-> 
-> If you did add a PCI I/O port number argument to pci_register_io_range(),
-> we might be able to make an ACPI-based implementation of it.  But I guess
-> that could be done if/when anybody ever wants to do that.
-
-I think we shoulnd't worry about it before we actually need it. As far as
-I understand, the only user of that code (unless someone wants to convert
-ia64) would be ARM64 with ACPI, but that uses the SBSA hardware model that
-recommends having no I/O space at all.
-
- 	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/c4b2c4ed/attachment.sig>
