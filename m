@@ -1,54 +1,44 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  9 Jul 2014 16:07:36 +0100
-Subject: [PATCH v4 05/10] ARM: STi: DT: Add sdhci pin configuration for stih415
+Date: Wed,  9 Jul 2014 16:07:37 +0100
+Subject: [PATCH v4 06/10] ARM: STi: DT: Add sdhci controller for stih415
 In-Reply-To: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
 References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1404918461-25390-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1404918461-25390-7-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the required pin config for the sdhci controller
-present in the stih415 SoC.
+This patch adds device tree config for the sdhci controller
+on the stih415 SoC.
 
 Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/boot/dts/stih415-pinctrl.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/stih415.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-index 8509a03..e574f39 100644
---- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-@@ -429,6 +429,27 @@
- 					};
- 				};
- 			};
-+
-+			mmc0 {
-+				pinctrl_mmc0: mmc0 {
-+					st,pins {
-+						mmcclk = <&PIO13 4 ALT4 BIDIR_PU NICLK 0 CLK_B>;
-+						data0  = <&PIO14 4 ALT4 BIDIR_PU BYPASS 0>;
-+						data1  = <&PIO14 5 ALT4 BIDIR_PU BYPASS 0>;
-+						data2  = <&PIO14 6 ALT4 BIDIR_PU BYPASS 0>;
-+						data3  = <&PIO14 7 ALT4 BIDIR_PU BYPASS 0>;
-+						cmd    = <&PIO15 1 ALT4 BIDIR_PU BYPASS 0>;
-+						wp     = <&PIO15 3 ALT4 IN>;
-+						data4  = <&PIO16 4 ALT4 BIDIR_PU BYPASS 0>;
-+						data5  = <&PIO16 5 ALT4 BIDIR_PU BYPASS 0>;
-+						data6  = <&PIO16 6 ALT4 BIDIR_PU BYPASS 0>;
-+						data7  = <&PIO16 7 ALT4 BIDIR_PU BYPASS 0>;
-+						pwr    = <&PIO17 1 ALT4 OUT>;
-+						cd     = <&PIO17 2 ALT4 IN>;
-+						led    = <&PIO17 3 ALT4 OUT>;
-+					};
-+				};
-+			};
+diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
+index a0f6f75..9198c12 100644
+--- a/arch/arm/boot/dts/stih415.dtsi
++++ b/arch/arm/boot/dts/stih415.dtsi
+@@ -218,5 +218,17 @@
+ 			resets	= <&powerdown STIH415_KEYSCAN_POWERDOWN>,
+ 				  <&softreset STIH415_KEYSCAN_SOFTRESET>;
  		};
- 
- 		pin-controller-left {
++
++		mmc0: sdhci at fe81e000 {
++			compatible      = "st,sdhci";
++			status          = "disabled";
++			reg             = <0xfe81e000 0x1000>;
++			interrupts      = <GIC_SPI 145 IRQ_TYPE_NONE>;
++			interrupt-names = "mmcirq";
++			pinctrl-names   = "default";
++			pinctrl-0       = <&pinctrl_mmc0>;
++			clock-names     = "mmc";
++			clocks          = <&clk_s_a1_ls 1>;
++		};
+ 	};
+ };
 -- 
 1.9.1
