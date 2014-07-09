@@ -1,87 +1,69 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 15:40:12 +0200
-Subject: [PATCHv2 08/17] ARM: mvebu: make the snoop disabling optional in
- mvebu_v7_pmsu_idle_prepare()
+Date: Wed,  9 Jul 2014 15:40:17 +0200
+Subject: [PATCHv2 13/17] cpuidle: mvebu: add Armada 370 support
 In-Reply-To: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404913221-17343-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404913221-17343-14-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+This commit adds the list of cpuidle states supported by the Armada
+370 SoC in the cpuidle-mvebu-v7 driver, as well as the necessary logic
+around it to support this SoC.
 
-On some mvebu v7 SoCs (the ones using a Cortex-A9 core and not a PJ4B
-core), the snoop disabling feature does not exist as the hardware
-coherency is handled in a different way. Therefore, in preparation to
-the introduction of the cpuidle support for those SoCs, this commit
-modifies the mvebu_v7_psmu_idle_prepare() function to take several
-flags, which allow to decide whether snooping should be disabled, and
-whether we should use the deep idle mode or not.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 26 +++++++++++++++++++-------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+ drivers/cpuidle/cpuidle-mvebu-v7.c | 18 ++++++++++++++++++
+ include/linux/mvebu-v7-cpuidle.h   |  1 +
+ 2 files changed, 19 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index ab525b7..15e67bf 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -191,8 +191,14 @@ static void mvebu_v7_pmsu_enable_l2_powerdown_onidle(void)
- 	writel(reg, pmsu_mp_base + L2C_NFABRIC_PM_CTL);
- }
+diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+index 82c545bb..5de147f 100644
+--- a/drivers/cpuidle/cpuidle-mvebu-v7.c
++++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+@@ -72,6 +72,22 @@ static struct cpuidle_driver armadaxp_cpuidle_driver = {
+ 	.state_count = 3,
+ };
  
-+enum pmsu_idle_prepare_flags {
-+	PMSU_PREPARE_NORMAL = 0,
-+	PMSU_PREPARE_DEEP_IDLE = BIT(0),
-+	PMSU_PREPARE_SNOOP_DISABLE = BIT(1),
++static struct cpuidle_driver armada370_cpuidle_driver = {
++	.name			= "armada_370_idle",
++	.states[0]		= ARM_CPUIDLE_WFI_STATE,
++	.states[1]		= {
++		.enter			= mvebu_v7_enter_idle,
++		.exit_latency		= 100,
++		.power_usage		= 5,
++		.target_residency	= 1000,
++		.flags			= (CPUIDLE_FLAG_TIME_VALID |
++					   MVEBU_V7_FLAG_DEEP_IDLE),
++		.name			= "Deep Idle",
++		.desc			= "CPU and L2 Fabric power down",
++	},
++	.state_count = 2,
 +};
 +
- /* No locking is needed because we only access per-CPU registers */
--static int mvebu_v7_pmsu_idle_prepare(bool deepidle)
-+static int mvebu_v7_pmsu_idle_prepare(unsigned long flags)
+ static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
  {
- 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 	u32 reg;
-@@ -216,26 +222,32 @@ static int mvebu_v7_pmsu_idle_prepare(bool deepidle)
+ 	struct cpuidle_driver *drv;
+@@ -80,6 +96,8 @@ static int mvebu_v7_cpuidle_probe(struct platform_device *pdev)
  
- 	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
- 	/* ask HW to power down the L2 Cache if needed */
--	if (deepidle)
-+	if (flags & PMSU_PREPARE_DEEP_IDLE)
- 		reg |= PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
+ 	if (pcpuidle->type == CPUIDLE_ARMADA_XP)
+ 		drv = &armadaxp_cpuidle_driver;
++	else if (pcpuidle->type == CPUIDLE_ARMADA_370)
++		drv = &armada370_cpuidle_driver;
+ 	else
+ 		return -EINVAL;
  
- 	/* request power down */
- 	reg |= PMSU_CONTROL_AND_CONFIG_PWDDN_REQ;
- 	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
+diff --git a/include/linux/mvebu-v7-cpuidle.h b/include/linux/mvebu-v7-cpuidle.h
+index 00fde86..6d54ae1 100644
+--- a/include/linux/mvebu-v7-cpuidle.h
++++ b/include/linux/mvebu-v7-cpuidle.h
+@@ -16,6 +16,7 @@
  
--	/* Disable snoop disable by HW - SW is taking care of it */
--	reg = readl(pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
--	reg |= PMSU_CPU_POWER_DOWN_DIS_SNP_Q_SKIP;
--	writel(reg, pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
-+	if (flags & PMSU_PREPARE_SNOOP_DISABLE) {
-+		/* Disable snoop disable by HW - SW is taking care of it */
-+		reg = readl(pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
-+		reg |= PMSU_CPU_POWER_DOWN_DIS_SNP_Q_SKIP;
-+		writel(reg, pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
-+	}
+ enum mvebu_v7_cpuidle_types {
+ 	CPUIDLE_ARMADA_XP,
++	CPUIDLE_ARMADA_370,
+ };
  
- 	return 0;
- }
- 
- int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
- {
-+	unsigned long flags = PMSU_PREPARE_SNOOP_DISABLE;
- 	int ret;
- 
--	ret = mvebu_v7_pmsu_idle_prepare(deepidle);
-+	if (deepidle)
-+		flags |= PMSU_PREPARE_DEEP_IDLE;
-+
-+	ret = mvebu_v7_pmsu_idle_prepare(flags);
- 	if (ret)
- 		return ret;
- 
+ struct mvebu_v7_cpuidle {
 -- 
 2.0.0
