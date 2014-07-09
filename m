@@ -1,96 +1,81 @@
-From: jwerner@chromium.org (Julius Werner)
-Date: Wed, 9 Jul 2014 10:58:01 -0700
-Subject: [PATCH v2 3/4] usb: host: xhci-plat: Caibrate PHY post host reset
-In-Reply-To: <1404900096-1721-4-git-send-email-gautam.vivek@samsung.com>
-References: <1404900096-1721-1-git-send-email-gautam.vivek@samsung.com>
- <1404900096-1721-4-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <CAODwPW92VpQpAK1X57cW7X6Y1q7=ESF7qxxtcpk4CBg1+n8BqA@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 9 Jul 2014 11:04:39 -0700
+Subject: arm64 flushing 255GB of vmalloc space takes too long
+In-Reply-To: <20140709174055.GC2814@arm.com>
+References: <CAMPhdO-j5SfHexP8hafB2EQVs91TOqp_k_SLwWmo9OHVEvNWiQ@mail.gmail.com>
+ <20140709174055.GC2814@arm.com>
+Message-ID: <CAMPhdO_XqAL4oXcuJkp2PTQ-J07sGG4Nm5HjHO=yGqS+KuWQzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 3:01 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> Some quirky PHYs may require to be calibrated post the host
-> controller initialization.
-> The USB 3.0 DRD PHY on Exynos5420/5800 systems, coming along with
-> Synopsys's DWC3 controller, is one such PHY which needs to be
-> calibrated post xhci's reset at initialization time and at
-> resume time, to get the controller work at SuperSpeed.
+On Wed, Jul 9, 2014 at 10:40 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Jul 09, 2014 at 05:53:26PM +0100, Eric Miao wrote:
+>> On Tue, Jul 8, 2014 at 6:43 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> > I have an arm64 target which has been observed hanging in __purge_vmap_area_lazy
+>> > in vmalloc.c The root cause of this 'hang' is that flush_tlb_kernel_range is
+>> > attempting to flush 255GB of virtual address space. This takes ~2 seconds and
+>> > preemption is disabled at this time thanks to the purge lock. Disabling
+>> > preemption for that time is long enough to trigger a watchdog we have setup.
 >
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->  drivers/usb/host/xhci-plat.c |   39 +++++++++++++++++++++++++++++++++++++--
->  1 file changed, 37 insertions(+), 2 deletions(-)
+> That's definitely not good.
 >
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index e50bd7d..decf349 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -35,7 +35,27 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
->  /* called during probe() after chip reset completes */
->  static int xhci_plat_setup(struct usb_hcd *hcd)
->  {
-> -       return xhci_gen_setup(hcd, xhci_plat_quirks);
-> +       struct device *parent;
-> +       int ret;
-> +
-> +       ret = xhci_gen_setup(hcd, xhci_plat_quirks);
-> +       if (ret) {
-> +               dev_err(hcd->self.controller, "xhci setup failed\n");
-> +               return ret;
-> +       }
-> +
-> +       parent = hcd->self.controller->parent;
-> +       if (of_device_is_compatible(parent->of_node, "synopsys,dwc3") ||
-> +           of_device_is_compatible(parent->of_node, "snps,dwc3")) {
-> +               if (!IS_ERR(hcd->gen_phy)) {
-> +                       ret = phy_calibrate(hcd->gen_phy);
-> +                       if (ret < 0 && ret != -ENOTSUPP)
-> +                               dev_err(hcd->self.controller,
-> +                                       "failed to calibrate USB PHY\n");
-> +               }
-> +       }
+>> > A couple of options I thought of:
+>> > 1) Increase the timeout of our watchdog to allow the flush to occur. Nobody
+>> > I suggested this to likes the idea as the watchdog firing generally catches
+>> > behavior that results in poor system performance and disabling preemption
+>> > for that long does seem like a problem.
+>> > 2) Change __purge_vmap_area_lazy to do less work under a spinlock. This would
+>> > certainly have a performance impact and I don't even know if it is plausible.
+>> > 3) Allow module unloading to trigger a vmalloc purge beforehand to help avoid
+>> > this case. This would still be racy if another vfree came in during the time
+>> > between the purge and the vfree but it might be good enough.
+>> > 4) Add 'if size > threshold flush entire tlb' (I haven't profiled this yet)
+>>
+>> We have the same problem. I'd agree with point 2 and point 4, point 1/3 do not
+>> actually fix this issue. purge_vmap_area_lazy() could be called in other
+>> cases.
+>
+> I would also discard point 2 as it still takes ~2 seconds, only that not
+> under a spinlock.
+>
 
-Here as well, is it really necessary to special-case it so much? I'd
-say if there is a PHY and it has a calibrate function bound we call
-it, and if not we just go ahead.
+Point is - we could still end up a good amount of time in that function,
+giving the default value of lazy_vfree_pages to be 32MB * log(ncpu),
+worst case of all vmap areas being only one page, tlb flush page by
+page, and traversal of the list, calling __free_vmap_area() that many
+times won't likely to reduce the execution time to microsecond level.
 
-I also think that this would fit better in core/hcd.c since it's not
-really XHCI specific... it's conceivable that an EHCI controller might
-also need to tune some PHY settings after reset (in fact Tegra does
-something similar, although it already has another hack for that now),
-so if we introduce this general facility why not offer it to
-everyone?.
+If it's something inevitable - we do it in a bit cleaner way.
 
-> +
-> +       return ret;
->  }
+>> w.r.t the threshold to flush entire tlb instead of doing that page-by-page, that
+>> could be different from platform to platform. And considering the cost of tlb
+>> flush on x86, I wonder why this isn't an issue on x86.
 >
->  static int xhci_plat_start(struct usb_hcd *hcd)
-> @@ -288,8 +308,23 @@ static int xhci_plat_resume(struct device *dev)
->  {
->         struct usb_hcd  *hcd = dev_get_drvdata(dev);
->         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-> +       int ret;
-> +
-> +       ret = xhci_resume(xhci, 0);
-> +       if (ret)
-> +               return ret;
+> The current __purge_vmap_area_lazy() was done as an optimisation (commit
+> db64fe02258f1) to avoid IPIs. So flush_tlb_kernel_range() would only be
+> IPI'ed once.
 >
-> -       return xhci_resume(xhci, 0);
-> +       if (of_device_is_compatible(dev->parent->of_node, "synopsys,dwc3") ||
-> +           of_device_is_compatible(dev->parent->of_node, "snps,dwc3")) {
-> +               if (!IS_ERR(hcd->gen_phy)) {
-> +                       ret = phy_calibrate(hcd->gen_phy);
-> +                       if (ret < 0 && ret != -ENOTSUPP)
-> +                               dev_err(hcd->self.controller,
-> +                                       "failed to calibrate USB PHY\n");
-> +               }
-> +       }
-> +
-> +       return ret;
->  }
+> IIUC, the problem is how start/end are computed in
+> __purge_vmap_area_lazy(), so even if you have only two vmap areas, if
+> they are 255GB apart you've got this problem.
+
+Indeed.
+
 >
->  static const struct dev_pm_ops xhci_plat_pm_ops = {
+> One temporary option is to limit the vmalloc space on arm64 to something
+> like 2 x RAM-size (haven't looked at this yet). But if you get a
+> platform with lots of RAM, you hit this problem again.
+>
+> Which leaves us with point (4) but finding the threshold is indeed
+> platform dependent. Another way could be a check for latency - so if it
+> took certain usecs, we break the loop and flush the whole TLB.
+
+Or we end up having platform specific tlb flush implementation just as we
+did for cache ops. I would expect only few platforms will have their own
+thresholds. A simple heuristic guess of the threshold based on number of
+tlb entries would be good to go?
+
+>
 > --
-> 1.7.10.4
->
+> Catalin
