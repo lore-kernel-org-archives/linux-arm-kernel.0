@@ -1,25 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Jul 2014 10:24:45 -0400
-Subject: [PATCH 0/3] ARM: keystone: enable mdio support
-In-Reply-To: <1404911660-10047-1-git-send-email-grygorii.strashko@ti.com>
-References: <1404911660-10047-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <53BD50AD.80704@ti.com>
+From: cl@gentwo.org (Christoph Lameter)
+Date: Wed, 9 Jul 2014 09:26:03 -0500 (CDT)
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <alpine.DEB.2.11.1407090924030.1384@gentwo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014 09:14 AM, Strashko, Grygorii wrote:
-> Add DT definitions for Keystone 2 MDIO module and Ethernet PHYs for Keystone
-> EVMK2HX evm. And enable MDIO support for Keystone 2 SoCs.
-> 
-> Grygorii Strashko (3):
->   ARM: dts: keystone: add mdio devices entries
->   ARM: dts: keystone-evm: add 1g ethernet phys nodes
->   ARM: keystone_defconfig: enable mdio and marvell eth phys
-> 
-Series looks good. I will merge it when the driver changes gets
-merged. Please ping me just in case I forget about it.
+On Wed, 9 Jul 2014, Andrey Ryabinin wrote:
 
-Thanks !!
+> +
+> +Markers of unaccessible bytes could be found in mm/kasan/kasan.h header:
+> +
+> +#define KASAN_FREE_PAGE         0xFF  /* page was freed */
+> +#define KASAN_PAGE_REDZONE      0xFE  /* redzone for kmalloc_large allocations */
+> +#define KASAN_SLAB_REDZONE      0xFD  /* Slab page redzone, does not belong to any slub object */
 
-Regards,
-Santosh
+We call these zones "PADDING". Redzones are associated with an object.
+Padding is there because bytes are left over, unusable or necessary for
+alignment.
