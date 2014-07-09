@@ -1,40 +1,45 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 9 Jul 2014 11:42:32 -0400
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140709152446.GN3113@piout.net>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
- <20140708170353.GA16148@kwain>
- <20140708171817.GH4979@htj.dyndns.org>
- <20140708174900.GC16148@kwain>
- <20140708214010.GI4979@htj.dyndns.org>
- <20140709082331.GA4510@kwain>
- <20140709135910.GA11193@htj.dyndns.org>
- <20140709152446.GN3113@piout.net>
-Message-ID: <20140709154232.GC11193@htj.dyndns.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 08:44:17 -0700
+Subject: [PATCH V4 2/2] arm: dts: dra7: add crossbar device binding
+In-Reply-To: <20140626102650.GH28884@atomide.com>
+References: <1403767532-19290-1-git-send-email-r.sricharan@ti.com>
+ <1403767532-19290-3-git-send-email-r.sricharan@ti.com>
+ <20140626074417.GF28884@atomide.com> <53ABDA9A.8000108@ti.com>
+ <20140626102650.GH28884@atomide.com>
+Message-ID: <20140709154417.GC28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 05:24:46PM +0200, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 09/07/2014 at 09:59:10 -0400, Tejun Heo wrote :
-> > Heh, I get that but, at the same time, this is the point where you're
-> > most motivated to actually work on it.  :)
+* Tony Lindgren <tony@atomide.com> [140626 03:28]:
+> * Sricharan R <r.sricharan@ti.com> [140626 01:36]:
+> > Hi Tony,
 > > 
+> > On Thursday 26 June 2014 01:14 PM, Tony Lindgren wrote:
+> > > * Sricharan R <r.sricharan@ti.com> [140626 00:29]:
+> > >> From: R Sricharan <r.sricharan@ti.com>
+> > >>
+> > >> There is a IRQ crossbar device in the soc, which
+> > >> maps the irq requests from the peripherals to the
+> > >> mpu interrupt controller's inputs. The Peripheral irq
+> > >> requests are connected to only one crossbar
+> > >> input and the output of the crossbar is connected to only one
+> > >> controller's input line. The crossbar device is used to map
+> > >> a peripheral input to a free mpu's interrupt controller line.
+> > >>
+> > >> Here, adding a new crossbar device node and replacing all the peripheral
+> > >> interrupt numbers with its fixed crossbar input lines.
+> > > 
+> > > I think these two patches need to be a single patch to avoid
+> > > breaking booting for git bisect inbetween these patches?
+> >   This does not cause booting issues. irq_desc gets allocated linearly,
+> >    but that does not create boot issues.
 > 
-> Or, starting that kind of review after 9 revisions, especially so close
-> to the end of the development cycle is discouraging enough and will
-> probably be used as an example of why we still have so many evil vendor
-> trees.
+> OK
 
-Yeap, that's my bad.  I should have paid more attention.  Sorry about
-that.  We still have quite a few weeks to go tho, so I don't think
-it's too unreasonable to at least look into it.  We're gonna have to
-do it anyway.
+These are now applied on top of Jason's immutable irqchip branch
+and merged and pushed out into omap-for-v3.17/dt. Can you guys
+please test?
 
-Thanks.
+Regards,
 
--- 
-tejun
+Tony
