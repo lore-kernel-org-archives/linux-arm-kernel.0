@@ -1,71 +1,38 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  9 Jul 2014 16:07:31 +0100
-Subject: [PATCH v4 00/10] Add SDHCI support for ST Microelectronics SoCs
-Message-ID: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  9 Jul 2014 17:06:44 +0200
+Subject: [PATCHv3 16/34] ARM: at91/dt: mpa1600: define crytals frequencies
+In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-17-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a SDHCI platform driver for ST SoCs, along with
-the additional device tree bindings and configuration to enable
-the controller to work properly.
+Define Phontech MPA 1600 main and slow crystals frequencies.
 
-Initially it supports the stih416 and stih415 SoCs, and has
-been tested on a stih416-b2020 board.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Joachim Eastwood <manabian@gmail.com>
+---
+ arch/arm/boot/dts/mpa1600.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-regards,
-
-Peter.
-
-Changes since v1
-- Whitespace cleanups
-- Use readl_relaxed io accessor
-- Add update to MAINTAINERS
-- Remove reset controller code from platform driver
-- Remove #ifdef around sleep ops
-- Use sdhci_pltfm_clk_get_max_clock lib function
-- Pass bus-width etc through board device tree node
-- Remove unncessary header
-- Remove / change some debug messages
-- Remove final break from switch case
-
-Changes since v2
-- Update CC list with alkml and lkml lists
-
-Changes since v3
-- Rebased on v3.16-rc4
-- Use sdhci_set_bus_width lib function for set_bus_width
-- Remove sdhci_st_8bit_width function
-- Use sdhci_set_clock lib function for set_clock
-
-Peter Griffin (10):
-  mmc: sdhci-st: Intial support for ST SDHCI controller
-  mmc: sdhci-st: ST Microelectronics SDHCI binding documentation.
-  ARM: STi: DT: Add sdhci pins for stih416
-  ARM: STi: DT: Add sdhci controller for stih416
-  ARM: STi: DT: Add sdhci pin configuration for stih415
-  ARM: STi: DT: Add sdhci controller for stih415
-  ARM: STi: DT: Enable mmc0 for both stih415 and stih416 SoCs
-  ARM: STi: DT: Enable second sdhci controller for stih416 b2020 boards.
-  ARM: update multi_v7_defconfig for STI
-  MAINTAINERS: Add sdhci-st file to ARCH/STI architecture
-
- Documentation/devicetree/bindings/mmc/sdhci-st.txt |  33 ++++
- MAINTAINERS                                        |   1 +
- arch/arm/boot/dts/stih415-pinctrl.dtsi             |  21 +++
- arch/arm/boot/dts/stih415.dtsi                     |  12 ++
- arch/arm/boot/dts/stih416-b2020.dts                |   8 +
- arch/arm/boot/dts/stih416-b2020e.dts               |   6 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi             |  39 +++++
- arch/arm/boot/dts/stih416.dtsi                     |  24 +++
- arch/arm/boot/dts/stih41x-b2020.dtsi               |   4 +
- arch/arm/boot/dts/stih41x-b2020x.dtsi              |   4 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- drivers/mmc/host/Kconfig                           |  12 ++
- drivers/mmc/host/Makefile                          |   1 +
- drivers/mmc/host/sdhci-st.c                        | 176 +++++++++++++++++++++
- 14 files changed, 342 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
- create mode 100644 drivers/mmc/host/sdhci-st.c
-
+diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
+index ccf9ea242f72..f0f5e1098928 100644
+--- a/arch/arm/boot/dts/mpa1600.dts
++++ b/arch/arm/boot/dts/mpa1600.dts
+@@ -25,6 +25,14 @@
+ 			compatible = "atmel,osc", "fixed-clock";
+ 			clock-frequency = <18432000>;
+ 		};
++
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <18432000>;
++		};
+ 	};
+ 
+ 	ahb {
 -- 
 1.9.1
