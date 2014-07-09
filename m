@@ -1,41 +1,41 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 8 Jul 2014 21:49:42 -0700
-Subject: Tegra baseline test results for v3.16-rc4
-Message-ID: <53BCC9E6.1010201@nvidia.com>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Tue, 8 Jul 2014 22:11:54 -0700
+Subject: [PATCH RFCv2] arm64: eBPF JIT compiler
+In-Reply-To: <CAMEtUuydrYMGdg2zNDYX4vKL0_-reF+yOPKx5hpUvy4guuVeBg@mail.gmail.com>
+References: <1404803213-10653-1-git-send-email-zlim.lnx@gmail.com>
+ <CAMEtUuydrYMGdg2zNDYX4vKL0_-reF+yOPKx5hpUvy4guuVeBg@mail.gmail.com>
+Message-ID: <CABg9mcv+7qSOSKw9emq1A+JbEvrUT9k4vAHMx9pdJiy4R4ZF9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.16-rc4.
-Logs and other details at:
+On Tue, Jul 8, 2014 at 2:24 AM, Alexei Starovoitov <ast@plumgrid.com> wrote:
+> On Tue, Jul 8, 2014 at 12:06 AM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
+[...]
+>>   Also, per discussion with Alexei, and additional suggestion from
+>>   Daniel:
+>>   - moved load_pointer() from net/core/filter.c into filter.h
+>>     as bpf_load_pointer()
+>>   which is done as a separate preparatory patch. [1]
+>>
+>> [1] http://patchwork.ozlabs.org/patch/366906/
+>
+> Just to clarify. This patch is on top of [1]
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.16-rc4/20140708212443/
+Yes, that's correct. This patch uses bpf_load_pointer() from [1].
 
+BTW, looks like David has applied it in net-next 9f12fbe603f7
+("net: filter: move load_pointer() into filter.h").
 
-Test summary
-------------
+[...]
+>> +               case BPF_DW:
+>
+> this case can be removed too.
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Thanks for catching this :) I've removed it.
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+>
+> Acked-by: Alexei Starovoitov <ast@plumgrid.com>
+>
+> Great work. Thanks.
 
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.16-rc3 (4c834452aad01531db949414f94f817a86348d59)):
-    text     data      bss    total  kernel
-   +3228    +2456        0    +5684  multi_v7_defconfig
-   +1088      +64        0    +1152  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.16-rc3 (4c834452aad01531db949414f94f817a86348d59))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-      -12k      12k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-      -12k      12k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Thanks for your time and feedback!
