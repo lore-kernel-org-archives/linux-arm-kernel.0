@@ -1,151 +1,99 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  9 Jul 2014 15:54:34 +0800
-Subject: [PATCH v4 1/6] clk: sunxi: sun6i-apb0-gates: use bitmaps for valid
- gate indicies
-In-Reply-To: <1404892479-12222-1-git-send-email-wens@csie.org>
-References: <1404892479-12222-1-git-send-email-wens@csie.org>
-Message-ID: <1404892479-12222-2-git-send-email-wens@csie.org>
+Date: Wed,  9 Jul 2014 15:54:33 +0800
+Subject: [PATCH v4 0/6] ARM: sun8i: Support A23 PRCM clock and reset
+ controllers
+Message-ID: <1404892479-12222-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun6i-apb0-gates uses the "clock-indices" DT property to indicate
-valid gate bits or holes in between. However, the rest of sunxi
-clock drivers use bitmaps for this purpose.
+Hi everyone,
 
-This patch modifies sun6i-apb0-gates to use bitmaps as well, to be
-consistent with the sunxi platform. Also add the missing call to
-clk_register_clkdev, so system clock lookups will work.
+This is PRCM subset v4 of the sun8i A23 bring-up series. This subset
+includes clock and reset controller support for the PRCM (power,
+reset and clock module) on the A23 SoC. It is based on my previous
+series for basic sun8i A23 clocks [1].
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 75 +++++++++++++++++---------------
- 1 file changed, 39 insertions(+), 36 deletions(-)
+Patch 1 modifies tha sun6i-a31-apb0-gates driver to use a bitmap
+to denote valid gate indices, instead of just counting "clock-names"
+from the DT possibly with "clock-indicies". This makes the driver
+consistent with the other sunxi clock gate drivers.
 
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-index b342f2a..3bd8357 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-@@ -9,24 +9,48 @@
-  */
- 
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- 
- #define SUN6I_APB0_GATES_MAX_SIZE	32
- 
-+struct gates_data {
-+	DECLARE_BITMAP(mask, SUN6I_APB0_GATES_MAX_SIZE);
-+};
-+
-+static const struct gates_data sun6i_a31_apb0_gates __initconst = {
-+	.mask = {0x7F},
-+};
-+
-+const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
-+	{ .compatible = "allwinner,sun6i-a31-apb0-gates-clk", .data = &sun6i_a31_apb0_gates },
-+	{ /* sentinel */ }
-+};
-+
- static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct clk_onecell_data *clk_data;
-+	const struct of_device_id *device;
-+	const struct gates_data *data;
- 	const char *clk_parent;
- 	const char *clk_name;
- 	struct resource *r;
- 	void __iomem *reg;
--	int gate_id;
- 	int ngates;
--	int gate_max = 0;
- 	int i;
-+	int j = 0;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	device = of_match_device(sun6i_a31_apb0_gates_clk_dt_ids, &pdev->dev);
-+	if (!device)
-+		return -ENODEV;
-+	data = device->data;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	reg = devm_ioremap_resource(&pdev->dev, r);
-@@ -37,57 +61,36 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
- 	if (!clk_parent)
- 		return -EINVAL;
- 
--	ngates = of_property_count_strings(np, "clock-output-names");
--	if (ngates < 0)
--		return ngates;
--
--	if (!ngates || ngates > SUN6I_APB0_GATES_MAX_SIZE)
--		return -EINVAL;
--
- 	clk_data = devm_kzalloc(&pdev->dev, sizeof(struct clk_onecell_data),
- 				GFP_KERNEL);
- 	if (!clk_data)
- 		return -ENOMEM;
- 
--	clk_data->clks = devm_kzalloc(&pdev->dev,
--				      SUN6I_APB0_GATES_MAX_SIZE *
--				      sizeof(struct clk *),
--				      GFP_KERNEL);
-+	/* Worst-case size approximation and memory allocation */
-+	ngates = find_last_bit(data->mask, SUN6I_APB0_GATES_MAX_SIZE);
-+	clk_data->clks = devm_kcalloc(&pdev->dev, (ngates + 1),
-+				      sizeof(struct clk *), GFP_KERNEL);
- 	if (!clk_data->clks)
- 		return -ENOMEM;
- 
--	for (i = 0; i < ngates; i++) {
-+	for_each_set_bit(i, data->mask, SUN6I_APB0_GATES_MAX_SIZE) {
- 		of_property_read_string_index(np, "clock-output-names",
--					      i, &clk_name);
--
--		gate_id = i;
--		of_property_read_u32_index(np, "clock-indices", i, &gate_id);
--
--		WARN_ON(gate_id >= SUN6I_APB0_GATES_MAX_SIZE);
--		if (gate_id >= SUN6I_APB0_GATES_MAX_SIZE)
--			continue;
-+					      j, &clk_name);
- 
--		clk_data->clks[gate_id] = clk_register_gate(&pdev->dev,
--							    clk_name,
--							    clk_parent, 0,
--							    reg, gate_id,
--							    0, NULL);
--		WARN_ON(IS_ERR(clk_data->clks[gate_id]));
-+		clk_data->clks[i] = clk_register_gate(&pdev->dev, clk_name,
-+						      clk_parent, 0, reg, i,
-+						      0, NULL);
-+		WARN_ON(IS_ERR(clk_data->clks[i]));
-+		clk_register_clkdev(clk_data->clks[i], clk_name, NULL);
- 
--		if (gate_id > gate_max)
--			gate_max = gate_id;
-+		j++;
- 	}
- 
--	clk_data->clk_num = gate_max + 1;
-+	clk_data->clk_num = ngates + 1;
- 
- 	return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
- }
- 
--const struct of_device_id sun6i_a31_apb0_gates_clk_dt_ids[] = {
--	{ .compatible = "allwinner,sun6i-a31-apb0-gates-clk" },
--	{ /* sentinel */ }
--};
--
- static struct platform_driver sun6i_a31_apb0_gates_clk_driver = {
- 	.driver = {
- 		.name = "sun6i-a31-apb0-gates-clk",
+Patch 2 adds the A23 variant of apb0-gates, with A23 specific
+compatible and bitmap.
+
+Patch 3 adds support for A23's PRCM to the sun6i-prcm driver.
+The difference between the A23 and the A31 regarding the PRCM block
+is 2 clock muxes were removed, a divider clock has slightly difference
+dividers, and some clock gates are gone. The resources used are
+unchanged. Drivers for the 2 clock muxes are replaced with fixed-factor
+clocks in the DT. So the A23 variant is supported with the sun6i-prcm
+driver with a slightly different sub-device list.
+
+Patch 4 adds optional reset control support to the 8250_dw, which
+is used by sun6i and sun8i platforms. Till now, this wasn't needed
+from a working standpoint, as the bootloader de-asserts the reset
+control on the console UART for us. However, during the development
+of the sun8i patches, I noticed other UARTs wouldn't work. Also the
+new sun6i A31 Hummingbird has multiple UARTs available, which would
+require this patch.
+
+Patch 5 adds deferred probing to 8250_dw. In my case, even though
+the clocks and reset controller "devices" were registered before
+the UART, the 8250_dw driver binded with the UART devices before
+the clocks and resets were available. This resulted in the 8250_dw
+driver failing. I only tested the R_UART device.
+
+Strictly speaking it won't be needed once pinctrl support is added,
+as the driver core handles deferred probing for pinctrl phandles,
+and the pinctrl device for the R_UART is probed after it. However
+it may be required for the A31 Hummingbird development board.
+
+Patch 6 adds the PRCM nodes, and the associated clock/reset phandles,
+to the sun8i DTSI.
+
+These patches can go through their separate trees. There are no
+compile time dependencies between them.
+
+Related changes since v3:
+
+  - Dropped patches already merged by Maxime
+  - Used bitmaps to denote possible gate indicies in sun6i-a31-apb0-gates,
+    and added A23 variant
+  - Added Maxime's Acked-by for
+    'mfd: sun6i-prcm: Add support for Allwinner A23 PRCM'
+
+Related changes since v2:
+
+  - Add separate driver for sun8i-a23-apb0-clk
+  - Use sun6i-a31-clock-reset for ahb1_rst
+
+Related changes since v1:
+
+  - Add sun8i-a23-apb0-gates-clk compatible to sun6i-a31-apb0-gates-clk
+
+
+Cheers
+ChenYu
+
+
+  [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266990.html
+
+Chen-Yu Tsai (6):
+  clk: sunxi: sun6i-apb0-gates: use bitmaps for valid gate indicies
+  clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0 support
+  mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
+  serial: 8250_dw: Add optional reset control support
+  serial: 8250_dw: Add support for deferred probing
+  ARM: sun8i: Add PRCM clock and reset controller nodes to the DTSI
+
+ Documentation/devicetree/bindings/clock/sunxi.txt  |  1 +
+ .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
+ .../bindings/serial/snps-dw-apb-uart.txt           |  1 +
+ arch/arm/boot/dts/sun8i-a23.dtsi                   | 47 ++++++++++++-
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c           | 80 ++++++++++++----------
+ drivers/mfd/sun6i-prcm.c                           | 30 ++++++++
+ drivers/tty/serial/8250/8250_dw.c                  | 13 ++++
+ 7 files changed, 136 insertions(+), 38 deletions(-)
+
 -- 
 2.0.1
