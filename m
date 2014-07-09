@@ -1,38 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:56 +0200
-Subject: [PATCHv3 28/34] ARM: at91/dt: cosino define crystals frequencies
+Date: Wed,  9 Jul 2014 17:06:47 +0200
+Subject: [PATCHv3 19/34] ARM: at91/dt: evk-pro3: define slow crytal frequency
 In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-29-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-20-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Cosino boards main and slow crystals frequencies.
+Define Telit EVK-PRO3 slow crystal frequency
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Rodolfo Giometti <giometti@linux.it>
 ---
- arch/arm/boot/dts/at91-cosino.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/evk-pro3.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
-index df4b78695695..b6ea3f4a7206 100644
---- a/arch/arm/boot/dts/at91-cosino.dtsi
-+++ b/arch/arm/boot/dts/at91-cosino.dtsi
-@@ -34,6 +34,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
- 		};
-+
+diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
+index 4d829685fdfb..f72969efe6d7 100644
+--- a/arch/arm/boot/dts/evk-pro3.dts
++++ b/arch/arm/boot/dts/evk-pro3.dts
+@@ -15,6 +15,12 @@
+ 	model = "Telit EVK-PRO3 for Telit GE863-PRO3";
+ 	compatible = "telit,evk-pro3", "atmel,at91sam9260", "atmel,at91sam9";
+ 
++	clocks {
 +		slow_xtal {
 +			clock-frequency = <32768>;
 +		};
++	};
 +
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
- 	};
- 
  	ahb {
+ 		apb {
+ 			macb0: ethernet at fffc4000 {
 -- 
 1.9.1
