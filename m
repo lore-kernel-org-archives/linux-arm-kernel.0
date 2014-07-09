@@ -1,32 +1,34 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Wed, 09 Jul 2014 12:31:58 -0700
-Subject: [RFC/PATCH RESEND -next 03/21] x86: add kasan hooks fort
- memcpy/memmove/memset functions
-In-Reply-To: <1404905415-9046-4-git-send-email-a.ryabinin@samsung.com> (Andrey
- Ryabinin's message of "Wed, 09 Jul 2014 15:29:57 +0400")
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-4-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <87ion6nxap.fsf@tassilo.jf.intel.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 9 Jul 2014 14:44:33 -0500
+Subject: [PATCH 1/3] arm64: vdso: put vdso datapage in a separate vma
+In-Reply-To: <1404930133-30324-2-git-send-email-will.deacon@arm.com>
+References: <1404930133-30324-1-git-send-email-will.deacon@arm.com>
+ <1404930133-30324-2-git-send-email-will.deacon@arm.com>
+Message-ID: <53BD9BA1.4070103@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrey Ryabinin <a.ryabinin@samsung.com> writes:
+Hi Will, one question (and maybe it's more of a question for Andy than
+for you).
+
+On 07/09/2014 01:22 PM, Will Deacon wrote:
+> -	ret = install_special_mapping(mm, vdso_base, vdso_mapping_len,
+> +	ret = install_special_mapping(mm, vdso_base, vdso_text_len,
+>  				      VM_READ|VM_EXEC|
+>  				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+>  				      vdso_pagelist);
+> -	if (ret) {
+> -		mm->context.vdso = NULL;
+> +	if (ret)
+> +		goto up_fail;
 > +
-> +#undef memcpy
-> +void *kasan_memset(void *ptr, int val, size_t len);
-> +void *kasan_memcpy(void *dst, const void *src, size_t len);
-> +void *kasan_memmove(void *dst, const void *src, size_t len);
-> +
-> +#define memcpy(dst, src, len) kasan_memcpy((dst), (src), (len))
-> +#define memset(ptr, val, len) kasan_memset((ptr), (val), (len))
-> +#define memmove(dst, src, len) kasan_memmove((dst), (src), (len))
+> +	vdso_base += vdso_text_len;
+> +	ret = install_special_mapping(mm, vdso_base, PAGE_SIZE,
+> +				      VM_READ|VM_MAYREAD,
+> +				      vdso_pagelist + vdso_pages);
 
-I don't think just define is enough, gcc can call these functions
-implicitely too (both with and without __). For example for a struct copy.
-
-You need to have true linker level aliases. 
-
--Andi
-
--- 
-ak at linux.intel.com -- Speaking for myself only
+I note this code sets VM_MAYREAD for the data page, while x86's vvar
+mapping sets only VM_READ.  (Personally I am not totally clear on the
+meaning of VM_MAYREAD, but it looks like it would have implications for
+use of mprotect on the mapping.)  Should one arch or the other adjust
+its flags?
