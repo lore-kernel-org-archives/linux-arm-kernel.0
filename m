@@ -1,169 +1,48 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 9 Jul 2014 15:49:26 +0300
-Subject: [PATCH] ARM: omap2+: gpmc-nand: Use dynamic
- platform_device_alloc()
-In-Reply-To: <1401891875-27843-1-git-send-email-lisovy@merica.cz>
-References: <1401891875-27843-1-git-send-email-lisovy@merica.cz>
-Message-ID: <53BD3A56.9050302@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jul 2014 14:50:01 +0200
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <20140709111633.GG23218@tbergstrom-lnx.Nvidia.com>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+ <20140709111633.GG23218@tbergstrom-lnx.Nvidia.com>
+Message-ID: <201407091450.02165.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rostislav,
+On Wednesday 09 July 2014, Peter De Schrijver wrote:
+> On Tue, Jul 08, 2014 at 07:47:16PM +0200, Olof Johansson wrote:
+> > On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
+> > <pdeschrijver@nvidia.com> wrote:
+> > > On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
+> > >> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+> > >> > This branch moves code related to the Tegra fuses out of arch/arm and
+> > >> > into a centralized location which could be shared with ARM64. It also
+> > >> > adds support for reading the fuse data through sysfs.
+> > >>
+> > >> The new/moved misc driver isn't acked by any misc maintainer, so I can't
+> > >> take this branch.
+> > >>
+> > >> I saw no indication from searching the mailing list of that either,
+> > >> so it wasn't just a missed acked-by.
+> > >>
+> > >> I wonder if this code should go under drivers/soc/ instead?
+> > >
+> > > It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
+> > > Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
+> > > and therefore it was moved to drivers/misc/fuse. I think that's the right
+> > > place still.
+> > 
+> > I disagree, I think this belongs under drivers/soc. Especially since
+> > you're adding dependencies on this misc driver from other parts of the
+> > kernel / other drivers.
+> > 
+> 
+> There are several other drivers doing that already, eg:
+> 
+> drivers/misc/eeprom/eeprom_93cx6.c
+> drivers/misc/atmel-ssc.c
+> drivers/misc/atmel_pwm.c
 
-On 06/04/2014 05:24 PM, Rostislav Lisovy wrote:
-> GPMC controller supports up to 8 memory devices connected to it.
-> Since there is one statically allocated "struct platform_device
-> gpmc_nand_device" it is not possible to configure the system to
-> use more than one NAND device connected to the GPMC. This
-> modification makes it possible to use up to 8 NAND devices
-> connected to the GPMC controller.
-> 
-> Signed-off-by: Rostislav Lisovy <lisovy@merica.cz>
-> ---
-> 
-> Tested on custom AM335x board with two different NAND chips
-> (128 + 256 MiB) using GPMC configuration in FDT -- behaves
-> correctly.
-> 
-> 
->  arch/arm/mach-omap2/gpmc-nand.c | 79 +++++++++++++++++++----------------------
->  1 file changed, 37 insertions(+), 42 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-> index 4349e82..c5481a8 100644
-> --- a/arch/arm/mach-omap2/gpmc-nand.c
-> +++ b/arch/arm/mach-omap2/gpmc-nand.c
-> @@ -24,25 +24,6 @@
->  /* minimum size for IO mapping */
->  #define	NAND_IO_SIZE	4
->  
-> -static struct resource gpmc_nand_resource[] = {
-> -	{
-> -		.flags		= IORESOURCE_MEM,
-> -	},
-> -	{
-> -		.flags		= IORESOURCE_IRQ,
-> -	},
-> -	{
-> -		.flags		= IORESOURCE_IRQ,
-> -	},
-> -};
-> -
-> -static struct platform_device gpmc_nand_device = {
-> -	.name		= "omap2-nand",
-> -	.id		= 0,
-> -	.num_resources	= ARRAY_SIZE(gpmc_nand_resource),
-> -	.resource	= gpmc_nand_resource,
-> -};
-> -
->  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->  {
->  	/* platforms which support all ECC schemes */
-> @@ -93,43 +74,41 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
->  {
->  	int err	= 0;
->  	struct gpmc_settings s;
-> -	struct device *dev = &gpmc_nand_device.dev;
-> -
-> -	memset(&s, 0, sizeof(struct gpmc_settings));
-> +	struct platform_device *pdev;
-> +	struct resource gpmc_nand_res[] = {
-> +		{ .flags = IORESOURCE_MEM, },
-> +		{ .flags = IORESOURCE_IRQ, },
-> +		{ .flags = IORESOURCE_IRQ, },
-> +	};
->  
-> -	gpmc_nand_device.dev.platform_data = gpmc_nand_data;
-> +	BUG_ON(gpmc_nand_data->cs >= GPMC_CS_NUM);
->  
->  	err = gpmc_cs_request(gpmc_nand_data->cs, NAND_IO_SIZE,
-> -				(unsigned long *)&gpmc_nand_resource[0].start);
-> +			      (unsigned long *)&gpmc_nand_res[0].start);
->  	if (err < 0) {
-> -		dev_err(dev, "Cannot request GPMC CS %d, error %d\n",
-> -			gpmc_nand_data->cs, err);
-> +		pr_err("omap2-gpmc: Cannot request GPMC CS %d, error %d\n",
-> +		       gpmc_nand_data->cs, err);
->  		return err;
->  	}
-> -
-> -	gpmc_nand_resource[0].end = gpmc_nand_resource[0].start +
-> -							NAND_IO_SIZE - 1;
-> -
-> -	gpmc_nand_resource[1].start =
-> -				gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
-> -	gpmc_nand_resource[2].start =
-> -				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
-> +	gpmc_nand_res[0].end = gpmc_nand_res[0].start + NAND_IO_SIZE - 1;
-> +	gpmc_nand_res[1].start = gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
-> +	gpmc_nand_res[2].start = gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
->  
->  	if (gpmc_t) {
->  		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
->  		if (err < 0) {
-> -			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
-> +			pr_err("omap2-gpmc: Unable to set gpmc timings: %d\n", err);
->  			return err;
->  		}
->  	}
->  
-> +	memset(&s, 0, sizeof(struct gpmc_settings));
->  	if (gpmc_nand_data->of_node)
->  		gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
->  	else
->  		gpmc_set_legacy(gpmc_nand_data, &s);
->  
->  	s.device_nand = true;
-> -
->  	err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
->  	if (err < 0)
->  		goto out_free_cs;
-> @@ -141,18 +120,34 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
->  	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
->  
->  	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
-> -		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
-> -		return -EINVAL;
-> +		pr_err("omap2-nand: Unsupported NAND ECC scheme selected\n");
-> +		err = -EINVAL;
-> +		goto out_free_cs;
->  	}
->  
-> -	err = platform_device_register(&gpmc_nand_device);
-> -	if (err < 0) {
-> -		dev_err(dev, "Unable to register NAND device\n");
-> -		goto out_free_cs;
-> +
-> +	pdev = platform_device_alloc("omap2-nand", gpmc_nand_data->cs);
-> +	if (pdev) {
-> +		err = platform_device_add_resources(pdev, gpmc_nand_res,
-> +						    ARRAY_SIZE(gpmc_nand_res));
-> +		if (!err)
-> +			pdev->dev.platform_data = gpmc_nand_data;
-> +	} else {
-> +		err = -ENOMEM;
-> +	}
-> +	if (err)
-> +		goto out_free_pdev;
+I believe we have plans to remove the latter two. I don't know about the eeprom one.
 
-There is a slight problem here. If platform_device_alloc() fails,
-we must jump to 'out_free_cs' and not 'out_free_pdev'.
-
-> +
-> +	err = platform_device_add(pdev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Unable to register NAND device\n");
-> +		goto out_free_pdev;
->  	}
->  
->  	return 0;
->  
-> +out_free_pdev:
-> +	platform_device_put(pdev);
->  out_free_cs:
->  	gpmc_cs_free(gpmc_nand_data->cs);
->  
-> 
-
-cheers,
--roger
+	Arnd
