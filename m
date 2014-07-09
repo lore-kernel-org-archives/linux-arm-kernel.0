@@ -1,36 +1,60 @@
-From: dave.hansen@intel.com (Dave Hansen)
-Date: Wed, 09 Jul 2014 14:19:18 -0700
-Subject: [RFC/PATCH RESEND -next 00/21] Address sanitizer for kernel
- (kasan) - dynamic memory error detector.
-In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <53BDB1D6.1090605@intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 9 Jul 2014 14:27:23 -0700
+Subject: [PATCH V8 1/6] power: reset: Add generic SYSCON register mapped
+ reset
+In-Reply-To: <CAL85gmB9wRXXrza3g0MBFWUi5w3_eCEhxdSd2FfmoB_SkGA8Ww@mail.gmail.com>
+References: <1404872153-3594-1-git-send-email-fkan@apm.com>
+ <1404872153-3594-2-git-send-email-fkan@apm.com>
+ <53BCBCEC.7010306@roeck-us.net>
+ <CAL85gmB9wRXXrza3g0MBFWUi5w3_eCEhxdSd2FfmoB_SkGA8Ww@mail.gmail.com>
+Message-ID: <20140709212723.GA6737@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is totally self-serving (and employer-serving), but has anybody
-thought about this large collection of memory debugging tools that we
-are growing?  It helps to have them all in the same places in the menus
-(thanks for adding it to Memory Debugging, btw!).
+On Wed, Jul 09, 2014 at 02:15:44PM -0700, Feng Kan wrote:
+> On Tue, Jul 8, 2014 at 8:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On 07/08/2014 07:15 PM, Feng Kan wrote:
+> >>
+> >> Add a generic SYSCON register mapped reset mechanism.
+> >>
+> >> Signed-off-by: Feng Kan <fkan@apm.com>
+> >> ---
+> >>   drivers/power/reset/Kconfig         |  6 +++
+> >>   drivers/power/reset/Makefile        |  1 +
+> >>   drivers/power/reset/syscon-reboot.c | 91
+> >> +++++++++++++++++++++++++++++++++++++
+> >>   3 files changed, 98 insertions(+)
+> >>   create mode 100644 drivers/power/reset/syscon-reboot.c
+> >>
+> >> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> >> index bdcf517..5877b38 100644
+> >> --- a/drivers/power/reset/Kconfig
+> >> +++ b/drivers/power/reset/Kconfig
+> >> @@ -80,3 +80,9 @@ config POWER_RESET_KEYSTONE
+> >>         help
+> >>           Reboot support for the KEYSTONE SoCs.
+> >>
+> >> +config POWER_RESET_SYSCON
+> >> +       bool "Generic SYSCON regmap reset driver"
+> >> +       depends on ARM || ARM64 || COMPILE_TEST
+> >
+> >
+> > As written, this driver is really not generic but very arm specific.
+> > I don't think COMPILE_TEST is a good idea either, since arm_pm_restart
+> > is only defined for the arm architecture. Did you try compiling allmodconfig
+> > or allyesconfig for, say, x86_64 with this patch applied ?
+> >
+> > I think this might benefit from using [1], which would make it really
+> > generic.
+> >
+> > Guenter
+> >
+> > [1] http://www.spinics.net/lists/kernel/msg1780939.html
+> This is great, I will base off this list. Did it make it to a branch anywhere?
+> 
+Still in review. I hope it will make it into 3.17.
+Of course it might be useful if you (and others)
+help making the case for it.
 
-But, this gives us at least four things that overlap with kasan's
-features on some level.  Each of these has its own advantages and
-disadvantages, of course:
-
-1. DEBUG_PAGEALLOC
-2. SLUB debugging / DEBUG_OBJECTS
-3. kmemcheck
-4. kasan
-... and there are surely more coming down pike.  Like Intel MPX:
-
-> https://software.intel.com/en-us/articles/introduction-to-intel-memory-protection-extensions
-
-Or, do we just keep adding these overlapping tools and their associated
-code over and over and fragment their user bases?
-
-You're also claiming that "KASAN is better than all of
-CONFIG_DEBUG_PAGEALLOC".  So should we just disallow (or hide)
-DEBUG_PAGEALLOC on kernels where KASAN is available?
-
-Maybe we just need to keep these out of mainline and make Andrew carry
-it in -mm until the end of time. :)
+Thanks,
+Guenter
