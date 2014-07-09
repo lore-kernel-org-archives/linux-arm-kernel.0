@@ -1,39 +1,71 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Tue, 08 Jul 2014 17:08:48 -0700 (PDT)
-Subject: [PATCH 1/2] usb: renesas_usbhs: add R-Car Gen. 2 init and power
- control
-In-Reply-To: <1404831571-19817-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1404831571-19817-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <87y4w3v1fa.wl%kuninori.morimoto.gx@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 8 Jul 2014 18:00:49 -0700
+Subject: [PATCH] Input: s3c2410_ts: Move to
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <1404155377-2862-1-git-send-email-anarsoul@gmail.com>
+References: <1404155377-2862-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20140709010049.GC14935@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Ulrich
-
-Thank you for your patch
-
-> In preparation for DT conversion to reduce reliance on platform device
-> callbacks.
+On Mon, Jun 30, 2014 at 10:09:37PM +0300, Vasily Khoruzhick wrote:
+> Use clk_prepare_enable/clk_disable_unprepare to make the driver
+> work properly with common clock framework.
 > 
-> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 > ---
-(snip)
-> @@ -186,6 +192,8 @@ struct renesas_usbhs_platform_info {
->  	 * driver use these param for some register
->  	 */
->  	struct renesas_usbhs_driver_param	driver_param;
-> +
-> +	struct usb_phy *phy;
->  };
+>  drivers/input/touchscreen/s3c2410_ts.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+> index 19cb247..c0e0baa 100644
+> --- a/drivers/input/touchscreen/s3c2410_ts.c
+> +++ b/drivers/input/touchscreen/s3c2410_ts.c
+> @@ -264,7 +264,7 @@ static int s3c2410ts_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
+>  
+> -	clk_enable(ts.clock);
+> +	clk_prepare_enable(ts.clock);
+>  	dev_dbg(dev, "got and enabled clocks\n");
+>  
+>  	ts.irq_tc = ret = platform_get_irq(pdev, 0);
+> @@ -369,7 +369,7 @@ static int s3c2410ts_remove(struct platform_device *pdev)
+>  	free_irq(ts.irq_tc, ts.input);
+>  	del_timer_sync(&touch_timer);
+>  
+> -	clk_disable(ts.clock);
+> +	clk_disable_unprepare(ts.clock);
+>  	clk_put(ts.clock);
+>  
+>  	input_unregister_device(ts.input);
+> @@ -383,7 +383,7 @@ static int s3c2410ts_suspend(struct device *dev)
+>  {
+>  	writel(TSC_SLEEP, ts.io + S3C2410_ADCTSC);
+>  	disable_irq(ts.irq_tc);
+> -	clk_disable(ts.clock);
+> +	clk_disable_unprepare(ts.clock);
 
-Using renesas_usbhs_platform_info for *phy is not good idea from my point of view.
-Because its memory is located on platform side.
-(this is the reason why usbhs_probe() using memcpy() for getting info->xxx)
+Do we really need to unprepare on suspend? Why simply disabling is not
+enough here?
 
-I guess struct usbhs_priv is good place,
-and you can use usbhs_pdev_to_priv() for this purpose ?
+Thanks.
 
-Best regards
----
-Kuninori Morimoto
+>  
+>  	return 0;
+>  }
+> @@ -393,7 +393,7 @@ static int s3c2410ts_resume(struct device *dev)
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct s3c2410_ts_mach_info *info = dev_get_platdata(&pdev->dev);
+>  
+> -	clk_enable(ts.clock);
+> +	clk_prepare_enable(ts.clock);
+>  	enable_irq(ts.irq_tc);
+>  
+>  	/* Initialise registers */
+> -- 
+> 2.0.0
+> 
+
+-- 
+Dmitry
