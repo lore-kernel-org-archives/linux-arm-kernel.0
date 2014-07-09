@@ -1,165 +1,31 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:30:02 +0400
-Subject: [RFC/PATCH RESEND -next 08/21] mm: page_alloc: add kasan hooks on
- alloc and free pathes
+Date: Wed, 09 Jul 2014 15:30:01 +0400
+Subject: [RFC/PATCH RESEND -next 07/21] x86: Kconfig: enable kernel address
+ sanitizer
 In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-9-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1404905415-9046-8-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add kernel address sanitizer hooks to mark allocated page's addresses
-as accessible in corresponding shadow region.
-Mark freed pages as unaccessible.
+Now everything in x86 code is ready for kasan. Enable it.
 
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- include/linux/kasan.h |  6 ++++++
- mm/Makefile           |  2 ++
- mm/kasan/kasan.c      | 18 ++++++++++++++++++
- mm/kasan/kasan.h      |  1 +
- mm/kasan/report.c     |  7 +++++++
- mm/page_alloc.c       |  4 ++++
- 6 files changed, 38 insertions(+)
+ arch/x86/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 7efc3eb..4adc0a1 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -17,6 +17,9 @@ void kasan_disable_local(void);
- void kasan_alloc_shadow(void);
- void kasan_init_shadow(void);
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 8657c06..f9863b3 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -132,6 +132,7 @@ config X86
+ 	select HAVE_CC_STACKPROTECTOR
+ 	select GENERIC_CPU_AUTOPROBE
+ 	select HAVE_ARCH_AUDITSYSCALL
++	select HAVE_ARCH_KASAN
  
-+void kasan_alloc_pages(struct page *page, unsigned int order);
-+void kasan_free_pages(struct page *page, unsigned int order);
-+
- #else /* CONFIG_KASAN */
- 
- static inline void unpoison_shadow(const void *address, size_t size) {}
-@@ -28,6 +31,9 @@ static inline void kasan_disable_local(void) {}
- static inline void kasan_init_shadow(void) {}
- static inline void kasan_alloc_shadow(void) {}
- 
-+static inline void kasan_alloc_pages(struct page *page, unsigned int order) {}
-+static inline void kasan_free_pages(struct page *page, unsigned int order) {}
-+
- #endif /* CONFIG_KASAN */
- 
- #endif /* LINUX_KASAN_H */
-diff --git a/mm/Makefile b/mm/Makefile
-index dbe9a22..6a9c3f8 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -2,6 +2,8 @@
- # Makefile for the linux memory manager.
- #
- 
-+KASAN_SANITIZE_page_alloc.o := n
-+
- mmu-y			:= nommu.o
- mmu-$(CONFIG_MMU)	:= gup.o highmem.o madvise.o memory.o mincore.o \
- 			   mlock.o mmap.o mprotect.o mremap.o msync.o rmap.o \
-diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
-index e2cd345..109478e 100644
---- a/mm/kasan/kasan.c
-+++ b/mm/kasan/kasan.c
-@@ -177,6 +177,24 @@ void __init kasan_init_shadow(void)
- 	}
- }
- 
-+void kasan_alloc_pages(struct page *page, unsigned int order)
-+{
-+	if (unlikely(!kasan_initialized))
-+		return;
-+
-+	if (likely(page && !PageHighMem(page)))
-+		unpoison_shadow(page_address(page), PAGE_SIZE << order);
-+}
-+
-+void kasan_free_pages(struct page *page, unsigned int order)
-+{
-+	if (unlikely(!kasan_initialized))
-+		return;
-+
-+	if (likely(!PageHighMem(page)))
-+		poison_shadow(page_address(page), PAGE_SIZE << order, KASAN_FREE_PAGE);
-+}
-+
- void *kasan_memcpy(void *dst, const void *src, size_t len)
- {
- 	if (unlikely(len == 0))
-diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
-index 711ae4f..be9597e 100644
---- a/mm/kasan/kasan.h
-+++ b/mm/kasan/kasan.h
-@@ -5,6 +5,7 @@
- #define KASAN_SHADOW_SCALE_SIZE (1UL << KASAN_SHADOW_SCALE_SHIFT)
- #define KASAN_SHADOW_MASK       (KASAN_SHADOW_SCALE_SIZE - 1)
- 
-+#define KASAN_FREE_PAGE         0xFF  /* page was freed */
- #define KASAN_SHADOW_GAP        0xF9  /* address belongs to shadow memory */
- 
- struct access_info {
-diff --git a/mm/kasan/report.c b/mm/kasan/report.c
-index 2430e05..6ef9e57 100644
---- a/mm/kasan/report.c
-+++ b/mm/kasan/report.c
-@@ -46,6 +46,9 @@ static void print_error_description(struct access_info *info)
- 	case 0 ... KASAN_SHADOW_SCALE_SIZE - 1:
- 		bug_type = "buffer overflow";
- 		break;
-+	case KASAN_FREE_PAGE:
-+		bug_type = "use after free";
-+		break;
- 	case KASAN_SHADOW_GAP:
- 		bug_type = "wild memory access";
- 		break;
-@@ -67,6 +70,10 @@ static void print_address_description(struct access_info *info)
- 	page = virt_to_page(info->access_addr);
- 
- 	switch (shadow_val) {
-+	case KASAN_FREE_PAGE:
-+		dump_page(page, "kasan error");
-+		dump_stack();
-+		break;
- 	case KASAN_SHADOW_GAP:
- 		pr_err("No metainfo is available for this access.\n");
- 		dump_stack();
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 8c9eeec..67833d1 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -61,6 +61,7 @@
- #include <linux/page-debug-flags.h>
- #include <linux/hugetlb.h>
- #include <linux/sched/rt.h>
-+#include <linux/kasan.h>
- 
- #include <asm/sections.h>
- #include <asm/tlbflush.h>
-@@ -747,6 +748,7 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
- 
- 	trace_mm_page_free(page, order);
- 	kmemcheck_free_shadow(page, order);
-+	kasan_free_pages(page, order);
- 
- 	if (PageAnon(page))
- 		page->mapping = NULL;
-@@ -2807,6 +2809,7 @@ out:
- 	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
- 		goto retry_cpuset;
- 
-+	kasan_alloc_pages(page, order);
- 	return page;
- }
- EXPORT_SYMBOL(__alloc_pages_nodemask);
-@@ -6415,6 +6418,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
- 	if (end != outer_end)
- 		free_contig_range(end, outer_end - end);
- 
-+	kasan_alloc_pages(pfn_to_page(start), end - start);
- done:
- 	undo_isolate_page_range(pfn_max_align_down(start),
- 				pfn_max_align_up(end), migratetype);
+ config INSTRUCTION_DECODER
+ 	def_bool y
 -- 
 1.8.5.5
