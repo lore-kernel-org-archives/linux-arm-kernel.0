@@ -1,110 +1,115 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 9 Jul 2014 10:23:31 +0200
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140708214010.GI4979@htj.dyndns.org>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
- <20140708170353.GA16148@kwain>
- <20140708171817.GH4979@htj.dyndns.org>
- <20140708174900.GC16148@kwain>
- <20140708214010.GI4979@htj.dyndns.org>
-Message-ID: <20140709082331.GA4510@kwain>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 9 Jul 2014 10:27:32 +0200
+Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
+In-Reply-To: <53BCBD0E.2070609@linux.vnet.ibm.com>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+ <53BB61E9.80200@linux.vnet.ibm.com>
+ <CAKfTPtA8BVPtRRLzomqnGp7_uaSbFYmFTrrt4fpQTOb7qyjddg@mail.gmail.com>
+ <53BCBD0E.2070609@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtA3FXE+kK_E_c_GkN7LAP+rf6+S4jRxE-42mdmLuS3L7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+On 9 July 2014 05:54, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> Hi Vincent,
+>
+> On 07/08/2014 03:42 PM, Vincent Guittot wrote:
 
-On Tue, Jul 08, 2014 at 05:40:10PM -0400, Tejun Heo wrote:
-> Hey,
-> 
-> On Tue, Jul 08, 2014 at 07:49:00PM +0200, Antoine T?nart wrote:
-> > > So, yeah, it's being used both as input and output and we also have
-> > > the arguments which affect port_map, right?  It does seem confusing.
-> > 
-> > I do see priv->port_map as being automatically set and then restricted
-> > if needed by the port_map input here. I don't see how that's confusing.
-> > The only modification is we restrict the port_map parameter to the set
-> > of available ports. The port_map argument affected priv->port_map before
-> > this patch.
-> 
-> It is confusing.  If you wanna pass around available ports in hpriv,
-> please add a separate field and replace the arguments to
-> save_initial_config().
+[ snip]
 
-I don't get it. Which argument should I replace in
-save_initial_config()? The change is we compute hpriv->port_map.
-I don't see which arguments we can add or replace.
+>>>>  out_balanced:
+>>>> +     /*
+>>>> +      * We reach balance although we may have faced some affinity
+>>>> +      * constraints. Clear the imbalance flag if it was set.
+>>>> +      */
+>>>> +     if (sd_parent) {
+>>>> +             int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+>>>> +             if (*group_imbalance)
+>>>> +                     *group_imbalance = 0;
+>>>> +     }
+>>>> +
+>>>>       schedstat_inc(sd, lb_balanced[idle]);
+>>>>
+>>>>       sd->nr_balance_failed = 0;
+>>>>
+>>> I am not convinced that we can clear the imbalance flag here. Lets take
+>>> a simple example. Assume at a particular level of sched_domain, there
+>>> are two sched_groups with one cpu each. There are 2 tasks on the source
+>>> cpu, one of which is running(t1) and the other thread(t2) does not have
+>>> the dst_cpu in the tsk_allowed_mask. Now no task can be migrated to the
+>>> dst_cpu due to affinity constraints. Note that t2 is *not pinned, it
+>>> just cannot run on the dst_cpu*. In this scenario also we reach the
+>>> out_balanced tag right? If we set the group_imbalance flag to 0, we are
+>>
+>> No we will not. If we have 2 tasks on 1 CPU in one sched_group and the
+>> other group with an idle CPU,  we are not balanced so we will not go
+>> to out_balanced and the group_imbalance will staty set until we reach
+>> a balanced state (by migrating t1).
+>
+> In the example that I mention above, t1 and t2 are on the rq of cpu0;
+> while t1 is running on cpu0, t2 is on the rq but does not have cpu1 in
+> its cpus allowed mask. So during load balance, cpu1 tries to pull t2,
+> cannot do so, and hence LBF_ALL_PINNED flag is set and it jumps to
 
-If that's more clear, the modification here is equivalent to (when using
-the new bindings):
+That's where I disagree: my understanding of can_migrate_task is that
+the LBF_ALL_PINNED will be cleared before returning false when
+checking t1 because we are testing all tasks even the running task
 
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 40ea583d3610..f9d3cfd5d1bd 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -513,7 +513,7 @@ void ahci_save_initial_config(struct device *dev,
-        /* record values to use during operation */
-        hpriv->cap = cap;
-        hpriv->cap2 = cap2;
--       hpriv->port_map = port_map;
-+       hpriv->port_map &= port_map;
- 
-        if (!hpriv->start_engine)
-                hpriv->start_engine = ahci_start_engine;
+> out_balanced. Note that there are only two sched groups at this level of
+> sched domain.one with cpu0 and the other with cpu1. In this scenario we
+> do not try to do active load balancing, atleast thats what the code does
+> now if LBF_ALL_PINNED flag is set.
+>
+>>
+>>> ruling out the possibility of migrating t2 to any other cpu in a higher
+>>> level sched_domain by saying that all is well, there is no imbalance.
+>>> This is wrong, isn't it?
+>>>
+>>> My point is that by clearing the imbalance flag in the out_balanced
+>>> case, you might be overlooking the fact that the tsk_cpus_allowed mask
+>>> of the tasks on the src_cpu may not be able to run on the dst_cpu in
+>>> *this* level of sched_domain, but can potentially run on a cpu at any
+>>> higher level of sched_domain. By clearing the flag, we are not
+>>
+>> The imbalance flag is per sched_domain level so we will not clear
+>> group_imbalance flag of other levels if the imbalance is also detected
+>> at a higher level it will migrate t2
+>
+> Continuing with the above explanation; when LBF_ALL_PINNED flag is
+> set,and we jump to out_balanced, we clear the imbalance flag for the
+> sched_group comprising of cpu0 and cpu1,although there is actually an
+> imbalance. t2 could still be migrated to say cpu2/cpu3 (t2 has them in
+> its cpus allowed mask) in another sched group when load balancing is
+> done at the next sched domain level.
 
-It just use the argument port_map on the real set of ports. If that's
-still not clear, I can add a separate field. But the field will store
-the exact same information as hpriv->port_map. We will have something
-like:
+The imbalance is per sched_domain level so it will not have any side
+effect on the next level
 
-if (hpriv->available_port_map)
-	hpriv->port_map &= hpriv->available_port_map;
+Regards,
+Vincent
 
-> > > Well, so does clk.  Let's say clk is more restricted and phy can be
-> > > one or more per port and thus needs to be dynamic.  If so, shouldn't
-> > > we at least have some correlation between phys and ports?  It bothers
-> > > me that now libahci is carrying random number of resources that it has
-> > > no idea how to associate with the ports it manages.  What if later we
-> > > want to involve phy driver in power managing unoccupied ports?
-> > 
-> > I see. This is a first (working) attempt to have a one node per port. I
-> > agree that would be nice to have a correlation between ports and PHYs.
-> > This can definitively be added when needed without changing the dt
-> > bindings as only the internal representation changes. This would also
-> > require to get all phys from the port nodes, which is again internal
-> > stuff.
-> > 
-> > Don't you think we can go by steps, and have a following up series for
-> > this when needed (like in a power managing series for unoccupied ports)?
-> 
-> I don't know.  It isn't exactly difficult to make it per-port, is it?
-> We already have ahci_port_priv and wouldn't the code actually be
-> simpler that way?
-
-I had a quick look on this, and it does not seems to be that simple. The
-ahci_port_priv is stored inside the ata_port struct and not accessible
-(as of now) from the ahci_host_priv one. The ahci_port_priv is
-initialized at the end of ahci_platform_init_host(), far after we need
-it. This requires quite a lot of changes. Or is there another way?
-
-To be honest, we are now at v9 and it's been quite a long time since v1.
-I'd really like it to be merged in 3.17. As I see it, this patch keeps
-the same logic as what was in place before, only with more PHYs.
-
-Don't take me wrong, I really think this is a good idea to have a
-per-port PHY information. But this is a refactoring not clearly related
-to this series as the logic is not changed. This definitively can be the
-subject of a dedicated series, especially if I got it right and the
-required modifications are not that obvious.
-
-What do you think?
-
-Thanks,
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> Elaborating on this, when cpu2 in another socket,lets say, begins load
+> balancing and update_sd_pick_busiest() is called, the group with cpu0
+> and cpu1 may not be picked as a potential imbalanced group. Had we not
+> cleared the imbalance flag for this group, we could have balanced out t2
+> to cpu2/3.
+>
+> Is the scenario I am describing clear?
+>
+> Regards
+> Preeti U Murthy
+>>
+>> Regards,
+>> Vincent
+>>
+>>> encouraging load balance at that level for t2.
+>>>
+>>> Am I missing something?
+>>>
+>>> Regards
+>>> Preeti U Murthy
+>>>
+>>
+>
