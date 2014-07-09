@@ -1,39 +1,31 @@
-From: ulrich.hecht@gmail.com (Ulrich Hecht)
-Date: Wed, 9 Jul 2014 12:11:44 +0200
-Subject: [PATCH 1/2] usb: renesas_usbhs: add R-Car Gen. 2 init and power
- control
-In-Reply-To: <87y4w3v1fa.wl%kuninori.morimoto.gx@gmail.com>
-References: <1404831571-19817-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <87y4w3v1fa.wl%kuninori.morimoto.gx@gmail.com>
-Message-ID: <CAO3366ySCau6A7hXTDzHy4COH8he5YrB2A_kNxuua8qejeH8VQ@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 9 Jul 2014 12:14:13 +0200
+Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
+In-Reply-To: <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140709101413.GR19379@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 2:08 AM, Kuninori Morimoto
-<kuninori.morimoto.gx@gmail.com> wrote:
->
-> Hi Ulrich
->
-> Thank you for your patch
+On Mon, Jun 30, 2014 at 06:05:32PM +0200, Vincent Guittot wrote:
+> +++ b/kernel/sched/fair.c
+> @@ -6615,10 +6615,8 @@ more_balance:
 
-Thank you for your review.
+In order to avoid labels being used as functions; you can use:
 
->> @@ -186,6 +192,8 @@ struct renesas_usbhs_platform_info {
->>        * driver use these param for some register
->>        */
->>       struct renesas_usbhs_driver_param       driver_param;
->> +
->> +     struct usb_phy *phy;
->>  };
->
-> Using renesas_usbhs_platform_info for *phy is not good idea from my point of view.
-> Because its memory is located on platform side.
-> (this is the reason why usbhs_probe() using memcpy() for getting info->xxx)
->
-> I guess struct usbhs_priv is good place,
-> and you can use usbhs_pdev_to_priv() for this purpose ?
+.quiltrc:
+QUILT_DIFF_OPTS="-F ^[[:alpha:]\$_].*[^:]\$"
 
-Yes, that seems more natural anyway.
+.gitconfig:
+[diff "default"]
+        xfuncname = "^[[:alpha:]$_].*[^:]$"
 
-CU
-Uli
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/15a1af21/attachment.sig>
