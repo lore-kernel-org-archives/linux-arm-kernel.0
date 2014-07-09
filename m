@@ -1,169 +1,73 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed,  9 Jul 2014 15:12:44 +0200
-Subject: [PATCH v5 8/8] ARM: shmobile: genmai-reference: Enable MTU2 in device
- tree
-In-Reply-To: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1404911564-17380-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: a.heider@gmail.com (Andre Heider)
+Date: Wed, 9 Jul 2014 15:19:14 +0200
+Subject: [PATCH 00/13] uio_pruss: add support for devicetree and am33xx
+In-Reply-To: <alpine.DEB.2.02.1407071733500.28318@utopia.booyaka.com>
+References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+ <20140707084824.GA83417@localhost>
+ <alpine.DEB.2.02.1407071733500.28318@utopia.booyaka.com>
+Message-ID: <20140709131914.GA93342@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No more device needs to be added from platform code when booting the
-reference platform, move MTU2 registration from setup-r7s72100.c to
-board-genmai.c and remove the now empty r7s72100_add_dt_devices()
-function.
+On Mon, Jul 07, 2014 at 05:50:09PM +0000, Paul Walmsley wrote:
+> On Mon, 7 Jul 2014, Andre Heider wrote:
+> 
+> > On Sun, Jun 29, 2014 at 06:21:34PM +0200, Andre Heider wrote:
+> > > 
+> > > this series adds PRUv2 support to uio_pruss through devicetree, makes the
+> > > device usable on am33xx and enables it on beaglebone black.
+> > > Inspired by old patches from Matt Porter found in a downstream tree.
+> > > 
+> > > To archieve that this series:
+> > > * adds a flag to omap_hwmod.c to get PRUSS out of hardreset (patch 5 and 6)
+> 
+> ...
+> 
+> > > * is the hardreset thing I did there the right thing to do? I think the
+> > >   proper way would be a reset controller (which apparently doesn't yet exist
+> > >   for this SoC?) and let the driver deassert/assert on probe/remove?
+> > > * the platform device path has a clk_enable() / clk_put() calls. Are those
+> > >   now redundant with the introduced pm_runtime_enable() pm_runtime_disable()
+> > >   calls?
+> 
+> Probably you only need pm_runtime_{get,put}_*() calls, unless you're 
+> changing clock parents or rates in your driver code.
 
-As the genmai_add_standard_devices() function is now identical to the
-default init_machine implementation, remove it as well.
+No, the driver doesn't do that. So I can clean that up, nice.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/r7s72100-genmai.dts           |  4 ++++
- arch/arm/mach-shmobile/board-genmai-reference.c | 20 --------------------
- arch/arm/mach-shmobile/board-genmai.c           | 14 +++++++++++++-
- arch/arm/mach-shmobile/r7s72100.h               |  1 -
- arch/arm/mach-shmobile/setup-r7s72100.c         | 21 ---------------------
- 5 files changed, 17 insertions(+), 43 deletions(-)
+> 
+> > @OMAP guys: any comments? The series depends on patch 5 and 6; both touch
+> > common hwmod code.
+> 
+> I'd suggest splitting the series into three independent pieces if 
+> possible:
+> 
+> 1. UIO code, for the UIO maintainer(s)
+> 2. DT pieces for Tony
+> 3. hwmod pieces for me
+> 
+> That way they can be cleanly merged by the respective maintainers.
+> 
+> As far as the hwmod piece goes, I'd be willing to merge your code as a 
+> temporary workaround for the issue, and marking it as such; but I'd be 
+> concerned about power management-related interactions (i.e., does the 
+> PRUSS need to be reset upon return from deep idle states, etc.)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index 56849b5..a352734 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -43,6 +43,10 @@
- 	clock-frequency = <48000000>;
- };
- 
-+&mtu2 {
-+	status = "ok";
-+};
-+
- &i2c2 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index e5448f7..bc52677 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -19,29 +19,10 @@
-  */
- 
- #include <linux/kernel.h>
--#include <linux/of_platform.h>
- 
--#include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include "clock.h"
- #include "common.h"
--#include "r7s72100.h"
--
--/*
-- * This is a really crude hack to provide clkdev support to platform
-- * devices until they get moved to DT.
-- */
--static const struct clk_name clk_names[] = {
--	{ "mtu2", "fck", "sh-mtu2" },
--};
--
--static void __init genmai_add_standard_devices(void)
--{
--	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
--	r7s72100_add_dt_devices();
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
- 
- static const char * const genmai_boards_compat_dt[] __initconst = {
- 	"renesas,genmai",
-@@ -50,6 +31,5 @@ static const char * const genmai_boards_compat_dt[] __initconst = {
- 
- DT_MACHINE_START(GENMAI_DT, "genmai")
- 	.init_early	= shmobile_init_delay,
--	.init_machine	= genmai_add_standard_devices,
- 	.dt_compat	= genmai_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index e2a3ba4..b5dee53 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/serial_sci.h>
- #include <linux/sh_eth.h>
-+#include <linux/sh_timer.h>
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
- 
-@@ -126,10 +127,21 @@ R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
- 					  &scif##index##_platform_data,	       \
- 					  sizeof(scif##index##_platform_data))
- 
-+static struct resource mtu2_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xfcff0000, 0x400),
-+	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
-+};
-+
-+#define r7s72100_register_mtu2()					\
-+	platform_device_register_resndata(&platform_bus, "sh-mtu2",	\
-+					  -1, mtu2_resources,		\
-+					  ARRAY_SIZE(mtu2_resources),	\
-+					  NULL, 0)
-+
- static void __init genmai_add_standard_devices(void)
- {
- 	r7s72100_clock_init();
--	r7s72100_add_dt_devices();
-+	r7s72100_register_mtu2();
- 
- 	platform_device_register_full(&ether_info);
- 
-diff --git a/arch/arm/mach-shmobile/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
-index efb723c..321ae4e 100644
---- a/arch/arm/mach-shmobile/r7s72100.h
-+++ b/arch/arm/mach-shmobile/r7s72100.h
-@@ -1,7 +1,6 @@
- #ifndef __ASM_R7S72100_H__
- #define __ASM_R7S72100_H__
- 
--void r7s72100_add_dt_devices(void);
- void r7s72100_clock_init(void);
- 
- #endif /* __ASM_R7S72100_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index 4a98b23..d898cef 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -18,32 +18,11 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
--#include <linux/irq.h>
- #include <linux/kernel.h>
--#include <linux/of_platform.h>
--#include <linux/sh_timer.h>
- 
- #include <asm/mach/arch.h>
- 
- #include "common.h"
--#include "irqs.h"
--#include "r7s72100.h"
--
--static struct resource mtu2_resources[] __initdata = {
--	DEFINE_RES_MEM(0xfcff0000, 0x400),
--	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
--};
--
--#define r7s72100_register_mtu2()					\
--	platform_device_register_resndata(&platform_bus, "sh-mtu2",	\
--					  -1, mtu2_resources,		\
--					  ARRAY_SIZE(mtu2_resources),	\
--					  NULL, 0)
--
--void __init r7s72100_add_dt_devices(void)
--{
--	r7s72100_register_mtu2();
--}
- 
- #ifdef CONFIG_USE_OF
- static const char *r7s72100_boards_compat_dt[] __initdata = {
--- 
-1.8.5.5
+Alright, thanks Paul.
+
+About the deep idle states... I'm not sure, I couldn't find any explicit
+wording about it in the am335x technical reference manual nor in in the
+boneblack system reference manual.
+
+According to the TRM the PRUSS lies in the PD_PER power domain, which is
+powered down for the "Deepsleep0" power mode. So I *guess* the PRUSS also
+needs to be taken out of hard reset when waking up from such a state.
+
+But there's no upstream support for these power modes on am33xx anyway,
+and I'd assume that HWMOD_INIT_DEASSERT_HARD_RESET gets removed or
+replaced once that lands. Which is probably what you meant by "temporary".
+FWIW, I'd be willing to look into that when the time comes and PRUSS gets
+left behind.
+
+Thanks,
+Andre
