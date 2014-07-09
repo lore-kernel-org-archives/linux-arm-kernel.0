@@ -1,22 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 04:37:29 -0700
-Subject: [Patch v2] omap: Add devicetree for Gumstix Pepper board
-In-Reply-To: <1402438920-3350-1-git-send-email-ashcharles@gmail.com>
-References: <CAK8F28kEi7TfnOCXk1S8bX8PpE_fQLHBFALg5GmtEk6iaTbf=Q@mail.gmail.com>
- <1402438920-3350-1-git-send-email-ashcharles@gmail.com>
-Message-ID: <20140709113729.GT28884@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  9 Jul 2014 12:41:09 +0100
+Subject: [PATCH v3 0/5] phy: miphy365x: Introduce support for MiPHY365x
+Message-ID: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ash Charles <ashcharles@gmail.com> [140610 15:24]:
-> This adds the Gumstix Pepper[1] single-board computer based on the
-> TI AM335x processor. Schematics are available [2].
-> 
-> [1] https://store.gumstix.com/index.php/products/344/
-> [2] https://pubs.gumstix.com/boards/PEPPER/
+Hi Kishon,
 
-Applying into omap-for-v3.17/dt thanks.
+This patchset is based on the two core patches you sent to the
+list which facilitate creating PHYs residing on multi-channel
+controllers.  The changes since the last submission centre
+around dynamic PHY creation based solely on what is provided via
+Device Tree, as requested.  The other review comments have also
+been addressed in this set.
 
-Regards,
+Kind regards,
+Lee
 
-Tony
+ .../devicetree/bindings/phy/phy-miphy365x.txt      |  76 +++
+ arch/arm/boot/dts/stih416-b2020-revE.dts           |  10 +
+ arch/arm/boot/dts/stih416-b2020.dts                |  12 +
+ arch/arm/boot/dts/stih416.dtsi                     |  22 +
+ drivers/phy/Kconfig                                |  10 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-miphy365x.c                        | 636 +++++++++++++++++++++
+ include/dt-bindings/phy/phy-miphy365x.h            |  14 +
+ 8 files changed, 781 insertions(+)
