@@ -1,38 +1,67 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 9 Jul 2014 15:43:44 +0300
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140709120400.GA3819@ulmo>
-References: <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
- <53A3096B.1040409@wwwdotorg.org>
- <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
- <20140708130501.GC9516@ulmo>
- <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
- <20140709063130.GA3170@ulmo>
- <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
- <20140709102551.GA19357@ulmo>
- <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
- <20140709120400.GA3819@ulmo>
-Message-ID: <20140709124344.GK23218@tbergstrom-lnx.Nvidia.com>
+From: rob.jones@codethink.co.uk (Rob Jones)
+Date: Wed, 09 Jul 2014 13:48:29 +0100
+Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
+ devm_request_gpio_array
+In-Reply-To: <alpine.DEB.2.10.1407091351530.2375@hadrien>
+References: <cover.1404665589.git.himangi774@gmail.com>
+ <1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>
+ <53BD2509.6070803@codethink.co.uk>
+ <alpine.DEB.2.10.1407091351530.2375@hadrien>
+Message-ID: <53BD3A1D.8060401@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 02:04:02PM +0200, Thierry Reding wrote:
-> > For those 2 domains we can find the necessary clocks and resets by parsing
-> > the relevant existing DT nodes for PCIe and gr3d. For clocks, this isn't
-> > even needed as we can always register some extra clkdev's to get them. There
-> > is no equivalent for resets so we have to parse the gr3d and pcie DT nodes,
-> > but that's not too bad I think.
-> 
-> Even if we could really do this, at this point I don't see an advantage.
-> All that it would be doing is move to some subsystem that doesn't quite
-> match what we need just for the sake of moving to that subsystem. Having
-> a Tegra-specific API doesn't sound so bad anymore.
-> 
 
-The advantage would be that we can use LP0/SC7 as a cpuidle state. Also system
-resume from LP0 can be faster as we potentially don't have to resume all
-domains at once.
 
-Cheers,
+On 09/07/14 12:52, Julia Lawall wrote:
+>
+>
+> On Wed, 9 Jul 2014, Rob Jones wrote:
+>
+>> Please note that I submitted a patch on 02/07/14 to create this
+>> function which was acked by Linus Walleij on 05/07/14.
+>>
+>> Great minds think alike, and all that.
+>>
+>> However, I think that the version I submitted better replicates the
+>> original (non devm) functionality, see below.
 
-Peter.
+<snip>
+
+>>> +int devm_gpio_request_array(struct device *dev, const struct gpio *array,
+>>> +			    size_t num)
+>>> +{
+>>> +	int i, err;
+>>> +
+>>> +	for (i = 0; i < num; i++, array++) {
+>>> +		err = devm_gpio_request_one(dev, array->gpio, array->flags,
+>>> +					    array->label);
+>>> +		if (err)
+>>> +			return err;
+>>
+>> The failure path in the version I submitted frees up any already
+>> allocated gpios on the first failure.
+>
+> Himangi first proposed doing that, but I thought it was not really in the
+> spirit of devm functions, which is to leave that implicit.  No strong
+> opinion on the matter, though.
+>
+
+Interestingly, we came at it from the other direction: I originally
+didn't have the unwind in and our internal review guys suggested that
+it was in the original function so putting it in would:
+
+1. make this a better analogue of the original
+2. help avoid deadlocks
+3. allow the driver to retry, perhaps requesting reduced functionality.
+
+> julia
+>
+
+<snip>
+
+-- 
+Rob Jones
+Codethink Ltd
+mailto:rob.jones at codethink.co.uk
+tel:+44 161 236 5575
