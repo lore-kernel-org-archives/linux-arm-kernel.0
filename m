@@ -1,113 +1,101 @@
-From: matthew_minter@xyratex.com (Matthew Minter)
-Date: Wed, 9 Jul 2014 18:08:07 +0100
-Subject: [PATCH RFC] Armada XP (mvebu) Hot-plug issues continued
-Message-ID: <CAFJTrDsu4k80kLjF9yZzctjznbYJ74y4m-VT3Vkf3XtGQXGAMw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 9 Jul 2014 19:09:22 +0200
+Subject: [GIT PULL] ARM: at91: Switch to CCF for 3.17
+Message-ID: <20140709170921.GP3113@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+Hi Nicolas,
 
-This is something of a follow up to my previous thread:
-Armada XP (mvebu) PCIe memory (BAR/window) re-allocation
+This is the switch to CCF for all the remaining at91 SoCs and boards. It
+is based on your at91-3.17-dt branch.
 
-Thanks to the helpful patches provided to the mvebu PCIe subsystem,
-hot-plug PCIe devices worked much better on this board, however I have
-discovered one remaining issue regarding them, due to the fact the
-legacy style IRQ is assigned during the fake "PCI BIOS" phase, devices
-which are plugged after boot will not be given an IRQ and thus if they
-do not support MSI/MSI-X will fail to initialize.
+The following changes since commit ad7c56aa2d08f9b4e182e8294cfd5896864e4db0:
 
-This seems a fairly simple problem to squash and as such I have
-written a small patch which helps solve this, however I am unsure if I
-am doing this in a sensible way or if a different kind of rework is
-needed here. Also, if this is the wrong mailing list to ask about this
-please say so.
+  ARM: at91/dt: add NAND + DMA property for at91sam9rl (2014-07-09 18:02:47 +0200)
 
-Any comments regarding this patch or a better way to achieve this
-would be greatly appreciated. Patch follows (sorry if the format is
-off, still getting used to git format-patch).
+are available in the git repository at:
 
-Many thanks,
-Matthew
+  git://github.com/at91linux/linux-at91.git tags/CCF-for-3.17
 
+for you to fetch changes up to 447025e96d54e32a4e60050cc430705d4e532917:
 
->From 54c95ae3939870e922659d0385cca9fca72d3524 Mon Sep 17 00:00:00 2001
-From: matthew_minter <matthew_minter@xyratex.com>
-Date: Wed, 9 Jul 2014 17:51:07 +0100
-Subject: [PATCH RFC] Added code to ensure hot-added PCI devices are given an
- IRQ on rescan
-To: linux-arm-kernel at lists.infradead.org
+  ARM: at91/dt: usb_a9263: define crystals frequencies (2014-07-09 19:05:23 +0200)
 
-Signed-off-by: matthew_minter <matthew_minter@xyratex.com>
----
- drivers/pci/bus.c       | 11 +++++++++++
- drivers/pci/setup-irq.c |  2 +-
- include/linux/pci.h     |  2 ++
- 3 files changed, 14 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+CCF migration for 3.17
 
-diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
-index 73aef51..eb4f93c 100644
---- a/drivers/pci/bus.c
-+++ b/drivers/pci/bus.c
-@@ -10,6 +10,7 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
-+#include <linux/of_pci.h>
- #include <linux/errno.h>
- #include <linux/ioport.h>
- #include <linux/proc_fs.h>
-@@ -245,6 +246,16 @@ void pci_bus_add_device(struct pci_dev *dev)
-      * are not assigned yet for some devices.
-      */
-     pci_fixup_device(pci_fixup_final, dev);
-+    /*
-+     * Devices which are hot-added after boot have not
-+     * been assigned an irq by the bios.
-+     */
-+    if (unlikely(!dev->irq)) {
-+        dev_dbg(&dev->dev,
-+            "PCI device missing IRQ, attempting to assign one\n");
-+        pdev_fixup_irq(dev, pci_common_swizzle,
-+            of_irq_parse_and_map_pci);
-+    }
-     pci_create_sysfs_dev_files(dev);
-     pci_proc_attach_device(dev);
+----------------------------------------------------------------
+Alexandre Belloni (34):
+      Documentation: dt: document all the atmel pmc compatibles
+      ARM: at91/dt: ariag25: define crystals frequencies
+      ARM: at91: prepare common clk transition for rm9200
+      ARM: at91/dt: rm9200: define clocks
+      ARM: at91: move at91rm9200 SoC to the CCF
+      ARM: at91/dt: at91rm9200ek: define crystals frequencies
+      ARM: at91: prepare common clk transition for sam9260
+      ARM: at91/dt: sam9260: define clocks
+      ARM: at91/dt: sam9g20: define clocks
+      ARM: at91: move at91sam9260 SoCs to the CCF
+      ARM: at91/dt: at91sam9g20ek: define crystals frequencies
+      ARM: at91/dt: foxg20: define crystals frequencies
+      ARM: at91/dt: usb_a9260: define crystals frequencies
+      ARM: at91/dt: tny_a9260: define crystals frequencies
+      ARM: at91/dt: qil_a9260: define crystals frequencies
+      ARM: at91/dt: mpa1600: define crytals frequencies
+      ARM: at91/dt: ge863-pro3: define main crystal frequency
+      ARM: at91/dt: aks-cdu: define slow crytal frequency
+      ARM: at91/dt: evk-pro3: define slow crytal frequency
+      ARM: at91/dt: ethernut5: define crystals frequencies
+      ARM: at91/dt: animeo_ip: define crystals frequencies
+      ARM: at91/dt: kizbox: define main crystal frequency
+      ARM: at91: prepare common clk transition for sam9g45
+      ARM: at91/dt: sam9g45: define clocks
+      ARM: at91: move at91sam9g45 SoC to the CCF
+      ARM: at91/dt: sam9m10g45ek: define crystals frequencies
+      ARM: at91/dt: pm9g45: crystals frequencies
+      ARM: at91/dt: cosino define crystals frequencies
+      ARM: at91: prepare common clk transition for sam9263
+      ARM: at91/dt: sam9263: define clocks
+      ARM: at91: move at91sam9263 SoC to the CCF
+      ARM: at91/dt: sam9263ek: define crystals frequencies
+      ARM: at91/dt: tny_a9263: define crystals frequencies
+      ARM: at91/dt: usb_a9263: define crystals frequencies
 
-diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-index 4e2d595..38c96c8 100644
---- a/drivers/pci/setup-irq.c
-+++ b/drivers/pci/setup-irq.c
-@@ -22,7 +22,7 @@ void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
-     pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
- }
-
--static void pdev_fixup_irq(struct pci_dev *dev,
-+void pdev_fixup_irq(struct pci_dev *dev,
-                u8 (*swizzle)(struct pci_dev *, u8 *),
-                int (*map_irq)(const struct pci_dev *, u8, u8))
- {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 466bcd1..4c1b1b3 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1056,6 +1056,8 @@ void pci_assign_unassigned_bus_resources(struct
-pci_bus *bus);
- void pci_assign_unassigned_root_bus_resources(struct pci_bus *bus);
- void pdev_enable_device(struct pci_dev *);
- int pci_enable_resources(struct pci_dev *, int mask);
-+void pdev_fixup_irq(struct pci_dev *, u8 (*)(struct pci_dev *, u8 *),
-+            int (*)(const struct pci_dev *, u8, u8));
- void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
-             int (*)(const struct pci_dev *, u8, u8));
- #define HAVE_PCI_REQ_REGIONS    2
--- 
-2.0.0
+ .../devicetree/bindings/arm/atmel-pmc.txt          |   5 +-
+ arch/arm/boot/dts/aks-cdu.dts                      |   6 +
+ arch/arm/boot/dts/animeo_ip.dts                    |   8 +
+ arch/arm/boot/dts/at91-ariag25.dts                 |   8 +
+ arch/arm/boot/dts/at91-cosino.dtsi                 |   8 +
+ arch/arm/boot/dts/at91-foxg20.dts                  |   8 +
+ arch/arm/boot/dts/at91-qil_a9260.dts               |   8 +
+ arch/arm/boot/dts/at91rm9200.dtsi                  | 304 ++++++++++++++++++
+ arch/arm/boot/dts/at91rm9200ek.dts                 |   8 +
+ arch/arm/boot/dts/at91sam9260.dtsi                 | 314 ++++++++++++++++++-
+ arch/arm/boot/dts/at91sam9263.dtsi                 | 311 +++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263ek.dts                |   8 +
+ arch/arm/boot/dts/at91sam9g20.dtsi                 |  24 ++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |   8 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 | 342 ++++++++++++++++++++-
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |   8 +
+ arch/arm/boot/dts/ethernut5.dts                    |  10 +
+ arch/arm/boot/dts/evk-pro3.dts                     |   6 +
+ arch/arm/boot/dts/ge863-pro3.dtsi                  |   4 +
+ arch/arm/boot/dts/kizbox.dts                       |   4 +
+ arch/arm/boot/dts/mpa1600.dts                      |   8 +
+ arch/arm/boot/dts/pm9g45.dts                       |   8 +
+ arch/arm/boot/dts/tny_a9260_common.dtsi            |   8 +
+ arch/arm/boot/dts/tny_a9263.dts                    |   8 +
+ arch/arm/boot/dts/usb_a9260_common.dtsi            |   8 +
+ arch/arm/boot/dts/usb_a9263.dts                    |   8 +
+ arch/arm/mach-at91/Kconfig                         |   4 -
+ arch/arm/mach-at91/at91rm9200.c                    |   6 +-
+ arch/arm/mach-at91/at91sam9260.c                   |   6 +-
+ arch/arm/mach-at91/at91sam9263.c                   |   6 +-
+ arch/arm/mach-at91/at91sam9g45.c                   |   6 +-
+ 31 files changed, 1467 insertions(+), 11 deletions(-)
 
 -- 
-
-
-------------------------------
-For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
-
-------------------------------
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
