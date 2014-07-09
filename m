@@ -1,7 +1,7 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  8 Jul 2014 18:19:00 -0700
-Subject: [PATCH] clk: qcom: Fix MN frequency tables, parent map, and jpegd
-Message-ID: <1404868740-10847-1-git-send-email-sboyd@codeaurora.org>
+Date: Tue,  8 Jul 2014 18:36:06 -0700
+Subject: [PATCH v2] clk: qcom: Fix MN frequency tables, parent map, and jpegd
+Message-ID: <1404869766-6311-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,20 +12,23 @@ assign the m and n values for each frequency. Furthermore, the
 mmcc_pxo_pll8_pll2_pll3 array improperly mapped the second
 element to pll2 instead of pll8, causing the clock driver to
 recalculate the wrong rate for any clocks using this array along
-with a rate that uses pll2. Finally I noticed that the jpegd
-clock improperly indicates that the pre-divider width is only 2,
-when it's actually 4 bits wide.
+with a rate that uses pll2. Plus the .num_parents field is 3
+instead of 4 so you can't even switch the parent to pll3. Finally
+I noticed that the jpegd clock improperly indicates that the
+pre-divider width is only 2, when it's actually 4 bits wide.
 
-Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia
-clock controller (MMCC)"
-
+Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia clock controller (MMCC)"
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/mmcc-msm8960.c | 80 +++++++++++++++++++++--------------------
- 1 file changed, 41 insertions(+), 39 deletions(-)
+
+ Changes since v1:
+  - num_parents for gfx3d should be 4, not 3.
+
+ drivers/clk/qcom/mmcc-msm8960.c | 82 +++++++++++++++++++++--------------------
+ 1 file changed, 42 insertions(+), 40 deletions(-)
 
 diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-index 12f3c0b64fcd..de8ee19160f7 100644
+index 12f3c0b64fcd..10d2f135dfba 100644
 --- a/drivers/clk/qcom/mmcc-msm8960.c
 +++ b/drivers/clk/qcom/mmcc-msm8960.c
 @@ -38,6 +38,8 @@
@@ -117,6 +120,15 @@ index 12f3c0b64fcd..de8ee19160f7 100644
  	{ }
  };
  
+@@ -897,7 +899,7 @@ static struct clk_dyn_rcg gfx3d_src = {
+ 		.hw.init = &(struct clk_init_data){
+ 			.name = "gfx3d_src",
+ 			.parent_names = mmcc_pxo_pll8_pll2_pll3,
+-			.num_parents = 3,
++			.num_parents = 4,
+ 			.ops = &clk_dyn_rcg_ops,
+ 		},
+ 	},
 @@ -995,7 +997,7 @@ static struct clk_rcg jpegd_src = {
  	.ns_reg = 0x00ac,
  	.p = {
