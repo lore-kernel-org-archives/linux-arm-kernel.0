@@ -1,45 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jul 2014 13:08:23 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <20140624092309.GD13803@lee--X1>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1>
-Message-ID: <20140709120823.GA32573@lee--X1>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 9 Jul 2014 21:10:29 +0900
+Subject: [PATCH 0/5] Introduce a managed function for gpio_request_array
+In-Reply-To: <CACRpkdYbK3tizezXNaTBT6ANQ8fxoBUH5OATpb5cLykQqRSuKA@mail.gmail.com>
+References: <cover.1404665589.git.himangi774@gmail.com>
+ <CACRpkdYbK3tizezXNaTBT6ANQ8fxoBUH5OATpb5cLykQqRSuKA@mail.gmail.com>
+Message-ID: <CAAVeFuLKdah5JHoetoSwZTxd4qAioCSFEWGgMCv1tY1_BSZowg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Lee Jones wrote:
+On Wed, Jul 9, 2014 at 7:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Jul 6, 2014 at 7:46 PM, Himangi Saraogi <himangi774@gmail.com> wrote:
+>
+>> This patchset intoduces a new managed interface devm_gpio_request_array,
+>> adds it in the documentation and its declaration in the gpio.h include
+>> file. Some cases of gpio_request_array are changed to
+>> devm_gpio_request_array.
+>>
+>> Himangi Saraogi (5):
+>>   gpiolib: devres: Introduce the function devm_request_gpio_array
+>>   ASoC: wm1250-ev1: Use devm_gpio_request_array
+>>   ASoC: pxa: Use devm_gpio_request_array
+>>   ASoC: pxa: e800_wm9712: Introduce the use of devm_gpio_request_array
+>>   ASoC: pxa/hx4700: Introduce the use of devm_gpio_request_array
+>
+> Sorry, we're not encouraging extension of the old gpio* plain API anymore.
+>
+> The right thing to do is convert users over to using GPIO descriptors
+> internally, then introduce devm_gpiod_get_array() if that makes some
+> sense.
+>
+> Alexandre, what do you say?
 
-> > I'm re-sending this set, as one of the maintainers' email addresses
-> > is incorrect in the MAINTAINERS file.
-> > 
-> > This patchset adds full support for 2 types of Thermal Controllers
-> > produced by STMicroelectronics.  One is a more traditional memory
-> > mapped variant, the other is controlled solely by system configuration
-> > registers.
-> 
-> Any thing from the Thermal guys? Has this set fallen through the gaps?
+I do agree that we want to discourage people from using the integer
+API, and would also prefer to see the consumers converted to gpiod and
+proper gpiod functions introduced.
 
-Anything at all?  It's been well over a month now.
-
-> >  Documentation/devicetree/bindings/thermal/st-thermal.txt |  42 ++++++++++++++++
-> >  arch/arm/boot/dts/stih416.dtsi                           |  18 +++++++
-> >  arch/arm/configs/multi_v7_defconfig                      |   2 +
-> >  drivers/thermal/Kconfig                                  |   5 ++
-> >  drivers/thermal/Makefile                                 |   1 +
-> >  drivers/thermal/st/Kconfig                               |  12 +++++
-> >  drivers/thermal/st/Makefile                              |   3 ++
-> >  drivers/thermal/st/st_thermal.c                          | 313 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> > ++++++++++++++++++++++++++++
-> >  drivers/thermal/st/st_thermal.h                          | 104 ++++++++++++++++++++++++++++++++++++++
-> >  drivers/thermal/st/st_thermal_memmap.c                   | 209 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/thermal/st/st_thermal_syscfg.c                   | 179 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  11 files changed, 888 insertions(+)
-> > 
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On the other hand with Rob's similar patch which seems to be about to
+be merged (https://lkml.org/lkml/2014/7/2/149 ) I guess the pressure
+to accept one or the other is quite high. At least, I hope Rob or
+Himangi will follow-up with a patch adding similar functionality to
+the gpiod API, and will consider converting their consumers to it
+(it's for your own good!).
