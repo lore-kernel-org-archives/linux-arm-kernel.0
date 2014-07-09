@@ -1,55 +1,49 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 9 Jul 2014 11:49:19 +0100
-Subject: [PATCH] xen/arm: use BUG_ON
-In-Reply-To: <20140708222634.GA11976@himangi-Dell>
-References: <20140708222634.GA11976@himangi-Dell>
-Message-ID: <alpine.DEB.2.02.1407091148530.27641@kaball.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 03:50:56 -0700
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <53BD1AF8.2060609@ti.com>
+References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+ <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
+ <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
+ <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
+ <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
+Message-ID: <20140709105055.GP28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Jul 2014, Himangi Saraogi wrote:
-> Use BUG_ON(x) rather than if(x) BUG();
+* Keerthy <a0393675@ti.com> [140709 03:39]:
+> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
+> >* Keerthy <a0393675@ti.com> [140709 02:36]:
+> >>On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
+> >>>* Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
+> >>>>--- a/arch/arm/boot/dts/dra7-evm.dts
+> >>>>+++ b/arch/arm/boot/dts/dra7-evm.dts
+> >>>>@@ -249,6 +249,7 @@
+> >>>>  					regulator-min-microvolt = <1050000>;
+> >>>>  					regulator-max-microvolt = <1050000>;
+> >>>>  					regulator-boot-on;
+> >>>>+					regulator-always-on;
+> >>>>  				};
+> >>>Is this regulator really always on?
+> >>This feeds on to RTC which is a free running clock. So i guess always on is
+> >>justified no?
+> >Well the dts entries should describe the hardware. If the
+> >regulator can be enabled and disabled, we should not claim it's
+> >always on.
 > 
-> The semantic patch that fixes this problem is as follows:
-> 
-> // <smpl>
-> @@ identifier x; @@
-> -if (x) BUG();
-> +BUG_ON(x);
-> // </smpl>
-> 
-> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+> From the PMIC perspective every regulator can be enabled and
+> disabled. From a Board perspective there are some which need
+> to be always on. For Ex: SMPS123 which feeds on to the MPU.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Right, and we already have regulator-boot-on for those. Or are
+you seeing some issue with that?
 
+> I guess RTC also needs the supply to be on as long as we want
+> the clock to be ticking.
 
->  arch/arm/xen/enlighten.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 1e63243..98544c5 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -181,8 +181,7 @@ static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
->  	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
->  	int rc;
->  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
-> -	if (rc)
-> -		BUG();
-> +	BUG_ON(rc);
->  }
->  
->  static void xen_power_off(void)
-> @@ -190,8 +189,7 @@ static void xen_power_off(void)
->  	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
->  	int rc;
->  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
-> -	if (rc)
-> -		BUG();
-> +	BUG_ON(rc);
->  }
->  
->  static int xen_cpu_notification(struct notifier_block *self,
-> -- 
-> 1.9.1
-> 
+Sure, but if somebody wants shut it off regulator-boot-on is
+better from driver point of view.
+
+Regards,
+
+Tony
