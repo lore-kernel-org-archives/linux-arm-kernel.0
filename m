@@ -1,44 +1,37 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:29:56 +0400
-Subject: [RFC/PATCH RESEND -next 02/21] init: main: initialize kasan's shadow
- area on boot
+Date: Wed, 09 Jul 2014 15:30:00 +0400
+Subject: [RFC/PATCH RESEND -next 06/21] x86: mm: init: allocate shadow memory
+ for kasan
 In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-3-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1404905415-9046-7-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch initializes shadow area after it was allocated by arch code.
-All low memory marked as accessible except shadow area itself.
-Later free_all_bootmem() will release pages to buddy allocator
-and these pages will be marked as unaccessible, untill somebody
-will allocate them.
-
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- init/main.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/x86/mm/init.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/init/main.c b/init/main.c
-index bb1aed9..d06a636 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -78,6 +78,7 @@
- #include <linux/context_tracking.h>
- #include <linux/random.h>
- #include <linux/list.h>
+diff --git a/arch/x86/mm/init.c b/arch/x86/mm/init.c
+index f971306..d9925ee 100644
+--- a/arch/x86/mm/init.c
++++ b/arch/x86/mm/init.c
+@@ -4,6 +4,7 @@
+ #include <linux/swap.h>
+ #include <linux/memblock.h>
+ #include <linux/bootmem.h>	/* for max_low_pfn */
 +#include <linux/kasan.h>
  
- #include <asm/io.h>
- #include <asm/bugs.h>
-@@ -549,7 +550,7 @@ asmlinkage __visible void __init start_kernel(void)
- 			   set_init_arg);
+ #include <asm/cacheflush.h>
+ #include <asm/e820.h>
+@@ -678,5 +679,7 @@ void __init zone_sizes_init(void)
+ #endif
  
- 	jump_label_init();
--
-+	kasan_init_shadow();
- 	/*
- 	 * These use large bootmem allocations and must precede
- 	 * kmem_cache_init()
+ 	free_area_init_nodes(max_zone_pfns);
++
++	kasan_alloc_shadow();
+ }
+ 
 -- 
 1.8.5.5
