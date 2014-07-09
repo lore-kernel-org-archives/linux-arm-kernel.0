@@ -1,40 +1,97 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed,  9 Jul 2014 15:12:40 +0200
-Subject: [PATCH v5 4/8] ARM: shmobile: r7s72100: Add MTU2 device to DT
+Date: Wed,  9 Jul 2014 15:12:42 +0200
+Subject: [PATCH v5 6/8] ARM: shmobile: koelsch-reference: Enable CMT0 in
+ device tree
 In-Reply-To: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1404911564-17380-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1404911564-17380-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the MTU2 counter to the r7s72100 device tree and make it disabled by
-default.
+No more device needs to be added from platform code when booting the
+reference platform, remove the now empty r8a7791_add_dt_devices()
+function completely.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch.dts            | 4 ++++
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 2 --
+ arch/arm/mach-shmobile/r8a7791.h                 | 1 -
+ arch/arm/mach-shmobile/setup-r8a7791.c           | 7 +------
+ 4 files changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index bdee225..c902b0b 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -229,6 +229,16 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 5dac673..7817ca8 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -297,6 +297,10 @@
  	};
+ };
  
-+	mtu2: timer at fcff0000 {
-+		compatible = "renesas,mtu2";
-+		reg = <0xfcff0000 0x400>;
-+		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "tgi0a";
-+		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-+		clock-names = "fck";
-+		status = "disabled";
-+	};
++&cmt0 {
++	status = "ok";
++};
 +
- 	scif0: serial at e8007000 {
- 		compatible = "renesas,scif-r7s72100", "renesas,scif";
- 		reg = <0xe8007000 64>;
+ &sata0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index 3ff88c1..9db5e67 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -88,7 +88,6 @@ static void __init koelsch_add_du_device(void)
+  * devices until they get moved to DT.
+  */
+ static const struct clk_name clk_names[] __initconst = {
+-	{ "cmt0", "fck", "sh-cmt-48-gen2.0" },
+ 	{ "du0", "du.0", "rcar-du-r8a7791" },
+ 	{ "du1", "du.1", "rcar-du-r8a7791" },
+ 	{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
+@@ -97,7 +96,6 @@ static const struct clk_name clk_names[] __initconst = {
+ static void __init koelsch_add_standard_devices(void)
+ {
+ 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
+-	r8a7791_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 
+ 	koelsch_add_du_device();
+diff --git a/arch/arm/mach-shmobile/r8a7791.h b/arch/arm/mach-shmobile/r8a7791.h
+index 86eae7b..c1bf7ab 100644
+--- a/arch/arm/mach-shmobile/r8a7791.h
++++ b/arch/arm/mach-shmobile/r8a7791.h
+@@ -2,7 +2,6 @@
+ #define __ASM_R8A7791_H__
+ 
+ void r8a7791_add_standard_devices(void);
+-void r8a7791_add_dt_devices(void);
+ void r8a7791_clock_init(void);
+ void r8a7791_pinmux_init(void);
+ void r8a7791_pm_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index 8823324..64cb1d7 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -182,11 +182,6 @@ static const struct resource thermal_resources[] __initconst = {
+ 					thermal_resources,		\
+ 					ARRAY_SIZE(thermal_resources))
+ 
+-void __init r8a7791_add_dt_devices(void)
+-{
+-	r8a7791_register_cmt(0);
+-}
+-
+ void __init r8a7791_add_standard_devices(void)
+ {
+ 	r8a7791_register_scif(0);
+@@ -204,7 +199,7 @@ void __init r8a7791_add_standard_devices(void)
+ 	r8a7791_register_scif(12);
+ 	r8a7791_register_scif(13);
+ 	r8a7791_register_scif(14);
+-	r8a7791_add_dt_devices();
++	r8a7791_register_cmt(0);
+ 	r8a7791_register_irqc(0);
+ 	r8a7791_register_thermal();
+ }
 -- 
 1.8.5.5
