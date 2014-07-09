@@ -1,67 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Jul 2014 19:10:48 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140709142125.GB3262@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140709134050.GN9485@arm.com> <20140709142125.GB3262@ulmo>
-Message-ID: <20140709181048.GX9485@arm.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 9 Jul 2014 14:11:18 -0400
+Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
+ CRTCs
+In-Reply-To: <20140709151618.GU21766@n2100.arm.linux.org.uk>
+References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGtEUqK=YBWwOz8bf8a_e_p8-Y0vFYRfs2uxJ20015roOA@mail.gmail.com>
+ <20140709151618.GU21766@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGt0yq-Feuq13ewY7_4YkgOW6FKjLHnNDELXiyzOWdO5=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Wed, Jul 9, 2014 at 11:16 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jul 03, 2014 at 06:36:47PM -0400, Rob Clark wrote:
+>> On Thu, Jul 3, 2014 at 12:49 PM, Russell King
+>> <rmk+kernel@arm.linux.org.uk> wrote:
+>> > Add a helper to allow encoders to find their possible CRTCs from the
+>> > OF graph without having to re-implement this functionality.  We add a
+>> > device_node to drm_crtc which corresponds with the port node in the
+>> > DT description of the CRTC device.
+>> >
+>> > We can then scan the DRM device list for CRTCs to find their index,
+>> > matching the appropriate CRTC using the port device_node, thus building
+>> > up the possible CRTC mask.
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > ---
+>> > This helper will be shared between imx-drm and Armada DRM, and should
+>> > be useful for other OF-based drivers.  At the moment, this is being
+>> > sent for comments and acks; I need to build upon this patch in order
+>> > to convert Armada DRM to DT.
+>> >
+>> >  drivers/gpu/drm/Makefile |  1 +
+>> >  drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
+>> >  include/drm/drm_crtc.h   |  2 ++
+>> >  include/drm/drm_of.h     | 18 ++++++++++++++
+>>
+>> oh, probably also should get links in Documentation/DocBook/drm.tmpl
+>
+> Hmm... can you advise a suitable location... I've never touched that
+> stuff before, and it seems I can't even get it to build on my machine:
+>
+> Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
+> Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
+> Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
+> Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
+>   DOCPROC Documentation/DocBook/w1.xml
+>   DOCPROC Documentation/DocBook/writing_musb_glue_layer.xml
+>   PDF     Documentation/DocBook/z8530book.pdf
+> Making portrait pages on A4 paper (210mmx297mm)
+> sh: /usr/share/xmlto/format/docbook/../fo/pdf: No such file or directory
+> make[2]: *** [Documentation/DocBook/z8530book.pdf] Error 1
+> make[2]: *** Waiting for unfinished jobs....
+> make[1]: *** [pdfdocs] Error 2
+> make: *** [sub-make] Error 2
 
-On Wed, Jul 09, 2014 at 03:21:27PM +0100, Thierry Reding wrote:
-> On Wed, Jul 09, 2014 at 02:40:50PM +0100, Will Deacon wrote:
-> > I would like to move the ARM SMMU driver over to this for 3.18, if possible.
-> > One use-case there is the ability to describe groups of masters behind a
-> > multi-master IOMMU but which must be part of the same domain (i.e. an
-> > iommu_group). This is useful for presenting devices to a guest with a
-> > virtual SMMU, where the physical devices share a stage-2 context.
-> > 
-> > With your binding, does this simply mean determining the set of master IDs
-> > in the group, then describing the complete set for each master?
-> 
-> I'm not sure I properly understand what you're trying to do, but I don't
-> think the binding is designed to cover that. Rather the goal was to
-> describe the IDs belonging to each master, so that an IOMMU can be
-> properly configured.
+hmm, I usually use 'make htmldocs'.. hadn't really bothered to try to
+build pdf docs.   It was a while ago, but I think 'xmlto-tex' would be
+what you need for fedora to get docs to build.  Hopefully the package
+has a similar name on other distros.
 
-This is directly related to that problem, see below.
+There are unfortunately a lot of warnings..  the headerdoc stuff is
+not always as clever as you would like.
 
-> Anything beyond that (e.g. logical grouping of masters) isn't directly
-> within the scope of the binding (it doesn't describe hardware but some
-> policy pertaining to some specific use-case).
+BR,
+-R
 
-This *is* for hardware. I can use PCI as an example, but this could equally
-apply to other types of bus. If you have a bunch of PCI master devices
-sitting being a non-transparent bridge, they can end up sharing the same
-master device ID (requester ID). This means that there is no way in the
-IOMMU to initialise a translation for one of these devices without also
-affecting the others. We currently have iommu_groups to deal with this, but
-it *is* a property of the hardware and we absolutely need a way to describe
-it. I'm happy to add it later, but we need to think about it now to avoid
-merging something that can't easily be extended.
 
-For PCI, the topology is probable but even then, we need this information to
-describe the resulting master device ID emitted by the bridge for the
-upstream group. One way to do this with your binding would be to treat all
-of the upstream masters as having the same device ID.
-
-With virtualisation, we may want to assign a group of devices to a guest but
-without emulating the bridge. This would need something the device-tree to
-describe that they are grouped together.
-
-> That said, the IOMMU driver that I prototyped for Tegra did some similar
-> grouping of devices, although in a much more restricted way. The goal of
-> that was to add a known set of devices into one group, "peripherals", so
-> that they could share one IOMMU domain. This was meant to separate them
-> from devices with more advanced needs (such as a GPU driver). Devices in
-> the "peripherals" group would be using the DMA mapping API integration
-> whereas other devices would have to explicitly allocate an IOMMU domain.
-> 
-> I'm not sure how much that helps for the use-case that you have in mind.
-
-That sounds more like a software decision, which I agree doesn't need to be
-described.
-
-Will
+> I guess my install is too old for it.
+>
+> Thanks.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
