@@ -1,55 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 9 Jul 2014 18:34:42 +0200
-Subject: [PATCH v2 0/2] ARM: at91: remove phy fixup for sama5d3xek boards
-In-Reply-To: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140709183442.14b8aef8@bbrezillon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Jul 2014 17:37:20 +0100
+Subject: [PATCH v3 1/5] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <CAG374jBLq8YShOakBJtf2U47wuKGYNM7vSTn4PjzHsvjaYjmNQ@mail.gmail.com>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+ <1404906074-31992-2-git-send-email-lee.jones@linaro.org>
+ <CAG374jBLq8YShOakBJtf2U47wuKGYNM7vSTn4PjzHsvjaYjmNQ@mail.gmail.com>
+Message-ID: <20140709163720.GN2635@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bo,
+On Wed, 09 Jul 2014, Gabriel Fernandez wrote:
+> On 9 July 2014 13:41, Lee Jones <lee.jones@linaro.org> wrote:
+> > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> > devices. It has 2 ports which it can use for either; both SATA, both
+> > PCIe or one of each in any configuration.
+> >
+> > Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/phy/phy-miphy365x.txt      | 76 ++++++++++++++++++++++
+> >  1 file changed, 76 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
 
-I know you're quite busy, but if you have some time could you test this
-series on both CPU Modules (Embest and Ronetix): I only own the Embest
-one.
+[...]
 
-Best Regards,
+> > +Specifying phy control of devices
+> > +=================================
+> > +
+> > +Device nodes should specify the configuration required in their "phys"
+> > +property, containing a phandle to the phy port node and a device type.
+> > +
+> > +Example:
+> > +
+> > +#include <dt-bindings/phy/phy-miphy365x.h>
+> > +
+> > +       sata0: sata at fe380000 {
+> > +               ...
+> > +               phys      = <&miphy365x_phy MIPHY_TYPE_SATA>;
+> > +               ...
+> 
+> In this example you select the type (SATA) but I don't understand how
+> do you select
+> the port (phy_port0 or phy_port1)
 
-Boris
-
-On Thu, 26 Jun 2014 12:13:33 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
-
-> Hello,
-> 
-> This patch removes a board specific hook for sama5d3xek boards from the
-> sama5d3 generic DT board file.
-> 
-> This hook (which register a phy fixup configuring board specific delays
-> in the ksz9021 ethernet phy) is now replaced by the appropriate DT
-> properties definitions in the sama5d3xcm.dtsi file.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v1:
->  - fix txc-skew-ps and rxc-skew-ps delays
->  - remove phy address info to handle Ronetix and Embest HW designs
-> 
-> Boris BREZILLON (2):
->   ARM: at91/dt: describe rgmii ethernet phy connected to sama5d3xek
->     boards
->   ARM: at91: remove phy fixup for sama5d3xek boards
-> 
->  arch/arm/boot/dts/sama5d3xcm.dtsi   | 15 +++++++++++++++
->  arch/arm/mach-at91/board-dt-sama5.c | 22 ----------------------
->  2 files changed, 15 insertions(+), 22 deletions(-)
-> 
-
-
+Right, historical typo.  Will send a v+1 as a reply, so it's easy for
+Kishon to collect when he applies next week.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
