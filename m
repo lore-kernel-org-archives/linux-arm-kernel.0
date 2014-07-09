@@ -1,95 +1,79 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 9 Jul 2014 18:53:57 +0200
-Subject: [GIT PULL] at91: drivers for 3.17 #1
-Message-ID: <1404924837-20952-1-git-send-email-nicolas.ferre@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 09 Jul 2014 18:53:27 +0200
+Subject: [PATCH v2 0/4] Add support for Exynos clock output configuration
+In-Reply-To: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
+References: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
+Message-ID: <53BD7387.8040200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Kukjin,
 
-This update delayed to 3.17, is about replacing the existing calls to the
-older, non-standard drivers by the use of the newer "pwm-atmel" which takes
-advantage of the PWM framework.
-All concerned maintainer gave their acknowledgement to the relevant patches.
-At the end, it removes three obsolete drivers and the diffstat looks pretty
-nice as well.
+On 24.06.2014 18:08, Tomasz Figa wrote:
+> On all Exynos SoCs there is a dedicated CLKOUT pin that allows many of
+> internal SoC clocks to be output from the SoC. The hardware structure
+> of CLKOUT related clocks looks as follows:
+> 
+> 	CMU	|---> clock0 --------->	|	PMU	|
+> 		|			|		|
+>     several	|---> clock1 ---------> |	mux	|
+>     muxes	|			|	+	|---> CLKOUT
+>     dividers	|       ...		|	gate	|
+>     and gates	|			|		|
+> 		|---> clockN ---------> |		|
+> 
+> Since the block responsible for handling the pin is PMU, not CMU,
+> a separate driver, that binds to PMU node is required and acquires
+> all input clocks by standard DT clock look-up. This way we don't need
+> any cross-IP block drivers and cross-driver register sharing or
+> nodes for fake devices.
+> 
+> To represent the PMU mux/gate clock, generic composite clock is registered.
+> 
+> Tested on Odroid U3, with HSIC/USB hub using CLKOUT as reference clock,
+> with some additional patches.
+> 
+> Changes since v1:
+> (http://www.spinics.net/lists/arm-kernel/msg333276.html)
+>  - rebased onto next-20140624,
+>  - fixed #clock-cells values in exynos5250.dtsi and exynos5420.dtsi,
+>  - temporarily removed ISP CLKOUT clocks on Exynos4x12, until ISP clock
+>    domain handling gets fixed in Exynos4 clock driver.
+> Changes since RFC v1:
+> (https://lkml.org/lkml/2014/5/15/506)
+>  - rebased onto v5 of "Enable usbphy and hsotg for exynos4" series and
+>    current HEAD of samsung-clk tree,
+>  - added handling of suspend/resume in the driver,
+>  - added missing CPU clocks on Exynos4,
+>  - added CLK_SET_RATE_PARENT to CMU CLKOUT gates on Exynos4,
+>  - fixed bit field width on Exynos4,
+>  - added CLKOUT CMU registers of Exynos4 to save/restore list,
+>  - added CLK_SET_RATE_PARENT and CLK_SET_RATE_NO_REPARENT to clkout clock,
+>  - changed the binding to use 1-cell clock specifier to allow extension
+>    with further PMU clocks in future, if needed.
+> 
+> Tomasz Figa (4):
+>   clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
+>   clk: samsung: exynos4: Add CLKOUT clock hierarchy
+>   clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
+>   ARM: dts: exynos: Update PMU node with CLKOUT related data
+> 
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
+>  arch/arm/boot/dts/exynos4210.dtsi                  |  10 ++
+>  arch/arm/boot/dts/exynos4x12.dtsi                  |   7 +
+>  arch/arm/boot/dts/exynos5250.dtsi                  |   3 +
+>  arch/arm/boot/dts/exynos5420.dtsi                  |   3 +
+>  drivers/clk/samsung/Makefile                       |   1 +
+>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++
+>  drivers/clk/samsung/clk-exynos4.c                  | 166 ++++++++++++++++++++-
+>  include/dt-bindings/clock/exynos4.h                |   5 +
+>  9 files changed, 374 insertions(+), 4 deletions(-)
+>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
+> 
 
-Thanks, best regards,
+Is there any progress with consulting this with hardware guys? Could I
+have your Ack for this series, so I could put it in my tree and let
+other patches base on it (especially on patches 1 and 2)? Thanks in advance.
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-drivers
-
-for you to fetch changes up to f2a70e1fc1ccc0fcdf4ad12db7382134228fb552:
-
-  misc: atmel_pwm: remove obsolete driver (2014-07-09 15:14:35 +0200)
-
-----------------------------------------------------------------
-Atmel PWM driver update for 3.17
-- move to the new PWM driver which uses PWM framework
-- remove 3 obsolete drivers (atmel-pwm-bl.c, leds-atmel-pwm.c and atmel_pwm.c)
-
-----------------------------------------------------------------
-Alexandre Belloni (15):
-      ARM: at91: at91sam9g45: switch to generic PWM framework
-      ARM: at91: sam9m10g45ek: use generic leds_pwm driver
-      ARM: at91: at91sam9263: switch to generic PWM framework
-      ARM: at91: sam9263ek: use generic leds_pwm driver
-      ARM: at91: at91sam9rl: switch to generic PWM framework
-      ARM: at91: remove useless at91_pwm_leds()
-      PWM: atmel: allow building for AVR32
-      avr32/at32ap: switch to the generic PWM framework
-      avr32: MRMT: use generic leds_pwm driver
-      avr32: merisc: use generic leds_pwm driver
-      avr32: favr-32: use generic pwm_bl driver
-      avr32: update defconfig to use the generic PWM framework
-      backlight: atmel-pwm-bl: remove obsolete driver
-      leds: atmel-pwm: remove obsolete driver
-      misc: atmel_pwm: remove obsolete driver
-
- arch/arm/mach-at91/at91sam9263.c           |   1 +
- arch/arm/mach-at91/at91sam9263_devices.c   |  11 +-
- arch/arm/mach-at91/at91sam9g45.c           |   1 +
- arch/arm/mach-at91/at91sam9g45_devices.c   |  11 +-
- arch/arm/mach-at91/at91sam9rl.c            |   1 +
- arch/arm/mach-at91/at91sam9rl_devices.c    |  11 +-
- arch/arm/mach-at91/board-sam9263ek.c       |  55 +++-
- arch/arm/mach-at91/board-sam9m10g45ek.c    |  42 ++-
- arch/arm/mach-at91/board.h                 |   1 -
- arch/arm/mach-at91/leds.c                  |  37 ---
- arch/avr32/boards/atngw100/mrmt.c          |  34 ++-
- arch/avr32/boards/favr-32/setup.c          |  48 ++--
- arch/avr32/boards/merisc/setup.c           |  34 ++-
- arch/avr32/configs/atngw100_mrmt_defconfig |   5 +-
- arch/avr32/configs/atstk1002_defconfig     |   5 +-
- arch/avr32/configs/atstk1003_defconfig     |   5 +-
- arch/avr32/configs/atstk1004_defconfig     |   5 +-
- arch/avr32/configs/atstk1006_defconfig     |   5 +-
- arch/avr32/configs/favr-32_defconfig       |   6 +-
- arch/avr32/configs/merisc_defconfig        |   5 +-
- arch/avr32/mach-at32ap/at32ap700x.c        |   7 +-
- drivers/leds/Kconfig                       |   8 -
- drivers/leds/Makefile                      |   1 -
- drivers/leds/leds-atmel-pwm.c              | 149 -----------
- drivers/misc/Kconfig                       |  10 -
- drivers/misc/Makefile                      |   1 -
- drivers/misc/atmel_pwm.c                   | 402 -----------------------------
- drivers/pwm/Kconfig                        |   2 +-
- drivers/video/backlight/Kconfig            |  11 -
- drivers/video/backlight/Makefile           |   1 -
- drivers/video/backlight/atmel-pwm-bl.c     | 223 ----------------
- include/linux/atmel-pwm-bl.h               |  43 ---
- include/linux/atmel_pwm.h                  |  70 -----
- 33 files changed, 186 insertions(+), 1065 deletions(-)
- delete mode 100644 drivers/leds/leds-atmel-pwm.c
- delete mode 100644 drivers/misc/atmel_pwm.c
- delete mode 100644 drivers/video/backlight/atmel-pwm-bl.c
- delete mode 100644 include/linux/atmel-pwm-bl.h
- delete mode 100644 include/linux/atmel_pwm.h
-
--- 
-Nicolas Ferre
+Best regards,
+Tomasz
