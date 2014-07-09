@@ -1,44 +1,62 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 15:40:06 +0200
-Subject: [PATCHv2 02/17] ARM: mvebu: sort the #include of pmsu.c in alphabetic
- order
+Date: Wed,  9 Jul 2014 15:40:05 +0200
+Subject: [PATCHv2 01/17] ARM: mvebu: split again
+ armada_370_xp_pmsu_idle_enter() in PMSU code
 In-Reply-To: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404913221-17343-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404913221-17343-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Sorting the headers in alphabetic order will help to reduce conflicts
-when adding new headers later.
+do_armada_370_xp_cpu_suspend() and armada_370_xp_pmsu_idle_prepare(),
+have been merged into a single function called
+armada_370_xp_pmsu_idle_enter() by the commit "bbb92284b6c8 ARM:
+mvebu: slightly refactor/rename PMSU idle related functions", in
+prepare for the introduction of the CPU hotplug support for Armada XP.
+
+But for cpuidle the prepare function will be common to all the mvebu
+SoCs that use the PMSU, while the suspend function will be specific to
+each SoC. Keeping the prepare function separate will help reducing
+code duplication while new SoC support is added.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 5fda549..9e18cce 100644
+index b31a829..5fda549 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -19,13 +19,13 @@
- #define pr_fmt(fmt) "mvebu-pmsu: " fmt
+@@ -143,7 +143,7 @@ static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
+ }
  
- #include <linux/cpu_pm.h>
--#include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/of_address.h>
- #include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of_address.h>
- #include <linux/platform_device.h>
--#include <linux/smp.h>
- #include <linux/resource.h>
-+#include <linux/smp.h>
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
- #include <asm/smp_plat.h>
+ /* No locking is needed because we only access per-CPU registers */
+-int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
++static int armada_370_xp_prepare(unsigned long deepidle)
+ {
+ 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+ 	u32 reg;
+@@ -179,6 +179,17 @@ int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
+ 	reg |= PMSU_CPU_POWER_DOWN_DIS_SNP_Q_SKIP;
+ 	writel(reg, pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
+ 
++	return 0;
++}
++
++int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
++{
++	int ret;
++
++	ret = armada_370_xp_prepare(deepidle);
++	if (ret)
++		return ret;
++
+ 	v7_exit_coherency_flush(all);
+ 
+ 	ll_disable_coherency();
 -- 
 2.0.0
