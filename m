@@ -1,51 +1,33 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 09 Jul 2014 12:00:19 +0900
-Subject: [PATCHv2] ARM: dts: Add I2S dt node for Exynos3250
-Message-ID: <1404874819-8257-1-git-send-email-cw00.choi@samsung.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 08 Jul 2014 20:02:10 -0700 (PDT)
+Subject: [PATCH] net: mvneta: fix operation in 10 Mbit/s mode
+In-Reply-To: <1404809383-5597-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404809383-5597-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140708.200210.1665388475429292104.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Tue,  8 Jul 2014 10:49:43 +0200
 
-This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
-(1 channels) IIS-bus for audio interface with DMA-based operation.
+> As reported by Maggie Mae Roxas, the mvneta driver doesn't behave
+> properly in 10 Mbit/s mode. This is due to a misconfiguration of the
+> MVNETA_GMAC_AUTONEG_CONFIG register: bit MVNETA_GMAC_CONFIG_MII_SPEED
+> must be set for a 100 Mbit/s speed, but cleared for a 10 Mbit/s speed,
+> which the driver was not properly doing. This commit adjusts that by
+> setting the MVNETA_GMAC_CONFIG_MII_SPEED bit only in 100 Mbit/s mode,
+> and relying on the fact that all the speed related bits of this
+> register are cleared at the beginning of the mvneta_adjust_link()
+> function.
+> 
+> This problem exists since c5aff18204da0 ("net: mvneta: driver for
+> Marvell Armada 370/XP network unit") which is the commit that
+> introduced the mvneta driver in the kernel.
+> 
+> Cc: <stable@vger.kernel.org> # v3.8+
+> Fixes: c5aff18204da0 ("net: mvneta: driver for Marvell Armada 370/XP network unit")
+> Reported-by: Maggie Mae Roxas <maggie.mae.roxas@gmail.com>
+> Cc: Maggie Mae Roxas <maggie.mae.roxas@gmail.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Inha Song <ideal.song@samsung.com>
-Tested-by: Inha Song <ideal.song@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-Changes from v1:
-- Fix wrong name of property (pinctrl-names)
-- Change phanle name (i2s->i2s2)
-
- arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 3e678fa..77a06df 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -425,6 +425,19 @@
- 			status = "disabled";
- 		};
- 
-+		i2s2: i2s at 13970000 {
-+			compatible = "samsung,s3c6410-i2s";
-+			reg = <0x13970000 0x100>;
-+			interrupts = <0 126 0>;
-+			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
-+			clock-names = "iis", "i2s_opclk0";
-+			dmas = <&pdma0 14>, <&pdma0 13>;
-+			dma-names = "tx", "rx";
-+			pinctrl-0 = <&i2s2_bus>;
-+			pinctrl-names = "default";
-+			status = "disabled";
-+		};
-+
- 		pwm: pwm at 139D0000 {
- 			compatible = "samsung,exynos4210-pwm";
- 			reg = <0x139D0000 0x1000>;
--- 
-1.8.0
+Applied and queued up for -stable, thanks.
