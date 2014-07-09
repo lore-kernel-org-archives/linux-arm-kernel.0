@@ -1,46 +1,30 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 09 Jul 2014 20:15:21 +0200
-Subject: [PATCH v7 04/24] mfd: max77686: Make platform data over-rule
- DT
-In-Reply-To: <20140709145203.GF2635@lee--X1>
-References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404505467-26526-5-git-send-email-javier.martinez@collabora.co.uk>
- <20140709145203.GF2635@lee--X1>
-Message-ID: <53BD86B9.4000907@collabora.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  9 Jul 2014 19:22:10 +0100
+Subject: [PATCH 0/3] Bunch of vdso cleanups following feedback from x86
+Message-ID: <1404930133-30324-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+Hi all,
 
-On 07/09/2014 04:52 PM, Lee Jones wrote:
-> On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
-> 
->> The function max77802_i2c_parse_dt_pdata() should only be called
->> if there isn't already platform data for the device.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>  drivers/mfd/max77686.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> I assume some of these patches can be applied independently.
->
+Following useful discussions with Andy (thanks!), I've put together the
+following (lightly tested) series for arm64 which attempts to address
+issues with our current vdso code.
 
-Yes, some patches can be applied independently and it would be quite helpful
-indeed since that will allow me to keep a smaller series :)
+Please take a look. Cheers,
 
-> Let me know which ones and I'll apply them.  In the mean time:
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
+Will
 
-Patches 1-7 are just cleanups and improvements for max77686 mfd driver so they
-can be applied safely. You had already acked 1-6 and 7 is just a trivial patch
-so I guess you won't have issues with that one as well.
+--->8
 
-Patches 11 and 14 are small patches for the max77802 clk driver and Mike already
-gave his Reviewed-by tag so if you are going to take the whole set through your
-tree those two patches are safe to be applied as well.
+Will Deacon (3):
+  arm64: vdso: put vdso datapage in a separate vma
+  arm64: vdso: move to _install_special_mapping and remove arch_vma_name
+  arm64: vdso: move data page before code pages
 
-Thanks a lot for your help and best regards,
-Javier
+ arch/arm64/kernel/vdso.c          | 94 +++++++++++++++++++++------------------
+ arch/arm64/kernel/vdso/vdso.lds.S |  4 +-
+ 2 files changed, 52 insertions(+), 46 deletions(-)
+
+-- 
+2.0.0
