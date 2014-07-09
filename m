@@ -1,69 +1,76 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 9 Jul 2014 18:38:00 +0200
-Subject: [PATCH v3 3/7] irqchip: atmel-aic: add new atmel AIC driver
-In-Reply-To: <20140626203007.GU10202@titan.lakedaemon.net>
-References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403276487-8792-4-git-send-email-boris.brezillon@free-electrons.com>
- <53AC8088.6020905@free-electrons.com>
- <20140626203007.GU10202@titan.lakedaemon.net>
-Message-ID: <53BD6FE8.1030704@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Jul 2014 17:39:17 +0100
+Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
+In-Reply-To: <1404915184.4256.160.camel@ul30vt.home>
+References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+ <1404125530-17984-3-git-send-email-will.deacon@arm.com>
+ <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140709132653.GM9485@arm.com>
+ <1404915184.4256.160.camel@ul30vt.home>
+Message-ID: <20140709163917.GU9485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/2014 22:30, Jason Cooper :
-> On Thu, Jun 26, 2014 at 10:20:24PM +0200, Boris BREZILLON wrote:
->>
->> On 20/06/2014 17:01, Boris BREZILLON wrote:
->>> Add new atmel AIC (Advanced Interrupt Controller) driver based on the
->>> generic chip infrastructure.
->>>
->>> This driver is only compatible with dt enabled board and replaces the old
->>> implementation found in arch/arm/mach-at91/irq.c.
->>>
->>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>> ---
->>>  drivers/irqchip/Kconfig         |   7 +
->>>  drivers/irqchip/Makefile        |   1 +
->>>  drivers/irqchip/irq-atmel-aic.c | 700 ++++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 708 insertions(+)
->>>  create mode 100644 drivers/irqchip/irq-atmel-aic.c
->>>
->>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->>> index bbb746e..6a7ad81 100644
->>> --- a/drivers/irqchip/Kconfig
->>> +++ b/drivers/irqchip/Kconfig
->>> @@ -30,6 +30,13 @@ config ARM_VIC_NR
->>>  	  The maximum number of VICs available in the system, for
->>>  	  power management.
->>>  
->>> +config ATMEL_AIC_IRQ
->>> +	bool
->>> +	select GENERIC_IRQ_CHIP
->>> +	select IRQ_DOMAIN
->>> +	select MULTI_IRQ_HANDLER
->>> +	select SPARSE_IRQ
->>> +
->>
->> I just though a bit about it and it might be better to split AIC and
->> AIC5 support in 2 different drivers, because the AIC is only available
->> on at91sam9/at91rm9200 SoCs and AIC5 only available on sama5 SoCs, and
->> AFAICT there is no combination of both controller in a singler SoC.
->>
->> Jason, Thomas, let me know if you think this worth the trouble, and if
->> so, should I keep a common implementation (in irq-atmel-aic-common.c/.h)
->> for the shared functions/structures.
+On Wed, Jul 09, 2014 at 03:13:04PM +0100, Alex Williamson wrote:
+> On Wed, 2014-07-09 at 14:26 +0100, Will Deacon wrote:
+> > [Adding Alex; question below]
+> > 
+> > On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
+> > > > +static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void
+> > > > +*data) {
+> > > > +     *((u16 *)data) = alias;
+> > > > +     return 0; /* Continue walking */
+> > > > +}
+> > 
+> > [...]
+> > 
+> > > > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
+> > > > *dev)
+> > > >               return PTR_ERR(group);
+> > > >       }
+> > > >
+> > > > +     if (dev_is_pci(dev)) {
+> > > > +             struct arm_smmu_master_cfg *cfg;
+> > > > +             struct pci_dev *pdev = to_pci_dev(dev);
+> > > > +
+> > > > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+> > > > +             if (!cfg) {
+> > > > +                     ret = -ENOMEM;
+> > > > +                     goto out_put_group;
+> > > > +             }
+> > > > +
+> > > > +             cfg->num_streamids = 1;
+> > > > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
+> > > > +                                    &cfg->streamids[0]);
+> > > [Sethi Varun-B16395] We need to look for upstream DMA device. We should be
+> > > using pci_find_dma_isolation_root here. Also, this would also imply that
+> > > there could be multiple devices sharing the same stream ID. So, we should
+> > > check if a particular stream ID value has already been configured in the
+> > > SMR registers.
+> > 
+> > pci_find_dma_isolation_root doesn't exist in any of the trees I have. Alex,
+> > is this queued anywhere and do I actually need it?
 > 
-> It sounds sensible, and we have a similar situation brewing with the gic
-> family.  I'd like to hear from the at91 maintainers, though.
+> That function was in the v3 DMA alias series, in v4 it got replaced.
+> iommu_group_get_for_pci_dev() is the common function for finding or
+> creating a group for a device and pci_for_each_dma_alias() is the
+> interface to walk each alias in a PCI topology.  The pci_ interface is
+> in 3.16-rc and the iommu_ pieces are current in next via the iommu tree.
 
-Absolutely Boris and Jason. Re-reading the new AIC code it seems obvious
-to split the 2 drivers, now that we have a nice framework in place, no
-extra code is needed appart from both form of irq chip implementation.
+Cheers, Alex. I'll move my driver to using iommu_group_get_for_pci_dev once
+that's hit mainline (since I currently put each master into its own group).
 
-Let's go this way. And of course, you have on the whole series my:
+> > The purpose of this code is to find the requester ID of a device as it
+> > appears at the host controller. At this point, we can map it (via firmware
+> > tables that are TBD) to a Stream ID for the SMMU. It looks to me like
+> > pci_for_each_dma_alias walks over non-transparent PCI bridges correctly, so
+> > the callback I provide just updates the alias until the walk has completed.
+> 
+> Yep, that's the intended usage.  There are cases in VT-d where it wants
+> to add context entries for every alias and cases elsewhere that we just
+> want the final alias.  pci_for_each_dma_alias() is meant to fit both use
+> cases.  Thanks,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cracking, cheers for confirming.
 
-Thanks, bye,
--- 
-Nicolas Ferre
+Will
