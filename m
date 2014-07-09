@@ -1,57 +1,22 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:30:05 +0400
-Subject: [RFC/PATCH RESEND -next 11/21] mm: slub: share slab_err and object_err
- functions
-In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-12-git-send-email-a.ryabinin@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 04:37:29 -0700
+Subject: [Patch v2] omap: Add devicetree for Gumstix Pepper board
+In-Reply-To: <1402438920-3350-1-git-send-email-ashcharles@gmail.com>
+References: <CAK8F28kEi7TfnOCXk1S8bX8PpE_fQLHBFALg5GmtEk6iaTbf=Q@mail.gmail.com>
+ <1402438920-3350-1-git-send-email-ashcharles@gmail.com>
+Message-ID: <20140709113729.GT28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove static and add function declarations to mm/slab.h so they
-could be used by kernel address sanitizer.
+* Ash Charles <ashcharles@gmail.com> [140610 15:24]:
+> This adds the Gumstix Pepper[1] single-board computer based on the
+> TI AM335x processor. Schematics are available [2].
+> 
+> [1] https://store.gumstix.com/index.php/products/344/
+> [2] https://pubs.gumstix.com/boards/PEPPER/
 
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
----
- mm/slab.h | 5 +++++
- mm/slub.c | 4 ++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+Applying into omap-for-v3.17/dt thanks.
 
-diff --git a/mm/slab.h b/mm/slab.h
-index 1257ade..912af7f 100644
---- a/mm/slab.h
-+++ b/mm/slab.h
-@@ -339,5 +339,10 @@ static inline struct kmem_cache_node *get_node(struct kmem_cache *s, int node)
- 
- void *slab_next(struct seq_file *m, void *p, loff_t *pos);
- void slab_stop(struct seq_file *m, void *p);
-+void slab_err(struct kmem_cache *s, struct page *page,
-+		const char *fmt, ...);
-+void object_err(struct kmem_cache *s, struct page *page,
-+		u8 *object, char *reason);
-+
- 
- #endif /* MM_SLAB_H */
-diff --git a/mm/slub.c b/mm/slub.c
-index 6641a8f..3bdd9ac 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -635,14 +635,14 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
- 	dump_stack();
- }
- 
--static void object_err(struct kmem_cache *s, struct page *page,
-+void object_err(struct kmem_cache *s, struct page *page,
- 			u8 *object, char *reason)
- {
- 	slab_bug(s, "%s", reason);
- 	print_trailer(s, page, object);
- }
- 
--static void slab_err(struct kmem_cache *s, struct page *page,
-+void slab_err(struct kmem_cache *s, struct page *page,
- 			const char *fmt, ...)
- {
- 	va_list args;
--- 
-1.8.5.5
+Regards,
+
+Tony
