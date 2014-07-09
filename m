@@ -1,131 +1,255 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 08:12:42 -0700
-Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <53BD38D3.2000204@linutronix.de>
-References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
- <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
- <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
- <20140709111705.GR28884@atomide.com>
- <53BD291D.3040307@linutronix.de>
- <20140709114837.GU28884@atomide.com>
- <53BD38D3.2000204@linutronix.de>
-Message-ID: <20140709151242.GY28884@atomide.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Jul 2014 16:13:36 +0100
+Subject: [PATCH v7 08/24] mfd: max77686: Add Dynamic Voltage Scaling
+ (DVS) support
+In-Reply-To: <1404505467-26526-9-git-send-email-javier.martinez@collabora.co.uk>
+References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404505467-26526-9-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140709151336.GI2635@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140709 05:45]:
-> On 07/09/2014 01:48 PM, Tony Lindgren wrote:
-> >>> So we can certainly enable this in a generic way, however, this
-> >>> can only be done under the following conditions:
-> > 
-> > Sorry forgot to mention why I think this can now be done in a
-> > generic way, that's because we have now runtime PM in Linux.
+I'd really like Linus Walleij to look over this if possible.
+
+On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
+> Some regulators on the MAX77686 PMIC have Dynamic Voltage Scaling
+> (DVS) support that allows output voltage to change dynamically.
 > 
-> I have a problem to follow here. I need set SET_RUNTIME_PM_OPS in
-> .pm member of the driver. This is around for a while now maybe it
-> wasn't around by the omap-serial was written but this doesn't matter
-> now.
-
-Right, the lack of runtime PM was one of the reasons for doing
-omap-serial earlier.
- 
-> As for the dw driver (as one of the gnomes points out) it shouldn't
-> matter because it is enabled / disabled based on 8250's pm callback. So
-> while the device is active and the 8250 core grabs & puts the
-> reference, nothing should change. Still a double check from Mika
-> wouldn't hurt.
-
-OK
- 
-> If I understand the omap case correct (and please correct me if I don't)
-> the 8250-omap driver assumes that the device can go to sleep
-> after the probe function completes. This does not happen
-> because pm_runtime_set_autosuspend_delay() sets the delay to -1.
-
-Correct. And once the timeout is enabled, the serial driver
-autoidles itself using runtime PM based on the timeout value.
-
-And also please note that for runtime PM the wake-up events need
-to be always enabled, so the device_may_wakeup() checks should
-be only implemented for suspend and resume. I think I got that
-corrected for most part in omap-serial.c recently, but knowing
-that might reduce the confusion a bit :)
-
-> If the user changes this via sysfs, then the device might go to sleep
-> and the IP block switched of. Therefore we need the runtime pm
-> callbacks in 8250-core before the register access because we can't
-> access the it otherwise.
-
-Correct. And it's not just the 8250 idle state, it's the whole SoC
-getting powered down during idle and rebooted when waking to a
-timer interrupt or device interrupt.
-
-> The core should wake us up in case there is incoming RX action to be
-> handled so we can restore register's content. And for TX we have the
-> proper pm hooks.
-
-The piece of code that runs in that case is the interrupt handler
-for the serial port. That handler could be separate from the
-regular serial port handler if necessary though and do a callback
-to the serial core code. But I don't know if that's needed.
-
-> The dw driver also only disables / enables the clock. So they don't
-> lose the register's content like omap does. Thus they don't need the
-> one struct I exported.
-
-Right, enabling and disabling the clock is done too for omaps
-when the SoC hits retention idle.
- 
-> I don't think that it makes sense to make this restore/save part
-> generic if this what it is about. OMAP at least has a few registers
-> more to take care of and set-termios is already different.
-
-Yeah, and that can be done later on if others need it.
- 
-> >>> 1. We can save and restore the serial register context and detect
-> >>>    when context was lost in the serial driver. The context loss
-> >>>    can be detected by looking at some registers that are only
-> >>>    initialized during init.
-> >>
-> >> A register check on restore context? DLL+DLH might be a good hint here
-> >> since its value should be >0 in the running case.
-> > 
-> > OK yeah that would be a generic way to do it potentially ;)
-> > 
-> > Note that all the context_loss_cnt stuff in omap-serial.c can
-> > then be ignored, that's still only needed for the omap3 legacy
-> > mode booting case and won't be needed much longer.
+> For MAX77686, these regulators are Buck regulators 2, 3 and 4.
 > 
-> Ah. The way the code reads, it is just an optimization in case the core
-> didn't go off after all so we don't have to restore the registers.
-
-Well the interconnect code knows when the context was lost on omaps,
-but there's currently no Linux generic API for that. And since we
-can do it by checking some registers, it's best to implement it that
-way.
- 
-> >>> 2. There's a way for the serial RX pin to wake the SoC. On some
-> >>>    omaps there's a separate pin specific wake-up interrupt that
-> >>>    can be used for that.
-> >>
-> >> That one would be handled by omap separately.
-> > 
-> > OK great.
-> >  
-> >>> 3. The serial PM features must be only enabled if requested by
-> >>>    the user via sysfs. Typically extra latency and loss of the
-> >>>    first RX character occur which is not acceptable to most
-> >>>    applications.
-> >>
-> >> Unless I'm mistaken the omap driver now initializes the timeout to -1.
-> >> So nothing happens unless this is enabled separately.
-> > 
-> > Yes that's the only safe approach so the serial port behaves in
-> > the standard Linux way unless specifically requested by the
-> > user.
-> > 
-> > Regards,
-> > 
-> > Tony
+> Each Buck output voltage is selected using a set of external
+> inputs: DVS1-3 and SELB2-4.
 > 
-> Sebastian
+> DVS registers can be used to configure the output voltages for each
+> Buck regulator and which one is active is controled by DVSx lines.
+> 
+> SELBx lines are used to control if individual Buck lines are ON or OFF.
+> 
+> This patch adds support to configure the DVSx and SELBx lines
+> from DT and to setup and read the GPIO lines connected to them.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+> 
+> Changes since v6:
+>  - Add a comment that max77686_read_gpios() function can sleep.
+>    Sugggested by Krzysztof Kozlowski
+> ---
+>  drivers/mfd/max77686.c       | 119 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/max77686.h |  18 ++++---
+>  2 files changed, 129 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+> index 8650832..d193873 100644
+> --- a/drivers/mfd/max77686.c
+> +++ b/drivers/mfd/max77686.c
+> @@ -32,8 +32,10 @@
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/max77686.h>
+>  #include <linux/mfd/max77686-private.h>
+> +#include <linux/gpio/consumer.h>
+>  #include <linux/err.h>
+>  #include <linux/of.h>
+> +#include <linux/export.h>
+>  
+>  #define I2C_ADDR_RTC	(0x0C >> 1)
+>  
+> @@ -101,9 +103,119 @@ static const struct of_device_id max77686_pmic_dt_match[] = {
+>  	{},
+>  };
+>  
+> +static void max77686_dt_parse_dvs_gpio(struct device *dev)
+> +{
+> +	struct max77686_platform_data *pd = dev_get_platdata(dev);
+> +	int i;
+> +
+> +	/*
+> +	 * NOTE: we don't consider GPIO errors fatal; board may have some lines
+> +	 * directly pulled high or low and thus doesn't specify them.
+> +	 */
+> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_dvs); i++)
+> +		pd->buck_gpio_dvs[i] =
+> +			devm_gpiod_get_index(dev, "max77686,pmic-buck-dvs", i);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++)
+> +		pd->buck_gpio_selb[i] =
+> +			devm_gpiod_get_index(dev, "max77686,pmic-buck-selb", i);
+> +}
+
+Not sure why you've pulled this out for parse_dt_pdata()?
+
+> +/**
+> + * max77686_setup_gpios() - init DVS-related GPIOs
+> + * @dev: device whose platform data contains the dvs GPIOs information
+> + *
+> + * This function claims / initalizations GPIOs related to DVS if they are
+
+s/initialzations/initialises
+
+> + * defined. This may have the effect of switching voltages if the
+
+s/if the/if
+
+> + * pdata->buck_default_idx does not match the boot time state of pins.
+> + */
+> +int max77686_setup_gpios(struct device *dev)
+> +{
+> +	struct max77686_platform_data *pd = dev_get_platdata(dev);
+> +	int buck_default_idx = pd->buck_default_idx;
+
+You're saving 4 characters once here.  Just use the variable in pd.
+
+> +	int ret;
+> +	int i;
+
+Don't you want some locking around this?
+
+> +	/* Set all SELB high to avoid glitching while DVS is changing */
+> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++) {
+> +		struct gpio_desc *gpio = pd->buck_gpio_selb[i];
+> +
+> +		/* OK if some GPIOs aren't defined */
+> +		if (IS_ERR(gpio))
+> +			continue;
+> +
+> +		ret = gpiod_direction_output_raw(gpio, 1);
+> +		if (ret) {
+> +			dev_err(dev, "can't set gpio[%d] dir: %d\n", i, ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	/* Set our initial setting */
+> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_dvs); i++) {
+> +		struct gpio_desc *gpio = pd->buck_gpio_dvs[i];
+> +
+> +		/* OK if some GPIOs aren't defined */
+> +		if (IS_ERR(gpio))
+> +			continue;
+> +
+> +		/* If a GPIO is valid, set it */
+> +		gpiod_direction_output(gpio, (buck_default_idx >> i) & 1);
+> +		if (ret) {
+> +			dev_err(dev, "can't set gpio[%d]: dir %d\n", i, ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	/* Now set SELB low to take effect */
+> +	for (i = 0; i < ARRAY_SIZE(pd->buck_gpio_selb); i++) {
+> +		struct gpio_desc *gpio = pd->buck_gpio_selb[i];
+> +
+> +		if (!IS_ERR(gpio))
+> +			gpiod_set_value(gpio, 0);
+> +	}
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(max77686_setup_gpios);
+> +
+> +/**
+> + * max77686_read_gpios() - read the current state of the dvs GPIOs
+> + * @pdata: platform data that contains the dvs GPIOs information
+> + *
+> + * We call this function at bootup to detect what slot the firmware was
+> + * using for the DVS GPIOs.  That way we can properly preserve the firmware's
+> + * voltage settings
+> + *
+> + * This function can sleep so must not be called from atomic context.
+> + */
+> +int max77686_read_gpios(struct max77686_platform_data *pdata)
+> +{
+> +	int buck_default_idx = pdata->buck_default_idx;
+
+Remove this, it adds very little.
+
+> +	int result = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_dvs); i++) {
+> +		struct gpio_desc *gpio = pdata->buck_gpio_dvs[i];
+> +
+> +		/* OK if some GPIOs aren't defined; we'll use default */
+> +		if (IS_ERR(gpio)) {
+> +			result |= buck_default_idx & (1 << i);
+
+s/(1 << i)/BIT(i)/
+
+> +			continue;
+> +		}
+> +
+> +		if (gpiod_get_value_cansleep(gpio))
+> +			result |= 1 << i;
+
+Same here.
+
+> +	}
+> +
+> +	return result;
+> +}
+> +EXPORT_SYMBOL_GPL(max77686_read_gpios);
+> +
+>  static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+>  								  *dev)
+>  {
+> +	struct device_node *np = dev->of_node;
+>  	struct max77686_platform_data *pd;
+>  
+>  	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
+> @@ -111,6 +223,13 @@ static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+>  		return NULL;
+>  
+>  	dev->platform_data = pd;
+> +
+> +	/* Read default index and ignore errors, since default is 0 */
+> +	of_property_read_u32(np, "max77686,pmic-buck-default-dvs-idx",
+
+If it doesn't already have one, this needs a DT Ack and associated
+documentation.
+
+> +			     &pd->buck_default_idx);
+> +
+> +	max77686_dt_parse_dvs_gpio(dev);
+
+Bring code back into here and remove the call.
+
+>  	return pd;
+>  }
+>  
+> diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
+> index 4cbcc13..46a736b 100644
+> --- a/include/linux/mfd/max77686.h
+> +++ b/include/linux/mfd/max77686.h
+> @@ -99,15 +99,17 @@ struct max77686_platform_data {
+>  	struct max77686_opmode_data *opmode_data;
+>  
+>  	/*
+> -	 * GPIO-DVS feature is not enabled with the current version of
+> -	 * MAX77686 driver. Buck2/3/4_voltages[0] is used as the default
+> -	 * voltage at probe. DVS/SELB gpios are set as OUTPUT-LOW.
+> +	 * GPIO-DVS feature is not fully enabled with the current version of
+> +	 * MAX77686 driver, but the driver does support using a DVS index other
+> +	 * than the default of 0.
+>  	 */
+> -	int buck234_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
+> -	int buck234_gpio_selb[3]; /* [0]SELB2, [1]SELB3, [2]SELB4 */
+> -	unsigned int buck2_voltage[8]; /* buckx_voltage in uV */
+> -	unsigned int buck3_voltage[8];
+> -	unsigned int buck4_voltage[8];
+> +	struct gpio_desc *buck_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
+> +	int buck_default_idx; /* Default value of DVS1, 2, 3 */
+> +
+> +	struct gpio_desc *buck_gpio_selb[3]; /* Buck regulators 2, 3, 4 */
+>  };
+>  
+> +extern int max77686_setup_gpios(struct device *dev);
+> +extern int max77686_read_gpios(struct max77686_platform_data *pdata);
+> +
+>  #endif /* __LINUX_MFD_MAX77686_H */
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
