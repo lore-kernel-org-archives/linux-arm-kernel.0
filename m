@@ -1,69 +1,101 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Wed, 9 Jul 2014 15:01:44 -0400
-Subject: [PATCH 5/6] tty: serial: 8250-core: add rs485 support
-In-Reply-To: <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
- <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140709190143.GF17769@csclub.uwaterloo.ca>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 09 Jul 2014 21:27:28 +0200
+Subject: [RFC v2 3/5] clk: use struct clk only for external API
+In-Reply-To: <1404398323-18934-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1404398323-18934-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <53BD97A0.2090909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 07:49:36PM +0200, Sebastian Andrzej Siewior wrote:
-> So after I stuffed the rs485 support from the omap-serial into
-> 8250-omap, I've been looking at it and the only omap specific part was
-> the OMAP_UART_SCR_TX_EMPTY part. The driver has always TX_EMPTY set
-> because the 8250 core expects an interrupt after the TX fifo + shift
-> register is empty. The rs485 parts seems to wait for half fifo and then
-> again for the empty fifo. With this change gone it fits fine as generic
-> code and here it is.
+Hi Tomeu, Rabin,
+
+Please see my comments inline.
+
+On 03.07.2014 16:38, Tomeu Vizoso wrote:
+> From: Rabin Vincent <rabin.vincent@stericsson.com>
 > 
-> It is expected that the potential rs485 user invokes
-> serial_omap_probe_rs485() to configure atleast RTS gpio which is a must
-> have property. The code has been taken from omap-serial driver and
-> received limited tested due to -ENODEV (the compiler said it works).
+> In order to provide per-user accounting, this separates the struct clk
+> used in the common clock framework into two structures 'struct clk_core'
+> and 'struct clk'.  struct clk_core will be used for internal
+> manipulation and struct clk will be used in the clock API
+> implementation.
 > 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> In this patch, struct clk is simply renamed to struct clk_core and a new
+> struct clk is implemented which simply wraps it.  In the next patch, the
+> new struct clk will be used to implement per-user clock enable
+> accounting.
+> 
+
+Hmm, shouldn't have Rabin signed off this patch as well?
+
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 > ---
->  drivers/tty/serial/8250/8250_core.c | 171 ++++++++++++++++++++++++++++++++++++
->  include/linux/serial_8250.h         |   6 ++
->  2 files changed, 177 insertions(+)
+>  drivers/clk/clk-devres.c     |  13 +-
+>  drivers/clk/clk.c            | 539 ++++++++++++++++++++++++-------------------
+>  drivers/clk/clk.h            |   4 +
+>  drivers/clk/clkdev.c         |  90 +++++---
+>  include/linux/clk-private.h  |  38 +--
+>  include/linux/clk-provider.h | 127 +++++-----
+>  include/linux/clk.h          |  21 +-
+>  include/linux/clkdev.h       |  24 +-
+>  8 files changed, 494 insertions(+), 362 deletions(-)
 > 
-> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-> index c7c3bf7..bf06a4c 100644
-> --- a/drivers/tty/serial/8250/8250_core.c
-> +++ b/drivers/tty/serial/8250/8250_core.c
-> @@ -39,6 +39,8 @@
->  #include <linux/mutex.h>
->  #include <linux/slab.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
->  #ifdef CONFIG_SPARC
->  #include <linux/sunserialcore.h>
->  #endif
-> @@ -1281,10 +1283,34 @@ static void autoconfig_irq(struct uart_8250_port *up)
+> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+> index 8f57154..5f2aba9 100644
+> --- a/drivers/clk/clk-devres.c
+> +++ b/drivers/clk/clk-devres.c
+> @@ -5,6 +5,7 @@
+>   */
 >  
->  static inline void __stop_tx(struct uart_8250_port *p)
+>  #include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+>  #include <linux/device.h>
+>  #include <linux/export.h>
+>  #include <linux/gfp.h>
+> @@ -14,15 +15,15 @@ static void devm_clk_release(struct device *dev, void *res)
+>  	clk_put(*(struct clk **)res);
+>  }
+>  
+> -struct clk *devm_clk_get(struct device *dev, const char *id)
+> +struct clk_core *devm_clk_provider_get(struct device *dev, const char *id)
+
+nit: I'm not sure if name of the internal struct has been discussed
+already, but clk_core sounds a bit off to me. Maybe it's just me but it
+looks like a big common structure of the whole clock core not some small
+per-clock structure.
+
+As for suggestions of alternative names that come to my mind:
+clk_object, clk_data, clk_entity.
+
 >  {
-> +	if (p->rs485.flags & SER_RS485_ENABLED) {
-> +		int ret;
-> +
-> +		ret = (p->rs485.flags & SER_RS485_RTS_AFTER_SEND) ? 1 : 0;
-> +		if (gpio_get_value(p->rts_gpio) != ret) {
-> +			if (p->rs485.delay_rts_after_send > 0)
-> +				mdelay(p->rs485.delay_rts_after_send);
-> +			gpio_set_value(p->rts_gpio, ret);
+> -	struct clk **ptr, *clk;
+> +	struct clk_core **ptr, *clk;
+>  
+>  	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+>  	if (!ptr)
+>  		return ERR_PTR(-ENOMEM);
 
-Usually the delay for RS485 is done in bit times, not msec.  Not sure
-how you expect this to work.  Not sure doing it in software is precise
-enough either.  It probably should be calculated based on the current
-baudrate with a bit time rather than msec in the DT data.  No one wants
-to have to change the DT data to change the baud rate.  After all this
-is very often used with modbus and the modbus rules specify turn around
-times in bit times.
+[snip]
 
-I hope TI puts this into the UART in future designs where it belongs
-(similar to what Exar and many others already did).
+>  
+> +/*
+> + * To avoid a mass-rename of all non-common clock implementations (spread out
+> + * in arch-specific code), we let them use struct clk for both the internal and
+> + * external view.
+> + */
+> +#ifdef CONFIG_COMMON_CLK
+> +#define clk_core_t struct clk_core
+> +#else
+> +#define clk_core_t struct clk
+> +#endif
 
--- 
-Len Sorensen
+Hmm. I have bad feelings about this making some typedef lovers overuse
+this macro to save few characters by not typing "struct" in code that
+doesn't have to use this macro. But clearly I can't think of any better
+solution right now, so don't consider this a showstopper.
+
+Otherwise looks good to me.
+
+Best regards,
+Tomasz
