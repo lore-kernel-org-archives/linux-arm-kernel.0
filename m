@@ -1,61 +1,46 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 9 Jul 2014 14:16:33 +0300
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
- <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
- <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
-Message-ID: <20140709111633.GG23218@tbergstrom-lnx.Nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 04:17:05 -0700
+Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
+References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
+ <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
+ <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
+Message-ID: <20140709111705.GR28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 07:47:16PM +0200, Olof Johansson wrote:
-> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> > On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
-> >> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
-> >> > This branch moves code related to the Tegra fuses out of arch/arm and
-> >> > into a centralized location which could be shared with ARM64. It also
-> >> > adds support for reading the fuse data through sysfs.
-> >>
-> >> The new/moved misc driver isn't acked by any misc maintainer, so I can't
-> >> take this branch.
-> >>
-> >> I saw no indication from searching the mailing list of that either,
-> >> so it wasn't just a missed acked-by.
-> >>
-> >> I wonder if this code should go under drivers/soc/ instead?
-> >
-> > It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
-> > Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
-> > and therefore it was moved to drivers/misc/fuse. I think that's the right
-> > place still.
+* One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [140707 06:22]:
+> On Fri,  4 Jul 2014 18:34:10 +0200
+> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
 > 
-> I disagree, I think this belongs under drivers/soc. Especially since
-> you're adding dependencies on this misc driver from other parts of the
-> kernel / other drivers.
+> > While comparing the OMAP-serial and the 8250 part of this I noticed that
+> > the the latter does not use runtime-pm.
 > 
+> Yes it does, but 8250 parts (generally - omap presumably is special
+> here ?) need to be powered on to transmit/receive not just for register
+> access. The core uart layer implements a "pm" operation for this.
 
-There are several other drivers doing that already, eg:
+At least for omaps the UARTs need to be idled for the SoC to
+hit off-idle where the SoC is powered off and rebooted during
+idle.
 
-drivers/misc/eeprom/eeprom_93cx6.c
-drivers/misc/atmel-ssc.c
-drivers/misc/atmel_pwm.c
+So we can certainly enable this in a generic way, however, this
+can only be done under the following conditions:
 
-> I also don't like seeing init calls form platform code down into
-> drivers/misc like you're adding here. Can you please look at doing
-> that as a regular init call setup?
-> 
+1. We can save and restore the serial register context and detect
+   when context was lost in the serial driver. The context loss
+   can be detected by looking at some registers that are only
+   initialized during init.
 
-Tegra has always avoided using the init calls and from previous versions of
-this patchset it's clear changing the init order is not an option for
-backwards compatibility reasons.
+2. There's a way for the serial RX pin to wake the SoC. On some
+   omaps there's a separate pin specific wake-up interrupt that
+   can be used for that.
 
-Given that it seems to be impossible to reach consensus on what the exact
-behaviour should be, consider this patchset to be abandoned.
+3. The serial PM features must be only enabled if requested by
+   the user via sysfs. Typically extra latency and loss of the
+   first RX character occur which is not acceptable to most
+   applications.
 
-Cheers,
+Regards,
 
-Peter.
+Tony
