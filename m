@@ -1,101 +1,77 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 9 Jul 2014 19:09:22 +0200
-Subject: [GIT PULL] ARM: at91: Switch to CCF for 3.17
-Message-ID: <20140709170921.GP3113@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  9 Jul 2014 18:12:57 +0100
+Subject: [PATCH v4 5/9] arm64: KVM: use separate tables for AArch32 32 and
+ 64bit traps
+In-Reply-To: <1404925981-17561-1-git-send-email-marc.zyngier@arm.com>
+References: <1404925981-17561-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404925981-17561-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+An interesting "feature" of the CP14 encoding is that there is
+an overlap between 32 and 64bit registers, meaning they cannot
+live in the same table as we did for CP15.
 
-This is the switch to CCF for all the remaining at91 SoCs and boards. It
-is based on your at91-3.17-dt branch.
+Create separate tables for 64bit CP14 and CP15 registers, and
+let the top level handler use the right one.
 
-The following changes since commit ad7c56aa2d08f9b4e182e8294cfd5896864e4db0:
+Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-  ARM: at91/dt: add NAND + DMA property for at91sam9rl (2014-07-09 18:02:47 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/CCF-for-3.17
-
-for you to fetch changes up to 447025e96d54e32a4e60050cc430705d4e532917:
-
-  ARM: at91/dt: usb_a9263: define crystals frequencies (2014-07-09 19:05:23 +0200)
-
-----------------------------------------------------------------
-CCF migration for 3.17
-
-----------------------------------------------------------------
-Alexandre Belloni (34):
-      Documentation: dt: document all the atmel pmc compatibles
-      ARM: at91/dt: ariag25: define crystals frequencies
-      ARM: at91: prepare common clk transition for rm9200
-      ARM: at91/dt: rm9200: define clocks
-      ARM: at91: move at91rm9200 SoC to the CCF
-      ARM: at91/dt: at91rm9200ek: define crystals frequencies
-      ARM: at91: prepare common clk transition for sam9260
-      ARM: at91/dt: sam9260: define clocks
-      ARM: at91/dt: sam9g20: define clocks
-      ARM: at91: move at91sam9260 SoCs to the CCF
-      ARM: at91/dt: at91sam9g20ek: define crystals frequencies
-      ARM: at91/dt: foxg20: define crystals frequencies
-      ARM: at91/dt: usb_a9260: define crystals frequencies
-      ARM: at91/dt: tny_a9260: define crystals frequencies
-      ARM: at91/dt: qil_a9260: define crystals frequencies
-      ARM: at91/dt: mpa1600: define crytals frequencies
-      ARM: at91/dt: ge863-pro3: define main crystal frequency
-      ARM: at91/dt: aks-cdu: define slow crytal frequency
-      ARM: at91/dt: evk-pro3: define slow crytal frequency
-      ARM: at91/dt: ethernut5: define crystals frequencies
-      ARM: at91/dt: animeo_ip: define crystals frequencies
-      ARM: at91/dt: kizbox: define main crystal frequency
-      ARM: at91: prepare common clk transition for sam9g45
-      ARM: at91/dt: sam9g45: define clocks
-      ARM: at91: move at91sam9g45 SoC to the CCF
-      ARM: at91/dt: sam9m10g45ek: define crystals frequencies
-      ARM: at91/dt: pm9g45: crystals frequencies
-      ARM: at91/dt: cosino define crystals frequencies
-      ARM: at91: prepare common clk transition for sam9263
-      ARM: at91/dt: sam9263: define clocks
-      ARM: at91: move at91sam9263 SoC to the CCF
-      ARM: at91/dt: sam9263ek: define crystals frequencies
-      ARM: at91/dt: tny_a9263: define crystals frequencies
-      ARM: at91/dt: usb_a9263: define crystals frequencies
-
- .../devicetree/bindings/arm/atmel-pmc.txt          |   5 +-
- arch/arm/boot/dts/aks-cdu.dts                      |   6 +
- arch/arm/boot/dts/animeo_ip.dts                    |   8 +
- arch/arm/boot/dts/at91-ariag25.dts                 |   8 +
- arch/arm/boot/dts/at91-cosino.dtsi                 |   8 +
- arch/arm/boot/dts/at91-foxg20.dts                  |   8 +
- arch/arm/boot/dts/at91-qil_a9260.dts               |   8 +
- arch/arm/boot/dts/at91rm9200.dtsi                  | 304 ++++++++++++++++++
- arch/arm/boot/dts/at91rm9200ek.dts                 |   8 +
- arch/arm/boot/dts/at91sam9260.dtsi                 | 314 ++++++++++++++++++-
- arch/arm/boot/dts/at91sam9263.dtsi                 | 311 +++++++++++++++++++
- arch/arm/boot/dts/at91sam9263ek.dts                |   8 +
- arch/arm/boot/dts/at91sam9g20.dtsi                 |  24 ++
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |   8 +
- arch/arm/boot/dts/at91sam9g45.dtsi                 | 342 ++++++++++++++++++++-
- arch/arm/boot/dts/at91sam9m10g45ek.dts             |   8 +
- arch/arm/boot/dts/ethernut5.dts                    |  10 +
- arch/arm/boot/dts/evk-pro3.dts                     |   6 +
- arch/arm/boot/dts/ge863-pro3.dtsi                  |   4 +
- arch/arm/boot/dts/kizbox.dts                       |   4 +
- arch/arm/boot/dts/mpa1600.dts                      |   8 +
- arch/arm/boot/dts/pm9g45.dts                       |   8 +
- arch/arm/boot/dts/tny_a9260_common.dtsi            |   8 +
- arch/arm/boot/dts/tny_a9263.dts                    |   8 +
- arch/arm/boot/dts/usb_a9260_common.dtsi            |   8 +
- arch/arm/boot/dts/usb_a9263.dts                    |   8 +
- arch/arm/mach-at91/Kconfig                         |   4 -
- arch/arm/mach-at91/at91rm9200.c                    |   6 +-
- arch/arm/mach-at91/at91sam9260.c                   |   6 +-
- arch/arm/mach-at91/at91sam9263.c                   |   6 +-
- arch/arm/mach-at91/at91sam9g45.c                   |   6 +-
- 31 files changed, 1467 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 62c1b6e..20aed6c 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -498,13 +498,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ static const struct sys_reg_desc cp14_regs[] = {
+ };
+ 
++/* Trapped cp14 64bit registers */
++static const struct sys_reg_desc cp14_64_regs[] = {
++};
++
+ /*
+  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+  * depending on the way they are accessed (as a 32bit or a 64bit
+  * register).
+  */
+ static const struct sys_reg_desc cp15_regs[] = {
+-	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
+@@ -545,6 +548,10 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn(10), CRm( 3), Op2( 1), access_vm_reg, NULL, c10_AMAIR1 },
+ 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
+ 
++};
++
++static const struct sys_reg_desc cp15_64_regs[] = {
++	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
+ };
+ 
+@@ -770,7 +777,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	target_specific = get_target_table(vcpu->arch.target, false, &num);
+ 	return kvm_handle_cp_64(vcpu,
+-				cp15_regs, ARRAY_SIZE(cp15_regs),
++				cp15_64_regs, ARRAY_SIZE(cp15_64_regs),
+ 				target_specific, num);
+ }
+ 
+@@ -788,7 +795,7 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	return kvm_handle_cp_64(vcpu,
+-				cp14_regs, ARRAY_SIZE(cp14_regs),
++				cp14_64_regs, ARRAY_SIZE(cp14_64_regs),
+ 				NULL, 0);
+ }
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.0.0
