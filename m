@@ -1,22 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 9 Jul 2014 10:34:39 +0200
-Subject: [PATCH V3 1/2] doc: dt bindings: Document Odroid X2/U3 audio
- subsystem bindings
-In-Reply-To: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
-References: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140709083439.GK30458@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Jul 2014 10:36:29 +0200
+Subject: [PATCH 0/3] ARM: shmobile: Consistently use tabs for indentation
+In-Reply-To: <1404715658-31050-1-git-send-email-horms+renesas@verge.net.au>
+References: <1404715658-31050-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140709083629.GH5656@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 03:13:44PM +0200, Sylwester Nawrocki wrote:
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On Mon, Jul 07, 2014 at 08:47:35AM +0200, Simon Horman wrote:
+> Some whitespace fixes for DT.
+> 
+> These changes are based on renesas-devel-v3.16-rc3-20140706.
+> 
+> Simon Horman (3):
+>   ARM: shmobile: henninger: Consistently use tabs for indentation
+>   ARM: shmobile: marzen: Consistently use tabs for indentation
+>   ARM: shmobile: r8a7779: Consistently use tabs for indentation
 
-Applied both, thanks.  Please use subject lines consistent with the
-subsystem style.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/2395ee4d/attachment.sig>
+I have queued up these changes.
