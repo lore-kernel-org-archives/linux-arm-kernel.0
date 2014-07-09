@@ -1,87 +1,94 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:29:58 +0400
-Subject: [RFC/PATCH RESEND -next 04/21] x86: boot: vdso: disable
- instrumentation for code not linked with kernel
+Date: Wed, 09 Jul 2014 15:30:07 +0400
+Subject: [RFC/PATCH RESEND -next 13/21] mm: slub: add allocation size field to
+ struct kmem_cache
 In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-5-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1404905415-9046-14-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid build errors, compiler's instrumentation must be disabled
-for code not linked with kernel image.
+When caller creates new kmem_cache, requested size of kmem_cache
+will be stored in alloc_size. Later alloc_size will be used by
+kerenel address sanitizer to mark alloc_size of slab object as
+accessible and the rest of its size as redzone.
 
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- arch/x86/boot/Makefile            | 2 ++
- arch/x86/boot/compressed/Makefile | 2 ++
- arch/x86/realmode/Makefile        | 2 +-
- arch/x86/realmode/rm/Makefile     | 1 +
- arch/x86/vdso/Makefile            | 1 +
- 5 files changed, 7 insertions(+), 1 deletion(-)
+ include/linux/slub_def.h |  5 +++++
+ mm/slab.h                | 10 ++++++++++
+ mm/slab_common.c         |  2 ++
+ mm/slub.c                |  1 +
+ 4 files changed, 18 insertions(+)
 
-diff --git a/arch/x86/boot/Makefile b/arch/x86/boot/Makefile
-index dbe8dd2..9204cc0 100644
---- a/arch/x86/boot/Makefile
-+++ b/arch/x86/boot/Makefile
-@@ -14,6 +14,8 @@
- # Set it to -DSVGA_MODE=NORMAL_VGA if you just want the EGA/VGA mode.
- # The number is the same as you would ordinarily press at bootup.
- 
-+KASAN_SANITIZE := n
+diff --git a/include/linux/slub_def.h b/include/linux/slub_def.h
+index d82abd4..b8b8154 100644
+--- a/include/linux/slub_def.h
++++ b/include/linux/slub_def.h
+@@ -68,6 +68,11 @@ struct kmem_cache {
+ 	int object_size;	/* The size of an object without meta data */
+ 	int offset;		/* Free pointer offset. */
+ 	int cpu_partial;	/* Number of per cpu partial objects to keep around */
 +
- SVGA_MODE	:= -DSVGA_MODE=NORMAL_VGA
- 
- targets		:= vmlinux.bin setup.bin setup.elf bzImage
-diff --git a/arch/x86/boot/compressed/Makefile b/arch/x86/boot/compressed/Makefile
-index 0fcd913..64a92b3 100644
---- a/arch/x86/boot/compressed/Makefile
-+++ b/arch/x86/boot/compressed/Makefile
-@@ -4,6 +4,8 @@
- # create a compressed vmlinux image from the original vmlinux
- #
- 
-+KASAN_SANITIZE := n
++#ifdef CONFIG_KASAN
++	int alloc_size;		/* actual allocation size kmem_cache_create */
++#endif
 +
- targets := vmlinux vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma \
- 	vmlinux.bin.xz vmlinux.bin.lzo vmlinux.bin.lz4
+ 	struct kmem_cache_order_objects oo;
  
-diff --git a/arch/x86/realmode/Makefile b/arch/x86/realmode/Makefile
-index 94f7fbe..e02c2c6 100644
---- a/arch/x86/realmode/Makefile
-+++ b/arch/x86/realmode/Makefile
-@@ -6,7 +6,7 @@
- # for more details.
- #
- #
--
-+KASAN_SANITIZE := n
- subdir- := rm
+ 	/* Allocation and freeing of slabs */
+diff --git a/mm/slab.h b/mm/slab.h
+index 912af7f..cb2e776 100644
+--- a/mm/slab.h
++++ b/mm/slab.h
+@@ -260,6 +260,16 @@ static inline void memcg_uncharge_slab(struct kmem_cache *s, int order)
+ }
+ #endif
  
- obj-y += init.o
-diff --git a/arch/x86/realmode/rm/Makefile b/arch/x86/realmode/rm/Makefile
-index 7c0d7be..2730d77 100644
---- a/arch/x86/realmode/rm/Makefile
-+++ b/arch/x86/realmode/rm/Makefile
-@@ -6,6 +6,7 @@
- # for more details.
- #
- #
-+KASAN_SANITIZE := n
++#ifdef CONFIG_KASAN
++static inline void kasan_set_alloc_size(struct kmem_cache *s, size_t size)
++{
++	s->alloc_size = size;
++}
++#else
++static inline void kasan_set_alloc_size(struct kmem_cache *s, size_t size) { }
++#endif
++
++
+ static inline struct kmem_cache *virt_to_cache(const void *obj)
+ {
+ 	struct page *page = virt_to_head_page(obj);
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 8df59b09..f5b52f0 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -147,6 +147,7 @@ do_kmem_cache_create(char *name, size_t object_size, size_t size, size_t align,
+ 	s->name = name;
+ 	s->object_size = object_size;
+ 	s->size = size;
++	kasan_set_alloc_size(s, object_size);
+ 	s->align = align;
+ 	s->ctor = ctor;
  
- always := realmode.bin realmode.relocs
+@@ -409,6 +410,7 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
  
-diff --git a/arch/x86/vdso/Makefile b/arch/x86/vdso/Makefile
-index 61b04fe..90daad6 100644
---- a/arch/x86/vdso/Makefile
-+++ b/arch/x86/vdso/Makefile
-@@ -3,6 +3,7 @@
- #
+ 	s->name = name;
+ 	s->size = s->object_size = size;
++	kasan_set_alloc_size(s, size);
+ 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
+ 	err = __kmem_cache_create(s, flags);
  
- KBUILD_CFLAGS += $(DISABLE_LTO)
-+KASAN_SANITIZE := n
+diff --git a/mm/slub.c b/mm/slub.c
+index 3bdd9ac..6ddedf9 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3724,6 +3724,7 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
+ 		 * the complete object on kzalloc.
+ 		 */
+ 		s->object_size = max(s->object_size, (int)size);
++		kasan_set_alloc_size(s, max(s->alloc_size, (int)size));
+ 		s->inuse = max_t(int, s->inuse, ALIGN(size, sizeof(void *)));
  
- VDSO64-$(CONFIG_X86_64)		:= y
- VDSOX32-$(CONFIG_X86_X32_ABI)	:= y
+ 		for_each_memcg_cache_index(i) {
 -- 
 1.8.5.5
