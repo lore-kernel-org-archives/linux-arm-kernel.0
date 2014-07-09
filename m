@@ -1,42 +1,19 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 9 Jul 2014 10:22:29 -0700
-Subject: [PATCH] mtd: nand: stm_nand_bch: add new driver
-In-Reply-To: <20140708095855.29c2fb87@bbrezillon>
-References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
- <20140703002237.GM3599@ld-irv-0074>
- <20140703100522.756f9715@bbrezillon>
- <20140707235222.GC7537@ld-irv-0074>
- <20140708095855.29c2fb87@bbrezillon>
-Message-ID: <20140709172229.GH7537@ld-irv-0074>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 09 Jul 2014 19:23:41 +0200
+Subject: [RFC PATCH 1/4] tty: serial: 8250 core: provide a function to
+ export uart_8250_port
+In-Reply-To: <20140707140911.5ee517d2@alan.etchedpixels.co.uk>
+References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
+ <20140707140911.5ee517d2@alan.etchedpixels.co.uk>
+Message-ID: <53BD7A9D.2070605@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 07/07/2014 03:09 PM, One Thousand Gnomes wrote:
+> Please update the patch to clearly describe the locking
+> assumptions/requirements for the caller (and not to use it unless you
+> have no other choice)
 
-On Tue, Jul 08, 2014 at 09:58:55AM +0200, Boris BREZILLON wrote:
-> On Mon, 7 Jul 2014 16:52:22 -0700 Brian Norris <computersforpeace@gmail.com> wrote:
-> > On Thu, Jul 03, 2014 at 10:05:22AM +0200, Boris BREZILLON wrote:
-> > > On Wed, 2 Jul 2014 17:22:37 -0700 Brian Norris <computersforpeace@gmail.com> wrote:
-> > > 
-> > > AFAIR, the NAND timing representation for non-ONFI chips question was
-> > > left unanswered:
-> > > 
-> > > https://lkml.org/lkml/2014/5/20/581
-> > > 
-> > > I can definitely respin my NAND timings series, but I'd like to be sure
-> > > this is how you want it done before doing so.
-> > 
-> > Can we start by supporting ONFI-only (or ONFI-only, plus entries in
-> > nand_flash_ids[]), and have nand_base provide the translation so drivers
-> > can retrieve the info? Then we can begin supporting new drivers like
-> > Lee's, and worry about the DT question separately.
-> 
-> So, basically, I just send a new series with patch 1 and 2 from my sunxi
-> NAND series [1] (including the fixes you suggested, of course), right ?
-> 
-> [1] http://thread.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/7977
+done.
 
-Yes, please send 1 and 2 on their own. I think that would be a good
-start for supporting these drivers.
-
-Brian
+Sebastian
