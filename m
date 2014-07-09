@@ -1,127 +1,57 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 9 Jul 2014 16:30:25 +0200
-Subject: [PATCH v3 1/5] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <1404906074-31992-2-git-send-email-lee.jones@linaro.org>
-References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
- <1404906074-31992-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAG374jBLq8YShOakBJtf2U47wuKGYNM7vSTn4PjzHsvjaYjmNQ@mail.gmail.com>
+From: v1ne2go@gmail.com (Denis Schneider)
+Date: Wed, 9 Jul 2014 16:31:58 +0200
+Subject: [PATCH v2 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot
+ add" problem
+In-Reply-To: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1407081552200.27641@kaball.uk.xensource.com>
+Message-ID: <CAE8M+o+c7y9mK531V4NbR4E4bggR3zHzSSJkV7z_ioBYx8NtcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee
-
-One question below,
-
-On 9 July 2014 13:41, Lee Jones <lee.jones@linaro.org> wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
+2014-07-08 17:40 GMT+02:00 Stefano Stabellini
+<stefano.stabellini@eu.citrix.com>:
+> Hi all,
+> Xen support in Linux for ARM and ARM64 suffers from lack of support for
+> multiple mfn to pfn mappings: whenever a frontend grants the same page
+> multiple times to the backend, the mfn to pfn accounting in
+> arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
+> when xen-netfront/xen-netback switched from grant copies to grant
+> mappings, therefore causing the issue to happen much more often.
 >
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/phy/phy-miphy365x.txt      | 76 ++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
+> therefore we are looking for alternative solutions. One idea is avoiding
+> mfn to pfn conversions altogether. The only code path that needs them is
+> swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
 >
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> new file mode 100644
-> index 0000000..7337ac2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> @@ -0,0 +1,76 @@
-> +STMicroelectronics STi MIPHY365x PHY binding
-> +============================================
-> +
-> +This binding describes a miphy device that is used to control PHY hardware
-> +for SATA and PCIe.
-> +
-> +Required properties (controller (parent) node):
-> +- compatible    : Should be "st,miphy365x-phy"
-> +- st,syscfg     : Should be a phandle of the system configuration register group
-> +                 which contain the SATA, PCIe mode setting bits
-> +
-> +Required nodes :  A sub-node is required for each channel the controller
-> +                  provides. Address range information including the usual
-> +                  'reg' and 'reg-names' properties are used inside these
-> +                  nodes to describe the controller's topology. These nodes
-> +                  are translated by the driver's .xlate() function.
-> +
-> +Required properties (port (child) node):
-> +- #phy-cells   : Should be 1 (See second example)
-> +                 Cell after port phandle is device type from:
-> +                       - MIPHY_TYPE_SATA
-> +                       - MIPHY_TYPE_PCI
-> +- reg          : Address and length of register sets for each device in
-> +                 "reg-names"
-> +- reg-names     : The names of the register addresses corresponding to the
-> +                 registers filled in "reg":
-> +                       - sata:   For SATA devices
-> +                       - pcie:   For PCIe devices
-> +                       - syscfg: To specify the syscfg based config register
-> +
-> +Optional properties (port (child) node):
-> +- st,sata-gen       :  Generation of locally attached SATA IP. Expected values
-> +                       are {1,2,3). If not supplied generation 1 hardware will
-> +                       be expected
-> +- st,pcie-tx-pol-inv : Bool property to invert the polarity PCIe Tx (Txn/Txp)
-> +- st,sata-tx-pol-inv : Bool property to invert the polarity SATA Tx (Txn/Txp)
-> +
-> +Example:
-> +
-> +       miphy365x_phy: miphy365x at fe382000 {
-> +               compatible      = "st,miphy365x-phy";
-> +               st,syscfg       = <&syscfg_rear>;
-> +               #address-cells  = <1>;
-> +               #size-cells     = <1>;
-> +               ranges;
-> +
-> +               phy_port0: port at fe382000 {
-> +                       reg = <0xfe382000 0x100>, <0xfe394000 0x100>, <0x824 0x4>;
-> +                       reg-names = "sata", "pcie", "syscfg";
-> +                       #phy-cells = <1>;
-> +                       st,sata-gen = <3>;
-> +               };
-> +
-> +               phy_port1: port at fe38a000 {
-> +                       reg = <0xfe38a000 0x100>, <0xfe804000 0x100>, <0x828 0x4>;;
-> +                       reg-names = "sata", "pcie", "syscfg";
-> +                       #phy-cells = <1>;
-> +                       st,pcie-tx-pol-inv;
-> +               };
-> +       };
-> +
-> +Specifying phy control of devices
-> +=================================
-> +
-> +Device nodes should specify the configuration required in their "phys"
-> +property, containing a phandle to the phy port node and a device type.
-> +
-> +Example:
-> +
-> +#include <dt-bindings/phy/phy-miphy365x.h>
-> +
-> +       sata0: sata at fe380000 {
-> +               ...
-> +               phys      = <&miphy365x_phy MIPHY_TYPE_SATA>;
-> +               ...
-
-In this example you select the type (SATA) but I don't understand how
-do you select
-the port (phy_port0 or phy_port1)
-
-BR
-Gabriel
-
-> +       };
-> --
-> 1.8.3.2
+> To avoid mfn to pfn conversions we rely on a second p2m mapping done by
+> Xen (a separate patch series will be sent for Xen). In Linux we use it
+> to perform the cache maintenance operations without mfns conversions.
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Changes in v2:
+> - introduce XENFEAT_grant_map_11;
+> - remeber the ptep corresponding to scratch pages so that we don't need
+> to calculate it again every time;
+> - do not acutally unmap the page on xen_mm32_unmap;
+> - properly account preempt_enable/disable;
+> - do not check for mfn in xen_add_phys_to_mach_entry.
+>
+>
+> Stefano Stabellini (3):
+>       xen/arm: introduce XENFEAT_grant_map_11
+>       xen/arm: reimplement xen_dma_unmap_page & friends
+>       xen/arm: remove mach_to_phys rbtree
+>
+>  arch/arm/include/asm/xen/page-coherent.h |   25 ++--
+>  arch/arm/include/asm/xen/page.h          |    9 --
+>  arch/arm/xen/Makefile                    |    2 +-
+>  arch/arm/xen/enlighten.c                 |    6 +
+>  arch/arm/xen/mm32.c                      |  202 ++++++++++++++++++++++++++++++
+>  arch/arm/xen/p2m.c                       |   66 +---------
+>  include/xen/interface/features.h         |    3 +
+>  7 files changed, 220 insertions(+), 93 deletions(-)
+>  create mode 100644 arch/arm/xen/mm32.c
+
+Tested-by: Denis Schneider <v1ne2go@gmail.com>
+
+Stress-tested with network I/O, disk I/O for hours without any problem. Thanks.
