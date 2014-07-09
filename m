@@ -1,39 +1,43 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 9 Jul 2014 11:02:09 +0100
-Subject: [PATCH 0/2] arm: add early_ioremap support
-In-Reply-To: <20140709094730.GC9485@arm.com>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <20140709094730.GC9485@arm.com>
-Message-ID: <20140709100209.GR4179@bivouac.eciton.net>
+From: sourav.poddar@ti.com (sourav)
+Date: Wed, 9 Jul 2014 15:37:00 +0530
+Subject: [PATCH 3/3] arm: dts: dra7: fixup qspi entry
+In-Reply-To: <1404844852-19980-3-git-send-email-bigeasy@linutronix.de>
+References: <1404844852-19980-1-git-send-email-bigeasy@linutronix.de>
+ <1404844852-19980-3-git-send-email-bigeasy@linutronix.de>
+Message-ID: <53BD1444.6080603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 10:47:30AM +0100, Will Deacon wrote:
-> On Wed, Jul 09, 2014 at 10:39:50AM +0100, Leif Lindholm wrote:
-> > early_ioremap()/early_memremap() create temporary virtual mappings
-> > in the fixmap region during boot time. Part of the support now exists
-> > in core code, but depends on the generic fixmap support.
-> > 
-> > This set converts arm to use the generic fixmap support, and adds the
-> > architecture-specific part of early_ioremap support.
-> > 
-> > The fixmap/kmap changes in 3.15 complicated things slightly compared
-> > to previous iterations of these patches - this version works around
-> > that by introducing local macros in arm/mm/highmem.c.
-> > 
-> > Tested on TC2 and software models, with/without LPAE.
-> > 
-> > Mark Salter (2):
-> >   arm: use generic fixmap.h
-> >   arm: add early_ioremap support
-> 
-> Curious: why are you sending these patches instead of Mark?
+Hi,
 
-Well, it used to form part of the larger UEFI patchset, which I'm
-still marshalling the 32-bit parts of (and which will follow later,
-but I will treat them separately from here on).
-Also, I did the hacky rework to Mark's original patches for the kmap
-changes.
+On Wednesday 09 July 2014 12:10 AM, Sebastian Andrzej Siewior wrote:
+> The core complains that the number 343 is too large. The older code has
+> here 124. This avoids the warning, the driver hasn't been tested.
+>
+> Signed-off-by: Sebastian Andrzej Siewior<bigeasy@linutronix.de>
+> ---
+>   arch/arm/boot/dts/dra7.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index daf7d36..1529bca 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -821,7 +821,7 @@
+>   			clocks =<&qspi_gfclk_div>;
+>   			clock-names = "fck";
+>   			num-cs =<4>;
+> -			interrupts =<0 343 0x4>;
+> +			interrupts =<0 124 0x4>;
+>   			status = "disabled";
+>   		};
+>
 
-/
-    Leif
+The number is correct and is complaining just because the crossbar stuff 
+is not
+put in. I had already posted a patch[1] to remove interrupt binding as 
+of now.
+
+Hence, NAK for this patch.
+
+[1]: https://patchwork.kernel.org/patch/4364341/
