@@ -1,101 +1,279 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 09 Jul 2014 21:27:28 +0200
-Subject: [RFC v2 3/5] clk: use struct clk only for external API
-In-Reply-To: <1404398323-18934-4-git-send-email-tomeu.vizoso@collabora.com>
-References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
- <1404398323-18934-4-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <53BD97A0.2090909@gmail.com>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Wed, 09 Jul 2014 12:29:26 -0700
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com> (Andrey
+ Ryabinin's message of "Wed, 09 Jul 2014 15:29:55 +0400")
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <87pphenxex.fsf@tassilo.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu, Rabin,
+Andrey Ryabinin <a.ryabinin@samsung.com> writes:
 
-Please see my comments inline.
+Seems like a useful facility. Thanks for working on it. Overall the code
+looks fairly good. Some comments below.
 
-On 03.07.2014 16:38, Tomeu Vizoso wrote:
-> From: Rabin Vincent <rabin.vincent@stericsson.com>
-> 
-> In order to provide per-user accounting, this separates the struct clk
-> used in the common clock framework into two structures 'struct clk_core'
-> and 'struct clk'.  struct clk_core will be used for internal
-> manipulation and struct clk will be used in the clock API
-> implementation.
-> 
-> In this patch, struct clk is simply renamed to struct clk_core and a new
-> struct clk is implemented which simply wraps it.  In the next patch, the
-> new struct clk will be used to implement per-user clock enable
-> accounting.
-> 
 
-Hmm, shouldn't have Rabin signed off this patch as well?
+> +
+> +Address sanitizer for kernel (KASAN) is a dynamic memory error detector. It provides
+> +fast and comprehensive solution for finding use-after-free and out-of-bounds bugs.
+> +
+> +KASAN is better than all of CONFIG_DEBUG_PAGEALLOC, because it:
+> + - is based on compiler instrumentation (fast),
+> + - detects OOB for both writes and reads,
+> + - provides UAF detection,
 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
->  drivers/clk/clk-devres.c     |  13 +-
->  drivers/clk/clk.c            | 539 ++++++++++++++++++++++++-------------------
->  drivers/clk/clk.h            |   4 +
->  drivers/clk/clkdev.c         |  90 +++++---
->  include/linux/clk-private.h  |  38 +--
->  include/linux/clk-provider.h | 127 +++++-----
->  include/linux/clk.h          |  21 +-
->  include/linux/clkdev.h       |  24 +-
->  8 files changed, 494 insertions(+), 362 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-> index 8f57154..5f2aba9 100644
-> --- a/drivers/clk/clk-devres.c
-> +++ b/drivers/clk/clk-devres.c
-> @@ -5,6 +5,7 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/clk-provider.h>
->  #include <linux/device.h>
->  #include <linux/export.h>
->  #include <linux/gfp.h>
-> @@ -14,15 +15,15 @@ static void devm_clk_release(struct device *dev, void *res)
->  	clk_put(*(struct clk **)res);
->  }
->  
-> -struct clk *devm_clk_get(struct device *dev, const char *id)
-> +struct clk_core *devm_clk_provider_get(struct device *dev, const char *id)
+Please expand the acronym.
 
-nit: I'm not sure if name of the internal struct has been discussed
-already, but clk_core sounds a bit off to me. Maybe it's just me but it
-looks like a big common structure of the whole clock core not some small
-per-clock structure.
+> +
+> +|--------|        |--------|
+> +| Memory |----    | Memory |
+> +|--------|    \   |--------|
+> +| Shadow |--   -->| Shadow |
+> +|--------|  \     |--------|
+> +|   Bad  |   ---->|  Bad   |
+> +|--------|  /     |--------|
+> +| Shadow |--   -->| Shadow |
+> +|--------|    /   |--------|
+> +| Memory |----    | Memory |
+> +|--------|        |--------|
 
-As for suggestions of alternative names that come to my mind:
-clk_object, clk_data, clk_entity.
+I guess this implies it's incompatible with memory hotplug, as the 
+shadow couldn't be extended?
 
->  {
-> -	struct clk **ptr, *clk;
-> +	struct clk_core **ptr, *clk;
->  
->  	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
->  	if (!ptr)
->  		return ERR_PTR(-ENOMEM);
+That's fine, but you should exclude that in Kconfig.
 
-[snip]
+There are likely more exclude dependencies for Kconfig too.
+Neds dependencies on the right sparse mem options?
+Does it work with kmemcheck? If not exclude.
 
->  
+Perhaps try to boot it with all other debug options and see which ones break.
+
+> diff --git a/Makefile b/Makefile
+> index 64ab7b3..08a07f2 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -384,6 +384,12 @@ LDFLAGS_MODULE  =
+>  CFLAGS_KERNEL	=
+>  AFLAGS_KERNEL	=
+>  CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+> +CFLAGS_KASAN	= -fsanitize=address --param asan-stack=0 \
+> +			--param asan-use-after-return=0 \
+> +			--param asan-globals=0 \
+> +			--param asan-memintrin=0 \
+> +			--param asan-instrumentation-with-call-threshold=0 \
+
+Hardcoding --param is not very nice. They can change from compiler
+to compiler version. Need some version checking?
+
+Also you should probably have some check that the compiler supports it
+(and print some warning if not)
+Otherwise randconfig builds will be broken if the compiler doesn't.
+
+Also does the kernel really build/work without the other patches?
+If not please move this patchkit to the end of the series, to keep
+the patchkit bisectable (this may need moving parts of the includes
+into a separate patch)
+
+> diff --git a/commit b/commit
+> new file mode 100644
+> index 0000000..134f4dd
+> --- /dev/null
+> +++ b/commit
+> @@ -0,0 +1,3 @@
+> +
+> +I'm working on address sanitizer for kernel.
+> +fuck this bloody.
+> \ No newline at end of file
+
+Heh. Please remove.
+
+> diff --git a/lib/Kconfig.kasan b/lib/Kconfig.kasan
+> new file mode 100644
+> index 0000000..2bfff78
+> --- /dev/null
+> +++ b/lib/Kconfig.kasan
+> @@ -0,0 +1,20 @@
+> +config HAVE_ARCH_KASAN
+> +	bool
+> +
+> +if HAVE_ARCH_KASAN
+> +
+> +config KASAN
+> +	bool "AddressSanitizer: dynamic memory error detector"
+> +	default n
+> +	help
+> +	  Enables AddressSanitizer - dynamic memory error detector,
+> +	  that finds out-of-bounds and use-after-free bugs.
+
+Needs much more description.
+
+> +
+> +config KASAN_SANITIZE_ALL
+> +	bool "Instrument entire kernel"
+> +	depends on KASAN
+> +	default y
+> +	help
+> +	  This enables compiler intrumentation for entire kernel
+> +
+
+Same.
+
+
+> diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+> new file mode 100644
+> index 0000000..e2cd345
+> --- /dev/null
+> +++ b/mm/kasan/kasan.c
+> @@ -0,0 +1,292 @@
 > +/*
-> + * To avoid a mass-rename of all non-common clock implementations (spread out
-> + * in arch-specific code), we let them use struct clk for both the internal and
-> + * external view.
-> + */
-> +#ifdef CONFIG_COMMON_CLK
-> +#define clk_core_t struct clk_core
-> +#else
-> +#define clk_core_t struct clk
-> +#endif
+> + *
 
-Hmm. I have bad feelings about this making some typedef lovers overuse
-this macro to save few characters by not typing "struct" in code that
-doesn't have to use this macro. But clearly I can't think of any better
-solution right now, so don't consider this a showstopper.
+Add one line here what the file does. Same for other files.
 
-Otherwise looks good to me.
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + * Author: Andrey Ryabinin <a.ryabinin@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +#include "kasan.h"
+> +#include "../slab.h"
 
-Best regards,
-Tomasz
+That's ugly, but ok.
+
+> +
+> +static bool __read_mostly kasan_initialized;
+
+It would be better to use a static_key, but I guess your initialization
+is too early?
+
+Of course the proposal to move it into start_kernel and get rid of the
+flag would be best.
+
+> +
+> +unsigned long kasan_shadow_start;
+> +unsigned long kasan_shadow_end;
+> +
+> +/* equals to (kasan_shadow_start - PAGE_OFFSET/KASAN_SHADOW_SCALE_SIZE) */
+> +unsigned long __read_mostly kasan_shadow_offset; /* it's not a very good name for this variable */
+
+Do these all need to be global?
+
+> +
+> +
+> +static inline bool addr_is_in_mem(unsigned long addr)
+> +{
+> +	return likely(addr >= PAGE_OFFSET && addr < (unsigned long)high_memory);
+> +}
+
+Of course there are lots of cases where this doesn't work (like large
+holes), but I assume this has been checked elsewhere?
+
+
+> +
+> +void kasan_enable_local(void)
+> +{
+> +	if (likely(kasan_initialized))
+> +		current->kasan_depth--;
+> +}
+> +
+> +void kasan_disable_local(void)
+> +{
+> +	if (likely(kasan_initialized))
+> +		current->kasan_depth++;
+> +}
+
+Couldn't this be done without checking the flag?
+
+
+> +		return;
+> +
+> +	if (unlikely(addr < TASK_SIZE)) {
+> +		info.access_addr = addr;
+> +		info.access_size = size;
+> +		info.is_write = write;
+> +		info.ip = _RET_IP_;
+> +		kasan_report_user_access(&info);
+> +		return;
+> +	}
+
+How about vsyscall pages here?
+
+> +
+> +	if (!addr_is_in_mem(addr))
+> +		return;
+> +
+> +	access_addr = memory_is_poisoned(addr, size);
+> +	if (likely(access_addr == 0))
+> +		return;
+> +
+> +	info.access_addr = access_addr;
+> +	info.access_size = size;
+> +	info.is_write = write;
+> +	info.ip = _RET_IP_;
+> +	kasan_report_error(&info);
+> +}
+> +
+> +void __init kasan_alloc_shadow(void)
+> +{
+> +	unsigned long lowmem_size = (unsigned long)high_memory - PAGE_OFFSET;
+> +	unsigned long shadow_size;
+> +	phys_addr_t shadow_phys_start;
+> +
+> +	shadow_size = lowmem_size >> KASAN_SHADOW_SCALE_SHIFT;
+> +
+> +	shadow_phys_start = memblock_alloc(shadow_size, PAGE_SIZE);
+> +	if (!shadow_phys_start) {
+> +		pr_err("Unable to reserve shadow memory\n");
+> +		return;
+
+Wouldn't this crash&burn later? panic?
+
+> +void *kasan_memcpy(void *dst, const void *src, size_t len)
+> +{
+> +	if (unlikely(len == 0))
+> +		return dst;
+> +
+> +	check_memory_region((unsigned long)src, len, false);
+> +	check_memory_region((unsigned long)dst, len, true);
+
+I assume this handles negative len?
+Also check for overlaps?
+
+> +
+> +static inline void *virt_to_obj(struct kmem_cache *s, void *slab_start, void *x)
+> +{
+> +	return x - ((x - slab_start) % s->size);
+> +}
+
+This should be in the respective slab headers, not hard coded.
+
+> +void kasan_report_error(struct access_info *info)
+> +{
+> +	kasan_disable_local();
+> +	pr_err("================================="
+> +		"=================================\n");
+> +	print_error_description(info);
+> +	print_address_description(info);
+> +	print_shadow_for_address(info->access_addr);
+> +	pr_err("================================="
+> +		"=================================\n");
+> +	kasan_enable_local();
+> +}
+> +
+> +void kasan_report_user_access(struct access_info *info)
+> +{
+> +	kasan_disable_local();
+
+Should print the same prefix oopses use, a lot of log grep tools
+look for that. 
+
+Also you may want some lock to prevent multiple
+reports mixing. 
+
+-Andi
+-- 
+ak at linux.intel.com -- Speaking for myself only
