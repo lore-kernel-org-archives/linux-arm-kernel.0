@@ -1,43 +1,38 @@
-From: sourav.poddar@ti.com (sourav)
-Date: Wed, 9 Jul 2014 15:37:00 +0530
-Subject: [PATCH 3/3] arm: dts: dra7: fixup qspi entry
-In-Reply-To: <1404844852-19980-3-git-send-email-bigeasy@linutronix.de>
-References: <1404844852-19980-1-git-send-email-bigeasy@linutronix.de>
- <1404844852-19980-3-git-send-email-bigeasy@linutronix.de>
-Message-ID: <53BD1444.6080603@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 03:09:15 -0700
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <53BD0C43.1090002@ti.com>
+References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+ <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
+ <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
+ <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
+Message-ID: <20140709100914.GL28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Keerthy <a0393675@ti.com> [140709 02:36]:
+> On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
+> >* Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
+> >>--- a/arch/arm/boot/dts/dra7-evm.dts
+> >>+++ b/arch/arm/boot/dts/dra7-evm.dts
+> >>@@ -249,6 +249,7 @@
+> >>  					regulator-min-microvolt = <1050000>;
+> >>  					regulator-max-microvolt = <1050000>;
+> >>  					regulator-boot-on;
+> >>+					regulator-always-on;
+> >>  				};
+> >Is this regulator really always on?
+> 
+> This feeds on to RTC which is a free running clock. So i guess always on is
+> justified no?
 
-On Wednesday 09 July 2014 12:10 AM, Sebastian Andrzej Siewior wrote:
-> The core complains that the number 343 is too large. The older code has
-> here 124. This avoids the warning, the driver hasn't been tested.
->
-> Signed-off-by: Sebastian Andrzej Siewior<bigeasy@linutronix.de>
-> ---
->   arch/arm/boot/dts/dra7.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index daf7d36..1529bca 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -821,7 +821,7 @@
->   			clocks =<&qspi_gfclk_div>;
->   			clock-names = "fck";
->   			num-cs =<4>;
-> -			interrupts =<0 343 0x4>;
-> +			interrupts =<0 124 0x4>;
->   			status = "disabled";
->   		};
->
+Well the dts entries should describe the hardware. If the
+regulator can be enabled and disabled, we should not claim it's
+always on.
 
-The number is correct and is complaining just because the crossbar stuff 
-is not
-put in. I had already posted a patch[1] to remove interrupt binding as 
-of now.
+Also adding temporary dts entries just causes more churn on the
+dts files which is a PITA for everybody.
 
-Hence, NAK for this patch.
+Regards,
 
-[1]: https://patchwork.kernel.org/patch/4364341/
+Tony
