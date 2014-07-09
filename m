@@ -1,32 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jul 2014 08:32:37 +0200
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140708224529.GB4980@e106497-lin.cambridge.arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <20140708212951.GA4555@google.com>
- <20140708224529.GB4980@e106497-lin.cambridge.arm.com>
-Message-ID: <201407090832.37918.arnd@arndb.de>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Tue, 8 Jul 2014 23:35:36 -0700
+Subject: Issue found in Armada 370: "No buffer space available" error
+ during continuous ping
+In-Reply-To: <20140708102142.0f7fe796@free-electrons.com>
+References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
+ <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
+ <20140708102142.0f7fe796@free-electrons.com>
+Message-ID: <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014, Liviu Dudau wrote:
-> > Maybe that assumption is guaranteed by OF, but it doesn't hold for ACPI;
-> > ACPI can describe several I/O port apertures for a single bridge, each
-> > associated with a different CPU physical memory region.
-> 
-> That is actually a good catch, I've completely missed the fact that
-> io_range->pci_addr could be non-zero.
+Hi Thomas,
+Good day.
 
-Hmm, that's what I thought in my initial review, but you convinced me
-that it's actually correct later on, and I still believe it is. Maybe
-now you got confused by your own code?
+As much as we'd like to switch to the latest v3.14.x, we need to stay
+at kernel v3.13.9 as that is a hard requirement of our customer (I
+think it's because it's the base platform for Ubuntu 14.04 FS which
+we'll use).
 
-Please have another look, I think your code in pci_host_bridge_of_get_ranges
-sufficiently handles the registration to the PCI code with the correct
-io_offset. The only thing that we might want to add is to record the
-PCI address along with the bridge->io_base: For the host driver to
-set up the mapping window correctly, you either need both of them, or
-you assume they are already set up.
+So I applied your patch in our v3.13.9 as suggested:
+http://kernel.opensuse.org/cgit/kernel/patch/?id=cd71e246c16b30e3f396a85943d5f596202737ba
 
-	Arnd
+Unfortunately, issue still exists after we applied it.
+
+> Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
+network driver:
+
+Given this, we tried to replace mvneta.c of our v3.13.9 and replace it
+with v3.13.5's mvneta.c.
+Issue does not exist when we did that - but of course, we surely will
+miss something, so we wanted to confirm this further with you.
+It seems like applying cd71e246c16b30e3f396a85943d5f596202737ba in
+v3.13.9 is not sufficient enough..?
+Possibly there are v3.13.5 and v3.13.9 diff (see attached) needed
+apart from just cd71e246c16b30e3f396a85943d5f596202737ba?
+
+> Thanks again for your report!
+No problem. We're also thankful for your support!
+
+Regards,
+Maggie Roxas
+
+On Tue, Jul 8, 2014 at 1:21 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Maggie Mae Roxas,
+>
+> On Mon, 7 Jul 2014 19:27:22 -0700, Maggie Mae Roxas wrote:
+>> Sorry, correcting typo:
+>>
+>> - 3.13.9 (issue exists)
+>> - 3.10.24 (issue does NOT exist)
+>> - 3.13.5 (issue does NOT exist)
+>
+> Ok, thanks again for the report. Unfortunately, you're hitting a known
+> problem that was fixed, but after the 3.13-stable cycle was closed.
+> Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
+> network driver:
+>
+> $ git slog --author=free-electrons v3.13.5..v3.13.9
+> 396b229b683fdc08d8705883860ec5a1b810546a net: mvneta: fix usage as a module on RGMII configurations
+> ea64e1f33d9d627da5d38da035e5d7443276e84e net: mvneta: rename MVNETA_GMAC2_PSC_ENABLE to MVNETA_GMAC2_PCS_ENABLE
+>
+> To fix the usage of mvneta on RGMII configurations. However, by doing
+> so, I broke SGMII configurations. So, I sent a patch to revert "net:
+> mvneta: fix usage as a module on RGMII configurations", which was
+> accepted. But in the mean time, the 3.13-stable cycle was closed, so
+> this revert was never merged in the 3.13.x series.
+>
+> If you want to stay on 3.13.x, you should therefore apply:
+>
+> cd71e246c16b30e3f396a85943d5f596202737ba Revert "net: mvneta: fix usage as a module on RGMII configurations"
+>
+> This commit is from the 3.14-stable branch, in Linus master branch,
+> it's:
+>
+> cc6ca3023f2c2bbcd062e9d4cf6afc2ba2821ada Revert "net: mvneta: fix usage as a module on RGMII configurations"
+>
+> Some other commits, merged after that, fix the usage of mvneta as a
+> module on both RGMII and SGMII configurations.
+>
+> Any reason you're still using 3.13.x ? You should really consider
+> switching at least to v3.14.x, which is a long-term version, and
+> therefore still maintained. If you use v3.14.x, all of your bug reports
+> that end up in patches, will ultimately be fixed in v3.14.x.
+>
+> Thanks again for your report!
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: diff_13.5_vs_13.9.patch
+Type: application/octet-stream
+Size: 15452 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140708/30d70391/attachment.obj>
