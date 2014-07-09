@@ -1,49 +1,28 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue,  8 Jul 2014 20:38:03 -0700
-Subject: [PATCH v3 7/7] arm/arm64: Unexport restart handlers
-In-Reply-To: <1404877083-6552-1-git-send-email-linux@roeck-us.net>
-References: <1404877083-6552-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1404877083-6552-8-git-send-email-linux@roeck-us.net>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 08 Jul 2014 20:52:08 -0700 (PDT)
+Subject: [PATCH resend] net: mvneta: Fix big endian issue in
+ mvneta_txq_desc_csum()
+In-Reply-To: <m3wqbnpgag.fsf@fitzsim.org>
+References: <m3wqbnpgag.fsf@fitzsim.org>
+Message-ID: <20140708.205208.1742283754280003313.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing a restart handler in a module don't make sense
-as there would be no guarantee that the module is loaded when
-a restart is needed. Unexport arm_pm_restart to ensure that
-no one gets the idea to do it anyway.
+From: Thomas Fitzsimmons <fitzsim@fitzsim.org>
+Date: Tue, 08 Jul 2014 19:44:07 -0400
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v3: No change
-v2: No change
+> This commit fixes the command value generated for CSUM calculation
+> when running in big endian mode.  The Ethernet protocol ID for IP was
+> being unconditionally byte-swapped in the layer 3 protocol check (with
+> swab16), which caused the mvneta driver to not function correctly in
+> big endian mode.  This patch byte-swaps the ID conditionally with
+> htons.
+> 
+> Cc: <stable@vger.kernel.org> # v3.13+
+> Signed-off-by: Thomas Fitzsimmons <fitzsim@fitzsim.org>
+> ---
+> The mvneta driver existed prior to v3.13, but it has only supported big
+> endian from v3.13 onward.  If it's accepted, this patch needs to be
+> backported for stable only as far back as v3.13.
 
- arch/arm/kernel/process.c   | 1 -
- arch/arm64/kernel/process.c | 1 -
- 2 files changed, 2 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 5d191e3..25c7f00 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -125,7 +125,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL(pm_power_off);
- 
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
--EXPORT_SYMBOL_GPL(arm_pm_restart);
- 
- /*
-  * This is our default idle handler.
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index b2da6d5..5b07396 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -92,7 +92,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL_GPL(pm_power_off);
- 
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
--EXPORT_SYMBOL_GPL(arm_pm_restart);
- 
- /*
-  * This is our default idle handler.
--- 
-1.9.1
+Applied and queued up for -stable, thanks.
