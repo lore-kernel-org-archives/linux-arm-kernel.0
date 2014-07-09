@@ -1,37 +1,24 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 9 Jul 2014 13:59:34 +0100
-Subject: [PATCH v3 01/10] mmc: sdhci-st: Intial support for ST SDHCI
- controller
-In-Reply-To: <CAPDyKFoFNaFpDTVvMF3fbkrgYwUY1_hcbic89JyJzezFDRtN_w@mail.gmail.com>
-References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
- <1401899424-1365-2-git-send-email-peter.griffin@linaro.org>
- <CAPDyKFoFNaFpDTVvMF3fbkrgYwUY1_hcbic89JyJzezFDRtN_w@mail.gmail.com>
-Message-ID: <20140709125934.GA18634@griffinp-ThinkPad-X1-Carbon-2nd>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Jul 2014 14:00:17 +0100
+Subject: [PATCH RFCv2] arm64: eBPF JIT compiler
+In-Reply-To: <1404803213-10653-1-git-send-email-zlim.lnx@gmail.com>
+References: <1404803213-10653-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <20140709130017.GL9485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Tue, Jul 08, 2014 at 08:06:53AM +0100, Zi Shen Lim wrote:
+> * Per discussion with Will, I'll also look into consolidating
+>   bpf_jit.h into arch/arm64/kernel/insn.{c,h}.
 
-On Wed, 09 Jul 2014, Ulf Hansson wrote:
+I'm happy to review this once you have something ready.
 
-> On 4 June 2014 18:30, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > This platform driver adds initial support for the SDHCI host controller
-> > found on STMicroelectronics SoCs.
-> >
-> > It has been tested on STiH41x b2020 platforms currently.
-> >
-> > Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> FUTURE WORK:
 > 
-> Thanks! Applied for next.
+> 1. Implement remaining classes of eBPF instructions: ST|MEM, STX|XADD
+>    which currently do not have corresponding test cases in test_bpf.
 
-Can you drop this patch for the moment?
+I can help out with atomics, if you need it. Are the memory barrier
+semantics well-defined for eBPF?
 
-I was just rebasing the series for Maxime, and noticed this patch needs a few 
-fixups to cope with Russell Kings recent changes in sdhci.c.
-
-regards,
-
-Peter.
+Will
