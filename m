@@ -1,34 +1,92 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 09 Jul 2014 14:42:25 +0200
-Subject: [PATCH v2] ARM: EXYNOS: add Exynos3250 PMU support
-In-Reply-To: <2933359.zRXLcIi25R@amdc1032>
-References: <2933359.zRXLcIi25R@amdc1032>
-Message-ID: <1640080.ftkUyQnINn@amdc1032>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 09 Jul 2014 14:42:59 +0200
+Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140709114837.GU28884@atomide.com>
+References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
+ <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
+ <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
+ <20140709111705.GR28884@atomide.com> <53BD291D.3040307@linutronix.de>
+ <20140709114837.GU28884@atomide.com>
+Message-ID: <53BD38D3.2000204@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 09, 2014 02:39:14 PM Bartlomiej Zolnierkiewicz wrote:
-> This is needed for suspend/resume and cpuidle AFTR mode support.
+On 07/09/2014 01:48 PM, Tony Lindgren wrote:
+>>> So we can certainly enable this in a generic way, however, this
+>>> can only be done under the following conditions:
 > 
-> Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Cc: Vikas Sajjan <vikas.sajjan@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
+> Sorry forgot to mention why I think this can now be done in a
+> generic way, that's because we have now runtime PM in Linux.
 
-Changelog for v2:
+I have a problem to follow here. I need set SET_RUNTIME_PM_OPS in
+.pm member of the driver. This is around for a while now maybe it
+wasn't around by the omap-serial was written but this doesn't matter
+now.
 
-- rebased on top of next-20140708 and
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32410.html
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33660.html
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33675.html
+As for the dw driver (as one of the gnomes points out) it shouldn't
+matter because it is enabled / disabled based on 8250's pm callback. So
+while the device is active and the 8250 core grabs & puts the
+reference, nothing should change. Still a double check from Mika
+wouldn't hurt.
 
-  this patchset also applies fine after/before Exynos5800 PMU support:
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33835.html
+If I understand the omap case correct (and please correct me if I don't)
+the 8250-omap driver assumes that the device can go to sleep
+after the probe function completes. This does not happen
+because pm_runtime_set_autosuspend_delay() sets the delay to -1.
+If the user changes this via sysfs, then the device might go to sleep
+and the IP block switched of. Therefore we need the runtime pm
+callbacks in 8250-core before the register access because we can't
+access the it otherwise.
+The core should wake us up in case there is incoming RX action to be
+handled so we can restore register's content. And for TX we have the
+proper pm hooks.
+The dw driver also only disables / enables the clock. So they don't
+lose the register's content like omap does. Thus they don't need the
+one struct I exported.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+I don't think that it makes sense to make this restore/save part
+generic if this what it is about. OMAP at least has a few registers
+more to take care of and set-termios is already different.
+
+>>> 1. We can save and restore the serial register context and detect
+>>>    when context was lost in the serial driver. The context loss
+>>>    can be detected by looking at some registers that are only
+>>>    initialized during init.
+>>
+>> A register check on restore context? DLL+DLH might be a good hint here
+>> since its value should be >0 in the running case.
+> 
+> OK yeah that would be a generic way to do it potentially ;)
+> 
+> Note that all the context_loss_cnt stuff in omap-serial.c can
+> then be ignored, that's still only needed for the omap3 legacy
+> mode booting case and won't be needed much longer.
+
+Ah. The way the code reads, it is just an optimization in case the core
+didn't go off after all so we don't have to restore the registers.
+
+>>> 2. There's a way for the serial RX pin to wake the SoC. On some
+>>>    omaps there's a separate pin specific wake-up interrupt that
+>>>    can be used for that.
+>>
+>> That one would be handled by omap separately.
+> 
+> OK great.
+>  
+>>> 3. The serial PM features must be only enabled if requested by
+>>>    the user via sysfs. Typically extra latency and loss of the
+>>>    first RX character occur which is not acceptable to most
+>>>    applications.
+>>
+>> Unless I'm mistaken the omap driver now initializes the timeout to -1.
+>> So nothing happens unless this is enabled separately.
+> 
+> Yes that's the only safe approach so the serial port behaves in
+> the standard Linux way unless specifically requested by the
+> user.
+> 
+> Regards,
+> 
+> Tony
+
+Sebastian
