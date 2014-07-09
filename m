@@ -1,161 +1,102 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  9 Jul 2014 19:22:12 +0100
-Subject: [PATCH 2/3] arm64: vdso: move to _install_special_mapping and remove
- arch_vma_name
+Date: Wed,  9 Jul 2014 19:22:11 +0100
+Subject: [PATCH 1/3] arm64: vdso: put vdso datapage in a separate vma
 In-Reply-To: <1404930133-30324-1-git-send-email-will.deacon@arm.com>
 References: <1404930133-30324-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1404930133-30324-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1404930133-30324-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_install_special_mapping replaces install_special_mapping and removes
-the need to detect special VMA in arch_vma_name.
+The VDSO datapage doesn't need to be executable (no code there) or
+CoW-able (the kernel writes the page, so a private copy is totally
+useless).
 
-This patch moves the vdso and compat vectors page code over to the new
-API.
+This patch moves the datapage into its own VMA, identified as "[vvar]"
+in /proc/<pid>/maps.
 
 Cc: Andy Lutomirski <luto@amacapital.net>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/vdso.c | 80 +++++++++++++++++++++---------------------------
- 1 file changed, 35 insertions(+), 45 deletions(-)
+ arch/arm64/kernel/vdso.c | 34 ++++++++++++++++++++++++++--------
+ 1 file changed, 26 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 84cafbc3eb54..60ae12087d9f 100644
+index 50384fec56c4..84cafbc3eb54 100644
 --- a/arch/arm64/kernel/vdso.c
 +++ b/arch/arm64/kernel/vdso.c
-@@ -88,22 +88,29 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+@@ -138,11 +138,12 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+ 				int uses_interp)
  {
  	struct mm_struct *mm = current->mm;
- 	unsigned long addr = AARCH32_VECTORS_BASE;
--	int ret;
-+	static struct vm_special_mapping spec = {
-+		.name	= "[vectors]",
-+		.pages	= vectors_page,
-+
-+	};
-+	void *ret;
+-	unsigned long vdso_base, vdso_mapping_len;
++	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+ 	int ret;
  
- 	down_write(&mm->mmap_sem);
- 	current->mm->context.vdso = (void *)addr;
- 
- 	/* Map vectors page at the high address. */
--	ret = install_special_mapping(mm, addr, PAGE_SIZE,
--				      VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
--				      vectors_page);
-+	ret = _install_special_mapping(mm, addr, PAGE_SIZE,
-+				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
-+				       &spec);
- 
- 	up_write(&mm->mmap_sem);
- 
--	return ret;
-+	return PTR_ERR_OR_ZERO(ret);
- }
- #endif /* CONFIG_COMPAT */
- 
-+static struct vm_special_mapping vdso_spec[2];
-+
- static int __init vdso_init(void)
- {
- 	int i;
-@@ -130,6 +137,17 @@ static int __init vdso_init(void)
- 	/* Grab the vDSO data page. */
- 	vdso_pagelist[i] = virt_to_page(vdso_data);
- 
-+	/* Populate the special mapping structures */
-+	vdso_spec[0] = (struct vm_special_mapping) {
-+		.name	= "[vdso]",
-+		.pages	= vdso_pagelist,
-+	};
-+
-+	vdso_spec[1] = (struct vm_special_mapping) {
-+		.name	= "[vvar]",
-+		.pages	= vdso_pagelist + vdso_pages,
-+	};
-+
- 	return 0;
- }
- arch_initcall(vdso_init);
-@@ -139,7 +157,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- {
- 	struct mm_struct *mm = current->mm;
- 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
--	int ret;
-+	void *ret;
- 
- 	vdso_text_len = vdso_pages << PAGE_SHIFT;
++	vdso_text_len = vdso_pages << PAGE_SHIFT;
  	/* Be sure to map the data page */
-@@ -148,23 +166,23 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+-	vdso_mapping_len = (vdso_pages + 1) << PAGE_SHIFT;
++	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+ 
  	down_write(&mm->mmap_sem);
  	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
- 	if (IS_ERR_VALUE(vdso_base)) {
--		ret = vdso_base;
-+		ret = ERR_PTR(vdso_base);
- 		goto up_fail;
+@@ -152,35 +153,52 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
  	}
  	mm->context.vdso = (void *)vdso_base;
  
--	ret = install_special_mapping(mm, vdso_base, vdso_text_len,
--				      VM_READ|VM_EXEC|
--				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
--				      vdso_pagelist);
--	if (ret)
-+	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
-+				       VM_READ|VM_EXEC|
-+				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-+				       &vdso_spec[0]);
-+	if (IS_ERR(ret))
+-	ret = install_special_mapping(mm, vdso_base, vdso_mapping_len,
++	ret = install_special_mapping(mm, vdso_base, vdso_text_len,
+ 				      VM_READ|VM_EXEC|
+ 				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+ 				      vdso_pagelist);
+-	if (ret) {
+-		mm->context.vdso = NULL;
++	if (ret)
++		goto up_fail;
++
++	vdso_base += vdso_text_len;
++	ret = install_special_mapping(mm, vdso_base, PAGE_SIZE,
++				      VM_READ|VM_MAYREAD,
++				      vdso_pagelist + vdso_pages);
++	if (ret)
  		goto up_fail;
- 
- 	vdso_base += vdso_text_len;
--	ret = install_special_mapping(mm, vdso_base, PAGE_SIZE,
--				      VM_READ|VM_MAYREAD,
--				      vdso_pagelist + vdso_pages);
--	if (ret)
-+	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
-+				       VM_READ|VM_MAYREAD,
-+				       &vdso_spec[1]);
-+	if (IS_ERR(ret))
- 		goto up_fail;
- 
- 	up_write(&mm->mmap_sem);
-@@ -173,35 +191,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- up_fail:
- 	mm->context.vdso = NULL;
- 	up_write(&mm->mmap_sem);
--	return ret;
--}
--
--const char *arch_vma_name(struct vm_area_struct *vma)
--{
--	unsigned long vdso_text;
--
--	if (!vma->vm_mm)
--		return NULL;
--
--	vdso_text = (unsigned long)vma->vm_mm->context.vdso;
--
--	/*
--	 * We can re-use the vdso pointer in mm_context_t for identifying
--	 * the vectors page for compat applications. The vDSO will always
--	 * sit above TASK_UNMAPPED_BASE and so we don't need to worry about
--	 * it conflicting with the vectors base.
--	 */
--	if (vma->vm_start == vdso_text) {
--#ifdef CONFIG_COMPAT
--		if (vma->vm_start == AARCH32_VECTORS_BASE)
--			return "[vectors]";
--#endif
--		return "[vdso]";
--	} else if (vma->vm_start == (vdso_text + (vdso_pages << PAGE_SHIFT))) {
--		return "[vvar]";
 -	}
--
--	return NULL;
-+	return PTR_ERR(ret);
+ 
+-up_fail:
+ 	up_write(&mm->mmap_sem);
++	return 0;
+ 
++up_fail:
++	mm->context.vdso = NULL;
++	up_write(&mm->mmap_sem);
+ 	return ret;
  }
  
- /*
+ const char *arch_vma_name(struct vm_area_struct *vma)
+ {
++	unsigned long vdso_text;
++
++	if (!vma->vm_mm)
++		return NULL;
++
++	vdso_text = (unsigned long)vma->vm_mm->context.vdso;
++
+ 	/*
+ 	 * We can re-use the vdso pointer in mm_context_t for identifying
+ 	 * the vectors page for compat applications. The vDSO will always
+ 	 * sit above TASK_UNMAPPED_BASE and so we don't need to worry about
+ 	 * it conflicting with the vectors base.
+ 	 */
+-	if (vma->vm_mm && vma->vm_start == (long)vma->vm_mm->context.vdso) {
++	if (vma->vm_start == vdso_text) {
+ #ifdef CONFIG_COMPAT
+ 		if (vma->vm_start == AARCH32_VECTORS_BASE)
+ 			return "[vectors]";
+ #endif
+ 		return "[vdso]";
++	} else if (vma->vm_start == (vdso_text + (vdso_pages << PAGE_SHIFT))) {
++		return "[vvar]";
+ 	}
+ 
+ 	return NULL;
 -- 
 2.0.0
