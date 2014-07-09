@@ -1,42 +1,25 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 09 Jul 2014 22:16:29 +0200
-Subject: [RFC v2 0/5] Per-user clock constraints
-In-Reply-To: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <53BDA31D.40502@gmail.com>
+From: dave.hansen@intel.com (Dave Hansen)
+Date: Wed, 09 Jul 2014 13:26:16 -0700
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <53BDA568.5030607@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu,
-
-On 03.07.2014 16:38, Tomeu Vizoso wrote:
-> Hello,
+On 07/09/2014 04:29 AM, Andrey Ryabinin wrote:
+> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
+> mapping with a scale and offset to translate a memory address to its corresponding
+> shadow address.
 > 
-> here is another round for commenting, not very different from the first one.
+> Here is function to translate address to corresponding shadow address:
 > 
-> Something I forgot to mention before is that the function rename was performed
-> by the scripts in:
-> 
-> http://cgit.collabora.com/git/user/tomeu/linux.git/commit/?h=clk-refactoring-4&id=0e983e28864229f2cd525f87d59e034c4876b233
-> 
-> As before, I have only checked that drivers/clk/ builds with allyesconfig, and
-> that a kernel can be built for tegra_defconfig.
+>      unsigned long kasan_mem_to_shadow(unsigned long addr)
+>      {
+>                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
+>                              + kasan_shadow_start;
+>      }
 
-This is quite an interesting series. I have reviewed two of five patches
-and have plans to look at remaining ones, however here are few general
-issues I'd like to raise:
-
-- somehow I don't see patch 2/5 on LAKML. Too big?
-
-- I see the series changing particular clock drivers. A good practice
-would be to Cc respective driver maintainers to take a look at those
-changes.
-
-- please make sure that all the patches don't have checkpatch errors or
-significant warnings.
-
-Will try (myself or by asking someone else) to do some testing on
-Samsung platforms.
-
-Best regards,
-Tomasz
+How does this interact with vmalloc() addresses or those from a kmap()?
