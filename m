@@ -1,71 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 9 Jul 2014 12:25:52 +0200
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
-References: <20140617215119.GC24743@mithrandir>
- <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
- <53A1B252.1030204@wwwdotorg.org>
- <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
- <53A3096B.1040409@wwwdotorg.org>
- <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
- <20140708130501.GC9516@ulmo>
- <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
- <20140709063130.GA3170@ulmo>
- <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140709102551.GA19357@ulmo>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 03:26:56 -0700
+Subject: [PATCH 3/3] arm: dts: dra7: fixup qspi entry
+In-Reply-To: <53BD16F6.1030006@linutronix.de>
+References: <1404844852-19980-1-git-send-email-bigeasy@linutronix.de>
+ <1404844852-19980-3-git-send-email-bigeasy@linutronix.de>
+ <53BD1444.6080603@ti.com> <53BD16F6.1030006@linutronix.de>
+Message-ID: <20140709102655.GN28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 11:33:11AM +0300, Peter De Schrijver wrote:
-> On Wed, Jul 09, 2014 at 08:31:32AM +0200, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
-> > > > > 
-> > > > > Yes, but the problem is that you also need clocks and reset of other modules
-> > > > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
-> > > > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
-> > > > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
-> > > > > someday which means we would need to control the domain and therefore would
-> > > > > need to tell that driver about the ISPs clocks and resets even though the
-> > > > > driver doesn't know anything about the ISP hw otherwise.
-> > > > 
-> > > > Can't we make powergates reference counted so that they don't get
-> > > > disabled as long as there are any users? Looking for example at the
-> > > 
-> > > We could, but then why not switch to the powerdomain code and make powering
-> > > off a domain a NOP until we sorted out the context save/restore or fixed
-> > > the framework to allow for suspend without turning off the domains?
-> > 
-> > Well, one of the reasons why I'm not sure it's worth the effort at this
-> > point is that we can't get rid of the tegra_powergate_*() API anyway
-> > because of backwards compatibility. So we're going to add code (without
-> > getting rid of old code) merely to support some generic framework. That
-> > doesn't sound very useful to me.
-> > 
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140709 03:20]:
+> On 07/09/2014 12:07 PM, sourav wrote:
+> > Hi,
 > 
-> We can also convert the existing users to genpd. Today there are only 2 users
-> (gpu/drm/tegra/gr3d.c and pci/host/pci-tegra.c), so that doesn't seem to be
-> an impossible task.
+> Hello, Sourav,
+> 
+> > The number is correct and is complaining just because the crossbar stuff
+> > is not
+> > put in. I had already posted a patch[1] to remove interrupt binding as
+> > of now.
+> > 
+> > Hence, NAK for this patch.
+> 
+> Thank you for explanation. What is the status on the crossbar stuff? Is
+> this comming any time soon? It seems that it is also stalling the
+> networking pieces.
 
-We can certainly do that. What I'm trying to say is that since people
-may be running newer versions of the kernel with a DTB that doesn't have
-the necessary properties to hook up power domains, we have to keep calls
-to tegra_powergate_*() functions as-is, lest we break those setups.
+The drivers/irqchip related fixes are queued into linux next,
+and I'm planning to queue the dts related changes for v3.17.
 
-That then means that each such driver needs a way to figure out whether
-power domains are hooked up (which will be rather clumsy to do if it's
-all supposed to work transparently) and fallback to the legacy API
-otherwise.
+I might have the crossbar stuff in omap-for-v3.17/dt at some
+point today.
 
-So essentially we'll be adding code without the possibility to remove
-any of the old code.
+Regards,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/26e9c5cc/attachment.sig>
+Tony
+
+> > [1]: https://patchwork.kernel.org/patch/4364341/
