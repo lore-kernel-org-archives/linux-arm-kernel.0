@@ -1,78 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 08:35:52 -0700
-Subject: [GIT PULL] omap fixes against v3.16-rc4
-Message-ID: <20140709153552.GA28884@atomide.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 9 Jul 2014 11:42:32 -0400
+Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
+In-Reply-To: <20140709152446.GN3113@piout.net>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140708134000.GC4979@htj.dyndns.org>
+ <20140708170353.GA16148@kwain>
+ <20140708171817.GH4979@htj.dyndns.org>
+ <20140708174900.GC16148@kwain>
+ <20140708214010.GI4979@htj.dyndns.org>
+ <20140709082331.GA4510@kwain>
+ <20140709135910.GA11193@htj.dyndns.org>
+ <20140709152446.GN3113@piout.net>
+Message-ID: <20140709154232.GC11193@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+On Wed, Jul 09, 2014 at 05:24:46PM +0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 09/07/2014 at 09:59:10 -0400, Tejun Heo wrote :
+> > Heh, I get that but, at the same time, this is the point where you're
+> > most motivated to actually work on it.  :)
+> > 
+> 
+> Or, starting that kind of review after 9 revisions, especially so close
+> to the end of the development cycle is discouraging enough and will
+> probably be used as an example of why we still have so many evil vendor
+> trees.
 
-  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+Yeap, that's my bad.  I should have paid more attention.  Sorry about
+that.  We still have quite a few weeks to go tho, so I don't think
+it's too unreasonable to at least look into it.  We're gonna have to
+do it anyway.
 
-are available in the git repository at:
+Thanks.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-rc4
-
-for you to fetch changes up to 1d29a0722f6c38f79785c9ffb911730598de84e2:
-
-  ARM: OMAP2+: Remove non working OMAP HDMI audio initialization (2014-07-08 01:08:44 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps for the -rc series. It's mostly fixes for clock rates,
-restart handling and phy regulators and SATA interconnect data.
-
-Also few build fixes related to the DSP driver in staging, and trivial
-stuff like removal of broken and soon to be unused platform data init
-for HDMI audio that would be good to get into the -rc series if not
-too late.
-
-----------------------------------------------------------------
-Enric Balletbo i Serra (1):
-      ARM: dts: Fix TI CPSW Phy mode selection on IGEP COM AQUILA.
-
-Guido Mart?nez (1):
-      ARM: OMAP2+: Make GPMC skip disabled devices
-
-Jyri Sarha (1):
-      ARM: OMAP2+: Remove non working OMAP HDMI audio initialization
-
-Nishanth Menon (1):
-      ARM: DRA7/AM43XX: fix header definition for omap44xx_restart
-
-Peter Ujfalusi (2):
-      ARM: dts: am335x-evm: Enable the McASP FIFO for audio
-      ARM: dts: am335x-evmsk: Enable the McASP FIFO for audio
-
-Rajendra Nayak (1):
-      ARM: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
-
-Roger Quadros (3):
-      ARM: DRA7: hwmod: Fixup SATA hwmod
-      ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
-      ARM: dts: dra7-evm: Make VDDA_1V8_PHY supply always on
-
-Suman Anna (2):
-      ARM: OMAP3: PRM/CM: Add back macros used by TI DSP/Bridge driver
-      ARM: OMAP2+: create dsp device only on OMAP3 SoCs
-
-Tero Kristo (1):
-      ARM: OMAP2+: clock/dpll: fix _dpll_test_fint arithmetics overflow
-
-Tony Lindgren (2):
-      Merge branch 'for-v3.16-rc/clk-dt-fixes' of https://github.com/t-kristo/linux-pm into fixes-rc4
-      Merge tag 'for-v3.16-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
-
- arch/arm/boot/dts/am335x-evm.dts          |  4 ++--
- arch/arm/boot/dts/am335x-evmsk.dts        |  4 ++--
- arch/arm/boot/dts/am335x-igep0033.dtsi    |  6 ++++++
- arch/arm/boot/dts/dra7-evm.dts            |  1 +
- arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++----
- arch/arm/mach-omap2/clkt_dpll.c           |  2 +-
- arch/arm/mach-omap2/cm-regbits-34xx.h     |  3 +++
- arch/arm/mach-omap2/common.h              |  3 ++-
- arch/arm/mach-omap2/devices.c             | 28 ----------------------------
- arch/arm/mach-omap2/dsp.c                 | 10 ++++++++++
- arch/arm/mach-omap2/gpmc.c                |  2 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 18 +++++++++++++-----
- arch/arm/mach-omap2/prm-regbits-34xx.h    |  6 ++++++
- 13 files changed, 53 insertions(+), 44 deletions(-)
+-- 
+tejun
