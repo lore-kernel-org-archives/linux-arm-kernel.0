@@ -1,69 +1,69 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 15:40:13 +0200
-Subject: [PATCHv2 09/17] ARM: mvebu: export the SCU address
+Date: Wed,  9 Jul 2014 15:40:14 +0200
+Subject: [PATCHv2 10/17] ARM: mvebu: add CA9 MPcore SoC Controller node
 In-Reply-To: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404913221-17343-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404913221-17343-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The SCU address will be needed in other files than board-v7.c,
-especially in pmsu.c for cpuidle related activities. So this patch
-adds a function that allows to retrieve the virtual address at which
-the SCU has been mapped.
+The CA9 MPcore SoC Control block is a set of registers that allows to
+configure certain internal aspects of the core blocks of the SoC
+(Cortex-A9, L2 cache controller, etc.). In most cases, the default
+values are fine so they aren't many reasons to touch those registers,
+but there is one exception: to support cpuidle on Armada 38x, we need
+to modify the value of the CA9 MPcore Reset Control register.
+
+Therefore, this commit adds a new Device Tree binding for this
+hardware block, and uses this new binding for the Armada 38x Device
+Tree file.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree at vger.kernel.org
 ---
- arch/arm/mach-mvebu/board-v7.c | 9 +++++++--
- arch/arm/mach-mvebu/common.h   | 2 ++
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt | 14 ++++++++++++++
+ arch/arm/boot/dts/armada-38x.dtsi                          |  5 +++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index f244622..6478626 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -34,14 +34,14 @@
- #include "coherency.h"
- #include "mvebu-soc-id.h"
- 
-+static void __iomem *scu_base;
+diff --git a/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt b/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+new file mode 100644
+index 0000000..8781073
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+@@ -0,0 +1,14 @@
++Marvell Armada 38x CA9 MPcore SoC Controller
++============================================
 +
- /*
-  * Enables the SCU when available. Obviously, this is only useful on
-  * Cortex-A based SOCs, not on PJ4B based ones.
-  */
- static void __init mvebu_scu_enable(void)
- {
--	void __iomem *scu_base;
--
- 	struct device_node *np =
- 		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
- 	if (np) {
-@@ -51,6 +51,11 @@ static void __init mvebu_scu_enable(void)
- 	}
- }
- 
-+void __iomem *mvebu_get_scu_base(void)
-+{
-+	return scu_base;
-+}
++Required properties:
 +
- /*
-  * Early versions of Armada 375 SoC have a bug where the BootROM
-  * leaves an external data abort pending. The kernel is hit by this
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index a97778e..3ccb40c 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -23,4 +23,6 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
- void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
- int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev);
- 
-+void __iomem *mvebu_get_scu_base(void);
++- compatible: Should be "marvell,armada-380-mpcore-soc-ctrl".
 +
- #endif
++- reg: should be the register base and length as documented in the
++  datasheet for the CA9 MPcore SoC Control registers
++
++mpcore-soc-ctrl at 20d20 {
++	compatible = "marvell,armada-380-mpcore-soc-ctrl";
++	reg = <0x20d20 0x6c>;
++};
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 689fa1a..242d0ec 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -286,6 +286,11 @@
+ 				reg = <0x20800 0x10>;
+ 			};
+ 
++			mpcore-soc-ctrl at 20d20 {
++				compatible = "marvell,armada-380-mpcore-soc-ctrl";
++				reg = <0x20d20 0x6c>;
++			};
++
+ 			coherency-fabric at 21010 {
+ 				compatible = "marvell,armada-380-coherency-fabric";
+ 				reg = <0x21010 0x1c>;
 -- 
 2.0.0
