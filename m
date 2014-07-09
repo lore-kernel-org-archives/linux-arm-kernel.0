@@ -1,76 +1,63 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed,  9 Jul 2014 15:12:36 +0200
-Subject: [PATCH v5 0/8] Enable timers DT devices for Marzen, Genmai,
- Lager and Koelsch
-Message-ID: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Wed,  9 Jul 2014 15:12:37 +0200
+Subject: [PATCH v5 1/8] ARM: shmobile: r8a7790: Add CMT devices to DT
+In-Reply-To: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1404911564-17380-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add the CMT0 and CMT1 counters to the r8a7790 device tree and make them
+disabled by default.
 
-This patch set enables timer devices in DT for the Marzen, Genmai, Lager and
-Koelsch boards. It has previously been posted as part of the "[PATCH v4 00/19]
-Renesas CMT, MTU2 and TMU timers DT support" series, and is now split into its
-own patch set for merge in v3.17.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-The series depends on the driver changes of the "[PATCH v4 00/19] Renesas CMT,
-MTU2 and TMU timers DT support" series, for which a pull request has been sent.
-
-Changes since v4:
-
-- Rebased on top of Simon's latest devel branch
-- Dropped driver patches merged through the clocksource tree
-
-Changes since v3:
-
-- Fixed TMU interrupt numbers
-- Fixed NULL platform device ID dereference in TMU driver
-- Removed interrupt-parent property from documentation
-- Add missing of_match_ptr() and __maybe_unused() annotations
-
-Changes since v2:
-
-- Rebased on top of Simon's latest devel branch
-
-Changes since v1:
-
-- Dropped the channel subnodes from the CMT DT bindings and just use a
-  channels mask, as we don't need to specify per-channel properties.
-
-Laurent Pinchart (8):
-  ARM: shmobile: r8a7790: Add CMT devices to DT
-  ARM: shmobile: r8a7791: Add CMT devices to DT
-  ARM: shmobile: r8a7779: Add TMU devices to DT
-  ARM: shmobile: r7s72100: Add MTU2 device to DT
-  ARM: shmobile: lager-reference: Enable CMT0 in device tree
-  ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
-  ARM: shmobile: marzen-reference: Enable TMU0 in device tree
-  ARM: shmobile: genmai-reference: Enable MTU2 in device tree
-
- arch/arm/boot/dts/r7s72100-genmai.dts            |  4 +++
- arch/arm/boot/dts/r7s72100.dtsi                  | 10 ++++++
- arch/arm/boot/dts/r8a7779-marzen.dts             |  4 +++
- arch/arm/boot/dts/r8a7779.dtsi                   | 42 ++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7790-lager.dts              |  4 +++
- arch/arm/boot/dts/r8a7790.dtsi                   | 32 ++++++++++++++++++
- arch/arm/boot/dts/r8a7791-koelsch.dts            |  4 +++
- arch/arm/boot/dts/r8a7791.dtsi                   | 32 ++++++++++++++++++
- arch/arm/mach-shmobile/board-genmai-reference.c  | 20 -----------
- arch/arm/mach-shmobile/board-genmai.c            | 14 +++++++-
- arch/arm/mach-shmobile/board-koelsch-reference.c |  2 --
- arch/arm/mach-shmobile/board-lager-reference.c   |  2 --
- arch/arm/mach-shmobile/board-marzen-reference.c  | 10 ------
- arch/arm/mach-shmobile/r7s72100.h                |  1 -
- arch/arm/mach-shmobile/r8a7779.h                 |  1 -
- arch/arm/mach-shmobile/r8a7790.h                 |  1 -
- arch/arm/mach-shmobile/r8a7791.h                 |  1 -
- arch/arm/mach-shmobile/setup-r7s72100.c          | 21 ------------
- arch/arm/mach-shmobile/setup-r8a7779.c           | 17 +++-------
- arch/arm/mach-shmobile/setup-r8a7790.c           |  7 +---
- arch/arm/mach-shmobile/setup-r8a7791.c           |  7 +---
- 21 files changed, 152 insertions(+), 84 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index bdcb7f0..2e65c30 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -206,6 +206,38 @@
+ 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
++	cmt0: timer at ffca0000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xffca0000 0 0x1004>;
++		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
++		clock-names = "fck";
++
++		renesas,channels-mask = <0x60>;
++
++		status = "disabled";
++	};
++
++	cmt1: timer at e6130000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xe6130000 0 0x1004>;
++		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 122 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 123 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 124 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7790_CLK_CMT1>;
++		clock-names = "fck";
++
++		renesas,channels-mask = <0xff>;
++
++		status = "disabled";
++	};
++
+ 	irqc0: interrupt-controller at e61c0000 {
+ 		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
+ 		#interrupt-cells = <2>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.5.5
