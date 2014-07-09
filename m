@@ -1,41 +1,35 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Tue, 8 Jul 2014 22:11:54 -0700
-Subject: [PATCH RFCv2] arm64: eBPF JIT compiler
-In-Reply-To: <CAMEtUuydrYMGdg2zNDYX4vKL0_-reF+yOPKx5hpUvy4guuVeBg@mail.gmail.com>
-References: <1404803213-10653-1-git-send-email-zlim.lnx@gmail.com>
- <CAMEtUuydrYMGdg2zNDYX4vKL0_-reF+yOPKx5hpUvy4guuVeBg@mail.gmail.com>
-Message-ID: <CABg9mcv+7qSOSKw9emq1A+JbEvrUT9k4vAHMx9pdJiy4R4ZF9A@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 8 Jul 2014 22:30:42 -0700
+Subject: [PATCH] Removes FIXME message in usb.c
+In-Reply-To: <1404871119-4324-1-git-send-email-xerofoify@gmail.com>
+References: <1404871119-4324-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20140709053042.GB8051@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 2:24 AM, Alexei Starovoitov <ast@plumgrid.com> wrote:
-> On Tue, Jul 8, 2014 at 12:06 AM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
-[...]
->>   Also, per discussion with Alexei, and additional suggestion from
->>   Daniel:
->>   - moved load_pointer() from net/core/filter.c into filter.h
->>     as bpf_load_pointer()
->>   which is done as a separate preparatory patch. [1]
->>
->> [1] http://patchwork.ozlabs.org/patch/366906/
->
-> Just to clarify. This patch is on top of [1]
+On Tue, Jul 08, 2014 at 09:58:39PM -0400, Nicholas Krause wrote:
+> This patch removes a fixme message in this file:wq for setting the usb 2
 
-Yes, that's correct. This patch uses bpf_load_pointer() from [1].
+I don't think you did this correctly :)
 
-BTW, looks like David has applied it in net-next 9f12fbe603f7
-("net: filter: move load_pointer() into filter.h").
+> speed on the board to the correct level. We need to depend on the
+> bootloader for doing this as the wires may be shared for the other
+> things on the board with the usb chipset.
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-omap1/usb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+> index 4118db5..172245a 100644
+> --- a/arch/arm/mach-omap1/usb.c
+> +++ b/arch/arm/mach-omap1/usb.c
+> @@ -505,7 +505,7 @@ static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+>  		omap_cfg_reg(W5_USB2_SE0);
+>  		if (nwires != 3)
+>  			omap_cfg_reg(Y5_USB2_RCV);
+> -		// FIXME omap_cfg_reg(USB2_SPEED);
+> +		/* Depend on boatloader for USB speed to be stated for board */
 
-[...]
->> +               case BPF_DW:
->
-> this case can be removed too.
-
-Thanks for catching this :) I've removed it.
-
->
-> Acked-by: Alexei Starovoitov <ast@plumgrid.com>
->
-> Great work. Thanks.
-
-Thanks for your time and feedback!
+Really?  Is that correct?  WHy?
