@@ -1,124 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  9 Jul 2014 19:22:13 +0100
-Subject: [PATCH 3/3] arm64: vdso: move data page before code pages
-In-Reply-To: <1404930133-30324-1-git-send-email-will.deacon@arm.com>
-References: <1404930133-30324-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1404930133-30324-4-git-send-email-will.deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Jul 2014 19:32:40 +0100
+Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
+ CRTCs
+In-Reply-To: <CAF6AEGt0yq-Feuq13ewY7_4YkgOW6FKjLHnNDELXiyzOWdO5=w@mail.gmail.com>
+References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGtEUqK=YBWwOz8bf8a_e_p8-Y0vFYRfs2uxJ20015roOA@mail.gmail.com>
+ <20140709151618.GU21766@n2100.arm.linux.org.uk>
+ <CAF6AEGt0yq-Feuq13ewY7_4YkgOW6FKjLHnNDELXiyzOWdO5=w@mail.gmail.com>
+Message-ID: <20140709183240.GV21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy pointed out that binutils generates additional sections in the vdso
-image (e.g. section string table) which, if our .text section gets big
-enough, could cross a page boundary and end up screwing up the location
-where the kernel expects to put the data page.
+On Wed, Jul 09, 2014 at 02:11:18PM -0400, Rob Clark wrote:
+> On Wed, Jul 9, 2014 at 11:16 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
+> > Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
+> > Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
+> > Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
+> >   DOCPROC Documentation/DocBook/w1.xml
+> >   DOCPROC Documentation/DocBook/writing_musb_glue_layer.xml
+> >   PDF     Documentation/DocBook/z8530book.pdf
+> > Making portrait pages on A4 paper (210mmx297mm)
+> > sh: /usr/share/xmlto/format/docbook/../fo/pdf: No such file or directory
+> > make[2]: *** [Documentation/DocBook/z8530book.pdf] Error 1
+> > make[2]: *** Waiting for unfinished jobs....
+> > make[1]: *** [pdfdocs] Error 2
+> > make: *** [sub-make] Error 2
+> 
+> hmm, I usually use 'make htmldocs'.. hadn't really bothered to try to
+> build pdf docs.   It was a while ago, but I think 'xmlto-tex' would be
+> what you need for fedora to get docs to build.  Hopefully the package
+> has a similar name on other distros.
+> 
+> There are unfortunately a lot of warnings..  the headerdoc stuff is
+> not always as clever as you would like.
 
-This patch solves the issue in the same manner as x86_32, by moving the
-data page before the code pages.
+Thanks, that helps it get a bit further, but it spits out a whole truck
+load of errors before it gets anywhere near DRM stuff.  Either this
+stuff isn't maintained, or it's for a newer flavour of TEX.  From what
+I read on the web, this kind of problem is fairly typical where TEX
+stuff goes (no two tex versions are compatible.)
 
-Cc: Andy Lutomirski <luto@amacapital.net>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/vdso.c          | 34 +++++++++++++++++-----------------
- arch/arm64/kernel/vdso/vdso.lds.S |  4 +---
- 2 files changed, 18 insertions(+), 20 deletions(-)
+I think I'll leave the kerneldoc stuff to someone who knows (a) how to
+deal with it.
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 60ae12087d9f..24f2e8c62479 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -121,8 +121,8 @@ static int __init vdso_init(void)
- 	}
- 
- 	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
--	pr_info("vdso: %ld pages (%ld code, %ld data) at base %p\n",
--		vdso_pages + 1, vdso_pages, 1L, &vdso_start);
-+	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-+		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
- 
- 	/* Allocate the vDSO pagelist, plus a page for the data. */
- 	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
-@@ -130,22 +130,22 @@ static int __init vdso_init(void)
- 	if (vdso_pagelist == NULL)
- 		return -ENOMEM;
- 
-+	/* Grab the vDSO data page. */
-+	vdso_pagelist[0] = virt_to_page(vdso_data);
-+
- 	/* Grab the vDSO code pages. */
- 	for (i = 0; i < vdso_pages; i++)
--		vdso_pagelist[i] = virt_to_page(&vdso_start + i * PAGE_SIZE);
--
--	/* Grab the vDSO data page. */
--	vdso_pagelist[i] = virt_to_page(vdso_data);
-+		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
- 
- 	/* Populate the special mapping structures */
- 	vdso_spec[0] = (struct vm_special_mapping) {
--		.name	= "[vdso]",
-+		.name	= "[vvar]",
- 		.pages	= vdso_pagelist,
- 	};
- 
- 	vdso_spec[1] = (struct vm_special_mapping) {
--		.name	= "[vvar]",
--		.pages	= vdso_pagelist + vdso_pages,
-+		.name	= "[vdso]",
-+		.pages	= &vdso_pagelist[1],
- 	};
- 
- 	return 0;
-@@ -169,22 +169,22 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 		ret = ERR_PTR(vdso_base);
- 		goto up_fail;
- 	}
--	mm->context.vdso = (void *)vdso_base;
--
--	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
--				       VM_READ|VM_EXEC|
--				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-+	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
-+				       VM_READ|VM_MAYREAD,
- 				       &vdso_spec[0]);
- 	if (IS_ERR(ret))
- 		goto up_fail;
- 
--	vdso_base += vdso_text_len;
--	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
--				       VM_READ|VM_MAYREAD,
-+	vdso_base += PAGE_SIZE;
-+	mm->context.vdso = (void *)vdso_base;
-+	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
-+				       VM_READ|VM_EXEC|
-+				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
- 				       &vdso_spec[1]);
- 	if (IS_ERR(ret))
- 		goto up_fail;
- 
-+
- 	up_write(&mm->mmap_sem);
- 	return 0;
- 
-diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
-index 8154b8d1c826..beca249bc2f3 100644
---- a/arch/arm64/kernel/vdso/vdso.lds.S
-+++ b/arch/arm64/kernel/vdso/vdso.lds.S
-@@ -28,6 +28,7 @@ OUTPUT_ARCH(aarch64)
- 
- SECTIONS
- {
-+	PROVIDE(_vdso_data = . - PAGE_SIZE);
- 	. = VDSO_LBASE + SIZEOF_HEADERS;
- 
- 	.hash		: { *(.hash) }			:text
-@@ -57,9 +58,6 @@ SECTIONS
- 	_end = .;
- 	PROVIDE(end = .);
- 
--	. = ALIGN(PAGE_SIZE);
--	PROVIDE(_vdso_data = .);
--
- 	/DISCARD/	: {
- 		*(.note.GNU-stack)
- 		*(.data .data.* .gnu.linkonce.d.* .sdata*)
 -- 
-2.0.0
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
