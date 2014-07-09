@@ -1,31 +1,33 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 9 Jul 2014 12:14:13 +0200
-Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
-In-Reply-To: <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140709101413.GR19379@twins.programming.kicks-ass.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 Jul 2014 12:14:42 +0200
+Subject: [PATCH 0/5] Introduce a managed function for gpio_request_array
+In-Reply-To: <cover.1404665589.git.himangi774@gmail.com>
+References: <cover.1404665589.git.himangi774@gmail.com>
+Message-ID: <CACRpkdYbK3tizezXNaTBT6ANQ8fxoBUH5OATpb5cLykQqRSuKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 06:05:32PM +0200, Vincent Guittot wrote:
-> +++ b/kernel/sched/fair.c
-> @@ -6615,10 +6615,8 @@ more_balance:
+On Sun, Jul 6, 2014 at 7:46 PM, Himangi Saraogi <himangi774@gmail.com> wrote:
 
-In order to avoid labels being used as functions; you can use:
+> This patchset intoduces a new managed interface devm_gpio_request_array,
+> adds it in the documentation and its declaration in the gpio.h include
+> file. Some cases of gpio_request_array are changed to
+> devm_gpio_request_array.
+>
+> Himangi Saraogi (5):
+>   gpiolib: devres: Introduce the function devm_request_gpio_array
+>   ASoC: wm1250-ev1: Use devm_gpio_request_array
+>   ASoC: pxa: Use devm_gpio_request_array
+>   ASoC: pxa: e800_wm9712: Introduce the use of devm_gpio_request_array
+>   ASoC: pxa/hx4700: Introduce the use of devm_gpio_request_array
 
-.quiltrc:
-QUILT_DIFF_OPTS="-F ^[[:alpha:]\$_].*[^:]\$"
+Sorry, we're not encouraging extension of the old gpio* plain API anymore.
 
-.gitconfig:
-[diff "default"]
-        xfuncname = "^[[:alpha:]$_].*[^:]$"
+The right thing to do is convert users over to using GPIO descriptors
+internally, then introduce devm_gpiod_get_array() if that makes some
+sense.
 
+Alexandre, what do you say?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/15a1af21/attachment.sig>
+Yours,
+Linus Walleij
