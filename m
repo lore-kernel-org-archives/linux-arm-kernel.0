@@ -1,68 +1,64 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 9 Jul 2014 08:55:30 -0500
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <53BD34FD.5070005@ti.com>
-References: <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
- <20140707134008.GU3705@n2100.arm.linux.org.uk>
- <20140707151024.GJ5582@saruman.home> <53BB7980.2060909@ti.com>
- <20140708082948.GE28884@atomide.com>
- <20140709092531.GK28884@atomide.com> <53BD34FD.5070005@ti.com>
-Message-ID: <20140709135530.GD973@saruman.home>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 9 Jul 2014 09:59:10 -0400
+Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
+In-Reply-To: <20140709082331.GA4510@kwain>
+References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140708134000.GC4979@htj.dyndns.org>
+ <20140708170353.GA16148@kwain>
+ <20140708171817.GH4979@htj.dyndns.org>
+ <20140708174900.GC16148@kwain>
+ <20140708214010.GI4979@htj.dyndns.org>
+ <20140709082331.GA4510@kwain>
+Message-ID: <20140709135910.GA11193@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 05:56:37PM +0530, Sekhar Nori wrote:
-> On Wednesday 09 July 2014 02:55 PM, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [140708 01:32]:
-> >> * Sekhar Nori <nsekhar@ti.com> [140707 21:56]:
-> >>> On Monday 07 July 2014 08:40 PM, Felipe Balbi wrote:
-> >>>> On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
-> >>>>> --- a/arch/arm/mm/cache-l2x0.c
-> >>>>> +++ b/arch/arm/mm/cache-l2x0.c
-> >>>>> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
-> >>>>>  
-> >>>>>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
-> >>>>>  {
-> >>>>> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-> >>>>> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
-> >>>>>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
-> >>>>
-> >>>> even with this change, l2c still tries to write to power control
-> >>>> register, at least on AM437x. Looking a little deeper here, AM437x
-> >>>> identifies itself as l2c PL310 r3p3, which should have power control
-> >>>> register, but aparentely there's no way to write that register. I'll
-> >>>> file a bug to our ROM team, but we will certainly need a way to
-> >>>> workaround this inside omap4-common.c
-> >>>
-> >>> Looks like we need both my patch as well as Russell's patch. I can
-> >>> respin my patch with the pr_info_once() dropped if it helps further
-> >>> reduce boot noise.
-> >>
-> >> In that case I'm fine with the original patch in this series. Russell,
-> >> got any better ideas?
-> > 
-> > I guess no more comments. Took a look at the patch again, Sekhar, can
-> > you please update the description with what has been discovered in this
-> > thread and repost?
-> 
-> How does the following sound:
-> 
-> ---
-> AM437x has L2C-310 version r3p2 and ROM code on that device does not
+Hello,
 
-at least my SoC has r3p3 (cache ID 0x9), other than that, commit log
-looks good to my eyes.
+On Wed, Jul 09, 2014 at 10:23:31AM +0200, Antoine T?nart wrote:
+> > It is confusing.  If you wanna pass around available ports in hpriv,
+> > please add a separate field and replace the arguments to
+> > save_initial_config().
+> 
+> I don't get it. Which argument should I replace in
+> save_initial_config()? The change is we compute hpriv->port_map.
+> I don't see which arguments we can add or replace.
 
+The @force_port_map and @mask_port_map of ahci_save_initial_config().
+We end up with three params from two places modifying port_map and one
+of those is in/out parameter, so ummm, no.  If you wanna add port
+masking to @hpriv, please do it by moving @force_port_map and
+@mask_port_map into @hpriv instead.
+
+Sure, the proposed change is small but the end result is messy.
+
+> I had a quick look on this, and it does not seems to be that simple. The
+> ahci_port_priv is stored inside the ata_port struct and not accessible
+> (as of now) from the ahci_host_priv one. The ahci_port_priv is
+> initialized at the end of ahci_platform_init_host(), far after we need
+> it. This requires quite a lot of changes. Or is there another way?
+
+Yeah, it'd probably need separating out port resource handling, so
+that the order is get_resources, host_alloc, get_port_resources and
+then init and activate.  Hans, what do you think?
+
+> To be honest, we are now at v9 and it's been quite a long time since v1.
+> I'd really like it to be merged in 3.17. As I see it, this patch keeps
+> the same logic as what was in place before, only with more PHYs.
+> 
+> Don't take me wrong, I really think this is a good idea to have a
+> per-port PHY information. But this is a refactoring not clearly related
+> to this series as the logic is not changed. This definitively can be the
+> subject of a dedicated series, especially if I got it right and the
+> required modifications are not that obvious.
+
+Heh, I get that but, at the same time, this is the point where you're
+most motivated to actually work on it.  :)
+
+Let's see how much work it's gonna be.
+
+Thanks.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/ba8147d0/attachment-0001.sig>
+tejun
