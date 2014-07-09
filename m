@@ -1,81 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Jul 2014 10:31:50 +0200
-Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <20140708100332.GW6501@e106497-lin.cambridge.arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <201407072322.00990.arnd@arndb.de>
- <20140708100332.GW6501@e106497-lin.cambridge.arm.com>
-Message-ID: <201407091031.50402.arnd@arndb.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 Jul 2014 11:33:11 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140709063130.GA3170@ulmo>
+References: <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
+ <20140617215119.GC24743@mithrandir>
+ <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
+ <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+ <53A3096B.1040409@wwwdotorg.org>
+ <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
+ <20140708130501.GC9516@ulmo>
+ <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+ <20140709063130.GA3170@ulmo>
+Message-ID: <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 July 2014, Liviu Dudau wrote:
-> On Mon, Jul 07, 2014 at 10:22:00PM +0100, Arnd Bergmann wrote:
+On Wed, Jul 09, 2014 at 08:31:32AM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
+> > > > 
+> > > > Yes, but the problem is that you also need clocks and reset of other modules
+> > > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
+> > > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
+> > > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
+> > > > someday which means we would need to control the domain and therefore would
+> > > > need to tell that driver about the ISPs clocks and resets even though the
+> > > > driver doesn't know anything about the ISP hw otherwise.
+> > > 
+> > > Can't we make powergates reference counted so that they don't get
+> > > disabled as long as there are any users? Looking for example at the
 > > 
-> > I looked at the other drivers briefly, and I think you indeed fix the Tegra
-> > driver with this but break the integrator driver as mentioned above.
-> > The other callers of of_pci_range_to_resource() are apparently not
-> > impacted as they recalculate the values they get.
+> > We could, but then why not switch to the powerdomain code and make powering
+> > off a domain a NOP until we sorted out the context save/restore or fixed
+> > the framework to allow for suspend without turning off the domains?
 > 
-> I would argue that integrator version is having broken assumptions. If it would
-> try to allocate that IO range or request the resource as returned currently by
-> of_pci_range_to_resource (without my patch) it would fail. I know because I did
-> the same thing in my host bridge driver and it failed miserably. That's why I
-> tried to patch it.
-
-The integrator code was just introduced and the reason for how it does things
-is the way that of_pci_range_to_resource() works today. We tried to cope with
-it and not change the existing behavior in order to not break any other drivers.
-
-It's certainly not fair to call the integrator version broken, it just works
-around the common code having a quirky interface. We should probably have
-done of_pci_range_to_resource better than it is today (I would have argued
-for it to return an IORESOURCE_MEM with the CPU address), but it took long
-enough to get that merged and I was sick of arguing about it.
-
-> If the IO space is memory mapped, then we use the port number, the io_offset
-> and the PCI_IOBASE to get to the virtual address that, when accessed, will
-> generate the correct addresses on the bus, based on what the host bridge has
-> been configured.
+> Well, one of the reasons why I'm not sure it's worth the effort at this
+> point is that we can't get rid of the tegra_powergate_*() API anyway
+> because of backwards compatibility. So we're going to add code (without
+> getting rid of old code) merely to support some generic framework. That
+> doesn't sound very useful to me.
 > 
-> This is the current level of my understanding of PCI IO.
 
-Your understanding is absolutely correct, and that's great because very few
-people get that right. What I think we're really arguing about is what the
-of_pci_range_to_resource is supposed to return. As you and Bjorn both pointed
-out earlier, there are in fact two resources associated with the I/O window
-and the flaw in the current implementation is that of_pci_range_to_resource
-returns the numeric values for the IORESOURCE_MEM resource, but sets the
-type to IORESOURCE_IO, which is offset from that by PCI_IOBASE.
+We can also convert the existing users to genpd. Today there are only 2 users
+(gpu/drm/tegra/gr3d.c and pci/host/pci-tegra.c), so that doesn't seem to be
+an impossible task.
 
-You try to fix that by making it return the correct IORESOURCE_IO resource,
-which is a reasonable approach but you must not break drivers that rely
-on the broken resource while doing that.
+> > > display controller driver, modules don't seem to care overly much about
+> > > the powergate's state except that it needs to be turned on before they
+> > > touch some of the registers.
+> > > 
+> > > From a bit of experimentation it also seems like the sequence encoded
+> > > within tegra_powergate_sequence_power_up() isn't at all necessary. I
+> > > couldn't find an authoritative reference for that either, so I'm tempted
+> > > to conclude that it was simply cargo-culted from the dark-ages.
+> > > 
+> > > So I'm thinking that if we ever move to use power domains for this, we
+> > > may be able to just drop any extra handling (well, we'd need to keep it
+> > > for backwards-compatibility... *sigh*) and let drivers handle the clock
+> > > and reset resources.
+> > > 
+> > > On the other hand, given that we already need to keep the existing code
+> > > for backwards-compatibility, I'm not sure there's a real advantage in
+> > > turning them into power domains, since we'd be adding extra code without
+> > > an clear gains (especially since it seems like we'd need even more code
+> > > to properly handle suspend/resume in drivers that need powergates).
+> > > 
+> > 
+> > Unless we fix the framework to require context save/restore for suspend.
+> > There is a good reason to do that. context save/restore requires energy
+> > as well, so it's not a given that turning off domains in system suspend
+> > will save power.
+> 
+> I'm not sure I follow. "require context save/restore for suspend" is
+> what many drivers currently don't support, hence we can't use the
+> generic PM domains. Perhaps what you're saying is that the PM domain
+> core code should be enhanced so that domains can be marked so that they
+> stay on during a suspend/resume cycle.
+> 
 
-The approach that I would have picked is to return the IORESOURCE_MEM
-resource associated with the I/O window and pick a (basically random)
-IORESOURCE_IO resource struct based on what hasn't been used and then
-compute the appropriate io_offset from that. This approach of course
-would also have required fixing up all drivers relying on the current
-behavior.
+Exactly.
 
-To be clear, I'm fine with you (and Bjorn if he cares) picking the
-approach you like here, either one of these works fine as long as the
-host drivers use the interface in the way it is defined.
+Cheers,
 
-> Now, I believe Rob has switched entirely to using my series in some test that
-> he has run and he hasn't encountered any issues, as long as one remembers in
-> the host bridge driver to add the io_base offset to the .start resource. If
-> not then I need to patch pci_v3.c.
-
-The crazy part of all these discussions is that basically nobody ever uses
-I/O port access, so it's very hard to test and we don't even notice when
-we get it wrong, but we end up spending most of the time for PCI host controller
-reviews trying to get these right.
-
-I'm very thankful that you are doing this work to get it moved into common
-code so hopefully this is the last time we ever have to worry about it because
-all future drivers will be able to use the common implemnetation.
-
-	Arnd
+Peter.
