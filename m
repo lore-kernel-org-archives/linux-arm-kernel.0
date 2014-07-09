@@ -1,132 +1,68 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 9 Jul 2014 16:32:14 +0530
-Subject: [PATCH v2] arm: dra7xx: Add hwmod data for pcie1 and pcie2
- subsystems
-In-Reply-To: <1404896567-32204-1-git-send-email-kishon@ti.com>
-References: <1403719366-9656-3-git-send-email-kishon@ti.com>
- <1404896567-32204-1-git-send-email-kishon@ti.com>
-Message-ID: <53BD2136.9030009@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 Jul 2014 14:08:16 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140709102551.GA19357@ulmo>
+References: <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
+ <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+ <53A3096B.1040409@wwwdotorg.org>
+ <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
+ <20140708130501.GC9516@ulmo>
+ <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+ <20140709063130.GA3170@ulmo>
+ <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
+ <20140709102551.GA19357@ulmo>
+Message-ID: <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014 02:32 PM, Kishon Vijay Abraham I wrote:
-> Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
+On Wed, Jul 09, 2014 at 12:25:52PM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> Changes from v1:
-> * changed the clock domain to "pcie_clkdm"
-> * Added PCIe as a slave port for l3_main.
+> On Wed, Jul 09, 2014 at 11:33:11AM +0300, Peter De Schrijver wrote:
+> > On Wed, Jul 09, 2014 at 08:31:32AM +0200, Thierry Reding wrote:
+> > > > Old Signed by an unknown key
+> > > 
+> > > On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
+> > > > > > 
+> > > > > > Yes, but the problem is that you also need clocks and reset of other modules
+> > > > > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
+> > > > > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
+> > > > > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
+> > > > > > someday which means we would need to control the domain and therefore would
+> > > > > > need to tell that driver about the ISPs clocks and resets even though the
+> > > > > > driver doesn't know anything about the ISP hw otherwise.
+> > > > > 
+> > > > > Can't we make powergates reference counted so that they don't get
+> > > > > disabled as long as there are any users? Looking for example at the
+> > > > 
+> > > > We could, but then why not switch to the powerdomain code and make powering
+> > > > off a domain a NOP until we sorted out the context save/restore or fixed
+> > > > the framework to allow for suspend without turning off the domains?
+> > > 
+> > > Well, one of the reasons why I'm not sure it's worth the effort at this
+> > > point is that we can't get rid of the tegra_powergate_*() API anyway
+> > > because of backwards compatibility. So we're going to add code (without
+> > > getting rid of old code) merely to support some generic framework. That
+> > > doesn't sound very useful to me.
+> > > 
+> > 
+> > We can also convert the existing users to genpd. Today there are only 2 users
+> > (gpu/drm/tegra/gr3d.c and pci/host/pci-tegra.c), so that doesn't seem to be
+> > an impossible task.
+> 
+> We can certainly do that. What I'm trying to say is that since people
+> may be running newer versions of the kernel with a DTB that doesn't have
+> the necessary properties to hook up power domains, we have to keep calls
+> to tegra_powergate_*() functions as-is, lest we break those setups.
+> 
 
-Looks good to me,
-Reviewed-by: Rajendra Nayak <rnayak@ti.com>
+For those 2 domains we can find the necessary clocks and resets by parsing
+the relevant existing DT nodes for PCIe and gr3d. For clocks, this isn't
+even needed as we can always register some extra clkdev's to get them. There
+is no equivalent for resets so we have to parse the gr3d and pcie DT nodes,
+but that's not too bad I think.
 
-> 
-> Boot log for dra7xx can be found at http://paste.ubuntu.com/7769402/
-> 
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   73 +++++++++++++++++++++++++++++
->  1 file changed, 73 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 6ff40a6..2f37ca8 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -1290,6 +1290,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
->  };
->  
->  /*
-> + * 'PCIE' class
-> + *
-> + */
-> +
-> +static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
-> +	.name	= "pcie",
-> +};
-> +
-> +/* pcie1 */
-> +static struct omap_hwmod dra7xx_pcie1_hwmod = {
-> +	.name		= "pcie1",
-> +	.class		= &dra7xx_pcie_hwmod_class,
-> +	.clkdm_name	= "pcie_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-> +			.modulemode	= MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +};
-> +
-> +/* pcie2 */
-> +static struct omap_hwmod dra7xx_pcie2_hwmod = {
-> +	.name		= "pcie2",
-> +	.class		= &dra7xx_pcie_hwmod_class,
-> +	.clkdm_name	= "pcie_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-> +			.modulemode   = MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +};
-> +
-> +/*
->   * 'PCIE PHY' class
->   *
->   */
-> @@ -2448,6 +2485,38 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +/* l3_main_1 -> pcie1 */
-> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pcie1 = {
-> +	.master		= &dra7xx_l3_main_1_hwmod,
-> +	.slave		= &dra7xx_pcie1_hwmod,
-> +	.clk		= "l3_iclk_div",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* l4_cfg -> pcie1 */
-> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
-> +	.master		= &dra7xx_l4_cfg_hwmod,
-> +	.slave		= &dra7xx_pcie1_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* l3_main_1 -> pcie2 */
-> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pcie2 = {
-> +	.master		= &dra7xx_l3_main_1_hwmod,
-> +	.slave		= &dra7xx_pcie2_hwmod,
-> +	.clk		= "l3_iclk_div",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +/* l4_cfg -> pcie2 */
-> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
-> +	.master		= &dra7xx_l4_cfg_hwmod,
-> +	.slave		= &dra7xx_pcie2_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  /* l4_cfg -> pcie1 phy */
->  static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
->  	.master		= &dra7xx_l4_cfg_hwmod,
-> @@ -2813,6 +2882,10 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
->  	&dra7xx_l4_cfg__mpu,
->  	&dra7xx_l4_cfg__ocp2scp1,
->  	&dra7xx_l4_cfg__ocp2scp3,
-> +	&dra7xx_l3_main_1__pcie1,
-> +	&dra7xx_l4_cfg__pcie1,
-> +	&dra7xx_l3_main_1__pcie2,
-> +	&dra7xx_l4_cfg__pcie2,
->  	&dra7xx_l4_cfg__pcie1_phy,
->  	&dra7xx_l4_cfg__pcie2_phy,
->  	&dra7xx_l3_main_1__qspi,
-> 
+Cheers,
+
+Peter.
