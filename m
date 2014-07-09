@@ -1,61 +1,501 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 9 Jul 2014 09:10:04 -0600
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
- <20140708005954.GC22939@google.com>
- <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
- <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
- <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
-Message-ID: <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  9 Jul 2014 17:11:37 +0200
+Subject: [PATCH 1/3] asm-generic/io.h: Implement generic {read,write}s*()
+Message-ID: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 4:48 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> On Tue, Jul 08, 2014 at 07:41:50PM +0100, Bjorn Helgaas wrote:
->> On Tue, Jul 8, 2014 at 4:46 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > On Tue, Jul 08, 2014 at 01:59:54AM +0100, Bjorn Helgaas wrote:
->>
->> >> I wonder if it would help to make a weak pci_domain_nr() function that
->> >> returns "bridge->domain_nr".  Then each arch could individually drop its
->> >> pci_domain_nr() definition as it was converted, e.g., something like this:
->> >>
->> >>   - Convert every arch pci_domain_nr() from a #define to a non-inline
->> >>     function
->> >>   - Add bridge.domain_nr, initialized from pci_domain_nr()
->> >>   - Add a weak generic pci_domain_nr() that returns bridge.domain_nr
->> >>   - Add a way to create a host bridge in a specified domain, so we can
->> >>     initialize bridge.domain_nr without using pci_domain_nr()
->> >>   - Convert each arch to use the new creation mechanism and drop its
->> >>     pci_domain_nr() implementation
->> >
->> > I will try to propose a patch implementing this.
->>
->> I think this is more of an extra credit, cleanup sort of thing.  I
->> don't think it advances your primary goal of (I think) getting arm64
->> PCI support in.  So my advice is to not worry about unifying domain
->> handling until later.
->
-> Getting arm64 supported *is* my main goal. But like you have stated in your
-> review of v7, you wanted to see another architecture converted as a guarantee
-> of "genericity" (for lack of a better word) for my patches. The one architecture
-> I've set my eyes on is microblaze, and that one uses pci_scan_root_bus()
-> rather than pci_create_root_bus() so I don't have any opportunity to pass the
-> domain number or any additional info (like the sysdata pointer that we were
-> talking about) to the pci_host_bridge structure unless I do this cleanup.
+From: Thierry Reding <treding@nvidia.com>
 
-I think maybe I was too harsh about that, or maybe we had different
-ideas about what "conversion" involved.  My comment was in response to
-"pci: Introduce pci_register_io_range() helper function", and I don't
-remember why I was concerned about that; it's not even in drivers/pci,
-and it doesn't have an obvious connection to putting the domain number
-in struct pci_host_bridge.
+This patch implements generic versions of readsb(), readsw(), readsl(),
+readsq(), writesb(), writesw(), writesl() and writesq(). Variants of
+these string functions for I/O accesses (ins*() and outs*() as well as
+ioread*_rep() and iowrite*_rep()) are now implemented in terms of the
+new functions.
 
-The thing I'm more concerned about is adding new PCI interfaces, e.g.,
-pci_create_root_bus_in_domain(), that are only used by one
-architecture.  Then it's hard to be sure that it's going to be useful
-for other arches.  If you can add arm64 using the existing PCI
-interfaces, I don't any problem with that.
+While at it, also make sure that any of the functions provided as
+fallback for architectures that don't override them can't be overridden
+subsequently.
 
-Bjorn
+This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+tested on Microblaze, s390, SPARC and Xtensa. For ARC, Blackfin, Metag,
+OpenRISC, Score and Unicore32 which also use asm-generic/io.h I couldn't
+find or build a cross-compiler that would run on my system. But by code
+inspection they shouldn't break with this patch.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ include/asm-generic/io.h | 278 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 197 insertions(+), 81 deletions(-)
+
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index 975e1cc75edb..bf9d3cd4e89e 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -32,6 +32,7 @@
+  * memory location directly.
+  */
+ #ifndef __raw_readb
++#define __raw_readb __raw_readb
+ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ {
+ 	return *(const volatile u8 __force *) addr;
+@@ -39,6 +40,7 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ #endif
+ 
+ #ifndef __raw_readw
++#define __raw_readw __raw_readw
+ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+ 	return *(const volatile u16 __force *) addr;
+@@ -46,27 +48,35 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ #endif
+ 
+ #ifndef __raw_readl
++#define __raw_readl __raw_readl
+ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ {
+ 	return *(const volatile u32 __force *) addr;
+ }
+ #endif
+ 
++#ifndef readb
+ #define readb __raw_readb
++#endif
+ 
++#ifndef readw
+ #define readw readw
+ static inline u16 readw(const volatile void __iomem *addr)
+ {
+ 	return __le16_to_cpu(__raw_readw(addr));
+ }
++#endif
+ 
++#ifndef readl
+ #define readl readl
+ static inline u32 readl(const volatile void __iomem *addr)
+ {
+ 	return __le32_to_cpu(__raw_readl(addr));
+ }
++#endif
+ 
+ #ifndef __raw_writeb
++#define __raw_writeb __raw_writeb
+ static inline void __raw_writeb(u8 b, volatile void __iomem *addr)
+ {
+ 	*(volatile u8 __force *) addr = b;
+@@ -74,6 +84,7 @@ static inline void __raw_writeb(u8 b, volatile void __iomem *addr)
+ #endif
+ 
+ #ifndef __raw_writew
++#define __raw_writew __raw_writew
+ static inline void __raw_writew(u16 b, volatile void __iomem *addr)
+ {
+ 	*(volatile u16 __force *) addr = b;
+@@ -81,78 +92,225 @@ static inline void __raw_writew(u16 b, volatile void __iomem *addr)
+ #endif
+ 
+ #ifndef __raw_writel
++#define __raw_writel __raw_writel
+ static inline void __raw_writel(u32 b, volatile void __iomem *addr)
+ {
+ 	*(volatile u32 __force *) addr = b;
+ }
+ #endif
+ 
++#ifndef writeb
+ #define writeb __raw_writeb
++#endif
++
++#ifndef writew
+ #define writew(b,addr) __raw_writew(__cpu_to_le16(b),addr)
++#endif
++
++#ifndef writel
+ #define writel(b,addr) __raw_writel(__cpu_to_le32(b),addr)
++#endif
+ 
+ #ifdef CONFIG_64BIT
+ #ifndef __raw_readq
++#define __raw_readq __raw_readq
+ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ {
+ 	return *(const volatile u64 __force *) addr;
+ }
+ #endif
+ 
++#ifndef readq
+ #define readq readq
+ static inline u64 readq(const volatile void __iomem *addr)
+ {
+ 	return __le64_to_cpu(__raw_readq(addr));
+ }
++#endif
+ 
+ #ifndef __raw_writeq
++#define __raw_writeq __raw_writeq
+ static inline void __raw_writeq(u64 b, volatile void __iomem *addr)
+ {
+ 	*(volatile u64 __force *) addr = b;
+ }
+ #endif
+ 
++#ifndef writeq
+ #define writeq(b, addr) __raw_writeq(__cpu_to_le64(b), addr)
++#endif
++#endif /* CONFIG_64BIT */
++
++#ifndef readsb
++#define readsb readsb
++static inline void readsb(const void __iomem *addr, void *buffer, int count)
++{
++	if (count) {
++		u8 *buf = buffer;
++		do {
++			u8 x = __raw_readb(addr);
++			*buf++ = x;
++		} while (--count);
++	}
++}
++#endif
++
++#ifndef readsw
++#define readsw readsw
++static inline void readsw(const void __iomem *addr, void *buffer, int count)
++{
++	if (count) {
++		u16 *buf = buffer;
++		do {
++			u16 x = __raw_readw(addr);
++			*buf++ = x;
++		} while (--count);
++	}
++}
++#endif
++
++#ifndef readsl
++#define readsl readsl
++static inline void readsl(const void __iomem *addr, void *buffer, int count)
++{
++	if (count) {
++		u32 *buf = buffer;
++		do {
++			u32 x = __raw_readl(addr);
++			*buf++ = x;
++		} while (--count);
++	}
++}
++#endif
++
++#ifndef writesb
++#define writesb writesb
++static inline void writesb(void __iomem *addr, const void *buffer, int count)
++{
++	if (count) {
++		const u8 *buf = buffer;
++		do {
++			__raw_writeb(*buf++, addr);
++		} while (--count);
++	}
++}
++#endif
++
++#ifndef writesw
++#define writesw writesw
++static inline void writesw(void __iomem *addr, const void *buffer, int count)
++{
++	if (count) {
++		const u16 *buf = buffer;
++		do {
++			__raw_writew(*buf++, addr);
++		} while (--count);
++	}
++}
++#endif
++
++#ifndef writesl
++#define writesl writesl
++static inline void writesl(void __iomem *addr, const void *buffer, int count)
++{
++	if (count) {
++		const u32 *buf = buffer;
++		do {
++			__raw_writel(*buf++, addr);
++		} while (--count);
++	}
++}
++#endif
++
++#ifdef CONFIG_64BIT
++#ifndef readsq
++#define readsq readsq
++static inline void readsq(const void __iomem *addr, void *buffer, int count)
++{
++	if (count) {
++		u64 *buf = buffer;
++		do {
++			u64 x = __raw_readq(addr);
++			*buf++ = x;
++		} while (--count);
++	}
++}
++#endif
++
++#ifndef writesq
++#define writesq writesq
++static inline void writesq(void __iomem *addr, const void *buffer, int count)
++{
++	if (count) {
++		const u64 *buf = buffer;
++		do {
++			__raw_writeq(*buf++, addr);
++		} while (--count);
++	}
++}
++#endif
+ #endif /* CONFIG_64BIT */
+ 
+ #ifndef PCI_IOBASE
+ #define PCI_IOBASE ((void __iomem *) 0)
+ #endif
+ 
++#ifndef IO_SPACE_LIMIT
++#define IO_SPACE_LIMIT 0xffff
++#endif
++
+ /*****************************************************************************/
+ /*
+  * traditional input/output functions
+  */
+ 
++#ifndef inb
++#define inb inb
+ static inline u8 inb(unsigned long addr)
+ {
+-	return readb(addr + PCI_IOBASE);
++	return readb(PCI_IOBASE + addr);
+ }
++#endif
+ 
++#ifndef inw
++#define inw inw
+ static inline u16 inw(unsigned long addr)
+ {
+-	return readw(addr + PCI_IOBASE);
++	return readw(PCI_IOBASE + addr);
+ }
++#endif
+ 
++#ifndef inl
++#define inl inl
+ static inline u32 inl(unsigned long addr)
+ {
+-	return readl(addr + PCI_IOBASE);
++	return readl(PCI_IOBASE + addr);
+ }
++#endif
+ 
++#ifndef outb
++#define outb outb
+ static inline void outb(u8 b, unsigned long addr)
+ {
+-	writeb(b, addr + PCI_IOBASE);
++	writeb(b, PCI_IOBASE + addr);
+ }
++#endif
+ 
++#ifndef outw
++#define outw outw
+ static inline void outw(u16 b, unsigned long addr)
+ {
+-	writew(b, addr + PCI_IOBASE);
++	writew(b, PCI_IOBASE + addr);
+ }
++#endif
+ 
++#ifndef outl
++#define outl outl
+ static inline void outl(u32 b, unsigned long addr)
+ {
+-	writel(b, addr + PCI_IOBASE);
++	writel(b, PCI_IOBASE + addr);
+ }
++#endif
+ 
+ #define inb_p(addr)	inb(addr)
+ #define inw_p(addr)	inw(addr)
+@@ -162,80 +320,37 @@ static inline void outl(u32 b, unsigned long addr)
+ #define outl_p(x, addr)	outl((x), (addr))
+ 
+ #ifndef insb
+-static inline void insb(unsigned long addr, void *buffer, int count)
+-{
+-	if (count) {
+-		u8 *buf = buffer;
+-		do {
+-			u8 x = __raw_readb(addr + PCI_IOBASE);
+-			*buf++ = x;
+-		} while (--count);
+-	}
+-}
++#define insb(addr, buffer, count) readsb(PCI_IOBASE + addr, buffer, count)
+ #endif
+ 
+ #ifndef insw
+-static inline void insw(unsigned long addr, void *buffer, int count)
+-{
+-	if (count) {
+-		u16 *buf = buffer;
+-		do {
+-			u16 x = __raw_readw(addr + PCI_IOBASE);
+-			*buf++ = x;
+-		} while (--count);
+-	}
+-}
++#define insw(addr, buffer, count) readsw(PCI_IOBASE + addr, buffer, count)
+ #endif
+ 
+ #ifndef insl
+-static inline void insl(unsigned long addr, void *buffer, int count)
+-{
+-	if (count) {
+-		u32 *buf = buffer;
+-		do {
+-			u32 x = __raw_readl(addr + PCI_IOBASE);
+-			*buf++ = x;
+-		} while (--count);
+-	}
+-}
++#define insl(addr, buffer, count) readsl(PCI_IOBASE + addr, buffer, count)
+ #endif
+ 
+ #ifndef outsb
+-static inline void outsb(unsigned long addr, const void *buffer, int count)
+-{
+-	if (count) {
+-		const u8 *buf = buffer;
+-		do {
+-			__raw_writeb(*buf++, addr + PCI_IOBASE);
+-		} while (--count);
+-	}
+-}
++#define outsb(addr, buffer, count) writesb(PCI_IOBASE + addr, buffer, count)
+ #endif
+ 
+ #ifndef outsw
+-static inline void outsw(unsigned long addr, const void *buffer, int count)
+-{
+-	if (count) {
+-		const u16 *buf = buffer;
+-		do {
+-			__raw_writew(*buf++, addr + PCI_IOBASE);
+-		} while (--count);
+-	}
+-}
++#define outsw(addr, buffer, count) writesw(PCI_IOBASE + addr, buffer, count)
+ #endif
+ 
+ #ifndef outsl
+-static inline void outsl(unsigned long addr, const void *buffer, int count)
+-{
+-	if (count) {
+-		const u32 *buf = buffer;
+-		do {
+-			__raw_writel(*buf++, addr + PCI_IOBASE);
+-		} while (--count);
+-	}
+-}
++#define outsl(addr, buffer, count) writesl(PCI_IOBASE + addr, buffer, count)
+ #endif
+ 
++#define insb_p(port,to,len)	insb(port,to,len)
++#define insw_p(port,to,len)	insw(port,to,len)
++#define insl_p(port,to,len)	insl(port,to,len)
++
++#define outsb_p(port,from,len)	outsb(port,from,len)
++#define outsw_p(port,from,len)	outsw(port,from,len)
++#define outsl_p(port,from,len)	outsl(port,from,len)
++
+ #ifndef CONFIG_GENERIC_IOMAP
+ #define ioread8(addr)		readb(addr)
+ #define ioread16(addr)		readw(addr)
+@@ -249,24 +364,14 @@ static inline void outsl(unsigned long addr, const void *buffer, int count)
+ #define iowrite32(v, addr)	writel((v), (addr))
+ #define iowrite32be(v, addr)	__raw_writel(__cpu_to_be32(v), addr)
+ 
+-#define ioread8_rep(p, dst, count) \
+-	insb((unsigned long) (p), (dst), (count))
+-#define ioread16_rep(p, dst, count) \
+-	insw((unsigned long) (p), (dst), (count))
+-#define ioread32_rep(p, dst, count) \
+-	insl((unsigned long) (p), (dst), (count))
+-
+-#define iowrite8_rep(p, src, count) \
+-	outsb((unsigned long) (p), (src), (count))
+-#define iowrite16_rep(p, src, count) \
+-	outsw((unsigned long) (p), (src), (count))
+-#define iowrite32_rep(p, src, count) \
+-	outsl((unsigned long) (p), (src), (count))
+-#endif /* CONFIG_GENERIC_IOMAP */
++#define ioread8_rep(p, dst, count) readsb(p, dst, count)
++#define ioread16_rep(p, dst, count) readsw(p, dst, count)
++#define ioread32_rep(p, dst, count) readsl(p, dst, count)
+ 
+-#ifndef IO_SPACE_LIMIT
+-#define IO_SPACE_LIMIT 0xffff
+-#endif
++#define iowrite8_rep(p, src, count) writesb(p, src, count)
++#define iowrite16_rep(p, src, count) writesw(p, src, count)
++#define iowrite32_rep(p, src, count) writesl(p, src, count)
++#endif /* CONFIG_GENERIC_IOMAP */
+ 
+ #ifdef __KERNEL__
+ 
+@@ -278,6 +383,7 @@ struct pci_dev;
+ extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max);
+ 
+ #ifndef pci_iounmap
++#define pci_iounmap pci_iounmap
+ static inline void pci_iounmap(struct pci_dev *dev, void __iomem *p)
+ {
+ }
+@@ -289,11 +395,15 @@ static inline void pci_iounmap(struct pci_dev *dev, void __iomem *p)
+  * These are pretty trivial
+  */
+ #ifndef virt_to_phys
++#define virt_to_phys virt_to_phys
+ static inline unsigned long virt_to_phys(volatile void *address)
+ {
+ 	return __pa((unsigned long)address);
+ }
++#endif
+ 
++#ifndef phys_to_virt
++#define phys_to_virt phys_to_virt
+ static inline void *phys_to_virt(unsigned long address)
+ {
+ 	return __va(address);
+@@ -329,14 +439,20 @@ static inline void iounmap(void __iomem *addr)
+ 
+ #ifdef CONFIG_HAS_IOPORT_MAP
+ #ifndef CONFIG_GENERIC_IOMAP
++#ifndef ioport_map
++#define ioport_map ioport_map
+ static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+ {
+-	return (void __iomem *) port;
++	return PCI_IOBASE + port;
+ }
++#endif
+ 
++#ifndef ioport_unmap
++#define ioport_unmap ioport_unmap
+ static inline void ioport_unmap(void __iomem *p)
+ {
+ }
++#endif
+ #else /* CONFIG_GENERIC_IOMAP */
+ extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
+ extern void ioport_unmap(void __iomem *p);
+-- 
+2.0.1
