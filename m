@@ -1,49 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jul 2014 10:49:26 +0100
-Subject: [PATCH 2/2] arm: add early_ioremap support
-In-Reply-To: <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20140709094926.GP21766@n2100.arm.linux.org.uk>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Wed, 9 Jul 2014 11:55:52 +0200
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20140709095552.GA25154@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 10:39:52AM +0100, Leif Lindholm wrote:
-> +config EARLY_IOREMAP
-> +	depends on MMU
-> +	bool "Provide early_ioremap() support for kernel initialization."
-> +	select GENERIC_EARLY_IOREMAP
+On 2014-07-08 18:46:39 [+0530], Mugunthan V N wrote:
+> Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
 
-Nit: please order as bool, then depends, then select.
+I reverted my patch, applied this one and after boot I got:
 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8a16ee5..aa2621a 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -36,6 +36,7 @@
->  #include <asm/cpu.h>
->  #include <asm/cputype.h>
->  #include <asm/elf.h>
-> +#include <asm/io.h>
+|platform 48485000.mdio: Cannot lookup hwmod 'davinci_mdio'
+|cpsw 48484000.ethernet: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+|davinci_mdio 48485000.mdio: failed to get device clock
+|davinci_mdio: probe of 48485000.mdio failed with error -2
+|cpsw 48484000.ethernet: Random MACID = 46:c6:34:6f:8d:c6
+| (null): fck is not found
 
-Please always use linux/io.h in preference to asm/io.h.
+with no eth0. Is there something with my setup? I still have the device
+tree pieces I posted (in case there is something wrong with them).
 
-> +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-> +{
-> +	unsigned int index = pgd_index(addr);
-> +	pgd_t *pgd = cpu_get_pgd() + index;
-
-What is the reasoning for using cpu_get_pgd() ?  Is there some specific
-reason you want to read from the hardware register rather than using
-the pgd_offset_k() macro here?
-
-> +void __init
-> +early_ioremap_shutdown(void)
-
-Nit: should be a single line.
-
-The rest of the patch looks fine, thanks.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Sebastian
