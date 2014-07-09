@@ -1,197 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 9 Jul 2014 08:49:29 +0200
-Subject: [PATCH v2 6/7] ata: Add support for the Tegra124 SATA controller
-In-Reply-To: <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
-References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
- <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140709064928.GC3170@ulmo>
+From: jerome.forissier@huawei.com (Jerome FORISSIER)
+Date: Wed, 9 Jul 2014 09:08:39 +0200
+Subject: [PATCH 1/3] mtd: hisilicon: add device tree node for nand
+ controller
+In-Reply-To: <1404115409-20200-2-git-send-email-wangzhou.bry@gmail.com>
+References: <1404115409-20200-1-git-send-email-wangzhou.bry@gmail.com>
+ <1404115409-20200-2-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <53BCEA77.2080004@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 05:23:25PM +0300, Mikko Perttunen wrote:
-[...]
-> diff --git a/drivers/ata/ahci_tegra.c b/drivers/ata/ahci_tegra.c
-[...]
-> +#include <linux/ahci_platform.h>
-> +#include <linux/reset.h>
-> +#include <linux/errno.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/tegra-powergate.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/tegra-soc.h>
-> +#include "ahci.h"
+On 30-Jun-14 10:03, Zhou Wang wrote:
+> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+> ---
+>  arch/arm/boot/dts/hip04.dtsi |   31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+> index abb42ca..e63fc61 100644
+> --- a/arch/arm/boot/dts/hip04.dtsi
+> +++ b/arch/arm/boot/dts/hip04.dtsi
+> @@ -386,5 +386,36 @@
+>  				interrupts = <0 389 4>;
+>  			};
+>  		};
 > +
-> +#define SATA_CONFIGURATION_0				0x180
-> +#define		SATA_CONFIGURATION_EN_FPCI		BIT(0)
+> +		nand: nand at 4020000 {
+> +			compatible = "hisilicon,504-nfc";
 
-This, and the register/field definitions below look weirdly indented,
-but I guess that's mostly a matter of taste.
+In PATCH 2/3 and 3/3 you are using "hisilicon,nfc504".
 
-> +#define T_SATA0_CHX_PHY_CTRL1_GEN1			0x690
-> +#define		T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_MASK	0xff
-> +#define		T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_SHIFT	0
-> +#define		T_SATA0_CHX_PHY_CTRL1_GEN1_TX_PEAK_MASK	(0xff<<8)
-
-Perhaps single spaces around "<<"? The same for other occurrences below.
-
-> +struct sata_pad_calibration {
-> +	u8 gen1_tx_amp, gen1_tx_peak, gen2_tx_amp, gen2_tx_peak;
-> +};
-
-I think a more idiomatic way would be to put the fields in a structure
-declaration on separate lines.
-
-> +static const struct sata_pad_calibration tegra124_pad_calibration[] = {
-> +	{0x18, 0x04, 0x18, 0x0a},
-
-Maybe spaces after '{' and before '}'?
-
-> +static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
-> +{
-> +	struct tegra_ahci_priv *tegra = hpriv->plat_data;
-> +	int ret;
+> +			reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
+> +			interrupts = <0 379 4>;
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "none";
+> +			hisi,nand-ecc-bits = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
 > +
-> +	ret = regulator_bulk_enable(ARRAY_SIZE(tegra->supplies),
-> +				    tegra->supplies);
-> +	if (ret)
-> +		return ret;
+> +			partition at 0 {
+> +				label = "nand_text";
+> +				reg = <0x00000000 0x00400000>;
+> +			};
 > +
-> +	ret = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_SATA,
-> +		tegra->sata_clk, tegra->sata_rst);
-
-These could be aligned with TEGRA_POWERGATE_SATA.
-
-> +	ret = clk_prepare_enable(tegra->cml1_clk);
-> +	if (ret) {
-> +		clk_disable_unprepare(tegra->sata_oob_clk);
-> +		goto disable_power;
-> +	}
+> +			partition at 00400000 {
+> +				label = "nand_monitor";
+> +				reg = <0x00400000 0x00400000>;
+> +			};
 > +
-> +	ret = clk_prepare_enable(tegra->plle_clk);
-> +	if (ret) {
-> +		clk_disable_unprepare(tegra->cml1_clk);
-> +		clk_disable_unprepare(tegra->sata_oob_clk);
-> +		goto disable_power;
-> +	}
+> +			partition at 00800000 {
+> +				label = "nand_kernel";
+> +				reg = <0x00800000 0x00800000>;
+> +			};
 > +
-> +	reset_control_deassert(tegra->sata_cold_rst);
-> +	reset_control_deassert(tegra->sata_oob_rst);
-> +
-> +	ret = phy_power_on(tegra->padctl_phy);
-> +	if (ret) {
-> +		clk_disable_unprepare(tegra->plle_clk);
-> +		clk_disable_unprepare(tegra->cml1_clk);
-> +		clk_disable_unprepare(tegra->sata_oob_clk);
-> +		goto disable_power;
-> +	}
+> +			partition at 01000000 {
+> +				label = "nand_fs";
+> +				reg = <0x01000000 0x1f000000>;
+> +			};
+> +		};
+>  	};
+>  };
+> 
 
-These error paths might be more readable if you did unwind them similar
-to how you did with sata_clk below.
-
-> +static int tegra_ahci_controller_init(struct ahci_host_priv *hpriv)
-> +{
-> +	struct tegra_ahci_priv *tegra = hpriv->plat_data;
-> +	int ret;
-> +	unsigned int val;
-> +	struct sata_pad_calibration calib;
-> +
-> +	ret = tegra_ahci_power_on(hpriv);
-> +	if (ret) {
-> +		dev_err(&tegra->pdev->dev,
-> +			"failed to power on ahci controller: %d\n", ret);
-
-s/ahci/AHCI/
-
-> +		return ret;
-> +	}
-> +
-> +	val = readl(tegra->sata_regs + SATA_CONFIGURATION_0);
-> +	val |= SATA_CONFIGURATION_EN_FPCI;
-> +	writel(val, tegra->sata_regs + SATA_CONFIGURATION_0);
-> +
-> +	/* Pad calibration */
-> +
-> +	ret = tegra_fuse_readl(FUSE_SATA_CALIB, &val);
-> +	if (ret) {
-> +		dev_err(&tegra->pdev->dev,
-> +			"failed to read sata calibration fuse: %d\n", ret);
-
-s/sata/SATA/
-
-> +static struct ata_port_operations ahci_tegra_port_ops = {
-> +	.inherits	= &ahci_ops,
-> +	.host_stop	= tegra_ahci_host_stop,
-> +};
-> +
-> +static const struct ata_port_info ahci_tegra_port_info = {
-> +	.flags		= AHCI_FLAG_COMMON,
-> +	.pio_mask	= ATA_PIO4,
-> +	.udma_mask	= ATA_UDMA6,
-> +	.port_ops	= &ahci_tegra_port_ops,
-> +};
-
-I prefer these to not be arbitrarily indented, but Tejun seemed to
-indicate he did, so it's ultimately his call.
-
-> +static const struct of_device_id tegra_ahci_of_match[] = {
-> +	{ .compatible = "nvidia,tegra124-ahci" },
-> +	{},
-
-Technically there's no need for the comma at the end here. Usually you'd
-put one here so that if somebody ever were to add a new entry after this
-the diff wouldn't need to include the line that you only add a comma to.
-But in this particular case the last entry is used as a sentinel, so
-leaving away the comma is actually useful as a hint that entries should
-be added in front rather than at the end.
-
-> +	hpriv->mmio = devm_ioremap_resource(&pdev->dev,
-> +		platform_get_resource(pdev, IORESOURCE_MEM, 0));
-
-Perhaps a temporary variable for the result of platform_get_resource()
-would help make this look less cluttered.
-
-> +	if (IS_ERR(hpriv->mmio)) {
-> +		dev_err(&pdev->dev, "Failed to get AHCI IO memory\n");
-
-This isn't necessary. devm_ioremap_resource() will already output an
-error message.
-
-> +	tegra->sata_regs = devm_ioremap_resource(&pdev->dev,
-> +		platform_get_resource(pdev, IORESOURCE_MEM, 1));
-> +	if (IS_ERR(tegra->sata_regs)) {
-> +		dev_err(&pdev->dev, "Failed to get SATA IO memory\n");
-
-Same here.
-
-> +	tegra->padctl_phy = devm_phy_get(&pdev->dev, "sata-phy");
-> +	if (IS_ERR(tegra->padctl_phy)) {
-> +		dev_err(&pdev->dev, "Failed to get phy\n");
-
-s/phy/PHY/
-
-> +	ret = devm_regulator_bulk_get(&pdev->dev, ARRAY_SIZE(tegra->supplies),
-> +					tegra->supplies);
-
-The trailing argument here isn't aligned as in other places.
-
-> +static struct platform_driver tegra_ahci_driver = {
-> +	.probe = tegra_ahci_probe,
-> +	.remove = ata_platform_remove_one,
-> +	.driver = {
-> +		.name = "tegra-ahci",
-> +		.owner = THIS_MODULE,
-
-This isn't really needed anymore, module_platform_driver will end up
-setting this for you anyway.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/cc582e79/attachment.sig>
+-- 
+Jerome
