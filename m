@@ -1,68 +1,55 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 9 Jul 2014 14:08:16 +0300
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140709102551.GA19357@ulmo>
-References: <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
- <53A1B252.1030204@wwwdotorg.org>
- <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
- <53A3096B.1040409@wwwdotorg.org>
- <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
- <20140708130501.GC9516@ulmo>
- <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
- <20140709063130.GA3170@ulmo>
- <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
- <20140709102551.GA19357@ulmo>
-Message-ID: <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
+From: a0393675@ti.com (Keerthy)
+Date: Wed, 9 Jul 2014 16:36:49 +0530
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <20140709110051.GQ28884@atomide.com>
+References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+ <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
+ <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
+ <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
+ <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
+ <20140709105055.GP28884@atomide.com> <53BD1FC3.6050500@ti.com>
+ <20140709110051.GQ28884@atomide.com>
+Message-ID: <53BD2249.2080808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 12:25:52PM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Wed, Jul 09, 2014 at 11:33:11AM +0300, Peter De Schrijver wrote:
-> > On Wed, Jul 09, 2014 at 08:31:32AM +0200, Thierry Reding wrote:
-> > > > Old Signed by an unknown key
-> > > 
-> > > On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
-> > > > > > 
-> > > > > > Yes, but the problem is that you also need clocks and reset of other modules
-> > > > > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
-> > > > > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
-> > > > > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
-> > > > > > someday which means we would need to control the domain and therefore would
-> > > > > > need to tell that driver about the ISPs clocks and resets even though the
-> > > > > > driver doesn't know anything about the ISP hw otherwise.
-> > > > > 
-> > > > > Can't we make powergates reference counted so that they don't get
-> > > > > disabled as long as there are any users? Looking for example at the
-> > > > 
-> > > > We could, but then why not switch to the powerdomain code and make powering
-> > > > off a domain a NOP until we sorted out the context save/restore or fixed
-> > > > the framework to allow for suspend without turning off the domains?
-> > > 
-> > > Well, one of the reasons why I'm not sure it's worth the effort at this
-> > > point is that we can't get rid of the tegra_powergate_*() API anyway
-> > > because of backwards compatibility. So we're going to add code (without
-> > > getting rid of old code) merely to support some generic framework. That
-> > > doesn't sound very useful to me.
-> > > 
-> > 
-> > We can also convert the existing users to genpd. Today there are only 2 users
-> > (gpu/drm/tegra/gr3d.c and pci/host/pci-tegra.c), so that doesn't seem to be
-> > an impossible task.
-> 
-> We can certainly do that. What I'm trying to say is that since people
-> may be running newer versions of the kernel with a DTB that doesn't have
-> the necessary properties to hook up power domains, we have to keep calls
-> to tegra_powergate_*() functions as-is, lest we break those setups.
-> 
+On Wednesday 09 July 2014 04:30 PM, Tony Lindgren wrote:
+> * Keerthy <a0393675@ti.com> [140709 03:59]:
+>> On Wednesday 09 July 2014 04:20 PM, Tony Lindgren wrote:
+>>> * Keerthy <a0393675@ti.com> [140709 03:39]:
+>>>> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
+>>>>> * Keerthy <a0393675@ti.com> [140709 02:36]:
+>>>>>> On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
+>>>>>>> * Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
+>>>>>>>> --- a/arch/arm/boot/dts/dra7-evm.dts
+>>>>>>>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+>>>>>>>> @@ -249,6 +249,7 @@
+>>>>>>>>   					regulator-min-microvolt = <1050000>;
+>>>>>>>>   					regulator-max-microvolt = <1050000>;
+>>>>>>>>   					regulator-boot-on;
+>>>>>>>> +					regulator-always-on;
+>>>>>>>>   				};
+>>>>>>> Is this regulator really always on?
+>>>>>> This feeds on to RTC which is a free running clock. So i guess always on is
+>>>>>> justified no?
+>>>>> Well the dts entries should describe the hardware. If the
+>>>>> regulator can be enabled and disabled, we should not claim it's
+>>>>> always on.
+>>>>  From the PMIC perspective every regulator can be enabled and
+>>>> disabled. From a Board perspective there are some which need
+>>>> to be always on. For Ex: SMPS123 which feeds on to the MPU.
+>>> Right, and we already have regulator-boot-on for those. Or are
+>>> you seeing some issue with that?
+>> regulator-boot-on describes that at boot a particular regulator is on.
+>> It does not guarantee that it will be on for the rest of the time. The
+>> regulator framework can go ahead and disable it if no one has requested
+>> for it. In case of RTC we do not want that to happen.
+> That's a bug in the RTC driver then. The driver should request a
+> regulator if it's specified.
 
-For those 2 domains we can find the necessary clocks and resets by parsing
-the relevant existing DT nodes for PCIe and gr3d. For clocks, this isn't
-even needed as we can always register some extra clkdev's to get them. There
-is no equivalent for resets so we have to parse the gr3d and pcie DT nodes,
-but that's not too bad I think.
+Okay.
 
-Cheers,
-
-Peter.
+>
+> Regards,
+>
+> Tony
