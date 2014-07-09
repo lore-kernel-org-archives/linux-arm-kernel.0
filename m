@@ -1,24 +1,23 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 9 Jul 2014 02:27:12 -0700
-Subject: [PATCH v3 1/9] arm64: KVM: rename pm_fake handler to trap_raz_wi
-In-Reply-To: <1403269207-1625-2-git-send-email-marc.zyngier@arm.com>
-References: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
- <1403269207-1625-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140709092712.GA19801@cbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Jul 2014 10:33:09 +0100
+Subject: [PATCH C 1/7] net: fec: better implementation of iMX6
+ ERR006358 quirk
+In-Reply-To: <E1X4oCZ-0004Yk-1O@rmk-PC.arm.linux.org.uk>
+References: <20140708120117.GJ21766@n2100.arm.linux.org.uk>
+ <E1X4oCZ-0004Yk-1O@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140709093309.GM21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 01:59:59PM +0100, Marc Zyngier wrote:
-> pm_fake doesn't quite describe what the handler does (ignoring writes
-> and returning 0 for reads).
-> 
-> As we're about to use it (a lot) in a different context, rename it
-> with a (admitedly cryptic) name that make sense for all users.
-> 
-> Reviewed-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, Jul 09, 2014 at 10:30:11AM +0100, Russell King wrote:
+> Using a (delayed) workqueue for ERR006358 is not correct - a work queue
+> is a single-trigger device.  Once the work queue has been scheduled, it
+> can't be re-scheduled until it has been run.  This can cause problems -
+> with an appropriate packet timing, we can end up with packets queued,
+> but not sent by the hardware, resulting in the transmit timeout firing.
 
-didn't I already review this?  Did something change, it doesn't look
-like it from the changelog....
+Oops, please ignore this patch; re-sent in error.
 
-/me confused.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
