@@ -1,35 +1,79 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 9 Jul 2014 09:21:17 -0600
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <201407090820.49418.arnd@arndb.de>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <201407080900.44882.arnd@arndb.de> <20140708212951.GA4555@google.com>
- <201407090820.49418.arnd@arndb.de>
-Message-ID: <CAErSpo6Oj-0cceTRM838nAFsSAJ1R7XVtqtUWV+DocqM=iwyqQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 9 Jul 2014 08:22:05 -0700
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <53BC1A63.80900@samsung.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+ <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
+ <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
+ <53BC1A63.80900@samsung.com>
+Message-ID: <CAD=FV=XjWu6RQ+9789fzg08Whq-d=XWoeT+dZ7YQLLJvCBUfwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 08 July 2014, Bjorn Helgaas wrote:
+Vikas,
 
->> I think my confusion is because your pci_register_io_range() and
->> pci_addess_to_pci() implementations assume that every io_range starts at
->> I/O port 0 on PCI (correct me if I'm wrong).  I suspect that's why you
->> don't save the I/O port number in struct io_range.
+On Tue, Jul 8, 2014 at 9:20 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> On 08.07.2014 17:27, Doug Anderson wrote:
+>> Hi,
+>>
+>> On Tue, Jul 8, 2014 at 12:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>>>
+>>>> From: Doug Anderson <dianders@chromium.org>
+>>>>
+>>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>>>> being reset across sleep/wake.  If we don't set it to anything then
+>>>> the TPM will be reset.  U-Boot will detect this as invalid
+>>>> and will reset the system on resume time. This GPIO can always be low
+>>>> and not hurt anything.  It will get pulled back high again during a
+>>>> normal warm reset when it will default back to an input.
+>>>>
+>>>> To properly preserve the TPM state across suspend/resume and to make
+>>>> the chrome U-Boot happy, properly set the GPIO to mask the
+>>>> reset to the TPM.
+>>>>
+>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>>> (...)
+>>>> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
+>>>> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+>>>> +       compatible = "regulator-fixed";
+>>>
+>>> No matter how the discussion ends up, regulator-fixed is wrong.
+>>
+>> OK, fair enough.
+>>
+>>
+>>> Either folding it into the TPM driver or using a separate reset driver
+>>> is fine with me.
+>>
+>> OK, Vikas: do you want to code up the driver?
+>>
+>>
+>>> So what about the generic delayed reset GPIO thing?
+>>> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
+>>
+>> That's a neat concept and could be useful in other cases, but I think
+>> it's just as much of a hack as using a regulator.  This is not a reset
+>> signal for the TPM.  This is a signal that will mask the CPU's reset
+>> signal (using a special bit of board-specific logic).
+>>
+>>
+>> Personally I think Tomasz's idea of using hogs (after his patches
+>> allowing a default output level) is the cleanest, but I think Stephen
+>> didn't like that.
 >
-> I think you are just misreading the code, but I agree it's hard to
-> understand and I made the same mistake in my initial reply to the
-> first version.
+> I don't see any benefits of using complex interfaces over simply
+> initializing the pin to the right value once at boot-up or at
+> suspend/resume. As far as I understand Doug's explanation of the
+> problem, nothing else is expected from the OS with respect to this pin.
+> Moreover it doesn't affect operation of any drivers.
 >
-> pci_register_io_range and pci_address_to_pci only worry about the mapping
-> between CPU physical and Linux I/O address, they do not care which PCI
-> port numbers are behind that. The mapping between PCI port numbers and
-> Linux port numbers is done correctly in patch 8/9 in the
-> pci_host_bridge_of_get_ranges() function.
+> So I'm still for the simplest and effective solution, i.e. hogs.
 
-Ah, I see now.  Thanks for explaining this again (I see you explained
-it earlier; I just didn't understand it).  Now that I see it, it *is*
-very slick to handle both MMIO and PIO spaces the same way.
+It looks as if Tomasz's patch has landed, so perhaps you could try to
+code it up his way.  It should be very simple.  Please make sure to CC
+Stephen Warren on the patch so that he is included in the discussion
+(and of course include Tomasz, Linus W, etc).
 
-Bjorn
+-Doug
