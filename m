@@ -1,35 +1,29 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 09 Jul 2014 09:22:23 +0200
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140708134000.GC4979@htj.dyndns.org>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
-Message-ID: <53BCEDAF.8090308@redhat.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 9 Jul 2014 09:24:20 +0200
+Subject: a case for a common efuse API?
+In-Reply-To: <53BC4DD7.20906@codeaurora.org>
+References: <53BC4DD7.20906@codeaurora.org>
+Message-ID: <20140709072420.GI7827@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 07/08/2014 03:40 PM, Tejun Heo wrote:
-> (Cc'ing Hans.)
+On Tue, Jul 08, 2014 at 01:00:23PM -0700, Stephen Boyd wrote:
+> On MSM chips we have some efuses (called qfprom) where we store things
+> like calibration data, speed bins, etc.
+I don't have something constructive to say here, just want to point out
+that on efm32 there is something similar. It's called "Device
+Information (DI) Page" and contains "calibration values, a
+unique identification number and other useful data".
 
-Thanks for adding me to the loop.
+Currently it is unused in mainline, but in my tree I access it directly
+to determine cpu type (part number, part family number and Production
+ID), flash and ram size, and the calibration settings for the ADC.
 
-I've been reading the entire thread sofar, and here are my 2 cents:
+Best regards
+Uwe
 
-1) I think overall this is a good idea, and I like the suggested dt representation
-2) I agree with Tejun that it would be better to tie the phy to the port, and thus to
-add the struct phy * pointer to struct ahci_port_priv.
-
-One question 2 brings with it is how to deal with older device-tree files which
-have the phy directly in the ahci controller node. This seems to only be the
-case for the TI dra7 and omap5 platforms. Probably those have only 1 sata port
-(this needs to be verified), if that is the case we can simply hard code
-tying the phy to port 0 in this case, and we should probably also update their
-dts files in the kernel tree to use the new structure (while keeping the
-ahci driver compatible with the old structure for now).
-
-Regards,
-
-Hans
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
