@@ -1,61 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Jul 2014 16:16:18 +0100
-Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
- CRTCs
-In-Reply-To: <CAF6AEGtEUqK=YBWwOz8bf8a_e_p8-Y0vFYRfs2uxJ20015roOA@mail.gmail.com>
-References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
- <CAF6AEGtEUqK=YBWwOz8bf8a_e_p8-Y0vFYRfs2uxJ20015roOA@mail.gmail.com>
-Message-ID: <20140709151618.GU21766@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 9 Jul 2014 09:21:17 -0600
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <201407090820.49418.arnd@arndb.de>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <201407080900.44882.arnd@arndb.de> <20140708212951.GA4555@google.com>
+ <201407090820.49418.arnd@arndb.de>
+Message-ID: <CAErSpo6Oj-0cceTRM838nAFsSAJ1R7XVtqtUWV+DocqM=iwyqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 03, 2014 at 06:36:47PM -0400, Rob Clark wrote:
-> On Thu, Jul 3, 2014 at 12:49 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Add a helper to allow encoders to find their possible CRTCs from the
-> > OF graph without having to re-implement this functionality.  We add a
-> > device_node to drm_crtc which corresponds with the port node in the
-> > DT description of the CRTC device.
-> >
-> > We can then scan the DRM device list for CRTCs to find their index,
-> > matching the appropriate CRTC using the port device_node, thus building
-> > up the possible CRTC mask.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> > This helper will be shared between imx-drm and Armada DRM, and should
-> > be useful for other OF-based drivers.  At the moment, this is being
-> > sent for comments and acks; I need to build upon this patch in order
-> > to convert Armada DRM to DT.
-> >
-> >  drivers/gpu/drm/Makefile |  1 +
-> >  drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/drm/drm_crtc.h   |  2 ++
-> >  include/drm/drm_of.h     | 18 ++++++++++++++
-> 
-> oh, probably also should get links in Documentation/DocBook/drm.tmpl
+On Wed, Jul 9, 2014 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 July 2014, Bjorn Helgaas wrote:
 
-Hmm... can you advise a suitable location... I've never touched that
-stuff before, and it seems I can't even get it to build on my machine:
+>> I think my confusion is because your pci_register_io_range() and
+>> pci_addess_to_pci() implementations assume that every io_range starts at
+>> I/O port 0 on PCI (correct me if I'm wrong).  I suspect that's why you
+>> don't save the I/O port number in struct io_range.
+>
+> I think you are just misreading the code, but I agree it's hard to
+> understand and I made the same mistake in my initial reply to the
+> first version.
+>
+> pci_register_io_range and pci_address_to_pci only worry about the mapping
+> between CPU physical and Linux I/O address, they do not care which PCI
+> port numbers are behind that. The mapping between PCI port numbers and
+> Linux port numbers is done correctly in patch 8/9 in the
+> pci_host_bridge_of_get_ranges() function.
 
-Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
-Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
-Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
-Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
-  DOCPROC Documentation/DocBook/w1.xml
-  DOCPROC Documentation/DocBook/writing_musb_glue_layer.xml
-  PDF     Documentation/DocBook/z8530book.pdf
-Making portrait pages on A4 paper (210mmx297mm)
-sh: /usr/share/xmlto/format/docbook/../fo/pdf: No such file or directory
-make[2]: *** [Documentation/DocBook/z8530book.pdf] Error 1
-make[2]: *** Waiting for unfinished jobs....
-make[1]: *** [pdfdocs] Error 2
-make: *** [sub-make] Error 2
+Ah, I see now.  Thanks for explaining this again (I see you explained
+it earlier; I just didn't understand it).  Now that I see it, it *is*
+very slick to handle both MMIO and PIO spaces the same way.
 
-I guess my install is too old for it.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Bjorn
