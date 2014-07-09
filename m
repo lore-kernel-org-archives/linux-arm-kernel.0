@@ -1,110 +1,60 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 9 Jul 2014 17:00:07 +0530
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <53BC0F8F.4010106@samsung.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
- <53A12EA3.5010007@samsung.com>
- <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
- <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
- <53BC0F8F.4010106@samsung.com>
-Message-ID: <CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 09 Jul 2014 13:35:57 +0200
+Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140709111705.GR28884@atomide.com>
+References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
+ <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
+ <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
+ <20140709111705.GR28884@atomide.com>
+Message-ID: <53BD291D.3040307@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On 8 July 2014 21:04, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul,
->
-> On 07.07.2014 15:37, Rahul Sharma wrote:
->> Hi Andrej, Inki,
+On 07/09/2014 01:17 PM, Tony Lindgren wrote:
+> * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [140707 06:22]:
+>> On Fri,  4 Jul 2014 18:34:10 +0200
+>> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
 >>
->> On 18 June 2014 12:06, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->>> Hi Andrej,
->>>
->>> On 18 June 2014 11:46, Andrzej Hajda <a.hajda@samsung.com> wrote:
->>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
->>>>> Hi All,
->>>>>
->>>>> Please review this patch.
->>>>>
->>>>> Regards,
->>>>> Rahul Sharma
->>>>>
->>>>> On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->>>>>> Display domain is removed due to instability issues. Explaining
->>>>>> the problem below:
->>>>>>
->>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
->>>>>> powers off the unused power domains. This call hits before
->>>>>> the trigger to deferred probes.
->>>>>>
->>>>>> DRM DP Panel defers the probe due to supply get failure. By the
->>>>>> time, deferred probe is scheduled again, Display Power Domain is
->>>>>> powered off by pm_genpd_poweroff_unused.
->>>>>>
->>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
->>>>>> callbacks. If display domain is enabled/disabled around register
->>>>>> accesses, display domain gets unstable and we are getting Power
->>>>>> Domain Disable fail notification. Increasing the Timeout also
->>>>>> didn't help.
->>>>
->>>> As I understand the problem is that fimd and dp drivers access hw
->>>> registers without enabling power domain. So the proper solution is to
->>>> fix these drivers.
->>>
->>> That is also a problem but I fixed those accesses in my local kernel before
->>> hitting this issue. If we do register accesses in FIMD/DP probe/bind we
->>> observes "Prefetch abort" exception. But here the problem is that 'DP
->>> domain disable' starts failing if we enable/disable multiple times.
->>>
->>>>
->>>> Btw. there are already patches removing hw access from probe/bind of
->>>> fimd. I guess removing also hw access from dp probe/bind could be a good
->>>> solution.
->>>
->>> Please let me know the links for posted patches. I will test with those patches.
+>>> While comparing the OMAP-serial and the 8250 part of this I noticed that
+>>> the the latter does not use runtime-pm.
 >>
->> Is there any update on this? Please share the patches which fixes the
->> above issue or avoid the above scenario of multiple PM Domain enable/disable.
->> I will test them for exynos5 based boards. Otherwise we should get this change
->> merged else display will remain broken for exynos5 based boards.
+>> Yes it does, but 8250 parts (generally - omap presumably is special
+>> here ?) need to be powered on to transmit/receive not just for register
+>> access. The core uart layer implements a "pm" operation for this.
+> 
+> At least for omaps the UARTs need to be idled for the SoC to
+> hit off-idle where the SoC is powered off and rebooted during
+> idle.
 >
-> Andrzej is on holidays right now, so he won't be able to reply in this
-> thread until he's back. Here are two patches I was able to find on the
-> related MLs that might be fixing the cause of your issues:
+> So we can certainly enable this in a generic way, however, this
+> can only be done under the following conditions:
+> 
+> 1. We can save and restore the serial register context and detect
+>    when context was lost in the serial driver. The context loss
+>    can be detected by looking at some registers that are only
+>    initialized during init.
 
-Ok. thanks for the update.
+A register check on restore context? DLL+DLH might be a good hint here
+since its value should be >0 in the running case.
 
-We should test with Ajay's patches which includes DP probe deferring
-based on availability of bridge chip. +
+> 
+> 2. There's a way for the serial RX pin to wake the SoC. On some
+>    omaps there's a separate pin specific wake-up interrupt that
+>    can be used for that.
 
-few patches which cleanup register access in FIMD and DP probe/bind
-OR
-few patches to enable Display power domain and clocks just before the
-register access. As done in https://lkml.org/lkml/2014/7/4/188.
+That one would be handled by omap separately.
 
-Later solution results into display power domain enable failure in case of DRM
-probe defer.
+> 3. The serial PM features must be only enabled if requested by
+>    the user via sysfs. Typically extra latency and loss of the
+>    first RX character occur which is not acceptable to most
+>    applications.
 
-I am just curious if Andrej has some solution for the first approach which can
-be tested for defer probe and S2R scenarios.
+Unless I'm mistaken the omap driver now initializes the timeout to -1.
+So nothing happens unless this is enabled separately.
 
-Regards,
-Rahul Sharma.
+> Regards,
+> 
+> Tony
+> 
 
->
-> [PATCH] drm/exynos: remove hardware overlays disable from fimd probe
-> (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
->
-> [PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
-> (https://lkml.org/lkml/2014/7/4/188)
->
-> Best regards,
-> Tomasz
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sebastian
