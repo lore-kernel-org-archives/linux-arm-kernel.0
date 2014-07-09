@@ -1,168 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  8 Jul 2014 18:36:06 -0700
-Subject: [PATCH v2] clk: qcom: Fix MN frequency tables, parent map, and jpegd
-Message-ID: <1404869766-6311-1-git-send-email-sboyd@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 08 Jul 2014 18:43:36 -0700
+Subject: arm64 flushing 255GB of vmalloc space takes too long
+Message-ID: <53BC9E48.7040809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clocks that don't have a pre-divider don't list any pre-divider
-in their frequency tables, but their tables are initialized using
-aggregate initializers. Use tagged initializers so we properly
-assign the m and n values for each frequency. Furthermore, the
-mmcc_pxo_pll8_pll2_pll3 array improperly mapped the second
-element to pll2 instead of pll8, causing the clock driver to
-recalculate the wrong rate for any clocks using this array along
-with a rate that uses pll2. Plus the .num_parents field is 3
-instead of 4 so you can't even switch the parent to pll3. Finally
-I noticed that the jpegd clock improperly indicates that the
-pre-divider width is only 2, when it's actually 4 bits wide.
+Hi,
 
-Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia clock controller (MMCC)"
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+I have an arm64 target which has been observed hanging in __purge_vmap_area_lazy
+in vmalloc.c The root cause of this 'hang' is that flush_tlb_kernel_range is
+attempting to flush 255GB of virtual address space. This takes ~2 seconds and
+preemption is disabled at this time thanks to the purge lock. Disabling
+preemption for that time is long enough to trigger a watchdog we have setup.
 
- Changes since v1:
-  - num_parents for gfx3d should be 4, not 3.
+Triggering this is fairly easy:
+1) Early in bootup, vmalloc > lazy_max_pages. This gives an address near the
+start of the vmalloc range.
+2) load a module
+3) vfree the vmalloc region from step 1
+4) unload the module
 
- drivers/clk/qcom/mmcc-msm8960.c | 82 +++++++++++++++++++++--------------------
- 1 file changed, 42 insertions(+), 40 deletions(-)
+The arm64 virtual address layout looks like
+vmalloc : 0xffffff8000000000 - 0xffffffbbffff0000   (245759 MB)
+vmemmap : 0xffffffbc02400000 - 0xffffffbc03600000   (    18 MB)
+modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
 
-diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-index 12f3c0b64fcd..10d2f135dfba 100644
---- a/drivers/clk/qcom/mmcc-msm8960.c
-+++ b/drivers/clk/qcom/mmcc-msm8960.c
-@@ -38,6 +38,8 @@
- #define P_PLL2	2
- #define P_PLL3	3
- 
-+#define F_MN(f, s, _m, _n) { .freq = f, .src = s, .m = _m, .n = _n }
-+
- static u8 mmcc_pxo_pll8_pll2_map[] = {
- 	[P_PXO]		= 0,
- 	[P_PLL8]	= 2,
-@@ -59,8 +61,8 @@ static u8 mmcc_pxo_pll8_pll2_pll3_map[] = {
- 
- static const char *mmcc_pxo_pll8_pll2_pll3[] = {
- 	"pxo",
--	"pll2",
- 	"pll8_vote",
-+	"pll2",
- 	"pll3",
- };
- 
-@@ -710,18 +712,18 @@ static struct clk_branch csiphy2_timer_clk = {
- };
- 
- static struct freq_tbl clk_tbl_gfx2d[] = {
--	{  27000000, P_PXO,  1,  0 },
--	{  48000000, P_PLL8, 1,  8 },
--	{  54857000, P_PLL8, 1,  7 },
--	{  64000000, P_PLL8, 1,  6 },
--	{  76800000, P_PLL8, 1,  5 },
--	{  96000000, P_PLL8, 1,  4 },
--	{ 128000000, P_PLL8, 1,  3 },
--	{ 145455000, P_PLL2, 2, 11 },
--	{ 160000000, P_PLL2, 1,  5 },
--	{ 177778000, P_PLL2, 2,  9 },
--	{ 200000000, P_PLL2, 1,  4 },
--	{ 228571000, P_PLL2, 2,  7 },
-+	F_MN( 27000000, P_PXO,  1,  0),
-+	F_MN( 48000000, P_PLL8, 1,  8),
-+	F_MN( 54857000, P_PLL8, 1,  7),
-+	F_MN( 64000000, P_PLL8, 1,  6),
-+	F_MN( 76800000, P_PLL8, 1,  5),
-+	F_MN( 96000000, P_PLL8, 1,  4),
-+	F_MN(128000000, P_PLL8, 1,  3),
-+	F_MN(145455000, P_PLL2, 2, 11),
-+	F_MN(160000000, P_PLL2, 1,  5),
-+	F_MN(177778000, P_PLL2, 2,  9),
-+	F_MN(200000000, P_PLL2, 1,  4),
-+	F_MN(228571000, P_PLL2, 2,  7),
- 	{ }
- };
- 
-@@ -842,22 +844,22 @@ static struct clk_branch gfx2d1_clk = {
- };
- 
- static struct freq_tbl clk_tbl_gfx3d[] = {
--	{  27000000, P_PXO,  1,  0 },
--	{  48000000, P_PLL8, 1,  8 },
--	{  54857000, P_PLL8, 1,  7 },
--	{  64000000, P_PLL8, 1,  6 },
--	{  76800000, P_PLL8, 1,  5 },
--	{  96000000, P_PLL8, 1,  4 },
--	{ 128000000, P_PLL8, 1,  3 },
--	{ 145455000, P_PLL2, 2, 11 },
--	{ 160000000, P_PLL2, 1,  5 },
--	{ 177778000, P_PLL2, 2,  9 },
--	{ 200000000, P_PLL2, 1,  4 },
--	{ 228571000, P_PLL2, 2,  7 },
--	{ 266667000, P_PLL2, 1,  3 },
--	{ 300000000, P_PLL3, 1,  4 },
--	{ 320000000, P_PLL2, 2,  5 },
--	{ 400000000, P_PLL2, 1,  2 },
-+	F_MN( 27000000, P_PXO,  1,  0),
-+	F_MN( 48000000, P_PLL8, 1,  8),
-+	F_MN( 54857000, P_PLL8, 1,  7),
-+	F_MN( 64000000, P_PLL8, 1,  6),
-+	F_MN( 76800000, P_PLL8, 1,  5),
-+	F_MN( 96000000, P_PLL8, 1,  4),
-+	F_MN(128000000, P_PLL8, 1,  3),
-+	F_MN(145455000, P_PLL2, 2, 11),
-+	F_MN(160000000, P_PLL2, 1,  5),
-+	F_MN(177778000, P_PLL2, 2,  9),
-+	F_MN(200000000, P_PLL2, 1,  4),
-+	F_MN(228571000, P_PLL2, 2,  7),
-+	F_MN(266667000, P_PLL2, 1,  3),
-+	F_MN(300000000, P_PLL3, 1,  4),
-+	F_MN(320000000, P_PLL2, 2,  5),
-+	F_MN(400000000, P_PLL2, 1,  2),
- 	{ }
- };
- 
-@@ -897,7 +899,7 @@ static struct clk_dyn_rcg gfx3d_src = {
- 		.hw.init = &(struct clk_init_data){
- 			.name = "gfx3d_src",
- 			.parent_names = mmcc_pxo_pll8_pll2_pll3,
--			.num_parents = 3,
-+			.num_parents = 4,
- 			.ops = &clk_dyn_rcg_ops,
- 		},
- 	},
-@@ -995,7 +997,7 @@ static struct clk_rcg jpegd_src = {
- 	.ns_reg = 0x00ac,
- 	.p = {
- 		.pre_div_shift = 12,
--		.pre_div_width = 2,
-+		.pre_div_width = 4,
- 	},
- 	.s = {
- 		.src_sel_shift = 0,
-@@ -1342,15 +1344,15 @@ static struct clk_branch hdmi_app_clk = {
- };
- 
- static struct freq_tbl clk_tbl_vcodec[] = {
--	{  27000000, P_PXO,  1,  0 },
--	{  32000000, P_PLL8, 1, 12 },
--	{  48000000, P_PLL8, 1,  8 },
--	{  54860000, P_PLL8, 1,  7 },
--	{  96000000, P_PLL8, 1,  4 },
--	{ 133330000, P_PLL2, 1,  6 },
--	{ 200000000, P_PLL2, 1,  4 },
--	{ 228570000, P_PLL2, 2,  7 },
--	{ 266670000, P_PLL2, 1,  3 },
-+	F_MN( 27000000, P_PXO,  1,  0),
-+	F_MN( 32000000, P_PLL8, 1, 12),
-+	F_MN( 48000000, P_PLL8, 1,  8),
-+	F_MN( 54860000, P_PLL8, 1,  7),
-+	F_MN( 96000000, P_PLL8, 1,  4),
-+	F_MN(133330000, P_PLL2, 1,  6),
-+	F_MN(200000000, P_PLL2, 1,  4),
-+	F_MN(228570000, P_PLL2, 2,  7),
-+	F_MN(266670000, P_PLL2, 1,  3),
- 	{ }
- };
- 
+and the algorithm in __purge_vmap_area_lazy flushes between the lowest address.
+Essentially, if we are using a reasonable amount of vmalloc space and a module
+unload triggers a vmalloc purge, we will end up triggering our watchdog.
+
+A couple of options I thought of:
+1) Increase the timeout of our watchdog to allow the flush to occur. Nobody
+I suggested this to likes the idea as the watchdog firing generally catches
+behavior that results in poor system performance and disabling preemption
+for that long does seem like a problem.
+2) Change __purge_vmap_area_lazy to do less work under a spinlock. This would
+certainly have a performance impact and I don't even know if it is plausible.
+3) Allow module unloading to trigger a vmalloc purge beforehand to help avoid
+this case. This would still be racy if another vfree came in during the time
+between the purge and the vfree but it might be good enough.
+4) Add 'if size > threshold flush entire tlb' (I haven't profiled this yet)
+
+
+Any other thoughts?
+
+Thanks,
+Laura
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
