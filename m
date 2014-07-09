@@ -1,35 +1,40 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:47 +0200
-Subject: [PATCHv3 19/34] ARM: at91/dt: evk-pro3: define slow crytal frequency
+Date: Wed,  9 Jul 2014 17:06:48 +0200
+Subject: [PATCHv3 20/34] ARM: at91/dt: ethernut5: define crystals frequencies
 In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-20-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-21-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Telit EVK-PRO3 slow crystal frequency
+Define egnite Ethernut 5 main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Tim Schendekehl <tim.schendekehl@egnite.de>
 ---
- arch/arm/boot/dts/evk-pro3.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/ethernut5.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-index 4d829685fdfb..f72969efe6d7 100644
---- a/arch/arm/boot/dts/evk-pro3.dts
-+++ b/arch/arm/boot/dts/evk-pro3.dts
-@@ -15,6 +15,12 @@
- 	model = "Telit EVK-PRO3 for Telit GE863-PRO3";
- 	compatible = "telit,evk-pro3", "atmel,at91sam9260", "atmel,at91sam9";
+diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
+index 143b6d25bc80..8f941c2db7c6 100644
+--- a/arch/arm/boot/dts/ethernut5.dts
++++ b/arch/arm/boot/dts/ethernut5.dts
+@@ -20,6 +20,16 @@
+ 		reg = <0x20000000 0x08000000>;
+ 	};
  
 +	clocks {
 +		slow_xtal {
 +			clock-frequency = <32768>;
 +		};
++
++		main_xtal {
++			clock-frequency = <18432000>;
++		};
 +	};
 +
  	ahb {
  		apb {
- 			macb0: ethernet at fffc4000 {
+ 			dbgu: serial at fffff200 {
 -- 
 1.9.1
