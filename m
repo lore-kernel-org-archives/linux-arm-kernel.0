@@ -1,76 +1,46 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 9 Jul 2014 14:11:18 -0400
-Subject: [PATCH RFC] drm: add of_graph endpoint helper to find possible
- CRTCs
-In-Reply-To: <20140709151618.GU21766@n2100.arm.linux.org.uk>
-References: <E1X2kC1-0000sH-C6@rmk-PC.arm.linux.org.uk>
- <CAF6AEGtEUqK=YBWwOz8bf8a_e_p8-Y0vFYRfs2uxJ20015roOA@mail.gmail.com>
- <20140709151618.GU21766@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGt0yq-Feuq13ewY7_4YkgOW6FKjLHnNDELXiyzOWdO5=w@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 09 Jul 2014 20:15:21 +0200
+Subject: [PATCH v7 04/24] mfd: max77686: Make platform data over-rule
+ DT
+In-Reply-To: <20140709145203.GF2635@lee--X1>
+References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404505467-26526-5-git-send-email-javier.martinez@collabora.co.uk>
+ <20140709145203.GF2635@lee--X1>
+Message-ID: <53BD86B9.4000907@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 11:16 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jul 03, 2014 at 06:36:47PM -0400, Rob Clark wrote:
->> On Thu, Jul 3, 2014 at 12:49 PM, Russell King
->> <rmk+kernel@arm.linux.org.uk> wrote:
->> > Add a helper to allow encoders to find their possible CRTCs from the
->> > OF graph without having to re-implement this functionality.  We add a
->> > device_node to drm_crtc which corresponds with the port node in the
->> > DT description of the CRTC device.
->> >
->> > We can then scan the DRM device list for CRTCs to find their index,
->> > matching the appropriate CRTC using the port device_node, thus building
->> > up the possible CRTC mask.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> > ---
->> > This helper will be shared between imx-drm and Armada DRM, and should
->> > be useful for other OF-based drivers.  At the moment, this is being
->> > sent for comments and acks; I need to build upon this patch in order
->> > to convert Armada DRM to DT.
->> >
->> >  drivers/gpu/drm/Makefile |  1 +
->> >  drivers/gpu/drm/drm_of.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++
->> >  include/drm/drm_crtc.h   |  2 ++
->> >  include/drm/drm_of.h     | 18 ++++++++++++++
->>
->> oh, probably also should get links in Documentation/DocBook/drm.tmpl
+Hello Lee,
+
+On 07/09/2014 04:52 PM, Lee Jones wrote:
+> On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
+> 
+>> The function max77802_i2c_parse_dt_pdata() should only be called
+>> if there isn't already platform data for the device.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  drivers/mfd/max77686.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> I assume some of these patches can be applied independently.
 >
-> Hmm... can you advise a suitable location... I've never touched that
-> stuff before, and it seems I can't even get it to build on my machine:
->
-> Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
-> Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
-> Warning(.../include/drm/drm_flip_work.h:68): No description found for parameter ')'
-> Warning(.../include/drm/drm_flip_work.h:68): Excess struct/union/enum/typedef member 'fifo' description in 'drm_flip_work'
->   DOCPROC Documentation/DocBook/w1.xml
->   DOCPROC Documentation/DocBook/writing_musb_glue_layer.xml
->   PDF     Documentation/DocBook/z8530book.pdf
-> Making portrait pages on A4 paper (210mmx297mm)
-> sh: /usr/share/xmlto/format/docbook/../fo/pdf: No such file or directory
-> make[2]: *** [Documentation/DocBook/z8530book.pdf] Error 1
-> make[2]: *** Waiting for unfinished jobs....
-> make[1]: *** [pdfdocs] Error 2
-> make: *** [sub-make] Error 2
 
-hmm, I usually use 'make htmldocs'.. hadn't really bothered to try to
-build pdf docs.   It was a while ago, but I think 'xmlto-tex' would be
-what you need for fedora to get docs to build.  Hopefully the package
-has a similar name on other distros.
+Yes, some patches can be applied independently and it would be quite helpful
+indeed since that will allow me to keep a smaller series :)
 
-There are unfortunately a lot of warnings..  the headerdoc stuff is
-not always as clever as you would like.
+> Let me know which ones and I'll apply them.  In the mean time:
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
 
-BR,
--R
+Patches 1-7 are just cleanups and improvements for max77686 mfd driver so they
+can be applied safely. You had already acked 1-6 and 7 is just a trivial patch
+so I guess you won't have issues with that one as well.
 
+Patches 11 and 14 are small patches for the max77802 clk driver and Mike already
+gave his Reviewed-by tag so if you are going to take the whole set through your
+tree those two patches are safe to be applied as well.
 
-> I guess my install is too old for it.
->
-> Thanks.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+Thanks a lot for your help and best regards,
+Javier
