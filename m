@@ -1,31 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:45 +0200
-Subject: [PATCHv3 17/34] ARM: at91/dt: ge863-pro3: define main crystal
- frequency
+Date: Wed,  9 Jul 2014 17:06:43 +0200
+Subject: [PATCHv3 15/34] ARM: at91/dt: qil_a9260: define crystals frequencies
 In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-18-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-16-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Telit GE863-PRO3 main crystal frequency.
+Define Calao QIL-A9260 main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
 ---
- arch/arm/boot/dts/ge863-pro3.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/at91-qil_a9260.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
-index 230099bb31c8..0d0e62489d93 100644
---- a/arch/arm/boot/dts/ge863-pro3.dtsi
-+++ b/arch/arm/boot/dts/ge863-pro3.dtsi
-@@ -19,6 +19,10 @@
+diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
+index 5576ae8786c0..a9aef53ab764 100644
+--- a/arch/arm/boot/dts/at91-qil_a9260.dts
++++ b/arch/arm/boot/dts/at91-qil_a9260.dts
+@@ -28,6 +28,14 @@
  			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <6000000>;
+ 			clock-frequency = <12000000>;
  		};
 +
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
 +		main_xtal {
-+			clock-frequency = <6000000>;
++			clock-frequency = <12000000>;
 +		};
  	};
  
