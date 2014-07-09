@@ -1,20 +1,28 @@
-From: tetra2005@gmail.com (Yuri Gribov)
-Date: Thu, 10 Jul 2014 00:40:58 +0400
-Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
- infrastructure.
-In-Reply-To: <87pphenxex.fsf@tassilo.jf.intel.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
- <87pphenxex.fsf@tassilo.jf.intel.com>
-Message-ID: <CAJOtW+5=5EGwLyAA+33y4E9UGuGHuXQkf6rTEsh0e7rqoNBKCg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 09 Jul 2014 22:42:25 +0200
+Subject: a case for a common efuse API?
+In-Reply-To: <53BC4DD7.20906@codeaurora.org>
+References: <53BC4DD7.20906@codeaurora.org>
+Message-ID: <53BDA931.5010600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 11:29 PM, Andi Kleen <andi@firstfloor.org> wrote:
-> Hardcoding --param is not very nice. They can change from compiler
-> to compiler version. Need some version checking?
+Hi Stephen,
 
-We plan to address this soon. CFLAGS will look more like
--fsanitize=kernel-address but this flag is not yet in gcc.
+On 08.07.2014 22:00, Stephen Boyd wrote:
+> Hi,
+> 
+> On MSM chips we have some efuses (called qfprom) where we store things
+> like calibration data, speed bins, etc. We need to read out data from
+> the efuses in various drivers like the cpufreq, thermal, etc. This
+> essentially boils down to a bunch of readls on the efuse from a handful
+> of different drivers.
 
--Y
+We have similar thing on Exynos SoCs as well. If you're interested in
+looking at our use cases, then there was an RFC series posted quite a
+long time ago [1], but then things stalled.
+
+[1] https://lkml.org/lkml/2013/11/15/155
+
+Best regards,
+Tomasz
