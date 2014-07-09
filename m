@@ -1,99 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  9 Jul 2014 15:54:33 +0800
-Subject: [PATCH v4 0/6] ARM: sun8i: Support A23 PRCM clock and reset
- controllers
-Message-ID: <1404892479-12222-1-git-send-email-wens@csie.org>
+Date: Wed,  9 Jul 2014 15:54:38 +0800
+Subject: [PATCH v4 5/6] serial: 8250_dw: Add support for deferred probing
+In-Reply-To: <1404892479-12222-1-git-send-email-wens@csie.org>
+References: <1404892479-12222-1-git-send-email-wens@csie.org>
+Message-ID: <1404892479-12222-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The 8250_dw driver fails to probe if the specified clock isn't
+registered at probe time. Even if a clock frequency is given,
+the required clock might be gated because it wasn't properly
+enabled.
 
-This is PRCM subset v4 of the sun8i A23 bring-up series. This subset
-includes clock and reset controller support for the PRCM (power,
-reset and clock module) on the A23 SoC. It is based on my previous
-series for basic sun8i A23 clocks [1].
+This happened to me when the device is registered through DT,
+and the clock was part of an MFD, the PRCM found on A31 and A23
+SoCs. Unlike core clocks that are registered with OF_CLK_DECLARE,
+which happen almost immediately after the kernel starts, the
+clocks are registered as sub-devices of the PRCM MFD platform
+device. Even though devices are registered in the order they are
+found in the DT, the drivers are registered in a different,
+arbitrary order. It is possible that the 8250_dw driver is
+registered, and thus associated with the device and probed, before
+the clock driver is registered and probed.
 
-Patch 1 modifies tha sun6i-a31-apb0-gates driver to use a bitmap
-to denote valid gate indices, instead of just counting "clock-names"
-from the DT possibly with "clock-indicies". This makes the driver
-consistent with the other sunxi clock gate drivers.
+8250_dw then reports unable to get the clock, and fails. Without
+a working console, the kernel panics.
 
-Patch 2 adds the A23 variant of apb0-gates, with A23 specific
-compatible and bitmap.
+This patch adds support for deferred probe handling for the clock
+and reset controller.
 
-Patch 3 adds support for A23's PRCM to the sun6i-prcm driver.
-The difference between the A23 and the A31 regarding the PRCM block
-is 2 clock muxes were removed, a divider clock has slightly difference
-dividers, and some clock gates are gone. The resources used are
-unchanged. Drivers for the 2 clock muxes are replaced with fixed-factor
-clocks in the DT. So the A23 variant is supported with the sun6i-prcm
-driver with a slightly different sub-device list.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/tty/serial/8250/8250_dw.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Patch 4 adds optional reset control support to the 8250_dw, which
-is used by sun6i and sun8i platforms. Till now, this wasn't needed
-from a working standpoint, as the bootloader de-asserts the reset
-control on the console UART for us. However, during the development
-of the sun8i patches, I noticed other UARTs wouldn't work. Also the
-new sun6i A31 Hummingbird has multiple UARTs available, which would
-require this patch.
-
-Patch 5 adds deferred probing to 8250_dw. In my case, even though
-the clocks and reset controller "devices" were registered before
-the UART, the 8250_dw driver binded with the UART devices before
-the clocks and resets were available. This resulted in the 8250_dw
-driver failing. I only tested the R_UART device.
-
-Strictly speaking it won't be needed once pinctrl support is added,
-as the driver core handles deferred probing for pinctrl phandles,
-and the pinctrl device for the R_UART is probed after it. However
-it may be required for the A31 Hummingbird development board.
-
-Patch 6 adds the PRCM nodes, and the associated clock/reset phandles,
-to the sun8i DTSI.
-
-These patches can go through their separate trees. There are no
-compile time dependencies between them.
-
-Related changes since v3:
-
-  - Dropped patches already merged by Maxime
-  - Used bitmaps to denote possible gate indicies in sun6i-a31-apb0-gates,
-    and added A23 variant
-  - Added Maxime's Acked-by for
-    'mfd: sun6i-prcm: Add support for Allwinner A23 PRCM'
-
-Related changes since v2:
-
-  - Add separate driver for sun8i-a23-apb0-clk
-  - Use sun6i-a31-clock-reset for ahb1_rst
-
-Related changes since v1:
-
-  - Add sun8i-a23-apb0-gates-clk compatible to sun6i-a31-apb0-gates-clk
-
-
-Cheers
-ChenYu
-
-
-  [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266990.html
-
-Chen-Yu Tsai (6):
-  clk: sunxi: sun6i-apb0-gates: use bitmaps for valid gate indicies
-  clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0 support
-  mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
-  serial: 8250_dw: Add optional reset control support
-  serial: 8250_dw: Add support for deferred probing
-  ARM: sun8i: Add PRCM clock and reset controller nodes to the DTSI
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |  1 +
- .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
- .../bindings/serial/snps-dw-apb-uart.txt           |  1 +
- arch/arm/boot/dts/sun8i-a23.dtsi                   | 47 ++++++++++++-
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c           | 80 ++++++++++++----------
- drivers/mfd/sun6i-prcm.c                           | 30 ++++++++
- drivers/tty/serial/8250/8250_dw.c                  | 13 ++++
- 7 files changed, 136 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+index cb1b3dc..d9eeed7 100644
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -405,12 +405,16 @@ static int dw8250_probe(struct platform_device *pdev)
+ 
+ 	data->usr_reg = DW_UART_USR;
+ 	data->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(data->clk) && PTR_ERR(data->clk) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
+ 	if (!IS_ERR(data->clk)) {
+ 		clk_prepare_enable(data->clk);
+ 		uart.port.uartclk = clk_get_rate(data->clk);
+ 	}
+ 
+ 	data->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
++	if (IS_ERR(data->rst) && PTR_ERR(data->rst) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
+ 	if (!IS_ERR(data->rst))
+ 		reset_control_deassert(data->rst);
+ 
 -- 
 2.0.1
