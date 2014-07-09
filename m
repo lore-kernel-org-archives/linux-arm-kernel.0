@@ -1,33 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 9 Jul 2014 17:24:46 +0200
-Subject: [PATCH v9 3/7] ata: libahci: allow to use multiple PHYs
-In-Reply-To: <20140709135910.GA11193@htj.dyndns.org>
-References: <1404728173-20263-1-git-send-email-antoine.tenart@free-electrons.com>
- <1404728173-20263-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140708134000.GC4979@htj.dyndns.org>
- <20140708170353.GA16148@kwain>
- <20140708171817.GH4979@htj.dyndns.org>
- <20140708174900.GC16148@kwain>
- <20140708214010.GI4979@htj.dyndns.org>
- <20140709082331.GA4510@kwain>
- <20140709135910.GA11193@htj.dyndns.org>
-Message-ID: <20140709152446.GN3113@piout.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Jul 2014 16:31:46 +0100
+Subject: [PATCH v7 18/24] mfd: max77686: Add Maxim 77802 PMIC support
+In-Reply-To: <1404505467-26526-19-git-send-email-javier.martinez@collabora.co.uk>
+References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404505467-26526-19-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140709153146.GJ2635@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/07/2014 at 09:59:10 -0400, Tejun Heo wrote :
-> Heh, I get that but, at the same time, this is the point where you're
-> most motivated to actually work on it.  :)
+On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
+> Maxim MAX77802 is a power management chip that contains 10 high
+> efficiency Buck regulators, 32 Low-dropout (LDO) regulators used
+> to power up application processors and peripherals, a 2-channel
+> 32kHz clock outputs, a Real-Time-Clock (RTC) and a I2C interface
+> to program the individual regulators, clocks outputs and the RTC.
 > 
+> This patch adds support for MAX77802 to the MAX77686 driver and is
+> based on a driver added to the Chrome OS kernel 3.8 by Simon Glass.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-Or, starting that kind of review after 9 revisions, especially so close
-to the end of the development cycle is discouraging enough and will
-probably be used as an example of why we still have so many evil vendor
-trees.
+[...]
+
+>  static const struct i2c_device_id max77686_i2c_id[] = {
+>  	{ "max77686", TYPE_MAX77686 },
+> +	{ "max77802", TYPE_MAX77802 },
+>  	{ }
+
+There's no point in filling this in.  Just empty it completely.
+
+Once you've done that, resubmit the patchset with my:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
