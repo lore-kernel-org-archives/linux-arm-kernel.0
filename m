@@ -1,72 +1,61 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Wed, 9 Jul 2014 14:21:07 +0000
-Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
-In-Reply-To: <20140709132653.GM9485@arm.com>
-References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
- <1404125530-17984-3-git-send-email-will.deacon@arm.com>
- <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140709132653.GM9485@arm.com>
-Message-ID: <3b971792af184640a1d2ff8c5b57e66d@BL2PR03MB468.namprd03.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 9 Jul 2014 16:21:27 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140709134050.GN9485@arm.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140709134050.GN9485@arm.com>
+Message-ID: <20140709142125.GB3262@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Jul 09, 2014 at 02:40:50PM +0100, Will Deacon wrote:
+> On Fri, Jul 04, 2014 at 04:29:17PM +0100, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > This commit introduces a generic device tree binding for IOMMU devices.
+> > Only a very minimal subset is described here, but it is enough to cover
+> > the requirements of both the Exynos System MMU and Tegra SMMU as
+> > discussed here:
+> > 
+> >     https://lkml.org/lkml/2014/4/27/346
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> I would like to move the ARM SMMU driver over to this for 3.18, if possible.
+> One use-case there is the ability to describe groups of masters behind a
+> multi-master IOMMU but which must be part of the same domain (i.e. an
+> iommu_group). This is useful for presenting devices to a guest with a
+> virtual SMMU, where the physical devices share a stage-2 context.
+> 
+> With your binding, does this simply mean determining the set of master IDs
+> in the group, then describing the complete set for each master?
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, July 09, 2014 6:57 PM
-> To: Sethi Varun-B16395; alex.williamson at redhat.com
-> Cc: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
-> foundation.org; thierry.reding at gmail.com; arnd at arndb.de;
-> ohaugan at codeaurora.org; joro at 8bytes.org;
-> a.motakis at virtualopensystems.com; Marc Zyngier
-> Subject: Re: [PATCH 2/5] iommu/arm-smmu: add support for PCI master
-> devices
-> 
-> [Adding Alex; question below]
-> 
-> On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
-> > > +static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias,
-> > > +void
-> > > +*data) {
-> > > +     *((u16 *)data) = alias;
-> > > +     return 0; /* Continue walking */ }
-> 
-> [...]
-> 
-> > > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
-> > > *dev)
-> > >               return PTR_ERR(group);
-> > >       }
-> > >
-> > > +     if (dev_is_pci(dev)) {
-> > > +             struct arm_smmu_master_cfg *cfg;
-> > > +             struct pci_dev *pdev = to_pci_dev(dev);
-> > > +
-> > > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> > > +             if (!cfg) {
-> > > +                     ret = -ENOMEM;
-> > > +                     goto out_put_group;
-> > > +             }
-> > > +
-> > > +             cfg->num_streamids = 1;
-> > > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
-> > > +                                    &cfg->streamids[0]);
-> > [Sethi Varun-B16395] We need to look for upstream DMA device. We
-> > should be using pci_find_dma_isolation_root here. Also, this would
-> > also imply that there could be multiple devices sharing the same
-> > stream ID. So, we should check if a particular stream ID value has
-> > already been configured in the SMR registers.
-> 
-> pci_find_dma_isolation_root doesn't exist in any of the trees I have.
-> Alex, is this queued anywhere and do I actually need it?
-> 
-> The purpose of this code is to find the requester ID of a device as it
-> appears at the host controller. At this point, we can map it (via
-> firmware tables that are TBD) to a Stream ID for the SMMU. It looks to me
-> like pci_for_each_dma_alias walks over non-transparent PCI bridges
-> correctly, so the callback I provide just updates the alias until the
-> walk has completed.
-I think pci_for_each_dma_alias should work fine here. Isolation would be specifically required while setting up the iommu groups.
+I'm not sure I properly understand what you're trying to do, but I don't
+think the binding is designed to cover that. Rather the goal was to
+describe the IDs belonging to each master, so that an IOMMU can be
+properly configured.
 
--Varun
+Anything beyond that (e.g. logical grouping of masters) isn't directly
+within the scope of the binding (it doesn't describe hardware but some
+policy pertaining to some specific use-case).
+
+That said, the IOMMU driver that I prototyped for Tegra did some similar
+grouping of devices, although in a much more restricted way. The goal of
+that was to add a known set of devices into one group, "peripherals", so
+that they could share one IOMMU domain. This was meant to separate them
+from devices with more advanced needs (such as a GPU driver). Devices in
+the "peripherals" group would be using the DMA mapping API integration
+whereas other devices would have to explicitly allocate an IOMMU domain.
+
+I'm not sure how much that helps for the use-case that you have in mind.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/9d120816/attachment.sig>
