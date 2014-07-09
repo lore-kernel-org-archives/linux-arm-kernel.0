@@ -1,116 +1,177 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 9 Jul 2014 10:27:16 +0100
-Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <201407091031.50402.arnd@arndb.de>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <201407072322.00990.arnd@arndb.de>
- <20140708100332.GW6501@e106497-lin.cambridge.arm.com>
- <201407091031.50402.arnd@arndb.de>
-Message-ID: <20140709092716.GS6501@e106497-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  9 Jul 2014 11:27:23 +0200
+Subject: [PATCH] ASoC: s3c64xx/smartq: use dynamic registration
+Message-ID: <1404898043-1160870-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 09:31:50AM +0100, Arnd Bergmann wrote:
-> On Tuesday 08 July 2014, Liviu Dudau wrote:
-> > On Mon, Jul 07, 2014 at 10:22:00PM +0100, Arnd Bergmann wrote:
-> > > 
-> > > I looked at the other drivers briefly, and I think you indeed fix the Tegra
-> > > driver with this but break the integrator driver as mentioned above.
-> > > The other callers of of_pci_range_to_resource() are apparently not
-> > > impacted as they recalculate the values they get.
-> > 
-> > I would argue that integrator version is having broken assumptions. If it would
-> > try to allocate that IO range or request the resource as returned currently by
-> > of_pci_range_to_resource (without my patch) it would fail. I know because I did
-> > the same thing in my host bridge driver and it failed miserably. That's why I
-> > tried to patch it.
-> 
-> The integrator code was just introduced and the reason for how it does things
-> is the way that of_pci_range_to_resource() works today. We tried to cope with
-> it and not change the existing behavior in order to not break any other drivers.
-> 
-> It's certainly not fair to call the integrator version broken, it just works
-> around the common code having a quirky interface. We should probably have
-> done of_pci_range_to_resource better than it is today (I would have argued
-> for it to return an IORESOURCE_MEM with the CPU address), but it took long
-> enough to get that merged and I was sick of arguing about it.
+As a prerequisite for moving s3c64xx into multiplatform configurations,
+we need to change the smartq audio driver to stop using hardcoded
+gpio numbers from the header file, and instead pass the gpio data
+through platform_data.
 
-Understood. That is why I have carefully worded my email as not to diss anyone.
-I didn't say the code is broken, I've said it has broken assumptions.
+In order to do that, we also move the code to use module_platform_driver
+and register the platform device using platform_device_register_data.
 
-> 
-> > If the IO space is memory mapped, then we use the port number, the io_offset
-> > and the PCI_IOBASE to get to the virtual address that, when accessed, will
-> > generate the correct addresses on the bus, based on what the host bridge has
-> > been configured.
-> > 
-> > This is the current level of my understanding of PCI IO.
-> 
-> Your understanding is absolutely correct, and that's great because very few
-> people get that right. What I think we're really arguing about is what the
-> of_pci_range_to_resource is supposed to return. As you and Bjorn both pointed
-> out earlier, there are in fact two resources associated with the I/O window
-> and the flaw in the current implementation is that of_pci_range_to_resource
-> returns the numeric values for the IORESOURCE_MEM resource, but sets the
-> type to IORESOURCE_IO, which is offset from that by PCI_IOBASE.
-> 
-> You try to fix that by making it return the correct IORESOURCE_IO resource,
-> which is a reasonable approach but you must not break drivers that rely
-> on the broken resource while doing that.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Maurus Cuelenaere <mcuelenaere@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s3c64xx/mach-smartq.c | 10 +++++
+ sound/soc/samsung/smartq_wm8987.c   | 73 ++++++++++++++-----------------------
+ 2 files changed, 37 insertions(+), 46 deletions(-)
 
-Or I need to fix the existing drivers that rely on the old behaviour.
-
-> 
-> The approach that I would have picked is to return the IORESOURCE_MEM
-> resource associated with the I/O window and pick a (basically random)
-> IORESOURCE_IO resource struct based on what hasn't been used and then
-> compute the appropriate io_offset from that. This approach of course
-> would also have required fixing up all drivers relying on the current
-> behavior.
-> 
-> To be clear, I'm fine with you (and Bjorn if he cares) picking the
-> approach you like here, either one of these works fine as long as the
-> host drivers use the interface in the way it is defined.
-
-OK. Thanks for that. It does look like either way some existing code needs
-fixing, so I will have a look at that. Unless Bjorn votes for making a new
-version of pci_range_to_resource().
-
-> 
-> > Now, I believe Rob has switched entirely to using my series in some test that
-> > he has run and he hasn't encountered any issues, as long as one remembers in
-> > the host bridge driver to add the io_base offset to the .start resource. If
-> > not then I need to patch pci_v3.c.
-> 
-> The crazy part of all these discussions is that basically nobody ever uses
-> I/O port access, so it's very hard to test and we don't even notice when
-> we get it wrong, but we end up spending most of the time for PCI host controller
-> reviews trying to get these right.
-> 
-> I'm very thankful that you are doing this work to get it moved into common
-> code so hopefully this is the last time we ever have to worry about it because
-> all future drivers will be able to use the common implemnetation.
-
-Ahh, we humans! We always hope for the best! :)
-
-My only chance of succeeding is if I make it a no brainer for people to use the
-code. At the moment the interface for host bridge drivers is not too bad, but
-it looks like the internals are still hard to comprehend.
-
-Best regards,
-Liviu
-
-> 
-> 	Arnd
-> 
-
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index b3d1353..4c111f6 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -20,6 +20,7 @@
+ #include <linux/spi/spi_gpio.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/platform_data/s3c-hsotg.h>
++#include <linux/platform_data/asoc-s3c-smartq.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+@@ -379,6 +380,11 @@ void __init smartq_map_io(void)
+ 	smartq_lcd_mode_set();
+ }
+ 
++static const __initconst struct smartq_audio_pdata smartq_audio_pdata = {
++	.gpio_jack = S3C64XX_GPL(12),
++	.gpio_amp = S3C64XX_GPK(12),
++};
++
+ void __init smartq_machine_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -397,4 +403,8 @@ void __init smartq_machine_init(void)
+ 	WARN_ON(smartq_wifi_init());
+ 
+ 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
++
++	platform_device_register_data(NULL, "smartq-audio", -1,
++				      &smartq_audio_pdata,
++				      sizeof (smartq_audio_pdata));
+ }
+diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+index 9b0ffac..8c4a0a2 100644
+--- a/sound/soc/samsung/smartq_wm8987.c
++++ b/sound/soc/samsung/smartq_wm8987.c
+@@ -19,8 +19,7 @@
+ #include <sound/soc.h>
+ #include <sound/jack.h>
+ 
+-#include <mach/gpio-samsung.h>
+-#include <asm/mach-types.h>
++#include <linux/platform_data/asoc-s3c-smartq.h>
+ 
+ #include "i2s.h"
+ #include "../codecs/wm8750.h"
+@@ -110,7 +109,7 @@ static struct snd_soc_jack_pin smartq_jack_pins[] = {
+ 
+ static struct snd_soc_jack_gpio smartq_jack_gpios[] = {
+ 	{
+-		.gpio		= S3C64XX_GPL(12),
++		.gpio		= -1,
+ 		.name		= "headphone detect",
+ 		.report		= SND_JACK_HEADPHONE,
+ 		.debounce_time	= 200,
+@@ -127,7 +126,10 @@ static int smartq_speaker_event(struct snd_soc_dapm_widget *w,
+ 				struct snd_kcontrol *k,
+ 				int event)
+ {
+-	gpio_set_value(S3C64XX_GPK(12), SND_SOC_DAPM_EVENT_OFF(event));
++	struct smartq_audio_pdata *pdata;
++	pdata = snd_soc_smartq.dev->platform_data;
++
++	gpio_set_value(pdata->gpio_amp, SND_SOC_DAPM_EVENT_OFF(event));
+ 
+ 	return 0;
+ }
+@@ -218,62 +220,41 @@ static struct snd_soc_card snd_soc_smartq = {
+ 	.num_controls = ARRAY_SIZE(wm8987_smartq_controls),
+ };
+ 
+-static struct platform_device *smartq_snd_device;
+-
+-static int __init smartq_init(void)
++static int smartq_probe(struct platform_device *pdev)
+ {
++	struct smartq_audio_pdata *pdata = pdev->dev.platform_data;
+ 	int ret;
+ 
+-	if (!machine_is_smartq7() && !machine_is_smartq5()) {
+-		pr_info("Only SmartQ is supported by this ASoC driver\n");
+-		return -ENODEV;
+-	}
+-
+-	smartq_snd_device = platform_device_alloc("soc-audio", -1);
+-	if (!smartq_snd_device)
+-		return -ENOMEM;
+-
+-	platform_set_drvdata(smartq_snd_device, &snd_soc_smartq);
+-
+-	ret = platform_device_add(smartq_snd_device);
+-	if (ret) {
+-		platform_device_put(smartq_snd_device);
+-		return ret;
+-	}
++	platform_set_drvdata(pdev, &snd_soc_smartq);
+ 
+ 	/* Initialise GPIOs used by amplifiers */
+-	ret = gpio_request(S3C64XX_GPK(12), "amplifiers shutdown");
++	ret = devm_gpio_request_one(&pdev->dev, pdata->gpio_amp,
++				    GPIOF_DIR_OUT | GPIOF_INIT_HIGH,
++				    "amplifiers shutdown");
+ 	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to register GPK12\n");
+-		goto err_unregister_device;
++		dev_err(&pdev->dev, "Failed to register GPK12\n");
++		goto out;
+ 	}
+ 
+-	/* Disable amplifiers */
+-	ret = gpio_direction_output(S3C64XX_GPK(12), 1);
+-	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to configure GPK12\n");
+-		goto err_free_gpio_amp_shut;
+-	}
++	smartq_jack_gpios[0].gpio = pdata->gpio_jack;
+ 
+-	return 0;
+-
+-err_free_gpio_amp_shut:
+-	gpio_free(S3C64XX_GPK(12));
+-err_unregister_device:
+-	platform_device_unregister(smartq_snd_device);
++	ret = devm_snd_soc_register_card(&pdev->dev, &snd_soc_smartq);
++	if (ret)
++		dev_err(&pdev->dev, "Failed to register card\n");
+ 
++out:
+ 	return ret;
+ }
+ 
+-static void __exit smartq_exit(void)
+-{
+-	gpio_free(S3C64XX_GPK(12));
+-
+-	platform_device_unregister(smartq_snd_device);
+-}
++static struct platform_driver smartq_driver = {
++	.driver = {
++		.name = "smartq-audio",
++		.owner = THIS_MODULE,
++	},
++	.probe = smartq_probe,
++};
+ 
+-module_init(smartq_init);
+-module_exit(smartq_exit);
++module_platform_driver(smartq_driver);
+ 
+ /* Module information */
+ MODULE_AUTHOR("Maurus Cuelenaere <mcuelenaere@gmail.com>");
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.8.3.2
