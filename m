@@ -1,102 +1,76 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  9 Jul 2014 14:23:40 +0200
-Subject: [PATCH 10/13] [RFC] ARM: dts: Add shmobile platform device tree
- bindings documentation
-In-Reply-To: <1404908623-909-1-git-send-email-geert+renesas@glider.be>
-References: <1404908623-909-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1404908623-909-11-git-send-email-geert+renesas@glider.be>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 9 Jul 2014 17:56:37 +0530
+Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <20140709092531.GK28884@atomide.com>
+References: <20140707104727.GM28884@atomide.com>
+ <20140707104944.GS3705@n2100.arm.linux.org.uk>
+ <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
+ <20140707121512.GT3705@n2100.arm.linux.org.uk>
+ <20140707123925.GW28884@atomide.com>
+ <20140707134008.GU3705@n2100.arm.linux.org.uk>
+ <20140707151024.GJ5582@saruman.home> <53BB7980.2060909@ti.com>
+ <20140708082948.GE28884@atomide.com> <20140709092531.GK28884@atomide.com>
+Message-ID: <53BD34FD.5070005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
-Documentation, listing supported SoCs and boards.
+On Wednesday 09 July 2014 02:55 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [140708 01:32]:
+>> * Sekhar Nori <nsekhar@ti.com> [140707 21:56]:
+>>> On Monday 07 July 2014 08:40 PM, Felipe Balbi wrote:
+>>>> On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
+>>>>> --- a/arch/arm/mm/cache-l2x0.c
+>>>>> +++ b/arch/arm/mm/cache-l2x0.c
+>>>>> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
+>>>>>  
+>>>>>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>>>>>  {
+>>>>> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+>>>>> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
+>>>>>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
+>>>>
+>>>> even with this change, l2c still tries to write to power control
+>>>> register, at least on AM437x. Looking a little deeper here, AM437x
+>>>> identifies itself as l2c PL310 r3p3, which should have power control
+>>>> register, but aparentely there's no way to write that register. I'll
+>>>> file a bug to our ROM team, but we will certainly need a way to
+>>>> workaround this inside omap4-common.c
+>>>
+>>> Looks like we need both my patch as well as Russell's patch. I can
+>>> respin my patch with the pr_info_once() dropped if it helps further
+>>> reduce boot noise.
+>>
+>> In that case I'm fine with the original patch in this series. Russell,
+>> got any better ideas?
+> 
+> I guess no more comments. Took a look at the patch again, Sekhar, can
+> you please update the description with what has been discovered in this
+> thread and repost?
 
-This allows to use checkpatch to validate DTSes referring to Renesas
-shmobile SoCs, and boards containing those SoCs.
+How does the following sound:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: linux-arm-kernel at lists.infradead.org
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 71 ++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+AM437x has L2C-310 version r3p2 and ROM code on that device does not
+support writing to L2C-310 power control register. The L2C driver,
+however, tries writing to this register for all revisions >= r3p0.
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-new file mode 100644
-index 000000000000..baa25c92597d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -0,0 +1,71 @@
-+Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
-+--------------------------------------------------------------------
-+
-+SoCs:
-+
-+  - Emma Mobile EV2
-+    compatible = "renesas,emev2"
-+  - RZ/A1H (R7S72100)
-+    compatible = "renesas,r7s72100"
-+  - R-Mobile APE6 (R8A73A40)
-+    compatible = "renesas,r8a73a4"
-+  - R-Mobile A1 (R8A77400)
-+    compatible = "renesas,r8a7740"
-+  - R-Car M1A (R8A77781)
-+    compatible = "renesas,r8a7778"
-+  - R-Car H1 (R8A77790)
-+    compatible = "renesas,r8a7779"
-+  - R-Car H2 (R8A77900)
-+    compatible = "renesas,r8a7790"
-+  - R-Car M2-W (R8A77910)
-+    compatible = "renesas,r8a7791"
-+  - R-Car V2H (R8A77920)
-+    compatible = "renesas,r8a7792"
-+  - R-Car M2-N (R8A77930)
-+    compatible = "renesas,r8a7793"
-+  - R-Car E2 (R8A77940)
-+    compatible = "renesas,r8a7794"
-+  - SH-Mobile AP4 (R8A73720/SH7372)
-+    compatible = "renesas,sh7372"
-+  - SH-Mobile AG5 (R8A73A00/SH73A0)
-+    compatible = "renesas,sh73a0"
-+
-+
-+Boards:
-+
-+  - Alt
-+    compatible = "renesas,alt", "renesas,r8a7794"
-+  - APE6-EVM
-+    compatible = "renesas,ape6evm", "renesas,r8a73a4"
-+  - APE6-EVM - Reference Device Tree Implementation
-+    compatible = "renesas,ape6evm-reference", "renesas,r8a73a4"
-+  - Atmark Techno Armadillo-800 EVA
-+    compatible = "renesas,armadillo800eva"
-+  - Atmark Techno Armadillo-800 EVA - Reference Device Tree Implementation
-+    compatible = "renesas,armadillo800eva-reference", "renesas,r8a7740"
-+  - BOCK-W
-+    compatible = "renesas,bockw", "renesas,r8a7778"
-+  - BOCK-W - Reference Device Tree Implementation
-+    compatible = "renesas,bockw-reference", "renesas,r8a7778"
-+  - Genmai (RTK772100BC00000BR)
-+    compatible = "renesas,genmai", "renesas,r7s72100"
-+  - Henninger
-+    compatible = "renesas,henninger", "renesas,r8a7791"
-+  - Koelsch (RTP0RC7791SEB00010S)
-+    compatible = "renesas,koelsch", "renesas,r8a7791"
-+  - EMEV2 KZM9D
-+    compatible = "renesas,kzm9d", "renesas,emev2"
-+  - KZM-A9-GT
-+    compatible = "renesas,kzm9g", "renesas,sh73a0"
-+  - KZM-A9-GT - Reference Device Tree Implementation
-+    compatible = "renesas,kzm9g-reference", "renesas,sh73a0"
-+  - Lager (RTP0RC7790SEB00010S)
-+    compatible = "renesas,lager", "renesas,r8a7790"
-+  - Mackerel (R0P7372LC0016RL, AP4 EVM 2nd)
-+    compatible = "renesas,mackerel"
-+  - Marzen
-+    compatible = "renesas,marzen", "renesas,r8a7779"
-+
-+Note: Reference Device Tree Implementations are temporary implementations
-+      to ease the migration from platform devices to Device Tree, and are
-+      intended to be removed in the future.
--- 
-1.9.1
+This leads to a warning dump on boot which leads most users to believe
+that L2 cache is non-functional.
+
+Since the problem is understood, and cannot be addressed through
+software, replace the warning with a pr_info() while maintaining the
+WARN_ON() for other truly unexpected scenarios.
+
+>From the public TRM available for OMAP4470, even on that device, ROM
+does not support writing to this register even though it uses a version
+of L2C-310 which has the register implemented. So this patch should take
+care of all variants of existing OMAPs.
+---
+
+Two things that I have added are the version of L2C on AM437x and the
+fact that OMAP4470 also has the same issue (at least from the public
+TRM). Let me know if you would like to see anything else mentioned.
+
+Thanks,
+Sekhar
