@@ -1,21 +1,27 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 9 Jul 2014 15:16:24 -0700
-Subject: [PATCH v3] pinctrl: msm: move all qualcomm drivers to subdir
-In-Reply-To: <1404910216-2170-1-git-send-email-linus.walleij@linaro.org>
-References: <1404910216-2170-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAJAp7Oi-UH4SUHNw_gHtm=P8EYG3+BsA=hPAsZZWjfG5KCMJeA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 9 Jul 2014 15:33:19 -0700
+Subject: [PATCHv4 2/5] lib/genalloc.c: Add genpool range check function
+In-Reply-To: <1404324218-4743-3-git-send-email-lauraa@codeaurora.org>
+References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
+ <1404324218-4743-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAOesGMiKBNDmJhiY-yK0uZmG-MnK82=ffNGxqasLKozqgpQQpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 5:50 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> We have four Qualcomm-related pin control drivers, and now there
-> are drivers coming in for the PMICs on these systems, so let's
-> create a qcom subdirectory to hold all the Qualcomm stuff.
+On Wed, Jul 2, 2014 at 11:03 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
 >
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> After allocating an address from a particular genpool,
+> there is no good way to verify if that address actually
+> belongs to a genpool. Introduce addr_in_gen_pool which
+> will return if an address plus size falls completely
+> within the genpool range.
+>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-Nice initiative.
+Reviewed-by: Olof Johansson <olof@lixom.net>
 
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+What's the merge path for this code? Part of the arm64 code that needs
+it, I presume?
+
+
+-Olof
