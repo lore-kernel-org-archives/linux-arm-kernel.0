@@ -1,35 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 Jul 2014 15:46:56 -0700
-Subject: [PATCHv4 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <1404324218-4743-4-git-send-email-lauraa@codeaurora.org>
-References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
- <1404324218-4743-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAOesGMimCAYnqxkKoYpZ2ws7x9eH4K1Yw3LnLz9HC6MWyHEo3A@mail.gmail.com>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Wed, 9 Jul 2014 18:05:00 -0500
+Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 2, 2014 at 11:03 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
->
-> For architectures without coherent DMA, memory for DMA may
-> need to be remapped with coherent attributes. Factor out
-> the the remapping code from arm and put it in a
-> common location to reduced code duplication.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Hm. The switch from ioremap to map_vm_area() here seems to imply that
-lib/ioremap can/should be reworked to use just wrap the vmalloc
-functions too?
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
-Unrelated to this change.
+This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
+(https://lkml.org/lkml/2014/3/14/320).
 
-I did a pass of review here. Nothing stands out as wrong but I don't
-claim to know this area well these days.
+Changes in V3:
+    * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
+      (per Jason Cooper request)
+    * Misc fix/clean up per Mark Rutland comments
+    * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
+    * Patch 4 is new to the series:
+        * Add ARM64-specific version arch_setup_msi_irqs() to allow support
+          for Multiple MSI.
+        * Add support for Multiple MSI for GICv2m.
 
-What's the merge/ack plan here? It might reduce the complexity of
-merging to add the common functions in your series, then move the ARM
-code over separately?
+Suravee Suthikulpanit (4):
+  irqchip: gic: Add binding probe for ARM GIC400
+  irqchip: gic: Restructuring ARM GIC code
+  irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+  irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
 
+ Documentation/devicetree/bindings/arm/gic.txt |  20 +-
+ arch/arm64/Kconfig                            |   1 +
+ arch/arm64/include/asm/msi.h                  |  15 ++
+ arch/arm64/kernel/Makefile                    |   1 +
+ arch/arm64/kernel/msi.c                       |  57 +++++
+ drivers/irqchip/Kconfig                       |   7 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-gic-v2m.c                 | 331 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v2m.h                 |  13 +
+ drivers/irqchip/irq-gic.c                     |  90 ++++---
+ drivers/irqchip/irq-gic.h                     |  67 ++++++
+ 11 files changed, 562 insertions(+), 41 deletions(-)
+ create mode 100644 arch/arm64/include/asm/msi.h
+ create mode 100644 arch/arm64/kernel/msi.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.h
+ create mode 100644 drivers/irqchip/irq-gic.h
 
--Olof
+-- 
+1.9.0
