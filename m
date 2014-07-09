@@ -1,56 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Jul 2014 14:26:53 +0100
-Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
-In-Reply-To: <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
- <1404125530-17984-3-git-send-email-will.deacon@arm.com>
- <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <20140709132653.GM9485@arm.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 9 Jul 2014 09:28:19 -0400
+Subject: [GIT PULL] msm drm update for component changes
+In-Reply-To: <20140709122645.GQ21766@n2100.arm.linux.org.uk>
+References: <20140709093458.GA17540@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGv+hzSKuD2mRDbz-hqN1H09tW5C4a2EYuZ5sN44RABe8w@mail.gmail.com>
+ <20140709122645.GQ21766@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGszBdYCrfb5q6Cpr26aaqivkjVjGi_7Mn+wL4EkHzX0Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Alex; question below]
+On Wed, Jul 9, 2014 at 8:26 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 09, 2014 at 06:56:14AM -0400, Rob Clark wrote:
+>> On Wed, Jul 9, 2014 at 5:34 AM, Russell King <rmk@arm.linux.org.uk> wrote:
+>> > David,
+>> >
+>> > Please incorporate the latest msm drm update for component changes, which can be found at:
+>> >
+>> >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-drm
+>> >
+>> > with SHA1 84448288546d13d7e06fd6638fb78ddff559b399.
+>> >
+>> > This updates the MSM's DRM driver for the updates merged in Greg's
+>> > driver-core tree, converting MSM to use the pre-declared array of
+>> > matches rather than walking the device tree each time we try to bind.
+>>
+>> Hey Russell, do you want me to take this for my v3.17 pull req?  I
+>> expect there will be some minor conflicts with the DT support I'm
+>> working on at the moment.
+>>
+>> Or does this need to be applied together with the rest of the series?
+>> In which case, maybe it should go first, and then I'd rebase msm-next
+>> on top.
+>
+> The patch for MSM is dependent on the component changes, which have
+> already been merged by Greg for the driver-core tree.  I don't have
+> anything following this, so if you instead want to merge my
+> component-for-driver branch (which is what Greg's pulled, which is a
+> sub-set of this pull), and then add this patch on top of your
+> development, that's fine too.
 
-On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
-> > +static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void
-> > +*data) {
-> > +     *((u16 *)data) = alias;
-> > +     return 0; /* Continue walking */
-> > +}
+ok, it sounds like it is probably easiest for Dave to take your pull
+req after drm-next picks up the driver-core updates?
 
-[...]
+anyways, if needed, I can coordinate with Dave about that.  Sounds
+easiest if I rebase my stuff on top of that before sending my pull req
+for 3.17.
 
-> > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
-> > *dev)
-> >               return PTR_ERR(group);
-> >       }
-> >
-> > +     if (dev_is_pci(dev)) {
-> > +             struct arm_smmu_master_cfg *cfg;
-> > +             struct pci_dev *pdev = to_pci_dev(dev);
-> > +
-> > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> > +             if (!cfg) {
-> > +                     ret = -ENOMEM;
-> > +                     goto out_put_group;
-> > +             }
-> > +
-> > +             cfg->num_streamids = 1;
-> > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
-> > +                                    &cfg->streamids[0]);
-> [Sethi Varun-B16395] We need to look for upstream DMA device. We should be
-> using pci_find_dma_isolation_root here. Also, this would also imply that
-> there could be multiple devices sharing the same stream ID. So, we should
-> check if a particular stream ID value has already been configured in the
-> SMR registers.
+> The only reason it's a pull request and not a single patch is to ensure
+> that the previous component commits don't end up being duplicated with
+> different commit IDs across several trees by being applied independently
+> as patches (which can end up causing unnecessary git conflicts.)
 
-pci_find_dma_isolation_root doesn't exist in any of the trees I have. Alex,
-is this queued anywhere and do I actually need it?
+sure, no prob about a pull-req.. just wanted to sort out what order
+things get merged in
 
-The purpose of this code is to find the requester ID of a device as it
-appears at the host controller. At this point, we can map it (via firmware
-tables that are TBD) to a Stream ID for the SMMU. It looks to me like
-pci_for_each_dma_alias walks over non-transparent PCI bridges correctly, so
-the callback I provide just updates the alias until the walk has completed.
+BR,
+-R
 
-Will
+> --
+> FTTC broadband for 0.8mile line: now at 9.5Mbps down 400kbps up.
