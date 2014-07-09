@@ -1,208 +1,93 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 09 Jul 2014 22:01:39 +0200
-Subject: [RFC v2 4/5] clk: per-user clock accounting for debug
-In-Reply-To: <1404398323-18934-5-git-send-email-tomeu.vizoso@collabora.com>
-References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
- <1404398323-18934-5-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <53BD9FA3.1040204@gmail.com>
+From: tthayer.linux@gmail.com (Thor Thayer)
+Date: Wed, 9 Jul 2014 15:07:46 -0500
+Subject: [PATCHv7 2/3] devicetree: Addition of the Altera SDRAM EDAC.
+In-Reply-To: <20140626094507.GM15240@leverpostej>
+References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
+ <1403730927-16163-3-git-send-email-tthayer@altera.com>
+ <20140626094507.GM15240@leverpostej>
+Message-ID: <CAF03EBdBMphBLkGj4=_kGADF4iq_uUpyBbRJ7O63OvSHcR5hSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu, Rabin,
+On Thu, Jun 26, 2014 at 4:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Jun 25, 2014 at 10:15:26PM +0100, tthayer at altera.com wrote:
+>> From: Thor Thayer <tthayer@altera.com>
+>>
+>> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@altera.com>
+>> ---
+>> v2: Changes to SoC EDAC source code.
+>>
+>> v3: Fix typo in device tree documentation.
+>>
+>> v4,v5: No changes - bump version for consistency.
+>>
+>> v6: Assign ECC registers in SDRAM controller to EDAC
+>>
+>> v7: Fix SDRAM EDAC base address.
+>> ---
+>>  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
+>>  arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
+>>  2 files changed, 21 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+>> new file mode 100644
+>> index 0000000..d68e033
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+>> @@ -0,0 +1,15 @@
+>> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
+>> +
+>> +Required properties:
+>> +- compatible : should contain "altr,sdram-edac";
+>> +- reg : should contain the ECC register range in sdram
+>> +        controller (address and length).
+>> +- interrupts : Should contain the SDRAM ECC IRQ in the
+>> +     appropriate format for the IRQ controller.
+>> +
+>> +Example:
+>> +     sdramedac at ffc2502c {
+>> +             compatible = "altr,sdram-edac";
+>> +             reg = <0xffc2502c 0x28>;
+>> +             interrupts = <0 39 4>;
+>> +     };
+>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> index 310292e..da0785d 100644
+>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> @@ -687,6 +687,12 @@
+>>                       reg = <0xffc25000 0x4>;
+>>               };
+>>
+>> +             sdramedac at ffc2502c {
+>> +                     compatible = "altr,sdram-edac";
+>> +                     reg = <0xffc2502c 0x28>;
+>> +                     interrupts = <0 39 4>;
+>> +             };
+>
+> I'm not sure I understand this. The ECC register existing within the
+> SDRAM controller, which we have a binding for. Why do we need a separate
+> binding for a subset of registers within an IP block?
+>
+> Why can we not have a single binding for the entire SDRAM controlelr and
+> decompse that within Linux as it makes sense for the appropriate
+> subsystyems?
+>
+> Leaking Linux design into bindings is a bad idea; it makes it harder to
+> change things.
+>
+> Mark.
 
-Please see my comments inline.
+Hi Mark,
 
-On 03.07.2014 16:38, Tomeu Vizoso wrote:
-> From: Rabin Vincent <rabin.vincent@stericsson.com>
-> 
-> When a clock has multiple users, the WARNING on imbalance of
-> enable/disable may not show the guilty party since although they may
-> have commited the error earlier, the warning is emitted later when some
-> other user, presumably innocent, disables the clock.
+How would we decompose this within Linux. MFD? Is there an example
+that I can look at?
 
-[snip]
+We originally used syscon for the entire sdram controller register
+block but we got dinged on it.
 
-> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-> index 5f2aba9..d6a5e59 100644
-> --- a/drivers/clk/clk-devres.c
-> +++ b/drivers/clk/clk-devres.c
-> @@ -37,7 +37,8 @@ EXPORT_SYMBOL(devm_clk_provider_get);
->  
->  struct clk *devm_clk_get(struct device *dev, const char *id)
->  {
-> -	return clk_core_to_clk(devm_clk_provider_get(dev, id));
-> +	const char *dev_id = dev ? dev_name(dev) : NULL;
-> +	return clk_core_to_clk(devm_clk_provider_get(dev, id), dev_id, id);
+Thanks for your help.
 
-Hmm, correct me if I'm missing something but you're just calling
-devm_clk_provider() which guarantees calling of clk_provider_put() on
-device removal, but what about the consumer struct being created here?
-
-Shouldn't you rather call normal clk_provider_get() here, then create a
-consumer struct for it and then wrap it up using devres, providing
-appropriate release function?
-
->  }
->  EXPORT_SYMBOL(devm_clk_get);
->  
-> diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
-> index cc1bae1..4e38856 100644
-> --- a/drivers/clk/clk-highbank.c
-> +++ b/drivers/clk/clk-highbank.c
-> @@ -331,7 +331,7 @@ CLK_OF_DECLARE(hb_a9periph, "calxeda,hb-a9periph-clock", hb_a9periph_init);
->  static void __init hb_a9bus_init(struct device_node *node)
->  {
->  	struct clk_core *clk = hb_clk_init(node, &a9bclk_ops);
-> -	clk_prepare_enable(clk_core_to_clk(clk));
-> +	clk_prepare_enable(clk_core_to_clk(clk, node->full_name, NULL));
->  }
->  CLK_OF_DECLARE(hb_a9bus, "calxeda,hb-a9bus-clock", hb_a9bus_init);
->  
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 644a824..b887c69 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -568,6 +568,28 @@ static int clk_disable_unused(void)
->  }
->  late_initcall_sync(clk_disable_unused);
->  
-> +struct clk *clk_core_to_clk(struct clk_core *clk_core, const char *dev,
-> +			    const char *con)
-
-Name of this function suggests that this is just a simple conversion,
-while it creates new object. I would suggest calling this
-clk_create_consumer() or something along these lines.
-
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> +	if (!clk)
-> +		return ERR_PTR(-ENOMEM);
-
-[snip]
-
-> +static void clk_free_clk(struct clk *clk)
-> +{
-> +	kfree(clk);
-> +}
-
-Any need for this one-liner? Seems to be used just once below.
-
-> +
->  void clk_put(struct clk *clk)
->  {
-> -	__clk_put(clk_to_clk_core(clk));
-> +	clk_core_t *core = clk_to_clk_core(clk);
-> +
-> +	clk_free_clk(clk);
-> +	__clk_put(core);
->  }
->  EXPORT_SYMBOL(clk_put);
->  
-> diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-> index 28a5d30..47f21ea 100644
-> --- a/drivers/clk/qcom/mmcc-msm8960.c
-> +++ b/drivers/clk/qcom/mmcc-msm8960.c
-> @@ -470,7 +470,8 @@ static int pix_rdi_set_parent(struct clk_hw *hw, u8 index)
->  	 * needs to be on at what time.
->  	 */
->  	for (i = 0; i < num_parents; i++) {
-> -		ret = clk_prepare_enable(clk_core_to_clk(clk_get_parent_by_index(clk, i)));
-> +		struct clk_core *parent = clk_get_parent_by_index(clk, i);
-> +		ret = clk_prepare_enable(clk_core_to_clk(parent, NULL, __clk_get_name(parent)));
-
-Shouldn't this use clk_provider_*() instead? IMHO clk_core_to_clk() and
-clk_to_clk_core() shouldn't be available to clock drivers, just the core
-clock code. Consumers should operate on struct clks alone, clock drivers
-should operate only on struct clk_cores and only the core code should be
-responsible for necessary conversions.
-
->  		if (ret)
->  			goto err;
->  	}
-> @@ -498,8 +499,10 @@ static int pix_rdi_set_parent(struct clk_hw *hw, u8 index)
->  	udelay(1);
->  
->  err:
-> -	for (i--; i >= 0; i--)
-> -		clk_disable_unprepare(clk_core_to_clk(clk_get_parent_by_index(clk, i)));
-> +	for (i--; i >= 0; i--) {
-> +		struct clk_core *parent = clk_get_parent_by_index(clk, i);
-> +		clk_disable_unprepare(clk_core_to_clk(parent, NULL, __clk_get_name(parent)));
-
-Hmm. Memory leak? Every time this operation is called you create a
-consumer struct for each parent two times.
-
-> +	}
->  
->  	return ret;
->  }
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 5de44c1..550a691 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1196,7 +1196,7 @@ static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
->  		struct clk_core *clk = clk_provider_get(NULL, clocks[i]);
->  
->  		if (!IS_ERR(clk))
-> -			clk_prepare_enable(clk_core_to_clk(clk));
-> +			clk_prepare_enable(clk_core_to_clk(clk, NULL, clocks[i]));
-
-Probably should use clk_provider_*()?
-
->  	}
->  }
->  
-> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-> index 385d101..2a03d47 100644
-> --- a/drivers/clk/tegra/clk.c
-> +++ b/drivers/clk/tegra/clk.c
-> @@ -228,7 +228,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
->  			}
->  
->  		if (tbl->state)
-> -			if (clk_prepare_enable(clk_core_to_clk(clk))) {
-> +			if (clk_prepare_enable(clk_core_to_clk(clk, NULL, __clk_get_name(clk)))) {
-
-Ditto. And all similar cases below which I skipped due to lack of any
-added value to this review.
-
->  				pr_err("%s: Failed to enable %s\n", __func__,
->  				       __clk_get_name(clk));
->  				WARN_ON(1);
-
-[snip]
-
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index 2c1ece9..9657fc8 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -57,6 +57,10 @@ struct clk_core {
->  
->  struct clk {
->  	struct clk_core	*core;
-> +	unsigned int	enable_count;
-> +	const char	*dev_id;
-> +	const char	*con_id;
-> +	void		*last_disable;
-
-Probably the same as for enables should be done for prepares.
-
->  };
->  
->  /*
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 87de32c..abfc31a 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -533,7 +533,8 @@ struct clk_core *clk_provider_get_sys(const char *dev_id, const char *con_id);
->  struct clk_core *clk_provider_get(struct device *dev, const char *con_id);
->  struct clk_core *devm_clk_provider_get(struct device *dev, const char *id);
->  
-> -#define clk_core_to_clk(core)	((struct clk *)(core))
-
-Btw. this should have been a static inline.
-
-Best regards,
-Tomasz
+Thor
