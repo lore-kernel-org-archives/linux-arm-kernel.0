@@ -1,178 +1,107 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 9 Jul 2014 09:05:14 -0400
-Subject: [PATCH v2] clk: qcom: Fix MN frequency tables, parent map,
- and jpegd
-In-Reply-To: <1404869766-6311-1-git-send-email-sboyd@codeaurora.org>
-References: <1404869766-6311-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAF6AEGscA_QSNZmUYtnzWnkR+xAPnwYdPm7V40VgdmV8HkWNKg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Jul 2014 14:06:30 +0100
+Subject: [PATCH v4 1/6] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <1403621195-9622-1-git-send-email-denis@eukrea.com>
+References: <1403621195-9622-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140709130630.GA479@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 9:36 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Clocks that don't have a pre-divider don't list any pre-divider
-> in their frequency tables, but their tables are initialized using
-> aggregate initializers. Use tagged initializers so we properly
-> assign the m and n values for each frequency. Furthermore, the
-> mmcc_pxo_pll8_pll2_pll3 array improperly mapped the second
-> element to pll2 instead of pll8, causing the clock driver to
-> recalculate the wrong rate for any clocks using this array along
-> with a rate that uses pll2. Plus the .num_parents field is 3
-> instead of 4 so you can't even switch the parent to pll3. Finally
-> I noticed that the jpegd clock improperly indicates that the
-> pre-divider width is only 2, when it's actually 4 bits wide.
->
-> Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia clock controller (MMCC)"
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Tue, 24 Jun 2014, Denis Carikli wrote:
 
-thanks, it's nice to have the gpu at >27MHz :-)
-
-Tested-by: Rob Clark <robdclark@gmail.com>
-
+> From: Markus Pargmann <mpa@pengutronix.de>
+> 
+> This is the core driver for imx25 touchscreen/adc driver. The module
+> has one shared ADC and two different conversion queues which use the
+> ADC. The two queues are identical. Both can be used for general purpose
+> ADC but one is meant to be used for touchscreens.
+> 
+> This driver is the core which manages the central components and
+> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> the correct components.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 > ---
->
->  Changes since v1:
->   - num_parents for gfx3d should be 4, not 3.
->
->  drivers/clk/qcom/mmcc-msm8960.c | 82 +++++++++++++++++++++--------------------
->  1 file changed, 42 insertions(+), 40 deletions(-)
->
-> diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-> index 12f3c0b64fcd..10d2f135dfba 100644
-> --- a/drivers/clk/qcom/mmcc-msm8960.c
-> +++ b/drivers/clk/qcom/mmcc-msm8960.c
-> @@ -38,6 +38,8 @@
->  #define P_PLL2 2
->  #define P_PLL3 3
->
-> +#define F_MN(f, s, _m, _n) { .freq = f, .src = s, .m = _m, .n = _n }
+> Changelog v3->v4:
+> - Added Jonathan's Ack
+> - ARCH_MXC Kconfigdependency removed.
+> - mx25_tsadc_get_regmap and mx25_tsadc_get_ipg contents have been moved
+>   in the caller function.
+> - mx25_tsadc_irq_chip has been removed.
+> - Register definitions are now more humain readable.
+> - Many other code and style cleanups.
+> 
+> Changelog v2->v3:
+> - None
+> ---
+>  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |   46 ++++++
+>  drivers/mfd/Kconfig                                |    8 +
+>  drivers/mfd/Makefile                               |    2 +
+>  drivers/mfd/fsl-imx25-tsadc.c                      |  170 ++++++++++++++++++++
+>  include/linux/mfd/imx25-tsadc.h                    |  140 ++++++++++++++++
+>  5 files changed, 366 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+>  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+>  create mode 100644 include/linux/mfd/imx25-tsadc.h
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+
+You need to split the DT documentation out into a separate patch.
+
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index af0e83f..d354547 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+
+[...]
+
+> +static int mx25_tsadc_domain_map(struct irq_domain *d, unsigned int irq,
+> +			     irq_hw_number_t hwirq)
+> +{
+> +	struct mx25_tsadc *tsadc = d->host_data;
 > +
->  static u8 mmcc_pxo_pll8_pll2_map[] = {
->         [P_PXO]         = 0,
->         [P_PLL8]        = 2,
-> @@ -59,8 +61,8 @@ static u8 mmcc_pxo_pll8_pll2_pll3_map[] = {
->
->  static const char *mmcc_pxo_pll8_pll2_pll3[] = {
->         "pxo",
-> -       "pll2",
->         "pll8_vote",
-> +       "pll2",
->         "pll3",
->  };
->
-> @@ -710,18 +712,18 @@ static struct clk_branch csiphy2_timer_clk = {
->  };
->
->  static struct freq_tbl clk_tbl_gfx2d[] = {
-> -       {  27000000, P_PXO,  1,  0 },
-> -       {  48000000, P_PLL8, 1,  8 },
-> -       {  54857000, P_PLL8, 1,  7 },
-> -       {  64000000, P_PLL8, 1,  6 },
-> -       {  76800000, P_PLL8, 1,  5 },
-> -       {  96000000, P_PLL8, 1,  4 },
-> -       { 128000000, P_PLL8, 1,  3 },
-> -       { 145455000, P_PLL2, 2, 11 },
-> -       { 160000000, P_PLL2, 1,  5 },
-> -       { 177778000, P_PLL2, 2,  9 },
-> -       { 200000000, P_PLL2, 1,  4 },
-> -       { 228571000, P_PLL2, 2,  7 },
-> +       F_MN( 27000000, P_PXO,  1,  0),
-> +       F_MN( 48000000, P_PLL8, 1,  8),
-> +       F_MN( 54857000, P_PLL8, 1,  7),
-> +       F_MN( 64000000, P_PLL8, 1,  6),
-> +       F_MN( 76800000, P_PLL8, 1,  5),
-> +       F_MN( 96000000, P_PLL8, 1,  4),
-> +       F_MN(128000000, P_PLL8, 1,  3),
-> +       F_MN(145455000, P_PLL2, 2, 11),
-> +       F_MN(160000000, P_PLL2, 1,  5),
-> +       F_MN(177778000, P_PLL2, 2,  9),
-> +       F_MN(200000000, P_PLL2, 1,  4),
-> +       F_MN(228571000, P_PLL2, 2,  7),
->         { }
->  };
->
-> @@ -842,22 +844,22 @@ static struct clk_branch gfx2d1_clk = {
->  };
->
->  static struct freq_tbl clk_tbl_gfx3d[] = {
-> -       {  27000000, P_PXO,  1,  0 },
-> -       {  48000000, P_PLL8, 1,  8 },
-> -       {  54857000, P_PLL8, 1,  7 },
-> -       {  64000000, P_PLL8, 1,  6 },
-> -       {  76800000, P_PLL8, 1,  5 },
-> -       {  96000000, P_PLL8, 1,  4 },
-> -       { 128000000, P_PLL8, 1,  3 },
-> -       { 145455000, P_PLL2, 2, 11 },
-> -       { 160000000, P_PLL2, 1,  5 },
-> -       { 177778000, P_PLL2, 2,  9 },
-> -       { 200000000, P_PLL2, 1,  4 },
-> -       { 228571000, P_PLL2, 2,  7 },
-> -       { 266667000, P_PLL2, 1,  3 },
-> -       { 300000000, P_PLL3, 1,  4 },
-> -       { 320000000, P_PLL2, 2,  5 },
-> -       { 400000000, P_PLL2, 1,  2 },
-> +       F_MN( 27000000, P_PXO,  1,  0),
-> +       F_MN( 48000000, P_PLL8, 1,  8),
-> +       F_MN( 54857000, P_PLL8, 1,  7),
-> +       F_MN( 64000000, P_PLL8, 1,  6),
-> +       F_MN( 76800000, P_PLL8, 1,  5),
-> +       F_MN( 96000000, P_PLL8, 1,  4),
-> +       F_MN(128000000, P_PLL8, 1,  3),
-> +       F_MN(145455000, P_PLL2, 2, 11),
-> +       F_MN(160000000, P_PLL2, 1,  5),
-> +       F_MN(177778000, P_PLL2, 2,  9),
-> +       F_MN(200000000, P_PLL2, 1,  4),
-> +       F_MN(228571000, P_PLL2, 2,  7),
-> +       F_MN(266667000, P_PLL2, 1,  3),
-> +       F_MN(300000000, P_PLL3, 1,  4),
-> +       F_MN(320000000, P_PLL2, 2,  5),
-> +       F_MN(400000000, P_PLL2, 1,  2),
->         { }
->  };
->
-> @@ -897,7 +899,7 @@ static struct clk_dyn_rcg gfx3d_src = {
->                 .hw.init = &(struct clk_init_data){
->                         .name = "gfx3d_src",
->                         .parent_names = mmcc_pxo_pll8_pll2_pll3,
-> -                       .num_parents = 3,
-> +                       .num_parents = 4,
->                         .ops = &clk_dyn_rcg_ops,
->                 },
->         },
-> @@ -995,7 +997,7 @@ static struct clk_rcg jpegd_src = {
->         .ns_reg = 0x00ac,
->         .p = {
->                 .pre_div_shift = 12,
-> -               .pre_div_width = 2,
-> +               .pre_div_width = 4,
->         },
->         .s = {
->                 .src_sel_shift = 0,
-> @@ -1342,15 +1344,15 @@ static struct clk_branch hdmi_app_clk = {
->  };
->
->  static struct freq_tbl clk_tbl_vcodec[] = {
-> -       {  27000000, P_PXO,  1,  0 },
-> -       {  32000000, P_PLL8, 1, 12 },
-> -       {  48000000, P_PLL8, 1,  8 },
-> -       {  54860000, P_PLL8, 1,  7 },
-> -       {  96000000, P_PLL8, 1,  4 },
-> -       { 133330000, P_PLL2, 1,  6 },
-> -       { 200000000, P_PLL2, 1,  4 },
-> -       { 228570000, P_PLL2, 2,  7 },
-> -       { 266670000, P_PLL2, 1,  3 },
-> +       F_MN( 27000000, P_PXO,  1,  0),
-> +       F_MN( 32000000, P_PLL8, 1, 12),
-> +       F_MN( 48000000, P_PLL8, 1,  8),
-> +       F_MN( 54860000, P_PLL8, 1,  7),
-> +       F_MN( 96000000, P_PLL8, 1,  4),
-> +       F_MN(133330000, P_PLL2, 1,  6),
-> +       F_MN(200000000, P_PLL2, 1,  4),
-> +       F_MN(228570000, P_PLL2, 2,  7),
-> +       F_MN(266670000, P_PLL2, 1,  3),
->         { }
->  };
->
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
+> +	irq_set_chip_data(irq, tsadc);
+> +	irq_set_chip_and_handler(irq, &dummy_irq_chip,
+> +				 handle_level_irq);
+> +	set_irq_flags(irq, IRQF_VALID);
+
+This is only valid on ARM based systems and the Kconfig options do not
+limit this driver enough for that to hold true.  In other words, this
+code should easily run on X86, PPC, etc etc.
+
+> +	return 0;
+> +}
+
+[...]
+
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id mx25_tsadc_ids[] = {
+> +	{ .compatible = "fsl,imx25-tsadc" },
+> +	{ /* Sentinel */ }
+> +};
+> +#endif
+
+Can this actually work without device tree?
+
+> +static struct platform_driver mx25_tsadc_driver = {
+> +	.driver = {
+> +		.name = "mx25-tsadc",
+> +		.owner = THIS_MODULE,
+
+Remove this line, it's done for you.
+
+> +		.of_match_table = of_match_ptr(mx25_tsadc_ids),
+> +	},
+> +	.probe = mx25_tsadc_probe,
+> +};
+> +module_platform_driver(mx25_tsadc_driver);
+
+[...]
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
