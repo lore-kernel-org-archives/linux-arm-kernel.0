@@ -1,37 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:30 +0200
-Subject: [PATCHv3 02/34] ARM: at91/dt: ariag25: define crystals frequencies
+Date: Wed,  9 Jul 2014 17:06:29 +0200
+Subject: [PATCHv3 01/34] Documentation: dt: document all the atmel pmc
+ compatibles
 In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Acme Systems Aria G25 board main and slow crystals frequencies.
+Documentation for atmel-pmc only list one compatible, add the remaining
+compatible strings.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-ariag25.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/arm/atmel-pmc.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
-index 55ab6180e350..e9ced30159a7 100644
---- a/arch/arm/boot/dts/at91-ariag25.dts
-+++ b/arch/arm/boot/dts/at91-ariag25.dts
-@@ -42,6 +42,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
- 		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/atmel-pmc.txt b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
+index 389bed5056e8..795cc78543fe 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-pmc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
+@@ -1,7 +1,10 @@
+ * Power Management Controller (PMC)
  
- 	ahb {
+ Required properties:
+-- compatible: Should be "atmel,at91rm9200-pmc"
++- compatible: Should be "atmel,<chip>-pmc".
++	<chip> can be: at91rm9200, at91sam9260, at91sam9g45, at91sam9n12,
++	at91sam9x5, sama5d3
++
+ - reg: Should contain PMC registers location and length
+ 
+ Examples:
 -- 
 1.9.1
