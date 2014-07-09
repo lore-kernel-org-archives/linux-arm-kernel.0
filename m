@@ -1,50 +1,39 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 09 Jul 2014 10:24:29 +0300
-Subject: [PATCH 1/3] mfd: pm8921: Expose pm8xxx_read_irq_status
-In-Reply-To: <CAJAp7Ogy3=tZvMAUojbf5sy8EMmQOT+imA3=TRVcGXXA_y7CtA@mail.gmail.com>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
- <53BC7CBD.2060901@codeaurora.org>
- <CAJAp7Ogy3=tZvMAUojbf5sy8EMmQOT+imA3=TRVcGXXA_y7CtA@mail.gmail.com>
-Message-ID: <1404890669.16296.5.camel@iivanov-dev>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 9 Jul 2014 09:25:53 +0200
+Subject: [PATCH] Removes FIXME message in usb.c
+In-Reply-To: <1404871119-4324-1-git-send-email-xerofoify@gmail.com>
+References: <1404871119-4324-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20140709072553.GJ7827@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-08 at 16:43 -0700, Bjorn Andersson wrote:
-> On Tue, Jul 8, 2014 at 4:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 07/07/14 18:26, Bjorn Andersson wrote:
+On Tue, Jul 08, 2014 at 09:58:39PM -0400, Nicholas Krause wrote:
+> This patch removes a fixme message in this file:wq for setting the usb 2
+:wq?
 
-<snip>
+> speed on the board to the correct level. We need to depend on the
+> bootloader for doing this as the wires may be shared for the other
+> things on the board with the usb chipset.
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-omap1/usb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+> index 4118db5..172245a 100644
+> --- a/arch/arm/mach-omap1/usb.c
+> +++ b/arch/arm/mach-omap1/usb.c
+> @@ -505,7 +505,7 @@ static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+>  		omap_cfg_reg(W5_USB2_SE0);
+>  		if (nwires != 3)
+>  			omap_cfg_reg(Y5_USB2_RCV);
+> -		// FIXME omap_cfg_reg(USB2_SPEED);
+> +		/* Depend on boatloader for USB speed to be stated for board */
+bootloader?
 
-> [...]
-> > Sad, the header file came back. I guess there isn't a way to put the
-> > pinctrl driver inside the core mfd driver? Then we wouldn't need to
-> > expose an "irq read line" function.
-> >
-> 
-> I continued my search and this needs to be accessed by gpio, mpp, adc,
-> charger, bms and usb(?). So we have to expose it in some form.
-> 
-> > Actually Abhijeet proposed such an API in 2011 but it didn't go
-> > anywhere[1]. If we had that API we should be able to call
-> > read_irq_line() from the pinctrl driver whenever we want to get the
-> > state of the gpio, plus the API is generic. We're going to need that API
-> > anyway for things like USB insertion detection so it might make sense to
-> > add it sooner rather than later.
-> >
-> > [1]
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/048319.html
-> 
-> From what I can see of this thread it was exposed as a way for drivers
-> to be able to query if an interrupt handler was called on raising or
-> falling edge. And based on the locking limitations of the
-> implementation we couldn't have used it anyways.
-> 
-> Our use case is different in that we're at any point in time
-> interested in reading out the status of the irq line, as the only way
-> of getting that status.
+Uwe
 
-How about using extcon framework? 
-
-Regards,
-Ivan
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
