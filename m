@@ -1,21 +1,81 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Jul 2014 10:30:18 +0200
-Subject: [PATCH 0/2] ARM: shmobile: Remove early_printk from command line
-In-Reply-To: <1404715809-31331-1-git-send-email-horms+renesas@verge.net.au>
-References: <1404715809-31331-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140709083018.GG5656@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Jul 2014 10:31:50 +0200
+Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <20140708100332.GW6501@e106497-lin.cambridge.arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <201407072322.00990.arnd@arndb.de>
+ <20140708100332.GW6501@e106497-lin.cambridge.arm.com>
+Message-ID: <201407091031.50402.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 08:50:07AM +0200, Simon Horman wrote:
-> As early printk is not supported when devices are initialised
-> using DT, so remove it from the command line.
+On Tuesday 08 July 2014, Liviu Dudau wrote:
+> On Mon, Jul 07, 2014 at 10:22:00PM +0100, Arnd Bergmann wrote:
+> > 
+> > I looked at the other drivers briefly, and I think you indeed fix the Tegra
+> > driver with this but break the integrator driver as mentioned above.
+> > The other callers of of_pci_range_to_resource() are apparently not
+> > impacted as they recalculate the values they get.
 > 
-> Based on renesas-devel-v3.16-rc3-20140706.
-> 
-> Simon Horman (2):
->   ARM: shmobile: armadillo800eva-reference: Remove early_printk from
->     command line
->   ARM: shmobile: kzm9g-reference: Remove early_printk from command line
+> I would argue that integrator version is having broken assumptions. If it would
+> try to allocate that IO range or request the resource as returned currently by
+> of_pci_range_to_resource (without my patch) it would fail. I know because I did
+> the same thing in my host bridge driver and it failed miserably. That's why I
+> tried to patch it.
 
-I have queued these up.
+The integrator code was just introduced and the reason for how it does things
+is the way that of_pci_range_to_resource() works today. We tried to cope with
+it and not change the existing behavior in order to not break any other drivers.
+
+It's certainly not fair to call the integrator version broken, it just works
+around the common code having a quirky interface. We should probably have
+done of_pci_range_to_resource better than it is today (I would have argued
+for it to return an IORESOURCE_MEM with the CPU address), but it took long
+enough to get that merged and I was sick of arguing about it.
+
+> If the IO space is memory mapped, then we use the port number, the io_offset
+> and the PCI_IOBASE to get to the virtual address that, when accessed, will
+> generate the correct addresses on the bus, based on what the host bridge has
+> been configured.
+> 
+> This is the current level of my understanding of PCI IO.
+
+Your understanding is absolutely correct, and that's great because very few
+people get that right. What I think we're really arguing about is what the
+of_pci_range_to_resource is supposed to return. As you and Bjorn both pointed
+out earlier, there are in fact two resources associated with the I/O window
+and the flaw in the current implementation is that of_pci_range_to_resource
+returns the numeric values for the IORESOURCE_MEM resource, but sets the
+type to IORESOURCE_IO, which is offset from that by PCI_IOBASE.
+
+You try to fix that by making it return the correct IORESOURCE_IO resource,
+which is a reasonable approach but you must not break drivers that rely
+on the broken resource while doing that.
+
+The approach that I would have picked is to return the IORESOURCE_MEM
+resource associated with the I/O window and pick a (basically random)
+IORESOURCE_IO resource struct based on what hasn't been used and then
+compute the appropriate io_offset from that. This approach of course
+would also have required fixing up all drivers relying on the current
+behavior.
+
+To be clear, I'm fine with you (and Bjorn if he cares) picking the
+approach you like here, either one of these works fine as long as the
+host drivers use the interface in the way it is defined.
+
+> Now, I believe Rob has switched entirely to using my series in some test that
+> he has run and he hasn't encountered any issues, as long as one remembers in
+> the host bridge driver to add the io_base offset to the .start resource. If
+> not then I need to patch pci_v3.c.
+
+The crazy part of all these discussions is that basically nobody ever uses
+I/O port access, so it's very hard to test and we don't even notice when
+we get it wrong, but we end up spending most of the time for PCI host controller
+reviews trying to get these right.
+
+I'm very thankful that you are doing this work to get it moved into common
+code so hopefully this is the last time we ever have to worry about it because
+all future drivers will be able to use the common implemnetation.
+
+	Arnd
