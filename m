@@ -1,28 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  9 Jul 2014 12:41:09 +0100
-Subject: [PATCH v3 0/5] phy: miphy365x: Introduce support for MiPHY365x
-Message-ID: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+Date: Wed,  9 Jul 2014 12:41:11 +0100
+Subject: [PATCH v3 2/5] phy: miphy365x: Add MiPHY365x header file for DT x
+ Driver defines
+In-Reply-To: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1404906074-31992-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+This provides the shared header file which will be reference from both
+the MiPHY365x driver and its associated Device Tree node(s).
 
-This patchset is based on the two core patches you sent to the
-list which facilitate creating PHYs residing on multi-channel
-controllers.  The changes since the last submission centre
-around dynamic PHY creation based solely on what is provided via
-Device Tree, as requested.  The other review comments have also
-been addressed in this set.
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/dt-bindings/phy/phy-miphy365x.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
 
-Kind regards,
-Lee
-
- .../devicetree/bindings/phy/phy-miphy365x.txt      |  76 +++
- arch/arm/boot/dts/stih416-b2020-revE.dts           |  10 +
- arch/arm/boot/dts/stih416-b2020.dts                |  12 +
- arch/arm/boot/dts/stih416.dtsi                     |  22 +
- drivers/phy/Kconfig                                |  10 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-miphy365x.c                        | 636 +++++++++++++++++++++
- include/dt-bindings/phy/phy-miphy365x.h            |  14 +
- 8 files changed, 781 insertions(+)
+diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
+new file mode 100644
+index 0000000..8ef8aba
+--- /dev/null
++++ b/include/dt-bindings/phy/phy-miphy365x.h
+@@ -0,0 +1,14 @@
++/*
++ * This header provides constants for the phy framework
++ * based on the STMicroelectronics MiPHY365x.
++ *
++ * Author: Lee Jones <lee.jones@linaro.org>
++ */
++#ifndef _DT_BINDINGS_PHY_MIPHY
++#define _DT_BINDINGS_PHY_MIPHY
++
++#define MIPHY_TYPE_SATA		1
++#define MIPHY_TYPE_PCIE		2
++#define MIPHY_TYPE_USB		3
++
++#endif /* _DT_BINDINGS_PHY_MIPHY */
+-- 
+1.8.3.2
