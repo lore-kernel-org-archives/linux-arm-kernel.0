@@ -1,56 +1,66 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 9 Jul 2014 09:26:45 +0200
-Subject: [PATCH 2/2] usb: ci_hdrc_imx doc: fsl,usbphy is required
-In-Reply-To: <53BC1C4B.6060207@cogentembedded.com>
-References: <1404814481-7652-1-git-send-email-mpa@pengutronix.de>
- <1404814481-7652-2-git-send-email-mpa@pengutronix.de>
- <53BC1C4B.6060207@cogentembedded.com>
-Message-ID: <20140709072645.GI6633@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 Jul 2014 09:32:30 +0200
+Subject: [PATCH 5/6] pinctrl: samsung: Allow grouping multiple
+ pinmux/pinconf nodes
+In-Reply-To: <1404315664-3174-6-git-send-email-t.figa@samsung.com>
+References: <1404315664-3174-1-git-send-email-t.figa@samsung.com>
+ <1404315664-3174-6-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkdYG7kc+rUHSMoiZCwDAhzWsbBze3djgiWQna0AG6oTwfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 2, 2014 at 5:41 PM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-On Tue, Jul 08, 2014 at 08:28:59PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07/08/2014 02:14 PM, Markus Pargmann wrote:
-> 
-> >fsl,usbphy is no optional property. This patch moves it to the list of
-> >required properties.
-> 
-> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >---
-> >  Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> >diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-> >index a6a32cb7f777..8014d0d050f8 100644
-> >--- a/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-> >+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-imx.txt
-> >@@ -4,6 +4,7 @@ Required properties:
-> >  - compatible: Should be "fsl,imx27-usb"
-> >  - reg: Should contain registers location and length
-> >  - interrupts: Should contain controller interrupt
-> >+- fsl,usbphy: phandler of usb phy that connects to the only one port
-> 
->    s/phandler/phandle/. Can fix, while at it...
+> One of remaining limitations of current pinctrl-samsung driver was
+> the inability to parse multiple pinmux/pinconf group nodes grouped
+> inside a single device tree node. It made defining groups of pins for
+> single purpose, but with different parameters very inconvenient.
+>
+> This patch implements Tegra-like support for grouping multiple pinctrl
+> groups inside one device tree node, by completely changing the way
+> pin groups and functions are parsed from device tree. The code creating
+> pinctrl maps from DT nodes has been borrowed from pinctrl-tegra, while
+> the initial creation of groups and functions has been completely
+> rewritten with following assumptions:
+>  - each group consists of just one pin and does not depend on data
+>    from device tree,
+>  - each function is represented by a device tree child node of the
+>    pin controller, which in turn can contain multiple child nodes
+>    for pins that need to have different configuration values.
+>
+> Device Tree bindings are fully backwards compatible. New functionality
+> can be used by defining a new pinctrl group consisting of several child
+> nodes, as on following example:
+>
+>         sd4_bus8: sd4-bus-width8 {
+>                 part-1 {
+>                         samsung,pins = "gpk0-3", "gpk0-4",
+>                                         "gpk0-5", "gpk0-6";
+>                         samsung,pin-function = <3>;
+>                         samsung,pin-pud = <3>;
+>                         samsung,pin-drv = <3>;
+>                 };
+>                 part-2 {
+>                         samsung,pins = "gpk1-3", "gpk1-4",
+>                                         "gpk1-5", "gpk1-6";
+>                         samsung,pin-function = <4>;
+>                         samsung,pin-pud = <4>;
+>                         samsung,pin-drv = <3>;
+>                 };
+>         };
+>
+> Tested on Exynos4210-Trats board and a custom Exynos4212-based one.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-Yes, right, I will fix it and resend.
+Patch applied.
 
-Thanks,
+(This decision is mainly based on trust, I got lost in the patch :-)
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/27181e9e/attachment.sig>
+Yours,
+Linus Walleij
