@@ -1,104 +1,287 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  9 Jul 2014 12:41:14 +0100
-Subject: [PATCH v3 5/5] ARM: DT: STi: STiH416: Add DT node for MiPHY365x
-In-Reply-To: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
-References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1404906074-31992-6-git-send-email-lee.jones@linaro.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 9 Jul 2014 12:48:32 +0100
+Subject: [PATCH 2/2] arm: add early_ioremap support
+In-Reply-To: <20140709094926.GP21766@n2100.arm.linux.org.uk>
+References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
+ <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
+ <20140709094926.GP21766@n2100.arm.linux.org.uk>
+Message-ID: <20140709114832.GS4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-devices. It has 2 ports which it can use for either; both SATA, both
-PCIe or one of each in any configuration.
+Hi Russell,
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Jul 09, 2014 at 10:49:26AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 09, 2014 at 10:39:52AM +0100, Leif Lindholm wrote:
+> > +config EARLY_IOREMAP
+> > +	depends on MMU
+> > +	bool "Provide early_ioremap() support for kernel initialization."
+> > +	select GENERIC_EARLY_IOREMAP
+> 
+> Nit: please order as bool, then depends, then select.
+
+Fixed in attached.
+
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 8a16ee5..aa2621a 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -36,6 +36,7 @@
+> >  #include <asm/cpu.h>
+> >  #include <asm/cputype.h>
+> >  #include <asm/elf.h>
+> > +#include <asm/io.h>
+> 
+> Please always use linux/io.h in preference to asm/io.h.
+
+Fixed in attached.
+ 
+> > +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+> > +{
+> > +	unsigned int index = pgd_index(addr);
+> > +	pgd_t *pgd = cpu_get_pgd() + index;
+> 
+> What is the reasoning for using cpu_get_pgd() ?  Is there some specific
+> reason you want to read from the hardware register rather than using
+> the pgd_offset_k() macro here?
+
+No, merely picked the wrong interface, and it seemed to work.
+Fixed in attached.
+
+> > +void __init
+> > +early_ioremap_shutdown(void)
+> 
+> Nit: should be a single line.
+
+Fixed in attached.
+ 
+> The rest of the patch looks fine, thanks.
+
+Thank you for your comments.
+
+/
+    Leif
+
+>From 6937e88fc0bc62e125d891889334b6659f2efd28 Mon Sep 17 00:00:00 2001
+From: Mark Salter <msalter@redhat.com>
+Date: Wed, 27 Nov 2013 10:21:11 -0500
+Subject: [PATCH 2/2] arm: add early_ioremap support
+
+This patch uses the generic early_ioremap code to implement
+early_ioremap for ARM. The ARM-specific bits come mostly from
+an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
+here:
+
+  https://lkml.org/lkml/2013/10/3/279
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+CC: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/stih416-b2020-revE.dts | 10 ++++++++++
- arch/arm/boot/dts/stih416-b2020.dts      | 12 ++++++++++++
- arch/arm/boot/dts/stih416.dtsi           | 22 ++++++++++++++++++++++
- 3 files changed, 44 insertions(+)
+ arch/arm/Kconfig            |   11 ++++++
+ arch/arm/include/asm/Kbuild |    1 +
+ arch/arm/include/asm/io.h   |    1 +
+ arch/arm/kernel/setup.c     |    3 ++
+ arch/arm/mm/Makefile        |    1 +
+ arch/arm/mm/early_ioremap.c |   84 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c           |    2 ++
+ 7 files changed, 103 insertions(+)
+ create mode 100644 arch/arm/mm/early_ioremap.c
 
-diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-index ba0fa2c..80aff0f 100644
---- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-@@ -31,5 +31,15 @@
- 		ethernet1: dwmac at fef08000 {
- 			snps,reset-gpio = <&PIO0 7>;
- 		};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 245058b..5ddafaf 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1800,6 +1800,17 @@ config UACCESS_WITH_MEMCPY
+ 	  However, if the CPU data cache is using a write-allocate mode,
+ 	  this option is unlikely to provide any performance gain.
+ 
++config EARLY_IOREMAP
++	bool "Provide early_ioremap() support for kernel initialization."
++	depends on MMU
++	select GENERIC_EARLY_IOREMAP
++	help
++	  Provide a mechanism for kernel initialisation code to temporarily
++	  map, in a highmem-agnostic way, memory pages in before ioremap()
++	  and friends are available (before paging_init() has run). It uses
++	  the same virtual memory range as kmap so all early mappings must
++	  be unmapped before paging_init() is called.
 +
-+		miphy365x_phy: miphy365x at fe382000 {
-+			phy_port0: port at fe382000 {
-+				st,sata-gen = <3>;
-+			};
+ config SECCOMP
+ 	bool
+ 	prompt "Enable seccomp to safely compute untrusted bytecode"
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index f5a3576..0bc5a02 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -4,6 +4,7 @@ generic-y += auxvec.h
+ generic-y += bitsperlong.h
+ generic-y += cputime.h
+ generic-y += current.h
++generic-y += early_ioremap.h
+ generic-y += emergency-restart.h
+ generic-y += errno.h
+ generic-y += exec.h
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 3d23418..7b8a981 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -28,6 +28,7 @@
+ #include <asm/byteorder.h>
+ #include <asm/memory.h>
+ #include <asm-generic/pci_iomap.h>
++#include <asm/early_ioremap.h>
+ #include <xen/xen.h>
+ 
+ /*
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 8a16ee5..b1f397c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -30,6 +30,7 @@
+ #include <linux/bug.h>
+ #include <linux/compiler.h>
+ #include <linux/sort.h>
++#include <linux/io.h>
+ 
+ #include <asm/unified.h>
+ #include <asm/cp15.h>
+@@ -894,6 +895,8 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	parse_early_param();
+ 
++	early_ioremap_init();
 +
-+			phy_port1: port at fe38a000 {
-+				st,pcie-tx-pol-inv;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 4e2df66..c3c2ac6 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -12,4 +12,16 @@
- / {
- 	model = "STiH416 B2020";
- 	compatible = "st,stih416-b2020", "st,stih416";
+ 	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+ 	setup_dma_zone(mdesc);
+ 	sanity_check_meminfo();
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 91da64d..1c8ce752 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
+ obj-$(CONFIG_MODULES)		+= proc-syms.o
+ 
+ obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
++obj-$(CONFIG_EARLY_IOREMAP)	+= early_ioremap.o
+ obj-$(CONFIG_HIGHMEM)		+= highmem.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+ 
+diff --git a/arch/arm/mm/early_ioremap.c b/arch/arm/mm/early_ioremap.c
+new file mode 100644
+index 0000000..6444454
+--- /dev/null
++++ b/arch/arm/mm/early_ioremap.c
+@@ -0,0 +1,84 @@
++/*
++ * early_ioremap() support for ARM
++ *
++ * Based on existing support in arch/x86/mm/ioremap.c
++ *
++ * Restrictions: currently only functional before paging_init()
++ */
 +
-+	soc {
-+		miphy365x_phy: miphy365x at fe382000 {
-+			phy_port0: port at fe382000 {
-+				st,sata-gen = <3>;
-+			};
++#include <linux/init.h>
++#include <linux/io.h>
 +
-+			phy_port1: port at fe38a000 {
-+				st,pcie-tx-pol-inv;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 06473c5..e62fdd3 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -9,6 +9,8 @@
- #include "stih41x.dtsi"
- #include "stih416-clock.dtsi"
- #include "stih416-pinctrl.dtsi"
++#include <asm/fixmap.h>
++#include <asm/pgalloc.h>
++#include <asm/pgtable.h>
++#include <asm/tlbflush.h>
 +
-+#include <dt-bindings/phy/phy-miphy365x.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset-controller/stih416-resets.h>
- / {
-@@ -236,5 +238,25 @@
- 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
- 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
- 		};
++#include <asm/mach/map.h>
 +
-+		miphy365x_phy: miphy365x at fe382000 {
-+			compatible      = "st,miphy365x-phy";
-+			st,syscfg  	= <&syscfg_rear>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
++static pte_t bm_pte[PTRS_PER_PTE] __aligned(PTE_HWTABLE_SIZE) __initdata;
 +
-+			phy_port0: port at fe382000 {
-+				#phy-cells = <1>;
-+				reg = <0xfe382000 0x100>, <0xfe394000 0x100>, <0x824 0x4>;
-+				reg-names = "sata", "pcie", "syscfg";
-+			};
++static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
++{
++	pgd_t *pgd = pgd_offset_k(addr);
++	pud_t *pud = pud_offset(pgd, addr);
++	pmd_t *pmd = pmd_offset(pud, addr);
 +
-+			phy_port1: port at fe38a000 {
-+				#phy-cells = <1>;
-+				reg = <0xfe38a000 0x100>, <0xfe804000 0x100>, <0x828 0x4>;
-+				reg-names = "sata", "pcie", "syscfg";
-+			};
-+		};
- 	};
- };
++	return pmd;
++}
++
++static inline pte_t * __init early_ioremap_pte(unsigned long addr)
++{
++	return &bm_pte[pte_index(addr)];
++}
++
++void __init early_ioremap_init(void)
++{
++	pmd_t *pmd;
++
++	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
++	pmd_populate_kernel(NULL, pmd, bm_pte);
++
++	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
++		WARN_ON(1);
++		pr_warn("pmd %p != %p\n",
++			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
++		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
++			fix_to_virt(FIX_BTMAP_BEGIN));
++		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
++			fix_to_virt(FIX_BTMAP_END));
++		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
++		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
++	}
++
++	early_ioremap_setup();
++}
++
++void __init __early_set_fixmap(enum fixed_addresses idx,
++			       phys_addr_t phys, pgprot_t flags)
++{
++	unsigned long addr = __fix_to_virt(idx);
++	pte_t *pte;
++	u64 desc;
++
++	if (idx > FIX_KMAP_END) {
++		BUG();
++		return;
++	}
++	pte = early_ioremap_pte(addr);
++
++	if (pgprot_val(flags))
++		set_pte_at(NULL, addr, pte,
++			   pfn_pte(phys >> PAGE_SHIFT, flags));
++	else
++		pte_clear(NULL, addr, pte);
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
++	desc = *pte;
++}
++
++void __init early_ioremap_shutdown(void)
++{
++	pmd_t *pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
++
++	pmd_clear(pmd);
++}
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index ab14b79..608dc36 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -36,6 +36,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/pci.h>
+ #include <asm/fixmap.h>
++#include <asm/early_ioremap.h>
+ 
+ #include "mm.h"
+ #include "tcm.h"
+@@ -1474,6 +1475,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ {
+ 	void *zero_page;
+ 
++	early_ioremap_reset();
+ 	build_mem_type_table();
+ 	prepare_page_table();
+ 	map_lowmem();
 -- 
-1.8.3.2
+1.7.10.4
