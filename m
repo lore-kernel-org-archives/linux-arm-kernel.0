@@ -1,79 +1,119 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 9 Jul 2014 14:04:02 +0200
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
-References: <53A1B252.1030204@wwwdotorg.org>
- <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
- <53A3096B.1040409@wwwdotorg.org>
- <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
- <20140708130501.GC9516@ulmo>
- <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
- <20140709063130.GA3170@ulmo>
- <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
- <20140709102551.GA19357@ulmo>
- <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140709120400.GA3819@ulmo>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 9 Jul 2014 13:52:54 +0200 (CEST)
+Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
+ devm_request_gpio_array
+In-Reply-To: <53BD2509.6070803@codethink.co.uk>
+References: <cover.1404665589.git.himangi774@gmail.com>
+ <1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>
+ <53BD2509.6070803@codethink.co.uk>
+Message-ID: <alpine.DEB.2.10.1407091351530.2375@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 02:08:16PM +0300, Peter De Schrijver wrote:
-> On Wed, Jul 09, 2014 at 12:25:52PM +0200, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Wed, Jul 09, 2014 at 11:33:11AM +0300, Peter De Schrijver wrote:
-> > > On Wed, Jul 09, 2014 at 08:31:32AM +0200, Thierry Reding wrote:
-> > > > > Old Signed by an unknown key
-> > > > 
-> > > > On Tue, Jul 08, 2014 at 05:11:35PM +0300, Peter De Schrijver wrote:
-> > > > > > > 
-> > > > > > > Yes, but the problem is that you also need clocks and reset of other modules
-> > > > > > > in the same domain to safely control the domain's status. Eg: the ISPs, VI and
-> > > > > > > CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
-> > > > > > > public documentation. So it's not unlikely a VI and CSI driver will upstreamed
-> > > > > > > someday which means we would need to control the domain and therefore would
-> > > > > > > need to tell that driver about the ISPs clocks and resets even though the
-> > > > > > > driver doesn't know anything about the ISP hw otherwise.
-> > > > > > 
-> > > > > > Can't we make powergates reference counted so that they don't get
-> > > > > > disabled as long as there are any users? Looking for example at the
-> > > > > 
-> > > > > We could, but then why not switch to the powerdomain code and make powering
-> > > > > off a domain a NOP until we sorted out the context save/restore or fixed
-> > > > > the framework to allow for suspend without turning off the domains?
-> > > > 
-> > > > Well, one of the reasons why I'm not sure it's worth the effort at this
-> > > > point is that we can't get rid of the tegra_powergate_*() API anyway
-> > > > because of backwards compatibility. So we're going to add code (without
-> > > > getting rid of old code) merely to support some generic framework. That
-> > > > doesn't sound very useful to me.
-> > > > 
-> > > 
-> > > We can also convert the existing users to genpd. Today there are only 2 users
-> > > (gpu/drm/tegra/gr3d.c and pci/host/pci-tegra.c), so that doesn't seem to be
-> > > an impossible task.
-> > 
-> > We can certainly do that. What I'm trying to say is that since people
-> > may be running newer versions of the kernel with a DTB that doesn't have
-> > the necessary properties to hook up power domains, we have to keep calls
-> > to tegra_powergate_*() functions as-is, lest we break those setups.
-> > 
-> 
-> For those 2 domains we can find the necessary clocks and resets by parsing
-> the relevant existing DT nodes for PCIe and gr3d. For clocks, this isn't
-> even needed as we can always register some extra clkdev's to get them. There
-> is no equivalent for resets so we have to parse the gr3d and pcie DT nodes,
-> but that's not too bad I think.
 
-Even if we could really do this, at this point I don't see an advantage.
-All that it would be doing is move to some subsystem that doesn't quite
-match what we need just for the sake of moving to that subsystem. Having
-a Tegra-specific API doesn't sound so bad anymore.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/5d6547f7/attachment.sig>
+On Wed, 9 Jul 2014, Rob Jones wrote:
+
+> Please note that I submitted a patch on 02/07/14 to create this
+> function which was acked by Linus Walleij on 05/07/14.
+>
+> Great minds think alike, and all that.
+>
+> However, I think that the version I submitted better replicates the
+> original (non devm) functionality, see below.
+>
+> I didn't, however, add it to the documentation. +1 on that.
+>
+> On 06/07/14 18:47, Himangi Saraogi wrote:
+> > This patch introduces the function devm_request_gpio_array that
+> > allocates multiple GPIOs in a single call in a managed manner. The
+> > function is also included in the documentation and a declaration is
+> > added in include/linux/gpio.h.
+> >
+> > Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+> > ---
+> >   Documentation/driver-model/devres.txt |  1 +
+> >   drivers/gpio/devres.c                 | 21 +++++++++++++++++++++
+> >   include/linux/gpio.h                  |  2 ++
+> >   3 files changed, 24 insertions(+)
+> >
+> > diff --git a/Documentation/driver-model/devres.txt
+> > b/Documentation/driver-model/devres.txt
+> > index 9e2098e..756f6cf 100644
+> > --- a/Documentation/driver-model/devres.txt
+> > +++ b/Documentation/driver-model/devres.txt
+> > @@ -337,6 +337,7 @@ GPIO
+> >     devm_gpiod_put()
+> >     devm_gpio_request()
+> >     devm_gpio_request_one()
+> > +  devm_gpio_request_array()
+> >     devm_gpio_free()
+> >
+> >   SND
+> > diff --git a/drivers/gpio/devres.c b/drivers/gpio/devres.c
+> > index 65978cf..adae7fa 100644
+> > --- a/drivers/gpio/devres.c
+> > +++ b/drivers/gpio/devres.c
+> > @@ -229,6 +229,27 @@ int devm_gpio_request_one(struct device *dev, unsigned
+> > gpio,
+> >   EXPORT_SYMBOL(devm_gpio_request_one);
+> >
+> >   /**
+> > + *	devm_gpio_request_array - request multiple GPIOs in a single call
+> > + *	@dev:   device to request for
+> > + *	@array:	array of the 'struct gpio'
+> > + *	@num:	how many GPIOs in the array
+> > + */
+> > +int devm_gpio_request_array(struct device *dev, const struct gpio *array,
+> > +			    size_t num)
+> > +{
+> > +	int i, err;
+> > +
+> > +	for (i = 0; i < num; i++, array++) {
+> > +		err = devm_gpio_request_one(dev, array->gpio, array->flags,
+> > +					    array->label);
+> > +		if (err)
+> > +			return err;
+>
+> The failure path in the version I submitted frees up any already
+> allocated gpios on the first failure.
+
+Himangi first proposed doing that, but I thought it was not really in the
+spirit of devm functions, which is to leave that implicit.  No strong
+opinion on the matter, though.
+
+julia
+
+
+>
+> > +	}
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(devm_gpio_request_array);
+> > +
+> > +/**
+> >    *      devm_gpio_free - free a GPIO
+> >    *      @dev: device to free GPIO for
+> >    *      @gpio: GPIO to free
+> > diff --git a/include/linux/gpio.h b/include/linux/gpio.h
+> > index 85aa5d0..c85f243 100644
+> > --- a/include/linux/gpio.h
+> > +++ b/include/linux/gpio.h
+> > @@ -84,6 +84,8 @@ struct device;
+> >   int devm_gpio_request(struct device *dev, unsigned gpio, const char
+> > *label);
+> >   int devm_gpio_request_one(struct device *dev, unsigned gpio,
+> >   			  unsigned long flags, const char *label);
+> > +int devm_gpio_request_array(struct device *dev, const struct gpio *array,
+> > +			    size_t num);
+> >   void devm_gpio_free(struct device *dev, unsigned int gpio);
+> >
+> >   #else /* ! CONFIG_GPIOLIB */
+> >
+>
+> --
+> Rob Jones
+> Codethink Ltd
+> mailto:rob.jones at codethink.co.uk
+> tel:+44 161 236 5575
+>
