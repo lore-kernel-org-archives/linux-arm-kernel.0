@@ -1,289 +1,121 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed,  9 Jul 2014 19:49:36 +0200
-Subject: [PATCH 5/6] tty: serial: 8250-core: add rs485 support
-In-Reply-To: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
+From: dianders@google.com (Doug Anderson)
+Date: Wed, 9 Jul 2014 10:52:30 -0700
+Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
+ Exynos5420
+In-Reply-To: <CABxcv==v9whax3oraJQnTiDwfAUznjQP6WHK-auPv3q-LOmdnA@mail.gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
+ <7hpphwlgn0.fsf@paris.lan>
+ <CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>
+ <7h8uojk61a.fsf@paris.lan> <53ACE724.7090606@gmail.com>
+ <CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
+ <CAGa+x87LHiYGb03=GRcZisK1=TyakW1htd1E2vOQ6ijZKw8syg@mail.gmail.com>
+ <53B2A2A5.4070203@gmail.com> <53BB2E7A.5080204@samsung.com>
+ <53BB5EBD.5030607@gmail.com>
+ <CABxcv=ka5UxZ8E3+F4cR4vcY1m3AfX=g7HiaNYqmyQjHfSVqtw@mail.gmail.com>
+ <53BD3157.7030804@gmail.com>
+ <CABxcv=mcKNY8TO3Ay+GRs3ha45ptw_w_tig0L8g_syMQdbUmhw@mail.gmail.com>
+ <CAD=FV=XDs8FL3wdmDUF8ch9NuZ4hWn6FHhn8vVK42aa4qwV_Sg@mail.gmail.com>
+ <CABxcv==v9whax3oraJQnTiDwfAUznjQP6WHK-auPv3q-LOmdnA@mail.gmail.com>
+Message-ID: <CAD=FV=VSkQL2pEgM9_Q7eZfa8qCyai2X9-_cSpptrmsu67mKHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So after I stuffed the rs485 support from the omap-serial into
-8250-omap, I've been looking at it and the only omap specific part was
-the OMAP_UART_SCR_TX_EMPTY part. The driver has always TX_EMPTY set
-because the 8250 core expects an interrupt after the TX fifo + shift
-register is empty. The rs485 parts seems to wait for half fifo and then
-again for the empty fifo. With this change gone it fits fine as generic
-code and here it is.
+Javier,
 
-It is expected that the potential rs485 user invokes
-serial_omap_probe_rs485() to configure atleast RTS gpio which is a must
-have property. The code has been taken from omap-serial driver and
-received limited tested due to -ENODEV (the compiler said it works).
+On Wed, Jul 9, 2014 at 10:46 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Doug,
+>
+> On Wed, Jul 9, 2014 at 6:01 PM, Doug Anderson <dianders@google.com> wrote:
+>> Javier,
+>>
+>> On Wed, Jul 9, 2014 at 6:03 AM, Javier Martinez Canillas
+>> <javier@dowhile0.org> wrote:
+>>> Hello Tushar,
+>>>
+>>> On Wed, Jul 9, 2014 at 2:11 PM, Tushar Behera <trblinux@gmail.com> wrote:
+>>>> On 07/09/2014 03:44 PM, Javier Martinez Canillas wrote:
+>>>>> Hello Tushar,
+>>>>>
+>>>>> On Tue, Jul 8, 2014 at 5:00 AM, Tushar Behera <trblinux@gmail.com> wrote:
+>>>>>>>>
+>>>>>>>> The u-boot version is a little different on my Peach-Pi as compared to
+>>>>>>>> the market release version. Not sure if that is making any difference.
+>>>>>>>>
+>>>>>>>> Peach # version
+>>>>>>>>
+>>>>>>>> U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
+>>>>>>>> armv7a-cros-linux-gnueabi-gcc.real (4.8.1_cos_gg_feea904_4.8.1-r66)
+>>>>>>>> 4.8.x-google 20130905 (prerelease)
+>>>>>>>> GNU ld (binutils-2.22_cos_gg_2) 2.22
+>>>>>>>>
+>>>>>>>
+>>>>>
+>>>>> I'm using the same U-Boot version than Kevin (U-Boot 2013.04-gb98ed09)
+>>>>> and on my setup using chained nv-uboot I also need patch 1/3 along
+>>>>> with 2/3 to fix the issue.
+>>>>>
+>>>>>>> Note that I've applied this only from this series so I'm not sure how
+>>>>>>> much the problem can be solved...any updates for 1/3 and 3/3?
+>>>>>>>
+>>>>>>> - Kukjin
+>>>>>>
+>>>>>> Thanks for applying 2/3. I am working on 1/3 to see if we are following
+>>>>>> the right approach to fix Kevin's issue (unfortunately, I am not hitting
+>>>>>> the bug on my board ATM). 3/3 has already been merged through a
+>>>>>> different patchset.
+>>>>>>
+>>>>>
+>>>>> I'm sending as an attachment my complete boot log when booting today's
+>>>>> next (20140709) until it hangs and my u-boot env vars. I hope that
+>>>>> helps.
+>>>>>
+>>>>
+>>>> Would you please check the behaviour after enabling following config
+>>>> options?
+>>>>
+>>>> diff --git a/arch/arm/configs/exynos_defconfig
+>>>> b/arch/arm/configs/exynos_defconfig
+>>>> index e07a227..d6056ab 100644
+>>>> --- a/arch/arm/configs/exynos_defconfig
+>>>> +++ b/arch/arm/configs/exynos_defconfig
+>>>> @@ -93,6 +93,11 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+>>>>  CONFIG_FONTS=y
+>>>>  CONFIG_FONT_7x14=y
+>>>>  CONFIG_LOGO=y
+>>>> +CONFIG_SOUND=y
+>>>> +CONFIG_SND=y
+>>>> +CONFIG_SND_SOC=y
+>>>> +CONFIG_SND_SOC_SAMSUNG=y
+>>>> +CONFIG_SND_SOC_SNOW=y
+>>>>  CONFIG_USB=y
+>>>>  CONFIG_USB_EHCI_HCD=y
+>>>>  CONFIG_USB_EHCI_EXYNOS=y
+>>>> @@ -109,6 +114,8 @@ CONFIG_MMC_DW_IDMAC=y
+>>>>  CONFIG_MMC_DW_EXYNOS=y
+>>>>  CONFIG_RTC_CLASS=y
+>>>>  CONFIG_RTC_DRV_S3C=y
+>>>> +CONFIG_DMADEVICES=y
+>>>> +CONFIG_PL330_DMA=y
+>>>>  CONFIG_COMMON_CLK_MAX77686=y
+>>>>  CONFIG_EXT2_FS=y
+>>>>  CONFIG_EXT3_FS=y
+>>>>
+>>>>
+>>>
+>>> With those Kconfig options enabled the kernel does not hang anymore so
+>>> patch 1/3 is not needed in that case.
+>>
+>> Just checking: did you happen to confirm whether it's the PL330 /
+>> DMADEVICES that fixes things or do you actually need the sound stuff?
+>
+> Sorry I should had mentioned this before. The DMADEVICES and PL330
+> Kconfig are enough to avoid the kernel to hang, the sound config
+> options are not actually required.
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- drivers/tty/serial/8250/8250_core.c | 171 ++++++++++++++++++++++++++++++++++++
- include/linux/serial_8250.h         |   6 ++
- 2 files changed, 177 insertions(+)
+OK, makes sense.  Possibly the correct fix is just a Kconfig change
+that somehow enforces that we have these two configs on.
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index c7c3bf7..bf06a4c 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -39,6 +39,8 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
-+#include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #ifdef CONFIG_SPARC
- #include <linux/sunserialcore.h>
- #endif
-@@ -1281,10 +1283,34 @@ static void autoconfig_irq(struct uart_8250_port *up)
- 
- static inline void __stop_tx(struct uart_8250_port *p)
- {
-+	if (p->rs485.flags & SER_RS485_ENABLED) {
-+		int ret;
-+
-+		ret = (p->rs485.flags & SER_RS485_RTS_AFTER_SEND) ? 1 : 0;
-+		if (gpio_get_value(p->rts_gpio) != ret) {
-+			if (p->rs485.delay_rts_after_send > 0)
-+				mdelay(p->rs485.delay_rts_after_send);
-+			gpio_set_value(p->rts_gpio, ret);
-+		}
-+	}
-+
- 	if (p->ier & UART_IER_THRI) {
- 		p->ier &= ~UART_IER_THRI;
- 		serial_out(p, UART_IER, p->ier);
- 	}
-+
-+	if ((p->rs485.flags & SER_RS485_ENABLED) &&
-+			!(p->rs485.flags & SER_RS485_RX_DURING_TX)) {
-+		/*
-+		 * Empty the RX FIFO, we are not interested in anything
-+		 * received during the half-duplex transmission.
-+		 */
-+		serial_out(p, UART_FCR, p->fcr | UART_FCR_CLEAR_RCVR);
-+		/* Re-enable RX interrupts */
-+		p->ier |= UART_IER_RLSI | UART_IER_RDI;
-+		p->port.read_status_mask |= UART_LSR_DR;
-+		serial_out(p, UART_IER, p->ier);
-+	}
- }
- 
- static void serial8250_stop_tx(struct uart_port *port)
-@@ -1330,6 +1356,20 @@ static void serial8250_start_tx(struct uart_port *port)
- 	if (up->dma && !serial8250_tx_dma(up)) {
- 		goto out;
- 	} else if (!(up->ier & UART_IER_THRI)) {
-+
-+		if (up->rs485.flags & SER_RS485_ENABLED) {
-+			int ret;
-+
-+			ret = (up->rs485.flags & SER_RS485_RTS_ON_SEND) ? 1 : 0;
-+			if (gpio_get_value(up->rts_gpio) != ret) {
-+				gpio_set_value(up->rts_gpio, ret);
-+				if (up->rs485.delay_rts_before_send > 0)
-+					mdelay(up->rs485.delay_rts_before_send);
-+			}
-+			if (!(up->rs485.flags & SER_RS485_RX_DURING_TX))
-+				serial8250_stop_rx(port);
-+		}
-+
- 		up->ier |= UART_IER_THRI;
- 		serial_port_out(port, UART_IER, up->ier);
- 
-@@ -2556,6 +2596,7 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
- 			serial_port_out(port, UART_FCR, UART_FCR_ENABLE_FIFO);
- 		serial_port_out(port, UART_FCR, fcr);		/* set fcr */
- 	}
-+	up->fcr = fcr;
- 	serial8250_set_mctrl(port, port->mctrl);
- 	spin_unlock_irqrestore(&port->lock, flags);
- 	pm_runtime_mark_last_busy(port->dev);
-@@ -2811,6 +2852,124 @@ serial8250_verify_port(struct uart_port *port, struct serial_struct *ser)
- 	return 0;
- }
- 
-+int serial8250_probe_rs485(struct uart_8250_port *up,
-+		struct device *dev)
-+{
-+	struct serial_rs485 *rs485conf = &up->rs485;
-+	struct device_node *np = dev->of_node;
-+	u32 rs485_delay[2];
-+	enum of_gpio_flags flags;
-+	int ret;
-+
-+	rs485conf->flags = 0;
-+	if (!np)
-+		return 0;
-+
-+	/* check for tx enable gpio */
-+	up->rts_gpio = of_get_named_gpio_flags(np, "rts-gpio", 0, &flags);
-+	if (up->rts_gpio == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+	if (!gpio_is_valid(up->rts_gpio))
-+		return 0;
-+
-+	ret = devm_gpio_request(dev, up->rts_gpio, "serial_rts");
-+	if (ret < 0)
-+		return ret;
-+	ret = gpio_direction_output(up->rts_gpio,
-+			flags & SER_RS485_RTS_AFTER_SEND);
-+	if (ret < 0)
-+		return ret;
-+
-+	up->rts_gpio_valid = true;
-+
-+	if (of_property_read_bool(np, "rs485-rts-active-high"))
-+		rs485conf->flags |= SER_RS485_RTS_ON_SEND;
-+	else
-+		rs485conf->flags |= SER_RS485_RTS_AFTER_SEND;
-+
-+	if (of_property_read_u32_array(np, "rs485-rts-delay",
-+				rs485_delay, 2) == 0) {
-+		rs485conf->delay_rts_before_send = rs485_delay[0];
-+		rs485conf->delay_rts_after_send = rs485_delay[1];
-+	}
-+
-+	if (of_property_read_bool(np, "rs485-rx-during-tx"))
-+		rs485conf->flags |= SER_RS485_RX_DURING_TX;
-+
-+	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
-+		rs485conf->flags |= SER_RS485_ENABLED;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(serial8250_probe_rs485);
-+
-+static void serial8250_config_rs485(struct uart_port *port,
-+		struct serial_rs485 *rs485conf)
-+{
-+	struct uart_8250_port *up =
-+		container_of(port, struct uart_8250_port, port);
-+	unsigned long flags;
-+	unsigned int mode;
-+	int val;
-+
-+	pm_runtime_get_sync(port->dev);
-+	spin_lock_irqsave(&up->port.lock, flags);
-+
-+	/* Disable interrupts from this port */
-+	mode = up->ier;
-+	up->ier = 0;
-+	serial_out(up, UART_IER, 0);
-+
-+	/* store new config */
-+	up->rs485 = *rs485conf;
-+
-+	/* enable / disable rts */
-+	val = (up->rs485.flags & SER_RS485_ENABLED) ?
-+		SER_RS485_RTS_AFTER_SEND : SER_RS485_RTS_ON_SEND;
-+	val = (up->rs485.flags & val) ? 1 : 0;
-+	gpio_set_value(up->rts_gpio, val);
-+
-+	/* Enable interrupts */
-+	up->ier = mode;
-+	serial_out(up, UART_IER, up->ier);
-+
-+	spin_unlock_irqrestore(&up->port.lock, flags);
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
-+}
-+
-+static int serial8250_ioctl(struct uart_port *port, unsigned int cmd,
-+		unsigned long arg)
-+{
-+	struct serial_rs485 rs485conf;
-+	struct uart_8250_port *up;
-+
-+	up = container_of(port, struct uart_8250_port, port);
-+	switch (cmd) {
-+	case TIOCSRS485:
-+		if (!gpio_is_valid(up->rts_gpio))
-+			return -ENODEV;
-+		if (copy_from_user(&rs485conf, (void __user *) arg,
-+					sizeof(rs485conf)))
-+			return -EFAULT;
-+
-+		serial8250_config_rs485(port, &rs485conf);
-+		break;
-+
-+	case TIOCGRS485:
-+		if (!gpio_is_valid(up->rts_gpio))
-+			return -ENODEV;
-+		if (copy_to_user((void __user *) arg, &up->rs485,
-+					sizeof(rs485conf)))
-+			return -EFAULT;
-+		break;
-+
-+	default:
-+		return -ENOIOCTLCMD;
-+	}
-+	return 0;
-+}
-+
- static const char *
- serial8250_type(struct uart_port *port)
- {
-@@ -2840,6 +2999,7 @@ static struct uart_ops serial8250_pops = {
- 	.request_port	= serial8250_request_port,
- 	.config_port	= serial8250_config_port,
- 	.verify_port	= serial8250_verify_port,
-+	.ioctl		= serial8250_ioctl,
- #ifdef CONFIG_CONSOLE_POLL
- 	.poll_get_char = serial8250_get_poll_char,
- 	.poll_put_char = serial8250_put_poll_char,
-@@ -3375,6 +3535,17 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
- 		uart->tx_loadsz		= up->tx_loadsz;
- 		uart->capabilities	= up->capabilities;
- 
-+		/*
-+		 * gpio_is_valid() is nice but if this struct wasn't initialized
-+		 * then it is 0 which is considered as valid. With the ioctl()
-+		 * which can enable the rs485 routine we could abuse a gpio.
-+		 */
-+		if (up->rts_gpio_valid) {
-+			uart->rs485		= up->rs485;
-+			uart->rts_gpio		= up->rts_gpio;
-+		} else
-+			uart->rts_gpio = -EINVAL;
-+
- 		/* Take tx_loadsz from fifosize if it wasn't set separately */
- 		if (uart->port.fifosize && !uart->tx_loadsz)
- 			uart->tx_loadsz = uart->port.fifosize;
-diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
-index 0ec21ec..056a73f 100644
---- a/include/linux/serial_8250.h
-+++ b/include/linux/serial_8250.h
-@@ -78,6 +78,7 @@ struct uart_8250_port {
- 	unsigned char		acr;
- 	unsigned char		ier;
- 	unsigned char		lcr;
-+	unsigned char		fcr;
- 	unsigned char		mcr;
- 	unsigned char		mcr_mask;	/* mask of user bits */
- 	unsigned char		mcr_force;	/* mask of forced bits */
-@@ -94,6 +95,9 @@ struct uart_8250_port {
- 	unsigned char		msr_saved_flags;
- 
- 	struct uart_8250_dma	*dma;
-+	struct serial_rs485	rs485;
-+	int			rts_gpio;
-+	bool			rts_gpio_valid;
- 
- 	/* 8250 specific callbacks */
- 	int			(*dl_read)(struct uart_8250_port *);
-@@ -107,6 +111,8 @@ void serial8250_resume_port(int line);
- 
- extern int early_serial_setup(struct uart_port *port);
- 
-+extern int serial8250_probe_rs485(struct uart_8250_port *up,
-+		struct device *dev);
- extern int serial8250_find_port(struct uart_port *p);
- extern int serial8250_find_port_for_earlycon(void);
- extern unsigned int serial8250_early_in(struct uart_port *port, int offset);
--- 
-2.0.1
+-Doug
