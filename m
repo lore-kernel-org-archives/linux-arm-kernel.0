@@ -1,287 +1,73 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 9 Jul 2014 12:48:32 +0100
-Subject: [PATCH 2/2] arm: add early_ioremap support
-In-Reply-To: <20140709094926.GP21766@n2100.arm.linux.org.uk>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <1404898792-4201-3-git-send-email-leif.lindholm@linaro.org>
- <20140709094926.GP21766@n2100.arm.linux.org.uk>
-Message-ID: <20140709114832.GS4179@bivouac.eciton.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 04:48:38 -0700
+Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <53BD291D.3040307@linutronix.de>
+References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
+ <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
+ <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
+ <20140709111705.GR28884@atomide.com>
+ <53BD291D.3040307@linutronix.de>
+Message-ID: <20140709114837.GU28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140709 04:38]:
+> On 07/09/2014 01:17 PM, Tony Lindgren wrote:
+> > * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [140707 06:22]:
+> >> On Fri,  4 Jul 2014 18:34:10 +0200
+> >> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+> >>
+> >>> While comparing the OMAP-serial and the 8250 part of this I noticed that
+> >>> the the latter does not use runtime-pm.
+> >>
+> >> Yes it does, but 8250 parts (generally - omap presumably is special
+> >> here ?) need to be powered on to transmit/receive not just for register
+> >> access. The core uart layer implements a "pm" operation for this.
+> > 
+> > At least for omaps the UARTs need to be idled for the SoC to
+> > hit off-idle where the SoC is powered off and rebooted during
+> > idle.
+> >
+> > So we can certainly enable this in a generic way, however, this
+> > can only be done under the following conditions:
 
-On Wed, Jul 09, 2014 at 10:49:26AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 09, 2014 at 10:39:52AM +0100, Leif Lindholm wrote:
-> > +config EARLY_IOREMAP
-> > +	depends on MMU
-> > +	bool "Provide early_ioremap() support for kernel initialization."
-> > +	select GENERIC_EARLY_IOREMAP
+Sorry forgot to mention why I think this can now be done in a
+generic way, that's because we have now runtime PM in Linux.
+
+> > 1. We can save and restore the serial register context and detect
+> >    when context was lost in the serial driver. The context loss
+> >    can be detected by looking at some registers that are only
+> >    initialized during init.
 > 
-> Nit: please order as bool, then depends, then select.
+> A register check on restore context? DLL+DLH might be a good hint here
+> since its value should be >0 in the running case.
 
-Fixed in attached.
+OK yeah that would be a generic way to do it potentially ;)
 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 8a16ee5..aa2621a 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -36,6 +36,7 @@
-> >  #include <asm/cpu.h>
-> >  #include <asm/cputype.h>
-> >  #include <asm/elf.h>
-> > +#include <asm/io.h>
+Note that all the context_loss_cnt stuff in omap-serial.c can
+then be ignored, that's still only needed for the omap3 legacy
+mode booting case and won't be needed much longer.
+
+> > 2. There's a way for the serial RX pin to wake the SoC. On some
+> >    omaps there's a separate pin specific wake-up interrupt that
+> >    can be used for that.
 > 
-> Please always use linux/io.h in preference to asm/io.h.
+> That one would be handled by omap separately.
 
-Fixed in attached.
+OK great.
  
-> > +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-> > +{
-> > +	unsigned int index = pgd_index(addr);
-> > +	pgd_t *pgd = cpu_get_pgd() + index;
+> > 3. The serial PM features must be only enabled if requested by
+> >    the user via sysfs. Typically extra latency and loss of the
+> >    first RX character occur which is not acceptable to most
+> >    applications.
 > 
-> What is the reasoning for using cpu_get_pgd() ?  Is there some specific
-> reason you want to read from the hardware register rather than using
-> the pgd_offset_k() macro here?
+> Unless I'm mistaken the omap driver now initializes the timeout to -1.
+> So nothing happens unless this is enabled separately.
 
-No, merely picked the wrong interface, and it seemed to work.
-Fixed in attached.
+Yes that's the only safe approach so the serial port behaves in
+the standard Linux way unless specifically requested by the
+user.
 
-> > +void __init
-> > +early_ioremap_shutdown(void)
-> 
-> Nit: should be a single line.
+Regards,
 
-Fixed in attached.
- 
-> The rest of the patch looks fine, thanks.
-
-Thank you for your comments.
-
-/
-    Leif
-
->From 6937e88fc0bc62e125d891889334b6659f2efd28 Mon Sep 17 00:00:00 2001
-From: Mark Salter <msalter@redhat.com>
-Date: Wed, 27 Nov 2013 10:21:11 -0500
-Subject: [PATCH 2/2] arm: add early_ioremap support
-
-This patch uses the generic early_ioremap code to implement
-early_ioremap for ARM. The ARM-specific bits come mostly from
-an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
-here:
-
-  https://lkml.org/lkml/2013/10/3/279
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: linux-arm-kernel at lists.infradead.org
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig            |   11 ++++++
- arch/arm/include/asm/Kbuild |    1 +
- arch/arm/include/asm/io.h   |    1 +
- arch/arm/kernel/setup.c     |    3 ++
- arch/arm/mm/Makefile        |    1 +
- arch/arm/mm/early_ioremap.c |   84 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/mmu.c           |    2 ++
- 7 files changed, 103 insertions(+)
- create mode 100644 arch/arm/mm/early_ioremap.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 245058b..5ddafaf 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1800,6 +1800,17 @@ config UACCESS_WITH_MEMCPY
- 	  However, if the CPU data cache is using a write-allocate mode,
- 	  this option is unlikely to provide any performance gain.
- 
-+config EARLY_IOREMAP
-+	bool "Provide early_ioremap() support for kernel initialization."
-+	depends on MMU
-+	select GENERIC_EARLY_IOREMAP
-+	help
-+	  Provide a mechanism for kernel initialisation code to temporarily
-+	  map, in a highmem-agnostic way, memory pages in before ioremap()
-+	  and friends are available (before paging_init() has run). It uses
-+	  the same virtual memory range as kmap so all early mappings must
-+	  be unmapped before paging_init() is called.
-+
- config SECCOMP
- 	bool
- 	prompt "Enable seccomp to safely compute untrusted bytecode"
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index f5a3576..0bc5a02 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -4,6 +4,7 @@ generic-y += auxvec.h
- generic-y += bitsperlong.h
- generic-y += cputime.h
- generic-y += current.h
-+generic-y += early_ioremap.h
- generic-y += emergency-restart.h
- generic-y += errno.h
- generic-y += exec.h
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 3d23418..7b8a981 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -28,6 +28,7 @@
- #include <asm/byteorder.h>
- #include <asm/memory.h>
- #include <asm-generic/pci_iomap.h>
-+#include <asm/early_ioremap.h>
- #include <xen/xen.h>
- 
- /*
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 8a16ee5..b1f397c 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -30,6 +30,7 @@
- #include <linux/bug.h>
- #include <linux/compiler.h>
- #include <linux/sort.h>
-+#include <linux/io.h>
- 
- #include <asm/unified.h>
- #include <asm/cp15.h>
-@@ -894,6 +895,8 @@ void __init setup_arch(char **cmdline_p)
- 
- 	parse_early_param();
- 
-+	early_ioremap_init();
-+
- 	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
- 	setup_dma_zone(mdesc);
- 	sanity_check_meminfo();
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 91da64d..1c8ce752 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
- obj-$(CONFIG_MODULES)		+= proc-syms.o
- 
- obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
-+obj-$(CONFIG_EARLY_IOREMAP)	+= early_ioremap.o
- obj-$(CONFIG_HIGHMEM)		+= highmem.o
- obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
- 
-diff --git a/arch/arm/mm/early_ioremap.c b/arch/arm/mm/early_ioremap.c
-new file mode 100644
-index 0000000..6444454
---- /dev/null
-+++ b/arch/arm/mm/early_ioremap.c
-@@ -0,0 +1,84 @@
-+/*
-+ * early_ioremap() support for ARM
-+ *
-+ * Based on existing support in arch/x86/mm/ioremap.c
-+ *
-+ * Restrictions: currently only functional before paging_init()
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+
-+#include <asm/fixmap.h>
-+#include <asm/pgalloc.h>
-+#include <asm/pgtable.h>
-+#include <asm/tlbflush.h>
-+
-+#include <asm/mach/map.h>
-+
-+static pte_t bm_pte[PTRS_PER_PTE] __aligned(PTE_HWTABLE_SIZE) __initdata;
-+
-+static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-+{
-+	pgd_t *pgd = pgd_offset_k(addr);
-+	pud_t *pud = pud_offset(pgd, addr);
-+	pmd_t *pmd = pmd_offset(pud, addr);
-+
-+	return pmd;
-+}
-+
-+static inline pte_t * __init early_ioremap_pte(unsigned long addr)
-+{
-+	return &bm_pte[pte_index(addr)];
-+}
-+
-+void __init early_ioremap_init(void)
-+{
-+	pmd_t *pmd;
-+
-+	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
-+	pmd_populate_kernel(NULL, pmd, bm_pte);
-+
-+	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
-+		WARN_ON(1);
-+		pr_warn("pmd %p != %p\n",
-+			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
-+		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
-+			fix_to_virt(FIX_BTMAP_BEGIN));
-+		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
-+			fix_to_virt(FIX_BTMAP_END));
-+		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
-+		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
-+	}
-+
-+	early_ioremap_setup();
-+}
-+
-+void __init __early_set_fixmap(enum fixed_addresses idx,
-+			       phys_addr_t phys, pgprot_t flags)
-+{
-+	unsigned long addr = __fix_to_virt(idx);
-+	pte_t *pte;
-+	u64 desc;
-+
-+	if (idx > FIX_KMAP_END) {
-+		BUG();
-+		return;
-+	}
-+	pte = early_ioremap_pte(addr);
-+
-+	if (pgprot_val(flags))
-+		set_pte_at(NULL, addr, pte,
-+			   pfn_pte(phys >> PAGE_SHIFT, flags));
-+	else
-+		pte_clear(NULL, addr, pte);
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-+	desc = *pte;
-+}
-+
-+void __init early_ioremap_shutdown(void)
-+{
-+	pmd_t *pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
-+
-+	pmd_clear(pmd);
-+}
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index ab14b79..608dc36 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -36,6 +36,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/pci.h>
- #include <asm/fixmap.h>
-+#include <asm/early_ioremap.h>
- 
- #include "mm.h"
- #include "tcm.h"
-@@ -1474,6 +1475,7 @@ void __init paging_init(const struct machine_desc *mdesc)
- {
- 	void *zero_page;
- 
-+	early_ioremap_reset();
- 	build_mem_type_table();
- 	prepare_page_table();
- 	map_lowmem();
--- 
-1.7.10.4
+Tony
