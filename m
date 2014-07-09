@@ -1,53 +1,51 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 9 Jul 2014 14:15:44 -0700
-Subject: [PATCH V8 1/6] power: reset: Add generic SYSCON register mapped
- reset
-In-Reply-To: <53BCBCEC.7010306@roeck-us.net>
-References: <1404872153-3594-1-git-send-email-fkan@apm.com>
- <1404872153-3594-2-git-send-email-fkan@apm.com>
- <53BCBCEC.7010306@roeck-us.net>
-Message-ID: <CAL85gmB9wRXXrza3g0MBFWUi5w3_eCEhxdSd2FfmoB_SkGA8Ww@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 9 Jul 2014 23:16:54 +0200
+Subject: [PATCH RFC] Armada XP (mvebu) Hot-plug issues continued
+In-Reply-To: <CAFJTrDsu4k80kLjF9yZzctjznbYJ74y4m-VT3Vkf3XtGQXGAMw@mail.gmail.com>
+References: <CAFJTrDsu4k80kLjF9yZzctjznbYJ74y4m-VT3Vkf3XtGQXGAMw@mail.gmail.com>
+Message-ID: <20140709231654.20e28529@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 8:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 07/08/2014 07:15 PM, Feng Kan wrote:
->>
->> Add a generic SYSCON register mapped reset mechanism.
->>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->>   drivers/power/reset/Kconfig         |  6 +++
->>   drivers/power/reset/Makefile        |  1 +
->>   drivers/power/reset/syscon-reboot.c | 91
->> +++++++++++++++++++++++++++++++++++++
->>   3 files changed, 98 insertions(+)
->>   create mode 100644 drivers/power/reset/syscon-reboot.c
->>
->> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
->> index bdcf517..5877b38 100644
->> --- a/drivers/power/reset/Kconfig
->> +++ b/drivers/power/reset/Kconfig
->> @@ -80,3 +80,9 @@ config POWER_RESET_KEYSTONE
->>         help
->>           Reboot support for the KEYSTONE SoCs.
->>
->> +config POWER_RESET_SYSCON
->> +       bool "Generic SYSCON regmap reset driver"
->> +       depends on ARM || ARM64 || COMPILE_TEST
->
->
-> As written, this driver is really not generic but very arm specific.
-> I don't think COMPILE_TEST is a good idea either, since arm_pm_restart
-> is only defined for the arm architecture. Did you try compiling allmodconfig
-> or allyesconfig for, say, x86_64 with this patch applied ?
->
-> I think this might benefit from using [1], which would make it really
-> generic.
->
-> Guenter
->
-> [1] http://www.spinics.net/lists/kernel/msg1780939.html
-This is great, I will base off this list. Did it make it to a branch anywhere?
+Dear Matthew Minter,
 
->
+On Wed, 9 Jul 2014 18:08:07 +0100, Matthew Minter wrote:
+
+> This is something of a follow up to my previous thread:
+> Armada XP (mvebu) PCIe memory (BAR/window) re-allocation
+> 
+> Thanks to the helpful patches provided to the mvebu PCIe subsystem,
+> hot-plug PCIe devices worked much better on this board, however I have
+> discovered one remaining issue regarding them, due to the fact the
+> legacy style IRQ is assigned during the fake "PCI BIOS" phase, devices
+> which are plugged after boot will not be given an IRQ and thus if they
+> do not support MSI/MSI-X will fail to initialize.
+> 
+> This seems a fairly simple problem to squash and as such I have
+> written a small patch which helps solve this, however I am unsure if I
+> am doing this in a sensible way or if a different kind of rework is
+> needed here. Also, if this is the wrong mailing list to ask about this
+> please say so.
+> 
+> Any comments regarding this patch or a better way to achieve this
+> would be greatly appreciated. Patch follows (sorry if the format is
+> off, still getting used to git format-patch).
+
+My knowledge of the PCI core is a bit too limited to judge whether this
+is the right solution or not.
+
+However, I would recommend you to send the patch and problem
+description to the linux-pci at vger.kernel.org mailing list, with Bjorn
+Helgaas <bhelgaas@google.com> in the recipients (he is the PCI
+subsystem maintainer).
+
+It would indeed be good if you could use git send-email, because your
+patch has been badly modified by  your e-mail client :/
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
