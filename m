@@ -1,45 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 08:44:17 -0700
-Subject: [PATCH V4 2/2] arm: dts: dra7: add crossbar device binding
-In-Reply-To: <20140626102650.GH28884@atomide.com>
-References: <1403767532-19290-1-git-send-email-r.sricharan@ti.com>
- <1403767532-19290-3-git-send-email-r.sricharan@ti.com>
- <20140626074417.GF28884@atomide.com> <53ABDA9A.8000108@ti.com>
- <20140626102650.GH28884@atomide.com>
-Message-ID: <20140709154417.GC28884@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed,  9 Jul 2014 17:45:08 +0200
+Subject: [PATCHv3 0/7] cpufreq support for Marvell Armada XP
+Message-ID: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140626 03:28]:
-> * Sricharan R <r.sricharan@ti.com> [140626 01:36]:
-> > Hi Tony,
-> > 
-> > On Thursday 26 June 2014 01:14 PM, Tony Lindgren wrote:
-> > > * Sricharan R <r.sricharan@ti.com> [140626 00:29]:
-> > >> From: R Sricharan <r.sricharan@ti.com>
-> > >>
-> > >> There is a IRQ crossbar device in the soc, which
-> > >> maps the irq requests from the peripherals to the
-> > >> mpu interrupt controller's inputs. The Peripheral irq
-> > >> requests are connected to only one crossbar
-> > >> input and the output of the crossbar is connected to only one
-> > >> controller's input line. The crossbar device is used to map
-> > >> a peripheral input to a free mpu's interrupt controller line.
-> > >>
-> > >> Here, adding a new crossbar device node and replacing all the peripheral
-> > >> interrupt numbers with its fixed crossbar input lines.
-> > > 
-> > > I think these two patches need to be a single patch to avoid
-> > > breaking booting for git bisect inbetween these patches?
-> >   This does not cause booting issues. irq_desc gets allocated linearly,
-> >    but that does not create boot issues.
-> 
-> OK
+Mike, Viresh, Rafael, Jason, Gregory, Andrew, Sebastian,
 
-These are now applied on top of Jason's immutable irqchip branch
-and merged and pushed out into omap-for-v3.17/dt. Can you guys
-please test?
+Here is the third version of the patches adding cpufreq support for
+the Marvell Armada XP processor.
 
-Regards,
+Changes since v2
+================
 
-Tony
+ - As suggested by Stephen Boyd, instead of using a new clock notifier
+   that somewhat "hides" the dependency of the clk-cpu clock driver on
+   the PMSU, use a direct call from the clk-cpu driver to the PMSU
+   driver.
+
+ - Add a comment that explains why the OPP are not removed on failure
+   in the PMSU code initializing the cpufreq logic, in answer to the
+   review from Ezequiel Garcia.
+
+Changes since v1
+================
+
+ - Rework the patch series to use the generalized cpufreq-cpu0
+   (renamed cpufreq-generic) driver instead of having an Armada XP
+   specific cpufreq driver. This was suggested by Viresh
+   Kumar. Basically, it only involved adding a "clock-latency"
+   property in the DT, and changing the PMSU code to register the two
+   OPPs supported by each CPU, and registering the "cpufreq-generic"
+   platform device instead of the "armadaxp-cpufreq" one.
+
+Jason, this patch series is based on 3.16-rc3, but it applies fine
+even with mvebu/fixes and mvebu/soc merged (which contain some PMSU
+changes), so I haven't based the patch series on those branches. To
+_work_, the code needs the new cpufreq-generic driver which is pending
+in Viresh Kumar's tree for 3.17, but there is no build dependency.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (7):
+  ARM: mvebu: ensure CPU clocks are enabled
+  ARM: mvebu: extend PMSU code to support dynamic frequency scaling
+  clk: mvebu: extend clk-cpu for dynamic frequency scaling
+  ARM: mvebu: update Armada XP DT for dynamic frequency scaling
+  ARM: mvebu: allow enabling of cpufreq on Armada XP
+  ARM: mvebu: update mvebu_v7_defconfig with cpufreq support
+  ARM: configs: add cpufreq-generic in multi_v7_defconfig
+
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   5 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   2 +
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   2 +
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   4 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   2 +-
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/mvebu_v7_defconfig                |   2 +
+ arch/arm/mach-mvebu/Kconfig                        |   1 +
+ arch/arm/mach-mvebu/platsmp.c                      |   1 +
+ arch/arm/mach-mvebu/pmsu.c                         | 162 +++++++++++++++++++++
+ drivers/clk/mvebu/clk-cpu.c                        |  80 +++++++++-
+ include/linux/mvebu-pmsu.h                         |  20 +++
+ 12 files changed, 274 insertions(+), 8 deletions(-)
+ create mode 100644 include/linux/mvebu-pmsu.h
+
+-- 
+2.0.0
