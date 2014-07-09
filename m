@@ -1,94 +1,43 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:30:07 +0400
-Subject: [RFC/PATCH RESEND -next 13/21] mm: slub: add allocation size field to
- struct kmem_cache
+Date: Wed, 09 Jul 2014 15:30:14 +0400
+Subject: [RFC/PATCH RESEND -next 20/21] fs: dcache: manually unpoison dname
+ after allocation to shut up kasan's reports
 In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-14-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1404905415-9046-21-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When caller creates new kmem_cache, requested size of kmem_cache
-will be stored in alloc_size. Later alloc_size will be used by
-kerenel address sanitizer to mark alloc_size of slab object as
-accessible and the rest of its size as redzone.
+We need to manually unpoison rounded up allocation size for dname
+to avoid kasan's reports in __d_lookup_rcu.
+__d_lookup_rcu may validly read a little beyound allocated size.
 
+Reported-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- include/linux/slub_def.h |  5 +++++
- mm/slab.h                | 10 ++++++++++
- mm/slab_common.c         |  2 ++
- mm/slub.c                |  1 +
- 4 files changed, 18 insertions(+)
+ fs/dcache.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/linux/slub_def.h b/include/linux/slub_def.h
-index d82abd4..b8b8154 100644
---- a/include/linux/slub_def.h
-+++ b/include/linux/slub_def.h
-@@ -68,6 +68,11 @@ struct kmem_cache {
- 	int object_size;	/* The size of an object without meta data */
- 	int offset;		/* Free pointer offset. */
- 	int cpu_partial;	/* Number of per cpu partial objects to keep around */
-+
-+#ifdef CONFIG_KASAN
-+	int alloc_size;		/* actual allocation size kmem_cache_create */
-+#endif
-+
- 	struct kmem_cache_order_objects oo;
+diff --git a/fs/dcache.c b/fs/dcache.c
+index b7e8b20..dff64f2 100644
+--- a/fs/dcache.c
++++ b/fs/dcache.c
+@@ -38,6 +38,7 @@
+ #include <linux/prefetch.h>
+ #include <linux/ratelimit.h>
+ #include <linux/list_lru.h>
++#include <linux/kasan.h>
+ #include "internal.h"
+ #include "mount.h"
  
- 	/* Allocation and freeing of slabs */
-diff --git a/mm/slab.h b/mm/slab.h
-index 912af7f..cb2e776 100644
---- a/mm/slab.h
-+++ b/mm/slab.h
-@@ -260,6 +260,16 @@ static inline void memcg_uncharge_slab(struct kmem_cache *s, int order)
- }
- #endif
- 
-+#ifdef CONFIG_KASAN
-+static inline void kasan_set_alloc_size(struct kmem_cache *s, size_t size)
-+{
-+	s->alloc_size = size;
-+}
-+#else
-+static inline void kasan_set_alloc_size(struct kmem_cache *s, size_t size) { }
-+#endif
-+
-+
- static inline struct kmem_cache *virt_to_cache(const void *obj)
- {
- 	struct page *page = virt_to_head_page(obj);
-diff --git a/mm/slab_common.c b/mm/slab_common.c
-index 8df59b09..f5b52f0 100644
---- a/mm/slab_common.c
-+++ b/mm/slab_common.c
-@@ -147,6 +147,7 @@ do_kmem_cache_create(char *name, size_t object_size, size_t size, size_t align,
- 	s->name = name;
- 	s->object_size = object_size;
- 	s->size = size;
-+	kasan_set_alloc_size(s, object_size);
- 	s->align = align;
- 	s->ctor = ctor;
- 
-@@ -409,6 +410,7 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
- 
- 	s->name = name;
- 	s->size = s->object_size = size;
-+	kasan_set_alloc_size(s, size);
- 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
- 	err = __kmem_cache_create(s, flags);
- 
-diff --git a/mm/slub.c b/mm/slub.c
-index 3bdd9ac..6ddedf9 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -3724,6 +3724,7 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
- 		 * the complete object on kzalloc.
- 		 */
- 		s->object_size = max(s->object_size, (int)size);
-+		kasan_set_alloc_size(s, max(s->alloc_size, (int)size));
- 		s->inuse = max_t(int, s->inuse, ALIGN(size, sizeof(void *)));
- 
- 		for_each_memcg_cache_index(i) {
+@@ -1412,6 +1413,8 @@ struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
+ 			kmem_cache_free(dentry_cache, dentry); 
+ 			return NULL;
+ 		}
++		unpoison_shadow(dname,
++				roundup(name->len + 1, sizeof(unsigned long)));
+ 	} else  {
+ 		dname = dentry->d_iname;
+ 	}	
 -- 
 1.8.5.5
