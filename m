@@ -1,27 +1,78 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 11 Jul 2014 10:05:56 +0530
-Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
-References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
- <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 09 Jul 2014 13:58:19 +0100
+Subject: [PATCH] of: Use proper types for checking memory overflow
+In-Reply-To: <alpine.DEB.2.10.1407080923001.2561@Yrabib>
+References: <1404780343-32188-1-git-send-email-lauraa@codeaurora.org>
+ <alpine.DEB.2.10.1407080923001.2561@Yrabib>
+Message-ID: <20140709125819.8E285C40A5C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tuomas,
+On Tue, 8 Jul 2014 09:24:08 +0200 (CEST), Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Mon, 7 Jul 2014, Laura Abbott wrote:
+> 
+> > Commit a67a6ed15513541579d38bcbd127e7be170710e5
+> > (of: Check for phys_addr_t overflows in early_init_dt_add_memory_arch)
+> > corrected early_init_dt_add_memory_arch to account for overflows
+> > but did so in an unclean way using ULONG_MAX. There is no
+> > guarantee that sizeof(unsigned long) == sizeof(phys_addr_t).
+> > Check against phys_addr_t instead.
+> > 
+> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-On 11 July 2014 03:12, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
-> Add a new cpufreq driver for Tegra124. Instead of using the PLLX as
-> the CPU clocksource, switch immediately to the DFLL. It allows the use
-> of higher clock rates, and will automatically scale the CPU voltage as
-> well. We also rely on the DFLL driver to determine the CPU clock
-> frequencies that the chip supports, so that we can directly build a
-> cpufreq table with the OPP library helper dev_pm_opp_init_cpufreq_table.
->
-> This driver is a completely independent of the old cpufreq driver
-> (tegra-cpufreq), which is only used on Tegra20.
->
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+Applied, thanks.
 
-Please reuse cpufreq-cpu0 instead of adding a new driver. Similar
-is being adopted by all platforms now: krait, mvebu, etc..
+g.
+
+> 
+> > ---
+> >  drivers/of/fdt.c | 22 +++++++++++-----------
+> >  1 file changed, 11 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> > index b777d8f..b88a68e 100644
+> > --- a/drivers/of/fdt.c
+> > +++ b/drivers/of/fdt.c
+> > @@ -875,24 +875,24 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+> >  }
+> >  
+> >  #ifdef CONFIG_HAVE_MEMBLOCK
+> > +#define MAX_PHYS_ADDR	((phys_addr_t)~0)
+> > +
+> >  void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+> >  {
+> >  	const u64 phys_offset = __pa(PAGE_OFFSET);
+> >  	base &= PAGE_MASK;
+> >  	size &= PAGE_MASK;
+> >  
+> > -	if (sizeof(phys_addr_t) < sizeof(u64)) {
+> > -		if (base > ULONG_MAX) {
+> > -			pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> > -					base, base + size);
+> > -			return;
+> > -		}
+> > +	if (base > MAX_PHYS_ADDR) {
+> > +		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> > +				base, base + size);
+> > +		return;
+> > +	}
+> >  
+> > -		if (base + size > ULONG_MAX) {
+> > -			pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
+> > -					ULONG_MAX, base + size);
+> > -			size = ULONG_MAX - base;
+> > -		}
+> > +	if (base + size > MAX_PHYS_ADDR) {
+> > +		pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
+> > +				ULONG_MAX, base + size);
+> > +		size = MAX_PHYS_ADDR - base;
+> >  	}
+> >  
+> >  	if (base + size < phys_offset) {
+> > -- 
+> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> > hosted by The Linux Foundation
+> > 
+> > 
