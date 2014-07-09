@@ -1,82 +1,103 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 9 Jul 2014 17:51:00 +0200
-Subject: [PATCH v4 00/10] Add SDHCI support for ST Microelectronics SoCs
-In-Reply-To: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
-References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <53BD64E4.5060504@st.com>
+From: dianders@google.com (Doug Anderson)
+Date: Wed, 9 Jul 2014 09:01:08 -0700
+Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
+ Exynos5420
+In-Reply-To: <CABxcv=mcKNY8TO3Ay+GRs3ha45ptw_w_tig0L8g_syMQdbUmhw@mail.gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
+ <7hpphwlgn0.fsf@paris.lan>
+ <CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>
+ <7h8uojk61a.fsf@paris.lan> <53ACE724.7090606@gmail.com>
+ <CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
+ <CAGa+x87LHiYGb03=GRcZisK1=TyakW1htd1E2vOQ6ijZKw8syg@mail.gmail.com>
+ <53B2A2A5.4070203@gmail.com> <53BB2E7A.5080204@samsung.com>
+ <53BB5EBD.5030607@gmail.com>
+ <CABxcv=ka5UxZ8E3+F4cR4vcY1m3AfX=g7HiaNYqmyQjHfSVqtw@mail.gmail.com>
+ <53BD3157.7030804@gmail.com>
+ <CABxcv=mcKNY8TO3Ay+GRs3ha45ptw_w_tig0L8g_syMQdbUmhw@mail.gmail.com>
+Message-ID: <CAD=FV=XDs8FL3wdmDUF8ch9NuZ4hWn6FHhn8vVK42aa4qwV_Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Javier,
 
+On Wed, Jul 9, 2014 at 6:03 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Tushar,
+>
+> On Wed, Jul 9, 2014 at 2:11 PM, Tushar Behera <trblinux@gmail.com> wrote:
+>> On 07/09/2014 03:44 PM, Javier Martinez Canillas wrote:
+>>> Hello Tushar,
+>>>
+>>> On Tue, Jul 8, 2014 at 5:00 AM, Tushar Behera <trblinux@gmail.com> wrote:
+>>>>>>
+>>>>>> The u-boot version is a little different on my Peach-Pi as compared to
+>>>>>> the market release version. Not sure if that is making any difference.
+>>>>>>
+>>>>>> Peach # version
+>>>>>>
+>>>>>> U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
+>>>>>> armv7a-cros-linux-gnueabi-gcc.real (4.8.1_cos_gg_feea904_4.8.1-r66)
+>>>>>> 4.8.x-google 20130905 (prerelease)
+>>>>>> GNU ld (binutils-2.22_cos_gg_2) 2.22
+>>>>>>
+>>>>>
+>>>
+>>> I'm using the same U-Boot version than Kevin (U-Boot 2013.04-gb98ed09)
+>>> and on my setup using chained nv-uboot I also need patch 1/3 along
+>>> with 2/3 to fix the issue.
+>>>
+>>>>> Note that I've applied this only from this series so I'm not sure how
+>>>>> much the problem can be solved...any updates for 1/3 and 3/3?
+>>>>>
+>>>>> - Kukjin
+>>>>
+>>>> Thanks for applying 2/3. I am working on 1/3 to see if we are following
+>>>> the right approach to fix Kevin's issue (unfortunately, I am not hitting
+>>>> the bug on my board ATM). 3/3 has already been merged through a
+>>>> different patchset.
+>>>>
+>>>
+>>> I'm sending as an attachment my complete boot log when booting today's
+>>> next (20140709) until it hangs and my u-boot env vars. I hope that
+>>> helps.
+>>>
+>>
+>> Would you please check the behaviour after enabling following config
+>> options?
+>>
+>> diff --git a/arch/arm/configs/exynos_defconfig
+>> b/arch/arm/configs/exynos_defconfig
+>> index e07a227..d6056ab 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -93,6 +93,11 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+>>  CONFIG_FONTS=y
+>>  CONFIG_FONT_7x14=y
+>>  CONFIG_LOGO=y
+>> +CONFIG_SOUND=y
+>> +CONFIG_SND=y
+>> +CONFIG_SND_SOC=y
+>> +CONFIG_SND_SOC_SAMSUNG=y
+>> +CONFIG_SND_SOC_SNOW=y
+>>  CONFIG_USB=y
+>>  CONFIG_USB_EHCI_HCD=y
+>>  CONFIG_USB_EHCI_EXYNOS=y
+>> @@ -109,6 +114,8 @@ CONFIG_MMC_DW_IDMAC=y
+>>  CONFIG_MMC_DW_EXYNOS=y
+>>  CONFIG_RTC_CLASS=y
+>>  CONFIG_RTC_DRV_S3C=y
+>> +CONFIG_DMADEVICES=y
+>> +CONFIG_PL330_DMA=y
+>>  CONFIG_COMMON_CLK_MAX77686=y
+>>  CONFIG_EXT2_FS=y
+>>  CONFIG_EXT3_FS=y
+>>
+>>
+>
+> With those Kconfig options enabled the kernel does not hang anymore so
+> patch 1/3 is not needed in that case.
 
-On 07/09/2014 05:07 PM, Peter Griffin wrote:
-> This series adds a SDHCI platform driver for ST SoCs, along with
-> the additional device tree bindings and configuration to enable
-> the controller to work properly.
->
-> Initially it supports the stih416 and stih415 SoCs, and has
-> been tested on a stih416-b2020 board.
->
-> regards,
->
-> Peter.
->
-> Changes since v1
-> - Whitespace cleanups
-> - Use readl_relaxed io accessor
-> - Add update to MAINTAINERS
-> - Remove reset controller code from platform driver
-> - Remove #ifdef around sleep ops
-> - Use sdhci_pltfm_clk_get_max_clock lib function
-> - Pass bus-width etc through board device tree node
-> - Remove unncessary header
-> - Remove / change some debug messages
-> - Remove final break from switch case
->
-> Changes since v2
-> - Update CC list with alkml and lkml lists
->
-> Changes since v3
-> - Rebased on v3.16-rc4
-> - Use sdhci_set_bus_width lib function for set_bus_width
-> - Remove sdhci_st_8bit_width function
-> - Use sdhci_set_clock lib function for set_clock
->
-> Peter Griffin (10):
->    mmc: sdhci-st: Intial support for ST SDHCI controller
->    mmc: sdhci-st: ST Microelectronics SDHCI binding documentation.
->    ARM: STi: DT: Add sdhci pins for stih416
->    ARM: STi: DT: Add sdhci controller for stih416
->    ARM: STi: DT: Add sdhci pin configuration for stih415
->    ARM: STi: DT: Add sdhci controller for stih415
->    ARM: STi: DT: Enable mmc0 for both stih415 and stih416 SoCs
->    ARM: STi: DT: Enable second sdhci controller for stih416 b2020 boards.
->    ARM: update multi_v7_defconfig for STI
->    MAINTAINERS: Add sdhci-st file to ARCH/STI architecture
->
->   Documentation/devicetree/bindings/mmc/sdhci-st.txt |  33 ++++
->   MAINTAINERS                                        |   1 +
->   arch/arm/boot/dts/stih415-pinctrl.dtsi             |  21 +++
->   arch/arm/boot/dts/stih415.dtsi                     |  12 ++
->   arch/arm/boot/dts/stih416-b2020.dts                |   8 +
->   arch/arm/boot/dts/stih416-b2020e.dts               |   6 +
->   arch/arm/boot/dts/stih416-pinctrl.dtsi             |  39 +++++
->   arch/arm/boot/dts/stih416.dtsi                     |  24 +++
->   arch/arm/boot/dts/stih41x-b2020.dtsi               |   4 +
->   arch/arm/boot/dts/stih41x-b2020x.dtsi              |   4 +
->   arch/arm/configs/multi_v7_defconfig                |   1 +
->   drivers/mmc/host/Kconfig                           |  12 ++
->   drivers/mmc/host/Makefile                          |   1 +
->   drivers/mmc/host/sdhci-st.c                        | 176 +++++++++++++++++++++
->   14 files changed, 342 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
->   create mode 100644 drivers/mmc/host/sdhci-st.c
->
-
-Thanks Peter.
-
-DT patches queued to git://git.stlinux.com/devel/kernel/linux-sti.git 
-sti-dt-for-v3.17-1
-
-Regards,
-Maxime
+Just checking: did you happen to confirm whether it's the PL330 /
+DMADEVICES that fixes things or do you actually need the sound stuff?
