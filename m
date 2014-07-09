@@ -1,43 +1,57 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:30:14 +0400
-Subject: [RFC/PATCH RESEND -next 20/21] fs: dcache: manually unpoison dname
- after allocation to shut up kasan's reports
+Date: Wed, 09 Jul 2014 15:30:05 +0400
+Subject: [RFC/PATCH RESEND -next 11/21] mm: slub: share slab_err and object_err
+ functions
 In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-21-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1404905415-9046-12-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to manually unpoison rounded up allocation size for dname
-to avoid kasan's reports in __d_lookup_rcu.
-__d_lookup_rcu may validly read a little beyound allocated size.
+Remove static and add function declarations to mm/slab.h so they
+could be used by kernel address sanitizer.
 
-Reported-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- fs/dcache.c | 3 +++
- 1 file changed, 3 insertions(+)
+ mm/slab.h | 5 +++++
+ mm/slub.c | 4 ++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/fs/dcache.c b/fs/dcache.c
-index b7e8b20..dff64f2 100644
---- a/fs/dcache.c
-+++ b/fs/dcache.c
-@@ -38,6 +38,7 @@
- #include <linux/prefetch.h>
- #include <linux/ratelimit.h>
- #include <linux/list_lru.h>
-+#include <linux/kasan.h>
- #include "internal.h"
- #include "mount.h"
+diff --git a/mm/slab.h b/mm/slab.h
+index 1257ade..912af7f 100644
+--- a/mm/slab.h
++++ b/mm/slab.h
+@@ -339,5 +339,10 @@ static inline struct kmem_cache_node *get_node(struct kmem_cache *s, int node)
  
-@@ -1412,6 +1413,8 @@ struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
- 			kmem_cache_free(dentry_cache, dentry); 
- 			return NULL;
- 		}
-+		unpoison_shadow(dname,
-+				roundup(name->len + 1, sizeof(unsigned long)));
- 	} else  {
- 		dname = dentry->d_iname;
- 	}	
+ void *slab_next(struct seq_file *m, void *p, loff_t *pos);
+ void slab_stop(struct seq_file *m, void *p);
++void slab_err(struct kmem_cache *s, struct page *page,
++		const char *fmt, ...);
++void object_err(struct kmem_cache *s, struct page *page,
++		u8 *object, char *reason);
++
+ 
+ #endif /* MM_SLAB_H */
+diff --git a/mm/slub.c b/mm/slub.c
+index 6641a8f..3bdd9ac 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -635,14 +635,14 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+ 	dump_stack();
+ }
+ 
+-static void object_err(struct kmem_cache *s, struct page *page,
++void object_err(struct kmem_cache *s, struct page *page,
+ 			u8 *object, char *reason)
+ {
+ 	slab_bug(s, "%s", reason);
+ 	print_trailer(s, page, object);
+ }
+ 
+-static void slab_err(struct kmem_cache *s, struct page *page,
++void slab_err(struct kmem_cache *s, struct page *page,
+ 			const char *fmt, ...)
+ {
+ 	va_list args;
 -- 
 1.8.5.5
