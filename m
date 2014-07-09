@@ -1,127 +1,185 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 15:40:04 +0200
-Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
-Message-ID: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed,  9 Jul 2014 15:40:08 +0200
+Subject: [PATCHv2 04/17] ARM: mvebu: use the common function for Armada 375
+ SMP workaround
+In-Reply-To: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404913221-17343-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Here comes the second version of the cpuidle support for Armada 370
-and Armada 38x. This series has been tested on the following
-configurations:
+Use the common function mvebu_setup_boot_addr_wa() introduced in the
+commit "ARM: mvebu: Add a common function for the boot address work
+around" instead of the dedicated version for Armada 375.
 
- * Armada XP, LE and BE, to verify that the existing, SMP, cpuidle and
-   CPU hotplug functionalities are still working.
+This commit also moves the workaround in the system-controller
+module. Indeed the workaround on 375 is really related to setting the
+boot address which is done by the system controller.
 
- * Armada 375, Z1 and A0, LE and BE, to verify that the existing SMP
-   functionality is still working (SMP support on Armada 375 Z1 is
-   affected by this series).
+As a bonus we no longer use an harcoded value to access the register
+storing the boot address.
 
- * Armada 370, LE and BE, to verify that the newly introduced cpuidle
-   functionality is working fine.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/headsmp-a9.S        | 15 ------------
+ arch/arm/mach-mvebu/platsmp-a9.c        | 42 +++------------------------------
+ arch/arm/mach-mvebu/system-controller.c | 31 ++++++++++++++++++++++++
+ 3 files changed, 34 insertions(+), 54 deletions(-)
 
- * Armada 38x, LE and BE, to verify that the existing SMP
-   functionality, and the newly introduced cpuidle functionality is
-   working fine.
-
-We are hoping to see this patch series merged for 3.17.
-
-Most patches are touching only arch/arm/mach-mvebu/ code so they
-should be handled by the mvebu maintainers. However, patches 11-14 are
-touching the mvebu cpuidle driver, with a possible issue on patch 11,
-which touches both the cpuidle driver and the mach-mvebu code in order
-to rename the driver without breaking functionality (if needed, we can
-decide to split the commits, it would break functionality temporarly,
-but not buildability).
-
-Changes since v1
-================
-
- * Series rebased on top of mvebu/fixes + mvebu/soc to take into
-   account the conflicts with the changes already merged on the PMSU
-   code.
-
- * Adjusted the fix that sorts the #include statements in pmsu.c by
-   alphabetic order to really use the alphabetic order.
-
- * Various improvements to the implementation of the common function
-   for the boot address workaround:
-
-    - Main function renamed from mvebu_boot_addr_wa() to
-      mvebu_setup_boot_addr_wa().
-    - Both target and attribute of the crypto SRAM MBus window are now
-      passed as arguments.
-    - Use appropriate types for arguments.
-    - Add error checking for ioremap() call.
-    - Use __raw_writel() instead of direct pointer dereference
-    - Fix the assembly code to work properly in big-endian
-      configurations.
-
- * Misc small fixes in the migration of the Armada 375 SMP code to use
-   the common function for the boot address workaround: use correct
-   types, split in a separate function to reduce the indentation
-   level, use better naming for macros, etc.
-
- * Re-organized the commits by grouping several patches that were
-   separate before, to for example have a single patch to introduce
-   the cpuidle support on Armada 370.
-
- * Move back into the cpuidle driver the list of the cpuidle states
-   for each SoC.
-
- * Numerous other small typos and improvements.
-
-Thanks,
-
-Thomas
-
-Gregory CLEMENT (15):
-  ARM: mvebu: split again armada_370_xp_pmsu_idle_enter() in PMSU code
-  ARM: mvebu: sort the #include of pmsu.c in alphabetic order
-  ARM: mvebu: add a common function for the boot address work around
-  ARM: mvebu: use the common function for Armada 375 SMP workaround
-  ARM: mvebu: rename the armada_370_xp symbols to mvebu_v7 in pmsu.c
-  ARM: mvebu: make the cpuidle initialization more generic
-  ARM: mvebu: use a local variable to store the resume address
-  ARM: mvebu: make the snoop disabling optional in
-    mvebu_v7_pmsu_idle_prepare()
-  ARM: mvebu: export the SCU address
-  ARM: mvebu: add CA9 MPcore SoC Controller node
-  cpuidle: mvebu: rename the driver from armada-370-xp to mvebu-v7
-  cpuidle: mvebu: make the cpuidle driver capable of handling multiple
-    SoCs
-  ARM: mvebu: add cpuidle support for Armada 370
-  ARM: mvebu: add cpuidle support for Armada 38x
-  ARM: mvebu: defconfig: enable cpuidle support in mvebu_v7_defconfig
-
-Thomas Petazzoni (2):
-  cpuidle: mvebu: add Armada 370 support
-  cpuidle: mvebu: add Armada 38x support
-
- .../bindings/arm/armada-380-mpcore-soc-ctrl.txt    |  14 +
- arch/arm/boot/dts/armada-38x.dtsi                  |   5 +
- arch/arm/configs/mvebu_v7_defconfig                |   2 +
- arch/arm/mach-mvebu/armada-370-xp.h                |   1 -
- arch/arm/mach-mvebu/board-v7.c                     |   9 +-
- arch/arm/mach-mvebu/common.h                       |   2 +
- arch/arm/mach-mvebu/headsmp-a9.S                   |  15 --
- arch/arm/mach-mvebu/platsmp-a9.c                   |  42 +--
- arch/arm/mach-mvebu/platsmp.c                      |   2 +-
- arch/arm/mach-mvebu/pmsu.c                         | 288 ++++++++++++++++++---
- arch/arm/mach-mvebu/pmsu.h                         |   5 +
- arch/arm/mach-mvebu/pmsu_ll.S                      |  36 +++
- arch/arm/mach-mvebu/system-controller.c            |  31 +++
- drivers/cpuidle/Kconfig.arm                        |  12 +-
- drivers/cpuidle/Makefile                           |   2 +-
- drivers/cpuidle/cpuidle-armada-370-xp.c            |  93 -------
- drivers/cpuidle/cpuidle-mvebu-v7.c                 | 136 ++++++++++
- include/linux/mvebu-v7-cpuidle.h                   |  28 ++
- 18 files changed, 529 insertions(+), 194 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
- delete mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
- create mode 100644 drivers/cpuidle/cpuidle-mvebu-v7.c
- create mode 100644 include/linux/mvebu-v7-cpuidle.h
-
+diff --git a/arch/arm/mach-mvebu/headsmp-a9.S b/arch/arm/mach-mvebu/headsmp-a9.S
+index da5bb29..be51c99 100644
+--- a/arch/arm/mach-mvebu/headsmp-a9.S
++++ b/arch/arm/mach-mvebu/headsmp-a9.S
+@@ -18,21 +18,6 @@
+ #include <asm/assembler.h>
+ 
+ 	__CPUINIT
+-#define CPU_RESUME_ADDR_REG 0xf10182d4
+-
+-.global armada_375_smp_cpu1_enable_code_start
+-.global armada_375_smp_cpu1_enable_code_end
+-
+-armada_375_smp_cpu1_enable_code_start:
+-ARM_BE8(setend	be)
+-	adr     r0, 1f
+-	ldr	r0, [r0]
+-	ldr     r1, [r0]
+-ARM_BE8(rev	r1, r1)
+-	mov     pc, r1
+-1:
+-	.word   CPU_RESUME_ADDR_REG
+-armada_375_smp_cpu1_enable_code_end:
+ 
+ ENTRY(mvebu_cortex_a9_secondary_startup)
+ ARM_BE8(setend	be)
+diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
+index 43aaf3f..47a71a9 100644
+--- a/arch/arm/mach-mvebu/platsmp-a9.c
++++ b/arch/arm/mach-mvebu/platsmp-a9.c
+@@ -20,33 +20,8 @@
+ #include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
+ #include "common.h"
+-#include "mvebu-soc-id.h"
+ #include "pmsu.h"
+ 
+-#define CRYPT0_ENG_ID   41
+-#define CRYPT0_ENG_ATTR 0x1
+-#define SRAM_PHYS_BASE  0xFFFF0000
+-
+-#define BOOTROM_BASE    0xFFF00000
+-#define BOOTROM_SIZE    0x100000
+-
+-extern unsigned char armada_375_smp_cpu1_enable_code_end;
+-extern unsigned char armada_375_smp_cpu1_enable_code_start;
+-
+-static void armada_375_smp_cpu1_enable_wa(void)
+-{
+-	void __iomem *sram_virt_base;
+-
+-	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
+-	mvebu_mbus_add_window_by_id(CRYPT0_ENG_ID, CRYPT0_ENG_ATTR,
+-				SRAM_PHYS_BASE, SZ_64K);
+-	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
+-
+-	memcpy(sram_virt_base, &armada_375_smp_cpu1_enable_code_start,
+-	       &armada_375_smp_cpu1_enable_code_end
+-	       - &armada_375_smp_cpu1_enable_code_start);
+-}
+-
+ extern void mvebu_cortex_a9_secondary_startup(void);
+ 
+ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
+@@ -63,21 +38,10 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
+ 	 * address.
+ 	 */
+ 	hw_cpu = cpu_logical_map(cpu);
+-
+-	if (of_machine_is_compatible("marvell,armada375")) {
+-		u32 dev, rev;
+-
+-		if (mvebu_get_soc_id(&dev, &rev) == 0 &&
+-		    rev == ARMADA_375_Z1_REV)
+-			armada_375_smp_cpu1_enable_wa();
+-
++	if (of_machine_is_compatible("marvell,armada375"))
+ 		mvebu_system_controller_set_cpu_boot_addr(mvebu_cortex_a9_secondary_startup);
+-	}
+-	else {
+-		mvebu_pmsu_set_cpu_boot_addr(hw_cpu,
+-					     mvebu_cortex_a9_secondary_startup);
+-	}
+-
++	else
++		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, mvebu_cortex_a9_secondary_startup);
+ 	smp_wmb();
+ 	ret = mvebu_cpu_reset_deassert(hw_cpu);
+ 	if (ret) {
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+index b2b4e3d..a068cb5 100644
+--- a/arch/arm/mach-mvebu/system-controller.c
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -28,8 +28,14 @@
+ #include <linux/io.h>
+ #include <linux/reboot.h>
+ #include "common.h"
++#include "mvebu-soc-id.h"
++#include "pmsu.h"
++
++#define ARMADA_375_CRYPT0_ENG_TARGET 41
++#define ARMADA_375_CRYPT0_ENG_ATTR    1
+ 
+ static void __iomem *system_controller_base;
++static phys_addr_t system_controller_phys_base;
+ 
+ struct mvebu_system_controller {
+ 	u32 rstoutn_mask_offset;
+@@ -121,10 +127,32 @@ int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev)
+ }
+ 
+ #ifdef CONFIG_SMP
++void mvebu_armada375_smp_wa_init(void)
++{
++	u32 dev, rev;
++	phys_addr_t resume_addr_reg;
++
++	if (mvebu_get_soc_id(&dev, &rev) != 0)
++		return;
++
++	if (rev != ARMADA_375_Z1_REV)
++		return;
++
++	resume_addr_reg = system_controller_phys_base +
++		mvebu_sc->resume_boot_addr;
++	mvebu_setup_boot_addr_wa(ARMADA_375_CRYPT0_ENG_TARGET,
++				 ARMADA_375_CRYPT0_ENG_ATTR,
++				 resume_addr_reg);
++}
++
+ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
+ {
+ 	BUG_ON(system_controller_base == NULL);
+ 	BUG_ON(mvebu_sc->resume_boot_addr == 0);
++
++	if (of_machine_is_compatible("marvell,armada375"))
++		mvebu_armada375_smp_wa_init();
++
+ 	writel(virt_to_phys(boot_addr), system_controller_base +
+ 	       mvebu_sc->resume_boot_addr);
+ }
+@@ -138,7 +166,10 @@ static int __init mvebu_system_controller_init(void)
+ 	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
+ 					     &match);
+ 	if (np) {
++		struct resource res;
+ 		system_controller_base = of_iomap(np, 0);
++		of_address_to_resource(np, 0, &res);
++		system_controller_phys_base = res.start;
+ 		mvebu_sc = (struct mvebu_system_controller *)match->data;
+ 		of_node_put(np);
+ 	}
 -- 
 2.0.0
