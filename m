@@ -1,92 +1,109 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed,  9 Jul 2014 15:31:34 +0530
-Subject: [PATCH v2 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
+Date: Wed,  9 Jul 2014 15:31:33 +0530
+Subject: [PATCH v2 1/4] phy: Add provision for calibrating phy.
 In-Reply-To: <1404900096-1721-1-git-send-email-gautam.vivek@samsung.com>
 References: <1404900096-1721-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1404900096-1721-3-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1404900096-1721-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The host controller by itself may sometimes need to handle PHY
-and/or calibrate some of the PHY settings to get full support out
-of the PHY controller. The PHY core provides a calibration
-funtionality now to do so.
-Therefore, facilitate getting the two possible PHYs, viz.
-USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3), provided
-by the parent - Synopsys's DWC3 controller
+Some PHY controllers may need to calibrate certain
+PHY settings after initialization of the controller and
+sometimes even after initializing the PHY-consumer too.
+Add support for the same in order to let consumers do so in need.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Signed-off-by: vivek Gautam <gautam.vivek@samsung.com>
 ---
- drivers/usb/host/xhci-plat.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/phy/phy-core.c  |   36 ++++++++++++++++++++++++++++++++++++
+ include/linux/phy/phy.h |    8 ++++++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 29d8adb..e50bd7d 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/phy/phy.h>
- #include <linux/slab.h>
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index 74d4346..92d31a3 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -376,6 +376,42 @@ int phy_power_off(struct phy *phy)
+ EXPORT_SYMBOL_GPL(phy_power_off);
  
- #include "xhci.h"
-@@ -101,6 +102,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	struct clk              *clk;
- 	int			ret;
- 	int			irq;
-+	struct device		*parent;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -165,6 +167,23 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 			goto unmap_registers;
- 	}
- 
-+	parent = pdev->dev.parent;
-+	/*
-+	 * Get possile USB 2.0 type PHY (UTMI+) registered by xhci's parent:
-+	 * Synopsys-dwc3
-+	 */
-+	if (of_device_is_compatible(parent->of_node, "synopsys,dwc3") ||
-+	    of_device_is_compatible(parent->of_node, "snps,dwc3")) {
-+		hcd->gen_phy = devm_phy_get(&pdev->dev, "usb2-phy");
-+		if (IS_ERR(hcd->gen_phy)) {
-+			ret = PTR_ERR(hcd->gen_phy);
-+			if (ret != -ENOSYS && ret != -ENODEV) {
-+				dev_err(&pdev->dev, "no usb2 phy configured\n");
-+				return ret;
-+			}
+ /**
++ * phy_calibrate - calibrate a phy post initialization
++ * @phy: Pointer to 'phy' from consumer
++ *
++ * For certain PHYs, it may be needed to calibrate few phy parameters
++ * post initialization. The need to calibrate may arise after the
++ * initialization of consumer itself, in order to prevent further any
++ * loss of phy settings post consumer-initialization.
++ *	example: USB 3.0 DRD PHY on Exynos5420/5800 systems is one such
++ *	phy which needs calibration after the host controller reset
++ *	has happened.
++ */
++int phy_calibrate(struct phy *phy)
++{
++	int ret = -ENOTSUPP;
++
++	if (!phy)
++		return 0;
++
++	mutex_lock(&phy->mutex);
++	if (phy->ops->calibrate) {
++		ret =  phy->ops->calibrate(phy);
++		if (ret < 0) {
++			dev_err(&phy->dev,
++				"phy calibration failed --> %d\n", ret);
++			goto out;
 +		}
 +	}
 +
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto disable_clk;
-@@ -191,6 +210,23 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
- 		xhci->shared_hcd->can_do_streams = 1;
- 
-+	/*
-+	 * Get possile USB 3.0 type PHY (PIPE3) registered by xhci's parent:
-+	 * Synopsys-dwc3
-+	 */
-+	if (of_device_is_compatible(parent->of_node, "synopsys,dwc3") ||
-+	    of_device_is_compatible(parent->of_node, "snps,dwc3")) {
-+		xhci->shared_hcd->gen_phy = devm_phy_get(&pdev->dev,
-+							 "usb3-phy");
-+		if (IS_ERR(xhci->shared_hcd->gen_phy)) {
-+			ret = PTR_ERR(xhci->shared_hcd->gen_phy);
-+			if (ret != -ENOSYS && ret != -ENODEV) {
-+				dev_err(&pdev->dev, "no usb3 phy configured\n");
-+				return ret;
-+			}
-+		}
-+	}
++out:
++	mutex_unlock(&phy->mutex);
 +
- 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto put_usb3_hcd;
++	return ret;
++}
++EXPORT_SYMBOL_GPL(phy_calibrate);
++
++/**
+  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
+  * @np: device_node for which to get the phy
+  * @index: the index of the phy
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 5a537a5..b7f33ee 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -27,6 +27,7 @@ struct phy;
+  * @exit: operation to be performed while exiting
+  * @power_on: powering on the phy
+  * @power_off: powering off the phy
++ * @calibrate: calibrate the phy post init
+  * @owner: the module owner containing the ops
+  */
+ struct phy_ops {
+@@ -34,6 +35,7 @@ struct phy_ops {
+ 	int	(*exit)(struct phy *phy);
+ 	int	(*power_on)(struct phy *phy);
+ 	int	(*power_off)(struct phy *phy);
++	int	(*calibrate)(struct phy *phy);
+ 	struct module *owner;
+ };
+ 
+@@ -124,6 +126,7 @@ int phy_init(struct phy *phy);
+ int phy_exit(struct phy *phy);
+ int phy_power_on(struct phy *phy);
+ int phy_power_off(struct phy *phy);
++int phy_calibrate(struct phy *phy);
+ static inline int phy_get_bus_width(struct phy *phy)
+ {
+ 	return phy->attrs.bus_width;
+@@ -227,6 +230,11 @@ static inline int phy_power_off(struct phy *phy)
+ 	return -ENOSYS;
+ }
+ 
++static inline int phy_calibrate(struct phy *phy)
++{
++	return -ENOSYS;
++}
++
+ static inline int phy_get_bus_width(struct phy *phy)
+ {
+ 	return -ENOSYS;
 -- 
 1.7.10.4
