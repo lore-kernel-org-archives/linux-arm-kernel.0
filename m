@@ -1,44 +1,43 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 9 Jul 2014 16:14:18 +0300
-Subject: [PATCH 1/3] ARM: dts: keystone: add mdio devices entries
+Date: Wed, 9 Jul 2014 16:14:19 +0300
+Subject: [PATCH 2/3] ARM: dts: keystone-evm: add 1g ethernet phys nodes
 In-Reply-To: <1404911660-10047-1-git-send-email-grygorii.strashko@ti.com>
 References: <1404911660-10047-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1404911660-10047-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1404911660-10047-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone 2 has MDIO HW block which are compatible
-to Davinci SoCs:
-See "Gigabit Ethernet (GbE) Switch Subsystem"
-  See http://www.ti.com/lit/ug/sprugv9d/sprugv9d.pdf
+Keystone EVMK2HX has two 1G Marvell 88E1111 Ethernet PHYs
+installed, so add corresponding child nodes for 1G MDIO bus
+and enable it.
 
-Hence, add corresponding DT entry for Keystone 2.
+For more information see schematics:
+ http://wfcache.advantech.com/www/support/TI-EVM/download/Schematics/PDF/K2H_K2EVM-HK_SCH_A102_Rev1_0.pdf
 
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/boot/dts/keystone.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/k2hk-evm.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index c1414cb..89256fc 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -266,5 +266,16 @@
- 			ranges = <0 0 0x30000000 0x10000000
- 				  1 0 0x21000A00 0x00000100>;
+diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+index 1f90cbf..3223cc1 100644
+--- a/arch/arm/boot/dts/k2hk-evm.dts
++++ b/arch/arm/boot/dts/k2hk-evm.dts
+@@ -167,3 +167,15 @@
  		};
-+
-+		mdio: mdio at 02090300 {
-+			compatible	= "ti,keystone-mdio", "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg		= <0x02090300 0x100>;
-+			status = "disabled";
-+			clocks = <&clkpa>;
-+			clock-names = "fck";
-+			bus_freq	= <2500000>;
-+		};
  	};
  };
++
++&mdio {
++	ethphy0: ethernet-phy at 0 {
++		compatible = "marvell,88E1111", "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++	};
++
++	ethphy1: ethernet-phy at 1 {
++		compatible = "marvell,88E1111", "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
 -- 
 1.7.9.5
