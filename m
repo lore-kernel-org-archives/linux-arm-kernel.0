@@ -1,63 +1,143 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 9 Jul 2014 08:51:37 -0500
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <20140709092531.GK28884@atomide.com>
-References: <20140707104944.GS3705@n2100.arm.linux.org.uk>
- <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
- <20140707134008.GU3705@n2100.arm.linux.org.uk>
- <20140707151024.GJ5582@saruman.home> <53BB7980.2060909@ti.com>
- <20140708082948.GE28884@atomide.com>
- <20140709092531.GK28884@atomide.com>
-Message-ID: <20140709135137.GC973@saruman.home>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Wed,  9 Jul 2014 14:55:12 +0100
+Subject: [PATCH] arm64: KVM: export current vcpu->pause state via pseudo regs
+Message-ID: <1404914112-7298-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 02:25:31AM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140708 01:32]:
-> > * Sekhar Nori <nsekhar@ti.com> [140707 21:56]:
-> > > On Monday 07 July 2014 08:40 PM, Felipe Balbi wrote:
-> > > > On Mon, Jul 07, 2014 at 02:40:08PM +0100, Russell King - ARM Linux wrote:
-> > > >> --- a/arch/arm/mm/cache-l2x0.c
-> > > >> +++ b/arch/arm/mm/cache-l2x0.c
-> > > >> @@ -732,7 +732,7 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
-> > > >>  
-> > > >>  static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
-> > > >>  {
-> > > >> -	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-> > > >> +	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
-> > > >>  	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
-> > > > 
-> > > > even with this change, l2c still tries to write to power control
-> > > > register, at least on AM437x. Looking a little deeper here, AM437x
-> > > > identifies itself as l2c PL310 r3p3, which should have power control
-> > > > register, but aparentely there's no way to write that register. I'll
-> > > > file a bug to our ROM team, but we will certainly need a way to
-> > > > workaround this inside omap4-common.c
-> > > 
-> > > Looks like we need both my patch as well as Russell's patch. I can
-> > > respin my patch with the pr_info_once() dropped if it helps further
-> > > reduce boot noise.
-> > 
-> > In that case I'm fine with the original patch in this series. Russell,
-> > got any better ideas?
-> 
-> I guess no more comments. Took a look at the patch again, Sekhar, can
-> you please update the description with what has been discovered in this
-> thread and repost?
+To cleanly restore an SMP VM we need to ensure that the current pause
+state of each vcpu is correctly recorded. Things could get confused if
+the CPU starts running after migration restore completes when it was
+paused before it state was captured.
 
-another thing to note is that as of today, there is no known way of
-accessing power control register in *any* TI parts. That's quite
-unfortunate :-(
+I've done this by exposing a register (currently only 1 bit used) via
+the GET/SET_ONE_REG logic to pass the state between KVM and the VM
+controller (e.g. QEMU).
 
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm64/include/uapi/asm/kvm.h |  8 +++++
+ arch/arm64/kvm/guest.c            | 61 ++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 68 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index eaf54a3..8990e6e 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -148,6 +148,14 @@ struct kvm_arch_memory_slot {
+ #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
+ #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
+ 
++/* Power state (PSCI), not real registers */
++#define KVM_REG_ARM_PSCI		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
++#define KVM_REG_ARM_PSCI_REG(n) \
++	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_PSCI | \
++         (n & ~KVM_REG_ARM_COPROC_MASK))
++#define KVM_REG_ARM_PSCI_STATE          KVM_REG_ARM_PSCI_REG(0)
++#define NUM_KVM_PSCI_REGS               1
++
+ /* Device Control API: ARM VGIC */
+ #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+ #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 205f0d8..31d6439 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -189,6 +189,54 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ }
+ 
+ /**
++ * PSCI State
++ *
++ * These are not real registers as they do not actually exist in the
++ * hardware but represent the current power state of the vCPU
++ */
++
++static bool is_psci_reg(u64 index)
++{
++	switch (index) {
++	case KVM_REG_ARM_PSCI_STATE:
++		return true;
++	}
++	return false;
++}
++
++static int copy_psci_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
++{
++	if (put_user(KVM_REG_ARM_PSCI_STATE, uindices))
++		return -EFAULT;
++	return 0;
++}
++
++static int set_psci_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++	int ret;
++
++	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
++	if (ret != 0)
++		return ret;
++
++        vcpu->arch.pause = (val & 0x1) ? false : true;
++	return 0;
++}
++
++static int get_psci_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++
++        /* currently we only use one bit */
++	val = vcpu->arch.pause ? 0 : 1;
++	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
++}
++
++
++/**
+  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+  *
+  * This is for all registers.
+@@ -196,7 +244,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+ {
+ 	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
+-                + NUM_TIMER_REGS;
++                + NUM_TIMER_REGS + NUM_KVM_PSCI_REGS;
+ }
+ 
+ /**
+@@ -221,6 +269,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 		return ret;
+ 	uindices += NUM_TIMER_REGS;
+ 
++        ret = copy_psci_indices(vcpu, uindices);
++	if (ret)
++		return ret;
++	uindices += NUM_KVM_PSCI_REGS;
++
+ 	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
+ }
+ 
+@@ -237,6 +290,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if (is_timer_reg(reg->id))
+ 		return get_timer_reg(vcpu, reg);
+ 
++        if (is_psci_reg(reg->id))
++		return get_psci_reg(vcpu, reg);
++
+ 	return kvm_arm_sys_reg_get_reg(vcpu, reg);
+ }
+ 
+@@ -253,6 +309,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if (is_timer_reg(reg->id))
+ 		return set_timer_reg(vcpu, reg);
+ 
++        if (is_psci_reg(reg->id))
++		return set_psci_reg(vcpu, reg);
++
+ 	return kvm_arm_sys_reg_set_reg(vcpu, reg);
+ }
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/06d18d0f/attachment.sig>
+2.0.1
