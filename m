@@ -1,85 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  9 Jul 2014 15:54:39 +0800
-Subject: [PATCH v4 6/6] ARM: sun8i: Add PRCM clock and reset controller nodes
- to the DTSI
-In-Reply-To: <1404892479-12222-1-git-send-email-wens@csie.org>
-References: <1404892479-12222-1-git-send-email-wens@csie.org>
-Message-ID: <1404892479-12222-7-git-send-email-wens@csie.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 Jul 2014 09:59:02 +0200
+Subject: [PATCH 1/3] mfd: pm8921: Expose pm8xxx_read_irq_status
+In-Reply-To: <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CACRpkdaYRwSb2cd88KEjKHKN_3sRv5BvJTvNMmF3CZszu8c2HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With sun8i PRCM support available, we can add the PRCM clock and
-reset controller nodes to the DTSI. Also update R_UART's clock
-phandle and add it's reset control phandle.
+On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23.dtsi | 47 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 46 insertions(+), 1 deletion(-)
+> Most status bits, e.g. for GPIO and MPP input, is retrieved by reading
+> the interrupt status registers, so this needs to be exposed to clients.
+>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 886776d..54ac0787 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -285,13 +285,58 @@
- 			interrupts = <1 9 0xf04>;
- 		};
- 
-+		prcm at 01f01400 {
-+			compatible = "allwinner,sun8i-a23-prcm";
-+			reg = <0x01f01400 0x200>;
-+
-+			ar100: ar100_clk {
-+				compatible = "fixed-factor-clock";
-+				#clock-cells = <0>;
-+				clock-div = <1>;
-+				clock-mult = <1>;
-+				clocks = <&osc24M>;
-+				clock-output-names = "ar100";
-+			};
-+
-+			ahb0: ahb0_clk {
-+				compatible = "fixed-factor-clock";
-+				#clock-cells = <0>;
-+				clock-div = <1>;
-+				clock-mult = <1>;
-+				clocks = <&ar100>;
-+				clock-output-names = "ahb0";
-+			};
-+
-+			apb0: apb0_clk {
-+				compatible = "allwinner,sun8i-a23-apb0-clk";
-+				#clock-cells = <0>;
-+				clocks = <&ahb0>;
-+				clock-output-names = "apb0";
-+			};
-+
-+			apb0_gates: apb0_gates_clk {
-+				compatible = "allwinner,sun8i-a23-apb0-gates-clk";
-+				#clock-cells = <1>;
-+				clocks = <&apb0>;
-+				clock-output-names = "apb0_pio", "apb0_timer",
-+						"apb0_rsb", "apb0_uart",
-+						"apb0_i2c";
-+			};
-+
-+			apb0_rst: apb0_rst {
-+				compatible = "allwinner,sun6i-a31-clock-reset";
-+				#reset-cells = <1>;
-+			};
-+		};
-+
- 		r_uart: serial at 01f02800 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01f02800 0x400>;
- 			interrupts = <0 38 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb0_gates 4>;
-+			resets = <&apb0_rst 4>;
- 			status = "disabled";
- 		};
- 	};
--- 
-2.0.1
+Hm do you mean you read the input *values* from the interrupt status
+registers?
+
+What madness in that case.... :-)
+
+Anyway, since the driver is based on regmap, can't the children just
+get a regmap * somehow and then just go read the same register
+instead of having to add a special function for it?
+
+When I look at it it seems like it's doing regmap strangely or
+something, like it's one write then one read operation to get
+the register(s) and isn't that all supposed to be hidden behind
+regmap so you don't need the local lock chip->pm_irq_lock?
+
+Yours,
+Linus Walleij
