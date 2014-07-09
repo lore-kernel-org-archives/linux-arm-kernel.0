@@ -1,73 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 04:48:38 -0700
-Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <53BD291D.3040307@linutronix.de>
-References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
- <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
- <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
- <20140709111705.GR28884@atomide.com>
- <53BD291D.3040307@linutronix.de>
-Message-ID: <20140709114837.GU28884@atomide.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 Jul 2014 14:49:07 +0300
+Subject: a case for a common efuse API?
+In-Reply-To: <53BC4DD7.20906@codeaurora.org>
+References: <53BC4DD7.20906@codeaurora.org>
+Message-ID: <20140709114907.GI23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140709 04:38]:
-> On 07/09/2014 01:17 PM, Tony Lindgren wrote:
-> > * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [140707 06:22]:
-> >> On Fri,  4 Jul 2014 18:34:10 +0200
-> >> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> >>
-> >>> While comparing the OMAP-serial and the 8250 part of this I noticed that
-> >>> the the latter does not use runtime-pm.
-> >>
-> >> Yes it does, but 8250 parts (generally - omap presumably is special
-> >> here ?) need to be powered on to transmit/receive not just for register
-> >> access. The core uart layer implements a "pm" operation for this.
-> > 
-> > At least for omaps the UARTs need to be idled for the SoC to
-> > hit off-idle where the SoC is powered off and rebooted during
-> > idle.
-> >
-> > So we can certainly enable this in a generic way, however, this
-> > can only be done under the following conditions:
-
-Sorry forgot to mention why I think this can now be done in a
-generic way, that's because we have now runtime PM in Linux.
-
-> > 1. We can save and restore the serial register context and detect
-> >    when context was lost in the serial driver. The context loss
-> >    can be detected by looking at some registers that are only
-> >    initialized during init.
+On Tue, Jul 08, 2014 at 10:00:23PM +0200, Stephen Boyd wrote:
 > 
-> A register check on restore context? DLL+DLH might be a good hint here
-> since its value should be >0 in the running case.
-
-OK yeah that would be a generic way to do it potentially ;)
-
-Note that all the context_loss_cnt stuff in omap-serial.c can
-then be ignored, that's still only needed for the omap3 legacy
-mode booting case and won't be needed much longer.
-
-> > 2. There's a way for the serial RX pin to wake the SoC. On some
-> >    omaps there's a separate pin specific wake-up interrupt that
-> >    can be used for that.
+> I added Tegra folks because I see that on Tegra this hardware is exposed
+> via an SoC specific API, tegra_fuse_readl(), and an associated driver in
+> drivers/misc/fuse/tegra/. Unfortunately I don't see any users of the API
+> outside of the speedo code in the same directory and the sysfs bin
+> attribute that may or may not be in use by some userspace code.
 > 
-> That one would be handled by omap separately.
 
-OK great.
- 
-> > 3. The serial PM features must be only enabled if requested by
-> >    the user via sysfs. Typically extra latency and loss of the
-> >    first RX character occur which is not acceptable to most
-> >    applications.
-> 
-> Unless I'm mistaken the omap driver now initializes the timeout to -1.
-> So nothing happens unless this is enabled separately.
+The SATA driver by Mikko Perttunen uses it. The driver hasn't been merged
+though. There's some more upcoming work which makes use of it.
+I don't think we can standardize much of an API for this. The data is
+SoC specific, so the user will always need to have some SoC specific
+knowledge on how to use it. In some cases we need it very early (eg. to
+determine the correct Tegra20 revision). On Tegra20 we can't use the CPU
+to read the fuses due to a hw bug, we have to use DMA, which means the
+transaction becomes blocking and could fail due to lack of resources.
 
-Yes that's the only safe approach so the serial port behaves in
-the standard Linux way unless specifically requested by the
-user.
+Cheers,
 
-Regards,
-
-Tony
+Peter.
