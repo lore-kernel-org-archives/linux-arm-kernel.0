@@ -1,28 +1,45 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 08 Jul 2014 20:52:08 -0700 (PDT)
-Subject: [PATCH resend] net: mvneta: Fix big endian issue in
- mvneta_txq_desc_csum()
-In-Reply-To: <m3wqbnpgag.fsf@fitzsim.org>
-References: <m3wqbnpgag.fsf@fitzsim.org>
-Message-ID: <20140708.205208.1742283754280003313.davem@davemloft.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 08 Jul 2014 20:54:20 -0700
+Subject: [PATCH V8 1/6] power: reset: Add generic SYSCON register mapped
+ reset
+In-Reply-To: <1404872153-3594-2-git-send-email-fkan@apm.com>
+References: <1404872153-3594-1-git-send-email-fkan@apm.com>
+ <1404872153-3594-2-git-send-email-fkan@apm.com>
+Message-ID: <53BCBCEC.7010306@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Fitzsimmons <fitzsim@fitzsim.org>
-Date: Tue, 08 Jul 2014 19:44:07 -0400
-
-> This commit fixes the command value generated for CSUM calculation
-> when running in big endian mode.  The Ethernet protocol ID for IP was
-> being unconditionally byte-swapped in the layer 3 protocol check (with
-> swab16), which caused the mvneta driver to not function correctly in
-> big endian mode.  This patch byte-swaps the ID conditionally with
-> htons.
-> 
-> Cc: <stable@vger.kernel.org> # v3.13+
-> Signed-off-by: Thomas Fitzsimmons <fitzsim@fitzsim.org>
+On 07/08/2014 07:15 PM, Feng Kan wrote:
+> Add a generic SYSCON register mapped reset mechanism.
+>
+> Signed-off-by: Feng Kan <fkan@apm.com>
 > ---
-> The mvneta driver existed prior to v3.13, but it has only supported big
-> endian from v3.13 onward.  If it's accepted, this patch needs to be
-> backported for stable only as far back as v3.13.
+>   drivers/power/reset/Kconfig         |  6 +++
+>   drivers/power/reset/Makefile        |  1 +
+>   drivers/power/reset/syscon-reboot.c | 91 +++++++++++++++++++++++++++++++++++++
+>   3 files changed, 98 insertions(+)
+>   create mode 100644 drivers/power/reset/syscon-reboot.c
+>
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index bdcf517..5877b38 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -80,3 +80,9 @@ config POWER_RESET_KEYSTONE
+>   	help
+>   	  Reboot support for the KEYSTONE SoCs.
+>
+> +config POWER_RESET_SYSCON
+> +	bool "Generic SYSCON regmap reset driver"
+> +	depends on ARM || ARM64 || COMPILE_TEST
 
-Applied and queued up for -stable, thanks.
+As written, this driver is really not generic but very arm specific.
+I don't think COMPILE_TEST is a good idea either, since arm_pm_restart
+is only defined for the arm architecture. Did you try compiling allmodconfig
+or allyesconfig for, say, x86_64 with this patch applied ?
+
+I think this might benefit from using [1], which would make it really
+generic.
+
+Guenter
+
+[1] http://www.spinics.net/lists/kernel/msg1780939.html
