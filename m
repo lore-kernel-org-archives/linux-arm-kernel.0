@@ -1,79 +1,29 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 9 Jul 2014 16:44:39 +0200
-Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
-In-Reply-To: <53BD2A60.3060106@linux.vnet.ibm.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
- <53BB61E9.80200@linux.vnet.ibm.com>
- <CAKfTPtA8BVPtRRLzomqnGp7_uaSbFYmFTrrt4fpQTOb7qyjddg@mail.gmail.com>
- <53BCBD0E.2070609@linux.vnet.ibm.com>
- <20140709104332.GS19379@twins.programming.kicks-ass.net>
- <53BD2A60.3060106@linux.vnet.ibm.com>
-Message-ID: <20140709144439.GF9918@twins.programming.kicks-ass.net>
+From: cl@gentwo.org (Christoph Lameter)
+Date: Wed, 9 Jul 2014 09:48:41 -0500 (CDT)
+Subject: [RFC/PATCH RESEND -next 15/21] mm: slub: add kernel address
+ sanitizer hooks to slub allocator
+In-Reply-To: <1404905415-9046-16-git-send-email-a.ryabinin@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-16-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <alpine.DEB.2.11.1407090947020.1384@gentwo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 05:11:20PM +0530, Preeti U Murthy wrote:
-> On 07/09/2014 04:13 PM, Peter Zijlstra wrote:
-> > On Wed, Jul 09, 2014 at 09:24:54AM +0530, Preeti U Murthy wrote:
-> >> In the example that I mention above, t1 and t2 are on the rq of cpu0;
-> >> while t1 is running on cpu0, t2 is on the rq but does not have cpu1 in
-> >> its cpus allowed mask. So during load balance, cpu1 tries to pull t2,
-> >> cannot do so, and hence LBF_ALL_PINNED flag is set and it jumps to
-> >> out_balanced. Note that there are only two sched groups at this level of
-> >> sched domain.one with cpu0 and the other with cpu1. In this scenario we
-> >> do not try to do active load balancing, atleast thats what the code does
-> >> now if LBF_ALL_PINNED flag is set.
-> > 
-> > I think Vince is right in saying that in this scenario ALL_PINNED won't
-> > be set. move_tasks() will iterate cfs_rq::cfs_tasks, that list will also
-> > include the current running task.
-> 
-> Hmm.. really? Because while dequeueing a task from the rq so as to
-> schedule it on a cpu, we delete its entry from the list of cfs_tasks on
-> the rq.
-> 
-> list_del_init(&se->group_node) in account_entity_dequeue() does that.
+On Wed, 9 Jul 2014, Andrey Ryabinin wrote:
 
-But set_next_entity() doesn't call account_entity_dequeue(), only
-__dequeue_entity() to take it out of the rb-tree.
+> With this patch kasan will be able to catch bugs in memory allocated
+> by slub.
+> Allocated slab page, this whole page marked as unaccessible
+> in corresponding shadow memory.
+> On allocation of slub object requested allocation size marked as
+> accessible, and the rest of the object (including slub's metadata)
+> marked as redzone (unaccessible).
+>
+> We also mark object as accessible if ksize was called for this object.
+> There is some places in kernel where ksize function is called to inquire
+> size of really allocated area. Such callers could validly access whole
+> allocated memory, so it should be marked as accessible by kasan_krealloc call.
 
-> > And can_migrate_task() only checks for current after the pinning bits.
-> > 
-> >> Continuing with the above explanation; when LBF_ALL_PINNED flag is
-> >> set,and we jump to out_balanced, we clear the imbalance flag for the
-> >> sched_group comprising of cpu0 and cpu1,although there is actually an
-> >> imbalance. t2 could still be migrated to say cpu2/cpu3 (t2 has them in
-> >> its cpus allowed mask) in another sched group when load balancing is
-> >> done at the next sched domain level.
-> > 
-> > And this is where Vince is wrong; note how
-> > update_sg_lb_stats()/sg_imbalance() uses group->sgc->imbalance, but
-> > load_balance() sets: sd_parent->groups->sgc->imbalance, so explicitly
-> > one level up.
-> 
-> One level up? The group->sgc->imbalance flag is checked during
-> update_sg_lb_stats(). This flag is *set during the load balancing at a
-> lower level sched domain*.IOW, when the 'group' formed the sched domain.
-
-sd_parent is one level up.
-
-> > 
-> > So what we can do I suppose is clear 'group->sgc->imbalance' at
-> > out_balanced.
-> 
-> You mean 'set'? If we clear it we will have no clue about imbalances at
-> lower level sched domains due to pinning. Specifically in LBF_ALL_PINNED
-> case. This might prevent us from balancing out these tasks to other
-> groups at a higher level domain. update_sd_pick_busiest() specifically
-> relies on this flag to choose the busiest group.
-
-No, clear, in load_balance. So set one level up, clear the current
-level.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/4b92decd/attachment.sig>
+Do you really need to go through all of this? Add the hooks to
+kmem_cache_alloc_trace() instead and use the existing instrumentation
+that is there for other purposes?
