@@ -1,51 +1,32 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 08 Jul 2014 18:43:36 -0700
-Subject: arm64 flushing 255GB of vmalloc space takes too long
-Message-ID: <53BC9E48.7040809@codeaurora.org>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Tue,  8 Jul 2014 21:58:39 -0400
+Subject: [PATCH] Removes FIXME message in usb.c
+Message-ID: <1404871119-4324-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch removes a fixme message in this file:wq for setting the usb 2
+speed on the board to the correct level. We need to depend on the
+bootloader for doing this as the wires may be shared for the other
+things on the board with the usb chipset.
 
-I have an arm64 target which has been observed hanging in __purge_vmap_area_lazy
-in vmalloc.c The root cause of this 'hang' is that flush_tlb_kernel_range is
-attempting to flush 255GB of virtual address space. This takes ~2 seconds and
-preemption is disabled at this time thanks to the purge lock. Disabling
-preemption for that time is long enough to trigger a watchdog we have setup.
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-omap1/usb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Triggering this is fairly easy:
-1) Early in bootup, vmalloc > lazy_max_pages. This gives an address near the
-start of the vmalloc range.
-2) load a module
-3) vfree the vmalloc region from step 1
-4) unload the module
-
-The arm64 virtual address layout looks like
-vmalloc : 0xffffff8000000000 - 0xffffffbbffff0000   (245759 MB)
-vmemmap : 0xffffffbc02400000 - 0xffffffbc03600000   (    18 MB)
-modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-
-and the algorithm in __purge_vmap_area_lazy flushes between the lowest address.
-Essentially, if we are using a reasonable amount of vmalloc space and a module
-unload triggers a vmalloc purge, we will end up triggering our watchdog.
-
-A couple of options I thought of:
-1) Increase the timeout of our watchdog to allow the flush to occur. Nobody
-I suggested this to likes the idea as the watchdog firing generally catches
-behavior that results in poor system performance and disabling preemption
-for that long does seem like a problem.
-2) Change __purge_vmap_area_lazy to do less work under a spinlock. This would
-certainly have a performance impact and I don't even know if it is plausible.
-3) Allow module unloading to trigger a vmalloc purge beforehand to help avoid
-this case. This would still be racy if another vfree came in during the time
-between the purge and the vfree but it might be good enough.
-4) Add 'if size > threshold flush entire tlb' (I haven't profiled this yet)
-
-
-Any other thoughts?
-
-Thanks,
-Laura
+diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+index 4118db5..172245a 100644
+--- a/arch/arm/mach-omap1/usb.c
++++ b/arch/arm/mach-omap1/usb.c
+@@ -505,7 +505,7 @@ static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+ 		omap_cfg_reg(W5_USB2_SE0);
+ 		if (nwires != 3)
+ 			omap_cfg_reg(Y5_USB2_RCV);
+-		// FIXME omap_cfg_reg(USB2_SPEED);
++		/* Depend on boatloader for USB speed to be stated for board */
+ 	} else {
+ 		pr_debug("usb%d cpu unrecognized\n", 1);
+ 		return 0;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
