@@ -1,38 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:44 +0200
-Subject: [PATCHv3 16/34] ARM: at91/dt: mpa1600: define crytals frequencies
+Date: Wed,  9 Jul 2014 17:06:46 +0200
+Subject: [PATCHv3 18/34] ARM: at91/dt: aks-cdu: define slow crytal frequency
 In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-17-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-19-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Phontech MPA 1600 main and slow crystals frequencies.
+Define AK signal CDU slow crystal frequency
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/mpa1600.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/aks-cdu.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
-index ccf9ea242f72..f0f5e1098928 100644
---- a/arch/arm/boot/dts/mpa1600.dts
-+++ b/arch/arm/boot/dts/mpa1600.dts
-@@ -25,6 +25,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <18432000>;
- 		};
-+
+diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
+index 54cb5cf8604a..d9c50fbb49d2 100644
+--- a/arch/arm/boot/dts/aks-cdu.dts
++++ b/arch/arm/boot/dts/aks-cdu.dts
+@@ -16,6 +16,12 @@
+ 		bootargs = "console=ttyS0,115200 ubi.mtd=4 root=ubi0:rootfs rootfstype=ubifs";
+ 	};
+ 
++	clocks {
 +		slow_xtal {
 +			clock-frequency = <32768>;
 +		};
++	};
 +
-+		main_xtal {
-+			clock-frequency = <18432000>;
-+		};
- 	};
- 
  	ahb {
+ 		apb {
+ 			usart0: serial at fffb0000 {
 -- 
 1.9.1
