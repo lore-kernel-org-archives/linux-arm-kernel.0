@@ -1,24 +1,27 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jul 2014 15:50:10 +0100
-Subject: [PATCH v7 03/24] mfd: max77686: Don't define dummy function if
- OF isn't enabled
-In-Reply-To: <1404505467-26526-4-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 9 Jul 2014 15:44:40 +0100
+Subject: [PATCH v7 02/24] mfd: max77686: Add power management support
+In-Reply-To: <1404505467-26526-3-git-send-email-javier.martinez@collabora.co.uk>
 References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404505467-26526-4-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140709145010.GE2635@lee--X1>
+ <1404505467-26526-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140709144440.GD2635@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
 
-> When the CONFIG_OF option was not enabled, a dummy function
-> max77686_i2c_parse_dt_pdata() was defined since this is called
-> unconditionally on probe(). Just always define the real function
-> and conditionally call it if CONFIG_OF is enabled instead.
+> The driver doesn't have PM operations defined so add a suspend
+> and resume function handlers to allow the PMIC IRQ to wakeup
+> the system when it is put into a sleep state.
 > 
 > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/mfd/max77686.c | 10 +---------
+>  drivers/mfd/max77686.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+
+Patch looks good.  I guess the set needs to go in as one big lump due
+to interdependencies, so for my own benefit (to prevent re-reviewing):
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
 
