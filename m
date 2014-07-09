@@ -1,69 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 15:40:14 +0200
-Subject: [PATCHv2 10/17] ARM: mvebu: add CA9 MPcore SoC Controller node
+Date: Wed,  9 Jul 2014 15:40:11 +0200
+Subject: [PATCHv2 07/17] ARM: mvebu: use a local variable to store the resume
+ address
 In-Reply-To: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404913221-17343-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404913221-17343-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The CA9 MPcore SoC Control block is a set of registers that allows to
-configure certain internal aspects of the core blocks of the SoC
-(Cortex-A9, L2 cache controller, etc.). In most cases, the default
-values are fine so they aren't many reasons to touch those registers,
-but there is one exception: to support cpuidle on Armada 38x, we need
-to modify the value of the CA9 MPcore Reset Control register.
-
-Therefore, this commit adds a new Device Tree binding for this
-hardware block, and uses this new binding for the Armada 38x Device
-Tree file.
+The resume address used by the cpuidle code will not always be the
+same depending on the SoC. Using a local variable to store the resume
+address allows to keep the same function for the PM notifier but with
+a different address. This address will be set during the
+initialization of the cpuidle logic in pmsu.c.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: devicetree at vger.kernel.org
 ---
- .../devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt | 14 ++++++++++++++
- arch/arm/boot/dts/armada-38x.dtsi                          |  5 +++++
- 2 files changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+ arch/arm/mach-mvebu/pmsu.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt b/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
-new file mode 100644
-index 0000000..8781073
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
-@@ -0,0 +1,14 @@
-+Marvell Armada 38x CA9 MPcore SoC Controller
-+============================================
-+
-+Required properties:
-+
-+- compatible: Should be "marvell,armada-380-mpcore-soc-ctrl".
-+
-+- reg: should be the register base and length as documented in the
-+  datasheet for the CA9 MPcore SoC Control registers
-+
-+mpcore-soc-ctrl at 20d20 {
-+	compatible = "marvell,armada-380-mpcore-soc-ctrl";
-+	reg = <0x20d20 0x6c>;
-+};
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 689fa1a..242d0ec 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -286,6 +286,11 @@
- 				reg = <0x20800 0x10>;
- 			};
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index e976c3e..ab525b7 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -73,6 +73,8 @@ extern void ll_enable_coherency(void);
  
-+			mpcore-soc-ctrl at 20d20 {
-+				compatible = "marvell,armada-380-mpcore-soc-ctrl";
-+				reg = <0x20d20 0x6c>;
-+			};
+ extern void armada_370_xp_cpu_resume(void);
+ 
++static void *mvebu_cpu_resume;
 +
- 			coherency-fabric at 21010 {
- 				compatible = "marvell,armada-380-coherency-fabric";
- 				reg = <0x21010 0x1c>;
+ static struct platform_device mvebu_v7_cpuidle_device = {
+ 	.name = "cpuidle-armada-370-xp",
+ };
+@@ -299,7 +301,7 @@ static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
+ {
+ 	if (action == CPU_PM_ENTER) {
+ 		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+-		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
++		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, mvebu_cpu_resume);
+ 	} else if (action == CPU_PM_EXIT) {
+ 		mvebu_v7_pmsu_idle_exit();
+ 	}
+@@ -320,6 +322,7 @@ static int __init armada_xp_cpuidle_init(void)
+ 		return -ENODEV;
+ 	of_node_put(np);
+ 
++	mvebu_cpu_resume = armada_370_xp_cpu_resume;
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+ 
+ 	return 0;
 -- 
 2.0.0
