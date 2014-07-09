@@ -1,591 +1,244 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Jul 2014 17:06:52 +0200
-Subject: [PATCHv3 24/34] ARM: at91/dt: sam9g45: define clocks
-In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404918422-7562-25-git-send-email-alexandre.belloni@free-electrons.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed,  9 Jul 2014 16:07:32 +0100
+Subject: [PATCH v4 01/10] mmc: sdhci-st: Intial support for ST SDHCI controller
+In-Reply-To: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
+References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1404918461-25390-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the at91sam9g45 clocks in the SoC dtsi file.
+This platform driver adds initial support for the SDHCI host controller
+found on STMicroelectronics SoCs.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+It has been tested on STiH41x b2020 platforms currently.
+
+Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 342 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 341 insertions(+), 1 deletion(-)
+ drivers/mmc/host/Kconfig    |  12 +++
+ drivers/mmc/host/Makefile   |   1 +
+ drivers/mmc/host/sdhci-st.c | 176 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 189 insertions(+)
+ create mode 100644 drivers/mmc/host/sdhci-st.c
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index ace6bf197b70..932a669156af 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/at91.h>
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index a565254..6615b79 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -290,6 +290,18 @@ config MMC_MOXART
+ 	  be found on some embedded hardware such as UC-7112-LX.
+ 	  If you have a controller with this interface, say Y here.
  
- / {
- 	model = "Atmel AT91SAM9G45 family SoC";
-@@ -53,6 +54,26 @@
- 		reg = <0x70000000 0x10000000>;
- 	};
++config MMC_SDHCI_ST
++	tristate "SDHCI support on STMicroelectronics SoC"
++	depends on ARCH_STI
++	depends on MMC_SDHCI_PLTFM
++	select MMC_SDHCI_IO_ACCESSORS
++	help
++	  This selects the Secure Digital Host Controller Interface in
++	  STMicroelectronics SoCs.
++
++	  If you have a controller with this interface, say Y or M here.
++	  If unsure, say N.
++
+ config MMC_OMAP
+ 	tristate "TI OMAP Multimedia Card Interface support"
+ 	depends on ARCH_OMAP
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index 7f81ddf..f211eed 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -68,6 +68,7 @@ obj-$(CONFIG_MMC_SDHCI_OF_HLWD)		+= sdhci-of-hlwd.o
+ obj-$(CONFIG_MMC_SDHCI_BCM_KONA)	+= sdhci-bcm-kona.o
+ obj-$(CONFIG_MMC_SDHCI_BCM2835)		+= sdhci-bcm2835.o
+ obj-$(CONFIG_MMC_SDHCI_MSM)		+= sdhci-msm.o
++obj-$(CONFIG_MMC_SDHCI_ST)		+= sdhci-st.o
  
-+	clocks {
-+		slow_xtal: slow_xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+		};
+ ifeq ($(CONFIG_CB710_DEBUG),y)
+ 	CFLAGS-cb710-mmc	+= -DDEBUG
+diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+new file mode 100644
+index 0000000..328f348
+--- /dev/null
++++ b/drivers/mmc/host/sdhci-st.c
+@@ -0,0 +1,176 @@
++/*
++ * Support for SDHCI on STMicroelectronics SoCs
++ *
++ * Copyright (C) 2014 STMicroelectronics Ltd
++ * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
++ * Contributors: Peter Griffin <peter.griffin@linaro.org>
++ *
++ * Based on sdhci-cns3xxx.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+		main_xtal: main_xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+		};
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/mmc/host.h>
 +
-+		adc_op_clk: adc_op_clk{
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <300000>;
-+		};
-+	};
++#include "sdhci-pltfm.h"
 +
- 	ahb {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -77,11 +98,279 @@
- 				compatible = "atmel,at91sam9g45-ddramc";
- 				reg = <0xffffe400 0x200
- 				       0xffffe600 0x200>;
-+				clocks = <&ddrck>;
-+				clock-names = "ddrck";
- 			};
- 
- 			pmc: pmc at fffffc00 {
--				compatible = "atmel,at91rm9200-pmc";
-+				compatible = "atmel,at91sam9g45-pmc";
- 				reg = <0xfffffc00 0x100>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-controller;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#interrupt-cells = <1>;
++static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
++{
++	u32 ret;
 +
-+				main_osc: main_osc {
-+					compatible = "atmel,at91rm9200-clk-main-osc";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_MOSCS>;
-+					clocks = <&main_xtal>;
-+				};
++	switch (reg) {
++	case SDHCI_CAPABILITIES:
++		ret = readl_relaxed(host->ioaddr + reg);
++		/* Support 3.3V and 1.8V */
++		ret &= ~SDHCI_CAN_VDD_300;
++		break;
++	default:
++		ret = readl_relaxed(host->ioaddr + reg);
++	}
++	return ret;
++}
 +
-+				main: mainck {
-+					compatible = "atmel,at91rm9200-clk-main";
-+					#clock-cells = <0>;
-+					clocks = <&main_osc>;
-+				};
++static const struct sdhci_ops sdhci_st_ops = {
++	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
++	.set_clock = sdhci_set_clock,
++	.set_bus_width = sdhci_set_bus_width,
++	.read_l = sdhci_st_readl,
++	.reset = sdhci_reset,
++};
 +
-+				plla: pllack {
-+					compatible = "atmel,at91rm9200-clk-pll";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_LOCKA>;
-+					clocks = <&main>;
-+					reg = <0>;
-+					atmel,clk-input-range = <2000000 32000000>;
-+					#atmel,pll-clk-output-range-cells = <4>;
-+					atmel,pll-clk-output-ranges = <745000000 800000000 0 0
-+								       695000000 750000000 1 0
-+								       645000000 700000000 2 0
-+								       595000000 650000000 3 0
-+								       545000000 600000000 0 1
-+								       495000000 555000000 1 1
-+								       445000000 500000000 2 1
-+								       400000000 450000000 3 1>;
-+				};
++static const struct sdhci_pltfm_data sdhci_st_pdata = {
++	.ops = &sdhci_st_ops,
++	.quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
++	    SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
++};
 +
-+				plladiv: plladivck {
-+					compatible = "atmel,at91sam9x5-clk-plldiv";
-+					#clock-cells = <0>;
-+					clocks = <&plla>;
-+				};
 +
-+				utmi: utmick {
-+					compatible = "atmel,at91sam9x5-clk-utmi";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_LOCKU>;
-+					clocks = <&main>;
-+				};
++static int sdhci_st_probe(struct platform_device *pdev)
++{
++	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
++	struct clk *clk;
++	int ret = 0;
++	u16 host_version;
 +
-+				mck: masterck {
-+					compatible = "atmel,at91rm9200-clk-master";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
-+					clocks = <&slow_xtal>, <&main>, <&plladiv>, <&utmi>;
-+					atmel,clk-output-range = <0 133333333>;
-+					atmel,clk-divisors = <1 2 4 3>;
-+				};
++	clk =  devm_clk_get(&pdev->dev, "mmc");
++	if (IS_ERR(clk)) {
++		dev_err(&pdev->dev, "Peripheral clk not found\n");
++		return PTR_ERR(clk);
++	}
 +
-+				usb: usbck {
-+					compatible = "atmel,at91sam9x5-clk-usb";
-+					#clock-cells = <0>;
-+					clocks = <&plladiv>, <&utmi>;
-+				};
++	host = sdhci_pltfm_init(pdev, &sdhci_st_pdata, 0);
++	if (IS_ERR(host)) {
++		dev_err(&pdev->dev, "Failed sdhci_pltfm_init\n");
++		return PTR_ERR(host);
++	}
 +
-+				prog: progck {
-+					compatible = "atmel,at91sam9g45-clk-programmable";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					clocks = <&slow_xtal>, <&main>, <&plladiv>, <&utmi>, <&mck>;
++	ret = mmc_of_parse(host->mmc);
 +
-+					prog0: prog0 {
-+						#clock-cells = <0>;
-+						reg = <0>;
-+						interrupts = <AT91_PMC_PCKRDY(0)>;
-+					};
++	if (ret) {
++		dev_err(&pdev->dev, "Failed mmc_of_parse\n");
++		return ret;
++	}
 +
-+					prog1: prog1 {
-+						#clock-cells = <0>;
-+						reg = <1>;
-+						interrupts = <AT91_PMC_PCKRDY(1)>;
-+					};
-+				};
++	clk_prepare_enable(clk);
 +
-+				systemck {
-+					compatible = "atmel,at91rm9200-clk-system";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++	pltfm_host = sdhci_priv(host);
++	pltfm_host->clk = clk;
 +
-+					ddrck: ddrck {
-+						#clock-cells = <0>;
-+						reg = <2>;
-+						clocks = <&mck>;
-+					};
++	ret = sdhci_add_host(host);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
++		goto err_out;
++	}
 +
-+					uhpck: uhpck {
-+						#clock-cells = <0>;
-+						reg = <6>;
-+						clocks = <&usb>;
-+					};
++	platform_set_drvdata(pdev, host);
 +
-+					pck0: pck0 {
-+						#clock-cells = <0>;
-+						reg = <8>;
-+						clocks = <&prog0>;
-+					};
++	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
 +
-+					pck1: pck1 {
-+						#clock-cells = <0>;
-+						reg = <9>;
-+						clocks = <&prog1>;
-+					};
-+				};
++	dev_info(&pdev->dev, "SDHCI ST Initialised: Host Version: 0x%x Vendor Version 0x%x\n",
++		((host_version & SDHCI_SPEC_VER_MASK) >> SDHCI_SPEC_VER_SHIFT),
++		((host_version & SDHCI_VENDOR_VER_MASK) >>
++		SDHCI_VENDOR_VER_SHIFT));
 +
-+				periphck {
-+					compatible = "atmel,at91rm9200-clk-peripheral";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&mck>;
++	return 0;
 +
-+					pioA_clk: pioA_clk {
-+						#clock-cells = <0>;
-+						reg = <2>;
-+					};
++err_out:
++	clk_disable_unprepare(clk);
++	sdhci_pltfm_free(pdev);
 +
-+					pioB_clk: pioB_clk {
-+						#clock-cells = <0>;
-+						reg = <3>;
-+					};
++	return ret;
++}
 +
-+					pioC_clk: pioC_clk {
-+						#clock-cells = <0>;
-+						reg = <4>;
-+					};
++static int sdhci_st_remove(struct platform_device *pdev)
++{
++	struct sdhci_host *host = platform_get_drvdata(pdev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 +
-+					pioDE_clk: pioDE_clk {
-+						#clock-cells = <0>;
-+						reg = <5>;
-+					};
++	clk_disable_unprepare(pltfm_host->clk);
 +
-+					trng_clk: trng_clk {
-+						#clock-cells = <0>;
-+						reg = <6>;
-+					};
++	return sdhci_pltfm_unregister(pdev);
++}
 +
-+					usart0_clk: usart0_clk {
-+						#clock-cells = <0>;
-+						reg = <7>;
-+					};
++#ifdef CONFIG_PM_SLEEP
++static int sdhci_st_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	int ret = sdhci_suspend_host(host);
 +
-+					usart1_clk: usart1_clk {
-+						#clock-cells = <0>;
-+						reg = <8>;
-+					};
++	if (ret)
++		goto out;
 +
-+					usart2_clk: usart2_clk {
-+						#clock-cells = <0>;
-+						reg = <9>;
-+					};
++	clk_disable_unprepare(pltfm_host->clk);
++out:
++	return ret;
++}
 +
-+					usart3_clk: usart3_clk {
-+						#clock-cells = <0>;
-+						reg = <10>;
-+					};
++static int sdhci_st_resume(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 +
-+					mci0_clk: mci0_clk {
-+						#clock-cells = <0>;
-+						reg = <11>;
-+					};
++	clk_prepare_enable(pltfm_host->clk);
 +
-+					twi0_clk: twi0_clk {
-+						#clock-cells = <0>;
-+						reg = <12>;
-+					};
++	return sdhci_resume_host(host);
++}
++#endif
 +
-+					twi1_clk: twi1_clk {
-+						#clock-cells = <0>;
-+						reg = <13>;
-+					};
++static SIMPLE_DEV_PM_OPS(sdhci_st_pmops, sdhci_st_suspend, sdhci_st_resume);
 +
-+					spi0_clk: spi0_clk {
-+						#clock-cells = <0>;
-+						reg = <14>;
-+					};
++static const struct of_device_id st_sdhci_match[] = {
++	{ .compatible = "st,sdhci" },
++	{},
++};
 +
-+					spi1_clk: spi1_clk {
-+						#clock-cells = <0>;
-+						reg = <15>;
-+					};
++MODULE_DEVICE_TABLE(of, st_sdhci_match);
 +
-+					ssc0_clk: ssc0_clk {
-+						#clock-cells = <0>;
-+						reg = <16>;
-+					};
++static struct platform_driver sdhci_st_driver = {
++	.probe = sdhci_st_probe,
++	.remove = sdhci_st_remove,
++	.driver = {
++		   .name = "sdhci-st",
++		   .pm = &sdhci_st_pmops,
++		   .of_match_table = of_match_ptr(st_sdhci_match),
++		  },
++};
 +
-+					ssc1_clk: ssc1_clk {
-+						#clock-cells = <0>;
-+						reg = <17>;
-+					};
++module_platform_driver(sdhci_st_driver);
 +
-+					tcb0_clk: tcb0_clk {
-+						#clock-cells = <0>;
-+						reg = <18>;
-+					};
-+
-+					pwm_clk: pwm_clk {
-+						#clock-cells = <0>;
-+						reg = <19>;
-+					};
-+
-+					adc_clk: adc_clk {
-+						#clock-cells = <0>;
-+						reg = <20>;
-+					};
-+
-+					dma0_clk: dma0_clk {
-+						#clock-cells = <0>;
-+						reg = <21>;
-+					};
-+
-+					uhphs_clk: uhphs_clk {
-+						#clock-cells = <0>;
-+						reg = <22>;
-+					};
-+
-+					lcd_clk: lcd_clk {
-+						#clock-cells = <0>;
-+						reg = <23>;
-+					};
-+
-+					ac97_clk: ac97_clk {
-+						#clock-cells = <0>;
-+						reg = <24>;
-+					};
-+
-+					macb0_clk: macb0_clk {
-+						#clock-cells = <0>;
-+						reg = <25>;
-+					};
-+
-+					isi_clk: isi_clk {
-+						#clock-cells = <0>;
-+						reg = <26>;
-+					};
-+
-+					udphs_clk: udphs_clk {
-+						#clock-cells = <0>;
-+						reg = <27>;
-+					};
-+
-+					aestdessha_clk: aestdessha_clk {
-+						#clock-cells = <0>;
-+						reg = <28>;
-+					};
-+
-+					mci1_clk: mci1_clk {
-+						#clock-cells = <0>;
-+						reg = <29>;
-+					};
-+
-+					vdec_clk: vdec_clk {
-+						#clock-cells = <0>;
-+						reg = <30>;
-+					};
-+				};
- 			};
- 
- 			rstc at fffffd00 {
-@@ -93,6 +382,7 @@
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xfffffd30 0xf>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&mck>;
- 			};
- 
- 
-@@ -105,12 +395,16 @@
- 				compatible = "atmel,at91rm9200-tcb";
- 				reg = <0xfff7c000 0x100>;
- 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>;
-+				clock-names = "t0_clk", "t1_clk", "t2_clk";
- 			};
- 
- 			tcb1: timer at fffd4000 {
- 				compatible = "atmel,at91rm9200-tcb";
- 				reg = <0xfffd4000 0x100>;
- 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>;
-+				clock-names = "t0_clk", "t1_clk", "t2_clk";
- 			};
- 
- 			dma: dma-controller at ffffec00 {
-@@ -118,6 +412,8 @@
- 				reg = <0xffffec00 0x200>;
- 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
- 				#dma-cells = <2>;
-+				clocks = <&dma0_clk>;
-+				clock-names = "dma_clk";
- 			};
- 
- 			pinctrl at fffff200 {
-@@ -516,6 +812,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioA_clk>;
- 				};
- 
- 				pioB: gpio at fffff400 {
-@@ -526,6 +823,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioB_clk>;
- 				};
- 
- 				pioC: gpio at fffff600 {
-@@ -536,6 +834,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioC_clk>;
- 				};
- 
- 				pioD: gpio at fffff800 {
-@@ -546,6 +845,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioDE_clk>;
- 				};
- 
- 				pioE: gpio at fffffa00 {
-@@ -556,6 +856,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioDE_clk>;
- 				};
- 			};
- 
-@@ -565,6 +866,8 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_dbgu>;
-+				clocks = <&mck>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -576,6 +879,8 @@
- 				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
-+				clocks = <&usart0_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -587,6 +892,8 @@
- 				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
-+				clocks = <&usart1_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -598,6 +905,8 @@
- 				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
-+				clocks = <&usart2_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -609,6 +918,8 @@
- 				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
-+				clocks = <&usart3_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -618,6 +929,8 @@
- 				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_macb_rmii>;
-+				clocks = <&macb0_clk>, <&macb0_clk>;
-+				clock-names = "hclk", "pclk";
- 				status = "disabled";
- 			};
- 
-@@ -629,6 +942,7 @@
- 				pinctrl-0 = <&pinctrl_i2c0>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&twi0_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -640,6 +954,7 @@
- 				pinctrl-0 = <&pinctrl_i2c1>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&twi1_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -649,6 +964,8 @@
- 				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-+				clocks = <&ssc0_clk>;
-+				clock-names = "pclk";
- 				status = "disabled";
- 			};
- 
-@@ -658,6 +975,8 @@
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
-+				clocks = <&ssc1_clk>;
-+				clock-names = "pclk";
- 				status = "disabled";
- 			};
- 
-@@ -667,6 +986,8 @@
- 				compatible = "atmel,at91sam9g45-adc";
- 				reg = <0xfffb0000 0x100>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&adc_clk>, <&adc_op_clk>;
-+				clock-names = "adc_clk", "adc_op_clk";
- 				atmel,adc-channels-used = <0xff>;
- 				atmel,adc-vref = <3300>;
- 				atmel,adc-startup-time = <40>;
-@@ -706,6 +1027,7 @@
- 				reg = <0xfffb8000 0x300>;
- 				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 4>;
- 				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -718,6 +1040,8 @@
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&mci0_clk>;
-+				clock-names = "mci_clk";
- 				status = "disabled";
- 			};
- 
-@@ -730,6 +1054,8 @@
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&mci1_clk>;
-+				clock-names = "mci_clk";
- 				status = "disabled";
- 			};
- 
-@@ -752,6 +1078,8 @@
- 				interrupts = <14 4 3>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi0>;
-+				clocks = <&spi0_clk>;
-+				clock-names = "spi_clk";
- 				status = "disabled";
- 			};
- 
-@@ -763,6 +1091,8 @@
- 				interrupts = <15 4 3>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi1>;
-+				clocks = <&spi1_clk>;
-+				clock-names = "spi_clk";
- 				status = "disabled";
- 			};
- 
-@@ -773,6 +1103,8 @@
- 				reg = <0x00600000 0x80000
- 				       0xfff78000 0x400>;
- 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&udphs_clk>, <&utmi>;
-+				clock-names = "pclk", "hclk";
- 				status = "disabled";
- 
- 				ep0 {
-@@ -835,6 +1167,8 @@
- 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH 3>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_fb>;
-+			clocks = <&lcd_clk>, <&lcd_clk>;
-+			clock-names = "hclk", "lcdc_clk";
- 			status = "disabled";
- 		};
- 
-@@ -861,6 +1195,9 @@
- 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
- 			reg = <0x00700000 0x100000>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-+			//TODO
-+			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
-+			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
- 			status = "disabled";
- 		};
- 
-@@ -868,6 +1205,9 @@
- 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
- 			reg = <0x00800000 0x100000>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-+			//TODO
-+			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
-+			clock-names = "usb_clk", "ehci_clk", "hclk", "uhpck";
- 			status = "disabled";
- 		};
- 	};
++MODULE_DESCRIPTION("SDHCI driver for STMicroelectronics SoCs");
++MODULE_AUTHOR("Giuseppe Cavallaro <peppe.cavallaro@st.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:st-sdhci");
 -- 
 1.9.1
