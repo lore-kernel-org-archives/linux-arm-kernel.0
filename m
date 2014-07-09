@@ -1,23 +1,47 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 9 Jul 2014 10:58:34 +0100
-Subject: [PATCH 0/2] arm: add early_ioremap support
-In-Reply-To: <20140709094242.GO21766@n2100.arm.linux.org.uk>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <20140709094242.GO21766@n2100.arm.linux.org.uk>
-Message-ID: <20140709095834.GQ4179@bivouac.eciton.net>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed,  9 Jul 2014 15:31:32 +0530
+Subject: [PATCH v2 0/4] Fine tune USB 3.0 PHY on exynos5420
+Message-ID: <1404900096-1721-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 10:42:42AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 09, 2014 at 10:39:50AM +0100, Leif Lindholm wrote:
-> > early_ioremap()/early_memremap() create temporary virtual mappings
-> > in the fixmap region during boot time. Part of the support now exists
-> > in core code, but depends on the generic fixmap support.
-> 
-> Does this mean that the changes upon which this patch depends are
-> already merged in mainline, or are they queued in some other tree?
+This series is based on Heikki's patches for simpliefied phy lookup table:
+[PATCHv2 0/6] phy: simplified phy lookup [1], applied against 'next' branch
+of Kishon's linux-phy tree.
 
-Yes, they went into 3.15.
+Changes since v1:
+1) Using 'gen_phy' member of 'hcd' instead of declaring more variables
+   to hold phys.
+2) Added a check for compatible match for 'Synopsys-dwc3' controller,
+   since the 'gen_phy' member of 'hcd' already gets the 'usb' PHY
+   in core/hcd.c; but XHCI on Synopsys-dwc3 doesn't need that,
+   instead two separate PHYs for UTMI+ and PIPE3 for the two HCDs
+   (main hcd and shared hcd).
+3) Restructured the code in 'xhci_plat_setup()' and 'xhci_plat_resume()'
+   to use hcd->gen_phy directly. Also added the check for Synopsys's DWC3
+   controller while trying to calibrate the PHY.
 
-/
-    Leif
+Explanation for the need of this patch-series:
+"The DWC3-exynos eXtensible host controller present on Exynos5420/5800
+SoCs is quirky. The PHY serving this controller operates at High-Speed
+by default, so it detects even Super-speed devices as high-speed ones.
+Certain PHY parameters like Tx LOS levels and Boost levels need to be
+calibrated further post initialization of xHCI controller, to get
+SuperSpeed operations working."
+
+[1] https://lkml.org/lkml/2014/6/5/358
+
+Vivek Gautam (4):
+  phy: Add provision for calibrating phy.
+  usb: host: xhci-plat: Get PHYs for xhci's hcds
+  usb: host: xhci-plat: Caibrate PHY post host reset
+  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
+
+ drivers/phy/phy-core.c           |   36 ++++++++
+ drivers/phy/phy-exynos5-usbdrd.c |  169 ++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/xhci-plat.c     |   75 ++++++++++++++++-
+ include/linux/phy/phy.h          |    8 ++
+ 4 files changed, 286 insertions(+), 2 deletions(-)
+
+-- 
+1.7.10.4
