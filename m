@@ -1,93 +1,93 @@
-From: tthayer.linux@gmail.com (Thor Thayer)
-Date: Wed, 9 Jul 2014 15:07:46 -0500
-Subject: [PATCHv7 2/3] devicetree: Addition of the Altera SDRAM EDAC.
-In-Reply-To: <20140626094507.GM15240@leverpostej>
-References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
- <1403730927-16163-3-git-send-email-tthayer@altera.com>
- <20140626094507.GM15240@leverpostej>
-Message-ID: <CAF03EBdBMphBLkGj4=_kGADF4iq_uUpyBbRJ7O63OvSHcR5hSw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 09 Jul 2014 22:12:13 +0200
+Subject: [RFC v2 3/5] clk: use struct clk only for external API
+In-Reply-To: <1404398323-18934-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1404398323-18934-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <53BDA21D.3070504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 4:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jun 25, 2014 at 10:15:26PM +0100, tthayer at altera.com wrote:
->> From: Thor Thayer <tthayer@altera.com>
->>
->> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
->>
->> Signed-off-by: Thor Thayer <tthayer@altera.com>
->> ---
->> v2: Changes to SoC EDAC source code.
->>
->> v3: Fix typo in device tree documentation.
->>
->> v4,v5: No changes - bump version for consistency.
->>
->> v6: Assign ECC registers in SDRAM controller to EDAC
->>
->> v7: Fix SDRAM EDAC base address.
->> ---
->>  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
->>  arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
->>  2 files changed, 21 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
->> new file mode 100644
->> index 0000000..d68e033
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
->> @@ -0,0 +1,15 @@
->> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
->> +
->> +Required properties:
->> +- compatible : should contain "altr,sdram-edac";
->> +- reg : should contain the ECC register range in sdram
->> +        controller (address and length).
->> +- interrupts : Should contain the SDRAM ECC IRQ in the
->> +     appropriate format for the IRQ controller.
->> +
->> +Example:
->> +     sdramedac at ffc2502c {
->> +             compatible = "altr,sdram-edac";
->> +             reg = <0xffc2502c 0x28>;
->> +             interrupts = <0 39 4>;
->> +     };
->> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->> index 310292e..da0785d 100644
->> --- a/arch/arm/boot/dts/socfpga.dtsi
->> +++ b/arch/arm/boot/dts/socfpga.dtsi
->> @@ -687,6 +687,12 @@
->>                       reg = <0xffc25000 0x4>;
->>               };
->>
->> +             sdramedac at ffc2502c {
->> +                     compatible = "altr,sdram-edac";
->> +                     reg = <0xffc2502c 0x28>;
->> +                     interrupts = <0 39 4>;
->> +             };
->
-> I'm not sure I understand this. The ECC register existing within the
-> SDRAM controller, which we have a binding for. Why do we need a separate
-> binding for a subset of registers within an IP block?
->
-> Why can we not have a single binding for the entire SDRAM controlelr and
-> decompse that within Linux as it makes sense for the appropriate
-> subsystyems?
->
-> Leaking Linux design into bindings is a bad idea; it makes it harder to
-> change things.
->
-> Mark.
+Actually few more comments, see inline.
 
-Hi Mark,
+On 03.07.2014 16:38, Tomeu Vizoso wrote:
+> From: Rabin Vincent <rabin.vincent@stericsson.com>
+> 
+> In order to provide per-user accounting, this separates the struct clk
+> used in the common clock framework into two structures 'struct clk_core'
+> and 'struct clk'.  struct clk_core will be used for internal
+> manipulation and struct clk will be used in the clock API
+> implementation.
 
-How would we decompose this within Linux. MFD? Is there an example
-that I can look at?
+[snip]
 
-We originally used syscon for the entire sdram controller register
-block but we got dinged on it.
+> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+> index 8f57154..5f2aba9 100644
+> --- a/drivers/clk/clk-devres.c
+> +++ b/drivers/clk/clk-devres.c
+> @@ -5,6 +5,7 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+>  #include <linux/device.h>
+>  #include <linux/export.h>
+>  #include <linux/gfp.h>
+> @@ -14,15 +15,15 @@ static void devm_clk_release(struct device *dev, void *res)
+>  	clk_put(*(struct clk **)res);
 
-Thanks for your help.
+This function still expects to get a (struct clk *) here, but...
 
-Thor
+>  }
+>  
+> -struct clk *devm_clk_get(struct device *dev, const char *id)
+> +struct clk_core *devm_clk_provider_get(struct device *dev, const char *id)
+>  {
+> -	struct clk **ptr, *clk;
+> +	struct clk_core **ptr, *clk;
+>  
+>  	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+>  	if (!ptr)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> -	clk = clk_get(dev, id);
+> +	clk = clk_provider_get(dev, id);
+>  	if (!IS_ERR(clk)) {
+>  		*ptr = clk;
+
+...here a (struct clk_core *) is stored.
+
+>  		devres_add(dev, ptr);
+
+[snip]
+
+> diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+> index d278572..c69f4fe 100644
+> --- a/drivers/clk/clk.h
+> +++ b/drivers/clk/clk.h
+> @@ -15,3 +15,7 @@ struct clk_core *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  void of_clk_lock(void);
+>  void of_clk_unlock(void);
+>  #endif
+> +
+> +#if defined(CONFIG_COMMON_CLK)
+> +#define clk_to_clk_core(clk)	(clk->core)
+
+Making this a static inline will benefit you with type checking at
+compilation time.
+
+> +#endif
+
+[snip]
+
+> +
+> +#define clk_core_to_clk(core)	((struct clk *)(core))
+
+Hmm, I'm not following. clk_to_clk_core() returns clk->core, while
+clk_core_to_clk() simply casts whatever the former returns into a
+pointer to struct clk?
+
+Also this should be a static inline to benefit from compiler type checking.
+
+Best regards,
+Tomasz
