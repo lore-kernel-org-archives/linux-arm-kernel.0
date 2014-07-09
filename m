@@ -1,31 +1,87 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 09 Jul 2014 15:30:01 +0400
-Subject: [RFC/PATCH RESEND -next 07/21] x86: Kconfig: enable kernel address
- sanitizer
+Date: Wed, 09 Jul 2014 15:29:58 +0400
+Subject: [RFC/PATCH RESEND -next 04/21] x86: boot: vdso: disable
+ instrumentation for code not linked with kernel
 In-Reply-To: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1404905415-9046-8-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1404905415-9046-5-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now everything in x86 code is ready for kasan. Enable it.
+To avoid build errors, compiler's instrumentation must be disabled
+for code not linked with kernel image.
 
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- arch/x86/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/x86/boot/Makefile            | 2 ++
+ arch/x86/boot/compressed/Makefile | 2 ++
+ arch/x86/realmode/Makefile        | 2 +-
+ arch/x86/realmode/rm/Makefile     | 1 +
+ arch/x86/vdso/Makefile            | 1 +
+ 5 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 8657c06..f9863b3 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -132,6 +132,7 @@ config X86
- 	select HAVE_CC_STACKPROTECTOR
- 	select GENERIC_CPU_AUTOPROBE
- 	select HAVE_ARCH_AUDITSYSCALL
-+	select HAVE_ARCH_KASAN
+diff --git a/arch/x86/boot/Makefile b/arch/x86/boot/Makefile
+index dbe8dd2..9204cc0 100644
+--- a/arch/x86/boot/Makefile
++++ b/arch/x86/boot/Makefile
+@@ -14,6 +14,8 @@
+ # Set it to -DSVGA_MODE=NORMAL_VGA if you just want the EGA/VGA mode.
+ # The number is the same as you would ordinarily press at bootup.
  
- config INSTRUCTION_DECODER
- 	def_bool y
++KASAN_SANITIZE := n
++
+ SVGA_MODE	:= -DSVGA_MODE=NORMAL_VGA
+ 
+ targets		:= vmlinux.bin setup.bin setup.elf bzImage
+diff --git a/arch/x86/boot/compressed/Makefile b/arch/x86/boot/compressed/Makefile
+index 0fcd913..64a92b3 100644
+--- a/arch/x86/boot/compressed/Makefile
++++ b/arch/x86/boot/compressed/Makefile
+@@ -4,6 +4,8 @@
+ # create a compressed vmlinux image from the original vmlinux
+ #
+ 
++KASAN_SANITIZE := n
++
+ targets := vmlinux vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma \
+ 	vmlinux.bin.xz vmlinux.bin.lzo vmlinux.bin.lz4
+ 
+diff --git a/arch/x86/realmode/Makefile b/arch/x86/realmode/Makefile
+index 94f7fbe..e02c2c6 100644
+--- a/arch/x86/realmode/Makefile
++++ b/arch/x86/realmode/Makefile
+@@ -6,7 +6,7 @@
+ # for more details.
+ #
+ #
+-
++KASAN_SANITIZE := n
+ subdir- := rm
+ 
+ obj-y += init.o
+diff --git a/arch/x86/realmode/rm/Makefile b/arch/x86/realmode/rm/Makefile
+index 7c0d7be..2730d77 100644
+--- a/arch/x86/realmode/rm/Makefile
++++ b/arch/x86/realmode/rm/Makefile
+@@ -6,6 +6,7 @@
+ # for more details.
+ #
+ #
++KASAN_SANITIZE := n
+ 
+ always := realmode.bin realmode.relocs
+ 
+diff --git a/arch/x86/vdso/Makefile b/arch/x86/vdso/Makefile
+index 61b04fe..90daad6 100644
+--- a/arch/x86/vdso/Makefile
++++ b/arch/x86/vdso/Makefile
+@@ -3,6 +3,7 @@
+ #
+ 
+ KBUILD_CFLAGS += $(DISABLE_LTO)
++KASAN_SANITIZE := n
+ 
+ VDSO64-$(CONFIG_X86_64)		:= y
+ VDSOX32-$(CONFIG_X86_X32_ABI)	:= y
 -- 
 1.8.5.5
