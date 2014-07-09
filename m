@@ -1,62 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Jul 2014 10:15:54 -0400
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <20140709123950.GV3705@n2100.arm.linux.org.uk>
-References: <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
- <20140707134008.GU3705@n2100.arm.linux.org.uk>
- <20140707151024.GJ5582@saruman.home> <53BB7980.2060909@ti.com>
- <20140708082948.GE28884@atomide.com> <20140709092531.GK28884@atomide.com>
- <53BD34FD.5070005@ti.com> <20140709123950.GV3705@n2100.arm.linux.org.uk>
-Message-ID: <53BD4E9A.7060903@ti.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Wed, 9 Jul 2014 14:21:07 +0000
+Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
+In-Reply-To: <20140709132653.GM9485@arm.com>
+References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+ <1404125530-17984-3-git-send-email-will.deacon@arm.com>
+ <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140709132653.GM9485@arm.com>
+Message-ID: <3b971792af184640a1d2ff8c5b57e66d@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014 08:39 AM, Russell King - ARM Linux wrote:
-> On Wed, Jul 09, 2014 at 05:56:37PM +0530, Sekhar Nori wrote:
->> On Wednesday 09 July 2014 02:55 PM, Tony Lindgren wrote:
->>> I guess no more comments. Took a look at the patch again, Sekhar, can
->>> you please update the description with what has been discovered in this
->>> thread and repost?
->>
->> How does the following sound:
->>
->> ---
->> AM437x has L2C-310 version r3p2 and ROM code on that device does not
->> support writing to L2C-310 power control register. The L2C driver,
->> however, tries writing to this register for all revisions >= r3p0.
->>
->> This leads to a warning dump on boot which leads most users to believe
->> that L2 cache is non-functional.
->>
-Power controller register setting doesn't make cache controller
-functional but it is for really clock gating and standby.
-So please reword, the above statement accordingly.
+Hi Will,
 
->> Since the problem is understood, and cannot be addressed through
->> software, replace the warning with a pr_info() while maintaining the
->> WARN_ON() for other truly unexpected scenarios.
->>
-Instead of being vague here and below, I will just make it very simple as
-below.
-
-On OMAP SOCs using PL310 controllers, Power_ctrl register is not
-accessible from non-secure software on PL310 versions which supports
-it. The secure code takes care of setting it up correctly and the
-power transitions are proven on these devices.
-
-So lets add the ignore write check for PL310 Power_ctrl register
-write.
-
->> >From the public TRM available for OMAP4470, even on that device, ROM
->> does not support writing to this register even though it uses a version
->> of L2C-310 which has the register implemented. So this patch should take
->> care of all variants of existing OMAPs.
->> ---
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Wednesday, July 09, 2014 6:57 PM
+> To: Sethi Varun-B16395; alex.williamson at redhat.com
+> Cc: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
+> foundation.org; thierry.reding at gmail.com; arnd at arndb.de;
+> ohaugan at codeaurora.org; joro at 8bytes.org;
+> a.motakis at virtualopensystems.com; Marc Zyngier
+> Subject: Re: [PATCH 2/5] iommu/arm-smmu: add support for PCI master
+> devices
 > 
-> That sounds perfect, and explains why the change has to exist, and why
-> it can't be fixed elsewhere.  Thanks for providing the full reasoning in
-> the commit message.
+> [Adding Alex; question below]
 > 
+> On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
+> > > +static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias,
+> > > +void
+> > > +*data) {
+> > > +     *((u16 *)data) = alias;
+> > > +     return 0; /* Continue walking */ }
+> 
+> [...]
+> 
+> > > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
+> > > *dev)
+> > >               return PTR_ERR(group);
+> > >       }
+> > >
+> > > +     if (dev_is_pci(dev)) {
+> > > +             struct arm_smmu_master_cfg *cfg;
+> > > +             struct pci_dev *pdev = to_pci_dev(dev);
+> > > +
+> > > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+> > > +             if (!cfg) {
+> > > +                     ret = -ENOMEM;
+> > > +                     goto out_put_group;
+> > > +             }
+> > > +
+> > > +             cfg->num_streamids = 1;
+> > > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
+> > > +                                    &cfg->streamids[0]);
+> > [Sethi Varun-B16395] We need to look for upstream DMA device. We
+> > should be using pci_find_dma_isolation_root here. Also, this would
+> > also imply that there could be multiple devices sharing the same
+> > stream ID. So, we should check if a particular stream ID value has
+> > already been configured in the SMR registers.
+> 
+> pci_find_dma_isolation_root doesn't exist in any of the trees I have.
+> Alex, is this queued anywhere and do I actually need it?
+> 
+> The purpose of this code is to find the requester ID of a device as it
+> appears at the host controller. At this point, we can map it (via
+> firmware tables that are TBD) to a Stream ID for the SMMU. It looks to me
+> like pci_for_each_dma_alias walks over non-transparent PCI bridges
+> correctly, so the callback I provide just updates the alias until the
+> walk has completed.
+I think pci_for_each_dma_alias should work fine here. Isolation would be specifically required while setting up the iommu groups.
+
+-Varun
