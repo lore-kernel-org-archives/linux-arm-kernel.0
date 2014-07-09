@@ -1,103 +1,121 @@
-From: dianders@google.com (Doug Anderson)
-Date: Wed, 9 Jul 2014 09:01:08 -0700
-Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
- Exynos5420
-In-Reply-To: <CABxcv=mcKNY8TO3Ay+GRs3ha45ptw_w_tig0L8g_syMQdbUmhw@mail.gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
- <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
- <7hpphwlgn0.fsf@paris.lan>
- <CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>
- <7h8uojk61a.fsf@paris.lan> <53ACE724.7090606@gmail.com>
- <CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
- <CAGa+x87LHiYGb03=GRcZisK1=TyakW1htd1E2vOQ6ijZKw8syg@mail.gmail.com>
- <53B2A2A5.4070203@gmail.com> <53BB2E7A.5080204@samsung.com>
- <53BB5EBD.5030607@gmail.com>
- <CABxcv=ka5UxZ8E3+F4cR4vcY1m3AfX=g7HiaNYqmyQjHfSVqtw@mail.gmail.com>
- <53BD3157.7030804@gmail.com>
- <CABxcv=mcKNY8TO3Ay+GRs3ha45ptw_w_tig0L8g_syMQdbUmhw@mail.gmail.com>
-Message-ID: <CAD=FV=XDs8FL3wdmDUF8ch9NuZ4hWn6FHhn8vVK42aa4qwV_Sg@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 Jul 2014 19:09:25 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140709144216.GA32375@ulmo>
+References: <20140708141135.GC23218@tbergstrom-lnx.Nvidia.com>
+ <20140709063130.GA3170@ulmo>
+ <20140709083311.GE23218@tbergstrom-lnx.Nvidia.com>
+ <20140709102551.GA19357@ulmo>
+ <20140709110816.GF23218@tbergstrom-lnx.Nvidia.com>
+ <20140709120400.GA3819@ulmo>
+ <20140709124344.GK23218@tbergstrom-lnx.Nvidia.com>
+ <20140709125613.GA3262@ulmo>
+ <20140709132010.GL23218@tbergstrom-lnx.Nvidia.com>
+ <20140709144216.GA32375@ulmo>
+Message-ID: <20140709160925.GM23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Wed, Jul 09, 2014 at 04:42:18PM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Wed, Jul 09, 2014 at 04:20:10PM +0300, Peter De Schrijver wrote:
+> > On Wed, Jul 09, 2014 at 02:56:14PM +0200, Thierry Reding wrote:
+> > > > Old Signed by an unknown key
+> > > 
+> > > On Wed, Jul 09, 2014 at 03:43:44PM +0300, Peter De Schrijver wrote:
+> > > > On Wed, Jul 09, 2014 at 02:04:02PM +0200, Thierry Reding wrote:
+> > > > > > For those 2 domains we can find the necessary clocks and resets by parsing
+> > > > > > the relevant existing DT nodes for PCIe and gr3d. For clocks, this isn't
+> > > > > > even needed as we can always register some extra clkdev's to get them. There
+> > > > > > is no equivalent for resets so we have to parse the gr3d and pcie DT nodes,
+> > > > > > but that's not too bad I think.
+> > > > > 
+> > > > > Even if we could really do this, at this point I don't see an advantage.
+> > > > > All that it would be doing is move to some subsystem that doesn't quite
+> > > > > match what we need just for the sake of moving to that subsystem. Having
+> > > > > a Tegra-specific API doesn't sound so bad anymore.
+> > > > > 
+> > > > 
+> > > > The advantage would be that we can use LP0/SC7 as a cpuidle state.
+> > > 
+> > > How is that going to work? And why does it need powergates to be
+> > 
+> > pm_runtime_get() and pm_runtime_put() hook into genpd. So genpd knows
+> > when all devices in a domain are idle. It can then decide to turn off
+> > the domain (based on the decision of a per domain governor). If all
+> > domains are off (except for the non-powergateable domain), a special cpuidle
+> > state can be enabled by genpd which will initiate a transition to LP0 without
+> > actually doing a full system suspend.
+> 
+> Okay, I see.
+> 
+> > > implemented as power domains? If we switch off power gates, then we need
+> > > to restore context in the drivers anyway, therefore I assume .suspend()
+> > > and .resume() would need to be called, in which case powergate handling
+> > > can surely be done at that stage, can't it?
+> > > 
+> > 
+> > .suspend() and .resume() are not used for this. genpd uses other per device
+> > callbacks to save and restore the state which are invoked when the domain
+> > is turned off and on (.save_state and .restore_state). The major difference
+> > with .suspend() and .resume() is that .suspend() has to perform 3 tasks:
+> > prevent any new requests to the driver, finalize or cancel all outstanding
+> > requests and save the hw context. .save_state will only be called when the
+> > device is idle (based on the refcount controlled by pm_runtime_get() and
+> > pm_runtime_put()) which means it only has to handle saving the hw context.
+> 
+> With the above, would it be possible to make turning off the domain
+> conditional on whether or not all devices in the domain implement
+> .save_state() and .restore_state()? That would allow us to convert to
+> power domains and then stage in context save/restore in drivers (or even
+> leave it out if there's not enough to be gained from turning the
+> partition off).
+> 
 
-On Wed, Jul 9, 2014 at 6:03 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Tushar,
->
-> On Wed, Jul 9, 2014 at 2:11 PM, Tushar Behera <trblinux@gmail.com> wrote:
->> On 07/09/2014 03:44 PM, Javier Martinez Canillas wrote:
->>> Hello Tushar,
->>>
->>> On Tue, Jul 8, 2014 at 5:00 AM, Tushar Behera <trblinux@gmail.com> wrote:
->>>>>>
->>>>>> The u-boot version is a little different on my Peach-Pi as compared to
->>>>>> the market release version. Not sure if that is making any difference.
->>>>>>
->>>>>> Peach # version
->>>>>>
->>>>>> U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
->>>>>> armv7a-cros-linux-gnueabi-gcc.real (4.8.1_cos_gg_feea904_4.8.1-r66)
->>>>>> 4.8.x-google 20130905 (prerelease)
->>>>>> GNU ld (binutils-2.22_cos_gg_2) 2.22
->>>>>>
->>>>>
->>>
->>> I'm using the same U-Boot version than Kevin (U-Boot 2013.04-gb98ed09)
->>> and on my setup using chained nv-uboot I also need patch 1/3 along
->>> with 2/3 to fix the issue.
->>>
->>>>> Note that I've applied this only from this series so I'm not sure how
->>>>> much the problem can be solved...any updates for 1/3 and 3/3?
->>>>>
->>>>> - Kukjin
->>>>
->>>> Thanks for applying 2/3. I am working on 1/3 to see if we are following
->>>> the right approach to fix Kevin's issue (unfortunately, I am not hitting
->>>> the bug on my board ATM). 3/3 has already been merged through a
->>>> different patchset.
->>>>
->>>
->>> I'm sending as an attachment my complete boot log when booting today's
->>> next (20140709) until it hangs and my u-boot env vars. I hope that
->>> helps.
->>>
->>
->> Would you please check the behaviour after enabling following config
->> options?
->>
->> diff --git a/arch/arm/configs/exynos_defconfig
->> b/arch/arm/configs/exynos_defconfig
->> index e07a227..d6056ab 100644
->> --- a/arch/arm/configs/exynos_defconfig
->> +++ b/arch/arm/configs/exynos_defconfig
->> @@ -93,6 +93,11 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
->>  CONFIG_FONTS=y
->>  CONFIG_FONT_7x14=y
->>  CONFIG_LOGO=y
->> +CONFIG_SOUND=y
->> +CONFIG_SND=y
->> +CONFIG_SND_SOC=y
->> +CONFIG_SND_SOC_SAMSUNG=y
->> +CONFIG_SND_SOC_SNOW=y
->>  CONFIG_USB=y
->>  CONFIG_USB_EHCI_HCD=y
->>  CONFIG_USB_EHCI_EXYNOS=y
->> @@ -109,6 +114,8 @@ CONFIG_MMC_DW_IDMAC=y
->>  CONFIG_MMC_DW_EXYNOS=y
->>  CONFIG_RTC_CLASS=y
->>  CONFIG_RTC_DRV_S3C=y
->> +CONFIG_DMADEVICES=y
->> +CONFIG_PL330_DMA=y
->>  CONFIG_COMMON_CLK_MAX77686=y
->>  CONFIG_EXT2_FS=y
->>  CONFIG_EXT3_FS=y
->>
->>
->
-> With those Kconfig options enabled the kernel does not hang anymore so
-> patch 1/3 is not needed in that case.
+Maybe. I would have to check that.
 
-Just checking: did you happen to confirm whether it's the PL330 /
-DMADEVICES that fixes things or do you actually need the sound stuff?
+> > > > Also system
+> > > > resume from LP0 can be faster as we potentially don't have to resume all
+> > > > domains at once.
+> > > 
+> > > I don't understand what that's got to do with anything. If we call into
+> > > the PMC driver explicitly via tegra_powergate_*() functions from driver
+> > > code, then we have full control over suspend/resume in the drivers, and
+> > > therefore don't need to resume all at once either.
+> > 
+> > But then we would be duplicating all the bookkeeping required for this? What's
+> > the point of that?
+> 
+> We're doing fine without any bookkeeping currently. I understand that
+> this may change eventually, but I'm hesitant to start any conversion
+> like this before we don't have a better understanding of how it should
+> work (and actual use-cases which we can test). Also we've seen in the
+> past that coding things up before we have enough use-cases we're bound
+> to fail at coming up with a proper binding and then we have to keep
+> carrying loads of code for compatibility.
+> 
+> So if you're willing to give this a shot, I'm not at all opposed to it
+> generally. But we need to make sure that both the binding is reasonably
+> future-proof and that we can actually test things like reference-counted
+> power domains.
+> 
+> Now in the meantime there are a bunch of other drivers that will need to
+> use the powergate API. DC is one of them. We haven't needed this before
+> because we assumed the partitions would be on by default. That's not
+> always the case apparently (ChromeOS does some funky things here). Both
+> the SATA and XUSB drivers that have been posted use them as well and the
+> nouveau driver that Alex has been working on uses at least parts of it.
+> I don't think it's fair to keep them from being merged while we're
+> trying to make the transition to power domains, but we should keep an
+> eye on what's happening there so it doesn't conflict with any of the
+> work we're planning for power domains.
+
+The problem with this is that moving to the genpd APIs will become much more
+difficult I'm afraid. I think we should maybe just make the pmc driver turn
+on all the domains which were turned off by the bootloader. That way the
+drivers don't need to handle the powerdomains at all for the time being.
+
+Cheers,
+
+Peter.
