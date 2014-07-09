@@ -1,25 +1,28 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Wed, 9 Jul 2014 11:55:52 +0200
-Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
-In-Reply-To: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
-References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <20140709095552.GA25154@breakpoint.cc>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Jul 2014 10:57:18 +0100
+Subject: [PATCH 0/6] LLVMLinux: Patches to enable the kernel to be
+ compiled with clang/LLVM
+In-Reply-To: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
+References: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
+Message-ID: <20140709095718.GD9485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-07-08 18:46:39 [+0530], Mugunthan V N wrote:
-> Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
+On Tue, Jul 08, 2014 at 09:16:10PM +0100, behanw at converseincode.com wrote:
+> From: Behan Webster <behanw@converseincode.com>
+> 
+> The LLVMLinux project aims to fully build the Linux kernel using both gcc and
+> clang (the C front end for the LLVM compiler infrastructure project). 
+> 
+> Clang only supports global named registers for non-allocatable registers like
+> the stack pointer. By centralizing the definition of current_stack_pointer, the
+> use of named registers for ARM remains largely unchanged while working for both
+> gcc and clang.
 
-I reverted my patch, applied this one and after boot I got:
+All looks sane to me. For the series:
 
-|platform 48485000.mdio: Cannot lookup hwmod 'davinci_mdio'
-|cpsw 48484000.ethernet: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
-|davinci_mdio 48485000.mdio: failed to get device clock
-|davinci_mdio: probe of 48485000.mdio failed with error -2
-|cpsw 48484000.ethernet: Random MACID = 46:c6:34:6f:8d:c6
-| (null): fck is not found
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-with no eth0. Is there something with my setup? I still have the device
-tree pieces I posted (in case there is something wrong with them).
+BTW, have you tried building an arm64 kernel with clang?
 
-Sebastian
+Will
