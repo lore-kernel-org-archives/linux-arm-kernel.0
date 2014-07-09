@@ -1,43 +1,46 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 9 Jul 2014 16:14:19 +0300
-Subject: [PATCH 2/3] ARM: dts: keystone-evm: add 1g ethernet phys nodes
-In-Reply-To: <1404911660-10047-1-git-send-email-grygorii.strashko@ti.com>
-References: <1404911660-10047-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1404911660-10047-3-git-send-email-grygorii.strashko@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Jul 2014 13:26:45 +0100
+Subject: [GIT PULL] msm drm update for component changes
+In-Reply-To: <CAF6AEGv+hzSKuD2mRDbz-hqN1H09tW5C4a2EYuZ5sN44RABe8w@mail.gmail.com>
+References: <20140709093458.GA17540@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGv+hzSKuD2mRDbz-hqN1H09tW5C4a2EYuZ5sN44RABe8w@mail.gmail.com>
+Message-ID: <20140709122645.GQ21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone EVMK2HX has two 1G Marvell 88E1111 Ethernet PHYs
-installed, so add corresponding child nodes for 1G MDIO bus
-and enable it.
+On Wed, Jul 09, 2014 at 06:56:14AM -0400, Rob Clark wrote:
+> On Wed, Jul 9, 2014 at 5:34 AM, Russell King <rmk@arm.linux.org.uk> wrote:
+> > David,
+> >
+> > Please incorporate the latest msm drm update for component changes, which can be found at:
+> >
+> >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git component-for-drm
+> >
+> > with SHA1 84448288546d13d7e06fd6638fb78ddff559b399.
+> >
+> > This updates the MSM's DRM driver for the updates merged in Greg's
+> > driver-core tree, converting MSM to use the pre-declared array of
+> > matches rather than walking the device tree each time we try to bind.
+> 
+> Hey Russell, do you want me to take this for my v3.17 pull req?  I
+> expect there will be some minor conflicts with the DT support I'm
+> working on at the moment.
+> 
+> Or does this need to be applied together with the rest of the series?
+> In which case, maybe it should go first, and then I'd rebase msm-next
+> on top.
 
-For more information see schematics:
- http://wfcache.advantech.com/www/support/TI-EVM/download/Schematics/PDF/K2H_K2EVM-HK_SCH_A102_Rev1_0.pdf
+The patch for MSM is dependent on the component changes, which have
+already been merged by Greg for the driver-core tree.  I don't have
+anything following this, so if you instead want to merge my
+component-for-driver branch (which is what Greg's pulled, which is a
+sub-set of this pull), and then add this patch on top of your
+development, that's fine too.
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2hk-evm.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+The only reason it's a pull request and not a single patch is to ensure
+that the previous component commits don't end up being duplicated with
+different commit IDs across several trees by being applied independently
+as patches (which can end up causing unnecessary git conflicts.)
 
-diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-index 1f90cbf..3223cc1 100644
---- a/arch/arm/boot/dts/k2hk-evm.dts
-+++ b/arch/arm/boot/dts/k2hk-evm.dts
-@@ -167,3 +167,15 @@
- 		};
- 	};
- };
-+
-+&mdio {
-+	ethphy0: ethernet-phy at 0 {
-+		compatible = "marvell,88E1111", "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+	};
-+
-+	ethphy1: ethernet-phy at 1 {
-+		compatible = "marvell,88E1111", "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.5Mbps down 400kbps up.
