@@ -1,338 +1,289 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed,  9 Jul 2014 19:49:34 +0200
-Subject: [PATCH 3/6] tty: serial: 8250 core: add runtime pm
+Date: Wed,  9 Jul 2014 19:49:36 +0200
+Subject: [PATCH 5/6] tty: serial: 8250-core: add rs485 support
 In-Reply-To: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
 References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1404928177-26554-4-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While comparing the OMAP-serial and the 8250 part of this I noticed that
-the the latter does not use runtime-pm. Here are the pieces. It is
-basically a get before first register access and a last_busy + put after
-last access.
-If I understand this correct, it should do nothing as long as
-pm_runtime_use_autosuspend() + pm_runtime_enable() isn't invoked on the
-device.
+So after I stuffed the rs485 support from the omap-serial into
+8250-omap, I've been looking at it and the only omap specific part was
+the OMAP_UART_SCR_TX_EMPTY part. The driver has always TX_EMPTY set
+because the 8250 core expects an interrupt after the TX fifo + shift
+register is empty. The rs485 parts seems to wait for half fifo and then
+again for the empty fifo. With this change gone it fits fine as generic
+code and here it is.
 
-Cc: mika.westerberg at linux.intel.com
+It is expected that the potential rs485 user invokes
+serial_omap_probe_rs485() to configure atleast RTS gpio which is a must
+have property. The code has been taken from omap-serial driver and
+received limited tested due to -ENODEV (the compiler said it works).
+
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250_core.c | 101 +++++++++++++++++++++++++++++++-----
- 1 file changed, 88 insertions(+), 13 deletions(-)
+ drivers/tty/serial/8250/8250_core.c | 171 ++++++++++++++++++++++++++++++++++++
+ include/linux/serial_8250.h         |   6 ++
+ 2 files changed, 177 insertions(+)
 
 diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index d37eb08..1a91a89 100644
+index c7c3bf7..bf06a4c 100644
 --- a/drivers/tty/serial/8250/8250_core.c
 +++ b/drivers/tty/serial/8250/8250_core.c
-@@ -38,6 +38,7 @@
- #include <linux/nmi.h>
+@@ -39,6 +39,8 @@
  #include <linux/mutex.h>
  #include <linux/slab.h>
-+#include <linux/pm_runtime.h>
+ #include <linux/pm_runtime.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
  #ifdef CONFIG_SPARC
  #include <linux/sunserialcore.h>
  #endif
-@@ -553,10 +554,11 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
- 	 * offset but the UART channel may only write to the corresponding
- 	 * bit.
- 	 */
-+	pm_runtime_get_sync(p->port.dev);
- 	if ((p->port.type == PORT_XR17V35X) ||
- 	   (p->port.type == PORT_XR17D15X)) {
- 		serial_out(p, UART_EXAR_SLEEP, sleep ? 0xff : 0);
--		return;
-+		goto out;
- 	}
+@@ -1281,10 +1283,34 @@ static void autoconfig_irq(struct uart_8250_port *up)
  
- 	if (p->capabilities & UART_CAP_SLEEP) {
-@@ -571,7 +573,17 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
- 			serial_out(p, UART_EFR, 0);
- 			serial_out(p, UART_LCR, 0);
- 		}
+ static inline void __stop_tx(struct uart_8250_port *p)
+ {
++	if (p->rs485.flags & SER_RS485_ENABLED) {
++		int ret;
 +
-+		if (!device_may_wakeup(p->port.dev)) {
-+			if (sleep)
-+				pm_runtime_forbid(p->port.dev);
-+			else
-+				pm_runtime_allow(p->port.dev);
++		ret = (p->rs485.flags & SER_RS485_RTS_AFTER_SEND) ? 1 : 0;
++		if (gpio_get_value(p->rts_gpio) != ret) {
++			if (p->rs485.delay_rts_after_send > 0)
++				mdelay(p->rs485.delay_rts_after_send);
++			gpio_set_value(p->rts_gpio, ret);
 +		}
- 	}
-+out:
-+	pm_runtime_mark_last_busy(p->port.dev);
-+	pm_runtime_put_autosuspend(p->port.dev);
- }
- 
- #ifdef CONFIG_SERIAL_8250_RSA
-@@ -1280,6 +1292,7 @@ static void serial8250_stop_tx(struct uart_port *port)
- 	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
- 
-+	pm_runtime_get_sync(port->dev);
- 	__stop_tx(up);
- 
- 	/*
-@@ -1289,6 +1302,8 @@ static void serial8250_stop_tx(struct uart_port *port)
- 		up->acr |= UART_ACR_TXDIS;
- 		serial_icr_write(up, UART_ACR, up->acr);
- 	}
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- }
- 
- static void serial8250_start_tx(struct uart_port *port)
-@@ -1296,8 +1311,9 @@ static void serial8250_start_tx(struct uart_port *port)
- 	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
- 
-+	pm_runtime_get_sync(port->dev);
- 	if (up->dma && !serial8250_tx_dma(up)) {
--		return;
-+		goto out;
- 	} else if (!(up->ier & UART_IER_THRI)) {
- 		up->ier |= UART_IER_THRI;
- 		serial_port_out(port, UART_IER, up->ier);
-@@ -1318,6 +1334,9 @@ static void serial8250_start_tx(struct uart_port *port)
- 		up->acr &= ~UART_ACR_TXDIS;
- 		serial_icr_write(up, UART_ACR, up->acr);
- 	}
-+out:
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- }
- 
- static void serial8250_stop_rx(struct uart_port *port)
-@@ -1325,9 +1344,14 @@ static void serial8250_stop_rx(struct uart_port *port)
- 	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
- 
-+	pm_runtime_get_sync(port->dev);
-+
- 	up->ier &= ~UART_IER_RLSI;
- 	up->port.read_status_mask &= ~UART_LSR_DR;
- 	serial_port_out(port, UART_IER, up->ier);
-+
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- }
- 
- static void serial8250_enable_ms(struct uart_port *port)
-@@ -1340,7 +1364,10 @@ static void serial8250_enable_ms(struct uart_port *port)
- 		return;
- 
- 	up->ier |= UART_IER_MSI;
-+	pm_runtime_get_sync(port->dev);
- 	serial_port_out(port, UART_IER, up->ier);
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- }
- 
- /*
-@@ -1530,9 +1557,17 @@ EXPORT_SYMBOL_GPL(serial8250_handle_irq);
- 
- static int serial8250_default_handle_irq(struct uart_port *port)
- {
--	unsigned int iir = serial_port_in(port, UART_IIR);
-+	unsigned int iir;
-+	int ret;
- 
--	return serial8250_handle_irq(port, iir);
-+	pm_runtime_get_sync(port->dev);
-+
-+	iir = serial_port_in(port, UART_IIR);
-+	ret = serial8250_handle_irq(port, iir);
-+
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
-+	return ret;
- }
- 
- /*
-@@ -1790,11 +1825,16 @@ static unsigned int serial8250_tx_empty(struct uart_port *port)
- 	unsigned long flags;
- 	unsigned int lsr;
- 
-+	pm_runtime_get_sync(port->dev);
-+
- 	spin_lock_irqsave(&port->lock, flags);
- 	lsr = serial_port_in(port, UART_LSR);
- 	up->lsr_saved_flags |= lsr & LSR_SAVE_FLAGS;
- 	spin_unlock_irqrestore(&port->lock, flags);
- 
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
-+
- 	return (lsr & BOTH_EMPTY) == BOTH_EMPTY ? TIOCSER_TEMT : 0;
- }
- 
-@@ -1805,7 +1845,10 @@ static unsigned int serial8250_get_mctrl(struct uart_port *port)
- 	unsigned int status;
- 	unsigned int ret;
- 
-+	pm_runtime_get_sync(port->dev);
- 	status = serial8250_modem_status(up);
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- 
- 	ret = 0;
- 	if (status & UART_MSR_DCD)
-@@ -1838,7 +1881,10 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
- 
- 	mcr = (mcr & up->mcr_mask) | up->mcr_force | up->mcr;
- 
-+	pm_runtime_get_sync(port->dev);
- 	serial_port_out(port, UART_MCR, mcr);
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- }
- 
- static void serial8250_break_ctl(struct uart_port *port, int break_state)
-@@ -1847,6 +1893,7 @@ static void serial8250_break_ctl(struct uart_port *port, int break_state)
- 		container_of(port, struct uart_8250_port, port);
- 	unsigned long flags;
- 
-+	pm_runtime_get_sync(port->dev);
- 	spin_lock_irqsave(&port->lock, flags);
- 	if (break_state == -1)
- 		up->lcr |= UART_LCR_SBC;
-@@ -1854,6 +1901,8 @@ static void serial8250_break_ctl(struct uart_port *port, int break_state)
- 		up->lcr &= ~UART_LCR_SBC;
- 	serial_port_out(port, UART_LCR, up->lcr);
- 	spin_unlock_irqrestore(&port->lock, flags);
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- }
- 
- /*
-@@ -1898,12 +1947,23 @@ static void wait_for_xmitr(struct uart_8250_port *up, int bits)
- 
- static int serial8250_get_poll_char(struct uart_port *port)
- {
--	unsigned char lsr = serial_port_in(port, UART_LSR);
-+	unsigned char lsr;
-+	int status;
-+
-+	pm_runtime_get_sync(port->dev);
- 
--	if (!(lsr & UART_LSR_DR))
--		return NO_POLL_CHAR;
-+	lsr = serial_port_in(port, UART_LSR);
- 
--	return serial_port_in(port, UART_RX);
-+	if (!(lsr & UART_LSR_DR)) {
-+		status = NO_POLL_CHAR;
-+		goto out;
 +	}
 +
-+	status = serial_port_in(port, UART_RX);
-+out:
-+	pm_runtime_mark_last_busy(up->dev);
-+	pm_runtime_put_autosuspend(up->dev);
-+	return status;
- }
- 
- 
-@@ -1914,6 +1974,7 @@ static void serial8250_put_poll_char(struct uart_port *port,
- 	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
- 
-+	pm_runtime_get_sync(up->dev);
- 	/*
- 	 *	First save the IER then disable the interrupts
- 	 */
-@@ -1935,6 +1996,9 @@ static void serial8250_put_poll_char(struct uart_port *port,
- 	 */
- 	wait_for_xmitr(up, BOTH_EMPTY);
- 	serial_port_out(port, UART_IER, ier);
-+	pm_runtime_mark_last_busy(up->dev);
-+	pm_runtime_put_autosuspend(up->dev);
+ 	if (p->ier & UART_IER_THRI) {
+ 		p->ier &= ~UART_IER_THRI;
+ 		serial_out(p, UART_IER, p->ier);
+ 	}
 +
++	if ((p->rs485.flags & SER_RS485_ENABLED) &&
++			!(p->rs485.flags & SER_RS485_RX_DURING_TX)) {
++		/*
++		 * Empty the RX FIFO, we are not interested in anything
++		 * received during the half-duplex transmission.
++		 */
++		serial_out(p, UART_FCR, p->fcr | UART_FCR_CLEAR_RCVR);
++		/* Re-enable RX interrupts */
++		p->ier |= UART_IER_RLSI | UART_IER_RDI;
++		p->port.read_status_mask |= UART_LSR_DR;
++		serial_out(p, UART_IER, p->ier);
++	}
  }
  
- #endif /* CONFIG_CONSOLE_POLL */
-@@ -1961,6 +2025,7 @@ int serial8250_do_startup(struct uart_port *port)
- 	if (port->iotype != up->cur_iotype)
- 		set_io_from_upio(port);
+ static void serial8250_stop_tx(struct uart_port *port)
+@@ -1330,6 +1356,20 @@ static void serial8250_start_tx(struct uart_port *port)
+ 	if (up->dma && !serial8250_tx_dma(up)) {
+ 		goto out;
+ 	} else if (!(up->ier & UART_IER_THRI)) {
++
++		if (up->rs485.flags & SER_RS485_ENABLED) {
++			int ret;
++
++			ret = (up->rs485.flags & SER_RS485_RTS_ON_SEND) ? 1 : 0;
++			if (gpio_get_value(up->rts_gpio) != ret) {
++				gpio_set_value(up->rts_gpio, ret);
++				if (up->rs485.delay_rts_before_send > 0)
++					mdelay(up->rs485.delay_rts_before_send);
++			}
++			if (!(up->rs485.flags & SER_RS485_RX_DURING_TX))
++				serial8250_stop_rx(port);
++		}
++
+ 		up->ier |= UART_IER_THRI;
+ 		serial_port_out(port, UART_IER, up->ier);
  
-+	pm_runtime_get_sync(port->dev);
- 	if (port->type == PORT_16C950) {
- 		/* Wake up and initialize UART */
- 		up->acr = 0;
-@@ -1981,7 +2046,6 @@ int serial8250_do_startup(struct uart_port *port)
- 	 */
- 	enable_rsa(up);
- #endif
--
- 	/*
- 	 * Clear the FIFO buffers and disable them.
- 	 * (they will be reenabled in set_termios())
-@@ -2005,7 +2069,8 @@ int serial8250_do_startup(struct uart_port *port)
- 	    (serial_port_in(port, UART_LSR) == 0xff)) {
- 		printk_ratelimited(KERN_INFO "ttyS%d: LSR safety check engaged!\n",
- 				   serial_index(port));
--		return -ENODEV;
-+		retval = -ENODEV;
-+		goto out;
+@@ -2556,6 +2596,7 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			serial_port_out(port, UART_FCR, UART_FCR_ENABLE_FIFO);
+ 		serial_port_out(port, UART_FCR, fcr);		/* set fcr */
  	}
- 
- 	/*
-@@ -2090,7 +2155,7 @@ int serial8250_do_startup(struct uart_port *port)
- 	} else {
- 		retval = serial_link_irq_chain(up);
- 		if (retval)
--			return retval;
-+			goto out;
- 	}
- 
- 	/*
-@@ -2188,8 +2253,11 @@ int serial8250_do_startup(struct uart_port *port)
- 		outb_p(0x80, icp);
- 		inb_p(icp);
- 	}
--
--	return 0;
-+	retval = 0;
-+out:
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
-+	return retval;
- }
- EXPORT_SYMBOL_GPL(serial8250_do_startup);
- 
-@@ -2207,6 +2275,7 @@ void serial8250_do_shutdown(struct uart_port *port)
- 		container_of(port, struct uart_8250_port, port);
- 	unsigned long flags;
- 
-+	pm_runtime_get_sync(port->dev);
- 	/*
- 	 * Disable interrupts from this port
- 	 */
-@@ -2246,6 +2315,8 @@ void serial8250_do_shutdown(struct uart_port *port)
- 	 * the IRQ chain.
- 	 */
- 	serial_port_in(port, UART_RX);
-+	pm_runtime_mark_last_busy(port->dev);
-+	pm_runtime_put_autosuspend(port->dev);
- 
- 	del_timer_sync(&up->timer);
- 	up->timer.function = serial8250_timeout;
-@@ -2365,6 +2436,7 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
- 	 * Ok, we're now changing the port state.  Do it with
- 	 * interrupts disabled.
- 	 */
-+	pm_runtime_get_sync(port->dev);
- 	spin_lock_irqsave(&port->lock, flags);
- 
- 	/*
-@@ -2486,6 +2558,9 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
- 	}
++	up->fcr = fcr;
  	serial8250_set_mctrl(port, port->mctrl);
  	spin_unlock_irqrestore(&port->lock, flags);
+ 	pm_runtime_mark_last_busy(port->dev);
+@@ -2811,6 +2852,124 @@ serial8250_verify_port(struct uart_port *port, struct serial_struct *ser)
+ 	return 0;
+ }
+ 
++int serial8250_probe_rs485(struct uart_8250_port *up,
++		struct device *dev)
++{
++	struct serial_rs485 *rs485conf = &up->rs485;
++	struct device_node *np = dev->of_node;
++	u32 rs485_delay[2];
++	enum of_gpio_flags flags;
++	int ret;
++
++	rs485conf->flags = 0;
++	if (!np)
++		return 0;
++
++	/* check for tx enable gpio */
++	up->rts_gpio = of_get_named_gpio_flags(np, "rts-gpio", 0, &flags);
++	if (up->rts_gpio == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++	if (!gpio_is_valid(up->rts_gpio))
++		return 0;
++
++	ret = devm_gpio_request(dev, up->rts_gpio, "serial_rts");
++	if (ret < 0)
++		return ret;
++	ret = gpio_direction_output(up->rts_gpio,
++			flags & SER_RS485_RTS_AFTER_SEND);
++	if (ret < 0)
++		return ret;
++
++	up->rts_gpio_valid = true;
++
++	if (of_property_read_bool(np, "rs485-rts-active-high"))
++		rs485conf->flags |= SER_RS485_RTS_ON_SEND;
++	else
++		rs485conf->flags |= SER_RS485_RTS_AFTER_SEND;
++
++	if (of_property_read_u32_array(np, "rs485-rts-delay",
++				rs485_delay, 2) == 0) {
++		rs485conf->delay_rts_before_send = rs485_delay[0];
++		rs485conf->delay_rts_after_send = rs485_delay[1];
++	}
++
++	if (of_property_read_bool(np, "rs485-rx-during-tx"))
++		rs485conf->flags |= SER_RS485_RX_DURING_TX;
++
++	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
++		rs485conf->flags |= SER_RS485_ENABLED;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(serial8250_probe_rs485);
++
++static void serial8250_config_rs485(struct uart_port *port,
++		struct serial_rs485 *rs485conf)
++{
++	struct uart_8250_port *up =
++		container_of(port, struct uart_8250_port, port);
++	unsigned long flags;
++	unsigned int mode;
++	int val;
++
++	pm_runtime_get_sync(port->dev);
++	spin_lock_irqsave(&up->port.lock, flags);
++
++	/* Disable interrupts from this port */
++	mode = up->ier;
++	up->ier = 0;
++	serial_out(up, UART_IER, 0);
++
++	/* store new config */
++	up->rs485 = *rs485conf;
++
++	/* enable / disable rts */
++	val = (up->rs485.flags & SER_RS485_ENABLED) ?
++		SER_RS485_RTS_AFTER_SEND : SER_RS485_RTS_ON_SEND;
++	val = (up->rs485.flags & val) ? 1 : 0;
++	gpio_set_value(up->rts_gpio, val);
++
++	/* Enable interrupts */
++	up->ier = mode;
++	serial_out(up, UART_IER, up->ier);
++
++	spin_unlock_irqrestore(&up->port.lock, flags);
 +	pm_runtime_mark_last_busy(port->dev);
 +	pm_runtime_put_autosuspend(port->dev);
++}
 +
- 	/* Don't rewrite B0 */
- 	if (tty_termios_baud_rate(termios))
- 		tty_termios_encode_baud_rate(termios, baud, baud);
++static int serial8250_ioctl(struct uart_port *port, unsigned int cmd,
++		unsigned long arg)
++{
++	struct serial_rs485 rs485conf;
++	struct uart_8250_port *up;
++
++	up = container_of(port, struct uart_8250_port, port);
++	switch (cmd) {
++	case TIOCSRS485:
++		if (!gpio_is_valid(up->rts_gpio))
++			return -ENODEV;
++		if (copy_from_user(&rs485conf, (void __user *) arg,
++					sizeof(rs485conf)))
++			return -EFAULT;
++
++		serial8250_config_rs485(port, &rs485conf);
++		break;
++
++	case TIOCGRS485:
++		if (!gpio_is_valid(up->rts_gpio))
++			return -ENODEV;
++		if (copy_to_user((void __user *) arg, &up->rs485,
++					sizeof(rs485conf)))
++			return -EFAULT;
++		break;
++
++	default:
++		return -ENOIOCTLCMD;
++	}
++	return 0;
++}
++
+ static const char *
+ serial8250_type(struct uart_port *port)
+ {
+@@ -2840,6 +2999,7 @@ static struct uart_ops serial8250_pops = {
+ 	.request_port	= serial8250_request_port,
+ 	.config_port	= serial8250_config_port,
+ 	.verify_port	= serial8250_verify_port,
++	.ioctl		= serial8250_ioctl,
+ #ifdef CONFIG_CONSOLE_POLL
+ 	.poll_get_char = serial8250_get_poll_char,
+ 	.poll_put_char = serial8250_put_poll_char,
+@@ -3375,6 +3535,17 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
+ 		uart->tx_loadsz		= up->tx_loadsz;
+ 		uart->capabilities	= up->capabilities;
+ 
++		/*
++		 * gpio_is_valid() is nice but if this struct wasn't initialized
++		 * then it is 0 which is considered as valid. With the ioctl()
++		 * which can enable the rs485 routine we could abuse a gpio.
++		 */
++		if (up->rts_gpio_valid) {
++			uart->rs485		= up->rs485;
++			uart->rts_gpio		= up->rts_gpio;
++		} else
++			uart->rts_gpio = -EINVAL;
++
+ 		/* Take tx_loadsz from fifosize if it wasn't set separately */
+ 		if (uart->port.fifosize && !uart->tx_loadsz)
+ 			uart->tx_loadsz = uart->port.fifosize;
+diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
+index 0ec21ec..056a73f 100644
+--- a/include/linux/serial_8250.h
++++ b/include/linux/serial_8250.h
+@@ -78,6 +78,7 @@ struct uart_8250_port {
+ 	unsigned char		acr;
+ 	unsigned char		ier;
+ 	unsigned char		lcr;
++	unsigned char		fcr;
+ 	unsigned char		mcr;
+ 	unsigned char		mcr_mask;	/* mask of user bits */
+ 	unsigned char		mcr_force;	/* mask of forced bits */
+@@ -94,6 +95,9 @@ struct uart_8250_port {
+ 	unsigned char		msr_saved_flags;
+ 
+ 	struct uart_8250_dma	*dma;
++	struct serial_rs485	rs485;
++	int			rts_gpio;
++	bool			rts_gpio_valid;
+ 
+ 	/* 8250 specific callbacks */
+ 	int			(*dl_read)(struct uart_8250_port *);
+@@ -107,6 +111,8 @@ void serial8250_resume_port(int line);
+ 
+ extern int early_serial_setup(struct uart_port *port);
+ 
++extern int serial8250_probe_rs485(struct uart_8250_port *up,
++		struct device *dev);
+ extern int serial8250_find_port(struct uart_port *p);
+ extern int serial8250_find_port_for_earlycon(void);
+ extern unsigned int serial8250_early_in(struct uart_port *port, int offset);
 -- 
 2.0.1
