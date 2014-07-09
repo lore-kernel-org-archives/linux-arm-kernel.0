@@ -1,171 +1,198 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  9 Jul 2014 15:40:09 +0200
-Subject: [PATCHv2 05/17] ARM: mvebu: rename the armada_370_xp symbols to
- mvebu_v7 in pmsu.c
+Date: Wed,  9 Jul 2014 15:40:20 +0200
+Subject: [PATCHv2 16/17] ARM: mvebu: add cpuidle support for Armada 38x
 In-Reply-To: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1404913221-17343-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1404913221-17343-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Most of the function related to the PMSU are not specific to the
-Armada 370 or Armada XP SoCs. They can also be used for most of the
-other mvebu ARMv7 SoCs, and will actually be used to support cpuidle
-on Armada 38x.
+Unlike the Armada XP and the Armada 370, this SoC uses a Cortex A9
+core. Consequently, the procedure to enter the idle state is
+different: interaction with the SCU, not disabling snooping, etc.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.h |  1 -
- arch/arm/mach-mvebu/platsmp.c       |  2 +-
- arch/arm/mach-mvebu/pmsu.c          | 34 +++++++++++++++++-----------------
- arch/arm/mach-mvebu/pmsu.h          |  2 ++
- 4 files changed, 20 insertions(+), 19 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c    | 89 ++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-mvebu/pmsu_ll.S | 14 +++++++
+ 2 files changed, 102 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 52c1603a..84cd90d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -25,6 +25,5 @@ extern struct smp_operations armada_xp_smp_ops;
- #endif
- 
- int armada_370_xp_pmsu_idle_enter(unsigned long deepidle);
--void armada_370_xp_pmsu_idle_exit(void);
- 
- #endif /* __MACH_ARMADA_370_XP_H */
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index b6fa9f0..6da2b72 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -108,7 +108,7 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-  */
- static void armada_xp_secondary_init(unsigned int cpu)
- {
--	armada_370_xp_pmsu_idle_exit();
-+	mvebu_v7_pmsu_idle_exit();
- }
- 
- static void __init armada_xp_smp_init_cpus(void)
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 272a9c05..501d450 100644
+index 7c3d3e1..f32749e 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -73,7 +73,7 @@ extern void ll_enable_coherency(void);
+@@ -31,6 +31,7 @@
+ #include <linux/smp.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
++#include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/tlbflush.h>
+@@ -65,6 +66,18 @@
+ #define L2C_NFABRIC_PM_CTL		    0x4
+ #define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
+ 
++/* PMSU delay registers */
++#define PMSU_POWERDOWN_DELAY		    0xF04
++#define PMSU_POWERDOWN_DELAY_PMU		BIT(1)
++#define PMSU_POWERDOWN_DELAY_MASK		0xFFFE
++#define PMSU_DFLT_ARMADA38X_DELAY	        0x64
++
++/* CA9 MPcore SoC Control registers */
++
++#define MPCORE_RESET_CTL		    0x64
++#define MPCORE_RESET_CTL_L2			BIT(0)
++#define MPCORE_RESET_CTL_DEBUG			BIT(16)
++
+ #define SRAM_PHYS_BASE  0xFFFF0000
+ #define BOOTROM_BASE    0xFFF00000
+ #define BOOTROM_SIZE    0x100000
+@@ -76,6 +89,8 @@ extern void ll_disable_coherency(void);
+ extern void ll_enable_coherency(void);
  
  extern void armada_370_xp_cpu_resume(void);
- 
--static struct platform_device armada_xp_cpuidle_device = {
-+static struct platform_device mvebu_v7_cpuidle_device = {
- 	.name = "cpuidle-armada-370-xp",
- };
- 
-@@ -132,7 +132,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
- 	return 0;
- }
- 
--static int __init armada_370_xp_pmsu_init(void)
-+static int __init mvebu_v7_pmsu_init(void)
- {
- 	struct device_node *np;
- 	struct resource res;
-@@ -176,7 +176,7 @@ static int __init armada_370_xp_pmsu_init(void)
- 	return ret;
- }
- 
--static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
-+static void mvebu_v7_pmsu_enable_l2_powerdown_onidle(void)
- {
- 	u32 reg;
- 
-@@ -190,7 +190,7 @@ static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
- }
- 
- /* No locking is needed because we only access per-CPU registers */
--static int armada_370_xp_prepare(unsigned long deepidle)
-+static int mvebu_v7_pmsu_idle_prepare(bool deepidle)
- {
- 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 	u32 reg;
-@@ -233,7 +233,7 @@ int armada_370_xp_pmsu_idle_enter(unsigned long deepidle)
- {
- 	int ret;
- 
--	ret = armada_370_xp_prepare(deepidle);
-+	ret = mvebu_v7_pmsu_idle_prepare(deepidle);
- 	if (ret)
- 		return ret;
- 
-@@ -272,7 +272,7 @@ static int armada_370_xp_cpu_suspend(unsigned long deepidle)
- }
- 
- /* No locking is needed because we only access per-CPU registers */
--void armada_370_xp_pmsu_idle_exit(void)
-+void mvebu_v7_pmsu_idle_exit(void)
- {
- 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 	u32 reg;
-@@ -294,24 +294,24 @@ void armada_370_xp_pmsu_idle_exit(void)
- 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
- }
- 
--static int armada_370_xp_cpu_pm_notify(struct notifier_block *self,
-+static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
- 				    unsigned long action, void *hcpu)
- {
- 	if (action == CPU_PM_ENTER) {
- 		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
- 	} else if (action == CPU_PM_EXIT) {
--		armada_370_xp_pmsu_idle_exit();
-+		mvebu_v7_pmsu_idle_exit();
- 	}
- 
- 	return NOTIFY_OK;
- }
- 
--static struct notifier_block armada_370_xp_cpu_pm_notifier = {
--	.notifier_call = armada_370_xp_cpu_pm_notify,
-+static struct notifier_block mvebu_v7_cpu_pm_notifier = {
-+	.notifier_call = mvebu_v7_cpu_pm_notify,
- };
- 
--static int __init armada_370_xp_cpu_pm_init(void)
-+static int __init mvebu_v7_cpu_pm_init(void)
- {
- 	struct device_node *np;
- 
-@@ -334,13 +334,13 @@ static int __init armada_370_xp_cpu_pm_init(void)
- 		return 0;
- 	of_node_put(np);
- 
--	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
--	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
--	platform_device_register(&armada_xp_cpuidle_device);
--	cpu_pm_register_notifier(&armada_370_xp_cpu_pm_notifier);
-+	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
-+	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
-+	platform_device_register(&mvebu_v7_cpuidle_device);
-+	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
- 
- 	return 0;
- }
- 
--arch_initcall(armada_370_xp_cpu_pm_init);
--early_initcall(armada_370_xp_pmsu_init);
-+arch_initcall(mvebu_v7_cpu_pm_init);
-+early_initcall(mvebu_v7_pmsu_init);
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index ae50194..6b58c1f 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -16,4 +16,6 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
-                              unsigned int crypto_eng_attribute,
-                              phys_addr_t resume_addr_reg);
- 
-+void mvebu_v7_pmsu_idle_exit(void);
++extern void armada_38x_cpu_resume(void);
 +
- #endif	/* __MACH_370_XP_PMSU_H */
+ static phys_addr_t pmsu_mp_phys_base;
+ static void __iomem *pmsu_mp_base;
+ 
+@@ -289,6 +304,32 @@ static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+ 	return cpu_suspend(deepidle, armada_370_xp_pmsu_idle_enter);
+ }
+ 
++static int armada_38x_do_cpu_suspend(unsigned long deepidle)
++{
++	unsigned long flags = 0;
++
++	if (deepidle)
++		flags |= PMSU_PREPARE_DEEP_IDLE;
++
++	mvebu_v7_pmsu_idle_prepare(flags);
++	/*
++	 * Already flushed cache, but do it again as the outer cache
++	 * functions dirty the cache with spinlocks
++	 */
++	v7_exit_coherency_flush(louis);
++
++	scu_power_mode(mvebu_get_scu_base(), SCU_PM_POWEROFF);
++
++	cpu_do_idle();
++
++	return 1;
++}
++
++static int armada_38x_cpu_suspend(unsigned long deepidle)
++{
++	return cpu_suspend(false, armada_38x_do_cpu_suspend);
++}
++
+ /* No locking is needed because we only access per-CPU registers */
+ void mvebu_v7_pmsu_idle_exit(void)
+ {
+@@ -297,7 +338,6 @@ void mvebu_v7_pmsu_idle_exit(void)
+ 
+ 	if (pmsu_mp_base == NULL)
+ 		return;
+-
+ 	/* cancel ask HW to power down the L2 Cache if possible */
+ 	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
+ 	reg &= ~PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
+@@ -334,6 +374,11 @@ static struct mvebu_v7_cpuidle armada_370_cpuidle = {
+ 	.cpu_suspend = armada_370_xp_cpu_suspend,
+ };
+ 
++static struct mvebu_v7_cpuidle armada_38x_cpuidle = {
++	.type = CPUIDLE_ARMADA_38X,
++	.cpu_suspend = armada_38x_cpu_suspend,
++};
++
+ static struct mvebu_v7_cpuidle armada_xp_cpuidle = {
+ 	.type = CPUIDLE_ARMADA_XP,
+ 	.cpu_suspend = armada_370_xp_cpu_suspend,
+@@ -372,6 +417,46 @@ static __init int armada_370_cpuidle_init(void)
+ 	return 0;
+ }
+ 
++static __init int armada_38x_cpuidle_init(void)
++{
++	struct device_node *np;
++	void __iomem *mpsoc_base;
++	u32 reg;
++
++	np = of_find_compatible_node(NULL, NULL,
++				     "marvell,armada-380-coherency-fabric");
++	if (!np)
++		return -ENODEV;
++	of_node_put(np);
++
++	np = of_find_compatible_node(NULL, NULL,
++				     "marvell,armada-380-mpcore-soc-ctrl");
++	if (!np)
++		return -ENODEV;
++	mpsoc_base = of_iomap(np, 0);
++	BUG_ON(!mpsoc_base);
++	of_node_put(np);
++
++	/* Set up reset mask when powering down the cpus */
++	reg = readl(mpsoc_base + MPCORE_RESET_CTL);
++	reg |= MPCORE_RESET_CTL_L2;
++	reg |= MPCORE_RESET_CTL_DEBUG;
++	writel(reg, mpsoc_base + MPCORE_RESET_CTL);
++	iounmap(mpsoc_base);
++
++	/* Set up delay */
++	reg = readl(pmsu_mp_base + PMSU_POWERDOWN_DELAY);
++	reg &= ~PMSU_POWERDOWN_DELAY_MASK;
++	reg |= PMSU_DFLT_ARMADA38X_DELAY;
++	reg |= PMSU_POWERDOWN_DELAY_PMU;
++	writel(reg, pmsu_mp_base + PMSU_POWERDOWN_DELAY);
++
++	mvebu_cpu_resume = armada_38x_cpu_resume;
++	mvebu_v7_cpuidle_device.dev.platform_data = &armada_38x_cpuidle;
++
++	return 0;
++}
++
+ static __init int armada_xp_cpuidle_init(void)
+ {
+ 	struct device_node *np;
+@@ -400,6 +485,8 @@ static int __init mvebu_v7_cpu_pm_init(void)
+ 		ret = armada_xp_cpuidle_init();
+ 	else if (of_machine_is_compatible("marvell,armada370"))
+ 		ret = armada_370_cpuidle_init();
++	else if (of_machine_is_compatible("marvell,armada380"))
++		ret = armada_38x_cpuidle_init();
+ 	else
+ 		return 0;
+ 
+diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
+index 17d7f3b..a945756 100644
+--- a/arch/arm/mach-mvebu/pmsu_ll.S
++++ b/arch/arm/mach-mvebu/pmsu_ll.S
+@@ -23,6 +23,20 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
+ 	b	cpu_resume
+ ENDPROC(armada_370_xp_cpu_resume)
+ 
++ENTRY(armada_38x_cpu_resume)
++	/* do we need it for Armada 38x*/
++ARM_BE8(setend	be )			@ go BE8 if entered LE
++	bl	v7_invalidate_l1
++	mrc     p15, 4, r1, c15, c0	@ get SCU base address
++	orr	r1, r1, #0x8		@ SCU CPU Power Status Register
++	mrc	15, 0, r0, cr0, cr0, 5	@ get the CPU ID
++	and	r0, r0, #15
++	add	r1, r1, r0
++	mov	r0, #0x0
++	strb	r0, [r1]		@ switch SCU power state to Normal mode
++	b	cpu_resume
++ENDPROC(armada_38x_cpu_resume)
++
+ .global mvebu_boot_wa_start
+ .global mvebu_boot_wa_end
+ 
 -- 
 2.0.0
