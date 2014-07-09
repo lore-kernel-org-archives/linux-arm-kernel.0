@@ -1,76 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Jul 2014 17:39:17 +0100
-Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
-In-Reply-To: <1404915184.4256.160.camel@ul30vt.home>
-References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
- <1404125530-17984-3-git-send-email-will.deacon@arm.com>
- <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140709132653.GM9485@arm.com>
- <1404915184.4256.160.camel@ul30vt.home>
-Message-ID: <20140709163917.GU9485@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 9 Jul 2014 18:44:28 +0200
+Subject: [PATCH v3 0/7] ARM: at91: move aic driver to drivers/irqchips
+In-Reply-To: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53BD716C.6080504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 03:13:04PM +0100, Alex Williamson wrote:
-> On Wed, 2014-07-09 at 14:26 +0100, Will Deacon wrote:
-> > [Adding Alex; question below]
-> > 
-> > On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
-> > > > +static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void
-> > > > +*data) {
-> > > > +     *((u16 *)data) = alias;
-> > > > +     return 0; /* Continue walking */
-> > > > +}
-> > 
-> > [...]
-> > 
-> > > > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
-> > > > *dev)
-> > > >               return PTR_ERR(group);
-> > > >       }
-> > > >
-> > > > +     if (dev_is_pci(dev)) {
-> > > > +             struct arm_smmu_master_cfg *cfg;
-> > > > +             struct pci_dev *pdev = to_pci_dev(dev);
-> > > > +
-> > > > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> > > > +             if (!cfg) {
-> > > > +                     ret = -ENOMEM;
-> > > > +                     goto out_put_group;
-> > > > +             }
-> > > > +
-> > > > +             cfg->num_streamids = 1;
-> > > > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
-> > > > +                                    &cfg->streamids[0]);
-> > > [Sethi Varun-B16395] We need to look for upstream DMA device. We should be
-> > > using pci_find_dma_isolation_root here. Also, this would also imply that
-> > > there could be multiple devices sharing the same stream ID. So, we should
-> > > check if a particular stream ID value has already been configured in the
-> > > SMR registers.
-> > 
-> > pci_find_dma_isolation_root doesn't exist in any of the trees I have. Alex,
-> > is this queued anywhere and do I actually need it?
+On 20/06/2014 17:01, Boris BREZILLON :
+> Hello,
 > 
-> That function was in the v3 DMA alias series, in v4 it got replaced.
-> iommu_group_get_for_pci_dev() is the common function for finding or
-> creating a group for a device and pci_for_each_dma_alias() is the
-> interface to walk each alias in a PCI topology.  The pci_ interface is
-> in 3.16-rc and the iommu_ pieces are current in next via the iommu tree.
-
-Cheers, Alex. I'll move my driver to using iommu_group_get_for_pci_dev once
-that's hit mainline (since I currently put each master into its own group).
-
-> > The purpose of this code is to find the requester ID of a device as it
-> > appears at the host controller. At this point, we can map it (via firmware
-> > tables that are TBD) to a Stream ID for the SMMU. It looks to me like
-> > pci_for_each_dma_alias walks over non-transparent PCI bridges correctly, so
-> > the callback I provide just updates the alias until the walk has completed.
+> This series moves the AIC driver to the irqchip directory and make use of
+> the generic chip framework whenever possible.
 > 
-> Yep, that's the intended usage.  There are cases in VT-d where it wants
-> to add context entries for every alias and cases elsewhere that we just
-> want the final alias.  pci_for_each_dma_alias() is meant to fit both use
-> cases.  Thanks,
+> This driver only support DT boards (all legacy board files should be soon
+> replaced by their DT versions).
+> 
+> Best Regards,
 
-Cracking, cheers for confirming.
+I repeat here for clarity:
 
-Will
+Boris,
+Once the AIC and AIC5 drivers are split, you can add my:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+And send the whole series to Jason.
+
+Jason,
+like you said in your response to patch #3/7, we can share a topic
+branch so that both arm-soc and yourself have this material in our trees
+and can go forward with other patch series on top of this one...
+
+Thanks for your work and review. Bye,
+
+
+> Changes since v2:
+>  - remove irq line muxing definition
+>  - rework Kconfig options
+> 
+> Changes since v1:
+>  - rework the irq-mux bindings
+> 
+> Boris BREZILLON (7):
+>   genirq: generic chip: export irq_map_generic_chip function
+>   irqchip: atmel-aic: move binding doc to interrupt-controller directory
+>   irqchip: atmel-aic: add new atmel AIC driver
+>   ARM: at91: introduce OLD_IRQ_AT91 Kconfig option
+>   ARM: at91: enclose at91_aic_xx calls in
+>     IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks
+>   ARM: at91: make use of the new AIC driver for dt enabled boards
+>   ARM: at91: remove old irq material
+> 
+>  .../devicetree/bindings/arm/atmel-aic.txt          |  42 --
+>  .../bindings/interrupt-controller/atmel,aic.txt    |  42 ++
+>  arch/arm/mach-at91/Kconfig                         |  17 +-
+>  arch/arm/mach-at91/Kconfig.non_dt                  |   6 +
+>  arch/arm/mach-at91/Makefile                        |   3 +-
+>  arch/arm/mach-at91/board-dt-rm9200.c               |  13 -
+>  arch/arm/mach-at91/board-dt-sam9.c                 |  13 -
+>  arch/arm/mach-at91/board-dt-sama5.c                |  13 -
+>  arch/arm/mach-at91/irq.c                           | 270 +-------
+>  arch/arm/mach-at91/pm.c                            |  32 +-
+>  arch/arm/mach-at91/setup.c                         |   3 +-
+>  drivers/irqchip/Kconfig                            |   7 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-atmel-aic.c                    | 700 +++++++++++++++++++++
+>  include/linux/irq.h                                |   2 +
+>  kernel/irq/generic-chip.c                          |   5 +-
+>  16 files changed, 800 insertions(+), 369 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+>  create mode 100644 drivers/irqchip/irq-atmel-aic.c
+> 
+
+
+-- 
+Nicolas Ferre
