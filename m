@@ -1,59 +1,69 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 9 Jul 2014 07:13:18 -0700
-Subject: [PATCH 1/3] mfd: pm8921: Expose pm8xxx_read_irq_status
-In-Reply-To: <CACRpkdaYRwSb2cd88KEjKHKN_3sRv5BvJTvNMmF3CZszu8c2HQ@mail.gmail.com>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-2-git-send-email-bjorn.andersson@sonymobile.com>
- <CACRpkdaYRwSb2cd88KEjKHKN_3sRv5BvJTvNMmF3CZszu8c2HQ@mail.gmail.com>
-Message-ID: <CAJAp7OgrHp9mKVkTAe8VdtbcDy=UMjLvTXBV2-gBZ3X4X4h_ag@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 09 Jul 2014 08:13:04 -0600
+Subject: [PATCH 2/5] iommu/arm-smmu: add support for PCI master devices
+In-Reply-To: <20140709132653.GM9485@arm.com>
+References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+ <1404125530-17984-3-git-send-email-will.deacon@arm.com>
+ <a9de518782874b5c8ddd366e6617b8de@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140709132653.GM9485@arm.com>
+Message-ID: <1404915184.4256.160.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 12:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
-> <bjorn.andersson@sonymobile.com> wrote:
->
->> Most status bits, e.g. for GPIO and MPP input, is retrieved by reading
->> the interrupt status registers, so this needs to be exposed to clients.
->>
->> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->
-> Hm do you mean you read the input *values* from the interrupt status
-> registers?
->
+On Wed, 2014-07-09 at 14:26 +0100, Will Deacon wrote:
+> [Adding Alex; question below]
+> 
+> On Thu, Jul 03, 2014 at 03:22:37PM +0100, Varun Sethi wrote:
+> > > +static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void
+> > > +*data) {
+> > > +     *((u16 *)data) = alias;
+> > > +     return 0; /* Continue walking */
+> > > +}
+> 
+> [...]
+> 
+> > > @@ -1598,15 +1642,36 @@ static int arm_smmu_add_device(struct device
+> > > *dev)
+> > >               return PTR_ERR(group);
+> > >       }
+> > >
+> > > +     if (dev_is_pci(dev)) {
+> > > +             struct arm_smmu_master_cfg *cfg;
+> > > +             struct pci_dev *pdev = to_pci_dev(dev);
+> > > +
+> > > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+> > > +             if (!cfg) {
+> > > +                     ret = -ENOMEM;
+> > > +                     goto out_put_group;
+> > > +             }
+> > > +
+> > > +             cfg->num_streamids = 1;
+> > > +             pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
+> > > +                                    &cfg->streamids[0]);
+> > [Sethi Varun-B16395] We need to look for upstream DMA device. We should be
+> > using pci_find_dma_isolation_root here. Also, this would also imply that
+> > there could be multiple devices sharing the same stream ID. So, we should
+> > check if a particular stream ID value has already been configured in the
+> > SMR registers.
+> 
+> pci_find_dma_isolation_root doesn't exist in any of the trees I have. Alex,
+> is this queued anywhere and do I actually need it?
 
-Due to the limited address space (I presume), many of the status bits
-on the pm8xxx are not exposed in any other place than through a banked
-register in the interrupt "block". So we have to read the interrupt
-status in order to get information related to things like gpio status
-or if a battery is present for charging.
+That function was in the v3 DMA alias series, in v4 it got replaced.
+iommu_group_get_for_pci_dev() is the common function for finding or
+creating a group for a device and pci_for_each_dma_alias() is the
+interface to walk each alias in a PCI topology.  The pci_ interface is
+in 3.16-rc and the iommu_ pieces are current in next via the iommu tree.
 
-> What madness in that case.... :-)
->
+> The purpose of this code is to find the requester ID of a device as it
+> appears at the host controller. At this point, we can map it (via firmware
+> tables that are TBD) to a Stream ID for the SMMU. It looks to me like
+> pci_for_each_dma_alias walks over non-transparent PCI bridges correctly, so
+> the callback I provide just updates the alias until the walk has completed.
 
-Totally!
+Yep, that's the intended usage.  There are cases in VT-d where it wants
+to add context entries for every alias and cases elsewhere that we just
+want the final alias.  pci_for_each_dma_alias() is meant to fit both use
+cases.  Thanks,
 
-> Anyway, since the driver is based on regmap, can't the children just
-> get a regmap * somehow and then just go read the same register
-> instead of having to add a special function for it?
->
-
-That we have, and we have access to that part of the ssbi address
-space. Unfortunately, like everything else in these pmics, things are
-banked. So we need first a bank selector and then a read; so it's racy
-with the interrupt handler code doing the same thing.
-
-> When I look at it it seems like it's doing regmap strangely or
-> something, like it's one write then one read operation to get
-> the register(s) and isn't that all supposed to be hidden behind
-> regmap so you don't need the local lock chip->pm_irq_lock?
->
-
-I guess one could have exposed a regmap that instead of exposing the
-ssbi address space presented a logical view of the pm8xxx registers;
-something like the bitplanes on Amiga. I prefer having a ssbi regmap
-for simplicity (and sanity) but then we need to have this read in the
-irq driver.
-
-Regards,
-Bjorn
+Alex
