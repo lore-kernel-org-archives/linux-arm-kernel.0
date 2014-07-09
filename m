@@ -1,61 +1,62 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 9 Jul 2014 09:59:11 +0100
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <201407081614.18304.arnd@arndb.de>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <20140708001418.GB22939@google.com>
- <20140708104050.GA6501@e106497-lin.cambridge.arm.com>
- <201407081614.18304.arnd@arndb.de>
-Message-ID: <20140709085910.GP6501@e106497-lin.cambridge.arm.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 9 Jul 2014 14:32:35 +0530
+Subject: [PATCH 1/4] phy: Add provision for calibrating phy.
+In-Reply-To: <20140609034902.GA2625@pratyush-vbox>
+References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
+ <1402056736-12674-2-git-send-email-gautam.vivek@samsung.com>
+ <20140609034902.GA2625@pratyush-vbox>
+Message-ID: <CAFp+6iH697pP9UWhYLKJc_S2VZUJQ3y6GDzg78gat=X1kybtiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 03:14:17PM +0100, Arnd Bergmann wrote:
-> On Tuesday 08 July 2014, Liviu Dudau wrote:
-> > > Here's what these look like in /proc/iomem and /proc/ioports (note that
-> > > there are two resource structs for each memory-mapped IO port space: one
-> > > IORESOURCE_MEM for the memory-mapped area (used only by the host bridge
-> > > driver), and one IORESOURCE_IO for the I/O port space (this becomes the
-> > > parent of a region used by a regular device driver):
-> > > 
-> > >   /proc/iomem:
-> > >     PCI Bus 0000:00 I/O Ports 00000000-00000fff
-> > >     PCI Bus 0001:00 I/O Ports 01000000-01000fff
-> > > 
-> > >   /proc/ioports:
-> > >     00000000-00000fff : PCI Bus 0000:00
-> > >     01000000-01000fff : PCI Bus 0001:00
-> > 
-> > OK, I have a question that might be ovbious to you but I have missed the answer
-> > so far: how does the IORESOURCE_MEM area gets created? Is it the host bridge
-> > driver's job to do it? Is it something that the framework should do when it
-> > notices that the IORESOURCE_IO is memory mapped?
-> 
-> The host bridge driver should either register the IORESOURCE_MEM resource
-> itself from its probe or setup function, or it should get registered behind
-> the covers in drivers using of_create_pci_host_bridge().
-> 
-> Your new pci_host_bridge_of_get_ranges already loops over all the 
-> resources, so it would be a good place to put that.
+Hi,
 
-OK, so it is not something that I've missed, just something that x86-64 does and
-my version doesn't yet.
 
-Thanks for confirming that.
+On Mon, Jun 9, 2014 at 9:19 AM, Pratyush Anand <pratyush.anand@st.com> wrote:
+> On Fri, Jun 06, 2014 at 08:12:12PM +0800, Vivek Gautam wrote:
+>> Some PHY controllers may need to calibrate certain
+>> PHY settings after initialization of the controller and
+>> sometimes even after initializing the PHY-consumer too.
+>> Add support for the same in order to let consumers do so in need.
+>>
+>> Signed-off-by: vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>  drivers/phy/phy-core.c  |   36 ++++++++++++++++++++++++++++++++++++
+>>  include/linux/phy/phy.h |    7 +++++++
+>>  2 files changed, 43 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+>> index 74d4346..92d31a3 100644
+>> --- a/drivers/phy/phy-core.c
+>> +++ b/drivers/phy/phy-core.c
+>> @@ -376,6 +376,42 @@ int phy_power_off(struct phy *phy)
+>>  EXPORT_SYMBOL_GPL(phy_power_off);
+>>
+>>  /**
+>> + * phy_calibrate - calibrate a phy post initialization
+>> + * @phy: Pointer to 'phy' from consumer
+>> + *
+>> + * For certain PHYs, it may be needed to calibrate few phy parameters
+>> + * post initialization. The need to calibrate may arise after the
+>
+> For USB you may need to calibrate phy after each new connection. If
+> so, why not to use already existing struct usb_phy's notify_connect.
 
-Liviu
+The phy_calibrate will rather be a one time phenomenon.
+On exynos atleast the case is : the phy settings for PIPE3 phy on DWC3
+controller need to be
+configured post hcd reset. so that we don't need to re-configure these
+phy settings on every connect.
 
-> 
-> 	Arnd
-> 
+Moreover *there are certain devices* which need these PHY settings
+even to show a connect-status-change.
+So, it would rather be not useful to create a 'phy_notify_connect' API
+in drivers/phy/ and use the same for this purpose.
+
+
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
