@@ -1,27 +1,26 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 9 Jul 2014 15:44:40 +0100
-Subject: [PATCH v7 02/24] mfd: max77686: Add power management support
-In-Reply-To: <1404505467-26526-3-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 9 Jul 2014 15:52:03 +0100
+Subject: [PATCH v7 04/24] mfd: max77686: Make platform data over-rule DT
+In-Reply-To: <1404505467-26526-5-git-send-email-javier.martinez@collabora.co.uk>
 References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404505467-26526-3-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140709144440.GD2635@lee--X1>
+ <1404505467-26526-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140709145203.GF2635@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
 
-> The driver doesn't have PM operations defined so add a suspend
-> and resume function handlers to allow the PMIC IRQ to wakeup
-> the system when it is put into a sleep state.
+> The function max77802_i2c_parse_dt_pdata() should only be called
+> if there isn't already platform data for the device.
 > 
 > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/mfd/max77686.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+>  drivers/mfd/max77686.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Patch looks good.  I guess the set needs to go in as one big lump due
-to interdependencies, so for my own benefit (to prevent re-reviewing):
+I assume some of these patches can be applied independently.
+
+Let me know which ones and I'll apply them.  In the mean time:
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
 
