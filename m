@@ -1,605 +1,303 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  9 Jul 2014 18:13:00 +0100
-Subject: [PATCH v4 8/9] arm64: KVM: implement lazy world switch for debug
- registers
+Date: Wed,  9 Jul 2014 18:12:56 +0100
+Subject: [PATCH v4 4/9] arm64: KVM: common infrastructure for handling AArch32
+ CP14/CP15
 In-Reply-To: <1404925981-17561-1-git-send-email-marc.zyngier@arm.com>
 References: <1404925981-17561-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1404925981-17561-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404925981-17561-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement switching of the debug registers. While the number
-of registers is massive, CPUs usually don't implement them all
-(A57 has 6 breakpoints and 4 watchpoints, which gives us a total
-of 22 registers "only").
-
-Also, we only save/restore them when MDSCR_EL1 has debug enabled,
-or when we've flagged the debug registers as dirty. It means that
-most of the time, we only save/restore MDSCR_EL1.
+As we're about to trap a bunch of CP14 registers, let's rework
+the CP15 handling so it can be generalized and work with multiple
+tables.
 
 Reviewed-by: Anup Patel <anup.patel@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/asm-offsets.c |   1 +
- arch/arm64/kvm/hyp.S            | 463 +++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 458 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h    |   2 +-
+ arch/arm64/include/asm/kvm_coproc.h |   3 +-
+ arch/arm64/include/asm/kvm_host.h   |  13 ++--
+ arch/arm64/kvm/handle_exit.c        |   4 +-
+ arch/arm64/kvm/sys_regs.c           | 133 +++++++++++++++++++++++++++++-------
+ 5 files changed, 124 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index e74654c..9a9fce0 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -120,6 +120,7 @@ int main(void)
-   DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
-   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
-   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
-+  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
-   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 7874e02..100494b 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -20,6 +20,7 @@
- #include <asm/assembler.h>
- #include <asm/memory.h>
- #include <asm/asm-offsets.h>
-+#include <asm/debug-monitors.h>
- #include <asm/fpsimdmacros.h>
- #include <asm/kvm.h>
- #include <asm/kvm_asm.h>
-@@ -211,6 +212,7 @@
- 	mrs	x22, 	amair_el1
- 	mrs	x23, 	cntkctl_el1
- 	mrs	x24,	par_el1
-+	mrs	x25,	mdscr_el1
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 660f75c..69027de 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -95,7 +95,7 @@
+ #define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
+ #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
+ #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
+-#define NR_CP15_REGS	(NR_SYS_REGS * 2)
++#define NR_COPRO_REGS	(NR_SYS_REGS * 2)
  
- 	stp	x4, x5, [x3]
- 	stp	x6, x7, [x3, #16]
-@@ -222,7 +224,202 @@
- 	stp	x18, x19, [x3, #112]
- 	stp	x20, x21, [x3, #128]
- 	stp	x22, x23, [x3, #144]
--	str	x24, [x3, #160]
-+	stp	x24, x25, [x3, #160]
-+.endm
-+
-+.macro save_debug
-+	// x2: base address for cpu context
-+	// x3: tmp register
-+
-+	mrs	x26, id_aa64dfr0_el1
-+	ubfx	x24, x26, #12, #4	// Extract BRPs
-+	ubfx	x25, x26, #20, #4	// Extract WRPs
-+	mov	w26, #15
-+	sub	w24, w26, w24		// How many BPs to skip
-+	sub	w25, w26, w25		// How many WPs to skip
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+1:
-+	mrs	x20, dbgbcr15_el1
-+	mrs	x19, dbgbcr14_el1
-+	mrs	x18, dbgbcr13_el1
-+	mrs	x17, dbgbcr12_el1
-+	mrs	x16, dbgbcr11_el1
-+	mrs	x15, dbgbcr10_el1
-+	mrs	x14, dbgbcr9_el1
-+	mrs	x13, dbgbcr8_el1
-+	mrs	x12, dbgbcr7_el1
-+	mrs	x11, dbgbcr6_el1
-+	mrs	x10, dbgbcr5_el1
-+	mrs	x9, dbgbcr4_el1
-+	mrs	x8, dbgbcr3_el1
-+	mrs	x7, dbgbcr2_el1
-+	mrs	x6, dbgbcr1_el1
-+	mrs	x5, dbgbcr0_el1
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+
-+1:
-+	str	x20, [x3, #(15 * 8)]
-+	str	x19, [x3, #(14 * 8)]
-+	str	x18, [x3, #(13 * 8)]
-+	str	x17, [x3, #(12 * 8)]
-+	str	x16, [x3, #(11 * 8)]
-+	str	x15, [x3, #(10 * 8)]
-+	str	x14, [x3, #(9 * 8)]
-+	str	x13, [x3, #(8 * 8)]
-+	str	x12, [x3, #(7 * 8)]
-+	str	x11, [x3, #(6 * 8)]
-+	str	x10, [x3, #(5 * 8)]
-+	str	x9, [x3, #(4 * 8)]
-+	str	x8, [x3, #(3 * 8)]
-+	str	x7, [x3, #(2 * 8)]
-+	str	x6, [x3, #(1 * 8)]
-+	str	x5, [x3, #(0 * 8)]
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+1:
-+	mrs	x20, dbgbvr15_el1
-+	mrs	x19, dbgbvr14_el1
-+	mrs	x18, dbgbvr13_el1
-+	mrs	x17, dbgbvr12_el1
-+	mrs	x16, dbgbvr11_el1
-+	mrs	x15, dbgbvr10_el1
-+	mrs	x14, dbgbvr9_el1
-+	mrs	x13, dbgbvr8_el1
-+	mrs	x12, dbgbvr7_el1
-+	mrs	x11, dbgbvr6_el1
-+	mrs	x10, dbgbvr5_el1
-+	mrs	x9, dbgbvr4_el1
-+	mrs	x8, dbgbvr3_el1
-+	mrs	x7, dbgbvr2_el1
-+	mrs	x6, dbgbvr1_el1
-+	mrs	x5, dbgbvr0_el1
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+
-+1:
-+	str	x20, [x3, #(15 * 8)]
-+	str	x19, [x3, #(14 * 8)]
-+	str	x18, [x3, #(13 * 8)]
-+	str	x17, [x3, #(12 * 8)]
-+	str	x16, [x3, #(11 * 8)]
-+	str	x15, [x3, #(10 * 8)]
-+	str	x14, [x3, #(9 * 8)]
-+	str	x13, [x3, #(8 * 8)]
-+	str	x12, [x3, #(7 * 8)]
-+	str	x11, [x3, #(6 * 8)]
-+	str	x10, [x3, #(5 * 8)]
-+	str	x9, [x3, #(4 * 8)]
-+	str	x8, [x3, #(3 * 8)]
-+	str	x7, [x3, #(2 * 8)]
-+	str	x6, [x3, #(1 * 8)]
-+	str	x5, [x3, #(0 * 8)]
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+1:
-+	mrs	x20, dbgwcr15_el1
-+	mrs	x19, dbgwcr14_el1
-+	mrs	x18, dbgwcr13_el1
-+	mrs	x17, dbgwcr12_el1
-+	mrs	x16, dbgwcr11_el1
-+	mrs	x15, dbgwcr10_el1
-+	mrs	x14, dbgwcr9_el1
-+	mrs	x13, dbgwcr8_el1
-+	mrs	x12, dbgwcr7_el1
-+	mrs	x11, dbgwcr6_el1
-+	mrs	x10, dbgwcr5_el1
-+	mrs	x9, dbgwcr4_el1
-+	mrs	x8, dbgwcr3_el1
-+	mrs	x7, dbgwcr2_el1
-+	mrs	x6, dbgwcr1_el1
-+	mrs	x5, dbgwcr0_el1
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+
-+1:
-+	str	x20, [x3, #(15 * 8)]
-+	str	x19, [x3, #(14 * 8)]
-+	str	x18, [x3, #(13 * 8)]
-+	str	x17, [x3, #(12 * 8)]
-+	str	x16, [x3, #(11 * 8)]
-+	str	x15, [x3, #(10 * 8)]
-+	str	x14, [x3, #(9 * 8)]
-+	str	x13, [x3, #(8 * 8)]
-+	str	x12, [x3, #(7 * 8)]
-+	str	x11, [x3, #(6 * 8)]
-+	str	x10, [x3, #(5 * 8)]
-+	str	x9, [x3, #(4 * 8)]
-+	str	x8, [x3, #(3 * 8)]
-+	str	x7, [x3, #(2 * 8)]
-+	str	x6, [x3, #(1 * 8)]
-+	str	x5, [x3, #(0 * 8)]
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+1:
-+	mrs	x20, dbgwvr15_el1
-+	mrs	x19, dbgwvr14_el1
-+	mrs	x18, dbgwvr13_el1
-+	mrs	x17, dbgwvr12_el1
-+	mrs	x16, dbgwvr11_el1
-+	mrs	x15, dbgwvr10_el1
-+	mrs	x14, dbgwvr9_el1
-+	mrs	x13, dbgwvr8_el1
-+	mrs	x12, dbgwvr7_el1
-+	mrs	x11, dbgwvr6_el1
-+	mrs	x10, dbgwvr5_el1
-+	mrs	x9, dbgwvr4_el1
-+	mrs	x8, dbgwvr3_el1
-+	mrs	x7, dbgwvr2_el1
-+	mrs	x6, dbgwvr1_el1
-+	mrs	x5, dbgwvr0_el1
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+
-+1:
-+	str	x20, [x3, #(15 * 8)]
-+	str	x19, [x3, #(14 * 8)]
-+	str	x18, [x3, #(13 * 8)]
-+	str	x17, [x3, #(12 * 8)]
-+	str	x16, [x3, #(11 * 8)]
-+	str	x15, [x3, #(10 * 8)]
-+	str	x14, [x3, #(9 * 8)]
-+	str	x13, [x3, #(8 * 8)]
-+	str	x12, [x3, #(7 * 8)]
-+	str	x11, [x3, #(6 * 8)]
-+	str	x10, [x3, #(5 * 8)]
-+	str	x9, [x3, #(4 * 8)]
-+	str	x8, [x3, #(3 * 8)]
-+	str	x7, [x3, #(2 * 8)]
-+	str	x6, [x3, #(1 * 8)]
-+	str	x5, [x3, #(0 * 8)]
-+
-+	mrs	x21, mdccint_el1
-+	str	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
- .endm
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_TRAP	  1
+diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
+index 9a59301..0b52377 100644
+--- a/arch/arm64/include/asm/kvm_coproc.h
++++ b/arch/arm64/include/asm/kvm_coproc.h
+@@ -39,7 +39,8 @@ void kvm_register_target_sys_reg_table(unsigned int target,
+ 				       struct kvm_sys_reg_target_table *table);
  
- .macro restore_sysregs
-@@ -241,7 +438,7 @@
- 	ldp	x18, x19, [x3, #112]
- 	ldp	x20, x21, [x3, #128]
- 	ldp	x22, x23, [x3, #144]
--	ldr	x24, [x3, #160]
-+	ldp	x24, x25, [x3, #160]
+ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 8e410f7..79812be 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -86,7 +86,7 @@ struct kvm_cpu_context {
+ 	struct kvm_regs	gp_regs;
+ 	union {
+ 		u64 sys_regs[NR_SYS_REGS];
+-		u32 cp15[NR_CP15_REGS];
++		u32 copro[NR_COPRO_REGS];
+ 	};
+ };
  
- 	msr	vmpidr_el2,	x4
- 	msr	csselr_el1,	x5
-@@ -264,6 +461,198 @@
- 	msr	amair_el1,	x22
- 	msr	cntkctl_el1,	x23
- 	msr	par_el1,	x24
-+	msr	mdscr_el1,	x25
-+.endm
-+
-+.macro restore_debug
-+	// x2: base address for cpu context
-+	// x3: tmp register
-+
-+	mrs	x26, id_aa64dfr0_el1
-+	ubfx	x24, x26, #12, #4	// Extract BRPs
-+	ubfx	x25, x26, #20, #4	// Extract WRPs
-+	mov	w26, #15
-+	sub	w24, w26, w24		// How many BPs to skip
-+	sub	w25, w26, w25		// How many WPs to skip
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+1:
-+	ldr	x20, [x3, #(15 * 8)]
-+	ldr	x19, [x3, #(14 * 8)]
-+	ldr	x18, [x3, #(13 * 8)]
-+	ldr	x17, [x3, #(12 * 8)]
-+	ldr	x16, [x3, #(11 * 8)]
-+	ldr	x15, [x3, #(10 * 8)]
-+	ldr	x14, [x3, #(9 * 8)]
-+	ldr	x13, [x3, #(8 * 8)]
-+	ldr	x12, [x3, #(7 * 8)]
-+	ldr	x11, [x3, #(6 * 8)]
-+	ldr	x10, [x3, #(5 * 8)]
-+	ldr	x9, [x3, #(4 * 8)]
-+	ldr	x8, [x3, #(3 * 8)]
-+	ldr	x7, [x3, #(2 * 8)]
-+	ldr	x6, [x3, #(1 * 8)]
-+	ldr	x5, [x3, #(0 * 8)]
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+1:
-+	msr	dbgbcr15_el1, x20
-+	msr	dbgbcr14_el1, x19
-+	msr	dbgbcr13_el1, x18
-+	msr	dbgbcr12_el1, x17
-+	msr	dbgbcr11_el1, x16
-+	msr	dbgbcr10_el1, x15
-+	msr	dbgbcr9_el1, x14
-+	msr	dbgbcr8_el1, x13
-+	msr	dbgbcr7_el1, x12
-+	msr	dbgbcr6_el1, x11
-+	msr	dbgbcr5_el1, x10
-+	msr	dbgbcr4_el1, x9
-+	msr	dbgbcr3_el1, x8
-+	msr	dbgbcr2_el1, x7
-+	msr	dbgbcr1_el1, x6
-+	msr	dbgbcr0_el1, x5
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+1:
-+	ldr	x20, [x3, #(15 * 8)]
-+	ldr	x19, [x3, #(14 * 8)]
-+	ldr	x18, [x3, #(13 * 8)]
-+	ldr	x17, [x3, #(12 * 8)]
-+	ldr	x16, [x3, #(11 * 8)]
-+	ldr	x15, [x3, #(10 * 8)]
-+	ldr	x14, [x3, #(9 * 8)]
-+	ldr	x13, [x3, #(8 * 8)]
-+	ldr	x12, [x3, #(7 * 8)]
-+	ldr	x11, [x3, #(6 * 8)]
-+	ldr	x10, [x3, #(5 * 8)]
-+	ldr	x9, [x3, #(4 * 8)]
-+	ldr	x8, [x3, #(3 * 8)]
-+	ldr	x7, [x3, #(2 * 8)]
-+	ldr	x6, [x3, #(1 * 8)]
-+	ldr	x5, [x3, #(0 * 8)]
-+
-+	adr	x26, 1f
-+	add	x26, x26, x24, lsl #2
-+	br	x26
-+1:
-+	msr	dbgbvr15_el1, x20
-+	msr	dbgbvr14_el1, x19
-+	msr	dbgbvr13_el1, x18
-+	msr	dbgbvr12_el1, x17
-+	msr	dbgbvr11_el1, x16
-+	msr	dbgbvr10_el1, x15
-+	msr	dbgbvr9_el1, x14
-+	msr	dbgbvr8_el1, x13
-+	msr	dbgbvr7_el1, x12
-+	msr	dbgbvr6_el1, x11
-+	msr	dbgbvr5_el1, x10
-+	msr	dbgbvr4_el1, x9
-+	msr	dbgbvr3_el1, x8
-+	msr	dbgbvr2_el1, x7
-+	msr	dbgbvr1_el1, x6
-+	msr	dbgbvr0_el1, x5
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+1:
-+	ldr	x20, [x3, #(15 * 8)]
-+	ldr	x19, [x3, #(14 * 8)]
-+	ldr	x18, [x3, #(13 * 8)]
-+	ldr	x17, [x3, #(12 * 8)]
-+	ldr	x16, [x3, #(11 * 8)]
-+	ldr	x15, [x3, #(10 * 8)]
-+	ldr	x14, [x3, #(9 * 8)]
-+	ldr	x13, [x3, #(8 * 8)]
-+	ldr	x12, [x3, #(7 * 8)]
-+	ldr	x11, [x3, #(6 * 8)]
-+	ldr	x10, [x3, #(5 * 8)]
-+	ldr	x9, [x3, #(4 * 8)]
-+	ldr	x8, [x3, #(3 * 8)]
-+	ldr	x7, [x3, #(2 * 8)]
-+	ldr	x6, [x3, #(1 * 8)]
-+	ldr	x5, [x3, #(0 * 8)]
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+1:
-+	msr	dbgwcr15_el1, x20
-+	msr	dbgwcr14_el1, x19
-+	msr	dbgwcr13_el1, x18
-+	msr	dbgwcr12_el1, x17
-+	msr	dbgwcr11_el1, x16
-+	msr	dbgwcr10_el1, x15
-+	msr	dbgwcr9_el1, x14
-+	msr	dbgwcr8_el1, x13
-+	msr	dbgwcr7_el1, x12
-+	msr	dbgwcr6_el1, x11
-+	msr	dbgwcr5_el1, x10
-+	msr	dbgwcr4_el1, x9
-+	msr	dbgwcr3_el1, x8
-+	msr	dbgwcr2_el1, x7
-+	msr	dbgwcr1_el1, x6
-+	msr	dbgwcr0_el1, x5
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+1:
-+	ldr	x20, [x3, #(15 * 8)]
-+	ldr	x19, [x3, #(14 * 8)]
-+	ldr	x18, [x3, #(13 * 8)]
-+	ldr	x17, [x3, #(12 * 8)]
-+	ldr	x16, [x3, #(11 * 8)]
-+	ldr	x15, [x3, #(10 * 8)]
-+	ldr	x14, [x3, #(9 * 8)]
-+	ldr	x13, [x3, #(8 * 8)]
-+	ldr	x12, [x3, #(7 * 8)]
-+	ldr	x11, [x3, #(6 * 8)]
-+	ldr	x10, [x3, #(5 * 8)]
-+	ldr	x9, [x3, #(4 * 8)]
-+	ldr	x8, [x3, #(3 * 8)]
-+	ldr	x7, [x3, #(2 * 8)]
-+	ldr	x6, [x3, #(1 * 8)]
-+	ldr	x5, [x3, #(0 * 8)]
-+
-+	adr	x26, 1f
-+	add	x26, x26, x25, lsl #2
-+	br	x26
-+1:
-+	msr	dbgwvr15_el1, x20
-+	msr	dbgwvr14_el1, x19
-+	msr	dbgwvr13_el1, x18
-+	msr	dbgwvr12_el1, x17
-+	msr	dbgwvr11_el1, x16
-+	msr	dbgwvr10_el1, x15
-+	msr	dbgwvr9_el1, x14
-+	msr	dbgwvr8_el1, x13
-+	msr	dbgwvr7_el1, x12
-+	msr	dbgwvr6_el1, x11
-+	msr	dbgwvr5_el1, x10
-+	msr	dbgwvr4_el1, x9
-+	msr	dbgwvr3_el1, x8
-+	msr	dbgwvr2_el1, x7
-+	msr	dbgwvr1_el1, x6
-+	msr	dbgwvr0_el1, x5
-+
-+	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
-+	msr	mdccint_el1, x21
- .endm
+@@ -141,12 +141,17 @@ struct kvm_vcpu_arch {
  
- .macro skip_32bit_state tmp, target
-@@ -278,6 +667,35 @@
- 	tbz	\tmp, #12, \target
- .endm
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+ #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+-#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
++/*
++ * CP14 and CP15 live in the same array, as they are backed by the
++ * same system registers.
++ */
++#define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
++#define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
  
-+.macro skip_debug_state tmp, target
-+	ldr	\tmp, [x0, #VCPU_DEBUG_FLAGS]
-+	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
-+.endm
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+-#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
++#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.copro[((r) + 1)])
+ #else
+-#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
++#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.copro[((r) + 0)])
+ #endif
+ 
+ struct kvm_vm_stat {
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 182415e..e28be51 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -73,9 +73,9 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+ 	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
+-	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_32,
+ 	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
+-	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_64,
+ 	[ESR_EL2_EC_HVC32]	= handle_hvc,
+ 	[ESR_EL2_EC_SMC32]	= handle_smc,
+ 	[ESR_EL2_EC_HVC64]	= handle_hvc,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 1ac63d5..62c1b6e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -494,6 +494,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  NULL, reset_val, FPEXC32_EL2, 0x70 },
+ };
+ 
++/* Trapped cp14 registers */
++static const struct sys_reg_desc cp14_regs[] = {
++};
 +
-+.macro compute_debug_state target
-+	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
-+	// is set, we do a full save/restore cycle and disable trapping.
-+	add	x25, x0, #VCPU_CONTEXT
+ /*
+  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+  * depending on the way they are accessed (as a 32bit or a 64bit
+@@ -601,26 +605,29 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
+ 
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+-{
+-	kvm_inject_undefined(vcpu);
+-	return 1;
+-}
+-
+-static void emulate_cp15(struct kvm_vcpu *vcpu,
+-			 const struct sys_reg_params *params)
++/*
++ * emulate_cp --  tries to match a sys_reg access in a handling table, and
++ *                call the corresponding trap handler.
++ *
++ * @params: pointer to the descriptor of the access
++ * @table: array of trap descriptors
++ * @num: size of the trap descriptor array
++ *
++ * Return 0 if the access has been handled, and -1 if not.
++ */
++static int emulate_cp(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_params *params,
++		      const struct sys_reg_desc *table,
++		      size_t num)
+ {
+-	size_t num;
+-	const struct sys_reg_desc *table, *r;
++	const struct sys_reg_desc *r;
+ 
+-	table = get_target_table(vcpu->arch.target, false, &num);
++	if (!table)
++		return -1;	/* Not handled */
+ 
+-	/* Search target-specific then generic table. */
+ 	r = find_reg(params, table, num);
+-	if (!r)
+-		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
+ 
+-	if (likely(r)) {
++	if (r) {
+ 		/*
+ 		 * Not having an accessor means that we have
+ 		 * configured a trap that we don't know how to
+@@ -632,22 +639,51 @@ static void emulate_cp15(struct kvm_vcpu *vcpu,
+ 		if (likely(r->access(vcpu, params, r))) {
+ 			/* Skip instruction, since it was emulated */
+ 			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			return;
+ 		}
+-		/* If access function fails, it should complain. */
 +
-+	// Check the state of MDSCR_EL1
-+	ldr	x25, [x25, #CPU_SYSREG_OFFSET(MDSCR_EL1)]
-+	and	x26, x25, #DBG_MDSCR_KDE
-+	and	x25, x25, #DBG_MDSCR_MDE
-+	adds	xzr, x25, x26
-+	b.eq	9998f		// Nothing to see there
++		/* Handled */
++		return 0;
+ 	}
+ 
+-	kvm_err("Unsupported guest CP15 access at: %08lx\n", *vcpu_pc(vcpu));
++	/* Not handled */
++	return -1;
++}
 +
-+	// If any interesting bits was set, we must set the flag
-+	mov	x26, #KVM_ARM64_DEBUG_DIRTY
-+	str	x26, [x0, #VCPU_DEBUG_FLAGS]
-+	b	9999f		// Don't skip restore
++static void unhandled_cp_access(struct kvm_vcpu *vcpu,
++				struct sys_reg_params *params)
++{
++	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
++	int cp;
 +
-+9998:
-+	// Otherwise load the flags from memory in case we recently
-+	// trapped
-+	skip_debug_state x25, \target
-+9999:
-+.endm
++	switch(hsr_ec) {
++	case ESR_EL2_EC_CP15_32:
++	case ESR_EL2_EC_CP15_64:
++		cp = 15;
++		break;
++	case ESR_EL2_EC_CP14_MR:
++	case ESR_EL2_EC_CP14_64:
++		cp = 14;
++		break;
++	default:
++		WARN_ON((cp = -1));
++	}
 +
- .macro save_guest_32bit_state
- 	skip_32bit_state x3, 1f
++	kvm_err("Unsupported guest CP%d access at: %08lx\n",
++		cp, *vcpu_pc(vcpu));
+ 	print_sys_reg_instr(params);
+ 	kvm_inject_undefined(vcpu);
+ }
  
-@@ -293,10 +711,13 @@
- 	mrs	x4, dacr32_el2
- 	mrs	x5, ifsr32_el2
- 	mrs	x6, fpexc32_el2
--	mrs	x7, dbgvcr32_el2
- 	stp	x4, x5, [x3]
--	stp	x6, x7, [x3, #16]
-+	str	x6, [x3, #16]
+ /**
+- * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
++ * kvm_handle_cp_64 -- handles a mrrc/mcrr trap on a guest CP15 access
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *global,
++			    size_t nr_global,
++			    const struct sys_reg_desc *target_specific,
++			    size_t nr_specific)
+ {
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+@@ -676,8 +712,14 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		*vcpu_reg(vcpu, params.Rt) = val;
+ 	}
  
-+	skip_debug_state x8, 2f
-+	mrs	x7, dbgvcr32_el2
-+	str	x7, [x3, #24]
-+2:
- 	skip_tee_state x8, 1f
+-	emulate_cp15(vcpu, &params);
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
++		goto out;
++	if (!emulate_cp(vcpu, &params, global, nr_global))
++		goto out;
  
- 	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
-@@ -319,12 +740,15 @@
- 
- 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
- 	ldp	x4, x5, [x3]
--	ldp	x6, x7, [x3, #16]
-+	ldr	x6, [x3, #16]
- 	msr	dacr32_el2, x4
- 	msr	ifsr32_el2, x5
- 	msr	fpexc32_el2, x6
--	msr	dbgvcr32_el2, x7
- 
-+	skip_debug_state x8, 2f
-+	ldr	x7, [x3, #24]
-+	msr	dbgvcr32_el2, x7
-+2:
- 	skip_tee_state x8, 1f
- 
- 	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
-@@ -463,6 +887,14 @@ __restore_sysregs:
- 	restore_sysregs
- 	ret
- 
-+__save_debug:
-+	save_debug
-+	ret
++	unhandled_cp_access(vcpu, &params);
 +
-+__restore_debug:
-+	restore_debug
-+	ret
++out:
+ 	/* Do the opposite hack for the read side */
+ 	if (!params.is_write) {
+ 		u64 val = *vcpu_reg(vcpu, params.Rt);
+@@ -693,7 +735,11 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *global,
++			    size_t nr_global,
++			    const struct sys_reg_desc *target_specific,
++			    size_t nr_specific)
+ {
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+@@ -708,10 +754,51 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	params.Op1 = (hsr >> 14) & 0x7;
+ 	params.Op2 = (hsr >> 17) & 0x7;
+ 
+-	emulate_cp15(vcpu, &params);
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
++		return 1;
++	if (!emulate_cp(vcpu, &params, global, nr_global))
++		return 1;
 +
- __save_fpsimd:
- 	save_fpsimd
- 	ret
-@@ -494,6 +926,9 @@ ENTRY(__kvm_vcpu_run)
- 	bl __save_fpsimd
- 	bl __save_sysregs
++	unhandled_cp_access(vcpu, &params);
+ 	return 1;
+ }
  
-+	compute_debug_state 1f
-+	bl	__save_debug
-+1:
- 	activate_traps
- 	activate_vm
- 
-@@ -505,6 +940,10 @@ ENTRY(__kvm_vcpu_run)
- 
- 	bl __restore_sysregs
- 	bl __restore_fpsimd
++int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	const struct sys_reg_desc *target_specific;
++	size_t num;
 +
-+	skip_debug_state x3, 1f
-+	bl	__restore_debug
-+1:
- 	restore_guest_32bit_state
- 	restore_guest_regs
- 
-@@ -521,6 +960,10 @@ __kvm_vcpu_return:
- 	save_guest_regs
- 	bl __save_fpsimd
- 	bl __save_sysregs
++	target_specific = get_target_table(vcpu->arch.target, false, &num);
++	return kvm_handle_cp_64(vcpu,
++				cp15_regs, ARRAY_SIZE(cp15_regs),
++				target_specific, num);
++}
 +
-+	skip_debug_state x3, 1f
-+	bl	__save_debug
-+1:
- 	save_guest_32bit_state
- 
- 	save_timer_state
-@@ -535,6 +978,14 @@ __kvm_vcpu_return:
- 
- 	bl __restore_sysregs
- 	bl __restore_fpsimd
++int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	const struct sys_reg_desc *target_specific;
++	size_t num;
 +
-+	skip_debug_state x3, 1f
-+	// Clear the dirty flag for the next run, as all the state has
-+	// already been saved. Note that we nuke the whole 64bit word.
-+	// If we ever add more flags, we'll have to be more careful...
-+	str	xzr, [x0, #VCPU_DEBUG_FLAGS]
-+	bl	__restore_debug
-+1:
- 	restore_host_regs
- 
- 	mov	x0, x1
++	target_specific = get_target_table(vcpu->arch.target, false, &num);
++	return kvm_handle_cp_32(vcpu,
++				cp15_regs, ARRAY_SIZE(cp15_regs),
++				target_specific, num);
++}
++
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return kvm_handle_cp_64(vcpu,
++				cp14_regs, ARRAY_SIZE(cp14_regs),
++				NULL, 0);
++}
++
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return kvm_handle_cp_32(vcpu,
++				cp14_regs, ARRAY_SIZE(cp14_regs),
++				NULL, 0);
++}
++
+ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 			   const struct sys_reg_params *params)
+ {
 -- 
 2.0.0
