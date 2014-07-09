@@ -1,71 +1,91 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 9 Jul 2014 09:50:43 +0200
-Subject: [PATCH v3 06/12] sched: add per rq cpu_power_orig
-In-Reply-To: <1404144343-18720-7-git-send-email-vincent.guittot@linaro.org>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-7-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <CAP245DXYvhD1EinAuRUCzY2wH=jJggV1dtAXwPJZN35jOU_bwA@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 09 Jul 2014 08:50:59 +0100
+Subject: a case for a common efuse API?
+In-Reply-To: <53BC4DD7.20906@codeaurora.org>
+References: <53BC4DD7.20906@codeaurora.org>
+Message-ID: <53BCF463.3000604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 6:05 PM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
-> This new field cpu_power_orig reflects the available capacity of a CPUs unlike
-> the cpu_power which reflects the current capacity that can be altered by
-> frequency and rt tasks.
+
+
+On 08/07/14 21:00, Stephen Boyd wrote:
+> Hi,
+>
+> On MSM chips we have some efuses (called qfprom) where we store things
+> like calibration data, speed bins, etc. We need to read out data from
+> the efuses in various drivers like the cpufreq, thermal, etc. This
+> essentially boils down to a bunch of readls on the efuse from a handful
+> of different drivers. In devicetree this looks a little odd because
+> these drivers end up having an extra reg property (or two) that points
+> to a register in the efuse and some length, i.e you see this:
+>
+> 	thermal-sensor at 34000 {
+> 		compatible = "sensor";
+> 		reg = <0x34000 0x1000>, <0x10018 0xc>;
+> 		reg-names = "sensor", "efuse_calib";
+> 	}
+>
+>
+> I imagine in DT we want something more like this:
+>
+> 	efuse: efuse at 10000 {
+> 		compatible = "efuse";
+> 		reg = <0x10000 0x1000>;
+> 	}
+>
+> 	thermal-sensor at 34000 {
+> 		compatible = "sensor";
+> 		reg = <0x34000 0x1000>;
+> 		efuse = <&efuse 0x18>;
+> 	}
+>
+>
+> Where we can point to the efuse and give an address offset. From code we
+> could then call some efuse_read() function to read the sensor's
+> calibration data.
+>
+> It's been suggested that we use syscon for this, but I wonder if that is
+> the right thing to do. With a syscon you're usually writing some
+> registers that got lumped together with other registers that aren't
+> directly related to your driver. It doesn't seem like syscon is made for
+> reading fuses or other things like eeproms. Maybe I'm wrong though.
 >
 
-s/cpu_power/cpu_capacity
+I remember there was a similar discussion some time last year about 
+this:  https://lkml.org/lkml/2013/7/5/361
 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/core.c  | 2 +-
->  kernel/sched/fair.c  | 1 +
->  kernel/sched/sched.h | 1 +
->  3 files changed, 3 insertions(+), 1 deletion(-)
+
+> Using syscon would probably work if we could add a way to point to
+> offsets within the syscon node (the 0x18 part in the example). In my
+> specific use-case the calibration data may have different offsets
+> depending on which SoC the hardware is instantiated in so we could also
+> make syscon work if the compatible field for the sensor node indicates
+> which SoC it is.
+
+Something like this:
+
+	efuse: efuse at 10000 {
+  		compatible = "efuse", "syscon";
+  		reg = <0x10000 0x1000>;
+  	}
+
+  	thermal-sensor at 34000 {
+  		compatible = "sensor", "soc-xyz";
+  		reg = <0x34000 0x1000>;
+		syscon = <&efuse>;
+  	}
+
+sensor driver could add of_data for the soc-xyz which would contain soc 
+specific efuse offsets.
+
+
+--srini
+
 >
-> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> index 54f5722..92dd6d1 100644
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -6964,7 +6964,7 @@ void __init sched_init(void)
->  #ifdef CONFIG_SMP
->                 rq->sd = NULL;
->                 rq->rd = NULL;
-> -               rq->cpu_capacity = SCHED_CAPACITY_SCALE;
-> +               rq->cpu_capacity = rq->cpu_capacity_orig = SCHED_CAPACITY_SCALE;
->                 rq->post_schedule = 0;
->                 rq->active_balance = 0;
->                 rq->next_balance = jiffies;
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index f0bba5f..7dff578 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5671,6 +5671,7 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
+> I added Tegra folks because I see that on Tegra this hardware is exposed
+> via an SoC specific API, tegra_fuse_readl(), and an associated driver in
+> drivers/misc/fuse/tegra/. Unfortunately I don't see any users of the API
+> outside of the speedo code in the same directory and the sysfs bin
+> attribute that may or may not be in use by some userspace code.
 >
->         capacity >>= SCHED_CAPACITY_SHIFT;
->
-> +       cpu_rq(cpu)->cpu_capacity_orig = capacity;
->         sdg->sgc->capacity_orig = capacity;
->
->         if (sched_feat(ARCH_CAPACITY))
-> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-> index 2f86361..7b311de 100644
-> --- a/kernel/sched/sched.h
-> +++ b/kernel/sched/sched.h
-> @@ -568,6 +568,7 @@ struct rq {
->         struct sched_domain *sd;
->
->         unsigned long cpu_capacity;
-> +       unsigned long cpu_capacity_orig;
->
->         unsigned char idle_balance;
->         /* For active balancing */
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linaro-kernel mailing list
-> linaro-kernel at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-kernel
