@@ -1,64 +1,38 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  9 Jul 2014 16:07:33 +0100
-Subject: [PATCH v4 02/10] mmc: sdhci-st: ST Microelectronics SDHCI binding
- documentation.
-In-Reply-To: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
-References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1404918461-25390-3-git-send-email-peter.griffin@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  9 Jul 2014 17:07:02 +0200
+Subject: [PATCHv3 34/34] ARM: at91/dt: usb_a9263: define crystals frequencies
+In-Reply-To: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1404918422-7562-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404918422-7562-35-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree binding documentation for the ST
-SDHCI driver. It documents the differences between the core properties
-described by mmc.txt and the properties used by the sdhci-st driver.
+Define Calao USB-A9263 main and slow crystals frequencies.
 
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
 ---
- Documentation/devicetree/bindings/mmc/sdhci-st.txt | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
+ arch/arm/boot/dts/usb_a9263.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-new file mode 100644
-index 0000000..7527db4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-@@ -0,0 +1,33 @@
-+* STMicroelectronics sdhci-st MMC/SD controller
+diff --git a/arch/arm/boot/dts/usb_a9263.dts b/arch/arm/boot/dts/usb_a9263.dts
+index 290e60383baf..68c0de36c339 100644
+--- a/arch/arm/boot/dts/usb_a9263.dts
++++ b/arch/arm/boot/dts/usb_a9263.dts
+@@ -29,6 +29,14 @@
+ 			compatible = "atmel,osc", "fixed-clock";
+ 			clock-frequency = <12000000>;
+ 		};
 +
-+This file documents the differences between the core properties in
-+Documentation/devicetree/bindings/mmc/mmc.txt and the properties
-+used by the sdhci-st driver.
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
 +
-+Required properties:
-+- compatible :  Must be "st,sdhci"
-+- clock-names : Should be "mmc"
-+                See: Documentation/devicetree/bindings/resource-names.txt
-+- clocks :      Phandle of the clock used by the sdhci controler
-+                See: Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Optional properties:
-+- non-removable: non-removable slot
-+                 See: Documentation/devicetree/bindings/mmc/mmc.txt
-+- bus-width: Number of data lines
-+                 See: Documentation/devicetree/bindings/mmc/mmc.txt
-+
-+Example:
-+
-+mmc0: sdhci at fe81e000 {
-+	compatible	= "st,sdhci";
-+	status		= "disabled";
-+	reg		= <0xfe81e000 0x1000>;
-+	interrupts	= <GIC_SPI 127 IRQ_TYPE_NONE>;
-+	interrupt-names	= "mmcirq";
-+	pinctrl-names	= "default";
-+	pinctrl-0	= <&pinctrl_mmc0>;
-+	clock-names	= "mmc";
-+	clocks		= <&clk_s_a1_ls 1>;
-+	bus-width       = <8>
-+};
++		main_xtal {
++			clock-frequency = <12000000>;
++		};
+ 	};
+ 
+ 	ahb {
 -- 
 1.9.1
