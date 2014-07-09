@@ -1,64 +1,26 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 9 Jul 2014 12:09:23 +0200
-Subject: [PATCH v3 05/12] ARM: topology: use new cpu_power interface
-In-Reply-To: <CAP245DWoQEgotq1FAu9f=zk_-bXAQtnG-RfLWzjrmOoZaCkBDw@mail.gmail.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-6-git-send-email-vincent.guittot@linaro.org>
- <CAP245DWoQEgotq1FAu9f=zk_-bXAQtnG-RfLWzjrmOoZaCkBDw@mail.gmail.com>
-Message-ID: <CAKfTPtC4RYVnRY0QMe-XQw0NB+DGsVU58aYYvR0t_QhO0avyGw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Jul 2014 03:11:16 -0700
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <20140709100147.GB25154@breakpoint.cc>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+ <20140709095552.GA25154@breakpoint.cc>
+ <20140709100147.GB25154@breakpoint.cc>
+Message-ID: <20140709101116.GM28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 July 2014 09:49, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> On Mon, Jun 30, 2014 at 6:05 PM, Vincent Guittot
-> <vincent.guittot@linaro.org> wrote:
->> Use the new arch_scale_cpu_power in order to reflect the original capacity of
->
-> s/arch_scale_cpu_power/arch_scale_cpu_capacity and similar renames in
-> the commit logs across the entire patchset to take into account all
-> the renames in the code.
+* Sebastian Andrzej Siewior <sebastian@breakpoint.cc> [140709 03:03]:
+> On 2014-07-09 11:55:52 [+0200], Sebastian Andrzej Siewior wrote:
+> > On 2014-07-08 18:46:39 [+0530], Mugunthan V N wrote:
+> > > Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
+> > 
+> > I reverted my patch, applied this one and after boot I got:
+> Oh me dum dum. I had --dry-run?
+> 
+> Acked-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+> 
+> This is basically what Tony hasked me to do: No IRQ numbers & iomem.
 
-good catch, the commit log passes through the find and replace.  I
-will change the other commit message as well
+OK great thanks for testing :)
 
->
->> a CPU instead of arch_scale_freq_power which is more linked to a scaling of
->> the capacity linked to the frequency.
->
-> here too...
->
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>  arch/arm/kernel/topology.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> index d42a7db..2310bfb 100644
->> --- a/arch/arm/kernel/topology.c
->> +++ b/arch/arm/kernel/topology.c
->> @@ -42,7 +42,7 @@
->>   */
->>  static DEFINE_PER_CPU(unsigned long, cpu_scale);
->>
->> -unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
->> +unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
->>  {
->>         return per_cpu(cpu_scale, cpu);
->>  }
->> @@ -166,7 +166,7 @@ static void update_cpu_capacity(unsigned int cpu)
->>         set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
->>
->>         printk(KERN_INFO "CPU%u: update cpu_capacity %lu\n",
->> -               cpu, arch_scale_freq_capacity(NULL, cpu));
->> +               cpu, arch_scale_cpu_capacity(NULL, cpu));
->>  }
->>
->>  #else
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linaro-kernel mailing list
->> linaro-kernel at lists.linaro.org
->> http://lists.linaro.org/mailman/listinfo/linaro-kernel
+Tony
