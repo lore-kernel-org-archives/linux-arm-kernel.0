@@ -1,89 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  9 Jul 2014 18:12:54 +0100
-Subject: [PATCH v4 2/9] arm64: move DBG_MDSCR_* to asm/debug-monitors.h
+Date: Wed,  9 Jul 2014 18:12:58 +0100
+Subject: [PATCH v4 6/9] arm64: KVM: check ordering of all system register
+ tables
 In-Reply-To: <1404925981-17561-1-git-send-email-marc.zyngier@arm.com>
 References: <1404925981-17561-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1404925981-17561-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404925981-17561-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to use the DBG_MDSCR_* macros from the KVM code,
-move the relevant definitions to the obvious include file.
+We now have multiple tables for the various system registers
+we trap. Make sure we check the order of all of them, as it is
+critical that we get the order right (been there, done that...).
 
-Also move the debug_el enum to a portion of the file that is guarded
-by #ifndef __ASSEMBLY__ in order to use that file from assembly code.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/debug-monitors.h | 19 ++++++++++++++-----
- arch/arm64/kernel/debug-monitors.c      |  9 ---------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 6e9b5b3..7fb3437 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -18,6 +18,15 @@
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 20aed6c..f21531a 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1308,14 +1308,32 @@ int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 	return write_demux_regids(uindices);
+ }
  
- #ifdef __KERNEL__
- 
-+/* Low-level stepping controls. */
-+#define DBG_MDSCR_SS		(1 << 0)
-+#define DBG_SPSR_SS		(1 << 21)
++static int check_sysreg_table(const struct sys_reg_desc *table, unsigned int n)
++{
++	unsigned int i;
 +
-+/* MDSCR_EL1 enabling bits */
-+#define DBG_MDSCR_KDE		(1 << 13)
-+#define DBG_MDSCR_MDE		(1 << 15)
-+#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
++	for (i = 1; i < n; i++) {
++		if (cmp_sys_reg(&table[i-1], &table[i]) >= 0) {
++			kvm_err("sys_reg table %p out of order (%d)\n", table, i - 1);
++			return 1;
++		}
++	}
 +
- #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
- 
- /* AArch64 */
-@@ -73,11 +82,6 @@
- 
- #define CACHE_FLUSH_IS_SAFE		1
- 
--enum debug_el {
--	DBG_ACTIVE_EL0 = 0,
--	DBG_ACTIVE_EL1,
--};
--
- /* AArch32 */
- #define DBG_ESR_EVT_BKPT	0x4
- #define DBG_ESR_EVT_VECC	0x5
-@@ -115,6 +119,11 @@ void unregister_break_hook(struct break_hook *hook);
- 
- u8 debug_monitors_arch(void);
- 
-+enum debug_el {
-+	DBG_ACTIVE_EL0 = 0,
-+	DBG_ACTIVE_EL1,
-+};
++	return 0;
++}
 +
- void enable_debug_monitors(enum debug_el el);
- void disable_debug_monitors(enum debug_el el);
- 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index a7fb874..e022f87 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -30,15 +30,6 @@
- #include <asm/cputype.h>
- #include <asm/system_misc.h>
- 
--/* Low-level stepping controls. */
--#define DBG_MDSCR_SS		(1 << 0)
--#define DBG_SPSR_SS		(1 << 21)
--
--/* MDSCR_EL1 enabling bits */
--#define DBG_MDSCR_KDE		(1 << 13)
--#define DBG_MDSCR_MDE		(1 << 15)
--#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
--
- /* Determine debug architecture. */
- u8 debug_monitors_arch(void)
+ void kvm_sys_reg_table_init(void)
  {
+ 	unsigned int i;
+ 	struct sys_reg_desc clidr;
+ 
+ 	/* Make sure tables are unique and in order. */
+-	for (i = 1; i < ARRAY_SIZE(sys_reg_descs); i++)
+-		BUG_ON(cmp_sys_reg(&sys_reg_descs[i-1], &sys_reg_descs[i]) >= 0);
++	BUG_ON(check_sysreg_table(sys_reg_descs, ARRAY_SIZE(sys_reg_descs)));
++	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
++	BUG_ON(check_sysreg_table(cp14_64_regs, ARRAY_SIZE(cp14_64_regs)));
++	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
++	BUG_ON(check_sysreg_table(cp15_64_regs, ARRAY_SIZE(cp15_64_regs)));
++	BUG_ON(check_sysreg_table(invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs)));
+ 
+ 	/* We abuse the reset function to overwrite the table itself. */
+ 	for (i = 0; i < ARRAY_SIZE(invariant_sys_regs); i++)
 -- 
 2.0.0
