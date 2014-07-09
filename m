@@ -1,126 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 9 Jul 2014 10:18:17 +0200
-Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display Controller
- support
-In-Reply-To: <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
- <CAF6AEGtttUFquRQrhFKtEKq+frAAmzp4AVtF5gixVkMmJNC68g@mail.gmail.com>
-Message-ID: <20140709101817.3ad39b2b@bbrezillon>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Wed, 9 Jul 2014 13:53:20 +0530
+Subject: [PATCH 0/2] cpuidle fixes and cleanup
+In-Reply-To: <20140708141731.GL21766@n2100.arm.linux.org.uk>
+References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
+ <20140701145244.GX32514@n2100.arm.linux.org.uk>
+ <CADWw7OgCgg8aE4W6LwmU3axDdmt-5uH=a+0fSSErfqDci3nNUA@mail.gmail.com>
+ <53BBF8A0.1050005@samsung.com>
+ <20140708141731.GL21766@n2100.arm.linux.org.uk>
+Message-ID: <CADWw7Oj9Dtsz8rHLBcGFbg76kAZTZSZYrTa=186TRuyWVm_hbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Jul 2014 23:45:54 -0400
-Rob Clark <robdclark@gmail.com> wrote:
+On Tue, Jul 8, 2014 at 7:47 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 08, 2014 at 03:56:48PM +0200, Tomasz Figa wrote:
+>> On 02.07.2014 05:11, Chander Kashyap wrote:
+>> > On Tue, Jul 1, 2014 at 8:22 PM, Russell King - ARM Linux
+>> > <linux@arm.linux.org.uk> wrote:
+>> >> On Tue, Jul 01, 2014 at 08:02:36PM +0530, Chander Kashyap wrote:
+>> >>> This patch series fixes the cpuidle for different states. Also removes arm
+>> >>> diagnostic and power register save/restore code as it is made generic.
+>> >>>
+>> >>> Based on:
+>> >>> ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
+>> >>>  http://www.spinics.net/lists/arm-kernel/msg340506.html
+>>
+>> [Ccing people who participated in discussion in that thread]
+>>
+>> >>
+>> >> As there is an outstanding issue with this patch, we can't proceed with
+>> >> this set of changes until we know what's going on there.
+>> >
+>> > Sure, I will wait for the conclusion.
+>>
+>> So I believe the conclusion was that this can't be handled in generic
+>> way, because on systems running in non-secure mode writing to those
+>> registers faults.
+>
+> That is, unfortunately, correct.
+>
+> There is a way around this, but people aren't going to like it.  That
+> is - we move it to the suspend and resume paths anyway.
+>
+> In the resume path, we read the register, compare it with the value
+> which we would update it to, and if it's identical, we avoid the write.
+>
+> This gets secure-mode platforms working.
+>
+> For non-secure mode platforms, we have to require them to insert some
+> assembly code into the early resume path which calls their secure
+> monitor to restore these registers before continuing on to cpu_resume,
+> thereby ensuring that the CPU specific code sees that the value in the
+> register is identical with the saved value, and omitting the write.
+>
+> This isn't really a new principle - we already have this requirement
+> for non-secure mode platforms when they're booting a kernel with
+> various errata enabled.
+>
+> I can't see any other alternative which satisfies everyone (by
+> everyone, I'm including the requirements from the hardware folk who
+> expect these registers to be static once the MMU is enabled.)
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 
-> On Mon, Jul 7, 2014 at 12:42 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
-> > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> > controller device.
-> >
-> > This display controller supports at least one primary plane and might
-> > provide several overlays and an hardware cursor depending on the IP
-> > version.
-> >
-> > At the moment, this driver only implements an RGB connector to interface
-> > with LCD panels, but support for other kind of external devices (like DRM
-> > bridges) might be added later.
-> >
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/Kconfig                         |   2 +
-> >  drivers/gpu/drm/Makefile                        |   1 +
-> >  drivers/gpu/drm/atmel-hlcdc/Kconfig             |  11 +
-> >  drivers/gpu/drm/atmel-hlcdc/Makefile            |   7 +
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c  | 469 +++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c    | 474 +++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 210 +++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c | 706 +++++++++++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h | 422 ++++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c | 351 ++++++++++++
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 729 ++++++++++++++++++++++++
-> >  11 files changed, 3382 insertions(+)
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c
-> >  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> >
-> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-> > index d1cc2f6..df6f0c1 100644
-> > --- a/drivers/gpu/drm/Kconfig
-> > +++ b/drivers/gpu/drm/Kconfig
-> > @@ -182,6 +182,8 @@ source "drivers/gpu/drm/cirrus/Kconfig"
-> >
+In that case i will re-post this after Russell post changes which
+conflict with that patch.
 
-[...]
-
-> > +/**
-> > + * Atmel HLCDC Layer GEM flip garbage collector structure
-> > + *
-> > + * This structure is used to schedule GEM object release when we are in
-> > + * interrupt context (within atmel_hlcdc_layer_irq function).
-> > + *
-> > + *@list: GEM flip objects to release
-> > + *@list_lock: lock to access the GEM flip list
-> > + *@work: work queue scheduled when there are GEM flip to collect
-> > + *@finished: action to execute the GEM flip and all attached objects have been
-> > + *          released
-> > + *@finished_data: data passed to the finished callback
-> > + *@finished_lock: lock to access finished related fields
-> > + */
-> > +struct atmel_hlcdc_layer_gem_flip_gc {
-> > +       struct list_head list;
-> > +       spinlock_t list_lock;
-> > +       struct work_struct work;
-> > +};
-> 
-> 
-> Please have a look at drm_flip_work.. I think that should simplify
-> post-flip cleanup for you..
-> 
-
-Now I remember why I didn't make use of drm_flip_work helpers:
-
-I have to specify a fifo size when initializing the
-drm_flip_work structure (drm_flip_work_init) and I don't know exactly
-what I should choose here.
-
-You might have noticed that I'm queuing the unref work to be done within
-the irq handler (which means I'm in irq context), and, AFAIU,
-drm_flip_work_queue will execute the function if the FIFO is full
-(AFAIK calling drm_framebuffer_unreference in irq context is not safe).
-
-This leaves the following solutions if I ever want to use drm_flip_work:
- - use a threaded irq. Meaning the next frame (or the pending plane
-   update) might take a bit longer to be displayed.
- - increase the fifo size, so that it's never entirely filled (relying
-   on the assumption that the flip work queue will be executed at least
-   as much as the plane update requests)
- - rely on the assumption that work_queue will be executed at least
-   once per fb flip. This is true for the primary plane because we're
-   using page_flip and only one page_flip can take place at a given
-   time, but AFAIK this is not true for plane updates.
-
-My approach is to use a simple list instead of a kfifo to queue fb
-flip unref work, this way I don't have to bother about whether the fifo
-is full or not.
-ITOH, this means I might keep fb references longer than I would when
-using drm_flip_work, and potentially get out of resources if plane
-updates occurs more often than my unref work queue is called.
-
-Please, let me know what's the preferred solution here.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
