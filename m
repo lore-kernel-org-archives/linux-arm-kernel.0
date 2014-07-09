@@ -1,44 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 02:12:32 -0700
-Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
-References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
- <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
- <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20140709091232.GJ28884@atomide.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 9 Jul 2014 10:13:20 +0100
+Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <201407090832.37918.arnd@arndb.de>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140708212951.GA4555@google.com>
+ <20140708224529.GB4980@e106497-lin.cambridge.arm.com>
+ <201407090832.37918.arnd@arndb.de>
+Message-ID: <20140709091320.GQ6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
-> Add node for RTC.
-> And also making RTC regulator always-on, as RTC should be powered
-> always.
+On Wed, Jul 09, 2014 at 07:32:37AM +0100, Arnd Bergmann wrote:
+> On Wednesday 09 July 2014, Liviu Dudau wrote:
+> > > Maybe that assumption is guaranteed by OF, but it doesn't hold for ACPI;
+> > > ACPI can describe several I/O port apertures for a single bridge, each
+> > > associated with a different CPU physical memory region.
+> > 
+> > That is actually a good catch, I've completely missed the fact that
+> > io_range->pci_addr could be non-zero.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> [nm at ti.com: update with rtc crossbar number]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> This patch depends on the crossbar dt patch series by Sricharan:
-> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg106910.html
+> Hmm, that's what I thought in my initial review, but you convinced me
+> that it's actually correct later on, and I still believe it is. Maybe
+> now you got confused by your own code?
+
+Man, it has been too long. Yes, I am now confused by my own code, which
+is not a good sign.
+
 > 
->  arch/arm/boot/dts/dra7-evm.dts |    1 +
->  arch/arm/boot/dts/dra7.dtsi    |    9 +++++++++
->  2 files changed, 10 insertions(+)
+> Please have another look, I think your code in pci_host_bridge_of_get_ranges
+> sufficiently handles the registration to the PCI code with the correct
+> io_offset. The only thing that we might want to add is to record the
+> PCI address along with the bridge->io_base: For the host driver to
+> set up the mapping window correctly, you either need both of them, or
+> you assume they are already set up.
+
+Hmm, having another look at pci_host_bridge_of_get_range() I'm not convinced
+that we need another storage for pci_addr. The resource gets added to the
+list of resources used by the bridge offsetted by range.pci_addr, so when
+re-creating the PCI bus address the value should come in play.
+
+I will double check but I think the code is correct as it is. Sorry for the
+early confusion.
+
+Best regards,
+Liviu
+
 > 
-> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-> index 4adc280..bca6d4a 100644
-> --- a/arch/arm/boot/dts/dra7-evm.dts
-> +++ b/arch/arm/boot/dts/dra7-evm.dts
-> @@ -249,6 +249,7 @@
->  					regulator-min-microvolt = <1050000>;
->  					regulator-max-microvolt = <1050000>;
->  					regulator-boot-on;
-> +					regulator-always-on;
->  				};
->  
+> 	Arnd
+> 
 
-Is this regulator really always on?
-
-Regards,
-
-Tony
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
