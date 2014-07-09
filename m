@@ -1,23 +1,24 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 9 Jul 2014 10:32:02 +0200
-Subject: [PATCH 1/3] regulators: tps65218: fix DCDC4 linear voltage range
-In-Reply-To: <1404846554-4095-1-git-send-email-balbi@ti.com>
-References: <1404846554-4095-1-git-send-email-balbi@ti.com>
-Message-ID: <20140709083202.GJ30458@sirena.org.uk>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 9 Jul 2014 14:05:30 +0530
+Subject: [PATCH V2 0/2] ARM: DRA7: Add RTC hwmod and dt entries
+In-Reply-To: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+Message-ID: <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 02:09:12PM -0500, Felipe Balbi wrote:
-> The second range of this particular regulator,
-> starts at 1.60V, not as 1.55V as it was originally
-> implied by code.
+This series adds hwmod entry and dt node for RTC.
 
-Applied all, thanks.  Please use subject lines consistent with the style
-for the subsystem - these even vary within the series!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140709/2ecb4acb/attachment.sig>
+Tested on DRA7: logs can be seen here: http://hastebin.com/jaxogatuta.vhdl
+
+Lokesh Vutla (2):
+  ARM: DRA7: hwmod: Add data for RTC
+  ARM: dts: DRA7: Add node for RTC
+
+ arch/arm/boot/dts/dra7-evm.dts            |    1 +
+ arch/arm/boot/dts/dra7.dtsi               |    9 +++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   41 +++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+
+-- 
+1.7.9.5
