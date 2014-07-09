@@ -1,46 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Jul 2014 04:17:05 -0700
-Subject: [RFC PATCH 3/4] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
-References: <1404491651-1388-1-git-send-email-bigeasy@linutronix.de>
- <1404491651-1388-3-git-send-email-bigeasy@linutronix.de>
- <20140707142056.46f61cf9@alan.etchedpixels.co.uk>
-Message-ID: <20140709111705.GR28884@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 09 Jul 2014 12:18:30 +0100
+Subject: [PATCH v3 8/9] arm64: KVM: implement lazy world switch for debug
+ registers
+In-Reply-To: <20140709094505.GD19801@cbox> (Christoffer Dall's message of
+ "Wed, 9 Jul 2014 10:45:05 +0100")
+References: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
+ <1403269207-1625-9-git-send-email-marc.zyngier@arm.com>
+ <20140709094505.GD19801@cbox>
+Message-ID: <87d2de7pbt.fsf@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> [140707 06:22]:
-> On Fri,  4 Jul 2014 18:34:10 +0200
-> Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> 
-> > While comparing the OMAP-serial and the 8250 part of this I noticed that
-> > the the latter does not use runtime-pm.
-> 
-> Yes it does, but 8250 parts (generally - omap presumably is special
-> here ?) need to be powered on to transmit/receive not just for register
-> access. The core uart layer implements a "pm" operation for this.
+On Wed, Jul 09 2014 at 10:45:05 am BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Fri, Jun 20, 2014 at 02:00:06PM +0100, Marc Zyngier wrote:
+>> Implement switching of the debug registers. While the number
+>> of registers is massive, CPUs usually don't implement them all
+>> (A57 has 6 breakpoints and 4 watchpoints, which gives us a total
+>> of 22 registers "only").
+>>
+>> Also, we only save/restore them when MDSCR_EL1 has debug enabled,
+>> or when we've flagged the debug registers as dirty. It means that
+>> most of the time, we only save/restore MDSCR_EL1.
+>>
+>> Reviewed-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kernel/asm-offsets.c |   1 +
+>>  arch/arm64/kvm/hyp.S            | 462 +++++++++++++++++++++++++++++++++++++++-
+>>  2 files changed, 457 insertions(+), 6 deletions(-)
+>>
 
-At least for omaps the UARTs need to be idled for the SoC to
-hit off-idle where the SoC is powered off and rebooted during
-idle.
+[...]
 
-So we can certainly enable this in a generic way, however, this
-can only be done under the following conditions:
+>> @@ -609,6 +1052,13 @@ __kvm_vcpu_return:
+>>
+>>       bl __restore_sysregs
+>>       bl __restore_fpsimd
+>> +
+>> +     skip_debug_state x3, 1f
+>> +     // Clear the dirty flag for the next run, as all the state has
+>> +     // already been saved.
+>> +     str     xzr, [x0, #VCPU_DEBUG_FLAGS]
+>> +     bl      __restore_debug
+>> +1:
+>>       restore_host_regs
+>>
+>>       mov     x0, x1
+>> --
+>> 1.8.3.4
+>>
+>
+> let's just try to remember the fact that we overwrite the entire bitmask
+> here if we add more bits to that value some time:
 
-1. We can save and restore the serial register context and detect
-   when context was lost in the serial driver. The context loss
-   can be detected by looking at some registers that are only
-   initialized during init.
+I'll add a comment to that effect.
 
-2. There's a way for the serial RX pin to wake the SoC. On some
-   omaps there's a separate pin specific wake-up interrupt that
-   can be used for that.
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-3. The serial PM features must be only enabled if requested by
-   the user via sysfs. Typically extra latency and loss of the
-   first RX character occur which is not acceptable to most
-   applications.
+Thanks!
 
-Regards,
-
-Tony
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
