@@ -1,121 +1,136 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 10 Jul 2014 14:53:00 +0800
-Subject: [PATCH v3 07/13] iommu/arm: Split arm_smmu_tlb_sync to reuse code
+Date: Thu, 10 Jul 2014 14:53:03 +0800
+Subject: [PATCH v3 10/13] iommu/arm: Adjust code to reuse more
 In-Reply-To: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1404975186-12032-8-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1404975186-12032-11-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TLB sync wait is a common operation, should be shared by all SMMUs.
+Limit smmu ias,oas,uas size is a common operation, the value of register MAIR0
+should be consistent across all SMMUs.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/arm-smmu-base.c | 15 +++++++++++++++
- drivers/iommu/arm-smmu.c      | 23 ++++++++++++-----------
- drivers/iommu/arm-smmu.h      |  3 +++
- 3 files changed, 30 insertions(+), 11 deletions(-)
+ drivers/iommu/arm-smmu-base.c | 20 ++++++++++++++++++++
+ drivers/iommu/arm-smmu.c      | 27 ++++-----------------------
+ drivers/iommu/arm-smmu.h      |  7 +++++++
+ 3 files changed, 31 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-base.c b/drivers/iommu/arm-smmu-base.c
-index 4d1c511..53f7907 100644
+index 400de39..8013751 100644
 --- a/drivers/iommu/arm-smmu-base.c
 +++ b/drivers/iommu/arm-smmu-base.c
-@@ -187,6 +187,21 @@ void __arm_smmu_free_bitmap(unsigned long *map, int idx)
- 	clear_bit(idx, map);
- }
+@@ -954,6 +954,26 @@ int arm_smmu_device_dt_probe(struct platform_device *pdev,
+ 		return -ENOMEM;
+ 	}
 
-+void arm_smmu_tlb_sync_wait(struct arm_smmu_device *smmu)
-+{
-+	int count = 0;
++	/*
++	 * Stage-1 output limited by stage-2 input size due to pgd
++	 * allocation (PTRS_PER_PGD).
++	 */
++#ifdef CONFIG_64BIT
++	smmu->s1_output_size = min((u32)VA_BITS, smmu->s1_output_size);
++	smmu->input_size = min((u32)VA_BITS, smmu->input_size);
++#else
++	smmu->s1_output_size = min(32U, smmu->s1_output_size);
++	smmu->input_size = 32;
++#endif
 +
-+	while (!smmu->hwdep_ops->tlb_sync_finished(smmu)) {
-+		cpu_relax();
-+		if (++count == TLB_LOOP_TIMEOUT) {
-+			dev_err_ratelimited(smmu->dev,
-+			"TLB sync timed out -- SMMU may be deadlocked\n");
-+			return;
-+		}
-+		udelay(1);
-+	}
-+}
++	/* The stage-2 output mask is also applied for bypass */
++	smmu->s2_output_size = min((u32)PHYS_MASK_SHIFT, smmu->s2_output_size);
 +
- void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
- 				   size_t size)
- {
++	dev_notice(smmu->dev,
++		   "\t%u-bit VA, %u-bit IPA, %u-bit PA\n",
++		   smmu->input_size,
++		   smmu->s1_output_size, smmu->s2_output_size);
++
+ 	parse_driver_options(smmu);
+
+ 	if (smmu->version > 1 &&
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index d2fc14c..fa65c7c 100644
+index dbd9c60..6971e11 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -223,23 +223,23 @@
+@@ -489,9 +489,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 
- #define FSYNR0_WNR			(1 << 4)
+ 	/* MAIR0 (stage-1 only) */
+ 	if (stage1) {
+-		reg = (MAIR_ATTR_NC << MAIR_ATTR_SHIFT(MAIR_ATTR_IDX_NC)) |
+-		      (MAIR_ATTR_WBRWA << MAIR_ATTR_SHIFT(MAIR_ATTR_IDX_CACHE)) |
+-		      (MAIR_ATTR_DEVICE << MAIR_ATTR_SHIFT(MAIR_ATTR_IDX_DEV));
++		reg = MAIR0_STAGE1;
+ 		writel_relaxed(reg, cb_base + ARM_SMMU_CB_S1_MAIR0);
+ 	}
 
-+static int arm_smmu_tlb_sync_finished(struct arm_smmu_device *smmu)
-+{
-+	u32 reg;
-+	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-+
-+	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sTLBGSTATUS);
-+
-+	return !(reg & sTLBGSTATUS_GSACTIVE);
-+}
-+
- /* Wait for any pending TLB invalidations to complete */
- static void arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
- {
--	int count = 0;
- 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+@@ -828,30 +826,16 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
+ 	size = arm_smmu_id_size_to_bits((id >> ID2_IAS_SHIFT) & ID2_IAS_MASK);
 
- 	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_sTLBGSYNC);
--	while (readl_relaxed(gr0_base + ARM_SMMU_GR0_sTLBGSTATUS)
--	       & sTLBGSTATUS_GSACTIVE) {
--		cpu_relax();
--		if (++count == TLB_LOOP_TIMEOUT) {
--			dev_err_ratelimited(smmu->dev,
--			"TLB sync timed out -- SMMU may be deadlocked\n");
--			return;
--		}
--		udelay(1);
--	}
-+	arm_smmu_tlb_sync_wait(smmu);
+-	/*
+-	 * Stage-1 output limited by stage-2 input size due to pgd
+-	 * allocation (PTRS_PER_PGD).
+-	 */
+-#ifdef CONFIG_64BIT
+-	smmu->s1_output_size = min((u32)VA_BITS, size);
+-#else
+-	smmu->s1_output_size = min(32U, size);
+-#endif
++	smmu->s1_output_size = size;
+
+-	/* The stage-2 output mask is also applied for bypass */
+ 	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
+-	smmu->s2_output_size = min((u32)PHYS_MASK_SHIFT, size);
++	smmu->s2_output_size = size;
+
+ 	if (smmu->version == 1) {
+ 		smmu->input_size = 32;
+ 	} else {
+-#ifdef CONFIG_64BIT
+ 		size = (id >> ID2_UBS_SHIFT) & ID2_UBS_MASK;
+-		size = min((u32)VA_BITS, arm_smmu_id_size_to_bits(size));
+-#else
+-		size = 32;
+-#endif
+-		smmu->input_size = size;
++		smmu->input_size = arm_smmu_id_size_to_bits(size);
+
+ 		if ((PAGE_SIZE == SZ_4K && !(id & ID2_PTFS_4K)) ||
+ 		    (PAGE_SIZE == SZ_64K && !(id & ID2_PTFS_64K)) ||
+@@ -862,9 +846,6 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 		}
+ 	}
+
+-	dev_notice(smmu->dev,
+-		   "\t%u-bit VA, %u-bit IPA, %u-bit PA\n",
+-		   smmu->input_size, smmu->s1_output_size, smmu->s2_output_size);
+ 	return 0;
  }
 
- static void arm_smmu_tlb_inv_context(struct arm_smmu_cfg *cfg)
-@@ -869,6 +869,7 @@ static int arm_smmu_device_unload(struct arm_smmu_device *smmu)
- }
-
- static struct smmu_hwdep_ops arm_smmu_hwdep_ops = {
-+	.tlb_sync_finished	= arm_smmu_tlb_sync_finished,
- 	.tlb_inv_context	= arm_smmu_tlb_inv_context,
- 	.context_fault		= arm_smmu_context_fault,
- 	.global_fault		= arm_smmu_global_fault,
 diff --git a/drivers/iommu/arm-smmu.h b/drivers/iommu/arm-smmu.h
-index 190f77c..8332ff0 100644
+index fff2b98..3164ba78 100644
 --- a/drivers/iommu/arm-smmu.h
 +++ b/drivers/iommu/arm-smmu.h
-@@ -209,6 +209,7 @@ struct arm_smmu_domain {
+@@ -72,6 +72,7 @@
+ #define RESUME_RETRY			(0 << 0)
+ #define RESUME_TERMINATE		(1 << 0)
 
- /**
-  * struct smmu_hwdep_ops - smmu hardware dependent ops
-+ * @tlb_sync_finished: check whether tlb sync operation is finished
-  * @tlb_inv_context: invalid smmu context bank tlb
-  * @context_fault: context fault handler
-  * @global_fault: global fault handler
-@@ -221,6 +222,7 @@ struct arm_smmu_domain {
-  * @device_remove: turn off a smmu and reclaim associated resources
-  */
- struct smmu_hwdep_ops {
-+	int (*tlb_sync_finished)(struct arm_smmu_device *smmu);
- 	void (*tlb_inv_context)(struct arm_smmu_cfg *cfg);
- 	irqreturn_t (*context_fault)(int irq, void *dev);
- 	irqreturn_t (*global_fault)(int irq, void *dev);
-@@ -237,6 +239,7 @@ struct smmu_hwdep_ops {
++/* In SMMUv2, this register is named SMMU_CBn_TCR */
+ #define TTBCR_EAE			(1 << 31)
 
- extern int __arm_smmu_alloc_bitmap(unsigned long *map, int start, int end);
- extern void __arm_smmu_free_bitmap(unsigned long *map, int idx);
-+extern void arm_smmu_tlb_sync_wait(struct arm_smmu_device *smmu);
- extern struct arm_smmu_device *find_parent_smmu(struct arm_smmu_device *smmu);
- extern void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
- 				   size_t size);
+ #define TTBCR_PASIZE_SHIFT		16
+@@ -112,6 +113,12 @@
+ #define MAIR_ATTR_IDX_CACHE		1
+ #define MAIR_ATTR_IDX_DEV		2
+
++#define MAIR0_STAGE1	\
++	((MAIR_ATTR_NC << MAIR_ATTR_SHIFT(MAIR_ATTR_IDX_NC)) |	\
++	(MAIR_ATTR_WBRWA << MAIR_ATTR_SHIFT(MAIR_ATTR_IDX_CACHE)) |	\
++	(MAIR_ATTR_DEVICE << MAIR_ATTR_SHIFT(MAIR_ATTR_IDX_DEV)))
++
++
+ struct arm_smmu_smr {
+ 	u8				idx;
+ 	u16				mask;
 --
 1.8.0
