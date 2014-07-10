@@ -1,32 +1,38 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 10 Jul 2014 17:15:21 +0400
-Subject: [RFC/PATCH RESEND -next 05/21] x86: cpu: don't sanitize early
- stages of a secondary CPU boot
-In-Reply-To: <87egxunx8j.fsf@tassilo.jf.intel.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-6-git-send-email-a.ryabinin@samsung.com>
- <87egxunx8j.fsf@tassilo.jf.intel.com>
-Message-ID: <53BE91E9.9090408@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 10 Jul 2014 14:25:34 +0100
+Subject: [PATCH v6 15/23] regulator: max77686: Setup DVS-related GPIOs on
+ probe
+In-Reply-To: <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
+References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
+ <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
+Message-ID: <20140710132534.GD11948@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/14 23:33, Andi Kleen wrote:
-> Andrey Ryabinin <a.ryabinin@samsung.com> writes:
-> 
->> Instrumentation of this files may result in unbootable machine.
-> 
-> This doesn't make sense. Is the code not NMI safe? 
-> If yes that would need to be fixed because
-> 
-> Please debug more.
-> 
+On Thu, 10 Jul 2014, amit daniel kachhap wrote:
 
-Sure.
-It turns out that  KASAN_SANITIZE_perf_event.o := n is not needed here.
-The problem only with common.c
+> On Fri, Jul 4, 2014 at 3:25 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+> > MAX77686 PMIC support Dyamic Voltage Scaling (DVS) on a set
+> > of Buck regulators. A number of GPIO are connected to these
+> > lines and are requested by the mfd driver. Setup the GPIO
+> > pins from the regulator driver.
 
-> perf is a common source of bugs (see Vice Weaver's fuzzer results),
-> so it would be good to have this functionality for it.
-> 
-> -Andi
-> 
+> If possible merge this patch with patch 8. Both are adding DVS
+> support. Put regmap_copy dependency patch in very beginning.
+
+You want to merge two patches which deal with different subsystems?
+
+That's the opposite of what we usually try and achieve.
+
+> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > ---
+> >  drivers/regulator/max77686.c | 34 ++++++++++++++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
