@@ -1,21 +1,94 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 10 Jul 2014 10:46:24 -0400
-Subject: [PATCH v2 2/2] arm64: Fix the APM X-Gene SoC SATA PHY clock DTS
- node csr-mask of the SATA Host Controller 1.
-In-Reply-To: <1405000156-321-3-git-send-email-stripathi@apm.com>
-References: <1405000156-321-1-git-send-email-stripathi@apm.com>
- <1405000156-321-3-git-send-email-stripathi@apm.com>
-Message-ID: <20140710144624.GB6609@htj.dyndns.org>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Thu, 10 Jul 2014 15:52:15 +0100
+Subject: [PATCH 5/6] tty: serial: 8250-core: add rs485 support
+In-Reply-To: <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
+References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
+ <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140710155215.3e17ca08@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 07:19:16PM +0530, Suman Tripathi wrote:
-> This patch fixes the SATA PHY clock DTS node csr-mask of the
-> SATA Host controller 1. This patch also fixes the status of
-> the PHY clock node of SATA Host Controller 1.
+>  static inline void __stop_tx(struct uart_8250_port *p)
+>  {
+> +	if (p->rs485.flags & SER_RS485_ENABLED) {
+> +		int ret;
+> +
+> +		ret = (p->rs485.flags & SER_RS485_RTS_AFTER_SEND) ? 1 : 0;
+> +		if (gpio_get_value(p->rts_gpio) != ret) {
+> +			if (p->rs485.delay_rts_after_send > 0)
+> +				mdelay(p->rs485.delay_rts_after_send);
+> +			gpio_set_value(p->rts_gpio, ret);
+> +		}
 
-Ditto.  Before, XXX was wrong and as a result YYY didn't work
-properly.  This patch updates ZZZ to fix the issue.
+RTS is not normally a GPIO. We should be controlling the UART RTS here,
+and if the UART has a magic special case RTS wired to a GPIO then really
+the hardware specific part should handle that gunge. I don't care whether
+the drive does it via serial_out magic or a more explicit hook but it
+doesn't belong here in core code.
 
--- 
-tejun
+Likewise the mdelay probably should be in the device specific bits or
+controlled by a flag as not all hardware is so braindead.
+
+> @@ -1330,6 +1356,20 @@ static void serial8250_start_tx(struct uart_port *port)
+>  	if (up->dma && !serial8250_tx_dma(up)) {
+
+Ditto
+
+> +int serial8250_probe_rs485(struct uart_8250_port *up,
+> +		struct device *dev)
+> +{
+> +	struct serial_rs485 *rs485conf = &up->rs485;
+> +	struct device_node *np = dev->of_node;
+> +	u32 rs485_delay[2];
+> +	enum of_gpio_flags flags;
+> +	int ret;
+> +
+> +	rs485conf->flags = 0;
+> +	if (!np)
+> +		return 0;
+> +
+> +	/* check for tx enable gpio */
+> +	up->rts_gpio = of_get_named_gpio_flags(np, "rts-gpio", 0, &flags);
+
+No of_ dependencies in core 8250.c either please. That looks a perfectly
+good implementation of serial8250_of_probe_rs485 however, just belongs in
+the right place.
+
+> +static int serial8250_ioctl(struct uart_port *port, unsigned int cmd,
+> +		unsigned long arg)
+> +{
+> +	struct serial_rs485 rs485conf;
+> +	struct uart_8250_port *up;
+> +
+> +	up = container_of(port, struct uart_8250_port, port);
+> +	switch (cmd) {
+> +	case TIOCSRS485:
+> +		if (!gpio_is_valid(up->rts_gpio))
+> +			return -ENODEV;
+
+GPIO assumption again needs to go
+
+
+> diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
+> index 0ec21ec..056a73f 100644
+> --- a/include/linux/serial_8250.h
+> +++ b/include/linux/serial_8250.h
+> @@ -78,6 +78,7 @@ struct uart_8250_port {
+>  	unsigned char		acr;
+>  	unsigned char		ier;
+>  	unsigned char		lcr;
+> +	unsigned char		fcr;
+>  	unsigned char		mcr;
+>  	unsigned char		mcr_mask;	/* mask of user bits */
+>  	unsigned char		mcr_force;	/* mask of forced bits */
+> @@ -94,6 +95,9 @@ struct uart_8250_port {
+>  	unsigned char		msr_saved_flags;
+>  
+>  	struct uart_8250_dma	*dma;
+> +	struct serial_rs485	rs485;
+> +	int			rts_gpio;
+> +	bool			rts_gpio_valid;
+
+Keeping the gpio here doesn't look unreasonable if one is in use.
+
+Alan
