@@ -1,132 +1,31 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 9 Jul 2014 20:40:21 -0400
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
-In-Reply-To: <53BDD834.5030405@codeaurora.org>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
- <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
- <53BC6866.30803@codeaurora.org>
- <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
- <53BDD834.5030405@codeaurora.org>
-Message-ID: <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 10 Jul 2014 09:24:34 +0800
+Subject: [PATCH v9 02/14] irq: gic: support hip04 gic
+In-Reply-To: <20140708224020.GI13433@titan.lakedaemon.net>
+References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
+ <1400591427-21922-3-git-send-email-haojian.zhuang@linaro.org>
+ <20140621015409.GZ21711@titan.lakedaemon.net>
+ <20140708224020.GI13433@titan.lakedaemon.net>
+Message-ID: <CAD6h2NR94=HRaG7T_EymjUY-_6RTfMjJxuKccWhGHFizP4ySZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 8:03 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
-> On 7/8/2014 4:49 PM, Rob Clark wrote:
->> On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
->>> Hi Hiroshi,
->>>
->>> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
->>>> Hi Olav,
->>>>
->>>> Olav Haugan <ohaugan@codeaurora.org> writes:
->>>>
->>>>> Mapping and unmapping are more often than not in the critical path.
->>>>> map_range and unmap_range allows SMMU driver implementations to optimize
->>>>> the process of mapping and unmapping buffers into the SMMU page tables.
->>>>> Instead of mapping one physical address, do TLB operation (expensive),
->>>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
->>>>> a scatter-gatherlist of physically contiguous pages into one virtual
->>>>> address space and then at the end do one TLB operation.
->>>>>
->>>>> Additionally, the mapping operation would be faster in general since
->>>>> clients does not have to keep calling map API over and over again for
->>>>> each physically contiguous chunk of memory that needs to be mapped to a
->>>>> virtually contiguous region.
->>>>>
->>>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->>>>> ---
->>>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
->>>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
->>>>>  2 files changed, 48 insertions(+)
->>>>>
->>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>>>> index e5555fc..f2a6b80 100644
->>>>> --- a/drivers/iommu/iommu.c
->>>>> +++ b/drivers/iommu/iommu.c
->>>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>>>>
->>>>>
->>>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
->>>>> +                struct scatterlist *sg, unsigned int len, int prot)
->>>>> +{
->>>>> +    if (unlikely(domain->ops->map_range == NULL))
->>>>> +            return -ENODEV;
->>>>> +
->>>>> +    BUG_ON(iova & (~PAGE_MASK));
->>>>> +
->>>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
->>>>> +}
->>>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
->>>>
->>>> We have the similar one internally, which is named, "iommu_map_sg()",
->>>> called from DMA API.
->>>
->>> Great, so this new API will be useful to more people!
->>>
->>>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
->>>>> +                  unsigned int len)
->>>>> +{
->>>>> +    if (unlikely(domain->ops->unmap_range == NULL))
->>>>> +            return -ENODEV;
->>>>> +
->>>>> +    BUG_ON(iova & (~PAGE_MASK));
->>>>> +
->>>>> +    return domain->ops->unmap_range(domain, iova, len);
->>>>> +}
->>>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
->>>>
->>>> Can the existing iommu_unmap() do the same?
->>>
->>> I believe iommu_unmap() behaves a bit differently because it will keep
->>> on calling domain->ops->unmap() until everything is unmapped instead of
->>> letting the iommu implementation take care of unmapping everything in
->>> one call.
->>>
->>> I am abandoning the patch series since our driver was not accepted.
->>> However, if there are no objections I will resubmit this patch (PATCH
->>> 2/7) as an independent patch to add this new map_range API.
->>
->> +1 for map_range().. I've seen for gpu workloads, at least, it is the
->> downstream map_range() API is quite beneficial.   It was worth at
->> least a few fps in xonotic.
->>
->> And, possibly getting off the subject a bit, but I was wondering about
->> the possibility of going one step further and batching up mapping
->> and/or unmapping multiple buffers (ranges) at once.  I have a pretty
->> convenient sync point in drm/msm to flush out multiple mappings before
->> kicking gpu.
+On 9 July 2014 06:40, Jason Cooper <jason@lakedaemon.net> wrote:
+> Haojian,
 >
-> I think you should be able to do that with this API already - at least
-> the mapping part since we are passing in a sg list (this could be a
-> chained sglist).
-
-What I mean by batching up is mapping and unmapping multiple sglists
-each at different iova's with minmal cpu cache and iommu tlb flushes..
-
-Ideally we'd let the IOMMU driver be clever and build out all 2nd
-level tables before inserting into first level tables (to minimize cpu
-cache flushing).. also, there is probably a reasonable chance that
-we'd be mapping a new buffer into existing location, so there might be
-some potential to reuse existing 2nd level tables (and save a tiny bit
-of free/alloc).  I've not thought too much about how that would look
-in code.. might be kinda, umm, fun..
-
-But at an API level, we should be able to do a bunch of
-map/unmap_range's with one flush.
-
-Maybe it could look like a sequence of iommu_{map,unmap}_range()
-followed by iommu_flush()?
-
-BR,
--R
-
-> Thanks,
+> I've set up a branch for all the changes to the gic driver this time
+> around.  Please keep an eye on:
 >
-> Olav
+>   git://git.infradead.org/users/jcooper/linux.git irqchip/gic
 >
-> --
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> And base your irqchip changes on top.
+>
+> thx,
+>
+> Jason.
+>
+
+Sure. I'll rebase my irqchip patch on this branch. Thanks for your reminder.
+
+Best Regards
+Haojian
