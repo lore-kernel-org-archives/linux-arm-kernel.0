@@ -1,46 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Jul 2014 12:00:34 +0100
-Subject: [PATCH 3/3] arm64: Use include/asm-generic/io.h
-In-Reply-To: <1404918699-17284-3-git-send-email-thierry.reding@gmail.com>
-References: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
- <1404918699-17284-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140710110034.GI16137@arm.com>
+From: rob.jones@codethink.co.uk (Rob Jones)
+Date: Thu, 10 Jul 2014 12:01:28 +0100
+Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
+ devm_request_gpio_array
+In-Reply-To: <CACRpkdZWfYN14aki-UqvWp1K0exVj-mMK92q431QueSVvjZFuA@mail.gmail.com>
+References: <cover.1404665589.git.himangi774@gmail.com>	<1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>	<53BD2509.6070803@codethink.co.uk>
+ <CACRpkdZWfYN14aki-UqvWp1K0exVj-mMK92q431QueSVvjZFuA@mail.gmail.com>
+Message-ID: <53BE7288.6060503@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 04:11:39PM +0100, Thierry Reding wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index a497556520d4..a428ac1573e7 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -20,7 +20,6 @@ config ARM64
->  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
->  	select GENERIC_CPU_AUTOPROBE
->  	select GENERIC_EARLY_IOREMAP
-> -	select GENERIC_IOMAP
->  	select GENERIC_IRQ_PROBE
->  	select GENERIC_IRQ_SHOW
->  	select GENERIC_SCHED_CLOCK
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index e0ecdcf6632d..00c7f9faf2a3 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-[...]
-> @@ -235,8 +155,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
->  #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
->  #define iounmap				__iounmap
->  
-> -#define ARCH_HAS_IOREMAP_WC
-> -#include <asm-generic/iomap.h>
-> +#include <asm-generic/io.h>
 
-We don't currently have PCIe support in mainline for arm64 but what I
-had in mind with the generic iomap is that functions like ioread32_rep
-first check whether the address is an IO address or a memory one and
-calls the insl or mmio_insl accordingly. With your generic
-implementation, this check disappears.
 
-The question is whether this functionality would still be needed.
+On 10/07/14 10:21, Linus Walleij wrote:
+> On Wed, Jul 9, 2014 at 1:18 PM, Rob Jones <rob.jones@codethink.co.uk> wrote:
+>
+>> Please note that I submitted a patch on 02/07/14 to create this
+>> function which was acked by Linus Walleij on 05/07/14.
+>>
+>> Great minds think alike, and all that.
+>
+> My mind certainly isn't any great :-(
+>
+
+I doubt that :-)
+
+> My left hand seems to be unaware of what the right hand is doing.
+>
+> Did I ACK that for merging through some other tree then?
+>
+
+You did: https://lkml.org/lkml/2014/7/4/715
+
+> And I guess if Himangi want to submit these ASoC patches, they
+> will have to go through the same tree as those patches in that case?
+>
+
+I don't know enough to comment.
+
+> And would you consider implementing a gpiod version...?
+>
+
+I will certainly consider it. I'm in the middle of something else right
+now but I should be available in a day or two and I'll have a look.
+
+>> However, I think that the version I submitted better replicates the
+>> original (non devm) functionality, see below.
+>>
+>> I didn't, however, add it to the documentation. +1 on that.
+>
+> Can you include that oneliner in your patch then to reduce
+> problems?
+>
+
+Certainly, with acknowledgement to Himangi Saraogi. Should I resubmit
+the patch series with amendment or should I put it in as a separate
+patch? Sorry for the noobie question but I *am* new to the kernel
+lists.
+
+> Yours,
+> Linus Walleij
+>
+>
 
 -- 
-Catalin
+Rob Jones
+Codethink Ltd
+mailto:rob.jones at codethink.co.uk
+tel:+44 161 236 5575
