@@ -1,96 +1,76 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 10 Jul 2014 08:25:43 -0700
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <CAGm_ybjRR_EpxPFOWVSG7D0HTE7PC4wPG_Rd1Xty8x_oAi+Biw@mail.gmail.com>
-References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
- <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
- <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
- <53BC1A63.80900@samsung.com>
- <CAD=FV=XjWu6RQ+9789fzg08Whq-d=XWoeT+dZ7YQLLJvCBUfwQ@mail.gmail.com>
- <CAGm_ybjRR_EpxPFOWVSG7D0HTE7PC4wPG_Rd1Xty8x_oAi+Biw@mail.gmail.com>
-Message-ID: <CAD=FV=Xype=Mv_zXsAZjUA-ZcAK6n3sf6ZqRkNkSv=aUZ3qDhw@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 10 Jul 2014 17:24:18 +0200
+Subject: [PATCH v9 09/11] seccomp: introduce writer locking
+In-Reply-To: <CAGXu5jL6q1d16uA1Yu+QO4eV7zWwcWEWgkZrwmsfymbMvEr6+Q@mail.gmail.com>
+References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
+ <1403911380-27787-10-git-send-email-keescook@chromium.org>
+ <20140709184215.GA4866@redhat.com> <20140709185549.GB4866@redhat.com>
+ <CAGXu5jL6q1d16uA1Yu+QO4eV7zWwcWEWgkZrwmsfymbMvEr6+Q@mail.gmail.com>
+Message-ID: <20140710152418.GB20861@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas,
-
-On Wed, Jul 9, 2014 at 9:35 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Doug,
+On 07/10, Kees Cook wrote:
 >
-> On Wed, Jul 9, 2014 at 8:52 PM, Doug Anderson <dianders@chromium.org> wrote:
->> Vikas,
->>
->> On Tue, Jul 8, 2014 at 9:20 AM, Tomasz Figa <t.figa@samsung.com> wrote:
->>> On 08.07.2014 17:27, Doug Anderson wrote:
->>>> Hi,
->>>>
->>>> On Tue, Jul 8, 2014 at 12:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>>> On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->>>>>
->>>>>> From: Doug Anderson <dianders@chromium.org>
->>>>>>
->>>>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
->>>>>> being reset across sleep/wake.  If we don't set it to anything then
->>>>>> the TPM will be reset.  U-Boot will detect this as invalid
->>>>>> and will reset the system on resume time. This GPIO can always be low
->>>>>> and not hurt anything.  It will get pulled back high again during a
->>>>>> normal warm reset when it will default back to an input.
->>>>>>
->>>>>> To properly preserve the TPM state across suspend/resume and to make
->>>>>> the chrome U-Boot happy, properly set the GPIO to mask the
->>>>>> reset to the TPM.
->>>>>>
->>>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
->>>>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->>>>> (...)
->>>>>> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
->>>>>> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
->>>>>> +       compatible = "regulator-fixed";
->>>>>
->>>>> No matter how the discussion ends up, regulator-fixed is wrong.
->>>>
->>>> OK, fair enough.
->>>>
->>>>
->>>>> Either folding it into the TPM driver or using a separate reset driver
->>>>> is fine with me.
->>>>
->>>> OK, Vikas: do you want to code up the driver?
->>>>
->>>>
->>>>> So what about the generic delayed reset GPIO thing?
->>>>> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
->>>>
->>>> That's a neat concept and could be useful in other cases, but I think
->>>> it's just as much of a hack as using a regulator.  This is not a reset
->>>> signal for the TPM.  This is a signal that will mask the CPU's reset
->>>> signal (using a special bit of board-specific logic).
->>>>
->>>>
->>>> Personally I think Tomasz's idea of using hogs (after his patches
->>>> allowing a default output level) is the cleanest, but I think Stephen
->>>> didn't like that.
->>>
->>> I don't see any benefits of using complex interfaces over simply
->>> initializing the pin to the right value once at boot-up or at
->>> suspend/resume. As far as I understand Doug's explanation of the
->>> problem, nothing else is expected from the OS with respect to this pin.
->>> Moreover it doesn't affect operation of any drivers.
->>>
->>> So I'm still for the simplest and effective solution, i.e. hogs.
->>
->> It looks as if Tomasz's patch has landed, so perhaps you could try to
->> code it up his way.  It should be very simple.  Please make sure to CC
->> Stephen Warren on the patch so that he is included in the discussion
->> (and of course include Tomasz, Linus W, etc).
+> On Wed, Jul 9, 2014 at 11:55 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> > On 07/09, Oleg Nesterov wrote:
+> >>
+> >> On 06/27, Kees Cook wrote:
+> >> >
+> >> >  static u32 seccomp_run_filters(int syscall)
+> >> >  {
+> >> > -   struct seccomp_filter *f;
+> >> > +   struct seccomp_filter *f = ACCESS_ONCE(current->seccomp.filter);
+> >>
+> >> I am not sure...
+> >>
+> >> This is fine if this ->filter is the 1st (and only) one, in this case
+> >> we can rely on rmb() in the caller.
+> >>
+> >> But the new filter can be installed at any moment. Say, right after that
+> >> rmb() although this doesn't matter. Either we need smp_read_barrier_depends()
+> >> after that, or smp_load_acquire() like the previous version did?
+> >
+> > Wait... and it seems that seccomp_sync_threads() needs smp_store_release()
+> > when it sets thread->filter = current->filter by the same reason?
+> >
+> > OTOH. smp_store_release() in seccomp_attach_filter() can die, "current"
+> > doesn't need a barrier to serialize with itself.
 >
-> Can you point me to Tomasz's patchset on which I should rebase this patch on.
+> I have lost track of what you're suggesting to change. :)
 
-You can base it atop (0635c88 pinctrl: samsung: Allow pin value to be
-initialized using pinfunc), which appears to be in linux-next.  That
-gives you "samsung,pin-val".
+Perhaps I am just trying to confuse you and myself ;)
 
-You can use that together with a pinctrl "hog" to specify the state of
-this pin for the board.
+But,
 
--Doug
+> Since rmb() happens before run_filters, isn't the ACCESS_ONCE
+> sufficient?
+
+Yes. But see above. ACCESS_ONCE is sufficient if we read the first filter
+installed by another thread, in this case rmb() pairs with mb_before_atomic()
+before set_bit(TIF_SECCOMP).
+
+IOW, if this threads sees TIF_SECCOMP, it should also see all modifications
+which were done before set_bit, including the data in ->filter points to.
+
+> We only care that TIF_SECCOMP, mode, and some filter is
+> valid. In a tsync thread race, it's okay to use not use the deepest
+> filter node in the list,
+
+Yes, it is fine if we miss yet another filter which was just installed by
+another thread.
+
+But, unless I missed something, the problem is that we can get this new
+filter.
+
+Just to simplify. Suppose TIF_SECCOMP was set a long ago. This thread
+has a single filter F1 and it enters seccomp_run_filters().
+
+Right before it does ACCESS_ONCE() to read the pointer, another thread
+does seccomp_sync_threads() and sets .filter = F2.
+
+If ACCESS_ONCE() returns F1 - everything is fine. But it can see the new
+pointer F2, and in this case we need a barrier to ensure that, say,
+LOAD(F2->prog) will see all the preceding changes in this memory.
+
+Oleg.
