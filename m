@@ -1,48 +1,124 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Jul 2014 20:36:41 +0200
-Subject: [PATCH 0/3] irqchip: atmel-aic: Add irq RTC fixups
-In-Reply-To: <20140710203249.23dd6444@bbrezillon>
-References: <1405016741-2407-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140710203249.23dd6444@bbrezillon>
-Message-ID: <20140710203641.2e17de80@bbrezillon>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 10 Jul 2014 11:40:26 -0700
+Subject: [PATCH v10 06/11] MIPS: add seccomp syscall
+In-Reply-To: <1405017631-27346-1-git-send-email-keescook@chromium.org>
+References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
+Message-ID: <1405017631-27346-7-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jul 2014 20:32:49 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+Wires up the new seccomp syscall.
 
-> On Thu, 10 Jul 2014 20:25:38 +0200
-> Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
-> 
-> > Hello,
-> > 
-> > This patch series introduce the notion of irq fixups for atmel SoCs.
-> > 
-> > In most at91 SoCs the first interrupt line is shared by several IPs, and
-> > some of these HW blocks might be in an unknown state when booting the
-> > Linux kernel.
-> > Hence these IPs might generate spurious interrupts if they've not masked
-> > their irqs and the shared irq line is requested by another peripheral.
-> > 
-> > These fixups were previously done in arch/arm/mach-at91/sysirq_mask.c
-> > but as we're trying to use standard implementation (IRQCHIP_DECLARE and
-> > automatic call of irqchip_init within arch/arm/kernel/irq.c) we need to
-> > do those fixups in the irqchip driver.
-> 
-> This is what I was talking about:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271425.htm
-> 
-> 
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/mips/include/uapi/asm/unistd.h |   15 +++++++++------
+ arch/mips/kernel/scall32-o32.S      |    1 +
+ arch/mips/kernel/scall64-64.S       |    1 +
+ arch/mips/kernel/scall64-n32.S      |    1 +
+ arch/mips/kernel/scall64-o32.S      |    1 +
+ 5 files changed, 13 insertions(+), 6 deletions(-)
 
-Oops, sorry this is not the appropriate thread: I meant to send this
-reply to this series:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271413.html
-
-
-
+diff --git a/arch/mips/include/uapi/asm/unistd.h b/arch/mips/include/uapi/asm/unistd.h
+index 5805414777e0..9bc13eaf9d67 100644
+--- a/arch/mips/include/uapi/asm/unistd.h
++++ b/arch/mips/include/uapi/asm/unistd.h
+@@ -372,16 +372,17 @@
+ #define __NR_sched_setattr		(__NR_Linux + 349)
+ #define __NR_sched_getattr		(__NR_Linux + 350)
+ #define __NR_renameat2			(__NR_Linux + 351)
++#define __NR_seccomp			(__NR_Linux + 352)
+ 
+ /*
+  * Offset of the last Linux o32 flavoured syscall
+  */
+-#define __NR_Linux_syscalls		351
++#define __NR_Linux_syscalls		352
+ 
+ #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
+ 
+ #define __NR_O32_Linux			4000
+-#define __NR_O32_Linux_syscalls		351
++#define __NR_O32_Linux_syscalls		352
+ 
+ #if _MIPS_SIM == _MIPS_SIM_ABI64
+ 
+@@ -701,16 +702,17 @@
+ #define __NR_sched_setattr		(__NR_Linux + 309)
+ #define __NR_sched_getattr		(__NR_Linux + 310)
+ #define __NR_renameat2			(__NR_Linux + 311)
++#define __NR_seccomp			(__NR_Linux + 312)
+ 
+ /*
+  * Offset of the last Linux 64-bit flavoured syscall
+  */
+-#define __NR_Linux_syscalls		311
++#define __NR_Linux_syscalls		312
+ 
+ #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
+ 
+ #define __NR_64_Linux			5000
+-#define __NR_64_Linux_syscalls		311
++#define __NR_64_Linux_syscalls		312
+ 
+ #if _MIPS_SIM == _MIPS_SIM_NABI32
+ 
+@@ -1034,15 +1036,16 @@
+ #define __NR_sched_setattr		(__NR_Linux + 313)
+ #define __NR_sched_getattr		(__NR_Linux + 314)
+ #define __NR_renameat2			(__NR_Linux + 315)
++#define __NR_seccomp			(__NR_Linux + 316)
+ 
+ /*
+  * Offset of the last N32 flavoured syscall
+  */
+-#define __NR_Linux_syscalls		315
++#define __NR_Linux_syscalls		316
+ 
+ #endif /* _MIPS_SIM == _MIPS_SIM_NABI32 */
+ 
+ #define __NR_N32_Linux			6000
+-#define __NR_N32_Linux_syscalls		315
++#define __NR_N32_Linux_syscalls		316
+ 
+ #endif /* _UAPI_ASM_UNISTD_H */
+diff --git a/arch/mips/kernel/scall32-o32.S b/arch/mips/kernel/scall32-o32.S
+index 3245474f19d5..ab02d14f1b5c 100644
+--- a/arch/mips/kernel/scall32-o32.S
++++ b/arch/mips/kernel/scall32-o32.S
+@@ -578,3 +578,4 @@ EXPORT(sys_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr		/* 4350 */
+ 	PTR	sys_renameat2
++	PTR	sys_seccomp
+diff --git a/arch/mips/kernel/scall64-64.S b/arch/mips/kernel/scall64-64.S
+index be2fedd4ae33..010dccf128ec 100644
+--- a/arch/mips/kernel/scall64-64.S
++++ b/arch/mips/kernel/scall64-64.S
+@@ -431,4 +431,5 @@ EXPORT(sys_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr		/* 5310 */
+ 	PTR	sys_renameat2
++	PTR	sys_seccomp
+ 	.size	sys_call_table,.-sys_call_table
+diff --git a/arch/mips/kernel/scall64-n32.S b/arch/mips/kernel/scall64-n32.S
+index c1dbcda4b816..c3b3b6525df5 100644
+--- a/arch/mips/kernel/scall64-n32.S
++++ b/arch/mips/kernel/scall64-n32.S
+@@ -424,4 +424,5 @@ EXPORT(sysn32_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr
+ 	PTR	sys_renameat2			/* 6315 */
++	PTR	sys_seccomp
+ 	.size	sysn32_call_table,.-sysn32_call_table
+diff --git a/arch/mips/kernel/scall64-o32.S b/arch/mips/kernel/scall64-o32.S
+index f1343ccd7ed7..bb1550b1f501 100644
+--- a/arch/mips/kernel/scall64-o32.S
++++ b/arch/mips/kernel/scall64-o32.S
+@@ -557,4 +557,5 @@ EXPORT(sys32_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr		/* 4350 */
+ 	PTR	sys_renameat2
++	PTR	sys_seccomp
+ 	.size	sys32_call_table,.-sys32_call_table
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
