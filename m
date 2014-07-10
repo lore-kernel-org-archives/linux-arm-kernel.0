@@ -1,77 +1,73 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 10 Jul 2014 11:14:29 +0200
-Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
-In-Reply-To: <20140709104332.GS19379@twins.programming.kicks-ass.net>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
- <53BB61E9.80200@linux.vnet.ibm.com>
- <CAKfTPtA8BVPtRRLzomqnGp7_uaSbFYmFTrrt4fpQTOb7qyjddg@mail.gmail.com>
- <53BCBD0E.2070609@linux.vnet.ibm.com>
- <20140709104332.GS19379@twins.programming.kicks-ass.net>
-Message-ID: <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Jul 2014 11:15:52 +0200
+Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
+ to host's quirk
+In-Reply-To: <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
+References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
+ <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
+Message-ID: <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 July 2014 12:43, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, Jul 09, 2014 at 09:24:54AM +0530, Preeti U Murthy wrote:
-
-[snip]
-
+On 10 July 2014 09:08, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Replaced the "disable-wp" into host's quirks.
+> (Because the slot-node is removed at dt-file.)
 >
->> Continuing with the above explanation; when LBF_ALL_PINNED flag is
->> set,and we jump to out_balanced, we clear the imbalance flag for the
->> sched_group comprising of cpu0 and cpu1,although there is actually an
->> imbalance. t2 could still be migrated to say cpu2/cpu3 (t2 has them in
->> its cpus allowed mask) in another sched group when load balancing is
->> done at the next sched domain level.
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+
+Hi Jaehoon,
+
+I plan to carry these patches through my mmc tree and I will share
+them through a PR from an immutable branch with the ARM SoC guys.
+Please tell me if you have any concern with this set up.
+
+Now, while I was applying this patch, I found it had checkpatch
+errors. Please run checkpatch and resend a new version.
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/dw_mmc.c |   12 +++++-------
+>  1 file changed, 5 insertions(+), 7 deletions(-)
 >
-> And this is where Vince is wrong; note how
-> update_sg_lb_stats()/sg_imbalance() uses group->sgc->imbalance, but
-> load_balance() sets: sd_parent->groups->sgc->imbalance, so explicitly
-> one level up.
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 1ac227c..a3ccd07 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
+>         int gpio_ro = mmc_gpio_get_ro(mmc);
 >
-
-I forgot this behavior when studying preeti use case
-
-> So what we can do I suppose is clear 'group->sgc->imbalance' at
-> out_balanced.
+>         /* Use platform get_ro function, else try on board write protect */
+> -       if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
+> +       if (slot->host->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
+>                 read_only = 0;
+>         else if (!IS_ERR_VALUE(gpio_ro))
+>                 read_only = gpio_ro;
+> @@ -2006,12 +2006,7 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
+>  static struct dw_mci_of_slot_quirks {
+>         char *quirk;
+>         int id;
+> -} of_slot_quirks[] = {
+> -       {
+> -               .quirk  = "disable-wp",
+> -               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
+> -       },
+> -};
+> +} of_slot_quirks[] = {};
 >
-> In any case, the entirely of this group imbalance crap is just that,
-> crap. Its a terribly difficult situation and the current bits more or
-> less fudge around some of the common cases. Also see the comment near
-> sg_imbalanced(). Its not a solid and 'correct' anything. Its a bunch of
-> hacks trying to deal with hard cases.
+>  static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
+>  {
+> @@ -2238,6 +2233,9 @@ static struct dw_mci_of_quirks {
+>         {
+>                 .quirk  = "broken-cd",
+>                 .id     = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
+> +       },{
+> +               .quirk  = "disable-wp",
+> +               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
+>         },
+>  };
 >
-> A 'good' solution would be prohibitively expensive I fear.
-
-I have tried to summarized several use cases that have been discussed
-for this patch
-
-The 1st use case is the one that i described in the commit message of
-this patch: If we have a sporadic imbalance that set the imbalance
-flag, we don't clear it after and it generates spurious and useless
-active load balance
-
-Then preeti came with the following use case :
-we have a sched_domain made of CPU0 and CPU1 in 2 different sched_groups
-2 tasks A and B are on CPU0, B can't run on CPU1, A is the running task.
-When CPU1's sched_group is doing load balance, the imbalance should be
-set. That's still happen with this patchset because the LBF_ALL_PINNED
-flag will be cleared thanks to task A.
-
-Preeti also explained me the following use cases on irc:
-
-If we have both tasks A and B that can't run on CPU1, the
-LBF_ALL_PINNED will stay set. As we can't do anything, we conclude
-that we are balanced, we go to out_balanced and we clear the imbalance
-flag. But we should not consider that as a balanced state but as a all
-tasks pinned state instead and we should let the imbalance flag set.
-If we now have 2 additional CPUs which are in the cpumask of task A
-and/or B at the parent sched_domain level , we should migrate one task
-in this group but this will not happen (with this patch) because the
-sched_group made of CPU0 and CPU1 is not overloaded (2 tasks for 2
-CPUs) and the imbalance flag has been cleared as described previously.
-
-I'm going to send a new revision of the patchset with the correction
-
-Vincent
+> --
+> 1.7.9.5
+>
