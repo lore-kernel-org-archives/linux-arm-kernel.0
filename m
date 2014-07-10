@@ -1,27 +1,35 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 10 Jul 2014 15:59:37 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20140710112441.GZ3935@laptop>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
- <20140710112441.GZ3935@laptop>
-Message-ID: <CAKfTPtC5pGr=0g=1ODT=fQL+XFXzU8nG6Fs8o2G3OYUFovvnfw@mail.gmail.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Thu, 10 Jul 2014 17:54:45 +0400
+Subject: [RFC/PATCH RESEND -next 03/21] x86: add kasan hooks fort
+ memcpy/memmove/memset functions
+In-Reply-To: <87ion6nxap.fsf@tassilo.jf.intel.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-4-git-send-email-a.ryabinin@samsung.com>
+ <87ion6nxap.fsf@tassilo.jf.intel.com>
+Message-ID: <53BE9B25.6090906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 13:24, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
->> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
->> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
->> +                                                     sd->imbalance_pct)))
->
->
->> +             if ((rq->cfs.h_nr_running >= 1)
->> +              && ((rq->cpu_capacity * sd->imbalance_pct) <
->> +                                     (rq->cpu_capacity_orig * 100))) {
->
-> That's just weird indentation and operators should be at the end not at
-> the beginning of a line-break.
+On 07/09/14 23:31, Andi Kleen wrote:
+> Andrey Ryabinin <a.ryabinin@samsung.com> writes:
+>> +
+>> +#undef memcpy
+>> +void *kasan_memset(void *ptr, int val, size_t len);
+>> +void *kasan_memcpy(void *dst, const void *src, size_t len);
+>> +void *kasan_memmove(void *dst, const void *src, size_t len);
+>> +
+>> +#define memcpy(dst, src, len) kasan_memcpy((dst), (src), (len))
+>> +#define memset(ptr, val, len) kasan_memset((ptr), (val), (len))
+>> +#define memmove(dst, src, len) kasan_memmove((dst), (src), (len))
+> 
+> I don't think just define is enough, gcc can call these functions
+> implicitely too (both with and without __). For example for a struct copy.
+> 
+> You need to have true linker level aliases. 
+> 
 
-Ok, i'm going to fix it
+It's true, but problem with linker aliases that they cannot be disabled for some files
+we don't want to instrument.
+
+> -Andi
+> 
