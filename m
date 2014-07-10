@@ -1,126 +1,77 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 10 Jul 2014 18:48:34 +0900
-Subject: [PATCHv4 1/5] mmc: dw_mmc: modify the dt-binding for removing
- slot-node and supports-highspeed
-In-Reply-To: <1404985718-12203-1-git-send-email-jh80.chung@samsung.com>
-References: <1404985718-12203-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1404985718-12203-2-git-send-email-jh80.chung@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 10 Jul 2014 11:49:10 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140709181048.GX9485@arm.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140709134050.GN9485@arm.com> <20140709142125.GB3262@ulmo>
+ <20140709181048.GX9485@arm.com>
+Message-ID: <20140710094909.GA21583@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Almost Soc is used the slot per a host.
-Don't use the slot-node and deprecated the "supports-highsped" property.
-Instead, use the cap-mmc/sd-highspeed.
+On Wed, Jul 09, 2014 at 07:10:48PM +0100, Will Deacon wrote:
+> Hi Thierry,
+> 
+> On Wed, Jul 09, 2014 at 03:21:27PM +0100, Thierry Reding wrote:
+> > On Wed, Jul 09, 2014 at 02:40:50PM +0100, Will Deacon wrote:
+> > > I would like to move the ARM SMMU driver over to this for 3.18, if possible.
+> > > One use-case there is the ability to describe groups of masters behind a
+> > > multi-master IOMMU but which must be part of the same domain (i.e. an
+> > > iommu_group). This is useful for presenting devices to a guest with a
+> > > virtual SMMU, where the physical devices share a stage-2 context.
+> > > 
+> > > With your binding, does this simply mean determining the set of master IDs
+> > > in the group, then describing the complete set for each master?
+> > 
+> > I'm not sure I properly understand what you're trying to do, but I don't
+> > think the binding is designed to cover that. Rather the goal was to
+> > describe the IDs belonging to each master, so that an IOMMU can be
+> > properly configured.
+> 
+> This is directly related to that problem, see below.
+> 
+> > Anything beyond that (e.g. logical grouping of masters) isn't directly
+> > within the scope of the binding (it doesn't describe hardware but some
+> > policy pertaining to some specific use-case).
+> 
+> This *is* for hardware. I can use PCI as an example, but this could equally
+> apply to other types of bus. If you have a bunch of PCI master devices
+> sitting being a non-transparent bridge, they can end up sharing the same
+> master device ID (requester ID). This means that there is no way in the
+> IOMMU to initialise a translation for one of these devices without also
+> affecting the others. We currently have iommu_groups to deal with this, but
+> it *is* a property of the hardware and we absolutely need a way to describe
+> it. I'm happy to add it later, but we need to think about it now to avoid
+> merging something that can't easily be extended.
+> 
+> For PCI, the topology is probable but even then, we need this information to
+> describe the resulting master device ID emitted by the bridge for the
+> upstream group. One way to do this with your binding would be to treat all
+> of the upstream masters as having the same device ID.
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Tushar Behera <trblinux@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
----
- .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   17 +++++------------
- .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   12 +++++-------
- .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |   12 +++++-------
- 3 files changed, 15 insertions(+), 26 deletions(-)
+Yes, I think that makes most sense. After all from the IOMMU's point of
+view requests from all devices behind the bridge will originate from the
+same ID.
 
-diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-index 532b1d4..9308325 100644
---- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-@@ -46,13 +46,14 @@ Required Properties:
-       - if CIU clock divider value is 0 (that is divide by 1), both tx and rx
-         phase shift clocks should be 0.
- 
--Required properties for a slot:
-+Required properties for a slot (Deprecated - Recommend to use one slot per a host):
- 
- * gpios: specifies a list of gpios used for command, clock and data bus. The
-   first gpio is the command line and the second gpio is the clock line. The
-   rest of the gpios (depending on the bus-width property) are the data lines in
-   no particular order. The format of the gpio specifier depends on the gpio
-   controller.
-+ (Deprecated - Refer to Documentaion/devicetree/binding/pinctrl/samsung-pinctrl.txt)
- 
- Example:
- 
-@@ -69,21 +70,13 @@ Example:
- 
- 	dwmmc0 at 12200000 {
- 		num-slots = <1>;
--		supports-highspeed;
-+		cap-mmc-highspeed;
-+		cap-sd-highspeed;
- 		broken-cd;
- 		fifo-depth = <0x80>;
- 		card-detect-delay = <200>;
- 		samsung,dw-mshc-ciu-div = <3>;
- 		samsung,dw-mshc-sdr-timing = <2 3>;
- 		samsung,dw-mshc-ddr-timing = <1 2>;
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <8>;
--			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
--				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
--				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
--				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
--				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
--		};
-+		bus-width = <8>;
- 	};
-diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-index e5bc49f..3b35449 100644
---- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-@@ -34,13 +34,11 @@ Example:
- 		num-slots = <1>;
- 		vmmc-supply = <&ldo12>;
- 		fifo-depth = <0x100>;
--		supports-highspeed;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
--		slot at 0 {
--			reg = <0>;
--			bus-width = <4>;
--			disable-wp;
--			cd-gpios = <&gpio10 3 0>;
--		};
-+		bus-width = <4>;
-+		disable-wp;
-+		cd-gpios = <&gpio10 3 0>;
-+		cap-mmc-highspeed;
-+		cap-sd-highspeed;
- 	};
-diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-index 2d4a725..346c609 100644
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-@@ -67,7 +67,8 @@ Optional properties:
- * card-detect-delay: Delay in milli-seconds before detecting card after card
-   insert event. The default value is 0.
- 
--* supports-highspeed: Enables support for high speed cards (up to 50MHz)
-+* supports-highspeed (DEPRECATED): Enables support for high speed cards (up to 50MHz)
-+			   (use "cap-mmc-highspeed" or "cap-sd-highspeed" instead)
- 
- * broken-cd: as documented in mmc core bindings.
- 
-@@ -98,14 +99,11 @@ board specific portions as listed below.
- 		clock-frequency = <400000000>;
- 		clock-freq-min-max = <400000 200000000>;
- 		num-slots = <1>;
--		supports-highspeed;
- 		broken-cd;
- 		fifo-depth = <0x80>;
- 		card-detect-delay = <200>;
- 		vmmc-supply = <&buck8>;
--
--		slot at 0 {
--			reg = <0>;
--			bus-width = <8>;
--		};
-+		bus-width = <8>;
-+		cap-mmc-highspeed;
-+		cap-sd-highspeed;
- 	};
--- 
-1.7.9.5
+So technically it's not really correct to encode the master ID within
+each of the devices, but rather they should be inheriting the ID from
+the non-transparent bridge.
+
+> With virtualisation, we may want to assign a group of devices to a guest but
+> without emulating the bridge. This would need something the device-tree to
+> describe that they are grouped together.
+
+But that's also a software decision, isn't it? Virtualization doesn't
+have anything to do with the hardware description. Or am I missing
+something? Of course I guess you could generate a DTB for the guest and
+group device together, in which case you're pretty much free to do what
+you want since you're essentially defining your own hardware.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/7b56bc1b/attachment.sig>
