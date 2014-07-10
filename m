@@ -1,31 +1,148 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jul 2014 22:48:01 +0200
-Subject: [PATCH 0/2] Add DT support for LaCie NAS d2 Network v2
-In-Reply-To: <1404830545-15581-1-git-send-email-simon.guinot@sequanux.org>
-References: <1401132591-26305-1-git-send-email-andrew@lunn.ch>
- <1404830545-15581-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20140710204801.GS21833@lunn.ch>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 10 Jul 2014 22:55:07 +0200
+Subject: dove (marvell A510) crash on boot with config_preempt
+In-Reply-To: <53BE8817.10703@gmail.com>
+References: <20140706080845.723e9787@armhf>
+ <20140708151705.GE13433@titan.lakedaemon.net> <53BE8817.10703@gmail.com>
+Message-ID: <53BEFDAB.4090606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 04:42:23PM +0200, Simon Guinot wrote:
-> Hi,
+On 07/10/2014 02:33 PM, Sebastian Hesselbarth wrote:
+> On 07/08/2014 05:17 PM, Jason Cooper wrote:
+>> On Sun, Jul 06, 2014 at 08:08:45AM +0200, Jean-Francois Moine wrote:
+>>> Since the official 3.15.0 release, the kernel crashes at boot time
+>>> when compiled with the option CONFIG_PREEMPT.
+>>>
+>>> Reverting the commit 431a84b1a4f7d1a0085d5b91330c5053cc8e8b12
+>>>
+>>>     ARM: 8034/1: Disable preemption in iwmmxt_task_enable()
+>>>
+>>> removes the problem.
+>>>
+>>> Linux version 3.16.0-rc3-00062-gd92a333-dirty (jef at armhf) (gcc
+>>> version 4.8.3 (Debian 4.8.3-4) ) #5 PREEMPT Thu Jul 3 19:46:39 CEST 2014
+> [...]
+>>> PJ4 iWMMXt v2 coprocessor enabled.
+> [...]
+>>> Unable to handle kernel paging request at virtual address fffffffe
+>>> pgd = bb25c000
+>>> [fffffffe] *pgd=3bfde821, *pte=00000000, *ppte=00000000
+>>> Internal error: Oops: 80000007 [#1] PREEMPT ARM
+>>> Modules linked in:
+>>> CPU: 0 PID: 62 Comm: startpar Not tainted
+>>> 3.16.0-rc3-00062-gd92a333-dirty #5
+>>> task: bb230b80 ti: bb256000 task.ti: bb256000
+>>> PC is at 0xfffffffe
+>>> LR is at iwmmxt_task_copy+0x44/0x4c
+>>> pc : [<fffffffe>]    lr : [<800130ac>]    psr: 40000033
+>>> sp : bb257de8  ip : 00000013  fp : bb257ea4
+>>> r10: bb256000  r9 : fffffdfe  r8 : 76e898e6
+>>> r7 : bb257ec8  r6 : bb256000  r5 : 7ea12760  r4 : 000000a0
+>>> r3 : ffffffff  r2 : 00000003  r1 : bb257df8  r0 : 00000000
+>>> Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
+>>> Control: 10c5387d  Table: 3b25c019  DAC: 00000015
+>>> Process startpar (pid: 62, stack limit = 0xbb256248)
 > 
-> This patch series completes the DT conversion for the LaCie Kirkwood
-> based boards by adding DT support for the d2 Network v2.
+> Ok, I have been able to debug this despite my limited knowledge of
+> iWMMXt and ARM asm. While the patch below fixes the issue, I have
+> no clue if it is the right approach or if there should be a different
+> solution. I'd like to leave that to either Russell or Catalin to decide.
+
+After thinking a while about it and because I missed it to mention:
+
+I did a bisect which ends in
+
+commit 1fb333489fb917c704ad43e51b45c12f52215a9c
+ ("Merge branches 'alignment', 'fixes', 'l2c' (early part) and 'misc'
+into for-next")
+
+which clearly isn't the offending commit itself but finally causing
+iwmmxt code to show the issue.
+
+I compared introduced {inc,dec}_preempt_count macros
+
+.macro  inc_preempt_count, ti, tmp
+ldr     \tmp, [\ti, #TI_PREEMPT]        @ get preempt count
+add     \tmp, \tmp, #1                  @ increment it
+str     \tmp, [\ti, #TI_PREEMPT]
+.endm
+
+.macro  dec_preempt_count, ti, tmp
+ldr     \tmp, [\ti, #TI_PREEMPT]        @ get preempt count
+sub     \tmp, \tmp, #1                  @ decrement it
+str     \tmp, [\ti, #TI_PREEMPT]
+.endm
+
+with common C defines for preempt_{disable,enable}
+
+#define preempt_disable() \
+do { \
+        preempt_count_inc(); \
+        barrier(); \
+} while (0)
+
+#define preempt_enable() \
+do { \
+        barrier(); \
+        preempt_count_dec(); \
+} while (0)
+
+and wondered about the missing barriers.
+
+The thing about iwmmxt.S is that it is assembled with -mcpu=iwmmxt
+causing the assembler to drop down to xscale instructions (?) which
+don't allow any atomic operations.
+
+Anyway, I may be wrong about it. At least I wanted to mention that
+bisect ends in above merge commit of l2c related cleanup and not
+the iwmmxt preempt commit itself.
+
+Sebastian
+
+> If anything in below explanation is wrong, please correct me
+> immediately!
 > 
-> Regards,
+> Above mentioned commit basically added {inc,dec}_preempt_count macros
+> to iwmmxt_task_enable to run it with preemption disabled:
 > 
-> Simon
+>  ENTRY(iwmmxt_task_enable)
+> +       inc_preempt_count r10, r3
+> [...]
+> concan_save:
+> [...]
+> concan_dump:
+> [...]
+> concan_load:
+> [...]
+> +3:
+> +#ifdef CONFIG_PREEMPT_COUNT
+> +       get_thread_info r10
+> +#endif
+> +4:     dec_preempt_count r10, r3
+>         mov     pc, lr
 > 
-> Simon Guinot (2):
->   ARM: Kirkwood: allow to use netxbig DTSI for d2net_v2 DTS
->   ARM: Kirkwood: add DT support for d2 Network v2
-
-Hi Simon
-
-These patches look good.
-
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-	  Andrew
+> Unfortunately, other procedures in iwmmxt.S, e.g. iwmmxt_task_copy,
+> also branch to above concan_{save,dump,load} labels without disabling
+> preemption first:
+> 
+> ENTRY(iwmmxt_task_copy)
+> [...]
+> 1:    @ this task owns Concan regs -- grab a copy from there
+>     mov    r0, #0            @ nothing to load
+>     mov    r2, #3            @ save all regs
+>     mov    r3, lr            @ preserve return address
+>     bl    concan_dump
+>     msr    cpsr_c, ip        @ restore interrupt mode
+>     mov    pc, r3
+> 
+> This causes two issues that finally lead to observed behavior:
+> (a) introduced {inc,dec}_preempt_count use r3 as temporary register,
+>     while iwmmxt_task_copy uses it to store its return address
+> (b) branching to concan_foo labels decrements preempt_count without
+>     incrementing it first
+> 
+> The patch below addresses (a) by using r4 as temporary register for
+> {inc,dec}_preempt_count macro and (b) by moving concan_foo into
+> separate code sections and call them from iwmmxt_task_enable like
+> the other procedures do.
