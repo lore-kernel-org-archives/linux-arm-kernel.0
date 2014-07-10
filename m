@@ -1,267 +1,42 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 10 Jul 2014 07:39:54 -0700
-Subject: [PATCH 4/6] arm/arm64: KVM: vgic: Improve handling of GICD_I{CS}PENDRn
+Date: Thu, 10 Jul 2014 07:39:53 -0700
+Subject: [PATCH 3/6] arm/arm64: KVM: vgic: Clear queued flags on unqueue
 In-Reply-To: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
 References: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1405003196-12403-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1405003196-12403-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writes to GICD_ISPENDRn and GICD_ICPENDRn are currently not handled
-correctly for level-triggered interrupts.  The spec states that for
-level-triggered interrupts, writes to the GICD_ISPENDRn activate the
-output of a flip-flop which is in turn or'ed with the actual input
-interrupt signal.  Correspondingly, writes to GICD_ICPENDRn simply
-deactivates the output of that flip-flop, but does not (of course) affect
-the external input signal.  Reads from GICC_IAR will also deactivate the
-flip-flop output.
+If we unqueue a level-triggered interrupt completely, and the LR does
+not stick around in the active state (and will therefore no longer
+generate a maintenance interrupt), then we should clear the queued flag
+so that the vgic can actually queue this level-triggered interrupt at a
+later time and deal with its pending state then.
 
-This requires us to track the state of the level-input separately from
-the state in the flip-flop.  We therefore introduce two new variables on
-the distributor struct to track these two states.  Astute readers may
-notice that this is introducing more state than required (because an OR
-of the two states gives you the pending state), but the remaining vgic
-code uses the pending bitmap for optimized operations to figure out, at
-the end of the day, if an interrupt is pending or not on the distributor
-side.  Refactoring the code to consider the two state variables all the
-places where we currently access the precomputed pending value, did not
-look pretty.
+Note: This should actually be properly fixed to handle the active state
+on the distributor.
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_vgic.h |  16 ++++++-
- virt/kvm/arm/vgic.c    | 123 ++++++++++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 127 insertions(+), 12 deletions(-)
+ virt/kvm/arm/vgic.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7d8e61f..f074539 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -140,9 +140,23 @@ struct vgic_dist {
- 	/* Interrupt enabled (one bit per IRQ) */
- 	struct vgic_bitmap	irq_enabled;
- 
--	/* Interrupt state is pending on the distributor */
-+	/* Level-triggered interrupt external input is asserted */
-+	struct vgic_bitmap	irq_level;
-+
-+	/*
-+	 * Interrupt state is pending on the distributor
-+	 */
- 	struct vgic_bitmap	irq_pending;
- 
-+	/*
-+	 * Tracks writes to GICD_ISPENDRn and GICD_ICPENDRn for level-triggered
-+	 * interrupts.  Essentially holds the state of the flip-flop in
-+	 * Figure 4-10 on page 4-101 in ARM IHI 0048B.b.
-+	 * Once set, it is only cleared for level-triggered interrupts on
-+	 * guest ACKs (when we queue it) or writes to GICD_ICPENDRn.
-+	 */
-+	struct vgic_bitmap	irq_soft_pend;
-+
- 	/* Level-triggered interrupt queued on VCPU interface */
- 	struct vgic_bitmap	irq_queued;
- 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 1b85f42..7b0ab7f 100644
+index c5b1ad7..1b85f42 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -67,6 +67,11 @@
-  * - When the interrupt is EOIed, the maintenance interrupt fires,
-  *   and clears the corresponding bit in irq_queued. This allow the
-  *   interrupt line to be sampled again.
-+ * - Note that level-triggered interrupts can also be set to pending from
-+ *   writes to GICD_ISPENDRn and lowering the external input line does not
-+ *   cause the interrupt to become inactive in such a situation.
-+ *   Conversely, writes to GICD_ICPENDRn do not cause the interrupt to become
-+ *   inactive as long as the external input line is held high.
-  */
- 
- #define VGIC_ADDR_UNDEF		(-1)
-@@ -217,6 +222,41 @@ static void vgic_irq_clear_queued(struct kvm_vcpu *vcpu, int irq)
- 	vgic_bitmap_set_irq_val(&dist->irq_queued, vcpu->vcpu_id, irq, 0);
- }
- 
-+static int vgic_dist_irq_get_level(struct kvm_vcpu *vcpu, int irq)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	return vgic_bitmap_get_irq_val(&dist->irq_level, vcpu->vcpu_id, irq);
-+}
-+
-+static void vgic_dist_irq_set_level(struct kvm_vcpu *vcpu, int irq)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	vgic_bitmap_set_irq_val(&dist->irq_level, vcpu->vcpu_id, irq, 1);
-+}
-+
-+static void vgic_dist_irq_clear_level(struct kvm_vcpu *vcpu, int irq)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	vgic_bitmap_set_irq_val(&dist->irq_level, vcpu->vcpu_id, irq, 0);
-+}
-+
-+static int vgic_dist_irq_soft_pend(struct kvm_vcpu *vcpu, int irq)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	return vgic_bitmap_get_irq_val(&dist->irq_soft_pend, vcpu->vcpu_id, irq);
-+}
-+
-+static void vgic_dist_irq_clear_soft_pend(struct kvm_vcpu *vcpu, int irq)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	vgic_bitmap_set_irq_val(&dist->irq_soft_pend, vcpu->vcpu_id, irq, 0);
-+}
-+
- static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-@@ -409,11 +449,26 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
- 					phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_pending,
--				       vcpu->vcpu_id, offset);
-+	u32 *reg;
-+	u32 level_mask;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	reg = vgic_bitmap_get_reg(&dist->irq_cfg, vcpu->vcpu_id, offset);
-+	level_mask = (~(*reg));
-+
-+	/* Mark both level and edge triggered irqs as pending */
-+	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
-+
- 	if (mmio->is_write) {
-+		/* Set the soft-pending flag only for level-triggered irqs */
-+		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
-+					  vcpu->vcpu_id, offset);
-+		vgic_reg_access(mmio, reg, offset,
-+				ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
-+		*reg &= level_mask;
-+
- 		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -425,11 +480,27 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  struct kvm_exit_mmio *mmio,
- 					  phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_pending,
--				       vcpu->vcpu_id, offset);
-+	u32 *level_active;
-+	u32 *reg;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
- 	if (mmio->is_write) {
-+		/* Re-set level triggered level-active interrupts */
-+		level_active = vgic_bitmap_get_reg(&dist->irq_level,
-+					  vcpu->vcpu_id, offset);
-+		reg = vgic_bitmap_get_reg(&dist->irq_pending,
-+					  vcpu->vcpu_id, offset);
-+		*reg |= *level_active;
-+
-+		/* Clear soft-pending flags */
-+		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
-+					  vcpu->vcpu_id, offset);
-+		vgic_reg_access(mmio, reg, offset,
-+				ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
-+
- 		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -1263,17 +1334,36 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 
- 		for_each_set_bit(lr, eisr_ptr, vgic->nr_lr) {
- 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
-+			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
- 
- 			vgic_irq_clear_queued(vcpu, vlr.irq);
- 			WARN_ON(vlr.state & LR_STATE_MASK);
- 			vlr.state = 0;
- 			vgic_set_lr(vcpu, lr, vlr);
- 
-+			/*
-+			 * If the IRQ was EOIed it was also ACKed and we we
-+			 * therefore assume we can clear the soft pending
-+			 * state (should it had been set) for this interrupt.
-+			 *
-+			 * Note: if the IRQ soft pending state was set after
-+			 * the IRQ was acked, it actually shouldn't be
-+			 * cleared, but we have no way of knowing that unless
-+			 * we start trapping ACKs when the soft-pending state
-+			 * is set.
-+			 */
-+			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
-+
- 			/* Any additional pending interrupt? */
--			if (vgic_dist_irq_is_pending(vcpu, vlr.irq)) {
-+			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-+				/*
-+				 * XXX: vgic_cpu_irq_set not always be true in
-+				 * this case?
-+				 */
- 				vgic_cpu_irq_set(vcpu, vlr.irq);
- 				level_pending = true;
- 			} else {
-+				vgic_dist_irq_clear_pending(vcpu, vlr.irq);
- 				vgic_cpu_irq_clear(vcpu, vlr.irq);
- 			}
- 
-@@ -1379,17 +1469,19 @@ static void vgic_kick_vcpus(struct kvm *kvm)
- static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
- {
- 	int edge_triggered = vgic_irq_is_edge(vcpu, irq);
--	int state = vgic_dist_irq_is_pending(vcpu, irq);
- 
- 	/*
- 	 * Only inject an interrupt if:
- 	 * - edge triggered and we have a rising edge
- 	 * - level triggered and we change level
- 	 */
--	if (edge_triggered)
-+	if (edge_triggered) {
-+		int state = vgic_dist_irq_is_pending(vcpu, irq);
- 		return level > state;
--	else
-+	} else {
-+		int state = vgic_dist_irq_get_level(vcpu, irq);
- 		return level != state;
-+	}
- }
- 
- static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-@@ -1419,10 +1511,19 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 
- 	kvm_debug("Inject IRQ%d level %d CPU%d\n", irq_num, level, cpuid);
- 
--	if (level)
-+	if (level) {
-+		if (level_triggered)
-+			vgic_dist_irq_set_level(vcpu, irq_num);
- 		vgic_dist_irq_set_pending(vcpu, irq_num);
--	else
--		vgic_dist_irq_clear_pending(vcpu, irq_num);
-+	} else {
-+		if (level_triggered) {
-+			vgic_dist_irq_clear_level(vcpu, irq_num);
-+			if (!vgic_dist_irq_soft_pend(vcpu, irq_num))
-+				vgic_dist_irq_clear_pending(vcpu, irq_num);
-+		} else {
-+			vgic_dist_irq_clear_pending(vcpu, irq_num);
+@@ -662,8 +662,10 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 		 * active), then the LR does not hold any useful info and can
+ 		 * be marked as free for other use.
+ 		 */
+-		if (!(lr.state & LR_STATE_MASK))
++		if (!(lr.state & LR_STATE_MASK)) {
+ 			vgic_retire_lr(i, lr.irq, vcpu);
++			vgic_irq_clear_queued(vcpu, lr.irq);
 +		}
-+	}
  
- 	enabled = vgic_irq_is_enabled(vcpu, irq_num);
- 
+ 		/* Finally update the VGIC state. */
+ 		vgic_update_state(vcpu->kvm);
 -- 
 2.0.0
