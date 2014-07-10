@@ -1,49 +1,51 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Thu, 10 Jul 2014 19:14:49 +0100
-Subject: [PATCH v2] efi: implement mandatory locking for UEFI Runtime
- Services
-In-Reply-To: <CAKv+Gu86W0hBEZhz_Aw07TmRHv8kgQN7JeRMC0Qs6FL0m6BrOQ@mail.gmail.com>
-References: <1404818508-17537-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu86W0hBEZhz_Aw07TmRHv8kgQN7JeRMC0Qs6FL0m6BrOQ@mail.gmail.com>
-Message-ID: <20140710181449.GI15932@console-pimps.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 10 Jul 2014 14:23:11 -0400 (EDT)
+Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <1405005486-26355-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1407101154070.1492-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 08 Jul, at 01:23:55PM, Ard Biesheuvel wrote:
-> On 8 July 2014 13:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > According to section 7.1 of the UEFI spec, Runtime Services are not fully
-> > reentrant, and there are particular combinations of calls that need to be
-> > serialized.
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >
-> > So this is v2 of the UEFI Runtime Services serialization patch: this time, I use
-> > a single spinlock rather than a set of mutexes, resulting in all services to be
-> > serialized with respect to all others. Also added handling of NMI state, as this
-> > results in some of the restrictions being lifted (x86, ia64 only)
-> >
-> > One question remains: with the NMI deadlock handling in place, is it really
-> > necessary to disable interrupts in all cases?
-> >
-> 
-> I omitted this hunk from the patch by accident:
+On Thu, 10 Jul 2014, Peter Griffin wrote:
 
-I'm seeing the following build warning with this patch,
+> This driver adds support for the USB HCD present in STi
+> SoC's from STMicroelectronics. It has been tested on the
+> stih416-b2020 board.
 
-In file included from include/linux/seqlock.h:35:0,
-                 from include/linux/time.h:5,
-                 from include/linux/efi.h:16,
-                 from drivers/firmware/efi/runtime-wrappers.c:18:
-drivers/firmware/efi/runtime-wrappers.c: In function ?virt_efi_query_capsule_caps?:
-include/linux/spinlock.h:358:2: warning: ?flags? may be used uninitialized in this function [-Wmaybe-uninitialized]
-drivers/firmware/efi/runtime-wrappers.c:275:16: note: ?flags? was declared here
+This driver file, along with the Kconfig changes, belongs in the
+arch/platform-specific source directory.  Not in drivers/usb/host/.  
+It is, after all, a platform driver that registers two platform
+devices.
 
-You'll need to cache the value of efi_in_nmi() in a local variable.
+> +++ b/drivers/usb/host/Kconfig
+> @@ -753,6 +753,23 @@ config USB_HCD_SSB
+>  
+>  	  If unsure, say N.
+>  
+> +config USB_HCD_ST
+> +	tristate "STMicroelectronics STi family HCD support"
 
-That should be safe, since if we're not executing in NMI context when we
-enter the function we won't be executing in NMI context at any point in
-during function. It's just that gcc can't infer that information.
+Why does this need to be tristate?  Why not always build it into the 
+kernel?  Or at least make it boolean rather than tristate.
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+> +	depends on ARCH_STI
+> +	select USB_OHCI_HCD_PLATFORM if USB_OHCI_HCD
+> +	select USB_EHCI_HCD_PLATFORM if USB_EHCI_HCD
+> +	select MFD_SYSCON
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable support for the EHCI and OCHI host controller on ST
+
+s/OCHI/OHCI/
+
+> + 	  consumer electronics SoCs.
+> +
+> + 	  It converts the ST driver into two platform device drivers
+
+It converts the ST driver?  That doesn't sound right at all.  You could 
+eliminate this paragraph completely and nobody would miss it.
+
+> + 	  for EHCI and OHCI and provides bus configuration, clock and power
+> + 	  management for the combined hardware block.
+
+Alan Stern
