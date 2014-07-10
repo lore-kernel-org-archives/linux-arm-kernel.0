@@ -1,106 +1,109 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 10 Jul 2014 19:00:30 +0530
-Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
-In-Reply-To: <53BE926A.2070005@ti.com>
-References: <cover.1404976058.git.viresh.kumar@linaro.org>
- <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
- <53BE926A.2070005@ti.com>
-Message-ID: <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
+From: sasha.levin@oracle.com (Sasha Levin)
+Date: Thu, 10 Jul 2014 09:31:06 -0400
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <53BE8EA5.2030402@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+ <53BE7F29.20304@oracle.com> <53BE8EA5.2030402@samsung.com>
+Message-ID: <53BE959A.4010206@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 18:47, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> On Thursday 10 July 2014 12:56 PM, Viresh Kumar wrote:
->> From: Pratyush Anand <pratyush.anand@st.com>
->>
->> ARM based ST Microelectronics's SPEAr1310/40 platforms uses ST's phy (known as
->> 'miphy') for PCIe and SATA. This patch adds drivers for these miphys.
->>
->> This also adds proper bindings for miphys.
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
->> Tested-by: Mohit Kumar <mohit.kumar@st.com>
->> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->> [viresh: fixed logs/cclist/checkpatch warnings, broken into smaller patches]
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->> ---
->>  .../devicetree/bindings/phy/st-spear1310-miphy.txt |  12 +
->>  .../devicetree/bindings/phy/st-spear1340-miphy.txt |  11 +
->>  drivers/phy/Kconfig                                |  12 +
->>  drivers/phy/Makefile                               |   2 +
->>  drivers/phy/phy-spear1310-miphy.c                  | 274 +++++++++++++++++++
->>  drivers/phy/phy-spear1340-miphy.c                  | 302 +++++++++++++++++++++
->
-> Please send separate patche for each driver.
+On 07/10/2014 09:01 AM, Andrey Ryabinin wrote:
+> On 07/10/14 15:55, Sasha Levin wrote:
+>> > On 07/09/2014 07:29 AM, Andrey Ryabinin wrote:
+>>> >> Address sanitizer for kernel (kasan) is a dynamic memory error detector.
+>>> >>
+>>> >> The main features of kasan is:
+>>> >>  - is based on compiler instrumentation (fast),
+>>> >>  - detects out of bounds for both writes and reads,
+>>> >>  - provides use after free detection,
+>>> >>
+>>> >> This patch only adds infrastructure for kernel address sanitizer. It's not
+>>> >> available for use yet. The idea and some code was borrowed from [1].
+>>> >>
+>>> >> This feature requires pretty fresh GCC (revision r211699 from 2014-06-16 or
+>>> >> latter).
+>>> >>
+>>> >> Implementation details:
+>>> >> The main idea of KASAN is to use shadow memory to record whether each byte of memory
+>>> >> is safe to access or not, and use compiler's instrumentation to check the shadow memory
+>>> >> on each memory access.
+>>> >>
+>>> >> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
+>>> >> mapping with a scale and offset to translate a memory address to its corresponding
+>>> >> shadow address.
+>>> >>
+>>> >> Here is function to translate address to corresponding shadow address:
+>>> >>
+>>> >>      unsigned long kasan_mem_to_shadow(unsigned long addr)
+>>> >>      {
+>>> >>                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
+>>> >>                              + kasan_shadow_start;
+>>> >>      }
+>>> >>
+>>> >> where KASAN_SHADOW_SCALE_SHIFT = 3.
+>>> >>
+>>> >> So for every 8 bytes of lowmemory there is one corresponding byte of shadow memory.
+>>> >> The following encoding used for each shadow byte: 0 means that all 8 bytes of the
+>>> >> corresponding memory region are valid for access; k (1 <= k <= 7) means that
+>>> >> the first k bytes are valid for access, and other (8 - k) bytes are not;
+>>> >> Any negative value indicates that the entire 8-bytes are unaccessible.
+>>> >> Different negative values used to distinguish between different kinds of
+>>> >> unaccessible memory (redzones, freed memory) (see mm/kasan/kasan.h).
+>>> >>
+>>> >> To be able to detect accesses to bad memory we need a special compiler.
+>>> >> Such compiler inserts a specific function calls (__asan_load*(addr), __asan_store*(addr))
+>>> >> before each memory access of size 1, 2, 4, 8 or 16.
+>>> >>
+>>> >> These functions check whether memory region is valid to access or not by checking
+>>> >> corresponding shadow memory. If access is not valid an error printed.
+>>> >>
+>>> >> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerForKernel
+>>> >>
+>>> >> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+>> > 
+>> > I gave it a spin, and it seems that it fails for what you might call a "regular"
+>> > memory size these days, in my case it was 18G:
+>> > 
+>> > [    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate 0xe0c00000 bytes below 0x0.
+>> > [    0.000000]
+>> > [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.16.0-rc4-next-20140710-sasha-00044-gb7b0579-dirty #784
+>> > [    0.000000]  ffffffffb9c2d3c8 cd9ce91adea4379a 0000000000000000 ffffffffb9c2d3c8
+>> > [    0.000000]  ffffffffb9c2d330 ffffffffb7fe89b7 ffffffffb93c8c28 ffffffffb9c2d3b8
+>> > [    0.000000]  ffffffffb7fcff1d 0000000000000018 ffffffffb9c2d3c8 ffffffffb9c2d360
+>> > [    0.000000] Call Trace:
+>> > [    0.000000] <UNK> dump_stack (lib/dump_stack.c:52)
+>> > [    0.000000] panic (kernel/panic.c:119)
+>> > [    0.000000] memblock_alloc_base (mm/memblock.c:1092)
+>> > [    0.000000] memblock_alloc (mm/memblock.c:1097)
+>> > [    0.000000] kasan_alloc_shadow (mm/kasan/kasan.c:151)
+>> > [    0.000000] zone_sizes_init (arch/x86/mm/init.c:684)
+>> > [    0.000000] paging_init (arch/x86/mm/init_64.c:677)
+>> > [    0.000000] setup_arch (arch/x86/kernel/setup.c:1168)
+>> > [    0.000000] ? printk (kernel/printk/printk.c:1839)
+>> > [    0.000000] start_kernel (include/linux/mm_types.h:462 init/main.c:533)
+>> > [    0.000000] ? early_idt_handlers (arch/x86/kernel/head_64.S:344)
+>> > [    0.000000] x86_64_start_reservations (arch/x86/kernel/head64.c:194)
+>> > [    0.000000] x86_64_start_kernel (arch/x86/kernel/head64.c:183)
+>> > 
+>> > It got better when I reduced memory to 1GB, but then my system just failed to boot
+>> > at all because that's not enough to bring everything up.
+>> > 
+> Thanks.
+> I think memory size is not a problem here. I tested on my desktop with 16G.
+> Seems it's a problem with memory holes cited by Dave.
+> kasan tries to allocate ~3.5G. It means that lowmemsize is 28G in your case.
 
-These were both around SPEAr and were on the same lines.
-So sending these in a single patch shouldn't be a big issue I believe.
+That's correct (I've mistyped and got 18 instead of 28 above).
 
-In case another version is required, I may do it.
+However, I'm a bit confused here, I thought highmem/lowmem split was a 32bit
+thing, so I'm not sure how it applies here.
 
->> diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
->> new file mode 100644
->> index 0000000..b9b281a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
->
-> We generally create a single document for a SoC vendor. So just use st-phy.txt.
+Anyways, the machine won't boot with more than 1GB of RAM, is there a solution to
+get KASAN running on my machine?
 
-Probably yes.
 
-> <snip>
-
-Please keep line containing file names while removing stuff, makes it easy
-to locate code.
-
->> +
->> +static int spear1340_miphy_sata_init(struct spear1340_miphy_priv *priv)
->> +{
->> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
->> +                        SPEAR1340_PCIE_SATA_CFG_MASK,
->> +                        SPEAR1340_SATA_CFG_VAL);
->> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
->> +                        SPEAR1340_PCIE_MIPHY_CFG_MASK,
->> +                        SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
->> +     /* Switch on sata power domain */
->> +     regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
->> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN,
->> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN);
->> +     msleep(20);
->> +     /* Disable PCIE SATA Controller reset */
->> +     regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
->> +                        SPEAR1340_PERIP1_SW_RSATA, 0);
->> +     msleep(20);
->
-> Please add a comment for all delays added.
-
-@Pratyush/Mohit: please let me know what to add here.
-
->> +#ifdef CONFIG_PM_SLEEP
->> +static int spear1340_miphy_suspend(struct device *dev)
->> +{
->> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
->> +     int ret = 0;
->> +
->> +     if (priv->mode == SATA)
->> +             ret = spear1340_miphy_sata_exit(priv);
->
-> Shouldn't this be spear1340_miphy_init()?
->> +
->> +     return ret;
->> +}
->> +
->> +static int spear1340_miphy_resume(struct device *dev)
->> +{
->> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
->> +     int ret = 0;
->> +
->> +     if (priv->mode == SATA)
->> +             ret = spear1340_miphy_sata_init(priv);
->
-> And here spear1340_miphy_exit()? Why only for sata phys?
-
-@Mohit/Pratyush ??
-
-Thanks Kishon for another round of review :)
+Thanks,
+Sasha
