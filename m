@@ -1,27 +1,107 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Thu, 10 Jul 2014 11:04:26 +0100
-Subject: [PATCH] efi: fdt: Do not report an error during boot if UEFI is
- not available
-In-Reply-To: <1404834858-10706-1-git-send-email-catalin.marinas@arm.com>
-References: <1404834858-10706-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20140710100426.GD15932@console-pimps.org>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 10 Jul 2014 15:38:27 +0530
+Subject: [PATCH v6 15/23] regulator: max77686: Setup DVS-related GPIOs on
+ probe
+In-Reply-To: <1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
+References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 08 Jul, at 04:54:18PM, Catalin Marinas wrote:
-> Currently, fdt_find_uefi_params() reports an error if no EFI parameters
-> are found in the DT. This is however a valid case for non-UEFI kernel
-> booting. This patch checks changes the error reporting to a
-> pr_info("UEFI not found") when no EFI parameters are found in the DT.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+On Fri, Jul 4, 2014 at 3:25 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> MAX77686 PMIC support Dyamic Voltage Scaling (DVS) on a set
+> of Buck regulators. A number of GPIO are connected to these
+> lines and are requested by the mfd driver. Setup the GPIO
+> pins from the regulator driver.
+If possible merge this patch with patch 8. Both are adding DVS
+support. Put regmap_copy dependency patch in very beginning.
+>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
->  drivers/firmware/efi/efi.c | 22 +++++++++++++++-------
->  1 file changed, 15 insertions(+), 7 deletions(-)
-
-Thanks, applied to 'urgent' for v3.16.
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+>  drivers/regulator/max77686.c | 34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>
+> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+> index ef1af2d..ecce77a 100644
+> --- a/drivers/regulator/max77686.c
+> +++ b/drivers/regulator/max77686.c
+> @@ -435,6 +435,12 @@ static int max77686_pmic_dt_parse_pdata(struct platform_device *pdev,
+>  }
+>  #endif /* CONFIG_OF */
+>
+> +static inline bool max77686_is_dvs_buck(int id)
+> +{
+> +       /* BUCK 2,3 and 4 support DVS */
+> +       return (id >= MAX77686_BUCK2 && id <= MAX77686_BUCK4);
+I am just wondering if along with above check, SELB gpios (if present)
+can be used to confirm if BUCK's are DVS based or not.
+> +}
+> +
+>  static int max77686_pmic_probe(struct platform_device *pdev)
+>  {
+>         struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+> @@ -442,6 +448,9 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>         struct max77686_data *max77686;
+>         int i, ret = 0;
+>         struct regulator_config config = { };
+> +       unsigned int reg;
+> +       int buck_default_idx;
+> +       int buck_old_idx;
+>
+>         dev_dbg(&pdev->dev, "%s\n", __func__);
+>
+> @@ -472,13 +481,34 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>         config.driver_data = max77686;
+>         platform_set_drvdata(pdev, max77686);
+>
+> +       buck_default_idx = pdata->buck_default_idx;
+> +       buck_old_idx = max77686_read_gpios(pdata);
+> +
+>         for (i = 0; i < MAX77686_REGULATORS; i++) {
+>                 struct regulator_dev *rdev;
+> +               int id = pdata->regulators[i].id;
+>
+>                 config.init_data = pdata->regulators[i].initdata;
+>                 config.of_node = pdata->regulators[i].of_node;
+>
+>                 max77686->opmode[i] = regulators[i].enable_mask;
+> +
+> +               if (max77686_is_dvs_buck(id)) {
+> +                       /* Try to copy over data so we keep firmware settings */
+> +                       reg = regulators[i].vsel_reg;
+> +
+> +                       ret = regmap_reg_copy(iodev->regmap,
+> +                                             reg + buck_default_idx,
+> +                                             reg + buck_old_idx);
+> +
+> +                       if (ret)
+> +                               dev_warn(&pdev->dev, "Copy err %d => %d (%d)\n",
+> +                                        reg + buck_old_idx,
+> +                                        reg + buck_default_idx, ret);
+> +
+> +                       regulators[i].vsel_reg += buck_default_idx;
+> +               }
+> +
+>                 rdev = devm_regulator_register(&pdev->dev,
+>                                                 &regulators[i], &config);
+>                 if (IS_ERR(rdev)) {
+> @@ -488,6 +518,10 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>                 }
+>         }
+>
+> +       ret = max77686_setup_gpios(iodev->dev);
+> +       if (ret)
+> +               return ret;
+> +
+>         return 0;
+>  }
+>
+> --
+> 2.0.0.rc2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
