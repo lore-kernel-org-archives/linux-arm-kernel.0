@@ -1,66 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Jul 2014 17:09:45 +0200
-Subject: a case for a common efuse API?
-In-Reply-To: <53BEB443.9000606@ti.com>
-References: <53BC4DD7.20906@codeaurora.org> <20140709083509.GQ13423@lukather>
- <53BDD0F3.7040906@codeaurora.org> <20140710142616.GD27469@lukather>
- <53BEB443.9000606@ti.com>
-Message-ID: <20140710150945.GF27469@lukather>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 10 Jul 2014 17:08:32 +0200
+Subject: [PATCH v9 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <CAGXu5jLUqz-T1tRBCpPLkzWijyAF-Vjw_7PnQ1EvUh4urwyaUg@mail.gmail.com>
+References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
+ <1403911380-27787-12-git-send-email-keescook@chromium.org>
+ <20140709180520.GA2560@redhat.com>
+ <CAGXu5jLUqz-T1tRBCpPLkzWijyAF-Vjw_7PnQ1EvUh4urwyaUg@mail.gmail.com>
+Message-ID: <20140710150832.GA20861@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 06:41:55PM +0300, Grygorii Strashko wrote:
-> On 07/10/2014 05:26 PM, Maxime Ripard wrote:
-> >On Wed, Jul 09, 2014 at 04:32:03PM -0700, Stephen Boyd wrote:
-> >>On 07/09/14 01:35, Maxime Ripard wrote:
-> >>>Hi Stephen,
-> >>>
-> >>>On Tue, Jul 08, 2014 at 01:00:23PM -0700, Stephen Boyd wrote:
-> >>>>Hi,
-> >>>>
-> >>>>On MSM chips we have some efuses (called qfprom) where we store things
-> >>>>like calibration data, speed bins, etc. We need to read out data from
-> >>>>the efuses in various drivers like the cpufreq, thermal, etc. This
-> >>>>essentially boils down to a bunch of readls on the efuse from a handful
-> >>>>of different drivers. In devicetree this looks a little odd because
-> >>>>these drivers end up having an extra reg property (or two) that points
-> >>>>to a register in the efuse and some length, i.e you see this:
-> >>>>
-> >>>>	thermal-sensor at 34000 {
-> >>>>		compatible = "sensor";
-> >>>>		reg = <0x34000 0x1000>, <0x10018 0xc>;
-> >>>>		reg-names = "sensor", "efuse_calib";
-> >>>>	}
-> >>>>
-> >>>>
-> >>>>I imagine in DT we want something more like this:
-> >>>>
-> >>>>	efuse: efuse at 10000 {
-> >>>>		compatible = "efuse";
-> >>>>		reg = <0x10000 0x1000>;
-> >>>>	}
-> >>>>
-> >>>>	thermal-sensor at 34000 {
-> >>>>		compatible = "sensor";
-> >>>>		reg = <0x34000 0x1000>;
-> >>>>		efuse = <&efuse 0x18>;
-> >>>>	}
-> 
-> Why don't use "syscon" framework for your needs? (mfd/syscon.c)
+On 07/10, Kees Cook wrote:
+>
+> On Wed, Jul 9, 2014 at 11:05 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> >
+> >> +     /*
+> >> +      * Make sure we cannot change seccomp or nnp state via TSYNC
+> >> +      * while another thread is in the middle of calling exec.
+> >> +      */
+> >> +     if (flags & SECCOMP_FILTER_FLAG_TSYNC &&
+> >> +         mutex_lock_killable(&current->signal->cred_guard_mutex))
+> >> +             goto out_free;
+> >
+> > -EINVAL looks a bit confusing in this case, but this is cosemtic because
+> > userspace won't see this error-code anyway.
+>
+> Happy to use whatever since, as you say, it's cosmetic. Perhaps -EAGAIN?
 
-Because syscon is restricted to MMIO, and not really meant to be used
-for this.
+Or -EINTR. I do not really mind, I only mentioned this because I had another
+nit.
 
-Maxime
+> >>       spin_lock_irq(&current->sighand->siglock);
+> >> +     if (unlikely(signal_group_exit(current->signal))) {
+> >> +             /* If thread is dying, return to process the signal. */
+> >
+> > OK, this doesn't hurt, but why?
+> >
+> > You could check __fatal_signal_pending() with the same effect. And since
+> > we hold this mutex, exec (de_thread) can be the source of that SIGKILL.
+> > We take this mutex specially to avoid the race with exec.
+> >
+> > So why do we need to abort if we race with kill() or exit_grouo() ?
+>
+> In my initial code inspection that we could block waiting for the
+> cred_guard mutex, with exec holding it, exec would schedule death in
+> de_thread, and then once it released, the tsync thread would try to
+> keep running.
+>
+> However, in looking at this again, now I'm concerned this produces a
+> dead-lock in de_thread, since it waits for all threads to actually
+> die, but tsync will be waiting with the killable mutex.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/4d5a6c38/attachment.sig>
+That is why you should always use _killable (or _interruptible) if you
+want to take ->cred_guard_mutex.
+
+If this thread races with de_thread() which holds this mutex, it will
+be killed and mutex_lock_killable() will fail.
+
+(to clarify; this deadlock is not "fatal", de_thread() can be killed too,
+ but this doesn't really matter).
+
+> So I think I got too defensive when I read the top of de_thread where
+> it checks for pending signals itself.
+>
+> It seems like I can just safely remove the singal_group_exit checks?
+> The other paths (non-tsync seccomp_set_mode_filter, and
+> seccomp_set_mode_strict)
+
+Yes, I missed another signal_group_exit() in seccomp_set_mode_strict().
+It looks equally unneeded.
+
+> I can't decide which feels cleaner: just letting stuff
+> clean up naturally on death or to short-circuit after taking
+> sighand->siglock.
+
+I'd prefer to simply remove the singal_group_exit checks.
+
+I won't argue if you prefer to keep them, but then please add a comment
+to explain that this is not needed for correctness.
+
+Because otherwise the code looks confusing, as if there is a subtle reason
+why we must not do this if killed.
+
+Oleg.
