@@ -1,164 +1,49 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 10 Jul 2014 19:01:08 +0100
-Subject: [PATCH RFA] drm: add of_graph endpoint helper to find possible CRTCs
-Message-ID: <E1X5Iea-0007A2-Rd@rmk-PC.arm.linux.org.uk>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Thu, 10 Jul 2014 19:14:49 +0100
+Subject: [PATCH v2] efi: implement mandatory locking for UEFI Runtime
+ Services
+In-Reply-To: <CAKv+Gu86W0hBEZhz_Aw07TmRHv8kgQN7JeRMC0Qs6FL0m6BrOQ@mail.gmail.com>
+References: <1404818508-17537-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu86W0hBEZhz_Aw07TmRHv8kgQN7JeRMC0Qs6FL0m6BrOQ@mail.gmail.com>
+Message-ID: <20140710181449.GI15932@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to allow encoders to find their possible CRTCs from the
-OF graph without having to re-implement this functionality.  We add a
-device_node to drm_crtc which corresponds with the port node in the
-DT description of the CRTC device.
+On Tue, 08 Jul, at 01:23:55PM, Ard Biesheuvel wrote:
+> On 8 July 2014 13:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > According to section 7.1 of the UEFI spec, Runtime Services are not fully
+> > reentrant, and there are particular combinations of calls that need to be
+> > serialized.
+> >
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >
+> > So this is v2 of the UEFI Runtime Services serialization patch: this time, I use
+> > a single spinlock rather than a set of mutexes, resulting in all services to be
+> > serialized with respect to all others. Also added handling of NMI state, as this
+> > results in some of the restrictions being lifted (x86, ia64 only)
+> >
+> > One question remains: with the NMI deadlock handling in place, is it really
+> > necessary to disable interrupts in all cases?
+> >
+> 
+> I omitted this hunk from the patch by accident:
 
-We can then scan the DRM device list for CRTCs to find their index,
-matching the appropriate CRTC using the port device_node, thus building
-up the possible CRTC mask.
+I'm seeing the following build warning with this patch,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
+In file included from include/linux/seqlock.h:35:0,
+                 from include/linux/time.h:5,
+                 from include/linux/efi.h:16,
+                 from drivers/firmware/efi/runtime-wrappers.c:18:
+drivers/firmware/efi/runtime-wrappers.c: In function ?virt_efi_query_capsule_caps?:
+include/linux/spinlock.h:358:2: warning: ?flags? may be used uninitialized in this function [-Wmaybe-uninitialized]
+drivers/firmware/efi/runtime-wrappers.c:275:16: note: ?flags? was declared here
 
-RFA = request for acks
+You'll need to cache the value of efi_in_nmi() in a local variable.
 
-- Updated commentry in the drm_of_find_possible_crtcs() comment block to
-point at the description of the of_graph bindings.
-- Not updated for drm kerneldoc as I'm unable to build the documentation.
+That should be safe, since if we're not executing in NMI context when we
+enter the function we won't be executing in NMI context at any point in
+during function. It's just that gcc can't infer that information.
 
- drivers/gpu/drm/Makefile |  1 +
- drivers/gpu/drm/drm_of.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/drm/drm_crtc.h   |  2 ++
- include/drm/drm_of.h     | 18 +++++++++++++
- 4 files changed, 88 insertions(+)
- create mode 100644 drivers/gpu/drm/drm_of.c
- create mode 100644 include/drm/drm_of.h
-
-diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-index dd2ba4269740..533d011eab3e 100644
---- a/drivers/gpu/drm/Makefile
-+++ b/drivers/gpu/drm/Makefile
-@@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
- drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
- drm-$(CONFIG_PCI) += ati_pcigart.o
- drm-$(CONFIG_DRM_PANEL) += drm_panel.o
-+drm-$(CONFIG_OF) += drm_of.o
- 
- drm-usb-y   := drm_usb.o
- 
-diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-new file mode 100644
-index 000000000000..16150a00c237
---- /dev/null
-+++ b/drivers/gpu/drm/drm_of.c
-@@ -0,0 +1,67 @@
-+#include <linux/export.h>
-+#include <linux/list.h>
-+#include <linux/of_graph.h>
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc.h>
-+#include <drm/drm_of.h>
-+
-+/**
-+ * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
-+ * @dev: DRM device
-+ * @port: port OF node
-+ *
-+ * Given a port OF node, return the possible mask of the corresponding
-+ * CRTC within a device's list of CRTCs.  Returns zero if not found.
-+ */
-+static uint32_t drm_crtc_port_mask(struct drm_device *dev,
-+				   struct device_node *port)
-+{
-+	unsigned int index = 0;
-+	struct drm_crtc *tmp;
-+
-+	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
-+		if (tmp->port == port)
-+			return 1 << index;
-+
-+		index++;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
-+ * @dev: DRM device
-+ * @port: encoder port to scan for endpoints
-+ *
-+ * Scan all endpoints attached to a port, locate their attached CRTCs,
-+ * and generate the DRM mask of CRTCs which may be attached to this
-+ * encoder.
-+ *
-+ * See Documentation/devicetree/bindings/graph.txt for the bindings.
-+ */
-+uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-+				    struct device_node *port)
-+{
-+	struct device_node *remote_port, *ep = NULL;
-+	uint32_t possible_crtcs = 0;
-+
-+	do {
-+		ep = of_graph_get_next_endpoint(port, ep);
-+		if (!ep)
-+			break;
-+
-+		remote_port = of_graph_get_remote_port(ep);
-+		if (!remote_port) {
-+			of_node_put(ep);
-+			return 0;
-+		}
-+
-+		possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
-+
-+		of_node_put(remote_port);
-+	} while (1);
-+
-+	return possible_crtcs;
-+}
-+EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-index 251b75e6bf7a..6a94909f1ca9 100644
---- a/include/drm/drm_crtc.h
-+++ b/include/drm/drm_crtc.h
-@@ -41,6 +41,7 @@ struct drm_framebuffer;
- struct drm_object_properties;
- struct drm_file;
- struct drm_clip_rect;
-+struct device_node;
- 
- #define DRM_MODE_OBJECT_CRTC 0xcccccccc
- #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
-@@ -314,6 +315,7 @@ struct drm_crtc_funcs {
-  */
- struct drm_crtc {
- 	struct drm_device *dev;
-+	struct device_node *port;
- 	struct list_head head;
- 
- 	/**
-diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-new file mode 100644
-index 000000000000..2441f7112074
---- /dev/null
-+++ b/include/drm/drm_of.h
-@@ -0,0 +1,18 @@
-+#ifndef __DRM_OF_H__
-+#define __DRM_OF_H__
-+
-+struct drm_device;
-+struct device_node;
-+
-+#ifdef CONFIG_OF
-+extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-+					   struct device_node *port);
-+#else
-+static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-+						  struct device_node *port)
-+{
-+	return 0;
-+}
-+#endif
-+
-+#endif /* __DRM_OF_H__ */
 -- 
-1.8.3.1
+Matt Fleming, Intel Open Source Technology Center
