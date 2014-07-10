@@ -1,52 +1,87 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 12:36:48 +0200
-Subject: [GIT PULL] Ux500 devicetree changes for v3.17
-Message-ID: <CACRpkda=5smrLuzHpAy_RxuEqcH9C=u3-sKmRgVxnEX4ko5bSg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 10 Jul 2014 12:37:57 +0200
+Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
+In-Reply-To: <53BDD84E.4090206@renesas.com>
+References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1400150451-13469-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <53BDD84E.4090206@renesas.com>
+Message-ID: <1474559.zFUJiypt1j@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On Thursday 10 July 2014 09:03:26 Khiem Nguyen wrote:
+> On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
+> > Cache the micro-TLB number in archdata allocated in the .add_device
+> > handler instead of looking it up when the deviced is attached and
+> > detached. This simplifies the .attach_dev and .detach_dev operations and
+> > prepares for DT support.
+> 
+> [snip]
+> 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> [snip]
+> 
+> > +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device
+> > *dev)
+> > +{
+> > +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
+> > +	const char *devname = dev_name(dev);
+> > +	unsigned int i;
+> > +
+> > +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
+> > +		if (strcmp(master->name, devname) == 0)
+> > +			return master->utlb;
+> > +	}
+> > +
+> > +	return -1;
+> > +}
+> 
+> [snip]
+> 
+> >  static int ipmmu_add_device(struct device *dev)
+> 
+> [snip]
+> 
+> >  	list_for_each_entry(mmu, &ipmmu_devices, list) {
+> > -		master = ipmmu_find_master(mmu, dev);
+> > -		if (master) {
+> > +		utlb = ipmmu_find_utlb(mmu, dev);
+> > +		if (utlb >= 0) {
+> >  			/*
+> > -			 * TODO Take a reference to the master to protect
+> > +			 * TODO Take a reference to the MMU to protect
+> >  			 * against device removal.
+> >  			 */
+> >  			break;
+> 
+> [snip]
+> 
+> > +	archdata->mmu = mmu;
+> > +	archdata->utlb = utlb;
+> 
+> [snip]
+> 
+> I have one question for ipmmu_add_device().
+> 
+> In my understanding, your code will find utlb for device
+> base on device name.
+> For any device, it will /only/ return utlb number of first match.
+> 
+> How about the case that a device name connected with more than 1 utlb ?
+> e.g DU device (rcar-du-r8a7790) in Lager
+> 
+> Was that case already covered in your code ?
 
-here are some three Ux500 device tree patches that I'd like
-to have funneled upstream for v3.17. Sorry for the bad tag
-name.
+For the DU case, the R8A7790 contains two DU devices, each connected to a 
+single utlb. The IPMMU driver will thus work fine in that case.
 
-The dependent changes to drivers and bindings are merged
-through subsystem trees.
+I agree that this is a problem in general though, other devices (such as the 
+DMAC) are connected to more than one utlb. This is currently not supported by 
+the driver.
 
-Please pull it in!
+-- 
+Regards,
 
-Yours,
-Linus Walleij
-
-The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
-
-  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-devicetree-v3.16-1
-
-for you to fetch changes up to d0e3bc813359360fb94098fec9403820846577f3:
-
-  ARM: ux500: add misc sensors to the device trees (2014-07-07 11:54:07 +0200)
-
-----------------------------------------------------------------
-Ux500 device tree patches for v3.17:
-- Add regulators to STMPE expanders
-- Add proper DMA channels for all SD/MMC blocks
-- Add sensors to the device tree
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: ux500: add VCC and VIO regulators to STMPE IC
-      ARM: ux500: add some DB8500 DMA channel info
-      ARM: ux500: add misc sensors to the device trees
-
- arch/arm/boot/dts/ste-dbx5x0.dtsi          | 10 +++++
- arch/arm/boot/dts/ste-href-stuib.dtsi      |  2 +
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 59 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ste-hrefv60plus.dtsi     | 24 ------------
- arch/arm/boot/dts/ste-snowball.dts         | 38 +++++++++++++++++--
- 5 files changed, 106 insertions(+), 27 deletions(-)
+Laurent Pinchart
