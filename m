@@ -1,87 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 10 Jul 2014 09:07:06 +0100
-Subject: [PATCH] backlight: jornada720: Minimise code duplication and handle
- errors better
-Message-ID: <1404979626-10951-1-git-send-email-lee.jones@linaro.org>
+From: arunks.linux@gmail.com (Arun KS)
+Date: Thu, 10 Jul 2014 14:16:41 +0530
+Subject: Probe-defer and loading firmware
+In-Reply-To: <CAKON4Oxa_jA1HH3aDH9NynszsPWe2as+XsYj1tFkVo-iwuTDnQ@mail.gmail.com>
+References: <CAKON4Oxa_jA1HH3aDH9NynszsPWe2as+XsYj1tFkVo-iwuTDnQ@mail.gmail.com>
+Message-ID: <CAKZGPAPT_YiEt1aPxAn90LcbKRpsJrjCmHd_HE7kdjayHht9BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rickard Strandqvi's ran a code analysis application which found that
-jornada_lcd_get_contrast(() and jornada_lcd_set_contrast() contained
-some code duplication (calling the same functions during various
-code execution paths) and failed to return errors in a consistent
-manner.  This patch aims to simplify the code, coercing it into
-behaving at a level expected of a driver in the Linux kernel.
+Hi Jon,
 
-Cc: Bryan Wu <cooloney@gmail.com>
-Suggested-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
-Reviewed-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/video/backlight/jornada720_lcd.c | 37 ++++++++++++++++----------------
- 1 file changed, 19 insertions(+), 18 deletions(-)
+You can use request_firmware_nowait
 
-diff --git a/drivers/video/backlight/jornada720_lcd.c b/drivers/video/backlight/jornada720_lcd.c
-index da3876c..228bc31 100644
---- a/drivers/video/backlight/jornada720_lcd.c
-+++ b/drivers/video/backlight/jornada720_lcd.c
-@@ -43,37 +43,38 @@ static int jornada_lcd_get_contrast(struct lcd_device *ld)
- 
- 	jornada_ssp_start();
- 
--	if (jornada_ssp_byte(GETCONTRAST) != TXDUMMY) {
--		dev_err(&ld->dev, "get contrast failed\n");
--		jornada_ssp_end();
--		return -ETIMEDOUT;
--	} else {
-+	if (jornada_ssp_byte(GETCONTRAST) == TXDUMMY) {
- 		ret = jornada_ssp_byte(TXDUMMY);
--		jornada_ssp_end();
--		return ret;
-+		goto success;
- 	}
-+
-+	dev_err(&ld->dev, "failed to set contrast\n");
-+	ret = -ETIMEDOUT;
-+
-+success:
-+	jornada_ssp_end();
-+	return ret;
- }
- 
- static int jornada_lcd_set_contrast(struct lcd_device *ld, int value)
- {
--	int ret;
-+	int ret = 0;
- 
- 	jornada_ssp_start();
- 
- 	/* start by sending our set contrast cmd to mcu */
--	ret = jornada_ssp_byte(SETCONTRAST);
--
--	/* push the new value */
--	if (jornada_ssp_byte(value) != TXDUMMY) {
--		dev_err(&ld->dev, "set contrast failed\n");
--		jornada_ssp_end();
--		return -ETIMEDOUT;
-+	if (jornada_ssp_byte(SETCONTRAST) == TXDUMMY) {
-+		/* if successful push the new value */
-+		if (jornada_ssp_byte(value) == TXDUMMY)
-+			goto success;
- 	}
- 
--	/* if we get here we can assume everything went well */
--	jornada_ssp_end();
-+	dev_err(&ld->dev, "failed to set contrast\n");
-+	ret = -ETIMEDOUT;
- 
--	return 0;
-+success:
-+	jornada_ssp_end();
-+	return ret;
- }
- 
- static int jornada_lcd_set_power(struct lcd_device *ld, int power)
--- 
-1.8.3.2
+Thanks,
+Arun
+
+On Sun, Jul 6, 2014 at 8:04 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> I just tried building the Broadcom wifi driver into my kernel which
+> didn't work.  The problem is that it needs to load firmware and the
+> filesystem with the firmware on it hasn't been mounted yet.  The
+> firmware is on my rootfs and I had rootwait on the kernel command
+> line.
+>
+> Is it possible to get this to work? Shouldn't request-firmware do a
+> probe-defer type operation until after rootwait completes?
+>
+> --
+> Jon Smirl
+> jonsmirl at gmail.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
