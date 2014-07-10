@@ -1,129 +1,89 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 10 Jul 2014 12:57:38 +0200
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140710102334.GG2449@arm.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140709134050.GN9485@arm.com> <20140709142125.GB3262@ulmo>
- <20140709181048.GX9485@arm.com> <20140710094909.GA21583@ulmo>
- <20140710102334.GG2449@arm.com>
-Message-ID: <20140710105737.GD21583@ulmo>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Thu, 10 Jul 2014 16:27:58 +0530
+Subject: [PATCH v4 ] sched: fix imbalance flag reset
+In-Reply-To: <1404984601-7306-1-git-send-email-vincent.guittot@linaro.org>
+References: <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
+ <1404984601-7306-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <53BE71B6.3040407@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 11:23:34AM +0100, Will Deacon wrote:
-> On Thu, Jul 10, 2014 at 10:49:10AM +0100, Thierry Reding wrote:
-> > On Wed, Jul 09, 2014 at 07:10:48PM +0100, Will Deacon wrote:
-> > > On Wed, Jul 09, 2014 at 03:21:27PM +0100, Thierry Reding wrote:
-> > > > Anything beyond that (e.g. logical grouping of masters) isn't directly
-> > > > within the scope of the binding (it doesn't describe hardware but some
-> > > > policy pertaining to some specific use-case).
-> > > 
-> > > This *is* for hardware. I can use PCI as an example, but this could equally
-> > > apply to other types of bus. If you have a bunch of PCI master devices
-> > > sitting being a non-transparent bridge, they can end up sharing the same
-> > > master device ID (requester ID). This means that there is no way in the
-> > > IOMMU to initialise a translation for one of these devices without also
-> > > affecting the others. We currently have iommu_groups to deal with this, but
-> > > it *is* a property of the hardware and we absolutely need a way to describe
-> > > it. I'm happy to add it later, but we need to think about it now to avoid
-> > > merging something that can't easily be extended.
-> > > 
-> > > For PCI, the topology is probable but even then, we need this information to
-> > > describe the resulting master device ID emitted by the bridge for the
-> > > upstream group. One way to do this with your binding would be to treat all
-> > > of the upstream masters as having the same device ID.
-> > 
-> > Yes, I think that makes most sense. After all from the IOMMU's point of
-> > view requests from all devices behind the bridge will originate from the
-> > same ID.
-> > 
-> > So technically it's not really correct to encode the master ID within
-> > each of the devices, but rather they should be inheriting the ID from
-> > the non-transparent bridge.
+Hi Vincent,
+
+On 07/10/2014 03:00 PM, Vincent Guittot wrote:
+> The imbalance flag can stay set whereas there is no imbalance.
 > 
-> Indeed. Is that possible with your binding, or would we just duplicate the
-> IDs between the masters?
-
-No, the binding only describes direct relationships between the IOMMU
-and masters. There's no way to translate them inbetween or inherit them.
-
-I'm wondering how this could be described in device tree, though.
-Perhaps something like this:
-
-	iommu {
-		#iommu-cells = <1>;
-	};
-
-	bridge {
-		iommus = <&/iommu 42>;
-		#iommu-cells = <0>;
-
-		device at 0 {
-			iommus = <&/bridge>;
-		};
-
-		device at 1 {
-			iommus = <&/bridge>;
-		};
-
-		...
-	};
-
-? That way some code could walk up the IOMMU tree to resolve this. Or
-perhaps even easier:
-
-	iommu {
-		#iommu-cells = <1>;
-	};
-
-	bridge {
-		iommus = <&/iommu 42>;
-
-		device at 0 {
-			...
-		};
-
-		device at 1 {
-			...
-		};
-
-		...
-	};
-
-And we could enhance the binding by defining that the iommus node is
-inherited by devices on a bus, which by what you're saying would be the
-sensible thing to do anyway.
-
-In the second example above, the presence of an iommus property in the
-bridge would indicate that it's non-transparent regarding IOMMU
-translation and therefore the master ID should be inherited. Devices
-could still override by providing their own iommus property, though I'd
-be a little surprised if there ever was hardware like that.
-
-> > > With virtualisation, we may want to assign a group of devices to a guest but
-> > > without emulating the bridge. This would need something the device-tree to
-> > > describe that they are grouped together.
-> > 
-> > But that's also a software decision, isn't it? Virtualization doesn't
-> > have anything to do with the hardware description. Or am I missing
-> > something? Of course I guess you could generate a DTB for the guest and
-> > group device together, in which case you're pretty much free to do what
-> > you want since you're essentially defining your own hardware.
+> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+> We will have some idle load balance which are triggered during tick.
+> Unfortunately, the tick is also used to queue background work so we can reach
+> the situation where short work has been queued on a CPU which already runs a
+> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+> detected and the imbalance flag is set.
+> Then, we will not be able to clear the flag because we have at most 1 task on
+> each CPU but the imbalance flag will trig to useless active load balance
+> between the idle CPU and the busy CPU.
 > 
-> If you're doing device passthrough and you want to allow the guest to
-> program the IOMMU, I think that virtualisation is directly related to the
-> hardware description, since the guest will be bound by physical properties
-> of the system.
+> We need to reset of the imbalance flag as soon as we have reached a balanced
+> state. If all tasks are pinned, we don't consider that as a balanced state and
+> let the imbalance flag set.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c | 22 ++++++++++++++++++----
+>  1 file changed, 18 insertions(+), 4 deletions(-)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index d3c73122..a836198 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6615,10 +6615,8 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+>  		if (sd_parent) {
+>  			int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+> 
+> -			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
+> +			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0)
+>  				*group_imbalance = 1;
+> -			} else if (*group_imbalance)
+> -				*group_imbalance = 0;
+>  		}
+> 
+>  		/* All tasks on this runqueue were pinned by CPU affinity */
+> @@ -6629,7 +6627,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+>  				env.loop_break = sched_nr_migrate_break;
+>  				goto redo;
+>  			}
+> -			goto out_balanced;
+> +			goto out_all_pinned;
+>  		}
+>  	}
+> 
+> @@ -6703,6 +6701,22 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+>  	goto out;
+> 
+>  out_balanced:
+> +	/*
+> +	 * We reach balance although we may have faced some affinity
+> +	 * constraints. Clear the imbalance flag if it was set.
+> +	 */
+> +	if (sd_parent) {
+> +		int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+> +		if (*group_imbalance)
+> +			*group_imbalance = 0;
+> +	}
+> +
+> +out_all_pinned:
+> +	/*
+> +	 * We reach balance because all tasks are pinned at this level so
+> +	 * we can't migrate them. Let the imbalance flag set so parent level
+> +	 * can try to migrate them.
+> +	 */
+>  	schedstat_inc(sd, lb_balanced[idle]);
+> 
+>  	sd->nr_balance_failed = 0;
+> 
 
-Evidently you know much better what the requirements are here and what
-will actually be required. I guess we'll need to have more discussions
-along with examples of use-cases.
+This patch looks good to me.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/71d0f718/attachment.sig>
+Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
