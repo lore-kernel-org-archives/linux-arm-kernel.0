@@ -1,63 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Jul 2014 12:40:09 +0100
-Subject: [PATCHv3] arm64: fpsimd: avoid restoring fpcr if the contents haven't
- changed
-Message-ID: <1404992409-6968-1-git-send-email-will.deacon@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 10 Jul 2014 13:46:24 +0200
+Subject: [PATCH 04/16] i2c: i2c-bfin-twi: Drop class based scanning to improve
+ bootup time
+In-Reply-To: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
+References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1404992799-3705-5-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing to the FPCR is commonly implemented as a self-synchronising
-operation in the CPU, so avoid writing to the register when the saved
-value matches that in the hardware already.
+This driver has been flagged to drop class based instantiation. The removal
+improves boot-up time and is unneeded for embedded controllers. Users have been
+warned to switch for some time now, so we can actually do the removal. Keep the
+DEPRECATED flag, so the core can inform users that the behaviour finally
+changed now. After another transition period, this flag can go, too.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- arch/arm64/include/asm/fpsimdmacros.h | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-bfin-twi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index 768414d55e64..007618b8188c 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -40,6 +40,19 @@
- 	str	w\tmpnr, [\state, #16 * 2 + 4]
- .endm
- 
-+.macro fpsimd_restore_fpcr state, tmp
-+	/*
-+	 * Writes to fpcr may be self-synchronising, so avoid restoring
-+	 * the register if it hasn't changed.
-+	 */
-+	mrs	\tmp, fpcr
-+	cmp	\tmp, \state
-+	b.eq	9999f
-+	msr	fpcr, \state
-+9999:
-+.endm
-+
-+/* Clobbers \state */
- .macro fpsimd_restore state, tmpnr
- 	ldp	q0, q1, [\state, #16 * 0]
- 	ldp	q2, q3, [\state, #16 * 2]
-@@ -60,7 +73,7 @@
- 	ldr	w\tmpnr, [\state, #16 * 2]
- 	msr	fpsr, x\tmpnr
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
--	msr	fpcr, x\tmpnr
-+	fpsimd_restore_fpcr x\tmpnr, \state
- .endm
- 
- .altmacro
-@@ -84,7 +97,7 @@
- .macro fpsimd_restore_partial state, tmpnr1, tmpnr2
- 	ldp	w\tmpnr1, w\tmpnr2, [\state]
- 	msr	fpsr, x\tmpnr1
--	msr	fpcr, x\tmpnr2
-+	fpsimd_restore_fpcr x\tmpnr2, x\tmpnr1
- 	adr	x\tmpnr1, 0f
- 	ldr	w\tmpnr2, [\state, #8]
- 	add	\state, \state, x\tmpnr2, lsl #4
+diff --git a/drivers/i2c/busses/i2c-bfin-twi.c b/drivers/i2c/busses/i2c-bfin-twi.c
+index 3e271e7558d3..067c1615e968 100644
+--- a/drivers/i2c/busses/i2c-bfin-twi.c
++++ b/drivers/i2c/busses/i2c-bfin-twi.c
+@@ -648,7 +648,7 @@ static int i2c_bfin_twi_probe(struct platform_device *pdev)
+ 	strlcpy(p_adap->name, pdev->name, sizeof(p_adap->name));
+ 	p_adap->algo = &bfin_twi_algorithm;
+ 	p_adap->algo_data = iface;
+-	p_adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD | I2C_CLASS_DEPRECATED;
++	p_adap->class = I2C_CLASS_DEPRECATED;
+ 	p_adap->dev.parent = &pdev->dev;
+ 	p_adap->timeout = 5 * HZ;
+ 	p_adap->retries = 3;
 -- 
 2.0.0
