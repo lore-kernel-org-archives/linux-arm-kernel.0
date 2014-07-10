@@ -1,97 +1,68 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Jul 2014 12:29:09 +0200
-Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
- to host's quirk
-In-Reply-To: <53BE5F9F.6070809@samsung.com>
-References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
- <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
- <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
- <53BE5F9F.6070809@samsung.com>
-Message-ID: <CAPDyKFrLJJn=SGpjtCq+x88EetBQQBCqgef9z9+3oEVut4upTg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Jul 2014 11:31:09 +0100
+Subject: [GIT PULL] ARM perf updates for 3.17
+Message-ID: <20140710103109.GI2449@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 11:40, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Ulf.
->
-> On 07/10/2014 06:15 PM, Ulf Hansson wrote:
->> On 10 July 2014 09:08, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> Replaced the "disable-wp" into host's quirks.
->>> (Because the slot-node is removed at dt-file.)
->>>
->>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->>
->> Hi Jaehoon,
->>
->> I plan to carry these patches through my mmc tree and I will share
->> them through a PR from an immutable branch with the ARM SoC guys.
->> Please tell me if you have any concern with this set up.
+Hi Russell,
 
-Hmm, I having a second thought around this. Could I just apply the mmc
-patches for my next branch instead of involving ARM SoC? In other
-words, are there any decencies? If not, I might just apply patch 1 and
-5.
+Please can you pull the following perf updates for 3.17? You will get a
+trivial conflict with your MIDR rework, but SFR fixed that up correctly
+already in -next [1].
 
-Kind regards
-Uffe
+The main changes are:
 
->>
->> Now, while I was applying this patch, I found it had checkpatch
->> errors. Please run checkpatch and resend a new version.
->
-> Sorry for not checking the patch. I will resend a new version.
-> Thanks for pointing out.
->
-> Best Regards,
-> Jaehoon Chung
->
->>
->> Kind regards
->> Uffe
->>
->>> ---
->>>  drivers/mmc/host/dw_mmc.c |   12 +++++-------
->>>  1 file changed, 5 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>> index 1ac227c..a3ccd07 100644
->>> --- a/drivers/mmc/host/dw_mmc.c
->>> +++ b/drivers/mmc/host/dw_mmc.c
->>> @@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
->>>         int gpio_ro = mmc_gpio_get_ro(mmc);
->>>
->>>         /* Use platform get_ro function, else try on board write protect */
->>> -       if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
->>> +       if (slot->host->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
->>>                 read_only = 0;
->>>         else if (!IS_ERR_VALUE(gpio_ro))
->>>                 read_only = gpio_ro;
->>> @@ -2006,12 +2006,7 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
->>>  static struct dw_mci_of_slot_quirks {
->>>         char *quirk;
->>>         int id;
->>> -} of_slot_quirks[] = {
->>> -       {
->>> -               .quirk  = "disable-wp",
->>> -               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
->>> -       },
->>> -};
->>> +} of_slot_quirks[] = {};
->>>
->>>  static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
->>>  {
->>> @@ -2238,6 +2233,9 @@ static struct dw_mci_of_quirks {
->>>         {
->>>                 .quirk  = "broken-cd",
->>>                 .id     = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
->>> +       },{
->>> +               .quirk  = "disable-wp",
->>> +               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
->>>         },
->>>  };
->>>
->>> --
->>> 1.7.9.5
->>>
->>
->
+  - Callchain stability fixes from Jean Pihet
+  - Event mapping and PMU name rework from Mark Rutland
+
+The latter is preparatory work for enabling some code re-use with arm64
+in the future.
+
+Cheers,
+
+Will
+
+[1] https://lkml.org/lkml/2014/7/1/659
+
+Cc: Jean Pihet <jean.pihet@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+
+--->8
+
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/perf
+
+for you to fetch changes up to 4b2974fa6a4a32d390a50e23381a2270a2e0d444:
+
+  ARM: perf: disable the pagefault handler when reading from user space (2014-07-09 15:05:29 +0100)
+
+----------------------------------------------------------------
+Jean Pihet (2):
+      ARM: perf: Check that current->mm is alive before getting user callchain
+      ARM: perf: disable the pagefault handler when reading from user space
+
+Mark Rutland (8):
+      arm: perf: move event map macros to pmu.h
+      arm: perf: add macros for empty event mappings
+      arm: perf: armv7: condense event maps
+      arm: perf: armv6: condense event maps
+      arm: perf: xscale: condense event maps
+      arm: perf: clean up PMU names
+      arm: perf: add more specific platform device IDs
+      arm: perf: krait: stop using singleton PMU
+
+ arch/arm/include/asm/perf_event.h   |   9 -
+ arch/arm/include/asm/pmu.h          |  19 +
+ arch/arm/kernel/perf_event.c        |  13 +-
+ arch/arm/kernel/perf_event_cpu.c    |  13 +-
+ arch/arm/kernel/perf_event_v6.c     | 307 +++---------
+ arch/arm/kernel/perf_event_v7.c     | 967 ++++++++----------------------------
+ arch/arm/kernel/perf_event_xscale.c | 121 +----
+ arch/arm/oprofile/common.c          |  14 +-
+ 8 files changed, 360 insertions(+), 1103 deletions(-)
