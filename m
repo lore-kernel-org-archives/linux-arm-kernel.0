@@ -1,34 +1,38 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 10 Jul 2014 16:52:16 -0300
-Subject: [PATCH v4 4/4] ARM: mvebu: enable Armada 375 network driver in
- mvebu_v7_defconfig
-In-Reply-To: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1405021936-28658-5-git-send-email-ezequiel.garcia@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Jul 2014 21:59:52 +0200
+Subject: [PATCH v3 0/2] ARM: at91: remove phy fixup for sama5d3xek boards
+Message-ID: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+Hello,
 
-Now that the Armada 375 network driver has been pushed, let's enable it
-in mvebu_v7_defconfig.
+This patch removes a board specific hook for sama5d3xek boards from the
+sama5d3 generic DT board file.
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+This hook (which register a phy fixup configuring board specific delays
+in the ksz9021 ethernet phy) is now replaced by the appropriate DT
+properties definitions in the sama5d3xcm.dtsi file.
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index b0bfefa..b477631 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -46,6 +46,7 @@ CONFIG_AHCI_MVEBU=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_MVNETA=y
-+CONFIG_MVPP2=y
- CONFIG_MARVELL_PHY=y
- CONFIG_MWIFIEX=y
- CONFIG_MWIFIEX_SDIO=y
+Best Regards,
+
+Boris
+
+Changes since v2:
+ - define 2 phy nodes to handle Ronetix and Embest HW designs
+
+Changes since v1:
+ - fix txc-skew-ps and rxc-skew-ps delays
+ - remove phy address info to handle Ronetix and Embest HW designs
+
+Boris BREZILLON (2):
+  ARM: at91/dt: describe rgmii ethernet phy connected to sama5d3xek
+    boards
+  ARM: at91: remove phy fixup for sama5d3xek boards
+
+ arch/arm/boot/dts/sama5d3xcm.dtsi   | 30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/board-dt-sama5.c | 22 ----------------------
+ 2 files changed, 30 insertions(+), 22 deletions(-)
+
 -- 
-1.9.1
+1.8.3.2
