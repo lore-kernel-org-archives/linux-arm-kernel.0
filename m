@@ -1,33 +1,18 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 10 Jul 2014 13:46:21 +0200
-Subject: [PATCH 01/16] i2c: add debug info when class instantiation was dropped
-In-Reply-To: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
-References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1404992799-3705-2-git-send-email-wsa@the-dreams.de>
+Date: Thu, 10 Jul 2014 13:46:20 +0200
+Subject: [PATCH 00/16] i2c: drop class based instantiaion for selected drivers
+Message-ID: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a warning already when support for old-fashioned class based
-instantiation is about to be dropped somewhen soon from a driver. Let's
-have another one when it was actually dropped. This allows to remove the
-cruft a little earlier and still let users know what happened in the
-rare case they are missing devices after the change. However, there is
-enough interest to get rid of class based instantiation rather sooner
-than later because it improves boot up time.
+Some drivers were flagged to remove class based instantiation soon to improve
+boot-up time. Originally, I was planning for a longer deprecation time so users
+could switch over to some other kind of instantiation. However, the demand for
+the speed up is high enough and class based instantiation is used rarely, so
+the removal takes place now. To make up for the deprecation time, another
+warning is added to the i2c core pointing out that the behaviour has now
+changed:
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/i2c/i2c-core.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 4ccff114b147..a1eeb8a5d3f8 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -1915,6 +1915,16 @@ static int i2c_detect(struct i2c_adapter *adapter, struct i2c_driver *driver)
- 	if (!driver->detect || !address_list)
- 		return 0;
- 
 +	/* Warn that the adapter lost class based instantiation */
 +	if (adapter->class == I2C_CLASS_DEPRECATED) {
 +		dev_dbg(&adapter->dev,
@@ -37,9 +22,53 @@ index 4ccff114b147..a1eeb8a5d3f8 100644
 +			driver->driver.name);
 +		return 0;
 +	}
-+
- 	/* Stop here if the classes do not match */
- 	if (!(adapter->class & driver->class))
- 		return 0;
+
+A branch can be found here (with two other cleanups -> driver removals):
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/deprecate_stuff
+
+I hope this meets all the needs. Please comment, ack, test...
+
+Thanks,
+
+   Wolfram
+
+
+Wolfram Sang (16):
+  i2c: add debug info when class instantiation was dropped
+  i2c: i2c-at91: Drop class based scanning to improve bootup time
+  i2c: i2c-bcm2835: Drop class based scanning to improve bootup time
+  i2c: i2c-bfin-twi: Drop class based scanning to improve bootup time
+  i2c: i2c-davinci: Drop class based scanning to improve bootup time
+  i2c: i2c-designware-platdrv: Drop class based scanning to improve
+    bootup time
+  i2c: i2c-mv64xxx: Drop class based scanning to improve bootup time
+  i2c: i2c-nomadik: Drop class based scanning to improve bootup time
+  i2c: i2c-ocores: Drop class based scanning to improve bootup time
+  i2c: i2c-omap: Drop class based scanning to improve bootup time
+  i2c: i2c-rcar: Drop class based scanning to improve bootup time
+  i2c: i2c-s3c2410: Drop class based scanning to improve bootup time
+  i2c: i2c-sirf: Drop class based scanning to improve bootup time
+  i2c: i2c-stu300: Drop class based scanning to improve bootup time
+  i2c: i2c-tegra: Drop class based scanning to improve bootup time
+  i2c: i2c-xiic: Drop class based scanning to improve bootup time
+
+ drivers/i2c/busses/i2c-at91.c               |  2 +-
+ drivers/i2c/busses/i2c-bcm2835.c            |  2 +-
+ drivers/i2c/busses/i2c-bfin-twi.c           |  2 +-
+ drivers/i2c/busses/i2c-davinci.c            |  2 +-
+ drivers/i2c/busses/i2c-designware-platdrv.c |  2 +-
+ drivers/i2c/busses/i2c-mv64xxx.c            |  2 +-
+ drivers/i2c/busses/i2c-nomadik.c            |  8 ++++----
+ drivers/i2c/busses/i2c-ocores.c             | 12 ++++++------
+ drivers/i2c/busses/i2c-omap.c               |  2 +-
+ drivers/i2c/busses/i2c-rcar.c               | 14 +++++++-------
+ drivers/i2c/busses/i2c-s3c2410.c            |  8 ++++----
+ drivers/i2c/busses/i2c-sirf.c               |  2 +-
+ drivers/i2c/busses/i2c-stu300.c             |  2 +-
+ drivers/i2c/busses/i2c-tegra.c              |  2 +-
+ drivers/i2c/busses/i2c-xiic.c               | 12 ++++++------
+ drivers/i2c/i2c-core.c                      | 10 ++++++++++
+ 16 files changed, 47 insertions(+), 37 deletions(-)
+
 -- 
 2.0.0
