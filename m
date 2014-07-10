@@ -1,21 +1,28 @@
-From: galibert@pobox.com (Olivier Galibert)
-Date: Thu, 10 Jul 2014 16:30:43 +0200
-Subject: [PATCH 1/6] tty: serial: 8250 core: provide a function to export
- uart_8250_port
-In-Reply-To: <1404928177-26554-2-git-send-email-bigeasy@linutronix.de>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
- <1404928177-26554-2-git-send-email-bigeasy@linutronix.de>
-Message-ID: <CAMFK0gtLHrYzWipw=9rp-cUZrKkzBAn_iXSetn016F7zvuZE0w@mail.gmail.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Thu, 10 Jul 2014 16:32:21 +0200
+Subject: [PATCH 09/16] i2c: i2c-ocores: Drop class based scanning to
+ improve bootup time
+In-Reply-To: <1404992799-3705-10-git-send-email-wsa@the-dreams.de> (Wolfram
+ Sang's message of "Thu, 10 Jul 2014 13:46:29 +0200")
+References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
+ <1404992799-3705-10-git-send-email-wsa@the-dreams.de>
+Message-ID: <874mypp9my.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 7:49 PM, Sebastian Andrzej Siewior
-<bigeasy@linutronix.de> wrote:
-> + * The lock assumption made here is none because runtime-pm suspend/resume
-> + * callbacks should not be invoked there is any operation performed on the port.
+>>>>> "Wolfram" == Wolfram Sang <wsa@the-dreams.de> writes:
 
-I think there's a missing "if"?
+ > This driver has been flagged to drop class based instantiation. The removal
+ > improves boot-up time and is unneeded for embedded controllers. Users have been
+ > warned to switch for some time now, so we can actually do the removal. Keep the
+ > DEPRECATED flag, so the core can inform users that the behaviour finally
+ > changed now. After another transition period, this flag can go, too.
+ > While we are here, remove the indentation for the array setup because
+ > such things always break after some time.
 
-Best,
+ > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
-  OG.
+Acked-by: Peter Korsgaard <peter@korsgaard.com>
+
+-- 
+Bye, Peter Korsgaard
