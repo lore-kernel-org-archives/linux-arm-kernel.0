@@ -1,59 +1,55 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Jul 2014 14:10:48 +0200
-Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
- to host's quirk
-In-Reply-To: <002101cf9c35$8da5b240$a8f116c0$%jun@samsung.com>
-References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
- <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
- <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
- <53BE5F9F.6070809@samsung.com>
- <CAPDyKFrLJJn=SGpjtCq+x88EetBQQBCqgef9z9+3oEVut4upTg@mail.gmail.com>
- <002101cf9c35$8da5b240$a8f116c0$%jun@samsung.com>
-Message-ID: <CAPDyKFo4gC8Mmbt+f88EMqGvPH9hqW4Fw9d05hq3YGB=iFgaXw@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 10 Jul 2014 09:10:10 -0300
+Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
+In-Reply-To: <alpine.LFD.2.11.1404102024200.980@knanqh.ubzr>
+References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr>
+ <1442455.pP6sroyjMG@avalon>
+ <alpine.LFD.2.11.1404102024200.980@knanqh.ubzr>
+Message-ID: <20140710121010.GA1990@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 13:53, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> On Thu, July 10, 2014, Ulf Hansson wrote:
->> On 10 July 2014 11:40, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> > Hi, Ulf.
->> >
->> > On 07/10/2014 06:15 PM, Ulf Hansson wrote:
->> >> On 10 July 2014 09:08, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> >>> Replaced the "disable-wp" into host's quirks.
->> >>> (Because the slot-node is removed at dt-file.)
->> >>>
->> >>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> >>
->> >> Hi Jaehoon,
->> >>
->> >> I plan to carry these patches through my mmc tree and I will share
->> >> them through a PR from an immutable branch with the ARM SoC guys.
->> >> Please tell me if you have any concern with this set up.
->>
->> Hmm, I having a second thought around this. Could I just apply the mmc
->> patches for my next branch instead of involving ARM SoC? In other
->> words, are there any decencies? If not, I might just apply patch 1 and
->> 5.
->>
->
-> [PATCHv4 2/5] ARM: dts: exynos: unuse the slot-node and deprecated the supports-highspeed for dw-mmc
-> [PATCHv4 4/5] ARM: dts: rockchip: unuse the slot-node and deprecated the supports-highspeed for dw-mmc
-> [PATCHv4 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk to host's quirk
->
-> 2nd and 4th are closely related 5th.
-> I think it shall be picked together. How about taking whole patch?
-> And I hope that it is applied for 3.16-rcX fix.
-> (Also, 3rd patch is close to fix patch.)
->
-> Kukjin,
-> Is it fine to be taken in Ulf's?
+On 10 Apr 08:31 PM, Nicolas Pitre wrote:
+> On Fri, 11 Apr 2014, Laurent Pinchart wrote:
+> 
+> > On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
+> > > On Wed, 9 Apr 2014, Laurent Pinchart wrote:
+> > > > Hello,
+> > > > 
+> > > > (Resending due to a typo in an e-mail address that caused LAKML to reject
+> > > > the mails. Sorry about the noise.)
+> > > > 
+> > > > This patch set reworks Ezequiel Garcia's previous fix [1] of an out of
+> > > > vmalloc space bug on PXA2[57]x platforms caused by an attempt to map the
+> > > > start of physical uncached outside of the vmalloc space.
+> > > > 
+> > > > This first three patches perform a couple of cleanups, and the last patch
+> > > > fixes the problem. I've decided to map the memory at address 0xfe000000 to
+> > > > minimize changes to the code, but this causes a bit of fragmentation of
+> > > > vmalloc space. I could map it to the very end of vmalloc space
+> > > > (0xfef00000)
+> > > > instead if preferred, which would involve replacing a mov by an ldr in
+> > > > pxa2[57]x_finish_suspend and pm_enter_standby_start.
+> > > > 
+> > > > I've tested the patch set on a PXA270-based system.
+> > > 
+> > > For those patches:
+> > > 
+> > > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> > Thank you.
+> > 
+> > MAINTAINERS lists three maintainers for the PXA architecture, and two git 
+> > trees that seem to be either dead or even deleted. Who picks up patches for 
+> > PXA ? Should I send a pull request ?
+> 
+> If no one else answers, then just send a pull request to the ARM-SOC 
+> team (arm at kernel.org) and CC the linux-arm-kernel mailing list.
+> 
 
-I tried applied the complete patchset for 3.16 rc4, but some of the
-DTS patches fails. What are these patches based upon?
-
-I wonder if it's not best to leave all these for Kukjin to handle
-instead. You have my ack for all of the mmc patches!
-
-Kind regards
-Uffe
+What ever happened to this?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
