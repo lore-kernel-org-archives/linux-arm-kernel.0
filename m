@@ -1,116 +1,39 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 10 Jul 2014 17:50:35 +0400
-Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
- infrastructure.
-In-Reply-To: <53BE959A.4010206@oracle.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
- <53BE7F29.20304@oracle.com> <53BE8EA5.2030402@samsung.com>
- <53BE959A.4010206@oracle.com>
-Message-ID: <53BE9A2B.5090104@samsung.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 10 Jul 2014 15:58:20 +0200
+Subject: [PATCH v3 07/12] sched: test the cpu's capacity in wake affine
+In-Reply-To: <20140710110644.GX3935@laptop>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-8-git-send-email-vincent.guittot@linaro.org>
+ <20140710110644.GX3935@laptop>
+Message-ID: <CAKfTPtB0hPyfzMpF_=34y=AyrEPXztbZCVvpqHZtEeR56_Qyiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/14 17:31, Sasha Levin wrote:
-> On 07/10/2014 09:01 AM, Andrey Ryabinin wrote:
->> On 07/10/14 15:55, Sasha Levin wrote:
->>>> On 07/09/2014 07:29 AM, Andrey Ryabinin wrote:
->>>>>> Address sanitizer for kernel (kasan) is a dynamic memory error detector.
->>>>>>
->>>>>> The main features of kasan is:
->>>>>>  - is based on compiler instrumentation (fast),
->>>>>>  - detects out of bounds for both writes and reads,
->>>>>>  - provides use after free detection,
->>>>>>
->>>>>> This patch only adds infrastructure for kernel address sanitizer. It's not
->>>>>> available for use yet. The idea and some code was borrowed from [1].
->>>>>>
->>>>>> This feature requires pretty fresh GCC (revision r211699 from 2014-06-16 or
->>>>>> latter).
->>>>>>
->>>>>> Implementation details:
->>>>>> The main idea of KASAN is to use shadow memory to record whether each byte of memory
->>>>>> is safe to access or not, and use compiler's instrumentation to check the shadow memory
->>>>>> on each memory access.
->>>>>>
->>>>>> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
->>>>>> mapping with a scale and offset to translate a memory address to its corresponding
->>>>>> shadow address.
->>>>>>
->>>>>> Here is function to translate address to corresponding shadow address:
->>>>>>
->>>>>>      unsigned long kasan_mem_to_shadow(unsigned long addr)
->>>>>>      {
->>>>>>                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
->>>>>>                              + kasan_shadow_start;
->>>>>>      }
->>>>>>
->>>>>> where KASAN_SHADOW_SCALE_SHIFT = 3.
->>>>>>
->>>>>> So for every 8 bytes of lowmemory there is one corresponding byte of shadow memory.
->>>>>> The following encoding used for each shadow byte: 0 means that all 8 bytes of the
->>>>>> corresponding memory region are valid for access; k (1 <= k <= 7) means that
->>>>>> the first k bytes are valid for access, and other (8 - k) bytes are not;
->>>>>> Any negative value indicates that the entire 8-bytes are unaccessible.
->>>>>> Different negative values used to distinguish between different kinds of
->>>>>> unaccessible memory (redzones, freed memory) (see mm/kasan/kasan.h).
->>>>>>
->>>>>> To be able to detect accesses to bad memory we need a special compiler.
->>>>>> Such compiler inserts a specific function calls (__asan_load*(addr), __asan_store*(addr))
->>>>>> before each memory access of size 1, 2, 4, 8 or 16.
->>>>>>
->>>>>> These functions check whether memory region is valid to access or not by checking
->>>>>> corresponding shadow memory. If access is not valid an error printed.
->>>>>>
->>>>>> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerForKernel
->>>>>>
->>>>>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
->>>>
->>>> I gave it a spin, and it seems that it fails for what you might call a "regular"
->>>> memory size these days, in my case it was 18G:
->>>>
->>>> [    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate 0xe0c00000 bytes below 0x0.
->>>> [    0.000000]
->>>> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.16.0-rc4-next-20140710-sasha-00044-gb7b0579-dirty #784
->>>> [    0.000000]  ffffffffb9c2d3c8 cd9ce91adea4379a 0000000000000000 ffffffffb9c2d3c8
->>>> [    0.000000]  ffffffffb9c2d330 ffffffffb7fe89b7 ffffffffb93c8c28 ffffffffb9c2d3b8
->>>> [    0.000000]  ffffffffb7fcff1d 0000000000000018 ffffffffb9c2d3c8 ffffffffb9c2d360
->>>> [    0.000000] Call Trace:
->>>> [    0.000000] <UNK> dump_stack (lib/dump_stack.c:52)
->>>> [    0.000000] panic (kernel/panic.c:119)
->>>> [    0.000000] memblock_alloc_base (mm/memblock.c:1092)
->>>> [    0.000000] memblock_alloc (mm/memblock.c:1097)
->>>> [    0.000000] kasan_alloc_shadow (mm/kasan/kasan.c:151)
->>>> [    0.000000] zone_sizes_init (arch/x86/mm/init.c:684)
->>>> [    0.000000] paging_init (arch/x86/mm/init_64.c:677)
->>>> [    0.000000] setup_arch (arch/x86/kernel/setup.c:1168)
->>>> [    0.000000] ? printk (kernel/printk/printk.c:1839)
->>>> [    0.000000] start_kernel (include/linux/mm_types.h:462 init/main.c:533)
->>>> [    0.000000] ? early_idt_handlers (arch/x86/kernel/head_64.S:344)
->>>> [    0.000000] x86_64_start_reservations (arch/x86/kernel/head64.c:194)
->>>> [    0.000000] x86_64_start_kernel (arch/x86/kernel/head64.c:183)
->>>>
->>>> It got better when I reduced memory to 1GB, but then my system just failed to boot
->>>> at all because that's not enough to bring everything up.
->>>>
->> Thanks.
->> I think memory size is not a problem here. I tested on my desktop with 16G.
->> Seems it's a problem with memory holes cited by Dave.
->> kasan tries to allocate ~3.5G. It means that lowmemsize is 28G in your case.
-> 
-> That's correct (I've mistyped and got 18 instead of 28 above).
-> 
-> However, I'm a bit confused here, I thought highmem/lowmem split was a 32bit
-> thing, so I'm not sure how it applies here.
-> 
-> Anyways, the machine won't boot with more than 1GB of RAM, is there a solution to
-> get KASAN running on my machine?
-> 
+On 10 July 2014 13:06, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Mon, Jun 30, 2014 at 06:05:38PM +0200, Vincent Guittot wrote:
+>> Currently the task always wakes affine on this_cpu if the latter is idle.
+>> Before waking up the task on this_cpu, we check that this_cpu capacity is not
+>> significantly reduced because of RT tasks or irq activity.
+>>
+>> Use case where the number of irq and/or the time spent under irq is important
+>> will take benefit of this because the task that is woken up by irq or softirq
+>> will not use the same CPU than irq (and softirq) but a idle one which share
+>> its cache.
+>
+> The above, doesn't seem to explain:
+>
+>> +     } else if (!(sd->flags & SD_SHARE_PKG_RESOURCES)) {
+>> +             this_eff_load = 0;
+>> +     }
+>> +
+>> +     balanced = this_eff_load <= prev_eff_load;
+>
+> this. Why would you unconditionally allow wake_affine across cache
+> domains?
 
-It's not boot with the same Failed to allocate error?
-
-> 
-> Thanks,
-> Sasha
-> 
-> 
+The current policy is to use this_cpu if this_load <= 0. I want to
+keep the current wake affine policy for all sched_domain that doesn't
+share cache so if the involved CPUs don't share cache, I clear
+this_eff_load to force balanced to be true. But when CPUs share their
+cache,  we not only look at idleness but also@available capacity of
+prev and local CPUs.
