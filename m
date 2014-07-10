@@ -1,10 +1,10 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 10 Jul 2014 18:48:37 +0900
-Subject: [PATCHv4 4/5] ARM: dts: rockchip: unuse the slot-node and deprecated
+Date: Thu, 10 Jul 2014 18:48:36 +0900
+Subject: [PATCHv4 3/5] ARM: dts: socfpga: unuse the slot-node and deprecated
  the supports-highspeed for dw-mmc
 In-Reply-To: <1404985718-12203-1-git-send-email-jh80.chung@samsung.com>
 References: <1404985718-12203-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1404985718-12203-5-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1404985718-12203-4-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,44 +17,74 @@ And "supports-highspeed" property in dw-mmc is deprecated.
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 Reviewed-by: Tushar Behera <trblinux@gmail.com>
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/socfpga_arria5.dtsi   |    9 +++------
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi |    9 +++------
+ arch/arm/boot/dts/socfpga_vt.dts        |    9 +++------
+ 3 files changed, 9 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index afb3273..ecea889 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -59,12 +59,8 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
- 			vmmc-supply = <&vcc_sd0>;
+diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+index 12d1c2c..468fc4c 100644
+--- a/arch/arm/boot/dts/socfpga_arria5.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+@@ -29,13 +29,10 @@
+ 
+ 		dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+-			supports-highspeed;
+ 			broken-cd;
 -
 -			slot at 0 {
 -				reg = <0>;
 -				bus-width = <4>;
--				disable-wp;
 -			};
 +			bus-width = <4>;
-+			disable-wp;
++			cap-mmc-highspeed;
++			cap-sd-highspeed;
  		};
  
- 		dwmmc at 10218000 { /* wifi */
-@@ -74,12 +70,8 @@
+ 		sysmgr at ffd08000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+index bf51182..1ee03c4 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+@@ -30,13 +30,10 @@
  
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
+ 		dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+-			supports-highspeed;
+ 			broken-cd;
 -
 -			slot at 0 {
 -				reg = <0>;
 -				bus-width = <4>;
--				disable-wp;
 -			};
 +			bus-width = <4>;
-+			disable-wp;
++			cap-mmc-highspeed;
++			cap-sd-highspeed;
  		};
  
- 		gpio-keys {
+ 		ethernet at ff702000 {
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 09792b4..f9345e0 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -43,13 +43,10 @@
+ 
+ 		dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+-			supports-highspeed;
+ 			broken-cd;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-			};
++			bus-width = <4>;
++			cap-mmc-highspeed;
++			cap-sd-highspeed;
+ 		};
+ 
+ 		ethernet at ff700000 {
 -- 
 1.7.9.5
