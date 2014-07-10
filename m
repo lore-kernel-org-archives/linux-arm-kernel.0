@@ -1,121 +1,81 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 10 Jul 2014 14:52:59 +0800
-Subject: [PATCH v3 06/13] iommu/arm: Split arm_smmu_destroy_domain_context to
- reuse code
+Date: Thu, 10 Jul 2014 14:53:04 +0800
+Subject: [PATCH v3 11/13] iommu/arm: Put off the initialization phase of
+ arm_smmu_ops registration
 In-Reply-To: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1404975186-12032-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1404975186-12032-7-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1404975186-12032-12-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free IRQ and context bank is a common operation, should be shared by all SMMUs.
+When more than two SMMU drivers running at the same, should make sure all SMMUs
+device tree nodes can be probed before arm_smmu_ops registered.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/arm-smmu-base.c | 20 ++++++++++++++++++++
- drivers/iommu/arm-smmu.c      | 15 ++-------------
- drivers/iommu/arm-smmu.h      |  3 ++-
- 3 files changed, 24 insertions(+), 14 deletions(-)
+ drivers/iommu/arm-smmu-base.c |  3 ++-
+ drivers/iommu/arm-smmu.c      | 12 ++----------
+ drivers/iommu/arm-smmu.h      |  2 --
+ 3 files changed, 4 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-base.c b/drivers/iommu/arm-smmu-base.c
-index 0b02da8..4d1c511 100644
+index 8013751..d71af43 100644
 --- a/drivers/iommu/arm-smmu-base.c
 +++ b/drivers/iommu/arm-smmu-base.c
-@@ -282,6 +282,26 @@ out_free_context:
- 	return ret;
+@@ -1066,7 +1066,7 @@ int arm_smmu_device_remove(struct platform_device *pdev)
+ 	return smmu->hwdep_ops->device_remove(smmu);
  }
 
-+static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = domain->priv;
-+	struct arm_smmu_cfg *root_cfg = &smmu_domain->root_cfg;
-+	struct arm_smmu_device *smmu = root_cfg->smmu;
-+	int irq;
-+
-+	if (!smmu)
-+		return;
-+
-+	smmu->hwdep_ops->destroy_context_bank(smmu_domain);
-+
-+	if (root_cfg->irptndx != INVALID_IRPTNDX) {
-+		irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
-+		free_irq(irq, domain);
-+	}
-+
-+	__arm_smmu_free_bitmap(smmu->context_map, root_cfg->cbndx);
-+}
-+
- static int arm_smmu_domain_init(struct iommu_domain *domain)
+-int __init arm_smmu_ops_init(void)
++static int __init arm_smmu_ops_init(void)
  {
- 	struct arm_smmu_domain *smmu_domain;
+ 	/* Oh, for a proper bus abstraction */
+ 	if (!iommu_present(&platform_bus_type))
+@@ -1079,3 +1079,4 @@ int __init arm_smmu_ops_init(void)
+
+ 	return 0;
+ }
++subsys_initcall_sync(arm_smmu_ops_init);
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index b9538f6..d2fc14c 100644
+index 6971e11..868e9ac 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -498,28 +498,16 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_SCTLR);
- }
+@@ -728,7 +728,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+ 	u32 id;
 
--void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
-+static void arm_smmu_destroy_context_bank(struct arm_smmu_domain *smmu_domain)
+-	dev_notice(smmu->dev, "probing hardware configuration...\n");
++	dev_notice(smmu->dev, "probing arm-smmu hardware configuration...\n");
+
+ 	/* Primecell ID */
+ 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_PIDR2);
+@@ -899,15 +899,7 @@ static struct platform_driver arm_smmu_driver = {
+
+ static int __init arm_smmu_init(void)
  {
--	struct arm_smmu_domain *smmu_domain = domain->priv;
- 	struct arm_smmu_cfg *root_cfg = &smmu_domain->root_cfg;
- 	struct arm_smmu_device *smmu = root_cfg->smmu;
- 	void __iomem *cb_base;
--	int irq;
+-	int ret;
 -
--	if (!smmu)
--		return;
-
- 	/* Disable the context bank and nuke the TLB before freeing it. */
- 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
- 	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
- 	arm_smmu_tlb_inv_context(root_cfg);
+-	ret = platform_driver_register(&arm_smmu_driver);
+-	if (ret)
+-		return ret;
 -
--	if (root_cfg->irptndx != INVALID_IRPTNDX) {
--		irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
--		free_irq(irq, domain);
--	}
+-	arm_smmu_ops_init();
 -
--	__arm_smmu_free_bitmap(smmu->context_map, root_cfg->cbndx);
+-	return 0;
++	return platform_driver_register(&arm_smmu_driver);
  }
 
- static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
-@@ -885,6 +873,7 @@ static struct smmu_hwdep_ops arm_smmu_hwdep_ops = {
- 	.context_fault		= arm_smmu_context_fault,
- 	.global_fault		= arm_smmu_global_fault,
- 	.init_context_bank	= arm_smmu_init_context_bank,
-+	.destroy_context_bank	= arm_smmu_destroy_context_bank,
- 	.domain_add_master	= arm_smmu_domain_add_master,
- 	.domain_remove_master	= arm_smmu_domain_remove_master,
- 	.device_reset		= arm_smmu_device_reset,
+ static void __exit arm_smmu_exit(void)
 diff --git a/drivers/iommu/arm-smmu.h b/drivers/iommu/arm-smmu.h
-index d66a8c4..190f77c 100644
+index 3164ba78..9847a33 100644
 --- a/drivers/iommu/arm-smmu.h
 +++ b/drivers/iommu/arm-smmu.h
-@@ -213,6 +213,7 @@ struct arm_smmu_domain {
-  * @context_fault: context fault handler
-  * @global_fault: global fault handler
-  * @init_context_bank: init a context bank
-+ * @destroy_context_bank: disable a context bank and invalid the TLBs
-  * @domain_add_master: add a master into a domain
-  * @domain_remove_master: remove a master from a domain
-  * @device_reset: initialize a smmu
-@@ -224,6 +225,7 @@ struct smmu_hwdep_ops {
- 	irqreturn_t (*context_fault)(int irq, void *dev);
- 	irqreturn_t (*global_fault)(int irq, void *dev);
- 	void (*init_context_bank)(struct arm_smmu_domain *smmu_domain);
-+	void (*destroy_context_bank)(struct arm_smmu_domain *smmu_domain);
- 	int (*domain_add_master)(struct arm_smmu_domain *smmu_domain,
- 					struct arm_smmu_master *master);
- 	void (*domain_remove_master)(struct arm_smmu_domain *smmu_domain,
-@@ -242,6 +244,5 @@ extern int arm_smmu_device_dt_probe(struct platform_device *pdev,
+@@ -253,6 +253,4 @@ extern void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
+ extern int arm_smmu_device_dt_probe(struct platform_device *pdev,
  					struct smmu_hwdep_ops *ops);
  extern int arm_smmu_device_remove(struct platform_device *pdev);
-
--extern void arm_smmu_destroy_domain_context(struct iommu_domain *domain);
- extern int __init arm_smmu_ops_init(void);
+-
+-extern int __init arm_smmu_ops_init(void);
  #endif
 --
 1.8.0
