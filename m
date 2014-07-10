@@ -1,109 +1,52 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Fri, 11 Jul 2014 00:42:41 +0300
-Subject: [PATCH 05/13] clk: tegra: Add DFLL DVCO reset control for Tegra124
+Date: Fri, 11 Jul 2014 00:42:45 +0300
+Subject: [PATCH 09/13] ARM: tegra: Add the DFLL to Tegra124 device tree
 In-Reply-To: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
 References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1405028569-14253-6-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1405028569-14253-10-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Walmsley <pwalmsley@nvidia.com>
+The DFLL clocksource is a separate IP block from the usual
+clock-and-reset controller, so it gets its own device tree node.
 
-The DVCO present in the DFLL IP block has a separate reset line,
-exposed via the CAR IP block.  This reset line is asserted upon SoC
-reset.  Unless something (such as the DFLL driver) deasserts this
-line, the DVCO will not oscillate, although reads and writes to the
-DFLL IP block will complete.
-
-Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
-saving hours of debugging time.
-
-Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-[ttynkkynen: ported to tegra124 from tegra114]
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 ---
- drivers/clk/tegra/clk-tegra124.c | 47 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/tegra/clk.h          |  3 +++
- 2 files changed, 50 insertions(+)
+ arch/arm/boot/dts/tegra124.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 80efe51..77fbf38 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -31,6 +31,9 @@
- #define CLK_SOURCE_CSITE 0x1d4
- #define CLK_SOURCE_EMC 0x19c
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 7cc535b..582a0e2 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -534,6 +534,28 @@
+ 		status = "disabled";
+ 	};
  
-+#define RST_DFLL_DVCO			0x2f4
-+#define DVFS_DFLL_RESET_SHIFT		0
++	dfll: dfll at 0,70110000 {
++		compatible = "nvidia,tegra124-dfll";
++		reg = <0 0x70110000 0 0x100>, /* DFLL control */
++		      <0 0x70110000 0 0x100>, /* I2C output control */
++		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
++		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
++		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
++			 <&tegra_car TEGRA124_CLK_DFLL_REF>,
++			 <&tegra_car TEGRA124_CLK_I2C5>;
++		clock-names = "soc", "ref", "i2c";
++		#clock-cells = <0>;
++		clock-output-names = "dfllCPU_out";
++		nvidia,sample-rate = <12500>;
++		nvidia,droop-ctrl = <0x00000f00>;
++		nvidia,force-mode = <1>;
++		nvidia,cf = <10>;
++		nvidia,ci = <0>;
++		nvidia,cg = <2>;
++		status = "disabled";
++	};
 +
- #define PLLC_BASE 0x80
- #define PLLC_OUT 0x84
- #define PLLC_MISC2 0x88
-@@ -1378,6 +1381,50 @@ static void __init tegra124_clock_apply_init_table(void)
- 	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
- }
- 
-+/**
-+ * tegra124_car_barrier - wait for pending writes to the CAR to complete
-+ *
-+ * Wait for any outstanding writes to the CAR MMIO space from this CPU
-+ * to complete before continuing execution.  No return value.
-+ */
-+static void tegra124_car_barrier(void)
-+{
-+	readl_relaxed(clk_base + RST_DFLL_DVCO);
-+}
-+
-+/**
-+ * tegra124_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
-+ *
-+ * Assert the reset line of the DFLL's DVCO.  No return value.
-+ */
-+void tegra124_clock_assert_dfll_dvco_reset(void)
-+{
-+	u32 v;
-+
-+	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
-+	v |= (1 << DVFS_DFLL_RESET_SHIFT);
-+	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
-+	tegra124_car_barrier();
-+}
-+EXPORT_SYMBOL(tegra124_clock_assert_dfll_dvco_reset);
-+
-+/**
-+ * tegra124_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
-+ *
-+ * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
-+ * operate.  No return value.
-+ */
-+void tegra124_clock_deassert_dfll_dvco_reset(void)
-+{
-+	u32 v;
-+
-+	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
-+	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
-+	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
-+	tegra124_car_barrier();
-+}
-+EXPORT_SYMBOL(tegra124_clock_deassert_dfll_dvco_reset);
-+
- static void __init tegra124_clock_init(struct device_node *np)
- {
- 	struct device_node *node;
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 16ec8d6..4b3f3d0 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -627,6 +627,9 @@ void tegra114_clock_tune_cpu_trimmers_init(void);
- void tegra114_clock_assert_dfll_dvco_reset(void);
- void tegra114_clock_deassert_dfll_dvco_reset(void);
- 
-+void tegra124_clock_assert_dfll_dvco_reset(void);
-+void tegra124_clock_deassert_dfll_dvco_reset(void);
-+
- typedef void (*tegra_clk_apply_init_table_func)(void);
- extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
- 
+ 	ahub at 0,70300000 {
+ 		compatible = "nvidia,tegra124-ahub";
+ 		reg = <0x0 0x70300000 0x0 0x200>,
 -- 
 1.8.1.5
