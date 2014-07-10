@@ -1,115 +1,62 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 10 Jul 2014 16:52:12 -0300
-Subject: [PATCH v4 net-next 0/4] Network driver for Armada 375 SoC
-Message-ID: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Thu, 10 Jul 2014 16:52:14 -0300
+Subject: [PATCH v4 2/4] ARM: mvebu: Add support for the network controller in
+ Armada 375 SoC
+In-Reply-To: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1405021936-28658-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+This commit adds the support for the network controller in Marvell
+Armada 375 SoC devicetree.
 
-This is the fourth round of the Armada 375 network support patchset. I've
-tried to address all the feedback provided for last version and I hope the
-driver looks better now.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-375.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-If there's nothing else to fix, we'd like to merge this for v3.17. The first
-patch should go through the network tree, and the other patches through
-the mvebu tree.
-
-Thanks a lot for all the great review, and feel free to comment some more!
-
-Changes from v3:
-
-  * Further optimization of the MTU, MAC and ring parameter change to make
-    it smoothier.
-
-  * Lots of cleanups in the parser configuration code, most of them addressing
-    the feedback from Francois. This include fixing: missing curly braces,
-    excessive parenthesis, excessive scope, and making several functions
-    more readable.
-
-  * Removed the Rx/Tx queue number module parameter. There's no reason to
-    use any other than the default hardware-defined value.
-
-Changes from v2:
-
-  * Reworked mvpp2_prs_tcam_first_free() as suggested by Joe and Francois,
-    to have a single loop instead of two.
-
-  * Replaced mvpp2_cpu_interrupts_enable/disable(pp, cpu) with one function
-    that enables/disable interrupts on all the CPUs at once.
-
-  * Factor out Tx descriptor DMA unmap + descriptor put sequence to have
-    more readable code, as suggested by Francois.
-
-  * Remove redundant netif_running() checks in the ingress and egress path,
-    as suggested by Francois.
-
-  * Reworked ring parameter, MTU and MAC address setting to produce a
-    more gentle modification of the parameter, and have a fallback in the
-    event of a failure.
-
-  * Fixed a percpu memory leak on error path, also noted by Francois.
-
-  * Removed the usage of the legacy net_device irq field, requested by
-    Francois.
-
-  * Removed the unneeded multiple Tx port support. It was hardcoded to a single
-    Tx port in the previous version so we decided to drop it and simplify the
-    code.
-
-  * Optimize the on_each_cpu() calls to clear the sent counters and the
-    TX_DONE pkts coalescing setting. on_each_cpu is expensive so it's better
-    to minize the calls to it.
-
-Changes from v1:
-
-  * Marcin Wojtas is the author of the driver, so I fixed authorship
-    for patch 1/3:
-    "ethernet: Add new driver for Marvell Armada 375 network unit"
-
-This patchset adds a new network driver to support the network controller
-in Armada 375 SoC.
-
-The network interfaces share a common hardware unit called Packet Processor,
-which contains a common register space and per-port register spaces.
-    
-The new network unit has different RXQ and TXQ management. The ports
-associate so-called per-port "logical queues" which are mapped to "physical
-queues". The latter are shared among the ports.
-
-Fo the egress part, the mapping for each port is predefined by hardware.
-The egress path incorporates so-called aggregation queues (one per CPU),
-from where the data is passed to the physical queues and then via prefetch
-buffer to the TxDMA.
-    
-The ingress path has a Parser and Classifier (PnC) and a Buffer Manager (BM)
-whose usage is obligatory. We are only implementing a simple configuration
-for the Parser and Classifier, yet the code is considerably large.
-    
-This network unit has other optional features like xPON, WoL, Hardware
-Forwarding, and more. This initial commit doesn't provide support for these.
-    
-The mvpp2 network driver has been written by Marcin Wojtas and then reviewed
-and cleaned up by Ezequiel Garcia.
-
-Ezequiel Garcia (2):
-  ARM: mvebu: Add support for the network controller in Armada 375 SoC
-  ARM: mvebu: Enable the network controller in Armada 375 DB board
-
-Marcin Wojtas (2):
-  ethernet: Add new driver for Marvell Armada 375 network unit
-  ARM: mvebu: enable Armada 375 network driver in mvebu_v7_defconfig
-
- .../devicetree/bindings/net/marvell-pp2.txt        |   61 +
- arch/arm/boot/dts/armada-375-db.dts                |   26 +
- arch/arm/boot/dts/armada-375.dtsi                  |   31 +
- arch/arm/configs/mvebu_v7_defconfig                |    1 +
- drivers/net/ethernet/marvell/Kconfig               |    8 +
- drivers/net/ethernet/marvell/Makefile              |    1 +
- drivers/net/ethernet/marvell/mvpp2.c               | 6393 ++++++++++++++++++++
- 7 files changed, 6521 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/marvell-pp2.txt
- create mode 100644 drivers/net/ethernet/marvell/mvpp2.c
-
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index fb92551..d4619ad 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -151,6 +151,37 @@
+ 				      <0xc100 0x100>;
+ 			};
+ 
++			mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,orion-mdio";
++				reg = <0xc0054 0x4>;
++			};
++
++			/* Network controller */
++			ethernet at f0000 {
++				compatible = "marvell,armada-375-pp2";
++				reg = <0xf0000 0xa000>, /* Packet Processor regs */
++				      <0xc0000 0x3060>, /* LMS regs */
++				      <0xc4000 0x100>,  /* eth0 regs */
++				      <0xc5000 0x100>;  /* eth1 regs */
++				clocks = <&gateclk 3>, <&gateclk 19>;
++				clock-names = "pp_clk", "gop_clk";
++				status = "disabled";
++
++				eth0: eth0 at c4000 {
++					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <0>;
++					status = "disabled";
++				};
++
++				eth1: eth1 at c5000 {
++					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <1>;
++					status = "disabled";
++				};
++			};
++
+ 			spi0: spi at 10600 {
+ 				compatible = "marvell,orion-spi";
+ 				reg = <0x10600 0x50>;
 -- 
 1.9.1
