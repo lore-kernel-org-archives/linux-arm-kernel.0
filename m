@@ -1,58 +1,39 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Thu, 10 Jul 2014 16:02:54 -0500
-Subject: [PATCH] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <20140710202502.GA20394@cbox>
-References: <20140709161704.9623.92358.stgit@joelaarch64.amd.com>
- <20140710202502.GA20394@cbox>
-Message-ID: <53BEFF7E.5010907@amd.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 Jul 2014 14:35:54 -0700
+Subject: [GIT PULL] omap fixes against v3.16-rc4
+In-Reply-To: <20140709153552.GA28884@atomide.com>
+References: <20140709153552.GA28884@atomide.com>
+Message-ID: <20140710213554.GA1313@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 09, 2014 at 08:35:52AM -0700, Tony Lindgren wrote:
+> The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+> 
+>   Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-rc4
+> 
+> for you to fetch changes up to 1d29a0722f6c38f79785c9ffb911730598de84e2:
+> 
+>   ARM: OMAP2+: Remove non working OMAP HDMI audio initialization (2014-07-08 01:08:44 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps for the -rc series. It's mostly fixes for clock rates,
+> restart handling and phy regulators and SATA interconnect data.
 
-On 07/10/2014 03:25 PM, Christoffer Dall wrote:
-> On Wed, Jul 09, 2014 at 11:17:04AM -0500, Joel Schopp wrote:
->> The current calculation for VTTBR_BADDR_MASK masks only 39 bits and not
->> all 40 bits.  That last bit is important as some systems allocate
->> from near the top of the available address space.
->>
->> This patch is necessary to run KVM on an aarch64 SOC I have been testing.
->>
->> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
->> ---
->>  arch/arm64/include/asm/kvm_arm.h |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index 3d69030..b39e93f 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -148,7 +148,7 @@
->>  #endif
->>  
->>  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
->> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
->> +#define VTTBR_BADDR_MASK  (0xffffffffffLLU)              /* bits 0-39 */
->>  #define VTTBR_VMID_SHIFT  (48LLU)
->>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
->>  
->>
-> While this is obviously fixing a bug, it doesn't feel like the right
-> short-term fix.  I'll have to go back and read the definitions of x in
-> BADDR[47:x] for VTTBR_EL2 exactly again, but the intended use of
-> VTTBR_BADDR_MASK (and the only occurence of it in C-code) is to deal
-> with alignment of the allocated pgd.
-I think there is some confusion.  Before VTTBR_BADDR_MASK always
-evaluated to 0x7fffffffffLLU, after the change it always evaluates to
-0xffffffffffLLU
+It's a little surprising to see a SATA fix about a week after enablement
+went in during -rc -- enabling it that late should ideally have been
+better tested than this.
 
-Neither before nor after the patch is it dealing with alignment.  Any
-bits it throws away (bits 40-47) are most significant not least significant.
+> Also few build fixes related to the DSP driver in staging, and trivial
+> stuff like removal of broken and soon to be unused platform data init
+> for HDMI audio that would be good to get into the -rc series if not
+> too late.
 
-I could have rewritten the macro like:
+Thanks, merged. Definitely time for regressions only from here on out though.
 
-#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X + 1)) - 1) << VTTBR_BADDR_SHIFT)
 
-to correct the bug but it's my opinion that the existing code is quite
-obfuscated which is how the bug happened in the first place.  It seemed
-easier to just actually mask the bits in a straightforward and easy to
-understand manner.  I even added a comment so nobody has to count the fs ;)
+-Olof
