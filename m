@@ -1,88 +1,179 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jul 2014 22:33:55 +0900
-Subject: [PATCH v6 2/6] ARM: EXYNOS: Move cpufreq and cpuidle device
- registration to init_machine
-In-Reply-To: <000801cf9a7f$3896e150$a9c4a3f0$@samsung.com>
-References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
- <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
- <53BB25B7.6000500@samsung.com> <000801cf9a7f$3896e150$a9c4a3f0$@samsung.com>
-Message-ID: <026701cf9c43$98b20860$ca161920$@samsung.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 10 Jul 2014 15:32:25 +0200
+Subject: [RFC v3 4/5] clk: per-user clock accounting for debug
+In-Reply-To: <1404999146-32691-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1404999146-32691-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1404999146-32691-5-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pankaj Dubey wrote:
-> 
-> Hi Kukjin,
-> 
-Hi,
+When a clock has multiple users, the WARNING on imbalance of
+enable/disable may not show the guilty party since although they may
+have commited the error earlier, the warning is emitted later when some
+other user, presumably innocent, disables the clock.
 
-> >
-> > On 07/07/14 12:50, Pankaj Dubey wrote:
-> > > As exynos_cpuidle_init and exynos_cpufreq_init function have just one
-> > > lines of code for registering platform devices. We can move these
-> > > lines to exynos_dt_machine_init and delete exynos_cpuidle_init and
-> > > exynos_cpufreq_init function. This will help in reducing lines of code
-> > > in exynos.c, making it more cleaner.
-> > >
-> > > Suggested-by: Tomasz Figa<t.figa@samsung.com>
-> > > Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
-> > > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
-> > > ---
-> > >   arch/arm/mach-exynos/exynos.c |   20 ++++----------------
-> > >   1 file changed, 4 insertions(+), 16 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-exynos/exynos.c
-> > > b/arch/arm/mach-exynos/exynos.c index ff60b4c..47170eb 100644
-> > > --- a/arch/arm/mach-exynos/exynos.c
-> > > +++ b/arch/arm/mach-exynos/exynos.c
-> > > @@ -171,19 +171,6 @@ static struct platform_device exynos_cpuidle = {
-> > >   	.id                = -1,
-> > >   };
-> > >
-> > > -void __init exynos_cpuidle_init(void) -{
-> > > -	if (soc_is_exynos5440())
-> > > -		return;
-> > > -
-> > > -	platform_device_register(&exynos_cpuidle);
-> > > -}
-> > > -
-> > > -void __init exynos_cpufreq_init(void) -{
-> > > -	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> > > -}
-> > > -
-> > >   void __iomem *sysram_base_addr;
-> > >   void __iomem *sysram_ns_base_addr;
-> > >
-> > > @@ -300,10 +287,11 @@ static void __init exynos_dt_machine_init(void)
-> > >   	if (!IS_ENABLED(CONFIG_SMP))
-> > >   		exynos_sysram_init();
-> > >
-> > > -	if (!of_machine_is_compatible("samsung,exynos5420"))
-> > > -		exynos_cpuidle_init();
-> > > +	if (!of_machine_is_compatible("samsung,exynos5420") ||
-> > > +			!of_machine_is_compatible("samsung,exynos5440"))
-> > > +		platform_device_register(&exynos_cpuidle);
-> > >
-> > > -	exynos_cpufreq_init();
-> > > +	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> > >
-> > >   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > >   }
-> >
-> > This cannot be applied in my tree now....
-> >
-> 
-> May I know what the issue is? As I am able to rebase this patch on today's
-> kgene/for-next
-> and could not see any merge conflict.
-> If you think I need to respin this patch please let me know.
-> 
+Provide per-user clock enable/disable accounting and disabler tracking
+in order to help debug these problems.
 
-Pankaj, I found this is based on cpuidle related branch in my tree, BTW this
-has a dependency with following so please respin your patch once I take the
-patch in my tree maybe tonight.
+Based on previous work by Rabin Vincent <rabin@rab.in>.
 
-https://lkml.org/lkml/2014/6/24/286
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ drivers/clk/clk.c           | 35 +++++++++++++++++++++++++++++++----
+ drivers/clk/clk.h           |  3 ++-
+ drivers/clk/clkdev.c        | 16 ++++++++++++----
+ include/linux/clk-private.h |  4 ++++
+ 4 files changed, 49 insertions(+), 9 deletions(-)
 
-Thanks,
-Kukjin
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index cc1d09b..9d51900 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -568,7 +568,8 @@ static int clk_disable_unused(void)
+ }
+ late_initcall_sync(clk_disable_unused);
+ 
+-struct clk *__clk_create_clk(struct clk_core *clk_core)
++struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
++			     const char *con)
+ {
+ 	struct clk *clk;
+ 
+@@ -581,6 +582,8 @@ struct clk *__clk_create_clk(struct clk_core *clk_core)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	clk->core = clk_core;
++	clk->dev_id = dev;
++	clk->con_id = con;
+ 
+ 	return clk;
+ }
+@@ -955,7 +958,20 @@ EXPORT_SYMBOL_GPL(clk_provider_disable);
+  */
+ void clk_disable(struct clk *clk_user)
+ {
+-	clk_provider_disable(clk_to_clk_core(clk_user));
++	struct clk_core *clk = clk_to_clk_core(clk_user);
++	unsigned long flags;
++
++	flags = clk_enable_lock();
++	if (!WARN(clk_user->enable_count == 0,
++		  "incorrect disable clk dev %s con %s last disabler %pF\n",
++		  clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
++
++		clk_user->last_disable = __builtin_return_address(0);
++		clk_user->enable_count--;
++
++		__clk_disable(clk);
++	}
++	clk_enable_unlock(flags);
+ }
+ EXPORT_SYMBOL_GPL(clk_disable);
+ 
+@@ -1016,7 +1032,17 @@ EXPORT_SYMBOL_GPL(clk_provider_enable);
+  */
+ int clk_enable(struct clk *clk_user)
+ {
+-	return clk_provider_enable(clk_to_clk_core(clk_user));
++	struct clk_core *clk = clk_to_clk_core(clk_user);
++	unsigned long flags;
++	int ret;
++
++	flags = clk_enable_lock();
++	ret = __clk_enable(clk);
++	if (!ret)
++		clk_user->enable_count++;
++	clk_enable_unlock(flags);
++
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(clk_enable);
+ 
+@@ -1692,8 +1718,9 @@ EXPORT_SYMBOL_GPL(clk_provider_get_parent);
+ struct clk *clk_get_parent(struct clk *clk_user)
+ {
+ 	struct clk_core *clk = clk_to_clk_core(clk_user);
++	struct clk_core *parent = clk_provider_get_parent(clk);
+ 
+-	return __clk_create_clk(clk_provider_get_parent(clk));
++	return __clk_create_clk(parent, clk_user->dev_id, clk_user->con_id);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
+ 
+diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+index 4d7398f..3987594 100644
+--- a/drivers/clk/clk.h
++++ b/drivers/clk/clk.h
+@@ -23,5 +23,6 @@ static inline struct clk_core *clk_to_clk_core(struct clk *clk)
+ {
+ 	return clk->core;
+ }
+-struct clk *__clk_create_clk(struct clk_core *clk_core);
++struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
++			     const char *con);
+ #endif
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 10020b2..6ea91bf 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -76,7 +76,9 @@ struct clk_core *of_clk_provider_get(struct device_node *np, int index)
+ 
+ struct clk *of_clk_get(struct device_node *np, int index)
+ {
+-	return __clk_create_clk(of_clk_provider_get(np, index));
++	struct clk_core *clk = of_clk_provider_get(np, index);
++
++	return __clk_create_clk(clk, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get);
+ 
+@@ -128,7 +130,9 @@ struct clk_core *of_clk_provider_get_by_name(struct device_node *np, const char
+  */
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+ {
+-	return __clk_create_clk(of_clk_provider_get_by_name(np, name));
++	struct clk_core *clk = of_clk_provider_get_by_name(np, name);
++
++	return __clk_create_clk(clk, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get_by_name);
+ #endif
+@@ -195,7 +199,9 @@ EXPORT_SYMBOL_GPL(clk_provider_get_sys);
+ 
+ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+ {
+-	return __clk_create_clk(clk_provider_get_sys(dev_id, con_id));
++	struct clk_core *clk = clk_provider_get_sys(dev_id, con_id);
++
++	return __clk_create_clk(clk, dev_id, con_id);
+ }
+ EXPORT_SYMBOL(clk_get_sys);
+ 
+@@ -218,7 +224,9 @@ EXPORT_SYMBOL(clk_provider_get);
+ 
+ struct clk *clk_get(struct device *dev, const char *con_id)
+ {
+-	return __clk_create_clk(clk_provider_get(dev, con_id));
++	const char *dev_id = dev ? dev_name(dev) : NULL;
++
++	return __clk_create_clk(clk_provider_get(dev, con_id), dev_id, con_id);
+ }
+ EXPORT_SYMBOL(clk_get);
+ 
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 2c1ece9..9657fc8 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -57,6 +57,10 @@ struct clk_core {
+ 
+ struct clk {
+ 	struct clk_core	*core;
++	unsigned int	enable_count;
++	const char	*dev_id;
++	const char	*con_id;
++	void		*last_disable;
+ };
+ 
+ /*
+-- 
+1.9.3
