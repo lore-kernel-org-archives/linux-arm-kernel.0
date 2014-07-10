@@ -1,354 +1,98 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Jul 2014 19:14:22 +0200
-Subject: [PATCH v4 7/7] ARM: at91: remove old irq material
-In-Reply-To: <1405012462-766-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405012462-766-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1405012462-766-8-git-send-email-boris.brezillon@free-electrons.com>
+Date: Thu, 10 Jul 2014 19:19:27 +0200
+Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
+ connected to sama5d3xek boards
+In-Reply-To: <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
+References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
+ <53AC7BFD.2070806@free-electrons.com> <53AD22D8.2090301@atmel.com>
+ <20140710110720.03f437eb@bbrezillon>
+ <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
+Message-ID: <20140710191927.56a3ead5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all the material related to AIC5 support: this interrupt controller
-driver is now implemented in drivers/irqchip/atmel-aic.c.
+On Thu, 10 Jul 2014 08:35:15 -0700
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/irq.c | 270 ++---------------------------------------------
- 1 file changed, 6 insertions(+), 264 deletions(-)
+> 2014-07-10 2:07 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> > On Fri, 27 Jun 2014 09:52:56 +0200
+> > Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> >
+> >> On 26/06/2014 22:01, Boris BREZILLON :
+> >> > Hi Florian,
+> >> >
+> >> > On 26/06/2014 20:15, Florian Fainelli wrote:
+> >> >> Hi Boris,
+> >> >>
+> >> >> 2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> >> >>> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
+> >> >>>
+> >> >>> The PHY address is not specified here because atmel have 2 different
+> >> >>> designs
+> >> >>> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
+> >> >>> (Embest design) and the other one is connection PHYAD0 to a pull up
+> >> >>> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
+> >> >>> As a result, Ronetix design will have its PHY available at address 0x1 and
+> >> >>> Embest design at 0x7.
+> >> >>> Let the net PHY core automatically detect the PHY address by scanning the
+> >> >>> MDIO bus.
+> >> >> I though the compatible string was listed as a required property, but
+> >> >> it is not. The 'reg' property however is listed as required, although
+> >> >> the of_miodbus_register() works just fine without it, although that is
+> >> >> a Linux-specific implementation detail.
+> >> >
+> >> > Indeed, it's listed in the required property list of the DT binding doc,
+> >> > but the code implement auto detection if reg is missing.
+> >> > However this line [1] clearly shows that specifying the reg property is
+> >> > the preferred way of doing things.
+> >> >
+> >> > I could define 2 different sama5d3xcm.dtsi (sama5d3xcm-ronetix.dtsi and
+> >> > sama5d3xcm-embest.dtsi) to avoid this dirty hack,
+> >> > but then we would have 2 more dtb and the user would have to determine
+> >> > which CPU module he owns to choose the appropriate dtb.
+> >> > If at91, arm-soc and DT maintainers agree with this approach I can
+> >> > definitely propose something.
+> >>
+> >> Yes Boris, I definitively prefer not to add another .dtsi file for this
+> >> series if we can avoid it.
+> >>
+> >
+> > Okay, now that I don't specify the reg property I have a bunch of
+> > noisy logs (which is exactly what the developer of of_mdio.c wanted in
+> > order to force people to specify the reg property).
+> >
+> > It seems to be a problem for atmel users (all these logs make them
+> > think there is something wrong with the net device).
+> >
+> > Apart from the dts/dtsi split solution, which Nicolas wants to avoid, I
+> > see two solutions here:
+> >
+> > 1) remove the logs (or use dev_dbg instead of dev_info) from of_mdio.c.
+> > But I'm pretty sure this solution won't be accepted :-).
+> 
+> I am fine with using dev_dbg() instead of dev_info() for that sort of
+> messages, provided that you state the rationale of this change
+> (spewing the log console with probing messages) and specify tha the
+> 'reg' property is optional.
+> 
+> >
+> > 2) define 2 ethernet phys (one for each possible solution). I tested it
+> > and it works fine (only the available PHY is registered and there is no
+> > noisy logs anymore).
+> 
+> One advantage of that solution is that you'll get slightly faster boot
+> times since you won't have to auto-probe for the PHYs on the MDIO bus,
+> the time savings get bigger as you start using higher PHY addresses.
 
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index 3d192c5..cdb3ec9 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -48,11 +48,6 @@ void __iomem *at91_aic_base;
- static struct irq_domain *at91_aic_domain;
- static struct device_node *at91_aic_np;
- static unsigned int n_irqs = NR_AIC_IRQS;
--static unsigned long at91_aic_caps = 0;
--
--/* AIC5 introduces a Source Select Register */
--#define AT91_AIC_CAP_AIC5	(1 << 0)
--#define has_aic5()		(at91_aic_caps & AT91_AIC_CAP_AIC5)
- 
- #ifdef CONFIG_PM
- 
-@@ -92,50 +87,14 @@ static int at91_aic_set_wake(struct irq_data *d, unsigned value)
- 
- void at91_irq_suspend(void)
- {
--	int bit = -1;
--
--	if (has_aic5()) {
--		/* disable enabled irqs */
--		while ((bit = find_next_bit(backups, n_irqs, bit + 1)) < n_irqs) {
--			at91_aic_write(AT91_AIC5_SSR,
--				       bit & AT91_AIC5_INTSEL_MSK);
--			at91_aic_write(AT91_AIC5_IDCR, 1);
--		}
--		/* enable wakeup irqs */
--		bit = -1;
--		while ((bit = find_next_bit(wakeups, n_irqs, bit + 1)) < n_irqs) {
--			at91_aic_write(AT91_AIC5_SSR,
--				       bit & AT91_AIC5_INTSEL_MSK);
--			at91_aic_write(AT91_AIC5_IECR, 1);
--		}
--	} else {
--		at91_aic_write(AT91_AIC_IDCR, *backups);
--		at91_aic_write(AT91_AIC_IECR, *wakeups);
--	}
-+	at91_aic_write(AT91_AIC_IDCR, *backups);
-+	at91_aic_write(AT91_AIC_IECR, *wakeups);
- }
- 
- void at91_irq_resume(void)
- {
--	int bit = -1;
--
--	if (has_aic5()) {
--		/* disable wakeup irqs */
--		while ((bit = find_next_bit(wakeups, n_irqs, bit + 1)) < n_irqs) {
--			at91_aic_write(AT91_AIC5_SSR,
--				       bit & AT91_AIC5_INTSEL_MSK);
--			at91_aic_write(AT91_AIC5_IDCR, 1);
--		}
--		/* enable irqs disabled for suspend */
--		bit = -1;
--		while ((bit = find_next_bit(backups, n_irqs, bit + 1)) < n_irqs) {
--			at91_aic_write(AT91_AIC5_SSR,
--				       bit & AT91_AIC5_INTSEL_MSK);
--			at91_aic_write(AT91_AIC5_IECR, 1);
--		}
--	} else {
--		at91_aic_write(AT91_AIC_IDCR, *wakeups);
--		at91_aic_write(AT91_AIC_IECR, *backups);
--	}
-+	at91_aic_write(AT91_AIC_IDCR, *wakeups);
-+	at91_aic_write(AT91_AIC_IECR, *backups);
- }
- 
- #else
-@@ -169,21 +128,6 @@ at91_aic_handle_irq(struct pt_regs *regs)
- 		handle_IRQ(irqnr, regs);
- }
- 
--asmlinkage void __exception_irq_entry
--at91_aic5_handle_irq(struct pt_regs *regs)
--{
--	u32 irqnr;
--	u32 irqstat;
--
--	irqnr = at91_aic_read(AT91_AIC5_IVR);
--	irqstat = at91_aic_read(AT91_AIC5_ISR);
--
--	if (!irqstat)
--		at91_aic_write(AT91_AIC5_EOICR, 0);
--	else
--		handle_IRQ(irqnr, regs);
--}
--
- static void at91_aic_mask_irq(struct irq_data *d)
- {
- 	/* Disable interrupt on AIC */
-@@ -192,15 +136,6 @@ static void at91_aic_mask_irq(struct irq_data *d)
- 	clear_backup(d->hwirq);
- }
- 
--static void __maybe_unused at91_aic5_mask_irq(struct irq_data *d)
--{
--	/* Disable interrupt on AIC5 */
--	at91_aic_write(AT91_AIC5_SSR, d->hwirq & AT91_AIC5_INTSEL_MSK);
--	at91_aic_write(AT91_AIC5_IDCR, 1);
--	/* Update ISR cache */
--	clear_backup(d->hwirq);
--}
--
- static void at91_aic_unmask_irq(struct irq_data *d)
- {
- 	/* Enable interrupt on AIC */
-@@ -209,15 +144,6 @@ static void at91_aic_unmask_irq(struct irq_data *d)
- 	set_backup(d->hwirq);
- }
- 
--static void __maybe_unused at91_aic5_unmask_irq(struct irq_data *d)
--{
--	/* Enable interrupt on AIC5 */
--	at91_aic_write(AT91_AIC5_SSR, d->hwirq & AT91_AIC5_INTSEL_MSK);
--	at91_aic_write(AT91_AIC5_IECR, 1);
--	/* Update ISR cache */
--	set_backup(d->hwirq);
--}
--
- static void at91_aic_eoi(struct irq_data *d)
- {
- 	/*
-@@ -227,11 +153,6 @@ static void at91_aic_eoi(struct irq_data *d)
- 	at91_aic_write(AT91_AIC_EOICR, 0);
- }
- 
--static void __maybe_unused at91_aic5_eoi(struct irq_data *d)
--{
--	at91_aic_write(AT91_AIC5_EOICR, 0);
--}
--
- static unsigned long *at91_extern_irq;
- 
- u32 at91_get_extern_irq(void)
-@@ -282,16 +203,8 @@ static int at91_aic_set_type(struct irq_data *d, unsigned type)
- 	if (srctype < 0)
- 		return srctype;
- 
--	if (has_aic5()) {
--		at91_aic_write(AT91_AIC5_SSR,
--			       d->hwirq & AT91_AIC5_INTSEL_MSK);
--		smr = at91_aic_read(AT91_AIC5_SMR) & ~AT91_AIC_SRCTYPE;
--		at91_aic_write(AT91_AIC5_SMR, smr | srctype);
--	} else {
--		smr = at91_aic_read(AT91_AIC_SMR(d->hwirq))
--		      & ~AT91_AIC_SRCTYPE;
--		at91_aic_write(AT91_AIC_SMR(d->hwirq), smr | srctype);
--	}
-+	smr = at91_aic_read(AT91_AIC_SMR(d->hwirq)) & ~AT91_AIC_SRCTYPE;
-+	at91_aic_write(AT91_AIC_SMR(d->hwirq), smr | srctype);
- 
- 	return 0;
- }
-@@ -331,177 +244,6 @@ static void __init at91_aic_hw_init(unsigned int spu_vector)
- 	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
- }
- 
--static void __init __maybe_unused at91_aic5_hw_init(unsigned int spu_vector)
--{
--	int i;
--
--	/*
--	 * Perform 8 End Of Interrupt Command to make sure AIC
--	 * will not Lock out nIRQ
--	 */
--	for (i = 0; i < 8; i++)
--		at91_aic_write(AT91_AIC5_EOICR, 0);
--
--	/*
--	 * Spurious Interrupt ID in Spurious Vector Register.
--	 * When there is no current interrupt, the IRQ Vector Register
--	 * reads the value stored in AIC_SPU
--	 */
--	at91_aic_write(AT91_AIC5_SPU, spu_vector);
--
--	/* No debugging in AIC: Debug (Protect) Control Register */
--	at91_aic_write(AT91_AIC5_DCR, 0);
--
--	/* Disable and clear all interrupts initially */
--	for (i = 0; i < n_irqs; i++) {
--		at91_aic_write(AT91_AIC5_SSR, i & AT91_AIC5_INTSEL_MSK);
--		at91_aic_write(AT91_AIC5_IDCR, 1);
--		at91_aic_write(AT91_AIC5_ICCR, 1);
--	}
--}
--
--#if defined(CONFIG_OF)
--static unsigned int *at91_aic_irq_priorities;
--
--static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
--							irq_hw_number_t hw)
--{
--	/* Put virq number in Source Vector Register */
--	at91_aic_write(AT91_AIC_SVR(hw), virq);
--
--	/* Active Low interrupt, with priority */
--	at91_aic_write(AT91_AIC_SMR(hw),
--		       AT91_AIC_SRCTYPE_LOW | at91_aic_irq_priorities[hw]);
--
--	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_fasteoi_irq);
--	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
--
--	return 0;
--}
--
--static int at91_aic5_irq_map(struct irq_domain *h, unsigned int virq,
--		irq_hw_number_t hw)
--{
--	at91_aic_write(AT91_AIC5_SSR, hw & AT91_AIC5_INTSEL_MSK);
--
--	/* Put virq number in Source Vector Register */
--	at91_aic_write(AT91_AIC5_SVR, virq);
--
--	/* Active Low interrupt, with priority */
--	at91_aic_write(AT91_AIC5_SMR,
--		       AT91_AIC_SRCTYPE_LOW | at91_aic_irq_priorities[hw]);
--
--	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_fasteoi_irq);
--	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
--
--	return 0;
--}
--
--static int at91_aic_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
--				const u32 *intspec, unsigned int intsize,
--				irq_hw_number_t *out_hwirq, unsigned int *out_type)
--{
--	if (WARN_ON(intsize < 3))
--		return -EINVAL;
--	if (WARN_ON(intspec[0] >= n_irqs))
--		return -EINVAL;
--	if (WARN_ON((intspec[2] < AT91_AIC_IRQ_MIN_PRIORITY)
--		    || (intspec[2] > AT91_AIC_IRQ_MAX_PRIORITY)))
--		return -EINVAL;
--
--	*out_hwirq = intspec[0];
--	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
--	at91_aic_irq_priorities[*out_hwirq] = intspec[2];
--
--	return 0;
--}
--
--static struct irq_domain_ops at91_aic_irq_ops = {
--	.map	= at91_aic_irq_map,
--	.xlate	= at91_aic_irq_domain_xlate,
--};
--
--int __init at91_aic_of_common_init(struct device_node *node,
--				    struct device_node *parent)
--{
--	struct property *prop;
--	const __be32 *p;
--	u32 val;
--
--	at91_extern_irq = kzalloc(BITS_TO_LONGS(n_irqs)
--				  * sizeof(*at91_extern_irq), GFP_KERNEL);
--	if (!at91_extern_irq)
--		return -ENOMEM;
--
--	if (at91_aic_pm_init()) {
--		kfree(at91_extern_irq);
--		return -ENOMEM;
--	}
--
--	at91_aic_irq_priorities = kzalloc(n_irqs
--					  * sizeof(*at91_aic_irq_priorities),
--					  GFP_KERNEL);
--	if (!at91_aic_irq_priorities)
--		return -ENOMEM;
--
--	at91_aic_base = of_iomap(node, 0);
--	at91_aic_np = node;
--
--	at91_aic_domain = irq_domain_add_linear(at91_aic_np, n_irqs,
--						&at91_aic_irq_ops, NULL);
--	if (!at91_aic_domain)
--		panic("Unable to add AIC irq domain (DT)\n");
--
--	of_property_for_each_u32(node, "atmel,external-irqs", prop, p, val) {
--		if (val >= n_irqs)
--			pr_warn("AIC: external irq %d >= %d skip it\n",
--				val, n_irqs);
--		else
--			set_bit(val, at91_extern_irq);
--	}
--
--	irq_set_default_host(at91_aic_domain);
--
--	return 0;
--}
--
--int __init at91_aic_of_init(struct device_node *node,
--				     struct device_node *parent)
--{
--	int err;
--
--	err = at91_aic_of_common_init(node, parent);
--	if (err)
--		return err;
--
--	at91_aic_hw_init(n_irqs);
--
--	return 0;
--}
--
--int __init at91_aic5_of_init(struct device_node *node,
--				     struct device_node *parent)
--{
--	int err;
--
--	at91_aic_caps |= AT91_AIC_CAP_AIC5;
--	n_irqs = NR_AIC5_IRQS;
--	at91_aic_chip.irq_ack           = at91_aic5_mask_irq;
--	at91_aic_chip.irq_mask		= at91_aic5_mask_irq;
--	at91_aic_chip.irq_unmask	= at91_aic5_unmask_irq;
--	at91_aic_chip.irq_eoi		= at91_aic5_eoi;
--	at91_aic_irq_ops.map		= at91_aic5_irq_map;
--
--	err = at91_aic_of_common_init(node, parent);
--	if (err)
--		return err;
--
--	at91_aic5_hw_init(n_irqs);
--
--	return 0;
--}
--#endif
--
- /*
-  * Initialize the AIC interrupt controller.
-  */
+Yes I prefer this solution too, but is it acceptable to define 2 phy
+nodes even if only one is really available ?
+
+
+
+
 -- 
-1.8.3.2
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
