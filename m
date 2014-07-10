@@ -1,51 +1,46 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 10 Jul 2014 14:23:11 -0400 (EDT)
-Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <1405005486-26355-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1407101154070.1492-100000@iolanthe.rowland.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Jul 2014 20:25:38 +0200
+Subject: [PATCH 0/3] irqchip: atmel-aic: Add irq RTC fixups
+Message-ID: <1405016741-2407-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jul 2014, Peter Griffin wrote:
+Hello,
 
-> This driver adds support for the USB HCD present in STi
-> SoC's from STMicroelectronics. It has been tested on the
-> stih416-b2020 board.
+This patch series introduce the notion of irq fixups for atmel SoCs.
 
-This driver file, along with the Kconfig changes, belongs in the
-arch/platform-specific source directory.  Not in drivers/usb/host/.  
-It is, after all, a platform driver that registers two platform
-devices.
+In most at91 SoCs the first interrupt line is shared by several IPs, and
+some of these HW blocks might be in an unknown state when booting the
+Linux kernel.
+Hence these IPs might generate spurious interrupts if they've not masked
+their irqs and the shared irq line is requested by another peripheral.
 
-> +++ b/drivers/usb/host/Kconfig
-> @@ -753,6 +753,23 @@ config USB_HCD_SSB
->  
->  	  If unsure, say N.
->  
-> +config USB_HCD_ST
-> +	tristate "STMicroelectronics STi family HCD support"
+These fixups were previously done in arch/arm/mach-at91/sysirq_mask.c
+but as we're trying to use standard implementation (IRQCHIP_DECLARE and
+automatic call of irqchip_init within arch/arm/kernel/irq.c) we need to
+do those fixups in the irqchip driver.
 
-Why does this need to be tristate?  Why not always build it into the 
-kernel?  Or at least make it boolean rather than tristate.
+This series only fix RTC irqs, but other HW blocks (RTT, PMC, ...) will
+be added later on.
 
-> +	depends on ARCH_STI
-> +	select USB_OHCI_HCD_PLATFORM if USB_OHCI_HCD
-> +	select USB_EHCI_HCD_PLATFORM if USB_EHCI_HCD
-> +	select MFD_SYSCON
-> +	select GENERIC_PHY
-> +	help
-> +	  Enable support for the EHCI and OCHI host controller on ST
+This series depends on this one [1].
 
-s/OCHI/OHCI/
+Best Regards,
 
-> + 	  consumer electronics SoCs.
-> +
-> + 	  It converts the ST driver into two platform device drivers
+Boris
 
-It converts the ST driver?  That doesn't sound right at all.  You could 
-eliminate this paragraph completely and nobody would miss it.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271413.html
 
-> + 	  for EHCI and OHCI and provides bus configuration, clock and power
-> + 	  management for the combined hardware block.
+Boris BREZILLON (3):
+  irqchip: atmel-aic: Add irq fixup infrastructure
+  irqchip: atmel-aic: Implement RTC irq fixup
+  irqchip: atmel-aic: Define irq fixups for atmel SoCs
 
-Alan Stern
+ drivers/irqchip/irq-atmel-aic-common.c | 47 ++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-atmel-aic-common.h |  4 +++
+ drivers/irqchip/irq-atmel-aic.c        | 15 +++++++++++
+ drivers/irqchip/irq-atmel-aic5.c       | 12 +++++++++
+ 4 files changed, 78 insertions(+)
+
+-- 
+1.8.3.2
