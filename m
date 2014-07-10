@@ -1,130 +1,65 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Thu, 10 Jul 2014 15:43:18 -0700
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
-In-Reply-To: <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>	<1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>	<20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>	<53BC6866.30803@codeaurora.org>	<CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>	<53BDD834.5030405@codeaurora.org>
- <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
-Message-ID: <53BF1706.4050203@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Jul 2014 23:55:39 +0100
+Subject: [linux-sunxi] Re: GSoC 2014 #0 status report - Improving
+ Allwinner SoC support
+In-Reply-To: <CAKON4Ow8m07sLXnnm3n6HNh3sg0nU6VDAZ0urZ0r2_6nT7UnHQ@mail.gmail.com>
+References: <53BE0B4F.1090001@elopez.com.ar> <20140710203906.GA3745@lukather>
+ <CAKON4Ow8m07sLXnnm3n6HNh3sg0nU6VDAZ0urZ0r2_6nT7UnHQ@mail.gmail.com>
+Message-ID: <20140710225538.GZ21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2014 5:40 PM, Rob Clark wrote:
-> On Wed, Jul 9, 2014 at 8:03 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
->> On 7/8/2014 4:49 PM, Rob Clark wrote:
->>> On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
->>>> Hi Hiroshi,
->>>>
->>>> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
->>>>> Hi Olav,
->>>>>
->>>>> Olav Haugan <ohaugan@codeaurora.org> writes:
->>>>>
->>>>>> Mapping and unmapping are more often than not in the critical path.
->>>>>> map_range and unmap_range allows SMMU driver implementations to optimize
->>>>>> the process of mapping and unmapping buffers into the SMMU page tables.
->>>>>> Instead of mapping one physical address, do TLB operation (expensive),
->>>>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
->>>>>> a scatter-gatherlist of physically contiguous pages into one virtual
->>>>>> address space and then at the end do one TLB operation.
->>>>>>
->>>>>> Additionally, the mapping operation would be faster in general since
->>>>>> clients does not have to keep calling map API over and over again for
->>>>>> each physically contiguous chunk of memory that needs to be mapped to a
->>>>>> virtually contiguous region.
->>>>>>
->>>>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->>>>>> ---
->>>>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
->>>>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
->>>>>>  2 files changed, 48 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>>>>> index e5555fc..f2a6b80 100644
->>>>>> --- a/drivers/iommu/iommu.c
->>>>>> +++ b/drivers/iommu/iommu.c
->>>>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>>>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>>>>>
->>>>>>
->>>>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
->>>>>> +                struct scatterlist *sg, unsigned int len, int prot)
->>>>>> +{
->>>>>> +    if (unlikely(domain->ops->map_range == NULL))
->>>>>> +            return -ENODEV;
->>>>>> +
->>>>>> +    BUG_ON(iova & (~PAGE_MASK));
->>>>>> +
->>>>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
->>>>>> +}
->>>>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
->>>>>
->>>>> We have the similar one internally, which is named, "iommu_map_sg()",
->>>>> called from DMA API.
->>>>
->>>> Great, so this new API will be useful to more people!
->>>>
->>>>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
->>>>>> +                  unsigned int len)
->>>>>> +{
->>>>>> +    if (unlikely(domain->ops->unmap_range == NULL))
->>>>>> +            return -ENODEV;
->>>>>> +
->>>>>> +    BUG_ON(iova & (~PAGE_MASK));
->>>>>> +
->>>>>> +    return domain->ops->unmap_range(domain, iova, len);
->>>>>> +}
->>>>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
->>>>>
->>>>> Can the existing iommu_unmap() do the same?
->>>>
->>>> I believe iommu_unmap() behaves a bit differently because it will keep
->>>> on calling domain->ops->unmap() until everything is unmapped instead of
->>>> letting the iommu implementation take care of unmapping everything in
->>>> one call.
->>>>
->>>> I am abandoning the patch series since our driver was not accepted.
->>>> However, if there are no objections I will resubmit this patch (PATCH
->>>> 2/7) as an independent patch to add this new map_range API.
->>>
->>> +1 for map_range().. I've seen for gpu workloads, at least, it is the
->>> downstream map_range() API is quite beneficial.   It was worth at
->>> least a few fps in xonotic.
->>>
->>> And, possibly getting off the subject a bit, but I was wondering about
->>> the possibility of going one step further and batching up mapping
->>> and/or unmapping multiple buffers (ranges) at once.  I have a pretty
->>> convenient sync point in drm/msm to flush out multiple mappings before
->>> kicking gpu.
->>
->> I think you should be able to do that with this API already - at least
->> the mapping part since we are passing in a sg list (this could be a
->> chained sglist).
+On Thu, Jul 10, 2014 at 06:40:42PM -0400, jonsmirl at gmail.com wrote:
+> On Thu, Jul 10, 2014 at 4:39 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > So they just implement a cyclic-like behaviour in software?
 > 
-> What I mean by batching up is mapping and unmapping multiple sglists
-> each at different iova's with minmal cpu cache and iommu tlb flushes..
->
-> Ideally we'd let the IOMMU driver be clever and build out all 2nd
-> level tables before inserting into first level tables (to minimize cpu
-> cache flushing).. also, there is probably a reasonable chance that
-> we'd be mapping a new buffer into existing location, so there might be
-> some potential to reuse existing 2nd level tables (and save a tiny bit
-> of free/alloc).  I've not thought too much about how that would look
-> in code.. might be kinda, umm, fun..
-> 
-> But at an API level, we should be able to do a bunch of
-> map/unmap_range's with one flush.
-> 
-> Maybe it could look like a sequence of iommu_{map,unmap}_range()
-> followed by iommu_flush()?
-> 
+> From what I can tell the Allwinner hardware will just cycle on a
+> single buffer.  Cyclic DMA for the kernel needs to cycle on the
+> equivalent of a scatter/gather list (in most cases the buffers are
+> sequential periodic splits of a single buffer).  And as each segment
+> completes it needs to signal the DMA subsystem.  Allwinner chips don't
+> support hardware scatter gather but that isn't a major problem.
 
-So we could add another argument ("options") in the range api that
-allows you to indicate whether you want to invalidate TLB or not.
+With cyclic DMA, there is no requirement in DMAengine to strictly report
+each period completion (due to the behaviour of tasklets.)  However,
+ASoC requires one of two things, either:
 
-Thanks,
+1. One callback per completed period
+2. A report of the current position in the cyclic DMA cycle (via the
+   number of bytes remaining to the end of the buffer.)
 
-Olav
+Either will do, and if you have to implement something which counts
+how many callbacks you need to do to satisfy (1), you might as well
+implement (2) instead - it's much more efficient that way.
+
+Internally, ALSA prefers (2) because each time you issue the callback,
+snd_pcm_period_elapsed() will be called.  This does a load of
+processing, including reading where the DMA pointer is so that ALSA
+can calculate the appropriate position in the buffer.
+
+That really only needs to happen once per "service" - as per the
+documentation for snd_pcm_period_elapsed() on the net.
+
+So, if you find that you've completed two periods, your choices either
+to report: "one period completed, one period completed" and have two
+runs through snd_pcm_period_elapsed(), or "update DMA residue, period(s)
+completed".
+
+I switched imx-sdma.c to use (2) because I was seeing problems with
+(1) - see "imx-sdma: update cyclic handling to report residue".
+
+I'd encourage everyone to use (2) rather than (1) - in fact, I'd
+suggest that the first method is deprecated and removed.  If the
+DMAengine driver knows how many times to make the callback, it can
+implement the residue too and not need to play that game.
+
+Another point here is if you are implementing cyclic behaviour in
+software, then you need to deal with the cyclic stuff in the hardware
+interrupt function, not in the tasklet.  There's too much latency with
+getting to the tasklet, especially if you have USB devices (which
+chew lots of interrupt time.)
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
