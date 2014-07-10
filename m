@@ -1,25 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 16:35:33 +0200
-Subject: [PATCH 14/16] i2c: i2c-stu300: Drop class based scanning to
- improve bootup time
-In-Reply-To: <1404992799-3705-15-git-send-email-wsa@the-dreams.de>
-References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
- <1404992799-3705-15-git-send-email-wsa@the-dreams.de>
-Message-ID: <CACRpkdZ-ZhQQz2-gvSDH-XYCcL-cL5fZKCEw9jeEpDUVRpazng@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 10 Jul 2014 07:39:50 -0700
+Subject: [PATCH 0/6] arm/arm64: KVM: Various VGIC cleanups and improvements
+Message-ID: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 1:46 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+The VGIC distributor struct has a number of fields which are named
+subopimally when needing to add more refined handling of level-triggered
+interrupts.
 
-> This driver has been flagged to drop class based instantiation. The removal
-> improves boot-up time and is unneeded for embedded controllers. Users have been
-> warned to switch for some time now, so we can actually do the removal. Keep the
-> DEPRECATED flag, so the core can inform users that the behaviour finally
-> changed now. After another transition period, this flag can go, too.
->
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+We also never handled writes to the GICD_ISPENDRn and GICD_ICPENDRn
+properly, which was never a real concern until we started playing with
+IRQ injection for assigned devices, IRQFDs, and other fun stuff.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+This series tries to address some of these issues.
 
-Yours,
-Linus Walleij
+The code is also available here:
+git://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git vgic-set-clear-pending-v2
+
+Changelog[v2]:
+ - Rebased onto Marc's series from hell (kvm-arm/debug-merge-3.17)
+ - Clarify comment in vgic_process_maintenance()
+ - Fix spelling errors and other commit text blurbs
+ - Actually tested it this time around (on TC2 and APM Mustang)
+
+Christoffer Dall (6):
+  arm/arm64: KVM: Rename irq_state to irq_pending
+  arm/arm64: KVM: Rename irq_active to irq_queued
+  arm/arm64: KVM: vgic: Clear queued flags on unqueue
+  arm/arm64: KVM: vgic: Improve handling of GICD_I{CS}PENDRn
+  arm/arm64: KVM: vgic: Fix SGI writes to GICD_I{CS}PENDR0
+  arm/arm64: KVM: vgic: Clarify and correct vgic documentation
+
+ include/kvm/arm_vgic.h |  24 ++++--
+ virt/kvm/arm/vgic.c    | 222 +++++++++++++++++++++++++++++++++++++------------
+ 2 files changed, 189 insertions(+), 57 deletions(-)
+
+-- 
+2.0.0
