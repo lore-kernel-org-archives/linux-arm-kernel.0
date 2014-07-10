@@ -1,49 +1,38 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 10 Jul 2014 02:25:12 -0700
-Subject: [PATCH v9 09/11] seccomp: introduce writer locking
-In-Reply-To: <20140709185549.GB4866@redhat.com>
-References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
- <1403911380-27787-10-git-send-email-keescook@chromium.org>
- <20140709184215.GA4866@redhat.com>
- <20140709185549.GB4866@redhat.com>
-Message-ID: <CAGXu5jL6q1d16uA1Yu+QO4eV7zWwcWEWgkZrwmsfymbMvEr6+Q@mail.gmail.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Thu, 10 Jul 2014 13:24:17 +0400
+Subject: [RFC/PATCH RESEND -next 15/21] mm: slub: add kernel address
+ sanitizer hooks to slub allocator
+In-Reply-To: <alpine.DEB.2.11.1407090947020.1384@gentwo.org>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-16-git-send-email-a.ryabinin@samsung.com>
+ <alpine.DEB.2.11.1407090947020.1384@gentwo.org>
+Message-ID: <53BE5BC1.6050802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 11:55 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 07/09, Oleg Nesterov wrote:
+On 07/09/14 18:48, Christoph Lameter wrote:
+> On Wed, 9 Jul 2014, Andrey Ryabinin wrote:
+> 
+>> With this patch kasan will be able to catch bugs in memory allocated
+>> by slub.
+>> Allocated slab page, this whole page marked as unaccessible
+>> in corresponding shadow memory.
+>> On allocation of slub object requested allocation size marked as
+>> accessible, and the rest of the object (including slub's metadata)
+>> marked as redzone (unaccessible).
 >>
->> On 06/27, Kees Cook wrote:
->> >
->> >  static u32 seccomp_run_filters(int syscall)
->> >  {
->> > -   struct seccomp_filter *f;
->> > +   struct seccomp_filter *f = ACCESS_ONCE(current->seccomp.filter);
->>
->> I am not sure...
->>
->> This is fine if this ->filter is the 1st (and only) one, in this case
->> we can rely on rmb() in the caller.
->>
->> But the new filter can be installed at any moment. Say, right after that
->> rmb() although this doesn't matter. Either we need smp_read_barrier_depends()
->> after that, or smp_load_acquire() like the previous version did?
->
-> Wait... and it seems that seccomp_sync_threads() needs smp_store_release()
-> when it sets thread->filter = current->filter by the same reason?
->
-> OTOH. smp_store_release() in seccomp_attach_filter() can die, "current"
-> doesn't need a barrier to serialize with itself.
+>> We also mark object as accessible if ksize was called for this object.
+>> There is some places in kernel where ksize function is called to inquire
+>> size of really allocated area. Such callers could validly access whole
+>> allocated memory, so it should be marked as accessible by kasan_krealloc call.
+> 
+> Do you really need to go through all of this? Add the hooks to
+> kmem_cache_alloc_trace() instead and use the existing instrumentation
+> that is there for other purposes?
+> 
 
-I have lost track of what you're suggesting to change. :)
+I could move kasan_kmalloc hooks kmem_cache_alloc_trace(), and I think it will look better.
+Hovewer I will require two hooks instead of one (for CONFIG_TRACING=y and CONFIG_TRACING=n).
 
-Since rmb() happens before run_filters, isn't the ACCESS_ONCE
-sufficient? We only care that TIF_SECCOMP, mode, and some filter is
-valid. In a tsync thread race, it's okay to use not use the deepest
-filter node in the list, it just needs A filter.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Btw, seems I broke CONFIG_SL[AO]B configurations in this patch by  introducing __ksize function
+which used in krealloc now.
