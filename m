@@ -1,58 +1,73 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 10 Jul 2014 12:56:35 +0530
-Subject: [PATCH V9 4/7] ARM: SPEAr13xx: Fix static mapping table
+Date: Thu, 10 Jul 2014 12:56:36 +0530
+Subject: [PATCH V9 5/7] ARM: SPEAr13xx: Add bindings and dt node for misc block
 In-Reply-To: <cover.1404976058.git.viresh.kumar@linaro.org>
 References: <cover.1404976058.git.viresh.kumar@linaro.org>
-Message-ID: <5a6d915a382c34940865b9ac8835c5af78723cc4.1404976058.git.viresh.kumar@linaro.org>
+Message-ID: <23080439ce6c96dbbe9f73e085fc4391c28cf785.1404976059.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-SPEAr13xx was using virtual address space 0xFE000000 to map physical address
-space 0xB3000000. But pci_remap_io uses 0xFEE00000 as virtual address and so
-replace 0xFE000000 with 0xF9000000.
+SPEAr SOCs have some miscellaneous registers which are used to configure
+peripheral.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+This patch adds dt node and binding information for this block.
+
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Cc: devicetree at vger.kernel.org
 [viresh: fixed logs/cclist]
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-spear/include/mach/spear.h | 4 ++--
- arch/arm/mach-spear/spear13xx.c          | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/spear-misc.txt | 9 +++++++++
+ arch/arm/boot/dts/spear13xx.dtsi                     | 5 +++++
+ arch/arm/mach-spear/Kconfig                          | 1 +
+ 3 files changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
 
-diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-index 5cdc53d..f2d6a01 100644
---- a/arch/arm/mach-spear/include/mach/spear.h
-+++ b/arch/arm/mach-spear/include/mach/spear.h
-@@ -52,10 +52,10 @@
- #ifdef CONFIG_ARCH_SPEAR13XX
+diff --git a/Documentation/devicetree/bindings/arm/spear-misc.txt b/Documentation/devicetree/bindings/arm/spear-misc.txt
+new file mode 100644
+index 0000000..cf64982
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/spear-misc.txt
+@@ -0,0 +1,9 @@
++SPEAr Misc configuration
++===========================
++SPEAr SOCs have some miscellaneous registers which are used to configure
++few properties of different peripheral controllers.
++
++misc node required properties:
++
++- compatible Should be	"st,spear1340-misc", "syscon".
++- reg: Address range of misc space upto 8K
+diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+index 4382547..3a72508 100644
+--- a/arch/arm/boot/dts/spear13xx.dtsi
++++ b/arch/arm/boot/dts/spear13xx.dtsi
+@@ -220,6 +220,11 @@
+ 				  0xd8000000 0xd8000000 0x01000000
+ 				  0xe0000000 0xe0000000 0x10000000>;
  
- #define PERIP_GRP2_BASE				UL(0xB3000000)
--#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
-+#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
- #define MCIF_SDHCI_BASE				UL(0xB3000000)
- #define SYSRAM0_BASE				UL(0xB3800000)
--#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
-+#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
- #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
++			misc: syscon at e0700000 {
++				compatible = "st,spear1340-misc", "syscon";
++				reg = <0xe0700000 0x1000>;
++			};
++
+ 			gpio0: gpio at e0600000 {
+ 				compatible = "arm,pl061", "arm,primecell";
+ 				reg = <0xe0600000 0x1000>;
+diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+index 90df202..ba57677 100644
+--- a/arch/arm/mach-spear/Kconfig
++++ b/arch/arm/mach-spear/Kconfig
+@@ -19,6 +19,7 @@ config ARCH_SPEAR13XX
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select PINCTRL
++	select MFD_SYSCON
+ 	help
+ 	  Supports for ARM's SPEAR13XX family
  
- #define PERIP_GRP1_BASE				UL(0xE0000000)
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index c9897ea..53a7614 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -52,7 +52,7 @@ void __init spear13xx_l2x0_init(void)
- /*
-  * Following will create 16MB static virtual/physical mappings
-  * PHYSICAL		VIRTUAL
-- * 0xB3000000		0xFE000000
-+ * 0xB3000000		0xF9000000
-  * 0xE0000000		0xFD000000
-  * 0xEC000000		0xFC000000
-  * 0xED000000		0xFB000000
 -- 
 2.0.0.rc2
