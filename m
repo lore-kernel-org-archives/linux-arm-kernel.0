@@ -1,148 +1,83 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 10 Jul 2014 22:55:07 +0200
-Subject: dove (marvell A510) crash on boot with config_preempt
-In-Reply-To: <53BE8817.10703@gmail.com>
-References: <20140706080845.723e9787@armhf>
- <20140708151705.GE13433@titan.lakedaemon.net> <53BE8817.10703@gmail.com>
-Message-ID: <53BEFDAB.4090606@gmail.com>
+From: delicious.quinoa@gmail.com (Alan Tull)
+Date: Thu, 10 Jul 2014 16:02:14 -0500
+Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
+References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
+ <1396907649-20212-2-git-send-email-tthayer@altera.com>
+ <20140408133818.GB16054@pengutronix.de>
+ <1396967390.23349.15.camel@dinh-ubuntu>
+ <20140408143327.GC16054@pengutronix.de>
+ <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
+ <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
+Message-ID: <CANk1AXSi0UrU+yHMz+B_gN-k9=DuTDHPaERQfwU+NHvWsaWDpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2014 02:33 PM, Sebastian Hesselbarth wrote:
-> On 07/08/2014 05:17 PM, Jason Cooper wrote:
->> On Sun, Jul 06, 2014 at 08:08:45AM +0200, Jean-Francois Moine wrote:
->>> Since the official 3.15.0 release, the kernel crashes at boot time
->>> when compiled with the option CONFIG_PREEMPT.
+On Tue, Apr 8, 2014 at 1:52 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Apr 8, 2014 at 11:02 AM, delicious quinoa
+> <delicious.quinoa@gmail.com> wrote:
+>> On Tue, Apr 8, 2014 at 9:33 AM, Steffen Trumtrar
+>> <s.trumtrar@pengutronix.de> wrote:
+>>> On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
+>>>> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
+>>>> > Hi!
+>>>> >
+>>>> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
+>>>> > > From: Thor Thayer <tthayer@altera.com>
+>>>> > >
+>>>> > > Addition of the Altera SDRAM controller bindings and device
+>>>> > > tree changes to the Altera SoC project.
+>>>> > >
+>>>> [snip]
+>>>> > > +
+>>>> > > +Required properties:
+>>>> > > +- compatible : "altr,sdr-ctl", "syscon";
+>>>> > > +                Note that syscon is invoked for this device to support the FPGA
+>>>> > > +         bridge driver, EDAC driver and other devices that share the
+>>>> > > +         registers.
+>>>> > > +- reg : Should contain 1 register ranges(address and length)
+>>>> >
+>>>> > I haven't really thought this through, but why would the FPGA bridge driver
+>>>> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
+>>>> > there more?
+>>>>
+>>>> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
+>>>> path. Our SDRAM controller allows FPGA master access to the SDRAM.
+>>>>
 >>>
->>> Reverting the commit 431a84b1a4f7d1a0085d5b91330c5053cc8e8b12
->>>
->>>     ARM: 8034/1: Disable preemption in iwmmxt_task_enable()
->>>
->>> removes the problem.
->>>
->>> Linux version 3.16.0-rc3-00062-gd92a333-dirty (jef at armhf) (gcc
->>> version 4.8.3 (Debian 4.8.3-4) ) #5 PREEMPT Thu Jul 3 19:46:39 CEST 2014
-> [...]
->>> PJ4 iWMMXt v2 coprocessor enabled.
-> [...]
->>> Unable to handle kernel paging request at virtual address fffffffe
->>> pgd = bb25c000
->>> [fffffffe] *pgd=3bfde821, *pte=00000000, *ppte=00000000
->>> Internal error: Oops: 80000007 [#1] PREEMPT ARM
->>> Modules linked in:
->>> CPU: 0 PID: 62 Comm: startpar Not tainted
->>> 3.16.0-rc3-00062-gd92a333-dirty #5
->>> task: bb230b80 ti: bb256000 task.ti: bb256000
->>> PC is at 0xfffffffe
->>> LR is at iwmmxt_task_copy+0x44/0x4c
->>> pc : [<fffffffe>]    lr : [<800130ac>]    psr: 40000033
->>> sp : bb257de8  ip : 00000013  fp : bb257ea4
->>> r10: bb256000  r9 : fffffdfe  r8 : 76e898e6
->>> r7 : bb257ec8  r6 : bb256000  r5 : 7ea12760  r4 : 000000a0
->>> r3 : ffffffff  r2 : 00000003  r1 : bb257df8  r0 : 00000000
->>> Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
->>> Control: 10c5387d  Table: 3b25c019  DAC: 00000015
->>> Process startpar (pid: 62, stack limit = 0xbb256248)
-> 
-> Ok, I have been able to debug this despite my limited knowledge of
-> iWMMXt and ARM asm. While the patch below fixes the issue, I have
-> no clue if it is the right approach or if there should be a different
-> solution. I'd like to leave that to either Russell or Catalin to decide.
+>>> Yes. But what you have to do to enable the path is let the FPGA port you use
+>>> out of reset. And that is it as far as I can see. The rest happens in the
+>>> bitstream. Or is there more to enable the path?
+>>> The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
+>>> please elaborate.
+>>
+>> Hi Steffen,
+>>
+>> The sdram controller is used by two drivers.  That's why we want to
+>> specify "syscon" here.  The other driver is the FPGA bridge driver.
+>> Its functionality is very separate from what this driver is doing (we
+>> are not enabling the bridge in this driver; we are enabling the
+>> monitoring and resetting the interrupt bit of the EDAC).  We wanted to
+>> specify "syscon" her so that we don't have to have to change it for
+>> the other driver.
+>
+> But are there actually overlapping registers which are accessed by
+> both drivers and need the protection of regmap?
 
-After thinking a while about it and because I missed it to mention:
+No overlapping registers here.  Just various registers that are used
+by: edac driver, fpga bridge, low power modes.  So no special
+protection needed.
 
-I did a bisect which ends in
+>
+> Perhaps MFD is more appropriate than syscon?
+>
+> Rob
 
-commit 1fb333489fb917c704ad43e51b45c12f52215a9c
- ("Merge branches 'alignment', 'fixes', 'l2c' (early part) and 'misc'
-into for-next")
+A syscon will do fine here.  If we did a MFD, all it would be doing
+would be providing register access for this range of registers to a
+few drivers, so syscon does that without any trouble.
 
-which clearly isn't the offending commit itself but finally causing
-iwmmxt code to show the issue.
-
-I compared introduced {inc,dec}_preempt_count macros
-
-.macro  inc_preempt_count, ti, tmp
-ldr     \tmp, [\ti, #TI_PREEMPT]        @ get preempt count
-add     \tmp, \tmp, #1                  @ increment it
-str     \tmp, [\ti, #TI_PREEMPT]
-.endm
-
-.macro  dec_preempt_count, ti, tmp
-ldr     \tmp, [\ti, #TI_PREEMPT]        @ get preempt count
-sub     \tmp, \tmp, #1                  @ decrement it
-str     \tmp, [\ti, #TI_PREEMPT]
-.endm
-
-with common C defines for preempt_{disable,enable}
-
-#define preempt_disable() \
-do { \
-        preempt_count_inc(); \
-        barrier(); \
-} while (0)
-
-#define preempt_enable() \
-do { \
-        barrier(); \
-        preempt_count_dec(); \
-} while (0)
-
-and wondered about the missing barriers.
-
-The thing about iwmmxt.S is that it is assembled with -mcpu=iwmmxt
-causing the assembler to drop down to xscale instructions (?) which
-don't allow any atomic operations.
-
-Anyway, I may be wrong about it. At least I wanted to mention that
-bisect ends in above merge commit of l2c related cleanup and not
-the iwmmxt preempt commit itself.
-
-Sebastian
-
-> If anything in below explanation is wrong, please correct me
-> immediately!
-> 
-> Above mentioned commit basically added {inc,dec}_preempt_count macros
-> to iwmmxt_task_enable to run it with preemption disabled:
-> 
->  ENTRY(iwmmxt_task_enable)
-> +       inc_preempt_count r10, r3
-> [...]
-> concan_save:
-> [...]
-> concan_dump:
-> [...]
-> concan_load:
-> [...]
-> +3:
-> +#ifdef CONFIG_PREEMPT_COUNT
-> +       get_thread_info r10
-> +#endif
-> +4:     dec_preempt_count r10, r3
->         mov     pc, lr
-> 
-> Unfortunately, other procedures in iwmmxt.S, e.g. iwmmxt_task_copy,
-> also branch to above concan_{save,dump,load} labels without disabling
-> preemption first:
-> 
-> ENTRY(iwmmxt_task_copy)
-> [...]
-> 1:    @ this task owns Concan regs -- grab a copy from there
->     mov    r0, #0            @ nothing to load
->     mov    r2, #3            @ save all regs
->     mov    r3, lr            @ preserve return address
->     bl    concan_dump
->     msr    cpsr_c, ip        @ restore interrupt mode
->     mov    pc, r3
-> 
-> This causes two issues that finally lead to observed behavior:
-> (a) introduced {inc,dec}_preempt_count use r3 as temporary register,
->     while iwmmxt_task_copy uses it to store its return address
-> (b) branching to concan_foo labels decrements preempt_count without
->     incrementing it first
-> 
-> The patch below addresses (a) by using r4 as temporary register for
-> {inc,dec}_preempt_count macro and (b) by moving concan_foo into
-> separate code sections and call them from iwmmxt_task_enable like
-> the other procedures do.
+Alan Tull
+aka
+delicious quinoa
