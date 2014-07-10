@@ -1,22 +1,65 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Thu, 10 Jul 2014 02:03:18 +0200
-Subject: [RFC/PATCH RESEND -next 00/21] Address sanitizer for kernel
- (kasan) - dynamic memory error detector.
-In-Reply-To: <CAOMGZ=Fmqg6MWyx3NygqVmYiqw=npkPQrO9ifhF489bq5Gxz4A@mail.gmail.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <53BDB1D6.1090605@intel.com> <8761j6nr53.fsf@tassilo.jf.intel.com>
- <CAOMGZ=Fmqg6MWyx3NygqVmYiqw=npkPQrO9ifhF489bq5Gxz4A@mail.gmail.com>
-Message-ID: <20140710000318.GO18735@two.firstfloor.org>
+From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
+Date: Thu, 10 Jul 2014 09:03:26 +0900
+Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
+In-Reply-To: <1400150451-13469-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1400150451-13469-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <53BDD84E.4090206@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> FWIW, I definitely agree with this -- if KASAN can do everything that
-> kmemcheck can, it is no doubt the right way forward.
+On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
+> Cache the micro-TLB number in archdata allocated in the .add_device
+> handler instead of looking it up when the deviced is attached and
+> detached. This simplifies the .attach_dev and .detach_dev operations and
+> prepares for DT support.
+[snip]
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+[snip]
+> +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device *dev)
+> +{
+> +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
+> +	const char *devname = dev_name(dev);
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
+> +		if (strcmp(master->name, devname) == 0)
+> +			return master->utlb;
+> +	}
+> +
+> +	return -1;
+> +}
+[snip]
+>  static int ipmmu_add_device(struct device *dev)
+[snip]
+>  	list_for_each_entry(mmu, &ipmmu_devices, list) {
+> -		master = ipmmu_find_master(mmu, dev);
+> -		if (master) {
+> +		utlb = ipmmu_find_utlb(mmu, dev);
+> +		if (utlb >= 0) {
+>  			/*
+> -			 * TODO Take a reference to the master to protect
+> +			 * TODO Take a reference to the MMU to protect
+>  			 * against device removal.
+>  			 */
+>  			break;
+[snip]
+> +	archdata->mmu = mmu;
+> +	archdata->utlb = utlb;
+[snip]
 
-Thanks
+I have one question for ipmmu_add_device().
 
-BTW I didn't want to sound like I'm against kmemcheck. It is a very
-useful tool and was impressive work given the constraints (no help from
-the compiler)
+In my understanding, your code will find utlb for device
+base on device name.
+For any device, it will /only/ return utlb number of first match.
 
--andi
+How about the case that a device name connected with more than 1 utlb ?
+e.g DU device (rcar-du-r8a7790) in Lager
+
+Was that case already covered in your code ?
+
+Thanks.
+
+Best regards,
+KHIEM Nguyen
