@@ -1,24 +1,227 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 10 Jul 2014 15:16:46 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140710131646.GB3935@laptop>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 10 Jul 2014 18:47:30 +0530
+Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
+In-Reply-To: <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+ <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
+Message-ID: <53BE926A.2070005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
-> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
+Hi,
+
+On Thursday 10 July 2014 12:56 PM, Viresh Kumar wrote:
+> From: Pratyush Anand <pratyush.anand@st.com>
 > 
-> We are going to use runnable_avg_sum and runnable_avg_period in order to get
-> the utilization of the CPU. This statistic includes all tasks that run the CPU
-> and not only CFS tasks.
+> ARM based ST Microelectronics's SPEAr1310/40 platforms uses ST's phy (known as
+> 'miphy') for PCIe and SATA. This patch adds drivers for these miphys.
+> 
+> This also adds proper bindings for miphys.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> Tested-by: Mohit Kumar <mohit.kumar@st.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> [viresh: fixed logs/cclist/checkpatch warnings, broken into smaller patches]
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  .../devicetree/bindings/phy/st-spear1310-miphy.txt |  12 +
+>  .../devicetree/bindings/phy/st-spear1340-miphy.txt |  11 +
+>  drivers/phy/Kconfig                                |  12 +
+>  drivers/phy/Makefile                               |   2 +
+>  drivers/phy/phy-spear1310-miphy.c                  | 274 +++++++++++++++++++
+>  drivers/phy/phy-spear1340-miphy.c                  | 302 +++++++++++++++++++++
 
-But this rq->avg is not the one that is migration aware, right? So why
-use this?
+Please send separate patche for each driver.
+>  6 files changed, 613 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+>  create mode 100644 Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
+>  create mode 100644 drivers/phy/phy-spear1310-miphy.c
+>  create mode 100644 drivers/phy/phy-spear1340-miphy.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+> new file mode 100644
+> index 0000000..b9b281a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
 
-We already compensate cpu_capacity for !fair tasks, so I don't see why
-we can't use the migration aware one (and kill this one as Yuyang keeps
-proposing) and compensate with the capacity factor.
+We generally create a single document for a SoC vendor. So just use st-phy.txt.
+> @@ -0,0 +1,12 @@
+> +ST SPEAr1310-miphy DT detail
+> +===================================
+> +
+> +SPEAr1310-miphy is a phy controller supporting PCIe and SATA.
+> +
+> +Required properties:
+> +- compatible : should be "st,spear1310-miphy"
+> +- reg : offset and length of the PHY register set.
+> +- misc: phandle for the syscon node to access misc registers
+> +- phy-id: Instance id of the phy.
+> +- #phy-cells : from the generic PHY bindings, must be 1.
+> +	- cell[1]: 0 if phy used for SATA, 1 for PCIe.
+> diff --git a/Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
+> new file mode 100644
+> index 0000000..7eb5335
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
+
+use st-phy.txt for this.
+> @@ -0,0 +1,11 @@
+> +ST SPEAr1340-miphy DT detail
+> +===================================
+> +
+> +SPEAr1340-miphy is a phy controller supporting PCIe and SATA.
+> +
+> +Required properties:
+> +- compatible : should be "st,spear1340-miphy"
+> +- reg : offset and length of the PHY register set.
+> +- misc: phandle for the syscon node to access misc registers
+> +- #phy-cells : from the generic PHY bindings, must be 1.
+> +	- cell[1]: 0 if phy used for SATA, 1 for PCIe.
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 16a2f06..e8f8a2d 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -178,4 +178,16 @@ config PHY_XGENE
+>  	help
+>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>  
+..
+<snip>
+.
+.
+
+> +
+> +static int spear1340_miphy_sata_init(struct spear1340_miphy_priv *priv)
+> +{
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> +			   SPEAR1340_PCIE_SATA_CFG_MASK,
+> +			   SPEAR1340_SATA_CFG_VAL);
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> +			   SPEAR1340_PCIE_MIPHY_CFG_MASK,
+> +			   SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
+> +	/* Switch on sata power domain */
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
+> +			   SPEAR1340_PCM_CFG_SATA_POWER_EN,
+> +			   SPEAR1340_PCM_CFG_SATA_POWER_EN);
+> +	msleep(20);
+> +	/* Disable PCIE SATA Controller reset */
+> +	regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
+> +			   SPEAR1340_PERIP1_SW_RSATA, 0);
+> +	msleep(20);
+
+Please add a comment for all delays added.
+> +
+> +	return 0;
+> +}
+> +
+> +static int spear1340_miphy_sata_exit(struct spear1340_miphy_priv *priv)
+> +{
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> +			   SPEAR1340_PCIE_SATA_CFG_MASK, 0);
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> +			   SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
+> +
+> +	/* Enable PCIE SATA Controller reset */
+> +	regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
+> +			   SPEAR1340_PERIP1_SW_RSATA,
+> +			   SPEAR1340_PERIP1_SW_RSATA);
+> +	msleep(20);
+> +	/* Switch off sata power domain */
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
+> +			   SPEAR1340_PCM_CFG_SATA_POWER_EN, 0);
+> +	msleep(20);
+ditto.
+> +
+> +	return 0;
+> +}
+> +
+> +static int spear1340_miphy_pcie_init(struct spear1340_miphy_priv *priv)
+> +{
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> +			   SPEAR1340_PCIE_MIPHY_CFG_MASK,
+> +			   SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE);
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> +			   SPEAR1340_PCIE_SATA_CFG_MASK,
+> +			   SPEAR1340_PCIE_CFG_VAL);
+> +
+> +	return 0;
+> +}
+> +
+> +static int spear1340_miphy_pcie_exit(struct spear1340_miphy_priv *priv)
+> +{
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> +			   SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> +			   SPEAR1340_PCIE_SATA_CFG_MASK, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static int spear1340_miphy_init(struct phy *phy)
+> +{
+> +	struct spear1340_miphy_priv *priv = phy_get_drvdata(phy);
+> +	int ret = 0;
+> +
+> +	if (priv->mode == SATA)
+> +		ret = spear1340_miphy_sata_init(priv);
+> +	else if (priv->mode == PCIE)
+> +		ret = spear1340_miphy_pcie_init(priv);
+> +
+> +	return ret;
+> +}
+> +
+> +static int spear1340_miphy_exit(struct phy *phy)
+> +{
+> +	struct spear1340_miphy_priv *priv = phy_get_drvdata(phy);
+> +	int ret = 0;
+> +
+> +	if (priv->mode == SATA)
+> +		ret = spear1340_miphy_sata_exit(priv);
+> +	else if (priv->mode == PCIE)
+> +		ret = spear1340_miphy_pcie_exit(priv);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id spear1340_miphy_of_match[] = {
+> +	{ .compatible = "st,spear1340-miphy" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, spear1340_miphy_of_match);
+> +
+> +static struct phy_ops spear1340_miphy_ops = {
+> +	.init = spear1340_miphy_init,
+> +	.exit = spear1340_miphy_exit,
+> +	.owner = THIS_MODULE,
+> +};
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int spear1340_miphy_suspend(struct device *dev)
+> +{
+> +	struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +
+> +	if (priv->mode == SATA)
+> +		ret = spear1340_miphy_sata_exit(priv);
+
+Shouldn't this be spear1340_miphy_init()?
+> +
+> +	return ret;
+> +}
+> +
+> +static int spear1340_miphy_resume(struct device *dev)
+> +{
+> +	struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +
+> +	if (priv->mode == SATA)
+> +		ret = spear1340_miphy_sata_init(priv);
+
+And here spear1340_miphy_exit()? Why only for sata phys?
+> +
+> +	return ret;
+> +}
+
+Thanks
+Kishon
