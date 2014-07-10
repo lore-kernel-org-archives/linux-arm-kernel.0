@@ -1,48 +1,45 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 10 Jul 2014 17:55:08 +0200
-Subject: [PATCH 5/6] tty: serial: 8250-core: add rs485 support
-In-Reply-To: <20140709190143.GF17769@csclub.uwaterloo.ca>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
- <1404928177-26554-6-git-send-email-bigeasy@linutronix.de>
- <20140709190143.GF17769@csclub.uwaterloo.ca>
-Message-ID: <53BEB75C.70304@linutronix.de>
+From: dave.hansen@intel.com (Dave Hansen)
+Date: Thu, 10 Jul 2014 08:55:38 -0700
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <53BE8333.6060404@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+ <53BDA568.5030607@intel.com> <53BE8333.6060404@samsung.com>
+Message-ID: <53BEB77A.6020003@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 09:01 PM, Lennart Sorensen wrote:
->> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
->> index c7c3bf7..bf06a4c 100644
->> --- a/drivers/tty/serial/8250/8250_core.c
->> +++ b/drivers/tty/serial/8250/8250_core.c
->> @@ -1281,10 +1283,34 @@ static void autoconfig_irq(struct uart_8250_port *up)
->>  
->>  static inline void __stop_tx(struct uart_8250_port *p)
->>  {
->> +	if (p->rs485.flags & SER_RS485_ENABLED) {
->> +		int ret;
->> +
->> +		ret = (p->rs485.flags & SER_RS485_RTS_AFTER_SEND) ? 1 : 0;
->> +		if (gpio_get_value(p->rts_gpio) != ret) {
->> +			if (p->rs485.delay_rts_after_send > 0)
->> +				mdelay(p->rs485.delay_rts_after_send);
->> +			gpio_set_value(p->rts_gpio, ret);
+On 07/10/2014 05:12 AM, Andrey Ryabinin wrote:
+> On 07/10/14 00:26, Dave Hansen wrote:
+>> On 07/09/2014 04:29 AM, Andrey Ryabinin wrote:
+>>> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
+>>> mapping with a scale and offset to translate a memory address to its corresponding
+>>> shadow address.
+>>>
+>>> Here is function to translate address to corresponding shadow address:
+>>>
+>>>      unsigned long kasan_mem_to_shadow(unsigned long addr)
+>>>      {
+>>>                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
+>>>                              + kasan_shadow_start;
+>>>      }
+>>
+>> How does this interact with vmalloc() addresses or those from a kmap()?
+>> 
+> It's used only for lowmem:
 > 
-> Usually the delay for RS485 is done in bit times, not msec.  Not sure
-> how you expect this to work.  Not sure doing it in software is precise
-> enough either.  It probably should be calculated based on the current
-> baudrate with a bit time rather than msec in the DT data.  No one wants
-> to have to change the DT data to change the baud rate.  After all this
-> is very often used with modbus and the modbus rules specify turn around
-> times in bit times.
+> static inline bool addr_is_in_mem(unsigned long addr)
+> {
+> 	return likely(addr >= PAGE_OFFSET && addr < (unsigned long)high_memory);
+> }
 
-My understanding is that this is not baudrate related. This is the
-delay that the hardware (the transceiver) to perform the change and
-work.
-There is the ioctl() interface which can change the delay, too. The
-only required thing is the gpio.
+That's fine, and definitely covers the common cases.  Could you make
+sure to call this out explicitly?  Also, there's nothing to _keep_ this
+approach working for things out of the direct map, right?  It would just
+be a matter of updating the shadow memory to have entries for the other
+virtual address ranges.
 
-> I hope TI puts this into the UART in future designs where it belongs
-> (similar to what Exar and many others already did).
-> 
+addr_is_in_mem() is a pretty bad name for what it's doing. :)
 
-Sebastian
+I'd probably call it something like kasan_tracks_vaddr().
