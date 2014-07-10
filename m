@@ -1,85 +1,99 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 10 Jul 2014 18:40:47 +0900
-Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
- to host's quirk
-In-Reply-To: <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
-References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
- <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
- <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
-Message-ID: <53BE5F9F.6070809@samsung.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 10 Jul 2014 10:47:58 +0100
+Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
+ <20140708005954.GC22939@google.com>
+ <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
+ <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
+ <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
+ <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
+Message-ID: <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ulf.
+On Wed, Jul 09, 2014 at 04:10:04PM +0100, Bjorn Helgaas wrote:
+> On Tue, Jul 8, 2014 at 4:48 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Tue, Jul 08, 2014 at 07:41:50PM +0100, Bjorn Helgaas wrote:
+> >> On Tue, Jul 8, 2014 at 4:46 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > On Tue, Jul 08, 2014 at 01:59:54AM +0100, Bjorn Helgaas wrote:
+> >>
+> >> >> I wonder if it would help to make a weak pci_domain_nr() function that
+> >> >> returns "bridge->domain_nr".  Then each arch could individually drop its
+> >> >> pci_domain_nr() definition as it was converted, e.g., something like this:
+> >> >>
+> >> >>   - Convert every arch pci_domain_nr() from a #define to a non-inline
+> >> >>     function
+> >> >>   - Add bridge.domain_nr, initialized from pci_domain_nr()
+> >> >>   - Add a weak generic pci_domain_nr() that returns bridge.domain_nr
+> >> >>   - Add a way to create a host bridge in a specified domain, so we can
+> >> >>     initialize bridge.domain_nr without using pci_domain_nr()
+> >> >>   - Convert each arch to use the new creation mechanism and drop its
+> >> >>     pci_domain_nr() implementation
+> >> >
+> >> > I will try to propose a patch implementing this.
+> >>
+> >> I think this is more of an extra credit, cleanup sort of thing.  I
+> >> don't think it advances your primary goal of (I think) getting arm64
+> >> PCI support in.  So my advice is to not worry about unifying domain
+> >> handling until later.
+> >
+> > Getting arm64 supported *is* my main goal. But like you have stated in your
+> > review of v7, you wanted to see another architecture converted as a guarantee
+> > of "genericity" (for lack of a better word) for my patches. The one architecture
+> > I've set my eyes on is microblaze, and that one uses pci_scan_root_bus()
+> > rather than pci_create_root_bus() so I don't have any opportunity to pass the
+> > domain number or any additional info (like the sysdata pointer that we were
+> > talking about) to the pci_host_bridge structure unless I do this cleanup.
+> 
+> I think maybe I was too harsh about that, or maybe we had different
+> ideas about what "conversion" involved.  My comment was in response to
+> "pci: Introduce pci_register_io_range() helper function", and I don't
+> remember why I was concerned about that; it's not even in drivers/pci,
+> and it doesn't have an obvious connection to putting the domain number
+> in struct pci_host_bridge.
 
-On 07/10/2014 06:15 PM, Ulf Hansson wrote:
-> On 10 July 2014 09:08, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Replaced the "disable-wp" into host's quirks.
->> (Because the slot-node is removed at dt-file.)
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> 
-> Hi Jaehoon,
-> 
-> I plan to carry these patches through my mmc tree and I will share
-> them through a PR from an immutable branch with the ARM SoC guys.
-> Please tell me if you have any concern with this set up.
-> 
-> Now, while I was applying this patch, I found it had checkpatch
-> errors. Please run checkpatch and resend a new version.
-
-Sorry for not checking the patch. I will resend a new version.
-Thanks for pointing out.
-
-Best Regards,
-Jaehoon Chung
+Well, to be honest I did move some of the code (as mentioned in the Changelog) from
+drivers/pci into drivers/of. It makes more sense to be in OF, as it mostly concerns
+architectures that use it.
 
 > 
-> Kind regards
-> Uffe
+> The thing I'm more concerned about is adding new PCI interfaces, e.g.,
+> pci_create_root_bus_in_domain(), that are only used by one
+> architecture.  Then it's hard to be sure that it's going to be useful
+> for other arches.  If you can add arm64 using the existing PCI
+> interfaces, I don't any problem with that.
+
+(No blame here or reproaches, I'm just restating the situation:) I (mostly) did try
+that in my v7 series but it also got NAK-ed by Arnd and Catalin as it had too much
+arm64 specific code in there.
+
+I don't see a way out of adding new PCI interfaces if we want to have support in
+the PCI framework for unifying existing architectures. Of course, there is the painful
+alternative of changing the existing APIs and fixing arches in one go, but like you've
+said is going to be messy. I don't think I (or the people and companies wanting PCIe
+on arm64) should cop out and pick a quick fix that adds sysdata structure into arm64
+just to avoid new APIs, as this is not going to help anyone in long term. What I can
+do is to create a set of parallel APIs for pci_{scan,create}_root_bus() that take
+a pci_host_bridge pointer and start converting architectures one by one to that API
+while deprecating the existing one. That way we can add arm64 easily as it would be
+the first architecture to use new code without breaking things *and* we provide a
+migration path.
+
+Best regards,
+Liviu
+
 > 
->> ---
->>  drivers/mmc/host/dw_mmc.c |   12 +++++-------
->>  1 file changed, 5 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 1ac227c..a3ccd07 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
->>         int gpio_ro = mmc_gpio_get_ro(mmc);
->>
->>         /* Use platform get_ro function, else try on board write protect */
->> -       if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
->> +       if (slot->host->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
->>                 read_only = 0;
->>         else if (!IS_ERR_VALUE(gpio_ro))
->>                 read_only = gpio_ro;
->> @@ -2006,12 +2006,7 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
->>  static struct dw_mci_of_slot_quirks {
->>         char *quirk;
->>         int id;
->> -} of_slot_quirks[] = {
->> -       {
->> -               .quirk  = "disable-wp",
->> -               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
->> -       },
->> -};
->> +} of_slot_quirks[] = {};
->>
->>  static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
->>  {
->> @@ -2238,6 +2233,9 @@ static struct dw_mci_of_quirks {
->>         {
->>                 .quirk  = "broken-cd",
->>                 .id     = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
->> +       },{
->> +               .quirk  = "disable-wp",
->> +               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
->>         },
->>  };
->>
->> --
->> 1.7.9.5
->>
+> Bjorn
 > 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
