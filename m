@@ -1,61 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 10 Jul 2014 09:56:32 -0700
-Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
-In-Reply-To: <20140710121010.GA1990@arch.cereza>
-References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr>
- <1442455.pP6sroyjMG@avalon>
- <alpine.LFD.2.11.1404102024200.980@knanqh.ubzr>
- <20140710121010.GA1990@arch.cereza>
-Message-ID: <CAOesGMiRjcWUnwsKBwK_dwWZP1EZpSVJyf5GyPkZJzP63SbS4Q@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com ('Ezequiel Garcia')
+Date: Thu, 10 Jul 2014 14:07:16 -0300
+Subject: [PATCH v3 1/4] ethernet: Add new driver for Marvell Armada 375
+ network unit
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D172700F9@AcuExch.aculab.com>
+References: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1404758751-2346-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140707221823.GC16677@electric-eye.fr.zoreil.com>
+ <20140710151904.GA5283@arch.cereza>
+ <063D6719AE5E284EB5DD2968C1650D6D172700F9@AcuExch.aculab.com>
+Message-ID: <20140710170716.GA17727@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 5:10 AM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> On 10 Apr 08:31 PM, Nicolas Pitre wrote:
->> On Fri, 11 Apr 2014, Laurent Pinchart wrote:
->>
->> > On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
->> > > On Wed, 9 Apr 2014, Laurent Pinchart wrote:
->> > > > Hello,
->> > > >
->> > > > (Resending due to a typo in an e-mail address that caused LAKML to reject
->> > > > the mails. Sorry about the noise.)
->> > > >
->> > > > This patch set reworks Ezequiel Garcia's previous fix [1] of an out of
->> > > > vmalloc space bug on PXA2[57]x platforms caused by an attempt to map the
->> > > > start of physical uncached outside of the vmalloc space.
->> > > >
->> > > > This first three patches perform a couple of cleanups, and the last patch
->> > > > fixes the problem. I've decided to map the memory at address 0xfe000000 to
->> > > > minimize changes to the code, but this causes a bit of fragmentation of
->> > > > vmalloc space. I could map it to the very end of vmalloc space
->> > > > (0xfef00000)
->> > > > instead if preferred, which would involve replacing a mov by an ldr in
->> > > > pxa2[57]x_finish_suspend and pm_enter_standby_start.
->> > > >
->> > > > I've tested the patch set on a PXA270-based system.
->> > >
->> > > For those patches:
->> > >
->> > > Acked-by: Nicolas Pitre <nico@linaro.org>
->> >
->> > Thank you.
->> >
->> > MAINTAINERS lists three maintainers for the PXA architecture, and two git
->> > trees that seem to be either dead or even deleted. Who picks up patches for
->> > PXA ? Should I send a pull request ?
->>
->> If no one else answers, then just send a pull request to the ARM-SOC
->> team (arm at kernel.org) and CC the linux-arm-kernel mailing list.
->>
->
-> What ever happened to this?
+On 10 Jul 03:26 PM, David Laight wrote:
+> From: Ezequiel Garcia
+> ...
+> > > > +/* Compare tcam data bytes with a pattern */
+> > > > +static bool mvpp2_prs_tcam_data_cmp(struct mvpp2_prs_entry *pe,
+> > > > +				    unsigned int offs, unsigned int size,
+> > > > +					   unsigned char *bytes)
+> > > > +{
+> > > > +	unsigned char byte, mask;
+> > > > +	int i;
+> 
+> Hmm. should be 'unsigned int' for the comparison against 'size'.
+> 
 
-Nothing, from the looks of it. I can apply them directly unless someone objects.
+Right. I've reworked this entirely, because it was barely readable,
+and now the size parameter is gone.
 
-Laurent, care to rebase and send a fresh copy? cc arm at kernel.org.
+> > > > +
+> > > > +	for (i = 0; i < size; i++) {
+> > > > +		mvpp2_prs_tcam_data_byte_get(pe, offs + i, &byte, &mask);
+> > > > +
+> > > > +		if (byte != bytes[i])
+> > > > +			return false;
+> > >
+> > > Please reduce the scope of "byte" and "mask".
+> > >
+> > 
+> > Agreed. This applies on several other places, I'll fix them all.
+> > 
+> > > > +	}
+> > > > +	return true;
+> 
+> Not sure about other people, but I prefer variables to be defined
+> at the top of a function so that I can find them.
+> Minimising the scope tends to make code harder to read.
+> 
+> If this was a big function, then reducing the scope of 'temporary'
+> variables need for a few lines (like the above loop) can make sense
+> because it reduces the clutter at the top of the function.
+> 
 
+Yeah, that makes sense. I'm fine either way; I'll be submitting v4 now
+addressing most of Francois' feedback. Feel free to complain if you think
+some function is not readable enough and can be improved.
 
--Olof
+Thanks for taking a look,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
