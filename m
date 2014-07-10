@@ -1,36 +1,45 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jul 2014 23:36:25 +0200
-Subject: [PATCH v2 05/12] cpuidle: kirkwood: Remove ARCH_KIRKWOOD dependency
+Date: Thu, 10 Jul 2014 23:36:28 +0200
+Subject: [PATCH v2 08/12] leds: Remove ARCH_KIRKWOOD dependency
 In-Reply-To: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
 References: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1405028192-9623-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1405028192-9623-9-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
-Use MACH_KIRKWOOD, which is set when kirkwood is built as part of
+Use MACH_KIRKWOOD which will be set when kirkwood is built as part of
 mach-mvebu.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: linux-pm at vger.kernel.org
+Acked-by: Bryan Wu <cooloney@gmail.com>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: linux-leds at vger.kernel.org
 ---
- drivers/cpuidle/Kconfig.arm | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/leds/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index b6d69e899f5d..dd9afb405766 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -33,7 +33,7 @@ config ARM_HIGHBANK_CPUIDLE
- 
- config ARM_KIRKWOOD_CPUIDLE
- 	bool "CPU Idle Driver for Marvell Kirkwood SoCs"
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index a1b044e7eaad..2d7c380f79ce 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -411,7 +411,7 @@ config LEDS_MC13783
+ config LEDS_NS2
+ 	tristate "LED support for Network Space v2 GPIO LEDs"
+ 	depends on LEDS_CLASS
 -	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
 +	depends on MACH_KIRKWOOD
+ 	default y
  	help
- 	  This adds the CPU Idle driver for Marvell Kirkwood SoCs.
- 
+ 	  This option enable support for the dual-GPIO LED found on the
+@@ -421,7 +421,7 @@ config LEDS_NS2
+ config LEDS_NETXBIG
+ 	tristate "LED support for Big Network series LEDs"
+ 	depends on LEDS_CLASS
+-	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
++	depends on MACH_KIRKWOOD
+ 	default y
+ 	help
+ 	  This option enable support for LEDs found on the LaCie 2Big
 -- 
 2.0.1
