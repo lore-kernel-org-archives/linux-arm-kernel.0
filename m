@@ -1,75 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Jul 2014 21:59:53 +0200
-Subject: [PATCH v3 1/2] ARM: at91/dt: describe rgmii ethernet phy connected to
- sama5d3xek boards
-In-Reply-To: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
+From: dave.hansen@intel.com (Dave Hansen)
+Date: Thu, 10 Jul 2014 13:04:53 -0700
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <CAPAsAGwYZ9AVUoOMipZEe8jdmJfd=aULR+yoVH5FqzW1Qa75AQ@mail.gmail.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>	<1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>	<53BDA568.5030607@intel.com>	<53BE8333.6060404@samsung.com>	<53BEB77A.6020003@intel.com>
+ <CAPAsAGwYZ9AVUoOMipZEe8jdmJfd=aULR+yoVH5FqzW1Qa75AQ@mail.gmail.com>
+Message-ID: <53BEF1E5.2000502@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ethernet-phy nodes and specify phy interrupt (connected to pin PB25)
-and board specific timing configs.
+On 07/10/2014 12:48 PM, Andrey Ryabinin wrote:
+>>>> How does this interact with vmalloc() addresses or those from a kmap()?
+>>>>
+>>> It's used only for lowmem:
+>>>
+>>> static inline bool addr_is_in_mem(unsigned long addr)
+>>> {
+>>>       return likely(addr >= PAGE_OFFSET && addr < (unsigned long)high_memory);
+>>> }
+>>
+>> That's fine, and definitely covers the common cases.  Could you make
+>> sure to call this out explicitly?  Also, there's nothing to _keep_ this
+>> approach working for things out of the direct map, right?  It would just
+>> be a matter of updating the shadow memory to have entries for the other
+>> virtual address ranges.
+> 
+> Why do you want shadow for things out of the direct map? If you want
+> to catch use-after-free in vmalloc than DEBUG_PAGEALLOC will be
+> enough. If you want catch out-of-bounds in vmalloc you don't need
+> anything, because vmalloc allocates guarding hole in the end. Or do
+> you want something else?
 
-Atmel has two different HW designs for its CPU modules: the first one
-(produced by Embest) is connecting PHYAD[0-2] pins to pull up resistors
-and the other one (produced by Ronetix) is connecting PHYAD0 to a pull up
-resistor and PHYAD[1-2] to pull down resistors.
-As a result, Ronetix design will have its PHY available at address 0x1 and
-Embest design at 0x7.
-By defining both phys we're letting the phy core detect the one actually
-available on the MDIO bus.
+That's all true for page-size accesses.  Address sanitizer's biggest
+advantage over using the page tables is that it can do checks at
+sub-page granularity.  But, we don't have any APIs that I can think of
+that _care_ about <PAGE_SIZE outside of the direct map (maybe zsmalloc,
+but that's pretty obscure).
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
-
-Florian, I dropped your Reviewed-by tag because this patch has slightly
-changed.
-
-
- arch/arm/boot/dts/sama5d3xcm.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index b0b1331..755369e 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -34,6 +34,36 @@
- 
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ethernet-phy at 1 {
-+					reg = <0x1>;
-+					interrupt-parent = <&pioB>;
-+					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-+					txen-skew-ps = <800>;
-+					txc-skew-ps = <3000>;
-+					rxdv-skew-ps = <400>;
-+					rxc-skew-ps = <3000>;
-+					rxd0-skew-ps = <400>;
-+					rxd1-skew-ps = <400>;
-+					rxd2-skew-ps = <400>;
-+					rxd3-skew-ps = <400>;
-+				};
-+
-+				ethernet-phy at 7 {
-+					reg = <0x7>;
-+					interrupt-parent = <&pioB>;
-+					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-+					txen-skew-ps = <800>;
-+					txc-skew-ps = <3000>;
-+					rxdv-skew-ps = <400>;
-+					rxc-skew-ps = <3000>;
-+					rxd0-skew-ps = <400>;
-+					rxd1-skew-ps = <400>;
-+					rxd2-skew-ps = <400>;
-+					rxd3-skew-ps = <400>;
-+				};
- 			};
- 
- 			pmc: pmc at fffffc00 {
--- 
-1.8.3.2
+So I guess it doesn't matter.
