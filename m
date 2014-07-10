@@ -1,34 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Jul 2014 15:14:16 +0200
-Subject: [PATCH 3/3] arm64: Use include/asm-generic/io.h
-In-Reply-To: <20140710110034.GI16137@arm.com>
-References: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
- <1404918699-17284-3-git-send-email-thierry.reding@gmail.com>
- <20140710110034.GI16137@arm.com>
-Message-ID: <201407101514.16530.arnd@arndb.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 10 Jul 2014 15:16:46 +0200
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140710131646.GB3935@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 July 2014, Catalin Marinas wrote:
-> > @@ -235,8 +155,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
-> >  #define ioremap_wc(addr, size)               __ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
-> >  #define iounmap                              __iounmap
-> >  
-> > -#define ARCH_HAS_IOREMAP_WC
-> > -#include <asm-generic/iomap.h>
-> > +#include <asm-generic/io.h>
+On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
+> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
 > 
-> We don't currently have PCIe support in mainline for arm64 but what I
-> had in mind with the generic iomap is that functions like ioread32_rep
-> first check whether the address is an IO address or a memory one and
-> calls the insl or mmio_insl accordingly. With your generic
-> implementation, this check disappears.
-> 
-> The question is whether this functionality would still be needed.
+> We are going to use runnable_avg_sum and runnable_avg_period in order to get
+> the utilization of the CPU. This statistic includes all tasks that run the CPU
+> and not only CFS tasks.
 
-I think it's much better not to have that check on architectures that have a memory
-mapped I/O space like arm64. The main advantage is that ioread32() is just a trivial
-alias for readl(). The only reason for needing generic_iomap is architectures that
-do something very different for I/O ports.
+But this rq->avg is not the one that is migration aware, right? So why
+use this?
 
-	Arnd
+We already compensate cpu_capacity for !fair tasks, so I don't see why
+we can't use the migration aware one (and kill this one as Yuyang keeps
+proposing) and compensate with the capacity factor.
