@@ -1,80 +1,56 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 10 Jul 2014 07:39:55 -0700
-Subject: [PATCH 5/6] arm/arm64: KVM: vgic: Fix SGI writes to GICD_I{CS}PENDR0
+Date: Thu, 10 Jul 2014 07:39:56 -0700
+Subject: [PATCH 6/6] arm/arm64: KVM: vgic: Clarify and correct vgic
+ documentation
 In-Reply-To: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
 References: <1405003196-12403-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1405003196-12403-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1405003196-12403-7-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writes to GICD_ISPENDR0 and GICD_ICPENDR0 ignore all settings of the
-pending state for SGIs.  Make sure the implementation handles this
-correctly.
+The VGIC virtual distributor implementation documentation was written a
+very long time ago, before the true nature of the beast had been
+partially absorbed into my bloodstream.  Clarify the docs.
+
+Plus, it fixes an actual bug.  ICFRn, pfff.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7b0ab7f..2c13384 100644
+index 2c13384..df0785c 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -449,7 +449,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
- 					phys_addr_t offset)
- {
--	u32 *reg;
-+	u32 *reg, orig;
- 	u32 level_mask;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 
-@@ -458,6 +458,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 
- 	/* Mark both level and edge triggered irqs as pending */
- 	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-+	orig = *reg;
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
- 
-@@ -469,6 +470,12 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
- 		*reg &= level_mask;
- 
-+		/* Ignore writes to SGIs */
-+		if (offset < 2) {
-+			*reg &= ~0xffff;
-+			*reg |= orig & 0xffff;
-+		}
-+
- 		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -481,10 +488,11 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  phys_addr_t offset)
- {
- 	u32 *level_active;
--	u32 *reg;
-+	u32 *reg, orig;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 
- 	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-+	orig = *reg;
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
- 	if (mmio->is_write) {
-@@ -495,6 +503,12 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  vcpu->vcpu_id, offset);
- 		*reg |= *level_active;
- 
-+		/* Ignore writes to SGIs */
-+		if (offset < 2) {
-+			*reg &= ~0xffff;
-+			*reg |= orig & 0xffff;
-+		}
-+
- 		/* Clear soft-pending flags */
- 		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
- 					  vcpu->vcpu_id, offset);
+@@ -36,21 +36,22 @@
+  * How the whole thing works (courtesy of Christoffer Dall):
+  *
+  * - At any time, the dist->irq_pending_on_cpu is the oracle that knows if
+- *   something is pending
+- * - VGIC pending interrupts are stored on the vgic.irq_pending vgic
+- *   bitmap (this bitmap is updated by both user land ioctls and guest
+- *   mmio ops, and other in-kernel peripherals such as the
+- *   arch. timers) and indicate the 'wire' state.
++ *   something is pending on the CPU interface.
++ * - Interrupts that are pending on the distributor are stored on the
++ *   vgic.irq_pending vgic bitmap (this bitmap is updated by both user land
++ *   ioctls and guest mmio ops, and other in-kernel peripherals such as the
++ *   arch. timers).
+  * - Every time the bitmap changes, the irq_pending_on_cpu oracle is
+  *   recalculated
+  * - To calculate the oracle, we need info for each cpu from
+  *   compute_pending_for_cpu, which considers:
+  *   - PPI: dist->irq_pending & dist->irq_enable
+  *   - SPI: dist->irq_pending & dist->irq_enable & dist->irq_spi_target
+- *   - irq_spi_target is a 'formatted' version of the GICD_ICFGR
++ *   - irq_spi_target is a 'formatted' version of the GICD_ITARGETSRn
+  *     registers, stored on each vcpu. We only keep one bit of
+  *     information per interrupt, making sure that only one vcpu can
+  *     accept the interrupt.
++ * - If any of the above state changes, we must recalculate the oracle.
+  * - The same is true when injecting an interrupt, except that we only
+  *   consider a single interrupt at a time. The irq_spi_cpu array
+  *   contains the target CPU for each SPI.
 -- 
 2.0.0
