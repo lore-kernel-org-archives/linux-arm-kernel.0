@@ -1,66 +1,83 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 10 Jul 2014 10:00:44 +0200
-Subject: [RFC v2 0/5] Per-user clock constraints
-In-Reply-To: <53BDA31D.40502@gmail.com>
-References: <1404398323-18934-1-git-send-email-tomeu.vizoso@collabora.com>
- <53BDA31D.40502@gmail.com>
-Message-ID: <53BE482C.9000503@collabora.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 10 Jul 2014 09:03:43 +0100
+Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
+In-Reply-To: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 10:16 PM, Tomasz Figa wrote:
-> Hi Tomeu,
->
-> On 03.07.2014 16:38, Tomeu Vizoso wrote:
->> Hello,
->>
->> here is another round for commenting, not very different from the first one.
->>
->> Something I forgot to mention before is that the function rename was performed
->> by the scripts in:
->>
->> http://cgit.collabora.com/git/user/tomeu/linux.git/commit/?h=clk-refactoring-4&id=0e983e28864229f2cd525f87d59e034c4876b233
->>
->> As before, I have only checked that drivers/clk/ builds with allyesconfig, and
->> that a kernel can be built for tegra_defconfig.
->
-> This is quite an interesting series. I have reviewed two of five patches
-> and have plans to look at remaining ones, however here are few general
-> issues I'd like to raise:
->
-> - somehow I don't see patch 2/5 on LAKML. Too big?
+This patchset makes it possible to use kgdb's NMI infrastructure on ARM
+platforms.
 
-Yes, I'm not sure what I can do about that, but it's only automated 
-function renaming. I'm going to send v3 in a bit and will CC you.
+The patches have been previously circulated as part of a large patchset
+mixing together ARM architecture code and driver changes
+(http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901 ). This
+patchset is dramatically cut down to include only the arch/arm code. The
+driver code (irqchip and tty/serial) will follow when/if the arch code
+is accepted.
 
-> - I see the series changing particular clock drivers. A good practice
-> would be to Cc respective driver maintainers to take a look at those
-> changes.
+The first two patches modify the FIQ infrastructure to allow interrupt
+controller drivers to register callbacks (the fiq_chip structure) to
+manage FIQ routings and to ACK and EOI the FIQ. This makes it possible
+to use FIQ in multi-platform kernels and with recent ARM interrupt
+controllers.
 
-Now that I'm more confident about this approach, for the next version 
-I'm going to CC them as well.
+The remaining two patches provide architecture support for KGDB's NMI
+feature (and rely upon the preceding changes to the FIQ code).
 
-> - please make sure that all the patches don't have checkpatch errors or
-> significant warnings.
+Tested on qemu (versatile), STiH416 (B2020 board) and Freescale i.MX6
+quad (wandboard).
 
-Sure.
+Changes since v7:
 
-> Will try (myself or by asking someone else) to do some testing on
-> Samsung platforms.
+- Introduced ack_fiq() to complement eoi_fiq(). Without this it is
+  not possible to meet the GIC specification (previous versions worked
+  when tested but are unpredictable according to the specification).
+  ack_fiq() also makes is possible for drivers for devices with multiple
+  interrupt lines to discover the interrupt source correctly.
 
-That will be great, thanks. One scenario I'm looking forward to test 
-this with is low system load while the display is being updated often at 
-a high resolution.
+Changes since v6:
 
-I would expect to see that the Exynos5 devfreq driver sets a relatively 
-low floor frequency, and the DC driver overrides that by setting a 
-higher floor, based on the calculated bandwidth that will be required to 
-move pixels around.
+- Corrected off-by-one comparison in has_fiq() (Nicolas Pitre)
+- Rewrote the FIQ stack initialization (Nicolas Pitre). This fixes a
+  serious data corruption bug due to bad stack mismanagement.
+- Introduced __fiq_abt to ensure lr_abt and spsr_abt are saved and
+  restored if we fast-interrupt an abort (Russell King).
+- Significantly improved the commenting of the exception handlers.
+- Added a call to trace_hardirqs_on() if we clear the I bit as we
+  exit the exception handler.
 
-Regards,
+Changes since v5:
 
-Tomeu
+- Separated anything not strictly impacting arch/arm.
+- Fixed a spurious add/remove of code within the series (there was
+  broken code in intermediate patches)
 
-> Best regards,
-> Tomasz
->
+For previous changes see:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901
+
+Anton Vorontsov (2):
+  ARM: Move some macros from entry-armv to entry-header
+  ARM: Add KGDB/KDB FIQ debugger generic code
+
+Daniel Thompson (2):
+  arm: fiq: Add callbacks to manage FIQ routings
+  arm: fiq: Allow ACK and EOI to be passed to the intc
+
+ arch/arm/Kconfig                 |   2 +
+ arch/arm/Kconfig.debug           |  18 +++++
+ arch/arm/include/asm/fiq.h       |  17 ++++
+ arch/arm/include/asm/kgdb.h      |   7 ++
+ arch/arm/kernel/Makefile         |   1 +
+ arch/arm/kernel/entry-armv.S     | 151 +----------------------------------
+ arch/arm/kernel/entry-header.S   | 164 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/fiq.c            | 122 ++++++++++++++++++++++++++++-
+ arch/arm/kernel/kgdb_fiq.c       | 132 +++++++++++++++++++++++++++++++
+ arch/arm/kernel/kgdb_fiq_entry.S | 130 +++++++++++++++++++++++++++++++
+ 10 files changed, 592 insertions(+), 152 deletions(-)
+ create mode 100644 arch/arm/kernel/kgdb_fiq.c
+ create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
+
+--
+1.9.3
