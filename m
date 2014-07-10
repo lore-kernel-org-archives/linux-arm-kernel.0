@@ -1,62 +1,47 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Thu, 10 Jul 2014 16:51:06 -0500
-Subject: [PATCH] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <53BEFF7E.5010907@amd.com>
-References: <20140709161704.9623.92358.stgit@joelaarch64.amd.com>
- <20140710202502.GA20394@cbox> <53BEFF7E.5010907@amd.com>
-Message-ID: <53BF0ACA.70403@amd.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 Jul 2014 15:05:29 -0700
+Subject: [PATCH 1/2] ARM: efm32: switch to properly namespaced location
+ property
+In-Reply-To: <20140708182620.GH7827@pengutronix.de>
+References: <20140630154030.GJ14781@pengutronix.de>
+ <1404142889-20740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAOesGMjzzYwXKXZLvUVp-nAGf+R4G8eUjK+3CumB8i5LkoRCow@mail.gmail.com>
+ <20140708064135.GE7827@pengutronix.de>
+ <CAOesGMjJJPJr7GnB=aoydGqtoaTd8wdBYDD92S0+5-y1PJepsA@mail.gmail.com>
+ <20140708182620.GH7827@pengutronix.de>
+Message-ID: <CAOesGMjgX5PWBSD2YP7mTGMWafxBjeMDmzZoPCXb27YPUHEcyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 8, 2014 at 11:26 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hi Olof,
+>
+> On Tue, Jul 08, 2014 at 09:06:13AM -0700, Olof Johansson wrote:
+>> I really don't want a hodge-podge of whatever someone felt like
+>> picking as a name at the time. It makes it really hard for newcomers
+>> to find a good best practices to follow, and over time will result in
+>> total chaos.
+> That's right. I did it in good faith. If you think it would be worth to
+> switch to say "energymicro,location" I think it wouldn't be that hard,
+> because I think there are no boards in the wild that use a device tree
+> and don't use the BSP I'm providing where switching is a no brainer.
 
-On 07/10/2014 04:02 PM, Joel Schopp wrote:
-> On 07/10/2014 03:25 PM, Christoffer Dall wrote:
->> On Wed, Jul 09, 2014 at 11:17:04AM -0500, Joel Schopp wrote:
->>> The current calculation for VTTBR_BADDR_MASK masks only 39 bits and not
->>> all 40 bits.  That last bit is important as some systems allocate
->>> from near the top of the available address space.
->>>
->>> This patch is necessary to run KVM on an aarch64 SOC I have been testing.
->>>
->>> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_arm.h |    2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>> index 3d69030..b39e93f 100644
->>> --- a/arch/arm64/include/asm/kvm_arm.h
->>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>> @@ -148,7 +148,7 @@
->>>  #endif
->>>  
->>>  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
->>> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
->>> +#define VTTBR_BADDR_MASK  (0xffffffffffLLU)              /* bits 0-39 */
->>>  #define VTTBR_VMID_SHIFT  (48LLU)
->>>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
->>>  
->>>
->> While this is obviously fixing a bug, it doesn't feel like the right
->> short-term fix.  I'll have to go back and read the definitions of x in
->> BADDR[47:x] for VTTBR_EL2 exactly again, but the intended use of
->> VTTBR_BADDR_MASK (and the only occurence of it in C-code) is to deal
->> with alignment of the allocated pgd.
-> I think there is some confusion.  Before VTTBR_BADDR_MASK always
-> evaluated to 0x7fffffffffLLU, after the change it always evaluates to
-> 0xffffffffffLLU
+Yeah, let's do it now before there are users, if that's OK with you.
+
+>> What's this binding for anyway? It looks a lot like an ad-hoc pinctrl
+>> binding for configuring pinout, is that accurate?
+> Well, it has to do with pinctrl, but it was agreed that managing it with
+> a single pinctrl device would complicate things considerably and in the
+> end the device tree wouldn't describe how the hardware looks like but
+> would result in a lot of complexity just to fit into the Linux pinctrl
+> model.
 >
-> Neither before nor after the patch is it dealing with alignment.  Any
-> bits it throws away (bits 40-47) are most significant not least significant.
->
-> I could have rewritten the macro like:
->
-> #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X + 1)) - 1) << VTTBR_BADDR_SHIFT)
->
-> to correct the bug but it's my opinion that the existing code is quite
-> obfuscated which is how the bug happened in the first place.  It seemed
-> easier to just actually mask the bits in a straightforward and easy to
-> understand manner.  I even added a comment so nobody has to count the fs ;)
->
-I hate to reply to my own email correcting myself.  But you were
-correct.  I will fix and resend a v2.
+> See the thread around
+> http://marc.info/?l=linux-spi&m=137485291802157&w=2 for the glory
+> details.
+
+OK, thanks for the background.
+
+
+-Olof
