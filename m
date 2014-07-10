@@ -1,20 +1,24 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Thu, 10 Jul 2014 12:44:24 +0200
-Subject: [PATCH 4/5] [RFC] ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAFC085@DBDE04.ent.ti.com>
-References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
- <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAFC085@DBDE04.ent.ti.com>
-Message-ID: <1404989064.8309.13.camel@mars>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 10 Jul 2014 12:46:56 +0200
+Subject: [linux-sunxi] GSoC 2014 #0 status report - Improving Allwinner
+ SoC support
+In-Reply-To: <53BE0B4F.1090001@elopez.com.ar>
+References: <53BE0B4F.1090001@elopez.com.ar>
+Message-ID: <53BE6F20.4090207@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-08 at 06:25 +0000, Gupta, Pekon wrote:
+Hi Emilio,
+
+On 07/10/2014 05:41 AM, Emilio L?pez wrote:
+> Hi everyone,
 > 
-> Do you plan to re-spin this patch with above comments, and mark it for stable?
-> It would be helpful for all OMAP3 users.
+> As some of you may know, I'm currently participating in Google Summer of Code under the Linux Foundation, working on a proposal titled "Improve Allwinner SoCs support on mainline Linux". There is a great quantity of devices out there that are powered by Allwinner processors, including but not limited to the various Cubieboards, OLinuXinos, STBs, Tablets and ?Mini PCs?. However, to date, support on mainline Linux is not yet feature complete. My proposal on particular focuses on DMA and analog audio on the earlier SoCs, and improved A23 support.
 
-Thanks for the reminder. I'll respin the patchset this weekend.
+I did not know you were working on this as part of gsoc, good to hear!
 
- -- Christoph
+Keep up the good work.
+
+Regards,
+
+Hans
