@@ -1,93 +1,207 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Thu, 10 Jul 2014 15:32:16 -0700
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140709105441.GE9485@arm.com>
-References: <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
- <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
- <20140624181150.GB4067@arm.com> <53A9EF3A.2070704@codeaurora.org>
- <20140625091858.GG6153@arm.com> <53ADEEDF.7060902@codeaurora.org>
- <20140630095220.GA25779@arm.com> <53BC95DA.1010500@codeaurora.org>
- <20140709105441.GE9485@arm.com>
-Message-ID: <53BF1470.1000704@codeaurora.org>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Thu, 10 Jul 2014 15:35:30 -0700
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
+References: <CAPz6YkUzGWnOznZ4UXNsLbe=ehDwfMJwUSjahUKVnVz8w9OcsA@mail.gmail.com>
+ <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
+ <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
+Message-ID: <CAPz6YkXgoKPSQEdNOwAQDhEnFGFVArr_0obbVR_okAEOvLxtzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2014 3:54 AM, Will Deacon wrote:
-> On Wed, Jul 09, 2014 at 02:07:38AM +0100, Olav Haugan wrote:
->> On 6/30/2014 2:52 AM, Will Deacon wrote:
->>> On Fri, Jun 27, 2014 at 11:23:27PM +0100, Olav Haugan wrote:
->>>> Lets say I have an IOMMU with 2 masters and 2 SMRn slots with the
->>>> following stream IDs coming from the masters:
->>>>
->>>> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
->>>> Master 2: 0x30
->>>>
->>>> To make this work I would program SMR[0] with StreamID 0x20 and mask 0xF
->>>> to ignore lower 4 bits. SMR[1] would just be StreamID 0x30 with mask 0x0.
->>>>
->>>> However, I could also have an IOMMU with 2 masters and 9 SMRn slots with
->>>> the following stream IDs:
->>>>
->>>> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
->>>> Master 2: 0x29
->>>>
->>>> Here I would program all SMRn and leave the mask to be 0 for all SMRn's.
->>>> So how do I detect when to apply a mask or not?
->>>
->>> You would aim to use the smallest number of SMRs per master possible.
->>> You could probably use:
->>>
->>>   Master 1: SMR[0].id == 0x20, SMR[0].mask = 0x07
->>>             SMR[1].id == 0x28, SMR[1].mask = 0x00
->>>
->>>   Master 2: SMR[2].id == 0x29, SMR[2].mask = 0x00
+On Thu, Jul 10, 2014 at 5:28 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> Hi Sonny,
+>
+> I have missed this patch.
+>
+> You finally choose to take extra interrupt handling.
+> If it is not harm, it's fine.
+
+Hi, thanks for coming back to it.  Based on my tracing, the interrupt
+seems to be okay and is just ignored.
+
+>
+> Please check one thing below.
+>
+> On Tue, June 10, 2014, Sonny Rao wrote:
+>> This patch changes the fifo reset code to follow the reset procedure
+>> outlined in the documentation of Synopsys Mobile storage host databook.
 >>
->> So how does an algorithm figure this out in both my examples? The
->> algorithm would have to know about both (all) bus masters and their
->> stream IDs for a specific SMMU. If the algorithm operates on the set of
->> stream IDs for one bus master at a time the algorithm has no way of
->> knowing which bits can be ignored since it doesn't know the value of the
->> other stream IDs for the other bus masters and thus could potentially
->> create a mask that could cause a stream ID to match in two different
->> entries.
-> 
-> Complete knowledge of the system topology (i.e. all bus masters) is a
-> requirement for being able to configure the SMMU correctly if you want to
-> guarantee that you don't have SMR aliasing issues.
-
-So you agree that an algorithm needs to know about all the bus
-masters/stream IDs for a specific IOMMU before it can figure out the
-StreamID masks and how many SMRs can be allocated to a specific bus
-master? Andreas's algorithm does not know about the other bus
-masters/stream IDs. It operates on one bus master at a time.
-
->>>> I am not familiar with Andreas's proposal. Do you have a link?
->>>
->>>   http://marc.info/?l=linux-arm-kernel&m=139110598005846&w=2
+>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>> ---
+>> v2: Add Generic DMA support
+>>     per the documentation, move interrupt clear before wait
+>>     make the test for DMA host->use_dma rather than host->using_dma
+>>     add proper return values (although it appears no caller checks)
+>> v3: rename fifo reset function, and change callers
+>>     use this combined reset function in dw_mci_resume()
+>>     just one caller left (probe), so get rid of dw_mci_ctrl_all_reset()
+>>     use DMA reset bit for all systems which use DMA
+>>     remove extra IDMAC reset in dw_mci_work_routine_card()
+>>     do CIU clock update in error path, if CIU reset cleared
+>> v4: remove comment about FIFO reset in dw_mci_work_routine_card()
+>>     move down error message when control reset clears but others don't
+>>      and clarify the error stating that we will still update clocks
+>>     make flags for all reset bits a macro
 >>
->> Unless I am mistaken the algorithm works on one bus master at a time. I
->> don't think that will work.
-> 
-> IIRC, it works for densely packed SIDs on the master, so it tries to build
-> up power-of-2 sized groups for that master then mops up the rest with
-> individual entries.
+>>  drivers/mmc/host/dw_mmc.c | 86 ++++++++++++++++++++++++++++++++++-------------
+>>  drivers/mmc/host/dw_mmc.h |  5 +++
+>>  2 files changed, 68 insertions(+), 23 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 55cd110..1d6d984 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -111,8 +111,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
+>>       0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
+>>  };
+>>
+>> -static inline bool dw_mci_fifo_reset(struct dw_mci *host);
+>> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
+>> +static inline bool dw_mci_reset(struct dw_mci *host);
+>>
+>>  #if defined(CONFIG_DEBUG_FS)
+>>  static int dw_mci_req_show(struct seq_file *s, void *v)
+>> @@ -1254,7 +1253,7 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+>>                * After an error, there may be data lingering
+>>                * in the FIFO
+>>                */
+>> -             dw_mci_fifo_reset(host);
+>> +             dw_mci_reset(host);
+>>       } else {
+>>               data->bytes_xfered = data->blocks * data->blksz;
+>>               data->error = 0;
+>> @@ -1371,7 +1370,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
+>>
+>>                       /* CMD error in data command */
+>>                       if (mrq->cmd->error && mrq->data)
+>> -                             dw_mci_fifo_reset(host);
+>> +                             dw_mci_reset(host);
+>>
+>>                       host->cmd = NULL;
+>>                       host->data = NULL;
+>> @@ -1982,14 +1981,8 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+>>                       }
+>>
+>>                       /* Power down slot */
+>> -                     if (present == 0) {
+>> -                             /* Clear down the FIFO */
+>> -                             dw_mci_fifo_reset(host);
+>> -#ifdef CONFIG_MMC_DW_IDMAC
+>> -                             dw_mci_idmac_reset(host);
+>> -#endif
+>> -
+>> -                     }
+>> +                     if (present == 0)
+>> +                             dw_mci_reset(host);
+>>
+>>                       spin_unlock_bh(&host->lock);
+>>
+>> @@ -2323,8 +2316,11 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+>>       return false;
+>>  }
+>>
+>> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>> +static inline bool dw_mci_reset(struct dw_mci *host)
+>>  {
+>> +     u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
+>> +     bool ret = false;
+>> +
+>>       /*
+>>        * Reseting generates a block interrupt, hence setting
+>>        * the scatter-gather pointer to NULL.
+>> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>>               host->sg = NULL;
+>>       }
+>>
+>> -     return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>> -}
+>> +     if (host->use_dma)
+>> +             flags |= SDMMC_CTRL_DMA_RESET;
+>>
+>> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+>> -{
+>> -     return dw_mci_ctrl_reset(host,
+>> -                              SDMMC_CTRL_FIFO_RESET |
+>> -                              SDMMC_CTRL_RESET |
+>> -                              SDMMC_CTRL_DMA_RESET);
+>> +     if (dw_mci_ctrl_reset(host, flags)) {
+>> +             /*
+>> +              * In all cases we clear the RAWINTS register to clear any
+>> +              * interrupts.
+>> +              */
+>> +             mci_writel(host, RINTSTS, 0xFFFFFFFF);
+>> +
+>> +             /* if using dma we wait for dma_req to clear */
+>> +             if (host->use_dma) {
+>> +                     unsigned long timeout = jiffies + msecs_to_jiffies(500);
+>> +                     u32 status;
+>> +                     do {
+>> +                             status = mci_readl(host, STATUS);
+>> +                             if (!(status & SDMMC_STATUS_DMA_REQ))
+>> +                                     break;
+>> +                             cpu_relax();
+>> +                     } while (time_before(jiffies, timeout));
+>> +
+>> +                     if (status & SDMMC_STATUS_DMA_REQ) {
+>> +                             dev_err(host->dev,
+>> +                                     "%s: Timeout waiting for dma_req to "
+>> +                                     "clear during reset", __func__);
+>> +                             goto ciu_out;
+>> +                     }
+>> +
+>> +                     /* when using DMA next we reset the fifo again */
+>> +                     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
+>> +                             goto ciu_out;
+>> +             }
+>> +     } else {
+>> +             /* if the controller reset bit did clear, then set clock regs */
+>> +             if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
+>> +                     dev_err(host->dev, "%s: fifo/dma reset bits didn't "
+>> +                             "clear but ciu was reset, doing clock update.",
+>> +                             __func__);
+>> +                     goto ciu_out;
+>> +             }
+>> +     }
+>> +
+>> +     if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
+>> +             /* It is also recommended that we reset and reprogram idmac */
+>> +             dw_mci_idmac_reset(host);
+>> +
+>> +     ret = true;
+>> +
+>> +ciu_out:
+>> +     /* After a CTRL reset we need to have CIU set clock registers  */
+>> +     mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+>> +
+>> +     return ret;
+>>  }
+>>
+>>  #ifdef CONFIG_OF
+>> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
+>>       }
+>>
+>>       /* Reset all blocks */
+>> -     if (!dw_mci_ctrl_all_reset(host))
+>> +     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
+>>               return -ENODEV;
+>>
+>>       host->dma_ops = host->pdata->dma_ops;
+>> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
+>>               }
+>>       }
+>>
+>> -     if (!dw_mci_ctrl_all_reset(host)) {
+>> +     if (!dw_mci_reset(host)) {
+> Do you have any reason to use dw_mci_reset() unlike doing on probing?
 
-I ran the algorithm through a few trivial cases:
+I really wanted to use dw_mci_reset() everwhere, including probe,
+because that would be simplest, where there is just one reset function
+always, but the host structure is not completely set up at probe time,
+so the code in dw_mci_reset() where we try to send a command to update
+clock fails, so that's why I had to just do a reset.
 
-1)
-Stream IDs: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
-Number of SMRs: 9
-
-In this case the algorithm decided to set mask to 0 for all entries
-using up 8 of the SMRs.
-
-2) Same Stream IDs but only 2 SMRs.
-The algorithm gave an error saying I did not have enough SMRs.
-
-Thanks,
-
-Olav
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Thanks,
+> Seungwon Jeon
+>
