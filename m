@@ -1,85 +1,187 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Thu, 10 Jul 2014 17:08:32 +0200
-Subject: [PATCH v9 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <CAGXu5jLUqz-T1tRBCpPLkzWijyAF-Vjw_7PnQ1EvUh4urwyaUg@mail.gmail.com>
-References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
- <1403911380-27787-12-git-send-email-keescook@chromium.org>
- <20140709180520.GA2560@redhat.com>
- <CAGXu5jLUqz-T1tRBCpPLkzWijyAF-Vjw_7PnQ1EvUh4urwyaUg@mail.gmail.com>
-Message-ID: <20140710150832.GA20861@redhat.com>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Thu, 10 Jul 2014 18:12:48 +0300
+Subject: [PATCH v2 2/4] ARM: tegra: Add resets & has-utmi-pad-registers
+ flag to all USB PHYs
+In-Reply-To: <1404436179-10745-3-git-send-email-ttynkkynen@nvidia.com>
+References: <1404436179-10745-1-git-send-email-ttynkkynen@nvidia.com>
+ <1404436179-10745-3-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <53BEAD70.5010504@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10, Kees Cook wrote:
+Thierry,
+
+Since Stephen's on a vacation, I'd like to double-check with you that 
+the DT changes looks good. Greg has applied these to the USB tree today.
+
+Thanks,
+Tuomas
+
+On 04/07/14 04:09, Tuomas Tynkkynen wrote:
+> Add new properties to all of the Tegra PHYs that are now required
+> according to the binding.
 >
-> On Wed, Jul 9, 2014 at 11:05 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> >
-> >> +     /*
-> >> +      * Make sure we cannot change seccomp or nnp state via TSYNC
-> >> +      * while another thread is in the middle of calling exec.
-> >> +      */
-> >> +     if (flags & SECCOMP_FILTER_FLAG_TSYNC &&
-> >> +         mutex_lock_killable(&current->signal->cred_guard_mutex))
-> >> +             goto out_free;
-> >
-> > -EINVAL looks a bit confusing in this case, but this is cosemtic because
-> > userspace won't see this error-code anyway.
+> In order to stay compatible with old device trees, the USB drivers
+> will still function without these reset properties but with the old,
+> potentially buggy behaviour.
 >
-> Happy to use whatever since, as you say, it's cosmetic. Perhaps -EAGAIN?
-
-Or -EINTR. I do not really mind, I only mentioned this because I had another
-nit.
-
-> >>       spin_lock_irq(&current->sighand->siglock);
-> >> +     if (unlikely(signal_group_exit(current->signal))) {
-> >> +             /* If thread is dying, return to process the signal. */
-> >
-> > OK, this doesn't hurt, but why?
-> >
-> > You could check __fatal_signal_pending() with the same effect. And since
-> > we hold this mutex, exec (de_thread) can be the source of that SIGKILL.
-> > We take this mutex specially to avoid the race with exec.
-> >
-> > So why do we need to abort if we race with kill() or exit_grouo() ?
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> ---
+> v2 changes: new patch, didn't exist in v1
+>   arch/arm/boot/dts/tegra114.dtsi |    5 +++++
+>   arch/arm/boot/dts/tegra124.dtsi |    7 +++++++
+>   arch/arm/boot/dts/tegra20.dtsi  |    7 +++++++
+>   arch/arm/boot/dts/tegra30.dtsi  |    7 +++++++
+>   4 files changed, 26 insertions(+)
 >
-> In my initial code inspection that we could block waiting for the
-> cred_guard mutex, with exec holding it, exec would schedule death in
-> de_thread, and then once it released, the tsync thread would try to
-> keep running.
+> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+> index 335a1d8..80b8edd 100644
+> --- a/arch/arm/boot/dts/tegra114.dtsi
+> +++ b/arch/arm/boot/dts/tegra114.dtsi
+> @@ -672,6 +672,8 @@
+>   			 <&tegra_car TEGRA114_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA114_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 22>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> @@ -682,6 +684,7 @@
+>   		nvidia,hssquelch-level = <2>;
+>   		nvidia,hsdiscon-level = <5>;
+>   		nvidia,xcvr-hsslew = <12>;
+> +		nvidia,has-utmi-pad-registers;
+>   		status = "disabled";
+>   	};
 >
-> However, in looking at this again, now I'm concerned this produces a
-> dead-lock in de_thread, since it waits for all threads to actually
-> die, but tsync will be waiting with the killable mutex.
-
-That is why you should always use _killable (or _interruptible) if you
-want to take ->cred_guard_mutex.
-
-If this thread races with de_thread() which holds this mutex, it will
-be killed and mutex_lock_killable() will fail.
-
-(to clarify; this deadlock is not "fatal", de_thread() can be killed too,
- but this doesn't really matter).
-
-> So I think I got too defensive when I read the top of de_thread where
-> it checks for pending signals itself.
+> @@ -705,6 +708,8 @@
+>   			 <&tegra_car TEGRA114_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA114_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 59>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+> index d675186..5b14d79 100644
+> --- a/arch/arm/boot/dts/tegra124.dtsi
+> +++ b/arch/arm/boot/dts/tegra124.dtsi
+> @@ -643,6 +643,8 @@
+>   			 <&tegra_car TEGRA124_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA124_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 22>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> @@ -653,6 +655,7 @@
+>   		nvidia,hssquelch-level = <2>;
+>   		nvidia,hsdiscon-level = <5>;
+>   		nvidia,xcvr-hsslew = <12>;
+> +		nvidia,has-utmi-pad-registers;
+>   		status = "disabled";
+>   	};
 >
-> It seems like I can just safely remove the singal_group_exit checks?
-> The other paths (non-tsync seccomp_set_mode_filter, and
-> seccomp_set_mode_strict)
+> @@ -677,6 +680,8 @@
+>   			 <&tegra_car TEGRA124_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA124_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 58>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> @@ -711,6 +716,8 @@
+>   			 <&tegra_car TEGRA124_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA124_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 59>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 243d84c..1908f69 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -645,6 +645,8 @@
+>   			 <&tegra_car TEGRA20_CLK_CLK_M>,
+>   			 <&tegra_car TEGRA20_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "timer", "utmi-pads";
+> +		resets = <&tegra_car 22>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,has-legacy-mode;
+>   		nvidia,hssync-start-delay = <9>;
+>   		nvidia,idle-wait-delay = <17>;
+> @@ -653,6 +655,7 @@
+>   		nvidia,xcvr-setup = <9>;
+>   		nvidia,xcvr-lsfslew = <1>;
+>   		nvidia,xcvr-lsrslew = <1>;
+> +		nvidia,has-utmi-pad-registers;
+>   		status = "disabled";
+>   	};
+>
+> @@ -676,6 +679,8 @@
+>   			 <&tegra_car TEGRA20_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA20_CLK_CDEV2>;
+>   		clock-names = "reg", "pll_u", "ulpi-link";
+> +		resets = <&tegra_car 58>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		status = "disabled";
+>   	};
+>
+> @@ -700,6 +705,8 @@
+>   			 <&tegra_car TEGRA20_CLK_CLK_M>,
+>   			 <&tegra_car TEGRA20_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "timer", "utmi-pads";
+> +		resets = <&tegra_car 59>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <9>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> index 0b1ede9..6b35c29 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -790,6 +790,8 @@
+>   			 <&tegra_car TEGRA30_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA30_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 22>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <9>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> @@ -801,6 +803,7 @@
+>   		nvidia,xcvr-hsslew = <32>;
+>   		nvidia,hssquelch-level = <2>;
+>   		nvidia,hsdiscon-level = <5>;
+> +		nvidia,has-utmi-pad-registers;
+>   		status = "disabled";
+>   	};
+>
+> @@ -824,6 +827,8 @@
+>   			 <&tegra_car TEGRA30_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA30_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 58>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <9>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+> @@ -858,6 +863,8 @@
+>   			 <&tegra_car TEGRA30_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA30_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+> +		resets = <&tegra_car 59>, <&tegra_car 22>;
+> +		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+>
 
-Yes, I missed another signal_group_exit() in seccomp_set_mode_strict().
-It looks equally unneeded.
-
-> I can't decide which feels cleaner: just letting stuff
-> clean up naturally on death or to short-circuit after taking
-> sighand->siglock.
-
-I'd prefer to simply remove the singal_group_exit checks.
-
-I won't argue if you prefer to keep them, but then please add a comment
-to explain that this is not needed for correctness.
-
-Because otherwise the code looks confusing, as if there is a subtle reason
-why we must not do this if killed.
-
-Oleg.
+-- 
+nvpublic
