@@ -1,49 +1,101 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 10 Jul 2014 15:26:55 +0000
-Subject: [PATCH v3 1/4] ethernet: Add new driver for Marvell Armada 375
- network unit
-In-Reply-To: <20140710151904.GA5283@arch.cereza>
-References: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1404758751-2346-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140707221823.GC16677@electric-eye.fr.zoreil.com>
- <20140710151904.GA5283@arch.cereza>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D172700F9@AcuExch.aculab.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 10 Jul 2014 08:35:15 -0700
+Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
+ connected to sama5d3xek boards
+In-Reply-To: <20140710110720.03f437eb@bbrezillon>
+References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
+ <53AC7BFD.2070806@free-electrons.com> <53AD22D8.2090301@atmel.com>
+ <20140710110720.03f437eb@bbrezillon>
+Message-ID: <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia
-...
-> > > +/* Compare tcam data bytes with a pattern */
-> > > +static bool mvpp2_prs_tcam_data_cmp(struct mvpp2_prs_entry *pe,
-> > > +				    unsigned int offs, unsigned int size,
-> > > +					   unsigned char *bytes)
-> > > +{
-> > > +	unsigned char byte, mask;
-> > > +	int i;
+2014-07-10 2:07 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> On Fri, 27 Jun 2014 09:52:56 +0200
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>
+>> On 26/06/2014 22:01, Boris BREZILLON :
+>> > Hi Florian,
+>> >
+>> > On 26/06/2014 20:15, Florian Fainelli wrote:
+>> >> Hi Boris,
+>> >>
+>> >> 2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+>> >>> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
+>> >>>
+>> >>> The PHY address is not specified here because atmel have 2 different
+>> >>> designs
+>> >>> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
+>> >>> (Embest design) and the other one is connection PHYAD0 to a pull up
+>> >>> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
+>> >>> As a result, Ronetix design will have its PHY available at address 0x1 and
+>> >>> Embest design at 0x7.
+>> >>> Let the net PHY core automatically detect the PHY address by scanning the
+>> >>> MDIO bus.
+>> >> I though the compatible string was listed as a required property, but
+>> >> it is not. The 'reg' property however is listed as required, although
+>> >> the of_miodbus_register() works just fine without it, although that is
+>> >> a Linux-specific implementation detail.
+>> >
+>> > Indeed, it's listed in the required property list of the DT binding doc,
+>> > but the code implement auto detection if reg is missing.
+>> > However this line [1] clearly shows that specifying the reg property is
+>> > the preferred way of doing things.
+>> >
+>> > I could define 2 different sama5d3xcm.dtsi (sama5d3xcm-ronetix.dtsi and
+>> > sama5d3xcm-embest.dtsi) to avoid this dirty hack,
+>> > but then we would have 2 more dtb and the user would have to determine
+>> > which CPU module he owns to choose the appropriate dtb.
+>> > If at91, arm-soc and DT maintainers agree with this approach I can
+>> > definitely propose something.
+>>
+>> Yes Boris, I definitively prefer not to add another .dtsi file for this
+>> series if we can avoid it.
+>>
+>
+> Okay, now that I don't specify the reg property I have a bunch of
+> noisy logs (which is exactly what the developer of of_mdio.c wanted in
+> order to force people to specify the reg property).
+>
+> It seems to be a problem for atmel users (all these logs make them
+> think there is something wrong with the net device).
+>
+> Apart from the dts/dtsi split solution, which Nicolas wants to avoid, I
+> see two solutions here:
+>
+> 1) remove the logs (or use dev_dbg instead of dev_info) from of_mdio.c.
+> But I'm pretty sure this solution won't be accepted :-).
 
-Hmm. should be 'unsigned int' for the comparison against 'size'.
+I am fine with using dev_dbg() instead of dev_info() for that sort of
+messages, provided that you state the rationale of this change
+(spewing the log console with probing messages) and specify tha the
+'reg' property is optional.
 
-> > > +
-> > > +	for (i = 0; i < size; i++) {
-> > > +		mvpp2_prs_tcam_data_byte_get(pe, offs + i, &byte, &mask);
-> > > +
-> > > +		if (byte != bytes[i])
-> > > +			return false;
-> >
-> > Please reduce the scope of "byte" and "mask".
-> >
-> 
-> Agreed. This applies on several other places, I'll fix them all.
-> 
-> > > +	}
-> > > +	return true;
+>
+> 2) define 2 ethernet phys (one for each possible solution). I tested it
+> and it works fine (only the available PHY is registered and there is no
+> noisy logs anymore).
 
-Not sure about other people, but I prefer variables to be defined
-at the top of a function so that I can find them.
-Minimising the scope tends to make code harder to read.
+One advantage of that solution is that you'll get slightly faster boot
+times since you won't have to auto-probe for the PHYs on the MDIO bus,
+the time savings get bigger as you start using higher PHY addresses.
 
-If this was a big function, then reducing the scope of 'temporary'
-variables need for a few lines (like the above loop) can make sense
-because it reduces the clutter at the top of the function.
+>
+> Could net and DT maintainers help us choose the best solution (or
+> propose a new one) ?
+>
+> Best Regards,
+>
+> Boris
+>
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-	David
+
+
+-- 
+Florian
