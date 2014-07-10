@@ -1,52 +1,121 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Fri, 11 Jul 2014 00:42:45 +0300
-Subject: [PATCH 09/13] ARM: tegra: Add the DFLL to Tegra124 device tree
+Date: Fri, 11 Jul 2014 00:42:46 +0300
+Subject: [PATCH 10/13] ARM: tegra: Enable the DFLL on the Jetson TK1
 In-Reply-To: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
 References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1405028569-14253-10-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1405028569-14253-11-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DFLL clocksource is a separate IP block from the usual
-clock-and-reset controller, so it gets its own device tree node.
+Add the board-specific properties of the DFLL for the Jetson TK1 board.
+On this board, the DFLL will take control of the sd0 regulator on the
+on-board AS3722 PMIC.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 ---
- arch/arm/boot/dts/tegra124.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 83 ++++++++++++++++++++++++++++++-
+ 1 file changed, 82 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 7cc535b..582a0e2 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -534,6 +534,28 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 89a772d..2dfd516 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1453,7 +1453,7 @@
+ 				vin-ldo9-10-supply = <&vdd_5v0_sys>;
+ 				vin-ldo11-supply = <&vdd_3v3_run>;
+ 
+-				sd0 {
++				vdd_cpu: sd0 {
+ 					regulator-name = "+VDD_CPU_AP";
+ 					regulator-min-microvolt = <700000>;
+ 					regulator-max-microvolt = <1400000>;
+@@ -1636,6 +1636,87 @@
+ 		non-removable;
  	};
  
-+	dfll: dfll at 0,70110000 {
-+		compatible = "nvidia,tegra124-dfll";
-+		reg = <0 0x70110000 0 0x100>, /* DFLL control */
-+		      <0 0x70110000 0 0x100>, /* I2C output control */
-+		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
-+		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
-+		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
-+			 <&tegra_car TEGRA124_CLK_DFLL_REF>,
-+			 <&tegra_car TEGRA124_CLK_I2C5>;
-+		clock-names = "soc", "ref", "i2c";
-+		#clock-cells = <0>;
-+		clock-output-names = "dfllCPU_out";
-+		nvidia,sample-rate = <12500>;
-+		nvidia,droop-ctrl = <0x00000f00>;
-+		nvidia,force-mode = <1>;
-+		nvidia,cf = <10>;
-+		nvidia,ci = <0>;
-+		nvidia,cg = <2>;
-+		status = "disabled";
++	dfll at 0,70110000 {
++		status = "okay";
++		vdd_cpu-supply = <&vdd_cpu>;
++		nvidia,i2c-fs-rate = <400000>;
++		nvidia,pmic-i2c-address = <0x40>;
++		nvidia,pmic-i2c-voltage-register = <0x00>;
++
++		nvidia,pmic-voltage-table =
++			<0x1e 700000>,
++			<0x1f 710000>,
++			<0x20 720000>,
++			<0x21 730000>,
++			<0x22 740000>,
++			<0x23 750000>,
++			<0x24 760000>,
++			<0x25 770000>,
++			<0x26 780000>,
++			<0x27 790000>,
++			<0x28 800000>,
++			<0x29 810000>,
++			<0x2a 820000>,
++			<0x2b 830000>,
++			<0x2c 840000>,
++			<0x2d 850000>,
++			<0x2e 860000>,
++			<0x2f 870000>,
++			<0x30 880000>,
++			<0x31 890000>,
++			<0x32 900000>,
++			<0x33 910000>,
++			<0x34 920000>,
++			<0x35 930000>,
++			<0x36 940000>,
++			<0x37 950000>,
++			<0x38 960000>,
++			<0x39 970000>,
++			<0x3a 980000>,
++			<0x3b 990000>,
++			<0x3c 1000000>,
++			<0x3d 1010000>,
++			<0x3e 1020000>,
++			<0x3f 1030000>,
++			<0x40 1040000>,
++			<0x41 1050000>,
++			<0x42 1060000>,
++			<0x43 1070000>,
++			<0x44 1080000>,
++			<0x45 1090000>,
++			<0x46 1100000>,
++			<0x47 1110000>,
++			<0x48 1120000>,
++			<0x49 1130000>,
++			<0x4a 1140000>,
++			<0x4b 1150000>,
++			<0x4c 1160000>,
++			<0x4d 1170000>,
++			<0x4e 1180000>,
++			<0x4f 1190000>,
++			<0x50 1200000>,
++			<0x51 1210000>,
++			<0x52 1220000>,
++			<0x53 1230000>,
++			<0x54 1240000>,
++			<0x55 1250000>,
++			<0x56 1260000>,
++			<0x57 1270000>,
++			<0x58 1280000>,
++			<0x59 1290000>,
++			<0x5a 1300000>,
++			<0x5b 1310000>,
++			<0x5c 1320000>,
++			<0x5d 1330000>,
++			<0x5e 1340000>,
++			<0x5f 1350000>,
++			<0x60 1360000>,
++			<0x61 1370000>,
++			<0x62 1380000>,
++			<0x63 1390000>,
++			<0x64 1400000>;
 +	};
 +
  	ahub at 0,70300000 {
- 		compatible = "nvidia,tegra124-ahub";
- 		reg = <0x0 0x70300000 0x0 0x200>,
+ 		i2s at 0,70301100 {
+ 			status = "okay";
 -- 
 1.8.1.5
