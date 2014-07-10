@@ -1,103 +1,103 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 10 Jul 2014 14:57:12 +0200
-Subject: [PATCH v4 00/10] Add SDHCI support for ST Microelectronics SoCs
-In-Reply-To: <CAPDyKFqpqa-nA3i8Z4k3oBqgo7OpppxM5tSCSz-mhxyHRJtZTw@mail.gmail.com>
-References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>	<53BD64E4.5060504@st.com>
- <CAPDyKFqpqa-nA3i8Z4k3oBqgo7OpppxM5tSCSz-mhxyHRJtZTw@mail.gmail.com>
-Message-ID: <53BE8DA8.6@st.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Thu, 10 Jul 2014 17:01:25 +0400
+Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
+ infrastructure.
+In-Reply-To: <53BE7F29.20304@oracle.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
+ <53BE7F29.20304@oracle.com>
+Message-ID: <53BE8EA5.2030402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/10/14 15:55, Sasha Levin wrote:
+> On 07/09/2014 07:29 AM, Andrey Ryabinin wrote:
+>> Address sanitizer for kernel (kasan) is a dynamic memory error detector.
+>>
+>> The main features of kasan is:
+>>  - is based on compiler instrumentation (fast),
+>>  - detects out of bounds for both writes and reads,
+>>  - provides use after free detection,
+>>
+>> This patch only adds infrastructure for kernel address sanitizer. It's not
+>> available for use yet. The idea and some code was borrowed from [1].
+>>
+>> This feature requires pretty fresh GCC (revision r211699 from 2014-06-16 or
+>> latter).
+>>
+>> Implementation details:
+>> The main idea of KASAN is to use shadow memory to record whether each byte of memory
+>> is safe to access or not, and use compiler's instrumentation to check the shadow memory
+>> on each memory access.
+>>
+>> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
+>> mapping with a scale and offset to translate a memory address to its corresponding
+>> shadow address.
+>>
+>> Here is function to translate address to corresponding shadow address:
+>>
+>>      unsigned long kasan_mem_to_shadow(unsigned long addr)
+>>      {
+>>                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
+>>                              + kasan_shadow_start;
+>>      }
+>>
+>> where KASAN_SHADOW_SCALE_SHIFT = 3.
+>>
+>> So for every 8 bytes of lowmemory there is one corresponding byte of shadow memory.
+>> The following encoding used for each shadow byte: 0 means that all 8 bytes of the
+>> corresponding memory region are valid for access; k (1 <= k <= 7) means that
+>> the first k bytes are valid for access, and other (8 - k) bytes are not;
+>> Any negative value indicates that the entire 8-bytes are unaccessible.
+>> Different negative values used to distinguish between different kinds of
+>> unaccessible memory (redzones, freed memory) (see mm/kasan/kasan.h).
+>>
+>> To be able to detect accesses to bad memory we need a special compiler.
+>> Such compiler inserts a specific function calls (__asan_load*(addr), __asan_store*(addr))
+>> before each memory access of size 1, 2, 4, 8 or 16.
+>>
+>> These functions check whether memory region is valid to access or not by checking
+>> corresponding shadow memory. If access is not valid an error printed.
+>>
+>> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerForKernel
+>>
+>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> 
+> I gave it a spin, and it seems that it fails for what you might call a "regular"
+> memory size these days, in my case it was 18G:
+> 
+> [    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate 0xe0c00000 bytes below 0x0.
+> [    0.000000]
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.16.0-rc4-next-20140710-sasha-00044-gb7b0579-dirty #784
+> [    0.000000]  ffffffffb9c2d3c8 cd9ce91adea4379a 0000000000000000 ffffffffb9c2d3c8
+> [    0.000000]  ffffffffb9c2d330 ffffffffb7fe89b7 ffffffffb93c8c28 ffffffffb9c2d3b8
+> [    0.000000]  ffffffffb7fcff1d 0000000000000018 ffffffffb9c2d3c8 ffffffffb9c2d360
+> [    0.000000] Call Trace:
+> [    0.000000] <UNK> dump_stack (lib/dump_stack.c:52)
+> [    0.000000] panic (kernel/panic.c:119)
+> [    0.000000] memblock_alloc_base (mm/memblock.c:1092)
+> [    0.000000] memblock_alloc (mm/memblock.c:1097)
+> [    0.000000] kasan_alloc_shadow (mm/kasan/kasan.c:151)
+> [    0.000000] zone_sizes_init (arch/x86/mm/init.c:684)
+> [    0.000000] paging_init (arch/x86/mm/init_64.c:677)
+> [    0.000000] setup_arch (arch/x86/kernel/setup.c:1168)
+> [    0.000000] ? printk (kernel/printk/printk.c:1839)
+> [    0.000000] start_kernel (include/linux/mm_types.h:462 init/main.c:533)
+> [    0.000000] ? early_idt_handlers (arch/x86/kernel/head_64.S:344)
+> [    0.000000] x86_64_start_reservations (arch/x86/kernel/head64.c:194)
+> [    0.000000] x86_64_start_kernel (arch/x86/kernel/head64.c:183)
+> 
+> It got better when I reduced memory to 1GB, but then my system just failed to boot
+> at all because that's not enough to bring everything up.
+> 
+
+Thanks.
+I think memory size is not a problem here. I tested on my desktop with 16G.
+Seems it's a problem with memory holes cited by Dave.
+kasan tries to allocate ~3.5G. It means that lowmemsize is 28G in your case.
 
 
-On 07/10/2014 02:51 PM, Ulf Hansson wrote:
-> On 9 July 2014 17:51, Maxime Coquelin <maxime.coquelin@st.com> wrote:
->>
->>
->> On 07/09/2014 05:07 PM, Peter Griffin wrote:
->>>
->>> This series adds a SDHCI platform driver for ST SoCs, along with
->>> the additional device tree bindings and configuration to enable
->>> the controller to work properly.
->>>
->>> Initially it supports the stih416 and stih415 SoCs, and has
->>> been tested on a stih416-b2020 board.
->>>
->>> regards,
->>>
->>> Peter.
->>>
->>> Changes since v1
->>> - Whitespace cleanups
->>> - Use readl_relaxed io accessor
->>> - Add update to MAINTAINERS
->>> - Remove reset controller code from platform driver
->>> - Remove #ifdef around sleep ops
->>> - Use sdhci_pltfm_clk_get_max_clock lib function
->>> - Pass bus-width etc through board device tree node
->>> - Remove unncessary header
->>> - Remove / change some debug messages
->>> - Remove final break from switch case
->>>
->>> Changes since v2
->>> - Update CC list with alkml and lkml lists
->>>
->>> Changes since v3
->>> - Rebased on v3.16-rc4
->>> - Use sdhci_set_bus_width lib function for set_bus_width
->>> - Remove sdhci_st_8bit_width function
->>> - Use sdhci_set_clock lib function for set_clock
->>>
->>> Peter Griffin (10):
->>>     mmc: sdhci-st: Intial support for ST SDHCI controller
->>>     mmc: sdhci-st: ST Microelectronics SDHCI binding documentation.
->>>     ARM: STi: DT: Add sdhci pins for stih416
->>>     ARM: STi: DT: Add sdhci controller for stih416
->>>     ARM: STi: DT: Add sdhci pin configuration for stih415
->>>     ARM: STi: DT: Add sdhci controller for stih415
->>>     ARM: STi: DT: Enable mmc0 for both stih415 and stih416 SoCs
->>>     ARM: STi: DT: Enable second sdhci controller for stih416 b2020 boards.
->>>     ARM: update multi_v7_defconfig for STI
->>>     MAINTAINERS: Add sdhci-st file to ARCH/STI architecture
->>>
->>>    Documentation/devicetree/bindings/mmc/sdhci-st.txt |  33 ++++
->>>    MAINTAINERS                                        |   1 +
->>>    arch/arm/boot/dts/stih415-pinctrl.dtsi             |  21 +++
->>>    arch/arm/boot/dts/stih415.dtsi                     |  12 ++
->>>    arch/arm/boot/dts/stih416-b2020.dts                |   8 +
->>>    arch/arm/boot/dts/stih416-b2020e.dts               |   6 +
->>>    arch/arm/boot/dts/stih416-pinctrl.dtsi             |  39 +++++
->>>    arch/arm/boot/dts/stih416.dtsi                     |  24 +++
->>>    arch/arm/boot/dts/stih41x-b2020.dtsi               |   4 +
->>>    arch/arm/boot/dts/stih41x-b2020x.dtsi              |   4 +
->>>    arch/arm/configs/multi_v7_defconfig                |   1 +
->>>    drivers/mmc/host/Kconfig                           |  12 ++
->>>    drivers/mmc/host/Makefile                          |   1 +
->>>    drivers/mmc/host/sdhci-st.c                        | 176
->>> +++++++++++++++++++++
->>>    14 files changed, 342 insertions(+)
->>>    create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
->>>    create mode 100644 drivers/mmc/host/sdhci-st.c
->>>
->>
->> Thanks Peter.
->>
->> DT patches queued to git://git.stlinux.com/devel/kernel/linux-sti.git
->> sti-dt-for-v3.17-1
->
-> What about patch9 and 10? Did you take them as well?
->
-> You may add my ack for them, for whatever it's worth.
-
-Yes I will take them too.
-
-Regards,
-Maxime
-
->
-> Kind regards
-> Uffe
->
->>
->> Regards,
->> Maxime
+> 
+> Thanks,
+> Sasha
+> 
