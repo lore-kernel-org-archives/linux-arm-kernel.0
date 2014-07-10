@@ -1,68 +1,58 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Jul 2014 11:31:09 +0100
-Subject: [GIT PULL] ARM perf updates for 3.17
-Message-ID: <20140710103109.GI2449@arm.com>
+Date: Thu, 10 Jul 2014 11:33:47 +0100
+Subject: [GIT PULL] iommu/arm-smmu: updates for 3.17
+Message-ID: <20140710103347.GJ2449@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Joerg,
 
-Please can you pull the following perf updates for 3.17? You will get a
-trivial conflict with your MIDR rework, but SFR fixed that up correctly
-already in -next [1].
+Please can you pull the following ARM SMMU updates for 3.17?
 
 The main changes are:
 
-  - Callchain stability fixes from Jean Pihet
-  - Event mapping and PMU name rework from Mark Rutland
+ - Removal of unused SMMU chaining code
+ - Initial support for PCI masters
+ - Misc. non-critical fixes to the capability checking code and TCR
+   configuration
 
-The latter is preparatory work for enabling some code re-use with arm64
-in the future.
+This has largely come out of work enabling passthrough of PCI devices
+to a KVM virtual machine with VFIO, so I anticipate further patches in
+this area in the near future.
 
 Cheers,
 
 Will
 
-[1] https://lkml.org/lkml/2014/7/1/659
-
-Cc: Jean Pihet <jean.pihet@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Varun Sethi <Varun.Sethi@freescale.com>
+Cc: Mitchel Humpherys <mitchelh@codeaurora.org> 
 
 --->8
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/perf
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
 
-for you to fetch changes up to 4b2974fa6a4a32d390a50e23381a2270a2e0d444:
+for you to fetch changes up to 2907320df3189420cb66178a86b2917f4b64018f:
 
-  ARM: perf: disable the pagefault handler when reading from user space (2014-07-09 15:05:29 +0100)
+  iommu/arm-smmu: fix some checkpatch issues (2014-07-09 10:38:23 +0100)
 
 ----------------------------------------------------------------
-Jean Pihet (2):
-      ARM: perf: Check that current->mm is alive before getting user callchain
-      ARM: perf: disable the pagefault handler when reading from user space
+Mitchel Humpherys (1):
+      iommu/arm-smmu: fix some checkpatch issues
 
-Mark Rutland (8):
-      arm: perf: move event map macros to pmu.h
-      arm: perf: add macros for empty event mappings
-      arm: perf: armv7: condense event maps
-      arm: perf: armv6: condense event maps
-      arm: perf: xscale: condense event maps
-      arm: perf: clean up PMU names
-      arm: perf: add more specific platform device IDs
-      arm: perf: krait: stop using singleton PMU
+Will Deacon (6):
+      iommu/arm-smmu: fix calculation of TCR.T0SZ
+      iommu/arm-smmu: add support for PCI master devices
+      iommu/arm-smmu: caps: add IOMMU_CAP_INTR_REMAP capability
+      iommu/arm-smmu: remove support for chained SMMUs
+      iommu/arm-smmu: prefer stage-1 mappings where we have a choice
+      iommu/arm-smmu: fix capability checking prior to device attach
 
- arch/arm/include/asm/perf_event.h   |   9 -
- arch/arm/include/asm/pmu.h          |  19 +
- arch/arm/kernel/perf_event.c        |  13 +-
- arch/arm/kernel/perf_event_cpu.c    |  13 +-
- arch/arm/kernel/perf_event_v6.c     | 307 +++---------
- arch/arm/kernel/perf_event_v7.c     | 967 ++++++++----------------------------
- arch/arm/kernel/perf_event_xscale.c | 121 +----
- arch/arm/oprofile/common.c          |  14 +-
- 8 files changed, 360 insertions(+), 1103 deletions(-)
+ .../devicetree/bindings/iommu/arm,smmu.txt         |   6 -
+ drivers/iommu/arm-smmu.c                           | 493 ++++++++++-----------
+ 2 files changed, 240 insertions(+), 259 deletions(-)
