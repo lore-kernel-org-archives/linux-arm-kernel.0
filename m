@@ -1,75 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Jul 2014 23:13:38 +0100
-Subject: dove (marvell A510) crash on boot with config_preempt
-In-Reply-To: <53BEFDAB.4090606@gmail.com>
-References: <20140706080845.723e9787@armhf>
- <20140708151705.GE13433@titan.lakedaemon.net> <53BE8817.10703@gmail.com>
- <53BEFDAB.4090606@gmail.com>
-Message-ID: <20140710221338.GY21766@n2100.arm.linux.org.uk>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Thu, 10 Jul 2014 15:32:16 -0700
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140709105441.GE9485@arm.com>
+References: <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
+ <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
+ <20140624181150.GB4067@arm.com> <53A9EF3A.2070704@codeaurora.org>
+ <20140625091858.GG6153@arm.com> <53ADEEDF.7060902@codeaurora.org>
+ <20140630095220.GA25779@arm.com> <53BC95DA.1010500@codeaurora.org>
+ <20140709105441.GE9485@arm.com>
+Message-ID: <53BF1470.1000704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 10:55:07PM +0200, Sebastian Hesselbarth wrote:
-> On 07/10/2014 02:33 PM, Sebastian Hesselbarth wrote:
-> > Ok, I have been able to debug this despite my limited knowledge of
-> > iWMMXt and ARM asm. While the patch below fixes the issue, I have
-> > no clue if it is the right approach or if there should be a different
-> > solution. I'd like to leave that to either Russell or Catalin to decide.
+On 7/9/2014 3:54 AM, Will Deacon wrote:
+> On Wed, Jul 09, 2014 at 02:07:38AM +0100, Olav Haugan wrote:
+>> On 6/30/2014 2:52 AM, Will Deacon wrote:
+>>> On Fri, Jun 27, 2014 at 11:23:27PM +0100, Olav Haugan wrote:
+>>>> Lets say I have an IOMMU with 2 masters and 2 SMRn slots with the
+>>>> following stream IDs coming from the masters:
+>>>>
+>>>> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+>>>> Master 2: 0x30
+>>>>
+>>>> To make this work I would program SMR[0] with StreamID 0x20 and mask 0xF
+>>>> to ignore lower 4 bits. SMR[1] would just be StreamID 0x30 with mask 0x0.
+>>>>
+>>>> However, I could also have an IOMMU with 2 masters and 9 SMRn slots with
+>>>> the following stream IDs:
+>>>>
+>>>> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+>>>> Master 2: 0x29
+>>>>
+>>>> Here I would program all SMRn and leave the mask to be 0 for all SMRn's.
+>>>> So how do I detect when to apply a mask or not?
+>>>
+>>> You would aim to use the smallest number of SMRs per master possible.
+>>> You could probably use:
+>>>
+>>>   Master 1: SMR[0].id == 0x20, SMR[0].mask = 0x07
+>>>             SMR[1].id == 0x28, SMR[1].mask = 0x00
+>>>
+>>>   Master 2: SMR[2].id == 0x29, SMR[2].mask = 0x00
+>>
+>> So how does an algorithm figure this out in both my examples? The
+>> algorithm would have to know about both (all) bus masters and their
+>> stream IDs for a specific SMMU. If the algorithm operates on the set of
+>> stream IDs for one bus master at a time the algorithm has no way of
+>> knowing which bits can be ignored since it doesn't know the value of the
+>> other stream IDs for the other bus masters and thus could potentially
+>> create a mask that could cause a stream ID to match in two different
+>> entries.
 > 
-> After thinking a while about it and because I missed it to mention:
-> 
-> I did a bisect which ends in
-> 
-> commit 1fb333489fb917c704ad43e51b45c12f52215a9c
->  ("Merge branches 'alignment', 'fixes', 'l2c' (early part) and 'misc'
-> into for-next")
-> 
-> which clearly isn't the offending commit itself but finally causing
-> iwmmxt code to show the issue.
-> 
-> I compared introduced {inc,dec}_preempt_count macros
-> 
-> .macro  inc_preempt_count, ti, tmp
-> ldr     \tmp, [\ti, #TI_PREEMPT]        @ get preempt count
-> add     \tmp, \tmp, #1                  @ increment it
-> str     \tmp, [\ti, #TI_PREEMPT]
-> .endm
-> 
-> .macro  dec_preempt_count, ti, tmp
-> ldr     \tmp, [\ti, #TI_PREEMPT]        @ get preempt count
-> sub     \tmp, \tmp, #1                  @ decrement it
-> str     \tmp, [\ti, #TI_PREEMPT]
-> .endm
-> 
-> with common C defines for preempt_{disable,enable}
-> 
-> #define preempt_disable() \
-> do { \
->         preempt_count_inc(); \
->         barrier(); \
-> } while (0)
-> 
-> #define preempt_enable() \
-> do { \
->         barrier(); \
->         preempt_count_dec(); \
-> } while (0)
-> 
-> and wondered about the missing barriers.
+> Complete knowledge of the system topology (i.e. all bus masters) is a
+> requirement for being able to configure the SMMU correctly if you want to
+> guarantee that you don't have SMR aliasing issues.
 
-The barriers there are just compiler barriers - they're there to
-prevent the compiler moving stores across the change in preempt
-count.  The assembly is safe because we're in control of when and
-how we insert the explicit data accesses.
+So you agree that an algorithm needs to know about all the bus
+masters/stream IDs for a specific IOMMU before it can figure out the
+StreamID masks and how many SMRs can be allocated to a specific bus
+master? Andreas's algorithm does not know about the other bus
+masters/stream IDs. It operates on one bus master at a time.
 
-> Anyway, I may be wrong about it. At least I wanted to mention that
-> bisect ends in above merge commit of l2c related cleanup and not
-> the iwmmxt preempt commit itself.
+>>>> I am not familiar with Andreas's proposal. Do you have a link?
+>>>
+>>>   http://marc.info/?l=linux-arm-kernel&m=139110598005846&w=2
+>>
+>> Unless I am mistaken the algorithm works on one bus master at a time. I
+>> don't think that will work.
+> 
+> IIRC, it works for densely packed SIDs on the master, so it tries to build
+> up power-of-2 sized groups for that master then mops up the rest with
+> individual entries.
 
-The iwmmxt preempt commit is definitely incorrect, and your analysis of
-the dump based on Jean-Francois's report is spot on, and your solution
-looks pretty much like a good solution.
+I ran the algorithm through a few trivial cases:
+
+1)
+Stream IDs: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+Number of SMRs: 9
+
+In this case the algorithm decided to set mask to 0 for all entries
+using up 8 of the SMRs.
+
+2) Same Stream IDs but only 2 SMRs.
+The algorithm gave an error saying I did not have enough SMRs.
+
+Thanks,
+
+Olav
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
