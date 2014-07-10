@@ -1,67 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 10:50:23 +0200
-Subject: [PATCH] ARM: ux500: remove pointless cache setup complexity
-Message-ID: <1404982223-8618-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 10 Jul 2014 10:57:16 +0200
+Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
+In-Reply-To: <3adb614c-38ae-4b0c-9e50-99f071bbf4c5@BL2FFO11FD038.protection.gbl>
+References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
+ <5cc8b89b-20ff-4fa9-92dd-bb2f6d3512d8@BY2FFO11FD030.protection.gbl>
+ <CACRpkdb1M3-hrSKLKWz21LCJ1sMvsq5E-aqkpmVhy0NwOS5HhA@mail.gmail.com>
+ <d1af864d-bf78-48bb-a545-8de3f9def75f@BL2FFO11FD037.protection.gbl>
+ <CACRpkdYSU6NdFuab6rJS7eADSqORNDBzbFfJ65nFoJj3EZVd-g@mail.gmail.com>
+ <3adb614c-38ae-4b0c-9e50-99f071bbf4c5@BL2FFO11FD038.protection.gbl>
+Message-ID: <CACRpkdZb1jDh2_bAvjj5SPsG3k4Sr8nTEjiVR29dNx9rS5a0_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This cleans out non-DT cache setup (the ux500 is DT only), and
-sinks the l2cc base into the unlock function.
+On Tue, Jul 8, 2014 at 5:55 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cache-l2x0.c | 18 ++++--------------
- 1 file changed, 4 insertions(+), 14 deletions(-)
+> I fully agree and you don't have to convince me. But to a lot of our
+> customers that are used to use FPGAs, SOCs and Linux are pretty new. You
+> see a lot of scary stuff. Accessing /dev/mem seems to be a lot of
+> people's big hammer solution for everything. Then I always perceive it
+> as great progress if things like the sysfs interface are used instead.
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 842ebedbdd1c..e97ee556f92f 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -7,17 +7,15 @@
- #include <linux/io.h>
- #include <linux/of.h>
- 
--#include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
- 
- #include "db8500-regs.h"
- #include "id.h"
- 
--static void __iomem *l2x0_base;
--
- static int __init ux500_l2x0_unlock(void)
- {
- 	int i;
-+	void __iomem *l2x0_base = __io_address(U8500_L2CC_BASE);
- 
- 	/*
- 	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-@@ -45,23 +43,15 @@ static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
- 
- static int __init ux500_l2x0_init(void)
- {
--	if (cpu_is_u8500_family() || cpu_is_ux540_family())
--		l2x0_base = __io_address(U8500_L2CC_BASE);
--	else
--		/* Non-Ux500 platform */
-+	/* Multiplatform guard */
-+	if (!((cpu_is_u8500_family() || cpu_is_ux540_family())))
- 		return -ENODEV;
- 
- 	/* Unlock before init */
- 	ux500_l2x0_unlock();
--
- 	outer_cache.write_sec = ux500_l2c310_write_sec;
--
--	if (of_have_populated_dt())
--		l2x0_of_init(0, ~0);
--	else
--		l2x0_init(l2x0_base, 0, ~0);
-+	l2x0_of_init(0, ~0);
- 
- 	return 0;
- }
--
- early_initcall(ux500_l2x0_init);
--- 
-1.9.3
+Well as upstream maintainer I really don't differentiate on the level
+of badness of different bad solutions, none of them are really helpful
+to the community, only to some specific user, so they get to carry the
+quirks...
+
+Yours,
+Linus Walleij
