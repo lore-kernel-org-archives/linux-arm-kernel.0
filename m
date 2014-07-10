@@ -1,120 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 10 Jul 2014 12:15:28 +0200
-Subject: [GIT PULL 1/3] ARM: tegra: rework PCIe regulators
-In-Reply-To: <CAOesGMjwE=xThuUwmBF02YaQ32_uFogryW5anNoGc8yfkuN_Pg@mail.gmail.com>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <20140707003854.GD8469@quad.lixom.net>
- <20140707055211.GA15216@ulmo>
- <CAOesGMjwE=xThuUwmBF02YaQ32_uFogryW5anNoGc8yfkuN_Pg@mail.gmail.com>
-Message-ID: <20140710101527.GC21583@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Jul 2014 11:23:34 +0100
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140710094909.GA21583@ulmo>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140709134050.GN9485@arm.com> <20140709142125.GB3262@ulmo>
+ <20140709181048.GX9485@arm.com> <20140710094909.GA21583@ulmo>
+Message-ID: <20140710102334.GG2449@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 09:45:46PM -0700, Olof Johansson wrote:
-> On Sun, Jul 6, 2014 at 10:52 PM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> > On Sun, Jul 06, 2014 at 05:38:54PM -0700, Olof Johansson wrote:
-> >> On Mon, Jun 23, 2014 at 03:23:44PM -0600, Stephen Warren wrote:
-> >> > This branch reworks the set of regulators that the Tegra PCIe driver
-> >> > uses, so that the driver and DT bindings more correctly model what's
-> >> > really going on in HW.
-> >> >
-> >> > I've made this a separate branch in case it needs to be pulled into the
-> >> > PCIe tree to resolve any conflicts. Any branch that adds Tegra124
-> >> > support to the PCIe driver will need to be based on this branch, and
-> >> > such patches might show up for 3.17, and be taken through the ARM tree
-> >> > so we can manage our own dependencies.
-> >>
-> >> Isn't PCI broken if you boot with an older device tree now?
-> >
-> > Yes.
-> >
-> >> I would like to see this as two branches: One to the PCI driver, and one
-> >> modifying DT contents. The PCI driver should remain working for old DTs,
-> >> so the last couple of commits on this branch can't be there.
-> >
-> > This is one of my main gripes with device tree these days. We have many
-> > situations where device tree bindings got rushed with the result that
-> > many of them describe hardware in a *completely* wrong way.
-> >
-> > The Tegra PCIe binding was designed with an incomplete understanding of
-> > the hardware (I wonder how many other cases there are like this in
-> > mainline) and it just happens to work by accident on existing platforms.
-> >
-> > So this really boils down to one question: how do we fix bugs in device
-> > tree bindings?
-> >
-> > I suppose we could keep some sort of backwards-compatible shim inside
-> > the driver to cope with the existing, wrong device tree binding. However
-> > that means an additional maintenance burden and I'm not convinced that
-> > there's a need in this particular case.
+On Thu, Jul 10, 2014 at 10:49:10AM +0100, Thierry Reding wrote:
+> On Wed, Jul 09, 2014 at 07:10:48PM +0100, Will Deacon wrote:
+> > On Wed, Jul 09, 2014 at 03:21:27PM +0100, Thierry Reding wrote:
+> > > Anything beyond that (e.g. logical grouping of masters) isn't directly
+> > > within the scope of the binding (it doesn't describe hardware but some
+> > > policy pertaining to some specific use-case).
+> > 
+> > This *is* for hardware. I can use PCI as an example, but this could equally
+> > apply to other types of bus. If you have a bunch of PCI master devices
+> > sitting being a non-transparent bridge, they can end up sharing the same
+> > master device ID (requester ID). This means that there is no way in the
+> > IOMMU to initialise a translation for one of these devices without also
+> > affecting the others. We currently have iommu_groups to deal with this, but
+> > it *is* a property of the hardware and we absolutely need a way to describe
+> > it. I'm happy to add it later, but we need to think about it now to avoid
+> > merging something that can't easily be extended.
+> > 
+> > For PCI, the topology is probable but even then, we need this information to
+> > describe the resulting master device ID emitted by the bridge for the
+> > upstream group. One way to do this with your binding would be to treat all
+> > of the upstream masters as having the same device ID.
 > 
-> It's really unfortunate, and this is very likely not the last time
-> we're going to see something like this.
+> Yes, I think that makes most sense. After all from the IOMMU's point of
+> view requests from all devices behind the bridge will originate from the
+> same ID.
 > 
-> Backwards compatibility is only needed where there actually are users
-> of it. Are you absolutely 100% sure that there will not be such a
-> case?
+> So technically it's not really correct to encode the master ID within
+> each of the devices, but rather they should be inheriting the ID from
+> the non-transparent bridge.
 
-Of course not. Nobody can be absolutely sure about that.
+Indeed. Is that possible with your binding, or would we just duplicate the
+IDs between the masters?
 
-> Trimslice users?
-
-I think there are two categories here: people that use non-upstream
-kernels provided by Compulab (because you get all the hardware
-acceleration goodness) and those that use upstream kernels. Those that
-use the downstream kernels likely use bindings (if DT at all) that are
-not supported upstream. And everybody that uses upstream almost
-certainly uses an upstream U-Boot where it's trivial to update kernel
-and DTB in one go.
-
-And this brings me back to another complaint about DTB: we keep saying
-things are stable ABI based on the rationale that somebody may have
-shipped some DT version in a read-only ROM and therefore can't be
-replaced and thus can't be broken. Today more people are likely to have
-some version of a downstream DTB in their device that was never
-supported upstream. And by the above argument we're giving downstream
-users the finger because it's impossible to update to an upstream
-kernel. So there's a lot of hypocrisy in that whole argument.
-
-> Out-of-tree DTS:es that now need to be fixed up or they will break?
-
-Yes, any out-of-tree DTS'es would need to be updated or things will
-indeed break. There at least one case where an out-of-tree DTS was
-already updated updated during the process of getting the support
-upstream (Toradex).
-
-> This isn't the same thing as in-kernel interface changes where we say
-> "out of tree, out of mind".
-
-That's exactly the problem. When we started out with the DT conversion
-this was never mentioned. Maybe some people always took this for granted
-but certainly not all. Most of the device tree bindings back at the time
-were pulled out of a hat. Many were subsequently changed because they
-didn't work out as expected. Until the big discussions around ABI
-stability started.
-
-> If you have to stay compatible, then I suggest you try to fill in
-> local driver variables with derivatives of the old properties (and
-> directly from the newer properties where you can). I haven't looked at
-> the specifics here so I don't know how hard it might be.
+> > With virtualisation, we may want to assign a group of devices to a guest but
+> > without emulating the bridge. This would need something the device-tree to
+> > describe that they are grouped together.
 > 
-> If you are 100% sure that you don't have to stay compatible, then you
-> can remove the code handling the old bindings. Still, even then I am a
-> little worried about dependencies (and more importantly conflicts)
-> between these dtsi changes and others done by tegra platform code for
-> this release. I suppose that can be resolved by having this as a base
-> of any DT changes for tegra if needed.
+> But that's also a software decision, isn't it? Virtualization doesn't
+> have anything to do with the hardware description. Or am I missing
+> something? Of course I guess you could generate a DTB for the guest and
+> group device together, in which case you're pretty much free to do what
+> you want since you're essentially defining your own hardware.
 
-To be honest, I'm very much tempted to just drop this series. Even if
-that means keeping a totally broken DT binding. But frankly I don't have
-any energy left to debate DT stability.
+If you're doing device passthrough and you want to allow the guest to
+program the IOMMU, I think that virtualisation is directly related to the
+hardware description, since the guest will be bound by physical properties
+of the system.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/2b71ebf6/attachment.sig>
+Will
