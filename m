@@ -1,64 +1,89 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Jul 2014 18:11:13 +0200
-Subject: [PATCH] ASoC: samsung-i2s: Maintain CDCLK settings across
- i2s_{shutdown/startup}
-Message-ID: <1405008673-15994-1-git-send-email-s.nawrocki@samsung.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 10 Jul 2014 12:13:37 -0400
+Subject: [linux-sunxi] GSoC 2014 #0 status report - Improving Allwinner
+ SoC support
+In-Reply-To: <CAKON4Ozcz0A2Rbc=mEoZBvUgx0A-DMz1qKN8pf7U4UNNUd5K9A@mail.gmail.com>
+References: <53BE0B4F.1090001@elopez.com.ar>
+ <CAKON4OxPG7sYoJQSLu62ptzJPo9vBHxWBb+-+Z9nZ2EVBeJPww@mail.gmail.com>
+ <CAKON4Ozcz0A2Rbc=mEoZBvUgx0A-DMz1qKN8pf7U4UNNUd5K9A@mail.gmail.com>
+Message-ID: <CAKON4OyU1Qk4j_n4vNqjnKVTRuCxs3OFE6G0kjg+W6_+HUpq9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently configuration of the CDCLK pad is being overwritten in
-the i2s_shutdown() callback in order to gate the SoC output clock.
-However if an ASoC machine driver doesn't restore that clock
-settings each time after opening the sound device this results
-in the CDCLK pin being permanently configured into input mode.
-I.e. the output clock will always stay disabled.
-Fix that by saving the CDCLKCON bit state in i2s_shutdown() and
-and restoring it in the i2s_startup() callback.
+On Thu, Jul 10, 2014 at 8:38 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Thu, Jul 10, 2014 at 8:32 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>> On Wed, Jul 9, 2014 at 11:41 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>>> Hi everyone,
+>>>
+>>> As some of you may know, I'm currently participating in Google Summer of
+>>> Code under the Linux Foundation, working on a proposal titled "Improve
+>>> Allwinner SoCs support on mainline Linux". There is a great quantity of
+>>> devices out there that are powered by Allwinner processors, including but
+>>> not limited to the various Cubieboards, OLinuXinos, STBs, Tablets and ?Mini
+>>> PCs?. However, to date, support on mainline Linux is not yet feature
+>>> complete. My proposal on particular focuses on DMA and analog audio on the
+>>> earlier SoCs, and improved A23 support.
+>>>
+>>> The idea here is to make a weekly status report of the project. As we are
+>>> starting mid-program, this one will be a bit different and I'll outline what
+>>> has been worked on so far since the beginning.
+>>>
+>>> To date, I have been mainly working on the DMA driver for sun4i, sun5i and
+>>> sun7i. Despite having completely different drivers on SDK kernels, the
+>>> hardware block looks and behaves the same, so we are using a single driver
+>>> for these three SoC families. I have sent a series of patches[1] as well as
+>>> a follow-up v2[2], and I will keep iterating over it until it's accepted. I
+>>> have also sent two trivial patches[3][4] as a side-effect.
+>>>
+>>> The main challenges while writing this driver can be summarized as a lack of
+>>> documentation. First of all, it took me a bit to get to know DMAEngine. As
+>>> there is not much documentation on it, most of my learning took place by
+>>> reading pre-existing drivers and consulting with my mentor. Secondly, as the
+>>> Allwinner documentation is mostly a register list with bitfield details, I
+>>> also had to read the SDK drivers and do some trial and error testing to
+>>> discover magic values and understand others.
+>>>
+>>> Lately, I have also been working on the audio part, now that I have a
+>>> working DMA driver. After implementing cyclic DMA transfers and some clock
+>>> code, and armed with a Buildroot image with mpg123 and an OpenBSD release
+>>> track[5] in mp3 format, I've been trying to get some sound out of my
+>>> Cubietruck's headphone jack, but without much success so far. I have
+>>> verified my userspace stack and hardware by running these same binaries on
+>>> top of the linux-sunxi 3.4 kernel, and it worked fine. I have since then
+>>> been dumping relevant registers with devmem and comparing them, resolving
+>>> issues as I see them - hopefully this will yield some audible results.
+>>>
 
-Signed-off-by: Chen Zhen <zhen1.chen@samsung.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- sound/soc/samsung/i2s.c |   13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Residue is not calculated correctly...  it is bytes left, not bytes transmitted.
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 2ac76fa..3cb3e95 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -68,6 +68,8 @@ struct i2s_dai {
- #define DAI_OPENED	(1 << 0) /* Dai is opened */
- #define DAI_MANAGER	(1 << 1) /* Dai is the manager */
- 	unsigned mode;
-+	/* CDCLK pin direction: 0  - input, 1 - output */
-+	unsigned int cdclk_out:1;
- 	/* Driver for this DAI */
- 	struct snd_soc_dai_driver i2s_dai_drv;
- 	/* DMA parameters */
-@@ -737,6 +739,9 @@ static int i2s_startup(struct snd_pcm_substream *substream,
- 
- 	spin_unlock_irqrestore(&lock, flags);
- 
-+	if (!is_opened(other) && i2s->cdclk_out)
-+		i2s_set_sysclk(dai, SAMSUNG_I2S_CDCLK,
-+				0, SND_SOC_CLOCK_OUT);
- 	return 0;
- }
- 
-@@ -752,9 +757,13 @@ static void i2s_shutdown(struct snd_pcm_substream *substream,
- 	i2s->mode &= ~DAI_OPENED;
- 	i2s->mode &= ~DAI_MANAGER;
- 
--	if (is_opened(other))
-+	if (is_opened(other)) {
- 		other->mode |= DAI_MANAGER;
--
-+	} else {
-+		u32 mod = readl(i2s->addr + I2SMOD);
-+		i2s->cdclk_out = !(mod & MOD_CDCLKCON);
-+		other->cdclk_out = i2s->cdclk_out;
-+	}
- 	/* Reset any constraint on RFS and BFS */
- 	i2s->rfs = 0;
- 	i2s->bfs = 0;
+ * @residue: the remaining number of bytes left to transmit
+ * on the selected transfer for states DMA_IN_PROGRESS and
+ * DMA_PAUSED if this is implemented in the driver, else 0
+
+list_for_each_entry(promise, &contract->demands, list) {
+bytes += promise->len;
+}
+
+/*
+* The hardware is configured to return the remaining byte
+* quantity. If possible, replace the first listed element's
+* full size with the actual remaining amount
+*/
+promise = list_first_entry_or_null(&contract->demands,
+  struct sun4i_dma_promise, list);
+if (promise && pchan) {
+bytes -= promise->len;
+if (pchan->is_dedicated)
+bytes += readl(pchan->base + DDMA_BYTE_COUNT_REG);
+else
+bytes += readl(pchan->base + NDMA_BYTE_COUNT_REG);
+}
+
+exit:
+
+dma_set_residue(state, bytes);
+
+
 -- 
-1.7.9.5
+Jon Smirl
+jonsmirl at gmail.com
