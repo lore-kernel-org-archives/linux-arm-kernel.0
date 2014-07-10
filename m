@@ -1,109 +1,118 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Jul 2014 13:38:24 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140710105737.GD21583@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140709134050.GN9485@arm.com> <20140709142125.GB3262@ulmo>
- <20140709181048.GX9485@arm.com> <20140710094909.GA21583@ulmo>
- <20140710102334.GG2449@arm.com> <20140710105737.GD21583@ulmo>
-Message-ID: <20140710123824.GN2449@arm.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 10 Jul 2014 08:38:55 -0400
+Subject: [linux-sunxi] GSoC 2014 #0 status report - Improving Allwinner
+ SoC support
+In-Reply-To: <CAKON4OxPG7sYoJQSLu62ptzJPo9vBHxWBb+-+Z9nZ2EVBeJPww@mail.gmail.com>
+References: <53BE0B4F.1090001@elopez.com.ar>
+ <CAKON4OxPG7sYoJQSLu62ptzJPo9vBHxWBb+-+Z9nZ2EVBeJPww@mail.gmail.com>
+Message-ID: <CAKON4Ozcz0A2Rbc=mEoZBvUgx0A-DMz1qKN8pf7U4UNNUd5K9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 11:57:38AM +0100, Thierry Reding wrote:
-> On Thu, Jul 10, 2014 at 11:23:34AM +0100, Will Deacon wrote:
-> > On Thu, Jul 10, 2014 at 10:49:10AM +0100, Thierry Reding wrote:
-> > > On Wed, Jul 09, 2014 at 07:10:48PM +0100, Will Deacon wrote:
-> > > > On Wed, Jul 09, 2014 at 03:21:27PM +0100, Thierry Reding wrote:
-> > > > > Anything beyond that (e.g. logical grouping of masters) isn't directly
-> > > > > within the scope of the binding (it doesn't describe hardware but some
-> > > > > policy pertaining to some specific use-case).
-> > > > 
-> > > > This *is* for hardware. I can use PCI as an example, but this could equally
-> > > > apply to other types of bus. If you have a bunch of PCI master devices
-> > > > sitting being a non-transparent bridge, they can end up sharing the same
-> > > > master device ID (requester ID). This means that there is no way in the
-> > > > IOMMU to initialise a translation for one of these devices without also
-> > > > affecting the others. We currently have iommu_groups to deal with this, but
-> > > > it *is* a property of the hardware and we absolutely need a way to describe
-> > > > it. I'm happy to add it later, but we need to think about it now to avoid
-> > > > merging something that can't easily be extended.
-> > > > 
-> > > > For PCI, the topology is probable but even then, we need this information to
-> > > > describe the resulting master device ID emitted by the bridge for the
-> > > > upstream group. One way to do this with your binding would be to treat all
-> > > > of the upstream masters as having the same device ID.
-> > > 
-> > > Yes, I think that makes most sense. After all from the IOMMU's point of
-> > > view requests from all devices behind the bridge will originate from the
-> > > same ID.
-> > > 
-> > > So technically it's not really correct to encode the master ID within
-> > > each of the devices, but rather they should be inheriting the ID from
-> > > the non-transparent bridge.
-> > 
-> > Indeed. Is that possible with your binding, or would we just duplicate the
-> > IDs between the masters?
-> 
-> No, the binding only describes direct relationships between the IOMMU
-> and masters. There's no way to translate them inbetween or inherit them.
+On Thu, Jul 10, 2014 at 8:32 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Wed, Jul 9, 2014 at 11:41 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>> Hi everyone,
+>>
+>> As some of you may know, I'm currently participating in Google Summer of
+>> Code under the Linux Foundation, working on a proposal titled "Improve
+>> Allwinner SoCs support on mainline Linux". There is a great quantity of
+>> devices out there that are powered by Allwinner processors, including but
+>> not limited to the various Cubieboards, OLinuXinos, STBs, Tablets and ?Mini
+>> PCs?. However, to date, support on mainline Linux is not yet feature
+>> complete. My proposal on particular focuses on DMA and analog audio on the
+>> earlier SoCs, and improved A23 support.
+>>
+>> The idea here is to make a weekly status report of the project. As we are
+>> starting mid-program, this one will be a bit different and I'll outline what
+>> has been worked on so far since the beginning.
+>>
+>> To date, I have been mainly working on the DMA driver for sun4i, sun5i and
+>> sun7i. Despite having completely different drivers on SDK kernels, the
+>> hardware block looks and behaves the same, so we are using a single driver
+>> for these three SoC families. I have sent a series of patches[1] as well as
+>> a follow-up v2[2], and I will keep iterating over it until it's accepted. I
+>> have also sent two trivial patches[3][4] as a side-effect.
+>>
+>> The main challenges while writing this driver can be summarized as a lack of
+>> documentation. First of all, it took me a bit to get to know DMAEngine. As
+>> there is not much documentation on it, most of my learning took place by
+>> reading pre-existing drivers and consulting with my mentor. Secondly, as the
+>> Allwinner documentation is mostly a register list with bitfield details, I
+>> also had to read the SDK drivers and do some trial and error testing to
+>> discover magic values and understand others.
+>>
+>> Lately, I have also been working on the audio part, now that I have a
+>> working DMA driver. After implementing cyclic DMA transfers and some clock
+>> code, and armed with a Buildroot image with mpg123 and an OpenBSD release
+>> track[5] in mp3 format, I've been trying to get some sound out of my
+>> Cubietruck's headphone jack, but without much success so far. I have
+>> verified my userspace stack and hardware by running these same binaries on
+>> top of the linux-sunxi 3.4 kernel, and it worked fine. I have since then
+>> been dumping relevant registers with devmem and comparing them, resolving
+>> issues as I see them - hopefully this will yield some audible results.
+>>
+>
+> Check out the last commit in this branch. It is based on your current
+> DMA branch.
+> https://github.com/jonsmirl/lpc31xx/tree/linus
+>
+> I am getting noise out of the codec but it is not the right noise.
+> Plus the cyclic transfer falls over when the buffer wraps. There is no
+> need to use the CONT bit on the Allwinner DMA hardware to implement
+> cyclic.
+>
+> The DMA interrupt routine should directly program in the next transfer
+> in the promise chain when the previous one completes. Doing it from
+> the tasklet opens a window where kernel task swap delays can cause DMA
+> underrun.
 
-[...]
 
-> ? That way some code could walk up the IOMMU tree to resolve this. Or
-> perhaps even easier:
-> 
-> 	iommu {
-> 		#iommu-cells = <1>;
-> 	};
-> 
-> 	bridge {
-> 		iommus = <&/iommu 42>;
-> 
-> 		device at 0 {
-> 			...
-> 		};
-> 
-> 		device at 1 {
-> 			...
-> 		};
-> 
-> 		...
-> 	};
+This commit is my WIP code.
+https://github.com/jonsmirl/lpc31xx/commit/dcbab1749af5fd82a65d72670a7a77f7ee734ba8
 
-Yes, I like that. Good thinking!
+Where is yours? I don't see it in your repo.
 
-> And we could enhance the binding by defining that the iommus node is
-> inherited by devices on a bus, which by what you're saying would be the
-> sensible thing to do anyway.
-> 
-> In the second example above, the presence of an iommus property in the
-> bridge would indicate that it's non-transparent regarding IOMMU
-> translation and therefore the master ID should be inherited. Devices
-> could still override by providing their own iommus property, though I'd
-> be a little surprised if there ever was hardware like that.
-> 
-> > > > With virtualisation, we may want to assign a group of devices to a guest but
-> > > > without emulating the bridge. This would need something the device-tree to
-> > > > describe that they are grouped together.
-> > > 
-> > > But that's also a software decision, isn't it? Virtualization doesn't
-> > > have anything to do with the hardware description. Or am I missing
-> > > something? Of course I guess you could generate a DTB for the guest and
-> > > group device together, in which case you're pretty much free to do what
-> > > you want since you're essentially defining your own hardware.
-> > 
-> > If you're doing device passthrough and you want to allow the guest to
-> > program the IOMMU, I think that virtualisation is directly related to the
-> > hardware description, since the guest will be bound by physical properties
-> > of the system.
-> 
-> Evidently you know much better what the requirements are here and what
-> will actually be required. I guess we'll need to have more discussions
-> along with examples of use-cases.
 
-It's still early days for getting this stuff up and running on ARM, so I
-agree that we'll have to come back to it a few times once we've got concrete
-examples and code.
+>
+>
+>
+>
+>> Interestingly enough, Allwinner themselves do not seem to be using cyclic
+>> DMA transfers on their driver[6]. I hope this is not a sign of a hardware
+>> bug that's not documented.
+>>
+>> To give some closure to this status report, I'd like to thank Maxime for his
+>> mentoring so far, Ezequiel for letting me pick his brain, and the Linux
+>> Foundation and Google for giving me this opportunity, as well as everyone on
+>> the kernel and sunxi communities who have come forward to review and test
+>> patches. You can expect a new report soon, in about a week's time or less.
+>>
+>> Emilio
+>>
+>> [1] http://www.spinics.net/lists/dmaengine/msg01148.html
+>> [2] http://www.spinics.net/lists/arm-kernel/msg344766.html
+>> [3] https://lkml.org/lkml/2014/5/11/166
+>> [4] https://lkml.org/lkml/2014/7/1/486
+>> [5] http://www.openbsd.org/lyrics.html, maybe I should consider using some
+>> other song for better luck
+>> [6]
+>> https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/sound/soc/sunxi/sunxi-codec.c#L1137
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups
+>> "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an
+>> email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+>
+>
+>
+> --
+> Jon Smirl
+> jonsmirl at gmail.com
 
-Will
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
