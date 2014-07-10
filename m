@@ -1,18 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Jul 2014 12:38:00 +0100
-Subject: [PATCHv4 0/4] arm64: simplify restrictions on bootloaders
-In-Reply-To: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
-References: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20140710113759.GC10749@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Jul 2014 12:40:09 +0100
+Subject: [PATCHv3] arm64: fpsimd: avoid restoring fpcr if the contents haven't
+ changed
+Message-ID: <1404992409-6968-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 04:51:33PM +0100, Mark Rutland wrote:
-> This is the fourth (and hopefully final) version of the boot simplification
-> series I've posted previously [1,4,5]. Many thanks to those who reviewed and/or
-> tested the prior postings.
+Writing to the FPCR is commonly implemented as a self-synchronising
+operation in the CPU, so avoid writing to the register when the saved
+value matches that in the hardware already.
 
-Applied for 3.17. Thanks.
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/fpsimdmacros.h | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index 768414d55e64..007618b8188c 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -40,6 +40,19 @@
+ 	str	w\tmpnr, [\state, #16 * 2 + 4]
+ .endm
+ 
++.macro fpsimd_restore_fpcr state, tmp
++	/*
++	 * Writes to fpcr may be self-synchronising, so avoid restoring
++	 * the register if it hasn't changed.
++	 */
++	mrs	\tmp, fpcr
++	cmp	\tmp, \state
++	b.eq	9999f
++	msr	fpcr, \state
++9999:
++.endm
++
++/* Clobbers \state */
+ .macro fpsimd_restore state, tmpnr
+ 	ldp	q0, q1, [\state, #16 * 0]
+ 	ldp	q2, q3, [\state, #16 * 2]
+@@ -60,7 +73,7 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2]
+ 	msr	fpsr, x\tmpnr
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+-	msr	fpcr, x\tmpnr
++	fpsimd_restore_fpcr x\tmpnr, \state
+ .endm
+ 
+ .altmacro
+@@ -84,7 +97,7 @@
+ .macro fpsimd_restore_partial state, tmpnr1, tmpnr2
+ 	ldp	w\tmpnr1, w\tmpnr2, [\state]
+ 	msr	fpsr, x\tmpnr1
+-	msr	fpcr, x\tmpnr2
++	fpsimd_restore_fpcr x\tmpnr2, x\tmpnr1
+ 	adr	x\tmpnr1, 0f
+ 	ldr	w\tmpnr2, [\state, #8]
+ 	add	\state, \state, x\tmpnr2, lsl #4
 -- 
-Catalin
+2.0.0
