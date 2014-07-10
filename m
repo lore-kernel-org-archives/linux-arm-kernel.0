@@ -1,100 +1,164 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 10 Jul 2014 10:46:21 -0700
-Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
- connected to sama5d3xek boards
-In-Reply-To: <20140710191927.56a3ead5@bbrezillon>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
- <53AC7BFD.2070806@free-electrons.com> <53AD22D8.2090301@atmel.com>
- <20140710110720.03f437eb@bbrezillon>
- <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
- <20140710191927.56a3ead5@bbrezillon>
-Message-ID: <CAGVrzcawPiJgQF-=18ZvFGr3LhZgS1ZSZMYA3i5x874S6=jcXw@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 10 Jul 2014 19:01:08 +0100
+Subject: [PATCH RFA] drm: add of_graph endpoint helper to find possible CRTCs
+Message-ID: <E1X5Iea-0007A2-Rd@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-10 10:19 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
-> On Thu, 10 Jul 2014 08:35:15 -0700
-> Florian Fainelli <f.fainelli@gmail.com> wrote:
->
->> 2014-07-10 2:07 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
->> > On Fri, 27 Jun 2014 09:52:56 +0200
->> > Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> >
->> >> On 26/06/2014 22:01, Boris BREZILLON :
->> >> > Hi Florian,
->> >> >
->> >> > On 26/06/2014 20:15, Florian Fainelli wrote:
->> >> >> Hi Boris,
->> >> >>
->> >> >> 2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
->> >> >>> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
->> >> >>>
->> >> >>> The PHY address is not specified here because atmel have 2 different
->> >> >>> designs
->> >> >>> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
->> >> >>> (Embest design) and the other one is connection PHYAD0 to a pull up
->> >> >>> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
->> >> >>> As a result, Ronetix design will have its PHY available at address 0x1 and
->> >> >>> Embest design at 0x7.
->> >> >>> Let the net PHY core automatically detect the PHY address by scanning the
->> >> >>> MDIO bus.
->> >> >> I though the compatible string was listed as a required property, but
->> >> >> it is not. The 'reg' property however is listed as required, although
->> >> >> the of_miodbus_register() works just fine without it, although that is
->> >> >> a Linux-specific implementation detail.
->> >> >
->> >> > Indeed, it's listed in the required property list of the DT binding doc,
->> >> > but the code implement auto detection if reg is missing.
->> >> > However this line [1] clearly shows that specifying the reg property is
->> >> > the preferred way of doing things.
->> >> >
->> >> > I could define 2 different sama5d3xcm.dtsi (sama5d3xcm-ronetix.dtsi and
->> >> > sama5d3xcm-embest.dtsi) to avoid this dirty hack,
->> >> > but then we would have 2 more dtb and the user would have to determine
->> >> > which CPU module he owns to choose the appropriate dtb.
->> >> > If at91, arm-soc and DT maintainers agree with this approach I can
->> >> > definitely propose something.
->> >>
->> >> Yes Boris, I definitively prefer not to add another .dtsi file for this
->> >> series if we can avoid it.
->> >>
->> >
->> > Okay, now that I don't specify the reg property I have a bunch of
->> > noisy logs (which is exactly what the developer of of_mdio.c wanted in
->> > order to force people to specify the reg property).
->> >
->> > It seems to be a problem for atmel users (all these logs make them
->> > think there is something wrong with the net device).
->> >
->> > Apart from the dts/dtsi split solution, which Nicolas wants to avoid, I
->> > see two solutions here:
->> >
->> > 1) remove the logs (or use dev_dbg instead of dev_info) from of_mdio.c.
->> > But I'm pretty sure this solution won't be accepted :-).
->>
->> I am fine with using dev_dbg() instead of dev_info() for that sort of
->> messages, provided that you state the rationale of this change
->> (spewing the log console with probing messages) and specify tha the
->> 'reg' property is optional.
->>
->> >
->> > 2) define 2 ethernet phys (one for each possible solution). I tested it
->> > and it works fine (only the available PHY is registered and there is no
->> > noisy logs anymore).
->>
->> One advantage of that solution is that you'll get slightly faster boot
->> times since you won't have to auto-probe for the PHYs on the MDIO bus,
->> the time savings get bigger as you start using higher PHY addresses.
->
-> Yes I prefer this solution too, but is it acceptable to define 2 phy
-> nodes even if only one is really available ?
+Add a helper to allow encoders to find their possible CRTCs from the
+OF graph without having to re-implement this functionality.  We add a
+device_node to drm_crtc which corresponds with the port node in the
+DT description of the CRTC device.
 
-One or the other machine .dts should have to set the status property
-accordingly so there is only effectively one PHY declared, assuming
-this is possible based on your .dtsi layout? If not, provided by the
-phy-handle properties are correct, I can't see any problem with having
-an unused PHY specified in DT.
---
-Florian
+We can then scan the DRM device list for CRTCs to find their index,
+matching the appropriate CRTC using the port device_node, thus building
+up the possible CRTC mask.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+
+RFA = request for acks
+
+- Updated commentry in the drm_of_find_possible_crtcs() comment block to
+point at the description of the of_graph bindings.
+- Not updated for drm kerneldoc as I'm unable to build the documentation.
+
+ drivers/gpu/drm/Makefile |  1 +
+ drivers/gpu/drm/drm_of.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_crtc.h   |  2 ++
+ include/drm/drm_of.h     | 18 +++++++++++++
+ 4 files changed, 88 insertions(+)
+ create mode 100644 drivers/gpu/drm/drm_of.c
+ create mode 100644 include/drm/drm_of.h
+
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index dd2ba4269740..533d011eab3e 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+ drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+ drm-$(CONFIG_PCI) += ati_pcigart.o
+ drm-$(CONFIG_DRM_PANEL) += drm_panel.o
++drm-$(CONFIG_OF) += drm_of.o
+ 
+ drm-usb-y   := drm_usb.o
+ 
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+new file mode 100644
+index 000000000000..16150a00c237
+--- /dev/null
++++ b/drivers/gpu/drm/drm_of.c
+@@ -0,0 +1,67 @@
++#include <linux/export.h>
++#include <linux/list.h>
++#include <linux/of_graph.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_of.h>
++
++/**
++ * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
++ * @dev: DRM device
++ * @port: port OF node
++ *
++ * Given a port OF node, return the possible mask of the corresponding
++ * CRTC within a device's list of CRTCs.  Returns zero if not found.
++ */
++static uint32_t drm_crtc_port_mask(struct drm_device *dev,
++				   struct device_node *port)
++{
++	unsigned int index = 0;
++	struct drm_crtc *tmp;
++
++	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
++		if (tmp->port == port)
++			return 1 << index;
++
++		index++;
++	}
++
++	return 0;
++}
++
++/**
++ * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
++ * @dev: DRM device
++ * @port: encoder port to scan for endpoints
++ *
++ * Scan all endpoints attached to a port, locate their attached CRTCs,
++ * and generate the DRM mask of CRTCs which may be attached to this
++ * encoder.
++ *
++ * See Documentation/devicetree/bindings/graph.txt for the bindings.
++ */
++uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
++				    struct device_node *port)
++{
++	struct device_node *remote_port, *ep = NULL;
++	uint32_t possible_crtcs = 0;
++
++	do {
++		ep = of_graph_get_next_endpoint(port, ep);
++		if (!ep)
++			break;
++
++		remote_port = of_graph_get_remote_port(ep);
++		if (!remote_port) {
++			of_node_put(ep);
++			return 0;
++		}
++
++		possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
++
++		of_node_put(remote_port);
++	} while (1);
++
++	return possible_crtcs;
++}
++EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+index 251b75e6bf7a..6a94909f1ca9 100644
+--- a/include/drm/drm_crtc.h
++++ b/include/drm/drm_crtc.h
+@@ -41,6 +41,7 @@ struct drm_framebuffer;
+ struct drm_object_properties;
+ struct drm_file;
+ struct drm_clip_rect;
++struct device_node;
+ 
+ #define DRM_MODE_OBJECT_CRTC 0xcccccccc
+ #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
+@@ -314,6 +315,7 @@ struct drm_crtc_funcs {
+  */
+ struct drm_crtc {
+ 	struct drm_device *dev;
++	struct device_node *port;
+ 	struct list_head head;
+ 
+ 	/**
+diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+new file mode 100644
+index 000000000000..2441f7112074
+--- /dev/null
++++ b/include/drm/drm_of.h
+@@ -0,0 +1,18 @@
++#ifndef __DRM_OF_H__
++#define __DRM_OF_H__
++
++struct drm_device;
++struct device_node;
++
++#ifdef CONFIG_OF
++extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
++					   struct device_node *port);
++#else
++static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
++						  struct device_node *port)
++{
++	return 0;
++}
++#endif
++
++#endif /* __DRM_OF_H__ */
+-- 
+1.8.3.1
