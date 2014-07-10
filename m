@@ -1,46 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Jul 2014 12:38:55 +0200
-Subject: [PATCH 1/3] asm-generic/io.h: Implement generic {read,write}s*()
-In-Reply-To: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
-References: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <201407101238.56081.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jul 2014 12:41:23 +0200
+Subject: [GIT PULL] Ux500 core changes for v3.17 take 1
+Message-ID: <CACRpkdY4FHgiJXZFyfdxSJAb3R03Kwk6oqVK5UvzX=AdQVnaAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014, Thierry Reding wrote:
-> 
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This patch implements generic versions of readsb(), readsw(), readsl(),
-> readsq(), writesb(), writesw(), writesl() and writesq(). Variants of
-> these string functions for I/O accesses (ins*() and outs*() as well as
-> ioread*_rep() and iowrite*_rep()) are now implemented in terms of the
-> new functions.
-> 
-> While at it, also make sure that any of the functions provided as
-> fallback for architectures that don't override them can't be overridden
-> subsequently.
-> 
-> This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
-> tested on Microblaze, s390, SPARC and Xtensa. For ARC, Blackfin, Metag,
-> OpenRISC, Score and Unicore32 which also use asm-generic/io.h I couldn't
-> find or build a cross-compiler that would run on my system. But by code
-> inspection they shouldn't break with this patch.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+Hi ARM SoC guys,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+these are some minor Ux500 cleanups that have been pending
+a while. Please pull this in for v3.17.
 
-Thanks for doing this!
+Yours,
+Linus Walleij
 
-Not sure how to best merge the series, but for the asm-generic patch,
-I'd suggest to keep it together with the follow-on patches in one
-branch and merge it either through Russell's arm32 tree or through
-Catalin's arm64 tree.
+The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
 
-The easiest way would probably be to take patches 1 and 3 for arm64 in
-3.17 and merge patch 2 in 3.18, unless Russell wants to see this earlier,
-in which case we could have a branch that is shared between arm32 and
-arm64.
+  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
 
-	Arnd
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-core-for-v3.17-1
+
+for you to fetch changes up to 823e7546c4a2bd4c8edce6d8dc8544fd79287c55:
+
+  ARM: ux500: remove pointless cache setup complexity (2014-07-10
+10:46:42 +0200)
+
+----------------------------------------------------------------
+Some minor cleanups to the Ux500 core. DT-only probe path and
+some constification from static code analysis.
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: ux500: remove pointless cache setup complexity
+
+Sachin Kamat (2):
+      ARM: ux500: Staticize local symbols in cpu-db8500.c
+      ARM: ux500: Staticize ab8505_regulators
+
+Thierry Reding (1):
+      ARM: ux500: Staticise ux500_soc_attr
+
+Tobias Klauser (1):
+      ARM: ux500: storage class should be before const qualifier
+
+ arch/arm/mach-ux500/board-mop500-regulators.c |  2 +-
+ arch/arm/mach-ux500/cache-l2x0.c              | 18 ++++--------------
+ arch/arm/mach-ux500/cpu-db8500.c              |  8 ++++----
+ arch/arm/mach-ux500/cpu.c                     |  2 +-
+ arch/arm/mach-ux500/timer.c                   |  2 +-
+ 5 files changed, 11 insertions(+), 21 deletions(-)
