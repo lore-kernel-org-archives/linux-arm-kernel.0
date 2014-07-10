@@ -1,64 +1,26 @@
-From: ezequiel.garcia@free-electrons.com ('Ezequiel Garcia')
-Date: Thu, 10 Jul 2014 14:07:16 -0300
-Subject: [PATCH v3 1/4] ethernet: Add new driver for Marvell Armada 375
- network unit
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D172700F9@AcuExch.aculab.com>
-References: <1404758751-2346-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1404758751-2346-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140707221823.GC16677@electric-eye.fr.zoreil.com>
- <20140710151904.GA5283@arch.cereza>
- <063D6719AE5E284EB5DD2968C1650D6D172700F9@AcuExch.aculab.com>
-Message-ID: <20140710170716.GA17727@arch.cereza>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Jul 2014 19:14:17 +0200
+Subject: [PATCH v4 2/7] irqchip: atmel-aic: move binding doc to
+ interrupt-controller directory
+In-Reply-To: <1405012462-766-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1405012462-766-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1405012462-766-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Jul 03:26 PM, David Laight wrote:
-> From: Ezequiel Garcia
-> ...
-> > > > +/* Compare tcam data bytes with a pattern */
-> > > > +static bool mvpp2_prs_tcam_data_cmp(struct mvpp2_prs_entry *pe,
-> > > > +				    unsigned int offs, unsigned int size,
-> > > > +					   unsigned char *bytes)
-> > > > +{
-> > > > +	unsigned char byte, mask;
-> > > > +	int i;
-> 
-> Hmm. should be 'unsigned int' for the comparison against 'size'.
-> 
+Move atmel aic driver doc to the interrupt-controller directory as the new
+driver now lays in drivers/irqchip/atmel-aic.c.
 
-Right. I've reworked this entirely, because it was barely readable,
-and now the size parameter is gone.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ .../bindings/{arm/atmel-aic.txt => interrupt-controller/atmel,aic.txt}    | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/atmel-aic.txt => interrupt-controller/atmel,aic.txt} (100%)
 
-> > > > +
-> > > > +	for (i = 0; i < size; i++) {
-> > > > +		mvpp2_prs_tcam_data_byte_get(pe, offs + i, &byte, &mask);
-> > > > +
-> > > > +		if (byte != bytes[i])
-> > > > +			return false;
-> > >
-> > > Please reduce the scope of "byte" and "mask".
-> > >
-> > 
-> > Agreed. This applies on several other places, I'll fix them all.
-> > 
-> > > > +	}
-> > > > +	return true;
-> 
-> Not sure about other people, but I prefer variables to be defined
-> at the top of a function so that I can find them.
-> Minimising the scope tends to make code harder to read.
-> 
-> If this was a big function, then reducing the scope of 'temporary'
-> variables need for a few lines (like the above loop) can make sense
-> because it reduces the clutter at the top of the function.
-> 
-
-Yeah, that makes sense. I'm fine either way; I'll be submitting v4 now
-addressing most of Francois' feedback. Feel free to complain if you think
-some function is not readable enough and can be improved.
-
-Thanks for taking a look,
+diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/atmel-aic.txt
+rename to Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.3.2
