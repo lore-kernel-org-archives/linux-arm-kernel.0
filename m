@@ -1,111 +1,88 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 10 Jul 2014 19:02:42 +0530
-Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
-In-Reply-To: <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
-References: <cover.1404976058.git.viresh.kumar@linaro.org>	<d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>	<53BE926A.2070005@ti.com>
- <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
-Message-ID: <53BE95FA.5080100@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 10 Jul 2014 22:33:55 +0900
+Subject: [PATCH v6 2/6] ARM: EXYNOS: Move cpufreq and cpuidle device
+ registration to init_machine
+In-Reply-To: <000801cf9a7f$3896e150$a9c4a3f0$@samsung.com>
+References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
+ <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
+ <53BB25B7.6000500@samsung.com> <000801cf9a7f$3896e150$a9c4a3f0$@samsung.com>
+Message-ID: <026701cf9c43$98b20860$ca161920$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Pankaj Dubey wrote:
+> 
+> Hi Kukjin,
+> 
+Hi,
 
+> >
+> > On 07/07/14 12:50, Pankaj Dubey wrote:
+> > > As exynos_cpuidle_init and exynos_cpufreq_init function have just one
+> > > lines of code for registering platform devices. We can move these
+> > > lines to exynos_dt_machine_init and delete exynos_cpuidle_init and
+> > > exynos_cpufreq_init function. This will help in reducing lines of code
+> > > in exynos.c, making it more cleaner.
+> > >
+> > > Suggested-by: Tomasz Figa<t.figa@samsung.com>
+> > > Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
+> > > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+> > > ---
+> > >   arch/arm/mach-exynos/exynos.c |   20 ++++----------------
+> > >   1 file changed, 4 insertions(+), 16 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-exynos/exynos.c
+> > > b/arch/arm/mach-exynos/exynos.c index ff60b4c..47170eb 100644
+> > > --- a/arch/arm/mach-exynos/exynos.c
+> > > +++ b/arch/arm/mach-exynos/exynos.c
+> > > @@ -171,19 +171,6 @@ static struct platform_device exynos_cpuidle = {
+> > >   	.id                = -1,
+> > >   };
+> > >
+> > > -void __init exynos_cpuidle_init(void) -{
+> > > -	if (soc_is_exynos5440())
+> > > -		return;
+> > > -
+> > > -	platform_device_register(&exynos_cpuidle);
+> > > -}
+> > > -
+> > > -void __init exynos_cpufreq_init(void) -{
+> > > -	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> > > -}
+> > > -
+> > >   void __iomem *sysram_base_addr;
+> > >   void __iomem *sysram_ns_base_addr;
+> > >
+> > > @@ -300,10 +287,11 @@ static void __init exynos_dt_machine_init(void)
+> > >   	if (!IS_ENABLED(CONFIG_SMP))
+> > >   		exynos_sysram_init();
+> > >
+> > > -	if (!of_machine_is_compatible("samsung,exynos5420"))
+> > > -		exynos_cpuidle_init();
+> > > +	if (!of_machine_is_compatible("samsung,exynos5420") ||
+> > > +			!of_machine_is_compatible("samsung,exynos5440"))
+> > > +		platform_device_register(&exynos_cpuidle);
+> > >
+> > > -	exynos_cpufreq_init();
+> > > +	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> > >
+> > >   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > >   }
+> >
+> > This cannot be applied in my tree now....
+> >
+> 
+> May I know what the issue is? As I am able to rebase this patch on today's
+> kgene/for-next
+> and could not see any merge conflict.
+> If you think I need to respin this patch please let me know.
+> 
 
-On Thursday 10 July 2014 07:00 PM, Viresh Kumar wrote:
-> On 10 July 2014 18:47, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> On Thursday 10 July 2014 12:56 PM, Viresh Kumar wrote:
->>> From: Pratyush Anand <pratyush.anand@st.com>
->>>
->>> ARM based ST Microelectronics's SPEAr1310/40 platforms uses ST's phy (known as
->>> 'miphy') for PCIe and SATA. This patch adds drivers for these miphys.
->>>
->>> This also adds proper bindings for miphys.
->>>
->>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
->>> Tested-by: Mohit Kumar <mohit.kumar@st.com>
->>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->>> [viresh: fixed logs/cclist/checkpatch warnings, broken into smaller patches]
->>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->>> ---
->>>  .../devicetree/bindings/phy/st-spear1310-miphy.txt |  12 +
->>>  .../devicetree/bindings/phy/st-spear1340-miphy.txt |  11 +
->>>  drivers/phy/Kconfig                                |  12 +
->>>  drivers/phy/Makefile                               |   2 +
->>>  drivers/phy/phy-spear1310-miphy.c                  | 274 +++++++++++++++++++
->>>  drivers/phy/phy-spear1340-miphy.c                  | 302 +++++++++++++++++++++
->>
->> Please send separate patche for each driver.
-> 
-> These were both around SPEAr and were on the same lines.
-> So sending these in a single patch shouldn't be a big issue I believe.
-> 
-> In case another version is required, I may do it.
-> 
->>> diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
->>> new file mode 100644
->>> index 0000000..b9b281a
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
->>
->> We generally create a single document for a SoC vendor. So just use st-phy.txt.
-> 
-> Probably yes.
-> 
->> <snip>
-> 
-> Please keep line containing file names while removing stuff, makes it easy
-> to locate code.
+Pankaj, I found this is based on cpuidle related branch in my tree, BTW this
+has a dependency with following so please respin your patch once I take the
+patch in my tree maybe tonight.
 
-ah.. apologies..
-> 
->>> +
->>> +static int spear1340_miphy_sata_init(struct spear1340_miphy_priv *priv)
->>> +{
->>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
->>> +                        SPEAR1340_PCIE_SATA_CFG_MASK,
->>> +                        SPEAR1340_SATA_CFG_VAL);
->>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
->>> +                        SPEAR1340_PCIE_MIPHY_CFG_MASK,
->>> +                        SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
->>> +     /* Switch on sata power domain */
->>> +     regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
->>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN,
->>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN);
->>> +     msleep(20);
->>> +     /* Disable PCIE SATA Controller reset */
->>> +     regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
->>> +                        SPEAR1340_PERIP1_SW_RSATA, 0);
->>> +     msleep(20);
->>
->> Please add a comment for all delays added.
-> 
-> @Pratyush/Mohit: please let me know what to add here.
-> 
->>> +#ifdef CONFIG_PM_SLEEP
->>> +static int spear1340_miphy_suspend(struct device *dev)
->>> +{
->>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
->>> +     int ret = 0;
->>> +
->>> +     if (priv->mode == SATA)
->>> +             ret = spear1340_miphy_sata_exit(priv);
->>
->> Shouldn't this be spear1340_miphy_init()?
->>> +
->>> +     return ret;
->>> +}
->>> +
->>> +static int spear1340_miphy_resume(struct device *dev)
->>> +{
->>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
->>> +     int ret = 0;
->>> +
->>> +     if (priv->mode == SATA)
->>> +             ret = spear1340_miphy_sata_init(priv);
->>
->> And here spear1340_miphy_exit()? Why only for sata phys?
-> 
-> @Mohit/Pratyush ??
-> 
-> Thanks Kishon for another round of review :)
-> 
+https://lkml.org/lkml/2014/6/24/286
+
+Thanks,
+Kukjin
