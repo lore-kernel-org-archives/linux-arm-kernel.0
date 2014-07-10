@@ -1,87 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 10 Jul 2014 12:37:57 +0200
-Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
-In-Reply-To: <53BDD84E.4090206@renesas.com>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1400150451-13469-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <53BDD84E.4090206@renesas.com>
-Message-ID: <1474559.zFUJiypt1j@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Jul 2014 12:38:55 +0200
+Subject: [PATCH 1/3] asm-generic/io.h: Implement generic {read,write}s*()
+In-Reply-To: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
+References: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <201407101238.56081.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 July 2014 09:03:26 Khiem Nguyen wrote:
-> On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
-> > Cache the micro-TLB number in archdata allocated in the .add_device
-> > handler instead of looking it up when the deviced is attached and
-> > detached. This simplifies the .attach_dev and .detach_dev operations and
-> > prepares for DT support.
+On Wednesday 09 July 2014, Thierry Reding wrote:
 > 
-> [snip]
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
+> This patch implements generic versions of readsb(), readsw(), readsl(),
+> readsq(), writesb(), writesw(), writesl() and writesq(). Variants of
+> these string functions for I/O accesses (ins*() and outs*() as well as
+> ioread*_rep() and iowrite*_rep()) are now implemented in terms of the
+> new functions.
 > 
-> [snip]
+> While at it, also make sure that any of the functions provided as
+> fallback for architectures that don't override them can't be overridden
+> subsequently.
 > 
-> > +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device
-> > *dev)
-> > +{
-> > +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
-> > +	const char *devname = dev_name(dev);
-> > +	unsigned int i;
-> > +
-> > +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
-> > +		if (strcmp(master->name, devname) == 0)
-> > +			return master->utlb;
-> > +	}
-> > +
-> > +	return -1;
-> > +}
+> This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+> tested on Microblaze, s390, SPARC and Xtensa. For ARC, Blackfin, Metag,
+> OpenRISC, Score and Unicore32 which also use asm-generic/io.h I couldn't
+> find or build a cross-compiler that would run on my system. But by code
+> inspection they shouldn't break with this patch.
 > 
-> [snip]
-> 
-> >  static int ipmmu_add_device(struct device *dev)
-> 
-> [snip]
-> 
-> >  	list_for_each_entry(mmu, &ipmmu_devices, list) {
-> > -		master = ipmmu_find_master(mmu, dev);
-> > -		if (master) {
-> > +		utlb = ipmmu_find_utlb(mmu, dev);
-> > +		if (utlb >= 0) {
-> >  			/*
-> > -			 * TODO Take a reference to the master to protect
-> > +			 * TODO Take a reference to the MMU to protect
-> >  			 * against device removal.
-> >  			 */
-> >  			break;
-> 
-> [snip]
-> 
-> > +	archdata->mmu = mmu;
-> > +	archdata->utlb = utlb;
-> 
-> [snip]
-> 
-> I have one question for ipmmu_add_device().
-> 
-> In my understanding, your code will find utlb for device
-> base on device name.
-> For any device, it will /only/ return utlb number of first match.
-> 
-> How about the case that a device name connected with more than 1 utlb ?
-> e.g DU device (rcar-du-r8a7790) in Lager
-> 
-> Was that case already covered in your code ?
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-For the DU case, the R8A7790 contains two DU devices, each connected to a 
-single utlb. The IPMMU driver will thus work fine in that case.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I agree that this is a problem in general though, other devices (such as the 
-DMAC) are connected to more than one utlb. This is currently not supported by 
-the driver.
+Thanks for doing this!
 
--- 
-Regards,
+Not sure how to best merge the series, but for the asm-generic patch,
+I'd suggest to keep it together with the follow-on patches in one
+branch and merge it either through Russell's arm32 tree or through
+Catalin's arm64 tree.
 
-Laurent Pinchart
+The easiest way would probably be to take patches 1 and 3 for arm64 in
+3.17 and merge patch 2 in 3.18, unless Russell wants to see this earlier,
+in which case we could have a branch that is shared between arm32 and
+arm64.
+
+	Arnd
