@@ -1,71 +1,87 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 10 Jul 2014 06:33:50 +0200
-Subject: [RESEND PATCH v4 2/2] arm64: Add seccomp support
-In-Reply-To: <20140709111239.GH9485@arm.com>
-References: <1404459115-8292-1-git-send-email-takahiro.akashi@linaro.org>
- <1404459115-8292-3-git-send-email-takahiro.akashi@linaro.org>
- <20140709111239.GH9485@arm.com>
-Message-ID: <53BE17AE.7080301@linaro.org>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Thu, 10 Jul 2014 10:05:02 +0530
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <CAD=FV=XjWu6RQ+9789fzg08Whq-d=XWoeT+dZ7YQLLJvCBUfwQ@mail.gmail.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+ <CACRpkdZrDJ3xoUYGynf0sO4-U7ZVkJ=Mr_pNVSdar8oM85aVgA@mail.gmail.com>
+ <CAD=FV=WQWBkq5JKttikLkyKEDX-YydQJLr9=bFWifpy2Lf0mSg@mail.gmail.com>
+ <53BC1A63.80900@samsung.com>
+ <CAD=FV=XjWu6RQ+9789fzg08Whq-d=XWoeT+dZ7YQLLJvCBUfwQ@mail.gmail.com>
+Message-ID: <CAGm_ybjRR_EpxPFOWVSG7D0HTE7PC4wPG_Rd1Xty8x_oAi+Biw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Doug,
 
- >  (1) Updating syscallno based on w8, but this ties us to the current ABI
- >      and could get messy if this register changes in the future.
-
-So, is this the conclusion that I should follow?
-
--Takahiro AKASHI
-
-
-On 07/09/2014 01:12 PM, Will Deacon wrote:
-> Hi Akashi,
+On Wed, Jul 9, 2014 at 8:52 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Vikas,
 >
-> On Fri, Jul 04, 2014 at 08:31:55AM +0100, AKASHI Takahiro wrote:
->> secure_computing() should always be called first in syscall_trace_enter().
->> If it returns non-zero, we should stop further handling. Then that system
->> call may eventually fail, be trapped or the process itself be killed
->> depending on loaded rules.
->> In this case, syscall_trace_enter() returns a dedicated value in order to
->> skip a normal syscall table lookup because a seccomp rule may have already
->> overridden errno.
->
-> [...]
->
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index 70526cf..baab5fc 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -21,12 +21,14 @@
+> On Tue, Jul 8, 2014 at 9:20 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> On 08.07.2014 17:27, Doug Anderson wrote:
+>>> Hi,
+>>>
+>>> On Tue, Jul 8, 2014 at 12:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>>> On Thu, Jun 26, 2014 at 11:15 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>>>>
+>>>>> From: Doug Anderson <dianders@chromium.org>
+>>>>>
+>>>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>>>>> being reset across sleep/wake.  If we don't set it to anything then
+>>>>> the TPM will be reset.  U-Boot will detect this as invalid
+>>>>> and will reset the system on resume time. This GPIO can always be low
+>>>>> and not hurt anything.  It will get pulled back high again during a
+>>>>> normal warm reset when it will default back to an input.
+>>>>>
+>>>>> To properly preserve the TPM state across suspend/resume and to make
+>>>>> the chrome U-Boot happy, properly set the GPIO to mask the
+>>>>> reset to the TPM.
+>>>>>
+>>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>>>> (...)
+>>>>> +       /* We need GPX0_6 to be low at sleep time; just keep it low always */
+>>>>> +       mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+>>>>> +       compatible = "regulator-fixed";
+>>>>
+>>>> No matter how the discussion ends up, regulator-fixed is wrong.
+>>>
+>>> OK, fair enough.
+>>>
+>>>
+>>>> Either folding it into the TPM driver or using a separate reset driver
+>>>> is fine with me.
+>>>
+>>> OK, Vikas: do you want to code up the driver?
+>>>
+>>>
+>>>> So what about the generic delayed reset GPIO thing?
+>>>> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
+>>>
+>>> That's a neat concept and could be useful in other cases, but I think
+>>> it's just as much of a hack as using a regulator.  This is not a reset
+>>> signal for the TPM.  This is a signal that will mask the CPU's reset
+>>> signal (using a special bit of board-specific logic).
+>>>
+>>>
+>>> Personally I think Tomasz's idea of using hogs (after his patches
+>>> allowing a default output level) is the cleanest, but I think Stephen
+>>> didn't like that.
 >>
->>   #include <linux/audit.h>
->>   #include <linux/compat.h>
->> +#include <linux/errno.h>
->>   #include <linux/kernel.h>
->>   #include <linux/sched.h>
->>   #include <linux/mm.h>
->>   #include <linux/smp.h>
->>   #include <linux/ptrace.h>
->>   #include <linux/user.h>
->> +#include <linux/seccomp.h>
->>   #include <linux/security.h>
->>   #include <linux/init.h>
->>   #include <linux/signal.h>
->> @@ -1109,6 +1111,10 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>> I don't see any benefits of using complex interfaces over simply
+>> initializing the pin to the right value once at boot-up or at
+>> suspend/resume. As far as I understand Doug's explanation of the
+>> problem, nothing else is expected from the OS with respect to this pin.
+>> Moreover it doesn't affect operation of any drivers.
 >>
->>   asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->>   {
->> +	if (secure_computing(regs->syscallno) == -1)
->> +		/* seccomp failures shouldn't expose any additional code. */
->> +		return -EPERM;
->> +
->>   	if (test_thread_flag(TIF_SYSCALL_TRACE))
->>   		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>> So I'm still for the simplest and effective solution, i.e. hogs.
 >
-> We return regs->syscallno immediately after this, so we have the same issue
-> that Kees identified for arch/arm/. Did you follow the discussion I had with
-> Andy?
+> It looks as if Tomasz's patch has landed, so perhaps you could try to
+> code it up his way.  It should be very simple.  Please make sure to CC
+> Stephen Warren on the patch so that he is included in the discussion
+> (and of course include Tomasz, Linus W, etc).
+
+Can you point me to Tomasz's patchset on which I should rebase this patch on.
+
+
 >
-> Will
->
+> -Doug
