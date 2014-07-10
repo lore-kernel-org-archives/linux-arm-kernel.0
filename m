@@ -1,27 +1,38 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Thu, 10 Jul 2014 15:18:29 +0300
-Subject: [PATCH v3] pinctrl: msm: move all qualcomm drivers to subdir
-In-Reply-To: <CAJAp7Oi-UH4SUHNw_gHtm=P8EYG3+BsA=hPAsZZWjfG5KCMJeA@mail.gmail.com>
-References: <1404910216-2170-1-git-send-email-linus.walleij@linaro.org>
- <CAJAp7Oi-UH4SUHNw_gHtm=P8EYG3+BsA=hPAsZZWjfG5KCMJeA@mail.gmail.com>
-Message-ID: <1404994709.16296.22.camel@iivanov-dev>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Jul 2014 14:22:27 +0200
+Subject: [PATCH v2 2/8] spi: sun4i: add DMA support
+In-Reply-To: <1404619518-7592-3-git-send-email-emilio@elopez.com.ar>
+References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
+ <1404619518-7592-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140710122227.GC27469@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-07-09 at 15:16 -0700, Bjorn Andersson wrote:
-> On Wed, Jul 9, 2014 at 5:50 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > We have four Qualcomm-related pin control drivers, and now there
-> > are drivers coming in for the PMICs on these systems, so let's
-> > create a qcom subdirectory to hold all the Qualcomm stuff.
-> >
-> > Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Nice initiative.
-> 
-> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Hi Emilio,
 
-+1 from me.
+On Sun, Jul 06, 2014 at 01:05:09AM -0300, Emilio L?pez wrote:
+> This patch adds DMA support for 64 byte transfers on the sun4i SPI
+> controller. Bigger transfers did not seem to work when tested, and if
+> the hardware actually supports those, it will need further
+> investigation as to how to issue them correctly.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-Acked-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+This patch looks fine from a quick look, but you should put Mark Brown
+in the recipients, since he's the SPI maintainer, and will probably
+have a sharper look.
+
+Thanks!
+Maxim
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/58b7adb0/attachment-0001.sig>
