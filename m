@@ -1,102 +1,104 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 10 Jul 2014 08:32:45 -0400
-Subject: [linux-sunxi] GSoC 2014 #0 status report - Improving Allwinner
- SoC support
-In-Reply-To: <53BE0B4F.1090001@elopez.com.ar>
-References: <53BE0B4F.1090001@elopez.com.ar>
-Message-ID: <CAKON4OxPG7sYoJQSLu62ptzJPo9vBHxWBb+-+Z9nZ2EVBeJPww@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 10 Jul 2014 14:33:27 +0200
+Subject: dove (marvell A510) crash on boot with config_preempt
+In-Reply-To: <20140708151705.GE13433@titan.lakedaemon.net>
+References: <20140706080845.723e9787@armhf>
+ <20140708151705.GE13433@titan.lakedaemon.net>
+Message-ID: <53BE8817.10703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 11:41 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> Hi everyone,
->
-> As some of you may know, I'm currently participating in Google Summer of
-> Code under the Linux Foundation, working on a proposal titled "Improve
-> Allwinner SoCs support on mainline Linux". There is a great quantity of
-> devices out there that are powered by Allwinner processors, including but
-> not limited to the various Cubieboards, OLinuXinos, STBs, Tablets and ?Mini
-> PCs?. However, to date, support on mainline Linux is not yet feature
-> complete. My proposal on particular focuses on DMA and analog audio on the
-> earlier SoCs, and improved A23 support.
->
-> The idea here is to make a weekly status report of the project. As we are
-> starting mid-program, this one will be a bit different and I'll outline what
-> has been worked on so far since the beginning.
->
-> To date, I have been mainly working on the DMA driver for sun4i, sun5i and
-> sun7i. Despite having completely different drivers on SDK kernels, the
-> hardware block looks and behaves the same, so we are using a single driver
-> for these three SoC families. I have sent a series of patches[1] as well as
-> a follow-up v2[2], and I will keep iterating over it until it's accepted. I
-> have also sent two trivial patches[3][4] as a side-effect.
->
-> The main challenges while writing this driver can be summarized as a lack of
-> documentation. First of all, it took me a bit to get to know DMAEngine. As
-> there is not much documentation on it, most of my learning took place by
-> reading pre-existing drivers and consulting with my mentor. Secondly, as the
-> Allwinner documentation is mostly a register list with bitfield details, I
-> also had to read the SDK drivers and do some trial and error testing to
-> discover magic values and understand others.
->
-> Lately, I have also been working on the audio part, now that I have a
-> working DMA driver. After implementing cyclic DMA transfers and some clock
-> code, and armed with a Buildroot image with mpg123 and an OpenBSD release
-> track[5] in mp3 format, I've been trying to get some sound out of my
-> Cubietruck's headphone jack, but without much success so far. I have
-> verified my userspace stack and hardware by running these same binaries on
-> top of the linux-sunxi 3.4 kernel, and it worked fine. I have since then
-> been dumping relevant registers with devmem and comparing them, resolving
-> issues as I see them - hopefully this will yield some audible results.
->
+On 07/08/2014 05:17 PM, Jason Cooper wrote:
+> On Sun, Jul 06, 2014 at 08:08:45AM +0200, Jean-Francois Moine wrote:
+>> Since the official 3.15.0 release, the kernel crashes at boot time
+>> when compiled with the option CONFIG_PREEMPT.
+>>
+>> Reverting the commit 431a84b1a4f7d1a0085d5b91330c5053cc8e8b12
+>>
+>>     ARM: 8034/1: Disable preemption in iwmmxt_task_enable()
+>>
+>> removes the problem.
+>>
+>> Linux version 3.16.0-rc3-00062-gd92a333-dirty (jef at armhf) (gcc version 4.8.3 (Debian 4.8.3-4) ) #5 PREEMPT Thu Jul 3 19:46:39 CEST 2014
+[...]
+>> PJ4 iWMMXt v2 coprocessor enabled.
+[...]
+>> Unable to handle kernel paging request at virtual address fffffffe
+>> pgd = bb25c000
+>> [fffffffe] *pgd=3bfde821, *pte=00000000, *ppte=00000000
+>> Internal error: Oops: 80000007 [#1] PREEMPT ARM
+>> Modules linked in:
+>> CPU: 0 PID: 62 Comm: startpar Not tainted 3.16.0-rc3-00062-gd92a333-dirty #5
+>> task: bb230b80 ti: bb256000 task.ti: bb256000
+>> PC is at 0xfffffffe
+>> LR is at iwmmxt_task_copy+0x44/0x4c
+>> pc : [<fffffffe>]    lr : [<800130ac>]    psr: 40000033
+>> sp : bb257de8  ip : 00000013  fp : bb257ea4
+>> r10: bb256000  r9 : fffffdfe  r8 : 76e898e6
+>> r7 : bb257ec8  r6 : bb256000  r5 : 7ea12760  r4 : 000000a0
+>> r3 : ffffffff  r2 : 00000003  r1 : bb257df8  r0 : 00000000
+>> Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
+>> Control: 10c5387d  Table: 3b25c019  DAC: 00000015
+>> Process startpar (pid: 62, stack limit = 0xbb256248)
 
-Check out the last commit in this branch. It is based on your current
-DMA branch.
-https://github.com/jonsmirl/lpc31xx/tree/linus
+Ok, I have been able to debug this despite my limited knowledge of
+iWMMXt and ARM asm. While the patch below fixes the issue, I have
+no clue if it is the right approach or if there should be a different
+solution. I'd like to leave that to either Russell or Catalin to decide.
 
-I am getting noise out of the codec but it is not the right noise.
-Plus the cyclic transfer falls over when the buffer wraps. There is no
-need to use the CONT bit on the Allwinner DMA hardware to implement
-cyclic.
+If anything in below explanation is wrong, please correct me
+immediately!
 
-The DMA interrupt routine should directly program in the next transfer
-in the promise chain when the previous one completes. Doing it from
-the tasklet opens a window where kernel task swap delays can cause DMA
-underrun.
+Above mentioned commit basically added {inc,dec}_preempt_count macros
+to iwmmxt_task_enable to run it with preemption disabled:
 
+  ENTRY(iwmmxt_task_enable)
++       inc_preempt_count r10, r3
+[...]
+concan_save:
+[...]
+concan_dump:
+[...]
+concan_load:
+[...]
++3:
++#ifdef CONFIG_PREEMPT_COUNT
++       get_thread_info r10
++#endif
++4:     dec_preempt_count r10, r3
+         mov     pc, lr
 
+Unfortunately, other procedures in iwmmxt.S, e.g. iwmmxt_task_copy,
+also branch to above concan_{save,dump,load} labels without disabling
+preemption first:
 
+ENTRY(iwmmxt_task_copy)
+[...]
+1:	@ this task owns Concan regs -- grab a copy from there
+	mov	r0, #0			@ nothing to load
+	mov	r2, #3			@ save all regs
+	mov	r3, lr			@ preserve return address
+	bl	concan_dump
+	msr	cpsr_c, ip		@ restore interrupt mode
+	mov	pc, r3
 
-> Interestingly enough, Allwinner themselves do not seem to be using cyclic
-> DMA transfers on their driver[6]. I hope this is not a sign of a hardware
-> bug that's not documented.
->
-> To give some closure to this status report, I'd like to thank Maxime for his
-> mentoring so far, Ezequiel for letting me pick his brain, and the Linux
-> Foundation and Google for giving me this opportunity, as well as everyone on
-> the kernel and sunxi communities who have come forward to review and test
-> patches. You can expect a new report soon, in about a week's time or less.
->
-> Emilio
->
-> [1] http://www.spinics.net/lists/dmaengine/msg01148.html
-> [2] http://www.spinics.net/lists/arm-kernel/msg344766.html
-> [3] https://lkml.org/lkml/2014/5/11/166
-> [4] https://lkml.org/lkml/2014/7/1/486
-> [5] http://www.openbsd.org/lyrics.html, maybe I should consider using some
-> other song for better luck
-> [6]
-> https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/sound/soc/sunxi/sunxi-codec.c#L1137
->
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an
-> email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+This causes two issues that finally lead to observed behavior:
+(a) introduced {inc,dec}_preempt_count use r3 as temporary register,
+     while iwmmxt_task_copy uses it to store its return address
+(b) branching to concan_foo labels decrements preempt_count without
+     incrementing it first
 
+The patch below addresses (a) by using r4 as temporary register for
+{inc,dec}_preempt_count macro and (b) by moving concan_foo into
+separate code sections and call them from iwmmxt_task_enable like
+the other procedures do.
 
+Sebastian
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: iwmmxt.S.diff
+Type: text/x-patch
+Size: 1061 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/e7869915/attachment.bin>
