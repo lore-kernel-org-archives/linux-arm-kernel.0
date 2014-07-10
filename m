@@ -1,98 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Jul 2014 19:19:27 +0200
-Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
- connected to sama5d3xek boards
-In-Reply-To: <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
- <53AC7BFD.2070806@free-electrons.com> <53AD22D8.2090301@atmel.com>
- <20140710110720.03f437eb@bbrezillon>
- <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
-Message-ID: <20140710191927.56a3ead5@bbrezillon>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 10 Jul 2014 19:35:52 +0200
+Subject: [PATCH v9 09/11] seccomp: introduce writer locking
+In-Reply-To: <CAGXu5jKNUn0OcXPyTmqbHwQ_GPMNTeajyrxpd2xAtzjTRFyhpg@mail.gmail.com>
+References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
+ <1403911380-27787-10-git-send-email-keescook@chromium.org>
+ <20140709184215.GA4866@redhat.com> <20140709185549.GB4866@redhat.com>
+ <CAGXu5jL6q1d16uA1Yu+QO4eV7zWwcWEWgkZrwmsfymbMvEr6+Q@mail.gmail.com>
+ <20140710152418.GB20861@redhat.com>
+ <CAGXu5jKNUn0OcXPyTmqbHwQ_GPMNTeajyrxpd2xAtzjTRFyhpg@mail.gmail.com>
+Message-ID: <20140710173552.GA27410@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jul 2014 08:35:15 -0700
-Florian Fainelli <f.fainelli@gmail.com> wrote:
-
-> 2014-07-10 2:07 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
-> > On Fri, 27 Jun 2014 09:52:56 +0200
-> > Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On 07/10, Kees Cook wrote:
+>
+> On Thu, Jul 10, 2014 at 8:24 AM, Oleg Nesterov <oleg@redhat.com> wrote:
 > >
-> >> On 26/06/2014 22:01, Boris BREZILLON :
-> >> > Hi Florian,
-> >> >
-> >> > On 26/06/2014 20:15, Florian Fainelli wrote:
-> >> >> Hi Boris,
-> >> >>
-> >> >> 2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
-> >> >>> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
-> >> >>>
-> >> >>> The PHY address is not specified here because atmel have 2 different
-> >> >>> designs
-> >> >>> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
-> >> >>> (Embest design) and the other one is connection PHYAD0 to a pull up
-> >> >>> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
-> >> >>> As a result, Ronetix design will have its PHY available at address 0x1 and
-> >> >>> Embest design at 0x7.
-> >> >>> Let the net PHY core automatically detect the PHY address by scanning the
-> >> >>> MDIO bus.
-> >> >> I though the compatible string was listed as a required property, but
-> >> >> it is not. The 'reg' property however is listed as required, although
-> >> >> the of_miodbus_register() works just fine without it, although that is
-> >> >> a Linux-specific implementation detail.
-> >> >
-> >> > Indeed, it's listed in the required property list of the DT binding doc,
-> >> > but the code implement auto detection if reg is missing.
-> >> > However this line [1] clearly shows that specifying the reg property is
-> >> > the preferred way of doing things.
-> >> >
-> >> > I could define 2 different sama5d3xcm.dtsi (sama5d3xcm-ronetix.dtsi and
-> >> > sama5d3xcm-embest.dtsi) to avoid this dirty hack,
-> >> > but then we would have 2 more dtb and the user would have to determine
-> >> > which CPU module he owns to choose the appropriate dtb.
-> >> > If at91, arm-soc and DT maintainers agree with this approach I can
-> >> > definitely propose something.
-> >>
-> >> Yes Boris, I definitively prefer not to add another .dtsi file for this
-> >> series if we can avoid it.
-> >>
+> > Just to simplify. Suppose TIF_SECCOMP was set a long ago. This thread
+> > has a single filter F1 and it enters seccomp_run_filters().
 > >
-> > Okay, now that I don't specify the reg property I have a bunch of
-> > noisy logs (which is exactly what the developer of of_mdio.c wanted in
-> > order to force people to specify the reg property).
+> > Right before it does ACCESS_ONCE() to read the pointer, another thread
+> > does seccomp_sync_threads() and sets .filter = F2.
 > >
-> > It seems to be a problem for atmel users (all these logs make them
-> > think there is something wrong with the net device).
-> >
-> > Apart from the dts/dtsi split solution, which Nicolas wants to avoid, I
-> > see two solutions here:
-> >
-> > 1) remove the logs (or use dev_dbg instead of dev_info) from of_mdio.c.
-> > But I'm pretty sure this solution won't be accepted :-).
-> 
-> I am fine with using dev_dbg() instead of dev_info() for that sort of
-> messages, provided that you state the rationale of this change
-> (spewing the log console with probing messages) and specify tha the
-> 'reg' property is optional.
-> 
-> >
-> > 2) define 2 ethernet phys (one for each possible solution). I tested it
-> > and it works fine (only the available PHY is registered and there is no
-> > noisy logs anymore).
-> 
-> One advantage of that solution is that you'll get slightly faster boot
-> times since you won't have to auto-probe for the PHYs on the MDIO bus,
-> the time savings get bigger as you start using higher PHY addresses.
+> > If ACCESS_ONCE() returns F1 - everything is fine. But it can see the new
+> > pointer F2, and in this case we need a barrier to ensure that, say,
+> > LOAD(F2->prog) will see all the preceding changes in this memory.
+>
+> And the rmb() isn't sufficient for that?
 
-Yes I prefer this solution too, but is it acceptable to define 2 phy
-nodes even if only one is really available ?
+But it has no effect if the pointer was changed _after_ rmb() was already
+called.
 
+And, you need a barrier _after_ ACCESS_ONCE().
 
+(Unless, again, we know that this is the first filter, but this is only
+ by accident).
 
+> Is another barrier needed
+> before assigning the filter pointer to make sure the contents it
+> points to are flushed?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+I think smp_store_release() should be moved from seccomp_attach_filter()
+to seccomp_sync_threads(). Although probably it _should_ work either way,
+but at least this looks confusing because a) "current" doesn't need a
+barrier to serialize wuth itself, and b) it is not clear why it is safe
+to change the pointer dereferenced by another thread without a barrier.
+
+> What's the least time-consuming operation I can use in run_filters?
+
+As I said smp_read_barrier_depends() (nop unless alpha) or
+smp_load_acquire() which you used in the previous version.
+
+And to remind, afaics smp_load_acquire() in put_filter() should die ;)
+
+Oleg.
