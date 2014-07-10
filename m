@@ -1,171 +1,132 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 9 Jul 2014 17:09:05 -0700
-Subject: [PATCH 2/9] drivers: base: support cpu cache information
- interface to userspace via sysfs
-In-Reply-To: <1403717444-23559-3-git-send-email-sudeep.holla@arm.com>
-References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
- <1403717444-23559-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20140710000905.GA18025@kroah.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 9 Jul 2014 20:40:21 -0400
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <53BDD834.5030405@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+ <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
+ <53BC6866.30803@codeaurora.org>
+ <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
+ <53BDD834.5030405@codeaurora.org>
+Message-ID: <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 06:30:37PM +0100, Sudeep Holla wrote:
-> +static const struct device_attribute *cache_optional_attrs[] = {
-> +	&dev_attr_coherency_line_size,
-> +	&dev_attr_ways_of_associativity,
-> +	&dev_attr_number_of_sets,
-> +	&dev_attr_size,
-> +	&dev_attr_attributes,
-> +	&dev_attr_physical_line_partition,
-> +	NULL
-> +};
-> +
-> +static int device_add_attrs(struct device *dev,
-> +			    const struct device_attribute **dev_attrs)
-> +{
-> +	int i, error = 0;
-> +	struct device_attribute *dev_attr;
-> +	char *buf;
-> +
-> +	if (!dev_attrs)
-> +		return 0;
-> +
-> +	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-> +	if (!buf)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; dev_attrs[i]; i++) {
-> +		dev_attr = (struct device_attribute *)dev_attrs[i];
-> +
-> +		/* create attributes that provides meaningful value */
-> +		if (dev_attr->show(dev, dev_attr, buf) < 0)
-> +			continue;
-> +
-> +		error = device_create_file(dev, dev_attrs[i]);
-> +		if (error) {
-> +			while (--i >= 0)
-> +				device_remove_file(dev, dev_attrs[i]);
-> +			break;
-> +		}
-> +	}
-> +
-> +	kfree(buf);
-> +	return error;
-> +}
+On Wed, Jul 9, 2014 at 8:03 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
+> On 7/8/2014 4:49 PM, Rob Clark wrote:
+>> On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
+>>> Hi Hiroshi,
+>>>
+>>> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
+>>>> Hi Olav,
+>>>>
+>>>> Olav Haugan <ohaugan@codeaurora.org> writes:
+>>>>
+>>>>> Mapping and unmapping are more often than not in the critical path.
+>>>>> map_range and unmap_range allows SMMU driver implementations to optimize
+>>>>> the process of mapping and unmapping buffers into the SMMU page tables.
+>>>>> Instead of mapping one physical address, do TLB operation (expensive),
+>>>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
+>>>>> a scatter-gatherlist of physically contiguous pages into one virtual
+>>>>> address space and then at the end do one TLB operation.
+>>>>>
+>>>>> Additionally, the mapping operation would be faster in general since
+>>>>> clients does not have to keep calling map API over and over again for
+>>>>> each physically contiguous chunk of memory that needs to be mapped to a
+>>>>> virtually contiguous region.
+>>>>>
+>>>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+>>>>> ---
+>>>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
+>>>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
+>>>>>  2 files changed, 48 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>>>> index e5555fc..f2a6b80 100644
+>>>>> --- a/drivers/iommu/iommu.c
+>>>>> +++ b/drivers/iommu/iommu.c
+>>>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>>>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
+>>>>>
+>>>>>
+>>>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
+>>>>> +                struct scatterlist *sg, unsigned int len, int prot)
+>>>>> +{
+>>>>> +    if (unlikely(domain->ops->map_range == NULL))
+>>>>> +            return -ENODEV;
+>>>>> +
+>>>>> +    BUG_ON(iova & (~PAGE_MASK));
+>>>>> +
+>>>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
+>>>>> +}
+>>>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
+>>>>
+>>>> We have the similar one internally, which is named, "iommu_map_sg()",
+>>>> called from DMA API.
+>>>
+>>> Great, so this new API will be useful to more people!
+>>>
+>>>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
+>>>>> +                  unsigned int len)
+>>>>> +{
+>>>>> +    if (unlikely(domain->ops->unmap_range == NULL))
+>>>>> +            return -ENODEV;
+>>>>> +
+>>>>> +    BUG_ON(iova & (~PAGE_MASK));
+>>>>> +
+>>>>> +    return domain->ops->unmap_range(domain, iova, len);
+>>>>> +}
+>>>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
+>>>>
+>>>> Can the existing iommu_unmap() do the same?
+>>>
+>>> I believe iommu_unmap() behaves a bit differently because it will keep
+>>> on calling domain->ops->unmap() until everything is unmapped instead of
+>>> letting the iommu implementation take care of unmapping everything in
+>>> one call.
+>>>
+>>> I am abandoning the patch series since our driver was not accepted.
+>>> However, if there are no objections I will resubmit this patch (PATCH
+>>> 2/7) as an independent patch to add this new map_range API.
+>>
+>> +1 for map_range().. I've seen for gpu workloads, at least, it is the
+>> downstream map_range() API is quite beneficial.   It was worth at
+>> least a few fps in xonotic.
+>>
+>> And, possibly getting off the subject a bit, but I was wondering about
+>> the possibility of going one step further and batching up mapping
+>> and/or unmapping multiple buffers (ranges) at once.  I have a pretty
+>> convenient sync point in drm/msm to flush out multiple mappings before
+>> kicking gpu.
+>
+> I think you should be able to do that with this API already - at least
+> the mapping part since we are passing in a sg list (this could be a
+> chained sglist).
 
-Ick, why create your own function for this when the driver core has this
-functionality built into it?  Look at the is_visible() callback, and how
-it is use for an attribute group please.
+What I mean by batching up is mapping and unmapping multiple sglists
+each at different iova's with minmal cpu cache and iommu tlb flushes..
 
-> +static void device_remove_attrs(struct device *dev,
-> +				const struct device_attribute **dev_attrs)
-> +{
-> +	int i;
-> +
-> +	if (!dev_attrs)
-> +		return;
-> +
-> +	for (i = 0; dev_attrs[i]; dev_attrs++, i++)
-> +		device_remove_file(dev, dev_attrs[i]);
-> +}
+Ideally we'd let the IOMMU driver be clever and build out all 2nd
+level tables before inserting into first level tables (to minimize cpu
+cache flushing).. also, there is probably a reasonable chance that
+we'd be mapping a new buffer into existing location, so there might be
+some potential to reuse existing 2nd level tables (and save a tiny bit
+of free/alloc).  I've not thought too much about how that would look
+in code.. might be kinda, umm, fun..
 
-You should just remove a whole group at once, not individually.
+But at an API level, we should be able to do a bunch of
+map/unmap_range's with one flush.
 
-> +
-> +const struct device_attribute **
-> +__weak cache_get_priv_attr(struct device *cache_idx_dev)
-> +{
-> +	return NULL;
-> +}
-> +
-> +/* Add/Remove cache interface for CPU device */
-> +static void cpu_cache_sysfs_exit(unsigned int cpu)
-> +{
-> +	int i;
-> +	struct device *tmp_dev;
-> +	const struct device_attribute **ci_priv_attr;
-> +
-> +	if (per_cpu_index_dev(cpu)) {
-> +		for (i = 0; i < cache_leaves(cpu); i++) {
-> +			tmp_dev = per_cache_index_dev(cpu, i);
-> +			if (!tmp_dev)
-> +				continue;
-> +			ci_priv_attr = cache_get_priv_attr(tmp_dev);
-> +			device_remove_attrs(tmp_dev, ci_priv_attr);
-> +			device_remove_attrs(tmp_dev, cache_optional_attrs);
-> +			device_unregister(tmp_dev);
-> +		}
-> +		kfree(per_cpu_index_dev(cpu));
-> +		per_cpu_index_dev(cpu) = NULL;
-> +	}
-> +	device_unregister(per_cpu_cache_dev(cpu));
-> +	per_cpu_cache_dev(cpu) = NULL;
-> +}
-> +
-> +static int cpu_cache_sysfs_init(unsigned int cpu)
-> +{
-> +	struct device *dev = get_cpu_device(cpu);
-> +
-> +	if (per_cpu_cacheinfo(cpu) == NULL)
-> +		return -ENOENT;
-> +
-> +	per_cpu_cache_dev(cpu) = device_create(dev->class, dev, cpu,
-> +					       NULL, "cache");
-> +	if (IS_ERR_OR_NULL(per_cpu_cache_dev(cpu)))
-> +		return PTR_ERR(per_cpu_cache_dev(cpu));
-> +
-> +	/* Allocate all required memory */
-> +	per_cpu_index_dev(cpu) = kzalloc(sizeof(struct device *) *
-> +					 cache_leaves(cpu), GFP_KERNEL);
-> +	if (unlikely(per_cpu_index_dev(cpu) == NULL))
-> +		goto err_out;
-> +
-> +	return 0;
-> +
-> +err_out:
-> +	cpu_cache_sysfs_exit(cpu);
-> +	return -ENOMEM;
-> +}
-> +
-> +static int cache_add_dev(unsigned int cpu)
-> +{
-> +	unsigned short i;
-> +	int rc;
-> +	struct device *tmp_dev, *parent;
-> +	struct cacheinfo *this_leaf;
-> +	const struct device_attribute **ci_priv_attr;
-> +	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-> +
-> +	rc = cpu_cache_sysfs_init(cpu);
-> +	if (unlikely(rc < 0))
-> +		return rc;
-> +
-> +	parent = per_cpu_cache_dev(cpu);
-> +	for (i = 0; i < cache_leaves(cpu); i++) {
-> +		this_leaf = this_cpu_ci->info_list + i;
-> +		if (this_leaf->disable_sysfs)
-> +			continue;
-> +		tmp_dev = device_create_with_groups(parent->class, parent, i,
-> +						    this_leaf,
-> +						    cache_default_groups,
-> +						    "index%1u", i);
-> +		if (IS_ERR_OR_NULL(tmp_dev)) {
-> +			rc = PTR_ERR(tmp_dev);
-> +			goto err;
-> +		}
-> +
-> +		rc = device_add_attrs(tmp_dev, cache_optional_attrs);
-> +		if (unlikely(rc))
-> +			goto err;
-> +
-> +		ci_priv_attr = cache_get_priv_attr(tmp_dev);
-> +		rc = device_add_attrs(tmp_dev, ci_priv_attr);
-> +		if (unlikely(rc))
-> +			goto err;
+Maybe it could look like a sequence of iommu_{map,unmap}_range()
+followed by iommu_flush()?
 
-You just raced with userspace here, creating these files _after_ the
-device was announced to userspace, causing problems with anyone wanting
-to read these attributes :(
+BR,
+-R
 
-I think if you fix up the is_visible() thing above, these calls will go
-away, right?
+> Thanks,
+>
+> Olav
+>
+> --
+> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
