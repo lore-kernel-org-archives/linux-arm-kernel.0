@@ -1,33 +1,34 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jul 2014 23:36:24 +0200
-Subject: [PATCH v2 04/12] ASoC: kirkwood: Remove ARCH_KIRKWOOD dependency
+Date: Thu, 10 Jul 2014 23:36:26 +0200
+Subject: [PATCH v2 06/12] ata: Remove ARCH_KIRKWOOD dependency
 In-Reply-To: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
 References: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1405028192-9623-5-git-send-email-andrew@lunn.ch>
+Message-ID: <1405028192-9623-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-kirkwood has been removed, now that kirkwood lives in
-mach-mvebu. Remove ARCH_KIRKWOOD since ARCH_MVEBU is sufficient.
+mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
+ARCH_MVEBU is sufficient.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: alsa-devel at alsa-project.org
+Cc: Tejun Heo <tj@kernel.org>
+Cc: linux-ide at vger.kernel.org
 ---
- sound/soc/kirkwood/Kconfig | 2 +-
+ drivers/ata/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
-index 1f7c7ee3527a..132bb83f8e99 100644
---- a/sound/soc/kirkwood/Kconfig
-+++ b/sound/soc/kirkwood/Kconfig
-@@ -1,6 +1,6 @@
- config SND_KIRKWOOD_SOC
- 	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
--	depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || MACH_KIRKWOOD || COMPILE_TEST
-+	depends on ARCH_DOVE || ARCH_MVEBU || COMPILE_TEST
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 7671dbac6015..4749aeb54bc1 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -289,7 +289,7 @@ config SATA_HIGHBANK
+ 
+ config SATA_MV
+ 	tristate "Marvell SATA support"
+-	depends on PCI || ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
++	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
+ 		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+ 	select GENERIC_PHY
  	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the Kirkwood I2S interface. You will also need to select the
 -- 
 2.0.1
