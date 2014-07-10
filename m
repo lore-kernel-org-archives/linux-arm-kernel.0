@@ -1,50 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 10 Jul 2014 15:01:04 +0800
-Subject: [PATCH V2] ARM: dts: Restructure imx6qdl-wandboard.dtsi for new
- rev C1 board.
-In-Reply-To: <1404845297-13751-1-git-send-email-george.joseph@fairview5.com>
-References: <1404845297-13751-1-git-send-email-george.joseph@fairview5.com>
-Message-ID: <20140710070103.GA2542@dragon>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 10 Jul 2014 16:08:39 +0900
+Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk to
+ host's quirk
+In-Reply-To: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
+References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 08, 2014 at 12:48:16PM -0600, George Joseph wrote:
-> The rev C1 Wandboard uses the Broadcom 4330 for WiFi and Bluetooth instead of
-> the 4329.  This changes the PADS assigned for the control lines.  Another
-> side effect of the change is that on the rev C1 board, usdhc driver can't
-> detect the chip presence correctly so usdhc2 now needs its 'non-removeable'
-> property removed.
-> 
-> So that rev B1 and earlier can continue to work, this patch splits the
-> board-specific definitions from imx6qdl-wandboard.dtsi into
-> imx6qdl-wandboard-revb1.dtsi and imx6qdl-wandboard-revc1.dtsi.  The new files
-> include the original base imx6qdl-wandboard.dtsi which retains the common
-> definitions.
-> 
-> The existing imx6dl-wandboard.dts includes imx6qdl-wandboard-revc1.dtsi and
-> imx6dl-wandboard-revb1.dts (new) includes imx6qdl-wandboard-revb1.dtsi.
-> This makes the rev C1 board the new default.  The same pattern is used for
-> imx6q-wandboard.dts.
-> 
-> So, from U-Boot on a WB-Quad you use imxq-wandboard-revb1.dtb for the older B1
-> board and imxq-wandboard.dtb for the current rev C1 board.
-> 
-> Signed-off-by: George Joseph <george.joseph@fairview5.com>
-> ---
->  arch/arm/boot/dts/imx6dl-wandboard-revb1.dts   | 22 ++++++++++++++
->  arch/arm/boot/dts/imx6dl-wandboard.dts         |  2 +-
->  arch/arm/boot/dts/imx6q-wandboard-revb1.dts    | 26 ++++++++++++++++
->  arch/arm/boot/dts/imx6q-wandboard.dts          |  2 +-
->  arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi | 42 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi | 41 +++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6qdl-wandboard.dtsi       | 21 -------------
->  7 files changed, 133 insertions(+), 23 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-wandboard-revb1.dts
+Replaced the "disable-wp" into host's quirks.
+(Because the slot-node is removed at dt-file.)
 
-These two should be added into arch/arm/boot/dts/Makefile as build
-target.
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+---
+ drivers/mmc/host/dw_mmc.c |   12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-I fixed it up and applied the patch.
-
-Shawn
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 1ac227c..a3ccd07 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
+ 	int gpio_ro = mmc_gpio_get_ro(mmc);
+ 
+ 	/* Use platform get_ro function, else try on board write protect */
+-	if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
++	if (slot->host->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
+ 		read_only = 0;
+ 	else if (!IS_ERR_VALUE(gpio_ro))
+ 		read_only = gpio_ro;
+@@ -2006,12 +2006,7 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
+ static struct dw_mci_of_slot_quirks {
+ 	char *quirk;
+ 	int id;
+-} of_slot_quirks[] = {
+-	{
+-		.quirk	= "disable-wp",
+-		.id	= DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
+-	},
+-};
++} of_slot_quirks[] = {};
+ 
+ static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
+ {
+@@ -2238,6 +2233,9 @@ static struct dw_mci_of_quirks {
+ 	{
+ 		.quirk	= "broken-cd",
+ 		.id	= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
++	},{
++		.quirk	= "disable-wp",
++		.id	= DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
+ 	},
+ };
+ 
+-- 
+1.7.9.5
