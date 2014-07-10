@@ -1,25 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 11:14:27 +0200
-Subject: [PATCH v3 2/2] devicetree: Add Zynq GPIO devicetree bindings
- documentation
-In-Reply-To: <1404817356-21568-2-git-send-email-harinik@xilinx.com>
-References: <1404817356-21568-1-git-send-email-harinik@xilinx.com>
- <1404817356-21568-2-git-send-email-harinik@xilinx.com>
-Message-ID: <CACRpkdY6VGNb4kd+qQuZ1=9fcYEKt3zhnyxdXPibMi352+eNvA@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 10 Jul 2014 11:14:29 +0200
+Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
+In-Reply-To: <20140709104332.GS19379@twins.programming.kicks-ass.net>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+ <53BB61E9.80200@linux.vnet.ibm.com>
+ <CAKfTPtA8BVPtRRLzomqnGp7_uaSbFYmFTrrt4fpQTOb7qyjddg@mail.gmail.com>
+ <53BCBD0E.2070609@linux.vnet.ibm.com>
+ <20140709104332.GS19379@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 1:02 PM, Harini Katakam <harinik@xilinx.com> wrote:
+On 9 July 2014 12:43, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, Jul 09, 2014 at 09:24:54AM +0530, Preeti U Murthy wrote:
 
-> From: Harini Katakam <harini.katakam@xilinx.com>
+[snip]
+
 >
-> Add gpio-zynq bindings documentation.
+>> Continuing with the above explanation; when LBF_ALL_PINNED flag is
+>> set,and we jump to out_balanced, we clear the imbalance flag for the
+>> sched_group comprising of cpu0 and cpu1,although there is actually an
+>> imbalance. t2 could still be migrated to say cpu2/cpu3 (t2 has them in
+>> its cpus allowed mask) in another sched group when load balancing is
+>> done at the next sched domain level.
 >
-> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> And this is where Vince is wrong; note how
+> update_sg_lb_stats()/sg_imbalance() uses group->sgc->imbalance, but
+> load_balance() sets: sd_parent->groups->sgc->imbalance, so explicitly
+> one level up.
+>
 
-Patch applied, timed out waiting for binding feedback and nothing
-controversial in there.
+I forgot this behavior when studying preeti use case
 
-Yours,
-Linus Walleij
+> So what we can do I suppose is clear 'group->sgc->imbalance' at
+> out_balanced.
+>
+> In any case, the entirely of this group imbalance crap is just that,
+> crap. Its a terribly difficult situation and the current bits more or
+> less fudge around some of the common cases. Also see the comment near
+> sg_imbalanced(). Its not a solid and 'correct' anything. Its a bunch of
+> hacks trying to deal with hard cases.
+>
+> A 'good' solution would be prohibitively expensive I fear.
+
+I have tried to summarized several use cases that have been discussed
+for this patch
+
+The 1st use case is the one that i described in the commit message of
+this patch: If we have a sporadic imbalance that set the imbalance
+flag, we don't clear it after and it generates spurious and useless
+active load balance
+
+Then preeti came with the following use case :
+we have a sched_domain made of CPU0 and CPU1 in 2 different sched_groups
+2 tasks A and B are on CPU0, B can't run on CPU1, A is the running task.
+When CPU1's sched_group is doing load balance, the imbalance should be
+set. That's still happen with this patchset because the LBF_ALL_PINNED
+flag will be cleared thanks to task A.
+
+Preeti also explained me the following use cases on irc:
+
+If we have both tasks A and B that can't run on CPU1, the
+LBF_ALL_PINNED will stay set. As we can't do anything, we conclude
+that we are balanced, we go to out_balanced and we clear the imbalance
+flag. But we should not consider that as a balanced state but as a all
+tasks pinned state instead and we should let the imbalance flag set.
+If we now have 2 additional CPUs which are in the cpumask of task A
+and/or B at the parent sched_domain level , we should migrate one task
+in this group but this will not happen (with this patch) because the
+sched_group made of CPU0 and CPU1 is not overloaded (2 tasks for 2
+CPUs) and the imbalance flag has been cleared as described previously.
+
+I'm going to send a new revision of the patchset with the correction
+
+Vincent
