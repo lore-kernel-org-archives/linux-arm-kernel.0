@@ -1,28 +1,27 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Thu, 10 Jul 2014 16:32:21 +0200
-Subject: [PATCH 09/16] i2c: i2c-ocores: Drop class based scanning to
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Jul 2014 16:35:01 +0200
+Subject: [PATCH 08/16] i2c: i2c-nomadik: Drop class based scanning to
  improve bootup time
-In-Reply-To: <1404992799-3705-10-git-send-email-wsa@the-dreams.de> (Wolfram
- Sang's message of "Thu, 10 Jul 2014 13:46:29 +0200")
+In-Reply-To: <1404992799-3705-9-git-send-email-wsa@the-dreams.de>
 References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
- <1404992799-3705-10-git-send-email-wsa@the-dreams.de>
-Message-ID: <874mypp9my.fsf@dell.be.48ers.dk>
+ <1404992799-3705-9-git-send-email-wsa@the-dreams.de>
+Message-ID: <CACRpkdZ9WpHVcv8vX8rVzxRaB=-BgHApUrHYZqwkr=m6d2pjGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Wolfram" == Wolfram Sang <wsa@the-dreams.de> writes:
+On Thu, Jul 10, 2014 at 1:46 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
 
- > This driver has been flagged to drop class based instantiation. The removal
- > improves boot-up time and is unneeded for embedded controllers. Users have been
- > warned to switch for some time now, so we can actually do the removal. Keep the
- > DEPRECATED flag, so the core can inform users that the behaviour finally
- > changed now. After another transition period, this flag can go, too.
- > While we are here, remove the indentation for the array setup because
- > such things always break after some time.
+> This driver has been flagged to drop class based instantiation. The removal
+> improves boot-up time and is unneeded for embedded controllers. Users have been
+> warned to switch for some time now, so we can actually do the removal. Keep the
+> DEPRECATED flag, so the core can inform users that the behaviour finally
+> changed now. After another transition period, this flag can go, too.
+> While we are here, remove the indentation for the array setup because
+> such things always break after some time.
+>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
- > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Acked-by: Peter Korsgaard <peter@korsgaard.com>
-
--- 
-Bye, Peter Korsgaard
+Yours,
+Linus Walleij
