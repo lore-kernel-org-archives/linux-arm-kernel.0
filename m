@@ -1,30 +1,101 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 10:57:16 +0200
-Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
-In-Reply-To: <3adb614c-38ae-4b0c-9e50-99f071bbf4c5@BL2FFO11FD038.protection.gbl>
-References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
- <5cc8b89b-20ff-4fa9-92dd-bb2f6d3512d8@BY2FFO11FD030.protection.gbl>
- <CACRpkdb1M3-hrSKLKWz21LCJ1sMvsq5E-aqkpmVhy0NwOS5HhA@mail.gmail.com>
- <d1af864d-bf78-48bb-a545-8de3f9def75f@BL2FFO11FD037.protection.gbl>
- <CACRpkdYSU6NdFuab6rJS7eADSqORNDBzbFfJ65nFoJj3EZVd-g@mail.gmail.com>
- <3adb614c-38ae-4b0c-9e50-99f071bbf4c5@BL2FFO11FD038.protection.gbl>
-Message-ID: <CACRpkdZb1jDh2_bAvjj5SPsG3k4Sr8nTEjiVR29dNx9rS5a0_g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 10 Jul 2014 10:09:31 +0100
+Subject: [PATCH v3+1 1/5] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <1404906074-31992-2-git-send-email-lee.jones@linaro.org>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+ <1404906074-31992-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140710090931.GA11948@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 5:55 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+devices. It has 2 ports which it can use for either; both SATA, both
+PCIe or one of each in any configuration.
 
-> I fully agree and you don't have to convince me. But to a lot of our
-> customers that are used to use FPGAs, SOCs and Linux are pretty new. You
-> see a lot of scary stuff. Accessing /dev/mem seems to be a lot of
-> people's big hammer solution for everything. Then I always perceive it
-> as great progress if things like the sysfs interface are used instead.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Well as upstream maintainer I really don't differentiate on the level
-of badness of different bad solutions, none of them are really helpful
-to the community, only to some specific user, so they get to carry the
-quirks...
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+new file mode 100644
+index 0000000..42c88088
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+@@ -0,0 +1,76 @@
++STMicroelectronics STi MIPHY365x PHY binding
++============================================
++
++This binding describes a miphy device that is used to control PHY hardware
++for SATA and PCIe.
++
++Required properties (controller (parent) node):
++- compatible    : Should be "st,miphy365x-phy"
++- st,syscfg     : Should be a phandle of the system configuration register group
++		  which contain the SATA, PCIe mode setting bits
++
++Required nodes	:  A sub-node is required for each channel the controller
++		   provides. Address range information including the usual
++		   'reg' and 'reg-names' properties are used inside these
++		   nodes to describe the controller's topology. These nodes
++		   are translated by the driver's .xlate() function.
++
++Required properties (port (child) node):
++- #phy-cells 	: Should be 1 (See second example)
++		  Cell after port phandle is device type from:
++			- MIPHY_TYPE_SATA
++			- MIPHY_TYPE_PCI
++- reg        	: Address and length of register sets for each device in
++		  "reg-names"
++- reg-names     : The names of the register addresses corresponding to the
++		  registers filled in "reg":
++			- sata:   For SATA devices
++			- pcie:   For PCIe devices
++			- syscfg: To specify the syscfg based config register
++
++Optional properties (port (child) node):
++- st,sata-gen	     :	Generation of locally attached SATA IP. Expected values
++			are {1,2,3). If not supplied generation 1 hardware will
++			be expected
++- st,pcie-tx-pol-inv :	Bool property to invert the polarity PCIe Tx (Txn/Txp)
++- st,sata-tx-pol-inv :	Bool property to invert the polarity SATA Tx (Txn/Txp)
++
++Example:
++
++	miphy365x_phy: miphy365x at fe382000 {
++		compatible      = "st,miphy365x-phy";
++		st,syscfg  	= <&syscfg_rear>;
++		#address-cells	= <1>;
++		#size-cells	= <1>;
++		ranges;
++
++		phy_port0: port at fe382000 {
++			reg = <0xfe382000 0x100>, <0xfe394000 0x100>, <0x824 0x4>;
++			reg-names = "sata", "pcie", "syscfg";
++			#phy-cells = <1>;
++			st,sata-gen = <3>;
++		};
++
++		phy_port1: port at fe38a000 {
++			reg = <0xfe38a000 0x100>, <0xfe804000 0x100>, <0x828 0x4>;;
++			reg-names = "sata", "pcie", "syscfg";
++			#phy-cells = <1>;
++			st,pcie-tx-pol-inv;
++		};
++	};
++
++Specifying phy control of devices
++=================================
++
++Device nodes should specify the configuration required in their "phys"
++property, containing a phandle to the phy port node and a device type.
++
++Example:
++
++#include <dt-bindings/phy/phy-miphy365x.h>
++
++	sata0: sata at fe380000 {
++		...
++		phys	  = <&phy_port0 MIPHY_TYPE_SATA>;
++		...
++	};
