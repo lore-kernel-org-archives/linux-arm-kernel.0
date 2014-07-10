@@ -1,34 +1,76 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jul 2014 23:36:26 +0200
-Subject: [PATCH v2 06/12] ata: Remove ARCH_KIRKWOOD dependency
-In-Reply-To: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
-References: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1405028192-9623-7-git-send-email-andrew@lunn.ch>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Fri, 11 Jul 2014 00:42:36 +0300
+Subject: [PATCH 00/13] Tegra124 CL-DVFS / DFLL clocksource, plus cpufreq
+Message-ID: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
-ARCH_MVEBU is sufficient.
+This series implements the DFLL/CL-DVFS clock source for the fast CPU
+cluster on Tegra124, and a cpufreq driver that uses the DFLL for
+clocking the CPU. Most of this is based on Paul Walmsley's public patch
+set from December 2013, which is available at
+http://comments.gmane.org/gmane.linux.ports.tegra/15273
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: linux-ide at vger.kernel.org
----
- drivers/ata/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The DFLL clock hardware is a voltage-controlled oscillator plus
+control logic that compares the generated output clock with a
+51 MHz reference clock, and can make decisions to either lower
+or raise the DFLL voltage to keep the output rate close to the
+software-requested rate. The voltage changes are done by
+communicating with an off-chip PMIC via either I2C or PWM.
+As the DFLL oscillator is powered via the CPU rail, using
+the DFLL as the CPU clocksource also gives us dynamic CPU
+voltage scaling.
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 7671dbac6015..4749aeb54bc1 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -289,7 +289,7 @@ config SATA_HIGHBANK
- 
- config SATA_MV
- 	tristate "Marvell SATA support"
--	depends on PCI || ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
-+	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
- 		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
- 	select GENERIC_PHY
- 	help
+This series has been tested on the Jetson TK1 (Rev C). Before attempting
+to port this to the Venice2, do note that there are two versions of the
+AS3722 with different voltage tables for the CPU rail (and that Venice2
+does not have active cooling).
+
+Thanks,
+Tuomas
+
+Paul Walmsley (1):
+  clk: tegra: Add DFLL DVCO reset control for Tegra124
+
+Tuomas Tynkkynen (12):
+  clk: tegra: Add binding for the Tegra124 DFLL clocksource
+  clk: tegra: Add library for the DFLL clock source (open-loop mode)
+  clk: tegra: Add closed loop support for the DFLL
+  clk: tegra: Add functions for parsing CVB tables
+  clk: tegra: Add Tegra124 DFLL clocksource platform driver
+  clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
+  clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
+  ARM: tegra: Add the DFLL to Tegra124 device tree
+  ARM: tegra: Enable the DFLL on the Jetson-TK1
+  cpufreq: tegra124: Add device tree bindings
+  cpufreq: Add cpufreq driver for Tegra124
+  ARM: tegra: Add entries for cpufreq on Tegra124
+
+ .../bindings/clock/nvidia,tegra124-dfll.txt        |   86 +
+ .../bindings/cpufreq/tegra124-cpufreq.txt          |   37 +
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   83 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   29 +
+ arch/arm/mach-tegra/Kconfig                        |    1 +
+ drivers/clk/tegra/Makefile                         |    3 +
+ drivers/clk/tegra/clk-dfll.c                       | 1759 ++++++++++++++++++++
+ drivers/clk/tegra/clk-dfll.h                       |   55 +
+ drivers/clk/tegra/clk-tegra-super-gen4.c           |    4 +-
+ drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  156 ++
+ drivers/clk/tegra/clk-tegra124.c                   |   61 +
+ drivers/clk/tegra/clk.h                            |    3 +
+ drivers/clk/tegra/cvb.c                            |  133 ++
+ drivers/clk/tegra/cvb.h                            |   67 +
+ drivers/cpufreq/Makefile                           |    1 +
+ drivers/cpufreq/tegra124-cpufreq.c                 |  221 +++
+ 16 files changed, 2697 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
+ create mode 100644 drivers/clk/tegra/clk-dfll.c
+ create mode 100644 drivers/clk/tegra/clk-dfll.h
+ create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+ create mode 100644 drivers/clk/tegra/cvb.c
+ create mode 100644 drivers/clk/tegra/cvb.h
+ create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
+
 -- 
-2.0.1
+1.8.1.5
