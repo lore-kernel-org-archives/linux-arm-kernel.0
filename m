@@ -1,30 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Jul 2014 12:40:56 +0200
-Subject: [PATCH v1 6/9] usb: xhci: Add NVIDIA Tegra XHCI host-controller
- driver
-In-Reply-To: <Pine.LNX.4.44L0.1407091001150.873-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1407091001150.873-100000@iolanthe.rowland.org>
-Message-ID: <201407101240.56828.arnd@arndb.de>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Thu, 10 Jul 2014 12:44:24 +0200
+Subject: [PATCH 4/5] [RFC] ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAFC085@DBDE04.ent.ti.com>
+References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
+ <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EAFC085@DBDE04.ent.ti.com>
+Message-ID: <1404989064.8309.13.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014, Alan Stern wrote:
-> On Tue, 8 Jul 2014, Andrew Bresticker wrote:
+On Tue, 2014-07-08 at 06:25 +0000, Gupta, Pekon wrote:
 > 
-> > > I think at the very least you should add a function
-> > > "xhci_default_driver(struct hc_driver *driver)" to xhci-plat.c (or
-> > > even better to xhci.c and use it for PCI as well) that initializes all
-> > > function pointers to the default (internal) symbols, and can then be
-> > > overridden afterwards.
-> > 
-> > Currently all XHCI host drivers (PCI, platform, MVEBU) will be built
-> > into the xhci-hcd module.  I could append the Tegra driver to that
-> > module or introduce a xhci_init_driver() like EHCI does as Julius
-> > suggests.  USB folks, do you have a preference?
-> 
-> As the EHCI maintainer, I naturally approve of Julius's suggestion.  
+> Do you plan to re-spin this patch with above comments, and mark it for stable?
+> It would be helpful for all OMAP3 users.
 
-I'm not a USB maintainer, but I also agree that's the best way forward,
-since it's similar to what all other similar drivers in the kernel do.
+Thanks for the reminder. I'll respin the patchset this weekend.
 
-	Arnd
+ -- Christoph
