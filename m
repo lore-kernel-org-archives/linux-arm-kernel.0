@@ -1,26 +1,42 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 10 Jul 2014 11:41:12 +0400
-Subject: [RFC/PATCH RESEND -next 11/21] mm: slub: share slab_err and
- object_err functions
-In-Reply-To: <alpine.DEB.2.11.1407090928530.1384@gentwo.org>
+Date: Thu, 10 Jul 2014 11:43:14 +0400
+Subject: [RFC/PATCH RESEND -next 12/21] mm: util: move krealloc/kzfree to
+ slab_common.c
+In-Reply-To: <alpine.DEB.2.11.1407090931350.1384@gentwo.org>
 References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-12-git-send-email-a.ryabinin@samsung.com>
- <alpine.DEB.2.11.1407090928530.1384@gentwo.org>
-Message-ID: <53BE4398.6020509@samsung.com>
+ <1404905415-9046-13-git-send-email-a.ryabinin@samsung.com>
+ <alpine.DEB.2.11.1407090931350.1384@gentwo.org>
+Message-ID: <53BE4412.6030707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/14 18:29, Christoph Lameter wrote:
+On 07/09/14 18:32, Christoph Lameter wrote:
 > On Wed, 9 Jul 2014, Andrey Ryabinin wrote:
 > 
->> Remove static and add function declarations to mm/slab.h so they
->> could be used by kernel address sanitizer.
+>> To avoid false positive reports in kernel address sanitizer krealloc/kzfree
+>> functions shouldn't be instrumented. Since we want to instrument other
+>> functions in mm/util.c, krealloc/kzfree moved to slab_common.c which is not
+>> instrumented.
+>>
+>> Unfortunately we can't completely disable instrumentation for one function.
+>> We could disable compiler's instrumentation for one function by using
+>> __atribute__((no_sanitize_address)).
+>> But the problem here is that memset call will be replaced by instumented
+>> version kasan_memset since currently it's implemented as define:
 > 
-> Hmmm... This is allocator specific. At some future point it would be good
-> to move error reporting to slab_common.c and use those from all
-> allocators.
+> Looks good to me and useful regardless of the sanitizer going in.
+> 
+> Acked-by: Christoph Lameter <cl@linux.com>
 > 
 
-I could move declarations to kasan internals, but it will look ugly too.
-I also had an idea about unifying SLAB_DEBUG and SLUB_DEBUG at some future.
-I can't tell right now how hard it will be, but it seems doable.
+I also noticed in mm/util.c:
+
+	/* Tracepoints definitions. */
+	EXPORT_TRACEPOINT_SYMBOL(kmalloc);
+	EXPORT_TRACEPOINT_SYMBOL(kmem_cache_alloc);
+	EXPORT_TRACEPOINT_SYMBOL(kmalloc_node);
+	EXPORT_TRACEPOINT_SYMBOL(kmem_cache_alloc_node);
+	EXPORT_TRACEPOINT_SYMBOL(kfree);
+	EXPORT_TRACEPOINT_SYMBOL(kmem_cache_free);
+
+Should I send another patch to move this to slab_common.c?
