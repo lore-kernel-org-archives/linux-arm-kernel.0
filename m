@@ -1,53 +1,29 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Thu, 10 Jul 2014 17:02:59 +0300
-Subject: [PATCH v2 4/4] USB: PHY: tegra: Call tegra_usb_phy_close only
- on device removal
-In-Reply-To: <20140710134859.GM15340@saruman.home>
-References: <1404436179-10745-1-git-send-email-ttynkkynen@nvidia.com>
- <1404436179-10745-5-git-send-email-ttynkkynen@nvidia.com>
- <20140710134859.GM15340@saruman.home>
-Message-ID: <53BE9D13.6000102@nvidia.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 10 Jul 2014 16:03:51 +0200
+Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <20140710111833.GY3935@laptop>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
+ <20140710111833.GY3935@laptop>
+Message-ID: <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/07/14 16:48, Felipe Balbi wrote:
-> * PGP Signed by an unknown key
+On 10 July 2014 13:18, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
+>> +             /*
+>> +              * If the CPUs share their cache and the src_cpu's capacity is
+>> +              * reduced because of other sched_class or IRQs, we trig an
+>> +              * active balance to move the task
+>> +              */
+>> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
+>> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
+>> +                                                     sd->imbalance_pct)))
+>>                       return 1;
 >
-> Hi,
->
-> On Fri, Jul 04, 2014 at 04:09:39AM +0300, Tuomas Tynkkynen wrote:
->> tegra_usb_phy_close() is supposed to undo the effects of
->> tegra_usb_phy_init(). It is also currently added as the USB PHY shutdown
->> callback, which is wrong, since tegra_usb_phy_init() is only called
->
-> you could just make tegra_usb_phy_init() be called as u_phy->init().
+> Why is this tied to shared caches?
 
-Apart from enabling pll_u and vbus, that function mostly fetches clocks 
-etc. from the device tree and as such should preferably fail the probe() 
-and not when the EHCI driver enables the PHY. (Renaming it would 
-probably be a good idea.)
-
-> That way you even delay enabling clocks and regulators to the point
-> where they are more likely to be needed. Also, if EHCI is never loaded,
-> you won't power up the PHY for no reason.
->
-
-That's true, but due to the above that'd be a bigger refactoring.
-
->> during probing wheras the shutdown callback can get called multiple
->> times. This then leads to warnings about unbalanced regulator_disable if
->> the EHCI driver is unbound and bound again at runtime.
->>
->> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
->
-> I suppose this has no dependencies with the rest of the series ?
->
-
-No. But Greg apparently applied these to his tree earlier today.
-
-Thanks,
-Tuomas.
-
--- 
-nvpublic
+It's just to limit the change of the policy to a level that can have
+benefit without performance regression. I'm not sure that we can do
+that at any level without risk
