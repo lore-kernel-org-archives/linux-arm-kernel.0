@@ -1,136 +1,254 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 10 Jul 2014 09:10:15 +0200
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
-In-Reply-To: <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
- <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
- <53BC6866.30803@codeaurora.org>
- <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
- <53BDD834.5030405@codeaurora.org>
- <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
-Message-ID: <20140710071014.GA17918@ulmo>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Jul 2014 09:12:32 +0200
+Subject: [PATCH v4 01/10] mmc: sdhci-st: Intial support for ST SDHCI
+ controller
+In-Reply-To: <1404918461-25390-2-git-send-email-peter.griffin@linaro.org>
+References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
+ <1404918461-25390-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAPDyKFqxEGjgiu-4qB76Bg4Jhv4WEPXSXkbCHVuQ1sS8zw_pmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 08:40:21PM -0400, Rob Clark wrote:
-> On Wed, Jul 9, 2014 at 8:03 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
-> > On 7/8/2014 4:49 PM, Rob Clark wrote:
-> >> On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
-> >>> Hi Hiroshi,
-> >>>
-> >>> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
-> >>>> Hi Olav,
-> >>>>
-> >>>> Olav Haugan <ohaugan@codeaurora.org> writes:
-> >>>>
-> >>>>> Mapping and unmapping are more often than not in the critical path.
-> >>>>> map_range and unmap_range allows SMMU driver implementations to optimize
-> >>>>> the process of mapping and unmapping buffers into the SMMU page tables.
-> >>>>> Instead of mapping one physical address, do TLB operation (expensive),
-> >>>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
-> >>>>> a scatter-gatherlist of physically contiguous pages into one virtual
-> >>>>> address space and then at the end do one TLB operation.
-> >>>>>
-> >>>>> Additionally, the mapping operation would be faster in general since
-> >>>>> clients does not have to keep calling map API over and over again for
-> >>>>> each physically contiguous chunk of memory that needs to be mapped to a
-> >>>>> virtually contiguous region.
-> >>>>>
-> >>>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
-> >>>>> ---
-> >>>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
-> >>>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
-> >>>>>  2 files changed, 48 insertions(+)
-> >>>>>
-> >>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> >>>>> index e5555fc..f2a6b80 100644
-> >>>>> --- a/drivers/iommu/iommu.c
-> >>>>> +++ b/drivers/iommu/iommu.c
-> >>>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
-> >>>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
-> >>>>>
-> >>>>>
-> >>>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
-> >>>>> +                struct scatterlist *sg, unsigned int len, int prot)
-> >>>>> +{
-> >>>>> +    if (unlikely(domain->ops->map_range == NULL))
-> >>>>> +            return -ENODEV;
-> >>>>> +
-> >>>>> +    BUG_ON(iova & (~PAGE_MASK));
-> >>>>> +
-> >>>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
-> >>>>> +}
-> >>>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
-> >>>>
-> >>>> We have the similar one internally, which is named, "iommu_map_sg()",
-> >>>> called from DMA API.
-> >>>
-> >>> Great, so this new API will be useful to more people!
-> >>>
-> >>>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
-> >>>>> +                  unsigned int len)
-> >>>>> +{
-> >>>>> +    if (unlikely(domain->ops->unmap_range == NULL))
-> >>>>> +            return -ENODEV;
-> >>>>> +
-> >>>>> +    BUG_ON(iova & (~PAGE_MASK));
-> >>>>> +
-> >>>>> +    return domain->ops->unmap_range(domain, iova, len);
-> >>>>> +}
-> >>>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
-> >>>>
-> >>>> Can the existing iommu_unmap() do the same?
-> >>>
-> >>> I believe iommu_unmap() behaves a bit differently because it will keep
-> >>> on calling domain->ops->unmap() until everything is unmapped instead of
-> >>> letting the iommu implementation take care of unmapping everything in
-> >>> one call.
-> >>>
-> >>> I am abandoning the patch series since our driver was not accepted.
-> >>> However, if there are no objections I will resubmit this patch (PATCH
-> >>> 2/7) as an independent patch to add this new map_range API.
-> >>
-> >> +1 for map_range().. I've seen for gpu workloads, at least, it is the
-> >> downstream map_range() API is quite beneficial.   It was worth at
-> >> least a few fps in xonotic.
-> >>
-> >> And, possibly getting off the subject a bit, but I was wondering about
-> >> the possibility of going one step further and batching up mapping
-> >> and/or unmapping multiple buffers (ranges) at once.  I have a pretty
-> >> convenient sync point in drm/msm to flush out multiple mappings before
-> >> kicking gpu.
-> >
-> > I think you should be able to do that with this API already - at least
-> > the mapping part since we are passing in a sg list (this could be a
-> > chained sglist).
-> 
-> What I mean by batching up is mapping and unmapping multiple sglists
-> each at different iova's with minmal cpu cache and iommu tlb flushes..
-> 
-> Ideally we'd let the IOMMU driver be clever and build out all 2nd
-> level tables before inserting into first level tables (to minimize cpu
-> cache flushing).. also, there is probably a reasonable chance that
-> we'd be mapping a new buffer into existing location, so there might be
-> some potential to reuse existing 2nd level tables (and save a tiny bit
-> of free/alloc).  I've not thought too much about how that would look
-> in code.. might be kinda, umm, fun..
-> 
-> But at an API level, we should be able to do a bunch of
-> map/unmap_range's with one flush.
-> 
-> Maybe it could look like a sequence of iommu_{map,unmap}_range()
-> followed by iommu_flush()?
+On 9 July 2014 17:07, Peter Griffin <peter.griffin@linaro.org> wrote:
+> This platform driver adds initial support for the SDHCI host controller
+> found on STMicroelectronics SoCs.
+>
+> It has been tested on STiH41x b2020 platforms currently.
+>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Doesn't that mean that the IOMMU driver would have to keep track of all
-mappings until it sees an iommu_flush()? That sounds like it could be a
-lot of work and complicated code.
+Thanks! Applied for next!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/5d9ecb22/attachment-0001.sig>
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/Kconfig    |  12 +++
+>  drivers/mmc/host/Makefile   |   1 +
+>  drivers/mmc/host/sdhci-st.c | 176 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 189 insertions(+)
+>  create mode 100644 drivers/mmc/host/sdhci-st.c
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index a565254..6615b79 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -290,6 +290,18 @@ config MMC_MOXART
+>           be found on some embedded hardware such as UC-7112-LX.
+>           If you have a controller with this interface, say Y here.
+>
+> +config MMC_SDHCI_ST
+> +       tristate "SDHCI support on STMicroelectronics SoC"
+> +       depends on ARCH_STI
+> +       depends on MMC_SDHCI_PLTFM
+> +       select MMC_SDHCI_IO_ACCESSORS
+> +       help
+> +         This selects the Secure Digital Host Controller Interface in
+> +         STMicroelectronics SoCs.
+> +
+> +         If you have a controller with this interface, say Y or M here.
+> +         If unsure, say N.
+> +
+>  config MMC_OMAP
+>         tristate "TI OMAP Multimedia Card Interface support"
+>         depends on ARCH_OMAP
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index 7f81ddf..f211eed 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -68,6 +68,7 @@ obj-$(CONFIG_MMC_SDHCI_OF_HLWD)               += sdhci-of-hlwd.o
+>  obj-$(CONFIG_MMC_SDHCI_BCM_KONA)       += sdhci-bcm-kona.o
+>  obj-$(CONFIG_MMC_SDHCI_BCM2835)                += sdhci-bcm2835.o
+>  obj-$(CONFIG_MMC_SDHCI_MSM)            += sdhci-msm.o
+> +obj-$(CONFIG_MMC_SDHCI_ST)             += sdhci-st.o
+>
+>  ifeq ($(CONFIG_CB710_DEBUG),y)
+>         CFLAGS-cb710-mmc        += -DDEBUG
+> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+> new file mode 100644
+> index 0000000..328f348
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci-st.c
+> @@ -0,0 +1,176 @@
+> +/*
+> + * Support for SDHCI on STMicroelectronics SoCs
+> + *
+> + * Copyright (C) 2014 STMicroelectronics Ltd
+> + * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> + * Contributors: Peter Griffin <peter.griffin@linaro.org>
+> + *
+> + * Based on sdhci-cns3xxx.c
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/mmc/host.h>
+> +
+> +#include "sdhci-pltfm.h"
+> +
+> +static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
+> +{
+> +       u32 ret;
+> +
+> +       switch (reg) {
+> +       case SDHCI_CAPABILITIES:
+> +               ret = readl_relaxed(host->ioaddr + reg);
+> +               /* Support 3.3V and 1.8V */
+> +               ret &= ~SDHCI_CAN_VDD_300;
+> +               break;
+> +       default:
+> +               ret = readl_relaxed(host->ioaddr + reg);
+> +       }
+> +       return ret;
+> +}
+> +
+> +static const struct sdhci_ops sdhci_st_ops = {
+> +       .get_max_clock = sdhci_pltfm_clk_get_max_clock,
+> +       .set_clock = sdhci_set_clock,
+> +       .set_bus_width = sdhci_set_bus_width,
+> +       .read_l = sdhci_st_readl,
+> +       .reset = sdhci_reset,
+> +};
+> +
+> +static const struct sdhci_pltfm_data sdhci_st_pdata = {
+> +       .ops = &sdhci_st_ops,
+> +       .quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
+> +           SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+> +};
+> +
+> +
+> +static int sdhci_st_probe(struct platform_device *pdev)
+> +{
+> +       struct sdhci_host *host;
+> +       struct sdhci_pltfm_host *pltfm_host;
+> +       struct clk *clk;
+> +       int ret = 0;
+> +       u16 host_version;
+> +
+> +       clk =  devm_clk_get(&pdev->dev, "mmc");
+> +       if (IS_ERR(clk)) {
+> +               dev_err(&pdev->dev, "Peripheral clk not found\n");
+> +               return PTR_ERR(clk);
+> +       }
+> +
+> +       host = sdhci_pltfm_init(pdev, &sdhci_st_pdata, 0);
+> +       if (IS_ERR(host)) {
+> +               dev_err(&pdev->dev, "Failed sdhci_pltfm_init\n");
+> +               return PTR_ERR(host);
+> +       }
+> +
+> +       ret = mmc_of_parse(host->mmc);
+> +
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed mmc_of_parse\n");
+> +               return ret;
+> +       }
+> +
+> +       clk_prepare_enable(clk);
+> +
+> +       pltfm_host = sdhci_priv(host);
+> +       pltfm_host->clk = clk;
+> +
+> +       ret = sdhci_add_host(host);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+> +               goto err_out;
+> +       }
+> +
+> +       platform_set_drvdata(pdev, host);
+> +
+> +       host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+> +
+> +       dev_info(&pdev->dev, "SDHCI ST Initialised: Host Version: 0x%x Vendor Version 0x%x\n",
+> +               ((host_version & SDHCI_SPEC_VER_MASK) >> SDHCI_SPEC_VER_SHIFT),
+> +               ((host_version & SDHCI_VENDOR_VER_MASK) >>
+> +               SDHCI_VENDOR_VER_SHIFT));
+> +
+> +       return 0;
+> +
+> +err_out:
+> +       clk_disable_unprepare(clk);
+> +       sdhci_pltfm_free(pdev);
+> +
+> +       return ret;
+> +}
+> +
+> +static int sdhci_st_remove(struct platform_device *pdev)
+> +{
+> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> +       clk_disable_unprepare(pltfm_host->clk);
+> +
+> +       return sdhci_pltfm_unregister(pdev);
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int sdhci_st_suspend(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       int ret = sdhci_suspend_host(host);
+> +
+> +       if (ret)
+> +               goto out;
+> +
+> +       clk_disable_unprepare(pltfm_host->clk);
+> +out:
+> +       return ret;
+> +}
+> +
+> +static int sdhci_st_resume(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> +       clk_prepare_enable(pltfm_host->clk);
+> +
+> +       return sdhci_resume_host(host);
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(sdhci_st_pmops, sdhci_st_suspend, sdhci_st_resume);
+> +
+> +static const struct of_device_id st_sdhci_match[] = {
+> +       { .compatible = "st,sdhci" },
+> +       {},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, st_sdhci_match);
+> +
+> +static struct platform_driver sdhci_st_driver = {
+> +       .probe = sdhci_st_probe,
+> +       .remove = sdhci_st_remove,
+> +       .driver = {
+> +                  .name = "sdhci-st",
+> +                  .pm = &sdhci_st_pmops,
+> +                  .of_match_table = of_match_ptr(st_sdhci_match),
+> +                 },
+> +};
+> +
+> +module_platform_driver(sdhci_st_driver);
+> +
+> +MODULE_DESCRIPTION("SDHCI driver for STMicroelectronics SoCs");
+> +MODULE_AUTHOR("Giuseppe Cavallaro <peppe.cavallaro@st.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:st-sdhci");
+> --
+> 1.9.1
+>
