@@ -1,93 +1,59 @@
-From: sasha.levin@oracle.com (Sasha Levin)
-Date: Thu, 10 Jul 2014 07:55:21 -0400
-Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
- infrastructure.
-In-Reply-To: <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <53BE7F29.20304@oracle.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Jul 2014 14:10:48 +0200
+Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
+ to host's quirk
+In-Reply-To: <002101cf9c35$8da5b240$a8f116c0$%jun@samsung.com>
+References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
+ <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
+ <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
+ <53BE5F9F.6070809@samsung.com>
+ <CAPDyKFrLJJn=SGpjtCq+x88EetBQQBCqgef9z9+3oEVut4upTg@mail.gmail.com>
+ <002101cf9c35$8da5b240$a8f116c0$%jun@samsung.com>
+Message-ID: <CAPDyKFo4gC8Mmbt+f88EMqGvPH9hqW4Fw9d05hq3YGB=iFgaXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 07:29 AM, Andrey Ryabinin wrote:
-> Address sanitizer for kernel (kasan) is a dynamic memory error detector.
-> 
-> The main features of kasan is:
->  - is based on compiler instrumentation (fast),
->  - detects out of bounds for both writes and reads,
->  - provides use after free detection,
-> 
-> This patch only adds infrastructure for kernel address sanitizer. It's not
-> available for use yet. The idea and some code was borrowed from [1].
-> 
-> This feature requires pretty fresh GCC (revision r211699 from 2014-06-16 or
-> latter).
-> 
-> Implementation details:
-> The main idea of KASAN is to use shadow memory to record whether each byte of memory
-> is safe to access or not, and use compiler's instrumentation to check the shadow memory
-> on each memory access.
-> 
-> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
-> mapping with a scale and offset to translate a memory address to its corresponding
-> shadow address.
-> 
-> Here is function to translate address to corresponding shadow address:
-> 
->      unsigned long kasan_mem_to_shadow(unsigned long addr)
->      {
->                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
->                              + kasan_shadow_start;
->      }
-> 
-> where KASAN_SHADOW_SCALE_SHIFT = 3.
-> 
-> So for every 8 bytes of lowmemory there is one corresponding byte of shadow memory.
-> The following encoding used for each shadow byte: 0 means that all 8 bytes of the
-> corresponding memory region are valid for access; k (1 <= k <= 7) means that
-> the first k bytes are valid for access, and other (8 - k) bytes are not;
-> Any negative value indicates that the entire 8-bytes are unaccessible.
-> Different negative values used to distinguish between different kinds of
-> unaccessible memory (redzones, freed memory) (see mm/kasan/kasan.h).
-> 
-> To be able to detect accesses to bad memory we need a special compiler.
-> Such compiler inserts a specific function calls (__asan_load*(addr), __asan_store*(addr))
-> before each memory access of size 1, 2, 4, 8 or 16.
-> 
-> These functions check whether memory region is valid to access or not by checking
-> corresponding shadow memory. If access is not valid an error printed.
-> 
-> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerForKernel
-> 
-> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+On 10 July 2014 13:53, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> On Thu, July 10, 2014, Ulf Hansson wrote:
+>> On 10 July 2014 11:40, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> > Hi, Ulf.
+>> >
+>> > On 07/10/2014 06:15 PM, Ulf Hansson wrote:
+>> >> On 10 July 2014 09:08, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> >>> Replaced the "disable-wp" into host's quirks.
+>> >>> (Because the slot-node is removed at dt-file.)
+>> >>>
+>> >>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> >>
+>> >> Hi Jaehoon,
+>> >>
+>> >> I plan to carry these patches through my mmc tree and I will share
+>> >> them through a PR from an immutable branch with the ARM SoC guys.
+>> >> Please tell me if you have any concern with this set up.
+>>
+>> Hmm, I having a second thought around this. Could I just apply the mmc
+>> patches for my next branch instead of involving ARM SoC? In other
+>> words, are there any decencies? If not, I might just apply patch 1 and
+>> 5.
+>>
+>
+> [PATCHv4 2/5] ARM: dts: exynos: unuse the slot-node and deprecated the supports-highspeed for dw-mmc
+> [PATCHv4 4/5] ARM: dts: rockchip: unuse the slot-node and deprecated the supports-highspeed for dw-mmc
+> [PATCHv4 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk to host's quirk
+>
+> 2nd and 4th are closely related 5th.
+> I think it shall be picked together. How about taking whole patch?
+> And I hope that it is applied for 3.16-rcX fix.
+> (Also, 3rd patch is close to fix patch.)
+>
+> Kukjin,
+> Is it fine to be taken in Ulf's?
 
-I gave it a spin, and it seems that it fails for what you might call a "regular"
-memory size these days, in my case it was 18G:
+I tried applied the complete patchset for 3.16 rc4, but some of the
+DTS patches fails. What are these patches based upon?
 
-[    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate 0xe0c00000 bytes below 0x0.
-[    0.000000]
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.16.0-rc4-next-20140710-sasha-00044-gb7b0579-dirty #784
-[    0.000000]  ffffffffb9c2d3c8 cd9ce91adea4379a 0000000000000000 ffffffffb9c2d3c8
-[    0.000000]  ffffffffb9c2d330 ffffffffb7fe89b7 ffffffffb93c8c28 ffffffffb9c2d3b8
-[    0.000000]  ffffffffb7fcff1d 0000000000000018 ffffffffb9c2d3c8 ffffffffb9c2d360
-[    0.000000] Call Trace:
-[    0.000000] <UNK> dump_stack (lib/dump_stack.c:52)
-[    0.000000] panic (kernel/panic.c:119)
-[    0.000000] memblock_alloc_base (mm/memblock.c:1092)
-[    0.000000] memblock_alloc (mm/memblock.c:1097)
-[    0.000000] kasan_alloc_shadow (mm/kasan/kasan.c:151)
-[    0.000000] zone_sizes_init (arch/x86/mm/init.c:684)
-[    0.000000] paging_init (arch/x86/mm/init_64.c:677)
-[    0.000000] setup_arch (arch/x86/kernel/setup.c:1168)
-[    0.000000] ? printk (kernel/printk/printk.c:1839)
-[    0.000000] start_kernel (include/linux/mm_types.h:462 init/main.c:533)
-[    0.000000] ? early_idt_handlers (arch/x86/kernel/head_64.S:344)
-[    0.000000] x86_64_start_reservations (arch/x86/kernel/head64.c:194)
-[    0.000000] x86_64_start_kernel (arch/x86/kernel/head64.c:183)
+I wonder if it's not best to leave all these for Kukjin to handle
+instead. You have my ack for all of the mmc patches!
 
-It got better when I reduced memory to 1GB, but then my system just failed to boot
-at all because that's not enough to bring everything up.
-
-
-Thanks,
-Sasha
+Kind regards
+Uffe
