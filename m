@@ -1,120 +1,111 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 10 Jul 2014 15:32:22 +0200
-Subject: [RFC v3 1/5] clk: Add temporary mapping to the existing API
-In-Reply-To: <1404999146-32691-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1404999146-32691-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1404999146-32691-2-git-send-email-tomeu.vizoso@collabora.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 10 Jul 2014 19:02:42 +0530
+Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
+In-Reply-To: <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>	<d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>	<53BE926A.2070005@ti.com>
+ <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
+Message-ID: <53BE95FA.5080100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To preserve git-bisectability, add aliases from the future provider API to the
-existing public API.
 
-Also includes clk-provider.h and clk-dev.h in a few places so the right
-functions are defined.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/clk/berlin/bg2.c                      |  1 +
- drivers/clk/berlin/bg2q.c                     |  1 +
- drivers/clk/clkdev.c                          |  1 +
- drivers/media/platform/exynos4-is/media-dev.c |  1 +
- include/linux/clk-provider.h                  | 22 ++++++++++++++++++++++
- include/linux/clk/zynq.h                      |  1 +
- 6 files changed, 27 insertions(+)
+On Thursday 10 July 2014 07:00 PM, Viresh Kumar wrote:
+> On 10 July 2014 18:47, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> On Thursday 10 July 2014 12:56 PM, Viresh Kumar wrote:
+>>> From: Pratyush Anand <pratyush.anand@st.com>
+>>>
+>>> ARM based ST Microelectronics's SPEAr1310/40 platforms uses ST's phy (known as
+>>> 'miphy') for PCIe and SATA. This patch adds drivers for these miphys.
+>>>
+>>> This also adds proper bindings for miphys.
+>>>
+>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+>>> Tested-by: Mohit Kumar <mohit.kumar@st.com>
+>>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>>> [viresh: fixed logs/cclist/checkpatch warnings, broken into smaller patches]
+>>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>> ---
+>>>  .../devicetree/bindings/phy/st-spear1310-miphy.txt |  12 +
+>>>  .../devicetree/bindings/phy/st-spear1340-miphy.txt |  11 +
+>>>  drivers/phy/Kconfig                                |  12 +
+>>>  drivers/phy/Makefile                               |   2 +
+>>>  drivers/phy/phy-spear1310-miphy.c                  | 274 +++++++++++++++++++
+>>>  drivers/phy/phy-spear1340-miphy.c                  | 302 +++++++++++++++++++++
+>>
+>> Please send separate patche for each driver.
+> 
+> These were both around SPEAr and were on the same lines.
+> So sending these in a single patch shouldn't be a big issue I believe.
+> 
+> In case another version is required, I may do it.
+> 
+>>> diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+>>> new file mode 100644
+>>> index 0000000..b9b281a
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+>>
+>> We generally create a single document for a SoC vendor. So just use st-phy.txt.
+> 
+> Probably yes.
+> 
+>> <snip>
+> 
+> Please keep line containing file names while removing stuff, makes it easy
+> to locate code.
 
-diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
-index 515fb13..4c81e09 100644
---- a/drivers/clk/berlin/bg2.c
-+++ b/drivers/clk/berlin/bg2.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-index 21784e4..748da9b 100644
---- a/drivers/clk/berlin/bg2q.c
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index f890b90..000c1ae 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -18,6 +18,7 @@
- #include <linux/string.h>
- #include <linux/mutex.h>
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/of.h>
- 
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index 344718d..2620c48 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -13,6 +13,7 @@
- #include <linux/bug.h>
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/device.h>
- #include <linux/errno.h>
- #include <linux/i2c.h>
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 0c287db..06d56c9 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -16,6 +16,28 @@
- 
- #ifdef CONFIG_COMMON_CLK
- 
-+/* Temporarily map the to-be-added API to the old API, just so stuff compiles */
-+#define clk_core			clk
-+
-+#define __clk_create_clk
-+
-+#define clk_provider_get		clk_get
-+#define clk_provider_get_sys		clk_get_sys
-+#define devm_clk_provider_get		devm_clk_get
-+#define of_clk_provider_get		of_clk_get
-+#define of_clk_provider_get_by_name	of_clk_get_by_name
-+
-+#define clk_provider_set_rate		clk_set_rate
-+#define clk_provider_get_rate		clk_get_rate
-+#define clk_provider_set_parent		clk_set_parent
-+#define clk_provider_get_parent		clk_get_parent
-+#define clk_provider_prepare		clk_prepare
-+#define clk_provider_unprepare		clk_unprepare
-+#define clk_provider_enable		clk_enable
-+#define clk_provider_disable		clk_disable
-+#define clk_provider_prepare_enable	clk_prepare_enable
-+#define clk_provider_disable_unprepare	clk_unprepare
-+
- /*
-  * flags used across common struct clk.  these flags should only affect the
-  * top-level framework.  custom flags for dealing with hardware specifics
-diff --git a/include/linux/clk/zynq.h b/include/linux/clk/zynq.h
-index 7a5633b..a990a59 100644
---- a/include/linux/clk/zynq.h
-+++ b/include/linux/clk/zynq.h
-@@ -21,6 +21,7 @@
- #define __LINUX_CLK_ZYNQ_H_
- 
- #include <linux/spinlock.h>
-+#include <linux/clk-provider.h>
- 
- void zynq_clock_init(void);
- 
--- 
-1.9.3
+ah.. apologies..
+> 
+>>> +
+>>> +static int spear1340_miphy_sata_init(struct spear1340_miphy_priv *priv)
+>>> +{
+>>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+>>> +                        SPEAR1340_PCIE_SATA_CFG_MASK,
+>>> +                        SPEAR1340_SATA_CFG_VAL);
+>>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+>>> +                        SPEAR1340_PCIE_MIPHY_CFG_MASK,
+>>> +                        SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
+>>> +     /* Switch on sata power domain */
+>>> +     regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
+>>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN,
+>>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN);
+>>> +     msleep(20);
+>>> +     /* Disable PCIE SATA Controller reset */
+>>> +     regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
+>>> +                        SPEAR1340_PERIP1_SW_RSATA, 0);
+>>> +     msleep(20);
+>>
+>> Please add a comment for all delays added.
+> 
+> @Pratyush/Mohit: please let me know what to add here.
+> 
+>>> +#ifdef CONFIG_PM_SLEEP
+>>> +static int spear1340_miphy_suspend(struct device *dev)
+>>> +{
+>>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+>>> +     int ret = 0;
+>>> +
+>>> +     if (priv->mode == SATA)
+>>> +             ret = spear1340_miphy_sata_exit(priv);
+>>
+>> Shouldn't this be spear1340_miphy_init()?
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +
+>>> +static int spear1340_miphy_resume(struct device *dev)
+>>> +{
+>>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+>>> +     int ret = 0;
+>>> +
+>>> +     if (priv->mode == SATA)
+>>> +             ret = spear1340_miphy_sata_init(priv);
+>>
+>> And here spear1340_miphy_exit()? Why only for sata phys?
+> 
+> @Mohit/Pratyush ??
+> 
+> Thanks Kishon for another round of review :)
+> 
