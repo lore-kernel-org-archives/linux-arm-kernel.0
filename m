@@ -1,90 +1,94 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 10 Jul 2014 16:08:37 +0900
-Subject: [PATCHv3 3/5] ARM: dts: socfpga: unuse the slot-node and deprecated
- the supports-highspeed for dw-mmc
-In-Reply-To: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
-References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1404976119-10777-4-git-send-email-jh80.chung@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Jul 2014 00:09:48 -0700
+Subject: [PATCH 6/6] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
+References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
+ <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140710070948.GH28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw-mmc controller can support multiple slots.
-But, there are no use-cases anywhere. So we don't need to support the
-slot-node for dw-mmc controller.
-And "supports-highspeed" property in dw-mmc is deprecated.
-"supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140709 10:52]:
+> 
+> v1?v2:
+> 	- added runtime PM. Could somebody could plese double check
+> 	  this? I seems to be enabled and nothing explodes. However
+> 	  serial_omap_get_context_loss_count() & enable_wakeup() are
+> 	  NULL pointer (in the omap-serial driver). So I am not sure how
+> 	  this supposed to work :)
+> 	- added omap_8250_set_termios()
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Tushar Behera <trblinux@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/boot/dts/socfpga_arria5.dtsi   |    9 +++------
- arch/arm/boot/dts/socfpga_cyclone5.dtsi |    9 +++------
- arch/arm/boot/dts/socfpga_vt.dts        |    9 +++------
- 3 files changed, 9 insertions(+), 18 deletions(-)
+You can test this pretty easily on beagleboard xm for example
+using v3.16-r4:
 
-diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-index 12d1c2c..468fc4c 100644
---- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-@@ -29,13 +29,10 @@
+1. Compile the kernel using omap2plus_defconfig and enable your
+   driver. USB EHCI needs to be disabled and OTG port should
+   not have a USB cable connected.
+
+2. Boot with init=/bin/sh to keep user space timers to minimum
+   at least until you have verified to hit off-idle
+
+3. Enable UART timeouts with something like this. You may need
+   to update it for ttyS, I just changed ttyO to ttyS here:
+
+   #!/bin/bash
+   uarts=$(find /sys/class/tty/ttyS*/device/power/ -type d)
+   for uart in $uarts; do
+   	echo 3000 > $uart/autosuspend_delay_ms
+   done
+
+   uarts=$(find /sys/class/tty/ttyS*/power/ -type d)
+   for uart in $uarts; do
+   	echo enabled > $uart/wakeup
+   	echo auto > $uart/control
+   done
+
+   echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+
+4. Wait for UART to time out and verify you hit off-idle by
+   looking at the debugfs entry:
+
+   # cat /sys/kernel/debug/pm_debug/count
+   ...
+   core_pwrdm (ON),OFF:6,RET:0,INA:0,ON:7,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+   ...
  
- 		dwmmc0 at ff704000 {
- 			num-slots = <1>;
--			supports-highspeed;
- 			broken-cd;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--			};
-+			bus-width = <4>;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 		};
- 
- 		sysmgr at ffd08000 {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-index bf51182..1ee03c4 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-@@ -30,13 +30,10 @@
- 
- 		dwmmc0 at ff704000 {
- 			num-slots = <1>;
--			supports-highspeed;
- 			broken-cd;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--			};
-+			bus-width = <4>;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 		};
- 
- 		ethernet at ff702000 {
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index 09792b4..f9345e0 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -43,13 +43,10 @@
- 
- 		dwmmc0 at ff704000 {
- 			num-slots = <1>;
--			supports-highspeed;
- 			broken-cd;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--			};
-+			bus-width = <4>;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 		};
- 
- 		ethernet at ff700000 {
--- 
-1.7.9.5
+I just tried testing this, but did not get far on my omap3 evm:
+
+[    5.445953] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfb020000
+[    5.453674] Internal error: : 1028 [#1] SMP ARM
+[    5.458221] Modules linked in:
+[    5.461334] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.16.0-rc4-00006-gaab2c6a #98
+[    5.469024] task: ce058b00 ti: ce05a000 task.ti: ce05a000
+[    5.474456] PC is at mem32_serial_in+0xc/0x1c
+[    5.478851] LR is at serial8250_do_startup+0xc8/0x89c
+[    5.483917] pc : [<c0346f90>]    lr : [<c034ab2c>]    psr: 60000113
+[    5.483917] sp : ce05bd10  ip : c0a0aba8  fp : ce275400
+[    5.495452] r10: 00000000  r9 : cda7a680  r8 : ce27568c
+[    5.500701] r7 : ce275400  r6 : 00000000  r5 : ce280408  r4 : c10b6234
+[    5.507263] r3 : fb020000  r2 : 00000002  r1 : fb020000  r0 : c10b6234
+[    5.513854] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    5.521179] Control: 10c5387d  Table: 80004019  DAC: 00000015
+[    5.526977] Process swapper/0 (pid: 1, stack limit = 0xce05a248)
+[    5.532989] Stack: (0xce05bd10 to 0xce05c000)
+...
+[    5.734771] [<c0346f90>] (mem32_serial_in) from [<c034ab2c>] (serial8250_do_startup+0xc8/0x89c)
+[    5.743530] [<c034ab2c>] (serial8250_do_startup) from [<c03461f8>] (uart_startup.part.3+0x7c/0x1dc)
+[    5.752624] [<c03461f8>] (uart_startup.part.3) from [<c0346d68>] (uart_open+0xe4/0x124)
+[    5.760681] [<c0346d68>] (uart_open) from [<c032c19c>] (tty_open+0x130/0x58c)
+[    5.767852] [<c032c19c>] (tty_open) from [<c01216f4>] (chrdev_open+0x9c/0x174)
+[    5.775115] [<c01216f4>] (chrdev_open) from [<c011b8d4>] (do_dentry_open+0x1d0/0x310)
+[    5.783020] [<c011b8d4>] (do_dentry_open) from [<c011bd98>] (finish_open+0x34/0x4c)
+[    5.790710] [<c011bd98>] (finish_open) from [<c012a8f8>] (do_last.isra.27+0x5a4/0xb98)
+[    5.798675] [<c012a8f8>] (do_last.isra.27) from [<c012afa0>] (path_openat+0xb4/0x5e4)
+[    5.806549] [<c012afa0>] (path_openat) from [<c012b7dc>] (do_filp_open+0x2c/0x80)
+[    5.814086] [<c012b7dc>] (do_filp_open) from [<c011cd14>] (do_sys_open+0x100/0x1d0)
+[    5.821777] [<c011cd14>] (do_sys_open) from [<c07b7ce0>] (kernel_init_freeable+0x124/0x1c8)
+[    5.830200] [<c07b7ce0>] (kernel_init_freeable) from [<c054eb90>] (kernel_init+0x8/0xe4)
+[    5.838348] [<c054eb90>] (kernel_init) from [<c000e868>] (ret_from_fork+0x14/0x2c)
+
+Sounds like the clocks are not enabled properly?
+
+Regards,
+
+Tony
