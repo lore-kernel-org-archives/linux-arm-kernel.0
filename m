@@ -1,51 +1,98 @@
-From: dpoole@marvell.com (David Poole)
-Date: Thu, 10 Jul 2014 07:10:52 -0700
-Subject: iotable_init() with device at 0xfffff000 
-Message-ID: <2FFEEF382AE80F408D11318E2F2EB199397FA8A51C@sc-vexch3.marvell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Jul 2014 16:26:16 +0200
+Subject: a case for a common efuse API?
+In-Reply-To: <53BDD0F3.7040906@codeaurora.org>
+References: <53BC4DD7.20906@codeaurora.org> <20140709083509.GQ13423@lukather>
+ <53BDD0F3.7040906@codeaurora.org>
+Message-ID: <20140710142616.GD27469@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jul 09, 2014 at 04:32:03PM -0700, Stephen Boyd wrote:
+> On 07/09/14 01:35, Maxime Ripard wrote:
+> > Hi Stephen,
+> >
+> > On Tue, Jul 08, 2014 at 01:00:23PM -0700, Stephen Boyd wrote:
+> >> Hi,
+> >>
+> >> On MSM chips we have some efuses (called qfprom) where we store things
+> >> like calibration data, speed bins, etc. We need to read out data from
+> >> the efuses in various drivers like the cpufreq, thermal, etc. This
+> >> essentially boils down to a bunch of readls on the efuse from a handful
+> >> of different drivers. In devicetree this looks a little odd because
+> >> these drivers end up having an extra reg property (or two) that points
+> >> to a register in the efuse and some length, i.e you see this:
+> >>
+> >> 	thermal-sensor at 34000 {
+> >> 		compatible = "sensor";
+> >> 		reg = <0x34000 0x1000>, <0x10018 0xc>;
+> >> 		reg-names = "sensor", "efuse_calib";
+> >> 	}
+> >>
+> >>
+> >> I imagine in DT we want something more like this:
+> >>
+> >> 	efuse: efuse at 10000 {
+> >> 		compatible = "efuse";
+> >> 		reg = <0x10000 0x1000>;
+> >> 	}
+> >>
+> >> 	thermal-sensor at 34000 {
+> >> 		compatible = "sensor";
+> >> 		reg = <0x34000 0x1000>;
+> >> 		efuse = <&efuse 0x18>;
+> >> 	}
+> > We have pretty much the same things in the Allwinner SoCs. We have an
+> > efuse directly mapped into memory, with a few informations like a MAC
+> > address, the SoC ID, the serial number, some RSA keys for the device,
+> > etc.
+> >
+> > The thing is, some boards expose these informations in an external
+> > EEPROM as well.
+> >
+> > I started working and went quite far to create an "eeprom" framework
+> > to handle these cases, with a dt representation similar to what you
+> > were exposing.
+> >
+> > https://github.com/mripard/linux/tree/eeprom-framework-at24
+> >
+> > It was working quite well, I was about to send it, but was told that I
+> > should all be moved to MTD, and given up on it.
+> 
+> Did anything ever get merged? Or the whole thing was dropped?
 
-I'm porting a working kernel 3.2 to 3.14 on a Marvell PJ4 (ARMv7) based SOC.  Have run into a problem with iotable_init().
+Nope, I just never posted it. I could send it as an RFC though, and
+see what are the feedbacks.
 
-We have a VIC at 0xfffff000 (last 32-bit addressible 4096).
+> That branch looks like what I want, assuming we could get an agreement
+> on the binding. It looks like pretty much every SoC has this, and there
+> isn't any API or binding for it that I've seen. The only thing I see is
+> Documentation/devicetree/bindings/eeprom.txt and that doesn't cover the
+> client aspect at all.
+> 
+> Taking a quick peek at the code, it might be better to change the read
+> API to take a buffer and length, so that the caller doesn't need to free
+> the data allocated by the eeprom layer. It also makes it symmetrical
+> with the write API. We'd probably also need to make it work really early
+> for SoC's like Tegra where we want to read the SoC revision early. So
+> probably split off the device registration part to a later time to allow
+> register() to be called early.
 
-static struct map_desc gogin_io_desc[] __initdata = {
-   { MV31X0_VIC_VIRT_BASE, __phys_to_pfn(MV31X0_VIC_PHYS_BASE), SZ_4K, MT_DEVICE},
-   ...
-};
+I guess that the kind of things we could discuss after posting these
+patches, but yep, it looks reasonnable.
 
-Newer kernels' iotable_init() have new calls that the 3.2 series didn't have:
+I'll try to get things a bit cleaner, and post them in the next days.
 
-add_static_vm_early() -> vm_area_add_early()
+Maxime
 
-The vm_area_add_early() adds the vm area to global 'vmlist'.  The vmlist is traversed in vmalloc_init() and the entries are passed to __insert_vmap_area() which adds the entry to a red/black tree.  The red/black tree add is hitting a BUG().
-
-        if (va->va_start < tmp_va->va_end)
-            p = &(*p)->rb_left;
-        else if (va->va_end > tmp_va->va_start)
-            p = &(*p)->rb_right;
-        else
-            BUG();
-
-For me, the 0xfffff000 is wrapping around to va_end==0. The tree add logic in __insert_vmap_area() is failing (BUG()).
-
-vmalloc_init() sets va_start and va_end
-        va->va_start = (unsigned long)tmp->addr;
-        va->va_end = va->va_start + tmp->size;
-
-va_start==0xfffff000 tmp->size=0x1000 => va_end=0
-
-I tried shrinking the area to SZ_1K or less (there are only a few registers in the VIC) but iotable_init() aligns everything up to page size (4k).
-
-Is there any way to use iotable_init() with addresses that wrap around like this? Or should I punt and move this to the devicetree?
-
-If I comment out this entry, iotable_init() succeeds but I die later:
-Unable to handle kernel paging request at virtual address ffffffe0
-PC is at __vic_init+0x3c/0x128
-LR is at vic_init+0x1c/0x24
-
-Thanks!
-
-David Poole
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/7e3b54ab/attachment-0001.sig>
