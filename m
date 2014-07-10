@@ -1,57 +1,75 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Jul 2014 21:59:54 +0200
-Subject: [PATCH v3 2/2] ARM: at91: remove phy fixup for sama5d3xek boards
+Date: Thu, 10 Jul 2014 21:59:53 +0200
+Subject: [PATCH v3 1/2] ARM: at91/dt: describe rgmii ethernet phy connected to
+ sama5d3xek boards
 In-Reply-To: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1405022394-8311-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These board specific delays are now configured through micrel's specific
-DT bindings (see Documentation/devicetree/bindings/net/micrel-ksz9021.txt).
+Add ethernet-phy nodes and specify phy interrupt (connected to pin PB25)
+and board specific timing configs.
 
-Remove this phy fixup registration from sama5 DT machine file to keep it
-as generic as possible.
+Atmel has two different HW designs for its CPU modules: the first one
+(produced by Embest) is connecting PHYAD[0-2] pins to pull up resistors
+and the other one (produced by Ronetix) is connecting PHYAD0 to a pull up
+resistor and PHYAD[1-2] to pull down resistors.
+As a result, Ronetix design will have its PHY available at address 0x1 and
+Embest design at 0x7.
+By defining both phys we're letting the phy core detect the one actually
+available on the MDIO bus.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-at91/board-dt-sama5.c | 22 ----------------------
- 1 file changed, 22 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index 075ec05..70b2504 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -46,30 +46,8 @@ static void __init at91_dt_init_irq(void)
- 	of_irq_init(irq_of_match);
- }
+Florian, I dropped your Reviewed-by tag because this patch has slightly
+changed.
+
+
+ arch/arm/boot/dts/sama5d3xcm.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index b0b1331..755369e 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -34,6 +34,36 @@
  
--static int ksz9021rn_phy_fixup(struct phy_device *phy)
--{
--	int value;
--
--	/* Set delay values */
--	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000;
--	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
--	value = 0xF2F4;
--	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
--	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000;
--	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
--	value = 0x2222;
--	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
--
--	return 0;
--}
--
- static void __init sama5_dt_device_init(void)
- {
--	if (of_machine_is_compatible("atmel,sama5d3xcm") &&
--	    IS_ENABLED(CONFIG_PHYLIB))
--		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
--			ksz9021rn_phy_fixup);
--
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
+ 			macb0: ethernet at f0028000 {
+ 				phy-mode = "rgmii";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				ethernet-phy at 1 {
++					reg = <0x1>;
++					interrupt-parent = <&pioB>;
++					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
++					txen-skew-ps = <800>;
++					txc-skew-ps = <3000>;
++					rxdv-skew-ps = <400>;
++					rxc-skew-ps = <3000>;
++					rxd0-skew-ps = <400>;
++					rxd1-skew-ps = <400>;
++					rxd2-skew-ps = <400>;
++					rxd3-skew-ps = <400>;
++				};
++
++				ethernet-phy at 7 {
++					reg = <0x7>;
++					interrupt-parent = <&pioB>;
++					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
++					txen-skew-ps = <800>;
++					txc-skew-ps = <3000>;
++					rxdv-skew-ps = <400>;
++					rxc-skew-ps = <3000>;
++					rxd0-skew-ps = <400>;
++					rxd1-skew-ps = <400>;
++					rxd2-skew-ps = <400>;
++					rxd3-skew-ps = <400>;
++				};
+ 			};
  
+ 			pmc: pmc at fffffc00 {
 -- 
 1.8.3.2
