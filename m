@@ -1,46 +1,27 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 10 Jul 2014 16:12:35 +0400
-Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
- infrastructure.
-In-Reply-To: <53BDA568.5030607@intel.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
- <53BDA568.5030607@intel.com>
-Message-ID: <53BE8333.6060404@samsung.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Thu, 10 Jul 2014 15:18:29 +0300
+Subject: [PATCH v3] pinctrl: msm: move all qualcomm drivers to subdir
+In-Reply-To: <CAJAp7Oi-UH4SUHNw_gHtm=P8EYG3+BsA=hPAsZZWjfG5KCMJeA@mail.gmail.com>
+References: <1404910216-2170-1-git-send-email-linus.walleij@linaro.org>
+ <CAJAp7Oi-UH4SUHNw_gHtm=P8EYG3+BsA=hPAsZZWjfG5KCMJeA@mail.gmail.com>
+Message-ID: <1404994709.16296.22.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/14 00:26, Dave Hansen wrote:
-> On 07/09/2014 04:29 AM, Andrey Ryabinin wrote:
->> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
->> mapping with a scale and offset to translate a memory address to its corresponding
->> shadow address.
->>
->> Here is function to translate address to corresponding shadow address:
->>
->>      unsigned long kasan_mem_to_shadow(unsigned long addr)
->>      {
->>                 return ((addr - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT)
->>                              + kasan_shadow_start;
->>      }
+On Wed, 2014-07-09 at 15:16 -0700, Bjorn Andersson wrote:
+> On Wed, Jul 9, 2014 at 5:50 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > We have four Qualcomm-related pin control drivers, and now there
+> > are drivers coming in for the PMICs on these systems, so let's
+> > create a qcom subdirectory to hold all the Qualcomm stuff.
+> >
+> > Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> > Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> How does this interact with vmalloc() addresses or those from a kmap()?
+> Nice initiative.
 > 
+> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-It's used only for lowmem:
++1 from me.
 
-static inline bool addr_is_in_mem(unsigned long addr)
-{
-	return likely(addr >= PAGE_OFFSET && addr < (unsigned long)high_memory);
-}
-
-
-
-static __always_inline void check_memory_region(unsigned long addr,
-						size_t size, bool write)
-{
-
-	....
-	if (!addr_is_in_mem(addr))
-		return;
-	// check shadow here
+Acked-by: Ivan T. Ivanov <iivanov@mm-sol.com>
