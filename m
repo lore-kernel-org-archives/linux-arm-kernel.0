@@ -1,38 +1,194 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Jul 2014 14:22:27 +0200
-Subject: [PATCH v2 2/8] spi: sun4i: add DMA support
-In-Reply-To: <1404619518-7592-3-git-send-email-emilio@elopez.com.ar>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-3-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20140710122227.GC27469@lukather>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Thu, 10 Jul 2014 21:28:18 +0900
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
+References: <CAPz6YkUzGWnOznZ4UXNsLbe=ehDwfMJwUSjahUKVnVz8w9OcsA@mail.gmail.com>
+ <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+Hi Sonny,
 
-On Sun, Jul 06, 2014 at 01:05:09AM -0300, Emilio L?pez wrote:
-> This patch adds DMA support for 64 byte transfers on the sun4i SPI
-> controller. Bigger transfers did not seem to work when tested, and if
-> the hardware actually supports those, it will need further
-> investigation as to how to issue them correctly.
+I have missed this patch.
+
+You finally choose to take extra interrupt handling.
+If it is not harm, it's fine.
+
+Please check one thing below.
+
+On Tue, June 10, 2014, Sonny Rao wrote:
+> This patch changes the fifo reset code to follow the reset procedure
+> outlined in the documentation of Synopsys Mobile storage host databook.
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> ---
+> v2: Add Generic DMA support
+>     per the documentation, move interrupt clear before wait
+>     make the test for DMA host->use_dma rather than host->using_dma
+>     add proper return values (although it appears no caller checks)
+> v3: rename fifo reset function, and change callers
+>     use this combined reset function in dw_mci_resume()
+>     just one caller left (probe), so get rid of dw_mci_ctrl_all_reset()
+>     use DMA reset bit for all systems which use DMA
+>     remove extra IDMAC reset in dw_mci_work_routine_card()
+>     do CIU clock update in error path, if CIU reset cleared
+> v4: remove comment about FIFO reset in dw_mci_work_routine_card()
+>     move down error message when control reset clears but others don't
+>      and clarify the error stating that we will still update clocks
+>     make flags for all reset bits a macro
+> 
+>  drivers/mmc/host/dw_mmc.c | 86 ++++++++++++++++++++++++++++++++++-------------
+>  drivers/mmc/host/dw_mmc.h |  5 +++
+>  2 files changed, 68 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 55cd110..1d6d984 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -111,8 +111,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
+>  	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
+>  };
+> 
+> -static inline bool dw_mci_fifo_reset(struct dw_mci *host);
+> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
+> +static inline bool dw_mci_reset(struct dw_mci *host);
+> 
+>  #if defined(CONFIG_DEBUG_FS)
+>  static int dw_mci_req_show(struct seq_file *s, void *v)
+> @@ -1254,7 +1253,7 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+>  		 * After an error, there may be data lingering
+>  		 * in the FIFO
+>  		 */
+> -		dw_mci_fifo_reset(host);
+> +		dw_mci_reset(host);
+>  	} else {
+>  		data->bytes_xfered = data->blocks * data->blksz;
+>  		data->error = 0;
+> @@ -1371,7 +1370,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
+> 
+>  			/* CMD error in data command */
+>  			if (mrq->cmd->error && mrq->data)
+> -				dw_mci_fifo_reset(host);
+> +				dw_mci_reset(host);
+> 
+>  			host->cmd = NULL;
+>  			host->data = NULL;
+> @@ -1982,14 +1981,8 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+>  			}
+> 
+>  			/* Power down slot */
+> -			if (present == 0) {
+> -				/* Clear down the FIFO */
+> -				dw_mci_fifo_reset(host);
+> -#ifdef CONFIG_MMC_DW_IDMAC
+> -				dw_mci_idmac_reset(host);
+> -#endif
+> -
+> -			}
+> +			if (present == 0)
+> +				dw_mci_reset(host);
+> 
+>  			spin_unlock_bh(&host->lock);
+> 
+> @@ -2323,8 +2316,11 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+>  	return false;
+>  }
+> 
+> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+> +static inline bool dw_mci_reset(struct dw_mci *host)
+>  {
+> +	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
+> +	bool ret = false;
+> +
+>  	/*
+>  	 * Reseting generates a block interrupt, hence setting
+>  	 * the scatter-gather pointer to NULL.
+> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>  		host->sg = NULL;
+>  	}
+> 
+> -	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> -}
+> +	if (host->use_dma)
+> +		flags |= SDMMC_CTRL_DMA_RESET;
+> 
+> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+> -{
+> -	return dw_mci_ctrl_reset(host,
+> -				 SDMMC_CTRL_FIFO_RESET |
+> -				 SDMMC_CTRL_RESET |
+> -				 SDMMC_CTRL_DMA_RESET);
+> +	if (dw_mci_ctrl_reset(host, flags)) {
+> +		/*
+> +		 * In all cases we clear the RAWINTS register to clear any
+> +		 * interrupts.
+> +		 */
+> +		mci_writel(host, RINTSTS, 0xFFFFFFFF);
+> +
+> +		/* if using dma we wait for dma_req to clear */
+> +		if (host->use_dma) {
+> +			unsigned long timeout = jiffies + msecs_to_jiffies(500);
+> +			u32 status;
+> +			do {
+> +				status = mci_readl(host, STATUS);
+> +				if (!(status & SDMMC_STATUS_DMA_REQ))
+> +					break;
+> +				cpu_relax();
+> +			} while (time_before(jiffies, timeout));
+> +
+> +			if (status & SDMMC_STATUS_DMA_REQ) {
+> +				dev_err(host->dev,
+> +					"%s: Timeout waiting for dma_req to "
+> +					"clear during reset", __func__);
+> +				goto ciu_out;
+> +			}
+> +
+> +			/* when using DMA next we reset the fifo again */
+> +			if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
+> +				goto ciu_out;
+> +		}
+> +	} else {
+> +		/* if the controller reset bit did clear, then set clock regs */
+> +		if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
+> +			dev_err(host->dev, "%s: fifo/dma reset bits didn't "
+> +				"clear but ciu was reset, doing clock update.",
+> +				__func__);
+> +			goto ciu_out;
+> +		}
+> +	}
+> +
+> +	if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
+> +		/* It is also recommended that we reset and reprogram idmac */
+> +		dw_mci_idmac_reset(host);
+> +
+> +	ret = true;
+> +
+> +ciu_out:
+> +	/* After a CTRL reset we need to have CIU set clock registers  */
+> +	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+> +
+> +	return ret;
+>  }
+> 
+>  #ifdef CONFIG_OF
+> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
+>  	}
+> 
+>  	/* Reset all blocks */
+> -	if (!dw_mci_ctrl_all_reset(host))
+> +	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
+>  		return -ENODEV;
+> 
+>  	host->dma_ops = host->pdata->dma_ops;
+> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
+>  		}
+>  	}
+> 
+> -	if (!dw_mci_ctrl_all_reset(host)) {
+> +	if (!dw_mci_reset(host)) {
+Do you have any reason to use dw_mci_reset() unlike doing on probing?
 
-This patch looks fine from a quick look, but you should put Mark Brown
-in the recipients, since he's the SPI maintainer, and will probably
-have a sharper look.
-
-Thanks!
-Maxim
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/58b7adb0/attachment-0001.sig>
+Thanks,
+Seungwon Jeon
