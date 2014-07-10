@@ -1,23 +1,28 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 10 Jul 2014 13:18:33 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140710111833.GY3935@laptop>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 10 Jul 2014 14:24:00 +0300
+Subject: [PATCH 0/3] ARM: DTS: omap5-uevm: Enable audio (for 3.17)
+Message-ID: <1404991443-14239-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
-> +		/*
-> +		 * If the CPUs share their cache and the src_cpu's capacity is
-> +		 * reduced because of other sched_class or IRQs, we trig an
-> +		 * active balance to move the task
-> +		 */
-> +		if ((sd->flags & SD_SHARE_PKG_RESOURCES)
-> +		 && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
-> +							sd->imbalance_pct)))
->  			return 1;
+Hi,
 
-Why is this tied to shared caches?
+This set is to enable audio (finally) on the omap5-uevm. We have been waiting
+for the palmas 32K clock driver to make it to upstream, which it did and it is
+already in linux-next.
+
+With the three patch we can have audio working on omap5-uevm with linux-next.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (3):
+  ARM: DTS: omap5-uevm: Enable palmas clk32kgaudio clock
+  ARM: DTS: omap5-uevm: Add node for twl6040 audio codec
+  ARM: DTS: omap5-uevm: Enable basic audio (McPDM <-> twl6040)
+
+ arch/arm/boot/dts/omap5-uevm.dts | 68 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 62 insertions(+), 6 deletions(-)
+
+-- 
+2.0.0
