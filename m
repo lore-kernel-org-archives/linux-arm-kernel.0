@@ -1,83 +1,58 @@
-From: delicious.quinoa@gmail.com (Alan Tull)
-Date: Thu, 10 Jul 2014 16:02:14 -0500
-Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
-References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
- <1396907649-20212-2-git-send-email-tthayer@altera.com>
- <20140408133818.GB16054@pengutronix.de>
- <1396967390.23349.15.camel@dinh-ubuntu>
- <20140408143327.GC16054@pengutronix.de>
- <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
- <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
-Message-ID: <CANk1AXSi0UrU+yHMz+B_gN-k9=DuTDHPaERQfwU+NHvWsaWDpQ@mail.gmail.com>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Thu, 10 Jul 2014 16:02:54 -0500
+Subject: [PATCH] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140710202502.GA20394@cbox>
+References: <20140709161704.9623.92358.stgit@joelaarch64.amd.com>
+ <20140710202502.GA20394@cbox>
+Message-ID: <53BEFF7E.5010907@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 8, 2014 at 1:52 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Apr 8, 2014 at 11:02 AM, delicious quinoa
-> <delicious.quinoa@gmail.com> wrote:
->> On Tue, Apr 8, 2014 at 9:33 AM, Steffen Trumtrar
->> <s.trumtrar@pengutronix.de> wrote:
->>> On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
->>>> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
->>>> > Hi!
->>>> >
->>>> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
->>>> > > From: Thor Thayer <tthayer@altera.com>
->>>> > >
->>>> > > Addition of the Altera SDRAM controller bindings and device
->>>> > > tree changes to the Altera SoC project.
->>>> > >
->>>> [snip]
->>>> > > +
->>>> > > +Required properties:
->>>> > > +- compatible : "altr,sdr-ctl", "syscon";
->>>> > > +                Note that syscon is invoked for this device to support the FPGA
->>>> > > +         bridge driver, EDAC driver and other devices that share the
->>>> > > +         registers.
->>>> > > +- reg : Should contain 1 register ranges(address and length)
->>>> >
->>>> > I haven't really thought this through, but why would the FPGA bridge driver
->>>> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
->>>> > there more?
->>>>
->>>> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
->>>> path. Our SDRAM controller allows FPGA master access to the SDRAM.
->>>>
->>>
->>> Yes. But what you have to do to enable the path is let the FPGA port you use
->>> out of reset. And that is it as far as I can see. The rest happens in the
->>> bitstream. Or is there more to enable the path?
->>> The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
->>> please elaborate.
+
+On 07/10/2014 03:25 PM, Christoffer Dall wrote:
+> On Wed, Jul 09, 2014 at 11:17:04AM -0500, Joel Schopp wrote:
+>> The current calculation for VTTBR_BADDR_MASK masks only 39 bits and not
+>> all 40 bits.  That last bit is important as some systems allocate
+>> from near the top of the available address space.
 >>
->> Hi Steffen,
+>> This patch is necessary to run KVM on an aarch64 SOC I have been testing.
 >>
->> The sdram controller is used by two drivers.  That's why we want to
->> specify "syscon" here.  The other driver is the FPGA bridge driver.
->> Its functionality is very separate from what this driver is doing (we
->> are not enabling the bridge in this driver; we are enabling the
->> monitoring and resetting the interrupt bit of the EDAC).  We wanted to
->> specify "syscon" her so that we don't have to have to change it for
->> the other driver.
->
-> But are there actually overlapping registers which are accessed by
-> both drivers and need the protection of regmap?
+>> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_arm.h |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 3d69030..b39e93f 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -148,7 +148,7 @@
+>>  #endif
+>>  
+>>  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+>> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+>> +#define VTTBR_BADDR_MASK  (0xffffffffffLLU)              /* bits 0-39 */
+>>  #define VTTBR_VMID_SHIFT  (48LLU)
+>>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+>>  
+>>
+> While this is obviously fixing a bug, it doesn't feel like the right
+> short-term fix.  I'll have to go back and read the definitions of x in
+> BADDR[47:x] for VTTBR_EL2 exactly again, but the intended use of
+> VTTBR_BADDR_MASK (and the only occurence of it in C-code) is to deal
+> with alignment of the allocated pgd.
+I think there is some confusion.  Before VTTBR_BADDR_MASK always
+evaluated to 0x7fffffffffLLU, after the change it always evaluates to
+0xffffffffffLLU
 
-No overlapping registers here.  Just various registers that are used
-by: edac driver, fpga bridge, low power modes.  So no special
-protection needed.
+Neither before nor after the patch is it dealing with alignment.  Any
+bits it throws away (bits 40-47) are most significant not least significant.
 
->
-> Perhaps MFD is more appropriate than syscon?
->
-> Rob
+I could have rewritten the macro like:
 
-A syscon will do fine here.  If we did a MFD, all it would be doing
-would be providing register access for this range of registers to a
-few drivers, so syscon does that without any trouble.
+#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X + 1)) - 1) << VTTBR_BADDR_SHIFT)
 
-Alan Tull
-aka
-delicious quinoa
+to correct the bug but it's my opinion that the existing code is quite
+obfuscated which is how the bug happened in the first place.  It seemed
+easier to just actually mask the bits in a straightforward and easy to
+understand manner.  I even added a comment so nobody has to count the fs ;)
