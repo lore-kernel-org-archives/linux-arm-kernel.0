@@ -1,95 +1,75 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Jul 2014 22:39:06 +0200
-Subject: GSoC 2014 #0 status report - Improving Allwinner SoC support
-In-Reply-To: <53BE0B4F.1090001@elopez.com.ar>
-References: <53BE0B4F.1090001@elopez.com.ar>
-Message-ID: <20140710203906.GA3745@lukather>
+From: amartin@nvidia.com (Allen Martin)
+Date: Thu, 10 Jul 2014 13:50:12 -0700
+Subject: [PATCH] arm64: Get the number of bits in ASID from the CPU
+In-Reply-To: <FDB72495-5071-4A82-A7D0-17BA1DF10D84@arm.com>
+References: <1404846860-15055-1-git-send-email-amartin@nvidia.com>
+ <FDB72495-5071-4A82-A7D0-17BA1DF10D84@arm.com>
+Message-ID: <20140710205012.GA21305@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 10, 2014 at 12:41:03AM -0300, Emilio L?pez wrote:
-> Hi everyone,
+On Tue, Jul 08, 2014 at 02:42:17PM -0700, Catalin Marinas wrote:
+> On 8 Jul 2014, at 20:14, Allen Martin <amartin@nvidia.com> wrote:
+> > From: Alex Van Brunt <avanbrunt@nvidia.com>
+> > 
+> > Instead of hard coding the number of ASID bits to 16, read the value
+> > from the CPU through the register ID_AA64MMFR0_EL1 at boot time.  This
+> > is required on Tegra132 Denver CPU which implements 8 bits.
 > 
-> As some of you may know, I'm currently participating in Google
-> Summer of Code under the Linux Foundation, working on a proposal
-> titled "Improve Allwinner SoCs support on mainline Linux". There is
-> a great quantity of devices out there that are powered by Allwinner
-> processors, including but not limited to the various Cubieboards,
-> OLinuXinos, STBs, Tablets and ?Mini PCs?. However, to date, support
-> on mainline Linux is not yet feature complete. My proposal on
-> particular focuses on DMA and analog audio on the earlier SoCs, and
-> improved A23 support.
+> Did you actually find a bug in the existing code?
+
+There was an internal bug associated with this patch, but I didn't
+author the patch, and it's not clear what if anything fails without
+this patch.  I'll dig further.
+
+> > --- a/arch/arm64/mm/context.c
+> > +++ b/arch/arm64/mm/context.c
+> [?]
+> > 
+> > @@ -142,9 +141,9 @@ void __new_context(struct mm_struct *mm)
+> > 	 */
+> > 	if (unlikely((asid & ((1 << bits) - 1)) == 0)) {
 > 
-> The idea here is to make a weekly status report of the project. As
-> we are starting mid-program, this one will be a bit different and
-> I'll outline what has been worked on so far since the beginning.
+> That?s the part where it uses the actual number of bits supported by
+> the hardware (bits is computed higher up in this function based on
+> ID_AA64MMFR0_EL1).
 > 
-> To date, I have been mainly working on the DMA driver for sun4i,
-> sun5i and sun7i. Despite having completely different drivers on SDK
-> kernels, the hardware block looks and behaves the same, so we are
-> using a single driver for these three SoC families. I have sent a
-> series of patches[1] as well as a follow-up v2[2], and I will keep
-> iterating over it until it's accepted. I have also sent two trivial
-> patches[3][4] as a side-effect.
+> > 		/* increment the ASID version */
+> > -		cpu_last_asid += (1 << MAX_ASID_BITS) - (1 << bits);
+> 
+> And here it bumps the generation at bit 16 onwards.
 
-Yep, thanks a lot for that good work.
+So based on your feedback and my read of the code, it looks like on
+CPUs that implement 8 bits of ASID (ID_AA64MMFR0_EL1 & 0xf0 == 0x20),
+bits 7:0 of asid are the real hw ASID, bits 31:16 are the ASID
+"version" which is how hw ASID wrap is counted, and bits 15:8 are
+unused.  A few quesions come up: 
 
-Hopefully, it will be merged rather soon, as it looks quite nice
-already.
+in set_mm_context():
+>        if (likely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS))
 
-> The main challenges while writing this driver can be summarized as a
-> lack of documentation. First of all, it took me a bit to get to know
-> DMAEngine. As there is not much documentation on it, most of my
-> learning took place by reading pre-existing drivers and consulting
-> with my mentor. Secondly, as the Allwinner documentation is mostly a
-> register list with bitfield details, I also had to read the SDK
-> drivers and do some trial and error testing to discover magic values
-> and understand others.
+why is this likely() ?  Shouldn't this only happen on an ASID wrap?
 
-I feel your pain :)
 
-> Lately, I have also been working on the audio part, now that I have
-> a working DMA driver. After implementing cyclic DMA transfers and
-> some clock code, and armed with a Buildroot image with mpg123 and an
-> OpenBSD release track[5] in mp3 format, I've been trying to get some
-> sound out of my Cubietruck's headphone jack, but without much
-> success so far. I have verified my userspace stack and hardware by
-> running these same binaries on top of the linux-sunxi 3.4 kernel,
-> and it worked fine. I have since then been dumping relevant
-> registers with devmem and comparing them, resolving issues as I see
-> them - hopefully this will yield some audible results.
+in __new_context():
+>                /* increment the ASID version */
+>                cpu_last_asid += (1 << MAX_ASID_BITS) - (1 << bits);
+>                if (cpu_last_asid == 0)
+>                        cpu_last_asid = ASID_FIRST_VERSION;
 
-What have you been working on? A new driver from scratch, tried to
-take Allwinner's code and then cleant it up, or used the recently
-published driver Jon made?
+How do you prevent two processes from having the same context.id in
+the case of ASID version wrap?  Since context.id is 64 bits, should
+asid and cpu_last_asid be 64 bits as well to make this less likely?
 
-> Interestingly enough, Allwinner themselves do not seem to be using
-> cyclic DMA transfers on their driver[6]. I hope this is not a sign
-> of a hardware bug that's not documented.
+> 
+> So unless you find some bug in the existing logic, I don?t think your
+> patch is needed.
 
-So they just implement a cyclic-like behaviour in software?
+After reading your comments and looking at the code some more I'm not
+sure it's needed either.  I guess the only advantage is that it uses
+bits 15:8 for ASID version instead of having them be unused.  I'll dig
+more on why this patch was added to begin with.
 
-> To give some closure to this status report, I'd like to thank Maxime
-> for his mentoring so far, Ezequiel for letting me pick his brain,
-> and the Linux Foundation and Google for giving me this opportunity,
-> as well as everyone on the kernel and sunxi communities who have
-> come forward to review and test patches. You can expect a new report
-> soon, in about a week's time or less.
+-Allen
 
-Keep up the good work.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/5b8b35cc/attachment.sig>
+nvpublic
