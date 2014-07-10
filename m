@@ -1,40 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 11:21:32 +0200
-Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
- devm_request_gpio_array
-In-Reply-To: <53BD2509.6070803@codethink.co.uk>
-References: <cover.1404665589.git.himangi774@gmail.com>
- <1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>
- <53BD2509.6070803@codethink.co.uk>
-Message-ID: <CACRpkdZWfYN14aki-UqvWp1K0exVj-mMK92q431QueSVvjZFuA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Jul 2014 10:22:28 +0100
+Subject: [PATCHv3][REBASED] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <1403736903-25594-1-git-send-email-lauraa@codeaurora.org>
+References: <1403736903-25594-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140710092227.GF16137@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 1:18 PM, Rob Jones <rob.jones@codethink.co.uk> wrote:
+On Wed, Jun 25, 2014 at 11:55:03PM +0100, Laura Abbott wrote:
+> arm64 currently lacks support for -fstack-protector. Add
+> similar functionality to arm to detect stack corruption.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm64/Kconfig                      |  1 +
+>  arch/arm64/include/asm/stackprotector.h | 38 +++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/process.c             |  6 ++++++
+>  3 files changed, 45 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/stackprotector.h
 
-> Please note that I submitted a patch on 02/07/14 to create this
-> function which was acked by Linus Walleij on 05/07/14.
->
-> Great minds think alike, and all that.
+Applied for 3.17. Thanks.
 
-My mind certainly isn't any great :-(
-
-My left hand seems to be unaware of what the right hand is doing.
-
-Did I ACK that for merging through some other tree then?
-
-And I guess if Himangi want to submit these ASoC patches, they
-will have to go through the same tree as those patches in that case?
-
-And would you consider implementing a gpiod version...?
-
-> However, I think that the version I submitted better replicates the
-> original (non devm) functionality, see below.
->
-> I didn't, however, add it to the documentation. +1 on that.
-
-Can you include that oneliner in your patch then to reduce
-problems?
-
-Yours,
-Linus Walleij
+-- 
+Catalin
