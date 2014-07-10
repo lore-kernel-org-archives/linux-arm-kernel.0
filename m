@@ -1,43 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Jul 2014 12:03:18 +0100
-Subject: [RESEND PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <1402102527-10569-1-git-send-email-zlim@broadcom.com>
-References: <1402102527-10569-1-git-send-email-zlim@broadcom.com>
-Message-ID: <20140710110318.GA10749@arm.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Thu, 10 Jul 2014 16:34:04 +0530
+Subject: [PATCH v3 01/12] sched: fix imbalance flag reset
+In-Reply-To: <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-2-git-send-email-vincent.guittot@linaro.org>
+ <53BB61E9.80200@linux.vnet.ibm.com>
+ <CAKfTPtA8BVPtRRLzomqnGp7_uaSbFYmFTrrt4fpQTOb7qyjddg@mail.gmail.com>
+ <53BCBD0E.2070609@linux.vnet.ibm.com>
+ <20140709104332.GS19379@twins.programming.kicks-ass.net>
+ <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
+Message-ID: <53BE7324.1090207@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 07, 2014 at 01:55:27AM +0100, Zi Shen Lim wrote:
-> Lorenzo and Mark agreed on the following updated patch from Lorenzo:
->     http://www.spinics.net/lists/arm-kernel/msg336998.html
-> 
-> W.r.t. cluster numbering, we're now back to where we were with the
-> the original patch sent out in April:
->     https://lkml.org/lkml/2014/4/22/951
-> 
-> Were there any other objections to this approach?
-> AFAICT, this patch should be good to go for 3.16.
-> ------->8--------
-> 
-> Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
-> values, this method will always work. Therefore it should also work well
-> as the fallback method. [1]
-> 
-> When we have multiple processing elements in the system, we create
-> the cpu topology by mapping each affinity level (from lowest to highest)
-> to threads (if they exist), cores, and clusters.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg317445.html
-> 
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/include/asm/cputype.h |  2 ++
->  arch/arm64/kernel/topology.c     | 47 ++++++++++++++++++++++++++++------------
->  2 files changed, 35 insertions(+), 14 deletions(-)
+Hi Peter, Vincent,
 
-Applied for 3.17. Thanks.
+On 07/10/2014 02:44 PM, Vincent Guittot wrote:
+> On 9 July 2014 12:43, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Wed, Jul 09, 2014 at 09:24:54AM +0530, Preeti U Murthy wrote:
+> 
+> [snip]
+> 
+>>
+>>> Continuing with the above explanation; when LBF_ALL_PINNED flag is
+>>> set,and we jump to out_balanced, we clear the imbalance flag for the
+>>> sched_group comprising of cpu0 and cpu1,although there is actually an
+>>> imbalance. t2 could still be migrated to say cpu2/cpu3 (t2 has them in
+>>> its cpus allowed mask) in another sched group when load balancing is
+>>> done at the next sched domain level.
+>>
+>> And this is where Vince is wrong; note how
+>> update_sg_lb_stats()/sg_imbalance() uses group->sgc->imbalance, but
+>> load_balance() sets: sd_parent->groups->sgc->imbalance, so explicitly
+>> one level up.
+>>
+> 
+> I forgot this behavior when studying preeti use case
+> 
+>> So what we can do I suppose is clear 'group->sgc->imbalance' at
+>> out_balanced.
+>>
+>> In any case, the entirely of this group imbalance crap is just that,
+>> crap. Its a terribly difficult situation and the current bits more or
+>> less fudge around some of the common cases. Also see the comment near
+>> sg_imbalanced(). Its not a solid and 'correct' anything. Its a bunch of
+>> hacks trying to deal with hard cases.
+>>
+>> A 'good' solution would be prohibitively expensive I fear.
+> 
+> I have tried to summarized several use cases that have been discussed
+> for this patch
+> 
+> The 1st use case is the one that i described in the commit message of
+> this patch: If we have a sporadic imbalance that set the imbalance
+> flag, we don't clear it after and it generates spurious and useless
+> active load balance
+> 
+> Then preeti came with the following use case :
+> we have a sched_domain made of CPU0 and CPU1 in 2 different sched_groups
+> 2 tasks A and B are on CPU0, B can't run on CPU1, A is the running task.
+> When CPU1's sched_group is doing load balance, the imbalance should be
+> set. That's still happen with this patchset because the LBF_ALL_PINNED
+> flag will be cleared thanks to task A.
+> 
+> Preeti also explained me the following use cases on irc:
+> 
+> If we have both tasks A and B that can't run on CPU1, the
+> LBF_ALL_PINNED will stay set. As we can't do anything, we conclude
+> that we are balanced, we go to out_balanced and we clear the imbalance
+> flag. But we should not consider that as a balanced state but as a all
+> tasks pinned state instead and we should let the imbalance flag set.
+> If we now have 2 additional CPUs which are in the cpumask of task A
+> and/or B at the parent sched_domain level , we should migrate one task
+> in this group but this will not happen (with this patch) because the
+> sched_group made of CPU0 and CPU1 is not overloaded (2 tasks for 2
+> CPUs) and the imbalance flag has been cleared as described previously.
 
--- 
-Catalin
+Peter,
+
+The above paragraph describes my concern with regard to clearing the
+imbalance flag at a given level of sched domain in case of pinned tasks
+in the below conversation.
+https://lkml.org/lkml/2014/7/9/454.
+
+You are right about iterating through all tasks including the current
+task during load balancing.
+
+Thanks
+
+Regards
+Preeti U Murthy
+> 
+> I'm going to send a new revision of the patchset with the correction
+> 
+> Vincent
+> 
