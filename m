@@ -1,25 +1,77 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Thu, 10 Jul 2014 14:47:29 +0530
-Subject: [PATCH v3 1/2] gpio: Add driver for Zynq GPIO controller
-In-Reply-To: <CACRpkdbaah=y22UAuWXQN2kDddD-pa7JS52hXT6Bx9dUmbSyMw@mail.gmail.com>
-References: <1404817356-21568-1-git-send-email-harinik@xilinx.com>
- <CACRpkdbaah=y22UAuWXQN2kDddD-pa7JS52hXT6Bx9dUmbSyMw@mail.gmail.com>
-Message-ID: <CAFcVEC+vydShChhKvD6ugbUBfLwd7=XbujjrcVLx6r1xjjkK3g@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 10 Jul 2014 02:17:30 -0700
+Subject: [PATCH v9 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <20140709180520.GA2560@redhat.com>
+References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
+ <1403911380-27787-12-git-send-email-keescook@chromium.org>
+ <20140709180520.GA2560@redhat.com>
+Message-ID: <CAGXu5jLUqz-T1tRBCpPLkzWijyAF-Vjw_7PnQ1EvUh4urwyaUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 2:42 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jul 8, 2014 at 1:02 PM, Harini Katakam <harinik@xilinx.com> wrote:
+On Wed, Jul 9, 2014 at 11:05 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> First of all, sorry for delay ;)
 >
->> From: Harini Katakam <harini.katakam@xilinx.com>
+> So far I quickly glanced at this series and everything look fine, but
+> I am confused by the signal_group_exit() check,
+>
+> On 06/27, Kees Cook wrote:
 >>
->> Add support for GPIO controller used by Xilinx Zynq.
->>
->> Signed-off-by: Harini Katakam <harinik@xilinx.com>
->> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>> To make sure that de_thread() is actually able
+>> to kill other threads during an exec, any sighand holders need to check
+>> if they've been scheduled to be killed, and to give up on their work.
 >
-> Patch applied! Thanks for your patient work on this Harini!
+> Probably this connects to that check below? I can't understand this...
 >
+>> +     /*
+>> +      * Make sure we cannot change seccomp or nnp state via TSYNC
+>> +      * while another thread is in the middle of calling exec.
+>> +      */
+>> +     if (flags & SECCOMP_FILTER_FLAG_TSYNC &&
+>> +         mutex_lock_killable(&current->signal->cred_guard_mutex))
+>> +             goto out_free;
+>
+> -EINVAL looks a bit confusing in this case, but this is cosemtic because
+> userspace won't see this error-code anyway.
 
-Thanks Linus.
-@Soren Thanks.
+Happy to use whatever since, as you say, it's cosmetic. Perhaps -EAGAIN?
+
+>
+>>       spin_lock_irq(&current->sighand->siglock);
+>> +     if (unlikely(signal_group_exit(current->signal))) {
+>> +             /* If thread is dying, return to process the signal. */
+>
+> OK, this doesn't hurt, but why?
+>
+> You could check __fatal_signal_pending() with the same effect. And since
+> we hold this mutex, exec (de_thread) can be the source of that SIGKILL.
+> We take this mutex specially to avoid the race with exec.
+>
+> So why do we need to abort if we race with kill() or exit_grouo() ?
+
+In my initial code inspection that we could block waiting for the
+cred_guard mutex, with exec holding it, exec would schedule death in
+de_thread, and then once it released, the tsync thread would try to
+keep running.
+
+However, in looking at this again, now I'm concerned this produces a
+dead-lock in de_thread, since it waits for all threads to actually
+die, but tsync will be waiting with the killable mutex.
+
+So I think I got too defensive when I read the top of de_thread where
+it checks for pending signals itself.
+
+It seems like I can just safely remove the singal_group_exit checks?
+The other paths (non-tsync seccomp_set_mode_filter, and
+seccomp_set_mode_strict) would just run until it finished the syscall,
+and then died. I can't decide which feels cleaner: just letting stuff
+clean up naturally on death or to short-circuit after taking
+sighand->siglock.
+
+What do you think?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
