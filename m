@@ -1,107 +1,20 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 10 Jul 2014 15:38:27 +0530
-Subject: [PATCH v6 15/23] regulator: max77686: Setup DVS-related GPIOs on
- probe
-In-Reply-To: <1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
-References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Jul 2014 11:08:03 +0100
+Subject: [PATCH v10 0/3] arm64: Add audit support
+In-Reply-To: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1404458911-8214-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140710100803.GH16137@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 4, 2014 at 3:25 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> MAX77686 PMIC support Dyamic Voltage Scaling (DVS) on a set
-> of Buck regulators. A number of GPIO are connected to these
-> lines and are requested by the mfd driver. Setup the GPIO
-> pins from the regulator driver.
-If possible merge this patch with patch 8. Both are adding DVS
-support. Put regmap_copy dependency patch in very beginning.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/regulator/max77686.c | 34 ++++++++++++++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->
-> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-> index ef1af2d..ecce77a 100644
-> --- a/drivers/regulator/max77686.c
-> +++ b/drivers/regulator/max77686.c
-> @@ -435,6 +435,12 @@ static int max77686_pmic_dt_parse_pdata(struct platform_device *pdev,
->  }
->  #endif /* CONFIG_OF */
->
-> +static inline bool max77686_is_dvs_buck(int id)
-> +{
-> +       /* BUCK 2,3 and 4 support DVS */
-> +       return (id >= MAX77686_BUCK2 && id <= MAX77686_BUCK4);
-I am just wondering if along with above check, SELB gpios (if present)
-can be used to confirm if BUCK's are DVS based or not.
-> +}
-> +
->  static int max77686_pmic_probe(struct platform_device *pdev)
->  {
->         struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-> @@ -442,6 +448,9 @@ static int max77686_pmic_probe(struct platform_device *pdev)
->         struct max77686_data *max77686;
->         int i, ret = 0;
->         struct regulator_config config = { };
-> +       unsigned int reg;
-> +       int buck_default_idx;
-> +       int buck_old_idx;
->
->         dev_dbg(&pdev->dev, "%s\n", __func__);
->
-> @@ -472,13 +481,34 @@ static int max77686_pmic_probe(struct platform_device *pdev)
->         config.driver_data = max77686;
->         platform_set_drvdata(pdev, max77686);
->
-> +       buck_default_idx = pdata->buck_default_idx;
-> +       buck_old_idx = max77686_read_gpios(pdata);
-> +
->         for (i = 0; i < MAX77686_REGULATORS; i++) {
->                 struct regulator_dev *rdev;
-> +               int id = pdata->regulators[i].id;
->
->                 config.init_data = pdata->regulators[i].initdata;
->                 config.of_node = pdata->regulators[i].of_node;
->
->                 max77686->opmode[i] = regulators[i].enable_mask;
-> +
-> +               if (max77686_is_dvs_buck(id)) {
-> +                       /* Try to copy over data so we keep firmware settings */
-> +                       reg = regulators[i].vsel_reg;
-> +
-> +                       ret = regmap_reg_copy(iodev->regmap,
-> +                                             reg + buck_default_idx,
-> +                                             reg + buck_old_idx);
-> +
-> +                       if (ret)
-> +                               dev_warn(&pdev->dev, "Copy err %d => %d (%d)\n",
-> +                                        reg + buck_old_idx,
-> +                                        reg + buck_default_idx, ret);
-> +
-> +                       regulators[i].vsel_reg += buck_default_idx;
-> +               }
-> +
->                 rdev = devm_regulator_register(&pdev->dev,
->                                                 &regulators[i], &config);
->                 if (IS_ERR(rdev)) {
-> @@ -488,6 +518,10 @@ static int max77686_pmic_probe(struct platform_device *pdev)
->                 }
->         }
->
-> +       ret = max77686_setup_gpios(iodev->dev);
-> +       if (ret)
-> +               return ret;
-> +
->         return 0;
->  }
->
-> --
-> 2.0.0.rc2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Fri, Jul 04, 2014 at 08:28:28AM +0100, AKASHI Takahiro wrote:
+> This patchset adds system call audit support on arm64.
+> Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
+> are supported. Since arm64 has the exact same set of system calls
+> on LE and BE, we don't care about endianness (or more specifically
+> __AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
+
+Applied for 3.17. Thanks.
+
+-- 
+Catalin
