@@ -1,49 +1,106 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 10 Jul 2014 22:30:05 +0900
-Subject: [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on
- Exynos4210 and 5250
-In-Reply-To: <156099171.AcKbd1QIut@amdc1032>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-7-git-send-email-t.figa@samsung.com>
- <038b01cf9ab7$0de5a440$29b0ecc0$@samsung.com> <156099171.AcKbd1QIut@amdc1032>
-Message-ID: <026601cf9c43$0faf6ad0$2f0e4070$@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 10 Jul 2014 19:00:30 +0530
+Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
+In-Reply-To: <53BE926A.2070005@ti.com>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+ <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
+ <53BE926A.2070005@ti.com>
+Message-ID: <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-Hi Bart,
+On 10 July 2014 18:47, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> On Thursday 10 July 2014 12:56 PM, Viresh Kumar wrote:
+>> From: Pratyush Anand <pratyush.anand@st.com>
+>>
+>> ARM based ST Microelectronics's SPEAr1310/40 platforms uses ST's phy (known as
+>> 'miphy') for PCIe and SATA. This patch adds drivers for these miphys.
+>>
+>> This also adds proper bindings for miphys.
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+>> Tested-by: Mohit Kumar <mohit.kumar@st.com>
+>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>> [viresh: fixed logs/cclist/checkpatch warnings, broken into smaller patches]
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> ---
+>>  .../devicetree/bindings/phy/st-spear1310-miphy.txt |  12 +
+>>  .../devicetree/bindings/phy/st-spear1340-miphy.txt |  11 +
+>>  drivers/phy/Kconfig                                |  12 +
+>>  drivers/phy/Makefile                               |   2 +
+>>  drivers/phy/phy-spear1310-miphy.c                  | 274 +++++++++++++++++++
+>>  drivers/phy/phy-spear1340-miphy.c                  | 302 +++++++++++++++++++++
+>
+> Please send separate patche for each driver.
 
-> On Tuesday, July 08, 2014 11:15:21 PM Kukjin Kim wrote:
-> > Tomasz Figa wrote:
-> > >
-> > > Currently, the Exynos cpuidle driver works correctly only on Exynos4210
-> > > and 5250. Trying to use it with just one CPU online on any other Exynos
-> > > SoC will lead to system failure, due to unsupported AFTR mode on other
-> > > SoCs. This patch fixes the problem by registering the driver only on
-> > > supported SoCs and letting others simply use default WFI mode until
-> > > support for them is added.
-> > >
-> > Hmm...I thought other SoCs have no problem on cpuidle except exynos5420 and
-> > exynos5440....something like this would be helpful to avoid system failure.
-> > But unfortunately this conflicts with Pankaj's cleanup cpufreq_init() and
-> > cpuidle_init() patch you've reviewed and I've applied in my local...
-> >
-> > I'm going to check which exynos is ok on cpuidle and then sort them out.
-> 
-> Tomasz's patch is correct - currently only Exynos4210 and Exynos5250 work
-> fine with AFTR mode and upstream kernel (AFTR gets triggered by offlining
-> CPUs other than CPU0).
-> 
-> [ Exynos4x12 and Exynos3250 need secure firmware support (patches for this
->   need to be reworked on top of recent PM/firmware/cpuidle changes).
-> 
->   Exynos5410 should use big_little cpuidle driver. ]
-> 
-Agreed that this is required at this moment.
-I will take this into fixes for 3.16.
+These were both around SPEAr and were on the same lines.
+So sending these in a single patch shouldn't be a big issue I believe.
 
-Thanks,
-Kukjin
+In case another version is required, I may do it.
+
+>> diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+>> new file mode 100644
+>> index 0000000..b9b281a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+>
+> We generally create a single document for a SoC vendor. So just use st-phy.txt.
+
+Probably yes.
+
+> <snip>
+
+Please keep line containing file names while removing stuff, makes it easy
+to locate code.
+
+>> +
+>> +static int spear1340_miphy_sata_init(struct spear1340_miphy_priv *priv)
+>> +{
+>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+>> +                        SPEAR1340_PCIE_SATA_CFG_MASK,
+>> +                        SPEAR1340_SATA_CFG_VAL);
+>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+>> +                        SPEAR1340_PCIE_MIPHY_CFG_MASK,
+>> +                        SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
+>> +     /* Switch on sata power domain */
+>> +     regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
+>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN,
+>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN);
+>> +     msleep(20);
+>> +     /* Disable PCIE SATA Controller reset */
+>> +     regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
+>> +                        SPEAR1340_PERIP1_SW_RSATA, 0);
+>> +     msleep(20);
+>
+> Please add a comment for all delays added.
+
+@Pratyush/Mohit: please let me know what to add here.
+
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int spear1340_miphy_suspend(struct device *dev)
+>> +{
+>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+>> +     int ret = 0;
+>> +
+>> +     if (priv->mode == SATA)
+>> +             ret = spear1340_miphy_sata_exit(priv);
+>
+> Shouldn't this be spear1340_miphy_init()?
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static int spear1340_miphy_resume(struct device *dev)
+>> +{
+>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+>> +     int ret = 0;
+>> +
+>> +     if (priv->mode == SATA)
+>> +             ret = spear1340_miphy_sata_init(priv);
+>
+> And here spear1340_miphy_exit()? Why only for sata phys?
+
+@Mohit/Pratyush ??
+
+Thanks Kishon for another round of review :)
