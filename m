@@ -1,39 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 10 Jul 2014 14:35:54 -0700
-Subject: [GIT PULL] omap fixes against v3.16-rc4
-In-Reply-To: <20140709153552.GA28884@atomide.com>
-References: <20140709153552.GA28884@atomide.com>
-Message-ID: <20140710213554.GA1313@quad.lixom.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 10 Jul 2014 15:39:37 -0600
+Subject: [PATCH V9 1/7] pcie: Add designware wrapper driver for SPEAr13xx
+In-Reply-To: <9430e4b284928e4919297de5602e803d03f82d7b.1404976058.git.viresh.kumar@linaro.org>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+ <9430e4b284928e4919297de5602e803d03f82d7b.1404976058.git.viresh.kumar@linaro.org>
+Message-ID: <20140710213937.GB15190@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 08:35:52AM -0700, Tony Lindgren wrote:
-> The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
-> 
->   Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-rc4
-> 
-> for you to fetch changes up to 1d29a0722f6c38f79785c9ffb911730598de84e2:
-> 
->   ARM: OMAP2+: Remove non working OMAP HDMI audio initialization (2014-07-08 01:08:44 -0700)
-> 
-> ----------------------------------------------------------------
-> Fixes for omaps for the -rc series. It's mostly fixes for clock rates,
-> restart handling and phy regulators and SATA interconnect data.
+I guess I'm obsessive, but I think it's nice when people run
+"git log --oneline" on the file or directory they're changing,
+and then follow the existing style.
 
-It's a little surprising to see a SATA fix about a week after enablement
-went in during -rc -- enabling it that late should ideally have been
-better tested than this.
+In this case, that would lead to a subject line like:
 
-> Also few build fixes related to the DSP driver in staging, and trivial
-> stuff like removal of broken and soon to be unused platform data init
-> for HDMI audio that would be good to get into the -rc series if not
-> too late.
+    PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx
 
-Thanks, merged. Definitely time for regressions only from here on out though.
+On Thu, Jul 10, 2014 at 12:56:32PM +0530, Viresh Kumar wrote:
+> From: Pratyush Anand <pratyush.anand@st.com>
+> 
+> ARM based ST Microelectronics's SPEAr1310 and SPEAr1340 SOCs have onchip
+> designware PCIe controller. To make that usable, this patch adds a wrapper
+> driver based on existing designware driver.
+> 
+> Adds bindings for this new driver and update MAINTAINERS as well.
+> 
+> Cc: linux-pci at vger.kernel.org
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+> [viresh: fixed logs/cclist/checkpatch warnings, broken into smaller patches]
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 702ca10..443dd05 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6820,6 +6820,12 @@ S:	Maintained
+>  F:	Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>  F:	drivers/pci/host/pci-host-generic.c
+>  
+> +PCIE DRIVER FOR ST SPEAR13XX
+> +M:	Mohit Kumar <mohit.kumar@st.com>
+> +L:	linux-pci at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/pci/host/pcie-spear13xx.c
 
--Olof
+Wildcards work here, so you could follow the lead of IMX6, MVEBU, RCAR,
+and DESIGNWARE and use:
+
+    F:	drivers/pci/host/*spear*
+
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-spear13xx.c
+> ...
+> +#define PCI_CAP_ID_EXP_OFFSET			0x70
+
+A nit, but I'd use a name like EXP_CAP_ID_OFFSET to make it
+more clear that this is specific to SPEAr, not something from
+the PCI specs.
+
+Bjorn
