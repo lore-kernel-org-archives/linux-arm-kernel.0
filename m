@@ -1,62 +1,118 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 10 Jul 2014 23:04:34 +0400
-Subject: [RFC/PATCH RESEND -next 01/21] Add kernel address sanitizer
- infrastructure.
-In-Reply-To: <53BE9CED.4090103@oracle.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-2-git-send-email-a.ryabinin@samsung.com>
- <53BE7F29.20304@oracle.com> <53BE8EA5.2030402@samsung.com>
- <53BE959A.4010206@oracle.com> <53BE9786.4060700@samsung.com>
- <53BE9CED.4090103@oracle.com>
-Message-ID: <CAPAsAGy279XqO0Yq9v1q1OoW4TLv2iFKC0UjY+fOh31LxYOB+w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Jul 2014 21:32:40 +0200
+Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
+ connected to sama5d3xek boards
+In-Reply-To: <CAGVrzcawPiJgQF-=18ZvFGr3LhZgS1ZSZMYA3i5x874S6=jcXw@mail.gmail.com>
+References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
+ <53AC7BFD.2070806@free-electrons.com> <53AD22D8.2090301@atmel.com>
+ <20140710110720.03f437eb@bbrezillon>
+ <CAGVrzcZD1SqwX1KqaMpZmBjOWGuvTSVaye0fkFXW_=h-N_d7WA@mail.gmail.com>
+ <20140710191927.56a3ead5@bbrezillon>
+ <CAGVrzcawPiJgQF-=18ZvFGr3LhZgS1ZSZMYA3i5x874S6=jcXw@mail.gmail.com>
+Message-ID: <20140710213240.3a5a540f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-10 18:02 GMT+04:00 Sasha Levin <sasha.levin@oracle.com>:
-> On 07/10/2014 09:39 AM, Andrey Ryabinin wrote:
->>> Anyways, the machine won't boot with more than 1GB of RAM, is there a solution to
->>> > get KASAN running on my machine?
->>> >
->> Could you share you .config? I'll try to boot it by myself. It could be that some options conflicting with kasan.
->> Also boot cmdline might help.
->>
->
-> Sure. It's the .config I use for fuzzing so it's rather big (attached).
->
-> The cmdline is:
->
-> [    0.000000] Command line: noapic noacpi pci=conf1 reboot=k panic=1 i8042.direct=1 i8042.dumbkbd=1 i8042.nopnp=1 console=ttyS0 earlyprintk=serial i8042.noaux=1 numa=fake=32 init=/virt/init zcache ftrace_dump_on_oops debugpat kvm.mmu_audit=1 slub_debug=FZPU rcutorture.rcutorture_runnable=0 loop.max_loop=64 zram.num_devices=4 rcutorture.nreaders=8 oops=panic nr_hugepages=1000 numa_balancing=enable softlockup_all_cpu_backtrace=1 root=/dev/root rw rootflags=rw,trans=virtio,version=9p2000.L rootfstype=9p init=/virt/init
->
-> And the memory map:
->
-> [    0.000000] e820: BIOS-provided physical RAM map:
-> [    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009fbff] usable
-> [    0.000000] BIOS-e820: [mem 0x000000000009fc00-0x000000000009ffff] reserved
-> [    0.000000] BIOS-e820: [mem 0x00000000000f0000-0x00000000000ffffe] reserved
-> [    0.000000] BIOS-e820: [mem 0x0000000000100000-0x00000000cfffffff] usable
-> [    0.000000] BIOS-e820: [mem 0x0000000100000000-0x0000000705ffffff] usable
->
->
-> On 07/10/2014 09:50 AM, Andrey Ryabinin wrote:>> Anyways, the machine won't boot with more than 1GB of RAM, is there a solution to
->>> > get KASAN running on my machine?
->>> >
->> It's not boot with the same Failed to allocate error?
->
-> I think I misunderstood your question here. With >1GB is triggers a panic() when
-> KASAN fails the memblock allocation. With <=1GB it fails a bit later in boot just
-> because 1GB isn't enough to load everything - so it fails in some other random
-> spot as it runs on out memory.
->
->
-> Thanks,
-> Sasha
+On Thu, 10 Jul 2014 10:46:21 -0700
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-Looks like I found where is a problem. memblock_alloc cannot allocate
-accross numa nodes,
-therefore kasan fails for numa=fake>=8.
-You should succeed with numa=fake=7 or less.
+> 2014-07-10 10:19 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> > On Thu, 10 Jul 2014 08:35:15 -0700
+> > Florian Fainelli <f.fainelli@gmail.com> wrote:
+> >
+> >> 2014-07-10 2:07 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> >> > On Fri, 27 Jun 2014 09:52:56 +0200
+> >> > Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> >> >
+> >> >> On 26/06/2014 22:01, Boris BREZILLON :
+> >> >> > Hi Florian,
+> >> >> >
+> >> >> > On 26/06/2014 20:15, Florian Fainelli wrote:
+> >> >> >> Hi Boris,
+> >> >> >>
+> >> >> >> 2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> >> >> >>> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
+> >> >> >>>
+> >> >> >>> The PHY address is not specified here because atmel have 2 different
+> >> >> >>> designs
+> >> >> >>> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
+> >> >> >>> (Embest design) and the other one is connection PHYAD0 to a pull up
+> >> >> >>> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
+> >> >> >>> As a result, Ronetix design will have its PHY available at address 0x1 and
+> >> >> >>> Embest design at 0x7.
+> >> >> >>> Let the net PHY core automatically detect the PHY address by scanning the
+> >> >> >>> MDIO bus.
+> >> >> >> I though the compatible string was listed as a required property, but
+> >> >> >> it is not. The 'reg' property however is listed as required, although
+> >> >> >> the of_miodbus_register() works just fine without it, although that is
+> >> >> >> a Linux-specific implementation detail.
+> >> >> >
+> >> >> > Indeed, it's listed in the required property list of the DT binding doc,
+> >> >> > but the code implement auto detection if reg is missing.
+> >> >> > However this line [1] clearly shows that specifying the reg property is
+> >> >> > the preferred way of doing things.
+> >> >> >
+> >> >> > I could define 2 different sama5d3xcm.dtsi (sama5d3xcm-ronetix.dtsi and
+> >> >> > sama5d3xcm-embest.dtsi) to avoid this dirty hack,
+> >> >> > but then we would have 2 more dtb and the user would have to determine
+> >> >> > which CPU module he owns to choose the appropriate dtb.
+> >> >> > If at91, arm-soc and DT maintainers agree with this approach I can
+> >> >> > definitely propose something.
+> >> >>
+> >> >> Yes Boris, I definitively prefer not to add another .dtsi file for this
+> >> >> series if we can avoid it.
+> >> >>
+> >> >
+> >> > Okay, now that I don't specify the reg property I have a bunch of
+> >> > noisy logs (which is exactly what the developer of of_mdio.c wanted in
+> >> > order to force people to specify the reg property).
+> >> >
+> >> > It seems to be a problem for atmel users (all these logs make them
+> >> > think there is something wrong with the net device).
+> >> >
+> >> > Apart from the dts/dtsi split solution, which Nicolas wants to avoid, I
+> >> > see two solutions here:
+> >> >
+> >> > 1) remove the logs (or use dev_dbg instead of dev_info) from of_mdio.c.
+> >> > But I'm pretty sure this solution won't be accepted :-).
+> >>
+> >> I am fine with using dev_dbg() instead of dev_info() for that sort of
+> >> messages, provided that you state the rationale of this change
+> >> (spewing the log console with probing messages) and specify tha the
+> >> 'reg' property is optional.
+> >>
+> >> >
+> >> > 2) define 2 ethernet phys (one for each possible solution). I tested it
+> >> > and it works fine (only the available PHY is registered and there is no
+> >> > noisy logs anymore).
+> >>
+> >> One advantage of that solution is that you'll get slightly faster boot
+> >> times since you won't have to auto-probe for the PHYs on the MDIO bus,
+> >> the time savings get bigger as you start using higher PHY addresses.
+> >
+> > Yes I prefer this solution too, but is it acceptable to define 2 phy
+> > nodes even if only one is really available ?
+> 
+> One or the other machine .dts should have to set the status property
+> accordingly so there is only effectively one PHY declared, assuming
+> this is possible based on your .dtsi layout?
 
+This is exactly what Nicolas wants to avoid (duplication of dts files
+to handle Embest and Ronetix designs).
+
+> If not, provided by the
+> phy-handle properties are correct, I can't see any problem with having
+> an unused PHY specified in DT.
+
+Okay, then I'll go for that solution.
+
+Thanks,
+
+Boris
 
 -- 
-Best regards,
-Andrey Ryabinin
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
