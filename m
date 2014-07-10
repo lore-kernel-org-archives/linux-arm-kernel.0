@@ -1,46 +1,94 @@
-From: andrey.krieger.utkin@gmail.com (Andrey Utkin)
-Date: Thu, 10 Jul 2014 15:47:30 +0300
-Subject: [PATCH] arch/arm/mach-s3c24xx/mach-osiris-dvs.c: use "&&" (not "&")
- with bool operands
-Message-ID: <1404996450-4617-1-git-send-email-andrey.krieger.utkin@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Jul 2014 14:51:53 +0200
+Subject: [PATCH v4 00/10] Add SDHCI support for ST Microelectronics SoCs
+In-Reply-To: <53BD64E4.5060504@st.com>
+References: <1404918461-25390-1-git-send-email-peter.griffin@linaro.org>
+ <53BD64E4.5060504@st.com>
+Message-ID: <CAPDyKFqpqa-nA3i8Z4k3oBqgo7OpppxM5tSCSz-mhxyHRJtZTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The issue was discovered by static analysis. Bitwise AND ("&") was used
-in logical expressions with operands having "bool" type. Replaced
-bitwise AND operators with logical AND.
+On 9 July 2014 17:51, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+>
+>
+> On 07/09/2014 05:07 PM, Peter Griffin wrote:
+>>
+>> This series adds a SDHCI platform driver for ST SoCs, along with
+>> the additional device tree bindings and configuration to enable
+>> the controller to work properly.
+>>
+>> Initially it supports the stih416 and stih415 SoCs, and has
+>> been tested on a stih416-b2020 board.
+>>
+>> regards,
+>>
+>> Peter.
+>>
+>> Changes since v1
+>> - Whitespace cleanups
+>> - Use readl_relaxed io accessor
+>> - Add update to MAINTAINERS
+>> - Remove reset controller code from platform driver
+>> - Remove #ifdef around sleep ops
+>> - Use sdhci_pltfm_clk_get_max_clock lib function
+>> - Pass bus-width etc through board device tree node
+>> - Remove unncessary header
+>> - Remove / change some debug messages
+>> - Remove final break from switch case
+>>
+>> Changes since v2
+>> - Update CC list with alkml and lkml lists
+>>
+>> Changes since v3
+>> - Rebased on v3.16-rc4
+>> - Use sdhci_set_bus_width lib function for set_bus_width
+>> - Remove sdhci_st_8bit_width function
+>> - Use sdhci_set_clock lib function for set_clock
+>>
+>> Peter Griffin (10):
+>>    mmc: sdhci-st: Intial support for ST SDHCI controller
+>>    mmc: sdhci-st: ST Microelectronics SDHCI binding documentation.
+>>    ARM: STi: DT: Add sdhci pins for stih416
+>>    ARM: STi: DT: Add sdhci controller for stih416
+>>    ARM: STi: DT: Add sdhci pin configuration for stih415
+>>    ARM: STi: DT: Add sdhci controller for stih415
+>>    ARM: STi: DT: Enable mmc0 for both stih415 and stih416 SoCs
+>>    ARM: STi: DT: Enable second sdhci controller for stih416 b2020 boards.
+>>    ARM: update multi_v7_defconfig for STI
+>>    MAINTAINERS: Add sdhci-st file to ARCH/STI architecture
+>>
+>>   Documentation/devicetree/bindings/mmc/sdhci-st.txt |  33 ++++
+>>   MAINTAINERS                                        |   1 +
+>>   arch/arm/boot/dts/stih415-pinctrl.dtsi             |  21 +++
+>>   arch/arm/boot/dts/stih415.dtsi                     |  12 ++
+>>   arch/arm/boot/dts/stih416-b2020.dts                |   8 +
+>>   arch/arm/boot/dts/stih416-b2020e.dts               |   6 +
+>>   arch/arm/boot/dts/stih416-pinctrl.dtsi             |  39 +++++
+>>   arch/arm/boot/dts/stih416.dtsi                     |  24 +++
+>>   arch/arm/boot/dts/stih41x-b2020.dtsi               |   4 +
+>>   arch/arm/boot/dts/stih41x-b2020x.dtsi              |   4 +
+>>   arch/arm/configs/multi_v7_defconfig                |   1 +
+>>   drivers/mmc/host/Kconfig                           |  12 ++
+>>   drivers/mmc/host/Makefile                          |   1 +
+>>   drivers/mmc/host/sdhci-st.c                        | 176
+>> +++++++++++++++++++++
+>>   14 files changed, 342 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
+>>   create mode 100644 drivers/mmc/host/sdhci-st.c
+>>
+>
+> Thanks Peter.
+>
+> DT patches queued to git://git.stlinux.com/devel/kernel/linux-sti.git
+> sti-dt-for-v3.17-1
 
-Bugzilla: https://bugzilla.kernel.org/show_bug.cgi?id=79781
-Reported-by: David Binderman <dcb314@hotmail.com>
-Signed-off-by: Andrey Utkin <andrey.krieger.utkin@gmail.com>
----
- arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+What about patch9 and 10? Did you take them as well?
 
-diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-index 33afb91..b2d620d 100644
---- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-+++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-@@ -70,16 +70,16 @@ static int osiris_dvs_notify(struct notifier_block *nb,
- 
- 	switch (val) {
- 	case CPUFREQ_PRECHANGE:
--		if (old_dvs & !new_dvs ||
--		    cur_dvs & !new_dvs) {
-+		if (old_dvs && !new_dvs ||
-+		    cur_dvs && !new_dvs) {
- 			pr_debug("%s: exiting dvs\n", __func__);
- 			cur_dvs = false;
- 			gpio_set_value(OSIRIS_GPIO_DVS, 1);
- 		}
- 		break;
- 	case CPUFREQ_POSTCHANGE:
--		if (!old_dvs & new_dvs ||
--		    !cur_dvs & new_dvs) {
-+		if (!old_dvs && new_dvs ||
-+		    !cur_dvs && new_dvs) {
- 			pr_debug("entering dvs\n");
- 			cur_dvs = true;
- 			gpio_set_value(OSIRIS_GPIO_DVS, 0);
--- 
-1.8.3.2
+You may add my ack for them, for whatever it's worth.
+
+Kind regards
+Uffe
+
+>
+> Regards,
+> Maxime
