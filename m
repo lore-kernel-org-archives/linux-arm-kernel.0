@@ -1,30 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Jul 2014 11:09:51 +0200
-Subject: [PATCH 3/3] ARM: msm: delete dangling debug UART code
-In-Reply-To: <53BC179E.5050000@mm-sol.com>
-References: <1404832303-14850-1-git-send-email-linus.walleij@linaro.org>
- <1404832303-14850-4-git-send-email-linus.walleij@linaro.org>
- <53BC179E.5050000@mm-sol.com>
-Message-ID: <CACRpkda9DH6okoW17WoFndM3aKbxOWkUi8j4RFbeN45yUfJ8EA@mail.gmail.com>
+Date: Thu, 10 Jul 2014 11:12:57 +0200
+Subject: [PATCH v3 1/2] gpio: Add driver for Zynq GPIO controller
+In-Reply-To: <1404817356-21568-1-git-send-email-harinik@xilinx.com>
+References: <1404817356-21568-1-git-send-email-harinik@xilinx.com>
+Message-ID: <CACRpkdbaah=y22UAuWXQN2kDddD-pa7JS52hXT6Bx9dUmbSyMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 6:09 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
-> On 07/08/2014 06:11 PM, Linus Walleij wrote:
->>
->> The config symbols CONFIG_MSM_DEBUG_UART1 and *UART3 are used
->> in the Trout board code, but these symbols are not defined anywhere
->> in the kernel so cleaning them out.
->>
->> This is not to be confused with CONFIG_DEBUG_MSM_UART1 and
->> CONFIG_DEBUG_MSM_UART2 which do exist.
+On Tue, Jul 8, 2014 at 1:02 PM, Harini Katakam <harinik@xilinx.com> wrote:
+
+> From: Harini Katakam <harini.katakam@xilinx.com>
 >
-> I have sent a similar patch: https://lkml.org/lkml/2014/5/26/406
+> Add support for GPIO controller used by Xilinx Zynq.
+>
+> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-OK I trashed this patch and applied your patch on top of the others instead.
-
-I'll send a pull request for the sum total to ARM SoC soon-ish so this
-doesn't fall to the floor.
+Patch applied! Thanks for your patient work on this Harini!
 
 Yours,
 Linus Walleij
