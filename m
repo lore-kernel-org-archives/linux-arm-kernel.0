@@ -1,35 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 10 Jul 2014 15:13:07 +0200
-Subject: [PATCH 00/16] i2c: drop class based instantiaion for selected
- drivers
-In-Reply-To: <20140710143837.558c1d07@ipc1.ka-ro>
-References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
- <20140710143837.558c1d07@ipc1.ka-ro>
-Message-ID: <20140710131307.GI2728@katana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Jul 2014 15:14:16 +0200
+Subject: [PATCH 3/3] arm64: Use include/asm-generic/io.h
+In-Reply-To: <20140710110034.GI16137@arm.com>
+References: <1404918699-17284-1-git-send-email-thierry.reding@gmail.com>
+ <1404918699-17284-3-git-send-email-thierry.reding@gmail.com>
+ <20140710110034.GI16137@arm.com>
+Message-ID: <201407101514.16530.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 10 July 2014, Catalin Marinas wrote:
+> > @@ -235,8 +155,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+> >  #define ioremap_wc(addr, size)               __ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
+> >  #define iounmap                              __iounmap
+> >  
+> > -#define ARCH_HAS_IOREMAP_WC
+> > -#include <asm-generic/iomap.h>
+> > +#include <asm-generic/io.h>
+> 
+> We don't currently have PCIe support in mainline for arm64 but what I
+> had in mind with the generic iomap is that functions like ioread32_rep
+> first check whether the address is an IO address or a memory one and
+> calls the insl or mmio_insl accordingly. With your generic
+> implementation, this check disappears.
+> 
+> The question is whether this functionality would still be needed.
 
-> > +	/* Warn that the adapter lost class based instantiation */
-> > +	if (adapter->class == I2C_CLASS_DEPRECATED) {
-> > +		dev_dbg(&adapter->dev,
-> > +			"This adapter dropped support for I2C classes and "
-> > +			"won't auto-detect %s devices anymore. If you need it, check "
-> > +			"'Documentation/i2c/instantiating-devices' for alternatives.\n",
-> >
-> It's usually a bad idea to split kernel messages across source lines
+I think it's much better not to have that check on architectures that have a memory
+mapped I/O space like arm64. The main advantage is that ioread32() is just a trivial
+alias for readl(). The only reason for needing generic_iomap is architectures that
+do something very different for I/O ports.
 
-Yes, "usually". Not for this message, though, it's specific. The lines
-would have been quite long.
-
-> You could at least do the split at the sentence boundary.
-
-OK, this would have been a compromise.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140710/dcb5f312/attachment.sig>
+	Arnd
