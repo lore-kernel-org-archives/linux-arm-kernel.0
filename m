@@ -1,59 +1,56 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 10 Jul 2014 10:24:06 +0800
-Subject: [PATCH v2 0/2] ARM: at91: remove phy fixup for sama5d3xek boards
-In-Reply-To: <20140709183442.14b8aef8@bbrezillon>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140709183442.14b8aef8@bbrezillon>
-Message-ID: <53BDF946.7060404@atmel.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 10 Jul 2014 10:28:33 +0800
+Subject: [PATCH] ARM: mm: fix the boundary checking on bitmaps
+Message-ID: <1404959313-15198-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+The issue of boundary checking on bitmaps is introduced by this commit
+in below.
 
-On 07/10/2014 12:34 AM, Boris BREZILLON wrote:
-> Hello Bo,
->
-> I know you're quite busy, but if you have some time could you test this
-> series on both CPU Modules (Embest and Ronetix): I only own the Embest
-> one.
->
-> Best Regards,
->
-> Boris
->
-> On Thu, 26 Jun 2014 12:13:33 +0200
-> Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
->
->> Hello,
->>
->> This patch removes a board specific hook for sama5d3xek boards from the
->> sama5d3 generic DT board file.
->>
->> This hook (which register a phy fixup configuring board specific delays
->> in the ksz9021 ethernet phy) is now replaced by the appropriate DT
->> properties definitions in the sama5d3xcm.dtsi file.
->>
->> Best Regards,
->>
->> Boris
->>
->> Changes since v1:
->>   - fix txc-skew-ps and rxc-skew-ps delays
->>   - remove phy address info to handle Ronetix and Embest HW designs
->>
->> Boris BREZILLON (2):
->>    ARM: at91/dt: describe rgmii ethernet phy connected to sama5d3xek
->>      boards
->>    ARM: at91: remove phy fixup for sama5d3xek boards
->>
->>   arch/arm/boot/dts/sama5d3xcm.dtsi   | 15 +++++++++++++++
->>   arch/arm/mach-at91/board-dt-sama5.c | 22 ----------------------
->>   2 files changed, 15 insertions(+), 22 deletions(-)
->>
+commit 4d852ef8c2544ce21ae41414099a7504c61164a0
+Author: Andreas Herrmann <andreas.herrmann@calxeda.com>
+Date:   Tue Feb 25 13:09:53 2014 +0100
 
-For this series, test OK on sama5d33ek (Ronetix) and sama5d34ek (Embest).
+    arm: dma-mapping: Add support to extend DMA IOMMU mappings
 
-Tested-by: Bo Shen <voice.shen@atmel.com>
+Multiple bitmaps were introduced as extension. If it needs to extend
+a bitmap, it still check whether the allocation exceeding the total
+size, not current bitmap size. So change the condition from
+mapping->bits to PAGE_SIZE.
 
-Best Regards,
-Bo Shen
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mm/dma-mapping.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 4c88935..d7da5c3 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1089,9 +1089,9 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+ 	spin_lock_irqsave(&mapping->lock, flags);
+ 	for (i = 0; i < mapping->nr_bitmaps; i++) {
+ 		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+-				mapping->bits, 0, count, align);
++				PAGE_SIZE, 0, count, align);
+ 
+-		if (start > mapping->bits)
++		if (start > PAGE_SIZE)
+ 			continue;
+ 
+ 		bitmap_set(mapping->bitmaps[i], start, count);
+@@ -1110,9 +1110,9 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+ 		}
+ 
+ 		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+-				mapping->bits, 0, count, align);
++				PAGE_SIZE, 0, count, align);
+ 
+-		if (start > mapping->bits) {
++		if (start > PAGE_SIZE) {
+ 			spin_unlock_irqrestore(&mapping->lock, flags);
+ 			return DMA_ERROR_CODE;
+ 		}
+-- 
+1.9.1
