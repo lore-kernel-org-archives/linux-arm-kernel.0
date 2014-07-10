@@ -1,70 +1,76 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Jul 2014 20:25:39 +0200
-Subject: [PATCH 1/3] irqchip: atmel-aic: Add irq fixup infrastructure
+Date: Thu, 10 Jul 2014 20:25:40 +0200
+Subject: [PATCH 2/3] irqchip: atmel-aic: Implement RTC irq fixup
 In-Reply-To: <1405016741-2407-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1405016741-2407-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1405016741-2407-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1405016741-2407-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add irq fixup infrastructure to handle IP blocks connected to shared irqs
-that are left in an unknown state when booting the kernel.
+Provide an implementation to fix RTC irqs before enabling the irqchip.
 
-In this case the IP block which has not masked its interrupt and has no
-driver loaded (either because it is not compiled or because it is not
-loaded yet) might generate spurious interrupts when another IP block
-request the shared irq.
-
-A good example of this case is the RTC block on which register configs are
-kept even after a shutdown (if a proper VDDcore is supplied), and thus
-might generate spurious interrupts when the platform is switched on.
+This was previously done in arch/arm/mach-at91/sysirq_mask.c but as we're
+trying to use standard implementation (IRQCHIP_DECLARE and automatic call
+of irqchip_init within arch/arm/kernel/irq.c) we need to do those fixups
+in the irqchip driver.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/irqchip/irq-atmel-aic-common.c | 19 +++++++++++++++++++
+ drivers/irqchip/irq-atmel-aic-common.c | 28 ++++++++++++++++++++++++++++
  drivers/irqchip/irq-atmel-aic-common.h |  2 ++
- 2 files changed, 21 insertions(+)
+ 2 files changed, 30 insertions(+)
 
 diff --git a/drivers/irqchip/irq-atmel-aic-common.c b/drivers/irqchip/irq-atmel-aic-common.c
-index 18b76fc..4705bdb 100644
+index 4705bdb..6ae3cdee 100644
 --- a/drivers/irqchip/irq-atmel-aic-common.c
 +++ b/drivers/irqchip/irq-atmel-aic-common.c
-@@ -139,6 +139,25 @@ static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
+@@ -139,6 +139,34 @@ static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
  	}
  }
  
-+void __init aic_common_irq_fixup(const struct of_device_id *matches)
-+{
-+	struct device_node *root = of_find_node_by_path("/");
-+	const struct of_device_id *match;
++#define AT91_RTC_IDR           0x24
++#define AT91_RTC_IMR           0x28
++#define AT91_RTC_IRQ_MASK      0x1f
 +
-+	if (!root)
++void __init aic_common_rtc_irq_fixup(struct device_node *root)
++{
++	struct device_node *np;
++	void __iomem *regs;
++
++	np = of_find_compatible_node(root, NULL, "atmel,at91rm9200-rtc");
++	if (!np)
++		np = of_find_compatible_node(root, NULL,
++					     "atmel,at91sam9x5-rtc");
++
++	if (!np)
 +		return;
 +
-+	match = of_match_node(matches, root);
-+	of_node_put(root);
++	regs = of_iomap(np, 0);
++	of_node_put(np);
 +
-+	if (match) {
-+		void (*fixup)(struct device_node *) = match->data;
-+		fixup(root);
-+	}
++	if (!regs)
++		return;
 +
-+	of_node_put(root);
++	writel(AT91_RTC_IRQ_MASK, regs + AT91_RTC_IDR);
++
++	iounmap(regs);
 +}
 +
- struct irq_domain *__init aic_common_of_init(struct device_node *node,
- 					     const struct irq_domain_ops *ops,
- 					     const char *name, int nirqs)
+ void __init aic_common_irq_fixup(const struct of_device_id *matches)
+ {
+ 	struct device_node *root = of_find_node_by_path("/");
 diff --git a/drivers/irqchip/irq-atmel-aic-common.h b/drivers/irqchip/irq-atmel-aic-common.h
-index c178557..aa0a42c 100644
+index aa0a42c..90aa00e 100644
 --- a/drivers/irqchip/irq-atmel-aic-common.h
 +++ b/drivers/irqchip/irq-atmel-aic-common.h
-@@ -32,4 +32,6 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
+@@ -32,6 +32,8 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
  					     const struct irq_domain_ops *ops,
  					     const char *name, int nirqs);
  
-+void __init aic_common_irq_fixup(const struct of_device_id *matches);
++void __init aic_common_rtc_irq_fixup(struct device_node *root);
 +
+ void __init aic_common_irq_fixup(const struct of_device_id *matches);
+ 
  #endif /* __IRQ_ATMEL_AIC_COMMON_H */
 -- 
 1.8.3.2
