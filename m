@@ -1,38 +1,82 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 10 Jul 2014 13:24:17 +0400
-Subject: [RFC/PATCH RESEND -next 15/21] mm: slub: add kernel address
- sanitizer hooks to slub allocator
-In-Reply-To: <alpine.DEB.2.11.1407090947020.1384@gentwo.org>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-16-git-send-email-a.ryabinin@samsung.com>
- <alpine.DEB.2.11.1407090947020.1384@gentwo.org>
-Message-ID: <53BE5BC1.6050802@samsung.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 10 Jul 2014 11:30:01 +0200
+Subject: [PATCH v4 ] sched: fix imbalance flag reset
+In-Reply-To: <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
+References: <CAKfTPtB-S=9irbZUVnr6zn3XTix2NDep_d+0FtDNRaB-x78_Vw@mail.gmail.com>
+Message-ID: <1404984601-7306-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/14 18:48, Christoph Lameter wrote:
-> On Wed, 9 Jul 2014, Andrey Ryabinin wrote:
-> 
->> With this patch kasan will be able to catch bugs in memory allocated
->> by slub.
->> Allocated slab page, this whole page marked as unaccessible
->> in corresponding shadow memory.
->> On allocation of slub object requested allocation size marked as
->> accessible, and the rest of the object (including slub's metadata)
->> marked as redzone (unaccessible).
->>
->> We also mark object as accessible if ksize was called for this object.
->> There is some places in kernel where ksize function is called to inquire
->> size of really allocated area. Such callers could validly access whole
->> allocated memory, so it should be marked as accessible by kasan_krealloc call.
-> 
-> Do you really need to go through all of this? Add the hooks to
-> kmem_cache_alloc_trace() instead and use the existing instrumentation
-> that is there for other purposes?
-> 
+The imbalance flag can stay set whereas there is no imbalance.
 
-I could move kasan_kmalloc hooks kmem_cache_alloc_trace(), and I think it will look better.
-Hovewer I will require two hooks instead of one (for CONFIG_TRACING=y and CONFIG_TRACING=n).
+Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+We will have some idle load balance which are triggered during tick.
+Unfortunately, the tick is also used to queue background work so we can reach
+the situation where short work has been queued on a CPU which already runs a
+task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+detected and the imbalance flag is set.
+Then, we will not be able to clear the flag because we have at most 1 task on
+each CPU but the imbalance flag will trig to useless active load balance
+between the idle CPU and the busy CPU.
 
-Btw, seems I broke CONFIG_SL[AO]B configurations in this patch by  introducing __ksize function
-which used in krealloc now.
+We need to reset of the imbalance flag as soon as we have reached a balanced
+state. If all tasks are pinned, we don't consider that as a balanced state and
+let the imbalance flag set.
+
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ kernel/sched/fair.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index d3c73122..a836198 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -6615,10 +6615,8 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 		if (sd_parent) {
+ 			int *group_imbalance = &sd_parent->groups->sgc->imbalance;
+ 
+-			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
++			if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0)
+ 				*group_imbalance = 1;
+-			} else if (*group_imbalance)
+-				*group_imbalance = 0;
+ 		}
+ 
+ 		/* All tasks on this runqueue were pinned by CPU affinity */
+@@ -6629,7 +6627,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 				env.loop_break = sched_nr_migrate_break;
+ 				goto redo;
+ 			}
+-			goto out_balanced;
++			goto out_all_pinned;
+ 		}
+ 	}
+ 
+@@ -6703,6 +6701,22 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 	goto out;
+ 
+ out_balanced:
++	/*
++	 * We reach balance although we may have faced some affinity
++	 * constraints. Clear the imbalance flag if it was set.
++	 */
++	if (sd_parent) {
++		int *group_imbalance = &sd_parent->groups->sgc->imbalance;
++		if (*group_imbalance)
++			*group_imbalance = 0;
++	}
++
++out_all_pinned:
++	/*
++	 * We reach balance because all tasks are pinned at this level so
++	 * we can't migrate them. Let the imbalance flag set so parent level
++	 * can try to migrate them.
++	 */
+ 	schedstat_inc(sd, lb_balanced[idle]);
+ 
+ 	sd->nr_balance_failed = 0;
+-- 
+1.9.1
