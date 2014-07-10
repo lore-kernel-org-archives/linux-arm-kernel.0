@@ -1,34 +1,35 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Jul 2014 23:36:29 +0200
-Subject: [PATCH v2 09/12] PCI: Remove ARCH_KIRKWOOD dependency
+Date: Thu, 10 Jul 2014 23:36:27 +0200
+Subject: [PATCH v2 07/12] thermal: Remove ARCH_KIRKWOOD dependency
 In-Reply-To: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
 References: <1405028192-9623-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1405028192-9623-10-git-send-email-andrew@lunn.ch>
+Message-ID: <1405028192-9623-8-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
-ARCH_MVEBU is sufficient.
+Depend on MACH_KIRKWOOD, which will be set when kirkwood is built as
+part of ARCH_MVEBU.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: linux-pci at vger.kernel.org
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: linux-pm at vger.kernel.org
 ---
- drivers/pci/host/Kconfig | 2 +-
+ drivers/thermal/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 21df477be0c8..88f4862fa452 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -3,7 +3,7 @@ menu "PCI host controller drivers"
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index f9a13867cb70..f2488607ee35 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -143,7 +143,7 @@ config RCAR_THERMAL
  
- config PCI_MVEBU
- 	bool "Marvell EBU PCIe controller"
--	depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
-+	depends on ARCH_MVEBU || ARCH_DOVE
+ config KIRKWOOD_THERMAL
+ 	tristate "Temperature sensor on Marvell Kirkwood SoCs"
+-	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
++	depends on MACH_KIRKWOOD
  	depends on OF
- 
- config PCIE_DW
+ 	help
+ 	  Support for the Kirkwood thermal sensor driver into the Linux thermal
 -- 
 2.0.1
