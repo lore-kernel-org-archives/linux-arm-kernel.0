@@ -1,69 +1,18 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 10 Jul 2014 13:31:20 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140710113120.GA3935@laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Jul 2014 12:38:00 +0100
+Subject: [PATCHv4 0/4] arm64: simplify restrictions on bootloaders
+In-Reply-To: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
+References: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140710113759.GC10749@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
+On Tue, Jun 24, 2014 at 04:51:33PM +0100, Mark Rutland wrote:
+> This is the fourth (and hopefully final) version of the boot simplification
+> series I've posted previously [1,4,5]. Many thanks to those who reviewed and/or
+> tested the prior postings.
 
-You 'forgot' to update the comment that goes with nohz_kick_needed().
+Applied for 3.17. Thanks.
 
-> @@ -7233,9 +7253,10 @@ static inline int nohz_kick_needed(struct rq *rq)
->  	struct sched_domain *sd;
->  	struct sched_group_capacity *sgc;
->  	int nr_busy, cpu = rq->cpu;
-> +	bool kick = false;
->  
->  	if (unlikely(rq->idle_balance))
-> +		return false;
->  
->         /*
->  	* We may be recently in ticked or tickless idle mode. At the first
-> @@ -7249,38 +7270,41 @@ static inline int nohz_kick_needed(struct rq *rq)
->  	 * balancing.
->  	 */
->  	if (likely(!atomic_read(&nohz.nr_cpus)))
-> +		return false;
->  
->  	if (time_before(now, nohz.next_balance))
-> +		return false;
->  
->  	if (rq->nr_running >= 2)
-> +		return true;
->  
->  	rcu_read_lock();
->  	sd = rcu_dereference(per_cpu(sd_busy, cpu));
->  	if (sd) {
->  		sgc = sd->groups->sgc;
->  		nr_busy = atomic_read(&sgc->nr_busy_cpus);
->  
-> +		if (nr_busy > 1) {
-> +			kick = true;
-> +			goto unlock;
-> +		}
-> +
-> +		if ((rq->cfs.h_nr_running >= 1)
-> +		 && ((rq->cpu_capacity * sd->imbalance_pct) <
-> +					(rq->cpu_capacity_orig * 100))) {
-> +			kick = true;
-> +			goto unlock;
-> +		}
-
-Again, why only for shared caches?
-
->  	}
->  
->  	sd = rcu_dereference(per_cpu(sd_asym, cpu));
->  	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
->  				  sched_domain_span(sd)) < cpu))
-> +		kick = true;
->  
-> +unlock:
->  	rcu_read_unlock();
-> +	return kick;
->  }
+-- 
+Catalin
