@@ -1,60 +1,97 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Jul 2014 11:23:34 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140710094909.GA21583@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140709134050.GN9485@arm.com> <20140709142125.GB3262@ulmo>
- <20140709181048.GX9485@arm.com> <20140710094909.GA21583@ulmo>
-Message-ID: <20140710102334.GG2449@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Jul 2014 12:29:09 +0200
+Subject: [PATCHv3 5/5] mmc: dw_mmc: replace "disable-wp" from slot's quirk
+ to host's quirk
+In-Reply-To: <53BE5F9F.6070809@samsung.com>
+References: <1404976119-10777-1-git-send-email-jh80.chung@samsung.com>
+ <1404976119-10777-6-git-send-email-jh80.chung@samsung.com>
+ <CAPDyKFoQ_ER7FAk_jCBURAa3_hVT25GXfQQfiDhMoYypdA=fHg@mail.gmail.com>
+ <53BE5F9F.6070809@samsung.com>
+Message-ID: <CAPDyKFrLJJn=SGpjtCq+x88EetBQQBCqgef9z9+3oEVut4upTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 10:49:10AM +0100, Thierry Reding wrote:
-> On Wed, Jul 09, 2014 at 07:10:48PM +0100, Will Deacon wrote:
-> > On Wed, Jul 09, 2014 at 03:21:27PM +0100, Thierry Reding wrote:
-> > > Anything beyond that (e.g. logical grouping of masters) isn't directly
-> > > within the scope of the binding (it doesn't describe hardware but some
-> > > policy pertaining to some specific use-case).
-> > 
-> > This *is* for hardware. I can use PCI as an example, but this could equally
-> > apply to other types of bus. If you have a bunch of PCI master devices
-> > sitting being a non-transparent bridge, they can end up sharing the same
-> > master device ID (requester ID). This means that there is no way in the
-> > IOMMU to initialise a translation for one of these devices without also
-> > affecting the others. We currently have iommu_groups to deal with this, but
-> > it *is* a property of the hardware and we absolutely need a way to describe
-> > it. I'm happy to add it later, but we need to think about it now to avoid
-> > merging something that can't easily be extended.
-> > 
-> > For PCI, the topology is probable but even then, we need this information to
-> > describe the resulting master device ID emitted by the bridge for the
-> > upstream group. One way to do this with your binding would be to treat all
-> > of the upstream masters as having the same device ID.
-> 
-> Yes, I think that makes most sense. After all from the IOMMU's point of
-> view requests from all devices behind the bridge will originate from the
-> same ID.
-> 
-> So technically it's not really correct to encode the master ID within
-> each of the devices, but rather they should be inheriting the ID from
-> the non-transparent bridge.
+On 10 July 2014 11:40, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Ulf.
+>
+> On 07/10/2014 06:15 PM, Ulf Hansson wrote:
+>> On 10 July 2014 09:08, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>> Replaced the "disable-wp" into host's quirks.
+>>> (Because the slot-node is removed at dt-file.)
+>>>
+>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>
+>> Hi Jaehoon,
+>>
+>> I plan to carry these patches through my mmc tree and I will share
+>> them through a PR from an immutable branch with the ARM SoC guys.
+>> Please tell me if you have any concern with this set up.
 
-Indeed. Is that possible with your binding, or would we just duplicate the
-IDs between the masters?
+Hmm, I having a second thought around this. Could I just apply the mmc
+patches for my next branch instead of involving ARM SoC? In other
+words, are there any decencies? If not, I might just apply patch 1 and
+5.
 
-> > With virtualisation, we may want to assign a group of devices to a guest but
-> > without emulating the bridge. This would need something the device-tree to
-> > describe that they are grouped together.
-> 
-> But that's also a software decision, isn't it? Virtualization doesn't
-> have anything to do with the hardware description. Or am I missing
-> something? Of course I guess you could generate a DTB for the guest and
-> group device together, in which case you're pretty much free to do what
-> you want since you're essentially defining your own hardware.
+Kind regards
+Uffe
 
-If you're doing device passthrough and you want to allow the guest to
-program the IOMMU, I think that virtualisation is directly related to the
-hardware description, since the guest will be bound by physical properties
-of the system.
-
-Will
+>>
+>> Now, while I was applying this patch, I found it had checkpatch
+>> errors. Please run checkpatch and resend a new version.
+>
+> Sorry for not checking the patch. I will resend a new version.
+> Thanks for pointing out.
+>
+> Best Regards,
+> Jaehoon Chung
+>
+>>
+>> Kind regards
+>> Uffe
+>>
+>>> ---
+>>>  drivers/mmc/host/dw_mmc.c |   12 +++++-------
+>>>  1 file changed, 5 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>> index 1ac227c..a3ccd07 100644
+>>> --- a/drivers/mmc/host/dw_mmc.c
+>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>> @@ -997,7 +997,7 @@ static int dw_mci_get_ro(struct mmc_host *mmc)
+>>>         int gpio_ro = mmc_gpio_get_ro(mmc);
+>>>
+>>>         /* Use platform get_ro function, else try on board write protect */
+>>> -       if (slot->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
+>>> +       if (slot->host->quirks & DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT)
+>>>                 read_only = 0;
+>>>         else if (!IS_ERR_VALUE(gpio_ro))
+>>>                 read_only = gpio_ro;
+>>> @@ -2006,12 +2006,7 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
+>>>  static struct dw_mci_of_slot_quirks {
+>>>         char *quirk;
+>>>         int id;
+>>> -} of_slot_quirks[] = {
+>>> -       {
+>>> -               .quirk  = "disable-wp",
+>>> -               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
+>>> -       },
+>>> -};
+>>> +} of_slot_quirks[] = {};
+>>>
+>>>  static int dw_mci_of_get_slot_quirks(struct device *dev, u8 slot)
+>>>  {
+>>> @@ -2238,6 +2233,9 @@ static struct dw_mci_of_quirks {
+>>>         {
+>>>                 .quirk  = "broken-cd",
+>>>                 .id     = DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
+>>> +       },{
+>>> +               .quirk  = "disable-wp",
+>>> +               .id     = DW_MCI_SLOT_QUIRK_NO_WRITE_PROTECT,
+>>>         },
+>>>  };
+>>>
+>>> --
+>>> 1.7.9.5
+>>>
+>>
+>
