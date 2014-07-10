@@ -1,237 +1,192 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 10 Jul 2014 15:32:26 +0200
-Subject: [RFC v3 5/5] clk: Add floor and ceiling constraints to clock rates
-In-Reply-To: <1404999146-32691-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1404999146-32691-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1404999146-32691-6-git-send-email-tomeu.vizoso@collabora.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 10 Jul 2014 14:37:23 +0100
+Subject: [PATCH 2/9] drivers: base: support cpu cache information interface
+ to userspace via sysfs
+In-Reply-To: <20140710000905.GA18025@kroah.com>
+References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
+ <1403717444-23559-3-git-send-email-sudeep.holla@arm.com>
+ <20140710000905.GA18025@kroah.com>
+Message-ID: <53BE9713.8090700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a way for clock consumers to set maximum and minimum rates. This can be
-used for thermal drivers to set ceiling rates, or by misc. drivers to set
-floor rates to assure a minimum performance level.
+Hi Greg,
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/clk/clk.c           | 103 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk.h           |   1 +
- drivers/clk/clkdev.c        |   2 +-
- include/linux/clk-private.h |   1 +
- include/linux/clk.h         |  18 ++++++++
- 5 files changed, 124 insertions(+), 1 deletion(-)
+Thanks for reviewing this.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 9d51900..f2fd95e 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -23,6 +23,19 @@
- 
- #include "clk.h"
- 
-+enum constraint_type {
-+	CONSTRAINT_FLOOR,
-+	CONSTRAINT_CEILING,
-+};
-+
-+struct rate_constraint {
-+	struct hlist_node	node;
-+	const char		*dev_id;
-+	const char		*con_id;
-+	enum constraint_type	type;
-+	unsigned long		rate;
-+};
-+
- static DEFINE_SPINLOCK(enable_lock);
- static DEFINE_MUTEX(prepare_lock);
- 
-@@ -1626,6 +1639,7 @@ static void clk_change_rate(struct clk_core *clk)
- int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
- {
- 	struct clk_core *top, *fail_clk;
-+	struct rate_constraint *constraint;
- 	int ret = 0;
- 
- 	if (!clk)
-@@ -1634,6 +1648,17 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
- 	/* prevent racing with updates to the clock topology */
- 	clk_prepare_lock();
- 
-+	hlist_for_each_entry(constraint, &clk->rate_constraints, node) {
-+		switch(constraint->type) {
-+		case CONSTRAINT_FLOOR:
-+			rate = max(rate, constraint->rate);
-+			break;
-+		case CONSTRAINT_CEILING:
-+			rate = min(rate, constraint->rate);
-+			break;
-+		}
-+	}
-+
- 	/* bail early if nothing to do */
- 	if (rate == clk_provider_get_rate(clk))
- 		goto out;
-@@ -1697,6 +1722,65 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
- }
- EXPORT_SYMBOL_GPL(clk_set_rate);
- 
-+static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
-+						   enum constraint_type type)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint = NULL;
-+	bool found = false;
-+
-+	hlist_for_each_entry(constraint, &clk->rate_constraints, node) {
-+		if (constraint->dev_id == clk_user->dev_id &&
-+		    constraint->con_id == clk_user->con_id &&
-+		    constraint->type == type)
-+			found = true;
-+	}
-+
-+	if (!found) {
-+		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
-+		if (!constraint)
-+			return NULL;
-+		hlist_add_head(&constraint->node, &clk->rate_constraints);
-+	}
-+
-+	return constraint;
-+}
-+
-+static int __clk_set_constraint(struct clk *clk_user, unsigned long rate,
-+				enum constraint_type type)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint;
-+	int ret;
-+
-+	clk_prepare_lock();
-+
-+	constraint = __ensure_constraint(clk_user, type);
-+	if (!constraint)
-+		return -ENOMEM;
-+
-+	constraint->rate = rate;
-+
-+	/* Update the rate so the new constraint is taken into account */
-+	ret = clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+
-+	clk_prepare_unlock();
-+
-+	return ret;
-+}
-+
-+int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
-+{
-+	return __clk_set_constraint(clk_user, rate, CONSTRAINT_FLOOR);
-+}
-+EXPORT_SYMBOL_GPL(clk_set_floor_rate);
-+
-+int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
-+{
-+	return __clk_set_constraint(clk_user, rate, CONSTRAINT_CEILING);
-+}
-+EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
-+
- struct clk_core *clk_provider_get_parent(struct clk_core *clk)
- {
- 	struct clk_core *parent;
-@@ -2030,6 +2114,8 @@ int __clk_init(struct device *dev, struct clk_core *clk)
- 			}
- 	 }
- 
-+	INIT_HLIST_HEAD(&clk->rate_constraints);
-+
- 	/*
- 	 * optional platform-specific magic
- 	 *
-@@ -2460,6 +2546,23 @@ int clk_notifier_unregister(struct clk *clk_user, struct notifier_block *nb)
- }
- EXPORT_SYMBOL_GPL(clk_notifier_unregister);
- 
-+void __clk_free_clk(struct clk *clk_user)
-+{
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct rate_constraint *constraint;
-+	struct hlist_node *tmp;
-+
-+	hlist_for_each_entry_safe(constraint, tmp, &clk->rate_constraints, node) {
-+		if (constraint->dev_id == clk_user->dev_id &&
-+		    constraint->con_id == clk_user->con_id) {
-+			hlist_del(&constraint->node);
-+			kfree(constraint);
-+		}
-+	}
-+
-+	kfree(clk_user);
-+}
-+
- #ifdef CONFIG_OF
- /**
-  * struct of_clk_provider - Clock provider registration structure
-diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
-index 3987594..8bedcdc 100644
---- a/drivers/clk/clk.h
-+++ b/drivers/clk/clk.h
-@@ -25,4 +25,5 @@ static inline struct clk_core *clk_to_clk_core(struct clk *clk)
- }
- struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
- 			     const char *con);
-+void __clk_free_clk(struct clk *clk_user);
- #endif
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 6ea91bf..0e2dd2b 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -234,7 +234,7 @@ void clk_put(struct clk *clk)
- {
- 	clk_core_t *core = clk_to_clk_core(clk);
- 
--	kfree(clk);
-+	__clk_free_clk(clk);
- 	__clk_put(core);
- }
- EXPORT_SYMBOL(clk_put);
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 9657fc8..a8279e1 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -48,6 +48,7 @@ struct clk_core {
- 	unsigned long		accuracy;
- 	struct hlist_head	children;
- 	struct hlist_node	child_node;
-+	struct hlist_head	rate_constraints;
- 	unsigned int		notifier_count;
- #ifdef CONFIG_DEBUG_FS
- 	struct dentry		*dentry;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 9633459..fbfc8eb 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -274,6 +274,24 @@ long clk_round_rate(struct clk *clk, unsigned long rate);
- int clk_set_rate(struct clk *clk, unsigned long rate);
- 
- /**
-+ * clk_set_floor_rate - set a minimum clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired minimum clock rate in Hz
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_floor_rate(struct clk *clk, unsigned long rate);
-+
-+/**
-+ * clk_set_ceiling_rate - set a maximum clock rate for a clock source
-+ * @clk: clock source
-+ * @rate: desired maximum clock rate in Hz
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
-+
-+/**
-  * clk_set_parent - set the parent clock source for this clock
-  * @clk: clock source
-  * @parent: parent clock source
--- 
-1.9.3
+On 10/07/14 01:09, Greg Kroah-Hartman wrote:
+> On Wed, Jun 25, 2014 at 06:30:37PM +0100, Sudeep Holla wrote:
+>> +static const struct device_attribute *cache_optional_attrs[] = {
+>> +	&dev_attr_coherency_line_size,
+>> +	&dev_attr_ways_of_associativity,
+>> +	&dev_attr_number_of_sets,
+>> +	&dev_attr_size,
+>> +	&dev_attr_attributes,
+>> +	&dev_attr_physical_line_partition,
+>> +	NULL
+>> +};
+>> +
+>> +static int device_add_attrs(struct device *dev,
+>> +			    const struct device_attribute **dev_attrs)
+>> +{
+>> +	int i, error = 0;
+>> +	struct device_attribute *dev_attr;
+>> +	char *buf;
+>> +
+>> +	if (!dev_attrs)
+>> +		return 0;
+>> +
+>> +	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+>> +	if (!buf)
+>> +		return -ENOMEM;
+>> +
+>> +	for (i = 0; dev_attrs[i]; i++) {
+>> +		dev_attr = (struct device_attribute *)dev_attrs[i];
+>> +
+>> +		/* create attributes that provides meaningful value */
+>> +		if (dev_attr->show(dev, dev_attr, buf) < 0)
+>> +			continue;
+>> +
+>> +		error = device_create_file(dev, dev_attrs[i]);
+>> +		if (error) {
+>> +			while (--i >= 0)
+>> +				device_remove_file(dev, dev_attrs[i]);
+>> +			break;
+>> +		}
+>> +	}
+>> +
+>> +	kfree(buf);
+>> +	return error;
+>> +}
+>
+> Ick, why create your own function for this when the driver core has this
+> functionality built into it?  Look at the is_visible() callback, and how
+> it is use for an attribute group please.
+>
+
+I agree even I added this function hesitantly as didn't realize that I can use
+is_visible for this purpose. Thanks for pointing that out I will have a look
+at it.
+
+>> +static void device_remove_attrs(struct device *dev,
+>> +				const struct device_attribute **dev_attrs)
+>> +{
+>> +	int i;
+>> +
+>> +	if (!dev_attrs)
+>> +		return;
+>> +
+>> +	for (i = 0; dev_attrs[i]; dev_attrs++, i++)
+>> +		device_remove_file(dev, dev_attrs[i]);
+>> +}
+>
+> You should just remove a whole group at once, not individually.
+>
+
+Right, I must be able to get rid of these 2 functions once I use
+is_visible callback.
+
+>> +
+>> +const struct device_attribute **
+>> +__weak cache_get_priv_attr(struct device *cache_idx_dev)
+>> +{
+>> +	return NULL;
+>> +}
+>> +
+>> +/* Add/Remove cache interface for CPU device */
+>> +static void cpu_cache_sysfs_exit(unsigned int cpu)
+>> +{
+>> +	int i;
+>> +	struct device *tmp_dev;
+>> +	const struct device_attribute **ci_priv_attr;
+>> +
+>> +	if (per_cpu_index_dev(cpu)) {
+>> +		for (i = 0; i < cache_leaves(cpu); i++) {
+>> +			tmp_dev = per_cache_index_dev(cpu, i);
+>> +			if (!tmp_dev)
+>> +				continue;
+>> +			ci_priv_attr = cache_get_priv_attr(tmp_dev);
+>> +			device_remove_attrs(tmp_dev, ci_priv_attr);
+>> +			device_remove_attrs(tmp_dev, cache_optional_attrs);
+>> +			device_unregister(tmp_dev);
+>> +		}
+>> +		kfree(per_cpu_index_dev(cpu));
+>> +		per_cpu_index_dev(cpu) = NULL;
+>> +	}
+>> +	device_unregister(per_cpu_cache_dev(cpu));
+>> +	per_cpu_cache_dev(cpu) = NULL;
+>> +}
+>> +
+>> +static int cpu_cache_sysfs_init(unsigned int cpu)
+>> +{
+>> +	struct device *dev = get_cpu_device(cpu);
+>> +
+>> +	if (per_cpu_cacheinfo(cpu) == NULL)
+>> +		return -ENOENT;
+>> +
+>> +	per_cpu_cache_dev(cpu) = device_create(dev->class, dev, cpu,
+>> +					       NULL, "cache");
+>> +	if (IS_ERR_OR_NULL(per_cpu_cache_dev(cpu)))
+>> +		return PTR_ERR(per_cpu_cache_dev(cpu));
+>> +
+>> +	/* Allocate all required memory */
+>> +	per_cpu_index_dev(cpu) = kzalloc(sizeof(struct device *) *
+>> +					 cache_leaves(cpu), GFP_KERNEL);
+>> +	if (unlikely(per_cpu_index_dev(cpu) == NULL))
+>> +		goto err_out;
+>> +
+>> +	return 0;
+>> +
+>> +err_out:
+>> +	cpu_cache_sysfs_exit(cpu);
+>> +	return -ENOMEM;
+>> +}
+>> +
+>> +static int cache_add_dev(unsigned int cpu)
+>> +{
+>> +	unsigned short i;
+>> +	int rc;
+>> +	struct device *tmp_dev, *parent;
+>> +	struct cacheinfo *this_leaf;
+>> +	const struct device_attribute **ci_priv_attr;
+>> +	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+>> +
+>> +	rc = cpu_cache_sysfs_init(cpu);
+>> +	if (unlikely(rc < 0))
+>> +		return rc;
+>> +
+>> +	parent = per_cpu_cache_dev(cpu);
+>> +	for (i = 0; i < cache_leaves(cpu); i++) {
+>> +		this_leaf = this_cpu_ci->info_list + i;
+>> +		if (this_leaf->disable_sysfs)
+>> +			continue;
+>> +		tmp_dev = device_create_with_groups(parent->class, parent, i,
+>> +						    this_leaf,
+>> +						    cache_default_groups,
+>> +						    "index%1u", i);
+>> +		if (IS_ERR_OR_NULL(tmp_dev)) {
+>> +			rc = PTR_ERR(tmp_dev);
+>> +			goto err;
+>> +		}
+>> +
+>> +		rc = device_add_attrs(tmp_dev, cache_optional_attrs);
+>> +		if (unlikely(rc))
+>> +			goto err;
+>> +
+>> +		ci_priv_attr = cache_get_priv_attr(tmp_dev);
+>> +		rc = device_add_attrs(tmp_dev, ci_priv_attr);
+>> +		if (unlikely(rc))
+>> +			goto err;
+>
+> You just raced with userspace here, creating these files _after_ the
+> device was announced to userspace, causing problems with anyone wanting
+> to read these attributes :(
+>
+> I think if you fix up the is_visible() thing above, these calls will go
+> away, right?
+>
+
+Yes I agree.
+
+Regards,
+Sudeep
