@@ -1,123 +1,152 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 10 Jul 2014 13:16:21 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1584022.nQ4HpIUW7J@avalon>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 10 Jul 2014 07:15:25 -0400
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <20140710071014.GA17918@ulmo>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+ <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
+ <53BC6866.30803@codeaurora.org>
+ <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
+ <53BDD834.5030405@codeaurora.org>
+ <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
+ <20140710071014.GA17918@ulmo>
+Message-ID: <CAF6AEGvpNXL3S1+M8yUcuAJ0GkOWh61=bcK1qzyL7n2oJrB+qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Thu, Jul 10, 2014 at 3:10 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Jul 09, 2014 at 08:40:21PM -0400, Rob Clark wrote:
+>> On Wed, Jul 9, 2014 at 8:03 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
+>> > On 7/8/2014 4:49 PM, Rob Clark wrote:
+>> >> On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
+>> >>> Hi Hiroshi,
+>> >>>
+>> >>> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
+>> >>>> Hi Olav,
+>> >>>>
+>> >>>> Olav Haugan <ohaugan@codeaurora.org> writes:
+>> >>>>
+>> >>>>> Mapping and unmapping are more often than not in the critical path.
+>> >>>>> map_range and unmap_range allows SMMU driver implementations to optimize
+>> >>>>> the process of mapping and unmapping buffers into the SMMU page tables.
+>> >>>>> Instead of mapping one physical address, do TLB operation (expensive),
+>> >>>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
+>> >>>>> a scatter-gatherlist of physically contiguous pages into one virtual
+>> >>>>> address space and then at the end do one TLB operation.
+>> >>>>>
+>> >>>>> Additionally, the mapping operation would be faster in general since
+>> >>>>> clients does not have to keep calling map API over and over again for
+>> >>>>> each physically contiguous chunk of memory that needs to be mapped to a
+>> >>>>> virtually contiguous region.
+>> >>>>>
+>> >>>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+>> >>>>> ---
+>> >>>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
+>> >>>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
+>> >>>>>  2 files changed, 48 insertions(+)
+>> >>>>>
+>> >>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>> >>>>> index e5555fc..f2a6b80 100644
+>> >>>>> --- a/drivers/iommu/iommu.c
+>> >>>>> +++ b/drivers/iommu/iommu.c
+>> >>>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>> >>>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
+>> >>>>>
+>> >>>>>
+>> >>>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
+>> >>>>> +                struct scatterlist *sg, unsigned int len, int prot)
+>> >>>>> +{
+>> >>>>> +    if (unlikely(domain->ops->map_range == NULL))
+>> >>>>> +            return -ENODEV;
+>> >>>>> +
+>> >>>>> +    BUG_ON(iova & (~PAGE_MASK));
+>> >>>>> +
+>> >>>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
+>> >>>>> +}
+>> >>>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
+>> >>>>
+>> >>>> We have the similar one internally, which is named, "iommu_map_sg()",
+>> >>>> called from DMA API.
+>> >>>
+>> >>> Great, so this new API will be useful to more people!
+>> >>>
+>> >>>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
+>> >>>>> +                  unsigned int len)
+>> >>>>> +{
+>> >>>>> +    if (unlikely(domain->ops->unmap_range == NULL))
+>> >>>>> +            return -ENODEV;
+>> >>>>> +
+>> >>>>> +    BUG_ON(iova & (~PAGE_MASK));
+>> >>>>> +
+>> >>>>> +    return domain->ops->unmap_range(domain, iova, len);
+>> >>>>> +}
+>> >>>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
+>> >>>>
+>> >>>> Can the existing iommu_unmap() do the same?
+>> >>>
+>> >>> I believe iommu_unmap() behaves a bit differently because it will keep
+>> >>> on calling domain->ops->unmap() until everything is unmapped instead of
+>> >>> letting the iommu implementation take care of unmapping everything in
+>> >>> one call.
+>> >>>
+>> >>> I am abandoning the patch series since our driver was not accepted.
+>> >>> However, if there are no objections I will resubmit this patch (PATCH
+>> >>> 2/7) as an independent patch to add this new map_range API.
+>> >>
+>> >> +1 for map_range().. I've seen for gpu workloads, at least, it is the
+>> >> downstream map_range() API is quite beneficial.   It was worth at
+>> >> least a few fps in xonotic.
+>> >>
+>> >> And, possibly getting off the subject a bit, but I was wondering about
+>> >> the possibility of going one step further and batching up mapping
+>> >> and/or unmapping multiple buffers (ranges) at once.  I have a pretty
+>> >> convenient sync point in drm/msm to flush out multiple mappings before
+>> >> kicking gpu.
+>> >
+>> > I think you should be able to do that with this API already - at least
+>> > the mapping part since we are passing in a sg list (this could be a
+>> > chained sglist).
+>>
+>> What I mean by batching up is mapping and unmapping multiple sglists
+>> each at different iova's with minmal cpu cache and iommu tlb flushes..
+>>
+>> Ideally we'd let the IOMMU driver be clever and build out all 2nd
+>> level tables before inserting into first level tables (to minimize cpu
+>> cache flushing).. also, there is probably a reasonable chance that
+>> we'd be mapping a new buffer into existing location, so there might be
+>> some potential to reuse existing 2nd level tables (and save a tiny bit
+>> of free/alloc).  I've not thought too much about how that would look
+>> in code.. might be kinda, umm, fun..
+>>
+>> But at an API level, we should be able to do a bunch of
+>> map/unmap_range's with one flush.
+>>
+>> Maybe it could look like a sequence of iommu_{map,unmap}_range()
+>> followed by iommu_flush()?
+>
+> Doesn't that mean that the IOMMU driver would have to keep track of all
+> mappings until it sees an iommu_flush()? That sounds like it could be a
+> lot of work and complicated code.
 
-Thank you for the patch.
+Well, depends on how elaborate you want to get.  If you don't want to
+be too fancy, it may just be a matter of not doing TLB flush until
+iommu_flush().  If you want to get fancy and minimize cpu flushes too,
+then iommu driver would have to do some more tracking to build up a
+transaction internally.  I'm not really sure how you avoid that.
 
-On Monday 07 July 2014 18:42:59 Boris BREZILLON wrote:
-> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> controller device.
-> 
-> The HLCDC block provides a single RGB output port, and only supports LCD
-> panels connection to LCD panels for now.
-> 
-> The atmel,panel property link the HLCDC RGB output with the LCD panel
-> connected on this port (note that the HLCDC RGB connector implementation
-> makes use of the DRM panel framework).
-> 
-> Connection to other external devices (DRM bridges) might be added later by
-> mean of a new atmel,xxx (atmel,bridge) property.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt new file mode
-> 100644
-> index 0000000..594bdb2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> @@ -0,0 +1,59 @@
-> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) DRM driver
-> +
-> +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
-> +See Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt for more details.
-> +
-> +Required properties:
-> + - compatible: value should be one of the following:
-> +   "atmel,hlcdc-dc"
-> + - interrupts: the HLCDC interrupt definition
-> + - pinctrl-names: the pin control state names. Should contain "default",
-> +   "rgb-444", "rgb-565", "rgb-666" and "rgb-888".
-> + - pinctrl-[0-4]: should contain the pinctrl states described by pinctrl
-> +   names.
+I'm not quite sure how frequent it would be that separate buffers
+touch the same 2nd level table, so it might be sufficient to treat it
+like N map_range and unmap_range's followed by one TLB flush.  I
+would, I think, need to implement a prototype or at least instrument
+the iommu driver somehow to generate some statistics.
 
-Do you need to switch between the different pinctrl configurations at runtime, 
-or is the configuration selected from the panel type, which doesn't change ?
+I've nearly got qcom-iommu-v0 working here on top of upstream + small
+set of patches.. but once that is a bit more complete, experimenting
+with some of this will be on my TODO list to see what amount of
+crazy/complicated brings worthwhile performance benefits.
 
-> + - atmel,panel: Should contain a phandle with 2 parameters.
-> +   The first cell is a phandle to a DRM panel device
-> +   The second cell encodes the RGB mode, which can take the following
-> values:
-> +   * 0: RGB444
-> +   * 1: RGB565
-> +   * 2: RGB666
-> +   * 3: RGB888
-> +   The third cell encodes specific flags describing LCD signals
-> configuration
-> +   (see Atmel's datasheet for a full description of these
-> fields):
-> +   * bit 0: HSPOL: Horizontal Synchronization Pulse Polarity
-> +   * bit 1: VSPOL: Vertical Synchronization Pulse Polarity
-> +   * bit 2: VSPDLYS: Vertical Synchronization Pulse Start
-> +   * bit 3: VSPDLYE: Vertical Synchronization Pulse End
-> +   * bit 4: DISPPOL: Display Signal Polarity
-> +   * bit 7: DISPDLY: LCD Controller Display Power Signal Synchronization
-> +   * bit 12: VSPSU: LCD Controller Vertical synchronization Pulse Setup
-> Configuration
-> +   * bit 13: VSPHO: LCD Controller Vertical synchronization Pulse Hold
-> Configuration
-> +   * bit 16-20: GUARDTIME: LCD DISPLAY Guard Time
+BR,
+-R
 
-If I'm not mistaken, those are HLCDC configuration values that depend on the 
-panel type and characteristics. Shouldn't they then be queries from the panel 
-through the drm_panel API at runtime instead of being specified in DT ? This 
-would likely require extending the drm_panel API.
-
-> +
-> +Example:
-> +
-> +	hlcdc: hlcdc at f0030000 {
-> +		compatible = "atmel,sama5d3-hlcdc";
-> +		reg = <0xf0030000 0x2000>;
-> +		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
-> +		clock-names = "periph_clk","sys_clk", "slow_clk";
-> +		status = "disabled";
-> +
-> +		hlcdc-display-controller {
-> +			compatible = "atmel,hlcdc-dc";
-> +			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-> +			pinctrl-names = "default", "rgb-444", "rgb-565", "rgb-666", 
-"rgb-888";
-> +			pinctrl-0 = <&pinctrl_lcd_base>;
-> +			pinctrl-1 = <&pinctrl_lcd_base &pinctrl_lcd_rgb444>;
-> +			pinctrl-2 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
-> +			pinctrl-3 = <&pinctrl_lcd_base &pinctrl_lcd_rgb666>;
-> +			pinctrl-4 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
-> +		};
-> +
-> +		hlcdc_pwm: hlcdc-pwm {
-> +			compatible = "atmel,hlcdc-pwm";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_lcd_pwm>;
-> +			#pwm-cells = <3>;
-> +		};
-> +	};
-
--- 
-Regards,
-
-Laurent Pinchart
+> Thierry
