@@ -1,194 +1,102 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Thu, 10 Jul 2014 21:28:18 +0900
-Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
-References: <CAPz6YkUzGWnOznZ4UXNsLbe=ehDwfMJwUSjahUKVnVz8w9OcsA@mail.gmail.com>
- <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 10 Jul 2014 08:32:45 -0400
+Subject: [linux-sunxi] GSoC 2014 #0 status report - Improving Allwinner
+ SoC support
+In-Reply-To: <53BE0B4F.1090001@elopez.com.ar>
+References: <53BE0B4F.1090001@elopez.com.ar>
+Message-ID: <CAKON4OxPG7sYoJQSLu62ptzJPo9vBHxWBb+-+Z9nZ2EVBeJPww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sonny,
+On Wed, Jul 9, 2014 at 11:41 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> Hi everyone,
+>
+> As some of you may know, I'm currently participating in Google Summer of
+> Code under the Linux Foundation, working on a proposal titled "Improve
+> Allwinner SoCs support on mainline Linux". There is a great quantity of
+> devices out there that are powered by Allwinner processors, including but
+> not limited to the various Cubieboards, OLinuXinos, STBs, Tablets and ?Mini
+> PCs?. However, to date, support on mainline Linux is not yet feature
+> complete. My proposal on particular focuses on DMA and analog audio on the
+> earlier SoCs, and improved A23 support.
+>
+> The idea here is to make a weekly status report of the project. As we are
+> starting mid-program, this one will be a bit different and I'll outline what
+> has been worked on so far since the beginning.
+>
+> To date, I have been mainly working on the DMA driver for sun4i, sun5i and
+> sun7i. Despite having completely different drivers on SDK kernels, the
+> hardware block looks and behaves the same, so we are using a single driver
+> for these three SoC families. I have sent a series of patches[1] as well as
+> a follow-up v2[2], and I will keep iterating over it until it's accepted. I
+> have also sent two trivial patches[3][4] as a side-effect.
+>
+> The main challenges while writing this driver can be summarized as a lack of
+> documentation. First of all, it took me a bit to get to know DMAEngine. As
+> there is not much documentation on it, most of my learning took place by
+> reading pre-existing drivers and consulting with my mentor. Secondly, as the
+> Allwinner documentation is mostly a register list with bitfield details, I
+> also had to read the SDK drivers and do some trial and error testing to
+> discover magic values and understand others.
+>
+> Lately, I have also been working on the audio part, now that I have a
+> working DMA driver. After implementing cyclic DMA transfers and some clock
+> code, and armed with a Buildroot image with mpg123 and an OpenBSD release
+> track[5] in mp3 format, I've been trying to get some sound out of my
+> Cubietruck's headphone jack, but without much success so far. I have
+> verified my userspace stack and hardware by running these same binaries on
+> top of the linux-sunxi 3.4 kernel, and it worked fine. I have since then
+> been dumping relevant registers with devmem and comparing them, resolving
+> issues as I see them - hopefully this will yield some audible results.
+>
 
-I have missed this patch.
+Check out the last commit in this branch. It is based on your current
+DMA branch.
+https://github.com/jonsmirl/lpc31xx/tree/linus
 
-You finally choose to take extra interrupt handling.
-If it is not harm, it's fine.
+I am getting noise out of the codec but it is not the right noise.
+Plus the cyclic transfer falls over when the buffer wraps. There is no
+need to use the CONT bit on the Allwinner DMA hardware to implement
+cyclic.
 
-Please check one thing below.
+The DMA interrupt routine should directly program in the next transfer
+in the promise chain when the previous one completes. Doing it from
+the tasklet opens a window where kernel task swap delays can cause DMA
+underrun.
 
-On Tue, June 10, 2014, Sonny Rao wrote:
-> This patch changes the fifo reset code to follow the reset procedure
-> outlined in the documentation of Synopsys Mobile storage host databook.
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> ---
-> v2: Add Generic DMA support
->     per the documentation, move interrupt clear before wait
->     make the test for DMA host->use_dma rather than host->using_dma
->     add proper return values (although it appears no caller checks)
-> v3: rename fifo reset function, and change callers
->     use this combined reset function in dw_mci_resume()
->     just one caller left (probe), so get rid of dw_mci_ctrl_all_reset()
->     use DMA reset bit for all systems which use DMA
->     remove extra IDMAC reset in dw_mci_work_routine_card()
->     do CIU clock update in error path, if CIU reset cleared
-> v4: remove comment about FIFO reset in dw_mci_work_routine_card()
->     move down error message when control reset clears but others don't
->      and clarify the error stating that we will still update clocks
->     make flags for all reset bits a macro
-> 
->  drivers/mmc/host/dw_mmc.c | 86 ++++++++++++++++++++++++++++++++++-------------
->  drivers/mmc/host/dw_mmc.h |  5 +++
->  2 files changed, 68 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 55cd110..1d6d984 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -111,8 +111,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
->  	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
->  };
-> 
-> -static inline bool dw_mci_fifo_reset(struct dw_mci *host);
-> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
-> +static inline bool dw_mci_reset(struct dw_mci *host);
-> 
->  #if defined(CONFIG_DEBUG_FS)
->  static int dw_mci_req_show(struct seq_file *s, void *v)
-> @@ -1254,7 +1253,7 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
->  		 * After an error, there may be data lingering
->  		 * in the FIFO
->  		 */
-> -		dw_mci_fifo_reset(host);
-> +		dw_mci_reset(host);
->  	} else {
->  		data->bytes_xfered = data->blocks * data->blksz;
->  		data->error = 0;
-> @@ -1371,7 +1370,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
-> 
->  			/* CMD error in data command */
->  			if (mrq->cmd->error && mrq->data)
-> -				dw_mci_fifo_reset(host);
-> +				dw_mci_reset(host);
-> 
->  			host->cmd = NULL;
->  			host->data = NULL;
-> @@ -1982,14 +1981,8 @@ static void dw_mci_work_routine_card(struct work_struct *work)
->  			}
-> 
->  			/* Power down slot */
-> -			if (present == 0) {
-> -				/* Clear down the FIFO */
-> -				dw_mci_fifo_reset(host);
-> -#ifdef CONFIG_MMC_DW_IDMAC
-> -				dw_mci_idmac_reset(host);
-> -#endif
-> -
-> -			}
-> +			if (present == 0)
-> +				dw_mci_reset(host);
-> 
->  			spin_unlock_bh(&host->lock);
-> 
-> @@ -2323,8 +2316,11 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
->  	return false;
->  }
-> 
-> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
-> +static inline bool dw_mci_reset(struct dw_mci *host)
->  {
-> +	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
-> +	bool ret = false;
-> +
->  	/*
->  	 * Reseting generates a block interrupt, hence setting
->  	 * the scatter-gather pointer to NULL.
-> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->  		host->sg = NULL;
->  	}
-> 
-> -	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-> -}
-> +	if (host->use_dma)
-> +		flags |= SDMMC_CTRL_DMA_RESET;
-> 
-> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
-> -{
-> -	return dw_mci_ctrl_reset(host,
-> -				 SDMMC_CTRL_FIFO_RESET |
-> -				 SDMMC_CTRL_RESET |
-> -				 SDMMC_CTRL_DMA_RESET);
-> +	if (dw_mci_ctrl_reset(host, flags)) {
-> +		/*
-> +		 * In all cases we clear the RAWINTS register to clear any
-> +		 * interrupts.
-> +		 */
-> +		mci_writel(host, RINTSTS, 0xFFFFFFFF);
-> +
-> +		/* if using dma we wait for dma_req to clear */
-> +		if (host->use_dma) {
-> +			unsigned long timeout = jiffies + msecs_to_jiffies(500);
-> +			u32 status;
-> +			do {
-> +				status = mci_readl(host, STATUS);
-> +				if (!(status & SDMMC_STATUS_DMA_REQ))
-> +					break;
-> +				cpu_relax();
-> +			} while (time_before(jiffies, timeout));
-> +
-> +			if (status & SDMMC_STATUS_DMA_REQ) {
-> +				dev_err(host->dev,
-> +					"%s: Timeout waiting for dma_req to "
-> +					"clear during reset", __func__);
-> +				goto ciu_out;
-> +			}
-> +
-> +			/* when using DMA next we reset the fifo again */
-> +			if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
-> +				goto ciu_out;
-> +		}
-> +	} else {
-> +		/* if the controller reset bit did clear, then set clock regs */
-> +		if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
-> +			dev_err(host->dev, "%s: fifo/dma reset bits didn't "
-> +				"clear but ciu was reset, doing clock update.",
-> +				__func__);
-> +			goto ciu_out;
-> +		}
-> +	}
-> +
-> +	if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
-> +		/* It is also recommended that we reset and reprogram idmac */
-> +		dw_mci_idmac_reset(host);
-> +
-> +	ret = true;
-> +
-> +ciu_out:
-> +	/* After a CTRL reset we need to have CIU set clock registers  */
-> +	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-> +
-> +	return ret;
->  }
-> 
->  #ifdef CONFIG_OF
-> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
->  	}
-> 
->  	/* Reset all blocks */
-> -	if (!dw_mci_ctrl_all_reset(host))
-> +	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
->  		return -ENODEV;
-> 
->  	host->dma_ops = host->pdata->dma_ops;
-> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
->  		}
->  	}
-> 
-> -	if (!dw_mci_ctrl_all_reset(host)) {
-> +	if (!dw_mci_reset(host)) {
-Do you have any reason to use dw_mci_reset() unlike doing on probing?
 
-Thanks,
-Seungwon Jeon
+
+
+> Interestingly enough, Allwinner themselves do not seem to be using cyclic
+> DMA transfers on their driver[6]. I hope this is not a sign of a hardware
+> bug that's not documented.
+>
+> To give some closure to this status report, I'd like to thank Maxime for his
+> mentoring so far, Ezequiel for letting me pick his brain, and the Linux
+> Foundation and Google for giving me this opportunity, as well as everyone on
+> the kernel and sunxi communities who have come forward to review and test
+> patches. You can expect a new report soon, in about a week's time or less.
+>
+> Emilio
+>
+> [1] http://www.spinics.net/lists/dmaengine/msg01148.html
+> [2] http://www.spinics.net/lists/arm-kernel/msg344766.html
+> [3] https://lkml.org/lkml/2014/5/11/166
+> [4] https://lkml.org/lkml/2014/7/1/486
+> [5] http://www.openbsd.org/lyrics.html, maybe I should consider using some
+> other song for better luck
+> [6]
+> https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/sound/soc/sunxi/sunxi-codec.c#L1137
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an
+> email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
