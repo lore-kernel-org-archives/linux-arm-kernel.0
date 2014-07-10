@@ -1,118 +1,59 @@
-From: delicious.quinoa@gmail.com (Alan Tull)
-Date: Thu, 10 Jul 2014 15:07:04 -0500
-Subject: [PATCHv7 2/3] devicetree: Addition of the Altera SDRAM EDAC.
-In-Reply-To: <CAF03EBdBMphBLkGj4=_kGADF4iq_uUpyBbRJ7O63OvSHcR5hSw@mail.gmail.com>
-References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
- <1403730927-16163-3-git-send-email-tthayer@altera.com>
- <20140626094507.GM15240@leverpostej>
- <CAF03EBdBMphBLkGj4=_kGADF4iq_uUpyBbRJ7O63OvSHcR5hSw@mail.gmail.com>
-Message-ID: <CANk1AXQ1Aw-8Et_XE9BSL42r_DGxLiwOdyjA7YxMJMw6Fc=YUg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 10 Jul 2014 13:25:02 -0700
+Subject: [PATCH] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140709161704.9623.92358.stgit@joelaarch64.amd.com>
+References: <20140709161704.9623.92358.stgit@joelaarch64.amd.com>
+Message-ID: <20140710202502.GA20394@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 3:07 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
->
-> On Thu, Jun 26, 2014 at 4:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Jun 25, 2014 at 10:15:26PM +0100, tthayer at altera.com wrote:
-> >> From: Thor Thayer <tthayer@altera.com>
-> >>
-> >> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
-> >>
-> >> Signed-off-by: Thor Thayer <tthayer@altera.com>
-> >> ---
-> >> v2: Changes to SoC EDAC source code.
-> >>
-> >> v3: Fix typo in device tree documentation.
-> >>
-> >> v4,v5: No changes - bump version for consistency.
-> >>
-> >> v6: Assign ECC registers in SDRAM controller to EDAC
-> >>
-> >> v7: Fix SDRAM EDAC base address.
-> >> ---
-> >>  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
-> >>  arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
-> >>  2 files changed, 21 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> >> new file mode 100644
-> >> index 0000000..d68e033
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> >> @@ -0,0 +1,15 @@
-> >> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
-> >> +
-> >> +Required properties:
-> >> +- compatible : should contain "altr,sdram-edac";
-> >> +- reg : should contain the ECC register range in sdram
-> >> +        controller (address and length).
-> >> +- interrupts : Should contain the SDRAM ECC IRQ in the
-> >> +     appropriate format for the IRQ controller.
-> >> +
-> >> +Example:
-> >> +     sdramedac at ffc2502c {
-> >> +             compatible = "altr,sdram-edac";
-> >> +             reg = <0xffc2502c 0x28>;
-> >> +             interrupts = <0 39 4>;
-> >> +     };
-> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> >> index 310292e..da0785d 100644
-> >> --- a/arch/arm/boot/dts/socfpga.dtsi
-> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> >> @@ -687,6 +687,12 @@
-> >>                       reg = <0xffc25000 0x4>;
-> >>               };
-> >>
-> >> +             sdramedac at ffc2502c {
-> >> +                     compatible = "altr,sdram-edac";
-> >> +                     reg = <0xffc2502c 0x28>;
-> >> +                     interrupts = <0 39 4>;
-> >> +             };
-> >
-> > I'm not sure I understand this. The ECC register existing within the
-> > SDRAM controller, which we have a binding for. Why do we need a separate
-> > binding for a subset of registers within an IP block?
-> >
-> > Why can we not have a single binding for the entire SDRAM controlelr and
-> > decompse that within Linux as it makes sense for the appropriate
-> > subsystyems?
-> >
-> > Leaking Linux design into bindings is a bad idea; it makes it harder to
-> > change things.
-> >
-> > Mark.
->
-> Hi Mark,
->
-> How would we decompose this within Linux. MFD? Is there an example
-> that I can look at?
->
-> We originally used syscon for the entire sdram controller register
-> block but we got dinged on it.
+On Wed, Jul 09, 2014 at 11:17:04AM -0500, Joel Schopp wrote:
+> The current calculation for VTTBR_BADDR_MASK masks only 39 bits and not
+> all 40 bits.  That last bit is important as some systems allocate
+> from near the top of the available address space.
+> 
+> This patch is necessary to run KVM on an aarch64 SOC I have been testing.
+> 
+> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 3d69030..b39e93f 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -148,7 +148,7 @@
+>  #endif
+>  
+>  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+> +#define VTTBR_BADDR_MASK  (0xffffffffffLLU)              /* bits 0-39 */
+>  #define VTTBR_VMID_SHIFT  (48LLU)
+>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+>  
+> 
 
-I think it is good feedback that we don't want the devicetree to break
-up this register range (unless someone wants to argue that).
+While this is obviously fixing a bug, it doesn't feel like the right
+short-term fix.  I'll have to go back and read the definitions of x in
+BADDR[47:x] for VTTBR_EL2 exactly again, but the intended use of
+VTTBR_BADDR_MASK (and the only occurence of it in C-code) is to deal
+with alignment of the allocated pgd.
 
-The problem we need to solve here is that the sdram controller
-register range has registers that are needed for at least 3 different
-functions/drivers: edac, fpga bridges, and loe power mode (putting ddr
-in self-refresh).  We would not want to do that in one driver.
-Originally we had the whole sdram controller as 'syscon' and that was
-frowned upon.  I think someone suggested a MFD.  We can do that and
-will do that if that will move things forward.  But that would just be
-a mfd that ioremaps the range and provides read/write functions for
-other drivers to use (which starts looking very similar to syscon
-except that it adds more code to the kernel to do what syscon does).
-It seems like that's what syscon was for (looking at
-Documentation/devicetree/bindings/mfd/syscon.txt).
+So while all the MSB in the physical address range of your system should
+be used, we still need to check that the pgd we allocate is actually
+aligned properly, because writing any bits in [x-1:0} as non-zero can
+potentially cause unpredicted behavior and the translation walk results
+can be corrupted.
 
-So can we have a consensus here on syscon or a very minimal mfd or
-some other clear way of moving forward?
+So, you do need to use a proper shift, I'm fine with fixing it for the
+assumed 40-bit physical address space for now, but you need to figure
+out the right value of 'x', for the BADDR[47:x], and you should change
+the code in update_vttbr() as part of this patch, something like
+BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK) and make sure the pgd is allocated
+at the right alignment, or ensure that the PGD is large enough that we
+can just mask off the lower bits and still contain the required number
+of entries.
 
-Alan
-
->
-> Thanks for your help.
->
-> Thor
+Thanks,
+-Christoffer
