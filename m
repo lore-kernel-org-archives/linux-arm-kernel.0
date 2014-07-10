@@ -1,32 +1,33 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Jul 2014 18:15:59 +0200
-Subject: [alsa-devel] [PATCH V3 2/2] ASoC: samsung: Add machine driver for
- Odroid X2/U3
-In-Reply-To: <CAD8Lp44JFtbcD22c+0PVb5S4U1kVTTxHD=PgqiKzhVypFW5Prg@mail.gmail.com>
-References: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
- <1404479625-25385-2-git-send-email-s.nawrocki@samsung.com>
- <CAD8Lp44JFtbcD22c+0PVb5S4U1kVTTxHD=PgqiKzhVypFW5Prg@mail.gmail.com>
-Message-ID: <53BEBC3F.6030205@samsung.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Thu, 10 Jul 2014 13:20:12 -0300
+Subject: [PATCH v2 2/8] spi: sun4i: add DMA support
+In-Reply-To: <20140710122227.GC27469@lukather>
+References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
+ <1404619518-7592-3-git-send-email-emilio@elopez.com.ar>
+ <20140710122227.GC27469@lukather>
+Message-ID: <53BEBD3C.9@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi,
 
-On 08/07/14 11:15, Daniel Drake wrote:
-> Testing on ODROID-U2, v3 is not quite working for me, but v2 of the
-> patch was fine.
-> I boot up, run:
-> # speaker-test -c 2 -t wav
-> 
-> As soon as I hear the word "front" I press ctrl+c and then run the
-> command again.
-> Now the command hangs with no audible output.
-> 
-> Any ideas? Let me know if you have trouble reproducing.
+El 10/07/14 09:22, Maxime Ripard escribi?:
+> Hi Emilio,
+>
+> On Sun, Jul 06, 2014 at 01:05:09AM -0300, Emilio L?pez wrote:
+>> This patch adds DMA support for 64 byte transfers on the sun4i SPI
+>> controller. Bigger transfers did not seem to work when tested, and if
+>> the hardware actually supports those, it will need further
+>> investigation as to how to issue them correctly.
+>>
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>
+> This patch looks fine from a quick look, but you should put Mark Brown
+> in the recipients, since he's the SPI maintainer, and will probably
+> have a sharper look.
 
-I just posted a patch addressing this, please let me know
-if there are any further issues.
+Thanks for the heads up, I'll Cc him as well as the SPI list on v3
 
--- 
-Thanks,
-Sylwester
+Cheers!
+
+Emilio
