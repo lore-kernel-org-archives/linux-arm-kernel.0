@@ -1,29 +1,48 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 10 Jul 2014 16:03:51 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20140710111833.GY3935@laptop>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
- <20140710111833.GY3935@laptop>
-Message-ID: <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Thu, 10 Jul 2014 17:59:47 +0400
+Subject: [RFC/PATCH RESEND -next 00/21] Address sanitizer for kernel
+ (kasan) - dynamic memory error detector.
+In-Reply-To: <CAOMGZ=Fmqg6MWyx3NygqVmYiqw=npkPQrO9ifhF489bq5Gxz4A@mail.gmail.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <53BDB1D6.1090605@intel.com> <8761j6nr53.fsf@tassilo.jf.intel.com>
+ <CAOMGZ=Fmqg6MWyx3NygqVmYiqw=npkPQrO9ifhF489bq5Gxz4A@mail.gmail.com>
+Message-ID: <53BE9C53.5090301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 13:18, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
->> +             /*
->> +              * If the CPUs share their cache and the src_cpu's capacity is
->> +              * reduced because of other sched_class or IRQs, we trig an
->> +              * active balance to move the task
->> +              */
->> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
->> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
->> +                                                     sd->imbalance_pct)))
->>                       return 1;
->
-> Why is this tied to shared caches?
+On 07/10/14 01:59, Vegard Nossum wrote:
+> On 9 July 2014 23:44, Andi Kleen <andi@firstfloor.org> wrote:
+>> Dave Hansen <dave.hansen@intel.com> writes:
+>>>
+>>> You're also claiming that "KASAN is better than all of
+>>
+>> better as in finding more bugs, but surely not better as in
+>> "do so with less overhead"
+>>
+>>> CONFIG_DEBUG_PAGEALLOC".  So should we just disallow (or hide)
+>>> DEBUG_PAGEALLOC on kernels where KASAN is available?
+>>
+>> I don't think DEBUG_PAGEALLOC/SLUB debug and kasan really conflict.
+>>
+>> DEBUG_PAGEALLOC/SLUB is "much lower overhead but less bugs found".
+>> KASAN is "slow but thorough" There are niches for both.
+>>
+>> But I could see KASAN eventually deprecating kmemcheck, which
+>> is just incredible slow.
+> 
+> FWIW, I definitely agree with this -- if KASAN can do everything that
+> kmemcheck can, it is no doubt the right way forward.
+> 
 
-It's just to limit the change of the policy to a level that can have
-benefit without performance regression. I'm not sure that we can do
-that at any level without risk
+AFAIK kmemcheck could catch reads of uninitialized memory.
+KASAN can't do it now, but It should be possible to implementation.
+There is such tool for userspace - https://code.google.com/p/memory-sanitizer/wiki/MemorySanitizer
+
+However detection of reads of uninitialized  memory will require a different
+shadow encoding. Therefore I think it would be better to make it as a separate feature, incompatible with kasan.
+
+
+
+> 
+> Vegard
+> 
