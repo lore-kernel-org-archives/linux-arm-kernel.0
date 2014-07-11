@@ -1,50 +1,147 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 11 Jul 2014 21:31:44 +0200
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <20140618195908.GJ32514@n2100.arm.linux.org.uk>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20140618190108.GI32514@n2100.arm.linux.org.uk>
- <201406182109.59059@pali>
- <20140618195908.GJ32514@n2100.arm.linux.org.uk>
-Message-ID: <20140711193144.GC20015@amd.pavel.ucw.cz>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Fri, 11 Jul 2014 12:48:17 -0700
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <001301cf9cf1$c91c7310$5b555930$%jun@samsung.com>
+References: <CAPz6YkUzGWnOznZ4UXNsLbe=ehDwfMJwUSjahUKVnVz8w9OcsA@mail.gmail.com>
+ <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
+ <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
+ <CAPz6YkXgoKPSQEdNOwAQDhEnFGFVArr_0obbVR_okAEOvLxtzA@mail.gmail.com>
+ <001301cf9cf1$c91c7310$5b555930$%jun@samsung.com>
+Message-ID: <CAPz6YkUKWUuQrSjPbdhwwZ57kkzJ7tLGpue=mvw6+31kkBhauw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2014-06-18 20:59:08, Russell King - ARM Linux wrote:
-> On Wed, Jun 18, 2014 at 09:09:58PM +0200, Pali Roh?r wrote:
-> > On Wednesday 18 June 2014 21:01:09 Russell King - ARM Linux 
-> > wrote:
-> > > On Wed, Jun 18, 2014 at 06:54:24PM +0200, Pali Roh?r wrote:
-> > > > Machine name from board description is some generic name on
-> > > > DT kernel. DT provides machine name property which is
-> > > > specific for board, so use it instead generic one when
-> > > > possible.
-> > > 
-> > > http://archive.arm.linux.org.uk/lurker/message/20130726.132850
-> > > .53d47576.en.html
-> > > 
-> > > "If userspace wants to get at the DT information about a
-> > > platform, we already have ways that can happen already - we
-> > > export the DT stuff so that kexec's tools can get at it."
-> > 
-> > Userspace application does not know that kernel using DT. And 
-> > also it does not want to get DT information. Only board/machine 
-> > name. So existing applications stop working after migration to 
-> > DT. And because legacy board boot code (without DT) is going to 
-> > be removed for ARM in near future this will permanently break 
-> > existing applications.
-> 
-> We're already breaking the userspace API through moving to DT, because
-> all the device names in /sys/devices are changing.  Userspace is going
-> to have to cope with change as we move towards DT.  This is just
-> another aspect of moving towards DT, and one which userspace is going
-> to have to deal with.
+On Fri, Jul 11, 2014 at 3:20 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> On Fri, July 11, 2014, Sonny Rao wrote:
+>> On Thu, Jul 10, 2014 at 5:28 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+>> > Hi Sonny,
+>> >
+>> > I have missed this patch.
+>> >
+>> > You finally choose to take extra interrupt handling.
+>> > If it is not harm, it's fine.
+>>
+>> Hi, thanks for coming back to it.  Based on my tracing, the interrupt
+>> seems to be okay and is just ignored.
+>>
+>> >> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>> >> +static inline bool dw_mci_reset(struct dw_mci *host)
+> "inline" is no needed anymore.
+>
+>> >>  {
+>> >> +     u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
+>> >> +     bool ret = false;
+>> >> +
+>> >>       /*
+>> >>        * Reseting generates a block interrupt, hence setting
+>> >>        * the scatter-gather pointer to NULL.
+>> >> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>> >>               host->sg = NULL;
+>> >>       }
+>> >>
+>> >> -     return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>> >> -}
+>> >> +     if (host->use_dma)
+>> >> +             flags |= SDMMC_CTRL_DMA_RESET;
+>> >>
+>> >> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+>> >> -{
+>> >> -     return dw_mci_ctrl_reset(host,
+>> >> -                              SDMMC_CTRL_FIFO_RESET |
+>> >> -                              SDMMC_CTRL_RESET |
+>> >> -                              SDMMC_CTRL_DMA_RESET);
+>> >> +     if (dw_mci_ctrl_reset(host, flags)) {
+>> >> +             /*
+>> >> +              * In all cases we clear the RAWINTS register to clear any
+>> >> +              * interrupts.
+>> >> +              */
+>> >> +             mci_writel(host, RINTSTS, 0xFFFFFFFF);
+>> >> +
+>> >> +             /* if using dma we wait for dma_req to clear */
+>> >> +             if (host->use_dma) {
+>> >> +                     unsigned long timeout = jiffies + msecs_to_jiffies(500);
+>> >> +                     u32 status;
+>> >> +                     do {
+>> >> +                             status = mci_readl(host, STATUS);
+>> >> +                             if (!(status & SDMMC_STATUS_DMA_REQ))
+>> >> +                                     break;
+>> >> +                             cpu_relax();
+>> >> +                     } while (time_before(jiffies, timeout));
+>> >> +
+>> >> +                     if (status & SDMMC_STATUS_DMA_REQ) {
+>> >> +                             dev_err(host->dev,
+>> >> +                                     "%s: Timeout waiting for dma_req to "
+>> >> +                                     "clear during reset", __func__);
+>> >> +                             goto ciu_out;
+>> >> +                     }
+>> >> +
+>> >> +                     /* when using DMA next we reset the fifo again */
+>> >> +                     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
+>> >> +                             goto ciu_out;
+>> >> +             }
+>> >> +     } else {
+>> >> +             /* if the controller reset bit did clear, then set clock regs */
+>> >> +             if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
+>> >> +                     dev_err(host->dev, "%s: fifo/dma reset bits didn't "
+>> >> +                             "clear but ciu was reset, doing clock update.",
+>> >> +                             __func__);
+>> >> +                     goto ciu_out;
+>> >> +             }
+>> >> +     }
+>> >> +
+>> >> +     if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
+>> >> +             /* It is also recommended that we reset and reprogram idmac */
+>> >> +             dw_mci_idmac_reset(host);
+>> >> +
+>> >> +     ret = true;
+>> >> +
+>> >> +ciu_out:
+>> >> +     /* After a CTRL reset we need to have CIU set clock registers  */
+>> >> +     mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+>> >> +
+>> >> +     return ret;
+>> >>  }
+>> >>
+>> >>  #ifdef CONFIG_OF
+>> >> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
+>> >>       }
+>> >>
+>> >>       /* Reset all blocks */
+>> >> -     if (!dw_mci_ctrl_all_reset(host))
+>> >> +     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
+>> >>               return -ENODEV;
+>> >>
+>> >>       host->dma_ops = host->pdata->dma_ops;
+>> >> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
+>> >>               }
+>> >>       }
+>> >>
+>> >> -     if (!dw_mci_ctrl_all_reset(host)) {
+>> >> +     if (!dw_mci_reset(host)) {
+>> > Do you have any reason to use dw_mci_reset() unlike doing on probing?
+>>
+>> I really wanted to use dw_mci_reset() everwhere, including probe,
+>> because that would be simplest, where there is just one reset function
+>> always, but the host structure is not completely set up at probe time,
+>> so the code in dw_mci_reset() where we try to send a command to update
+>> clock fails, so that's why I had to just do a reset.
+>
+> Yes, if we can keep one interface, it would be good.
+> But can you check below?
+> Did you see the kernel panic on probing with "host->cur_slot" is NULL?
 
-You don't _have_ to break /proc/cpuinfo.  No, "DT breaks stuff" should
-not be reason to "break more stuff".  (Actually, I'm not aware of
-anything DT would have to break.)
+Yes, I think that was the one.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> If right, resume seems not different from probe in case of removable type.
+> And dw_mci_idmac_reset() is redundant when dw_mci_reset() is used at resume.
+>
+> I think dw_mci_ctrl_reset() can be also used at resume like at probe for simple way.
+> For safety's sake, "host->cur_slot" should be guaranteed it's not NULL.
+
+Ok, I didn't try on removable, but I can change it to match probe,
+thanks for looking at this.
+
+>
+> Thanks,
+> Seungwon Jeon
+>
