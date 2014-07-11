@@ -1,61 +1,51 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Fri, 11 Jul 2014 11:07:10 +0200
-Subject: [PATCH v3 2/5] phy: miphy365x: Add MiPHY365x header file for DT x
- Driver defines
-In-Reply-To: <1404906074-31992-3-git-send-email-lee.jones@linaro.org>
-References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
- <1404906074-31992-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAG374jD=DOVveEOxvddxMZYrEk0Paj4on3cnzSM8kZstSUrwcA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 11 Jul 2014 14:37:56 +0530
+Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
+In-Reply-To: <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+ <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
+ <53BE926A.2070005@ti.com>
+ <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
+Message-ID: <CAOh2x=muti0t8akw=Kbw22seOCP4=CsUrCUaNzmae74+JH3Q+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee
+On Thu, Jul 10, 2014 at 7:00 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-On 9 July 2014 13:41, Lee Jones <lee.jones@linaro.org> wrote:
-> This provides the shared header file which will be reference from both
-> the MiPHY365x driver and its associated Device Tree node(s).
->
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  include/dt-bindings/phy/phy-miphy365x.h | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
->
-> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
-> new file mode 100644
-> index 0000000..8ef8aba
-> --- /dev/null
-> +++ b/include/dt-bindings/phy/phy-miphy365x.h
-> @@ -0,0 +1,14 @@
-> +/*
-> + * This header provides constants for the phy framework
-> + * based on the STMicroelectronics MiPHY365x.
-> + *
-> + * Author: Lee Jones <lee.jones@linaro.org>
-> + */
-> +#ifndef _DT_BINDINGS_PHY_MIPHY
-> +#define _DT_BINDINGS_PHY_MIPHY
-> +
-> +#define MIPHY_TYPE_SATA                1
+>>> +#ifdef CONFIG_PM_SLEEP
+>>> +static int spear1340_miphy_suspend(struct device *dev)
+>>> +{
+>>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+>>> +     int ret = 0;
+>>> +
+>>> +     if (priv->mode == SATA)
+>>> +             ret = spear1340_miphy_sata_exit(priv);
+>>
+>> Shouldn't this be spear1340_miphy_init()?
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +
+>>> +static int spear1340_miphy_resume(struct device *dev)
+>>> +{
+>>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
+>>> +     int ret = 0;
+>>> +
+>>> +     if (priv->mode == SATA)
+>>> +             ret = spear1340_miphy_sata_init(priv);
+>>
+>> And here spear1340_miphy_exit()? Why only for sata phys?
 
-why it start to 1 ? for my side i prefer 0.
+Kishon,
 
-BR.
+I had a chat with Pratyush and this is what we came to:
 
-Gabriel.
+init and exit are rightly placed I believe. We need to initialize from
+resume and exit from suspend. That's fine right? Also this was already
+part of: arch/arm/mach-spear/spear1340.c which is removed with
+this set.
 
-> +#define MIPHY_TYPE_PCIE                2
-> +#define MIPHY_TYPE_USB         3
-> +
-> +#endif /* _DT_BINDINGS_PHY_MIPHY */
-> --
-> 1.8.3.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regarding sata and pcie, pcie suspend isn't yet implemented and
+tested. So only sata :)
+
+For delays, need to wait for mohit. Was on leave today.
