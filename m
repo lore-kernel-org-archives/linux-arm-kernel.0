@@ -1,156 +1,197 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Jul 2014 15:45:07 +0200
-Subject: [PATCH 3/4] ASoC: samsung: s3c24xx dmaengine follow-up
+Date: Fri, 11 Jul 2014 15:45:05 +0200
+Subject: [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic registration
 In-Reply-To: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
 References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
-Message-ID: <1405086308-1461192-6-git-send-email-arnd@arndb.de>
+Message-ID: <1405086308-1461192-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ae602456e83c92 ("ASoC: samsung: drop support for legacy
-S3C24XX DMA API") removed the old code for the samsung specific
-DMA interfaces, now that everybody can use dmaengine.
+As a prerequisite for moving s3c64xx into multiplatform configurations,
+we need to change the smartq audio driver to stop using hardcoded
+gpio numbers from the header file, and instead pass the gpio data
+through platform_data.
 
-This picks up the few remaining pieces left over by that patch:
-
-The most important one is the removal of the dma_data->ops->started()
-calls in ac97. My understanding is that these are only required
-for drivers that do not support cyclic transfers, which the new dma
-engine driver now does, so we can simply remove them. This would also
-fix at least one bug in the ac97 driver on newer machines, which
-currently gives us a NULL pointer dereference from trying to call
-dma_data->ops->started().
-
-Further, we must no longer 'select' S3C2410_DMA, which conflicts
-with the dmaengine driver. The SND_S3C_DMA symbol is now
-useless, because it is always selected, so we can remove it
-and build the dmaengine support unconditionally.
-
-Finally, we should not 'select' S3C24XX_DMAC or S3C64XX_PL080,
-which may have additional dependencies. This replaces it with
-'depends on', to be more conservative.
+In order to do that, we also move the code to use module_platform_driver
+and register the platform device using platform_device_register_data.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Sangbeom Kim <sbkim73@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Maurus Cuelenaere <mcuelenaere@gmail.com>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
 ---
- sound/soc/samsung/Kconfig  | 10 ++--------
- sound/soc/samsung/Makefile |  2 +-
- sound/soc/samsung/ac97.c   | 17 -----------------
- 3 files changed, 3 insertions(+), 26 deletions(-)
+ arch/arm/mach-s3c64xx/mach-smartq.c           | 10 ++++
+ include/linux/platform_data/asoc-s3c-smartq.h | 10 ++++
+ sound/soc/samsung/smartq_wm8987.c             | 73 ++++++++++-----------------
+ 3 files changed, 47 insertions(+), 46 deletions(-)
+ create mode 100644 include/linux/platform_data/asoc-s3c-smartq.h
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 7622af82ac4f..afcf95c6e212 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -1,18 +1,14 @@
- config SND_SOC_SAMSUNG
- 	tristate "ASoC support for Samsung"
- 	depends on PLAT_SAMSUNG
--	select S3C24XX_DMAC if ARCH_S3C24XX
--	select S3C64XX_PL080 if ARCH_S3C64XX
--	select SND_S3C_DMA
-+	depends on S3C64XX_PL080 || !ARCH_S3C64XX
-+	depends on S3C24XX_DMAC || !ARCH_S3C24XX
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the Samsung SoCs' Audio interfaces. You will also need to
- 	  select the audio interfaces to support below.
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index b3d13537a7f0..4c111f60dbf2 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -20,6 +20,7 @@
+ #include <linux/spi/spi_gpio.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/platform_data/s3c-hsotg.h>
++#include <linux/platform_data/asoc-s3c-smartq.h>
  
--config SND_S3C_DMA
--	tristate
--
- config SND_S3C24XX_I2S
- 	tristate
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+@@ -379,6 +380,11 @@ void __init smartq_map_io(void)
+ 	smartq_lcd_mode_set();
+ }
  
-@@ -77,7 +73,6 @@ config SND_SOC_SAMSUNG_SMDK_WM8994
- config SND_SOC_SAMSUNG_SMDK2443_WM9710
- 	tristate "SoC AC97 Audio support for SMDK2443 - WM9710"
- 	depends on SND_SOC_SAMSUNG && MACH_SMDK2443
--	select S3C2410_DMA
- 	select AC97_BUS
- 	select SND_SOC_AC97_CODEC
- 	select SND_SAMSUNG_AC97
-@@ -88,7 +83,6 @@ config SND_SOC_SAMSUNG_SMDK2443_WM9710
- config SND_SOC_SAMSUNG_LN2440SBC_ALC650
- 	tristate "SoC AC97 Audio support for LN2440SBC - ALC650"
- 	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX
--	select S3C2410_DMA
- 	select AC97_BUS
- 	select SND_SOC_AC97_CODEC
- 	select SND_SAMSUNG_AC97
-diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
-index e8d9ccdc41fd..91505ddaaf95 100644
---- a/sound/soc/samsung/Makefile
-+++ b/sound/soc/samsung/Makefile
-@@ -9,7 +9,7 @@ snd-soc-samsung-spdif-objs := spdif.o
- snd-soc-pcm-objs := pcm.o
- snd-soc-i2s-objs := i2s.o
++static const __initconst struct smartq_audio_pdata smartq_audio_pdata = {
++	.gpio_jack = S3C64XX_GPL(12),
++	.gpio_amp = S3C64XX_GPK(12),
++};
++
+ void __init smartq_machine_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -397,4 +403,8 @@ void __init smartq_machine_init(void)
+ 	WARN_ON(smartq_wifi_init());
  
--obj-$(CONFIG_SND_S3C_DMA) += snd-soc-s3c-dma.o
-+obj-$(CONFIG_SND_SOC_SAMSUNG) += snd-soc-s3c-dma.o
- obj-$(CONFIG_SND_S3C24XX_I2S) += snd-soc-s3c24xx-i2s.o
- obj-$(CONFIG_SND_SAMSUNG_AC97) += snd-soc-ac97.o
- obj-$(CONFIG_SND_S3C2412_SOC_I2S) += snd-soc-s3c2412-i2s.o
-diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-index 68d9303047e8..2aa24d052a4a 100644
---- a/sound/soc/samsung/ac97.c
-+++ b/sound/soc/samsung/ac97.c
-@@ -19,7 +19,6 @@
- 
+ 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
++
++	platform_device_register_data(NULL, "smartq-audio", -1,
++				      &smartq_audio_pdata,
++				      sizeof (smartq_audio_pdata));
+ }
+diff --git a/include/linux/platform_data/asoc-s3c-smartq.h b/include/linux/platform_data/asoc-s3c-smartq.h
+new file mode 100644
+index 000000000000..5bddc3586802
+--- /dev/null
++++ b/include/linux/platform_data/asoc-s3c-smartq.h
+@@ -0,0 +1,10 @@
++#ifndef __PLATFORM_DATA_ASOC_S3C_SMARTQ
++#define __PLATFORM_DATA_ASOC_S3C_SMARTQ
++
++struct smartq_audio_pdata {
++	int gpio_jack;
++	int gpio_amp;
++};
++
++#endif
++
+diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+index 9b0ffacab790..8c4a0a285ce7 100644
+--- a/sound/soc/samsung/smartq_wm8987.c
++++ b/sound/soc/samsung/smartq_wm8987.c
+@@ -19,8 +19,7 @@
  #include <sound/soc.h>
+ #include <sound/jack.h>
  
--#include <mach/dma.h>
- #include "regs-ac97.h"
- #include <linux/platform_data/asoc-s3c.h>
+-#include <mach/gpio-samsung.h>
+-#include <asm/mach-types.h>
++#include <linux/platform_data/asoc-s3c-smartq.h>
  
-@@ -225,9 +224,6 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
- 				struct snd_soc_dai *dai)
+ #include "i2s.h"
+ #include "../codecs/wm8750.h"
+@@ -110,7 +109,7 @@ static struct snd_soc_jack_pin smartq_jack_pins[] = {
+ 
+ static struct snd_soc_jack_gpio smartq_jack_gpios[] = {
+ 	{
+-		.gpio		= S3C64XX_GPL(12),
++		.gpio		= -1,
+ 		.name		= "headphone detect",
+ 		.report		= SND_JACK_HEADPHONE,
+ 		.debounce_time	= 200,
+@@ -127,7 +126,10 @@ static int smartq_speaker_event(struct snd_soc_dapm_widget *w,
+ 				struct snd_kcontrol *k,
+ 				int event)
  {
- 	u32 ac_glbctrl;
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct s3c_dma_params *dma_data =
--		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+-	gpio_set_value(S3C64XX_GPK(12), SND_SOC_DAPM_EVENT_OFF(event));
++	struct smartq_audio_pdata *pdata;
++	pdata = snd_soc_smartq.dev->platform_data;
++
++	gpio_set_value(pdata->gpio_amp, SND_SOC_DAPM_EVENT_OFF(event));
  
- 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-@@ -253,11 +249,6 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
- 
- 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 
--	if (!dma_data->ops)
--		dma_data->ops = samsung_dma_get_ops();
--
--	dma_data->ops->started(dma_data->channel);
--
  	return 0;
  }
+@@ -218,62 +220,41 @@ static struct snd_soc_card snd_soc_smartq = {
+ 	.num_controls = ARRAY_SIZE(wm8987_smartq_controls),
+ };
  
-@@ -265,9 +256,6 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
- 				    int cmd, struct snd_soc_dai *dai)
+-static struct platform_device *smartq_snd_device;
+-
+-static int __init smartq_init(void)
++static int smartq_probe(struct platform_device *pdev)
  {
- 	u32 ac_glbctrl;
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct s3c_dma_params *dma_data =
--		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
++	struct smartq_audio_pdata *pdata = pdev->dev.platform_data;
+ 	int ret;
  
- 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 	ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
-@@ -287,11 +275,6 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
- 
- 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 
--	if (!dma_data->ops)
--		dma_data->ops = samsung_dma_get_ops();
+-	if (!machine_is_smartq7() && !machine_is_smartq5()) {
+-		pr_info("Only SmartQ is supported by this ASoC driver\n");
+-		return -ENODEV;
+-	}
 -
--	dma_data->ops->started(dma_data->channel);
+-	smartq_snd_device = platform_device_alloc("soc-audio", -1);
+-	if (!smartq_snd_device)
+-		return -ENOMEM;
 -
- 	return 0;
+-	platform_set_drvdata(smartq_snd_device, &snd_soc_smartq);
+-
+-	ret = platform_device_add(smartq_snd_device);
+-	if (ret) {
+-		platform_device_put(smartq_snd_device);
+-		return ret;
+-	}
++	platform_set_drvdata(pdev, &snd_soc_smartq);
+ 
+ 	/* Initialise GPIOs used by amplifiers */
+-	ret = gpio_request(S3C64XX_GPK(12), "amplifiers shutdown");
++	ret = devm_gpio_request_one(&pdev->dev, pdata->gpio_amp,
++				    GPIOF_DIR_OUT | GPIOF_INIT_HIGH,
++				    "amplifiers shutdown");
+ 	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to register GPK12\n");
+-		goto err_unregister_device;
++		dev_err(&pdev->dev, "Failed to register GPK12\n");
++		goto out;
+ 	}
+ 
+-	/* Disable amplifiers */
+-	ret = gpio_direction_output(S3C64XX_GPK(12), 1);
+-	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to configure GPK12\n");
+-		goto err_free_gpio_amp_shut;
+-	}
++	smartq_jack_gpios[0].gpio = pdata->gpio_jack;
+ 
+-	return 0;
+-
+-err_free_gpio_amp_shut:
+-	gpio_free(S3C64XX_GPK(12));
+-err_unregister_device:
+-	platform_device_unregister(smartq_snd_device);
++	ret = devm_snd_soc_register_card(&pdev->dev, &snd_soc_smartq);
++	if (ret)
++		dev_err(&pdev->dev, "Failed to register card\n");
+ 
++out:
+ 	return ret;
  }
  
+-static void __exit smartq_exit(void)
+-{
+-	gpio_free(S3C64XX_GPK(12));
+-
+-	platform_device_unregister(smartq_snd_device);
+-}
++static struct platform_driver smartq_driver = {
++	.driver = {
++		.name = "smartq-audio",
++		.owner = THIS_MODULE,
++	},
++	.probe = smartq_probe,
++};
+ 
+-module_init(smartq_init);
+-module_exit(smartq_exit);
++module_platform_driver(smartq_driver);
+ 
+ /* Module information */
+ MODULE_AUTHOR("Maurus Cuelenaere <mcuelenaere@gmail.com>");
 -- 
 1.8.3.2
