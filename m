@@ -1,74 +1,160 @@
-From: a.heider@gmail.com (Andre Heider)
-Date: Fri, 11 Jul 2014 17:30:19 +0200
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140711153019.GA75267@localhost>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Jul 2014 17:31:11 +0200
+Subject: [PATCH v2 2/3] ARM: Use include/asm-generic/io.h
+In-Reply-To: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
+References: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1405092672-18549-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+From: Thierry Reding <treding@nvidia.com>
 
-On Thu, Jul 10, 2014 at 09:55:38PM -0500, Dave Gerlach wrote:
-> Hello,
-> 
-> This series adds suspend/resume support for am335x. Version 3 of this
-> series can be found at [1]. I apologize for the large delay between this
-> and the previous revision. This code has been heavily refined
-> since the last version based on the various comments received for v3. The
-> major change from previous version is moving all wkup_m3 code into a
-> remoteproc based driver. The new driver handles all IPC and fw loading
-> and exposes a small API to be used by PM code to achieve low power states.
-> 
-> Firmware that can be used for testing this can be found at [2] on branch
-> pm-remote-proc-v3, using am335x-pm-firmware.elf found in bin directory.
-> Please note this has changed from all previous versions and is no longer
-> the .bin file. Firmware can be built into kernel or placed in /lib/firmware
-> in rootfs for automatic loading during boot.
-> 
-> This series has several dependencies. The wkup_m3_rproc utilizes a mailbox
-> to communicate with the cm3 and depends on Suman's series for omap mbox
-> support [3], which has several dependencies of it's own, listed in the
-> cover letter. Also, a few changes to remoteproc itself were needed and
-> have been provided by Suman here [4]. The edma patch included in this
-> series was previously submitted by Daniel Mack and after discussion with
-> him we agreed to include an updated version with this series as resume
-> has a direct dependency on it due to hangs in mmc without it.
-> 
-> Because of the high number of dependencies I have pushed a branch for
-> testing here [6] if anyone desires to try it out on branch pm-ds0-v3.16.
-> 
-> As is this series will only suspend and resume one time and then
-> fail to resume afterwards due to the removal of direct PM code control
-> of hwmods that do not properly assert their MSTANDBY signal after a context
-> loss, discussed here [7]. In particular it is due to the usb_otg_hs hwmod
-> that currently has no driver controlling it in the kernel. The main
-> cause of the issue is that the SYSCONFIG register present within
-> the IP must be reprogrammed after every suspend cycle and this
-> only happens at boot if no driver is present. Work is in progress to
-> allow suspend to function with or without drivers for the troublesome
-> hwmods (cpgmac, usb_otg_hs, and tptc1-3) and will be provided in a separate
-> future patch. The previous suggestion of allowing omap_device to handle
-> it proved to be too invasive into both omap_device and omap_hwmod and
-> the approach of allowing the firmware to handle it is not possible due
-> to the inability of the CM3 to access the IPs causing the issue. I'd
-> be happy to discuss this at length if anybody is interested.
+Include the generic I/O header file so that duplicate implementations
+can be removed. This will also help to establish consistency across more
+architectures regarding which accessors they support.
 
-I gave this a quick spin on boneblack, and it works for me, thanks!
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm/include/asm/io.h     | 52 +++++++++----------------------------------
+ arch/arm/include/asm/memory.h |  2 ++
+ 2 files changed, 13 insertions(+), 41 deletions(-)
 
-Tested with "echo mem > /sys/power/state" and uart0 input to resume.
-
-Contradictionary to the limits you mention, multiple suspend/resume cycles
-do work for me. Maybe because of the enabled drivers in my .config, or
-maybe something was messed up, but at first glance it looked fine.
-
-It fails to compile with CONFIG_THUMB2_KERNEL though:
-arch/arm/mach-omap2/sleep33xx.S:61: Error: cannot use register index
-with PC-relative addressing -- `str r1,emif_addr_virt'
-
-Then I noticed "freeze" in /sys/power/state, when triggered then crashes
-with a null pointer dereference in suspend_devices_and_enter(). That might
-be expected or even stupid though ;)
-
-Thanks,
-Andre
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index a78562f21aab..ef54f5c8a7ae 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -69,6 +69,7 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+  * writeback addressing modes as these incur a significant performance
+  * overhead (the address generation must be emulated in software).
+  */
++#define __raw_writew __raw_writew
+ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("strh %1, %0"
+@@ -76,6 +77,7 @@ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ 		     : "r" (val));
+ }
+ 
++#define __raw_readw __raw_readw
+ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+ 	u16 val;
+@@ -86,6 +88,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ }
+ #endif
+ 
++#define __raw_writeb __raw_writeb
+ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("strb %1, %0"
+@@ -93,6 +96,7 @@ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+ 		     : "r" (val));
+ }
+ 
++#define __raw_writel __raw_writel
+ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("str %1, %0"
+@@ -100,6 +104,7 @@ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ 		     : "r" (val));
+ }
+ 
++#define __raw_readb __raw_readb
+ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ {
+ 	u8 val;
+@@ -109,6 +114,7 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ 	return val;
+ }
+ 
++#define __raw_readl __raw_readl
+ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ {
+ 	u32 val;
+@@ -267,20 +273,6 @@ extern void pci_iounmap_io(unsigned int offset);
+ #define insl(p,d,l)		__raw_readsl(__io(p),d,l)
+ #endif
+ 
+-#define outb_p(val,port)	outb((val),(port))
+-#define outw_p(val,port)	outw((val),(port))
+-#define outl_p(val,port)	outl((val),(port))
+-#define inb_p(port)		inb((port))
+-#define inw_p(port)		inw((port))
+-#define inl_p(port)		inl((port))
+-
+-#define outsb_p(port,from,len)	outsb(port,from,len)
+-#define outsw_p(port,from,len)	outsw(port,from,len)
+-#define outsl_p(port,from,len)	outsl(port,from,len)
+-#define insb_p(port,to,len)	insb(port,to,len)
+-#define insw_p(port,to,len)	insw(port,to,len)
+-#define insl_p(port,to,len)	insl(port,to,len)
+-
+ /*
+  * String version of IO memory access ops:
+  */
+@@ -346,40 +338,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define ioremap_wc(cookie,size)		__arm_ioremap((cookie), (size), MT_DEVICE_WC)
+ #define iounmap				__arm_iounmap
+ 
+-/*
+- * io{read,write}{8,16,32} macros
+- */
+-#ifndef ioread8
+-#define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
+-#define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })
+-#define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
+-
+-#define ioread16be(p)	({ unsigned int __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+-#define ioread32be(p)	({ unsigned int __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
+-
+-#define iowrite8(v,p)	({ __iowmb(); __raw_writeb(v, p); })
+-#define iowrite16(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_le16(v), p); })
+-#define iowrite32(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_le32(v), p); })
+-
+-#define iowrite16be(v,p) ({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+-#define iowrite32be(v,p) ({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+-
+-#define ioread8_rep(p,d,c)	__raw_readsb(p,d,c)
+-#define ioread16_rep(p,d,c)	__raw_readsw(p,d,c)
+-#define ioread32_rep(p,d,c)	__raw_readsl(p,d,c)
+-
+-#define iowrite8_rep(p,s,c)	__raw_writesb(p,s,c)
+-#define iowrite16_rep(p,s,c)	__raw_writesw(p,s,c)
+-#define iowrite32_rep(p,s,c)	__raw_writesl(p,s,c)
+-
++#define ioport_map ioport_map
+ extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
++#define ioport_unmap ioport_unmap
+ extern void ioport_unmap(void __iomem *addr);
+-#endif
+ 
+ struct pci_dev;
+ 
++#define pci_iounmap pci_iounmap
+ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+ 
++#include <asm-generic/io.h>
++
+ /*
+  * can the hardware map this into one segment or not, given no other
+  * constraints.
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 2b751464d6ff..35ae6eaf33b2 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -278,11 +278,13 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+  * translation for translating DMA addresses.  Use the driver
+  * DMA support - see dma-mapping.h.
+  */
++#define virt_to_phys virt_to_phys
+ static inline phys_addr_t virt_to_phys(const volatile void *x)
+ {
+ 	return __virt_to_phys((unsigned long)(x));
+ }
+ 
++#define phys_to_virt phys_to_virt
+ static inline void *phys_to_virt(phys_addr_t x)
+ {
+ 	return (void *)__phys_to_virt(x);
+-- 
+2.0.1
