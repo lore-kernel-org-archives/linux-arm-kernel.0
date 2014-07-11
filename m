@@ -1,53 +1,138 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 11 Jul 2014 11:31:16 +0200
-Subject: [BUG] usb: gadget: rndis: atmel_usba_udc: probe of 500000.gadget
- failed with error -2
-In-Reply-To: <53BF998B.2070006@atmel.com>
-References: <53BF8890.9020409@aksignal.cz> <53BF998B.2070006@atmel.com>
-Message-ID: <53BFAEE4.3060009@aksignal.cz>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Fri, 11 Jul 2014 15:01:46 +0530
+Subject: [PATCH v6 15/23] regulator: max77686: Setup DVS-related GPIOs on
+ probe
+In-Reply-To: <53BF45D4.2000302@collabora.co.uk>
+References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
+ <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
+ <53BF45D4.2000302@collabora.co.uk>
+Message-ID: <CADGdYn6k8U84Amh_MRAxHFTNNXKy9NKQzV0B-e20v4bjhD-MnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Dne 11.7.2014 10:00, Bo Shen napsal(a):
-> Hi Jiri Prchal,
+On Fri, Jul 11, 2014 at 7:33 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Amit,
 >
-> On 07/11/2014 02:47 PM, Ji?? Prchal wrote:
->> Hi,
->> I discovered bug when I try to use RNDIS gadget driver on SAM9G25 with
->> version 3.16.0-rc4. In version 3.14.0-rc4 it was OK.
->> If I plug pc to device port on my board I expect to establish ethernet
->> connection, instead of this it looks like it behave like host port. If I
->> look at all messages I found some problem during boot:
->> [    1.585937] atmel_usba_udc: probe of 500000.gadget failed with error -2
+> On 07/10/2014 12:08 PM, amit daniel kachhap wrote:
+>> On Fri, Jul 4, 2014 at 3:25 PM, Javier Martinez Canillas
+>> <javier.martinez@collabora.co.uk> wrote:
+>>> MAX77686 PMIC support Dyamic Voltage Scaling (DVS) on a set
+>>> of Buck regulators. A number of GPIO are connected to these
+>>> lines and are requested by the mfd driver. Setup the GPIO
+>>> pins from the regulator driver.
+>> If possible merge this patch with patch 8. Both are adding DVS
+>> support. Put regmap_copy dependency patch in very beginning.
 >
-> I tested OK with Linux kernel v3.16-rc4 (latest commit is: 4f440cd534359f689cb577c68f8491d1eddf0b76) on sam9g25.
+> As Lee already said, I split the changes to minimize the cross-subsystem churn.
+Yes agreed. This comment doesn't hold.
 >
-> Best Regards,
-> Bo Shen
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>> ---
+>>>  drivers/regulator/max77686.c | 34 ++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 34 insertions(+)
+>>>
+>>> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+>>> index ef1af2d..ecce77a 100644
+>>> --- a/drivers/regulator/max77686.c
+>>> +++ b/drivers/regulator/max77686.c
+>>> @@ -435,6 +435,12 @@ static int max77686_pmic_dt_parse_pdata(struct platform_device *pdev,
+>>>  }
+>>>  #endif /* CONFIG_OF */
+>>>
+>>> +static inline bool max77686_is_dvs_buck(int id)
+>>> +{
+>>> +       /* BUCK 2,3 and 4 support DVS */
+>>> +       return (id >= MAX77686_BUCK2 && id <= MAX77686_BUCK4);
+>> I am just wondering if along with above check, SELB gpios (if present)
+>> can be used to confirm if BUCK's are DVS based or not.
 >
-I just cloned git https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and still same problem. There is 
-some other commit.
-Couldn't be the problem in at91sam9x5.dtsi not defines clocks?
-In ohci they are:
-		usb0: ohci at 00600000 {
-			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-			reg = <0x00600000 0x100000>;
-			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
-				 <&uhpck>;
-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
-			status = "disabled";
-		};
-But in gadget not:
-			usb2: gadget at f803c000 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-				compatible = "atmel,at91sam9rl-udc";
-				reg = <0x00500000 0x80000
-				       0xf803c000 0x400>;
-				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
-				status = "disabled";
-Best Regards,
-Jiri
+> I don't know if SELB gpios being present or not should be used to determine
+> whether a BUCK includes the DVS feature. AFAIK boards could have some of these
+> lines hardwired and pulled high or low instead of using a GPIO.
+As per the max77686 data sheet, selb2.3.4 uses logic high for no DVS
+and logic low for DVS enabled.
+So may be if DT is supplying selb gpios then the above checks can be
+put otherwise not required.
+Anyway from your other comments, since this patch series is not
+handling complete DVS scenario.
+So putting this check is not useful in this stage.
+>
+>>> +}
+>>> +
+>>>  static int max77686_pmic_probe(struct platform_device *pdev)
+>>>  {
+>>>         struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+>>> @@ -442,6 +448,9 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>>>         struct max77686_data *max77686;
+>>>         int i, ret = 0;
+>>>         struct regulator_config config = { };
+>>> +       unsigned int reg;
+>>> +       int buck_default_idx;
+>>> +       int buck_old_idx;
+>>>
+>>>         dev_dbg(&pdev->dev, "%s\n", __func__);
+>>>
+>>> @@ -472,13 +481,34 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>>>         config.driver_data = max77686;
+>>>         platform_set_drvdata(pdev, max77686);
+>>>
+>>> +       buck_default_idx = pdata->buck_default_idx;
+>>> +       buck_old_idx = max77686_read_gpios(pdata);
+>>> +
+>>>         for (i = 0; i < MAX77686_REGULATORS; i++) {
+>>>                 struct regulator_dev *rdev;
+>>> +               int id = pdata->regulators[i].id;
+>>>
+>>>                 config.init_data = pdata->regulators[i].initdata;
+>>>                 config.of_node = pdata->regulators[i].of_node;
+>>>
+>>>                 max77686->opmode[i] = regulators[i].enable_mask;
+>>> +
+>>> +               if (max77686_is_dvs_buck(id)) {
+>>> +                       /* Try to copy over data so we keep firmware settings */
+>>> +                       reg = regulators[i].vsel_reg;
+>>> +
+>>> +                       ret = regmap_reg_copy(iodev->regmap,
+>>> +                                             reg + buck_default_idx,
+>>> +                                             reg + buck_old_idx);
+>>> +
+>>> +                       if (ret)
+>>> +                               dev_warn(&pdev->dev, "Copy err %d => %d (%d)\n",
+>>> +                                        reg + buck_old_idx,
+>>> +                                        reg + buck_default_idx, ret);
+>>> +
+>>> +                       regulators[i].vsel_reg += buck_default_idx;
+>>> +               }
+>>> +
+>>>                 rdev = devm_regulator_register(&pdev->dev,
+>>>                                                 &regulators[i], &config);
+>>>                 if (IS_ERR(rdev)) {
+>>> @@ -488,6 +518,10 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>>>                 }
+>>>         }
+>>>
+>>> +       ret = max77686_setup_gpios(iodev->dev);
+>>> +       if (ret)
+>>> +               return ret;
+>>> +
+>>>         return 0;
+>>>  }
+>>>
+>>> --
+>>> 2.0.0.rc2
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+> Best regards,
+> Javier
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
