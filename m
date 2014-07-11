@@ -1,31 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Jul 2014 08:58:58 +0200
-Subject: [PATCH 2/2] PCI: tegra: Fix license string
-In-Reply-To: <1405061938-2191-1-git-send-email-thierry.reding@gmail.com>
-References: <1405061938-2191-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1405061938-2191-2-git-send-email-thierry.reding@gmail.com>
+From: sdu.liu@huawei.com (Liu Hua)
+Date: Fri, 11 Jul 2014 14:46:16 +0800
+Subject: [RFC PATCH 1/2] irqchip: GIC: introduce ICPIDR2 register interface
+In-Reply-To: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
+References: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
+Message-ID: <1405061177-43834-2-git-send-email-sdu.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Peripheral ID2 Register provides a four-bit architecturally-defined
+architecture revision field. So we can identify the GIC verison from
+this register. It is useful sometimes.
 
-The proper MODULE_LICENSE() string for the GPL v2 is "GPL v2", not
-"GPLv2".
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Liu Hua <sdu.liu@huawei.com>
 ---
- drivers/pci/host/pci-tegra.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/irqchip/arm-gic.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 7df5aaf58921..14ec5b2c69e0 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1742,4 +1742,4 @@ module_platform_driver(tegra_pcie_driver);
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 45e2d8c..872a562 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -38,6 +38,7 @@
+ #define GIC_DIST_SOFTINT		0xf00
+ #define GIC_DIST_SGI_PENDING_CLEAR	0xf10
+ #define GIC_DIST_SGI_PENDING_SET	0xf20
++#define GIC_DIST_ICPIDR2		0xfe8
  
- MODULE_AUTHOR("Thierry Reding <treding@nvidia.com>");
- MODULE_DESCRIPTION("NVIDIA Tegra PCIe driver");
--MODULE_LICENSE("GPLv2");
-+MODULE_LICENSE("GPL v2");
+ #define GICH_HCR			0x0
+ #define GICH_VTR			0x4
 -- 
-2.0.1
+1.9.0
