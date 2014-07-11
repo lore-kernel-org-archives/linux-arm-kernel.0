@@ -1,268 +1,61 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Fri, 11 Jul 2014 12:14:00 -0500
-Subject: [PATCH v2] arm64: fix VTTBR_BADDR_MASK
-Message-ID: <20140711171400.1552.71195.stgit@joelaarch64.amd.com>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Fri, 11 Jul 2014 20:21:27 +0300
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>	<1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>	<CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>	<53C01558.3090607@nvidia.com>
+ <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+Message-ID: <53C01D17.2050906@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
-not compile time.
 
-In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
-size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
-depends on hardware capability.
 
-According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
-vttbr_x is calculated using different hard-coded values with consideration
-of T0SZ, granule size and the level of translation tables. Therefore,
-vttbr_baddr_mask should be determined dynamically.
+On 11/07/14 20:08, Andrew Bresticker wrote:
+> On Fri, Jul 11, 2014 at 9:48 AM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+>>
+>>
+>> On 11/07/14 19:28, Andrew Bresticker wrote:
+>>>
+>>> On Thu, Jul 10, 2014 at 2:42 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>>> wrote:
+>>>>
+>>>> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
+>>>> and also provides automatic CPU rail voltage scaling as well. The DFLL
+>>>> is a separate IP block from the usual Tegra124 clock-and-reset
+>>>> controller, so it gets its own node in the device tree.
+>>>
+>>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>>>> b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>>>
+>>>
+>>>> +- nvidia,pmic-voltage-table: Array of 2-tuples.  Each entry should have
+>>>> the
+>>>> +  form <register-value voltage-in-uV>, indicating the register value
+>>>> that
+>>>> +  needs to be programmed to the PMIC for changing the VDD_CPU voltage to
+>>>> +  the specified voltage. The table must be in ascending order by the
+>>>> voltage.
+>>>
+>>>
+>>> Instead of listing the register values for each voltage in the DT,
+>>> can't you use regulator_list_voltage() to create this map?
+>>>
+>>
+>> I don't see a way to get the register values that way, unless we assume that
+>> the mapping is linear and doesn't have holes.
+>
+> Hmm... I guess if you don't assume it's linear and continuous you'd
+> have to iterate over all 256 selectors.
+>
 
-Changes since v1:
-Rebased fix on Jungseok Lee's patch https://lkml.org/lkml/2014/5/12/189 to
-provide better long term fix.  Updated that patch to log error instead of
-silently fail on unaligned vttbr.
+I don't think we can assume that each selector maps to a concrete 
+register value, though I'm not sure. include/linux/regulator/driver.h 
+documents for @list_voltage "Selectors range from zero to one less 
+regulator_desc.n_voltages." but maybe the consumer API could take 
+different values.
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Sungjinn Chung <sungjinn.chung@samsung.com>
-Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
----
- arch/arm/kvm/arm.c               |   91 +++++++++++++++++++++++++++++++++++++-
- arch/arm64/include/asm/kvm_arm.h |   17 +------
- arch/arm64/kvm/hyp-init.S        |   20 ++++++--
- 3 files changed, 106 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 3c82b37..6d51a53 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -37,6 +37,7 @@
- #include <asm/mman.h>
- #include <asm/tlbflush.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/virt.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_asm.h>
-@@ -61,6 +62,9 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
- static u8 kvm_next_vmid;
- static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
-+/* VTTBR mask cannot be determined in complie time under ARMv8 */
-+static u64 vttbr_baddr_mask;
-+
- static bool vgic_present;
- 
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
-@@ -413,6 +417,75 @@ static bool need_new_vmid_gen(struct kvm *kvm)
- }
- 
- /**
-+ * set_vttbr_baddr_mask - set mask value for vttbr base address
-+ *
-+ * In ARMv8, vttbr_baddr_mask cannot be determined in compile time since stage2
-+ * input address size depends on hardware capability. Thus, it is needed to read
-+ * ID_AA64MMFR0_EL1.PARange first and then set vttbr_baddr_mask with
-+ * consideration of both granule size and the level of translation tables.
-+ */
-+static int set_vttbr_baddr_mask(void)
-+{
-+#ifndef CONFIG_ARM64
-+	vttbr_baddr_mask = VTTBR_BADDR_MASK;
-+#else
-+	int pa_range, t0sz, vttbr_x;
-+
-+	pa_range = read_cpuid(ID_AA64MMFR0_EL1) & 0xf;
-+
-+	switch (pa_range) {
-+	case 0:
-+		t0sz = VTCR_EL2_T0SZ(32);
-+		break;
-+	case 1:
-+		t0sz = VTCR_EL2_T0SZ(36);
-+		break;
-+	case 2:
-+		t0sz = VTCR_EL2_T0SZ(40);
-+		break;
-+	case 3:
-+		t0sz = VTCR_EL2_T0SZ(42);
-+		break;
-+	case 4:
-+		t0sz = VTCR_EL2_T0SZ(44);
-+		break;
-+	default:
-+		t0sz = VTCR_EL2_T0SZ(48);
-+	}
-+
-+	/*
-+	 * See Table D4-23 and Table D4-25 in ARM DDI 0487A.b to figure out
-+	 * the origin of the hardcoded values, 38 and 37.
-+	 */
-+#ifdef CONFIG_ARM64_64K_PAGES
-+	/*
-+	 * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
-+	 * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
-+	 * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
-+	 */
-+	if (t0sz <= 17) {
-+		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
-+		return -EINVAL;
-+	}
-+	vttbr_x = 38 - t0sz;
-+#else
-+	/*
-+	 * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
-+	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
-+	 * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
-+	 */
-+	if (t0sz <= 20) {
-+		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
-+		return -EINVAL;
-+	}
-+	vttbr_x = 37 - t0sz;
-+#endif
-+	vttbr_baddr_mask = (((1LLU << (48 - vttbr_x)) - 1) << (vttbr_x - 1));
-+#endif
-+	return 0;
-+}
-+
-+/**
-  * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
-  * @kvm	The guest that we are about to run
-  *
-@@ -466,8 +539,16 @@ static void update_vttbr(struct kvm *kvm)
- 	/* update vttbr to be used with the new vmid */
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
--	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
--	kvm->arch.vttbr |= vmid;
-+
-+	/*
-+	 * If the VTTBR isn't aligned there is something wrong with the system
-+	 * or kernel.  It is better to just fail and not mask it. But no need
-+	 * to panic the host kernel with a BUG_ON(), instead just log the error.
-+	 */
-+	if (pgd_phys & ~vttbr_baddr_mask)
-+		kvm_err("VTTBR not aligned, expect guest to fail");
-+
-+	kvm->arch.vttbr = pgd_phys | vmid;
- 
- 	spin_unlock(&kvm_vmid_lock);
- }
-@@ -1052,6 +1133,12 @@ int kvm_arch_init(void *opaque)
- 		}
- 	}
- 
-+	err = set_vttbr_baddr_mask();
-+	if (err) {
-+		kvm_err("Cannot set vttbr_baddr_mask\n");
-+		return -EINVAL;
-+	}
-+
- 	cpu_notifier_register_begin();
- 
- 	err = init_hyp_mode();
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 3d69030..8dbef70 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -94,7 +94,6 @@
- /* TCR_EL2 Registers bits */
- #define TCR_EL2_TBI	(1 << 20)
- #define TCR_EL2_PS	(7 << 16)
--#define TCR_EL2_PS_40B	(2 << 16)
- #define TCR_EL2_TG0	(1 << 14)
- #define TCR_EL2_SH0	(3 << 12)
- #define TCR_EL2_ORGN0	(3 << 10)
-@@ -103,8 +102,6 @@
- #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
- 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
- 
--#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
--
- /* VTCR_EL2 Registers bits */
- #define VTCR_EL2_PS_MASK	(7 << 16)
- #define VTCR_EL2_TG0_MASK	(1 << 14)
-@@ -119,36 +116,28 @@
- #define VTCR_EL2_SL0_MASK	(3 << 6)
- #define VTCR_EL2_SL0_LVL1	(1 << 6)
- #define VTCR_EL2_T0SZ_MASK	0x3f
--#define VTCR_EL2_T0SZ_40B	24
-+#define VTCR_EL2_T0SZ(bits)	(64 - (bits))
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- /*
-  * Stage2 translation configuration:
-- * 40bits output (PS = 2)
-- * 40bits input  (T0SZ = 24)
-  * 64kB pages (TG0 = 1)
-  * 2 level page tables (SL = 1)
-  */
- #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
--#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
-+				 VTCR_EL2_SL0_LVL1)
- #else
- /*
-  * Stage2 translation configuration:
-- * 40bits output (PS = 2)
-- * 40bits input  (T0SZ = 24)
-  * 4kB pages (TG0 = 0)
-  * 3 level page tables (SL = 1)
-  */
- #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
--#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-+				 VTCR_EL2_SL0_LVL1)
- #endif
- 
--#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
--#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
- #define VTTBR_VMID_SHIFT  (48LLU)
- #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
- 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index d968796..c0f7634 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -63,17 +63,21 @@ __do_hyp_init:
- 	mrs	x4, tcr_el1
- 	ldr	x5, =TCR_EL2_MASK
- 	and	x4, x4, x5
--	ldr	x5, =TCR_EL2_FLAGS
--	orr	x4, x4, x5
--	msr	tcr_el2, x4
--
--	ldr	x4, =VTCR_EL2_FLAGS
- 	/*
- 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
--	 * VTCR_EL2.
-+	 * TCR_EL2 and both PS bits and T0SZ bits in VTCR_EL2.
- 	 */
- 	mrs	x5, ID_AA64MMFR0_EL1
- 	bfi	x4, x5, #16, #3
-+	msr	tcr_el2, x4
-+
-+	ldr	x4, =VTCR_EL2_FLAGS
-+	bfi	x4, x5, #16, #3
-+	and	x5, x5, #0xf
-+	adr	x6, t0sz
-+	add	x6, x6, x5, lsl #2
-+	ldr	w5, [x6]
-+	orr	x4, x4, x5
- 	msr	vtcr_el2, x4
- 
- 	mrs	x4, mair_el1
-@@ -109,6 +113,10 @@ target: /* We're now in the trampoline code, switch page tables */
- 
- 	/* Hello, World! */
- 	eret
-+
-+t0sz:
-+	.word	VTCR_EL2_T0SZ(32), VTCR_EL2_T0SZ(36), VTCR_EL2_T0SZ(40)
-+	.word	VTCR_EL2_T0SZ(42), VTCR_EL2_T0SZ(44), VTCR_EL2_T0SZ(48)
- ENDPROC(__kvm_hyp_init)
- 
- 	.ltorg
+-- 
+nvpublic
