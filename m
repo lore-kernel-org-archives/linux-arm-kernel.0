@@ -1,30 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Jul 2014 14:54:00 +0100
-Subject: [PATCH 0/4] ASoC: samsung updates from arm testing
-In-Reply-To: <1405086308-1461192-2-git-send-email-arnd@arndb.de>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <1405086308-1461192-2-git-send-email-arnd@arndb.de>
-Message-ID: <20140711135400.GY30458@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jul 2014 14:56:13 +0100
+Subject: No uart output on my snowball board
+In-Reply-To: <20140711093108.4807d473@gandalf.local.home>
+References: <20140710223021.6e9c857f@gandalf.local.home>
+ <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
+ <20140711093108.4807d473@gandalf.local.home>
+Message-ID: <20140711135613.GC2954@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 03:45:03PM +0200, Arnd Bergmann wrote:
+On Fri, 11 Jul 2014, Steven Rostedt wrote:
 
-> Here are a few patches from my randconfig and multiplatform series.
-> The smartq patch is a re-send of the one I screwed up the other day.
-> the dependencies and dma data removal should be trivial, the
-> dmaengine one probably needs some closer inspection.
+> On Fri, 11 Jul 2014 14:00:55 +0200
+> Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > On Fri, Jul 11, 2014 at 4:30 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> > 
+> > > commit a0998b8321eb5f53ef51924f5ab6c69237ac1025
+> > > Author: Lee Jones <lee.jones@linaro.org>
+> > > Date:   Thu Aug 22 16:18:56 2013 +0100
+> > >
+> > >     ARM: ux500: Remove UART support when booting without Device Tree
+> > >
+> > >     It's time to remove all ATAG support from ux500 and rely solely on
+> > >     Device Tree booting. This patch is part of that endeavour.
+> > >
+> > >     Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > >     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > I hate that I didn't spot the speling mistake in the subject,
+> > its ATAG support we're removing, not UART :-)
+> > 
+> > Anyway, I think you got enough hints on how we do this
+> > with appended devicetrees instead, Lee's snippet should
+> > work or check out this page that I also posted to your
+> > G+ post:
+> > http://www.df.lth.se/~triad/krad/ux00/
+> > 
+> 
+> Thanks, with everyone's feedback I got it working with ktest.
+> 
+> I added the following to my ktest snowball.conf:
+> 
+> OUTPUT_BOOT := ${OUTPUT_DIR}/arch/arm/boot
+> 
+> PRE_BUILD = ${MAKE_CMD} O=${OUTPUT_DIR} dtbs
+> POST_BUILD = cat ${OUTPUT_BOOT}/zImage ${OUTPUT_BOOT}/dts/ste-snowball.dtb > ${OUTPUT_BOOT}/zImage.snowball; mkimage -A arm -O linux -C none -T kernel -a 0x00008000 -e 0x00008000 -d ${OUTPUT_BOOT}/zImage.snowball ${OUTPUT_BOOT}/uImage.snowball
+> 
+> and walla!
+> 
+> root at linaro-ubuntu-desktop:~# uname -r
+> 3.16.0-rc4-test-00042-g4f440cd
 
-Hrm, can you check what's going on with the series - I've got two copies
-of patch 2 and an extra patch [PATCH] ASoC: s3c64xx/smartq: use dynamic
-registration which is threaded before this cover letter and looks like a
-resend of the prior copy with the platform_data header missing that got
-included by mistake?  The patches look OK but I just want to make sure
-I'm applying the right things.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/beecccc7/attachment-0001.sig>
+Good work.  Glad to be of service.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
