@@ -1,40 +1,29 @@
-From: sdu.liu@huawei.com (Liu Hua)
-Date: Fri, 11 Jul 2014 14:46:15 +0800
-Subject: [RFC PATCH 0/2] irqchip: GIC: check and clear GIC interupt active
- status
-Message-ID: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Jul 2014 08:58:57 +0200
+Subject: [PATCH 1/2] PCI: mvebu: Fix license string
+Message-ID: <1405061938-2191-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For this version of GIC codes, kernel assumes that all the interrupt
-status of GIC is inactive. So the kernel does not check this when 
-booting.
+From: Thierry Reding <treding@nvidia.com>
 
-This is no problem on must sitations. But when kdump is deplayed.
-And a panic occurs when a interrupt is being handled (may be PPI 
-and SPI). We have no chance to write relative bit to GICC_EOIR.
-So this interrupt remains active. And GIC will not deliver this
-type interrupt to cpu interface. And the capture kernel may 
-fail to boot becase of lacking of certain interrupt (such as timer 
-interupt).
+The proper MODULE_LICENSE() string for the GPL v2 is "GPL v2", not
+"GPLv2".
 
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/pci/host/pci-mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I glanced over the GIC Architecture Specification, but did not 
-find a simple way to deactive state of all interrupts. For GICv1,
-I can only deal with one abnormal interrupt state one time. For 
-GICv2, I can deactive 32 one time.
-
-
-So guys, Do you know a better way to do that? 
-
-
-Liu Hua (2):
-  irqchip: gic: introduce ICPIDR2 register interface
-  irqchip: GIC: introduce method to deactive interupts
-
- drivers/irqchip/irq-gic.c       | 57 +++++++++++++++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic.h |  1 +
- 2 files changed, 58 insertions(+)
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index ce23e0f076b6..a8c6f1a92e0f 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -1094,4 +1094,4 @@ module_platform_driver(mvebu_pcie_driver);
+ 
+ MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+ MODULE_DESCRIPTION("Marvell EBU PCIe driver");
+-MODULE_LICENSE("GPLv2");
++MODULE_LICENSE("GPL v2");
 -- 
-1.9.0
+2.0.1
