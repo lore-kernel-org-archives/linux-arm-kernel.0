@@ -1,138 +1,227 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Jul 2014 14:16:03 +0200
-Subject: [PATCH 04/12] ARM: tegra: move fuse exports to tegra-soc.h
+Date: Fri, 11 Jul 2014 14:16:05 +0200
+Subject: [PATCH 06/12] soc/tegra: Add efuse and apbmisc bindings
 In-Reply-To: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
 References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1405080971-7609-5-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1405080971-7609-7-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-All fuse related functionality will move to a driver in the following
-patches. To prepare for this, export all the required functionality in a
-global header file and move all users of fuse.h to tegra-soc.h. While
-we're at it, remove tegra_bct_strapping, as its only user was removed in
-Commit a7cbe92cef27 ("ARM: tegra: remove tegra EMC scaling driver").
+Add efuse and apbmisc bindings for Tegra20, Tegra30, Tegra114 and
+Tegra124.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-tegra/fuse.h            | 13 -------------
- arch/arm/mach-tegra/tegra.c           |  1 -
- arch/arm/mach-tegra/tegra114_speedo.c |  1 +
- arch/arm/mach-tegra/tegra20_speedo.c  |  1 +
- arch/arm/mach-tegra/tegra30_speedo.c  |  1 +
- include/linux/tegra-soc.h             | 16 ++++++++++++++++
- 6 files changed, 19 insertions(+), 14 deletions(-)
+ .../bindings/fuse/nvidia,tegra20-fuse.txt          | 40 ++++++++++++++++++++++
+ .../bindings/misc/nvidia,tegra20-apbmisc.txt       | 13 +++++++
+ arch/arm/boot/dts/tegra114.dtsi                    | 15 ++++++++
+ arch/arm/boot/dts/tegra124.dtsi                    | 15 ++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     | 15 ++++++++
+ arch/arm/boot/dts/tegra30.dtsi                     | 15 ++++++++
+ 6 files changed, 113 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fuse/nvidia,tegra20-fuse.txt
+ create mode 100644 Documentation/devicetree/bindings/misc/nvidia,tegra20-apbmisc.txt
 
-diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
-index 7a08b4b70c8d..48a48861c19b 100644
---- a/arch/arm/mach-tegra/fuse.h
-+++ b/arch/arm/mach-tegra/fuse.h
-@@ -27,27 +27,14 @@
- #define SKU_ID_T25E	28
- 
- #ifndef __ASSEMBLY__
--enum tegra_revision {
--	TEGRA_REVISION_UNKNOWN = 0,
--	TEGRA_REVISION_A01,
--	TEGRA_REVISION_A02,
--	TEGRA_REVISION_A03,
--	TEGRA_REVISION_A03p,
--	TEGRA_REVISION_A04,
--	TEGRA_REVISION_MAX,
--};
- 
- extern int tegra_sku_id;
- extern int tegra_cpu_process_id;
- extern int tegra_core_process_id;
- extern int tegra_cpu_speedo_id;		/* only exist in Tegra30 and later */
- extern int tegra_soc_speedo_id;
--extern enum tegra_revision tegra_revision;
--
--extern int tegra_bct_strapping;
- 
- unsigned long long tegra_chip_uid(void);
--void tegra_init_fuse(void);
- bool tegra_spare_fuse(int bit);
- u32 tegra_fuse_readl(unsigned long offset);
- 
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index e36b81870e66..f4c5f6469ee4 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -47,7 +47,6 @@
- #include "board.h"
- #include "common.h"
- #include "cpuidle.h"
--#include "fuse.h"
- #include "iomap.h"
- #include "irq.h"
- #include "pmc.h"
-diff --git a/arch/arm/mach-tegra/tegra114_speedo.c b/arch/arm/mach-tegra/tegra114_speedo.c
-index 86eca17e5286..f086a3ea291e 100644
---- a/arch/arm/mach-tegra/tegra114_speedo.c
-+++ b/arch/arm/mach-tegra/tegra114_speedo.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/bug.h>
- #include <linux/kernel.h>
-+#include <linux/tegra-soc.h>
- 
- #include "fuse.h"
- 
-diff --git a/arch/arm/mach-tegra/tegra20_speedo.c b/arch/arm/mach-tegra/tegra20_speedo.c
-index dcd29a0b0187..83431011a23c 100644
---- a/arch/arm/mach-tegra/tegra20_speedo.c
-+++ b/arch/arm/mach-tegra/tegra20_speedo.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/bug.h>
- #include <linux/kernel.h>
-+#include <linux/tegra-soc.h>
- 
- #include "fuse.h"
- 
-diff --git a/arch/arm/mach-tegra/tegra30_speedo.c b/arch/arm/mach-tegra/tegra30_speedo.c
-index 7c0038326cf5..4dda681bdaf9 100644
---- a/arch/arm/mach-tegra/tegra30_speedo.c
-+++ b/arch/arm/mach-tegra/tegra30_speedo.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/bug.h>
- #include <linux/kernel.h>
-+#include <linux/tegra-soc.h>
- 
- #include "fuse.h"
- 
-diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
-index 5b419760ff5f..3a00b3419594 100644
---- a/include/linux/tegra-soc.h
-+++ b/include/linux/tegra-soc.h
-@@ -27,6 +27,22 @@
- u32 tegra_read_chipid(void);
- u8 tegra_get_chip_id(void);
- 
-+enum tegra_revision {
-+	TEGRA_REVISION_UNKNOWN = 0,
-+	TEGRA_REVISION_A01,
-+	TEGRA_REVISION_A02,
-+	TEGRA_REVISION_A03,
-+	TEGRA_REVISION_A03p,
-+	TEGRA_REVISION_A04,
-+	TEGRA_REVISION_MAX,
-+};
+diff --git a/Documentation/devicetree/bindings/fuse/nvidia,tegra20-fuse.txt b/Documentation/devicetree/bindings/fuse/nvidia,tegra20-fuse.txt
+new file mode 100644
+index 000000000000..d8c98c7614d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fuse/nvidia,tegra20-fuse.txt
+@@ -0,0 +1,40 @@
++NVIDIA Tegra20/Tegra30/Tegr114/Tegra124 fuse block.
 +
-+u32 tegra_read_straps(void);
-+u32 tegra_read_chipid(void);
-+void tegra_init_fuse(void);
++Required properties:
++- compatible : should be:
++	"nvidia,tegra20-efuse"
++	"nvidia,tegra30-efuse"
++	"nvidia,tegra114-efuse"
++	"nvidia,tegra124-efuse"
++  Details:
++  nvidia,tegra20-efuse: Tegra20 requires using APB DMA to read the fuse data
++	due to a hardware bug. Tegra20 also lacks certain information which is
++	available in later generations such as fab code, lot code, wafer id,..
++  nvidia,tegra30-efuse, nvidia,tegra114-efuse and nvidia,tegra124-efuse:
++	The differences between these SoCs are the size of the efuse array,
++	the location of the spare (OEM programmable) bits and the location of
++	the speedo data.
++- reg: Should contain 1 entry: the entry gives the physical address and length
++       of the fuse registers.
++- clocks: Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names: Must include the following entries:
++  - fuse
++- resets: Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names: Must include the following entries:
++ - fuse
 +
-+extern enum tegra_revision tegra_revision;
++Example:
 +
- #if defined(CONFIG_TEGRA20_APB_DMA)
- int tegra_apb_readl_using_dma(unsigned long offset, u32 *value);
- int tegra_apb_writel_using_dma(u32 value, unsigned long offset);
++	fuse at 7000f800 {
++		compatible = "nvidia,tegra20-efuse";
++		reg = <0x7000F800 0x400>,
++		      <0x70000000 0x400>;
++		clocks = <&tegra_car TEGRA20_CLK_FUSE>;
++		clock-names = "fuse";
++		resets = <&tegra_car 39>;
++		reset-names = "fuse";
++	};
++
++
+diff --git a/Documentation/devicetree/bindings/misc/nvidia,tegra20-apbmisc.txt b/Documentation/devicetree/bindings/misc/nvidia,tegra20-apbmisc.txt
+new file mode 100644
+index 000000000000..b97b8bef1fe5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/nvidia,tegra20-apbmisc.txt
+@@ -0,0 +1,13 @@
++NVIDIA Tegra20/Tegra30/Tegr114/Tegra124 apbmisc block
++
++Required properties:
++- compatible : should be:
++       "nvidia,tegra20-apbmisc"
++       "nvidia,tegra30-apbmisc"
++       "nvidia,tegra114-apbmisc"
++       "nvidia,tegra124-apbmisc"
++- reg: Should contain 2 entries: the first entry gives the physical address
++       and length of the registers which contain revision and debug features.
++       The second entry gives the physical address and length of the
++       registers indicating the strapping options.
++
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index fdc559ab2db3..335a1d8047f2 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -220,6 +220,12 @@
+ 		interrupt-controller;
+ 	};
+ 
++	apbmisc at 70000800 {
++		compatible = "nvidia,tegra114-apbmisc", "nvidia,tegra20-apbmisc";
++		reg = <0x70000800 0x64   /* Chip revision */
++		       0x70000008 0x04>; /* Strapping options */
++	};
++
+ 	pinmux: pinmux at 70000868 {
+ 		compatible = "nvidia,tegra114-pinmux";
+ 		reg = <0x70000868 0x148		/* Pad control registers */
+@@ -485,6 +491,15 @@
+ 		clock-names = "pclk", "clk32k_in";
+ 	};
+ 
++	fuse@7000f800 {
++		compatible = "nvidia,tegra114-efuse";
++		reg = <0x7000f800 0x400>;
++		clocks = <&tegra_car TEGRA114_CLK_FUSE>;
++		clock-names = "fuse";
++		resets = <&tegra_car 39>;
++		reset-names = "fuse";
++	};
++
+ 	iommu at 70019010 {
+ 		compatible = "nvidia,tegra114-smmu", "nvidia,tegra30-smmu";
+ 		reg = <0x70019010 0x02c
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 6e6bc4e8185c..226941c07d15 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -179,6 +179,12 @@
+ 		#dma-cells = <1>;
+ 	};
+ 
++	apbmisc at 0,70000800 {
++		compatible = "nvidia,tegra124-apbmisc", "nvidia,tegra20-apbmisc";
++		reg = <0x0 0x70000800 0x0 0x64>,   /* Chip revision */
++		      <0x0 0x7000E864 0x0 0x04>;   /* Strapping options */
++	};
++
+ 	pinmux: pinmux at 0,70000868 {
+ 		compatible = "nvidia,tegra124-pinmux";
+ 		reg = <0x0 0x70000868 0x0 0x164>, /* Pad control registers */
+@@ -449,6 +455,15 @@
+ 		clock-names = "pclk", "clk32k_in";
+ 	};
+ 
++	fuse at 0,7000f800 {
++		compatible = "nvidia,tegra124-efuse";
++		reg = <0x0 0x7000f800 0x0 0x400>;
++		clocks = <&tegra_car TEGRA124_CLK_FUSE>;
++		clock-names = "fuse";
++		resets = <&tegra_car 39>;
++		reset-names = "fuse";
++	};
++
+ 	sdhci at 0,700b0000 {
+ 		compatible = "nvidia,tegra124-sdhci";
+ 		reg = <0x0 0x700b0000 0x0 0x200>;
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index a7ddf70df50b..243d84cdbae8 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -236,6 +236,12 @@
+ 		interrupt-controller;
+ 	};
+ 
++	apbmisc at 70000800 {
++		compatible = "nvidia,tegra20-apbmisc";
++		reg = <0x70000800 0x64   /* Chip revision */
++		       0x70000008 0x04>; /* Strapping options */
++	};
++
+ 	pinmux: pinmux at 70000014 {
+ 		compatible = "nvidia,tegra20-pinmux";
+ 		reg = <0x70000014 0x10   /* Tri-state registers */
+@@ -545,6 +551,15 @@
+ 		#size-cells = <0>;
+ 	};
+ 
++	fuse at 7000f800 {
++		compatible = "nvidia,tegra20-efuse";
++		reg = <0x7000F800 0x400>;
++		clocks = <&tegra_car TEGRA20_CLK_FUSE>;
++		clock-names = "fuse";
++		resets = <&tegra_car 39>;
++		reset-names = "fuse";
++	};
++
+ 	pcie-controller at 80003000 {
+ 		compatible = "nvidia,tegra20-pcie";
+ 		device_type = "pci";
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index dec4fc823901..0b1ede940d1f 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -335,6 +335,12 @@
+ 		interrupt-controller;
+ 	};
+ 
++	apbmisc at 70000800 {
++		compatible = "nvidia,tegra30-apbmisc", "nvidia,tegra20-apbmisc";
++		reg = <0x70000800 0x64   /* Chip revision */
++		       0x70000008 0x04>; /* Strapping options */
++	};
++
+ 	pinmux: pinmux at 70000868 {
+ 		compatible = "nvidia,tegra30-pinmux";
+ 		reg = <0x70000868 0xd4    /* Pad control registers */
+@@ -631,6 +637,15 @@
+ 		nvidia,ahb = <&ahb>;
+ 	};
+ 
++	fuse at 7000f800 {
++		compatible = "nvidia,tegra30-efuse";
++		reg = <0x7000f800 0x400>;
++		clocks = <&tegra_car TEGRA30_CLK_FUSE>;
++		clock-names = "fuse";
++		resets = <&tegra_car 39>;
++		reset-names = "fuse";
++	};
++
+ 	ahub at 70080000 {
+ 		compatible = "nvidia,tegra30-ahub";
+ 		reg = <0x70080000 0x200
 -- 
 2.0.1
