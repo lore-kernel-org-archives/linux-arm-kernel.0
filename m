@@ -1,354 +1,135 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 11 Jul 2014 16:44:39 -0500
-Subject: [PATCHv2 06/10] ARM: DRA7: hwmod_data: Add mailbox hwmod data
+Date: Fri, 11 Jul 2014 16:44:41 -0500
+Subject: [PATCHv2 08/10] ARM: OMAP2: hwmod_data: Remove legacy mailbox data
+ and addrs
 In-Reply-To: <1405115083-52977-1-git-send-email-s-anna@ti.com>
 References: <1405115083-52977-1-git-send-email-s-anna@ti.com>
-Message-ID: <1405115083-52977-7-git-send-email-s-anna@ti.com>
+Message-ID: <1405115083-52977-9-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the hwmod data for the 13 instances of the system mailbox
-IP in DRA7 SoC. The patch is needed for performing a soft-reset
-while configuring the respective mailbox instance, otherwise is
-a non-essential change for functionality. The modules are smart
-idled on reset, and the IP module mode is hardware controlled.
+OMAP2 devices are devicetree boot only, and the legacy mode
+of mailbox device creation should no longer be used, so remove
+the mailbox attribute data and the hwmod addr space used for
+creating mailboxes in legacy mode.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
+Acked-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 305 ++++++++++++++++++++++++++++++
- 1 file changed, 305 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c                 | 14 --------------
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c                 | 13 -------------
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c    |  9 ---------
+ arch/arm/mach-omap2/omap_hwmod_common_data.h               |  1 -
+ 4 files changed, 37 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 20b4398..e35f5b1 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -939,6 +939,194 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index 2f15979..65b1647 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -16,7 +16,6 @@
+ #include <linux/i2c-omap.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/omap-dma.h>
+-#include <linux/platform_data/mailbox-omap.h>
+ #include <plat/dmtimer.h>
+ 
+ #include "omap_hwmod.h"
+@@ -163,18 +162,6 @@ static struct omap_hwmod omap2420_dma_system_hwmod = {
+ };
+ 
+ /* mailbox */
+-static struct omap_mbox_dev_info omap2420_mailbox_info[] = {
+-	{ .name = "dsp", .tx_id = 0, .rx_id = 1, .irq_id = 0, .usr_id = 0 },
+-	{ .name = "iva", .tx_id = 2, .rx_id = 3, .irq_id = 1, .usr_id = 3 },
+-};
+-
+-static struct omap_mbox_pdata omap2420_mailbox_attrs = {
+-	.num_users	= 4,
+-	.num_fifos	= 6,
+-	.info_cnt	= ARRAY_SIZE(omap2420_mailbox_info),
+-	.info		= omap2420_mailbox_info,
+-};
+-
+ static struct omap_hwmod omap2420_mailbox_hwmod = {
+ 	.name		= "mailbox",
+ 	.class		= &omap2xxx_mailbox_hwmod_class,
+@@ -188,7 +175,6 @@ static struct omap_hwmod omap2420_mailbox_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_MAILBOXES_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &omap2420_mailbox_attrs,
  };
  
  /*
-+ * 'mailbox' class
-+ *
-+ */
-+
-+static struct omap_hwmod_class_sysconfig dra7xx_mailbox_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class dra7xx_mailbox_hwmod_class = {
-+	.name	= "mailbox",
-+	.sysc	= &dra7xx_mailbox_sysc,
-+};
-+
-+/* mailbox1 */
-+static struct omap_hwmod dra7xx_mailbox1_hwmod = {
-+	.name		= "mailbox1",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX1_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX1_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox2 */
-+static struct omap_hwmod dra7xx_mailbox2_hwmod = {
-+	.name		= "mailbox2",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX2_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX2_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox3 */
-+static struct omap_hwmod dra7xx_mailbox3_hwmod = {
-+	.name		= "mailbox3",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX3_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX3_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox4 */
-+static struct omap_hwmod dra7xx_mailbox4_hwmod = {
-+	.name		= "mailbox4",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX4_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX4_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox5 */
-+static struct omap_hwmod dra7xx_mailbox5_hwmod = {
-+	.name		= "mailbox5",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX5_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX5_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox6 */
-+static struct omap_hwmod dra7xx_mailbox6_hwmod = {
-+	.name		= "mailbox6",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX6_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX6_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox7 */
-+static struct omap_hwmod dra7xx_mailbox7_hwmod = {
-+	.name		= "mailbox7",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX7_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX7_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox8 */
-+static struct omap_hwmod dra7xx_mailbox8_hwmod = {
-+	.name		= "mailbox8",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX8_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX8_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox9 */
-+static struct omap_hwmod dra7xx_mailbox9_hwmod = {
-+	.name		= "mailbox9",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX9_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX9_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox10 */
-+static struct omap_hwmod dra7xx_mailbox10_hwmod = {
-+	.name		= "mailbox10",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX10_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX10_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox11 */
-+static struct omap_hwmod dra7xx_mailbox11_hwmod = {
-+	.name		= "mailbox11",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX11_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX11_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox12 */
-+static struct omap_hwmod dra7xx_mailbox12_hwmod = {
-+	.name		= "mailbox12",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX12_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX12_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* mailbox13 */
-+static struct omap_hwmod dra7xx_mailbox13_hwmod = {
-+	.name		= "mailbox13",
-+	.class		= &dra7xx_mailbox_hwmod_class,
-+	.clkdm_name	= "l4cfg_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4CFG_MAILBOX13_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4CFG_MAILBOX13_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/*
-  * 'mcspi' class
-  *
-  */
-@@ -2246,6 +2434,110 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__i2c5 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 6d1b609..c2555cb 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -17,7 +17,6 @@
+ #include <linux/platform_data/asoc-ti-mcbsp.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/omap-dma.h>
+-#include <linux/platform_data/mailbox-omap.h>
+ #include <plat/dmtimer.h>
+ 
+ #include "omap_hwmod.h"
+@@ -161,17 +160,6 @@ static struct omap_hwmod omap2430_dma_system_hwmod = {
  };
  
-+/* l4_cfg -> mailbox1 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__mailbox1 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_mailbox1_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox2 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox2 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox2_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox3 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox3 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox3_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox4 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox4 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox4_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox5 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox5 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox5_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox6 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox6 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox6_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox7 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox7 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox7_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox8 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox8 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox8_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox9 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox9 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox9_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox10 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox10 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox10_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox11 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox11 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox11_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox12 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox12 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox12_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per3 -> mailbox13 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per3__mailbox13 = {
-+	.master		= &dra7xx_l4_per3_hwmod,
-+	.slave		= &dra7xx_mailbox13_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_per1 -> mcspi1 */
- static struct omap_hwmod_ocp_if dra7xx_l4_per1__mcspi1 = {
- 	.master		= &dra7xx_l4_per1_hwmod,
-@@ -2662,6 +2954,19 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per1__i2c3,
- 	&dra7xx_l4_per1__i2c4,
- 	&dra7xx_l4_per1__i2c5,
-+	&dra7xx_l4_cfg__mailbox1,
-+	&dra7xx_l4_per3__mailbox2,
-+	&dra7xx_l4_per3__mailbox3,
-+	&dra7xx_l4_per3__mailbox4,
-+	&dra7xx_l4_per3__mailbox5,
-+	&dra7xx_l4_per3__mailbox6,
-+	&dra7xx_l4_per3__mailbox7,
-+	&dra7xx_l4_per3__mailbox8,
-+	&dra7xx_l4_per3__mailbox9,
-+	&dra7xx_l4_per3__mailbox10,
-+	&dra7xx_l4_per3__mailbox11,
-+	&dra7xx_l4_per3__mailbox12,
-+	&dra7xx_l4_per3__mailbox13,
- 	&dra7xx_l4_per1__mcspi1,
- 	&dra7xx_l4_per1__mcspi2,
- 	&dra7xx_l4_per1__mcspi3,
+ /* mailbox */
+-static struct omap_mbox_dev_info omap2430_mailbox_info[] = {
+-	{ .name = "dsp", .tx_id = 0, .rx_id = 1 },
+-};
+-
+-static struct omap_mbox_pdata omap2430_mailbox_attrs = {
+-	.num_users	= 4,
+-	.num_fifos	= 6,
+-	.info_cnt	= ARRAY_SIZE(omap2430_mailbox_info),
+-	.info		= omap2430_mailbox_info,
+-};
+-
+ static struct omap_hwmod omap2430_mailbox_hwmod = {
+ 	.name		= "mailbox",
+ 	.class		= &omap2xxx_mailbox_hwmod_class,
+@@ -185,7 +173,6 @@ static struct omap_hwmod omap2430_mailbox_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_MAILBOXES_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &omap2430_mailbox_attrs,
+ };
+ 
+ /* mcspi3 */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
+index 0413dab..c1e98d5 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_interconnect_data.c
+@@ -152,15 +152,6 @@ struct omap_hwmod_addr_space omap2_dma_system_addrs[] = {
+ 	{ }
+ };
+ 
+-struct omap_hwmod_addr_space omap2_mailbox_addrs[] = {
+-	{
+-		.pa_start	= 0x48094000,
+-		.pa_end		= 0x48094000 + SZ_512 - 1,
+-		.flags		= ADDR_TYPE_RT,
+-	},
+-	{ }
+-};
+-
+ struct omap_hwmod_addr_space omap2_mcbsp1_addrs[] = {
+ 	{
+ 		.name		= "mpu",
+diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.h b/arch/arm/mach-omap2/omap_hwmod_common_data.h
+index 2c38c6b..11ed5a1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_common_data.h
++++ b/arch/arm/mach-omap2/omap_hwmod_common_data.h
+@@ -33,7 +33,6 @@ extern struct omap_hwmod_addr_space omap2_mcspi1_addr_space[];
+ extern struct omap_hwmod_addr_space omap2_mcspi2_addr_space[];
+ extern struct omap_hwmod_addr_space omap2430_mcspi3_addr_space[];
+ extern struct omap_hwmod_addr_space omap2_dma_system_addrs[];
+-extern struct omap_hwmod_addr_space omap2_mailbox_addrs[];
+ extern struct omap_hwmod_addr_space omap2_mcbsp1_addrs[];
+ extern struct omap_hwmod_addr_space omap2_hdq1w_addr_space[];
+ 
 -- 
 2.0.0
