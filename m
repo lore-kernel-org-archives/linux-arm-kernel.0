@@ -1,51 +1,114 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 11 Jul 2014 14:37:56 +0530
-Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
-In-Reply-To: <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
-References: <cover.1404976058.git.viresh.kumar@linaro.org>
- <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
- <53BE926A.2070005@ti.com>
- <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
-Message-ID: <CAOh2x=muti0t8akw=Kbw22seOCP4=CsUrCUaNzmae74+JH3Q+g@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 11 Jul 2014 10:08:51 +0100
+Subject: [PATCH v8 8/9] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <004601cf9cdb$ca08f7f0$5e1ae7d0$%han@samsung.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
+ <004601cf9cdb$ca08f7f0$5e1ae7d0$%han@samsung.com>
+Message-ID: <20140711090851.GL6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 7:00 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On Fri, Jul 11, 2014 at 08:43:21AM +0100, Jingoo Han wrote:
+> On Wednesday, July 02, 2014 3:44 AM, Liviu Dudau wrote:
+> > 
+> > Several platforms use a rather generic version of parsing
+> > the device tree to find the host bridge ranges. Move the common code
+> > into the generic PCI code and use it to create a pci_host_bridge
+> > structure that can be used by arch code.
+> > 
+> > Based on early attempts by Andrew Murray to unify the code.
+> > Used powerpc and microblaze PCI code as starting point.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  drivers/of/of_pci.c       | 135 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/pci/host-bridge.c |  18 +++++++
+> >  include/linux/of_pci.h    |  10 ++++
+> >  include/linux/pci.h       |   8 +++
+> >  4 files changed, 171 insertions(+)
+> > 
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 8481996..55d8320 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> 
+> [.....]
+> 
+> > +struct pci_host_bridge *
+> > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
+> > +{
+> > +	int err, domain, busno;
+> > +	struct resource *bus_range;
+> > +	struct pci_bus *root_bus;
+> > +	struct pci_host_bridge *bridge;
+> > +	resource_size_t io_base;
+> > +	LIST_HEAD(res);
+> > +
+> > +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+> > +	if (!bus_range)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	domain = of_alias_get_id(parent->of_node, "pci-domain");
+> > +	if (domain == -ENODEV)
+> > +		domain = atomic_inc_return(&domain_nr);
+> > +
+> > +	err = of_pci_parse_bus_range(parent->of_node, bus_range);
+> > +	if (err) {
+> > +		dev_info(parent, "No bus range for %s, using default [0-255]\n",
+> > +			parent->of_node->full_name);
+> > +		bus_range->start = 0;
+> > +		bus_range->end = 255;
+> > +		bus_range->flags = IORESOURCE_BUS;
+> > +	}
+> > +	busno = bus_range->start;
+> > +	pci_add_resource(&res, bus_range);
+> > +
+> > +	/* now parse the rest of host bridge bus ranges */
+> > +	err = pci_host_bridge_of_get_ranges(parent->of_node, &res, &io_base);
+> > +	if (err)
+> > +		goto err_create;
+> > +
+> > +	/* then create the root bus */
+> > +	root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
+> > +						ops, host_data, &res);
+> > +	if (IS_ERR(root_bus)) {
+> > +		err = PTR_ERR(root_bus);
+> > +		goto err_create;
+> > +	}
+> > +
+> > +	bridge = to_pci_host_bridge(root_bus->bridge);
+> > +	bridge->io_base = io_base;
+> 
+> Hi Liviu Dudau,
+> 
+> Would you fix the following warning?
+> 
+> drivers/of/of_pci.c: In function 'of_create_pci_host_bridge'
+> drivers/of/of_pci.c:218:18: warning: 'of_base' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>   bridge->io_base = io_base;
 
->>> +#ifdef CONFIG_PM_SLEEP
->>> +static int spear1340_miphy_suspend(struct device *dev)
->>> +{
->>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
->>> +     int ret = 0;
->>> +
->>> +     if (priv->mode == SATA)
->>> +             ret = spear1340_miphy_sata_exit(priv);
->>
->> Shouldn't this be spear1340_miphy_init()?
->>> +
->>> +     return ret;
->>> +}
->>> +
->>> +static int spear1340_miphy_resume(struct device *dev)
->>> +{
->>> +     struct spear1340_miphy_priv *priv = dev_get_drvdata(dev);
->>> +     int ret = 0;
->>> +
->>> +     if (priv->mode == SATA)
->>> +             ret = spear1340_miphy_sata_init(priv);
->>
->> And here spear1340_miphy_exit()? Why only for sata phys?
+Yes, I have a simple fix which is to set the initial value to zero when declaring the variable.
 
-Kishon,
+Best regards,
+Liviu
 
-I had a chat with Pratyush and this is what we came to:
+> 
+> Best regards,
+> Jingoo Han
+> 
+> [.....]
+> 
+> 
 
-init and exit are rightly placed I believe. We need to initialize from
-resume and exit from suspend. That's fine right? Also this was already
-part of: arch/arm/mach-spear/spear1340.c which is removed with
-this set.
-
-Regarding sata and pcie, pcie suspend isn't yet implemented and
-tested. So only sata :)
-
-For delays, need to wait for mohit. Was on leave today.
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
