@@ -1,54 +1,86 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 11 Jul 2014 11:00:07 +0200
-Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
-In-Reply-To: <53BF35B7.9000105@renesas.com>
- <87oawxy69b.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20140711090005.GH12420@verge.net.au>
+Date: Fri, 11 Jul 2014 11:40:44 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v3.17
+In-Reply-To: <20140708050708.GC28931@quad.lixom.net>
+References: <cover.1403681315.git.horms+renesas@verge.net.au>
+ <20140708050708.GC28931@quad.lixom.net>
+Message-ID: <20140711094044.GB26660@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc Felipe Balbi]
-
-On Thu, Jul 10, 2014 at 01:20:34AM -0700, Kuninori Morimoto wrote:
-> 
-> Hi
-> 
-> > Changes in v2:
-> > - move phy handle to struct usbhs_priv
-> > - add new default pipe type to driver
-> > - remove pipe type from Lager board code
+On Mon, Jul 07, 2014 at 10:07:08PM -0700, Olof Johansson wrote:
+> On Wed, Jun 25, 2014 at 04:35:24PM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
 > > 
-> > Ulrich Hecht (2):
-> >   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
-> >   ARM: shmobile: lager: remove USBHS callbacks
+> > Please consider these Renesas ARM based SoC updates for v3.17.
 > > 
-> >  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
-> >  drivers/usb/renesas_usbhs/Makefile   |   2 +-
-> >  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
-> >  drivers/usb/renesas_usbhs/common.h   |   2 +
-> >  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
-> >  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
-> >  include/linux/usb/renesas_usbhs.h    |   6 ++
-> >  7 files changed, 163 insertions(+), 119 deletions(-)
-> >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
-> >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
+> > This pull request is based on 'Renesas ARM Based SoC Header Cleanup for v3.17',
+> > tagged as header-cleanup-for-v3.17, which I have already sent a
+> > pull-request for. 
+> > 
+> > The following changes since commit 62872989bdbf1245d7239b9f4c05a8ee7c775ed5:
+> > 
+> >   ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case (2014-06-17 17:09:40 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-for-v3.17
+> > 
+> > for you to fetch changes up to 3ed66ec5ced8b801cb851b2b8548301df94f8f54:
+> > 
+> >   ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile (2014-06-23 09:53:55 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC Updates for v3.17
+> > 
+> > * Use shmobile_init_late on r8a7791 and r8a7790 whien booting using DT-only
+> > * Support Core-Standby for Suspend to RAM on r8a7791 and r8a7790 SoCs
+> > * Shared CMA reservation for R-Car Gen2 SoCs
+> > * Add r8a7791 SYSC power management support
 > 
-> For all patches
+> This branch also seems to contain a bunch of bugfixes? Did they get merged into
+> the wrong base, or what's going on?
 > 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-[snip]
-
-> I tested these patches on Lager legacy, and these patches worked correctly.
+> > Benoit Cousson (1):
+> >       ARM: shmobile: Mark all SoCs in shmobile as CPUFreq, capable
+> > 
+> > Gaku Inami (1):
+> >       ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile
 > 
-> Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> The latter patch fixes the former, why not just fold them in?
+> 
+> > Geert Uytterhoeven (3):
+> >       ARM: shmobile: rcar-gen2: Update for of_get_flat_dt_prop() update
+> >       ARM: shmobile: rcar-gen2: Use "1ULL" instead of "(u64)1"
+> >       ARM: shmobile: rcar-gen2: Remove useless copied section for LongTrail
+> 
+> The last two seem to be small bug fixes/cleanups. They should probably go in a
+> cleanup branch unless there are conflicts with new development. Even then, we
+> tend to prefer to order it with the cleanups/fixes before new development
+> (where it doesn't cause extra complications).
+> 
+> > 
+> > Magnus Damm (3):
+> >       ARM: shmobile: Use shmobile_init_late() on r8a7790 DT-only
+> >       ARM: shmobile: Use shmobile_init_late() on r8a7791 DT-only
+> >       ARM: shmobile: Add shared R-Car Gen2 CMA reservation code
+> > 
+> > Simon Horman (1):
+> >       ARM: shmobile: rcar-gen2: correct return value of shmobile_smp_apmu_suspend_init
+> > 
+> > Vincent Stehl? (1):
+> >       ARM: shmobile: rcar-gen2: update call to dma_contiguous_reserve_area
+> 
+> Again those two patches seem to be fixes, the former to a patch in this very
+> branch.
+> 
+> > keita kobayashi (4):
+> >       ARM: shmobile: r8a7791 SYSC setup code
+> >       ARM: shmobile: APMU: Add Core-Standby-state for Suspend to RAM
+> >       ARM: shmobile: r8a7790: Support Core-Standby for Suspend to RAM
+> >       ARM: shmobile: r8a7791: Support Core-Standby for Suspend to RAM
+> 
+> Anyway, I've merged it in as it is. Keep some of the above stuff in mind
+> for future releases though.
 
-Hi,
-
-it seems that the 2nd patch should go through my renesas tree
-but it depends on the first patch which should be taken by 
-Felipe Balbi (Cced).
-
-Felipe, is there any chance that you could take this for v3.16?
-I am quite happy to make a branch for you to pull for renesas_usbhs
-if this would make your life easier.
+Thanks, I will try to tune my processes to produce cleaner branches for you.
