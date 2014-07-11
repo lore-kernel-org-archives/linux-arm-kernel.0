@@ -1,65 +1,30 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 11 Jul 2014 09:51:06 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <20140710131646.GB3935@laptop>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
-Message-ID: <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Fri, 11 Jul 2014 09:59:42 +0200
+Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <53BF996E.8020801@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 15:16, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
->> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
->>
->> We are going to use runnable_avg_sum and runnable_avg_period in order to get
->> the utilization of the CPU. This statistic includes all tasks that run the CPU
->> and not only CFS tasks.
->
-> But this rq->avg is not the one that is migration aware, right? So why
-> use this?
+On 07/11/2014 04:55 AM, Dave Gerlach wrote:
+> This series adds suspend/resume support for am335x. Version 3 of this
+> series can be found at [1]. I apologize for the large delay between this
+> and the previous revision. This code has been heavily refined
+> since the last version based on the various comments received for v3. The
+> major change from previous version is moving all wkup_m3 code into a
+> remoteproc based driver. The new driver handles all IPC and fw loading
+> and exposes a small API to be used by PM code to achieve low power states.
 
-Yes, it's not the one that is migration aware
+Thanks a lot for this new series, Dave!
 
->
-> We already compensate cpu_capacity for !fair tasks, so I don't see why
-> we can't use the migration aware one (and kill this one as Yuyang keeps
-> proposing) and compensate with the capacity factor.
+I've given it a quick test on a custom AM335x board and can confirm
+success. Tested with both DDR2 and DDR3 versions, both work fine, and
+power consumption drops to a reasonable level.
 
-The 1st point is that cpu_capacity is compensated by both !fair_tasks
-and frequency scaling and we should not take into account frequency
-scaling for detecting overload
+I'd be very happy if these patches made it in for 3.17, but I haven't
+followed the discussion on the patches this set depends on.
 
-What we have now is the the weighted load avg that is the sum of the
-weight load of entities on the run queue. This is not usable to detect
-overload because of the weight. An unweighted version of this figure
-would be more usefull but it's not as accurate as the one I use IMHO.
-The example that has been discussed during the review of the last
-version has shown some limitations
 
-With the following schedule pattern from Morten's example
-
-   | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms |
-A:   run     rq     run  ----------- sleeping -------------  run
-B:   rq      run    rq    run   ---- sleeping -------------  rq
-
-The scheduler will see the following values:
-Task A unweighted load value is 47%
-Task B unweight load is 60%
-The maximum Sum of unweighted load is 104%
-rq->avg load is 60%
-
-And the real CPU load is 50%
-
-So we will have opposite decision depending of the used values: the
-rq->avg or the Sum of unweighted load
-
-The sum of unweighted load has the main advantage of showing
-immediately what will be the relative impact of adding/removing a
-task. In the example, we can see that removing task A or B will remove
-around half the CPU load but it's not so good for giving the current
-utilization of the CPU
-
-Vincent
+Best regards,
+Daniel
