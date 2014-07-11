@@ -1,24 +1,38 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 11 Jul 2014 20:07:42 +0530
-Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <53BFF132.3020700@nvidia.com>
-References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
- <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
- <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
- <53BFF132.3020700@nvidia.com>
-Message-ID: <CAKohpon_YKkRP+iYnUaE14fKmcSx_SfWVHPiA48BGiPTCPHTKA@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 11 Jul 2014 16:51:38 +0200
+Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
+ <20140710111833.GY3935@laptop>
+ <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
+Message-ID: <20140711145138.GC3935@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2014 19:44, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
-> Sure, I can do the CPU clock parent change first and then instantiate the
-> cpufreq-cpu0 driver, like highbank-cpufreq. That'll depend on the patch
-> 'cpufreq: cpu0: OPPs can be populated at runtime' from your 'Extend support
-> beyond CPU0' series though, any idea when that patch will land in?
+On Thu, Jul 10, 2014 at 04:03:51PM +0200, Vincent Guittot wrote:
+> On 10 July 2014 13:18, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
+> >> +             /*
+> >> +              * If the CPUs share their cache and the src_cpu's capacity is
+> >> +              * reduced because of other sched_class or IRQs, we trig an
+> >> +              * active balance to move the task
+> >> +              */
+> >> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
+> >> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
+> >> +                                                     sd->imbalance_pct)))
+> >>                       return 1;
+> >
+> > Why is this tied to shared caches?
+> 
+> It's just to limit the change of the policy to a level that can have
+> benefit without performance regression. I'm not sure that we can do
+> that at any level without risk
 
-So, after your mail I had a chat with Rafael. As this patch happens to be a
-fix, we will try to take it into 3.16 only (I am going to send few patches out
-of that series separately in few mins). Otherwise 3.17 is where most of it
-should go.
+Similar to the other change; so both details _should_ have been in the
+changelogs etc..
 
-Thanks for your agreement to make our life easier :)
+In any case, its feels rather arbitrary to me. What about machines where
+there's no cache sharing at all (the traditional SMP systems). This
+thing you're trying to do still seems to make sense there.
