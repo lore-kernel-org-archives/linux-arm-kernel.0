@@ -1,72 +1,47 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jul 2014 13:00:37 +0200
-Subject: [PATCH v4 2/4] ARM: pxa: Move UNCACHED_PHYS_0 mapping from generic.c
- to pxa2[57]x.c
+Date: Fri, 11 Jul 2014 13:00:39 +0200
+Subject: [PATCH v4 4/4] ARM: pxa: Move iotable mapping inside vmalloc region
 In-Reply-To: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1405076439-22038-3-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1405076439-22038-5-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UNCACHED_PHYS_0 mapping is only needed on PXA25x and PXA27x
-platforms. Move it to pxa25x.c and pxa27x.c to avoid wasting vmalloc
-space on PXA3xx.
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
+In order to remove the following ugly message:
+
+  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+
+the iotable mappings should be re-located inside the vmalloc
+region. Such move was introduced at commit:
+
+commit 0536bdf33faff4d940ac094c77998cfac368cfff
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Thu Aug 25 00:35:59 2011 -0400
+
+    ARM: move iotable mappings within the vmalloc region
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+[laurent.pinchart at ideasonboard.com: Hardcode the virtual address]
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mach-pxa/generic.c | 5 -----
- arch/arm/mach-pxa/pxa25x.c  | 5 +++++
- arch/arm/mach-pxa/pxa27x.c  | 5 +++++
- 3 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-pxa/include/mach/hardware.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index 4bc0a2c..6bd7f36 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -83,11 +83,6 @@ static struct map_desc common_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(PERIPH_PHYS),
- 		.length		= PERIPH_SIZE,
- 		.type		= MT_DEVICE
--	}, {	/* UNCACHED_PHYS_0 */
--		.virtual	= UNCACHED_PHYS_0,
--		.pfn		= __phys_to_pfn(0x00000000),
--		.length		= UNCACHED_PHYS_0_SIZE,
--		.type		= MT_DEVICE
- 	}
- };
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index efb3965..8d63c21 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -19,7 +19,7 @@
+  * Workarounds for at least 2 errata so far require this.
+  * The mapping is set in mach-pxa/generic.c.
+  */
+-#define UNCACHED_PHYS_0		0xff000000
++#define UNCACHED_PHYS_0		0xfe000000
+ #define UNCACHED_PHYS_0_SIZE	0x00100000
  
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index 926c506..66e4a2b 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -333,6 +333,11 @@ static struct map_desc pxa25x_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(PXA2XX_SMEMC_BASE),
- 		.length		= SMEMC_SIZE,
- 		.type		= MT_DEVICE
-+	}, {	/* UNCACHED_PHYS_0 */
-+		.virtual	= UNCACHED_PHYS_0,
-+		.pfn		= __phys_to_pfn(0x00000000),
-+		.length		= UNCACHED_PHYS_0_SIZE,
-+		.type		= MT_DEVICE
- 	},
- };
- 
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 4405644..6cc0f46 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -409,6 +409,11 @@ static struct map_desc pxa27x_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(IMEMC_PHYS),
- 		.length		= IMEMC_SIZE,
- 		.type		= MT_DEVICE
-+	}, {	/* UNCACHED_PHYS_0 */
-+		.virtual	= UNCACHED_PHYS_0,
-+		.pfn		= __phys_to_pfn(0x00000000),
-+		.length		= UNCACHED_PHYS_0_SIZE,
-+		.type		= MT_DEVICE
- 	},
- };
- 
+ /*
 -- 
 1.8.5.5
