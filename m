@@ -1,48 +1,50 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 11 Jul 2014 11:02:56 -0600
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140711141115.GB16321@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
- <20140708005954.GC22939@google.com>
- <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
- <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
- <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
- <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
- <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
- <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
- <20140711141115.GB16321@arm.com>
-Message-ID: <CAErSpo7C8qzmdp+XgVi2ysXj_NcgvVY7RVfBZ2PHimLzrzANMQ@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Fri, 11 Jul 2014 10:08:55 -0700
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <53C01558.3090607@nvidia.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+ <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
+ <53C01558.3090607@nvidia.com>
+Message-ID: <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 8:11 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Jul 10, 2014 at 11:36:10PM +0100, Bjorn Helgaas wrote:
->> Most of the rest of the v7 discussion was about "Introduce a domain
->> number for pci_host_bridge."  I think we should add arm64 using the
->> existing pci_scan_root_bus() and keep the domain number in the arm64
->> sysdata structure like every other arch does.  Isn't that feasible?
->> We can worry about domain unification later.
+On Fri, Jul 11, 2014 at 9:48 AM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
 >
-> I think that's what we were trying to avoid, adding an arm64-specific
-> pci_sys_data structure (and arm64-specific API). IIUC, avoiding this
-> would allow the host controller drivers to use the sysdata pointer for
-> their own private data structures.
 >
-> Also since you can specify the domain number via DT (and in Liviu's
-> v8 patches read by of_create_pci_host_bridge), I think it would make
-> sense to have it stored in some generic data structures (e.g.
-> pci_host_bridge) rather than in an arm64 private sysdata.
+> On 11/07/14 19:28, Andrew Bresticker wrote:
+>>
+>> On Thu, Jul 10, 2014 at 2:42 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>> wrote:
+>>>
+>>> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
+>>> and also provides automatic CPU rail voltage scaling as well. The DFLL
+>>> is a separate IP block from the usual Tegra124 clock-and-reset
+>>> controller, so it gets its own node in the device tree.
+>>
+>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>>> b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>>
+>>
+>>> +- nvidia,pmic-voltage-table: Array of 2-tuples.  Each entry should have
+>>> the
+>>> +  form <register-value voltage-in-uV>, indicating the register value
+>>> that
+>>> +  needs to be programmed to the PMIC for changing the VDD_CPU voltage to
+>>> +  the specified voltage. The table must be in ascending order by the
+>>> voltage.
+>>
+>>
+>> Instead of listing the register values for each voltage in the DT,
+>> can't you use regulator_list_voltage() to create this map?
+>>
+>
+> I don't see a way to get the register values that way, unless we assume that
+> the mapping is linear and doesn't have holes.
 
-It would definitely be nice to keep the domain in a generic data
-structure rather than an arm64-specific one.  But every other arch
-keeps it in an arch-specific structure today, and I think following
-that existing pattern is the quickest way forward.
-
-But you mentioned arm64-specific API, too.  What do you have in mind
-there?  I know there will be arm64 implementations of various
-pcibios_*() functions (just like for every other arch), but it sounds
-like there might be something else?
-
-Bjorn
+Hmm... I guess if you don't assume it's linear and continuous you'd
+have to iterate over all 256 selectors.
