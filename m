@@ -1,39 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Jul 2014 15:11:16 +0100
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
- <20140708005954.GC22939@google.com>
- <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
- <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
- <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
- <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
- <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
- <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
-Message-ID: <20140711141115.GB16321@arm.com>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Fri, 11 Jul 2014 17:14:10 +0300
+Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
+In-Reply-To: <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>	<1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
+ <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
+Message-ID: <53BFF132.3020700@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 11:36:10PM +0100, Bjorn Helgaas wrote:
-> Most of the rest of the v7 discussion was about "Introduce a domain
-> number for pci_host_bridge."  I think we should add arm64 using the
-> existing pci_scan_root_bus() and keep the domain number in the arm64
-> sysdata structure like every other arch does.  Isn't that feasible?
-> We can worry about domain unification later.
 
-I think that's what we were trying to avoid, adding an arm64-specific
-pci_sys_data structure (and arm64-specific API). IIUC, avoiding this
-would allow the host controller drivers to use the sysdata pointer for
-their own private data structures.
 
-Also since you can specify the domain number via DT (and in Liviu's
-v8 patches read by of_create_pci_host_bridge), I think it would make
-sense to have it stored in some generic data structures (e.g.
-pci_host_bridge) rather than in an arm64 private sysdata.
+On 11/07/14 07:35, Viresh Kumar wrote:
+> Hi Tuomas,
+>
+> On 11 July 2014 03:12, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+>> Add a new cpufreq driver for Tegra124. Instead of using the PLLX as
+>> the CPU clocksource, switch immediately to the DFLL. It allows the use
+>> of higher clock rates, and will automatically scale the CPU voltage as
+>> well. We also rely on the DFLL driver to determine the CPU clock
+>> frequencies that the chip supports, so that we can directly build a
+>> cpufreq table with the OPP library helper dev_pm_opp_init_cpufreq_table.
+>>
+>> This driver is a completely independent of the old cpufreq driver
+>> (tegra-cpufreq), which is only used on Tegra20.
+>>
+>> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>
+> Please reuse cpufreq-cpu0 instead of adding a new driver. Similar
+> is being adopted by all platforms now: krait, mvebu, etc..
+>
 
-(Liviu is thinking of an alternative API but maybe he could briefly
-describe it here before posting a new series)
+Sure, I can do the CPU clock parent change first and then instantiate 
+the cpufreq-cpu0 driver, like highbank-cpufreq. That'll depend on the 
+patch 'cpufreq: cpu0: OPPs can be populated at runtime' from your 
+'Extend support beyond CPU0' series though, any idea when that patch 
+will land in?
+
 
 -- 
-Catalin
+nvpublic
