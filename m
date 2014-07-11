@@ -1,44 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jul 2014 15:21:35 +0100
-Subject: [PATCH] bus: ARM CCN PMU driver
-In-Reply-To: <1405088056-29181-1-git-send-email-pawel.moll@arm.com>
-References: <1405088056-29181-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140711142135.GA21766@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 11 Jul 2014 16:26:03 +0200
+Subject: [PATCH 10/13] [RFC] ARM: dts: Add shmobile platform device tree
+ bindings documentation
+In-Reply-To: <20140711091720.GO12420@verge.net.au>
+References: <1404908623-909-1-git-send-email-geert+renesas@glider.be>
+ <1404908623-909-11-git-send-email-geert+renesas@glider.be>
+ <20140711091720.GO12420@verge.net.au>
+Message-ID: <CAMuHMdXP6GfO7OEnXU8x4Sn5j8_tA2nnrFANr1sriB-B4BYoOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 03:14:16PM +0100, Pawel Moll wrote:
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 1f37d98..6ab2a62 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -4,14 +4,6 @@
->  
->  menu "Bus devices"
->  
-> -config BRCMSTB_GISB_ARB
-> -	bool "Broadcom STB GISB bus arbiter"
-> -	depends on ARM
-> -	help
-> -	  Driver for the Broadcom Set Top Box System-on-a-chip internal bus
-> -	  arbiter. This driver provides timeout and target abort error handling
-> -	  and internal bus master decoding.
-> -
-...
-> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-> index 6a4ea7e..493b4ff 100644
-> --- a/drivers/bus/Makefile
-> +++ b/drivers/bus/Makefile
-> @@ -2,14 +2,15 @@
->  # Makefile for the bus drivers.
->  #
->  
-> -obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+Hi Simon,
 
-I assume that as these exist in the patch, you haven't looked through
-the patch to check what you're actually submitting... how can we be
-sure that the rest of the patch is what you intend to submit?
+On Fri, Jul 11, 2014 at 11:17 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jul 09, 2014 at 02:23:40PM +0200, Geert Uytterhoeven wrote:
+>> Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+>> Documentation, listing supported SoCs and boards.
+>>
+>> This allows to use checkpatch to validate DTSes referring to Renesas
+>> shmobile SoCs, and boards containing those SoCs.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>
+> Thanks Geert,
+>
+> from my point of view this seems nice. Is there a reason it is marked as an RFC?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+>From the cover letter:
+
+"The last 4 patches contain compatible strings for new R-Car Gen2 SoCs,
+ which are not yet in active use, hence the RFC status."
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
