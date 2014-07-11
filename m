@@ -1,109 +1,114 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Fri, 11 Jul 2014 11:45:32 +0530
-Subject: [PATCH v6 0/4] Adds PMU and S2R support for exynos5420
-In-Reply-To: <1404737763-21783-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1404737763-21783-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAHfPSqAUnNR7R48hv-=8xq=iGp1m+9P_=BT5Ak1U-RuzGXteTg@mail.gmail.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Fri, 11 Jul 2014 11:48:54 +0530
+Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
+ always enabled
+In-Reply-To: <20140612210920.6562.96815@quantum>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
+ <20140611165027.6562.64928@quantum>
+ <CAC5m3BwR9WhiiDqUw1A6FjmzAnQ02xCBxOeAaY2nt3CRqTz+oQ@mail.gmail.com>
+ <20140612210920.6562.96815@quantum>
+Message-ID: <53BF81CE.60507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vikas,
+On 06/13/2014 02:39 AM, Mike Turquette wrote:
+> Quoting Tushar Behera (2014-06-12 00:29:23)
+>> On Wed, Jun 11, 2014 at 10:20 PM, Mike Turquette <mturquette@linaro.org> wrote:
+>>> Quoting Tushar Behera (2014-06-10 22:32:17)
+>>>> When the output clock of AUDSS mux is disabled, we are getting kernel
+>>>> oops while doing a clk_get() on other clocks provided by AUDSS. Though
+>>>> user manual doesn't specify this dependency, we came across this issue
+>>>> while disabling the parent of AUDSS mux clocks.
+>>>
+>>> Hi Tushar,
+>>>
+>>> Can you help me understand better what the actual problem is? What is
+>>> the root cause of the kernel oops?
+>>
+>> Currently AUDSS mux has two parents, XXTI crystal and MAU_EPLL clock.
+>> As per observation, when the output of AUDSS mux is gated, we are not
+>> able to do any operation on the clocks provided by MAU block (mostly
+>> the clocks used by ADMA and audio blocks).
+> 
+> I tried to get a datasheet for Exynos 54xx but could not find it. I even
+> looked at the public 5250 data sheet, but it is completely missing
+> Chapter 34, "Audio Subsystem", which apparently contains Figure 34-3,
+> "Clock names and clock tree diagram of MAUDIO_BLK".
+> 
+> So without any clue about your hardware (not for lack of trying) I would
+> guess that somewhere in the parent hierarchy you have an interface clock
+> which must be enabled in order for you to touch the registers pertaining
+> to the downstream audio clocks.
+> 
 
-On 7 July 2014 18:25, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Rebased on
-> 1] Kukjin Kim's tree, for-next branch
-> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
-> 2] Pankaj Dubey's v6 PMU patchset
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33660.html
->
-> changes since v5:
->         - Refactored pm.c to use DT based lookup as suggested by Tomasz Figa.
->
-> changes since v4:
->         - Adressed comments from Tomasz figa and rebased on Pankaj Dubey's v5 PMU patchset
->
-> changes since v3:
-> Addressed the following comments from Pankaj Dubey, Bartlomiej Zolnierkiewicz,
-> Tomasz Figa and Alim Akhtar:
->         - Moved EXYNOS5420_USE_STANDBY_WFI_ALL define to regs-pmu.h.
->         - Merged exynos5420_set_core_flag function into powerdown_conf.
->         - Removed XXTI_DURATION3 register setting.
->         - Updated the commit message and ordered the clock registers in clock
->           patch.
->         - Removed the code for SYS_DISP1_BLK_CFG handling.
->         - Modified SoC checks to A9 specific checks in PM code.
->         - Updated some comments in the code and added macros for register offsets.
->         - Fixed code which was changing pad retention code for older SoCs.
->
-> changes since v2:
->         - Addressed comments from Tomasz figa
->         - rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
->         - dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
->           will be sent separately.
->
-> changes since v1:
->         - Addressed comments from Tomasz figa.
->         - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
->
-> Tested on Kukjin Kim's tree, for-next branch +
->         1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
->         2] http://www.spinics.net/lists/linux-samsung-soc/msg32923.html
->         3] https://www.mail-archive.com/linux-mmc at vger.kernel.org/msg26210.html (for eMMC S2R fail issue)
->
-> on Exynos5420 based chromebook (peach-pit board) and Exynos5250 based chromebook (snow board).
->
-> PS : Not tested on exynos4 based boards.
->
-> Tested-by for exynos4 would be appreciated.
->
-> Below procedures were followed to test S2R:
-> Procedure A:
->         1. make multi_v7_defconfig
->         2  enable MCPM for 5420
->         3. enable S3C RTC
->         4. pass "no_console_suspend" in bootargs
->         5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-> Procedure B:
->         1. make exynos_defconfig
->         2  enable MCPM for 5420
->         3  enable CONFIG_PL330_DMA
->         4. enable CONFIG_PM_RUNTIME
->         5. pass "no_console_suspend" in bootargs
->         6. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+Yes, right. As per observation, we need to keep the output of AUDSS mux
+enabled to access the registers present in MAU block.
 
-Could test with the given description on Exynos5420 based Peach PIT.
-S2R on Exynos5250 based Snow works fine too.
+> The right way to handle this requires two steps:
+> 
+> 1) model your interface clock in the Linux clock framework if you
+> haven't already (I assume it is a gate clock, or the child of a gate
+> clock)
+> 
 
-With http://www.spinics.net/lists/linux-samsung-soc/msg33999.html
-S2R on Exynos5800 based Peach PI works fine.
+The interface clock is already part of the clock framework.
 
-Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> 2) the clk_ops callbacks for the affected audio clocks should wrap their
+> operations (i.e. critical secion) with a clk_enable/clk_disable pair,
+> where the clock being enables/disable is the interface clock mentioned
+> above in #1
+> 
+> The CCF is reentrant, so you can do this by simply using the top-level
+> clk.h API from within your clk_ops callbacks.
+> 
 
->
-> Abhilash Kesavan (2):
->   arm: exynos5: Add PMU support for 5420
->   arm: exynos5: Add Suspend-to-RAM support for 5420
->
-> Vikas Sajjan (2):
->   ARM: EXYNOS: Refactor the code to use DT based lookup
->   clk: samsung: exynos5420: Setup clocks before system suspend
->
->  arch/arm/mach-exynos/pm.c            |  376 ++++++++++++++++++++++++++++++----
->  arch/arm/mach-exynos/pmu.c           |  288 ++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h      |  230 +++++++++++++++++++++
->  drivers/clk/samsung/clk-exynos5420.c |   29 +++
->  4 files changed, 880 insertions(+), 43 deletions(-)
->
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Right now, the clocks are registered with clk_register_mux,
+clk_register_div and clk_register_gate calls which in turn set
+appropriate clk_ops callbacks. If I need to wrap the register access
+during these clk_ops callbacks with clk_enable/clk_disable of interface
+lock, I would have to reimplement the clk_ops callbacks in
+clk-exynos-audss driver.
 
+Is that the approach that you are suggesting?
+
+> I might be totally wrong about the cause of the hang, but that's my best
+> guess based on everyone's bug reports.
+> 
+
+There are 5 gate clocks within MAU block. While disabling the unused
+clocks, if CLK_MAU_EPLL is disabled first, then we are getting this
+system hang.
+
+
+> Regards,
+> Mike
+> 
+>>
+>>>
+>>> You mention calling clk_get on child clocks of the AUDSS mux fails, but
+>>> I cannot imagine why. How can the enable/disable state of a clock affect
+>>> the ability to clk_get other clocks?
+>>>
+>>
+>> I might have a little vogue while updating the commit message
+>> (mentioning about clk_get which surely is only a s/w operation), but
+>> there is definitely some issue with handling those clocks under given
+>> scenario.
+>>
+>> I am on leave till end of this week, so I will update you more with
+>> the logs on Monday.
+>>
+>> Thanks,
+>> --
+>> Tushar
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 
 -- 
-Shine bright,
-(: Nav :)
+Tushar Behera
