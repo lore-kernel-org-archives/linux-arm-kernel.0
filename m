@@ -1,66 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 11 Jul 2014 10:50:14 +0200
-Subject: [PATCH v2] i2c: efm32: correct namespacing of location property
-In-Reply-To: <1405066940-12919-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1405066940-12919-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1405068614-14279-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Fri, 11 Jul 2014 11:07:00 +0200
+Subject: [PATCH v3 3/5] phy: miphy365x: Provide support for the MiPHY356x
+ Generic PHY
+In-Reply-To: <1404906074-31992-4-git-send-email-lee.jones@linaro.org>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+ <1404906074-31992-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAG374jC1s3A6i+ivO51E-N-9QAa4Pcfh909xPZAtmZ_onUM_LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson pointed out that usually the company name is picked as
-namespace prefix to specific properties. So expect "energymicro,location"
-but fall back to the previously introduced name "efm32,location".
+Hi Lee
 
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Changes since (implicit) v1:
- - fix a wrong if condtion
+One suggestion
 
- Documentation/devicetree/bindings/i2c/i2c-efm32.txt | 4 ++--
- drivers/i2c/busses/i2c-efm32.c                      | 8 +++++++-
- 2 files changed, 9 insertions(+), 3 deletions(-)
+On 9 July 2014 13:41, Lee Jones <lee.jones@linaro.org> wrote:
+> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> devices. It has 2 ports which it can use for either; both SATA, both
+> PCIe or one of each in any configuration.
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/phy/Kconfig         |  10 +
+>  drivers/phy/Makefile        |   1 +
+>  drivers/phy/phy-miphy365x.c | 616 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 627 insertions(+)
+>  create mode 100644 drivers/phy/phy-miphy365x.c
+>
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-efm32.txt b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-index fc15ac519437..50b25c3da186 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-@@ -10,7 +10,7 @@ Required properties :
- Recommended properties :
- 
-  - clock-frequency : maximal I2C bus clock frequency in Hz.
-- - efm32,location : Decides the location of the USART I/O pins.
-+ - energymicro,location : Decides the location of the USART I/O pins.
-    Allowed range : [0 .. 6]
- 
- Example:
-@@ -23,7 +23,7 @@ Example:
- 		clocks = <&cmu clk_HFPERCLKI2C0>;
- 		clock-frequency = <100000>;
- 		status = "ok";
--		efm32,location = <3>;
-+		energymicro,location = <3>;
- 
- 		eeprom at 50 {
- 			compatible = "microchip,24c02";
-diff --git a/drivers/i2c/busses/i2c-efm32.c b/drivers/i2c/busses/i2c-efm32.c
-index f7eccd682de9..10b8323b08d4 100644
---- a/drivers/i2c/busses/i2c-efm32.c
-+++ b/drivers/i2c/busses/i2c-efm32.c
-@@ -370,7 +370,13 @@ static int efm32_i2c_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = of_property_read_u32(np, "efm32,location", &location);
-+
-+	ret = of_property_read_u32(np, "energymicro,location", &location);
-+
-+	if (ret)
-+		/* fall back to wrongly namespaced property */
-+		ret = of_property_read_u32(np, "efm32,location", &location);
-+
- 	if (!ret) {
- 		dev_dbg(&pdev->dev, "using location %u\n", location);
- 	} else {
--- 
-2.0.0
+[...]
+
+> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
+> new file mode 100644
+> index 0000000..65ecd04
+> --- /dev/null
+> +++ b/drivers/phy/phy-miphy365x.c
+> @@ -0,0 +1,616 @@
+
+[...]
+
+> +
+> +struct miphy365x_phy {
+> +       struct phy *phy;
+> +       void __iomem *base;
+> +       void __iomem *sata;
+> +       void __iomem *pcie;
+> +       u8 type;
+> +       u8 port;
+
+
+if we add:
+     struct miphy365x_dev *phydev;
+
+it's could simplified call of procedures below ?
+
+for e.g.
+static int miphy365x_set_path(struct miphy365x_phy *miphy_phy,
+                             struct miphy365x_dev *miphy_dev)
+
+into
+
+static int miphy365x_set_path(struct miphy365x_phy *miphy_phy)
+{
+    struct miphy365x_dev *miphy_dev=miphy_phy->phydev;
+
+
+[...]
+
+Best regards
+Gabriel
