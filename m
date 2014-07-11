@@ -1,60 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jul 2014 17:22:08 +0100
-Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
-In-Reply-To: <1405095403.667469987@f367.i.mail.ru>
-References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
- <20140711160238.GD21766@n2100.arm.linux.org.uk>
- <1405095403.667469987@f367.i.mail.ru>
-Message-ID: <20140711162208.GF21766@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 11 Jul 2014 11:23:48 -0500
+Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
+In-Reply-To: <20140711154152.GC1777@verge.net.au>
+References: <53BF35B7.9000105@renesas.com>
+ <87oawxy69b.wl%kuninori.morimoto.gx@renesas.com>
+ <20140711090005.GH12420@verge.net.au>
+ <20140711151236.GG27864@saruman.home>
+ <20140711154152.GC1777@verge.net.au>
+Message-ID: <20140711162348.GF22572@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 08:16:43PM +0400, Alexander Shiyan wrote:
-> Fri, 11 Jul 2014 17:02:38 +0100 ?? Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Fri, Jul 11, 2014 at 08:34:19AM -0700, Tim Harvey wrote:
-> > > I've noticed that for IMX6 the gpio-mxc gpio driver always returns 0
-> > > for gpio's configured as outputs regardless of if they are outputing
-> > > high or low.
+On Fri, Jul 11, 2014 at 05:41:52PM +0200, Simon Horman wrote:
+> On Fri, Jul 11, 2014 at 10:12:37AM -0500, Felipe Balbi wrote:
+> > On Fri, Jul 11, 2014 at 11:00:07AM +0200, Simon Horman wrote:
+> > > [Cc Felipe Balbi]
+> > > 
+> > > On Thu, Jul 10, 2014 at 01:20:34AM -0700, Kuninori Morimoto wrote:
+> > > > 
+> > > > Hi
+> > > > 
+> > > > > Changes in v2:
+> > > > > - move phy handle to struct usbhs_priv
+> > > > > - add new default pipe type to driver
+> > > > > - remove pipe type from Lager board code
+> > > > > 
+> > > > > Ulrich Hecht (2):
+> > > > >   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
+> > > > >   ARM: shmobile: lager: remove USBHS callbacks
+> > > > > 
+> > > > >  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
+> > > > >  drivers/usb/renesas_usbhs/Makefile   |   2 +-
+> > > > >  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
+> > > > >  drivers/usb/renesas_usbhs/common.h   |   2 +
+> > > > >  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
+> > > > >  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
+> > > > >  include/linux/usb/renesas_usbhs.h    |   6 ++
+> > > > >  7 files changed, 163 insertions(+), 119 deletions(-)
+> > > > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
+> > > > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
+> > > > 
+> > > > For all patches
+> > > > 
+> > > > Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > > 
+> > > [snip]
+> > > 
+> > > > I tested these patches on Lager legacy, and these patches worked correctly.
+> > > > 
+> > > > Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > 
+> > > Hi,
+> > > 
+> > > it seems that the 2nd patch should go through my renesas tree
+> > > but it depends on the first patch which should be taken by 
+> > > Felipe Balbi (Cced).
+> > > 
+> > > Felipe, is there any chance that you could take this for v3.16?
+> > > I am quite happy to make a branch for you to pull for renesas_usbhs
+> > > if this would make your life easier.
 > > 
-> > There's a different way which this can be solved - set the SION but on
-> > your GPIOs.  You will then be able to read back the state of the
-> > output pin.
+> > you need to take both patches or just patch 1 ?
 > 
-> AFAIK, SION is not affected for pins configured as GPIO.
-> Please FIX ME if my opinion is wrong.
+> Please just take patch 1.
 
-SION forces the input path to the GPIOs to be enabled, meaning you can
-read the actual state of the pin.
-
-I've ended up setting that on several GPIOs used for regulator control
-on iMX6 so that I can see their output state in /sys/kernel/debug/gpio,
-otherwise I can't read back their output states.  It appears to work
-there:
-
-GPIOs 0-31, platform/209c000.gpio, 209c000.gpio:
- gpio-0   (usb_h1_vbus         ) out lo
- gpio-2   (gpio-ir-recv        ) in  hi
- gpio-4   (2194000.usdhc cd    ) in  lo
-
-GPIOs 32-63, platform/20a0000.gpio, 20a0000.gpio:
-
-GPIOs 64-95, platform/20a4000.gpio, 20a4000.gpio:
- gpio-83  (brcm_reg            ) out hi
- gpio-86  (usb_otg_vbus        ) out lo
-
-GPIOs 96-127, platform/20a8000.gpio, 20a8000.gpio:
- gpio-111 (phy-reset           ) out lo
-
-GPIOs 128-159, platform/20ac000.gpio, 20ac000.gpio:
- gpio-133 (brcm_osc_reg        ) out hi
- gpio-154 (card-reset          ) out hi
-
-GPIOs 160-191, platform/20b0000.gpio, 20b0000.gpio:
- gpio-160 (card-reset          ) out hi
-
-GPIOs 192-223, platform/20b4000.gpio, 20b4000.gpio:
-
+will do.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/d012ef40/attachment.sig>
