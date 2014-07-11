@@ -1,46 +1,110 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jul 2014 13:00:35 +0200
-Subject: [PATCH v4 0/4] ARM: pxa: Fix out of vmalloc space bug
-Message-ID: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Date: Fri, 11 Jul 2014 13:00:36 +0200
+Subject: [PATCH v4 1/4] ARM: pxa: Don't hardcode addresses and size in
+ map_desc tables
+In-Reply-To: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1405076439-22038-2-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The virtual address, physical address and size of all regions for which
+we create static mappings are defined in PXA headers. Replaced the
+hardcoded values with macros.
 
-This patch set reworks Ezequiel Garcia's previous fix [1] of an out of vmalloc
-space bug on PXA2[57]x platforms caused by an attempt to map the start of
-physical uncached outside of the vmalloc space.
-
-This first three patches perform a couple of cleanups, and the last patch
-fixes the problem. I've decided to map the memory at address 0xfe000000 to
-minimize changes to the code, but this causes a bit of fragmentation of
-vmalloc space. I could map it to the very end of vmalloc space (0xfef00000)
-instead if preferred, which would involve replacing a mov by an ldr in
-pxa2[57]x_finish_suspend and pm_enter_standby_start.
-
-I've tested the patch set on a PXA270-based system.
-
-[1] https://lkml.org/lkml/2013/11/28/474
-
-Compared to v3, the patches have been rebased on top of v3.16-rc5. Olof, could
-you please pick them up for v3.17 ?
-
-Ezequiel Garcia (1):
-  ARM: pxa: Move iotable mapping inside vmalloc region
-
-Laurent Pinchart (3):
-  ARM: pxa: Don't hardcode addresses and size in map_desc tables
-  ARM: pxa: Move UNCACHED_PHYS_0 mapping from generic.c to pxa2[57]x.c
-  ARM: pxa: pxa27x: Don't map IMEMC region statically
-
- arch/arm/mach-pxa/generic.c               | 11 +++--------
- arch/arm/mach-pxa/include/mach/hardware.h |  4 ++--
- arch/arm/mach-pxa/pxa25x.c                |  7 ++++++-
- arch/arm/mach-pxa/pxa27x.c                | 10 +++++-----
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/mach-pxa/generic.c               | 10 +++++-----
+ arch/arm/mach-pxa/include/mach/hardware.h |  2 +-
+ arch/arm/mach-pxa/pxa25x.c                |  2 +-
+ arch/arm/mach-pxa/pxa27x.c                |  8 ++++----
  arch/arm/mach-pxa/pxa3xx.c                |  2 +-
- 5 files changed, 17 insertions(+), 17 deletions(-)
+ 5 files changed, 12 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 4225417..4bc0a2c 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -79,14 +79,14 @@ EXPORT_SYMBOL(get_clk_frequency_khz);
+  */
+ static struct map_desc common_io_desc[] __initdata = {
+   	{	/* Devs */
+-		.virtual	=  0xf2000000,
+-		.pfn		= __phys_to_pfn(0x40000000),
+-		.length		= 0x02000000,
++		.virtual	= (unsigned long)PERIPH_VIRT,
++		.pfn		= __phys_to_pfn(PERIPH_PHYS),
++		.length		= PERIPH_SIZE,
+ 		.type		= MT_DEVICE
+ 	}, {	/* UNCACHED_PHYS_0 */
+-		.virtual	= 0xff000000,
++		.virtual	= UNCACHED_PHYS_0,
+ 		.pfn		= __phys_to_pfn(0x00000000),
+-		.length		= 0x00100000,
++		.length		= UNCACHED_PHYS_0_SIZE,
+ 		.type		= MT_DEVICE
+ 	}
+ };
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index ccb06e4..efb3965 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -20,7 +20,7 @@
+  * The mapping is set in mach-pxa/generic.c.
+  */
+ #define UNCACHED_PHYS_0		0xff000000
+-#define UNCACHED_ADDR		UNCACHED_PHYS_0
++#define UNCACHED_PHYS_0_SIZE	0x00100000
+ 
+ /*
+  * Intel PXA2xx internal register mapping:
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index f2c2897..926c506 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -331,7 +331,7 @@ static struct map_desc pxa25x_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
+ 		.pfn		= __phys_to_pfn(PXA2XX_SMEMC_BASE),
+-		.length		= 0x00200000,
++		.length		= SMEMC_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+ };
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 301471a..4405644 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -402,12 +402,12 @@ static struct map_desc pxa27x_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
+ 		.pfn		= __phys_to_pfn(PXA2XX_SMEMC_BASE),
+-		.length		= 0x00200000,
++		.length		= SMEMC_SIZE,
+ 		.type		= MT_DEVICE
+ 	}, {	/* IMem ctl */
+-		.virtual	=  0xfe000000,
+-		.pfn		= __phys_to_pfn(0x58000000),
+-		.length		= 0x00100000,
++		.virtual	= (unsigned long)IMEMC_VIRT,
++		.pfn		= __phys_to_pfn(IMEMC_PHYS),
++		.length		= IMEMC_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+ };
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 87011f3..593ccd35 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -416,7 +416,7 @@ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
+ 		.pfn		= __phys_to_pfn(PXA3XX_SMEMC_BASE),
+-		.length		= 0x00200000,
++		.length		= SMEMC_SIZE,
+ 		.type		= MT_DEVICE
+ 	}
+ };
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.5.5
