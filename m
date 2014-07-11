@@ -1,73 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 11 Jul 2014 17:13:04 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
-Message-ID: <20140711151304.GD3935@laptop>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Jul 2014 17:15:02 +0200
+Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
+In-Reply-To: <53BFFEAD.7000405@nvidia.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
+ <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
+ <20140711091207.GY23218@tbergstrom-lnx.Nvidia.com>
+ <20140711145735.GB6523@ulmo> <53BFFEAD.7000405@nvidia.com>
+Message-ID: <20140711151501.GA25810@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 09:51:06AM +0200, Vincent Guittot wrote:
-> On 10 July 2014 15:16, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
-> >> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
-> >>
-> >> We are going to use runnable_avg_sum and runnable_avg_period in order to get
-> >> the utilization of the CPU. This statistic includes all tasks that run the CPU
-> >> and not only CFS tasks.
+On Fri, Jul 11, 2014 at 06:11:41PM +0300, Tuomas Tynkkynen wrote:
+> On 11/07/14 17:57, Thierry Reding wrote:
+> 
+> >>I don't think that's going to work? The voltage scaling is handled in hw.
 > >
-> > But this rq->avg is not the one that is migration aware, right? So why
-> > use this?
-> 
-> Yes, it's not the one that is migration aware
-> 
+> >Do we have to handle it in hardware or can we opt to do it in software,
+> >too?
 > >
-> > We already compensate cpu_capacity for !fair tasks, so I don't see why
-> > we can't use the migration aware one (and kill this one as Yuyang keeps
-> > proposing) and compensate with the capacity factor.
 > 
-> The 1st point is that cpu_capacity is compensated by both !fair_tasks
-> and frequency scaling and we should not take into account frequency
-> scaling for detecting overload
+> With the PLLX, voltage scaling is done entirely in SW. With the DFLL,
+> it's possible to stay in open-loop mode and do it in SW, but there's
+> not much point in that.
 
-dvfs could help? Also we should not use arch_scale_freq_capacity() for
-things like cpufreq-ondemand etc. Because for those the compute capacity
-is still the max. We should only use it when we hard limit things.
+It's kind of ugly how we need to pass the address of the PMU and the
+offset of the voltage control register to the DFLL which will then
+initiate I2C transactions itself. I'm wondering if that plays well with
+the I2C traffic originating from within the kernel.
 
-> What we have now is the the weighted load avg that is the sum of the
-> weight load of entities on the run queue. This is not usable to detect
-> overload because of the weight. An unweighted version of this figure
-> would be more usefull but it's not as accurate as the one I use IMHO.
-> The example that has been discussed during the review of the last
-> version has shown some limitations
-> 
-> With the following schedule pattern from Morten's example
-> 
->    | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms |
-> A:   run     rq     run  ----------- sleeping -------------  run
-> B:   rq      run    rq    run   ---- sleeping -------------  rq
-> 
-> The scheduler will see the following values:
-> Task A unweighted load value is 47%
-> Task B unweight load is 60%
-> The maximum Sum of unweighted load is 104%
-> rq->avg load is 60%
-> 
-> And the real CPU load is 50%
-> 
-> So we will have opposite decision depending of the used values: the
-> rq->avg or the Sum of unweighted load
-> 
-> The sum of unweighted load has the main advantage of showing
-> immediately what will be the relative impact of adding/removing a
-> task. In the example, we can see that removing task A or B will remove
-> around half the CPU load but it's not so good for giving the current
-> utilization of the CPU
-
-In that same discussion ISTR a suggestion about adding avg_running time,
-as opposed to the current avg_runnable. The sum of avg_running should be
-much more accurate, and still react correctly to migrations.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/c9ef5c4d/attachment-0001.sig>
