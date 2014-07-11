@@ -1,72 +1,53 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 11 Jul 2014 10:30:07 +0100
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
- <20140708005954.GC22939@google.com>
- <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
- <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
- <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
- <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
- <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
- <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
-Message-ID: <20140711093007.GN6501@e106497-lin.cambridge.arm.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Fri, 11 Jul 2014 11:31:16 +0200
+Subject: [BUG] usb: gadget: rndis: atmel_usba_udc: probe of 500000.gadget
+ failed with error -2
+In-Reply-To: <53BF998B.2070006@atmel.com>
+References: <53BF8890.9020409@aksignal.cz> <53BF998B.2070006@atmel.com>
+Message-ID: <53BFAEE4.3060009@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 11:36:10PM +0100, Bjorn Helgaas wrote:
-> On Thu, Jul 10, 2014 at 3:47 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> 
-> > I don't see a way out of adding new PCI interfaces if we want to have support in
-> > the PCI framework for unifying existing architectures. Of course, there is the painful
-> > alternative of changing the existing APIs and fixing arches in one go, but like you've
-> > said is going to be messy. I don't think I (or the people and companies wanting PCIe
-> > on arm64) should cop out and pick a quick fix that adds sysdata structure into arm64
-> > just to avoid new APIs, as this is not going to help anyone in long term. What I can
-> > do is to create a set of parallel APIs for pci_{scan,create}_root_bus() that take
-> > a pci_host_bridge pointer and start converting architectures one by one to that API
-> > while deprecating the existing one. That way we can add arm64 easily as it would be
-> > the first architecture to use new code without breaking things *and* we provide a
-> > migration path.
-> 
-> A lot of the v7 discussion was about pci_register_io_range().  I
-> apologize, because I think I really derailed things there and it was
-> unwarranted.  Arnd was right that migrating other arches should be a
-> separate effort.  I *think* I was probably thinking about the proposal
-> of adding pci_create_root_bus_in_domain(), and my reservations about
-> that got transferred to the pci_register_io_range() discussion.  In
-> any case, I'm completely fine with pci_register_io_range() now.
-> 
-> Most of the rest of the v7 discussion was about "Introduce a domain
-> number for pci_host_bridge."  I think we should add arm64 using the
-> existing pci_scan_root_bus() and keep the domain number in the arm64
-> sysdata structure like every other arch does.  Isn't that feasible?
-> We can worry about domain unification later.
 
-Thanks!
 
-I'm really not that keen to add sysdata support in the arch code as it
-requires initialisation code that I have tried to eliminate. What I'm
-going to suggest for my v9 is a parallel set of APIs that arm64 will
-be the first to use without changing the existing pci_{scan,create}_bus()
-functions and then the conversion process will migrate arches to the new API.
-
-Best regards,
-Liviu
-
-> 
-> I haven't followed closely enough to know what other objections people had.
-> 
-> Bjorn
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Dne 11.7.2014 10:00, Bo Shen napsal(a):
+> Hi Jiri Prchal,
+>
+> On 07/11/2014 02:47 PM, Ji?? Prchal wrote:
+>> Hi,
+>> I discovered bug when I try to use RNDIS gadget driver on SAM9G25 with
+>> version 3.16.0-rc4. In version 3.14.0-rc4 it was OK.
+>> If I plug pc to device port on my board I expect to establish ethernet
+>> connection, instead of this it looks like it behave like host port. If I
+>> look at all messages I found some problem during boot:
+>> [    1.585937] atmel_usba_udc: probe of 500000.gadget failed with error -2
+>
+> I tested OK with Linux kernel v3.16-rc4 (latest commit is: 4f440cd534359f689cb577c68f8491d1eddf0b76) on sam9g25.
+>
+> Best Regards,
+> Bo Shen
+>
+I just cloned git https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and still same problem. There is 
+some other commit.
+Couldn't be the problem in at91sam9x5.dtsi not defines clocks?
+In ohci they are:
+		usb0: ohci at 00600000 {
+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+			reg = <0x00600000 0x100000>;
+			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
+				 <&uhpck>;
+			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+			status = "disabled";
+		};
+But in gadget not:
+			usb2: gadget at f803c000 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "atmel,at91sam9rl-udc";
+				reg = <0x00500000 0x80000
+				       0xf803c000 0x400>;
+				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
+				status = "disabled";
+Best Regards,
+Jiri
