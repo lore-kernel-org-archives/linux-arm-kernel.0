@@ -1,32 +1,180 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Fri, 11 Jul 2014 10:09:19 +0800
-Subject: [PATCH 4/4] spi/rockchip: add compatible strings for RK3188 and RK3288
-In-Reply-To: <1405044389-6800-1-git-send-email-addy.ke@rock-chips.com>
-References: <1405044389-6800-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1405044559-7009-1-git-send-email-addy.ke@rock-chips.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 10 Jul 2014 22:22:38 -0400
+Subject: [PATCH RFA] drm: add of_graph endpoint helper to find possible
+ CRTCs
+In-Reply-To: <E1X5Iea-0007A2-Rd@rmk-PC.arm.linux.org.uk>
+References: <E1X5Iea-0007A2-Rd@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAF6AEGvE1zscFuaP5cuf6G6oQMsPXnubwOSXyEccEkyJzrn+eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Addy Ke <addy.ke@rockchip.com>
+On Thu, Jul 10, 2014 at 2:01 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Add a helper to allow encoders to find their possible CRTCs from the
+> OF graph without having to re-implement this functionality.  We add a
+> device_node to drm_crtc which corresponds with the port node in the
+> DT description of the CRTC device.
+>
+> We can then scan the DRM device list for CRTCs to find their index,
+> matching the appropriate CRTC using the port device_node, thus building
+> up the possible CRTC mask.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>
+> RFA = request for acks
+>
+> - Updated commentry in the drm_of_find_possible_crtcs() comment block to
+> point at the description of the of_graph bindings.
+> - Not updated for drm kerneldoc as I'm unable to build the documentation.
 
-Suggested-by: Mark Brown <broonie@kernel.org>
-Signed-off-by: Addy Ke <addy.ke@rockchip.com>
----
- drivers/spi/spi-rockchip.c | 2 ++
- 1 file changed, 2 insertions(+)
+hmm, I wonder if kbuild robot builds docs?
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index a8866c9..cb8fd6f 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -814,6 +814,8 @@ static const struct dev_pm_ops rockchip_spi_pm = {
- 
- static const struct of_device_id rockchip_spi_dt_match[] = {
- 	{ .compatible = "rockchip,rk3066-spi", },
-+	{ .compatible = "rockchip,rk3188-spi", },
-+	{ .compatible = "rockchip,rk3288-spi", },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, rockchip_spi_dt_match);
--- 
-1.8.3.2
+Anyways, no worries.. I can add the entries in drm.tmpl once this
+lands.. if I forget, someone remind me ;-)
+
+
+Reviewed-by: Rob Clark <robdclark@gmail.com>
+
+
+>
+>  drivers/gpu/drm/Makefile |  1 +
+>  drivers/gpu/drm/drm_of.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/drm/drm_crtc.h   |  2 ++
+>  include/drm/drm_of.h     | 18 +++++++++++++
+>  4 files changed, 88 insertions(+)
+>  create mode 100644 drivers/gpu/drm/drm_of.c
+>  create mode 100644 include/drm/drm_of.h
+>
+> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> index dd2ba4269740..533d011eab3e 100644
+> --- a/drivers/gpu/drm/Makefile
+> +++ b/drivers/gpu/drm/Makefile
+> @@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+>  drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>  drm-$(CONFIG_PCI) += ati_pcigart.o
+>  drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+> +drm-$(CONFIG_OF) += drm_of.o
+>
+>  drm-usb-y   := drm_usb.o
+>
+> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> new file mode 100644
+> index 000000000000..16150a00c237
+> --- /dev/null
+> +++ b/drivers/gpu/drm/drm_of.c
+> @@ -0,0 +1,67 @@
+> +#include <linux/export.h>
+> +#include <linux/list.h>
+> +#include <linux/of_graph.h>
+> +#include <drm/drmP.h>
+> +#include <drm/drm_crtc.h>
+> +#include <drm/drm_of.h>
+> +
+> +/**
+> + * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
+> + * @dev: DRM device
+> + * @port: port OF node
+> + *
+> + * Given a port OF node, return the possible mask of the corresponding
+> + * CRTC within a device's list of CRTCs.  Returns zero if not found.
+> + */
+> +static uint32_t drm_crtc_port_mask(struct drm_device *dev,
+> +                                  struct device_node *port)
+> +{
+> +       unsigned int index = 0;
+> +       struct drm_crtc *tmp;
+> +
+> +       list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
+> +               if (tmp->port == port)
+> +                       return 1 << index;
+> +
+> +               index++;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
+> + * @dev: DRM device
+> + * @port: encoder port to scan for endpoints
+> + *
+> + * Scan all endpoints attached to a port, locate their attached CRTCs,
+> + * and generate the DRM mask of CRTCs which may be attached to this
+> + * encoder.
+> + *
+> + * See Documentation/devicetree/bindings/graph.txt for the bindings.
+> + */
+> +uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> +                                   struct device_node *port)
+> +{
+> +       struct device_node *remote_port, *ep = NULL;
+> +       uint32_t possible_crtcs = 0;
+> +
+> +       do {
+> +               ep = of_graph_get_next_endpoint(port, ep);
+> +               if (!ep)
+> +                       break;
+> +
+> +               remote_port = of_graph_get_remote_port(ep);
+> +               if (!remote_port) {
+> +                       of_node_put(ep);
+> +                       return 0;
+> +               }
+> +
+> +               possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
+> +
+> +               of_node_put(remote_port);
+> +       } while (1);
+> +
+> +       return possible_crtcs;
+> +}
+> +EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+> index 251b75e6bf7a..6a94909f1ca9 100644
+> --- a/include/drm/drm_crtc.h
+> +++ b/include/drm/drm_crtc.h
+> @@ -41,6 +41,7 @@ struct drm_framebuffer;
+>  struct drm_object_properties;
+>  struct drm_file;
+>  struct drm_clip_rect;
+> +struct device_node;
+>
+>  #define DRM_MODE_OBJECT_CRTC 0xcccccccc
+>  #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
+> @@ -314,6 +315,7 @@ struct drm_crtc_funcs {
+>   */
+>  struct drm_crtc {
+>         struct drm_device *dev;
+> +       struct device_node *port;
+>         struct list_head head;
+>
+>         /**
+> diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+> new file mode 100644
+> index 000000000000..2441f7112074
+> --- /dev/null
+> +++ b/include/drm/drm_of.h
+> @@ -0,0 +1,18 @@
+> +#ifndef __DRM_OF_H__
+> +#define __DRM_OF_H__
+> +
+> +struct drm_device;
+> +struct device_node;
+> +
+> +#ifdef CONFIG_OF
+> +extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> +                                          struct device_node *port);
+> +#else
+> +static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> +                                                 struct device_node *port)
+> +{
+> +       return 0;
+> +}
+> +#endif
+> +
+> +#endif /* __DRM_OF_H__ */
+> --
+> 1.8.3.1
+>
