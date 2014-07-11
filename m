@@ -1,35 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jul 2014 12:34:33 +0100
+Date: Fri, 11 Jul 2014 12:38:04 +0100
 Subject: [STLinux Kernel] [PATCH v3 0/5] phy: miphy365x: Introduce
  support for MiPHY365x
-In-Reply-To: <53BFC6F4.2060804@ti.com>
+In-Reply-To: <53BFCB83.8020304@st.com>
 References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
  <53BD572C.4060406@ti.com>
  <20140710153548.GB26886@griffinp-ThinkPad-X1-Carbon-2nd>
  <20140711103104.GC30519@lee--X1>
  <20140711110547.GA23439@griffinp-ThinkPad-X1-Carbon-2nd>
- <53BFC6F4.2060804@ti.com>
-Message-ID: <20140711113433.GE30519@lee--X1>
+ <20140711113037.GD30519@lee--X1> <53BFCB83.8020304@st.com>
+Message-ID: <20140711113804.GA2954@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jul 2014, Kishon Vijay Abraham I wrote:
-> On Friday 11 July 2014 04:35 PM, Peter Griffin wrote:
-> > On Fri, 11 Jul 2014, Lee Jones wrote:
-> >>> One small point, patch 5 which adds the DT nodes may not apply as the file got
-> >>> renamed from stih416-b2020-revE.dts to stih416-b2020e.dts.
+On Fri, 11 Jul 2014, Maxime Coquelin wrote:
+> On 07/11/2014 01:30 PM, Lee Jones wrote:
+> >On Fri, 11 Jul 2014, Peter Griffin wrote:
+> >>On Fri, 11 Jul 2014, Lee Jones wrote:
+> >>>>One small point, patch 5 which adds the DT nodes may not apply as the file got
+> >>>>renamed from stih416-b2020-revE.dts to stih416-b2020e.dts.
+> >>>
+> >>>Not required, Git should handle this seamlessly.
 > >>
-> >> Not required, Git should handle this seamlessly.
+> >>I didn't ask you to do anything.
+> >
+> >Ah, I misread, my bad.
+> >
+> >>Also when I made the same mistake, GIT
+> >>did not handle it seamlessly and I got the following query
+> >>from Ulf http://www.mail-archive.com/devicetree at vger.kernel.org/msg33926.html
+> >
+> >Oh, it looks like the renaming patch went into -rc3 as part of Max's
+> >-fixes branch.  I assumed it would go in via -next.  This is
+> >different, so yes, it will have to be rebased onto -rc3.
+> >
+> >Maxime,
+> >   Do you want me to do that, or are you happy to?
+> 
+> Actually, I already rebase the next branch for DT stuff on top of -rc3.
+> This is not available on stlinux git yet because of mirroring issue.
+> I will let you know when this is fixed, then you can rebase your DT
+> patches on top of it.
 
-[...]
-
-> Your cover letter did not have the patch subjects. When you send the next
-> version can you use --cover-letter option to create the cover letter?
-
-Using --annotate and --compose has done me well up until now and no
-one has ever complained before.  But yes, I can use --cover-letter if
-having the list of patch subjects in the 0/x patch is important
-somehow.
+I'll rebase onto -rc3 now and submit the patch as a vX+1.
 
 -- 
 Lee Jones
