@@ -1,25 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Jul 2014 17:24:23 +0100
-Subject: [PATCH v2 2/3] ARM: Use include/asm-generic/io.h
-In-Reply-To: <1405092672-18549-2-git-send-email-thierry.reding@gmail.com>
-References: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
- <1405092672-18549-2-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140711162422.GF16321@arm.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Fri, 11 Jul 2014 09:28:09 -0700
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 04:31:11PM +0100, Thierry Reding wrote:
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index a78562f21aab..ef54f5c8a7ae 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-[...]
-> -#define iowrite16be(v,p) ({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
-> -#define iowrite32be(v,p) ({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+On Thu, Jul 10, 2014 at 2:42 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
+> and also provides automatic CPU rail voltage scaling as well. The DFLL
+> is a separate IP block from the usual Tegra124 clock-and-reset
+> controller, so it gets its own node in the device tree.
 
-Aren't you losing the barrier semantics here? The generic iowrite*be()
-functions call __raw_write*() directly which don't have a barrier
-(write* accessors do).
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
 
--- 
-Catalin
+> +- nvidia,pmic-voltage-table: Array of 2-tuples.  Each entry should have the
+> +  form <register-value voltage-in-uV>, indicating the register value that
+> +  needs to be programmed to the PMIC for changing the VDD_CPU voltage to
+> +  the specified voltage. The table must be in ascending order by the voltage.
+
+Instead of listing the register values for each voltage in the DT,
+can't you use regulator_list_voltage() to create this map?
