@@ -1,74 +1,21 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 11 Jul 2014 06:50:38 -0700
-Subject: [PATCH V9 3/7] ARM: SPEAr13xx: Fix pcie clock name
-In-Reply-To: <08c2b017de1d545e42d97ce911ed913aeba46ca9.1404976058.git.viresh.kumar@linaro.org>
-References: <cover.1404976058.git.viresh.kumar@linaro.org>
- <08c2b017de1d545e42d97ce911ed913aeba46ca9.1404976058.git.viresh.kumar@linaro.org>
-Message-ID: <20140711135038.9850.6196@quantum>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 11 Jul 2014 16:58:00 +0300
+Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
+In-Reply-To: <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140711135800.GD23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2014-07-10 00:26:34)
-> From: Pratyush Anand <pratyush.anand@st.com>
+On Fri, Jul 11, 2014 at 02:16:11PM +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Follow dt clock naming convention for PCIe clocks.
-> 
-> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> [viresh: fixed logs/cclist]
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> This commit converts the PMC support code to a platform driver. Because
+> the boot process needs to cal into this driver very early, also set up a
 
-Applied to clk-next.
+Small typo: 'call' :)
 
-Regards,
-Mike
+Cheers,
 
-> ---
->  drivers/clk/spear/spear1310_clock.c | 6 +++---
->  drivers/clk/spear/spear1340_clock.c | 2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-> index 65894f7..4daa597 100644
-> --- a/drivers/clk/spear/spear1310_clock.c
-> +++ b/drivers/clk/spear/spear1310_clock.c
-> @@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
->         clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
->                         SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
->                         0, &_lock);
-> -       clk_register_clkdev(clk, NULL, "dw_pcie.0");
-> +       clk_register_clkdev(clk, NULL, "b1000000.pcie");
->         clk_register_clkdev(clk, NULL, "b1000000.ahci");
->  
->         clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
->                         SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
->                         0, &_lock);
-> -       clk_register_clkdev(clk, NULL, "dw_pcie.1");
-> +       clk_register_clkdev(clk, NULL, "b1800000.pcie");
->         clk_register_clkdev(clk, NULL, "b1800000.ahci");
->  
->         clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
->                         SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
->                         0, &_lock);
-> -       clk_register_clkdev(clk, NULL, "dw_pcie.2");
-> +       clk_register_clkdev(clk, NULL, "b4000000.pcie");
->         clk_register_clkdev(clk, NULL, "b4000000.ahci");
->  
->         clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
-> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-> index fe835c1..5a5c664 100644
-> --- a/drivers/clk/spear/spear1340_clock.c
-> +++ b/drivers/clk/spear/spear1340_clock.c
-> @@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
->         clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
->                         SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
->                         0, &_lock);
-> -       clk_register_clkdev(clk, NULL, "dw_pcie");
-> +       clk_register_clkdev(clk, NULL, "b1000000.pcie");
->         clk_register_clkdev(clk, NULL, "b1000000.ahci");
->  
->         clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
-> -- 
-> 2.0.0.rc2
-> 
+Peter.
