@@ -1,32 +1,49 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 11 Jul 2014 21:28:45 +0200
+Date: Fri, 11 Jul 2014 21:31:44 +0200
 Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <20140618211038.GD558@drone.musicnaut.iki.fi>
+In-Reply-To: <20140618195908.GJ32514@n2100.arm.linux.org.uk>
 References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
- <201406182122.29623@pali>
- <20140618211038.GD558@drone.musicnaut.iki.fi>
-Message-ID: <20140711192845.GB20015@amd.pavel.ucw.cz>
+ <20140618190108.GI32514@n2100.arm.linux.org.uk>
+ <201406182109.59059@pali>
+ <20140618195908.GJ32514@n2100.arm.linux.org.uk>
+Message-ID: <20140711193144.GC20015@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2014-06-19 00:10:39, Aaro Koskinen wrote:
-> Hi,
+On Wed 2014-06-18 20:59:08, Russell King - ARM Linux wrote:
+> On Wed, Jun 18, 2014 at 09:09:58PM +0200, Pali Roh?r wrote:
+> > On Wednesday 18 June 2014 21:01:09 Russell King - ARM Linux 
+> > wrote:
+> > > On Wed, Jun 18, 2014 at 06:54:24PM +0200, Pali Roh?r wrote:
+> > > > Machine name from board description is some generic name on
+> > > > DT kernel. DT provides machine name property which is
+> > > > specific for board, so use it instead generic one when
+> > > > possible.
+> > > 
+> > > http://archive.arm.linux.org.uk/lurker/message/20130726.132850
+> > > .53d47576.en.html
+> > > 
+> > > "If userspace wants to get at the DT information about a
+> > > platform, we already have ways that can happen already - we
+> > > export the DT stuff so that kexec's tools can get at it."
+> > 
+> > Userspace application does not know that kernel using DT. And 
+> > also it does not want to get DT information. Only board/machine 
+> > name. So existing applications stop working after migration to 
+> > DT. And because legacy board boot code (without DT) is going to 
+> > be removed for ARM in near future this will permanently break 
+> > existing applications.
 > 
-> On Wed, Jun 18, 2014 at 09:22:29PM +0200, Pali Roh?r wrote:
-> > So without this patch DT migration for Nokia N900 cannot be done 
-> > without breaking userspace - which is not acceptable...
-> 
-> I guess the fact is that the Nokia N900 proprietary userspace has
-> never worked properly with the mainline kernel without severe patching,
-> so you cannot really talk about any regression. If you cannot fix
-> those programs, you could still probably emulate the old Nokia kernel's
-> /proc/cpuinfo by providing some text file and bind mounting it, no?
+> We're already breaking the userspace API through moving to DT, because
+> all the device names in /sys/devices are changing.  Userspace is going
+> to have to cope with change as we move towards DT.  This is just
+> another aspect of moving towards DT, and one which userspace is going
+> to have to deal with.
 
-Actually, yes, it worked pretty well with some close-to-mainline
-kernels.
+You don't _have_ to break /proc/cpuinfo.  No, "DT breaks stuff" should
+not be reason to "break more stuff".  (Actually, I'm not aware of
+anything DT would have to break.)
 
-And bind-mount on /proc/cpuinfo is beyond ugly, don't you think?
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
