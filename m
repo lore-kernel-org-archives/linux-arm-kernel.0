@@ -1,32 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 10 Jul 2014 17:44:25 -0700
-Subject: [PATCH v3 0/7] kernel: Add support for restart notifier call chain
-In-Reply-To: <53BF2CB5.5080602@roeck-us.net>
-References: <1404877083-6552-1-git-send-email-linux@roeck-us.net>
- <20140710160907.da1024914366de947ebdf384@linux-foundation.org>
- <53BF2CB5.5080602@roeck-us.net>
-Message-ID: <20140710174425.2f3fea98.akpm@linux-foundation.org>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Fri, 11 Jul 2014 09:54:15 +0900
+Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
+In-Reply-To: <1404978840-31917-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+References: <1404978840-31917-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <53BF35B7.9000105@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Jul 2014 17:15:49 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+Hi Ulrich,
 
-> Error on my part - I thought lower numbers would
-> have higher priority, but after looking into the code again that
-> is wrong.
-
-You shouldn't have needed to look into the code :( Maybe a
-documentation patch for notifier_block.priority for the next person?
-
-> To avoid making things too complicated, maybe it would make sense to
-> specify guidelines for notifier priorities, such as
-> 0   - restart notifier of last resort, with least reset capabilities
-> 128 - default; use if no other notifier is expected to be available
->        and/or if restart functionality is acceptable
-> 255 - highest priority notifier which _must_ be used
+(2014/07/10 16:53), Ulrich Hecht wrote:
+> Changes in v2:
+> - move phy handle to struct usbhs_priv
+> - add new default pipe type to driver
+> - remove pipe type from Lager board code
 > 
-> Would that make sense and be acceptable ? In this context, I would then
-> set the notifier priorities for the callers in the patch set to 128.
+> Ulrich Hecht (2):
+>   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
+>   ARM: shmobile: lager: remove USBHS callbacks
+> 
+>  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
+>  drivers/usb/renesas_usbhs/Makefile   |   2 +-
+>  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
+>  drivers/usb/renesas_usbhs/common.h   |   2 +
+>  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
+>  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
+>  include/linux/usb/renesas_usbhs.h    |   6 ++
+>  7 files changed, 163 insertions(+), 119 deletions(-)
+>  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
+>  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
+> 
 
-Yep, that sounds nice.  It's unlikely to see a lot of use, but at least
-we showed we thought about it ;)
+I tested these patches on Lager legacy, and these patches worked correctly.
+
+Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+
+Best regards,
+Yoshihiro Shimoda
