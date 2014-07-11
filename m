@@ -1,164 +1,142 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 10 Jul 2014 21:55:49 -0500
-Subject: [PATCH v4 11/11] ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP
- builds
-In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1405047349-15101-12-git-send-email-d-gerlach@ti.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 11 Jul 2014 09:10:20 +0530
+Subject: [PATCH v2 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
+In-Reply-To: <CAODwPW_2prSQj_vx96cZfG4_yjhL2HCmpBZohezYDdQUoq2mPA@mail.gmail.com>
+References: <1404900096-1721-1-git-send-email-gautam.vivek@samsung.com>
+ <1404900096-1721-3-git-send-email-gautam.vivek@samsung.com>
+ <CAODwPW_2prSQj_vx96cZfG4_yjhL2HCmpBZohezYDdQUoq2mPA@mail.gmail.com>
+Message-ID: <CAFp+6iGV1kxQd0WUO5oXNgYmnMDi+26GpNGe+nmSP6z4fZaYOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all the requisite changes in place we can now enable the basic
-PM support for AM33xx. This patch updates the various OMAP files
-to enable suspend-resume on AM33xx.
+Hi Julius,
 
-Because the suspend resume functionality is different on AM33xx
-than other OMAP platforms due to the need for M3 firmware and an
-IPC channel to be in place, separate PM ops are used instead of
-omap_pm_ops. These are now set using omap2_common_suspend_init
-so the AM33xx can make a decision at runtime to enable suspend based
-on the availabilty of aforementioned requirements.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
-v3->v4:
-	Updated for rproc usage now.
+On Wed, Jul 9, 2014 at 11:26 PM, Julius Werner <jwerner@chromium.org> wrote:
+> On Wed, Jul 9, 2014 at 3:01 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> The host controller by itself may sometimes need to handle PHY
+>> and/or calibrate some of the PHY settings to get full support out
+>> of the PHY controller. The PHY core provides a calibration
+>> funtionality now to do so.
+>> Therefore, facilitate getting the two possible PHYs, viz.
+>> USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3), provided
+>> by the parent - Synopsys's DWC3 controller
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>  drivers/usb/host/xhci-plat.c |   36 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 36 insertions(+)
+>>
+>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> index 29d8adb..e50bd7d 100644
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -16,6 +16,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/phy/phy.h>
+>>  #include <linux/slab.h>
+>>
+>>  #include "xhci.h"
+>> @@ -101,6 +102,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>         struct clk              *clk;
+>>         int                     ret;
+>>         int                     irq;
+>> +       struct device           *parent;
+>>
+>>         if (usb_disabled())
+>>                 return -ENODEV;
+>> @@ -165,6 +167,23 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>                         goto unmap_registers;
+>>         }
+>>
+>> +       parent = pdev->dev.parent;
+>> +       /*
+>> +        * Get possile USB 2.0 type PHY (UTMI+) registered by xhci's parent:
+>> +        * Synopsys-dwc3
+>> +        */
+>> +       if (of_device_is_compatible(parent->of_node, "synopsys,dwc3") ||
+>> +           of_device_is_compatible(parent->of_node, "snps,dwc3")) {
+>> +               hcd->gen_phy = devm_phy_get(&pdev->dev, "usb2-phy");
+>> +               if (IS_ERR(hcd->gen_phy)) {
+>> +                       ret = PTR_ERR(hcd->gen_phy);
+>> +                       if (ret != -ENOSYS && ret != -ENODEV) {
+>> +                               dev_err(&pdev->dev, "no usb2 phy configured\n");
+>> +                               return ret;
+>> +                       }
+>> +               }
+>> +       }
+>
+> Why does this need to check for DWC3? I think this code should be as
+> generic as possible. Can't you just devm_phy_get("usb2-phy"), and keep
+> going with a dev_dbg() message if it fails? If the platform has a phy
+> it will find it, if not that's fine too.
 
- arch/arm/mach-omap2/Kconfig  |  1 +
- arch/arm/mach-omap2/Makefile |  2 ++
- arch/arm/mach-omap2/common.h |  9 +++++++++
- arch/arm/mach-omap2/io.c     |  1 +
- arch/arm/mach-omap2/pm.h     |  5 +++++
- arch/arm/mach-omap2/sram.c   | 10 +++++++++-
- arch/arm/mach-omap2/sram.h   |  2 ++
- 7 files changed, 29 insertions(+), 1 deletion(-)
+Right, i was misled with the phy requisition in usb_add_hcd(), which i
+thought would be
+called first, and we would have been trying to overwrite the 'gen_phy'
+member here. My bad!!
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 1c1ed73..f8a56e5 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -59,6 +59,7 @@ config SOC_AM33XX
- 	select ARCH_OMAP2PLUS
- 	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
-+	select WKUP_M3_RPROC if PM
- 
- config SOC_AM43XX
- 	bool "TI AM43x"
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 8ca99e9..3c8d30c 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -90,6 +90,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
- obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
- obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
- obj-$(CONFIG_SOC_DRA7XX)		+= omap-mpuss-lowpower.o
-+obj-$(CONFIG_SOC_AM33XX)		+= pm33xx.o sleep33xx.o
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
- 
- obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
-@@ -97,6 +98,7 @@ obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
- 
- AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
- AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
-+AFLAGS_sleep33xx.o			:=-Wa,-march=armv7-a$(plus_sec)
- 
- endif
- 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 1536338..1bcd475 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -75,6 +75,15 @@ static inline int omap4_pm_init_early(void)
- }
- #endif
- 
-+#if defined(CONFIG_PM) && defined(CONFIG_SOC_AM33XX)
-+int am33xx_pm_init(void);
-+#else
-+static inline int am33xx_pm_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- #ifdef CONFIG_OMAP_MUX
- int omap_mux_late_init(void);
- #else
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 4d4d150..fb23f83 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -590,6 +590,7 @@ void __init am33xx_init_early(void)
- void __init am33xx_init_late(void)
- {
- 	omap_common_late_init();
-+	am33xx_pm_init();
- }
- #endif
- 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index e150102..b6f72a4 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -81,6 +81,11 @@ extern unsigned int omap3_do_wfi_sz;
- /* ... and its pointer from SRAM after copy */
- extern void (*omap3_do_wfi_sram)(void);
- 
-+/* am33xx_do_wfi function pointer and size, for copy to SRAM */
-+extern void am33xx_do_wfi(void);
-+extern unsigned int am33xx_do_wfi_sz;
-+extern unsigned int am33xx_resume_offset;
-+
- /* save_secure_ram_context function pointer and size, for copy to SRAM */
- extern int save_secure_ram_context(u32 *addr);
- extern unsigned int save_secure_ram_context_sz;
-diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-index ddf1818..2227f20 100644
---- a/arch/arm/mach-omap2/sram.c
-+++ b/arch/arm/mach-omap2/sram.c
-@@ -154,7 +154,7 @@ static void __init omap2_map_sram(void)
- 		omap_sram_size -= SZ_16K;
- 	}
- #endif
--	if (cpu_is_omap34xx()) {
-+	if (cpu_is_omap34xx() || soc_is_am33xx()) {
- 		/*
- 		 * SRAM must be marked as non-cached on OMAP3 since the
- 		 * CORE DPLL M2 divider change code (in SRAM) runs with the
-@@ -285,10 +285,18 @@ static inline int omap34xx_sram_init(void)
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
-+#ifdef CONFIG_SOC_AM33XX
- static inline int am33xx_sram_init(void)
- {
-+	am33xx_push_sram_idle();
- 	return 0;
- }
-+#else
-+static inline int am33xx_sram_init(void)
-+{
-+	return 0;
-+}
-+#endif
- 
- int __init omap_sram_init(void)
- {
-diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
-index ca7277c..24788b5 100644
---- a/arch/arm/mach-omap2/sram.h
-+++ b/arch/arm/mach-omap2/sram.h
-@@ -62,8 +62,10 @@ extern unsigned long omap3_sram_configure_core_dpll_sz;
- 
- #ifdef CONFIG_PM
- extern void omap_push_sram_idle(void);
-+extern void am33xx_push_sram_idle(void);
- #else
- static inline void omap_push_sram_idle(void) {}
-+static inline void am33xx_push_sram_idle(void) {}
- #endif /* CONFIG_PM */
- 
- #endif /* __ASSEMBLY__ */
+You are right, in this case we will not need the check for DWC3, and
+we will still have the
+liberty to get two different PHYs (usb2-phy and usb3-phy).
+
+>
+> Looks like Heikki's patch assigns the phy names in DWC3-specific code,
+> so I'm not sure if they are supposed to be specific to that
+> controller... but DWC3 is the only merged XHCI controller this applys
+> to right now, so why not make that a general convention? The concept
+> of having one "usb2-phy" and one "usb3-phy" is probably common across
+> most xHC implementations (unless they share a single phy in which case
+> they could just leave one of them unset), so it will be much easier to
+> handle if they all chose the same two names for those (and we can
+> avoid a big list of special cases here).
+
+Right, i will remove these checks then, and let this be generic so that each
+xHCI could get 'usb2-phy' and 'usb3-phy', if it's available.
+
+>
+>> +
+>>         ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>>         if (ret)
+>>                 goto disable_clk;
+>> @@ -191,6 +210,23 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>         if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>>                 xhci->shared_hcd->can_do_streams = 1;
+>>
+>> +       /*
+>> +        * Get possile USB 3.0 type PHY (PIPE3) registered by xhci's parent:
+>> +        * Synopsys-dwc3
+>> +        */
+>> +       if (of_device_is_compatible(parent->of_node, "synopsys,dwc3") ||
+>> +           of_device_is_compatible(parent->of_node, "snps,dwc3")) {
+>> +               xhci->shared_hcd->gen_phy = devm_phy_get(&pdev->dev,
+>> +                                                        "usb3-phy");
+>> +               if (IS_ERR(xhci->shared_hcd->gen_phy)) {
+>> +                       ret = PTR_ERR(xhci->shared_hcd->gen_phy);
+>> +                       if (ret != -ENOSYS && ret != -ENODEV) {
+>> +                               dev_err(&pdev->dev, "no usb3 phy configured\n");
+>> +                               return ret;
+>> +                       }
+>> +               }
+>> +       }
+>> +
+>>         ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+>>         if (ret)
+>>                 goto put_usb3_hcd;
+>> --
+>> 1.7.10.4
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
 -- 
-1.9.0
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
