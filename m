@@ -1,220 +1,86 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Jul 2014 17:31:12 +0200
-Subject: [PATCH v2 3/3] arm64: Use include/asm-generic/io.h
-In-Reply-To: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
-References: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1405092672-18549-3-git-send-email-thierry.reding@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 11 Jul 2014 08:32:50 -0700
+Subject: [PATCH 00/13] Tegra124 CL-DVFS / DFLL clocksource, plus cpufreq
+In-Reply-To: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <20140711153250.9850.23148@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Quoting Tuomas Tynkkynen (2014-07-10 14:42:36)
+> This series implements the DFLL/CL-DVFS clock source for the fast CPU
+> cluster on Tegra124, and a cpufreq driver that uses the DFLL for
+> clocking the CPU. Most of this is based on Paul Walmsley's public patch
+> set from December 2013, which is available at
+> http://comments.gmane.org/gmane.linux.ports.tegra/15273
+> 
+> The DFLL clock hardware is a voltage-controlled oscillator plus
+> control logic that compares the generated output clock with a
+> 51 MHz reference clock, and can make decisions to either lower
+> or raise the DFLL voltage to keep the output rate close to the
+> software-requested rate. The voltage changes are done by
+> communicating with an off-chip PMIC via either I2C or PWM.
+> As the DFLL oscillator is powered via the CPU rail, using
+> the DFLL as the CPU clocksource also gives us dynamic CPU
+> voltage scaling.
 
-Include the generic I/O header file so that duplicate implementations
-can be removed. This will also help to establish consistency across more
-architectures regarding which accessors they support.
+Clock driver bits look good to me. CVB table stuff is pretty neat.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm64/Kconfig              |  1 -
- arch/arm64/include/asm/io.h     | 99 ++++-------------------------------------
- arch/arm64/include/asm/memory.h |  2 +
- 3 files changed, 11 insertions(+), 91 deletions(-)
+Regards,
+Mike
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 02cd76f6d7b4..3fa250534e16 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -21,7 +21,6 @@ config ARM64
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_EARLY_IOREMAP
--	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
- 	select GENERIC_SCHED_CLOCK
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index e0ecdcf6632d..00c7f9faf2a3 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -34,26 +34,31 @@
- /*
-  * Generic IO read/write.  These perform native-endian accesses.
-  */
-+#define __raw_writeb __raw_writeb
- static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
- {
- 	asm volatile("strb %w0, [%1]" : : "r" (val), "r" (addr));
- }
- 
-+#define __raw_writew __raw_writew
- static inline void __raw_writew(u16 val, volatile void __iomem *addr)
- {
- 	asm volatile("strh %w0, [%1]" : : "r" (val), "r" (addr));
- }
- 
-+#define __raw_writel __raw_writel
- static inline void __raw_writel(u32 val, volatile void __iomem *addr)
- {
- 	asm volatile("str %w0, [%1]" : : "r" (val), "r" (addr));
- }
- 
-+#define __raw_writeq __raw_writeq
- static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
- {
- 	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
- }
- 
-+#define __raw_readb __raw_readb
- static inline u8 __raw_readb(const volatile void __iomem *addr)
- {
- 	u8 val;
-@@ -61,6 +66,7 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+#define __raw_readw __raw_readw
- static inline u16 __raw_readw(const volatile void __iomem *addr)
- {
- 	u16 val;
-@@ -68,6 +74,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+#define __raw_readl __raw_readl
- static inline u32 __raw_readl(const volatile void __iomem *addr)
- {
- 	u32 val;
-@@ -75,6 +82,7 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+#define __raw_readq __raw_readq
- static inline u64 __raw_readq(const volatile void __iomem *addr)
- {
- 	u64 val;
-@@ -124,94 +132,6 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- #define IO_SPACE_LIMIT		0xffff
- #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
--static inline u8 inb(unsigned long addr)
--{
--	return readb(addr + PCI_IOBASE);
--}
--
--static inline u16 inw(unsigned long addr)
--{
--	return readw(addr + PCI_IOBASE);
--}
--
--static inline u32 inl(unsigned long addr)
--{
--	return readl(addr + PCI_IOBASE);
--}
--
--static inline void outb(u8 b, unsigned long addr)
--{
--	writeb(b, addr + PCI_IOBASE);
--}
--
--static inline void outw(u16 b, unsigned long addr)
--{
--	writew(b, addr + PCI_IOBASE);
--}
--
--static inline void outl(u32 b, unsigned long addr)
--{
--	writel(b, addr + PCI_IOBASE);
--}
--
--#define inb_p(addr)	inb(addr)
--#define inw_p(addr)	inw(addr)
--#define inl_p(addr)	inl(addr)
--
--#define outb_p(x, addr)	outb((x), (addr))
--#define outw_p(x, addr)	outw((x), (addr))
--#define outl_p(x, addr)	outl((x), (addr))
--
--static inline void insb(unsigned long addr, void *buffer, int count)
--{
--	u8 *buf = buffer;
--	while (count--)
--		*buf++ = __raw_readb(addr + PCI_IOBASE);
--}
--
--static inline void insw(unsigned long addr, void *buffer, int count)
--{
--	u16 *buf = buffer;
--	while (count--)
--		*buf++ = __raw_readw(addr + PCI_IOBASE);
--}
--
--static inline void insl(unsigned long addr, void *buffer, int count)
--{
--	u32 *buf = buffer;
--	while (count--)
--		*buf++ = __raw_readl(addr + PCI_IOBASE);
--}
--
--static inline void outsb(unsigned long addr, const void *buffer, int count)
--{
--	const u8 *buf = buffer;
--	while (count--)
--		__raw_writeb(*buf++, addr + PCI_IOBASE);
--}
--
--static inline void outsw(unsigned long addr, const void *buffer, int count)
--{
--	const u16 *buf = buffer;
--	while (count--)
--		__raw_writew(*buf++, addr + PCI_IOBASE);
--}
--
--static inline void outsl(unsigned long addr, const void *buffer, int count)
--{
--	const u32 *buf = buffer;
--	while (count--)
--		__raw_writel(*buf++, addr + PCI_IOBASE);
--}
--
--#define insb_p(port,to,len)	insb(port,to,len)
--#define insw_p(port,to,len)	insw(port,to,len)
--#define insl_p(port,to,len)	insl(port,to,len)
--
--#define outsb_p(port,from,len)	outsb(port,from,len)
--#define outsw_p(port,from,len)	outsw(port,from,len)
--#define outsl_p(port,from,len)	outsl(port,from,len)
--
- /*
-  * String version of I/O memory access operations.
-  */
-@@ -235,8 +155,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
- #define iounmap				__iounmap
- 
--#define ARCH_HAS_IOREMAP_WC
--#include <asm-generic/iomap.h>
-+#include <asm-generic/io.h>
- 
- /*
-  * More restrictive address range checking than the default implementation
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 993bce527b85..ca6116de3155 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -122,11 +122,13 @@ extern phys_addr_t		memstart_addr;
-  * translation for translating DMA addresses.  Use the driver
-  * DMA support - see dma-mapping.h.
-  */
-+#define virt_to_phys virt_to_phys
- static inline phys_addr_t virt_to_phys(const volatile void *x)
- {
- 	return __virt_to_phys((unsigned long)(x));
- }
- 
-+#define phys_to_virt phys_to_virt
- static inline void *phys_to_virt(phys_addr_t x)
- {
- 	return (void *)(__phys_to_virt(x));
--- 
-2.0.1
+> 
+> This series has been tested on the Jetson TK1 (Rev C). Before attempting
+> to port this to the Venice2, do note that there are two versions of the
+> AS3722 with different voltage tables for the CPU rail (and that Venice2
+> does not have active cooling).
+> 
+> Thanks,
+> Tuomas
+> 
+> Paul Walmsley (1):
+>   clk: tegra: Add DFLL DVCO reset control for Tegra124
+> 
+> Tuomas Tynkkynen (12):
+>   clk: tegra: Add binding for the Tegra124 DFLL clocksource
+>   clk: tegra: Add library for the DFLL clock source (open-loop mode)
+>   clk: tegra: Add closed loop support for the DFLL
+>   clk: tegra: Add functions for parsing CVB tables
+>   clk: tegra: Add Tegra124 DFLL clocksource platform driver
+>   clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
+>   clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
+>   ARM: tegra: Add the DFLL to Tegra124 device tree
+>   ARM: tegra: Enable the DFLL on the Jetson-TK1
+>   cpufreq: tegra124: Add device tree bindings
+>   cpufreq: Add cpufreq driver for Tegra124
+>   ARM: tegra: Add entries for cpufreq on Tegra124
+> 
+>  .../bindings/clock/nvidia,tegra124-dfll.txt        |   86 +
+>  .../bindings/cpufreq/tegra124-cpufreq.txt          |   37 +
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   83 +-
+>  arch/arm/boot/dts/tegra124.dtsi                    |   29 +
+>  arch/arm/mach-tegra/Kconfig                        |    1 +
+>  drivers/clk/tegra/Makefile                         |    3 +
+>  drivers/clk/tegra/clk-dfll.c                       | 1759 ++++++++++++++++++++
+>  drivers/clk/tegra/clk-dfll.h                       |   55 +
+>  drivers/clk/tegra/clk-tegra-super-gen4.c           |    4 +-
+>  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  156 ++
+>  drivers/clk/tegra/clk-tegra124.c                   |   61 +
+>  drivers/clk/tegra/clk.h                            |    3 +
+>  drivers/clk/tegra/cvb.c                            |  133 ++
+>  drivers/clk/tegra/cvb.h                            |   67 +
+>  drivers/cpufreq/Makefile                           |    1 +
+>  drivers/cpufreq/tegra124-cpufreq.c                 |  221 +++
+>  16 files changed, 2697 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
+>  create mode 100644 drivers/clk/tegra/clk-dfll.c
+>  create mode 100644 drivers/clk/tegra/clk-dfll.h
+>  create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>  create mode 100644 drivers/clk/tegra/cvb.c
+>  create mode 100644 drivers/clk/tegra/cvb.h
+>  create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
+> 
+> -- 
+> 1.8.1.5
+> 
