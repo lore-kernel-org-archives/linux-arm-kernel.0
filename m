@@ -1,157 +1,81 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 11 Jul 2014 13:01:55 -0700
-Subject: [PATCH] clk: qcom: Support bypass RCG configuration
-In-Reply-To: <1405106207-26638-1-git-send-email-robdclark@gmail.com>
-Message-ID: <1405108915-19234-1-git-send-email-sboyd@codeaurora.org>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Fri, 11 Jul 2014 21:03:44 +0100
+Subject: [GIT PULL] Armada DRM devel updates
+Message-ID: <20140711200344.GA7973@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case of HDMI clocks, we want to bypass the RCG's ability
-to divide the output clock and pass through the parent HDMI PLL
-rate through. Add a simple set of clk_ops to configure the RCG to
-do this. This removes the need to keep adding more frequency
-entries to the tv_src clock whenever we want to support a new
-rate.
+David,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Please incorporate the latest Armada DRM updates, which can be found at:
 
-On 07/11, Rob Clark wrote:
-> It would probably be better to get rid of the fixed table, which
-> duplicates the set of fixed frequences in the hdmi pll clk (in
-> drm/msm/hdmi).  But I'll leave that as an exercise for someone
-> who knows the clk driver better than myself.  Until then, this
-> trivial fix is useful.
+  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git drm-armada-devel
 
-Here's a quick attempt at that. Let me know if this works.
+with SHA1 9611cb93fa65dde199f4f888bd034ffc80c7adf0, based on v3.16-rc3.
 
- drivers/clk/qcom/clk-rcg.c      | 51 +++++++++++++++++++++++++++++++++++------
- drivers/clk/qcom/clk-rcg.h      |  1 +
- drivers/clk/qcom/mmcc-msm8960.c |  9 ++------
- 3 files changed, 47 insertions(+), 14 deletions(-)
+This pull includes the component helpers which have been merged into
+Greg's driver-devel tree, and the new DRM OF helper file, which
+Rob has reviewed, along with the Armada DRM updates.
 
-diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
-index abfc2b675aea..b638c5846dbf 100644
---- a/drivers/clk/qcom/clk-rcg.c
-+++ b/drivers/clk/qcom/clk-rcg.c
-@@ -417,20 +417,25 @@ static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
- 	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
- }
- 
--static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
--			    unsigned long parent_rate)
-+static long clk_rcg_bypass_determine_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *p_rate, struct clk **p)
- {
- 	struct clk_rcg *rcg = to_clk_rcg(hw);
--	const struct freq_tbl *f;
-+	const struct freq_tbl *f = rcg->freq_tbl;
-+
-+	*p = clk_get_parent_by_index(hw->clk, f->src);
-+	*p_rate = __clk_round_rate(*p, rate);
-+
-+	return *p_rate;
-+}
-+
-+static int __clk_rcg_set_rate(struct clk_rcg *rcg, const struct freq_tbl *f)
-+{
- 	u32 ns, md, ctl;
- 	struct mn *mn = &rcg->mn;
- 	u32 mask = 0;
- 	unsigned int reset_reg;
- 
--	f = find_freq(rcg->freq_tbl, rate);
--	if (!f)
--		return -EINVAL;
--
- 	if (rcg->mn.reset_in_cc)
- 		reset_reg = rcg->clkr.enable_reg;
- 	else
-@@ -466,6 +471,27 @@ static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
- }
- 
-+static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long parent_rate)
-+{
-+	struct clk_rcg *rcg = to_clk_rcg(hw);
-+	const struct freq_tbl *f;
-+
-+	f = find_freq(rcg->freq_tbl, rate);
-+	if (!f)
-+		return -EINVAL;
-+
-+	return __clk_rcg_set_rate(rcg, f);
-+}
-+
-+static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clk_rcg *rcg = to_clk_rcg(hw);
-+
-+	return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
-+}
-+
- static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
- {
- 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
-@@ -503,6 +529,17 @@ const struct clk_ops clk_rcg_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_rcg_ops);
- 
-+const struct clk_ops clk_rcg_bypass_ops = {
-+	.enable = clk_enable_regmap,
-+	.disable = clk_disable_regmap,
-+	.get_parent = clk_rcg_get_parent,
-+	.set_parent = clk_rcg_set_parent,
-+	.recalc_rate = clk_rcg_recalc_rate,
-+	.determine_rate = clk_rcg_bypass_determine_rate,
-+	.set_rate = clk_rcg_bypass_set_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
-+
- const struct clk_ops clk_dyn_rcg_ops = {
- 	.enable = clk_enable_regmap,
- 	.is_enabled = clk_is_enabled_regmap,
-diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
-index b9ec11dfd1b4..ba0523cefd2e 100644
---- a/drivers/clk/qcom/clk-rcg.h
-+++ b/drivers/clk/qcom/clk-rcg.h
-@@ -95,6 +95,7 @@ struct clk_rcg {
- };
- 
- extern const struct clk_ops clk_rcg_ops;
-+extern const struct clk_ops clk_rcg_bypass_ops;
- 
- #define to_clk_rcg(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg, clkr)
- 
-diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-index 12f3c0b64fcd..14eeeba005f3 100644
---- a/drivers/clk/qcom/mmcc-msm8960.c
-+++ b/drivers/clk/qcom/mmcc-msm8960.c
-@@ -1218,12 +1218,7 @@ static const char *mmcc_pxo_hdmi[] = {
- };
- 
- static struct freq_tbl clk_tbl_tv[] = {
--	{  25200000, P_HDMI_PLL, 1, 0, 0 },
--	{  27000000, P_HDMI_PLL, 1, 0, 0 },
--	{  27030000, P_HDMI_PLL, 1, 0, 0 },
--	{  74250000, P_HDMI_PLL, 1, 0, 0 },
--	{ 108000000, P_HDMI_PLL, 1, 0, 0 },
--	{ 148500000, P_HDMI_PLL, 1, 0, 0 },
-+	{  .src = P_HDMI_PLL, .pre_div = 1 },
- 	{ }
- };
- 
-@@ -1254,7 +1249,7 @@ static struct clk_rcg tv_src = {
- 			.name = "tv_src",
- 			.parent_names = mmcc_pxo_hdmi,
- 			.num_parents = 2,
--			.ops = &clk_rcg_ops,
-+			.ops = &clk_rcg_bypass_ops,
- 			.flags = CLK_SET_RATE_PARENT,
- 		},
- 	},
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+The Armada DRM changes:
+- move the interrupt handling solely into the CRTC layer, otherwise
+  we have problems as each CRTC has its own interrupt signal.
+- change the way CRTCs are numbered, to use the number of CRTCs which
+  have already been registered.  This ultimately equates to the same
+  number, so we achieve the same thing but in a simpler way.
+- move the variant initialisation from the DRM driver layer to the CRTC
+  layer, which is really where it's needed, and make the variant
+  handling purely a CRTC thing.
+- augment Armada DRM with the component helper to allow multiple
+  struct device's to describe the DRM subsystem.  This will be necessary
+  for DT support, as each LCD controller is described as a separate node
+  in DT, thus creating separate device structures for each LCD controller.
+- tweak the external reference clock name to match the documentation
+  more exactly - there is no underscore before the '1'.
+- allow CRTCs to be registered as separate devices, thereby allowing
+  DT to describe the LCD controllers, while preserving the remainder of
+  the original behaviour.  (The original driver behaviour is still
+  available at this time.)
+- register the CRTCs with the DT node so that the recently introduced
+  DRM OF helper can be used by encoders to locate their associated
+  CRTCs.
+
+This will update the following files:
+
+ .../bindings/drm/armada/marvell,dove-lcd.txt       |  30 +++
+ drivers/base/component.c                           | 192 +++++++++++++---
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/armada/armada_510.c                |  23 +-
+ drivers/gpu/drm/armada/armada_crtc.c               | 187 ++++++++++++++--
+ drivers/gpu/drm/armada/armada_crtc.h               |  11 +-
+ drivers/gpu/drm/armada/armada_drm.h                |  13 +-
+ drivers/gpu/drm/armada/armada_drv.c                | 245 +++++++++++++++------
+ drivers/gpu/drm/drm_of.c                           |  67 ++++++
+ include/drm/drm_crtc.h                             |   2 +
+ include/drm/drm_of.h                               |  18 ++
+ include/linux/component.h                          |   7 +
+ 12 files changed, 642 insertions(+), 154 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/armada/marvell,dove-lcd.txt
+ create mode 100644 drivers/gpu/drm/drm_of.c
+ create mode 100644 include/drm/drm_of.h
+
+through these changes:
+
+Russell King (15):
+      component: fix missed cleanup in case of devres failure
+      component: ignore multiple additions of the same component
+      component: add support for component match array
+      drm/armada: move IRQ handling into CRTC
+      drm/armada: use number of CRTCs registered
+      drm/armada: move variant initialisation to CRTC init
+      drm/armada: make variant a CRTC thing
+      component: fix bug with legacy API
+      drm: add of_graph endpoint helper to find possible CRTCs
+      Merge branches 'drm-devel' and 'component-for-driver' into armada-drm
+      drm/armada: convert to componentized support
+      drm/armada: update Armada 510 (Dove) to use "ext_ref_clk1" as the clock
+      dt-bindings: add Marvell Dove LCD controller documentation
+      drm/armada: permit CRTCs to be registered as separate devices
+      drm/armada: register crtc with port
+
+Many thanks.
