@@ -1,36 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Jul 2014 15:04:57 +0200
-Subject: [PATCH] ARM: tegra: Fix typoed ams,ext-control properties
-In-Reply-To: <1404931997-7118-1-git-send-email-ttynkkynen@nvidia.com>
-References: <1404931997-7118-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <20140711130456.GB10827@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Jul 2014 15:07:08 +0200
+Subject: [PATCH] ASoC: rockchips: fix build error
+Message-ID: <1405084028-1209898-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 09:53:17PM +0300, Tuomas Tynkkynen wrote:
-> The property for enabling external rail control on the AS3722 is
-> ams,ext-control, not ams,external-control. Since the external rail
-> control property was previously being ignored, LP1 suspend on these
-> boards wasn't actually turning the CPU rail off at all.
-> 
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> ---
-> So here's a dilemma, either change the existing DTs, change the
-> binding + driver, or make the driver recognize both properties.
-> I chose the first one since the old behaviour was broken in the
-> first place and the old DTs stay as buggy as they were before.
-> 
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 6 +++---
->  arch/arm/boot/dts/tegra124-venice2.dts    | 6 +++---
->  2 files changed, 6 insertions(+), 6 deletions(-)
+The newly added rockchip_i2s driver is lacking an include of
+linux/module.h, causing a build error in some cases:
 
-Applied to the for-3.17/dt branch. Thanks.
+../sound/soc/rockchip/rockchip_i2s.c:526:20: error: expected declaration specifiers or '...' before string constant
+ MODULE_DESCRIPTION("ROCKCHIP IIS ASoC Interface");
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/82f5c73b/attachment.sig>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Jianqun Xu <xjq@rock-chips.com>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index af1d8eb94f04..c3e53feba5b9 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -13,6 +13,7 @@
+ #include <linux/delay.h>
+ #include <linux/of_gpio.h>
+ #include <linux/clk.h>
++#include <linux/module.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
+ #include <sound/pcm_params.h>
+-- 
+1.8.3.2
