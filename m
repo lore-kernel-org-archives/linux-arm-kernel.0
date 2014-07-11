@@ -1,50 +1,64 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Fri, 11 Jul 2014 08:34:19 -0700
-Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
-Message-ID: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 Jul 2014 17:41:52 +0200
+Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
+In-Reply-To: <20140711151236.GG27864@saruman.home>
+References: <53BF35B7.9000105@renesas.com>
+ <87oawxy69b.wl%kuninori.morimoto.gx@renesas.com>
+ <20140711090005.GH12420@verge.net.au>
+ <20140711151236.GG27864@saruman.home>
+Message-ID: <20140711154152.GC1777@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On Fri, Jul 11, 2014 at 10:12:37AM -0500, Felipe Balbi wrote:
+> On Fri, Jul 11, 2014 at 11:00:07AM +0200, Simon Horman wrote:
+> > [Cc Felipe Balbi]
+> > 
+> > On Thu, Jul 10, 2014 at 01:20:34AM -0700, Kuninori Morimoto wrote:
+> > > 
+> > > Hi
+> > > 
+> > > > Changes in v2:
+> > > > - move phy handle to struct usbhs_priv
+> > > > - add new default pipe type to driver
+> > > > - remove pipe type from Lager board code
+> > > > 
+> > > > Ulrich Hecht (2):
+> > > >   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
+> > > >   ARM: shmobile: lager: remove USBHS callbacks
+> > > > 
+> > > >  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
+> > > >  drivers/usb/renesas_usbhs/Makefile   |   2 +-
+> > > >  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
+> > > >  drivers/usb/renesas_usbhs/common.h   |   2 +
+> > > >  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
+> > > >  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
+> > > >  include/linux/usb/renesas_usbhs.h    |   6 ++
+> > > >  7 files changed, 163 insertions(+), 119 deletions(-)
+> > > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
+> > > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
+> > > 
+> > > For all patches
+> > > 
+> > > Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > 
+> > [snip]
+> > 
+> > > I tested these patches on Lager legacy, and these patches worked correctly.
+> > > 
+> > > Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > 
+> > Hi,
+> > 
+> > it seems that the 2nd patch should go through my renesas tree
+> > but it depends on the first patch which should be taken by 
+> > Felipe Balbi (Cced).
+> > 
+> > Felipe, is there any chance that you could take this for v3.16?
+> > I am quite happy to make a branch for you to pull for renesas_usbhs
+> > if this would make your life easier.
+> 
+> you need to take both patches or just patch 1 ?
 
-I've noticed that for IMX6 the gpio-mxc gpio driver always returns 0
-for gpio's configured as outputs regardless of if they are outputing
-high or low.
-
-Digging into gpio-mxc.c I see that the basic memory-mapped generic
-gpio controller is used, but its configured to use GPIO_PSR to obtain
-the gpio value. For the IMX6 (I can't speak for the other MXC/IMX
-users of this driver) the reference manual indicates that GPIO_PSR is
-appropriate only if the GPIO is an input and that GPIO_DR will read
-the proper state if its configured as an output or an input.
-
-Even before the driver was converted to use the basic memory-mapped
-generic gpio controller this was the case (GPIO_PSR used for get). Is
-there a reason for this, or is it simply a bug that has been around
-since the driver's original creation as I suspect?
-
-The following patch resolves the issue and causes gpio get to always
-return the proper setting when configured for an input or output:
-
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 7176743..25b97db 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -458,8 +458,8 @@ static int mxc_gpio_probe(struct platform_device *pdev)
-        }
-
-        err = bgpio_init(&port->bgc, &pdev->dev, 4,
--                        port->base + GPIO_PSR,
--                        port->base + GPIO_DR, NULL,
-+                        port->base + GPIO_DR,
-+                        NULL, NULL,
-                         port->base + GPIO_GDIR, NULL, 0);
-        if (err)
-                goto out_iounmap;
-
-If this looks right to you for all IMX users let me know and I'll post
-a properly formatted patch with commit message.
-
-Regards,
-
-Tim
+Please just take patch 1.
+Thanks
