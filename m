@@ -1,94 +1,95 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 11 Jul 2014 16:43:21 +0900
-Subject: [PATCH v8 8/9] pci: Add support for creating a generic host_bridge
- from device tree
-In-Reply-To: <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <004601cf9cdb$ca08f7f0$5e1ae7d0$%han@samsung.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 11 Jul 2014 08:44:17 +0100
+Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <Pine.LNX.4.44L0.1407101154070.1492-100000@iolanthe.rowland.org>
+References: <1405005486-26355-2-git-send-email-peter.griffin@linaro.org>
+ <Pine.LNX.4.44L0.1407101154070.1492-100000@iolanthe.rowland.org>
+Message-ID: <20140711074417.GA8233@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 02, 2014 3:44 AM, Liviu Dudau wrote:
+Hi Alan,
+
+Thanks for reviewing.
+
+On Thu, 10 Jul 2014, Alan Stern wrote:
+
+> On Thu, 10 Jul 2014, Peter Griffin wrote:
 > 
-> Several platforms use a rather generic version of parsing
-> the device tree to find the host bridge ranges. Move the common code
-> into the generic PCI code and use it to create a pci_host_bridge
-> structure that can be used by arch code.
+> > This driver adds support for the USB HCD present in STi
+> > SoC's from STMicroelectronics. It has been tested on the
+> > stih416-b2020 board.
 > 
-> Based on early attempts by Andrew Murray to unify the code.
-> Used powerpc and microblaze PCI code as starting point.
+> This driver file, along with the Kconfig changes, belongs in the
+> arch/platform-specific source directory.  Not in drivers/usb/host/.  
+> It is, after all, a platform driver that registers two platform
+> devices.
+
+Why do think that?
+
+AFAIK certainly for ARM we are trying NOT to add code
+under the arch/platform directorys and get the code into the relevant subsystems.
+
+In order to prove the above if you look in drivers/usb/host/ there are many other 
+similar platform drivers for other SoC families: -
+bcma-hcd.c
+ehci-atmel.c
+ssb-hcd.c
+ehci-exynos.c
+ehci-fsl.c
+ehci-mxc.c 
+ehci-omap.c
+ehci-orion.c
+ohci-nxp.c
+and more, but you get the idea. In short I believe this to be the correct directory :-)
+
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  drivers/of/of_pci.c       | 135 ++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/host-bridge.c |  18 +++++++
->  include/linux/of_pci.h    |  10 ++++
->  include/linux/pci.h       |   8 +++
->  4 files changed, 171 insertions(+)
+> > +++ b/drivers/usb/host/Kconfig
+> > @@ -753,6 +753,23 @@ config USB_HCD_SSB
+> >  
+> >  	  If unsure, say N.
+> >  
+> > +config USB_HCD_ST
+> > +	tristate "STMicroelectronics STi family HCD support"
 > 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 8481996..55d8320 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
+> Why does this need to be tristate?  Why not always build it into the 
+> kernel?  Or at least make it boolean rather than tristate.
 
-[.....]
+Building as a module is useful on these embedded SoCs usually as a mechanism for speeding up boot time.
+Anything which isn't critical to getting the core functionality of the device going (in this case decoding
+TV and outputting on HDMI), can be deffered to a later point. Things like USB drivers, can then be loaded in
+after that point (deffered module loading), to give the appearence of 'instant on' (which in consumer electronics
+is what everyone wishes to achieve).
 
-> +struct pci_host_bridge *
-> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
-> +{
-> +	int err, domain, busno;
-> +	struct resource *bus_range;
-> +	struct pci_bus *root_bus;
-> +	struct pci_host_bridge *bridge;
-> +	resource_size_t io_base;
-> +	LIST_HEAD(res);
-> +
-> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> +	if (!bus_range)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	domain = of_alias_get_id(parent->of_node, "pci-domain");
-> +	if (domain == -ENODEV)
-> +		domain = atomic_inc_return(&domain_nr);
-> +
-> +	err = of_pci_parse_bus_range(parent->of_node, bus_range);
-> +	if (err) {
-> +		dev_info(parent, "No bus range for %s, using default [0-255]\n",
-> +			parent->of_node->full_name);
-> +		bus_range->start = 0;
-> +		bus_range->end = 255;
-> +		bus_range->flags = IORESOURCE_BUS;
-> +	}
-> +	busno = bus_range->start;
-> +	pci_add_resource(&res, bus_range);
-> +
-> +	/* now parse the rest of host bridge bus ranges */
-> +	err = pci_host_bridge_of_get_ranges(parent->of_node, &res, &io_base);
-> +	if (err)
-> +		goto err_create;
-> +
-> +	/* then create the root bus */
-> +	root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
-> +						ops, host_data, &res);
-> +	if (IS_ERR(root_bus)) {
-> +		err = PTR_ERR(root_bus);
-> +		goto err_create;
-> +	}
-> +
-> +	bridge = to_pci_host_bridge(root_bus->bridge);
-> +	bridge->io_base = io_base;
+Going back to my examples above, most of these platforms are also defined as tristate.
 
-Hi Liviu Dudau,
+> 
+> > +	depends on ARCH_STI
+> > +	select USB_OHCI_HCD_PLATFORM if USB_OHCI_HCD
+> > +	select USB_EHCI_HCD_PLATFORM if USB_EHCI_HCD
+> > +	select MFD_SYSCON
+> > +	select GENERIC_PHY
+> > +	help
+> > +	  Enable support for the EHCI and OCHI host controller on ST
+> 
+> s/OCHI/OHCI/
 
-Would you fix the following warning?
+Good spot, will fix in V2
 
-drivers/of/of_pci.c: In function 'of_create_pci_host_bridge'
-drivers/of/of_pci.c:218:18: warning: 'of_base' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  bridge->io_base = io_base;
+> 
+> > + 	  consumer electronics SoCs.
+> > +
+> > + 	  It converts the ST driver into two platform device drivers
+> 
+> It converts the ST driver?  That doesn't sound right at all.  You could 
+> eliminate this paragraph completely and nobody would miss it.
 
-Best regards,
-Jingoo Han
+I agree the wording is a little off there, I can remove or re-phrase it. What it is trying to express
+is that it is slightly different to some other platform drivers, in that it creates two platform drivers one
+for the ehci controller and the other for the OHCI controller. From looking at other drivers in this directory 
+this driver is quite similar to USB_HCD_BCMA, which also deemed it noteworthy to mention in the help, although
+phrased somewhat more succinctly.
 
-[.....]
+regards,
+
+Peter.
