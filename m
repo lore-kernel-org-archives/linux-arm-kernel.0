@@ -1,132 +1,44 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 10 Jul 2014 21:55:46 -0500
-Subject: [PATCH v4 08/11] ARM: OMAP2+: AM33XX: Reserve memory to comply with
- EMIF spec
+Date: Thu, 10 Jul 2014 21:55:45 -0500
+Subject: [PATCH v4 07/11] ARM: dts: am33xx: Update wkup_m3 node
 In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
 References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1405047349-15101-9-git-send-email-d-gerlach@ti.com>
+Message-ID: <1405047349-15101-8-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Allow interrupt for wkup_m3 to be set from DT, add regs for
+IPC regs to allow pm code to communicate with wkup_m3, and add data
+needed for mailbox channel.
 
-SDRAM controller on AM33XX requires that a modification of certain
-bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
-AM335x-Rev H) is followed by a dummy read access to SDRAM. This
-scenario arises when entering a low power state like DeepSleep.
-To ensure that the read is not from a cached region we reserve
-some memory during bootup using the arm_memblock_steal() API. The
-original call to omap_reserve is removed as it is not used in any
-way on am335x.
-
-A subsequent patch will pass along the location of the reserved
-memory location to the AM335x suspend handler which modifies the
-PWR_MGMT_CTRL register in the EMIF.
-
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+CC: Ohad Ben-Cohen <ohad@wizery.com>
+CC: Benoit Cousson <bcousson@baylibre.com>
 ---
-v3->v4:
-	Left as is because of use in sram code when EMIF is off to avoid
-	copying additional code. Also uses hardcoded virtual address now
-	to avoid problems with himem
-	
- arch/arm/mach-omap2/board-generic.c |  2 +-
- arch/arm/mach-omap2/common.c        | 32 ++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/common.h        |  4 ++++
- arch/arm/mach-omap2/io.c            |  1 +
- 4 files changed, 38 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am33xx.dtsi | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 9480997..d2c435e 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -163,7 +163,7 @@ static const char *am33xx_boards_compat[] __initconst = {
- };
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 6f8f7cf..fe0cff5 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -736,10 +736,15 @@
  
- DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
--	.reserve	= omap_reserve,
-+	.reserve	= am33xx_reserve,
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am33xx_init_early,
- 	.init_irq	= omap_intc_of_init,
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 2dabb9e..df6394e 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -15,10 +15,14 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_data/dsp-omap.h>
-+#include <asm/memblock.h>
-+#include <asm/mach/map.h>
+ 		wkup_m3: wkup_m3 at 44d00000 {
+ 			compatible = "ti,am3353-wkup-m3";
+-			reg = <0x44d00000 0x4000	/* M3 UMEM */
+-			       0x44d80000 0x2000>;	/* M3 DMEM */
++			reg = <0x44d00000 0x4000
++			       0x44d80000 0x2000
++			       0x44e11324 0x0024>;
++			reg-names = "m3_umem", "m3_dmem", "ipc_regs";
++			interrupts = <78>;
+ 			ti,hwmods = "wkup_m3";
+ 			ti,no-reset-on-init;
++			mbox-names = "wkup_m3";
++			mbox = <&mailbox &mbox_wkupm3>;
+ 		};
  
- #include "common.h"
- #include "omap-secure.h"
- 
-+#define AM33XX_DRAM_SYNC_VA 0xfe600000
-+
- /*
-  * Stub function for OMAP2 so that common files
-  * continue to build when custom builds are used
-@@ -34,3 +38,31 @@ void __init omap_reserve(void)
- 	omap_secure_ram_reserve_memblock();
- 	omap_barrier_reserve_memblock();
- }
-+
-+static phys_addr_t am33xx_paddr;
-+static u32 am33xx_size;
-+
-+/* Steal one page physical memory for uncached read DeepSleep */
-+void __init am33xx_reserve(void)
-+{
-+	am33xx_size = ALIGN(PAGE_SIZE, SZ_1M);
-+	am33xx_paddr = arm_memblock_steal(am33xx_size, SZ_1M);
-+
-+	omap_reserve();
-+}
-+
-+void __iomem *am33xx_dram_sync;
-+
-+void __init am33xx_dram_sync_init(void)
-+{
-+	struct map_desc dram_io_desc[1];
-+
-+	dram_io_desc[0].virtual = AM33XX_DRAM_SYNC_VA;
-+	dram_io_desc[0].pfn = __phys_to_pfn(am33xx_paddr);
-+	dram_io_desc[0].length = am33xx_size;
-+	dram_io_desc[0].type = MT_MEMORY_RW_SO;
-+
-+	iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
-+
-+	am33xx_dram_sync = (void __iomem *) dram_io_desc[0].virtual;
-+}
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index b2d252b..1536338 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -316,6 +316,10 @@ extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
- struct omap2_hsmmc_info;
- extern void omap_reserve(void);
- 
-+extern void am33xx_reserve(void);
-+extern void am33xx_dram_sync_init(void);
-+extern void __iomem *am33xx_dram_sync;
-+
- struct omap_hwmod;
- extern int omap_dss_reset(struct omap_hwmod *);
- 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 8f55945..4d4d150 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -313,6 +313,7 @@ void __init ti81xx_map_io(void)
- void __init am33xx_map_io(void)
- {
- 	iotable_init(omapam33xx_io_desc, ARRAY_SIZE(omapam33xx_io_desc));
-+	am33xx_dram_sync_init();
- }
- #endif
- 
+ 		elm: elm at 48080000 {
 -- 
 1.9.0
