@@ -1,33 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Jul 2014 15:07:08 +0200
-Subject: [PATCH] ASoC: rockchips: fix build error
-Message-ID: <1405084028-1209898-1-git-send-email-arnd@arndb.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 11 Jul 2014 09:31:08 -0400
+Subject: No uart output on my snowball board
+In-Reply-To: <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
+References: <20140710223021.6e9c857f@gandalf.local.home>
+ <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
+Message-ID: <20140711093108.4807d473@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added rockchip_i2s driver is lacking an include of
-linux/module.h, causing a build error in some cases:
+On Fri, 11 Jul 2014 14:00:55 +0200
+Linus Walleij <linus.walleij@linaro.org> wrote:
 
-../sound/soc/rockchip/rockchip_i2s.c:526:20: error: expected declaration specifiers or '...' before string constant
- MODULE_DESCRIPTION("ROCKCHIP IIS ASoC Interface");
+> On Fri, Jul 11, 2014 at 4:30 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> 
+> > commit a0998b8321eb5f53ef51924f5ab6c69237ac1025
+> > Author: Lee Jones <lee.jones@linaro.org>
+> > Date:   Thu Aug 22 16:18:56 2013 +0100
+> >
+> >     ARM: ux500: Remove UART support when booting without Device Tree
+> >
+> >     It's time to remove all ATAG support from ux500 and rely solely on
+> >     Device Tree booting. This patch is part of that endeavour.
+> >
+> >     Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I hate that I didn't spot the speling mistake in the subject,
+> its ATAG support we're removing, not UART :-)
+> 
+> Anyway, I think you got enough hints on how we do this
+> with appended devicetrees instead, Lee's snippet should
+> work or check out this page that I also posted to your
+> G+ post:
+> http://www.df.lth.se/~triad/krad/ux00/
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jianqun Xu <xjq@rock-chips.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 1 +
- 1 file changed, 1 insertion(+)
+Thanks, with everyone's feedback I got it working with ktest.
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index af1d8eb94f04..c3e53feba5b9 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -13,6 +13,7 @@
- #include <linux/delay.h>
- #include <linux/of_gpio.h>
- #include <linux/clk.h>
-+#include <linux/module.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- #include <sound/pcm_params.h>
--- 
-1.8.3.2
+I added the following to my ktest snowball.conf:
+
+OUTPUT_BOOT := ${OUTPUT_DIR}/arch/arm/boot
+
+PRE_BUILD = ${MAKE_CMD} O=${OUTPUT_DIR} dtbs
+POST_BUILD = cat ${OUTPUT_BOOT}/zImage ${OUTPUT_BOOT}/dts/ste-snowball.dtb > ${OUTPUT_BOOT}/zImage.snowball; mkimage -A arm -O linux -C none -T kernel -a 0x00008000 -e 0x00008000 -d ${OUTPUT_BOOT}/zImage.snowball ${OUTPUT_BOOT}/uImage.snowball
+
+and walla!
+
+root at linaro-ubuntu-desktop:~# uname -r
+3.16.0-rc4-test-00042-g4f440cd
+
+
+Thanks everyone!
+
+-- Steve
