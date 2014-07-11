@@ -1,63 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 11 Jul 2014 10:22:20 +0200
-Subject: [PATCH] i2c: efm32: correct namespacing of location property
-In-Reply-To: <CAOesGMjgX5PWBSD2YP7mTGMWafxBjeMDmzZoPCXb27YPUHEcyw@mail.gmail.com>
-References: <CAOesGMjgX5PWBSD2YP7mTGMWafxBjeMDmzZoPCXb27YPUHEcyw@mail.gmail.com>
-Message-ID: <1405066940-12919-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jul 2014 09:24:25 +0100
+Subject: [PATCH 2/3] usb: host: st-hcd: Add st-hcd devicetree bindings
+ documentation.
+In-Reply-To: <1405005486-26355-3-git-send-email-peter.griffin@linaro.org>
+References: <1405005486-26355-1-git-send-email-peter.griffin@linaro.org>
+ <1405005486-26355-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140711082425.GJ11948@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson pointed out that usually the company name is picked as
-namespace prefix to specific properties. So expect "energymicro,location"
-but fall back to the previously introduced name "efm32,location".
+On Thu, 10 Jul 2014, Peter Griffin wrote:
 
-Cc: Olof Johansson <olof@lixom.net>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- Documentation/devicetree/bindings/i2c/i2c-efm32.txt | 4 ++--
- drivers/i2c/busses/i2c-efm32.c                      | 8 +++++++-
- 2 files changed, 9 insertions(+), 3 deletions(-)
+> This patch documents the device tree documentation required for
+> the ST HCD controller found in STMicroelectronics SoCs.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/usb/st-hcd.txt | 51 ++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/st-hcd.txt
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-efm32.txt b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-index fc15ac519437..50b25c3da186 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
-@@ -10,7 +10,7 @@ Required properties :
- Recommended properties :
- 
-  - clock-frequency : maximal I2C bus clock frequency in Hz.
-- - efm32,location : Decides the location of the USART I/O pins.
-+ - energymicro,location : Decides the location of the USART I/O pins.
-    Allowed range : [0 .. 6]
- 
- Example:
-@@ -23,7 +23,7 @@ Example:
- 		clocks = <&cmu clk_HFPERCLKI2C0>;
- 		clock-frequency = <100000>;
- 		status = "ok";
--		efm32,location = <3>;
-+		energymicro,location = <3>;
- 
- 		eeprom at 50 {
- 			compatible = "microchip,24c02";
-diff --git a/drivers/i2c/busses/i2c-efm32.c b/drivers/i2c/busses/i2c-efm32.c
-index f7eccd682de9..5c4cf94527e3 100644
---- a/drivers/i2c/busses/i2c-efm32.c
-+++ b/drivers/i2c/busses/i2c-efm32.c
-@@ -370,7 +370,13 @@ static int efm32_i2c_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = of_property_read_u32(np, "efm32,location", &location);
-+
-+	ret = of_property_read_u32(np, "energymicro,location", &location);
-+
-+	if (!ret)
-+		/* fall back to wrongly namespaced property */
-+		ret = of_property_read_u32(np, "efm32,location", &location);
-+
- 	if (!ret) {
- 		dev_dbg(&pdev->dev, "using location %u\n", location);
- 	} else {
+Just some nits:
+
+> +Example:
+> +
+> +usb0: usb at fe100000 {
+> +	compatible	= "st,usb-300x";
+> +	reg		= <0xfe1ffc00 0x100>,
+> +			  <0xfe1ffe00 0x100>;
+> +	reg-names	= "ohci", "ehci";
+> +
+> +	interrupts	=  <GIC_SPI 148 IRQ_TYPE_NONE>,
+> +			   <GIC_SPI 149 IRQ_TYPE_NONE>;
+> +	interrupt-names	= "ehci","ohci";
+
+s/","/", "
+
+> +	pinctrl-names	= "default";
+> +	pinctrl-0	= <&pinctrl_usb0>;
+> +	clocks		= <&clk_s_a1_ls CLK_ICN_IF_2>,
+> +			  <&clockgen_b0 0>;
+> +	clock-names	= "ic", "ohci";
+> +
+> +	resets		= <&powerdown STIH416_USB0_POWERDOWN>,
+> +			  <&softreset STIH416_USB0_SOFTRESET>;
+> +	reset-names	= "power", "softreset";
+> +
+> +	phys = <&usb2_phy>;
+> +	phy-names = "usb2-phy";
+
+Tabbing of the '='s not consistent.
+
+> +};
+> +
+> +
+
+Too many '\n' at EOF.
+
+Nothing controversial here, so once this nits are rectified:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
 -- 
-2.0.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
