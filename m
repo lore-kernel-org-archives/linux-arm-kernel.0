@@ -1,21 +1,43 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 11 Jul 2014 16:58:00 +0300
-Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
-In-Reply-To: <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
-References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
- <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140711135800.GD23218@tbergstrom-lnx.Nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jul 2014 14:58:13 +0100
+Subject: No uart output on my snowball board
+In-Reply-To: <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
+References: <20140710223021.6e9c857f@gandalf.local.home>
+ <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
+Message-ID: <20140711135813.GD2954@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 02:16:11PM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Fri, 11 Jul 2014, Linus Walleij wrote:
+> On Fri, Jul 11, 2014 at 4:30 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
 > 
-> This commit converts the PMC support code to a platform driver. Because
-> the boot process needs to cal into this driver very early, also set up a
+> > commit a0998b8321eb5f53ef51924f5ab6c69237ac1025
+> > Author: Lee Jones <lee.jones@linaro.org>
+> > Date:   Thu Aug 22 16:18:56 2013 +0100
+> >
+> >     ARM: ux500: Remove UART support when booting without Device Tree
+> >
+> >     It's time to remove all ATAG support from ux500 and rely solely on
+> >     Device Tree booting. This patch is part of that endeavour.
+> >
+> >     Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I hate that I didn't spot the speling mistake in the subject,
+> its ATAG support we're removing, not UART :-)
 
-Small typo: 'call' :)
+Now you're going coo-coo. :)
 
-Cheers,
+The subject line is fine.  Take a look at the patch.
 
-Peter.
+> Anyway, I think you got enough hints on how we do this
+> with appended devicetrees instead, Lee's snippet should
+> work or check out this page that I also posted to your
+> G+ post:
+> http://www.df.lth.se/~triad/krad/ux00/
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
