@@ -1,39 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Jul 2014 17:15:02 +0200
-Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <53BFFEAD.7000405@nvidia.com>
-References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
- <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
- <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
- <20140711091207.GY23218@tbergstrom-lnx.Nvidia.com>
- <20140711145735.GB6523@ulmo> <53BFFEAD.7000405@nvidia.com>
-Message-ID: <20140711151501.GA25810@ulmo>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 11 Jul 2014 17:17:44 +0200
+Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <20140711145138.GC3935@laptop>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
+ <20140710111833.GY3935@laptop>
+ <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
+ <20140711145138.GC3935@laptop>
+Message-ID: <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 06:11:41PM +0300, Tuomas Tynkkynen wrote:
-> On 11/07/14 17:57, Thierry Reding wrote:
-> 
-> >>I don't think that's going to work? The voltage scaling is handled in hw.
-> >
-> >Do we have to handle it in hardware or can we opt to do it in software,
-> >too?
-> >
-> 
-> With the PLLX, voltage scaling is done entirely in SW. With the DFLL,
-> it's possible to stay in open-loop mode and do it in SW, but there's
-> not much point in that.
+On 11 July 2014 16:51, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Jul 10, 2014 at 04:03:51PM +0200, Vincent Guittot wrote:
+>> On 10 July 2014 13:18, Peter Zijlstra <peterz@infradead.org> wrote:
+>> > On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
+>> >> +             /*
+>> >> +              * If the CPUs share their cache and the src_cpu's capacity is
+>> >> +              * reduced because of other sched_class or IRQs, we trig an
+>> >> +              * active balance to move the task
+>> >> +              */
+>> >> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
+>> >> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
+>> >> +                                                     sd->imbalance_pct)))
+>> >>                       return 1;
+>> >
+>> > Why is this tied to shared caches?
+>>
+>> It's just to limit the change of the policy to a level that can have
+>> benefit without performance regression. I'm not sure that we can do
+>> that at any level without risk
+>
+> Similar to the other change; so both details _should_ have been in the
+> changelogs etc..
 
-It's kind of ugly how we need to pass the address of the PMU and the
-offset of the voltage control register to the DFLL which will then
-initiate I2C transactions itself. I'm wondering if that plays well with
-the I2C traffic originating from within the kernel.
+i'm going to add details in the v4
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/c9ef5c4d/attachment-0001.sig>
+>
+> In any case, its feels rather arbitrary to me. What about machines where
+> there's no cache sharing at all (the traditional SMP systems). This
+> thing you're trying to do still seems to make sense there.
+
+ok, I thought that traditional SMP systems have this flag set at core
+level. I mean ARM platforms have the flag for CPUs in the same cluster
+(which include current ARM SMP system) and the corei7 of my laptop has
+the flag at the cores level.
+
+>
