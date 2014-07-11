@@ -1,50 +1,64 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 11 Jul 2014 17:17:44 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20140711145138.GC3935@laptop>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
- <20140710111833.GY3935@laptop>
- <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
- <20140711145138.GC3935@laptop>
-Message-ID: <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 11 Jul 2014 17:18:50 +0200
+Subject: [PATCH RFC 06/15] drm/armada: move variant initialisation to
+ CRTC init
+In-Reply-To: <20140711143733.GB21766@n2100.arm.linux.org.uk>
+References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
+ <E1X3NMM-0000A5-N5@rmk-PC.arm.linux.org.uk> <53B7E86D.5040109@gmail.com>
+ <20140711143733.GB21766@n2100.arm.linux.org.uk>
+Message-ID: <53C0005A.4010001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2014 16:51, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Thu, Jul 10, 2014 at 04:03:51PM +0200, Vincent Guittot wrote:
->> On 10 July 2014 13:18, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
->> >> +             /*
->> >> +              * If the CPUs share their cache and the src_cpu's capacity is
->> >> +              * reduced because of other sched_class or IRQs, we trig an
->> >> +              * active balance to move the task
->> >> +              */
->> >> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
->> >> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
->> >> +                                                     sd->imbalance_pct)))
->> >>                       return 1;
->> >
->> > Why is this tied to shared caches?
+On 07/11/2014 04:37 PM, Russell King - ARM Linux wrote:
+> On Sat, Jul 05, 2014 at 01:58:37PM +0200, Sebastian Hesselbarth wrote:
+>> On 07/05/2014 12:38 PM, Russell King wrote:
+>>> Move the variant initialisation entirely to the CRTC init function -
+>>> the variant support is really about the CRTC properties than the whole
+>>> system, and we want to treat each CRTC individually when we support DT.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>> ---
+>> [...]
+>>> diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
+>>> index 531a9b0bdcfb..3f0e70bb2e9c 100644
+>>> --- a/drivers/gpu/drm/armada/armada_crtc.h
+>>> +++ b/drivers/gpu/drm/armada/armada_crtc.h
+>>> @@ -38,6 +38,7 @@ struct armada_crtc {
+>>>   	unsigned		num;
+>>>   	void __iomem		*base;
+>>>   	struct clk		*clk;
+>>> +	struct clk		*extclk[2];
 >>
->> It's just to limit the change of the policy to a level that can have
->> benefit without performance regression. I'm not sure that we can do
->> that at any level without risk
+>> Russell,
+>>
+>> I wonder, if we should rename above array srcclk instead of extclk
+>> while moving it anyway. That way we can use it for the other variant
+>> specific clocks, too.
 >
-> Similar to the other change; so both details _should_ have been in the
-> changelogs etc..
+> As the patches are prepared with this change, I'd prefer to submit them
+> as-is, and then we can update that as and when the support for things
+> like the MMP/610 is finished off.  I think they're good to go, so I'll
+> send them off later today to David.
 
-i'm going to add details in the v4
+Ok, sounds fine to me.
 
->
-> In any case, its feels rather arbitrary to me. What about machines where
-> there's no cache sharing at all (the traditional SMP systems). This
-> thing you're trying to do still seems to make sense there.
+> This leaves the TDA998x componentisation patches which I need to kick
+> out, and the initial DT changes.  Once those are in place, we should
+> have almost all ducks lined up for working DRM support - it'll certainly
+> be advanced enough to describe the LCD controllers and the TDA998x as
+> three separate DT entities using the of graph helpers.
 
-ok, I thought that traditional SMP systems have this flag set at core
-level. I mean ARM platforms have the flag for CPUs in the same cluster
-(which include current ARM SMP system) and the corei7 of my laptop has
-the flag at the cores level.
+Ok.
 
->
+> What's left is the display-subsystem { } entity to describe the makeup
+> of the subsystem.  That's not included as we currently need to pass
+> a block of memory, and the DT support for reserving chunks of memory
+> appeared (last time I looked) to only be botch-merged (only half of it
+> seems to have been merged making the whole reserved memory thing
+> totally useless - why people only half-merge features I've no idea.)
+
+There was a follow-up patch set for this some days ago
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/337686
+
+Sebastian
