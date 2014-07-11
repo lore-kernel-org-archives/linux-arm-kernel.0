@@ -1,41 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Jul 2014 19:15:00 +0100
-Subject: [GIT PULL] arm64 fixes for 3.16
-Message-ID: <20140711181452.GA20619@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 11 Jul 2014 21:28:45 +0200
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <20140618211038.GD558@drone.musicnaut.iki.fi>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
+ <201406182122.29623@pali>
+ <20140618211038.GD558@drone.musicnaut.iki.fi>
+Message-ID: <20140711192845.GB20015@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu 2014-06-19 00:10:39, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Wed, Jun 18, 2014 at 09:22:29PM +0200, Pali Roh?r wrote:
+> > So without this patch DT migration for Nokia N900 cannot be done 
+> > without breaking userspace - which is not acceptable...
+> 
+> I guess the fact is that the Nokia N900 proprietary userspace has
+> never worked properly with the mainline kernel without severe patching,
+> so you cannot really talk about any regression. If you cannot fix
+> those programs, you could still probably emulate the old Nokia kernel's
+> /proc/cpuinfo by providing some text file and bind mounting it, no?
 
-Please pull the arm64 fixes below. Thanks.
+Actually, yes, it worked pretty well with some close-to-mainline
+kernels.
 
-
-The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
-
-  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to fa2ec3ea10bd377f9d55772b1dab65178425a1a2:
-
-  arm64: implement TASK_SIZE_OF (2014-07-08 17:30:59 +0100)
-
-----------------------------------------------------------------
-ARM64 implementation of TASK_SIZE_OF and exporting two functions to
-modules.
-
-----------------------------------------------------------------
-Colin Cross (1):
-      arm64: implement TASK_SIZE_OF
-
-Mark Salter (1):
-      arm64: export __cpu_{clear,copy}_user_page functions
-
- arch/arm64/include/asm/memory.h | 2 ++
- arch/arm64/mm/copypage.c        | 2 ++
- 2 files changed, 4 insertions(+)
-
+And bind-mount on /proc/cpuinfo is beyond ugly, don't you think?
+									Pavel
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
