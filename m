@@ -1,209 +1,270 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 11 Jul 2014 13:53:10 -0700
-Subject: [PATCHv5] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <CAPz6YkUKWUuQrSjPbdhwwZ57kkzJ7tLGpue=mvw6+31kkBhauw@mail.gmail.com>
-References: <CAPz6YkUKWUuQrSjPbdhwwZ57kkzJ7tLGpue=mvw6+31kkBhauw@mail.gmail.com>
-Message-ID: <1405111990-23452-1-git-send-email-sonnyrao@chromium.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 11 Jul 2014 13:53:45 -0700
+Subject: [PATCH v1] clk: qcom: Add APQ8084 Multimedia Clock Controller
+ (MMCC) support
+In-Reply-To: <1402591302-12100-1-git-send-email-gdjakov@mm-sol.com>
+References: <1402591302-12100-1-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <53C04ED9.6030508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the fifo reset code to follow the reset procedure
-outlined in the documentation of Synopsys Mobile storage host databook.
+On 06/12/14 09:41, Georgi Djakov wrote:
+> Add support for the multimedia clock controller found on the APQ8084
+> based platforms. This will allow the multimedia device drivers to
+> control their clocks.
+>
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> ---
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
----
-v2: Add Generic DMA support
-    per the documentation, move interrupt clear before wait
-    make the test for DMA host->use_dma rather than host->using_dma
-    add proper return values (although it appears no caller checks)
-v3: rename fifo reset function, and change callers
-    use this combined reset function in dw_mci_resume()
-    just one caller left (probe), so get rid of dw_mci_ctrl_all_reset()
-    use DMA reset bit for all systems which use DMA
-    remove extra IDMAC reset in dw_mci_work_routine_card()
-    do CIU clock update in error path, if CIU reset cleared
-v4: remove comment about FIFO reset in dw_mci_work_routine_card()
-    move down error message when control reset clears but others don't
-     and clarify the error stating that we will still update clocks
-    make flags for all reset bits a macro
-v5: don't use dw_mci_reset() in dw_mci_resume() and instead match what
-    is done in dw_mci_probe() and don't force inline dw_mci_resume()
----
- drivers/mmc/host/dw_mmc.c | 86 ++++++++++++++++++++++++++++++++++-------------
- drivers/mmc/host/dw_mmc.h |  5 +++
- 2 files changed, 68 insertions(+), 23 deletions(-)
+I started picking up the qcom clock patches from the list. I see that
+this one has a small problem though:
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 55cd110..db25494 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -111,8 +111,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
- 	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
- };
- 
--static inline bool dw_mci_fifo_reset(struct dw_mci *host);
--static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
-+static bool dw_mci_reset(struct dw_mci *host);
- 
- #if defined(CONFIG_DEBUG_FS)
- static int dw_mci_req_show(struct seq_file *s, void *v)
-@@ -1254,7 +1253,7 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
- 		 * After an error, there may be data lingering
- 		 * in the FIFO
- 		 */
--		dw_mci_fifo_reset(host);
-+		dw_mci_reset(host);
- 	} else {
- 		data->bytes_xfered = data->blocks * data->blksz;
- 		data->error = 0;
-@@ -1371,7 +1370,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
- 
- 			/* CMD error in data command */
- 			if (mrq->cmd->error && mrq->data)
--				dw_mci_fifo_reset(host);
-+				dw_mci_reset(host);
- 
- 			host->cmd = NULL;
- 			host->data = NULL;
-@@ -1982,14 +1981,8 @@ static void dw_mci_work_routine_card(struct work_struct *work)
- 			}
- 
- 			/* Power down slot */
--			if (present == 0) {
--				/* Clear down the FIFO */
--				dw_mci_fifo_reset(host);
--#ifdef CONFIG_MMC_DW_IDMAC
--				dw_mci_idmac_reset(host);
--#endif
--
--			}
-+			if (present == 0)
-+				dw_mci_reset(host);
- 
- 			spin_unlock_bh(&host->lock);
- 
-@@ -2323,8 +2316,11 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
- 	return false;
- }
- 
--static inline bool dw_mci_fifo_reset(struct dw_mci *host)
-+static bool dw_mci_reset(struct dw_mci *host)
- {
-+	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
-+	bool ret = false;
-+
- 	/*
- 	 * Reseting generates a block interrupt, hence setting
- 	 * the scatter-gather pointer to NULL.
-@@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
- 		host->sg = NULL;
- 	}
- 
--	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
--}
-+	if (host->use_dma)
-+		flags |= SDMMC_CTRL_DMA_RESET;
- 
--static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
--{
--	return dw_mci_ctrl_reset(host,
--				 SDMMC_CTRL_FIFO_RESET |
--				 SDMMC_CTRL_RESET |
--				 SDMMC_CTRL_DMA_RESET);
-+	if (dw_mci_ctrl_reset(host, flags)) {
-+		/*
-+		 * In all cases we clear the RAWINTS register to clear any
-+		 * interrupts.
-+		 */
-+		mci_writel(host, RINTSTS, 0xFFFFFFFF);
-+
-+		/* if using dma we wait for dma_req to clear */
-+		if (host->use_dma) {
-+			unsigned long timeout = jiffies + msecs_to_jiffies(500);
-+			u32 status;
-+			do {
-+				status = mci_readl(host, STATUS);
-+				if (!(status & SDMMC_STATUS_DMA_REQ))
-+					break;
-+				cpu_relax();
-+			} while (time_before(jiffies, timeout));
-+
-+			if (status & SDMMC_STATUS_DMA_REQ) {
-+				dev_err(host->dev,
-+					"%s: Timeout waiting for dma_req to "
-+					"clear during reset", __func__);
-+				goto ciu_out;
-+			}
-+
-+			/* when using DMA next we reset the fifo again */
-+			if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
-+				goto ciu_out;
-+		}
-+	} else {
-+		/* if the controller reset bit did clear, then set clock regs */
-+		if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
-+			dev_err(host->dev, "%s: fifo/dma reset bits didn't "
-+				"clear but ciu was reset, doing clock update.",
-+				__func__);
-+			goto ciu_out;
-+		}
-+	}
-+
-+	if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
-+		/* It is also recommended that we reset and reprogram idmac */
-+		dw_mci_idmac_reset(host);
-+
-+	ret = true;
-+
-+ciu_out:
-+	/* After a CTRL reset we need to have CIU set clock registers  */
-+	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-+
-+	return ret;
- }
- 
- #ifdef CONFIG_OF
-@@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
- 	}
- 
- 	/* Reset all blocks */
--	if (!dw_mci_ctrl_all_reset(host))
-+	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
- 		return -ENODEV;
- 
- 	host->dma_ops = host->pdata->dma_ops;
-@@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
- 		}
- 	}
- 
--	if (!dw_mci_ctrl_all_reset(host)) {
-+	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
- 		ret = -ENODEV;
- 		return ret;
- 	}
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 6bf24ab..9ab8ccd 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -129,6 +129,7 @@
- #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
- /* Status register defines */
- #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
-+#define SDMMC_STATUS_DMA_REQ		BIT(31)
- /* FIFOTH register defines */
- #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
- 					 ((r) & 0xFFF) << 16 | \
-@@ -150,6 +151,10 @@
- /* Card read threshold */
- #define SDMMC_SET_RD_THLD(v, x)		(((v) & 0x1FFF) << 16 | (x))
- 
-+/* All ctrl reset bits */
-+#define SDMMC_CTRL_ALL_RESET_FLAGS \
-+	(SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET | SDMMC_CTRL_DMA_RESET)
-+
- /* Register access macros */
- #define mci_readl(dev, reg)			\
- 	__raw_readl((dev)->regs + SDMMC_##reg)
+drivers/clk/qcom/mmcc-apq8084.c:169:10: warning: Initializer entry
+defined twice
+drivers/clk/qcom/mmcc-apq8084.c:170:10:   also defined here
+drivers/clk/qcom/mmcc-apq8084.c:185:10: warning: Initializer entry
+defined twice
+drivers/clk/qcom/mmcc-apq8084.c:187:10:   also defined here
+drivers/clk/qcom/mmcc-apq8084.c:203:10: warning: Initializer entry
+defined twice
+drivers/clk/qcom/mmcc-apq8084.c:205:10:   also defined here
+
+> diff --git a/drivers/clk/qcom/mmcc-apq8084.c b/drivers/clk/qcom/mmcc-apq8084.c
+> new file mode 100644
+> index 0000000..9cc956a
+> --- /dev/null
+> +++ b/drivers/clk/qcom/mmcc-apq8084.c
+> @@ -0,0 +1,3352 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset-controller.h>
+> +
+> +#include <dt-bindings/clock/qcom,mmcc-apq8084.h>
+> +#include <dt-bindings/reset/qcom,mmcc-apq8084.h>
+> +
+> +#include "common.h"
+> +#include "clk-regmap.h"
+> +#include "clk-pll.h"
+> +#include "clk-rcg.h"
+> +#include "clk-branch.h"
+> +#include "reset.h"
+> +
+> +#define P_XO		0
+> +#define P_MMPLL0	1
+> +#define P_EDPLINK	1
+> +#define P_MMPLL1	2
+> +#define P_HDMIPLL	2
+> +#define P_GPLL0		3
+> +#define P_EDPVCO	3
+> +#define P_MMPLL4	3
+
+Seems that these are shared in the same parent map table. I'm not sure
+the best way to fix this yet because it's pretty annoying to come up
+with an optimal order. Maybe the whole scheme should be thrown out and
+we should just loop over the parent map looking for a particular enum
+value, and then have that enum map to the actual register value. We lose
+the direct indexing into the array, but it sure makes things a lot
+easier and avoids this whole mess.
+
+> +#define P_GPLL1		4
+> +#define P_DSI0PLL	4
+> +#define P_DSI0PLL_BYTE	4
+> +#define P_MMPLL2	4
+> +#define P_MMPLL3	4
+> +#define P_DSI1PLL	5
+> +#define P_DSI1PLL_BYTE	5
+> +#define P_MMSLEEP	6
+> +
+> +static const u8 mmcc_xo_mmpll0_mmpll1_gpll0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_MMPLL1]	= 2,
+> +	[P_GPLL0]	= 5,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_mmpll1_gpll0[] = {
+> +	"xo",
+> +	"mmpll0_vote",
+> +	"mmpll1_vote",
+> +	"mmss_gpll0_vote",
+> +};
+> +
+> +static const u8 mmcc_xo_mmpll0_dsi_hdmi_gpll0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_HDMIPLL]	= 4,
+> +	[P_GPLL0]	= 5,
+> +	[P_DSI0PLL]	= 2,
+> +	[P_DSI1PLL]	= 3,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_dsi_hdmi_gpll0[] = {
+> +	"xo",
+> +	"mmpll0_vote",
+> +	"hdmipll",
+> +	"mmss_gpll0_vote",
+> +	"dsi0pll",
+> +	"dsi1pll",
+> +};
+> +
+> +static const u8 mmcc_xo_mmpll0_1_2_gpll0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_MMPLL1]	= 2,
+> +	[P_GPLL0]	= 5,
+> +	[P_MMPLL2]	= 3,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_1_2_gpll0[] = {
+> +	"xo",
+> +	"mmpll0_vote",
+> +	"mmpll1_vote",
+> +	"mmss_gpll0_vote",
+> +	"mmpll2",
+> +};
+> +
+> +static const u8 mmcc_xo_mmpll0_1_3_gpll0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_MMPLL1]	= 2,
+> +	[P_GPLL0]	= 5,
+> +	[P_MMPLL3]	= 3,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_1_3_gpll0[] = {
+> +	"xo",
+> +	"mmpll0_vote",
+> +	"mmpll1_vote",
+> +	"mmss_gpll0_vote",
+> +	"mmpll3",
+> +};
+> +
+> +static const u8 mmcc_xo_dsi_hdmi_edp_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_EDPLINK]	= 4,
+> +	[P_HDMIPLL]	= 3,
+> +	[P_EDPVCO]	= 5,
+> +	[P_DSI0PLL]	= 1,
+> +	[P_DSI1PLL]	= 2,
+> +};
+> +
+> +static const char *mmcc_xo_dsi_hdmi_edp[] = {
+> +	"xo",
+> +	"edp_link_clk",
+> +	"hdmipll",
+> +	"edp_vco_div",
+> +	"dsi0pll",
+> +	"dsi1pll",
+> +};
+> +
+> +static const u8 mmcc_xo_dsi_hdmi_edp_gpll0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_EDPLINK]	= 4,
+> +	[P_HDMIPLL]	= 3,
+> +	[P_GPLL0]	= 5,
+> +	[P_DSI0PLL]	= 1,
+> +	[P_DSI1PLL]	= 2,
+> +};
+> +
+> +static const char *mmcc_xo_dsi_hdmi_edp_gpll0[] = {
+> +	"xo",
+> +	"edp_link_clk",
+> +	"hdmipll",
+> +	"gpll0_vote",
+> +	"dsi0pll",
+> +	"dsi1pll",
+> +};
+> +
+> +static const u8 mmcc_xo_dsibyte_hdmi_edp_gpll0_map[] = {
+> +	[P_XO]			= 0,
+> +	[P_EDPLINK]		= 4,
+> +	[P_HDMIPLL]		= 3,
+> +	[P_GPLL0]		= 5,
+> +	[P_DSI0PLL_BYTE]	= 1,
+> +	[P_DSI1PLL_BYTE]	= 2,
+> +};
+> +
+> +static const char *mmcc_xo_dsibyte_hdmi_edp_gpll0[] = {
+> +	"xo",
+> +	"edp_link_clk",
+> +	"hdmipll",
+> +	"gpll0_vote",
+> +	"dsi0pllbyte",
+> +	"dsi1pllbyte",
+> +};
+> +
+> +static const u8 mmcc_xo_mmpll0_1_4_gpll0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_MMPLL1]	= 2,
+> +	[P_MMPLL4]	= 3,
+> +	[P_GPLL0]	= 5,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_1_4_gpll0[] = {
+> +	"xo",
+> +	"mmpll0",
+> +	"mmpll1",
+> +	"mmpll4",
+> +	"gpll0",
+> +};
+> +
+> +static const u8 mmcc_xo_mmpll0_1_4_gpll1_0_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_MMPLL1]	= 2,
+> +	[P_MMPLL4]	= 3,
+> +	[P_GPLL1]	= 4,
+> +	[P_GPLL0]	= 5,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_1_4_gpll1_0[] = {
+> +	"xo",
+> +	"mmpll0",
+> +	"mmpll1",
+> +	"mmpll4",
+> +	"gpll1",
+> +	"gpll0",
+> +};
+> +
+> +static const u8 mmcc_xo_mmpll0_1_4_gpll1_0_sleep_map[] = {
+> +	[P_XO]		= 0,
+> +	[P_MMPLL0]	= 1,
+> +	[P_MMPLL1]	= 2,
+> +	[P_MMPLL4]	= 3,
+> +	[P_GPLL1]	= 4,
+> +	[P_GPLL0]	= 5,
+> +	[P_MMSLEEP]	= 6,
+> +};
+> +
+> +static const char *mmcc_xo_mmpll0_1_4_gpll1_0_sleep[] = {
+> +	"xo",
+> +	"mmpll0",
+> +	"mmpll1",
+> +	"mmpll4",
+> +	"gpll1",
+> +	"gpll0",
+> +	"sleep_clk_src",
+> +};
+> +
+>
+
+
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
