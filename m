@@ -1,53 +1,107 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 11 Jul 2014 09:30:54 +0200
-Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
-In-Reply-To: <20140701094159.GM14781@pengutronix.de>
-References: <20140630144355.GH14781@pengutronix.de>
- <20140701094159.GM14781@pengutronix.de>
-Message-ID: <20140711073054.GI11056@pengutronix.de>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 11 Jul 2014 16:33:23 +0900
+Subject: [PATCH v8 0/9] Support for creating generic PCI host bridges from
+ DT
+In-Reply-To: <CACoXjcn3b7otcbxdr+RAVNHHjHyVsvw0QcmK5jd-QBF8SQX5iw@mail.gmail.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
+ <20140708171828.GM6501@e106497-lin.cambridge.arm.com>
+ <CACoXjcn3b7otcbxdr+RAVNHHjHyVsvw0QcmK5jd-QBF8SQX5iw@mail.gmail.com>
+Message-ID: <004501cf9cda$65703610$3050a230$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Friday, July 11, 2014 9:44 AM, Tanmay Inamdar wrote:
+> On Tue, Jul 8, 2014 at 10:18 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Sun, Jul 06, 2014 at 04:23:43PM +0100, Rob Herring wrote:
+> >> On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > This is my resurected attempt at adding support for generic PCI host
+> >> > bridge controllers that make use of device tree information to
+> >> > configure themselves. I've tagged it as v8 although the patches
+> >> > have now been reshuffled in order to ease adoption so referring to
+> >> > the older versions might be a bit of a hoop jumping exercise.
+> >> >
+> >> > Changes from v7:
+> >> >   - Reordered the patches so that fixes and non-controversial patches
+> >> >     from v7 can be accepted more easily. If agreed I can split the
+> >> >     series again into patches that can be upstreamed easily and ones
+> >> >     that still need discussion.
+> >> >   - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
+> >> >     to better reflect its target use.
+> >> >   - Added the function to remap the bus I/O resources that used to be
+> >> >     provided in my arm64 patch series and (re)named it pci_remap_iospace()
+> >> >   - Removed error code checking from parsing and mapping of IRQ from DT
+> >> >     in recognition that some PCI devices will not have legacy IRQ mappings.
+> >> >
+> >> > v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
+> >>
+> >> Can you publish a branch for this series please.
+> >>
+> >> Rob
+> >>
+> >
+> > Hi Rob,
+> >
+> > I have pushed a brach that matches my v8 patchset +1 obvious missing header include
+> > here: http://www.linux-arm.org/git?p=linux-ld.git;a=shortlog;h=refs/heads/for-upstream/pci_v8
+> >
+> 
+> I was still getting following compilation error after applying arm64
+> pci headers. Please let me know if I am missing something.
+> 
+> linux-git/drivers/of/of_pci.c: In function ?pci_host_bridge_of_get_ranges?:
+> linux-git/drivers/of/of_pci.c:114:22: error: storage size of ?range? isn?t known
+>   struct of_pci_range range;
+>                       ^
+> linux-git/drivers/of/of_pci.c:115:29: error: storage size of ?parser?
+> isn?t known
+>   struct of_pci_range_parser parser;
+>                              ^
+> linux-git/drivers/of/of_pci.c:121:2: error: implicit declaration of
+> function ?of_pci_range_parser_init?
+> [-Werror=implicit-function-declaration]
+>   err = of_pci_range_parser_init(&parser, dev);
+> 
+> 
+> Below patch fixes the errors.
+> 
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 55d8320..da88dac 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -2,6 +2,7 @@
+>  #include <linux/export.h>
+>  #include <linux/of.h>
+>  #include <linux/of_pci.h>
+> +#include <linux/of_address.h>
 
-On Tue, Jul 01, 2014 at 11:41:59AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> I updated my tag to pull to not include the commit that drops ARM740T,
-> ARM940T and ARM946E-S because of Arnd's concerns. Also the two cleanups
-> that depended on this one are dropped.
-> 
-> (As before) I picked -rc3 as base because 1c2f87c22566..6980c3e2514e~ is
-> broken on nommu. 
-> 
-> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-> 
->   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
-> 
-> for you to fetch changes up to 83de911cf897a4317147dd9cb379378c2c4abf4c:
-> 
->   ARM: make user_addr_max more robust (2014-07-01 11:12:09 +0200)
-> 
-> ----------------------------------------------------------------
-> Two different fixes for the same problem making some ARM nommu configurations
-> not boot since 3.6-rc1. The problem is that user_addr_max returned the biggest
-> available RAM address which makes some copy_from_user variants fail to read
-> from XIP memory.
-> 
-> Even in the presence of one of the two fixes the other still makes sense, so
-> both patches are included here.
-> 
-> This problem was the last one preventing efm32 boot to a prompt with mainline.
-You neither commented nor pulled this request (at least I didn't find it
-in your repository). Is it still on your radar?
+Yes, right. I also found the build errors as above mentioned.
+"of_address.h" should be included, in order to fix the build errors.
+However, for readability, the following would be better.
 
-Best regards
-Uwe
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_pci.h>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+Jingoo Han
+
+> 
+>  static inline int __of_pci_pci_compare(struct device_node *node,
+>                                        unsigned int data)
+> 
+> 
+> > Best regards,
+> > Liviu
+> >
+> >
+> > --
+> > ====================
+> > | I would like to |
+> > | fix the world,  |
+> > | but they're not |
+> > | giving me the   |
+> >  \ source code!  /
+> >   ---------------
+> >     ?\_(?)_/?
+> >
