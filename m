@@ -1,44 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 11 Jul 2014 18:34:56 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: add clocks for usb device
-Message-ID: <1405096496-4139-1-git-send-email-nicolas.ferre@atmel.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Fri, 11 Jul 2014 09:43:37 -0700
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+Message-ID: <CAL1qeaGHfjQhLHvgzt85hmbuY4FOG5-k=f80=CNvzPDEgi9_6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+On Fri, Jul 11, 2014 at 7:18 AM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+> Add binding documentation for the nvidia,tegra124-emc device tree
+> node.
 
-Add clocks for usb device, or else switch to CCF, the gadget
-won't work.
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
 
-Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Tested-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Arnd, Olof, Kevin,
+> +Required properties :
+> +- compatible : "nvidia,tegra124-emc".
+> +- reg : Should contain 1 or 2 entries:
+> +  - EMC register set
+> +  - MC register set : Required only if no node with
+> +    'compatible = "nvidia,tegra124-mc"' exists. The MC register set
+> +    is first read from the MC node. If it doesn't exist, it is read
+> +    from this property.
+> +- timings : Should contain 1 entry for each supported clock rate.
+> +  Entries should be named "timing at n" where n is a 0-based increasing
+> +  number. The timings must be listed in rate-ascending order.
 
-This fix is the only one that I have for 3.16-rc currently. Can you please
-take it as a patch and queue it? It can go on top of already sent AT91 fixes
-for 3.16 or a 3.16-rc4.
+There are upcoming boards which support multiple DRAM configurations
+and require a separate set of timings for each configuration.  Could
+we instead have multiple sets of timings with the proper one selected
+at runtime by RAM code, as reported by PMC_STRAPPING_OPT_A_0?
+Something like:
 
-Best regards,
-
- arch/arm/boot/dts/at91sam9x5.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index d6133f497207..2ebc42140ea6 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -1045,6 +1045,8 @@
- 				reg = <0x00500000 0x80000
- 				       0xf803c000 0x400>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&usb>, <&udphs_clk>;
-+				clock-names = "hclk", "pclk";
- 				status = "disabled";
- 
- 				ep0 {
--- 
-1.8.2.2
+emc {
+        emc-table at 0 {
+                nvidia,ram-code = <0>;
+                timing at 0 {
+                        ...
+                };
+                ...
+        };
+        emc-table at 1 {
+                nvidia,ram-code = <4>;
+                timing at 0 {
+                        ...
+                };
+                ...
+        };
+        ...
+};
