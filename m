@@ -1,38 +1,69 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 11 Jul 2014 16:51:38 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
- <20140710111833.GY3935@laptop>
- <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
-Message-ID: <20140711145138.GC3935@laptop>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Jul 2014 16:51:47 +0200
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140711145146.GA6523@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 04:03:51PM +0200, Vincent Guittot wrote:
-> On 10 July 2014 13:18, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Mon, Jun 30, 2014 at 06:05:39PM +0200, Vincent Guittot wrote:
-> >> +             /*
-> >> +              * If the CPUs share their cache and the src_cpu's capacity is
-> >> +              * reduced because of other sched_class or IRQs, we trig an
-> >> +              * active balance to move the task
-> >> +              */
-> >> +             if ((sd->flags & SD_SHARE_PKG_RESOURCES)
-> >> +              && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
-> >> +                                                     sd->imbalance_pct)))
-> >>                       return 1;
-> >
-> > Why is this tied to shared caches?
+On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
+> Add binding documentation for the nvidia,tegra124-emc device tree
+> node.
 > 
-> It's just to limit the change of the policy to a level that can have
-> benefit without performance regression. I'm not sure that we can do
-> that at any level without risk
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  .../bindings/memory-controllers/tegra-emc.txt      | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+> new file mode 100644
+> index 0000000..2dde17e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+> @@ -0,0 +1,42 @@
+> +Tegra124 SoC EMC controller
+> +
+> +Required properties :
+> +- compatible : "nvidia,tegra124-emc".
+> +- reg : Should contain 1 or 2 entries:
+> +  - EMC register set
+> +  - MC register set : Required only if no node with
+> +    'compatible = "nvidia,tegra124-mc"' exists. The MC register set
+> +    is first read from the MC node. If it doesn't exist, it is read
+> +    from this property.
 
-Similar to the other change; so both details _should_ have been in the
-changelogs etc..
+No can do. Memory regions shouldn't be shared between drivers like this.
+It makes it impossible to ensure that they don't stump on each others'
+toes.
 
-In any case, its feels rather arbitrary to me. What about machines where
-there's no cache sharing at all (the traditional SMP systems). This
-thing you're trying to do still seems to make sense there.
+One possibility to make this work is to export global functions from the
+memory controller driver that this driver can call into. Perhaps if you
+want you can be extra explicit by linking them in DT, like this:
+
+	mc: memory-controller at 0,70019000 {
+		compatible = "nvidia,tegra124-mc";
+		reg = <0x0 0x70019000 0x0 0x00001000>;
+		...
+	};
+
+	memory-controller at 0,7001b000 {
+		compatible = "nvidia,tegra124-emc";
+		reg = <0x0 0x7001b000 0x0 0x00001000>;
+		memory-controller = <&mc>;
+		...
+	};
+
+But I think it's safe enough to assume that there will only be a single
+memory controller/EMC pair in the device.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/c8076ea6/attachment.sig>
