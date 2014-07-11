@@ -1,30 +1,26 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Fri, 11 Jul 2014 09:59:42 +0200
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <53BF996E.8020801@zonque.org>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 11 Jul 2014 16:00:11 +0800
+Subject: [BUG] usb: gadget: rndis: atmel_usba_udc: probe of 500000.gadget
+ failed with error -2
+In-Reply-To: <53BF8890.9020409@aksignal.cz>
+References: <53BF8890.9020409@aksignal.cz>
+Message-ID: <53BF998B.2070006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 04:55 AM, Dave Gerlach wrote:
-> This series adds suspend/resume support for am335x. Version 3 of this
-> series can be found at [1]. I apologize for the large delay between this
-> and the previous revision. This code has been heavily refined
-> since the last version based on the various comments received for v3. The
-> major change from previous version is moving all wkup_m3 code into a
-> remoteproc based driver. The new driver handles all IPC and fw loading
-> and exposes a small API to be used by PM code to achieve low power states.
+Hi Jiri Prchal,
 
-Thanks a lot for this new series, Dave!
+On 07/11/2014 02:47 PM, Ji?? Prchal wrote:
+> Hi,
+> I discovered bug when I try to use RNDIS gadget driver on SAM9G25 with
+> version 3.16.0-rc4. In version 3.14.0-rc4 it was OK.
+> If I plug pc to device port on my board I expect to establish ethernet
+> connection, instead of this it looks like it behave like host port. If I
+> look at all messages I found some problem during boot:
+> [    1.585937] atmel_usba_udc: probe of 500000.gadget failed with error -2
 
-I've given it a quick test on a custom AM335x board and can confirm
-success. Tested with both DDR2 and DDR3 versions, both work fine, and
-power consumption drops to a reasonable level.
+I tested OK with Linux kernel v3.16-rc4 (latest commit is: 
+4f440cd534359f689cb577c68f8491d1eddf0b76) on sam9g25.
 
-I'd be very happy if these patches made it in for 3.17, but I haven't
-followed the discussion on the patches this set depends on.
-
-
-Best regards,
-Daniel
+Best Regards,
+Bo Shen
