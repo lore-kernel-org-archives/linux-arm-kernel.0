@@ -1,61 +1,39 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Fri, 11 Jul 2014 20:21:27 +0300
-Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
- clocksource
-In-Reply-To: <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
-References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>	<1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>	<CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>	<53C01558.3090607@nvidia.com>
- <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
-Message-ID: <53C01D17.2050906@nvidia.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 11 Jul 2014 12:24:22 -0500
+Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <53BF996E.8020801@zonque.org>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <53BF996E.8020801@zonque.org>
+Message-ID: <53C01DC6.9040804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/07/14 20:08, Andrew Bresticker wrote:
-> On Fri, Jul 11, 2014 at 9:48 AM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
->>
->>
->> On 11/07/14 19:28, Andrew Bresticker wrote:
->>>
->>> On Thu, Jul 10, 2014 at 2:42 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com>
->>> wrote:
->>>>
->>>> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
->>>> and also provides automatic CPU rail voltage scaling as well. The DFLL
->>>> is a separate IP block from the usual Tegra124 clock-and-reset
->>>> controller, so it gets its own node in the device tree.
->>>
->>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->>>> b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
->>>
->>>
->>>> +- nvidia,pmic-voltage-table: Array of 2-tuples.  Each entry should have
->>>> the
->>>> +  form <register-value voltage-in-uV>, indicating the register value
->>>> that
->>>> +  needs to be programmed to the PMIC for changing the VDD_CPU voltage to
->>>> +  the specified voltage. The table must be in ascending order by the
->>>> voltage.
->>>
->>>
->>> Instead of listing the register values for each voltage in the DT,
->>> can't you use regulator_list_voltage() to create this map?
->>>
->>
->> I don't see a way to get the register values that way, unless we assume that
->> the mapping is linear and doesn't have holes.
+On 07/11/2014 02:59 AM, Daniel Mack wrote:
+> On 07/11/2014 04:55 AM, Dave Gerlach wrote:
+>> This series adds suspend/resume support for am335x. Version 3 of this
+>> series can be found at [1]. I apologize for the large delay between this
+>> and the previous revision. This code has been heavily refined
+>> since the last version based on the various comments received for v3. The
+>> major change from previous version is moving all wkup_m3 code into a
+>> remoteproc based driver. The new driver handles all IPC and fw loading
+>> and exposes a small API to be used by PM code to achieve low power states.
 >
-> Hmm... I guess if you don't assume it's linear and continuous you'd
-> have to iterate over all 256 selectors.
+> Thanks a lot for this new series, Dave!
+>
+> I've given it a quick test on a custom AM335x board and can confirm
+> success. Tested with both DDR2 and DDR3 versions, both work fine, and
+> power consumption drops to a reasonable level.
 >
 
-I don't think we can assume that each selector maps to a concrete 
-register value, though I'm not sure. include/linux/regulator/driver.h 
-documents for @list_voltage "Selectors range from zero to one less 
-regulator_desc.n_voltages." but maybe the consumer API could take 
-different values.
+I appreciate you trying it out!
 
--- 
-nvpublic
+Regards,
+Dave
+
+> I'd be very happy if these patches made it in for 3.17, but I haven't
+> followed the discussion on the patches this set depends on.
+>
+>
+> Best regards,
+> Daniel
+>
