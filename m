@@ -1,49 +1,54 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Jul 2014 11:11:08 +0200
-Subject: [PATCH v2 repost] serial: sh-sci: Add device tree support for
- r8a7{778,740,3a4} and sh73a0
-Message-ID: <20140711091107.GA25710@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 Jul 2014 11:00:07 +0200
+Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
+In-Reply-To: <53BF35B7.9000105@renesas.com>
+ <87oawxy69b.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20140711090005.GH12420@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply document new compat strings.
-There appears to be no need for a driver updates.
+[Cc Felipe Balbi]
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Thu, Jul 10, 2014 at 01:20:34AM -0700, Kuninori Morimoto wrote:
+> 
+> Hi
+> 
+> > Changes in v2:
+> > - move phy handle to struct usbhs_priv
+> > - add new default pipe type to driver
+> > - remove pipe type from Lager board code
+> > 
+> > Ulrich Hecht (2):
+> >   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
+> >   ARM: shmobile: lager: remove USBHS callbacks
+> > 
+> >  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
+> >  drivers/usb/renesas_usbhs/Makefile   |   2 +-
+> >  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
+> >  drivers/usb/renesas_usbhs/common.h   |   2 +
+> >  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
+> >  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
+> >  include/linux/usb/renesas_usbhs.h    |   6 ++
+> >  7 files changed, 163 insertions(+), 119 deletions(-)
+> >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
+> >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
+> 
+> For all patches
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
---
-v2
-* Added r8a73a4, r8a7740 and sh73a0 support
+[snip]
 
-Repost to Greg KH.
+> I tested these patches on Lager legacy, and these patches worked correctly.
+> 
+> Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Greg, I am hoping to get the platform side of this change included in v3.16.
-As there are no code changes I think it should be safe enough. But I am
-wondering if you could either merge this patch or give an Ack so that I'm
-not using bindings in dts files that have not been accepted by the driver
-maintainer.
+Hi,
 
----
- Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+it seems that the 2nd patch should go through my renesas tree
+but it depends on the first patch which should be taken by 
+Felipe Balbi (Cced).
 
-diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-index 64fd7de..b355660 100644
---- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-+++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-@@ -4,6 +4,13 @@ Required properties:
- 
-   - compatible: Must contain one of the following:
- 
-+    - "renesas,scifa-sh73a0" for SH73A0 (SH-Mobile AG5) SCIFA compatible UART.
-+    - "renesas,scifb-sh73a0" for SH73A0 (SH-Mobile AG5) SCIFB compatible UART.
-+    - "renesas,scifa-r8a73a4" for R8A73A4 (R-Mobile APE6) SCIFA compatible UART.
-+    - "renesas,scifb-r8a73a4" for R8A73A4 (R-Mobile APE6) SCIFB compatible UART.
-+    - "renesas,scifa-r8a7740" for R8A7740 (R-Mobile A1) SCIFA compatible UART.
-+    - "renesas,scifb-r8a7740" for R8A7740 (R-Mobile A1) SCIFB compatible UART.
-+    - "renesas,scif-r8a7778" for R8A7778 (R-Car M1) SCIF compatible UART.
-     - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
-     - "renesas,scif-r8a7790" for R8A7790 (R-Car H2) SCIF compatible UART.
-     - "renesas,scifa-r8a7790" for R8A7790 (R-Car H2) SCIFA compatible UART.
--- 
-2.0.0.rc2
+Felipe, is there any chance that you could take this for v3.16?
+I am quite happy to make a branch for you to pull for renesas_usbhs
+if this would make your life easier.
