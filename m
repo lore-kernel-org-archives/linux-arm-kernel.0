@@ -1,40 +1,38 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 10 Jul 2014 22:30:21 -0400
-Subject: No uart output on my snowball board
-Message-ID: <20140710223021.6e9c857f@gandalf.local.home>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Fri, 11 Jul 2014 02:38:00 +0000
+Subject: [PATCH] tty: serial: fsl_lpuart: add 32-bit register interface
+ support
+In-Reply-To: <20140710230353.GA25661@kroah.com>
+References: <1404204226-24452-1-git-send-email-jingchang.lu@freescale.com>
+ <20140710230353.GA25661@kroah.com>
+Message-ID: <d2f73b90bc714108a9aa14824633b375@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I decided to play with my snowball board as that's the easiest arm
-board I have to do testing on, and it was reported to me that I broke
-function graph tracing on the arm boards. But I haven't booted my
-snowball since 3.8. When I tried with the latest kernel, it didn't give
-me *any* output. I figured something was up with the uart, but the
-board also didn't boot.
+>-----Original Message-----
+>From: Greg KH [mailto:gregkh at linuxfoundation.org]
+>Sent: Friday, July 11, 2014 7:04 AM
+>To: Lu Jingchang-B35083
+>Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH] tty: serial: fsl_lpuart: add 32-bit register
+>interface support
+>
+>On Tue, Jul 01, 2014 at 04:43:46PM +0800, Jingchang Lu wrote:
+>> This add the big-endian 32-bit register version LPUART support.
+>>
+>> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+>> ---
+>>  drivers/tty/serial/fsl_lpuart.c | 652
+>> +++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 643 insertions(+), 9 deletions(-)
+>
+>This patch fails to apply to my tree :(
+>
+>Can you refresh it against the tty-next branch of the tty.git tree on
+>git.kernel.org and resend?
+Yes, I will do that and resend the patch. Thanks.
 
-I did a bisect to find out where the uart stopped working (I also
-stumbled on where the board stopped booting, but still need to find
-that commit). The uart died with this commit:
 
-commit a0998b8321eb5f53ef51924f5ab6c69237ac1025
-Author: Lee Jones <lee.jones@linaro.org>
-Date:   Thu Aug 22 16:18:56 2013 +0100
 
-    ARM: ux500: Remove UART support when booting without Device Tree
-    
-    It's time to remove all ATAG support from ux500 and rely solely on
-    Device Tree booting. This patch is part of that endeavour.
-    
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-This happened between 3.12 and 3.13.
-
-Does this mean that I need to get device tree support for this. I have
-no idea how to fix it as a device tree to me is a christmas tree (a
-tree with little lighty devices on it). Thus I'll just go and throw
-this out at you.
-
-Thanks,
-
--- Steve
+Best Regards,
+Jingchang
