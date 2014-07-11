@@ -1,69 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 11 Jul 2014 10:12:37 -0500
-Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
-In-Reply-To: <20140711090005.GH12420@verge.net.au>
-References: <53BF35B7.9000105@renesas.com>
- <87oawxy69b.wl%kuninori.morimoto.gx@renesas.com>
- <20140711090005.GH12420@verge.net.au>
-Message-ID: <20140711151236.GG27864@saruman.home>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 11 Jul 2014 17:13:04 +0200
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+Message-ID: <20140711151304.GD3935@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 11:00:07AM +0200, Simon Horman wrote:
-> [Cc Felipe Balbi]
+On Fri, Jul 11, 2014 at 09:51:06AM +0200, Vincent Guittot wrote:
+> On 10 July 2014 15:16, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
+> >> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
+> >>
+> >> We are going to use runnable_avg_sum and runnable_avg_period in order to get
+> >> the utilization of the CPU. This statistic includes all tasks that run the CPU
+> >> and not only CFS tasks.
+> >
+> > But this rq->avg is not the one that is migration aware, right? So why
+> > use this?
 > 
-> On Thu, Jul 10, 2014 at 01:20:34AM -0700, Kuninori Morimoto wrote:
-> > 
-> > Hi
-> > 
-> > > Changes in v2:
-> > > - move phy handle to struct usbhs_priv
-> > > - add new default pipe type to driver
-> > > - remove pipe type from Lager board code
-> > > 
-> > > Ulrich Hecht (2):
-> > >   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
-> > >   ARM: shmobile: lager: remove USBHS callbacks
-> > > 
-> > >  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
-> > >  drivers/usb/renesas_usbhs/Makefile   |   2 +-
-> > >  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
-> > >  drivers/usb/renesas_usbhs/common.h   |   2 +
-> > >  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
-> > >  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
-> > >  include/linux/usb/renesas_usbhs.h    |   6 ++
-> > >  7 files changed, 163 insertions(+), 119 deletions(-)
-> > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
-> > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
-> > 
-> > For all patches
-> > 
-> > Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Yes, it's not the one that is migration aware
 > 
-> [snip]
+> >
+> > We already compensate cpu_capacity for !fair tasks, so I don't see why
+> > we can't use the migration aware one (and kill this one as Yuyang keeps
+> > proposing) and compensate with the capacity factor.
 > 
-> > I tested these patches on Lager legacy, and these patches worked correctly.
-> > 
-> > Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> 
-> Hi,
-> 
-> it seems that the 2nd patch should go through my renesas tree
-> but it depends on the first patch which should be taken by 
-> Felipe Balbi (Cced).
-> 
-> Felipe, is there any chance that you could take this for v3.16?
-> I am quite happy to make a branch for you to pull for renesas_usbhs
-> if this would make your life easier.
+> The 1st point is that cpu_capacity is compensated by both !fair_tasks
+> and frequency scaling and we should not take into account frequency
+> scaling for detecting overload
 
-you need to take both patches or just patch 1 ?
+dvfs could help? Also we should not use arch_scale_freq_capacity() for
+things like cpufreq-ondemand etc. Because for those the compute capacity
+is still the max. We should only use it when we hard limit things.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/77a83077/attachment.sig>
+> What we have now is the the weighted load avg that is the sum of the
+> weight load of entities on the run queue. This is not usable to detect
+> overload because of the weight. An unweighted version of this figure
+> would be more usefull but it's not as accurate as the one I use IMHO.
+> The example that has been discussed during the review of the last
+> version has shown some limitations
+> 
+> With the following schedule pattern from Morten's example
+> 
+>    | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms |
+> A:   run     rq     run  ----------- sleeping -------------  run
+> B:   rq      run    rq    run   ---- sleeping -------------  rq
+> 
+> The scheduler will see the following values:
+> Task A unweighted load value is 47%
+> Task B unweight load is 60%
+> The maximum Sum of unweighted load is 104%
+> rq->avg load is 60%
+> 
+> And the real CPU load is 50%
+> 
+> So we will have opposite decision depending of the used values: the
+> rq->avg or the Sum of unweighted load
+> 
+> The sum of unweighted load has the main advantage of showing
+> immediately what will be the relative impact of adding/removing a
+> task. In the example, we can see that removing task A or B will remove
+> around half the CPU load but it's not so good for giving the current
+> utilization of the CPU
+
+In that same discussion ISTR a suggestion about adding avg_running time,
+as opposed to the current avg_runnable. The sum of avg_running should be
+much more accurate, and still react correctly to migrations.
