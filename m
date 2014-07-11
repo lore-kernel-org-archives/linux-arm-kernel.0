@@ -1,38 +1,68 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 11 Jul 2014 02:38:00 +0000
-Subject: [PATCH] tty: serial: fsl_lpuart: add 32-bit register interface
- support
-In-Reply-To: <20140710230353.GA25661@kroah.com>
-References: <1404204226-24452-1-git-send-email-jingchang.lu@freescale.com>
- <20140710230353.GA25661@kroah.com>
-Message-ID: <d2f73b90bc714108a9aa14824633b375@BL2PR03MB467.namprd03.prod.outlook.com>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Fri, 11 Jul 2014 10:40:20 +0800
+Subject: [PATCH 1/3] mtd: hisilicon: add device tree node for nand
+ controller
+In-Reply-To: <53BCEA77.2080004@huawei.com>
+References: <1404115409-20200-1-git-send-email-wangzhou.bry@gmail.com>
+ <1404115409-20200-2-git-send-email-wangzhou.bry@gmail.com>
+ <53BCEA77.2080004@huawei.com>
+Message-ID: <53BF4E94.7030104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Greg KH [mailto:gregkh at linuxfoundation.org]
->Sent: Friday, July 11, 2014 7:04 AM
->To: Lu Jingchang-B35083
->Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH] tty: serial: fsl_lpuart: add 32-bit register
->interface support
->
->On Tue, Jul 01, 2014 at 04:43:46PM +0800, Jingchang Lu wrote:
->> This add the big-endian 32-bit register version LPUART support.
->>
->> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+On 2014?07?09? 15:08, Jerome FORISSIER wrote:
+> On 30-Jun-14 10:03, Zhou Wang wrote:
+>> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
 >> ---
->>  drivers/tty/serial/fsl_lpuart.c | 652
->> +++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 643 insertions(+), 9 deletions(-)
+>>   arch/arm/boot/dts/hip04.dtsi |   31 +++++++++++++++++++++++++++++++
+>>   1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+>> index abb42ca..e63fc61 100644
+>> --- a/arch/arm/boot/dts/hip04.dtsi
+>> +++ b/arch/arm/boot/dts/hip04.dtsi
+>> @@ -386,5 +386,36 @@
+>>   				interrupts = <0 389 4>;
+>>   			};
+>>   		};
+>> +
+>> +		nand: nand at 4020000 {
+>> +			compatible = "hisilicon,504-nfc";
 >
->This patch fails to apply to my tree :(
+> In PATCH 2/3 and 3/3 you are using "hisilicon,nfc504".
 >
->Can you refresh it against the tty-next branch of the tty.git tree on
->git.kernel.org and resend?
-Yes, I will do that and resend the patch. Thanks.
 
+It was my mistake. All should be "hisilicon,504-nfc". Thanks a lot.
 
-
-Best Regards,
-Jingchang
+>> +			reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
+>> +			interrupts = <0 379 4>;
+>> +			nand-bus-width = <8>;
+>> +			nand-ecc-mode = "none";
+>> +			hisi,nand-ecc-bits = <0>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +
+>> +			partition at 0 {
+>> +				label = "nand_text";
+>> +				reg = <0x00000000 0x00400000>;
+>> +			};
+>> +
+>> +			partition at 00400000 {
+>> +				label = "nand_monitor";
+>> +				reg = <0x00400000 0x00400000>;
+>> +			};
+>> +
+>> +			partition at 00800000 {
+>> +				label = "nand_kernel";
+>> +				reg = <0x00800000 0x00800000>;
+>> +			};
+>> +
+>> +			partition at 01000000 {
+>> +				label = "nand_fs";
+>> +				reg = <0x01000000 0x1f000000>;
+>> +			};
+>> +		};
+>>   	};
+>>   };
+>>
+>
