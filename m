@@ -1,44 +1,32 @@
 From: addy.ke@rock-chips.com (Addy Ke)
-Date: Fri, 11 Jul 2014 10:08:51 +0800
-Subject: [PATCH 3/4] spi/rockchip: master->mode_bits: remove SPI_CS_HIGH bit
+Date: Fri, 11 Jul 2014 10:09:19 +0800
+Subject: [PATCH 4/4] spi/rockchip: add compatible strings for RK3188 and RK3288
 In-Reply-To: <1405044389-6800-1-git-send-email-addy.ke@rock-chips.com>
 References: <1405044389-6800-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1405044531-6963-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1405044559-7009-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Addy Ke <addy.ke@rockchip.com>
 
-Suggested-by: Jonas Gorski <jogo@openwrt.org>
+Suggested-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Addy Ke <addy.ke@rockchip.com>
 ---
- drivers/spi/spi-rockchip.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ drivers/spi/spi-rockchip.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 09c690c..a8866c9 100644
+index a8866c9..cb8fd6f 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -295,11 +295,6 @@ static int rockchip_spi_prepare_message(struct spi_master *master,
- 	struct rockchip_spi *rs = spi_master_get_devdata(master);
- 	struct spi_device *spi = msg->spi;
+@@ -814,6 +814,8 @@ static const struct dev_pm_ops rockchip_spi_pm = {
  
--	if (spi->mode & SPI_CS_HIGH) {
--		dev_err(rs->dev, "spi_cs_hign: not support\n");
--		return -EINVAL;
--	}
--
- 	rs->mode = spi->mode;
- 
- 	return 0;
-@@ -657,7 +652,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 
- 	master->auto_runtime_pm = true;
- 	master->bus_num = pdev->id;
--	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP;
-+	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
- 	master->num_chipselect = 2;
- 	master->dev.of_node = pdev->dev.of_node;
- 	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8);
+ static const struct of_device_id rockchip_spi_dt_match[] = {
+ 	{ .compatible = "rockchip,rk3066-spi", },
++	{ .compatible = "rockchip,rk3188-spi", },
++	{ .compatible = "rockchip,rk3288-spi", },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, rockchip_spi_dt_match);
 -- 
 1.8.3.2
