@@ -1,46 +1,66 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 11 Jul 2014 15:43:03 +0200
-Subject: [PATCH] ARM: EXYNOS: Fix build with PM_SLEEP=n
-Message-ID: <1405086183-24715-1-git-send-email-k.kozlowski@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 11 Jul 2014 13:44:59 -0000
+Subject: [patch 41/55] arm: bL_switcher:k Use ktime_get_real_ns()
+References: <20140711133623.530368377@linutronix.de>
+Message-ID: <20140711133708.760127423@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix building of exynos defconfig with disabled PM_SLEEP:
-CONFIG_PM_SLEEP=n
-CONFIG_PM_SLEEP_SMP=n
-CONFIG_SUSPEND=n
+Use the nanoseconds based interface instead of converting from a
+timespec.
 
-The build error messages:
-arch/arm/mach-exynos/built-in.o: In function `exynos_boot_secondary':
-arch/arm/mach-exynos/platsmp.c:111: undefined reference to `exynos_cpu_power_state'
-arch/arm/mach-exynos/platsmp.c:112: undefined reference to `exynos_cpu_power_up'
-arch/arm/mach-exynos/platsmp.c:116: undefined reference to `exynos_cpu_power_state'
-make: *** [vmlinux] Error 1
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/mach-exynos/common.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/common/bL_switcher.c |   16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index f8daa9cc5617..966ecf195265 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -149,9 +149,15 @@ struct exynos_pmu_conf {
- };
+Index: tip/arch/arm/common/bL_switcher.c
+===================================================================
+--- tip.orig/arch/arm/common/bL_switcher.c
++++ tip/arch/arm/common/bL_switcher.c
+@@ -58,16 +58,6 @@ static int read_mpidr(void)
+ }
  
- extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-+#ifdef CONFIG_PM_SLEEP
- extern void exynos_cpu_power_down(int cpu);
- extern void exynos_cpu_power_up(int cpu);
- extern int  exynos_cpu_power_state(int cpu);
-+#else
-+extern inline void exynos_cpu_power_down(int cpu) {}
-+extern inline void exynos_cpu_power_up(int cpu) {}
-+extern inline int  exynos_cpu_power_state(int cpu) { return 0; }
-+#endif
- extern void exynos_cluster_power_down(int cluster);
- extern void exynos_cluster_power_up(int cluster);
- extern int  exynos_cluster_power_state(int cluster);
--- 
-1.9.1
+ /*
+- * Get a global nanosecond time stamp for tracing.
+- */
+-static s64 get_ns(void)
+-{
+-	struct timespec ts;
+-	getnstimeofday(&ts);
+-	return timespec_to_ns(&ts);
+-}
+-
+-/*
+  * bL switcher core code.
+  */
+ 
+@@ -224,7 +214,7 @@ static int bL_switch_to(unsigned int new
+ 	 */
+ 	local_irq_disable();
+ 	local_fiq_disable();
+-	trace_cpu_migrate_begin(get_ns(), ob_mpidr);
++	trace_cpu_migrate_begin(ktime_get_real_ns(), ob_mpidr);
+ 
+ 	/* redirect GIC's SGIs to our counterpart */
+ 	gic_migrate_target(bL_gic_id[ib_cpu][ib_cluster]);
+@@ -267,7 +257,7 @@ static int bL_switch_to(unsigned int new
+ 					  tdev->evtdev->next_event, 1);
+ 	}
+ 
+-	trace_cpu_migrate_finish(get_ns(), ib_mpidr);
++	trace_cpu_migrate_finish(ktime_get_real_ns(), ib_mpidr);
+ 	local_fiq_enable();
+ 	local_irq_enable();
+ 
+@@ -558,7 +548,7 @@ int bL_switcher_get_logical_index(u32 mp
+ 
+ static void bL_switcher_trace_trigger_cpu(void *__always_unused info)
+ {
+-	trace_cpu_migrate_current(get_ns(), read_mpidr());
++	trace_cpu_migrate_current(ktime_get_real_ns(), read_mpidr());
+ }
+ 
+ int bL_switcher_trace_trigger(void)
