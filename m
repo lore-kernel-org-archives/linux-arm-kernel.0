@@ -1,137 +1,44 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Fri, 11 Jul 2014 19:20:48 +0900
-Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <CAPz6YkXgoKPSQEdNOwAQDhEnFGFVArr_0obbVR_okAEOvLxtzA@mail.gmail.com>
-References: <CAPz6YkUzGWnOznZ4UXNsLbe=ehDwfMJwUSjahUKVnVz8w9OcsA@mail.gmail.com>
- <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
- <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
- <CAPz6YkXgoKPSQEdNOwAQDhEnFGFVArr_0obbVR_okAEOvLxtzA@mail.gmail.com>
-Message-ID: <001301cf9cf1$c91c7310$5b555930$%jun@samsung.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 11 Jul 2014 12:20:53 +0200
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140711102053.GB1958@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, July 11, 2014, Sonny Rao wrote:
-> On Thu, Jul 10, 2014 at 5:28 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> > Hi Sonny,
-> >
-> > I have missed this patch.
-> >
-> > You finally choose to take extra interrupt handling.
-> > If it is not harm, it's fine.
-> 
-> Hi, thanks for coming back to it.  Based on my tracing, the interrupt
-> seems to be okay and is just ignored.
-> 
-> >> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
-> >> +static inline bool dw_mci_reset(struct dw_mci *host)
-"inline" is no needed anymore.
+On Mon, Jun 30, 2014 at 09:51:51AM -0700, Olav Haugan wrote:
+> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
+> +		    struct scatterlist *sg, unsigned int len, int prot)
+> +{
+> +	if (unlikely(domain->ops->map_range == NULL))
+> +		return -ENODEV;
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	return domain->ops->map_range(domain, iova, sg, len, prot);
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_map_range);
+> +
+> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
+> +		      unsigned int len)
+> +{
+> +	if (unlikely(domain->ops->unmap_range == NULL))
+> +		return -ENODEV;
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	return domain->ops->unmap_range(domain, iova, len);
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
 
-> >>  {
-> >> +     u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
-> >> +     bool ret = false;
-> >> +
-> >>       /*
-> >>        * Reseting generates a block interrupt, hence setting
-> >>        * the scatter-gather pointer to NULL.
-> >> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
-> >>               host->sg = NULL;
-> >>       }
-> >>
-> >> -     return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-> >> -}
-> >> +     if (host->use_dma)
-> >> +             flags |= SDMMC_CTRL_DMA_RESET;
-> >>
-> >> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
-> >> -{
-> >> -     return dw_mci_ctrl_reset(host,
-> >> -                              SDMMC_CTRL_FIFO_RESET |
-> >> -                              SDMMC_CTRL_RESET |
-> >> -                              SDMMC_CTRL_DMA_RESET);
-> >> +     if (dw_mci_ctrl_reset(host, flags)) {
-> >> +             /*
-> >> +              * In all cases we clear the RAWINTS register to clear any
-> >> +              * interrupts.
-> >> +              */
-> >> +             mci_writel(host, RINTSTS, 0xFFFFFFFF);
-> >> +
-> >> +             /* if using dma we wait for dma_req to clear */
-> >> +             if (host->use_dma) {
-> >> +                     unsigned long timeout = jiffies + msecs_to_jiffies(500);
-> >> +                     u32 status;
-> >> +                     do {
-> >> +                             status = mci_readl(host, STATUS);
-> >> +                             if (!(status & SDMMC_STATUS_DMA_REQ))
-> >> +                                     break;
-> >> +                             cpu_relax();
-> >> +                     } while (time_before(jiffies, timeout));
-> >> +
-> >> +                     if (status & SDMMC_STATUS_DMA_REQ) {
-> >> +                             dev_err(host->dev,
-> >> +                                     "%s: Timeout waiting for dma_req to "
-> >> +                                     "clear during reset", __func__);
-> >> +                             goto ciu_out;
-> >> +                     }
-> >> +
-> >> +                     /* when using DMA next we reset the fifo again */
-> >> +                     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
-> >> +                             goto ciu_out;
-> >> +             }
-> >> +     } else {
-> >> +             /* if the controller reset bit did clear, then set clock regs */
-> >> +             if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
-> >> +                     dev_err(host->dev, "%s: fifo/dma reset bits didn't "
-> >> +                             "clear but ciu was reset, doing clock update.",
-> >> +                             __func__);
-> >> +                     goto ciu_out;
-> >> +             }
-> >> +     }
-> >> +
-> >> +     if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
-> >> +             /* It is also recommended that we reset and reprogram idmac */
-> >> +             dw_mci_idmac_reset(host);
-> >> +
-> >> +     ret = true;
-> >> +
-> >> +ciu_out:
-> >> +     /* After a CTRL reset we need to have CIU set clock registers  */
-> >> +     mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-> >> +
-> >> +     return ret;
-> >>  }
-> >>
-> >>  #ifdef CONFIG_OF
-> >> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
-> >>       }
-> >>
-> >>       /* Reset all blocks */
-> >> -     if (!dw_mci_ctrl_all_reset(host))
-> >> +     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
-> >>               return -ENODEV;
-> >>
-> >>       host->dma_ops = host->pdata->dma_ops;
-> >> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
-> >>               }
-> >>       }
-> >>
-> >> -     if (!dw_mci_ctrl_all_reset(host)) {
-> >> +     if (!dw_mci_reset(host)) {
-> > Do you have any reason to use dw_mci_reset() unlike doing on probing?
-> 
-> I really wanted to use dw_mci_reset() everwhere, including probe,
-> because that would be simplest, where there is just one reset function
-> always, but the host structure is not completely set up at probe time,
-> so the code in dw_mci_reset() where we try to send a command to update
-> clock fails, so that's why I had to just do a reset.
+Before introducing these new API functions there should be a fall-back
+for IOMMU drivers that do (not yet) implement the map_range and
+unmap_range call-backs.
 
-Yes, if we can keep one interface, it would be good.
-But can you check below?
-Did you see the kernel panic on probing with "host->cur_slot" is NULL?
-If right, resume seems not different from probe in case of removable type.
-And dw_mci_idmac_reset() is redundant when dw_mci_reset() is used at resume.
+The last thing we want is this kind of functional partitioning between
+different IOMMU drivers.
 
-I think dw_mci_ctrl_reset() can be also used at resume like at probe for simple way.
-For safety's sake, "host->cur_slot" should be guaranteed it's not NULL.
 
-Thanks,
-Seungwon Jeon
+	Joerg
