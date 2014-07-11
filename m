@@ -1,53 +1,75 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 11 Jul 2014 15:37:38 +0800
-Subject: [RFC Patch V1 21/30] mm,
- irqchip: Use cpu_to_mem()/numa_mem_id() to support memoryless node
-In-Reply-To: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1405064267-11678-22-git-send-email-jiang.liu@linux.intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 11 Jul 2014 09:35:13 +0200
+Subject: [PATCHv3] arm64: fpsimd: avoid restoring fpcr if the contents
+ haven't changed
+In-Reply-To: <1404992409-6968-1-git-send-email-will.deacon@arm.com>
+References: <1404992409-6968-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu_zWB5ADag8w68--YnH6BNy3FVaHzz2zr+R5K6XcA9iYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_HAVE_MEMORYLESS_NODES is enabled, cpu_to_node()/numa_node_id()
-may return a node without memory, and later cause system failure/panic
-when calling kmalloc_node() and friends with returned node id.
-So use cpu_to_mem()/numa_mem_id() instead to get the nearest node with
-memory for the/current cpu.
+On 10 July 2014 13:40, Will Deacon <will.deacon@arm.com> wrote:
+> Writing to the FPCR is commonly implemented as a self-synchronising
+> operation in the CPU, so avoid writing to the register when the saved
+> value matches that in the hardware already.
+>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/fpsimdmacros.h | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+>
 
-If CONFIG_HAVE_MEMORYLESS_NODES is disabled, cpu_to_mem()/numa_mem_id()
-is the same as cpu_to_node()/numa_node_id().
+Hi Will,
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- drivers/irqchip/irq-clps711x.c |    2 +-
- drivers/irqchip/irq-gic.c      |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/irqchip/irq-clps711x.c b/drivers/irqchip/irq-clps711x.c
-index 33340dc97d1d..b0acf8b32a1a 100644
---- a/drivers/irqchip/irq-clps711x.c
-+++ b/drivers/irqchip/irq-clps711x.c
-@@ -186,7 +186,7 @@ static int __init _clps711x_intc_init(struct device_node *np,
- 	writel_relaxed(0, clps711x_intc->intmr[1]);
- 	writel_relaxed(0, clps711x_intc->intmr[2]);
- 
--	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_node_id());
-+	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_mem_id());
- 	if (IS_ERR_VALUE(err))
- 		goto out_iounmap;
- 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 7e11c9d6ae8c..a7e6c043d823 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1005,7 +1005,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	if (of_property_read_u32(node, "arm,routable-irqs",
- 				 &nr_routable_irqs)) {
- 		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
--					   numa_node_id());
-+					   numa_mem_id());
- 		if (IS_ERR_VALUE(irq_base)) {
- 			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
- 			     irq_start);
+This works fine as far as I can tell.
 -- 
-1.7.10.4
+Ard.
+
+
+> diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+> index 768414d55e64..007618b8188c 100644
+> --- a/arch/arm64/include/asm/fpsimdmacros.h
+> +++ b/arch/arm64/include/asm/fpsimdmacros.h
+> @@ -40,6 +40,19 @@
+>         str     w\tmpnr, [\state, #16 * 2 + 4]
+>  .endm
+>
+> +.macro fpsimd_restore_fpcr state, tmp
+> +       /*
+> +        * Writes to fpcr may be self-synchronising, so avoid restoring
+> +        * the register if it hasn't changed.
+> +        */
+> +       mrs     \tmp, fpcr
+> +       cmp     \tmp, \state
+> +       b.eq    9999f
+> +       msr     fpcr, \state
+> +9999:
+> +.endm
+> +
+> +/* Clobbers \state */
+>  .macro fpsimd_restore state, tmpnr
+>         ldp     q0, q1, [\state, #16 * 0]
+>         ldp     q2, q3, [\state, #16 * 2]
+> @@ -60,7 +73,7 @@
+>         ldr     w\tmpnr, [\state, #16 * 2]
+>         msr     fpsr, x\tmpnr
+>         ldr     w\tmpnr, [\state, #16 * 2 + 4]
+> -       msr     fpcr, x\tmpnr
+> +       fpsimd_restore_fpcr x\tmpnr, \state
+>  .endm
+>
+>  .altmacro
+> @@ -84,7 +97,7 @@
+>  .macro fpsimd_restore_partial state, tmpnr1, tmpnr2
+>         ldp     w\tmpnr1, w\tmpnr2, [\state]
+>         msr     fpsr, x\tmpnr1
+> -       msr     fpcr, x\tmpnr2
+> +       fpsimd_restore_fpcr x\tmpnr2, x\tmpnr1
+>         adr     x\tmpnr1, 0f
+>         ldr     w\tmpnr2, [\state, #8]
+>         add     \state, \state, x\tmpnr2, lsl #4
+> --
+> 2.0.0
+>
