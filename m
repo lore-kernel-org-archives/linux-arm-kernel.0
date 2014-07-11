@@ -1,62 +1,37 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 11 Jul 2014 16:08:23 +0100
-Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140711141115.GB16321@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
- <20140708005954.GC22939@google.com>
- <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
- <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
- <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
- <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
- <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
- <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
- <20140711141115.GB16321@arm.com>
-Message-ID: <20140711150823.GU6501@e106497-lin.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 Jul 2014 17:09:22 +0200
+Subject: [PATCH 10/13] [RFC] ARM: dts: Add shmobile platform device tree
+ bindings documentation
+In-Reply-To: <CAMuHMdXP6GfO7OEnXU8x4Sn5j8_tA2nnrFANr1sriB-B4BYoOQ@mail.gmail.com>
+References: <1404908623-909-1-git-send-email-geert+renesas@glider.be>
+ <1404908623-909-11-git-send-email-geert+renesas@glider.be>
+ <20140711091720.GO12420@verge.net.au>
+ <CAMuHMdXP6GfO7OEnXU8x4Sn5j8_tA2nnrFANr1sriB-B4BYoOQ@mail.gmail.com>
+Message-ID: <20140711150921.GA1777@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 03:11:16PM +0100, Catalin Marinas wrote:
-> On Thu, Jul 10, 2014 at 11:36:10PM +0100, Bjorn Helgaas wrote:
-> > Most of the rest of the v7 discussion was about "Introduce a domain
-> > number for pci_host_bridge."  I think we should add arm64 using the
-> > existing pci_scan_root_bus() and keep the domain number in the arm64
-> > sysdata structure like every other arch does.  Isn't that feasible?
-> > We can worry about domain unification later.
+On Fri, Jul 11, 2014 at 04:26:03PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> I think that's what we were trying to avoid, adding an arm64-specific
-> pci_sys_data structure (and arm64-specific API). IIUC, avoiding this
-> would allow the host controller drivers to use the sysdata pointer for
-> their own private data structures.
+> On Fri, Jul 11, 2014 at 11:17 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Wed, Jul 09, 2014 at 02:23:40PM +0200, Geert Uytterhoeven wrote:
+> >> Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+> >> Documentation, listing supported SoCs and boards.
+> >>
+> >> This allows to use checkpatch to validate DTSes referring to Renesas
+> >> shmobile SoCs, and boards containing those SoCs.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >
+> > Thanks Geert,
+> >
+> > from my point of view this seems nice. Is there a reason it is marked as an RFC?
 > 
-> Also since you can specify the domain number via DT (and in Liviu's
-> v8 patches read by of_create_pci_host_bridge), I think it would make
-> sense to have it stored in some generic data structures (e.g.
-> pci_host_bridge) rather than in an arm64 private sysdata.
+> >From the cover letter:
 > 
-> (Liviu is thinking of an alternative API but maybe he could briefly
-> describe it here before posting a new series)
-> 
-> -- 
-> Catalin
+> "The last 4 patches contain compatible strings for new R-Car Gen2 SoCs,
+>  which are not yet in active use, hence the RFC status."
 
-
-My plan is to keep the domain number in the pci_host_bridge and split
-the creation of the pci_host_bridge out of the pci_create_root_bus().
-The new function (tentatively called pci_create_new_root_bus()) will
-no longer call pci_alloc_host_bridge() but will accept it as a
-parameter, allowing one to be able to set the domain_nr ahead of the
-root bus creation.
-
-Best regards,
-Liviu
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Thanks, sorry for missing that.
