@@ -1,116 +1,73 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 11 Jul 2014 14:54:00 +0200
-Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
-In-Reply-To: <1405074557-5519-1-git-send-email-b29396@freescale.com>
-References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
-Message-ID: <53BFDE68.4040405@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Jul 2014 14:56:40 +0200
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+ <20140707004417.GE8469@quad.lixom.net>
+ <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+ <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
+Message-ID: <20140711125639.GA10744@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 12:29 PM, Dong Aisheng wrote:
-> add M_CAN device tree binding documentation
+On Tue, Jul 08, 2014 at 10:47:16AM -0700, Olof Johansson wrote:
+> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
+> <pdeschrijver@nvidia.com> wrote:
+> > On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
+> >> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+> >> > This branch moves code related to the Tegra fuses out of arch/arm and
+> >> > into a centralized location which could be shared with ARM64. It also
+> >> > adds support for reading the fuse data through sysfs.
+> >>
+> >> The new/moved misc driver isn't acked by any misc maintainer, so I can't
+> >> take this branch.
+> >>
+> >> I saw no indication from searching the mailing list of that either,
+> >> so it wasn't just a missed acked-by.
+> >>
+> >> I wonder if this code should go under drivers/soc/ instead?
+> >
+> > It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
+> > Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
+> > and therefore it was moved to drivers/misc/fuse. I think that's the right
+> > place still.
 > 
-> Cc: Wolfgang Grandegger <wg@grandegger.com>
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
-> Cc: Varka Bhadram <varkabhadram@gmail.com>
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
->  1 files changed, 65 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+> I disagree, I think this belongs under drivers/soc. Especially since
+> you're adding dependencies on this misc driver from other parts of the
+> kernel / other drivers.
 > 
-> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
-> new file mode 100644
-> index 0000000..c4cb263
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
-> @@ -0,0 +1,65 @@
-> +Bosch MCAN controller Device Tree Bindings
-> +-------------------------------------------------
-> +
-> +Required properties:
-> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
-> +- reg			: physical base address and size of the M_CAN
-> +			  registers map and Message RAM
-> +- reg-names		: Should be "m_can" and "message_ram"
-> +- interrupts		: Should be the interrupt number of M_CAN interrupt
-> +			  line 0 and line 1, could be same if sharing
-> +			  the same interrupt.
-> +- interrupt-names	: Should contain "int0" and "int1"
-> +- clocks		: Clocks used by controller, should be host clock
-> +			  and CAN clock.
-> +- clock-names		: Should contain "hclk" and "cclk"
-> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
-> +- pinctrl-names		: Names corresponding to the numbered pinctrl states
-> +- mram-cfg		: Message RAM configuration data.
-> +  Multiple M_CAN instances can share the same Message RAM and each element(e.g
-> +  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
-> +  so this property is telling driver how the shared or private Message RAM
-> +  are used by this M_CAN controller.
-
-Will you have to modify the binding, espeically the mram-cfg, if you add
-canfd support to the driver?
-
-I think mram-cfg should have a vendor prefix, e.g.: bosch,mram-cfg
-
-> +
-> +  The format should be as follows:
-> +  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems rxb_elems
-> +   txe_elems txb_elems>
-> +  The 'offset' is an address offset of the Message RAM where the following
-> +  elements start from. This is usually set to 0x0 if you're using a private
-> +  Message RAM. The remain cells are used to specify how many elements are used
-> +  for each FIFO/Buffer.
-> +
-> +M_CAN includes the following elements according to user manual:
-> +11-bit Filter	0-128 elements / 0-128 words
-> +29-bit Filter	0-64 elements / 0-128 words
-> +Rx FIFO 0	0-64 elements / 0-1152 words
-> +Rx FIFO 1	0-64 elements / 0-1152 words
-> +Rx Buffers	0-64 elements / 0-1152 words
-> +Tx Event FIFO	0-32 elements / 0-64 words
-> +Tx Buffers	0-32 elements / 0-576 words
-> +
-> +Please refer to 2.4.1 Message RAM Configuration in Bosch M_CAN user manual
-> +for details.
-> +
-> +Example:
-> +SoC dtsi:
-> +m_can1: can at 020e8000 {
-> +	compatible = "bosch,m_can";
-> +	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
-> +	reg-names = "m_can", "message_ram";
-> +	interrupts = <0 114 0x04>,
-> +		     <0 114 0x04>;
-> +	interrupt-names = "int0", "int1";
-> +	clocks = <&clks IMX6SX_CLK_CANFD>,
-> +		 <&clks IMX6SX_CLK_CANFD>;
-> +	clock-names = "hclk", "cclk";
-> +	mram-cfg = <0x0 0 0 32 0 0 0 1>;
-> +	status = "disabled";
-> +};
-> +
-> +Board dtsi:
-> +&m_can1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_m_can1>;
-> +	status = "enabled";
-> +};
+> I also don't like seeing init calls form platform code down into
+> drivers/misc like you're adding here. Can you please look at doing
+> that as a regular init call setup?
 > 
+> The fact that you provide data to the rest of the kernel again really
+> says drivers/soc to me, not drivers/misc.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Hi Olof,
 
+I just sent a patch series that addresses your comments:
+
+	[PATCH 00/12] Add NVIDIA Tegra FUSE driver
+
+That contains a lot of the cleanup that I've been doing to get things
+ready for 64-bit. It's essentially what this pull request contained,
+with a couple of other patches on top to untangle the init sequence
+so that these can all go into regular init calls. I've tested on all
+four Tegra generations supported upstream.
+
+While there's possibly more that we can do I think it is a reasonable
+first step and I'd like to get this into 3.17 so that we can start
+moving out other things after the merge window.
+
+It would be great if you could have a look, and if there aren't any
+objections I'll send out another pull request.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/8b533762/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/0c66808f/attachment.sig>
