@@ -1,61 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jul 2014 14:56:13 +0100
-Subject: No uart output on my snowball board
-In-Reply-To: <20140711093108.4807d473@gandalf.local.home>
-References: <20140710223021.6e9c857f@gandalf.local.home>
- <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
- <20140711093108.4807d473@gandalf.local.home>
-Message-ID: <20140711135613.GC2954@lee--X1>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 11 Jul 2014 06:50:38 -0700
+Subject: [PATCH V9 3/7] ARM: SPEAr13xx: Fix pcie clock name
+In-Reply-To: <08c2b017de1d545e42d97ce911ed913aeba46ca9.1404976058.git.viresh.kumar@linaro.org>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+ <08c2b017de1d545e42d97ce911ed913aeba46ca9.1404976058.git.viresh.kumar@linaro.org>
+Message-ID: <20140711135038.9850.6196@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jul 2014, Steven Rostedt wrote:
+Quoting Viresh Kumar (2014-07-10 00:26:34)
+> From: Pratyush Anand <pratyush.anand@st.com>
+> 
+> Follow dt clock naming convention for PCIe clocks.
+> 
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> [viresh: fixed logs/cclist]
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-> On Fri, 11 Jul 2014 14:00:55 +0200
-> Linus Walleij <linus.walleij@linaro.org> wrote:
-> 
-> > On Fri, Jul 11, 2014 at 4:30 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
-> > 
-> > > commit a0998b8321eb5f53ef51924f5ab6c69237ac1025
-> > > Author: Lee Jones <lee.jones@linaro.org>
-> > > Date:   Thu Aug 22 16:18:56 2013 +0100
-> > >
-> > >     ARM: ux500: Remove UART support when booting without Device Tree
-> > >
-> > >     It's time to remove all ATAG support from ux500 and rely solely on
-> > >     Device Tree booting. This patch is part of that endeavour.
-> > >
-> > >     Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > >     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > I hate that I didn't spot the speling mistake in the subject,
-> > its ATAG support we're removing, not UART :-)
-> > 
-> > Anyway, I think you got enough hints on how we do this
-> > with appended devicetrees instead, Lee's snippet should
-> > work or check out this page that I also posted to your
-> > G+ post:
-> > http://www.df.lth.se/~triad/krad/ux00/
-> > 
-> 
-> Thanks, with everyone's feedback I got it working with ktest.
-> 
-> I added the following to my ktest snowball.conf:
-> 
-> OUTPUT_BOOT := ${OUTPUT_DIR}/arch/arm/boot
-> 
-> PRE_BUILD = ${MAKE_CMD} O=${OUTPUT_DIR} dtbs
-> POST_BUILD = cat ${OUTPUT_BOOT}/zImage ${OUTPUT_BOOT}/dts/ste-snowball.dtb > ${OUTPUT_BOOT}/zImage.snowball; mkimage -A arm -O linux -C none -T kernel -a 0x00008000 -e 0x00008000 -d ${OUTPUT_BOOT}/zImage.snowball ${OUTPUT_BOOT}/uImage.snowball
-> 
-> and walla!
-> 
-> root at linaro-ubuntu-desktop:~# uname -r
-> 3.16.0-rc4-test-00042-g4f440cd
+Applied to clk-next.
 
-Good work.  Glad to be of service.
+Regards,
+Mike
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> ---
+>  drivers/clk/spear/spear1310_clock.c | 6 +++---
+>  drivers/clk/spear/spear1340_clock.c | 2 +-
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
+> index 65894f7..4daa597 100644
+> --- a/drivers/clk/spear/spear1310_clock.c
+> +++ b/drivers/clk/spear/spear1310_clock.c
+> @@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
+>         clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
+>                         SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
+>                         0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "dw_pcie.0");
+> +       clk_register_clkdev(clk, NULL, "b1000000.pcie");
+>         clk_register_clkdev(clk, NULL, "b1000000.ahci");
+>  
+>         clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
+>                         SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
+>                         0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "dw_pcie.1");
+> +       clk_register_clkdev(clk, NULL, "b1800000.pcie");
+>         clk_register_clkdev(clk, NULL, "b1800000.ahci");
+>  
+>         clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
+>                         SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
+>                         0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "dw_pcie.2");
+> +       clk_register_clkdev(clk, NULL, "b4000000.pcie");
+>         clk_register_clkdev(clk, NULL, "b4000000.ahci");
+>  
+>         clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+> diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+> index fe835c1..5a5c664 100644
+> --- a/drivers/clk/spear/spear1340_clock.c
+> +++ b/drivers/clk/spear/spear1340_clock.c
+> @@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
+>         clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
+>                         SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
+>                         0, &_lock);
+> -       clk_register_clkdev(clk, NULL, "dw_pcie");
+> +       clk_register_clkdev(clk, NULL, "b1000000.pcie");
+>         clk_register_clkdev(clk, NULL, "b1000000.ahci");
+>  
+>         clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+> -- 
+> 2.0.0.rc2
+> 
