@@ -1,61 +1,49 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 11 Jul 2014 12:07:45 +0200
-Subject: [PATCH 1/5] gpiolib: devres: Introduce the function
- devm_request_gpio_array
-In-Reply-To: <53BFB659.8050306@codethink.co.uk>
-References: <cover.1404665589.git.himangi774@gmail.com>
- <1a1752ce7455bac8f2505a9790da891a830699f5.1404665589.git.himangi774@gmail.com>
- <53BD2509.6070803@codethink.co.uk>
- <CACRpkdZWfYN14aki-UqvWp1K0exVj-mMK92q431QueSVvjZFuA@mail.gmail.com>
- <53BE7288.6060503@codethink.co.uk>
- <CABxcv=mhMMQxqVRM28NucnSW62v_3ghnT58JqFxvK=2bjxizdw@mail.gmail.com>
- <53BFB659.8050306@codethink.co.uk>
-Message-ID: <CABxcv==adT6YPEekjD1y3ncrj9ghWE8UMuc64AeVWCPVb0ywFw@mail.gmail.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Fri, 11 Jul 2014 15:39:35 +0530
+Subject: [PATCH 0/2] clk: exynos-audss: Adapt to exising clock framework
+In-Reply-To: <53BFB39F.6040606@samsung.com>
+References: <1405071475-31946-1-git-send-email-tushar.b@samsung.com>
+ <53BFB39F.6040606@samsung.com>
+Message-ID: <53BFB7DF.3010205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+On 07/11/2014 03:21 PM, Tomasz Figa wrote:
+> Hi Tushar,
+> 
+> On 11.07.2014 11:37, Tushar Behera wrote:
+>> The patchset is targetted as moving exising exynos-audss clock driver from being
+>> a module driver. The driver is now registered through CLK_OF_DECLARE and is
+>> inline with other Samsung clock drivers.
+> 
+> I'm afraid I have to NAK this series or at least the part converting the
+> driver back to use CLK_OF_DECLARE().
+> 
 
-On Fri, Jul 11, 2014 at 12:03 PM, Rob Jones <rob.jones@codethink.co.uk> wrote:
->
->
-> On 11/07/14 01:35, Javier Martinez Canillas wrote:
->>
->> Hello Rob,
->>
->> On Thu, Jul 10, 2014 at 1:01 PM, Rob Jones <rob.jones@codethink.co.uk>
->> wrote:
->
->
-> <snip>
->
->
->>>
->>> I will certainly consider it. I'm in the middle of something else right
->>> now but I should be available in a day or two and I'll have a look.
->>>
->>>
->>
->> I'm working on a driver for a PMIC which uses a set of GPIO to select
->> a particular register. Right now I'm getting each GPIO independently
->> but Linus mentioned [0] the devm_gpio_request_array() patch you
->> posted.
->>
->> Now, I'm not using the integer-based GPIO API but the new
->> descriptor-based one so I was wondering if you are already
->> implementing a devm_gpiod_get_array() or if you want me to implement
->> it myself.
->>
->
-> As I said, I'm deep in something else for the next day or two so if you
-> need it urgently you should probably do it yourself but if you don't
-> mind waiting until next week, I can have a go.
->
-> Your call, let me know.
->
+Considering the more prevalent usage of CLK_OF_DECLARE() in drivers/clk
+led me into thinking it was the normal way for the clock drivers.
+Keeping only one clock driver using a different approach looked odd to
+me. Anyways, I don't have any other reason to pursue this case.
 
-I'm not in a hurry, just wanted to know if it was on your plate. I'll
-wait for your patch then, thanks!
+> We have deliberately made this driver a platform driver, because this is
+> how drivers should be modeled in Linux kernel whenever possible.
+> CLK_OF_DECLARE() should be only considered a hack to work around late
+> initialization of driver model. Reverting this change without a good
+> reason (and you haven't provided such) is just going backwards.
+> 
+> Rest of this series is actually quite nice, though, as reusing Samsung
+> clock helpers reduces the line count significantly, so if you could
+> rework this to keep this driver a platform driver then we could get
+> something I could ack.
+> 
 
-Best regards,
-Javier
+Sure. There are still some valid cleanups even if we plan to retain the
+platform driver infrastructure. I will split and repost.
+
+> Best regards,
+> Tomasz
+> 
+
+
+-- 
+Tushar Behera
