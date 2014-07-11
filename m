@@ -1,45 +1,39 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Jul 2014 16:00:44 +0200
-Subject: [PATCH] can: flexcan: add vf61x support for flexcan
-In-Reply-To: <dac76ccd134f41b86f00352d10cfae4b@agner.ch>
-References: <1405075933-22317-1-git-send-email-stefan@agner.ch>
- <53BFD401.8030101@pengutronix.de>
- <dac76ccd134f41b86f00352d10cfae4b@agner.ch>
-Message-ID: <1405087244.4630.15.camel@weser.hi.pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Jul 2014 15:11:16 +0100
+Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
+ <20140708005954.GC22939@google.com>
+ <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
+ <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
+ <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
+ <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
+ <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
+ <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
+Message-ID: <20140711141115.GB16321@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 11.07.2014, 15:58 +0200 schrieb Stefan Agner:
-> Hi Marc,
-> 
-> Am 2014-07-11 14:09, schrieb Marc Kleine-Budde:
-> > IMHO it should be 4 seperate patches:
-> > - dt
-> > - clocks
-> > - flexcan_get_berr_counter fixes
-> > - your flexcan enhancements
-> 
-> Ok, will split.
-> 
-> >> @@ -362,7 +374,7 @@
-> >>
-> >>  			esdhc1: esdhc at 400b2000 {
-> >>  				compatible = "fsl,imx53-esdhc";
-> >> -				reg = <0x400b2000 0x4000>;
-> >> +				reg = <0x400b2000 0x1000>;
-> > 
-> > What's that doing here? :)
-> 
-> That's an error I just stumbled upon. I know it's not related but it's
-> such a small change... Do I need to make a separate patch for that or
-> can I include it in the FlexCAN dt commit?
-> 
-Upstream changes are meant to be traceable by reading the git log. Thus
-no drive-by changes are allowed in unrelated commits. This absolutely
-needs to be a separate patch.
+On Thu, Jul 10, 2014 at 11:36:10PM +0100, Bjorn Helgaas wrote:
+> Most of the rest of the v7 discussion was about "Introduce a domain
+> number for pci_host_bridge."  I think we should add arm64 using the
+> existing pci_scan_root_bus() and keep the domain number in the arm64
+> sysdata structure like every other arch does.  Isn't that feasible?
+> We can worry about domain unification later.
 
-Regards,
-Lucas 
+I think that's what we were trying to avoid, adding an arm64-specific
+pci_sys_data structure (and arm64-specific API). IIUC, avoiding this
+would allow the host controller drivers to use the sysdata pointer for
+their own private data structures.
+
+Also since you can specify the domain number via DT (and in Liviu's
+v8 patches read by of_create_pci_host_bridge), I think it would make
+sense to have it stored in some generic data structures (e.g.
+pci_host_bridge) rather than in an arm64 private sysdata.
+
+(Liviu is thinking of an alternative API but maybe he could briefly
+describe it here before posting a new series)
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Catalin
