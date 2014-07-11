@@ -1,87 +1,122 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 11 Jul 2014 09:47:50 +0800
-Subject: [PATCH v3 1/2] ARM: at91/dt: describe rgmii ethernet phy connected
- to sama5d3xek boards
-In-Reply-To: <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
- <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53BF4246.2070706@atmel.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 11 Jul 2014 04:03:00 +0200
+Subject: [PATCH v6 15/23] regulator: max77686: Setup DVS-related GPIOs
+ on probe
+In-Reply-To: <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
+References: <1404467722-26687-1-git-send-email-javier.martinez@collabora.co.uk>	<1404467722-26687-16-git-send-email-javier.martinez@collabora.co.uk>
+ <CADGdYn4EURaHinWVksQSPzVr=CkZYcrqvWsO7mKDz_gY9XB__Q@mail.gmail.com>
+Message-ID: <53BF45D4.2000302@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hello Amit,
 
-On 07/11/2014 03:59 AM, Boris BREZILLON wrote:
-> Add ethernet-phy nodes and specify phy interrupt (connected to pin PB25)
-> and board specific timing configs.
->
-> Atmel has two different HW designs for its CPU modules: the first one
-> (produced by Embest) is connecting PHYAD[0-2] pins to pull up resistors
-> and the other one (produced by Ronetix) is connecting PHYAD0 to a pull up
-> resistor and PHYAD[1-2] to pull down resistors.
-> As a result, Ronetix design will have its PHY available at address 0x1 and
-> Embest design at 0x7.
-> By defining both phys we're letting the phy core detect the one actually
-> available on the MDIO bus.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+On 07/10/2014 12:08 PM, amit daniel kachhap wrote:
+> On Fri, Jul 4, 2014 at 3:25 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> MAX77686 PMIC support Dyamic Voltage Scaling (DVS) on a set
+>> of Buck regulators. A number of GPIO are connected to these
+>> lines and are requested by the mfd driver. Setup the GPIO
+>> pins from the regulator driver.
+> If possible merge this patch with patch 8. Both are adding DVS
+> support. Put regmap_copy dependency patch in very beginning.
 
-For this patch series, test OK on both Embest (sama5d34ek) and Ronetix 
-(sama5d33ek).
+As Lee already said, I split the changes to minimize the cross-subsystem churn.
 
-Tested-by: Bo Shen <voice.shen@atmel.com>
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  drivers/regulator/max77686.c | 34 ++++++++++++++++++++++++++++++++++
+>>  1 file changed, 34 insertions(+)
+>>
+>> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+>> index ef1af2d..ecce77a 100644
+>> --- a/drivers/regulator/max77686.c
+>> +++ b/drivers/regulator/max77686.c
+>> @@ -435,6 +435,12 @@ static int max77686_pmic_dt_parse_pdata(struct platform_device *pdev,
+>>  }
+>>  #endif /* CONFIG_OF */
+>>
+>> +static inline bool max77686_is_dvs_buck(int id)
+>> +{
+>> +       /* BUCK 2,3 and 4 support DVS */
+>> +       return (id >= MAX77686_BUCK2 && id <= MAX77686_BUCK4);
+> I am just wondering if along with above check, SELB gpios (if present)
+> can be used to confirm if BUCK's are DVS based or not.
 
-> ---
->
-> Florian, I dropped your Reviewed-by tag because this patch has slightly
-> changed.
->
->
->   arch/arm/boot/dts/sama5d3xcm.dtsi | 30 ++++++++++++++++++++++++++++++
->   1 file changed, 30 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index b0b1331..755369e 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -34,6 +34,36 @@
->
->   			macb0: ethernet at f0028000 {
->   				phy-mode = "rgmii";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				ethernet-phy at 1 {
-> +					reg = <0x1>;
-> +					interrupt-parent = <&pioB>;
-> +					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-> +					txen-skew-ps = <800>;
-> +					txc-skew-ps = <3000>;
-> +					rxdv-skew-ps = <400>;
-> +					rxc-skew-ps = <3000>;
-> +					rxd0-skew-ps = <400>;
-> +					rxd1-skew-ps = <400>;
-> +					rxd2-skew-ps = <400>;
-> +					rxd3-skew-ps = <400>;
-> +				};
-> +
-> +				ethernet-phy at 7 {
-> +					reg = <0x7>;
-> +					interrupt-parent = <&pioB>;
-> +					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-> +					txen-skew-ps = <800>;
-> +					txc-skew-ps = <3000>;
-> +					rxdv-skew-ps = <400>;
-> +					rxc-skew-ps = <3000>;
-> +					rxd0-skew-ps = <400>;
-> +					rxd1-skew-ps = <400>;
-> +					rxd2-skew-ps = <400>;
-> +					rxd3-skew-ps = <400>;
-> +				};
->   			};
->
->   			pmc: pmc at fffffc00 {
->
+I don't know if SELB gpios being present or not should be used to determine
+whether a BUCK includes the DVS feature. AFAIK boards could have some of these
+lines hardwired and pulled high or low instead of using a GPIO.
 
-Best Regards,
-Bo Shen
+>> +}
+>> +
+>>  static int max77686_pmic_probe(struct platform_device *pdev)
+>>  {
+>>         struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+>> @@ -442,6 +448,9 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>>         struct max77686_data *max77686;
+>>         int i, ret = 0;
+>>         struct regulator_config config = { };
+>> +       unsigned int reg;
+>> +       int buck_default_idx;
+>> +       int buck_old_idx;
+>>
+>>         dev_dbg(&pdev->dev, "%s\n", __func__);
+>>
+>> @@ -472,13 +481,34 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>>         config.driver_data = max77686;
+>>         platform_set_drvdata(pdev, max77686);
+>>
+>> +       buck_default_idx = pdata->buck_default_idx;
+>> +       buck_old_idx = max77686_read_gpios(pdata);
+>> +
+>>         for (i = 0; i < MAX77686_REGULATORS; i++) {
+>>                 struct regulator_dev *rdev;
+>> +               int id = pdata->regulators[i].id;
+>>
+>>                 config.init_data = pdata->regulators[i].initdata;
+>>                 config.of_node = pdata->regulators[i].of_node;
+>>
+>>                 max77686->opmode[i] = regulators[i].enable_mask;
+>> +
+>> +               if (max77686_is_dvs_buck(id)) {
+>> +                       /* Try to copy over data so we keep firmware settings */
+>> +                       reg = regulators[i].vsel_reg;
+>> +
+>> +                       ret = regmap_reg_copy(iodev->regmap,
+>> +                                             reg + buck_default_idx,
+>> +                                             reg + buck_old_idx);
+>> +
+>> +                       if (ret)
+>> +                               dev_warn(&pdev->dev, "Copy err %d => %d (%d)\n",
+>> +                                        reg + buck_old_idx,
+>> +                                        reg + buck_default_idx, ret);
+>> +
+>> +                       regulators[i].vsel_reg += buck_default_idx;
+>> +               }
+>> +
+>>                 rdev = devm_regulator_register(&pdev->dev,
+>>                                                 &regulators[i], &config);
+>>                 if (IS_ERR(rdev)) {
+>> @@ -488,6 +518,10 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+>>                 }
+>>         }
+>>
+>> +       ret = max77686_setup_gpios(iodev->dev);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>>         return 0;
+>>  }
+>>
+>> --
+>> 2.0.0.rc2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+Best regards,
+Javier
