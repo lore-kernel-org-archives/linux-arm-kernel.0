@@ -1,282 +1,324 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 11 Jul 2014 14:09:37 +0200
-Subject: [PATCH] can: flexcan: add vf61x support for flexcan
-In-Reply-To: <1405075933-22317-1-git-send-email-stefan@agner.ch>
-References: <1405075933-22317-1-git-send-email-stefan@agner.ch>
-Message-ID: <53BFD401.8030101@pengutronix.de>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Fri, 11 Jul 2014 17:43:19 +0530
+Subject: [PATCH v3 2/2] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <53BFD28A.5090202@pengutronix.de>
+References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+ <1405074557-5519-2-git-send-email-b29396@freescale.com>
+ <53BFC6CE.9090408@gmail.com> <53BFD28A.5090202@pengutronix.de>
+Message-ID: <53BFD4DF.7030003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 12:52 PM, Stefan Agner wrote:
-> Extend FlexCAN driver to support Vybrid. Vybrids variant of the IP
-> has ECC support which is controlled through the memory error
-> control register (MECR). There is also an errata which leads to
-> false positive error detections (ID e5295). This patch disables
-> the memory error detection completely.
-> 
-> Also extend the clock control for FlexCAN to enable the clocks
-> in the Clock Divider (CCM_CSCDR2) register too.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Marc, this patch requires your patch regarding clock enable
-> for reading the ECR register:
-> http://marc.info/?l=linux-can&m=136861025221160&w=2
-> So I also tested that patch and it proved solving that issue
-> hence
+On 07/11/2014 05:33 PM, Marc Kleine-Budde wrote:
+> On 07/11/2014 01:13 PM, Varka Bhadram wrote:
+>> On 07/11/2014 03:59 PM, Dong Aisheng wrote:
+>>
+>> (...)
+>>
+>>> +/* m_can private data structure */
+>>> +struct m_can_priv {
+>>> +    struct can_priv can;    /* must be the first member */
+>>> +    struct napi_struct napi;
+>>> +    struct net_device *dev;
+>>> +    struct device *device;
+>>> +    struct clk *hclk;
+>>> +    struct clk *cclk;
+>>> +    void __iomem *base;
+>>> +    u32 irqstatus;
+>>> +
+>>> +    /* message ram configuration */
+>>> +    void __iomem *mram_base;
+>>> +    struct mram_cfg mcfg[MRAM_CFG_NUM];
+>>> +};
+>>> +
+>> It will be good if we write the comments for the driver private structure
+>>
+>>> +static inline u32 m_can_read(const struct m_can_priv *priv, enum
+>>> m_can_reg reg)
+>>> +{
+>>> +    return readl(priv->base + reg);
+>>> +}
+>>> +
+>> (...)
+>>
+>>> +static void free_m_can_dev(struct net_device *dev)
+>>> +{
+>>> +    free_candev(dev);
+>>> +}
+>>> +
+>> Why do we need a separate function which calls a single function...  :-)
+> To be symetric with alloc_m_can_dev()
+>
+>>> +static struct net_device *alloc_m_can_dev(void)
+>>> +{
+>>> +    struct net_device *dev;
+>>> +    struct m_can_priv *priv;
+>>> +
+>>> +    dev = alloc_candev(sizeof(struct m_can_priv), 1);
+>> sizeof(*priv)...?
+>>
+>>> +    if (!dev)
+>>> +        return NULL;
+>> Return value -ENOMEM ?
+> I'm okay with NULL, however if we want to return an arror value, it must
+> be ERR_PTR() wrapped.
+>
+>>> +
+>>> +    priv = netdev_priv(dev);
+>>> +    netif_napi_add(dev, &priv->napi, m_can_poll, M_CAN_NAPI_WEIGHT);
+>>> +
+>>> +    priv->dev = dev;
+>>> +    priv->can.bittiming_const = &m_can_bittiming_const;
+>>> +    priv->can.do_set_mode = m_can_set_mode;
+>>> +    priv->can.do_get_berr_counter = m_can_get_berr_counter;
+>>> +    priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
+>>> +                    CAN_CTRLMODE_LISTENONLY |
+>>> +                    CAN_CTRLMODE_BERR_REPORTING;
+>>> +
+>>> +    return dev;
+>>> +}
+>>> +
+>>> +static int m_can_open(struct net_device *dev)
+>>> +{
+>>> +    struct m_can_priv *priv = netdev_priv(dev);
+>>> +    int err;
+>>> +
+>>> +    err = clk_prepare_enable(priv->hclk);
+>>> +    if (err)
+>>> +        return err;
+>>> +
+>>> +    err = clk_prepare_enable(priv->cclk);
+>>> +    if (err)
+>>> +        goto exit_disable_hclk;
+>>> +
+>>> +    /* open the can device */
+>>> +    err = open_candev(dev);
+>>> +    if (err) {
+>>> +        netdev_err(dev, "failed to open can device\n");
+>>> +        goto exit_disable_cclk;
+>>> +    }
+>>> +
+>>> +    /* register interrupt handler */
+>>> +    err = request_irq(dev->irq, m_can_isr, IRQF_SHARED, dev->name,
+>>> +              dev);
+>> why don't we use devm_request_irq()...? If you use this no need to worry
+>> about freeing the irq
+> ...because the IRQ is allocated during ifup and released during ifdown.
+>
+>>> +    if (err < 0) {
+>>> +        netdev_err(dev, "failed to request interrupt\n");
+>>> +        goto exit_irq_fail;
+>>> +    }
+>>> +
+>>> +    /* start the m_can controller */
+>>> +    m_can_start(dev);
+>>> +
+>>> +    can_led_event(dev, CAN_LED_EVENT_OPEN);
+>>> +    napi_enable(&priv->napi);
+>>> +    netif_start_queue(dev);
+>>> +
+>>> +    return 0;
+>>> +
+>>> +exit_irq_fail:
+>>> +    close_candev(dev);
+>>> +exit_disable_cclk:
+>>> +    clk_disable_unprepare(priv->cclk);
+>>> +exit_disable_hclk:
+>>> +    clk_disable_unprepare(priv->hclk);
+>>> +    return err;
+>>> +}
+>>> +
+>>> +static void m_can_stop(struct net_device *dev)
+>>> +{
+>>> +    struct m_can_priv *priv = netdev_priv(dev);
+>>> +
+>>> +    /* disable all interrupts */
+>>> +    m_can_disable_all_interrupts(priv);
+>>> +
+>>> +    clk_disable_unprepare(priv->hclk);
+>>> +    clk_disable_unprepare(priv->cclk);
+>>> +
+>>> +    /* set the state as STOPPED */
+>>> +    priv->can.state = CAN_STATE_STOPPED;
+>>> +}
+>>> +
+>>> +static int m_can_close(struct net_device *dev)
+>>> +{
+>>> +    struct m_can_priv *priv = netdev_priv(dev);
+>>> +
+>>> +    netif_stop_queue(dev);
+>>> +    napi_disable(&priv->napi);
+>>> +    m_can_stop(dev);
+>>> +    free_irq(dev->irq, dev);
+>> not required when you use devm_request_irq()
+> No....see above.
+>
+>>> +    close_candev(dev);
+>>> +    can_led_event(dev, CAN_LED_EVENT_STOP);
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>> (...)
+>>
+>>> +
+>>> +static const struct of_device_id m_can_of_table[] = {
+>>> +    { .compatible = "bosch,m_can", .data = NULL },
+>> we can simply give '0' . No need of .data = NULL. Things should be
+>> simple right....  :-)
+> .data should be a pointer, while "0" isn't. (Although 0 is valid C, we
+> don't want a integer 0 to initialize a pointer.) However, you can omit
+> .data = NULL completely. When initialzing via C99, any omited members of
+> the struct will automatically be initialized with 0x0. I like to see the
+> .data = NULL because it documents that there isn't any data (yet), once
+> another compatible is added, we need the .data anyways.
 
-Feel free to pick up that patch (and add the mising return value check
-for clock_prepare_enable().
+static const struct of_device_id m_can_of_table[] = {
+	{ .compatible = "bosch,m_can", },
+};
 
-> Tested-By <stefan@agner.ch>
-> 
-> I'm not sure whether its ok to include the device tree and
-> clock changes in one patch, let me know if you prefer that
-> splitted patches.
+This is enough... right ?
 
-IMHO it should be 4 seperate patches:
-- dt
-- clocks
-- flexcan_get_berr_counter fixes
-- your flexcan enhancements
+>>> +    { /* sentinel */ },
+>>> +};
+>>> +MODULE_DEVICE_TABLE(of, m_can_of_table);
+>>> +
+>>> +static int m_can_of_parse_mram(struct platform_device *pdev,
+>>> +                   struct m_can_priv *priv)
+>>> +{
+>>> +    struct device_node *np = pdev->dev.of_node;
+>>> +    struct resource *res;
+>>> +    void __iomem *addr;
+>>> +    u32 out_val[MRAM_CFG_LEN];
+>>> +    int ret;
+>>> +
+>>> +    /* message ram could be shared */
+>>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>>> "message_ram");
+>>> +    if (!res)
+>>> +        return -ENODEV;
+>>> +
+>>> +    addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+>>> +    if (!addr)
+>>> +        return -ENODEV;
+>> Is this err return is appropriate ... ?
+> -ENOMEM seems to be more commonly used.
+>
+>>> +
+>>> +    /* get message ram configuration */
+>>> +    ret = of_property_read_u32_array(np, "mram-cfg",
+>>> +                     out_val, sizeof(out_val) / 4);
+>>> +    if (ret) {
+>>> +        dev_err(&pdev->dev, "can not get message ram configuration\n");
+>>> +        return -ENODEV;
+>>> +    }
+>>> +
+>> Is this err return is appropriate ... ?
+> Whay do you suggest?
+>
+>>> +    priv->mram_base = addr;
+>>> +    priv->mcfg[MRAM_SIDF].off = out_val[0];
+>>> +    priv->mcfg[MRAM_SIDF].num = out_val[1];
+>>> +    priv->mcfg[MRAM_XIDF].off = priv->mcfg[MRAM_SIDF].off +
+>>> +            priv->mcfg[MRAM_SIDF].num * SIDF_ELEMENT_SIZE;
+>>> +    priv->mcfg[MRAM_XIDF].num = out_val[2];
+>>> +    priv->mcfg[MRAM_RXF0].off = priv->mcfg[MRAM_XIDF].off +
+>>> +            priv->mcfg[MRAM_XIDF].num * XIDF_ELEMENT_SIZE;
+>>> +    priv->mcfg[MRAM_RXF0].num = out_val[3] & RXFC_FS_MASK;
+>>> +    priv->mcfg[MRAM_RXF1].off = priv->mcfg[MRAM_RXF0].off +
+>>> +            priv->mcfg[MRAM_RXF0].num * RXF0_ELEMENT_SIZE;
+>>> +    priv->mcfg[MRAM_RXF1].num = out_val[4] & RXFC_FS_MASK;
+>>> +    priv->mcfg[MRAM_RXB].off = priv->mcfg[MRAM_RXF1].off +
+>>> +            priv->mcfg[MRAM_RXF1].num * RXF1_ELEMENT_SIZE;
+>>> +    priv->mcfg[MRAM_RXB].num = out_val[5];
+>>> +    priv->mcfg[MRAM_TXE].off = priv->mcfg[MRAM_RXB].off +
+>>> +            priv->mcfg[MRAM_RXB].num * RXB_ELEMENT_SIZE;
+>>> +    priv->mcfg[MRAM_TXE].num = out_val[6];
+>>> +    priv->mcfg[MRAM_TXB].off = priv->mcfg[MRAM_TXE].off +
+>>> +            priv->mcfg[MRAM_TXE].num * TXE_ELEMENT_SIZE;
+>>> +    priv->mcfg[MRAM_TXB].num = out_val[7] & TXBC_NDTB_MASK;
+>>> +
+>>> +    dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0
+>>> 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d\n",
+>>> +        priv->mram_base,
+>>> +        priv->mcfg[MRAM_SIDF].off, priv->mcfg[MRAM_SIDF].num,
+>>> +        priv->mcfg[MRAM_XIDF].off, priv->mcfg[MRAM_XIDF].num,
+>>> +        priv->mcfg[MRAM_RXF0].off, priv->mcfg[MRAM_RXF0].num,
+>>> +        priv->mcfg[MRAM_RXF1].off, priv->mcfg[MRAM_RXF1].num,
+>>> +        priv->mcfg[MRAM_RXB].off, priv->mcfg[MRAM_RXB].num,
+>>> +        priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
+>>> +        priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
+>>> +
+>> dev_dbg() will insert the new lines in b/w. It wont print the values as
+>> you expected.
+>> Check this by enabling debug ...
+> What do you mean by b/w?
 
-The first two patches go probably via Shawn's tree, while the latter two
-go via linux-can-next.
+You are expecting the data to be print in format like:
+pdev->dev/name: mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d
 
-> --
-> Stefan
-> 
->  arch/arm/boot/dts/vf610.dtsi  | 25 ++++++++++++++-
->  arch/arm/mach-imx/clk-vf610.c |  6 ++--
->  drivers/net/can/flexcan.c     | 73 +++++++++++++++++++++++++++++++++++++------
->  3 files changed, 92 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index 3fb127a..f38d8d8 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -14,6 +14,8 @@
->  
->  / {
->  	aliases {
-> +		can0 = &can0;
-> +		can1 = &can1;
->  		serial0 = &uart0;
->  		serial1 = &uart1;
->  		serial2 = &uart2;
-> @@ -103,6 +105,16 @@
->  					<&clks VF610_CLK_DMAMUX1>;
->  			};
->  
-> +			can0: flexcan at 40020000 {
-> +				compatible = "fsl,vf610-flexcan";
-> +				reg = <0x40020000 0x4000>;
-> +				interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_FLEXCAN0>,
-> +					 <&clks VF610_CLK_FLEXCAN0>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
-> +
->  			uart0: serial at 40027000 {
->  				compatible = "fsl,vf610-lpuart";
->  				reg = <0x40027000 0x1000>;
-> @@ -362,7 +374,7 @@
->  
->  			esdhc1: esdhc at 400b2000 {
->  				compatible = "fsl,imx53-esdhc";
-> -				reg = <0x400b2000 0x4000>;
-> +				reg = <0x400b2000 0x1000>;
+But when we use the dev_dbg()/pr_debug()... It will put data like:
+pdev->dev/name: mram_base %p sidf 0x%x
+0x%x %d rxf0 0x%x
+rxf1 0x%x %d rxb
+....
 
-What's that doing here? :)
+check this by enable DEBUG...
 
->  				interrupts = <0 28 0x04>;
->  				clocks = <&clks VF610_CLK_IPG_BUS>,
->  					<&clks VF610_CLK_PLATFORM_BUS>,
-> @@ -414,6 +426,17 @@
->  				clock-names = "nfc";
->  				status = "disabled";
->  			};
-> +
-> +			can1: flexcan at 400d4000 {
-> +				compatible = "fsl,vf610-flexcan";
-> +				reg = <0x400d4000 0x4000>;
-> +				interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_FLEXCAN1>,
-> +					 <&clks VF610_CLK_FLEXCAN1>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
-> +
->  		};
->  	};
->  };
-> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-> index 22dc3ee..b12b888 100644
-> --- a/arch/arm/mach-imx/clk-vf610.c
-> +++ b/arch/arm/mach-imx/clk-vf610.c
-> @@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  
->  	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
->  
-> -	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
-> -	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
-> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
-> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
-> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
-> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
->  
->  	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
->  	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
-> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-> index f425ec2..1601247 100644
-> --- a/drivers/net/can/flexcan.c
-> +++ b/drivers/net/can/flexcan.c
-> @@ -92,6 +92,27 @@
->  #define FLEXCAN_CTRL_ERR_ALL \
->  	(FLEXCAN_CTRL_ERR_BUS | FLEXCAN_CTRL_ERR_STATE)
->  
-> +/* FLEXCAN control register 2 (CTRL2) bits */
-> +#define FLEXCAN_CRL2_ECRWRE		BIT(29)
-> +#define FLEXCAN_CRL2_WRMFRZ		BIT(28)
-> +#define FLEXCAN_CRL2_RFFN(x)		(((x) & 0x0f) << 24)
-> +#define FLEXCAN_CRL2_TASD(x)		(((x) & 0x1f) << 19)
-> +#define FLEXCAN_CRL2_MRP		BIT(18)
-> +#define FLEXCAN_CRL2_RRS		BIT(17)
-> +#define FLEXCAN_CRL2_EACEN		BIT(16)
-> +
-> +/* FLEXCAN memory error control register (MECR) bits */
-> +#define FLEXCAN_MECR_ECRWRDIS		BIT(31)
-> +#define FLEXCAN_MECR_HANCEI_MSK		BIT(19)
-> +#define FLEXCAN_MECR_FANCEI_MSK		BIT(18)
-> +#define FLEXCAN_MECR_CEI_MSK		BIT(16)
-> +#define FLEXCAN_MECR_HAERRIE		BIT(15)
-> +#define FLEXCAN_MECR_FAERRIE		BIT(14)
-> +#define FLEXCAN_MECR_EXTERRIE		BIT(13)
-> +#define FLEXCAN_MECR_RERRDIS		BIT(9)
-> +#define FLEXCAN_MECR_ECCDIS		BIT(8)
-> +#define FLEXCAN_MECR_NCEFAFRZ		BIT(7)
-> +
->  /* FLEXCAN error and status register (ESR) bits */
->  #define FLEXCAN_ESR_TWRN_INT		BIT(17)
->  #define FLEXCAN_ESR_RWRN_INT		BIT(16)
-> @@ -150,18 +171,20 @@
->   * FLEXCAN hardware feature flags
->   *
->   * Below is some version info we got:
-> - *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT
-> - *                                Filter?   connected?
-> - *   MX25  FlexCAN2  03.00.00.00     no         no
-> - *   MX28  FlexCAN2  03.00.04.00    yes        yes
-> - *   MX35  FlexCAN2  03.00.00.00     no         no
-> - *   MX53  FlexCAN2  03.00.00.00    yes         no
-> - *   MX6s  FlexCAN3  10.00.12.00    yes        yes
-> + *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT  Memory err
-> + *                                Filter?   connected?  detection
-> + *   MX25  FlexCAN2  03.00.00.00     no         no	   no
-> + *   MX28  FlexCAN2  03.00.04.00    yes        yes	   no
-> + *   MX35  FlexCAN2  03.00.00.00     no         no	   no
-> + *   MX53  FlexCAN2  03.00.00.00    yes         no	   no
-> + *   MX6s  FlexCAN3  10.00.12.00    yes        yes	   no
-> + *   VFxx  FlexCAN3  ?		     no		no	  yes
+>>> +    return 0;
+>>> +}
+>>> +
+>> (...)
+>>
+>>> +
+>>> +static void unregister_m_can_dev(struct net_device *dev)
+>>> +{
+>>> +    unregister_candev(dev);
+>>> +}
+>>> +
+>> again a function which calls a single func.
+>>
+>>> +static int m_can_plat_remove(struct platform_device *pdev)
+>>> +{
+>>> +    struct net_device *dev = platform_get_drvdata(pdev);
+>>> +
+>>> +    unregister_m_can_dev(dev);
+>>> +    platform_set_drvdata(pdev, NULL);
+>>> +
+>>> +    free_m_can_dev(dev);
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static const struct dev_pm_ops m_can_pmops = {
+>>> +    SET_SYSTEM_SLEEP_PM_OPS(m_can_suspend, m_can_resume)
+>>> +};
+>>> +
+>>> +static struct platform_driver m_can_plat_driver = {
+>>> +    .driver = {
+>>> +        .name = KBUILD_MODNAME,
+>>> +        .owner = THIS_MODULE,
+>> No need to update .owner. module_platform_driver() will do for you.
+>> see:http://lxr.free-electrons.com/source/include/linux/platform_device.h#L190
+> Oh, right.
+>
+>>> +        .of_match_table = of_match_ptr(m_can_of_table),
+>>> +        .pm     = &m_can_pmops,
+>>> +    },
+>>> +    .probe = m_can_plat_probe,
+>>> +    .remove = m_can_plat_remove,
+>>> +};
+>>> +
+>>> +module_platform_driver(m_can_plat_driver);
+>>> +
+>>> +MODULE_AUTHOR("Dong Aisheng <b29396@freescale.com>");
+>>> +MODULE_LICENSE("GPL v2");
+>>> +MODULE_DESCRIPTION("CAN bus driver for Bosch M_CAN controller");
+>>
+> Marc
+>
 
-Please use either tabs or space to indent in this table.
-
->   *
->   * Some SOCs do not have the RX_WARN & TX_WARN interrupt line connected.
->   */
->  #define FLEXCAN_HAS_V10_FEATURES	BIT(1) /* For core version >= 10 */
->  #define FLEXCAN_HAS_BROKEN_ERR_STATE	BIT(2) /* [TR]WRN_INT not connected */
-> +#define FLEXCAN_HAS_MECR_FEATURES	BIT(3) /* Memory error detection */
->  
->  /* Structure of the message buffer */
->  struct flexcan_mb {
-> @@ -192,8 +215,11 @@ struct flexcan_regs {
->  	u32 crcr;		/* 0x44 */
->  	u32 rxfgmask;		/* 0x48 */
->  	u32 rxfir;		/* 0x4c */
-> -	u32 _reserved3[12];
-> +	u32 _reserved3[12];	/* 0x50 */
->  	struct flexcan_mb cantxfg[64];
-> +	u32 _reserved4[408];
-> +	u32 mecr;		/* 0xae0 */
-> +	u32 erriar;		/* 0xae4 */
->  };
->  
->  struct flexcan_devtype_data {
-> @@ -223,6 +249,9 @@ static struct flexcan_devtype_data fsl_imx28_devtype_data;
->  static struct flexcan_devtype_data fsl_imx6q_devtype_data = {
->  	.features = FLEXCAN_HAS_V10_FEATURES,
->  };
-> +static struct flexcan_devtype_data fsl_vf610_devtype_data = {
-> +	.features = FLEXCAN_HAS_V10_FEATURES | FLEXCAN_HAS_MECR_FEATURES,
-> +};
->  
->  static const struct can_bittiming_const flexcan_bittiming_const = {
->  	.name = DRV_NAME,
-> @@ -793,7 +822,7 @@ static int flexcan_chip_start(struct net_device *dev)
->  	struct flexcan_priv *priv = netdev_priv(dev);
->  	struct flexcan_regs __iomem *regs = priv->base;
->  	int err;
-> -	u32 reg_mcr, reg_ctrl;
-> +	u32 reg_mcr, reg_ctrl, reg_crl2, reg_mecr;
->  
->  	/* enable module */
->  	err = flexcan_chip_enable(priv);
-> @@ -870,6 +899,31 @@ static int flexcan_chip_start(struct net_device *dev)
->  	if (priv->devtype_data->features & FLEXCAN_HAS_V10_FEATURES)
->  		flexcan_write(0x0, &regs->rxfgmask);
->  
-> +	/*
-> +	 * On Vybrid, disable memory error detection interrupts
-> +	 * and freeze mode.
-> +	 * This also works around errata e5295 which generates
-> +	 * false positive memory errors and put the device in
-> +	 * freeze mode.
-> +	 */
-> +	if (priv->devtype_data->features & FLEXCAN_HAS_MECR_FEATURES) {
-> +		/*
-> +		 * Follow the protocol as described in "Detection
-> +		 * and Correction of Memory Errors" to write to
-> +		 * MECR register
-> +		 */
-> +		reg_crl2 = flexcan_read(&regs->crl2);
-> +		reg_crl2 |= FLEXCAN_CRL2_ECRWRE;
-> +		flexcan_write(reg_crl2, &regs->crl2);
-> +
-> +		reg_mecr = flexcan_read(&regs->mecr);
-> +		reg_mecr &= ~FLEXCAN_MECR_ECRWRDIS;
-> +		flexcan_write(reg_mecr, &regs->mecr);
-> +		reg_mecr &= ~(FLEXCAN_MECR_NCEFAFRZ | FLEXCAN_MECR_HANCEI_MSK |
-> +				FLEXCAN_MECR_FANCEI_MSK);
-> +		flexcan_write(reg_mecr, &regs->mecr);
-> +	}
-> +
->  	err = flexcan_transceiver_enable(priv);
->  	if (err)
->  		goto out_chip_disable;
-> @@ -1080,6 +1134,7 @@ static const struct of_device_id flexcan_of_match[] = {
->  	{ .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
->  	{ .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
->  	{ .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
-> +	{ .compatible = "fsl,vf610-flexcan", .data = &fsl_vf610_devtype_data, },
->  	{ /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(of, flexcan_of_match);
-> 
-
-Marc
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/eb322b56/attachment-0001.sig>
+Regards,
+Varka Bhadram.
