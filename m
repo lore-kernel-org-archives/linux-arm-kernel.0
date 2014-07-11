@@ -1,41 +1,53 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 11 Jul 2014 16:06:16 +0900
-Subject: [PATCH 1/2] PCI: mvebu: Fix license string
-In-Reply-To: <1405061938-2191-1-git-send-email-thierry.reding@gmail.com>
-References: <1405061938-2191-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <004201cf9cd6$9beeda10$d3cc8e30$%han@samsung.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Fri, 11 Jul 2014 15:37:38 +0800
+Subject: [RFC Patch V1 21/30] mm,
+ irqchip: Use cpu_to_mem()/numa_mem_id() to support memoryless node
+In-Reply-To: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1405064267-11678-22-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 11, 2014 3:59 PM, Thierry Reding wrote:
-> 
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The proper MODULE_LICENSE() string for the GPL v2 is "GPL v2", not
-> "GPLv2".
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+When CONFIG_HAVE_MEMORYLESS_NODES is enabled, cpu_to_node()/numa_node_id()
+may return a node without memory, and later cause system failure/panic
+when calling kmalloc_node() and friends with returned node id.
+So use cpu_to_mem()/numa_mem_id() instead to get the nearest node with
+memory for the/current cpu.
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+If CONFIG_HAVE_MEMORYLESS_NODES is disabled, cpu_to_mem()/numa_mem_id()
+is the same as cpu_to_node()/numa_node_id().
 
-Best regards,
-Jingoo Han
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+---
+ drivers/irqchip/irq-clps711x.c |    2 +-
+ drivers/irqchip/irq-gic.c      |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> ---
->  drivers/pci/host/pci-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index ce23e0f076b6..a8c6f1a92e0f 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -1094,4 +1094,4 @@ module_platform_driver(mvebu_pcie_driver);
-> 
->  MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
->  MODULE_DESCRIPTION("Marvell EBU PCIe driver");
-> -MODULE_LICENSE("GPLv2");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.0.1
-> 
-> --
+diff --git a/drivers/irqchip/irq-clps711x.c b/drivers/irqchip/irq-clps711x.c
+index 33340dc97d1d..b0acf8b32a1a 100644
+--- a/drivers/irqchip/irq-clps711x.c
++++ b/drivers/irqchip/irq-clps711x.c
+@@ -186,7 +186,7 @@ static int __init _clps711x_intc_init(struct device_node *np,
+ 	writel_relaxed(0, clps711x_intc->intmr[1]);
+ 	writel_relaxed(0, clps711x_intc->intmr[2]);
+ 
+-	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_node_id());
++	err = irq_alloc_descs(-1, 0, ARRAY_SIZE(clps711x_irqs), numa_mem_id());
+ 	if (IS_ERR_VALUE(err))
+ 		goto out_iounmap;
+ 
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 7e11c9d6ae8c..a7e6c043d823 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1005,7 +1005,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	if (of_property_read_u32(node, "arm,routable-irqs",
+ 				 &nr_routable_irqs)) {
+ 		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
+-					   numa_node_id());
++					   numa_mem_id());
+ 		if (IS_ERR_VALUE(irq_base)) {
+ 			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
+ 			     irq_start);
+-- 
+1.7.10.4
