@@ -1,33 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jul 2014 16:24:10 +0100
-Subject: [PATCH RFC 06/15] drm/armada: move variant initialisation to
- CRTC init
-In-Reply-To: <53C0005A.4010001@gmail.com>
-References: <20140705103724.GN21766@n2100.arm.linux.org.uk>
- <E1X3NMM-0000A5-N5@rmk-PC.arm.linux.org.uk> <53B7E86D.5040109@gmail.com>
- <20140711143733.GB21766@n2100.arm.linux.org.uk> <53C0005A.4010001@gmail.com>
-Message-ID: <20140711152410.GC21766@n2100.arm.linux.org.uk>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Fri, 11 Jul 2014 18:29:02 +0300
+Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
+In-Reply-To: <20140711151501.GA25810@ulmo>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
+ <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
+ <20140711091207.GY23218@tbergstrom-lnx.Nvidia.com>
+ <20140711145735.GB6523@ulmo> <53BFFEAD.7000405@nvidia.com>
+ <20140711151501.GA25810@ulmo>
+Message-ID: <53C002BE.90805@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 05:18:50PM +0200, Sebastian Hesselbarth wrote:
-> On 07/11/2014 04:37 PM, Russell King - ARM Linux wrote:
->> What's left is the display-subsystem { } entity to describe the makeup
->> of the subsystem.  That's not included as we currently need to pass
->> a block of memory, and the DT support for reserving chunks of memory
->> appeared (last time I looked) to only be botch-merged (only half of it
->> seems to have been merged making the whole reserved memory thing
->> totally useless - why people only half-merge features I've no idea.)
->
-> There was a follow-up patch set for this some days ago
-> http://comments.gmane.org/gmane.linux.ports.arm.kernel/337686
 
-Yes, I did a bit of digging a while back and found the outstanding
-stuff, but it wasn't clear what's happening with it.  As it isn't
-part of mainline, and I don't want to pick up further patches to
-add dependencies, I decided it was better to stick with old proven
-ways of a manually declared platform device for the time being.
+
+On 11/07/14 18:15, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Fri, Jul 11, 2014 at 06:11:41PM +0300, Tuomas Tynkkynen wrote:
+>> On 11/07/14 17:57, Thierry Reding wrote:
+>>
+>>>> I don't think that's going to work? The voltage scaling is handled in hw.
+>>>
+>>> Do we have to handle it in hardware or can we opt to do it in software,
+>>> too?
+>>>
+>>
+>> With the PLLX, voltage scaling is done entirely in SW. With the DFLL,
+>> it's possible to stay in open-loop mode and do it in SW, but there's
+>> not much point in that.
+>
+> It's kind of ugly how we need to pass the address of the PMU and the
+> offset of the voltage control register to the DFLL which will then
+> initiate I2C transactions itself. I'm wondering if that plays well with
+> the I2C traffic originating from within the kernel.
+>
+
+On the hardware level, the two I2C controllers sharing the same pins
+have knowledge of each other and won't start transmitting if the bus
+is busy (something different from the usual I2C arbitration, that is).
+I guess on the kernel side there could be a problem if the voltage 
+register is marked cached in the PMIC driver's regmap.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+nvpublic
