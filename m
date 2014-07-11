@@ -1,114 +1,127 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 11 Jul 2014 09:18:16 +0530
-Subject: [PATCH v2 3/4] usb: host: xhci-plat: Caibrate PHY post host reset
-In-Reply-To: <CAODwPW92VpQpAK1X57cW7X6Y1q7=ESF7qxxtcpk4CBg1+n8BqA@mail.gmail.com>
-References: <1404900096-1721-1-git-send-email-gautam.vivek@samsung.com>
- <1404900096-1721-4-git-send-email-gautam.vivek@samsung.com>
- <CAODwPW92VpQpAK1X57cW7X6Y1q7=ESF7qxxtcpk4CBg1+n8BqA@mail.gmail.com>
-Message-ID: <CAFp+6iGdvGgtQejG9n1pk42XnPKazPg7zpunDjr0qhjoHMAmeg@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 11 Jul 2014 12:49:43 +0900
+Subject: [PATCHv5 1/5] mmc: dw_mmc: modify the dt-binding for removing
+ slot-node and supports-highspeed
+In-Reply-To: <1405050587-5577-1-git-send-email-jh80.chung@samsung.com>
+References: <1405050587-5577-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1405050587-5577-2-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 9, 2014 at 11:28 PM, Julius Werner <jwerner@chromium.org> wrote:
-> On Wed, Jul 9, 2014 at 3:01 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> Some quirky PHYs may require to be calibrated post the host
->> controller initialization.
->> The USB 3.0 DRD PHY on Exynos5420/5800 systems, coming along with
->> Synopsys's DWC3 controller, is one such PHY which needs to be
->> calibrated post xhci's reset at initialization time and at
->> resume time, to get the controller work at SuperSpeed.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>  drivers/usb/host/xhci-plat.c |   39 +++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 37 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> index e50bd7d..decf349 100644
->> --- a/drivers/usb/host/xhci-plat.c
->> +++ b/drivers/usb/host/xhci-plat.c
->> @@ -35,7 +35,27 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
->>  /* called during probe() after chip reset completes */
->>  static int xhci_plat_setup(struct usb_hcd *hcd)
->>  {
->> -       return xhci_gen_setup(hcd, xhci_plat_quirks);
->> +       struct device *parent;
->> +       int ret;
->> +
->> +       ret = xhci_gen_setup(hcd, xhci_plat_quirks);
->> +       if (ret) {
->> +               dev_err(hcd->self.controller, "xhci setup failed\n");
->> +               return ret;
->> +       }
->> +
->> +       parent = hcd->self.controller->parent;
->> +       if (of_device_is_compatible(parent->of_node, "synopsys,dwc3") ||
->> +           of_device_is_compatible(parent->of_node, "snps,dwc3")) {
->> +               if (!IS_ERR(hcd->gen_phy)) {
->> +                       ret = phy_calibrate(hcd->gen_phy);
->> +                       if (ret < 0 && ret != -ENOTSUPP)
->> +                               dev_err(hcd->self.controller,
->> +                                       "failed to calibrate USB PHY\n");
->> +               }
->> +       }
->
-> Here as well, is it really necessary to special-case it so much? I'd
-> say if there is a PHY and it has a calibrate function bound we call
-> it, and if not we just go ahead.
->
-> I also think that this would fit better in core/hcd.c since it's not
-> really XHCI specific... it's conceivable that an EHCI controller might
-> also need to tune some PHY settings after reset (in fact Tegra does
-> something similar, although it already has another hack for that now),
-> so if we introduce this general facility why not offer it to
-> everyone?.
+Almost Soc is used the slot per a host.
+Don't use the slot-node and deprecated the "supports-highsped" property.
+Instead, use the cap-mmc/sd-highspeed.
 
-True, lets move it to core/hcd.c to make the entire calibration thing
-more generic.
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+Reviewed-by: Tushar Behera <trblinux@gmail.com>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+---
+ .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   17 +++++------------
+ .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   12 +++++-------
+ .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |   12 +++++-------
+ 3 files changed, 15 insertions(+), 26 deletions(-)
 
->
->> +
->> +       return ret;
->>  }
->>
->>  static int xhci_plat_start(struct usb_hcd *hcd)
->> @@ -288,8 +308,23 @@ static int xhci_plat_resume(struct device *dev)
->>  {
->>         struct usb_hcd  *hcd = dev_get_drvdata(dev);
->>         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->> +       int ret;
->> +
->> +       ret = xhci_resume(xhci, 0);
->> +       if (ret)
->> +               return ret;
->>
->> -       return xhci_resume(xhci, 0);
->> +       if (of_device_is_compatible(dev->parent->of_node, "synopsys,dwc3") ||
->> +           of_device_is_compatible(dev->parent->of_node, "snps,dwc3")) {
->> +               if (!IS_ERR(hcd->gen_phy)) {
->> +                       ret = phy_calibrate(hcd->gen_phy);
->> +                       if (ret < 0 && ret != -ENOTSUPP)
->> +                               dev_err(hcd->self.controller,
->> +                                       "failed to calibrate USB PHY\n");
->> +               }
->> +       }
->> +
->> +       return ret;
->>  }
->>
->>  static const struct dev_pm_ops xhci_plat_pm_ops = {
->> --
->> 1.7.10.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
+diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+index 532b1d4..9308325 100644
+--- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+@@ -46,13 +46,14 @@ Required Properties:
+       - if CIU clock divider value is 0 (that is divide by 1), both tx and rx
+         phase shift clocks should be 0.
+ 
+-Required properties for a slot:
++Required properties for a slot (Deprecated - Recommend to use one slot per a host):
+ 
+ * gpios: specifies a list of gpios used for command, clock and data bus. The
+   first gpio is the command line and the second gpio is the clock line. The
+   rest of the gpios (depending on the bus-width property) are the data lines in
+   no particular order. The format of the gpio specifier depends on the gpio
+   controller.
++ (Deprecated - Refer to Documentaion/devicetree/binding/pinctrl/samsung-pinctrl.txt)
+ 
+ Example:
+ 
+@@ -69,21 +70,13 @@ Example:
+ 
+ 	dwmmc0 at 12200000 {
+ 		num-slots = <1>;
+-		supports-highspeed;
++		cap-mmc-highspeed;
++		cap-sd-highspeed;
+ 		broken-cd;
+ 		fifo-depth = <0x80>;
+ 		card-detect-delay = <200>;
+ 		samsung,dw-mshc-ciu-div = <3>;
+ 		samsung,dw-mshc-sdr-timing = <2 3>;
+ 		samsung,dw-mshc-ddr-timing = <1 2>;
+-
+-		slot at 0 {
+-			reg = <0>;
+-			bus-width = <8>;
+-			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
+-				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
+-				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
+-				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
+-				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
+-		};
++		bus-width = <8>;
+ 	};
+diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+index e5bc49f..3b35449 100644
+--- a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+@@ -34,13 +34,11 @@ Example:
+ 		num-slots = <1>;
+ 		vmmc-supply = <&ldo12>;
+ 		fifo-depth = <0x100>;
+-		supports-highspeed;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
+-		slot at 0 {
+-			reg = <0>;
+-			bus-width = <4>;
+-			disable-wp;
+-			cd-gpios = <&gpio10 3 0>;
+-		};
++		bus-width = <4>;
++		disable-wp;
++		cd-gpios = <&gpio10 3 0>;
++		cap-mmc-highspeed;
++		cap-sd-highspeed;
+ 	};
+diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+index 2d4a725..346c609 100644
+--- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+@@ -67,7 +67,8 @@ Optional properties:
+ * card-detect-delay: Delay in milli-seconds before detecting card after card
+   insert event. The default value is 0.
+ 
+-* supports-highspeed: Enables support for high speed cards (up to 50MHz)
++* supports-highspeed (DEPRECATED): Enables support for high speed cards (up to 50MHz)
++			   (use "cap-mmc-highspeed" or "cap-sd-highspeed" instead)
+ 
+ * broken-cd: as documented in mmc core bindings.
+ 
+@@ -98,14 +99,11 @@ board specific portions as listed below.
+ 		clock-frequency = <400000000>;
+ 		clock-freq-min-max = <400000 200000000>;
+ 		num-slots = <1>;
+-		supports-highspeed;
+ 		broken-cd;
+ 		fifo-depth = <0x80>;
+ 		card-detect-delay = <200>;
+ 		vmmc-supply = <&buck8>;
+-
+-		slot at 0 {
+-			reg = <0>;
+-			bus-width = <8>;
+-		};
++		bus-width = <8>;
++		cap-mmc-highspeed;
++		cap-sd-highspeed;
+ 	};
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+1.7.9.5
