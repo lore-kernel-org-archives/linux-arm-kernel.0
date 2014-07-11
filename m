@@ -1,47 +1,64 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jul 2014 13:00:39 +0200
-Subject: [PATCH v4 4/4] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1405076439-22038-5-git-send-email-laurent.pinchart@ideasonboard.com>
+Date: Fri, 11 Jul 2014 13:00:47 +0200
+Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
+In-Reply-To: <CAOesGMiRjcWUnwsKBwK_dwWZP1EZpSVJyf5GyPkZJzP63SbS4Q@mail.gmail.com>
+References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <20140710121010.GA1990@arch.cereza>
+ <CAOesGMiRjcWUnwsKBwK_dwWZP1EZpSVJyf5GyPkZJzP63SbS4Q@mail.gmail.com>
+Message-ID: <3632586.xKfZNAEmjS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Hi Olof,
 
-In order to remove the following ugly message:
+On Thursday 10 July 2014 09:56:32 Olof Johansson wrote:
+> On Thu, Jul 10, 2014 at 5:10 AM, Ezequiel Garcia wrote:
+> > On 10 Apr 08:31 PM, Nicolas Pitre wrote:
+> >> On Fri, 11 Apr 2014, Laurent Pinchart wrote:
+> >>> On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
+> >>>> On Wed, 9 Apr 2014, Laurent Pinchart wrote:
+> >>>>> Hello,
+> >>>>> 
+> >>>>> (Resending due to a typo in an e-mail address that caused LAKML to
+> >>>>> reject the mails. Sorry about the noise.)
+> >>>>> 
+> >>>>> This patch set reworks Ezequiel Garcia's previous fix [1] of an out
+> >>>>> of vmalloc space bug on PXA2[57]x platforms caused by an attempt to
+> >>>>> map the start of physical uncached outside of the vmalloc space.
+> >>>>> 
+> >>>>> This first three patches perform a couple of cleanups, and the last
+> >>>>> patch fixes the problem. I've decided to map the memory at address
+> >>>>> 0xfe000000 to minimize changes to the code, but this causes a bit
+> >>>>> of fragmentation of vmalloc space. I could map it to the very end
+> >>>>> of vmalloc space (0xfef00000) instead if preferred, which would
+> >>>>> involve replacing a mov by an ldr in
+> >>>>> pxa2[57]x_finish_suspend and pm_enter_standby_start.
+> >>>>> 
+> >>>>> I've tested the patch set on a PXA270-based system.
+> >>>> 
+> >>>> For those patches:
+> >>>> 
+> >>>> Acked-by: Nicolas Pitre <nico@linaro.org>
+> >>> 
+> >>> Thank you.
+> >>> 
+> >>> MAINTAINERS lists three maintainers for the PXA architecture, and two
+> >>> git trees that seem to be either dead or even deleted. Who picks up
+> >>> patches for PXA ? Should I send a pull request ?
+> >> 
+> >> If no one else answers, then just send a pull request to the ARM-SOC
+> >> team (arm at kernel.org) and CC the linux-arm-kernel mailing list.
+> > 
+> > What ever happened to this?
+> 
+> Nothing, from the looks of it. I can apply them directly unless someone
+> objects.
+> 
+> Laurent, care to rebase and send a fresh copy? cc arm at kernel.org.
 
-  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+Sure. Done.
 
-the iotable mappings should be re-located inside the vmalloc
-region. Such move was introduced at commit:
-
-commit 0536bdf33faff4d940ac094c77998cfac368cfff
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Thu Aug 25 00:35:59 2011 -0400
-
-    ARM: move iotable mappings within the vmalloc region
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-[laurent.pinchart at ideasonboard.com: Hardcode the virtual address]
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/mach-pxa/include/mach/hardware.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-index efb3965..8d63c21 100644
---- a/arch/arm/mach-pxa/include/mach/hardware.h
-+++ b/arch/arm/mach-pxa/include/mach/hardware.h
-@@ -19,7 +19,7 @@
-  * Workarounds for at least 2 errata so far require this.
-  * The mapping is set in mach-pxa/generic.c.
-  */
--#define UNCACHED_PHYS_0		0xff000000
-+#define UNCACHED_PHYS_0		0xfe000000
- #define UNCACHED_PHYS_0_SIZE	0x00100000
- 
- /*
 -- 
-1.8.5.5
+Regards,
+
+Laurent Pinchart
