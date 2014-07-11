@@ -1,282 +1,245 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 11 Jul 2014 16:22:08 +0530
-Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
- <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
- <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
-Message-ID: <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 11 Jul 2014 12:52:13 +0200
+Subject: [PATCH] can: flexcan: add vf61x support for flexcan
+Message-ID: <1405075933-22317-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2014 15:29,  <skannan@codeaurora.org> wrote:
-> Viresh Kumar wrote:
->> On 11 July 2014 09:48, Saravana Kannan <skannan@codeaurora.org> wrote:
+Extend FlexCAN driver to support Vybrid. Vybrids variant of the IP
+has ECC support which is controlled through the memory error
+control register (MECR). There is also an errata which leads to
+false positive error detections (ID e5295). This patch disables
+the memory error detection completely.
 
->>> * Policy settings and governor tunables maintained across suspend/resume
->>>   and hotplug.
->>
->> Its already maintained during suspend/resume.
->
-> But not across hotplug. Which is also very useful when you have 2 clusters
-> and one gets hotplugged offline due to thermal and then reinserted.
-> Userspace has to come and restore it back today. In our tree, we "stitched
-> up" the governor. Also, this make the suspend/resume code a tiny bit
-> simpler -- in the sense, it's not a special case anymore.
+Also extend the clock control for FlexCAN to enable the clocks
+in the Clock Divider (CCM_CSCDR2) register too.
 
-Yeah, I understood that. I was just pointing that you need to mention
-hotplug alone in the bullet point.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Marc, this patch requires your patch regarding clock enable
+for reading the ECR register:
+http://marc.info/?l=linux-can&m=136861025221160&w=2
+So I also tested that patch and it proved solving that issue
+hence
+Tested-By <stefan@agner.ch>
 
->>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+I'm not sure whether its ok to include the device tree and
+clock changes in one patch, let me know if you prefer that
+splitted patches.
 
->>>  static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
->>>  {
->>> -       unsigned int j;
->>> +       unsigned int j, first_cpu = cpumask_first(policy->related_cpus);
->>>         int ret = 0;
->>>
->>> -       for_each_cpu(j, policy->cpus) {
->>> +       for_each_cpu(j, policy->related_cpus) {
->>>                 struct device *cpu_dev;
->>>
->>> -               if (j == policy->cpu)
->>> +               if (j == first_cpu)
->>
->> why?
->
-> The first CPU is a cluster always own the real nodes.
+--
+Stefan
 
-What I meant was, why not use policy->cpu?
+ arch/arm/boot/dts/vf610.dtsi  | 25 ++++++++++++++-
+ arch/arm/mach-imx/clk-vf610.c |  6 ++--
+ drivers/net/can/flexcan.c     | 73 +++++++++++++++++++++++++++++++++++++------
+ 3 files changed, 92 insertions(+), 12 deletions(-)
 
->>> +static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
->>>  {
->>>         struct freq_attr **drv_attr;
->>> +       struct device *dev;
->>>         int ret = 0;
->>>
->>> +       dev = get_cpu_device(cpumask_first(policy->related_cpus));
->>> +       if (!dev)
->>> +               return -EINVAL;
->>> +
->>
->> Why?
->
-> I'm just always adding the real nodes to the first CPU in a cluster
-> independent of which CPU gets added first. Makes it easier to know which
-> ones to symlink. See comment next to policy->cpu for full context.
-
-Yeah, and that is the order in which CPUs will boot and cpufreq_add_dev()
-will be called. So, isn't policy->cpu the right CPU always?
-
->>> +       blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
->>> +                                       CPUFREQ_UPDATE_POLICY_CPU,
->>> policy);
->>
->> This should be only called when policy->cpu is updated. And shouldn't
->> be called anymore and can be dropped as you might not wanna change
->> policy->cpu after this patch.
->
-> Right. I should have reordered this to after.
->
-> But I always HAVE to send it when I add/remove a CPU. That's how I believe
-> cpufreq stats can keep of CPUs going offline.
-
-No. cpufreq-stats doesn't have to care about CPUs going in/out. It just
-cares about poilcy->cpu and so we notify it when that gets updated.
-
-> Oh, yeah. Which bring me to
-> another point. If I'm not mistaken, cpufreq stats keeps track of policy
-> stats. Really, it should track a CPU's stats. If it's hotplugged out, it
-> should count that time towards it's current freq.
-
-Even if CPU is hotplugged out, it is getting clock from the same pll. And
-so if clock for rest of the CPUs change, it changes for the hotplugged
-out one as well.. Even if it is not running.
-
-So, we must account on the new frequencies.
-
->>> -       if (has_target()) {
->>> +       cpus = cpumask_weight(policy->cpus);
->>> +       policy->cpu = cpumask_first(policy->cpus);
->>
->> why update it at all? Also, as per your logic what if cpus == 0?
->
-> Yeah, I didn't write it this way at first. But the governors are making
-> the assumption that policy->cpu is always an online CPU. So, they try to
-
-Are you sure? I had a quick look and failed to see that..
-
-> queue work there and use data structs of that CPU (even if they free it in
-> the STOP event since it went offline).
-
-So, it queues work on all policy->cpus, not policy->cpu. And the data structures
-are just allocated with a CPU number, its fine if its offline.
-
-And where are we freeing that stuff in STOP ?
-
-Sorry if I am really really tired and couldn't read it correctly.
-
-> Another option is to leave policy->cpu unchanged and then fix all the
-> governors. But this patch would get even more complicated. So, we can
-> leave this as is, or fix that up in a separate patch.
-
-Since we are simplifying it here, I think we should NOT change policy->cpu
-at all. It will make life simple (probably).
-
->>> +       if (has_target() && cpus > 0) {
->>
->> Instead of > or < use cpus or !cpus.
->
-> Kinda personal style I guess. cpus > 0 reads like "there's more than 0
-> CPUs" which makes sense in English too. But sure, I can change if you
-> really want to.
-
-Actually at places its compared with 0 or 1, and so thought cpus, !cpus
-would be better..
-
-> Sorry if I gave the impression that this patch is complete.
-
-No, you didn't :)
-
->>> +               cpufreq_driver->stop_cpu(policy);
->>
->> Where is ->exit() gone?
->>
->
-> Why should I exit? I don't think we need to. I'm not planning on exit()
-> and init() every time an entire cluster is offlined or onlined. Just stop
-> the governor and let if go quiet.
-
-Okay, my driver is compiled as a module. I insert/remove it multiple
-times. Only ->init() will be called multiple times, no exit ?
-
->>>  #ifdef CONFIG_SMP
->>>         /* check whether a different CPU already registered this
->>>          * CPU because it is in the same boat. */
->>> +       /* FIXME: This probably needs fixing to avoid "try lock" from
->>> +        * returning NULL. Also, change to likely() */
->>
->> I wanted to give this comment later, but that's fine ..
->>
->> - First, I couldn't understand the try-lock fixme
->
-> If trylock fails when we are adding a new CPU to an existing cluster, I
-> should skip adding it just because someone else was holding the lock and
-> the try lock failed.
-
-But that trylock thing was later in the code. How does it affect the
-'if' block you commented on?
-
-> But I don't think trylocks are needed anymore. Maybe I can fix it in later
-> patches. We'll see.
-
-I don't know yet :)
-
->> - And you aren't freeing 'struct cpufreq_policy' at all now. Would result
->> in
->> Memory leak cpufreq driver is compiled as a module and inserted/removed
->> multiple times.
->
-> Again, sorry, if I gave the impression this patch was done. If you don't
-> want me to send intermediate RFC patches, I can hold off. I'm well aware
-> that this is not completed yet. When I'm done, there should be no memory
-> leak when modules get added/removed.
-
-Oh yes. I believed that atleast the basic things are all working. It even had
-a Tested-by from Stephen :)
-
-Okay, this stuff isn't THAT big. So, hold-on your patches for sometime and
-send when they are almost ready.
-
-I understand that you wanted to have some early feedback, but its already
-there with you. YES we want this change to retain settings during hotplug.
-
-The problem is, even when I didn't review it completely it took over an hour
-to do the reviews I did :)
-
-So, I would like to see something *much more* stable. Finishing can be
-done later.
-
->>>         policy = cpufreq_cpu_get(cpu);
->>>         if (unlikely(policy)) {
->>> +               cpufreq_change_policy_cpus(policy, cpu, true);
->>>                 cpufreq_cpu_put(policy);
->>>                 return 0;
->>>         }
->>
->> This optimization wasn't for the hotplug case, but for adding
->> non-policy->cpu
->> cpus for the first time.
->
-> Sure, but I'm making it an optimization for any time a CPU is added except
-> for the first time. Since I'm not always freeing and allocating policies
-> or moving them around, I can simplify it as such.
-
-Hmm, but that would be an overhead of calling cpufreq_change_policy_cpus()
-for every cpu on boot. Wouldn't be that nice for big servers.
-
->> In your case policy->cpus would already be updated and so calling
->> cpufreq_change_policy_cpus() isn't required.
->
-> How? I don't you misunderstood the intent here.
-
-Only on first boot policy->cpus would be updated. Later on you can do it
-separately as it was done in existing code.
-
-> Yeah, that's why I didn't fix it here yet. Leaving existing bugs as is.
-
-I would prefer cleaning them up first, so that the new changes you are
-making are rock solid.
-
->>> +       /* Weed out impossible CPUs. */
->>> +       cpumask_and(policy->related_cpus, policy->related_cpus,
->>> +                       cpu_possible_mask);
->>
->> why?
->
-> Why not? It should make the future bit ops faster?
-
-Drivers shouldn't set non-populatable CPUs to this mask.
-
->> Sorry but I am stopping now. I have already pointed out some issues
->> which make this unusable.
->
-> Most of them aren't really bugs, but I should clarify the intent though.
-
-I wasn't worried about most of the comments, but exit(), memory leaks,
-etc..
-
-> In this patch, I'm ONLY touching hotplug and resume related code (except
-> for one line). I'll give some description in my next patch on how I'm
-> expecting the events to be across hotplug/suspend and what happens with
-> the policies. Once we are on the same page on the intent of the patch, it
-> should be easier.
-
->> Please make sure you take care of these issues:
->> - suspend/resume
-> Didn't test. I expect it to be broken in v2.
-
-:)
-
->> - module insert/remove
-> Didn't test. Expected to be broken.
->
->> - Memory leaks
-> Will do.
->
->> - multi cluster systems (with one and multiple CPU per cluster)
->> *by cluster I mean group of CPUs sharing clock line
->> - single cluster ones, one and multiple CPUs
->
-> I actually tested hotplug for all these cases. That's how I found the
-> governor issue.
->
->>
->> Will see how V3 goes. Thanks.
->
-> Thanks for taking the time to review and being open to these changes.
-> Appreciate the cooperation.
-
-Thanks Saravana.
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 3fb127a..f38d8d8 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -14,6 +14,8 @@
+ 
+ / {
+ 	aliases {
++		can0 = &can0;
++		can1 = &can1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+@@ -103,6 +105,16 @@
+ 					<&clks VF610_CLK_DMAMUX1>;
+ 			};
+ 
++			can0: flexcan at 40020000 {
++				compatible = "fsl,vf610-flexcan";
++				reg = <0x40020000 0x4000>;
++				interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_FLEXCAN0>,
++					 <&clks VF610_CLK_FLEXCAN0>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 			uart0: serial at 40027000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x40027000 0x1000>;
+@@ -362,7 +374,7 @@
+ 
+ 			esdhc1: esdhc at 400b2000 {
+ 				compatible = "fsl,imx53-esdhc";
+-				reg = <0x400b2000 0x4000>;
++				reg = <0x400b2000 0x1000>;
+ 				interrupts = <0 28 0x04>;
+ 				clocks = <&clks VF610_CLK_IPG_BUS>,
+ 					<&clks VF610_CLK_PLATFORM_BUS>,
+@@ -414,6 +426,17 @@
+ 				clock-names = "nfc";
+ 				status = "disabled";
+ 			};
++
++			can1: flexcan at 400d4000 {
++				compatible = "fsl,vf610-flexcan";
++				reg = <0x400d4000 0x4000>;
++				interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_FLEXCAN1>,
++					 <&clks VF610_CLK_FLEXCAN1>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index 22dc3ee..b12b888 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
+ 
+-	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+-	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
++	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
++	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
++	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
+ 
+ 	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
+ 	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
+diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+index f425ec2..1601247 100644
+--- a/drivers/net/can/flexcan.c
++++ b/drivers/net/can/flexcan.c
+@@ -92,6 +92,27 @@
+ #define FLEXCAN_CTRL_ERR_ALL \
+ 	(FLEXCAN_CTRL_ERR_BUS | FLEXCAN_CTRL_ERR_STATE)
+ 
++/* FLEXCAN control register 2 (CTRL2) bits */
++#define FLEXCAN_CRL2_ECRWRE		BIT(29)
++#define FLEXCAN_CRL2_WRMFRZ		BIT(28)
++#define FLEXCAN_CRL2_RFFN(x)		(((x) & 0x0f) << 24)
++#define FLEXCAN_CRL2_TASD(x)		(((x) & 0x1f) << 19)
++#define FLEXCAN_CRL2_MRP		BIT(18)
++#define FLEXCAN_CRL2_RRS		BIT(17)
++#define FLEXCAN_CRL2_EACEN		BIT(16)
++
++/* FLEXCAN memory error control register (MECR) bits */
++#define FLEXCAN_MECR_ECRWRDIS		BIT(31)
++#define FLEXCAN_MECR_HANCEI_MSK		BIT(19)
++#define FLEXCAN_MECR_FANCEI_MSK		BIT(18)
++#define FLEXCAN_MECR_CEI_MSK		BIT(16)
++#define FLEXCAN_MECR_HAERRIE		BIT(15)
++#define FLEXCAN_MECR_FAERRIE		BIT(14)
++#define FLEXCAN_MECR_EXTERRIE		BIT(13)
++#define FLEXCAN_MECR_RERRDIS		BIT(9)
++#define FLEXCAN_MECR_ECCDIS		BIT(8)
++#define FLEXCAN_MECR_NCEFAFRZ		BIT(7)
++
+ /* FLEXCAN error and status register (ESR) bits */
+ #define FLEXCAN_ESR_TWRN_INT		BIT(17)
+ #define FLEXCAN_ESR_RWRN_INT		BIT(16)
+@@ -150,18 +171,20 @@
+  * FLEXCAN hardware feature flags
+  *
+  * Below is some version info we got:
+- *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT
+- *                                Filter?   connected?
+- *   MX25  FlexCAN2  03.00.00.00     no         no
+- *   MX28  FlexCAN2  03.00.04.00    yes        yes
+- *   MX35  FlexCAN2  03.00.00.00     no         no
+- *   MX53  FlexCAN2  03.00.00.00    yes         no
+- *   MX6s  FlexCAN3  10.00.12.00    yes        yes
++ *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT  Memory err
++ *                                Filter?   connected?  detection
++ *   MX25  FlexCAN2  03.00.00.00     no         no	   no
++ *   MX28  FlexCAN2  03.00.04.00    yes        yes	   no
++ *   MX35  FlexCAN2  03.00.00.00     no         no	   no
++ *   MX53  FlexCAN2  03.00.00.00    yes         no	   no
++ *   MX6s  FlexCAN3  10.00.12.00    yes        yes	   no
++ *   VFxx  FlexCAN3  ?		     no		no	  yes
+  *
+  * Some SOCs do not have the RX_WARN & TX_WARN interrupt line connected.
+  */
+ #define FLEXCAN_HAS_V10_FEATURES	BIT(1) /* For core version >= 10 */
+ #define FLEXCAN_HAS_BROKEN_ERR_STATE	BIT(2) /* [TR]WRN_INT not connected */
++#define FLEXCAN_HAS_MECR_FEATURES	BIT(3) /* Memory error detection */
+ 
+ /* Structure of the message buffer */
+ struct flexcan_mb {
+@@ -192,8 +215,11 @@ struct flexcan_regs {
+ 	u32 crcr;		/* 0x44 */
+ 	u32 rxfgmask;		/* 0x48 */
+ 	u32 rxfir;		/* 0x4c */
+-	u32 _reserved3[12];
++	u32 _reserved3[12];	/* 0x50 */
+ 	struct flexcan_mb cantxfg[64];
++	u32 _reserved4[408];
++	u32 mecr;		/* 0xae0 */
++	u32 erriar;		/* 0xae4 */
+ };
+ 
+ struct flexcan_devtype_data {
+@@ -223,6 +249,9 @@ static struct flexcan_devtype_data fsl_imx28_devtype_data;
+ static struct flexcan_devtype_data fsl_imx6q_devtype_data = {
+ 	.features = FLEXCAN_HAS_V10_FEATURES,
+ };
++static struct flexcan_devtype_data fsl_vf610_devtype_data = {
++	.features = FLEXCAN_HAS_V10_FEATURES | FLEXCAN_HAS_MECR_FEATURES,
++};
+ 
+ static const struct can_bittiming_const flexcan_bittiming_const = {
+ 	.name = DRV_NAME,
+@@ -793,7 +822,7 @@ static int flexcan_chip_start(struct net_device *dev)
+ 	struct flexcan_priv *priv = netdev_priv(dev);
+ 	struct flexcan_regs __iomem *regs = priv->base;
+ 	int err;
+-	u32 reg_mcr, reg_ctrl;
++	u32 reg_mcr, reg_ctrl, reg_crl2, reg_mecr;
+ 
+ 	/* enable module */
+ 	err = flexcan_chip_enable(priv);
+@@ -870,6 +899,31 @@ static int flexcan_chip_start(struct net_device *dev)
+ 	if (priv->devtype_data->features & FLEXCAN_HAS_V10_FEATURES)
+ 		flexcan_write(0x0, &regs->rxfgmask);
+ 
++	/*
++	 * On Vybrid, disable memory error detection interrupts
++	 * and freeze mode.
++	 * This also works around errata e5295 which generates
++	 * false positive memory errors and put the device in
++	 * freeze mode.
++	 */
++	if (priv->devtype_data->features & FLEXCAN_HAS_MECR_FEATURES) {
++		/*
++		 * Follow the protocol as described in "Detection
++		 * and Correction of Memory Errors" to write to
++		 * MECR register
++		 */
++		reg_crl2 = flexcan_read(&regs->crl2);
++		reg_crl2 |= FLEXCAN_CRL2_ECRWRE;
++		flexcan_write(reg_crl2, &regs->crl2);
++
++		reg_mecr = flexcan_read(&regs->mecr);
++		reg_mecr &= ~FLEXCAN_MECR_ECRWRDIS;
++		flexcan_write(reg_mecr, &regs->mecr);
++		reg_mecr &= ~(FLEXCAN_MECR_NCEFAFRZ | FLEXCAN_MECR_HANCEI_MSK |
++				FLEXCAN_MECR_FANCEI_MSK);
++		flexcan_write(reg_mecr, &regs->mecr);
++	}
++
+ 	err = flexcan_transceiver_enable(priv);
+ 	if (err)
+ 		goto out_chip_disable;
+@@ -1080,6 +1134,7 @@ static const struct of_device_id flexcan_of_match[] = {
+ 	{ .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
+ 	{ .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
+ 	{ .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
++	{ .compatible = "fsl,vf610-flexcan", .data = &fsl_vf610_devtype_data, },
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, flexcan_of_match);
+-- 
+2.0.1
