@@ -1,26 +1,26 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Fri, 11 Jul 2014 09:28:09 -0700
-Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
- clocksource
-In-Reply-To: <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+Date: Fri, 11 Jul 2014 09:33:47 -0700
+Subject: [PATCH 12/13] cpufreq: Add cpufreq driver for Tegra124
+In-Reply-To: <53C002BE.90805@nvidia.com>
 References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
- <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
+ <1405028569-14253-13-git-send-email-ttynkkynen@nvidia.com>
+ <CAKohpom9ORXFiUU4=V+CxgN0ZOFLMEhEjHiU8HsYUYDybNXgHQ@mail.gmail.com>
+ <20140711091207.GY23218@tbergstrom-lnx.Nvidia.com>
+ <20140711145735.GB6523@ulmo> <53BFFEAD.7000405@nvidia.com>
+ <20140711151501.GA25810@ulmo> <53C002BE.90805@nvidia.com>
+Message-ID: <CAL1qeaGOW8U6B0rLvFZKLzoZviMZwWJcfmXdmgZA329Mmvy_Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 2:42 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
-> The DFLL is the main clocksource for the fast CPU cluster on Tegra124
-> and also provides automatic CPU rail voltage scaling as well. The DFLL
-> is a separate IP block from the usual Tegra124 clock-and-reset
-> controller, so it gets its own node in the device tree.
+On Fri, Jul 11, 2014 at 8:29 AM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+>
+> On the hardware level, the two I2C controllers sharing the same pins
+> have knowledge of each other and won't start transmitting if the bus
+> is busy (something different from the usual I2C arbitration, that is).
+> I guess on the kernel side there could be a problem if the voltage register
+> is marked cached in the PMIC driver's regmap.
 
-> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
-
-> +- nvidia,pmic-voltage-table: Array of 2-tuples.  Each entry should have the
-> +  form <register-value voltage-in-uV>, indicating the register value that
-> +  needs to be programmed to the PMIC for changing the VDD_CPU voltage to
-> +  the specified voltage. The table must be in ascending order by the voltage.
-
-Instead of listing the register values for each voltage in the DT,
-can't you use regulator_list_voltage() to create this map?
+Yeah, in our tree we have a hack to disable regcache for SD0_VOLTAGE.
+Other than the value reported to userspace being wrong, leaving it as
+cacheable shouldn't be an issue if no other drivers try to read/write
+that register.
