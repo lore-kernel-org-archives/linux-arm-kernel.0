@@ -1,64 +1,155 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jul 2014 13:00:47 +0200
-Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
-In-Reply-To: <CAOesGMiRjcWUnwsKBwK_dwWZP1EZpSVJyf5GyPkZJzP63SbS4Q@mail.gmail.com>
-References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <20140710121010.GA1990@arch.cereza>
- <CAOesGMiRjcWUnwsKBwK_dwWZP1EZpSVJyf5GyPkZJzP63SbS4Q@mail.gmail.com>
-Message-ID: <3632586.xKfZNAEmjS@avalon>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 11 Jul 2014 13:04:07 +0200
+Subject: [PATCH 1/3 v5] spi: s3c64xx: fix broken "cs_gpios" usage in the
+ driver
+In-Reply-To: <CABxcv=mw0ma3MQPsR5sGU7UcORehyyhqOtQ_SUwCNr4kpsK-7g@mail.gmail.com>
+References: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
+ <20140702165651.GK410@sirena.org.uk>
+ <CAHfPSqAXs=5VLLEV-XVw5YJo=-9QFn9KA8oG_A0CfNykcVwnCQ@mail.gmail.com>
+ <20140707073244.GC30458@sirena.org.uk>
+ <CAHfPSqAf3z9otNJivw5W7oKdRbU085+AWxCMAh8ORh=GkiNiXw@mail.gmail.com>
+ <CABxcv=mw0ma3MQPsR5sGU7UcORehyyhqOtQ_SUwCNr4kpsK-7g@mail.gmail.com>
+Message-ID: <CABxcv=kcxAJz2gACAQG3H6xR1E_SBJqOkBOq=cQ7oHpndonbRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hello Naveen and Mark,
 
-On Thursday 10 July 2014 09:56:32 Olof Johansson wrote:
-> On Thu, Jul 10, 2014 at 5:10 AM, Ezequiel Garcia wrote:
-> > On 10 Apr 08:31 PM, Nicolas Pitre wrote:
-> >> On Fri, 11 Apr 2014, Laurent Pinchart wrote:
-> >>> On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
-> >>>> On Wed, 9 Apr 2014, Laurent Pinchart wrote:
-> >>>>> Hello,
-> >>>>> 
-> >>>>> (Resending due to a typo in an e-mail address that caused LAKML to
-> >>>>> reject the mails. Sorry about the noise.)
-> >>>>> 
-> >>>>> This patch set reworks Ezequiel Garcia's previous fix [1] of an out
-> >>>>> of vmalloc space bug on PXA2[57]x platforms caused by an attempt to
-> >>>>> map the start of physical uncached outside of the vmalloc space.
-> >>>>> 
-> >>>>> This first three patches perform a couple of cleanups, and the last
-> >>>>> patch fixes the problem. I've decided to map the memory at address
-> >>>>> 0xfe000000 to minimize changes to the code, but this causes a bit
-> >>>>> of fragmentation of vmalloc space. I could map it to the very end
-> >>>>> of vmalloc space (0xfef00000) instead if preferred, which would
-> >>>>> involve replacing a mov by an ldr in
-> >>>>> pxa2[57]x_finish_suspend and pm_enter_standby_start.
-> >>>>> 
-> >>>>> I've tested the patch set on a PXA270-based system.
-> >>>> 
-> >>>> For those patches:
-> >>>> 
-> >>>> Acked-by: Nicolas Pitre <nico@linaro.org>
-> >>> 
-> >>> Thank you.
-> >>> 
-> >>> MAINTAINERS lists three maintainers for the PXA architecture, and two
-> >>> git trees that seem to be either dead or even deleted. Who picks up
-> >>> patches for PXA ? Should I send a pull request ?
-> >> 
-> >> If no one else answers, then just send a pull request to the ARM-SOC
-> >> team (arm at kernel.org) and CC the linux-arm-kernel mailing list.
-> > 
-> > What ever happened to this?
-> 
-> Nothing, from the looks of it. I can apply them directly unless someone
-> objects.
-> 
-> Laurent, care to rebase and send a fresh copy? cc arm at kernel.org.
+On Mon, Jul 7, 2014 at 1:22 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> On Mon, Jul 7, 2014 at 10:31 AM, Naveen Krishna Ch
+> <naveenkrishna.ch@gmail.com> wrote:
+>>>
+>>>> >> Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
+>>>> >> considering the time with no compliants about the breakage.
+>>>
+>>>> > I'm not clear what the breakage is?  Some boards are broken but what's
+>>>> > the driver issue?
+>>>
+>>>> ToT was broken for few boards
+>>>> exynos4412-trats2.dts, exynos4210-smdkv310.dts and exynos5250-smdk5250.dts
+>>>
+>>>> With some DTS changes SPI works well, spi-s3c64xx.c driver had no issues.
+>>>
+>
+> Correct me if I'm wrong but I think that the driver does have issues
+> since the commit mentioned (3146bee) broke DT backward compatibility.
+>
+>>> No, you're not answering my question - to repeat, what is the breakage?
+>>
+>
+> As far as I understand, the breakage is that any DTS that followed the
+> DT binding documented in
+> Documentation/devicetree/bindings/spi/spi-samsung.txt is not working
+> with the current driver. So is not that some boards are broken, is
+> that the driver is broken and it has been broken for more than a year
+> (the commit date is Jun 21 2013).
+>
+>> The Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> describes "cs-gpio" as a controller specific property.
+>>
+>> The dts entries for SPI in exynos4412-trats2.dts, exynos4210-smdkv310.dts
+>> and exynos5250-smdk5250.dts boards have the "cs-gpio" property defined
+>> under controller-data node, which is inside the SPI device node
+>> &spi_1 {
+>>   controller-data {
+>>     cs-gpio = <>;
+>>   };
+>> };
+>>
+>> But, _probe() of spi-s3c64xx.c driver looks for "cs-gpio" in the SPI
+>> device node and
+>> sets a flag "sdd->cs_gpio = false" (If the property is not available)
+>> &spi_1 {
+>>   cs-gpio = <>;
+>> };
+>>
+>> the sdd->cs_gpio flag is checked before actually getting the gpios
+>> from the controller-data node
+>>        if (sdd->cs_gpio)
+>>                 cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+>>
+>
+> I think that if changing the binding is not possible, at least we
+> should document this new "cs-gpio" property that is looked in the top
+> level SPI node after commit 3146bee and also revert the default in
+> order to allow DTs using the old binding to keep working.
+>
+> By default not having the "cs-gpio" property in the SPI dev node
+> should mean that the "cs-gpio" property in the controller-data node
+> should be used to signal the chip-select and having the "cs-gpio"
+> property in the SPI node should mean that the native chip select
+> should be used instead of a GPIO. That preserves the old DT binding
+> semantic while making the GPIO to be optional.
+>
+> Of course in that case the property name does not make too much sense,
+> so probably should be changed to "cs-native" or something like that.
+> But I still don't understand why this is needed in the first place
+> since according to Documentation/devicetree/bindings/spi/spi-bus.txt
+> you can use the cs-gpios property to specify that a native chip-select
+> will be used instead of a GPIO by doing:
+>
+> cs-gpios = <&gpio1 0 0> <0>
+>
+> cs0 : &gpio1 0 0
+> cs1 : native
+>
+>> Hence, SPI was failing on those boards.
+>>
+>> 1. As the SPI core and several drivers were changed to work with
+>>     DT property "cs-gpios" (plural) defined under SPI node.
+>> 2. Since the commit 3146beec21b64f4551fcf0ac148381d54dc41b1b
+>>     "spi: s3c64xx: Added provision for dedicated cs pin"
+>>     Dated:   Fri Jun 21 11:26:12 2013 +0530
+>>
+>> For the above 2 reasons, It was decided to drop the backward compatibility
+>> of using "cs-gpio"(singular) in controller-data.
+>> Instead, start supporting "cs-gpios"(plural) in the SPI node.
+>>
+>
+> Right, since the DT binding has been broken for a year and because is
+> not consistent with the bindings used by all other SPI drivers, many
+> agreed that it was one of the exceptional cases where the DT binding
+> can be rethought and changed to use the generic "cs-gpios" property
+> already supported by SPI core. It breaks backward compatibility that's
+> true but the DT binding has been broken anyways and nobody noticed
+> before.
+>
+> The other option is what I said above, fixing the DT binding
+> compatibility breakage while keeping the custom binding for this SPI
+> driver.
+>
+>>>
+>>>> > Also I'd need to check but are you sure that GPIO 0 is not valid?
+>>>
+>>>> gpio_is_valid() returns true for
+>>>> "number >= 0 && number < ARCH_NR_GPIOS"
+>>>
+>>> Right, so this means that any board that is using the internal chip
+>>> select with zero as default in their platform data is broken by this
+>>> change.
+>>
+>
+> I think this problem could be present in other SPI drivers as well? So
+> maybe the right fix for this is to convert the SPI core gpio handling
+> to use the new descriptor-based gpio API instead of the integer-base
+> one?
+>
+>> using gpio_is_valid() to "sdd->cs_gpio" flag every where to check for the
+>> validity was a review comment.
+>> Which seems to fail for internal chip select with zero.
+>>
+>> I can submit another version with"sdd->cs_gpio" flag for this purpose.
+>>
+>> --
+>> Thanks & Regards,
+>> (: Nav :)
+>> --
 
-Sure. Done.
+Any more opinions on this issue?
 
--- 
-Regards,
+It would be great if we can move this forward since there are other
+series that depend on these fixes.
 
-Laurent Pinchart
+Best regards,
+Javier
