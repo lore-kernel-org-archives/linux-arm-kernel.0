@@ -1,119 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 11 Jul 2014 13:46:50 +0200
-Subject: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
-Message-ID: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jul 2014 12:54:06 +0100
+Subject: [PATCH v3+1 5/5] ARM: DT: STi: STiH416: Add DT node for MiPHY365x
+In-Reply-To: <1404906074-31992-6-git-send-email-lee.jones@linaro.org>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+ <1404906074-31992-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140711115406.GB2954@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yi Li <yi.li@linaro.org>
+The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+devices. It has 2 ports which it can use for either; both SATA, both
+PCIe or one of each in any configuration.
 
-SMbios is important for server hardware vendors. It implements a spec for
-providing descriptive information about the platform. Things like serial
-numbers, physical layout of the ports, build configuration data, and the like.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-This has been tested by dmidecode and lshw tools.
-
-Signed-off-by: Yi Li <yi.li@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Changes since previous version:
-- changed double inclusion guard to arm64 flavour
-- use kzalloc(GFP_KERNEL) as GFP_ATOMIC is not needed
-- do a sanity check on the size of the requested mapping
-
- arch/arm64/Kconfig           | 10 ++++++++++
- arch/arm64/include/asm/dmi.h | 41 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c    |  2 ++
- 3 files changed, 53 insertions(+)
- create mode 100644 arch/arm64/include/asm/dmi.h
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a474de346be6..560996c4a172 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -307,6 +307,16 @@ config EFI
- 	  allow the kernel to be booted as an EFI application. This
- 	  is only useful on systems that have UEFI firmware.
- 
-+config DMI
-+	bool "Enable support for SMBIOS (DMI) tables"
-+	depends on EFI
-+	default y
-+	help
-+	  This enables SMBIOS/DMI feature for systems.
+diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+index 4e2df66..c3c2ac6 100644
+--- a/arch/arm/boot/dts/stih416-b2020.dts
++++ b/arch/arm/boot/dts/stih416-b2020.dts
+@@ -12,4 +12,16 @@
+ / {
+ 	model = "STiH416 B2020";
+ 	compatible = "st,stih416-b2020", "st,stih416";
 +
-+	  This option is only useful on systems that have UEFI firmware.
-+	  However, even with this option, the resultant kernel should
-+	  continue to boot on existing non-UEFI platforms.
- endmenu
- 
- menu "Userspace binary formats"
-diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
-new file mode 100644
-index 000000000000..b0882a8620e1
---- /dev/null
-+++ b/arch/arm64/include/asm/dmi.h
-@@ -0,0 +1,41 @@
-+/*
-+ * arch/arm64/include/asm/dmi.h
-+ *
-+ * Copyright (C) 2013 Linaro Limited.
-+ * Written by: Yi Li (yi.li at linaro.org)
-+ *
-+ * based on arch/ia64/include/asm/dmi.h
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
++	soc {
++		miphy365x_phy: miphy365x at fe382000 {
++			phy_port0: port at fe382000 {
++				st,sata-gen = <3>;
++			};
 +
-+#ifndef __ASM_DMI_H
-+#define __ASM_DMI_H
++			phy_port1: port at fe38a000 {
++				st,pcie-tx-pol-inv;
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
+index ba0fa2c..80aff0f 100644
+--- a/arch/arm/boot/dts/stih416-b2020e.dts
++++ b/arch/arm/boot/dts/stih416-b2020e.dts
+@@ -31,5 +31,15 @@
+ 		ethernet1: dwmac at fef08000 {
+ 			snps,reset-gpio = <&PIO0 7>;
+ 		};
 +
-+#include <linux/slab.h>
-+#include <linux/efi.h>
++		miphy365x_phy: miphy365x at fe382000 {
++			phy_port0: port at fe382000 {
++				st,sata-gen = <3>;
++			};
 +
-+static inline void __iomem *dmi_remap(u64 phys, u64 size)
-+{
-+	void __iomem *p = efi_lookup_mapped_addr(phys);
++			phy_port1: port at fe38a000 {
++				st,pcie-tx-pol-inv;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 84758d7..2b98a0a 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -9,6 +9,8 @@
+ #include "stih41x.dtsi"
+ #include "stih416-clock.dtsi"
+ #include "stih416-pinctrl.dtsi"
 +
-+	/*
-+	 * If the mapping spans multiple pages, do a minimal check to ensure
-+	 * that the mapping returned by efi_lookup_mapped_addr() covers the
-+	 * whole requested range (but ignore potential holes)
-+	 */
-+	if ((phys & ~PAGE_MASK) + size > PAGE_SIZE
-+	    && (p + size - 1) != efi_lookup_mapped_addr(phys + size - 1))
-+		return NULL;
-+	return p;
-+}
++#include <dt-bindings/phy/phy-miphy365x.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset-controller/stih416-resets.h>
+ / {
+@@ -236,5 +238,25 @@
+ 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
+ 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
+ 		};
 +
-+/* Reuse existing UEFI mappings for DMI */
-+#define dmi_alloc(l)			kzalloc(l, GFP_KERNEL)
-+#define dmi_early_remap(x, l)		dmi_remap(x, l)
-+#define dmi_early_unmap(x, l)
-+#define dmi_unmap(x)
++		miphy365x_phy: miphy365x at fe382000 {
++			compatible      = "st,miphy365x-phy";
++			st,syscfg  	= <&syscfg_rear>;
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			ranges;
 +
-+#endif
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 46d1125571f6..4075e46282b1 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -43,6 +43,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- #include <linux/efi.h>
-+#include <linux/dmi.h>
- 
- #include <asm/fixmap.h>
- #include <asm/cputype.h>
-@@ -413,6 +414,7 @@ void __init setup_arch(char **cmdline_p)
- static int __init arm64_device_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	dmi_scan_machine();
- 	return 0;
- }
- arch_initcall_sync(arm64_device_init);
--- 
-1.8.3.2
++			phy_port0: port at fe382000 {
++				#phy-cells = <1>;
++				reg = <0xfe382000 0x100>, <0xfe394000 0x100>, <0x824 0x4>;
++				reg-names = "sata", "pcie", "syscfg";
++			};
++
++			phy_port1: port at fe38a000 {
++				#phy-cells = <1>;
++				reg = <0xfe38a000 0x100>, <0xfe804000 0x100>, <0x828 0x4>;
++				reg-names = "sata", "pcie", "syscfg";
++			};
++		};
+ 	};
+ };
