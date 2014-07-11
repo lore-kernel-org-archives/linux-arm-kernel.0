@@ -1,34 +1,157 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Jul 2014 14:00:55 +0200
-Subject: No uart output on my snowball board
-In-Reply-To: <20140710223021.6e9c857f@gandalf.local.home>
-References: <20140710223021.6e9c857f@gandalf.local.home>
-Message-ID: <CACRpkdZM5NECaPbFC1aGH2zD4T_8g9TYRy1HkbDVAQvjJs5E5w@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 11 Jul 2014 15:02:52 +0300
+Subject: [PATCH] ARM: omap2+: gpmc-nand: Use dynamic
+ platform_device_alloc()
+In-Reply-To: <53BD3A56.9050302@ti.com>
+References: <1401891875-27843-1-git-send-email-lisovy@merica.cz>
+ <53BD3A56.9050302@ti.com>
+Message-ID: <53BFD26C.6080609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 4:30 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+On 07/09/2014 03:49 PM, Roger Quadros wrote:
+> Hi Rostislav,
+> 
+> On 06/04/2014 05:24 PM, Rostislav Lisovy wrote:
+>> GPMC controller supports up to 8 memory devices connected to it.
+>> Since there is one statically allocated "struct platform_device
+>> gpmc_nand_device" it is not possible to configure the system to
+>> use more than one NAND device connected to the GPMC. This
+>> modification makes it possible to use up to 8 NAND devices
+>> connected to the GPMC controller.
+>>
+>> Signed-off-by: Rostislav Lisovy <lisovy@merica.cz>
+>> ---
+>>
+>> Tested on custom AM335x board with two different NAND chips
+>> (128 + 256 MiB) using GPMC configuration in FDT -- behaves
+>> correctly.
+>>
+>>
+>>  arch/arm/mach-omap2/gpmc-nand.c | 79 +++++++++++++++++++----------------------
+>>  1 file changed, 37 insertions(+), 42 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+>> index 4349e82..c5481a8 100644
+>> --- a/arch/arm/mach-omap2/gpmc-nand.c
+>> +++ b/arch/arm/mach-omap2/gpmc-nand.c
+>> @@ -24,25 +24,6 @@
+>>  /* minimum size for IO mapping */
+>>  #define	NAND_IO_SIZE	4
+>>  
+>> -static struct resource gpmc_nand_resource[] = {
+>> -	{
+>> -		.flags		= IORESOURCE_MEM,
+>> -	},
+>> -	{
+>> -		.flags		= IORESOURCE_IRQ,
+>> -	},
+>> -	{
+>> -		.flags		= IORESOURCE_IRQ,
+>> -	},
+>> -};
+>> -
+>> -static struct platform_device gpmc_nand_device = {
+>> -	.name		= "omap2-nand",
+>> -	.id		= 0,
+>> -	.num_resources	= ARRAY_SIZE(gpmc_nand_resource),
+>> -	.resource	= gpmc_nand_resource,
+>> -};
+>> -
+>>  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+>>  {
+>>  	/* platforms which support all ECC schemes */
+>> @@ -93,43 +74,41 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+>>  {
+>>  	int err	= 0;
+>>  	struct gpmc_settings s;
+>> -	struct device *dev = &gpmc_nand_device.dev;
+>> -
+>> -	memset(&s, 0, sizeof(struct gpmc_settings));
+>> +	struct platform_device *pdev;
+>> +	struct resource gpmc_nand_res[] = {
+>> +		{ .flags = IORESOURCE_MEM, },
+>> +		{ .flags = IORESOURCE_IRQ, },
+>> +		{ .flags = IORESOURCE_IRQ, },
+>> +	};
+>>  
+>> -	gpmc_nand_device.dev.platform_data = gpmc_nand_data;
+>> +	BUG_ON(gpmc_nand_data->cs >= GPMC_CS_NUM);
+>>  
+>>  	err = gpmc_cs_request(gpmc_nand_data->cs, NAND_IO_SIZE,
+>> -				(unsigned long *)&gpmc_nand_resource[0].start);
+>> +			      (unsigned long *)&gpmc_nand_res[0].start);
+>>  	if (err < 0) {
+>> -		dev_err(dev, "Cannot request GPMC CS %d, error %d\n",
+>> -			gpmc_nand_data->cs, err);
+>> +		pr_err("omap2-gpmc: Cannot request GPMC CS %d, error %d\n",
+>> +		       gpmc_nand_data->cs, err);
+>>  		return err;
+>>  	}
+>> -
+>> -	gpmc_nand_resource[0].end = gpmc_nand_resource[0].start +
+>> -							NAND_IO_SIZE - 1;
+>> -
+>> -	gpmc_nand_resource[1].start =
+>> -				gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
+>> -	gpmc_nand_resource[2].start =
+>> -				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
+>> +	gpmc_nand_res[0].end = gpmc_nand_res[0].start + NAND_IO_SIZE - 1;
+>> +	gpmc_nand_res[1].start = gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
+>> +	gpmc_nand_res[2].start = gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
+>>  
+>>  	if (gpmc_t) {
+>>  		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
+>>  		if (err < 0) {
+>> -			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
+>> +			pr_err("omap2-gpmc: Unable to set gpmc timings: %d\n", err);
+>>  			return err;
+>>  		}
+>>  	}
+>>  
+>> +	memset(&s, 0, sizeof(struct gpmc_settings));
+>>  	if (gpmc_nand_data->of_node)
+>>  		gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
+>>  	else
+>>  		gpmc_set_legacy(gpmc_nand_data, &s);
+>>  
+>>  	s.device_nand = true;
+>> -
+>>  	err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
+>>  	if (err < 0)
+>>  		goto out_free_cs;
+>> @@ -141,18 +120,34 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+>>  	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
+>>  
+>>  	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
+>> -		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
+>> -		return -EINVAL;
+>> +		pr_err("omap2-nand: Unsupported NAND ECC scheme selected\n");
+>> +		err = -EINVAL;
+>> +		goto out_free_cs;
+>>  	}
+>>  
+>> -	err = platform_device_register(&gpmc_nand_device);
+>> -	if (err < 0) {
+>> -		dev_err(dev, "Unable to register NAND device\n");
+>> -		goto out_free_cs;
+>> +
+>> +	pdev = platform_device_alloc("omap2-nand", gpmc_nand_data->cs);
+>> +	if (pdev) {
+>> +		err = platform_device_add_resources(pdev, gpmc_nand_res,
+>> +						    ARRAY_SIZE(gpmc_nand_res));
+>> +		if (!err)
+>> +			pdev->dev.platform_data = gpmc_nand_data;
+>> +	} else {
+>> +		err = -ENOMEM;
+>> +	}
+>> +	if (err)
+>> +		goto out_free_pdev;
+> 
+> There is a slight problem here. If platform_device_alloc() fails,
+> we must jump to 'out_free_cs' and not 'out_free_pdev'.
 
-> commit a0998b8321eb5f53ef51924f5ab6c69237ac1025
-> Author: Lee Jones <lee.jones@linaro.org>
-> Date:   Thu Aug 22 16:18:56 2013 +0100
->
->     ARM: ux500: Remove UART support when booting without Device Tree
->
->     It's time to remove all ATAG support from ux500 and rely solely on
->     Device Tree booting. This patch is part of that endeavour.
->
->     Signed-off-by: Lee Jones <lee.jones@linaro.org>
->     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Nevermind. It shouldn't be a problem as platform_device_put() checks for NULL pdev.
 
-I hate that I didn't spot the speling mistake in the subject,
-its ATAG support we're removing, not UART :-)
-
-Anyway, I think you got enough hints on how we do this
-with appended devicetrees instead, Lee's snippet should
-work or check out this page that I also posted to your
-G+ post:
-http://www.df.lth.se/~triad/krad/ux00/
-
-Yours,
-Linus Walleij
+cheers,
+-roger
