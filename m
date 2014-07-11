@@ -1,23 +1,85 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Jul 2014 13:39:49 +0100
-Subject: [PATCH] spi: efm32: correct namespacing of location property
-In-Reply-To: <1405066677-12858-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <CAOesGMjgX5PWBSD2YP7mTGMWafxBjeMDmzZoPCXb27YPUHEcyw@mail.gmail.com>
- <1405066677-12858-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20140711123949.GM30458@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Jul 2014 13:45:53 +0100
+Subject: arm64 flushing 255GB of vmalloc space takes too long
+In-Reply-To: <53BF3D58.2010900@codeaurora.org>
+References: <CAMPhdO-j5SfHexP8hafB2EQVs91TOqp_k_SLwWmo9OHVEvNWiQ@mail.gmail.com>
+ <20140709174055.GC2814@arm.com>
+ <CAMPhdO_XqAL4oXcuJkp2PTQ-J07sGG4Nm5HjHO=yGqS+KuWQzg@mail.gmail.com>
+ <53BF3D58.2010900@codeaurora.org>
+Message-ID: <20140711124553.GG11473@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 10:17:57AM +0200, Uwe Kleine-K?nig wrote:
-> Olof Johansson pointed out that usually the company name is picked as
-> namespace prefix to specific properties. So expect "energymicro,location"
-> but fall back to the previously introduced name "efm32,location".
+On Fri, Jul 11, 2014 at 02:26:48AM +0100, Laura Abbott wrote:
+> On 7/9/2014 11:04 AM, Eric Miao wrote:
+> > On Wed, Jul 9, 2014 at 10:40 AM, Catalin Marinas
+> > <catalin.marinas@arm.com> wrote:
+> >> On Wed, Jul 09, 2014 at 05:53:26PM +0100, Eric Miao wrote:
+> >>> On Tue, Jul 8, 2014 at 6:43 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> >>>> I have an arm64 target which has been observed hanging in __purge_vmap_area_lazy
+> >>>> in vmalloc.c The root cause of this 'hang' is that flush_tlb_kernel_range is
+> >>>> attempting to flush 255GB of virtual address space. This takes ~2 seconds and
+> >>>> preemption is disabled at this time thanks to the purge lock. Disabling
+> >>>> preemption for that time is long enough to trigger a watchdog we have setup.
+> >>
+> >> That's definitely not good.
+> >>
+> >>>> A couple of options I thought of:
+> >>>> 1) Increase the timeout of our watchdog to allow the flush to occur. Nobody
+> >>>> I suggested this to likes the idea as the watchdog firing generally catches
+> >>>> behavior that results in poor system performance and disabling preemption
+> >>>> for that long does seem like a problem.
+> >>>> 2) Change __purge_vmap_area_lazy to do less work under a spinlock. This would
+> >>>> certainly have a performance impact and I don't even know if it is plausible.
+> >>>> 3) Allow module unloading to trigger a vmalloc purge beforehand to help avoid
+> >>>> this case. This would still be racy if another vfree came in during the time
+> >>>> between the purge and the vfree but it might be good enough.
+> >>>> 4) Add 'if size > threshold flush entire tlb' (I haven't profiled this yet)
+> >>>
+> >>> We have the same problem. I'd agree with point 2 and point 4, point 1/3 do not
+> >>> actually fix this issue. purge_vmap_area_lazy() could be called in other
+> >>> cases.
+> >>
+> >> I would also discard point 2 as it still takes ~2 seconds, only that not
+> >> under a spinlock.
+> > 
+> > Point is - we could still end up a good amount of time in that function,
+> > giving the default value of lazy_vfree_pages to be 32MB * log(ncpu),
+> > worst case of all vmap areas being only one page, tlb flush page by
+> > page, and traversal of the list, calling __free_vmap_area() that many
+> > times won't likely to reduce the execution time to microsecond level.
+> > 
+> > If it's something inevitable - we do it in a bit cleaner way.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/a622b1d9/attachment-0001.sig>
+In general I think it makes sense to add a mutex instead of a spinlock
+here if slowdown is caused by other things as well. That's independent
+of the TLB invalidation optimisation for arm64.
+
+> > Or we end up having platform specific tlb flush implementation just as we
+> > did for cache ops. I would expect only few platforms will have their own
+> > thresholds. A simple heuristic guess of the threshold based on number of
+> > tlb entries would be good to go?
+> 
+> Mark Salter actually proposed a fix to this back in May 
+> 
+> https://lkml.org/lkml/2014/5/2/311
+> 
+> I never saw any further comments on it though. It also matches what x86
+> does with their TLB flushing. It fixes the problem for me and the threshold
+> seems to be the best we can do unless we want to introduce options per
+> platform. It will need to be rebased to the latest tree though.
+
+There were other patches in this area and I forgot about this. The
+problem is that the ARM architecture does not define the actual
+micro-architectural implementation of the TLBs (and it shouldn't), so
+there is no way to guess how many TLB entries there are. It's not an
+easy figure to get either since there are multiple levels of caching for
+the TLBs.
+
+So we either guess some value here (we may not always be optimal) or we
+put some time bound (e.g. based on sched_clock()) on how long to loop.
+The latter is not optimal either, the only aim being to avoid
+soft-lockups.
+
+-- 
+Catalin
