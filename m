@@ -1,147 +1,157 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 11 Jul 2014 12:48:17 -0700
-Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <001301cf9cf1$c91c7310$5b555930$%jun@samsung.com>
-References: <CAPz6YkUzGWnOznZ4UXNsLbe=ehDwfMJwUSjahUKVnVz8w9OcsA@mail.gmail.com>
- <1402351255-7423-1-git-send-email-sonnyrao@chromium.org>
- <002201cf9c3a$6de4a150$49ade3f0$%jun@samsung.com>
- <CAPz6YkXgoKPSQEdNOwAQDhEnFGFVArr_0obbVR_okAEOvLxtzA@mail.gmail.com>
- <001301cf9cf1$c91c7310$5b555930$%jun@samsung.com>
-Message-ID: <CAPz6YkUKWUuQrSjPbdhwwZ57kkzJ7tLGpue=mvw6+31kkBhauw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 11 Jul 2014 13:01:55 -0700
+Subject: [PATCH] clk: qcom: Support bypass RCG configuration
+In-Reply-To: <1405106207-26638-1-git-send-email-robdclark@gmail.com>
+Message-ID: <1405108915-19234-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 3:20 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> On Fri, July 11, 2014, Sonny Rao wrote:
->> On Thu, Jul 10, 2014 at 5:28 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
->> > Hi Sonny,
->> >
->> > I have missed this patch.
->> >
->> > You finally choose to take extra interrupt handling.
->> > If it is not harm, it's fine.
->>
->> Hi, thanks for coming back to it.  Based on my tracing, the interrupt
->> seems to be okay and is just ignored.
->>
->> >> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->> >> +static inline bool dw_mci_reset(struct dw_mci *host)
-> "inline" is no needed anymore.
->
->> >>  {
->> >> +     u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
->> >> +     bool ret = false;
->> >> +
->> >>       /*
->> >>        * Reseting generates a block interrupt, hence setting
->> >>        * the scatter-gather pointer to NULL.
->> >> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->> >>               host->sg = NULL;
->> >>       }
->> >>
->> >> -     return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
->> >> -}
->> >> +     if (host->use_dma)
->> >> +             flags |= SDMMC_CTRL_DMA_RESET;
->> >>
->> >> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
->> >> -{
->> >> -     return dw_mci_ctrl_reset(host,
->> >> -                              SDMMC_CTRL_FIFO_RESET |
->> >> -                              SDMMC_CTRL_RESET |
->> >> -                              SDMMC_CTRL_DMA_RESET);
->> >> +     if (dw_mci_ctrl_reset(host, flags)) {
->> >> +             /*
->> >> +              * In all cases we clear the RAWINTS register to clear any
->> >> +              * interrupts.
->> >> +              */
->> >> +             mci_writel(host, RINTSTS, 0xFFFFFFFF);
->> >> +
->> >> +             /* if using dma we wait for dma_req to clear */
->> >> +             if (host->use_dma) {
->> >> +                     unsigned long timeout = jiffies + msecs_to_jiffies(500);
->> >> +                     u32 status;
->> >> +                     do {
->> >> +                             status = mci_readl(host, STATUS);
->> >> +                             if (!(status & SDMMC_STATUS_DMA_REQ))
->> >> +                                     break;
->> >> +                             cpu_relax();
->> >> +                     } while (time_before(jiffies, timeout));
->> >> +
->> >> +                     if (status & SDMMC_STATUS_DMA_REQ) {
->> >> +                             dev_err(host->dev,
->> >> +                                     "%s: Timeout waiting for dma_req to "
->> >> +                                     "clear during reset", __func__);
->> >> +                             goto ciu_out;
->> >> +                     }
->> >> +
->> >> +                     /* when using DMA next we reset the fifo again */
->> >> +                     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
->> >> +                             goto ciu_out;
->> >> +             }
->> >> +     } else {
->> >> +             /* if the controller reset bit did clear, then set clock regs */
->> >> +             if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
->> >> +                     dev_err(host->dev, "%s: fifo/dma reset bits didn't "
->> >> +                             "clear but ciu was reset, doing clock update.",
->> >> +                             __func__);
->> >> +                     goto ciu_out;
->> >> +             }
->> >> +     }
->> >> +
->> >> +     if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
->> >> +             /* It is also recommended that we reset and reprogram idmac */
->> >> +             dw_mci_idmac_reset(host);
->> >> +
->> >> +     ret = true;
->> >> +
->> >> +ciu_out:
->> >> +     /* After a CTRL reset we need to have CIU set clock registers  */
->> >> +     mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
->> >> +
->> >> +     return ret;
->> >>  }
->> >>
->> >>  #ifdef CONFIG_OF
->> >> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
->> >>       }
->> >>
->> >>       /* Reset all blocks */
->> >> -     if (!dw_mci_ctrl_all_reset(host))
->> >> +     if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
->> >>               return -ENODEV;
->> >>
->> >>       host->dma_ops = host->pdata->dma_ops;
->> >> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
->> >>               }
->> >>       }
->> >>
->> >> -     if (!dw_mci_ctrl_all_reset(host)) {
->> >> +     if (!dw_mci_reset(host)) {
->> > Do you have any reason to use dw_mci_reset() unlike doing on probing?
->>
->> I really wanted to use dw_mci_reset() everwhere, including probe,
->> because that would be simplest, where there is just one reset function
->> always, but the host structure is not completely set up at probe time,
->> so the code in dw_mci_reset() where we try to send a command to update
->> clock fails, so that's why I had to just do a reset.
->
-> Yes, if we can keep one interface, it would be good.
-> But can you check below?
-> Did you see the kernel panic on probing with "host->cur_slot" is NULL?
+In the case of HDMI clocks, we want to bypass the RCG's ability
+to divide the output clock and pass through the parent HDMI PLL
+rate through. Add a simple set of clk_ops to configure the RCG to
+do this. This removes the need to keep adding more frequency
+entries to the tv_src clock whenever we want to support a new
+rate.
 
-Yes, I think that was the one.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> If right, resume seems not different from probe in case of removable type.
-> And dw_mci_idmac_reset() is redundant when dw_mci_reset() is used at resume.
->
-> I think dw_mci_ctrl_reset() can be also used at resume like at probe for simple way.
-> For safety's sake, "host->cur_slot" should be guaranteed it's not NULL.
+On 07/11, Rob Clark wrote:
+> It would probably be better to get rid of the fixed table, which
+> duplicates the set of fixed frequences in the hdmi pll clk (in
+> drm/msm/hdmi).  But I'll leave that as an exercise for someone
+> who knows the clk driver better than myself.  Until then, this
+> trivial fix is useful.
 
-Ok, I didn't try on removable, but I can change it to match probe,
-thanks for looking at this.
+Here's a quick attempt at that. Let me know if this works.
 
->
-> Thanks,
-> Seungwon Jeon
->
+ drivers/clk/qcom/clk-rcg.c      | 51 +++++++++++++++++++++++++++++++++++------
+ drivers/clk/qcom/clk-rcg.h      |  1 +
+ drivers/clk/qcom/mmcc-msm8960.c |  9 ++------
+ 3 files changed, 47 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
+index abfc2b675aea..b638c5846dbf 100644
+--- a/drivers/clk/qcom/clk-rcg.c
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -417,20 +417,25 @@ static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
+ }
+ 
+-static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
+-			    unsigned long parent_rate)
++static long clk_rcg_bypass_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
+ {
+ 	struct clk_rcg *rcg = to_clk_rcg(hw);
+-	const struct freq_tbl *f;
++	const struct freq_tbl *f = rcg->freq_tbl;
++
++	*p = clk_get_parent_by_index(hw->clk, f->src);
++	*p_rate = __clk_round_rate(*p, rate);
++
++	return *p_rate;
++}
++
++static int __clk_rcg_set_rate(struct clk_rcg *rcg, const struct freq_tbl *f)
++{
+ 	u32 ns, md, ctl;
+ 	struct mn *mn = &rcg->mn;
+ 	u32 mask = 0;
+ 	unsigned int reset_reg;
+ 
+-	f = find_freq(rcg->freq_tbl, rate);
+-	if (!f)
+-		return -EINVAL;
+-
+ 	if (rcg->mn.reset_in_cc)
+ 		reset_reg = rcg->clkr.enable_reg;
+ 	else
+@@ -466,6 +471,27 @@ static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return 0;
+ }
+ 
++static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	const struct freq_tbl *f;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	return __clk_rcg_set_rate(rcg, f);
++}
++
++static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++
++	return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
++}
++
+ static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
+ {
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+@@ -503,6 +529,17 @@ const struct clk_ops clk_rcg_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_rcg_ops);
+ 
++const struct clk_ops clk_rcg_bypass_ops = {
++	.enable = clk_enable_regmap,
++	.disable = clk_disable_regmap,
++	.get_parent = clk_rcg_get_parent,
++	.set_parent = clk_rcg_set_parent,
++	.recalc_rate = clk_rcg_recalc_rate,
++	.determine_rate = clk_rcg_bypass_determine_rate,
++	.set_rate = clk_rcg_bypass_set_rate,
++};
++EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
++
+ const struct clk_ops clk_dyn_rcg_ops = {
+ 	.enable = clk_enable_regmap,
+ 	.is_enabled = clk_is_enabled_regmap,
+diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
+index b9ec11dfd1b4..ba0523cefd2e 100644
+--- a/drivers/clk/qcom/clk-rcg.h
++++ b/drivers/clk/qcom/clk-rcg.h
+@@ -95,6 +95,7 @@ struct clk_rcg {
+ };
+ 
+ extern const struct clk_ops clk_rcg_ops;
++extern const struct clk_ops clk_rcg_bypass_ops;
+ 
+ #define to_clk_rcg(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg, clkr)
+ 
+diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
+index 12f3c0b64fcd..14eeeba005f3 100644
+--- a/drivers/clk/qcom/mmcc-msm8960.c
++++ b/drivers/clk/qcom/mmcc-msm8960.c
+@@ -1218,12 +1218,7 @@ static const char *mmcc_pxo_hdmi[] = {
+ };
+ 
+ static struct freq_tbl clk_tbl_tv[] = {
+-	{  25200000, P_HDMI_PLL, 1, 0, 0 },
+-	{  27000000, P_HDMI_PLL, 1, 0, 0 },
+-	{  27030000, P_HDMI_PLL, 1, 0, 0 },
+-	{  74250000, P_HDMI_PLL, 1, 0, 0 },
+-	{ 108000000, P_HDMI_PLL, 1, 0, 0 },
+-	{ 148500000, P_HDMI_PLL, 1, 0, 0 },
++	{  .src = P_HDMI_PLL, .pre_div = 1 },
+ 	{ }
+ };
+ 
+@@ -1254,7 +1249,7 @@ static struct clk_rcg tv_src = {
+ 			.name = "tv_src",
+ 			.parent_names = mmcc_pxo_hdmi,
+ 			.num_parents = 2,
+-			.ops = &clk_rcg_ops,
++			.ops = &clk_rcg_bypass_ops,
+ 			.flags = CLK_SET_RATE_PARENT,
+ 		},
+ 	},
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
