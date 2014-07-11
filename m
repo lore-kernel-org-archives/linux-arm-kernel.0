@@ -1,74 +1,17 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 10 Jul 2014 17:15:49 -0700
-Subject: [PATCH v3 0/7] kernel: Add support for restart notifier call chain
-In-Reply-To: <20140710160907.da1024914366de947ebdf384@linux-foundation.org>
-References: <1404877083-6552-1-git-send-email-linux@roeck-us.net>
- <20140710160907.da1024914366de947ebdf384@linux-foundation.org>
-Message-ID: <53BF2CB5.5080602@roeck-us.net>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 10 Jul 2014 17:20:02 -0700 (PDT)
+Subject: [PATCH v4 net-next 0/4] Network driver for Armada 375 SoC
+In-Reply-To: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1405021936-28658-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140710.172002.527288974818817073.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2014 04:09 PM, Andrew Morton wrote:
-> On Tue,  8 Jul 2014 20:37:56 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
->
->> The existing mechanisms have a number of drawbacks. Typically only one scheme
->> to restart the system is supported (at least if arm_pm_restart is used).
->> At least in theory there can be mutliple means to restart the system, some of
->> which may be less desirable (for example one mechanism may only reset the CPU,
->> while another may reset the entire system).
->
-> So the callbacks need to be prioritized.
->
->> Using arm_pm_restart can also be
->> racy if the function pointer is set from a driver, as the driver may be in
->> the process of being unloaded when arm_pm_restart is called.
->> Using the reboot notifier is always racy, as it is unknown if and when
->> other functions using the reboot notifier have completed execution
->> by the time the watchdog fires.
->>
->> To solve the problem, introduce a system restart notifier. This notifier
->> is expected to be called from the architecture specific machine_restart()
->> function. Drivers providing system restart functionality (such as the watchdog
->> drivers mentioned above) are expected to register with this notifier.
->
-> It's worth mentioning here that the notifier_block priority scheme is
-> used to address the problem which was identified in the previous
-> paragraph.
->
-Ok.
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date: Thu, 10 Jul 2014 16:52:12 -0300
 
-> If this scheme is to be successful we will need to set in place some
-> protocol for specifying how the priorities are managed.  If someone
-> sits down and writes a new restart handler, how is that person to
-> decide how to prioritize it against other handlers, both present and
-> future?
->
-> Also, looking at the patches, you don't appear to have actually *used*
-> the prioritization - everything is left at zero.  So we'll end up using
-> the most-recently-registered handler to restart the system.  The
-> patches don't actually solve the problem which was identified in the
-> above paragraph?
+> If there's nothing else to fix, we'd like to merge this for v3.17. The first
+> patch should go through the network tree, and the other patches through
+> the mvebu tree.
 
-The primary goal of this patch set was to provide a generic scheme for
-registering restart handlers, and the ability to load and unload notifiers
-without race conditions. Support for multiple restart handlers with
-different priorities was a secondary objective. The conversions I did
-so far are expected to be mutually exclusive, ie provide the one and
-only means on a given architecture to restart the system. So I guess
-you do have a point - the priorities for those notifiers should
-probably be higher. Error on my part - I thought lower numbers would
-have higher priority, but after looking into the code again that
-is wrong.
-
-To avoid making things too complicated, maybe it would make sense to
-specify guidelines for notifier priorities, such as
-0   - restart notifier of last resort, with least reset capabilities
-128 - default; use if no other notifier is expected to be available
-       and/or if restart functionality is acceptable
-255 - highest priority notifier which _must_ be used
-
-Would that make sense and be acceptable ? In this context, I would then
-set the notifier priorities for the callers in the patch set to 128.
-
-Thanks,
-Guenter
+I've merged the first patch into net-next, thanks.
