@@ -1,324 +1,147 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Fri, 11 Jul 2014 17:43:19 +0530
-Subject: [PATCH v3 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <53BFD28A.5090202@pengutronix.de>
-References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
- <1405074557-5519-2-git-send-email-b29396@freescale.com>
- <53BFC6CE.9090408@gmail.com> <53BFD28A.5090202@pengutronix.de>
-Message-ID: <53BFD4DF.7030003@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Jul 2014 14:15:59 +0200
+Subject: [PATCH 00/12] Add NVIDIA Tegra FUSE driver
+Message-ID: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 05:33 PM, Marc Kleine-Budde wrote:
-> On 07/11/2014 01:13 PM, Varka Bhadram wrote:
->> On 07/11/2014 03:59 PM, Dong Aisheng wrote:
->>
->> (...)
->>
->>> +/* m_can private data structure */
->>> +struct m_can_priv {
->>> +    struct can_priv can;    /* must be the first member */
->>> +    struct napi_struct napi;
->>> +    struct net_device *dev;
->>> +    struct device *device;
->>> +    struct clk *hclk;
->>> +    struct clk *cclk;
->>> +    void __iomem *base;
->>> +    u32 irqstatus;
->>> +
->>> +    /* message ram configuration */
->>> +    void __iomem *mram_base;
->>> +    struct mram_cfg mcfg[MRAM_CFG_NUM];
->>> +};
->>> +
->> It will be good if we write the comments for the driver private structure
->>
->>> +static inline u32 m_can_read(const struct m_can_priv *priv, enum
->>> m_can_reg reg)
->>> +{
->>> +    return readl(priv->base + reg);
->>> +}
->>> +
->> (...)
->>
->>> +static void free_m_can_dev(struct net_device *dev)
->>> +{
->>> +    free_candev(dev);
->>> +}
->>> +
->> Why do we need a separate function which calls a single function...  :-)
-> To be symetric with alloc_m_can_dev()
->
->>> +static struct net_device *alloc_m_can_dev(void)
->>> +{
->>> +    struct net_device *dev;
->>> +    struct m_can_priv *priv;
->>> +
->>> +    dev = alloc_candev(sizeof(struct m_can_priv), 1);
->> sizeof(*priv)...?
->>
->>> +    if (!dev)
->>> +        return NULL;
->> Return value -ENOMEM ?
-> I'm okay with NULL, however if we want to return an arror value, it must
-> be ERR_PTR() wrapped.
->
->>> +
->>> +    priv = netdev_priv(dev);
->>> +    netif_napi_add(dev, &priv->napi, m_can_poll, M_CAN_NAPI_WEIGHT);
->>> +
->>> +    priv->dev = dev;
->>> +    priv->can.bittiming_const = &m_can_bittiming_const;
->>> +    priv->can.do_set_mode = m_can_set_mode;
->>> +    priv->can.do_get_berr_counter = m_can_get_berr_counter;
->>> +    priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
->>> +                    CAN_CTRLMODE_LISTENONLY |
->>> +                    CAN_CTRLMODE_BERR_REPORTING;
->>> +
->>> +    return dev;
->>> +}
->>> +
->>> +static int m_can_open(struct net_device *dev)
->>> +{
->>> +    struct m_can_priv *priv = netdev_priv(dev);
->>> +    int err;
->>> +
->>> +    err = clk_prepare_enable(priv->hclk);
->>> +    if (err)
->>> +        return err;
->>> +
->>> +    err = clk_prepare_enable(priv->cclk);
->>> +    if (err)
->>> +        goto exit_disable_hclk;
->>> +
->>> +    /* open the can device */
->>> +    err = open_candev(dev);
->>> +    if (err) {
->>> +        netdev_err(dev, "failed to open can device\n");
->>> +        goto exit_disable_cclk;
->>> +    }
->>> +
->>> +    /* register interrupt handler */
->>> +    err = request_irq(dev->irq, m_can_isr, IRQF_SHARED, dev->name,
->>> +              dev);
->> why don't we use devm_request_irq()...? If you use this no need to worry
->> about freeing the irq
-> ...because the IRQ is allocated during ifup and released during ifdown.
->
->>> +    if (err < 0) {
->>> +        netdev_err(dev, "failed to request interrupt\n");
->>> +        goto exit_irq_fail;
->>> +    }
->>> +
->>> +    /* start the m_can controller */
->>> +    m_can_start(dev);
->>> +
->>> +    can_led_event(dev, CAN_LED_EVENT_OPEN);
->>> +    napi_enable(&priv->napi);
->>> +    netif_start_queue(dev);
->>> +
->>> +    return 0;
->>> +
->>> +exit_irq_fail:
->>> +    close_candev(dev);
->>> +exit_disable_cclk:
->>> +    clk_disable_unprepare(priv->cclk);
->>> +exit_disable_hclk:
->>> +    clk_disable_unprepare(priv->hclk);
->>> +    return err;
->>> +}
->>> +
->>> +static void m_can_stop(struct net_device *dev)
->>> +{
->>> +    struct m_can_priv *priv = netdev_priv(dev);
->>> +
->>> +    /* disable all interrupts */
->>> +    m_can_disable_all_interrupts(priv);
->>> +
->>> +    clk_disable_unprepare(priv->hclk);
->>> +    clk_disable_unprepare(priv->cclk);
->>> +
->>> +    /* set the state as STOPPED */
->>> +    priv->can.state = CAN_STATE_STOPPED;
->>> +}
->>> +
->>> +static int m_can_close(struct net_device *dev)
->>> +{
->>> +    struct m_can_priv *priv = netdev_priv(dev);
->>> +
->>> +    netif_stop_queue(dev);
->>> +    napi_disable(&priv->napi);
->>> +    m_can_stop(dev);
->>> +    free_irq(dev->irq, dev);
->> not required when you use devm_request_irq()
-> No....see above.
->
->>> +    close_candev(dev);
->>> +    can_led_event(dev, CAN_LED_EVENT_STOP);
->>> +
->>> +    return 0;
->>> +}
->>> +
->> (...)
->>
->>> +
->>> +static const struct of_device_id m_can_of_table[] = {
->>> +    { .compatible = "bosch,m_can", .data = NULL },
->> we can simply give '0' . No need of .data = NULL. Things should be
->> simple right....  :-)
-> .data should be a pointer, while "0" isn't. (Although 0 is valid C, we
-> don't want a integer 0 to initialize a pointer.) However, you can omit
-> .data = NULL completely. When initialzing via C99, any omited members of
-> the struct will automatically be initialized with 0x0. I like to see the
-> .data = NULL because it documents that there isn't any data (yet), once
-> another compatible is added, we need the .data anyways.
+From: Thierry Reding <treding@nvidia.com>
 
-static const struct of_device_id m_can_of_table[] = {
-	{ .compatible = "bosch,m_can", },
-};
+This series is an extension of Peter's original series to add a proper
+driver for the FUSE block on Tegra.
 
-This is enough... right ?
+Patches 1 and 2 are preparatory work that cleans up include lists and
+introduces a function to query the Tegra chip ID rather than accessing
+a simple variable. This is used by subsequent patches to allow us to
+execute code when the variable is accessed to help in pin-pointing
+locations where it's accessed before the driver had a chance to
+initialize.
 
->>> +    { /* sentinel */ },
->>> +};
->>> +MODULE_DEVICE_TABLE(of, m_can_of_table);
->>> +
->>> +static int m_can_of_parse_mram(struct platform_device *pdev,
->>> +                   struct m_can_priv *priv)
->>> +{
->>> +    struct device_node *np = pdev->dev.of_node;
->>> +    struct resource *res;
->>> +    void __iomem *addr;
->>> +    u32 out_val[MRAM_CFG_LEN];
->>> +    int ret;
->>> +
->>> +    /* message ram could be shared */
->>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->>> "message_ram");
->>> +    if (!res)
->>> +        return -ENODEV;
->>> +
->>> +    addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
->>> +    if (!addr)
->>> +        return -ENODEV;
->> Is this err return is appropriate ... ?
-> -ENOMEM seems to be more commonly used.
->
->>> +
->>> +    /* get message ram configuration */
->>> +    ret = of_property_read_u32_array(np, "mram-cfg",
->>> +                     out_val, sizeof(out_val) / 4);
->>> +    if (ret) {
->>> +        dev_err(&pdev->dev, "can not get message ram configuration\n");
->>> +        return -ENODEV;
->>> +    }
->>> +
->> Is this err return is appropriate ... ?
-> Whay do you suggest?
->
->>> +    priv->mram_base = addr;
->>> +    priv->mcfg[MRAM_SIDF].off = out_val[0];
->>> +    priv->mcfg[MRAM_SIDF].num = out_val[1];
->>> +    priv->mcfg[MRAM_XIDF].off = priv->mcfg[MRAM_SIDF].off +
->>> +            priv->mcfg[MRAM_SIDF].num * SIDF_ELEMENT_SIZE;
->>> +    priv->mcfg[MRAM_XIDF].num = out_val[2];
->>> +    priv->mcfg[MRAM_RXF0].off = priv->mcfg[MRAM_XIDF].off +
->>> +            priv->mcfg[MRAM_XIDF].num * XIDF_ELEMENT_SIZE;
->>> +    priv->mcfg[MRAM_RXF0].num = out_val[3] & RXFC_FS_MASK;
->>> +    priv->mcfg[MRAM_RXF1].off = priv->mcfg[MRAM_RXF0].off +
->>> +            priv->mcfg[MRAM_RXF0].num * RXF0_ELEMENT_SIZE;
->>> +    priv->mcfg[MRAM_RXF1].num = out_val[4] & RXFC_FS_MASK;
->>> +    priv->mcfg[MRAM_RXB].off = priv->mcfg[MRAM_RXF1].off +
->>> +            priv->mcfg[MRAM_RXF1].num * RXF1_ELEMENT_SIZE;
->>> +    priv->mcfg[MRAM_RXB].num = out_val[5];
->>> +    priv->mcfg[MRAM_TXE].off = priv->mcfg[MRAM_RXB].off +
->>> +            priv->mcfg[MRAM_RXB].num * RXB_ELEMENT_SIZE;
->>> +    priv->mcfg[MRAM_TXE].num = out_val[6];
->>> +    priv->mcfg[MRAM_TXB].off = priv->mcfg[MRAM_TXE].off +
->>> +            priv->mcfg[MRAM_TXE].num * TXE_ELEMENT_SIZE;
->>> +    priv->mcfg[MRAM_TXB].num = out_val[7] & TXBC_NDTB_MASK;
->>> +
->>> +    dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0
->>> 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d\n",
->>> +        priv->mram_base,
->>> +        priv->mcfg[MRAM_SIDF].off, priv->mcfg[MRAM_SIDF].num,
->>> +        priv->mcfg[MRAM_XIDF].off, priv->mcfg[MRAM_XIDF].num,
->>> +        priv->mcfg[MRAM_RXF0].off, priv->mcfg[MRAM_RXF0].num,
->>> +        priv->mcfg[MRAM_RXF1].off, priv->mcfg[MRAM_RXF1].num,
->>> +        priv->mcfg[MRAM_RXB].off, priv->mcfg[MRAM_RXB].num,
->>> +        priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
->>> +        priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
->>> +
->> dev_dbg() will insert the new lines in b/w. It wont print the values as
->> you expected.
->> Check this by enabling debug ...
-> What do you mean by b/w?
+Patches 3 through 8 are Peter's series with a fixup patch by Stephen. I
+also moved the driver to drivers/soc/tegra/fuse as requested by Olof.
 
-You are expecting the data to be print in format like:
-pdev->dev/name: mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d
+Patches 9 and 10 defer usages of the tegra_get_chip_id() function to a
+later stage (pure_initcall). This allows patch 11 to set up the early
+FUSE support code from an early initcall. This has the advantage of not
+requiring an explicit call from SoC setup code in arch/arm/mach-tegra
+and will allow the code to be shared on 64-bit variants of Tegra.
 
-But when we use the dev_dbg()/pr_debug()... It will put data like:
-pdev->dev/name: mram_base %p sidf 0x%x
-0x%x %d rxf0 0x%x
-rxf1 0x%x %d rxb
-....
+Patch 12 finally turns the PMC and powergate support code into a proper
+driver which also sets up a minimal environment from an early initcall.
+The driver isn't moved out of arch/arm/mach-tegra yet because people
+have suggested drivers/power as a good home, but that whole directory
+depends on the POWER_SUPPLY Kconfig symbol yet this driver doesn't have
+anything to do with that. Once that debate has been settled the driver
+can easily be moved out in a separate patch.
 
-check this by enable DEBUG...
+Some of the patches in this series introduce diagnostic WARN() messages
+if functions are called without setup having completed. I've booted the
+v3.16-rc1 kernel with these changes on top on Tegra20 (TrimSlice),
+Tegra30 (Beaver), Tegra114 (Dalmore) and Tegra124 (Jetson TK1) without
+encountering any of the diagnostic warnings and without noticing any
+breakage.
 
->>> +    return 0;
->>> +}
->>> +
->> (...)
->>
->>> +
->>> +static void unregister_m_can_dev(struct net_device *dev)
->>> +{
->>> +    unregister_candev(dev);
->>> +}
->>> +
->> again a function which calls a single func.
->>
->>> +static int m_can_plat_remove(struct platform_device *pdev)
->>> +{
->>> +    struct net_device *dev = platform_get_drvdata(pdev);
->>> +
->>> +    unregister_m_can_dev(dev);
->>> +    platform_set_drvdata(pdev, NULL);
->>> +
->>> +    free_m_can_dev(dev);
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +static const struct dev_pm_ops m_can_pmops = {
->>> +    SET_SYSTEM_SLEEP_PM_OPS(m_can_suspend, m_can_resume)
->>> +};
->>> +
->>> +static struct platform_driver m_can_plat_driver = {
->>> +    .driver = {
->>> +        .name = KBUILD_MODNAME,
->>> +        .owner = THIS_MODULE,
->> No need to update .owner. module_platform_driver() will do for you.
->> see:http://lxr.free-electrons.com/source/include/linux/platform_device.h#L190
-> Oh, right.
->
->>> +        .of_match_table = of_match_ptr(m_can_of_table),
->>> +        .pm     = &m_can_pmops,
->>> +    },
->>> +    .probe = m_can_plat_probe,
->>> +    .remove = m_can_plat_remove,
->>> +};
->>> +
->>> +module_platform_driver(m_can_plat_driver);
->>> +
->>> +MODULE_AUTHOR("Dong Aisheng <b29396@freescale.com>");
->>> +MODULE_LICENSE("GPL v2");
->>> +MODULE_DESCRIPTION("CAN bus driver for Bosch M_CAN controller");
->>
-> Marc
->
+Olof, this series should address the concerns you expressed after
+reviewing Stephen's earlier pull request for Peter's FUSE driver series.
+It would be great if you could take another look to see if this is more
+according to your taste. I'll see if I can take this through linux-next
+for a little and if you have no objections will submit another pull
+request next week.
 
+Thierry
+
+Peter De Schrijver (5):
+  ARM: tegra: export apb dma readl/writel
+  ARM: tegra: move fuse exports to tegra-soc.h
+  soc/tegra: Add efuse driver for Tegra
+  soc/tegra: Add efuse and apbmisc bindings
+  soc/tegra: fuse: move APB DMA into Tegra20 fuse driver
+
+Stephen Warren (1):
+  misc: fuse: fix dummy functions
+
+Thierry Reding (6):
+  ARM: tegra: Sort includes alphabetically
+  ARM: tegra: Use a function to get the chip ID
+  ARM: tegra: Setup CPU hotplug in a pure initcall
+  ARM: tegra: Always lock the CPU reset vector
+  soc/tegra: fuse: Set up in early initcall
+  ARM: tegra: Convert PMC to a driver
+
+ Documentation/ABI/testing/sysfs-driver-tegra-fuse  |  11 +
+ .../bindings/fuse/nvidia,tegra20-fuse.txt          |  40 +
+ .../bindings/misc/nvidia,tegra20-apbmisc.txt       |  13 +
+ arch/arm/boot/dts/tegra114.dtsi                    |  15 +
+ arch/arm/boot/dts/tegra124.dtsi                    |  15 +
+ arch/arm/boot/dts/tegra20.dtsi                     |  15 +
+ arch/arm/boot/dts/tegra30.dtsi                     |  15 +
+ arch/arm/mach-tegra/Makefile                       |   8 +-
+ arch/arm/mach-tegra/apbio.c                        | 206 -----
+ arch/arm/mach-tegra/apbio.h                        |  22 -
+ arch/arm/mach-tegra/board-paz00.c                  |   3 +-
+ arch/arm/mach-tegra/board.h                        |   7 -
+ arch/arm/mach-tegra/cpuidle-tegra114.c             |  10 +-
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |  16 +-
+ arch/arm/mach-tegra/cpuidle-tegra30.c              |  10 +-
+ arch/arm/mach-tegra/cpuidle.c                      |   6 +-
+ arch/arm/mach-tegra/flowctrl.c                     |  10 +-
+ arch/arm/mach-tegra/fuse.c                         | 252 ------
+ arch/arm/mach-tegra/fuse.h                         |  79 --
+ arch/arm/mach-tegra/hotplug.c                      |  25 +-
+ arch/arm/mach-tegra/io.c                           |   8 +-
+ arch/arm/mach-tegra/irq.c                          |   8 +-
+ arch/arm/mach-tegra/platsmp.c                      |  27 +-
+ arch/arm/mach-tegra/pm-tegra20.c                   |   1 +
+ arch/arm/mach-tegra/pm-tegra30.c                   |   1 +
+ arch/arm/mach-tegra/pm.c                           |  60 +-
+ arch/arm/mach-tegra/pm.h                           |  10 +-
+ arch/arm/mach-tegra/pmc.c                          | 413 ---------
+ arch/arm/mach-tegra/pmc.h                          |  49 --
+ arch/arm/mach-tegra/powergate.c                    | 515 -----------
+ arch/arm/mach-tegra/reset-handler.S                |   6 +-
+ arch/arm/mach-tegra/reset.c                        |  18 +-
+ arch/arm/mach-tegra/sleep-tegra30.S                |   6 +-
+ arch/arm/mach-tegra/sleep.h                        |   3 -
+ arch/arm/mach-tegra/tegra-pmc.c                    | 948 +++++++++++++++++++++
+ arch/arm/mach-tegra/tegra.c                        |  35 +-
+ drivers/misc/fuse/Makefile                         |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/tegra/Makefile                         |   1 +
+ drivers/soc/tegra/fuse/Makefile                    |   8 +
+ drivers/soc/tegra/fuse/fuse-tegra.c                | 158 ++++
+ drivers/soc/tegra/fuse/fuse-tegra20.c              | 214 +++++
+ drivers/soc/tegra/fuse/fuse-tegra30.c              | 223 +++++
+ drivers/soc/tegra/fuse/fuse.h                      |  71 ++
+ .../soc/tegra/fuse/speedo-tegra114.c               |  53 +-
+ drivers/soc/tegra/fuse/speedo-tegra124.c           | 167 ++++
+ .../soc/tegra/fuse/speedo-tegra20.c                |  42 +-
+ .../soc/tegra/fuse/speedo-tegra30.c                | 173 ++--
+ drivers/soc/tegra/fuse/tegra-apbmisc.c             | 114 +++
+ include/linux/tegra-soc.h                          |  89 ++
+ 50 files changed, 2387 insertions(+), 1814 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-tegra-fuse
+ create mode 100644 Documentation/devicetree/bindings/fuse/nvidia,tegra20-fuse.txt
+ create mode 100644 Documentation/devicetree/bindings/misc/nvidia,tegra20-apbmisc.txt
+ delete mode 100644 arch/arm/mach-tegra/apbio.c
+ delete mode 100644 arch/arm/mach-tegra/apbio.h
+ delete mode 100644 arch/arm/mach-tegra/fuse.c
+ delete mode 100644 arch/arm/mach-tegra/fuse.h
+ delete mode 100644 arch/arm/mach-tegra/pmc.c
+ delete mode 100644 arch/arm/mach-tegra/pmc.h
+ delete mode 100644 arch/arm/mach-tegra/powergate.c
+ create mode 100644 arch/arm/mach-tegra/tegra-pmc.c
+ create mode 100644 drivers/misc/fuse/Makefile
+ create mode 100644 drivers/soc/tegra/Makefile
+ create mode 100644 drivers/soc/tegra/fuse/Makefile
+ create mode 100644 drivers/soc/tegra/fuse/fuse-tegra.c
+ create mode 100644 drivers/soc/tegra/fuse/fuse-tegra20.c
+ create mode 100644 drivers/soc/tegra/fuse/fuse-tegra30.c
+ create mode 100644 drivers/soc/tegra/fuse/fuse.h
+ rename arch/arm/mach-tegra/tegra114_speedo.c => drivers/soc/tegra/fuse/speedo-tegra114.c (55%)
+ create mode 100644 drivers/soc/tegra/fuse/speedo-tegra124.c
+ rename arch/arm/mach-tegra/tegra20_speedo.c => drivers/soc/tegra/fuse/speedo-tegra20.c (67%)
+ rename arch/arm/mach-tegra/tegra30_speedo.c => drivers/soc/tegra/fuse/speedo-tegra30.c (52%)
+ create mode 100644 drivers/soc/tegra/fuse/tegra-apbmisc.c
 
 -- 
-Regards,
-Varka Bhadram.
+2.0.1
