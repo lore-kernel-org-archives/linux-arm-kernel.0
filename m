@@ -1,178 +1,67 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Jul 2014 12:37:46 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140710145626.48cb956f@bbrezillon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1584022.nQ4HpIUW7J@avalon> <20140710145626.48cb956f@bbrezillon>
-Message-ID: <33456066.4Q4p6nxKdU@avalon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 11 Jul 2014 03:38:19 -0700
+Subject: [PATCH] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <53BF0ACA.70403@amd.com>
+References: <20140709161704.9623.92358.stgit@joelaarch64.amd.com>
+ <20140710202502.GA20394@cbox> <53BEFF7E.5010907@amd.com>
+ <53BF0ACA.70403@amd.com>
+Message-ID: <20140711103819.GB23588@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Thursday 10 July 2014 14:56:26 Boris BREZILLON wrote:
-> On Thu, 10 Jul 2014 13:16:21 +0200 Laurent Pinchart wrote:
-> > On Monday 07 July 2014 18:42:59 Boris BREZILLON wrote:
-> > > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> > > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> > > controller device.
-> > > 
-> > > The HLCDC block provides a single RGB output port, and only supports LCD
-> > > panels connection to LCD panels for now.
-> > > 
-> > > The atmel,panel property link the HLCDC RGB output with the LCD panel
-> > > connected on this port (note that the HLCDC RGB connector implementation
-> > > makes use of the DRM panel framework).
-> > > 
-> > > Connection to other external devices (DRM bridges) might be added later
-> > > by mean of a new atmel,xxx (atmel,bridge) property.
-> > > 
-> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > ---
-> > > 
-> > >  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++++++
-> > >  1 file changed, 59 insertions(+)
-> > >  create mode 100644
-> > >  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt new file mode
-> > > 100644
-> > > index 0000000..594bdb2
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > @@ -0,0 +1,59 @@
-> > > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) DRM driver
-> > > +
-> > > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD
-> > > device.
-> > > +See Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt for more
-> > > details.
-> > > +
-> > > +Required properties:
-> > > + - compatible: value should be one of the following:
-> > > +   "atmel,hlcdc-dc"
-> > > + - interrupts: the HLCDC interrupt definition
-> > > + - pinctrl-names: the pin control state names. Should contain
-> > > "default",
-> > > +   "rgb-444", "rgb-565", "rgb-666" and "rgb-888".
-> > > + - pinctrl-[0-4]: should contain the pinctrl states described by
-> > > pinctrl
-> > > +   names.
-> > 
-> > Do you need to switch between the different pinctrl configurations at
-> > runtime, or is the configuration selected from the panel type, which
-> > doesn't change ?
->
-> At the moment no, but if we ever need to support different devices on
-> the same RGB connector (actually Atmel's sama5d3xek boards have an
-> RGB to HDMI bridge connected on the same RGB connector) and these
-> devices do not support the same RGB mode (say your LCD panel supports
-> RGB888 and your RGB to HDMI bridge supports RGB555), then depending on
-> the output you select you'll have to change your pinctrl config at
-> runtime.
-
-Just to make sure I understand the use case correctly, are you talking about 
-two devices (for example an RGB666 panel and an RGB888 RGB to HDMI bridge) 
-connected to the same output, with the ability to switch between the two at 
-runtime ? That's a valid case (on a side note we shouldn't forget that the 
-option of using both devices at the same time should be supported as well), 
-but I would probably go for a fixed pinctrl configuration that supports both, 
-although switching configurations at runtime would be a micro-optimization 
-that might make sense.
-
-> I'd say we could get rid of this runtime pinctrl config as a first step
-> if DT ABI stability was not required.
-> But it is, and I'd like to have a future proof binding to handle these
-> tricky cases when they occurs (if they ever do).
-
-I think we have a shortcoming of the pinctrl API here in the general case. The 
-API only allows you to select a single configuration per device. Imagine the 
-same display controller, with two DPI outputs, each of them configurable in 
-444, 565, 666 or 888 modes. With the current API we would have to create 4*4 = 
-16 pinctrl configurations for all combinations. That obviously wouldn't scale, 
-so we'll have to fix this eventually. From a DT stability point of view, I 
-would thus avoid specifying multiple pinctrl configurations now until we come 
-up with a standard way to support this use case.
-
-> Anyway, I'm open to any other alternative that could let me add support
-> for this later on.
+On Thu, Jul 10, 2014 at 04:51:06PM -0500, Joel Schopp wrote:
 > 
-> BTW, is there any reason for not defining an RGB connector type (I'm
-> currently defining HLCDC connector as an LVDS connector) ?
+> On 07/10/2014 04:02 PM, Joel Schopp wrote:
+> > On 07/10/2014 03:25 PM, Christoffer Dall wrote:
+> >> On Wed, Jul 09, 2014 at 11:17:04AM -0500, Joel Schopp wrote:
+> >>> The current calculation for VTTBR_BADDR_MASK masks only 39 bits and not
+> >>> all 40 bits.  That last bit is important as some systems allocate
+> >>> from near the top of the available address space.
+> >>>
+> >>> This patch is necessary to run KVM on an aarch64 SOC I have been testing.
+> >>>
+> >>> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> >>> ---
+> >>>  arch/arm64/include/asm/kvm_arm.h |    2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> >>> index 3d69030..b39e93f 100644
+> >>> --- a/arch/arm64/include/asm/kvm_arm.h
+> >>> +++ b/arch/arm64/include/asm/kvm_arm.h
+> >>> @@ -148,7 +148,7 @@
+> >>>  #endif
+> >>>  
+> >>>  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+> >>> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+> >>> +#define VTTBR_BADDR_MASK  (0xffffffffffLLU)              /* bits 0-39 */
+> >>>  #define VTTBR_VMID_SHIFT  (48LLU)
+> >>>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+> >>>  
+> >>>
+> >> While this is obviously fixing a bug, it doesn't feel like the right
+> >> short-term fix.  I'll have to go back and read the definitions of x in
+> >> BADDR[47:x] for VTTBR_EL2 exactly again, but the intended use of
+> >> VTTBR_BADDR_MASK (and the only occurence of it in C-code) is to deal
+> >> with alignment of the allocated pgd.
+> > I think there is some confusion.  Before VTTBR_BADDR_MASK always
+> > evaluated to 0x7fffffffffLLU, after the change it always evaluates to
+> > 0xffffffffffLLU
+> >
+> > Neither before nor after the patch is it dealing with alignment.  Any
+> > bits it throws away (bits 40-47) are most significant not least significant.
+> >
+> > I could have rewritten the macro like:
+> >
+> > #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X + 1)) - 1) << VTTBR_BADDR_SHIFT)
+> >
+> > to correct the bug but it's my opinion that the existing code is quite
+> > obfuscated which is how the bug happened in the first place.  It seemed
+> > easier to just actually mask the bits in a straightforward and easy to
+> > understand manner.  I even added a comment so nobody has to count the fs ;)
+> >
+> I hate to reply to my own email correcting myself.  But you were
+> correct.  I will fix and resend a v2.
 
-Not that I know of. The DRM API has been developed before display on embedded 
-systems became such a hot topic. If we had to redo it today, panels might be 
-exposed to userspace as such, with a connector. We have to live with the past, 
-so the connector will stay, but adding a new RGB connector type could make 
-sense (although we might need a different name, in a way the VGA and LVDS 
-connectors also carry RGB signals).
-
-> > > + - atmel,panel: Should contain a phandle with 2 parameters.
-> > > +   The first cell is a phandle to a DRM panel device
-> > > +   The second cell encodes the RGB mode, which can take the following
-> > > values:
-> > > +   * 0: RGB444
-> > > +   * 1: RGB565
-> > > +   * 2: RGB666
-> > > +   * 3: RGB888
-> > > +   The third cell encodes specific flags describing LCD signals
-> > > configuration
-> > > +   (see Atmel's datasheet for a full description of these
-> > > fields):
-> > > +   * bit 0: HSPOL: Horizontal Synchronization Pulse Polarity
-> > > +   * bit 1: VSPOL: Vertical Synchronization Pulse Polarity
-> > > +   * bit 2: VSPDLYS: Vertical Synchronization Pulse Start
-> > > +   * bit 3: VSPDLYE: Vertical Synchronization Pulse End
-> > > +   * bit 4: DISPPOL: Display Signal Polarity
-> > > +   * bit 7: DISPDLY: LCD Controller Display Power Signal
-> > > Synchronization
-> > > +   * bit 12: VSPSU: LCD Controller Vertical synchronization Pulse Setup
-> > > Configuration
-> > > +   * bit 13: VSPHO: LCD Controller Vertical synchronization Pulse Hold
-> > > Configuration
-> > > +   * bit 16-20: GUARDTIME: LCD DISPLAY Guard Time
-> > 
-> > If I'm not mistaken, those are HLCDC configuration values that depend on
-> > the panel type and characteristics. Shouldn't they then be queries from
-> > the panel through the drm_panel API at runtime instead of being specified
-> > in DT ? This would likely require extending the drm_panel API.
-> 
-> HSPOL and VSPOL can be deduced from DRM_MODE_FLAG_[PN]HSYNC and
-> DRM_MODE_FLAG_[PN]VSYNC, I'm not sure for the other flags or the
-> GUARDTIME value.
-> 
-> Another question I had regarding these flags is whether they were LCD
-> panel specific or a mix of panel and board implementation.
-> Take the VSYNC HSYNC polarity, of course the LCD panel defines what it
-> expects in terms of polarity, but nothing prevents the HW designer from
-> inverting the VSYNC/HSYNC polarity (expect common sense :-)), right ?
->
-> A solution would be to override some drm_display_mode settings with
-> informations taken from the DT.
-
-Given that I gave the exact same argument during a V4L2 DT bindings design 
-review, I can only agree :-) It thus makes sense to specify polarities in the 
-HLCDC DT node. The RGB mode, however, should probably be queried from the 
-panel, as I don't expect it to be board-dependent but only panel-dependent.
-
-I'm not sure about the other bits in the third cell, maybe we should discuss 
-them in more details. I'm always wary when I see DT bindings referring to a 
-datasheet :-) Getting the information from the panel by default, with a 
-possible override, is an interesting option. You would thus likely need 
-several DT properties associated with each connection to a panel. Would it 
-then make sense to use the OF graph DT bindings instead of the atmel,panel 
-property to specify connections ? You could store per-connection data in the 
-endpoint and/or port nodes.
-
-> Thanks for your review.
-
-You're welcome. Sorry for not having had time to review the driver itself. 
-Given my limited bandwidth at the moment I've decided to concentrate on the DT 
-bindings first.
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+-Christoffer
