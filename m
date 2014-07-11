@@ -1,39 +1,53 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Fri, 11 Jul 2014 09:54:15 +0900
-Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
-In-Reply-To: <1404978840-31917-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-References: <1404978840-31917-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <53BF35B7.9000105@renesas.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 11 Jul 2014 08:58:39 +0800
+Subject: [GIT PULL][for v3.17] pull request from pxa git tree
+In-Reply-To: <CAD6h2NSmFxLah64ukoopLXrJ=D5hjBWNLONPUOA=K+jOg4EWEw@mail.gmail.com>
+References: <CAD6h2NSmFxLah64ukoopLXrJ=D5hjBWNLONPUOA=K+jOg4EWEw@mail.gmail.com>
+Message-ID: <CAD6h2NT-cbpVR-484Z6sed29DM7BSecZcSe9mLFMEE8j+JUu6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulrich,
+On 4 July 2014 21:14, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
+> Hi Arnd, Olof, Kevin,
+>
+> Please help to merge the pull request from pxa git tree.
+>
+> Best Regards
+> Haojian
+>
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+>
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+> tags/pxa-for-v3.17
+>
+> for you to fetch changes up to 282b37e19cc1d3302ad28f92671aa6093685e075:
+>
+>   ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER' (2014-07-04 20:52:09 +0800)
+>
+> ----------------------------------------------------------------
+> pxa for v3.17
+>
+> ----------------------------------------------------------------
+> Andrew Ruder (2):
+>       ARM: pxa: correct errata number for PXA270
+>       ARM: pxa: call debug_ll_io_init for earlyprintk
+>
+> Haojian Zhuang (1):
+>       ARM: pxa: remove unnecessary pxa3xx io mapping
+>
+> Paul Bolle (1):
+>       ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER'
+>
+>  arch/arm/mach-pxa/corgi.c   | 2 +-
+>  arch/arm/mach-pxa/generic.c | 9 ++++++++-
+>  arch/arm/mach-pxa/sleep.S   | 2 +-
+>  3 files changed, 10 insertions(+), 3 deletions(-)
 
-(2014/07/10 16:53), Ulrich Hecht wrote:
-> Changes in v2:
-> - move phy handle to struct usbhs_priv
-> - add new default pipe type to driver
-> - remove pipe type from Lager board code
-> 
-> Ulrich Hecht (2):
->   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
->   ARM: shmobile: lager: remove USBHS callbacks
-> 
->  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
->  drivers/usb/renesas_usbhs/Makefile   |   2 +-
->  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
->  drivers/usb/renesas_usbhs/common.h   |   2 +
->  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
->  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
->  include/linux/usb/renesas_usbhs.h    |   6 ++
->  7 files changed, 163 insertions(+), 119 deletions(-)
->  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
->  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
-> 
+Drop this pull request since Laurent has similar patch on fix io mapping.
 
-I tested these patches on Lager legacy, and these patches worked correctly.
-
-Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-
-Best regards,
-Yoshihiro Shimoda
+Regards
+Haojian
