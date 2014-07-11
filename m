@@ -1,48 +1,46 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 11 Jul 2014 12:55:16 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: add clocks for usb device
-In-Reply-To: <20140711104755.GA3112@piout.net>
-References: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
- <20140711104755.GA3112@piout.net>
-Message-ID: <53BFC294.4050502@aksignal.cz>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 11 Jul 2014 13:00:35 +0200
+Subject: [PATCH v4 0/4] ARM: pxa: Fix out of vmalloc space bug
+Message-ID: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, it works now.
+Hello,
 
-Dne 11.7.2014 12:47, Alexandre Belloni napsal(a):
-> On 11/07/2014 at 18:22:55 +0800, Bo Shen wrote :
->> Add clocks for usb device, or else switch to CCF, the gadget
->> won't work.
->>
->> Reported-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Tested-by: Jiri Prchal <jiri.prchal@aksignal.cz>
->
->> ---
->>   arch/arm/boot/dts/at91sam9x5.dtsi | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index d6133f4..2ebc421 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -1045,6 +1045,8 @@
->>   				reg = <0x00500000 0x80000
->>   				       0xf803c000 0x400>;
->>   				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
->> +				clocks = <&usb>, <&udphs_clk>;
->> +				clock-names = "hclk", "pclk";
->>   				status = "disabled";
->>
->>   				ep0 {
->> --
->> 1.8.5.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+This patch set reworks Ezequiel Garcia's previous fix [1] of an out of vmalloc
+space bug on PXA2[57]x platforms caused by an attempt to map the start of
+physical uncached outside of the vmalloc space.
+
+This first three patches perform a couple of cleanups, and the last patch
+fixes the problem. I've decided to map the memory at address 0xfe000000 to
+minimize changes to the code, but this causes a bit of fragmentation of
+vmalloc space. I could map it to the very end of vmalloc space (0xfef00000)
+instead if preferred, which would involve replacing a mov by an ldr in
+pxa2[57]x_finish_suspend and pm_enter_standby_start.
+
+I've tested the patch set on a PXA270-based system.
+
+[1] https://lkml.org/lkml/2013/11/28/474
+
+Compared to v3, the patches have been rebased on top of v3.16-rc5. Olof, could
+you please pick them up for v3.17 ?
+
+Ezequiel Garcia (1):
+  ARM: pxa: Move iotable mapping inside vmalloc region
+
+Laurent Pinchart (3):
+  ARM: pxa: Don't hardcode addresses and size in map_desc tables
+  ARM: pxa: Move UNCACHED_PHYS_0 mapping from generic.c to pxa2[57]x.c
+  ARM: pxa: pxa27x: Don't map IMEMC region statically
+
+ arch/arm/mach-pxa/generic.c               | 11 +++--------
+ arch/arm/mach-pxa/include/mach/hardware.h |  4 ++--
+ arch/arm/mach-pxa/pxa25x.c                |  7 ++++++-
+ arch/arm/mach-pxa/pxa27x.c                | 10 +++++-----
+ arch/arm/mach-pxa/pxa3xx.c                |  2 +-
+ 5 files changed, 17 insertions(+), 17 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
