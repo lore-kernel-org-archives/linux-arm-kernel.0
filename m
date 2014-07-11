@@ -1,21 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Jul 2014 17:02:38 +0100
-Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
-In-Reply-To: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
-References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
-Message-ID: <20140711160238.GD21766@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Jul 2014 17:09:25 +0100
+Subject: [PATCH v8 6/9] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <20140711150823.GU6501@e106497-lin.cambridge.arm.com>
+References: <1404240214-9804-7-git-send-email-Liviu.Dudau@arm.com>
+ <20140708005954.GC22939@google.com>
+ <20140708104655.GC6501@e106497-lin.cambridge.arm.com>
+ <CAErSpo75ovmGoeSHKJN0nckGDy-0gpn8kLPfHQ79CtcXxhPydw@mail.gmail.com>
+ <20140708224847.GC4980@e106497-lin.cambridge.arm.com>
+ <CAErSpo5rBt0iF2HGeDD-UH6_sPCoC647VCw0Q1v_0Rdpvcir-w@mail.gmail.com>
+ <20140710094758.GA6501@e106497-lin.cambridge.arm.com>
+ <CAErSpo5ZNCY31NztT0cLFbRVsBZqMsZ0LbTFNOTQCZUU3F7qJA@mail.gmail.com>
+ <20140711141115.GB16321@arm.com>
+ <20140711150823.GU6501@e106497-lin.cambridge.arm.com>
+Message-ID: <20140711160925.GD16321@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 08:34:19AM -0700, Tim Harvey wrote:
-> I've noticed that for IMX6 the gpio-mxc gpio driver always returns 0
-> for gpio's configured as outputs regardless of if they are outputing
-> high or low.
+On Fri, Jul 11, 2014 at 04:08:23PM +0100, Liviu Dudau wrote:
+> On Fri, Jul 11, 2014 at 03:11:16PM +0100, Catalin Marinas wrote:
+> > On Thu, Jul 10, 2014 at 11:36:10PM +0100, Bjorn Helgaas wrote:
+> > > Most of the rest of the v7 discussion was about "Introduce a domain
+> > > number for pci_host_bridge."  I think we should add arm64 using the
+> > > existing pci_scan_root_bus() and keep the domain number in the arm64
+> > > sysdata structure like every other arch does.  Isn't that feasible?
+> > > We can worry about domain unification later.
+> > 
+> > I think that's what we were trying to avoid, adding an arm64-specific
+> > pci_sys_data structure (and arm64-specific API). IIUC, avoiding this
+> > would allow the host controller drivers to use the sysdata pointer for
+> > their own private data structures.
+> > 
+> > Also since you can specify the domain number via DT (and in Liviu's
+> > v8 patches read by of_create_pci_host_bridge), I think it would make
+> > sense to have it stored in some generic data structures (e.g.
+> > pci_host_bridge) rather than in an arm64 private sysdata.
+> > 
+> > (Liviu is thinking of an alternative API but maybe he could briefly
+> > describe it here before posting a new series)
+> 
+> My plan is to keep the domain number in the pci_host_bridge and split
+> the creation of the pci_host_bridge out of the pci_create_root_bus().
 
-There's a different way which this can be solved - set the SION but on
-your GPIOs.  You will then be able to read back the state of the
-output pin.
+Wouldn't it make more sense to add domain_nr to the pci_bus structure
+(well, only needed for the root bus)? It would simplify pci_domain_nr()
+as well which only takes a pci_bus parameter.
+
+> The new function (tentatively called pci_create_new_root_bus()) will
+> no longer call pci_alloc_host_bridge() but will accept it as a
+> parameter, allowing one to be able to set the domain_nr ahead of the
+> root bus creation.
+
+If we place domain_nr in pci_bus, this split wouldn't help but we still
+need your original pci_create_root_bus_in_domain(). Are there other uses
+of your proposal above?
+
+Yet another alternative is to ignore PCI domains altogether (domain 0
+always).
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
