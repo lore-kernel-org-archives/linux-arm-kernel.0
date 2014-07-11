@@ -1,99 +1,21 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 11 Jul 2014 19:01:27 +0300
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <20140711145146.GA6523@ulmo>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
- <20140711145146.GA6523@ulmo>
-Message-ID: <53C00A57.5070102@kapsi.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Jul 2014 17:02:38 +0100
+Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
+In-Reply-To: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+Message-ID: <20140711160238.GD21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 05:51 PM, Thierry Reding wrote:
-> On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
->> Add binding documentation for the nvidia,tegra124-emc device tree
->> node.
->>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->>   .../bindings/memory-controllers/tegra-emc.txt      | 42 ++++++++++++++++++++++
->>   1 file changed, 42 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
->> new file mode 100644
->> index 0000000..2dde17e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
->> @@ -0,0 +1,42 @@
->> +Tegra124 SoC EMC controller
->> +
->> +Required properties :
->> +- compatible : "nvidia,tegra124-emc".
->> +- reg : Should contain 1 or 2 entries:
->> +  - EMC register set
->> +  - MC register set : Required only if no node with
->> +    'compatible = "nvidia,tegra124-mc"' exists. The MC register set
->> +    is first read from the MC node. If it doesn't exist, it is read
->> +    from this property.
->
-> No can do. Memory regions shouldn't be shared between drivers like this.
-> It makes it impossible to ensure that they don't stump on each others'
-> toes.
+On Fri, Jul 11, 2014 at 08:34:19AM -0700, Tim Harvey wrote:
+> I've noticed that for IMX6 the gpio-mxc gpio driver always returns 0
+> for gpio's configured as outputs regardless of if they are outputing
+> high or low.
 
-In this case, all the registers that will be written are such that the 
-MC driver will never need to write them. They are shadowed registers, 
-meaning that all writes are stored and are only effective starting from 
-the next time the EMC rate change state machine is activated, so writing 
-them from anywhere except than the EMC driver would be pointless.
+There's a different way which this can be solved - set the SION but on
+your GPIOs.  You will then be able to read back the state of the
+output pin.
 
-I can find two users of these registers in downstream:
-1) mc.c saves and loads them on suspend/restore (I don't know why, that 
-shouldn't do anything. They will be overridden anyway during the next 
-EMC rate change).
-2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to 
-calculate a value which it then writes to a register that is also 
-shadowed and that is part of downstream burst registers so that doesn't 
-do anything either.
-
-The reason I implemented two ways to specify the MC register area was 
-that this could be merged before an MC driver and retain 
-backwards-compatibility after the MC driver arrives.
-
-If this is not acceptable, we can certainly wait for the MC driver to be 
-merged first. (Although with the general rate of things, I hope I won't 
-be back at school at that point..) I assume that this is blocked on the 
-IOMMU bindings discussion? In that case, there are several options: the 
-MC driver could have its own tables for each EMC rate or we could just 
-make the EMC tables global (i.e. not under the EMC node). In any case, 
-the MC driver would need to implement a function that would just write 
-these values but be guaranteed to not do anything else, since that could 
-cause nasty things during the EMC rate change sequence.
-
-Yet another option is to just not write to these registers at all. In my 
-tests, that would entail a 20-25% penalty to memory throughput for most 
-timings.
-
->
-> One possibility to make this work is to export global functions from the
-> memory controller driver that this driver can call into. Perhaps if you
-> want you can be extra explicit by linking them in DT, like this:
->
-> 	mc: memory-controller at 0,70019000 {
-> 		compatible = "nvidia,tegra124-mc";
-> 		reg = <0x0 0x70019000 0x0 0x00001000>;
-> 		...
-> 	};
->
-> 	memory-controller at 0,7001b000 {
-> 		compatible = "nvidia,tegra124-emc";
-> 		reg = <0x0 0x7001b000 0x0 0x00001000>;
-> 		memory-controller = <&mc>;
-> 		...
-> 	};
->
-> But I think it's safe enough to assume that there will only be a single
-> memory controller/EMC pair in the device.
->
-> Thierry
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
