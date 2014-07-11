@@ -1,31 +1,22 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 11 Jul 2014 18:22:55 +0800
-Subject: [PATCH] ARM: at91: at91sam9x5: add clocks for usb device
-Message-ID: <1405074175-22444-1-git-send-email-voice.shen@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Jul 2014 11:31:04 +0100
+Subject: [STLinux Kernel] [PATCH v3 0/5] phy: miphy365x: Introduce
+ support for MiPHY365x
+In-Reply-To: <20140710153548.GB26886@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
+ <53BD572C.4060406@ti.com>
+ <20140710153548.GB26886@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20140711103104.GC30519@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocks for usb device, or else switch to CCF, the gadget
-won't work.
+> One small point, patch 5 which adds the DT nodes may not apply as the file got
+> renamed from stih416-b2020-revE.dts to stih416-b2020e.dts.
 
-Reported-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- arch/arm/boot/dts/at91sam9x5.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Not required, Git should handle this seamlessly.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index d6133f4..2ebc421 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -1045,6 +1045,8 @@
- 				reg = <0x00500000 0x80000
- 				       0xf803c000 0x400>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&usb>, <&udphs_clk>;
-+				clock-names = "hclk", "pclk";
- 				status = "disabled";
- 
- 				ep0 {
 -- 
-1.8.5.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
