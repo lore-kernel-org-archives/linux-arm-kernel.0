@@ -1,68 +1,32 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 11 Jul 2014 17:47:48 +0800
-Subject: [PATCH 7/8] arm64/kexec: Add core kexec support
-In-Reply-To: <20140707073337.GA1108@dhcp-16-198.nay.redhat.com>
-References: <cover.1399594544.git.geoff@infradead.org>
- <64ef27888fa70b3e27ddcf4ca594fa71ab7f7777.1399594544.git.geoff@infradead.org>
- <20140707073337.GA1108@dhcp-16-198.nay.redhat.com>
-Message-ID: <20140711094747.GA16936@darkstar.nay.redhat.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 11 Jul 2014 11:51:27 +0200
+Subject: [PATCH 0/2] clk: exynos-audss: Adapt to exising clock framework
+In-Reply-To: <1405071475-31946-1-git-send-email-tushar.b@samsung.com>
+References: <1405071475-31946-1-git-send-email-tushar.b@samsung.com>
+Message-ID: <53BFB39F.6040606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/14 at 03:33pm, Dave Young wrote:
-> [snip]
-> 
-> > +
-> > +/**
-> > + * kexec_cpu_info_init - Initialize an array of kexec_cpu_info structures.
-> > + *
-> > + * Allocates a cpu info array and fills it with info for all cpus found in
-> > + * the device tree passed.  The cpu info array is zero terminated.
-> > + */
-> > +
-> > +int kexec_cpu_info_init(const struct device_node *dn,
-> > +	struct kexec_dt_info *info)
-> > +{
-> > +	int result;
-> > +	unsigned int cpu;
-> > +	const struct device_node *i;
-> > +
-> > +	info->cpu_info = kmalloc(
-> > +		(1 + info->cpu_count) * sizeof(struct kexec_cpu_info),
-> > +		GFP_KERNEL);
-> > +
-> > +	if (!info->cpu_info) {
-> > +		pr_debug("%s: out of memory", __func__);
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	info->spinner_count = 0;
-> > +
-> > +	for (cpu = 0, i = dn; cpu < info->cpu_count; cpu++) {
-> > +		struct kexec_cpu_info *cpu_info = &info->cpu_info[cpu];
-> > +
-> > +		i = of_find_node_by_type((struct device_node *)i, "cpu");
-> > +
-> > +		BUG_ON(!i);
-> > +
-> > +		cpu_info->cpu = cpu;
-> > +
-> > +		result = cpu_read_ops((struct device_node *)i, cpu,
-> > +			&cpu_info->cpu_ops);
-> 
-> cpu_ops memory is not allocated?
+Hi Tushar,
 
-Oops, I misread the code, it should be not a problem. Just ignore above comment
+On 11.07.2014 11:37, Tushar Behera wrote:
+> The patchset is targetted as moving exising exynos-audss clock driver from being
+> a module driver. The driver is now registered through CLK_OF_DECLARE and is
+> inline with other Samsung clock drivers.
 
-But I surely have some problem, probably caused by some random issues. 
+I'm afraid I have to NAK this series or at least the part converting the
+driver back to use CLK_OF_DECLARE().
 
-> 
-> BTW cpu_read_ops will call cpu_get_ops which is marked as __init
-> 
-> Thanks
-> Dave
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+We have deliberately made this driver a platform driver, because this is
+how drivers should be modeled in Linux kernel whenever possible.
+CLK_OF_DECLARE() should be only considered a hack to work around late
+initialization of driver model. Reverting this change without a good
+reason (and you haven't provided such) is just going backwards.
+
+Rest of this series is actually quite nice, though, as reusing Samsung
+clock helpers reduces the line count significantly, so if you could
+rework this to keep this driver a platform driver then we could get
+something I could ack.
+
+Best regards,
+Tomasz
