@@ -1,98 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Jul 2014 12:54:06 +0100
-Subject: [PATCH v3+1 5/5] ARM: DT: STi: STiH416: Add DT node for MiPHY365x
-In-Reply-To: <1404906074-31992-6-git-send-email-lee.jones@linaro.org>
-References: <1404906074-31992-1-git-send-email-lee.jones@linaro.org>
- <1404906074-31992-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140711115406.GB2954@lee--X1>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Fri, 11 Jul 2014 20:59:00 +0900
+Subject: [PATCH,RESEND] arm: Do not define "comma" twice
+In-Reply-To: <1396228057-1488-1-git-send-email-yamada.m@jp.panasonic.com>
+References: <1396228057-1488-1-git-send-email-yamada.m@jp.panasonic.com>
+Message-ID: <20140711205900.E6FA.AA925319@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-devices. It has 2 ports which it can use for either; both SATA, both
-PCIe or one of each in any configuration.
+Hi.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 4e2df66..c3c2ac6 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -12,4 +12,16 @@
- / {
- 	model = "STiH416 B2020";
- 	compatible = "st,stih416-b2020", "st,stih416";
-+
-+	soc {
-+		miphy365x_phy: miphy365x at fe382000 {
-+			phy_port0: port at fe382000 {
-+				st,sata-gen = <3>;
-+			};
-+
-+			phy_port1: port at fe38a000 {
-+				st,pcie-tx-pol-inv;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
-index ba0fa2c..80aff0f 100644
---- a/arch/arm/boot/dts/stih416-b2020e.dts
-+++ b/arch/arm/boot/dts/stih416-b2020e.dts
-@@ -31,5 +31,15 @@
- 		ethernet1: dwmac at fef08000 {
- 			snps,reset-gpio = <&PIO0 7>;
- 		};
-+
-+		miphy365x_phy: miphy365x at fe382000 {
-+			phy_port0: port at fe382000 {
-+				st,sata-gen = <3>;
-+			};
-+
-+			phy_port1: port at fe38a000 {
-+				st,pcie-tx-pol-inv;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 84758d7..2b98a0a 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -9,6 +9,8 @@
- #include "stih41x.dtsi"
- #include "stih416-clock.dtsi"
- #include "stih416-pinctrl.dtsi"
-+
-+#include <dt-bindings/phy/phy-miphy365x.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset-controller/stih416-resets.h>
- / {
-@@ -236,5 +238,25 @@
- 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
- 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
- 		};
-+
-+		miphy365x_phy: miphy365x at fe382000 {
-+			compatible      = "st,miphy365x-phy";
-+			st,syscfg  	= <&syscfg_rear>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
-+
-+			phy_port0: port at fe382000 {
-+				#phy-cells = <1>;
-+				reg = <0xfe382000 0x100>, <0xfe394000 0x100>, <0x824 0x4>;
-+				reg-names = "sata", "pcie", "syscfg";
-+			};
-+
-+			phy_port1: port at fe38a000 {
-+				#phy-cells = <1>;
-+				reg = <0xfe38a000 0x100>, <0xfe804000 0x100>, <0x828 0x4>;
-+				reg-names = "sata", "pcie", "syscfg";
-+			};
-+		};
- 	};
- };
+
+This is a ping.
+
+It has been three months since I posted this trivial patch.
+Any comments?
+
+If this patch looks good, could you apply it
+for Linux 3.17-rc1 ?
+
+Thanks,
+
+Masahiro Yamada
+
+
+
+On Mon, 31 Mar 2014 10:07:37 +0900
+Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+
+> We have the definition of "comma" in scripts/Kbuild.include.
+> We should not double it.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> ---
+> 
+> First I posted this patch to linux-kbuild ML.
+> But, Michal Marek recommended me to send it to linux-arm-kernel ML.
+> 
+> So this is here now.
+> 
+> 
+>  arch/arm/Makefile   | 2 --
+>  arch/arm64/Makefile | 2 --
+>  2 files changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 08a9ef5..72f7b8c 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -50,8 +50,6 @@ AS		+= -EL
+>  LD		+= -EL
+>  endif
+>  
+> -comma = ,
+> -
+>  # This selects which instruction set is used.
+>  # Note that GCC does not numerically define an architecture version
+>  # macro, but instead defines a whole series of macros which makes
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 2fceb71..473a050 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -30,8 +30,6 @@ AS		+= -EL
+>  LD		+= -EL
+>  endif
+>  
+> -comma = ,
+> -
+>  CHECKFLAGS	+= -D__aarch64__
+>  
+>  # Default value
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
