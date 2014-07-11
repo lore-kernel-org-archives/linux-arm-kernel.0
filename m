@@ -1,161 +1,63 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 11 Jul 2014 17:13:44 +0100
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
-Message-ID: <20140711161344.GD26542@e103034-lin>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 11 Jul 2014 09:15:50 -0700
+Subject: [PATCH v6 01/21] irqchip: ARM: GIC: Move some bits of GICv2 to a
+ library-type file
+In-Reply-To: <20140708223145.GG13433@titan.lakedaemon.net>
+References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
+ <1404140510-5382-2-git-send-email-marc.zyngier@arm.com>
+ <20140708223145.GG13433@titan.lakedaemon.net>
+Message-ID: <20140711161550.GA2093@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 08:51:06AM +0100, Vincent Guittot wrote:
-> On 10 July 2014 15:16, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
-> >> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
-> >>
-> >> We are going to use runnable_avg_sum and runnable_avg_period in order to get
-> >> the utilization of the CPU. This statistic includes all tasks that run the CPU
-> >> and not only CFS tasks.
-> >
-> > But this rq->avg is not the one that is migration aware, right? So why
-> > use this?
+On Tue, Jul 08, 2014 at 06:31:45PM -0400, Jason Cooper wrote:
+> Marc,
 > 
-> Yes, it's not the one that is migration aware
+> On Mon, Jun 30, 2014 at 04:01:30PM +0100, Marc Zyngier wrote:
+> > A few GICv2 low-level function are actually very useful to GICv3,
+> > and it makes some sense to share them across the two drivers.
+> > They end-up in their own file, with an additional parameter used
+> > to ensure an optional synchronization (unused on GICv2).
+> > 
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  drivers/irqchip/Makefile         |   2 +-
+> >  drivers/irqchip/irq-gic-common.c | 115 +++++++++++++++++++++++++++++++++++++++
+> >  drivers/irqchip/irq-gic-common.h |  29 ++++++++++
+> >  drivers/irqchip/irq-gic.c        |  59 ++------------------
+> >  4 files changed, 149 insertions(+), 56 deletions(-)
+> >  create mode 100644 drivers/irqchip/irq-gic-common.c
+> >  create mode 100644 drivers/irqchip/irq-gic-common.h
 > 
-> >
-> > We already compensate cpu_capacity for !fair tasks, so I don't see why
-> > we can't use the migration aware one (and kill this one as Yuyang keeps
-> > proposing) and compensate with the capacity factor.
+> I've now applied this and patch #2 to irqchip/gic.  It'll be in -next
+> tonight, and I'll merge it into /core at some point in the future.
+> Probably after the other gic changes go on top of this.
 > 
-> The 1st point is that cpu_capacity is compensated by both !fair_tasks
-> and frequency scaling and we should not take into account frequency
-> scaling for detecting overload
+> At any rate, unless you tell me it's all fouled up, this branch is
+> stable.  Since I'll be adding more stuff on top, I've tagged this for
+> you guys to pull:
 > 
-> What we have now is the the weighted load avg that is the sum of the
-> weight load of entities on the run queue. This is not usable to detect
-> overload because of the weight. An unweighted version of this figure
-> would be more usefull but it's not as accurate as the one I use IMHO.
-
-IMHO there is no perfect utilization metric, but I think it is
-fundamentally wrong to use a metric that is migration unaware to make
-migration decisions. I mentioned that during the last review as well. It
-is like having a very fast controller with a really slow (large delay)
-feedback loop. There is a high risk of getting an unstable balance when
-you load-balance rate is faster than the feedback delay.
-
-> The example that has been discussed during the review of the last
-> version has shown some limitations
+>   git://git.infradead.org/users/jcooper/linux.git  tags/deps-irqchip-gic-3.17
 > 
-> With the following schedule pattern from Morten's example
+> Please wait to send your pull request for changes depending on this
+> branch until after you see Thomas send Linus the request for irq/core.
 > 
->    | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms |
-> A:   run     rq     run  ----------- sleeping -------------  run
-> B:   rq      run    rq    run   ---- sleeping -------------  rq
-> 
-> The scheduler will see the following values:
-> Task A unweighted load value is 47%
-> Task B unweight load is 60%
-> The maximum Sum of unweighted load is 104%
-> rq->avg load is 60%
-> 
-> And the real CPU load is 50%
-> 
-> So we will have opposite decision depending of the used values: the
-> rq->avg or the Sum of unweighted load
-> 
-> The sum of unweighted load has the main advantage of showing
-> immediately what will be the relative impact of adding/removing a
-> task. In the example, we can see that removing task A or B will remove
-> around half the CPU load but it's not so good for giving the current
-> utilization of the CPU
 
-You forgot to mention the issues with rq->avg that were brought up last
-time :-)
+Thanks, I've pushed
 
-Here is an load-balancing example:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git queue
 
-Task A, B, C, and D are all running/runnable constantly. To avoid
-decimals we assume the sched tick to have a 9 ms period. We have four
-cpus in a single sched_domain.
 
-rq == rq->avg
-uw == unweighted tracked load
+which will pretty much be the pull request to kvm/next (still need to
+test a few bits before moving to next and make it stable to be included
+in kvm/next).
 
-cpu0:
-    | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms |
- A:   run    rq     rq
- B:   rq     run    rq
- C:   rq     rq     run
- D:   rq     rq     rq     run    run    run    run    run    run
-rq:  100%    100%   100%   100%   100%   100%   100%   100%   100%
-uw:  400%    400%   400%   100%   100%   100%   100%   100%   100%
+Will coordinate with Paolo to make sure commit
+021f653791ad17e03f98aaa7fb933816ae16f161 lands in Linus' tree before
+sending the KVM pull-request.
 
-cpu1:
-    | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms |
- A:                        run    rq     run    rq     run    rq
- B:                        rq     run    rq     run    rq     run
- C:
- D:
-rq:    0%      0%     0%     0%     6%    12%    18%    23%    28%
-uw:    0%      0%     0%   200%   200%   200%   200%   200%   200%
-
-cpu2:
-    | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms |
- A: 
- B:
- C:                        run    run    run    run    run    run
- D:
-rq:    0%      0%     0%     0%     6%    12%    18%    23%    28%
-uw:    0%      0%     0%   100%   100%   100%   100%   100%   100%
-
-cpu3:
-    | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms | 3 ms |
- A: 
- B:
- C:
- D:
-rq:    0%      0%     0%     0%     0%     0%     0%     0%     0%
-uw:    0%      0%     0%     0%     0%     0%     0%     0%     0%
-
-A periodic load-balance occurs on cpu1 after 9 ms. cpu0 rq->avg
-indicates overload. Consequently cpu1 pulls task A and B.
-
-Shortly after (<1 ms) cpu2 does a periodic load-balance. cpu0 rq->avg
-hasn't changed so cpu0 still appears overloaded. cpu2 pulls task C.
-
-Shortly after (<1 ms) cpu3 does a periodic load-balance. cpu0 rq->avg
-still indicates overload so cpu3 tries to pull tasks but fails since
-there is only task D left.
-
-9 ms later the sched tick causes periodic load-balances on all the cpus.
-cpu0 rq->avg still indicates that it has the highest load since cpu1
-rq->avg has not had time to indicate overload. Consequently cpu1, 2,
-and 3 will try to pull from that and fail. The balance will only change
-once cpu1 rq->avg has increased enough to indicate overload.
-
-Unweighted load will on the other hand indicate the load changes
-instantaneously, so cpu3 would observe the overload of cpu1 immediately
-and pull task A or B.
-
-In this example using rq->avg leads to imbalance whereas unweighted load
-would not. Correct me if I missed anything.
-
-Coming back to the previous example. I'm not convinced that inflation of
-the unweighted load sum when tasks overlap in time is a bad thing. I
-have mentioned this before. The average cpu utilization over the 40ms
-period is 50%. However the true compute capacity demand is 200% for the
-first 15ms of the period, 100% for the next 5ms and 0% for the remaining
-25ms. The cpu is actually overloaded for 15ms every 40ms. This fact is
-factored into the unweighted load whereas rq->avg would give you the
-same utilization no matter if the tasks are overlapped or not. Hence
-unweighted load would give us an indication that the mix of tasks isn't
-optimal even if the cpu has spare cycles.
-
-If you don't care about overlap and latency, the unweighted sum of task
-running time (that Peter has proposed a number of times) is better
-metric, IMHO. As long the cpu isn't fully utilized.
-
-Morten
+Thanks,
+-Christoffer
