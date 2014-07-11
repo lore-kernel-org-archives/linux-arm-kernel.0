@@ -1,109 +1,116 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 11 Jul 2014 11:10:13 +0200
-Subject: [PATCH] ARM: Fix preemption disable in iwmmxt_task_enable()
-In-Reply-To: <20140706080845.723e9787@armhf>
-References: <20140706080845.723e9787@armhf>
-Message-ID: <1405069813-9270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 11 Jul 2014 10:11:39 +0100
+Subject: [PATCH v8 0/9] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <004501cf9cda$65703610$3050a230$%han@samsung.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqK_CfagmiFOpOXVYGry22nGnCZL0ZXeJhYxb9zp=P2fsQ@mail.gmail.com>
+ <20140708171828.GM6501@e106497-lin.cambridge.arm.com>
+ <CACoXjcn3b7otcbxdr+RAVNHHjHyVsvw0QcmK5jd-QBF8SQX5iw@mail.gmail.com>
+ <004501cf9cda$65703610$3050a230$%han@samsung.com>
+Message-ID: <20140711091139.GM6501@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 431a84b1a4f7d1a0085d5b91330c5053cc8e8b12
- ("ARM: 8034/1: Disable preemption in iwmmxt_task_enable()")
-introduced macros {inc,dec}_preempt_count to iwmmxt_task_enable
-to make it run with preemption disabled.
+On Fri, Jul 11, 2014 at 08:33:23AM +0100, Jingoo Han wrote:
+> On Friday, July 11, 2014 9:44 AM, Tanmay Inamdar wrote:
+> > On Tue, Jul 8, 2014 at 10:18 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > On Sun, Jul 06, 2014 at 04:23:43PM +0100, Rob Herring wrote:
+> > >> On Tue, Jul 1, 2014 at 1:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > >> > This is my resurected attempt at adding support for generic PCI host
+> > >> > bridge controllers that make use of device tree information to
+> > >> > configure themselves. I've tagged it as v8 although the patches
+> > >> > have now been reshuffled in order to ease adoption so referring to
+> > >> > the older versions might be a bit of a hoop jumping exercise.
+> > >> >
+> > >> > Changes from v7:
+> > >> >   - Reordered the patches so that fixes and non-controversial patches
+> > >> >     from v7 can be accepted more easily. If agreed I can split the
+> > >> >     series again into patches that can be upstreamed easily and ones
+> > >> >     that still need discussion.
+> > >> >   - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
+> > >> >     to better reflect its target use.
+> > >> >   - Added the function to remap the bus I/O resources that used to be
+> > >> >     provided in my arm64 patch series and (re)named it pci_remap_iospace()
+> > >> >   - Removed error code checking from parsing and mapping of IRQ from DT
+> > >> >     in recognition that some PCI devices will not have legacy IRQ mappings.
+> > >> >
+> > >> > v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
+> > >>
+> > >> Can you publish a branch for this series please.
+> > >>
+> > >> Rob
+> > >>
+> > >
+> > > Hi Rob,
+> > >
+> > > I have pushed a brach that matches my v8 patchset +1 obvious missing header include
+> > > here: http://www.linux-arm.org/git?p=linux-ld.git;a=shortlog;h=refs/heads/for-upstream/pci_v8
+> > >
+> > 
+> > I was still getting following compilation error after applying arm64
+> > pci headers. Please let me know if I am missing something.
+> > 
+> > linux-git/drivers/of/of_pci.c: In function ?pci_host_bridge_of_get_ranges?:
+> > linux-git/drivers/of/of_pci.c:114:22: error: storage size of ?range? isn?t known
+> >   struct of_pci_range range;
+> >                       ^
+> > linux-git/drivers/of/of_pci.c:115:29: error: storage size of ?parser?
+> > isn?t known
+> >   struct of_pci_range_parser parser;
+> >                              ^
+> > linux-git/drivers/of/of_pci.c:121:2: error: implicit declaration of
+> > function ?of_pci_range_parser_init?
+> > [-Werror=implicit-function-declaration]
+> >   err = of_pci_range_parser_init(&parser, dev);
+> > 
+> > 
+> > Below patch fixes the errors.
+> > 
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 55d8320..da88dac 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -2,6 +2,7 @@
+> >  #include <linux/export.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_pci.h>
+> > +#include <linux/of_address.h>
+> 
+> Yes, right. I also found the build errors as above mentioned.
+> "of_address.h" should be included, in order to fix the build errors.
+> However, for readability, the following would be better.
+> 
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+> 
+> Best regards,
+> Jingoo Han
 
-Unfortunately, other functions in iwmmxt.S also use concan_{save,dump,load}
-sections located in iwmmxt_task_enable() to deal with iWMMXt coprocessor.
-This causes an unbalanced preempt_count due to excessive dec_preempt_count
-and destroyed return addresses in callers of concan_ labels due to a register
-collision:
 
-Linux version 3.16.0-rc3-00062-gd92a333-dirty (jef at armhf) (gcc version 4.8.3 (Debian 4.8.3-4) ) #5 PREEMPT Thu Jul 3 19:46:39 CEST 2014
-CPU: ARMv7 Processor [560f5815] revision 5 (ARMv7), cr=10c5387d
-CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-Machine model: SolidRun CuBox
-...
-PJ4 iWMMXt v2 coprocessor enabled.
-...
-Unable to handle kernel paging request at virtual address fffffffe
-pgd = bb25c000
-[fffffffe] *pgd=3bfde821, *pte=00000000, *ppte=00000000
-Internal error: Oops: 80000007 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 62 Comm: startpar Not tainted 3.16.0-rc3-00062-gd92a333-dirty #5
-task: bb230b80 ti: bb256000 task.ti: bb256000
-PC is at 0xfffffffe
-LR is at iwmmxt_task_copy+0x44/0x4c
-pc : [<fffffffe>]    lr : [<800130ac>]    psr: 40000033
-sp : bb257de8  ip : 00000013  fp : bb257ea4
-r10: bb256000  r9 : fffffdfe  r8 : 76e898e6
-r7 : bb257ec8  r6 : bb256000  r5 : 7ea12760  r4 : 000000a0
-r3 : ffffffff  r2 : 00000003  r1 : bb257df8  r0 : 00000000
-Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
-Control: 10c5387d  Table: 3b25c019  DAC: 00000015
-Process startpar (pid: 62, stack limit = 0xbb256248)
+Thanks, guys! Like I've said, it was not my day when I've submitted v8 series.
+I've cherry picked the patches into a clean branch but forgot to be thorough
+and was compiling in the old working directory.
 
-This patch fixes the issue by moving concan_{save,dump,load} into separate
-code sections and make iwmmxt_task_enable() call them in the same way the
-other functions use concan_ symbols. The test for valid ownership is moved
-to concan_save and is safe for the other user of it, iwmmxt_task_disable().
-The register collision is also resolved by moving concan_ symbols as
-{inc,dec}_preempt_count are now local to iwmmxt_task_enable().
+Sorry,
+Liviu
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reported-by: Jean-Francois Moine <moinejf@free.fr>
-Fixes: 431a84b1a4f7 ("ARM: 8034/1: Disable preemption in iwmmxt_task_enable()")
----
-The offending commit was intoduced past v3.15-rc1 and the corresponding fix
-should also be queued up for stable v3.15+
+> 
+> > 
+> >  static inline int __of_pci_pci_compare(struct device_node *node,
+> >                                        unsigned int data)
+> > 
+> > 
+> > > Best regards,
+> > > Liviu
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Jean-Francois Moine <moinejf@free.fr>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/kernel/iwmmxt.S |   16 +++++++++-------
- 1 files changed, 9 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-index a5599cf..fc95b89 100644
---- a/arch/arm/kernel/iwmmxt.S
-+++ b/arch/arm/kernel/iwmmxt.S
-@@ -94,13 +94,19 @@ ENTRY(iwmmxt_task_enable)
- 
- 	mrc	p15, 0, r2, c2, c0, 0
- 	mov	r2, r2				@ cpwait
-+	bl	concan_save
- 
--	teq	r1, #0				@ test for last ownership
--	mov	lr, r9				@ normal exit from exception
--	beq	concan_load			@ no owner, skip save
-+#ifdef CONFIG_PREEMPT_COUNT
-+	get_thread_info r10
-+#endif
-+4:	dec_preempt_count r10, r3
-+	mov	pc, r9				@ normal exit from exception
- 
- concan_save:
- 
-+	teq	r1, #0				@ test for last ownership
-+	beq	concan_load			@ no owner, skip save
-+
- 	tmrc	r2, wCon
- 
- 	@ CUP? wCx
-@@ -175,10 +181,6 @@ concan_load:
- 	tmcr	wCon, r2
- 
- 3:
--#ifdef CONFIG_PREEMPT_COUNT
--	get_thread_info r10
--#endif
--4:	dec_preempt_count r10, r3
- 	mov	pc, lr
- 
- /*
 -- 
-1.7.2.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
