@@ -1,75 +1,94 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 11 Jul 2014 09:35:13 +0200
-Subject: [PATCHv3] arm64: fpsimd: avoid restoring fpcr if the contents
- haven't changed
-In-Reply-To: <1404992409-6968-1-git-send-email-will.deacon@arm.com>
-References: <1404992409-6968-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu_zWB5ADag8w68--YnH6BNy3FVaHzz2zr+R5K6XcA9iYw@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 11 Jul 2014 16:43:21 +0900
+Subject: [PATCH v8 8/9] pci: Add support for creating a generic host_bridge
+ from device tree
+In-Reply-To: <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+ <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <004601cf9cdb$ca08f7f0$5e1ae7d0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 13:40, Will Deacon <will.deacon@arm.com> wrote:
-> Writing to the FPCR is commonly implemented as a self-synchronising
-> operation in the CPU, so avoid writing to the register when the saved
-> value matches that in the hardware already.
->
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Wednesday, July 02, 2014 3:44 AM, Liviu Dudau wrote:
+> 
+> Several platforms use a rather generic version of parsing
+> the device tree to find the host bridge ranges. Move the common code
+> into the generic PCI code and use it to create a pci_host_bridge
+> structure that can be used by arch code.
+> 
+> Based on early attempts by Andrew Murray to unify the code.
+> Used powerpc and microblaze PCI code as starting point.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 > ---
->  arch/arm64/include/asm/fpsimdmacros.h | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
->
+>  drivers/of/of_pci.c       | 135 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/pci/host-bridge.c |  18 +++++++
+>  include/linux/of_pci.h    |  10 ++++
+>  include/linux/pci.h       |   8 +++
+>  4 files changed, 171 insertions(+)
+> 
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 8481996..55d8320 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
 
-Hi Will,
+[.....]
 
-This works fine as far as I can tell.
--- 
-Ard.
-
-
-> diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-> index 768414d55e64..007618b8188c 100644
-> --- a/arch/arm64/include/asm/fpsimdmacros.h
-> +++ b/arch/arm64/include/asm/fpsimdmacros.h
-> @@ -40,6 +40,19 @@
->         str     w\tmpnr, [\state, #16 * 2 + 4]
->  .endm
->
-> +.macro fpsimd_restore_fpcr state, tmp
-> +       /*
-> +        * Writes to fpcr may be self-synchronising, so avoid restoring
-> +        * the register if it hasn't changed.
-> +        */
-> +       mrs     \tmp, fpcr
-> +       cmp     \tmp, \state
-> +       b.eq    9999f
-> +       msr     fpcr, \state
-> +9999:
-> +.endm
+> +struct pci_host_bridge *
+> +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
+> +{
+> +	int err, domain, busno;
+> +	struct resource *bus_range;
+> +	struct pci_bus *root_bus;
+> +	struct pci_host_bridge *bridge;
+> +	resource_size_t io_base;
+> +	LIST_HEAD(res);
 > +
-> +/* Clobbers \state */
->  .macro fpsimd_restore state, tmpnr
->         ldp     q0, q1, [\state, #16 * 0]
->         ldp     q2, q3, [\state, #16 * 2]
-> @@ -60,7 +73,7 @@
->         ldr     w\tmpnr, [\state, #16 * 2]
->         msr     fpsr, x\tmpnr
->         ldr     w\tmpnr, [\state, #16 * 2 + 4]
-> -       msr     fpcr, x\tmpnr
-> +       fpsimd_restore_fpcr x\tmpnr, \state
->  .endm
->
->  .altmacro
-> @@ -84,7 +97,7 @@
->  .macro fpsimd_restore_partial state, tmpnr1, tmpnr2
->         ldp     w\tmpnr1, w\tmpnr2, [\state]
->         msr     fpsr, x\tmpnr1
-> -       msr     fpcr, x\tmpnr2
-> +       fpsimd_restore_fpcr x\tmpnr2, x\tmpnr1
->         adr     x\tmpnr1, 0f
->         ldr     w\tmpnr2, [\state, #8]
->         add     \state, \state, x\tmpnr2, lsl #4
-> --
-> 2.0.0
->
+> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+> +	if (!bus_range)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	domain = of_alias_get_id(parent->of_node, "pci-domain");
+> +	if (domain == -ENODEV)
+> +		domain = atomic_inc_return(&domain_nr);
+> +
+> +	err = of_pci_parse_bus_range(parent->of_node, bus_range);
+> +	if (err) {
+> +		dev_info(parent, "No bus range for %s, using default [0-255]\n",
+> +			parent->of_node->full_name);
+> +		bus_range->start = 0;
+> +		bus_range->end = 255;
+> +		bus_range->flags = IORESOURCE_BUS;
+> +	}
+> +	busno = bus_range->start;
+> +	pci_add_resource(&res, bus_range);
+> +
+> +	/* now parse the rest of host bridge bus ranges */
+> +	err = pci_host_bridge_of_get_ranges(parent->of_node, &res, &io_base);
+> +	if (err)
+> +		goto err_create;
+> +
+> +	/* then create the root bus */
+> +	root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
+> +						ops, host_data, &res);
+> +	if (IS_ERR(root_bus)) {
+> +		err = PTR_ERR(root_bus);
+> +		goto err_create;
+> +	}
+> +
+> +	bridge = to_pci_host_bridge(root_bus->bridge);
+> +	bridge->io_base = io_base;
+
+Hi Liviu Dudau,
+
+Would you fix the following warning?
+
+drivers/of/of_pci.c: In function 'of_create_pci_host_bridge'
+drivers/of/of_pci.c:218:18: warning: 'of_base' may be used uninitialized in this function [-Wmaybe-uninitialized]
+  bridge->io_base = io_base;
+
+Best regards,
+Jingoo Han
+
+[.....]
