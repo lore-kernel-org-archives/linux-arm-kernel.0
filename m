@@ -1,53 +1,44 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 11 Jul 2014 08:58:39 +0800
-Subject: [GIT PULL][for v3.17] pull request from pxa git tree
-In-Reply-To: <CAD6h2NSmFxLah64ukoopLXrJ=D5hjBWNLONPUOA=K+jOg4EWEw@mail.gmail.com>
-References: <CAD6h2NSmFxLah64ukoopLXrJ=D5hjBWNLONPUOA=K+jOg4EWEw@mail.gmail.com>
-Message-ID: <CAD6h2NT-cbpVR-484Z6sed29DM7BSecZcSe9mLFMEE8j+JUu6g@mail.gmail.com>
+Date: Fri, 11 Jul 2014 09:01:07 +0800
+Subject: [GIT PULL v2][for 3.17] pull request from pxa git tree
+Message-ID: <CAD6h2NTMLXxEi+uFz74B-de2y6-gggxhWt8yPS6593cuJxdMrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2014 21:14, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> Hi Arnd, Olof, Kevin,
->
-> Please help to merge the pull request from pxa git tree.
->
-> Best Regards
-> Haojian
->
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
->
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/pxa-for-v3.17
->
-> for you to fetch changes up to 282b37e19cc1d3302ad28f92671aa6093685e075:
->
->   ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER' (2014-07-04 20:52:09 +0800)
->
-> ----------------------------------------------------------------
-> pxa for v3.17
->
-> ----------------------------------------------------------------
-> Andrew Ruder (2):
->       ARM: pxa: correct errata number for PXA270
->       ARM: pxa: call debug_ll_io_init for earlyprintk
->
-> Haojian Zhuang (1):
->       ARM: pxa: remove unnecessary pxa3xx io mapping
->
-> Paul Bolle (1):
->       ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER'
->
->  arch/arm/mach-pxa/corgi.c   | 2 +-
->  arch/arm/mach-pxa/generic.c | 9 ++++++++-
->  arch/arm/mach-pxa/sleep.S   | 2 +-
->  3 files changed, 10 insertions(+), 3 deletions(-)
+Hi Olof, Arnd, Kevin,
 
-Drop this pull request since Laurent has similar patch on fix io mapping.
+Please help to merge the pull request from pxa git tree.
+
+BTW, Laurent's fixing IO mapping patch will be merged by Olof directly.
 
 Regards
 Haojian
+
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+tags/pxa-for-v3.17-2
+
+for you to fetch changes up to 5837391bbc7ab4307abf957e6cce0b83f7f9869a:
+
+  ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER' (2014-07-11 08:50:53 +0800)
+
+----------------------------------------------------------------
+pxa for v3.17 v2
+
+----------------------------------------------------------------
+Andrew Ruder (2):
+      ARM: pxa: correct errata number for PXA270
+      ARM: pxa: call debug_ll_io_init for earlyprintk
+
+Paul Bolle (1):
+      ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER'
+
+ arch/arm/mach-pxa/corgi.c   | 2 +-
+ arch/arm/mach-pxa/generic.c | 1 +
+ arch/arm/mach-pxa/sleep.S   | 2 +-
+ 3 files changed, 3 insertions(+), 2 deletions(-)
