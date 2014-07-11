@@ -1,78 +1,55 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 09 Jul 2014 13:58:19 +0100
-Subject: [PATCH] of: Use proper types for checking memory overflow
-In-Reply-To: <alpine.DEB.2.10.1407080923001.2561@Yrabib>
-References: <1404780343-32188-1-git-send-email-lauraa@codeaurora.org>
- <alpine.DEB.2.10.1407080923001.2561@Yrabib>
-Message-ID: <20140709125819.8E285C40A5C@trevor.secretlab.ca>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Fri, 11 Jul 2014 11:29:46 +0530
+Subject: [PATCH 12/16] i2c: i2c-s3c2410: Drop class based scanning to
+ improve bootup time
+In-Reply-To: <1404992799-3705-13-git-send-email-wsa@the-dreams.de>
+References: <1404992799-3705-1-git-send-email-wsa@the-dreams.de>
+ <1404992799-3705-13-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAK5sBcG_bWS5frTkTCwUeSEe_oNrVP9QDtFjWzwfhv2KWSN3HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Jul 2014 09:24:08 +0200 (CEST), Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 7 Jul 2014, Laura Abbott wrote:
-> 
-> > Commit a67a6ed15513541579d38bcbd127e7be170710e5
-> > (of: Check for phys_addr_t overflows in early_init_dt_add_memory_arch)
-> > corrected early_init_dt_add_memory_arch to account for overflows
-> > but did so in an unclean way using ULONG_MAX. There is no
-> > guarantee that sizeof(unsigned long) == sizeof(phys_addr_t).
-> > Check against phys_addr_t instead.
-> > 
-> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+Hi Wolfram,
 
-Applied, thanks.
+On Thu, Jul 10, 2014 at 5:16 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> This driver has been flagged to drop class based instantiation. The removal
+> improves boot-up time and is unneeded for embedded controllers. Users have been
+> warned to switch for some time now, so we can actually do the removal. Keep the
+> DEPRECATED flag, so the core can inform users that the behaviour finally
+> changed now. After another transition period, this flag can go, too.
+> While we are here, remove the indentation for the array setup because
+> such things always break after some time.
+>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>  drivers/i2c/busses/i2c-s3c2410.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+> index e828a1dba0e5..6252c051525a 100644
+> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> @@ -1128,11 +1128,11 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>                 s3c24xx_i2c_parse_dt(pdev->dev.of_node, i2c);
+>
+>         strlcpy(i2c->adap.name, "s3c2410-i2c", sizeof(i2c->adap.name));
+> -       i2c->adap.owner   = THIS_MODULE;
+> -       i2c->adap.algo    = &s3c24xx_i2c_algorithm;
+> +       i2c->adap.owner = THIS_MODULE;
+> +       i2c->adap.algo = &s3c24xx_i2c_algorithm;
+>         i2c->adap.retries = 2;
+> -       i2c->adap.class   = I2C_CLASS_HWMON | I2C_CLASS_SPD | I2C_CLASS_DEPRECATED;
+> -       i2c->tx_setup     = 50;
+> +       i2c->adap.class = I2C_CLASS_DEPRECATED;
+> +       i2c->tx_setup = 50;
+>
+>         init_waitqueue_head(&i2c->wait);
+>
+> --
 
-g.
+Tested on Exynos 5250 boards.
+Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
 
-> 
-> > ---
-> >  drivers/of/fdt.c | 22 +++++++++++-----------
-> >  1 file changed, 11 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index b777d8f..b88a68e 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> > @@ -875,24 +875,24 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
-> >  }
-> >  
-> >  #ifdef CONFIG_HAVE_MEMBLOCK
-> > +#define MAX_PHYS_ADDR	((phys_addr_t)~0)
-> > +
-> >  void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
-> >  {
-> >  	const u64 phys_offset = __pa(PAGE_OFFSET);
-> >  	base &= PAGE_MASK;
-> >  	size &= PAGE_MASK;
-> >  
-> > -	if (sizeof(phys_addr_t) < sizeof(u64)) {
-> > -		if (base > ULONG_MAX) {
-> > -			pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-> > -					base, base + size);
-> > -			return;
-> > -		}
-> > +	if (base > MAX_PHYS_ADDR) {
-> > +		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-> > +				base, base + size);
-> > +		return;
-> > +	}
-> >  
-> > -		if (base + size > ULONG_MAX) {
-> > -			pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
-> > -					ULONG_MAX, base + size);
-> > -			size = ULONG_MAX - base;
-> > -		}
-> > +	if (base + size > MAX_PHYS_ADDR) {
-> > +		pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
-> > +				ULONG_MAX, base + size);
-> > +		size = MAX_PHYS_ADDR - base;
-> >  	}
-> >  
-> >  	if (base + size < phys_offset) {
-> > -- 
-> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> > hosted by The Linux Foundation
-> > 
-> > 
+-- 
+Regards,
+Sachin.
