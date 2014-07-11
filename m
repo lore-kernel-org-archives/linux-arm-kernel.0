@@ -1,85 +1,116 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Jul 2014 13:45:53 +0100
-Subject: arm64 flushing 255GB of vmalloc space takes too long
-In-Reply-To: <53BF3D58.2010900@codeaurora.org>
-References: <CAMPhdO-j5SfHexP8hafB2EQVs91TOqp_k_SLwWmo9OHVEvNWiQ@mail.gmail.com>
- <20140709174055.GC2814@arm.com>
- <CAMPhdO_XqAL4oXcuJkp2PTQ-J07sGG4Nm5HjHO=yGqS+KuWQzg@mail.gmail.com>
- <53BF3D58.2010900@codeaurora.org>
-Message-ID: <20140711124553.GG11473@arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 11 Jul 2014 14:54:00 +0200
+Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
+In-Reply-To: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+Message-ID: <53BFDE68.4040405@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 02:26:48AM +0100, Laura Abbott wrote:
-> On 7/9/2014 11:04 AM, Eric Miao wrote:
-> > On Wed, Jul 9, 2014 at 10:40 AM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> >> On Wed, Jul 09, 2014 at 05:53:26PM +0100, Eric Miao wrote:
-> >>> On Tue, Jul 8, 2014 at 6:43 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> >>>> I have an arm64 target which has been observed hanging in __purge_vmap_area_lazy
-> >>>> in vmalloc.c The root cause of this 'hang' is that flush_tlb_kernel_range is
-> >>>> attempting to flush 255GB of virtual address space. This takes ~2 seconds and
-> >>>> preemption is disabled at this time thanks to the purge lock. Disabling
-> >>>> preemption for that time is long enough to trigger a watchdog we have setup.
-> >>
-> >> That's definitely not good.
-> >>
-> >>>> A couple of options I thought of:
-> >>>> 1) Increase the timeout of our watchdog to allow the flush to occur. Nobody
-> >>>> I suggested this to likes the idea as the watchdog firing generally catches
-> >>>> behavior that results in poor system performance and disabling preemption
-> >>>> for that long does seem like a problem.
-> >>>> 2) Change __purge_vmap_area_lazy to do less work under a spinlock. This would
-> >>>> certainly have a performance impact and I don't even know if it is plausible.
-> >>>> 3) Allow module unloading to trigger a vmalloc purge beforehand to help avoid
-> >>>> this case. This would still be racy if another vfree came in during the time
-> >>>> between the purge and the vfree but it might be good enough.
-> >>>> 4) Add 'if size > threshold flush entire tlb' (I haven't profiled this yet)
-> >>>
-> >>> We have the same problem. I'd agree with point 2 and point 4, point 1/3 do not
-> >>> actually fix this issue. purge_vmap_area_lazy() could be called in other
-> >>> cases.
-> >>
-> >> I would also discard point 2 as it still takes ~2 seconds, only that not
-> >> under a spinlock.
-> > 
-> > Point is - we could still end up a good amount of time in that function,
-> > giving the default value of lazy_vfree_pages to be 32MB * log(ncpu),
-> > worst case of all vmap areas being only one page, tlb flush page by
-> > page, and traversal of the list, calling __free_vmap_area() that many
-> > times won't likely to reduce the execution time to microsecond level.
-> > 
-> > If it's something inevitable - we do it in a bit cleaner way.
-
-In general I think it makes sense to add a mutex instead of a spinlock
-here if slowdown is caused by other things as well. That's independent
-of the TLB invalidation optimisation for arm64.
-
-> > Or we end up having platform specific tlb flush implementation just as we
-> > did for cache ops. I would expect only few platforms will have their own
-> > thresholds. A simple heuristic guess of the threshold based on number of
-> > tlb entries would be good to go?
+On 07/11/2014 12:29 PM, Dong Aisheng wrote:
+> add M_CAN device tree binding documentation
 > 
-> Mark Salter actually proposed a fix to this back in May 
+> Cc: Wolfgang Grandegger <wg@grandegger.com>
+> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+> Cc: Varka Bhadram <varkabhadram@gmail.com>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
+>  1 files changed, 65 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
 > 
-> https://lkml.org/lkml/2014/5/2/311
+> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+> new file mode 100644
+> index 0000000..c4cb263
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+> @@ -0,0 +1,65 @@
+> +Bosch MCAN controller Device Tree Bindings
+> +-------------------------------------------------
+> +
+> +Required properties:
+> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
+> +- reg			: physical base address and size of the M_CAN
+> +			  registers map and Message RAM
+> +- reg-names		: Should be "m_can" and "message_ram"
+> +- interrupts		: Should be the interrupt number of M_CAN interrupt
+> +			  line 0 and line 1, could be same if sharing
+> +			  the same interrupt.
+> +- interrupt-names	: Should contain "int0" and "int1"
+> +- clocks		: Clocks used by controller, should be host clock
+> +			  and CAN clock.
+> +- clock-names		: Should contain "hclk" and "cclk"
+> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> +- pinctrl-names		: Names corresponding to the numbered pinctrl states
+> +- mram-cfg		: Message RAM configuration data.
+> +  Multiple M_CAN instances can share the same Message RAM and each element(e.g
+> +  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+> +  so this property is telling driver how the shared or private Message RAM
+> +  are used by this M_CAN controller.
+
+Will you have to modify the binding, espeically the mram-cfg, if you add
+canfd support to the driver?
+
+I think mram-cfg should have a vendor prefix, e.g.: bosch,mram-cfg
+
+> +
+> +  The format should be as follows:
+> +  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems rxb_elems
+> +   txe_elems txb_elems>
+> +  The 'offset' is an address offset of the Message RAM where the following
+> +  elements start from. This is usually set to 0x0 if you're using a private
+> +  Message RAM. The remain cells are used to specify how many elements are used
+> +  for each FIFO/Buffer.
+> +
+> +M_CAN includes the following elements according to user manual:
+> +11-bit Filter	0-128 elements / 0-128 words
+> +29-bit Filter	0-64 elements / 0-128 words
+> +Rx FIFO 0	0-64 elements / 0-1152 words
+> +Rx FIFO 1	0-64 elements / 0-1152 words
+> +Rx Buffers	0-64 elements / 0-1152 words
+> +Tx Event FIFO	0-32 elements / 0-64 words
+> +Tx Buffers	0-32 elements / 0-576 words
+> +
+> +Please refer to 2.4.1 Message RAM Configuration in Bosch M_CAN user manual
+> +for details.
+> +
+> +Example:
+> +SoC dtsi:
+> +m_can1: can at 020e8000 {
+> +	compatible = "bosch,m_can";
+> +	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
+> +	reg-names = "m_can", "message_ram";
+> +	interrupts = <0 114 0x04>,
+> +		     <0 114 0x04>;
+> +	interrupt-names = "int0", "int1";
+> +	clocks = <&clks IMX6SX_CLK_CANFD>,
+> +		 <&clks IMX6SX_CLK_CANFD>;
+> +	clock-names = "hclk", "cclk";
+> +	mram-cfg = <0x0 0 0 32 0 0 0 1>;
+> +	status = "disabled";
+> +};
+> +
+> +Board dtsi:
+> +&m_can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_m_can1>;
+> +	status = "enabled";
+> +};
 > 
-> I never saw any further comments on it though. It also matches what x86
-> does with their TLB flushing. It fixes the problem for me and the threshold
-> seems to be the best we can do unless we want to introduce options per
-> platform. It will need to be rebased to the latest tree though.
 
-There were other patches in this area and I forgot about this. The
-problem is that the ARM architecture does not define the actual
-micro-architectural implementation of the TLBs (and it shouldn't), so
-there is no way to guess how many TLB entries there are. It's not an
-easy figure to get either since there are multiple levels of caching for
-the TLBs.
-
-So we either guess some value here (we may not always be optimal) or we
-put some time bound (e.g. based on sched_clock()) on how long to loop.
-The latter is not optimal either, the only aim being to avoid
-soft-lockups.
-
+Marc
 -- 
-Catalin
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140711/8b533762/attachment.sig>
