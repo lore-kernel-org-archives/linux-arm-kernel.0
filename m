@@ -1,100 +1,95 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 11 Jul 2014 12:31:06 -0500
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <20140711153019.GA75267@localhost>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <20140711153019.GA75267@localhost>
-Message-ID: <53C01F5A.6040409@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 11 Jul 2014 19:39:29 +0200
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <20140711151304.GD3935@laptop>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+ <20140711151304.GD3935@laptop>
+Message-ID: <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andre,
-
-On 07/11/2014 10:30 AM, Andre Heider wrote:
-> Hi Dave,
->
-> On Thu, Jul 10, 2014 at 09:55:38PM -0500, Dave Gerlach wrote:
->> Hello,
+On 11 July 2014 17:13, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, Jul 11, 2014 at 09:51:06AM +0200, Vincent Guittot wrote:
+>> On 10 July 2014 15:16, Peter Zijlstra <peterz@infradead.org> wrote:
+>> > On Mon, Jun 30, 2014 at 06:05:40PM +0200, Vincent Guittot wrote:
+>> >> This reverts commit f5f9739d7a0ccbdcf913a0b3604b134129d14f7e.
+>> >>
+>> >> We are going to use runnable_avg_sum and runnable_avg_period in order to get
+>> >> the utilization of the CPU. This statistic includes all tasks that run the CPU
+>> >> and not only CFS tasks.
+>> >
+>> > But this rq->avg is not the one that is migration aware, right? So why
+>> > use this?
 >>
->> This series adds suspend/resume support for am335x. Version 3 of this
->> series can be found at [1]. I apologize for the large delay between this
->> and the previous revision. This code has been heavily refined
->> since the last version based on the various comments received for v3. The
->> major change from previous version is moving all wkup_m3 code into a
->> remoteproc based driver. The new driver handles all IPC and fw loading
->> and exposes a small API to be used by PM code to achieve low power states.
+>> Yes, it's not the one that is migration aware
 >>
->> Firmware that can be used for testing this can be found at [2] on branch
->> pm-remote-proc-v3, using am335x-pm-firmware.elf found in bin directory.
->> Please note this has changed from all previous versions and is no longer
->> the .bin file. Firmware can be built into kernel or placed in /lib/firmware
->> in rootfs for automatic loading during boot.
+>> >
+>> > We already compensate cpu_capacity for !fair tasks, so I don't see why
+>> > we can't use the migration aware one (and kill this one as Yuyang keeps
+>> > proposing) and compensate with the capacity factor.
 >>
->> This series has several dependencies. The wkup_m3_rproc utilizes a mailbox
->> to communicate with the cm3 and depends on Suman's series for omap mbox
->> support [3], which has several dependencies of it's own, listed in the
->> cover letter. Also, a few changes to remoteproc itself were needed and
->> have been provided by Suman here [4]. The edma patch included in this
->> series was previously submitted by Daniel Mack and after discussion with
->> him we agreed to include an updated version with this series as resume
->> has a direct dependency on it due to hangs in mmc without it.
+>> The 1st point is that cpu_capacity is compensated by both !fair_tasks
+>> and frequency scaling and we should not take into account frequency
+>> scaling for detecting overload
+>
+> dvfs could help? Also we should not use arch_scale_freq_capacity() for
+> things like cpufreq-ondemand etc. Because for those the compute capacity
+> is still the max. We should only use it when we hard limit things.
+
+In my mind, arch_scale_cpu_freq was intend to scale the capacity of
+the CPU according to the current dvfs operating point.
+As it's no more use anywhere now that we have arch_scale_cpu, we could
+probably remove it .. and see when it will become used.
+
+>
+>> What we have now is the the weighted load avg that is the sum of the
+>> weight load of entities on the run queue. This is not usable to detect
+>> overload because of the weight. An unweighted version of this figure
+>> would be more usefull but it's not as accurate as the one I use IMHO.
+>> The example that has been discussed during the review of the last
+>> version has shown some limitations
 >>
->> Because of the high number of dependencies I have pushed a branch for
->> testing here [6] if anyone desires to try it out on branch pm-ds0-v3.16.
+>> With the following schedule pattern from Morten's example
 >>
->> As is this series will only suspend and resume one time and then
->> fail to resume afterwards due to the removal of direct PM code control
->> of hwmods that do not properly assert their MSTANDBY signal after a context
->> loss, discussed here [7]. In particular it is due to the usb_otg_hs hwmod
->> that currently has no driver controlling it in the kernel. The main
->> cause of the issue is that the SYSCONFIG register present within
->> the IP must be reprogrammed after every suspend cycle and this
->> only happens at boot if no driver is present. Work is in progress to
->> allow suspend to function with or without drivers for the troublesome
->> hwmods (cpgmac, usb_otg_hs, and tptc1-3) and will be provided in a separate
->> future patch. The previous suggestion of allowing omap_device to handle
->> it proved to be too invasive into both omap_device and omap_hwmod and
->> the approach of allowing the firmware to handle it is not possible due
->> to the inability of the CM3 to access the IPs causing the issue. I'd
->> be happy to discuss this at length if anybody is interested.
+>>    | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms |
+>> A:   run     rq     run  ----------- sleeping -------------  run
+>> B:   rq      run    rq    run   ---- sleeping -------------  rq
+>>
+>> The scheduler will see the following values:
+>> Task A unweighted load value is 47%
+>> Task B unweight load is 60%
+>> The maximum Sum of unweighted load is 104%
+>> rq->avg load is 60%
+>>
+>> And the real CPU load is 50%
+>>
+>> So we will have opposite decision depending of the used values: the
+>> rq->avg or the Sum of unweighted load
+>>
+>> The sum of unweighted load has the main advantage of showing
+>> immediately what will be the relative impact of adding/removing a
+>> task. In the example, we can see that removing task A or B will remove
+>> around half the CPU load but it's not so good for giving the current
+>> utilization of the CPU
 >
-> I gave this a quick spin on boneblack, and it works for me, thanks!
->
-> Tested with "echo mem > /sys/power/state" and uart0 input to resume.
->
+> In that same discussion ISTR a suggestion about adding avg_running time,
+> as opposed to the current avg_runnable. The sum of avg_running should be
+> much more accurate, and still react correctly to migrations.
 
-Thanks for trying it out!
-
-> Contradictionary to the limits you mention, multiple suspend/resume cycles
-> do work for me. Maybe because of the enabled drivers in my .config, or
-> maybe something was messed up, but at first glance it looked fine.
-
-Yes, if you have USB enabled and the driver is present, the usb hwmod is 
-properly handled and SYSCONFIG properly restored, it is only when there is no 
-driver as is the case with the defconfig that we run in to issues. Looking back 
-I was not clear about that, sorry.
-
->
-> It fails to compile with CONFIG_THUMB2_KERNEL though:
-> arch/arm/mach-omap2/sleep33xx.S:61: Error: cannot use register index
-> with PC-relative addressing -- `str r1,emif_addr_virt'
-
-Hmm, interestingly enough I can not reproduce this build error. Can you share 
-your config and compiler version?
+I haven't look in details but I agree that avg_running would be much
+more accurate than avg_runnable and should probably fit the
+requirement. Does it means that we could re-add the avg_running (or
+something similar) that has disappeared during the review of load avg
+tracking patchset ?
 
 >
-> Then I noticed "freeze" in /sys/power/state, when triggered then crashes
-> with a null pointer dereference in suspend_devices_and_enter(). That might
-> be expected or even stupid though ;)
-
-This is present before my patches are applied, this series adds support for 
-PM_SUSPEND_MEM, that's something else I probably should have been a bit more 
-clear about in my cover letter.
-
-Regards,
-Dave
-
 >
-> Thanks,
-> Andre
->
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
