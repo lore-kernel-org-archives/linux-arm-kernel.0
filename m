@@ -1,143 +1,74 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 10 Jul 2014 19:42:14 -0400
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
-In-Reply-To: <53BF1706.4050203@codeaurora.org>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
- <20140704072940.c1e8e8cdd38fbc295fe5c086@nvidia.com>
- <53BC6866.30803@codeaurora.org>
- <CAF6AEGvpD+gvDvQte6YVOP8Q6NeXsoReQ_waWqjsMjffUzALOA@mail.gmail.com>
- <53BDD834.5030405@codeaurora.org>
- <CAF6AEGucNbo7sm9oQWFq9hcfoSeR5DuwRcRUvG+Y2sxLaM7OTQ@mail.gmail.com>
- <53BF1706.4050203@codeaurora.org>
-Message-ID: <CAF6AEGuHE0k09G-qUvVy0rrG1655heDamggtyAgO-NrML1XyvQ@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 10 Jul 2014 17:15:49 -0700
+Subject: [PATCH v3 0/7] kernel: Add support for restart notifier call chain
+In-Reply-To: <20140710160907.da1024914366de947ebdf384@linux-foundation.org>
+References: <1404877083-6552-1-git-send-email-linux@roeck-us.net>
+ <20140710160907.da1024914366de947ebdf384@linux-foundation.org>
+Message-ID: <53BF2CB5.5080602@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 6:43 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
-> On 7/9/2014 5:40 PM, Rob Clark wrote:
->> On Wed, Jul 9, 2014 at 8:03 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
->>> On 7/8/2014 4:49 PM, Rob Clark wrote:
->>>> On Tue, Jul 8, 2014 at 5:53 PM, Olav Haugan <ohaugan@codeaurora.org> wrote:
->>>>> Hi Hiroshi,
->>>>>
->>>>> On 7/3/2014 9:29 PM, Hiroshi Doyu wrote:
->>>>>> Hi Olav,
->>>>>>
->>>>>> Olav Haugan <ohaugan@codeaurora.org> writes:
->>>>>>
->>>>>>> Mapping and unmapping are more often than not in the critical path.
->>>>>>> map_range and unmap_range allows SMMU driver implementations to optimize
->>>>>>> the process of mapping and unmapping buffers into the SMMU page tables.
->>>>>>> Instead of mapping one physical address, do TLB operation (expensive),
->>>>>>> mapping, do TLB operation, mapping, do TLB operation the driver can map
->>>>>>> a scatter-gatherlist of physically contiguous pages into one virtual
->>>>>>> address space and then at the end do one TLB operation.
->>>>>>>
->>>>>>> Additionally, the mapping operation would be faster in general since
->>>>>>> clients does not have to keep calling map API over and over again for
->>>>>>> each physically contiguous chunk of memory that needs to be mapped to a
->>>>>>> virtually contiguous region.
->>>>>>>
->>>>>>> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->>>>>>> ---
->>>>>>>  drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
->>>>>>>  include/linux/iommu.h | 24 ++++++++++++++++++++++++
->>>>>>>  2 files changed, 48 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>>>>>> index e5555fc..f2a6b80 100644
->>>>>>> --- a/drivers/iommu/iommu.c
->>>>>>> +++ b/drivers/iommu/iommu.c
->>>>>>> @@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
->>>>>>>  EXPORT_SYMBOL_GPL(iommu_unmap);
->>>>>>>
->>>>>>>
->>>>>>> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
->>>>>>> +                struct scatterlist *sg, unsigned int len, int prot)
->>>>>>> +{
->>>>>>> +    if (unlikely(domain->ops->map_range == NULL))
->>>>>>> +            return -ENODEV;
->>>>>>> +
->>>>>>> +    BUG_ON(iova & (~PAGE_MASK));
->>>>>>> +
->>>>>>> +    return domain->ops->map_range(domain, iova, sg, len, prot);
->>>>>>> +}
->>>>>>> +EXPORT_SYMBOL_GPL(iommu_map_range);
->>>>>>
->>>>>> We have the similar one internally, which is named, "iommu_map_sg()",
->>>>>> called from DMA API.
->>>>>
->>>>> Great, so this new API will be useful to more people!
->>>>>
->>>>>>> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
->>>>>>> +                  unsigned int len)
->>>>>>> +{
->>>>>>> +    if (unlikely(domain->ops->unmap_range == NULL))
->>>>>>> +            return -ENODEV;
->>>>>>> +
->>>>>>> +    BUG_ON(iova & (~PAGE_MASK));
->>>>>>> +
->>>>>>> +    return domain->ops->unmap_range(domain, iova, len);
->>>>>>> +}
->>>>>>> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
->>>>>>
->>>>>> Can the existing iommu_unmap() do the same?
->>>>>
->>>>> I believe iommu_unmap() behaves a bit differently because it will keep
->>>>> on calling domain->ops->unmap() until everything is unmapped instead of
->>>>> letting the iommu implementation take care of unmapping everything in
->>>>> one call.
->>>>>
->>>>> I am abandoning the patch series since our driver was not accepted.
->>>>> However, if there are no objections I will resubmit this patch (PATCH
->>>>> 2/7) as an independent patch to add this new map_range API.
->>>>
->>>> +1 for map_range().. I've seen for gpu workloads, at least, it is the
->>>> downstream map_range() API is quite beneficial.   It was worth at
->>>> least a few fps in xonotic.
->>>>
->>>> And, possibly getting off the subject a bit, but I was wondering about
->>>> the possibility of going one step further and batching up mapping
->>>> and/or unmapping multiple buffers (ranges) at once.  I have a pretty
->>>> convenient sync point in drm/msm to flush out multiple mappings before
->>>> kicking gpu.
->>>
->>> I think you should be able to do that with this API already - at least
->>> the mapping part since we are passing in a sg list (this could be a
->>> chained sglist).
->>
->> What I mean by batching up is mapping and unmapping multiple sglists
->> each at different iova's with minmal cpu cache and iommu tlb flushes..
->>
->> Ideally we'd let the IOMMU driver be clever and build out all 2nd
->> level tables before inserting into first level tables (to minimize cpu
->> cache flushing).. also, there is probably a reasonable chance that
->> we'd be mapping a new buffer into existing location, so there might be
->> some potential to reuse existing 2nd level tables (and save a tiny bit
->> of free/alloc).  I've not thought too much about how that would look
->> in code.. might be kinda, umm, fun..
->>
->> But at an API level, we should be able to do a bunch of
->> map/unmap_range's with one flush.
->>
->> Maybe it could look like a sequence of iommu_{map,unmap}_range()
->> followed by iommu_flush()?
->>
+On 07/10/2014 04:09 PM, Andrew Morton wrote:
+> On Tue,  8 Jul 2014 20:37:56 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
 >
-> So we could add another argument ("options") in the range api that
-> allows you to indicate whether you want to invalidate TLB or not.
-
-sounds reasonable.. I'm pretty sure we want explict-flush to be an
-opt-in behaviour.
-
-BR,
--R
-
-> Thanks,
+>> The existing mechanisms have a number of drawbacks. Typically only one scheme
+>> to restart the system is supported (at least if arm_pm_restart is used).
+>> At least in theory there can be mutliple means to restart the system, some of
+>> which may be less desirable (for example one mechanism may only reset the CPU,
+>> while another may reset the entire system).
 >
-> Olav
+> So the callbacks need to be prioritized.
 >
-> --
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+>> Using arm_pm_restart can also be
+>> racy if the function pointer is set from a driver, as the driver may be in
+>> the process of being unloaded when arm_pm_restart is called.
+>> Using the reboot notifier is always racy, as it is unknown if and when
+>> other functions using the reboot notifier have completed execution
+>> by the time the watchdog fires.
+>>
+>> To solve the problem, introduce a system restart notifier. This notifier
+>> is expected to be called from the architecture specific machine_restart()
+>> function. Drivers providing system restart functionality (such as the watchdog
+>> drivers mentioned above) are expected to register with this notifier.
+>
+> It's worth mentioning here that the notifier_block priority scheme is
+> used to address the problem which was identified in the previous
+> paragraph.
+>
+Ok.
+
+> If this scheme is to be successful we will need to set in place some
+> protocol for specifying how the priorities are managed.  If someone
+> sits down and writes a new restart handler, how is that person to
+> decide how to prioritize it against other handlers, both present and
+> future?
+>
+> Also, looking at the patches, you don't appear to have actually *used*
+> the prioritization - everything is left at zero.  So we'll end up using
+> the most-recently-registered handler to restart the system.  The
+> patches don't actually solve the problem which was identified in the
+> above paragraph?
+
+The primary goal of this patch set was to provide a generic scheme for
+registering restart handlers, and the ability to load and unload notifiers
+without race conditions. Support for multiple restart handlers with
+different priorities was a secondary objective. The conversions I did
+so far are expected to be mutually exclusive, ie provide the one and
+only means on a given architecture to restart the system. So I guess
+you do have a point - the priorities for those notifiers should
+probably be higher. Error on my part - I thought lower numbers would
+have higher priority, but after looking into the code again that
+is wrong.
+
+To avoid making things too complicated, maybe it would make sense to
+specify guidelines for notifier priorities, such as
+0   - restart notifier of last resort, with least reset capabilities
+128 - default; use if no other notifier is expected to be available
+       and/or if restart functionality is acceptable
+255 - highest priority notifier which _must_ be used
+
+Would that make sense and be acceptable ? In this context, I would then
+set the notifier priorities for the callers in the patch set to 128.
+
+Thanks,
+Guenter
