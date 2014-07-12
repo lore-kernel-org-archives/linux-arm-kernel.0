@@ -1,130 +1,79 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 12 Jul 2014 00:12:34 -0700
-Subject: [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
-In-Reply-To: <1404163947-3105-15-git-send-email-kgene.kim@samsung.com>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
- <1404163947-3105-15-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20140712071234.GF23883@brian-ubuntu>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 12 Jul 2014 10:39:17 +0100
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <CAF6AEGv2P_Uq8CHgm1YdaUeMSNdH62ZwjLnT83Fr5GnxEAhTMw@mail.gmail.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <CAF6AEGv2P_Uq8CHgm1YdaUeMSNdH62ZwjLnT83Fr5GnxEAhTMw@mail.gmail.com>
+Message-ID: <20140712093917.GD18601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-mtd (please CC for anything driver/mtd/*; see MAINTAINERS)
+Hi Rob,
 
-On Tue, Jul 01, 2014 at 06:32:24AM +0900, Kukjin Kim wrote:
-> This patch removes s5pc100 related onenand codes because of no more
-> support for S5PC100 SoC in mainline.
+On Fri, Jul 11, 2014 at 09:55:14PM +0100, Rob Clark wrote:
+> On Fri, Jul 4, 2014 at 11:29 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> ok, so I was working through this to try to convert my
+> {qcom,msm}-iommu-v0 RFC over to using these bindings.  For background,
+> I was initially using something that looked a bit more like the
+> current arm-smmu bindings:
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> ---
->  drivers/mtd/onenand/Kconfig   |    4 ++--
->  drivers/mtd/onenand/samsung.c |   25 +------------------------
->  2 files changed, 3 insertions(+), 26 deletions(-)
+>         gpu {
+>             #stream-id-cells = <16>;
+>             ...
+>         };
 > 
-> diff --git a/drivers/mtd/onenand/Kconfig b/drivers/mtd/onenand/Kconfig
-> index ab26072..dcae2f6 100644
-> --- a/drivers/mtd/onenand/Kconfig
-> +++ b/drivers/mtd/onenand/Kconfig
-> @@ -32,10 +32,10 @@ config MTD_ONENAND_OMAP2
->  
->  config MTD_ONENAND_SAMSUNG
->          tristate "OneNAND on Samsung SOC controller support"
-> -        depends on ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4
-> +        depends on ARCH_S3C64XX || ARCH_S5PV210 || ARCH_EXYNOS4
->          help
->            Support for a OneNAND flash device connected to an Samsung SOC.
-> -          S3C64XX/S5PC100 use command mapping method.
-> +          S3C64XX uses command mapping method.
->            S5PC110/S5PC210 use generic OneNAND method.
->  
->  config MTD_ONENAND_OTP
-> diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-> index efb819c..19cfb97 100644
-> --- a/drivers/mtd/onenand/samsung.c
-> +++ b/drivers/mtd/onenand/samsung.c
-> @@ -10,7 +10,7 @@
->   * published by the Free Software Foundation.
->   *
->   * Implementation:
-> - *	S3C64XX and S5PC100: emulate the pseudo BufferRAM
-> + *	S3C64XX: emulate the pseudo BufferRAM
->   *	S5PC110: use DMA
->   */
->  
-> @@ -32,7 +32,6 @@
->  enum soc_type {
->  	TYPE_S3C6400,
->  	TYPE_S3C6410,
-> -	TYPE_S5PC100,
->  	TYPE_S5PC110,
->  };
->  
-> @@ -59,7 +58,6 @@ enum soc_type {
->  #define MAP_11				(0x3)
->  
->  #define S3C64XX_CMD_MAP_SHIFT		24
-> -#define S5PC100_CMD_MAP_SHIFT		26
->  
->  #define S3C6400_FBA_SHIFT		10
->  #define S3C6400_FPA_SHIFT		4
-> @@ -69,10 +67,6 @@ enum soc_type {
->  #define S3C6410_FPA_SHIFT		6
->  #define S3C6410_FSA_SHIFT		4
->  
-> -#define S5PC100_FBA_SHIFT		13
-> -#define S5PC100_FPA_SHIFT		7
-> -#define S5PC100_FSA_SHIFT		5
-> -
->  /* S5PC110 specific definitions */
->  #define S5PC110_DMA_SRC_ADDR		0x400
->  #define S5PC110_DMA_SRC_CFG		0x404
-> @@ -195,11 +189,6 @@ static unsigned int s3c64xx_cmd_map(unsigned type, unsigned val)
->  	return (type << S3C64XX_CMD_MAP_SHIFT) | val;
->  }
->  
-> -static unsigned int s5pc1xx_cmd_map(unsigned type, unsigned val)
-> -{
-> -	return (type << S5PC100_CMD_MAP_SHIFT) | val;
-> -}
-> -
->  static unsigned int s3c6400_mem_addr(int fba, int fpa, int fsa)
->  {
->  	return (fba << S3C6400_FBA_SHIFT) | (fpa << S3C6400_FPA_SHIFT) |
-> @@ -212,12 +201,6 @@ static unsigned int s3c6410_mem_addr(int fba, int fpa, int fsa)
->  		(fsa << S3C6410_FSA_SHIFT);
->  }
->  
-> -static unsigned int s5pc100_mem_addr(int fba, int fpa, int fsa)
-> -{
-> -	return (fba << S5PC100_FBA_SHIFT) | (fpa << S5PC100_FPA_SHIFT) |
-> -		(fsa << S5PC100_FSA_SHIFT);
-> -}
-> -
->  static void s3c_onenand_reset(void)
->  {
->  	unsigned long timeout = 0x10000;
-> @@ -835,9 +818,6 @@ static void s3c_onenand_setup(struct mtd_info *mtd)
->  	} else if (onenand->type == TYPE_S3C6410) {
->  		onenand->mem_addr = s3c6410_mem_addr;
->  		onenand->cmd_map = s3c64xx_cmd_map;
-> -	} else if (onenand->type == TYPE_S5PC100) {
-> -		onenand->mem_addr = s5pc100_mem_addr;
-> -		onenand->cmd_map = s5pc1xx_cmd_map;
->  	} else if (onenand->type == TYPE_S5PC110) {
->  		/* Use generic onenand functions */
->  		this->read_bufferram = s5pc110_read_bufferram;
-> @@ -1111,9 +1091,6 @@ static struct platform_device_id s3c_onenand_driver_ids[] = {
->  		.name		= "s3c6410-onenand",
->  		.driver_data	= TYPE_S3C6410,
->  	}, {
-> -		.name		= "s5pc100-onenand",
-> -		.driver_data	= TYPE_S5PC100,
-> -	}, {
->  		.name		= "s5pc110-onenand",
->  		.driver_data	= TYPE_S5PC110,
->  	}, { },
-> -- 
-> 1.7.10.4
+>         gfx3d: qcom,iommu at 7c00000 {
+>             compatible = "qcom,iommu-v0";
+>             ...
+>             mmu-masters =
+>                 /* gfx3d_user: */
+>                 <&gpu 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15>,
+>                 /* gfx3d_priv: */
+>                 <&gpu 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31>;
+>         };
 > 
+>         gfx3d1: qcom,iommu at 7d00000 {
+>             compatible = "qcom,iommu-v0";
+>             ...
+>             mmu-masters =
+>                 /* gfx3d_user: */
+>                 <&gpu 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15>,
+>                 /* gfx3d_priv: */
+>                 <&gpu 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31>;
+>         };
+> 
+> With my current arrangement, I have everything I need when the iommu
+> device is probed to set up each of the context banks
+> 
+> This proposal inverts that relationship.  Which forces me to do a lot
+> more (including DT parsing) on device attach.  Which I'm not a huge
+> fan of.  Ie. if I even wanted to try to implement per-process
+> pagetables for gpu without completely going behind the IOMMU API's
+> back, I would want attach/detach to be as lightweight as possible.
+
+I think we'd have to walk the entire device-tree at IOMMU probe time in
+order to enumerate the masters, which sounds horrible... If we want to do
+clever SMR allocation on the ARM SMMU (as I've been discussing with Olav),
+we're going to need knowledge about *all* the valid Stream IDs in the system
+before we can program *any* translations.
+
+> Was there actually a good reason for having the device link to the
+> iommu rather than the other way around?  How much would people hate it
+> if I just ignore the generic bindings and use something that works for
+> me instead.  I mean, it isn't exactly like there is going to be .dts
+> re-use across different SoC's..  and at least with current IOMMU API
+> some sort of of_get_named_iommu() API doesn't really make sense.
+
+The thing is, if you end up ignoring the generic binding then we have two
+IOMMUs using the same (ARM SMMU) binding and it begs the question as to
+which is the more generic! I know we're keen to get this merged, but merging
+something that people won't use and calling it generic doesn't seem ideal
+either. We do, however, desperately need a generic binding.
+
+Turning the question around; Thierry -- what are the issue in using
+something like the ARM SMMU binding (master device IDs held in the IOMMU
+node) for the nvidia IOMMU?
+
+Will
