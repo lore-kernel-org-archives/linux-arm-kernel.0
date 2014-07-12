@@ -1,57 +1,396 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 12 Jul 2014 23:01:56 +0200
-Subject: shmobile build breakage
-In-Reply-To: <20140712101153.GG21766@n2100.arm.linux.org.uk>
-References: <20140712101153.GG21766@n2100.arm.linux.org.uk>
-Message-ID: <20140712210155.GB12422@verge.net.au>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 12 Jul 2014 23:31:38 +0200 (CEST)
+Subject: [PATCH v10 03/11] ARM: hisi: enable MCPM implementation
+In-Reply-To: <1404957850-13340-4-git-send-email-haojian.zhuang@linaro.org>
+References: <1404957850-13340-1-git-send-email-haojian.zhuang@linaro.org>
+ <1404957850-13340-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <alpine.DEB.2.10.1407101714400.2893@Yrabib>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 11:11:53AM +0100, Russell King - ARM Linux wrote:
-> Regular nightly randconfig build testing found:
-> 
-> arch/arm/mach-shmobile/platsmp-apmu.c:245:6: error: redefinition of 'shmobile_smp_apmu_suspend_init'
-> In file included from arch/arm/mach-shmobile/platsmp-apmu.c:23:0:
-> arch/arm/mach-shmobile/common.h:41:91: note: previous definition of 'shmobile_smp_apmu_suspend_init' was here
-> arch/arm/mach-shmobile/platsmp-apmu.c:46:12: warning: 'apmu_power_off' defined but not used [-Wunused-function]
-> arch/arm/mach-shmobile/platsmp-apmu.c:53:12: warning: 'apmu_power_off_poll' defined but not used [-Wunused-function]
-> make[2]: *** [arch/arm/mach-shmobile/platsmp-apmu.o] Error 1
-> 
-> arch/arm/mach-shmobile/platsmp-apmu.c does this:
-> 
-> #include "common.h"
-> ...
-> #if defined(CONFIG_SUSPEND)
-> void shmobile_smp_apmu_suspend_init(void)
-> {
->         shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
-> }
-> #else
-> void shmobile_smp_apmu_suspend_init(void) {}
-> #endif
-> 
-> whereas common.h does this:
-> 
-> #ifdef CONFIG_SUSPEND
-> int shmobile_suspend_init(void);
-> void shmobile_smp_apmu_suspend_init(void);
-> #else
-> static inline int shmobile_suspend_init(void) { return 0; }
-> static inline void shmobile_smp_apmu_suspend_init(void) { return 0; }
-> #endif
-> 
-> So when CONFIG_SUSPEND is disabled, we get an inline function and a
-> stub function, and the compiler complains.
-> 
-> The two warnings mentioned above could do with fixing as well.
+On Thu, 10 Jul 2014, Haojian Zhuang wrote:
 
-Hi Russell,
+> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+> framework to manage power on HiP04 SoC.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/mach-hisi/Makefile   |   1 +
+>  arch/arm/mach-hisi/platmcpm.c | 331 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 332 insertions(+)
+>  create mode 100644 arch/arm/mach-hisi/platmcpm.c
+> 
+> diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+> index ee2506b..d64831e 100644
+> --- a/arch/arm/mach-hisi/Makefile
+> +++ b/arch/arm/mach-hisi/Makefile
+> @@ -3,4 +3,5 @@
+>  #
+>  
+>  obj-y	+= hisilicon.o
+> +obj-$(CONFIG_MCPM)		+= platmcpm.o
+>  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
+> diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+> new file mode 100644
+> index 0000000..3befcb3
+> --- /dev/null
+> +++ b/arch/arm/mach-hisi/platmcpm.c
+> @@ -0,0 +1,331 @@
+> +/*
+> + * Copyright (c) 2013-2014 Linaro Ltd.
+> + * Copyright (c) 2013-2014 Hisilicon Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + */
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +
+> +#include <asm/cputype.h>
+> +#include <asm/cp15.h>
+> +#include <asm/mcpm.h>
+> +
+> +#include "core.h"
+> +
+> +/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
+> + * 1 -- unreset; 0 -- reset
+> + */
+> +#define CORE_RESET_BIT(x)		(1 << x)
+> +#define NEON_RESET_BIT(x)		(1 << (x + 4))
+> +#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
+> +#define CLUSTER_L2_RESET_BIT		(1 << 8)
+> +#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
+> +
+> +/*
+> + * bits definition in SC_CPU_RESET_STATUS[x]
+> + * 1 -- reset status; 0 -- unreset status
+> + */
+> +#define CORE_RESET_STATUS(x)		(1 << x)
+> +#define NEON_RESET_STATUS(x)		(1 << (x + 4))
+> +#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
+> +#define CLUSTER_L2_RESET_STATUS		(1 << 8)
+> +#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
+> +#define CORE_WFI_STATUS(x)		(1 << (x + 16))
+> +#define CORE_WFE_STATUS(x)		(1 << (x + 20))
+> +#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
+> +
+> +#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
+> +#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
+> +#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
+> +
+> +#define FAB_SF_MODE			0x0c
+> +#define FAB_SF_INVLD			0x10
+> +
+> +/* bits definition in FB_SF_INVLD */
+> +#define FB_SF_INVLD_START		(1 << 8)
+> +
+> +#define HIP04_MAX_CLUSTERS		4
+> +#define HIP04_MAX_CPUS_PER_CLUSTER	4
+> +
+> +#define POLL_MSEC	10
+> +#define TIMEOUT_MSEC	1000
+> +
+> +struct hip04_secondary_cpu_data {
+> +	u32	bootwrapper_phys;
+> +	u32	bootwrapper_size;
+> +	u32	bootwrapper_magic;
+> +	u32	relocation_entry;
+> +	u32	relocation_size;
+> +};
+> +
+> +static void __iomem *relocation, *sysctrl, *fabric;
+> +static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
+> +static DEFINE_SPINLOCK(boot_lock);
+> +static struct hip04_secondary_cpu_data hip04_boot;
+> +static u32 fabric_phys_addr;
+> +
+> +static bool hip04_cluster_down(unsigned int cluster)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
+> +		if (hip04_cpu_table[cluster][i])
+> +			return false;
+> +	return true;
+> +}
+> +
+> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned long data, mask;
+> +
+> +	if (!relocation || !sysctrl)
+> +		return -ENODEV;
+> +	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irq(&boot_lock);
+> +
+> +	if (hip04_cpu_table[cluster][cpu]) {
+> +		hip04_cpu_table[cluster][cpu]++;
+> +		spin_unlock_irq(&boot_lock);
+> +		return 0;
+> +	}
+> +
+> +	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+> +	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+> +	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+> +	writel_relaxed(0, relocation + 12);
+> +
+> +	if (hip04_cluster_down(cluster)) {
+> +		data = CLUSTER_DEBUG_RESET_BIT;
+> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+> +		do {
+> +			mask = CLUSTER_DEBUG_RESET_STATUS;
+> +			data = readl_relaxed(sysctrl + \
+> +					     SC_CPU_RESET_STATUS(cluster));
+> +		} while (data & mask);
+> +	}
+> +
+> +	hip04_cpu_table[cluster][cpu]++;
+> +
+> +	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +	       CORE_DEBUG_RESET_BIT(cpu);
+> +	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+> +	spin_unlock_irq(&boot_lock);
+> +	msleep(POLL_MSEC);
+> +
+> +	return 0;
+> +}
+> +
+> +static void hip04_mcpm_power_down(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster, data = 0;
+> +	bool skip_reset = false;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	__mcpm_cpu_going_down(cpu, cluster);
+> +
+> +	spin_lock(&boot_lock);
+> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+> +	hip04_cpu_table[cluster][cpu]--;
+> +	if (hip04_cpu_table[cluster][cpu] == 1) {
+> +		/* A power_up request went ahead of us. */
+> +		skip_reset = true;
+> +	} else if (hip04_cpu_table[cluster][cpu] > 1) {
+> +		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
+> +		BUG();
+> +	}
+> +	spin_unlock(&boot_lock);
+> +
+> +	v7_exit_coherency_flush(louis);
+> +
+> +	__mcpm_cpu_down(cpu, cluster);
 
-sorry for letting this one slip through.
+What if there is a hip04_mcpm_power_up() being called on another CPU 
+right here?  There is a race that I illustrated in a previous email 
+which is still unresolved.
 
-I believe it is resolved by "ARM: shmobile: fix
-shmobile_smp_apmu_suspend_init build failure for !SUSPEND" from Arnd.
-I have asked the arm SoC folks to pull a branch including that fix.
+> +
+> +	if (!skip_reset) {
+> +		data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +		       CORE_DEBUG_RESET_BIT(cpu);
+> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
+> +	}
+> +}
+> +
+> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned int data, tries;
+> +
+> +	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
+> +	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
+> +
+> +	for (tries = 0; tries < TIMEOUT_MSEC / POLL_MSEC; tries++) {
+> +		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
+> +		if (!(data & CORE_RESET_STATUS(cpu))) {
+> +			msleep(POLL_MSEC);
+> +			continue;
+> +		}
+> +		return 0;
+> +	}
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static void hip04_mcpm_powered_up(void)
+> +{
+> +	if (!relocation)
+> +		return;
+> +	spin_lock(&boot_lock);
+> +	writel_relaxed(0, relocation);
+> +	writel_relaxed(0, relocation + 4);
+> +	writel_relaxed(0, relocation + 8);
+> +	writel_relaxed(0, relocation + 12);
+> +	spin_unlock(&boot_lock);
+> +}
+> +
+> +static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
+> +{
+> +	asm volatile ("			\n"
+> +	/* calculate fabric phys address */
+> +"	adr	r2, 2f			\n"
+> +"	ldmia	r2, {r1, r3}		\n"
+> +"	sub	r0, r2, r1		\n"
+> +"	add	r2, r0, r3		\n"
+> +"	ldr	r2, [r2]		\n"
 
-That pull request is
-"Third Round of Renesas ARM Based SoC Updates for v3.17"
+You may replace the above 2 instructions with "ldr r2, [r0, r3]".
+
+> +	/* get cluster id from MPIDR */
+> +"	mrc	p15, 0, r0, c0, c0, 5	\n"
+> +"	ubfx	r1, r0, #8, #8		\n"
+> +"	and	r1, r1, #0xf		\n"
+
+You don't need the "and" here.  It is implicit in ubfx.
+
+> +	/* 1 << cluster id */
+> +"	mov	r0, #1			\n"
+> +"	mov	r3, r0, lsl r1		\n"
+> +"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
+> +"	tst	r0, r3			\n"
+> +"	bxne	lr			\n"
+
+Instead of running all this code all the time, you could simply test r0 
+at the very beginning and if it is not equal to 1 then return 
+immediately. If it is 1 that means the CPU executing this code is the 
+first one to run in the cluster, in which case you also don't have to 
+test if the cluster snoop is already enabled here.
+
+> +"	orr	r1, r0, r3		\n"
+> +"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
+> +"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
+> +"	tst	r0, r3			\n"
+> +"	beq	1b			\n"
+> +"	bx	lr			\n"
+> +
+> +"	.align	2			\n"
+> +"2:	.word	.			\n"
+> +"	.word	fabric_phys_addr	\n"
+> +	);
+> +}
+
+Of course you will also have to enable the snoops for the current 
+cluster in hip04_cpu_table_init() as well.
+
+
+> +
+> +static const struct mcpm_platform_ops hip04_mcpm_ops = {
+> +	.power_up		= hip04_mcpm_power_up,
+> +	.power_down		= hip04_mcpm_power_down,
+> +	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
+> +	.powered_up		= hip04_mcpm_powered_up,
+> +};
+> +
+> +static bool __init hip04_cpu_table_init(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	if (cluster >= HIP04_MAX_CLUSTERS ||
+> +	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
+> +		pr_err("%s: boot CPU is out of bound!\n", __func__);
+> +		return false;
+> +	}
+> +	hip04_cpu_table[cluster][cpu] = 1;
+> +	return true;
+> +}
+> +
+> +static int __init hip04_mcpm_init(void)
+> +{
+> +	struct device_node *np, *np_fab;
+> +	struct resource fab_res;
+> +	int ret = -ENODEV;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
+> +	if (!np)
+> +		goto err;
+> +	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
+> +	if (!np_fab)
+> +		goto err;
+> +
+> +	if (of_property_read_u32(np, "bootwrapper-phys",
+> +				 &hip04_boot.bootwrapper_phys)) {
+> +		pr_err("failed to get bootwrapper-phys\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "bootwrapper-size",
+> +				 &hip04_boot.bootwrapper_size)) {
+> +		pr_err("failed to get bootwrapper-size\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "bootwrapper-magic",
+> +				 &hip04_boot.bootwrapper_magic)) {
+> +		pr_err("failed to get bootwrapper-magic\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "relocation-entry",
+> +				 &hip04_boot.relocation_entry)) {
+> +		pr_err("failed to get relocation-entry\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "relocation-size",
+> +				 &hip04_boot.relocation_size)) {
+> +		pr_err("failed to get relocation-size\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	relocation = ioremap(hip04_boot.relocation_entry,
+> +			     hip04_boot.relocation_size);
+> +	if (!relocation) {
+> +		pr_err("failed to map relocation space\n");
+> +		ret = -ENOMEM;
+> +		goto err;
+> +	}
+> +	sysctrl = of_iomap(np, 0);
+> +	if (!sysctrl) {
+> +		pr_err("failed to get sysctrl base\n");
+> +		ret = -ENOMEM;
+> +		goto err_sysctrl;
+> +	}
+> +	ret = of_address_to_resource(np_fab, 0, &fab_res);
+> +	if (ret) {
+> +		pr_err("failed to get fabric base phys\n");
+> +		goto err_fabric;
+> +	}
+> +	fabric_phys_addr = fab_res.start;
+> +	sync_cache_w(&fabric_phys_addr);
+> +	fabric = of_iomap(np_fab, 0);
+> +	if (!fabric) {
+> +		pr_err("failed to get fabric base\n");
+> +		ret = -ENOMEM;
+> +		goto err_fabric;
+> +	}
+> +
+> +	if (!hip04_cpu_table_init())
+> +		return -EINVAL;
+> +	ret = mcpm_platform_register(&hip04_mcpm_ops);
+> +	if (!ret) {
+> +		mcpm_sync_init(hip04_mcpm_power_up_setup);
+> +		pr_info("HiP04 MCPM initialized\n");
+> +	}
+> +	mcpm_smp_set_ops();
+> +	return ret;
+> +err_fabric:
+> +	iounmap(sysctrl);
+> +err_sysctrl:
+> +	iounmap(relocation);
+> +err:
+> +	return ret;
+> +}
+> +early_initcall(hip04_mcpm_init);
+> -- 
+> 1.9.1
+> 
+> 
