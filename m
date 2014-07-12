@@ -1,33 +1,30 @@
-From: xjq@rock-chips.com (Jianqun)
-Date: Sat, 12 Jul 2014 08:59:21 +0800
-Subject: [PATCH] ASoC: rockchips: fix build error
-In-Reply-To: <20140711134848.GX30458@sirena.org.uk>
-References: <1405084028-1209898-1-git-send-email-arnd@arndb.de>
- <20140711134848.GX30458@sirena.org.uk>
-Message-ID: <53C08869.5060408@rock-chips.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Fri, 11 Jul 2014 17:59:34 -0700
+Subject: [RFC/PATCH -next 00/21] Address sanitizer for kernel (kasan)
+ - dynamic memory error detector.
+In-Reply-To: <1404903678-8257-1-git-send-email-a.ryabinin@samsung.com>
+References: <1404903678-8257-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <53C08876.10209@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?07?11? 21:48, Mark Brown wrote:
-> On Fri, Jul 11, 2014 at 03:07:08PM +0200, Arnd Bergmann wrote:
->> The newly added rockchip_i2s driver is lacking an include of
->> linux/module.h, causing a build error in some cases:
+On 07/09/2014 04:00 AM, Andrey Ryabinin wrote:
 > 
-> A fix for this has already been applied.
+> Address sanitizer dedicates 1/8 of the low memory to the shadow memory and uses direct
+> mapping with a scale and offset to translate a memory address to its corresponding
+> shadow address.
 > 
-Thank you very much :), it's great help for a begainner.
+> Here is function to translate address to corresponding shadow address:
+> 
+>      unsigned long kasan_mem_to_shadow(unsigned long addr)
+>      {
+> 		return ((addr) >> KASAN_SHADOW_SCALE_SHIFT)
+>        	             + kasan_shadow_start - (PAGE_OFFSET >> KASAN_SHADOW_SCALE_SHIFT);
+>      }
+> 
+> where KASAN_SHADOW_SCALE_SHIFT = 3.
+> 
 
--- 
--------------
-? ? ? Jay
-Rockchip Electronics Co.Ltd
-****************************************************************************
-*IMPORTANT NOTICE:*This email is from Fuzhou Rockchip Electronics Co.,
-Ltd .The contents of this email and any attachments may contain
-information that is privileged, confidential and/or exempt from
-disclosure under applicable law and relevant NDA. If you are not the
-intended recipient, you are hereby notified that any disclosure,
-copying, distribution, or use of the information is STRICTLY PROHIBITED.
-Please immediately contact the sender as soon as possible and destroy
-the material in its entirety in any format. Thank you.
-****************************************************************************
+How does that work when memory is sparsely populated?
+
+	-hpa
