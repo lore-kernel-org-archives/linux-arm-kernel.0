@@ -1,74 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 09:46:17 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.17
-In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
-References: <cover.1404174157.git.horms+renesas@verge.net.au>
-Message-ID: <20140712164617.GE3954@quad.lixom.net>
+Date: Sat, 12 Jul 2014 09:48:30 -0700
+Subject: [GIT][for v3.17] pull request from mmp git tree
+In-Reply-To: <CAD6h2NRQJ3X8xt=0idbDPVb53DR0JHiVbiKqoE1hnM32aiD2LQ@mail.gmail.com>
+References: <CAD6h2NRQJ3X8xt=0idbDPVb53DR0JHiVbiKqoE1hnM32aiD2LQ@mail.gmail.com>
+Message-ID: <20140712164830.GF3954@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 09:28:47AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Jul 04, 2014 at 09:21:57PM +0800, Haojian Zhuang wrote:
+> Hi Arnd, Olof, Kevin,
 > 
-> Please consider these Second Round of Renesas ARM Based SoC Updates for v3.17.
+> Please help to merge pull request from mmp git tree.
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc-for-v3.17,
-> which I have already sent a pull-request for.
+> Best Regards
+> Haojian
 > 
-> This conflicts with other changes made to pm-r8a7790.c in the soc branch
-> of the renesas tree. A resolution can be found in the
-> renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
-> In short, the resulting includes should be:
-> 
-> #include <linux/kernel.h>
-> #include <linux/smp.h>
-> #include <asm/io.h>
-> #include "common.h"
-> #include "pm-rcar.h"
-> #include "r8a7790.h"
-> 
-> 
-> The following changes since commit 3ed66ec5ced8b801cb851b2b8548301df94f8f54:
-> 
->   ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile (2014-06-23 09:53:55 +0900)
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc2-for-v3.17
+>   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+> tags/mmp-for-v3.17
 > 
-> for you to fetch changes up to bfe4cfa8ae21628267f2b879b4396ee17ea4fd3a:
+> for you to fetch changes up to 02db444db1256341d14acb7813abd67ddd94c350:
 > 
->   ARM: shmobile: Allow r8a7791 to build non-SMP APMU code (2014-06-26 16:01:34 +0900)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC Updates for v3.17
-> 
-> * Suspend on non-SMP update for r8a7790
-> * Move r8a7791.h out of mach directory.
->   This is part of a multi-stage effort to move headers
->   out of that directory.
+>   ARM: mmp: remove duplicate SM_SCLK_SM_SCLK define (2014-07-04 21:19:08 +0800)
 > 
 > ----------------------------------------------------------------
-> Geert Uytterhoeven (1):
->       ARM: shmobile: Move r8a7791.h
+> mmp for v3.17
 
-Merged, but:
-
-This is a bit confused. You've now sent me three branches in this batch
-alone that contain these header moves. One for next/soc that contained
-nothing but a header move, one for cleanup that contained a whole bunch
-of them, and now yet another one in this combined branch.
-
-Please collect all of these in the cleanup branch, and make the soc branch
-build on top of that if needed to avoid conflicts, instead of spreading them
-out like this.
-
-This is also where the conflict showed up that you mentioned in the
-preceding pull request. To avoid that, I merged in your cleanup branch
-on top, so that this conflict doesn't surface all the way up like it
-otherwise would.
+Merged. Use better tag descriptions than this in the future.
 
 
 -Olof
