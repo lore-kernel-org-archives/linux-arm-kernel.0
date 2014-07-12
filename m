@@ -1,46 +1,38 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 12 Jul 2014 15:53:34 +0200
-Subject: [PATCH] ARM: shmobile: marzen: Consistently use tabs for indentation
-In-Reply-To: <cover.1405173109.git.horms+renesas@verge.net.au>
-References: <cover.1405173109.git.horms+renesas@verge.net.au>
-Message-ID: <08af64097d4c5cb17f9df4dadf80ed5f508db743.1405173109.git.horms+renesas@verge.net.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 12 Jul 2014 15:18:11 +0100
+Subject: [PATCH v2 2/3] ARM: Use include/asm-generic/io.h
+In-Reply-To: <201407121427.22668.arnd@arndb.de>
+References: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
+ <1405092672-18549-2-git-send-email-thierry.reding@gmail.com>
+ <20140711162422.GF16321@arm.com> <201407121427.22668.arnd@arndb.de>
+Message-ID: <ED7E6275-79B2-4610-9DA2-CFAC3D026798@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unify white space usage by consistently using tabs for indentation.
+On 12 Jul 2014, at 13:27, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7779-marzen.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> On Friday 11 July 2014, Catalin Marinas wrote:
+>> 
+>> On Fri, Jul 11, 2014 at 04:31:11PM +0100, Thierry Reding wrote:
+>>> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+>>> index a78562f21aab..ef54f5c8a7ae 100644
+>>> --- a/arch/arm/include/asm/io.h
+>>> +++ b/arch/arm/include/asm/io.h
+>> [...]
+>>> -#define iowrite16be(v,p) ({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+>>> -#define iowrite32be(v,p) ({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+>> 
+>> Aren't you losing the barrier semantics here? The generic iowrite*be()
+>> functions call __raw_write*() directly which don't have a barrier
+>> (write* accessors do).
+> 
+> Indeed, sorry for missing this. The generic implementation still makes sense for
+> include/asm-generic, but arm32 and arm64 must provide their own versions here.
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 20b1768..5745555 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -112,17 +112,17 @@
- };
- 
- &scif2 {
--       pinctrl-0 = <&scif2_pins>;
--       pinctrl-names = "default";
-+	pinctrl-0 = <&scif2_pins>;
-+	pinctrl-names = "default";
- 
--       status = "okay";
-+	status = "okay";
- };
- 
- &scif4 {
--       pinctrl-0 = <&scif4_pins>;
--       pinctrl-names = "default";
-+	pinctrl-0 = <&scif4_pins>;
-+	pinctrl-names = "default";
- 
--       status = "okay";
-+	status = "okay";
- };
- 
- &sdhi0 {
--- 
-2.0.0.rc2
+I think this would be the easiest. But the asm-generic/io.h needs some
+#ifndef iowrite16be checks.
+
+(in arm64 we missed the iowrite*be barriers completely, so not broken by
+this patch; Thierry could update arm64 as well with patch 3/3)
+
+Catalin
