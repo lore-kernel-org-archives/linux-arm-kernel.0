@@ -1,33 +1,33 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 11 Jul 2014 17:51:22 -0700
-Subject: [PATCH 2/2] tty: serial: fsl_lpuart: add 32-bit register
- interface support
-In-Reply-To: <1405057302-26041-3-git-send-email-jingchang.lu@freescale.com>
-References: <1405057302-26041-1-git-send-email-jingchang.lu@freescale.com>
- <1405057302-26041-3-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140712005122.GA31974@kroah.com>
+From: xjq@rock-chips.com (Jianqun)
+Date: Sat, 12 Jul 2014 08:59:21 +0800
+Subject: [PATCH] ASoC: rockchips: fix build error
+In-Reply-To: <20140711134848.GX30458@sirena.org.uk>
+References: <1405084028-1209898-1-git-send-email-arnd@arndb.de>
+ <20140711134848.GX30458@sirena.org.uk>
+Message-ID: <53C08869.5060408@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 01:41:42PM +0800, Jingchang Lu wrote:
-> This add the 32-bit register version LPUART support with big-endian
-> byte order.
+On 2014?07?11? 21:48, Mark Brown wrote:
+> On Fri, Jul 11, 2014 at 03:07:08PM +0200, Arnd Bergmann wrote:
+>> The newly added rockchip_i2s driver is lacking an include of
+>> linux/module.h, causing a build error in some cases:
 > 
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
->  drivers/tty/serial/fsl_lpuart.c | 653 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 643 insertions(+), 10 deletions(-)
+> A fix for this has already been applied.
+> 
+Thank you very much :), it's great help for a begainner.
 
-You didn't even test build this patch:
-
-  CC [M]  drivers/tty/serial/fsl_lpuart.o
-drivers/tty/serial/fsl_lpuart.c: In function ?lpuart_suspend?:
-drivers/tty/serial/fsl_lpuart.c:1856:22: error: ?lpuart32_reg? undeclared (first use in this function)
-   uart_suspend_port(&lpuart32_reg, &sport->port);
-                      ^
-
-No quicker way to make me grumpy...
-
-Please take some time to do this right.
-
-greg k-h
+-- 
+-------------
+? ? ? Jay
+Rockchip Electronics Co.Ltd
+****************************************************************************
+*IMPORTANT NOTICE:*This email is from Fuzhou Rockchip Electronics Co.,
+Ltd .The contents of this email and any attachments may contain
+information that is privileged, confidential and/or exempt from
+disclosure under applicable law and relevant NDA. If you are not the
+intended recipient, you are hereby notified that any disclosure,
+copying, distribution, or use of the information is STRICTLY PROHIBITED.
+Please immediately contact the sender as soon as possible and destroy
+the material in its entirety in any format. Thank you.
+****************************************************************************
