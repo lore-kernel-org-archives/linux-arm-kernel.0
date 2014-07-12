@@ -1,40 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Jul 2014 14:22:01 +0200
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140712093917.GD18601@arm.com>
- <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
-Message-ID: <201407121422.02078.arnd@arndb.de>
+Date: Sat, 12 Jul 2014 14:27:22 +0200
+Subject: [PATCH v2 2/3] ARM: Use include/asm-generic/io.h
+In-Reply-To: <20140711162422.GF16321@arm.com>
+References: <1405092672-18549-1-git-send-email-thierry.reding@gmail.com>
+ <1405092672-18549-2-git-send-email-thierry.reding@gmail.com>
+ <20140711162422.GF16321@arm.com>
+Message-ID: <201407121427.22668.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 July 2014, Rob Clark wrote:
-> >> Was there actually a good reason for having the device link to the
-> >> iommu rather than the other way around?  How much would people hate it
-> >> if I just ignore the generic bindings and use something that works for
-> >> me instead.  I mean, it isn't exactly like there is going to be .dts
-> >> re-use across different SoC's..  and at least with current IOMMU API
-> >> some sort of of_get_named_iommu() API doesn't really make sense.
-> >
-> > The thing is, if you end up ignoring the generic binding then we have two
-> > IOMMUs using the same (ARM SMMU) binding and it begs the question as to
-> > which is the more generic! I know we're keen to get this merged, but merging
-> > something that people won't use and calling it generic doesn't seem ideal
-> > either. We do, however, desperately need a generic binding.
+On Friday 11 July 2014, Catalin Marinas wrote:
 > 
-> yeah, ignoring the generic binding is not my first choice.  I'd rather
-> have something that works well for everyone.  But I wasn't really sure
-> if the current proposal was arbitrary, or if there are some
-> conflicting requirements between different platforms.
+> On Fri, Jul 11, 2014 at 04:31:11PM +0100, Thierry Reding wrote:
+> > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> > index a78562f21aab..ef54f5c8a7ae 100644
+> > --- a/arch/arm/include/asm/io.h
+> > +++ b/arch/arm/include/asm/io.h
+> [...]
+> > -#define iowrite16be(v,p) ({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+> > -#define iowrite32be(v,p) ({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+> 
+> Aren't you losing the barrier semantics here? The generic iowrite*be()
+> functions call __raw_write*() directly which don't have a barrier
+> (write* accessors do).
+> 
 
-The common case that needs to be simple is attaching one (master) device
-to an IOMMU using the shared global context for the purposes of implementing
-the dma-mapping API.
+Indeed, sorry for missing this. The generic implementation still makes sense for
+include/asm-generic, but arm32 and arm64 must provide their own versions here.
 
-The way that Thierry's binding does that is the obvious solution to this,
-and it mirrors what we do in practically every other subsystem. I definitely
-want the SMMU to change before anybody starts using it in a real system,
-which we fortunately do not have yet.
+An alternative would be to define
+
+#define iowrite32be(v, p) iowrite32(swab32(v), p)
+
+which is correct but can end up swapping multiple twice.
 
 	Arnd
