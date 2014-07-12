@@ -1,142 +1,127 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 11 Jul 2014 18:56:58 -0700
-Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
- gpio block
-In-Reply-To: <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
- <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
- <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
- <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
-Message-ID: <53C095EA.90000@codeaurora.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 11 Jul 2014 19:44:58 -0700
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+Message-ID: <53C0A12A.2060204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/14 02:53, Linus Walleij wrote:
-> On Wed, Jul 9, 2014 at 11:18 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
->> On Wed, Jul 9, 2014 at 1:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
->>> <bjorn.andersson@sonymobile.com> wrote:
->>>
->>> +- function:
->>> +       Usage: optional
->>> +       Value type: <string>
->>> +       Definition: Specify the alternative function to be configured for the
->>> +                   specified pins.  Valid values are:
->>> +                       "normal",
->>> +                       "paired",
->>> +                       "func1",
->>> +                       "func2",
->>> +                       "dtest1",
->>> +                       "dtest2",
->>> +                       "dtest3",
->>> +                       "dtest4"
->>> These are a bit ambigous, why doesn't the driver present functions that
->>> are more specific than "func1", "func2"? Or "dtest1"?
->> I agree, unfortunately I have only seen traces of the actual function matrix;
->> for pm8xxx I have no documentation and for pm8x41 they are only listed as
->> func[1-2] and dtest[1-4].
->>
->> Maybe if someone at Qualcomm could release such a list we could provide a
->> proper table instead.
-> I guess Stephen Boyd can help us. (?)
+On 07/11/2014 03:52 AM, Viresh Kumar wrote:
 
-Ok. "normal" is pretty much gpio mode, i.e. don't mux anything. "paired"
-is where we take the output of the gpio next to it and loop it back into
-this gpio (and vice versa). So gpio1 is paired with gpio2, gpio 3 is
-paired with gpio 4, etc. This allows us to make level translators by
-choosing different supply voltages for the paired gpios. "func1" and
-"func2" are used for muxing things internally. "dtest" is used to mux
-specific things out for testing purposes, not really used in any
-end-products but still useful while debugging. I can provide the
-function to pin mapping if necessary. There are lots of pmics.
+Just responding to one comment. The one about policy->cpu.
 
 >
->>>> +- bias-pull-up:
->>>> +       Usage: optional
->>>> +       Value type: <u32> (optional)
->>>> +       Definition: The specified pins should be configued as pull up. An
->>>> +                   optional argument can be used to configure the strength.
->>>> +                   Valid values are; as defined in
->>>> +                   <dt-bindings/pinctrl/qcom,pm8xxx-gpio.h>:
->>>> +                   1: 30uA                     (PM8XXX_GPIO_PULL_UP_30)
->>>> +                   2: 1.5uA                    (PM8XXX_GPIO_PULL_UP_1P5)
->>>> +                   3: 31.5uA                   (PM8XXX_GPIO_PULL_UP_31P5)
->>>> +                   4: 1.5uA + 30uA boost       (PM8XXX_GPIO_PULL_UP_1P5_30)
->>> Hm, I don't know of the internal kernel API or so, but I'm thinking that
->>> for the DT bindings, this definition should be generic in
->>> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>> and put in SI units like uA.
->> Totally agree with you; and this is already specified in pinctrl-binding.txt as
->> being Ohm.
->>
->> So I first did a spin with the strength as a separate property, but as that
->> because the only part that pinconf-generic didn't parse for me I merged it and
->> wanted your comment on it.
-> Yeah. And thinking of it.... how can it be uA? It has to be Ohms... it's a pull
-> up resistor thing after all. I suspect the uA value is just something like the
-> maximum current drawn through the pullup given a certain voltage?
+>>>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
 >
->>> So I would prefer:
+>>>>   static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
+>>>>   {
+>>>> -       unsigned int j;
+>>>> +       unsigned int j, first_cpu = cpumask_first(policy->related_cpus);
+>>>>          int ret = 0;
+>>>>
+>>>> -       for_each_cpu(j, policy->cpus) {
+>>>> +       for_each_cpu(j, policy->related_cpus) {
+>>>>                  struct device *cpu_dev;
+>>>>
+>>>> -               if (j == policy->cpu)
+>>>> +               if (j == first_cpu)
 >>>
->>> bias-pull-up = <30>;
->>>
->> Yeah, but that's the easy one ;)
+>>> why?
 >>
->> How do you say 1.5 or 31.5 and how do you differ that from 1.5 + 30 boot?
-> It needs to be set using Ohms.
+>> The first CPU is a cluster always own the real nodes.
 >
->>> for 30 uA. Maybe we want nA even? I'm uncertain about the proper granularity
->>> here :-/
+> What I meant was, why not use policy->cpu?
+>
+>>>> +static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
+>>>>   {
+>>>>          struct freq_attr **drv_attr;
+>>>> +       struct device *dev;
+>>>>          int ret = 0;
+>>>>
+>>>> +       dev = get_cpu_device(cpumask_first(policy->related_cpus));
+>>>> +       if (!dev)
+>>>> +               return -EINVAL;
+>>>> +
 >>>
->>> Magic enumerators 1,2,3,4 doesn't seem so good, that seems more like it's
->>> trying to match the magic value that is to be poked into a register or
->>> something like that.
->> The stuff going into the hardware is a value 0-3 for pull up; so these values
->> are "only" an enum with the additional benefit of saying "bias-pull-up;"
->> results in 30uA pull up which is the most commonly used form (hence being
->> optional).
-> What is the nominal voltage of these pins? GIven that you can figure
-> out the Ohms. And I suspect it to be something very close to N times
-> the resistance of a depleted transistor in this technology.
+>>> Why?
+>>
+>> I'm just always adding the real nodes to the first CPU in a cluster
+>> independent of which CPU gets added first. Makes it easier to know which
+>> ones to symlink. See comment next to policy->cpu for full context.
+>
+> Yeah, and that is the order in which CPUs will boot and cpufreq_add_dev()
+> will be called. So, isn't policy->cpu the right CPU always?
 
-I believe the nominal voltage changes depending on which supply you
-choose (power-source in this document). Basically the gpio can be
-connected to different regulators on the pmic so you can choose
-different voltages, i.e. 1.8V, 3.0V, 3.3V etc. Furthermore, some of the
-regulators you can choose have variable voltage, although it may not be
-variable enough to have much effect on this. So it would seem that the
-pull-up resistance would be directly affected by which power-source is
-chosen. Maybe we just shouldn't use the generic properties for this?
+No, the "first" cpu in a cluster doesn't need to be the first one to be 
+added. An example is 2x2 cluster system where the system is booted with 
+max cpus = 2 and then cpu3 could be onlined first by userspace.
 
-BTW, I see that power-source has made a comeback. What are the units? Is
-that in mV? If it is I'm slightly concerned that we're not accurately
-describing the hardware in cases where the voltage can actually be
-different. And I worry about configurations where we may have the same
-power source muxed into the gpio twice from different places on the
-pmic. Sometimes we do this and actually need to choose the "right" power
-source even though they're technically running at the same voltage (one
-may be slightly cleaner signal or something).
+>
+>>>> -       if (has_target()) {
+>>>> +       cpus = cpumask_weight(policy->cpus);
+>>>> +       policy->cpu = cpumask_first(policy->cpus);
+>>>
+>>> why update it at all? Also, as per your logic what if cpus == 0?
+>>
+>> Yeah, I didn't write it this way at first. But the governors are making
+>> the assumption that policy->cpu is always an online CPU. So, they try to
+>
+> Are you sure? I had a quick look and failed to see that..
+>
+>> queue work there and use data structs of that CPU (even if they free it in
+>> the STOP event since it went offline).
+>
+> So, it queues work on all policy->cpus, not policy->cpu.
+> And the data structures
+> are just allocated with a CPU number, its fine if its offline.
+>
+> And where are we freeing that stuff in STOP ?
+>
+> Sorry if I am really really tired and couldn't read it correctly.
 
->>>> +- drive-strength:
->>>> +       Usage: optional
->>>> +       Value type: <u32>
->>>> +       Definition: Selects the drive strength for the specified pins. Value
->>>> +                   drive strengths are:
->>>> +                       0: no   (PM8XXX_GPIO_STRENGTH_NO)
->>>> +                       1: high (PM8XXX_GPIO_STRENGTH_HIGH)
->>>> +                       2: medium       (PM8XXX_GPIO_STRENGTH_MED)
->>>> +                       3: low  (PM8XXX_GPIO_STRENGTH_LOW)
->>> I would really prefer to have these in mA, because the genric pinconf
->>> bindings say they should be! SI units are so much more understandable.
->> This is all the information to be found in the available documentation and
->> code. Maybe someone from Qualcomm can shed some light on it?
-> Stephen?
+Yeah, it is pretty convolution. But pretty much anywhere in the gov code 
+where policy->cpu is used could cause this. The specific crash I hit was 
+in this code:
 
-I've emailed the hardware engineers. I'm pretty sure this is the same
-story as the pull-up though. It varies depending on the input voltage. I
-hope to get more information soon.
+static void od_dbs_timer(struct work_struct *work)
+{
+	struct od_cpu_dbs_info_s *dbs_info =
+		container_of(work, struct od_cpu_dbs_info_s, cdbs.work.work);
+	unsigned int cpu = dbs_info->cdbs.cur_policy->cpu;
+
+======= CPU is policy->cpu here.
+
+	struct od_cpu_dbs_info_s *core_dbs_info = &per_cpu(od_cpu_dbs_info,
+			cpu);
+
+======= Picks the per CPU struct of an offline CPU
+
+<snip>
+
+	mutex_lock(&core_dbs_info->cdbs.timer_mutex);
+
+======= Dies trying to lock a destroyed mutex
+
+>
+>> Another option is to leave policy->cpu unchanged and then fix all the
+>> governors. But this patch would get even more complicated. So, we can
+>> leave this as is, or fix that up in a separate patch.
+>
+> Since we are simplifying it here, I think we should NOT change policy->cpu
+> at all. It will make life simple (probably).
+
+I agree, but then I would have to fix up the governors. In the interest 
+of keeping this patch small. I'll continue with what I'm doing and fix 
+it up in another patch.
+
+-Saravana
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
