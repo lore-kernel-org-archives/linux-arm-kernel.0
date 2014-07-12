@@ -1,49 +1,129 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 12 Jul 2014 12:55:08 +0200
-Subject: [PATCH] ARM: OMAP: generic: add call to of_clk_init()
-Message-ID: <1405162508-9835-1-git-send-email-zonque@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 12 Jul 2014 13:05:30 +0200
+Subject: [PATCH v2] ARM: Fix preemption disable in iwmmxt_task_enable()
+In-Reply-To: <1405069813-9270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1405069813-9270-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1405163130-3927-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed to instanciate fixed clocks in the DT.
+commit 431a84b1a4f7d1a0085d5b91330c5053cc8e8b12
+ ("ARM: 8034/1: Disable preemption in iwmmxt_task_enable()")
+introduced macros {inc,dec}_preempt_count to iwmmxt_task_enable
+to make it run with preemption disabled.
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
+Unfortunately, other functions in iwmmxt.S also use concan_{save,dump,load}
+sections located in iwmmxt_task_enable() to deal with iWMMXt coprocessor.
+This causes an unbalanced preempt_count due to excessive dec_preempt_count
+and destroyed return addresses in callers of concan_ labels due to a register
+collision:
+
+Linux version 3.16.0-rc3-00062-gd92a333-dirty (jef at armhf) (gcc version 4.8.3 (Debian 4.8.3-4) ) #5 PREEMPT Thu Jul 3 19:46:39 CEST 2014
+CPU: ARMv7 Processor [560f5815] revision 5 (ARMv7), cr=10c5387d
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+Machine model: SolidRun CuBox
+...
+PJ4 iWMMXt v2 coprocessor enabled.
+...
+Unable to handle kernel paging request at virtual address fffffffe
+pgd = bb25c000
+[fffffffe] *pgd=3bfde821, *pte=00000000, *ppte=00000000
+Internal error: Oops: 80000007 [#1] PREEMPT ARM
+Modules linked in:
+CPU: 0 PID: 62 Comm: startpar Not tainted 3.16.0-rc3-00062-gd92a333-dirty #5
+task: bb230b80 ti: bb256000 task.ti: bb256000
+PC is at 0xfffffffe
+LR is at iwmmxt_task_copy+0x44/0x4c
+pc : [<fffffffe>]    lr : [<800130ac>]    psr: 40000033
+sp : bb257de8  ip : 00000013  fp : bb257ea4
+r10: bb256000  r9 : fffffdfe  r8 : 76e898e6
+r7 : bb257ec8  r6 : bb256000  r5 : 7ea12760  r4 : 000000a0
+r3 : ffffffff  r2 : 00000003  r1 : bb257df8  r0 : 00000000
+Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
+Control: 10c5387d  Table: 3b25c019  DAC: 00000015
+Process startpar (pid: 62, stack limit = 0xbb256248)
+
+This patch fixes the issue by moving concan_{save,dump,load} into separate
+code sections and make iwmmxt_task_enable() call them in the same way the
+other functions use concan_ symbols. The test for valid ownership is moved
+to concan_save and is safe for the other user of it, iwmmxt_task_disable().
+The register collision is also resolved by moving concan_ symbols as
+{inc,dec}_preempt_count are now local to iwmmxt_task_enable().
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reported-by: Jean-Francois Moine <moinejf@free.fr>
+Fixes: 431a84b1a4f7 ("ARM: 8034/1: Disable preemption in iwmmxt_task_enable()")
 ---
- arch/arm/mach-omap2/board-generic.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+The offending commit was intoduced past v3.15-rc1 and the corresponding fix
+should also be queued up for stable v3.15+
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 5606fa2..39f154a 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -15,6 +15,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
-+#include <linux/clk-provider.h>
+Changelog
+v1->v2:
+- return immediately from concan_ instead of branch to 3f, i.e. replace
+  'beq 3f' with 'moveq pc, lr' (Suggested by Catalin Marinas)
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Jean-Francois Moine <moinejf@free.fr>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/kernel/iwmmxt.S | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index a5599cfc43cb..2b32978ae905 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -94,13 +94,19 @@ ENTRY(iwmmxt_task_enable)
  
- #include <asm/mach/arch.h>
+ 	mrc	p15, 0, r2, c2, c0, 0
+ 	mov	r2, r2				@ cpwait
++	bl	concan_save
  
-@@ -33,6 +34,11 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ }
- };
+-	teq	r1, #0				@ test for last ownership
+-	mov	lr, r9				@ normal exit from exception
+-	beq	concan_load			@ no owner, skip save
++#ifdef CONFIG_PREEMPT_COUNT
++	get_thread_info r10
++#endif
++4:	dec_preempt_count r10, r3
++	mov	pc, r9				@ normal exit from exception
  
-+static struct of_device_id clk_match[] __initdata = {
-+	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-+	{ }
-+};
+ concan_save:
+ 
++	teq	r1, #0				@ test for last ownership
++	beq	concan_load			@ no owner, skip save
 +
- static void __init omap_generic_init(void)
- {
- 	omapdss_early_init_of();
-@@ -40,6 +46,8 @@ static void __init omap_generic_init(void)
- 	pdata_quirks_init(omap_dt_match_table);
+ 	tmrc	r2, wCon
  
- 	omapdss_init_of();
-+
-+	of_clk_init(clk_match);
- }
+ 	@ CUP? wCx
+@@ -138,7 +144,7 @@ concan_dump:
+ 	wstrd	wR15, [r1, #MMX_WR15]
  
- #ifdef CONFIG_SOC_OMAP2420
+ 2:	teq	r0, #0				@ anything to load?
+-	beq	3f
++	moveq	pc, lr				@ if not, return
+ 
+ concan_load:
+ 
+@@ -171,14 +177,9 @@ concan_load:
+ 	@ clear CUP/MUP (only if r1 != 0)
+ 	teq	r1, #0
+ 	mov 	r2, #0
+-	beq	3f
+-	tmcr	wCon, r2
++	moveq	pc, lr
+ 
+-3:
+-#ifdef CONFIG_PREEMPT_COUNT
+-	get_thread_info r10
+-#endif
+-4:	dec_preempt_count r10, r3
++	tmcr	wCon, r2
+ 	mov	pc, lr
+ 
+ /*
 -- 
-1.9.3
+2.0.0
