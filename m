@@ -1,54 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 12 Jul 2014 15:53:17 +0200
-Subject: [PATCH] ARM: shmobile: Remove opps table check for cpufreq
-In-Reply-To: <cover.1405172884.git.horms+renesas@verge.net.au>
-References: <cover.1405172884.git.horms+renesas@verge.net.au>
-Message-ID: <e423d12cbcb9576785e891617888f627f1f57bf4.1405172884.git.horms+renesas@verge.net.au>
+Date: Sat, 12 Jul 2014 15:53:23 +0200
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Defconfig Updates for
+ v3.17
+Message-ID: <cover.1405173007.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This patch is based on feedback from Viresh Kumar.
-Since cpufreq-cpu0 driver has already check opp table, there is no
-need to same check in mach-shmobile.
+Please consider these third round of Renesas ARM based SoC defconfig updates for v3.17.
 
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/cpufreq.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig2-for-v3.17,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
-index e2c868f..8a24b2b 100644
---- a/arch/arm/mach-shmobile/cpufreq.c
-+++ b/arch/arm/mach-shmobile/cpufreq.c
-@@ -8,24 +8,10 @@
-  * for more details.
-  */
- 
--#include <linux/of.h>
--#include <linux/of_device.h>
- #include <linux/platform_device.h>
- 
- int __init shmobile_cpufreq_init(void)
- {
--	struct device_node *np;
--
--	np = of_cpu_device_node_get(0);
--	if (np == NULL) {
--		pr_err("failed to find cpu0 node\n");
--		return 0;
--	}
--
--	if (of_get_property(np, "operating-points", NULL))
--		platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
--
--	of_node_put(np);
--
-+	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
- 	return 0;
- }
--- 
-2.0.0.rc2
+
+The following changes since commit c61010050d3baa3e1a3964bec7e62437d21107c6:
+
+  ARM: shmobile: Enable genmai board in multiplatform defconfig (2014-06-25 16:46:31 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-defconfig3-for-v3.17
+
+for you to fetch changes up to 8cbf869a0a278c4d39e50daa4f4101b394a72a93:
+
+  ARM: shmobile: Enable R-Car Gen 2 PCIe in shmobile_defconfig (2014-07-09 10:44:12 +0200)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC Defconfig Updates for v3.17
+
+* Enable R-Car Gen 2 PCIe in shmobile_defconfig
+
+----------------------------------------------------------------
+Simon Horman (1):
+      ARM: shmobile: Enable R-Car Gen 2 PCIe in shmobile_defconfig
+
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
