@@ -1,39 +1,47 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Jul 2014 21:28:55 +0200
-Subject: [PATCH 2/7] ARM: dts: rockchip: add tps65910 regulator for bqcurie2
+Date: Sat, 12 Jul 2014 21:29:30 +0200
+Subject: [PATCH 3/7] ARM: dts: add i2c and regulator nodes to rk3188-radxarock
 In-Reply-To: <16344051.ZPa9bzz4Fj@diego>
 References: <16344051.ZPa9bzz4Fj@diego>
-Message-ID: <1964418.AtfHtuR7W0@diego>
+Message-ID: <1595980.jcnCXXlPVU@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Curie2 uses a tps659102 as its main pmic, so add the i2c1 and tps65910
-node as well as define the used voltages and regulator-names according to
-the schematics.
+From: Beniamino Galvani <b.galvani@gmail.com>
 
-Also fix the supply of the sd0 regulator, as it is supplied by the vio reg.
+This enables the 2nd i2c bus and adds the act8846 pmic as device.
 
+Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a-bqcurie2.dts | 93 ++++++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
+ arch/arm/boot/dts/rk3188-radxarock.dts | 117 
++++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index afb3273..4174ff8 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -50,6 +50,7 @@
- 			regulator-max-microvolt = <3000000>;
- 			gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
- 			startup-delay-us = <100000>;
-+			vin-supply = <&vio_reg>;
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-
+radxarock.dts
+index a5eee55..d4d9f94 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -77,5 +77,122 @@
+ 			};
  		};
  
- 		dwmmc at 10214000 { /* sdmmc */
-@@ -108,3 +109,95 @@
- 		};
- 	};
- };
++		pinctrl at 20008000 {
++			pcfg_output_low: pcfg_output_low {
++				output-low;
++			};
++
++			act8846 {
++				act8846_dvs0_ctl: act8846-dvs0-ctl {
++					rockchip,pins = <RK_GPIO3 27 RK_FUNC_GPIO 
+&pcfg_output_low>;
++				};
++			};
++		};
++
++	};
++};
 +
 +&i2c1 {
 +	pinctrl-names = "default";
@@ -42,89 +50,102 @@ index afb3273..4174ff8 100644
 +	status = "okay";
 +	clock-frequency = <400000>;
 +
-+	tps: tps at 2d {
-+		reg = <0x2d>;
++	act8846: act8846 at 5a {
++		compatible = "active-semi,act8846";
++		reg = <0x5a>;
++		status = "okay";
 +
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&act8846_dvs0_ctl>;
 +	};
 +};
 +
-+#include "tps65910.dtsi"
-+
-+&tps {
-+	vcc5-supply = <&vio_reg>;
-+	vcc6-supply = <&vio_reg>;
-+
++&act8846 {
 +	regulators {
-+		vrtc_reg: regulator at 0 {
-+			regulator-name = "vcc_rtc";
++		vcc_ddr: REG1 {
++			regulator-name = "VCC_DDR";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
 +			regulator-always-on;
 +		};
 +
-+		vio_reg: regulator at 1 {
-+			regulator-name = "vcc_io";
++		vdd_log: REG2 {
++			regulator-name = "VDD_LOG";
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
 +			regulator-always-on;
 +		};
 +
-+		vdd1_reg: regulator at 2 {
-+			regulator-name = "vdd_arm";
-+			regulator-min-microvolt = <600000>;
-+			regulator-max-microvolt = <1500000>;
-+			regulator-boot-on;
++		vdd_arm: REG3 {
++			regulator-name = "VDD_ARM";
++			regulator-min-microvolt = <875000>;
++			regulator-max-microvolt = <1300000>;
 +			regulator-always-on;
 +		};
 +
-+		vdd2_reg: regulator at 3 {
-+			regulator-name = "vcc_ddr";
-+			regulator-min-microvolt = <600000>;
-+			regulator-max-microvolt = <1500000>;
-+			regulator-boot-on;
++		vcc_io: REG4 {
++			regulator-name = "VCC_IO";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
 +			regulator-always-on;
 +		};
 +
-+		/* vdd3_reg is not connected */
-+
-+		vdig1_reg: regulator at 5 {
-+			regulator-name = "vcc18_cif";
++		vdd_10: REG5 {
++			regulator-name = "VDD_10";
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
 +			regulator-always-on;
 +		};
 +
-+		vdig2_reg: regulator at 6 {
-+			regulator-name = "vdd_11";
++		vdd_hdmi: REG6 {
++			regulator-name = "VDD_HDMI";
++			regulator-min-microvolt = <2500000>;
++			regulator-max-microvolt = <2500000>;
 +			regulator-always-on;
 +		};
 +
-+		vpll_reg: regulator at 7 {
-+			regulator-name = "vcc_25";
++		vcc18: REG7 {
++			regulator-name = "VCC_18";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
 +			regulator-always-on;
 +		};
 +
-+		vdac_reg: regulator at 8 {
-+			regulator-name = "vcc_18";
++		vcca_33: REG8 {
++			regulator-name = "VCCA_33";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
 +			regulator-always-on;
 +		};
 +
-+		vaux1_reg: regulator at 9 {
-+			regulator-name = "vcc25_hdmi";
++		vcc_rmii: REG9 {
++			regulator-name = "VCC_RMII";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
 +			regulator-always-on;
 +		};
 +
-+		vaux2_reg: regulator at 10 {
-+			regulator-name = "vcca_33";
++		vccio_wl: REG10 {
++			regulator-name = "VCCIO_WL";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
 +			regulator-always-on;
 +		};
 +
-+		vaux33_reg: regulator at 11 {
-+			regulator-name = "vcc_tp";
++		vcc_18: REG11 {
++			regulator-name = "VCC18_IO";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
 +			regulator-always-on;
 +		};
 +
-+		vmmc_reg: regulator at 12 {
-+			regulator-name = "vcc28_cif";
++		vcc28: REG12 {
++			regulator-name = "VCC_28";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <2800000>;
 +			regulator-always-on;
 +		};
-+	};
-+};
+ 	};
+ };
 -- 
 1.9.0
