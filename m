@@ -1,47 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 09:36:05 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC r8a7779
- Multiplatform Updates for v3.17
-In-Reply-To: <cover.1404173506.git.horms+renesas@verge.net.au>
-References: <cover.1404173506.git.horms+renesas@verge.net.au>
-Message-ID: <20140712163605.GC3954@quad.lixom.net>
+Date: Sat, 12 Jul 2014 09:37:49 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC soc-cleanup
+ Updates for v3.17
+In-Reply-To: <cover.1404173049.git.horms+renesas@verge.net.au>
+References: <cover.1404173049.git.horms+renesas@verge.net.au>
+Message-ID: <20140712163749.GD3954@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 09:28:28AM +0900, Simon Horman wrote:
+On Tue, Jul 01, 2014 at 09:28:37AM +0900, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Second Round of Renesas ARM Based SoC r8a7779
-> Multiplatform Updates for v3.17o.
+> Please consider these Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17.
 > 
 > This pull request is based on the previous round of
-> such requests, tagged as renesas-r8a7779-multiplatform-for-v3.17,
+> such requests, tagged as renesas-soc-cleanup-for-v3.17,
 > which I have already sent a pull-request for.
 > 
-> I have applied this clean-up change to a non-cleanup branch
-> to avoid adding conflicts that were known (to me) at the
-> time of queuing up this change.
+> This conflicts with other changes made to pm-r8a7790.c in the soc branch
+> of the renesas tree. A resolution can be found in the
+> renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
+> 
+> In short, the resulting includes should be:
+> 
+> #include <linux/kernel.h>
+> #include <linux/smp.h>
+> #include <asm/io.h>
+> #include "common.h"
+> #include "pm-rcar.h"
+> #include "r8a7790.h"
 > 
 > 
-> The following changes since commit c1a0f9932b66b2298163c31f8ac3f2844476e1c2:
+> The following changes since commit d83fa4c9c27c4d8612e39e99506b5420fa05b58b:
 > 
->   ARM: shmobile: marzen: Do not use workaround for scif devices (2014-06-17 19:56:37 +0900)
+>   ARM: shmobile: Remove unused r8a7790_init_early() (2014-06-17 19:50:35 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-r8a7779-multiplatform2-for-v3.17
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-cleanup2-for-v3.17
 > 
-> for you to fetch changes up to 1b55353c9214788b0d0797a5fd4585af1557a12c:
+> for you to fetch changes up to 113522ee3034427472bcb4b8665833719809b31a:
 > 
->   ARM: shmobile: Move r8a7779.h (2014-06-25 16:52:39 +0900)
+>   ARM: shmobile: Move sh7372.h (2014-06-25 16:50:00 +0900)
 > 
 > ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC r8a7779-multiplatform Updates for v3.17
+> Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17
 > 
-> * Move r8a7779.h out of mach directory.
+> * Move SOC-specific headers out of mach directory.
 >   This is part of a multi-stage effort to move headers
 >   out of that directory.
 
-Merged, thanks.
+Merged, but I didn't notice any conflict here. I might have resolved it
+in the past already.
+
 
 -Olof
