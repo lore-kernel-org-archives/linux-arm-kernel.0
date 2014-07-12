@@ -1,74 +1,27 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Jul 2014 21:31:15 +0200
-Subject: [PATCH 7/7] ARM: dts: rockchip: add saradc nodes
-In-Reply-To: <16344051.ZPa9bzz4Fj@diego>
-References: <16344051.ZPa9bzz4Fj@diego>
-Message-ID: <4866856.TxetFWNmpJ@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 12 Jul 2014 20:44:16 +0100
+Subject: [GIT PULL] Samsung cleanup for S5P SoCs for 3.17
+In-Reply-To: <20140712165948.GA10012@quad.lixom.net>
+References: <53BB2658.4050808@samsung.com>
+ <20140712165948.GA10012@quad.lixom.net>
+Message-ID: <20140712194416.GA6800@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds devicetree nodes for the SAR A/D converter including the board
-specific regulator references for the two boards currently supported.
+On Sat, Jul 12, 2014 at 09:59:48AM -0700, Olof Johansson wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3066a-bqcurie2.dts |  5 +++++
- arch/arm/boot/dts/rk3188-radxarock.dts |  5 +++++
- arch/arm/boot/dts/rk3xxx.dtsi          | 11 +++++++++++
- 3 files changed, 21 insertions(+)
+> I've merged these in. I noticed lack of acked-by from Mark Brown, so I pinged
+> him on IRC about it and the branch is currently at the top so it's easy to drop
+> in case he has objections (cc:d here too).
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index 4174ff8..d90a058 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -83,6 +83,11 @@
- 			};
- 		};
- 
-+		saradc: saradc at 2006c000 {
-+			status = "okay";
-+			vref-supply = <&vpll_reg>;
-+		};
-+
- 		gpio-keys {
- 			compatible = "gpio-keys";
- 			#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index f277237..19d45b4 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -52,6 +52,11 @@
- 			vin-supply = <&vcc_io>;
- 		};
- 
-+		saradc: saradc at 2006c000 {
-+			status = "okay";
-+			vref-supply = <&vcc18>;
-+		};
-+
- 		gpio-keys {
- 			compatible = "gpio-keys";
- 			#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 1623e21..69d866a 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -261,5 +261,16 @@
- 			clocks = <&cru PCLK_PWM23>;
- 			status = "disabled";
- 		};
-+
-+		saradc at 2006c000 {
-+			compatible = "rockchip,saradc";
-+			reg = <0x2006c000 0x100>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
-+			clock-names = "saradc", "apb_pclk";
-+			#io-channel-cells = <1>;
-+			clock-frequency = <1000000>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.9.0
+Don't know if I've seen these changes (though IIRC they might've gone to
+the work account).  I suspect we're going to get some conflicts since
+we've also got other changes going on in ASoC so it is probably going to
+be easier to merge at least that patch via ASoC.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140712/fb4e0741/attachment.sig>
