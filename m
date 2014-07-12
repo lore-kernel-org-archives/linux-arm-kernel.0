@@ -1,22 +1,31 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 13 Jul 2014 00:13:57 +0200
-Subject: [PATCHv2 01/10] ARM: dts: OMAP2+: Add mailbox fifo and user
- information
-In-Reply-To: <1405115083-52977-2-git-send-email-s-anna@ti.com>
-References: <1405115083-52977-1-git-send-email-s-anna@ti.com>
- <1405115083-52977-2-git-send-email-s-anna@ti.com>
-Message-ID: <20140712221357.GA17930@amd.pavel.ucw.cz>
+Date: Sun, 13 Jul 2014 00:16:12 +0200
+Subject: [PATCHv2 2/5] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <1405116252-53612-3-git-send-email-s-anna@ti.com>
+References: <1405116252-53612-1-git-send-email-s-anna@ti.com>
+ <1405116252-53612-3-git-send-email-s-anna@ti.com>
+Message-ID: <20140712221612.GB17930@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2014-07-11 16:44:34, Suman Anna wrote:
-> The number of mailbox fifos and users (IP interrupts) are added
-> to the Mailbox DT nodes on OMAP2420, OMAP2430, OMAP3, and OMAP5
-> family of SoCs through the DT properties "ti,mbox-num-fifos" and
-> "ti,mbox-num-users" properties. This data represents the same data
-> that used to be represented in hwmod attribute data through the
-> .num_fifos and .num_users fields previously.
+On Fri 2014-07-11 17:04:09, Suman Anna wrote:
+> Logic has been added to the OMAP2+ mailbox code to parse the
+> mailbox dt nodes and construct the different sub-mailboxes
+> associated with the instance. The DT representation of the
+> sub-mailbox devices is different from legacy platform data
+> representation to allow flexibility of interrupt configuration
+> between Tx and Rx fifos (to also possibly allow simplex devices
+> in the future). The DT representation gathers similar information
+> that was being passed previously through the platform data, except
+> for the number of fifos, interrupts and interrupt type information,
+> which are gathered through driver compatible match data.
 > 
+> The non-DT support has to be maintained for now to not break
+> OMAP3 legacy boot, and the legacy-style code will be cleaned
+> up once OMAP3 is also converted to DT-boot only.
+> 
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
 > Signed-off-by: Suman Anna <s-anna@ti.com>
 
 Acked-by: Pavel Machek <pavel@ucw.cz>
