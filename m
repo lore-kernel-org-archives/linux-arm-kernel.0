@@ -1,12 +1,33 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Sat, 12 Jul 2014 01:41:42 -0400
-Subject: FIX ME in pgtable.h
-Message-ID: <CAPDOMVg2-B1=PkZX05jpFUorbygfjtYt=qm-6L-aiDhYZ-T=DQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 12 Jul 2014 08:50:43 +0200
+Subject: [PATCH v2 repost] serial: sh-sci: Add device tree support for
+ r8a7{778,740,3a4} and sh73a0
+In-Reply-To: <20140712004451.GA9549@kroah.com>
+References: <20140711091107.GA25710@verge.net.au>
+ <20140712004451.GA9549@kroah.com>
+Message-ID: <20140712065040.GB24129@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a fix me message I am hitting with cscope on line 317 of this
-file about  #define kern_addr_valid(addr)   (1) not being correct.
-I am wondering what value this should be set to. Thanks for the advice
-so I can remove this fix me from the kernel.
-Cheers Nick
+On Fri, Jul 11, 2014 at 05:44:51PM -0700, Greg Kroah-Hartman wrote:
+> On Fri, Jul 11, 2014 at 11:11:08AM +0200, Simon Horman wrote:
+> > Simply document new compat strings.
+> > There appears to be no need for a driver updates.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > --
+> > v2
+> > * Added r8a73a4, r8a7740 and sh73a0 support
+> > 
+> > Repost to Greg KH.
+> > 
+> > Greg, I am hoping to get the platform side of this change included in v3.16.
+> 
+> Isn't it a bit late for 3.16?  I'll go add this to my 3.16 tree, as it's
+> just a .txt file, and leave the fighting over new code to the other
+> maintainers :)
+
+Thanks.
+
+In order to avoid fighting I'll queue up the code changes for v3.17.
