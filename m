@@ -1,151 +1,62 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Jul 2014 21:29:30 +0200
-Subject: [PATCH 3/7] ARM: dts: add i2c and regulator nodes to rk3188-radxarock
+Date: Sat, 12 Jul 2014 21:29:55 +0200
+Subject: [PATCH 4/7] ARM: dts: rk3188-radxarock: enable sd-card slot
 In-Reply-To: <16344051.ZPa9bzz4Fj@diego>
 References: <16344051.ZPa9bzz4Fj@diego>
-Message-ID: <1595980.jcnCXXlPVU@diego>
+Message-ID: <1714076.jNfxIcBree@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Beniamino Galvani <b.galvani@gmail.com>
+The Radxa Rock contains one sd-card slot. Add the supplying regulator
+and enable its dw_mmc node.
 
-This enables the 2nd i2c bus and adds the act8846 pmic as device.
-
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3188-radxarock.dts | 117 
-+++++++++++++++++++++++++++++++++
- 1 file changed, 117 insertions(+)
+ arch/arm/boot/dts/rk3188-radxarock.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-
-radxarock.dts
-index a5eee55..d4d9f94 100644
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index d4d9f94..f277237 100644
 --- a/arch/arm/boot/dts/rk3188-radxarock.dts
 +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -77,5 +77,122 @@
+@@ -42,6 +42,16 @@
+ 			status = "okay";
+ 		};
+ 
++		vcc_sd0: sdmmc-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "sdmmc-supply";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio3 1 GPIO_ACTIVE_LOW>;
++			startup-delay-us = <100000>;
++			vin-supply = <&vcc_io>;
++		};
++
+ 		gpio-keys {
+ 			compatible = "gpio-keys";
+ 			#address-cells = <1>;
+@@ -77,6 +87,21 @@
  			};
  		};
  
-+		pinctrl at 20008000 {
-+			pcfg_output_low: pcfg_output_low {
-+				output-low;
++		dwmmc at 10214000 {
++			num-slots = <1>;
++			status = "okay";
++
++			pinctrl-names = "default";
++			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
++			vmmc-supply = <&vcc_sd0>;
++
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++				disable-wp;
 +			};
-+
-+			act8846 {
-+				act8846_dvs0_ctl: act8846-dvs0-ctl {
-+					rockchip,pins = <RK_GPIO3 27 RK_FUNC_GPIO 
-&pcfg_output_low>;
-+				};
-+			};
 +		};
 +
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	act8846: act8846 at 5a {
-+		compatible = "active-semi,act8846";
-+		reg = <0x5a>;
-+		status = "okay";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&act8846_dvs0_ctl>;
-+	};
-+};
-+
-+&act8846 {
-+	regulators {
-+		vcc_ddr: REG1 {
-+			regulator-name = "VCC_DDR";
-+			regulator-min-microvolt = <1200000>;
-+			regulator-max-microvolt = <1200000>;
-+			regulator-always-on;
-+		};
-+
-+		vdd_log: REG2 {
-+			regulator-name = "VDD_LOG";
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1000000>;
-+			regulator-always-on;
-+		};
-+
-+		vdd_arm: REG3 {
-+			regulator-name = "VDD_ARM";
-+			regulator-min-microvolt = <875000>;
-+			regulator-max-microvolt = <1300000>;
-+			regulator-always-on;
-+		};
-+
-+		vcc_io: REG4 {
-+			regulator-name = "VCC_IO";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		vdd_10: REG5 {
-+			regulator-name = "VDD_10";
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1000000>;
-+			regulator-always-on;
-+		};
-+
-+		vdd_hdmi: REG6 {
-+			regulator-name = "VDD_HDMI";
-+			regulator-min-microvolt = <2500000>;
-+			regulator-max-microvolt = <2500000>;
-+			regulator-always-on;
-+		};
-+
-+		vcc18: REG7 {
-+			regulator-name = "VCC_18";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+
-+		vcca_33: REG8 {
-+			regulator-name = "VCCA_33";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		vcc_rmii: REG9 {
-+			regulator-name = "VCC_RMII";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		vccio_wl: REG10 {
-+			regulator-name = "VCCIO_WL";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		vcc_18: REG11 {
-+			regulator-name = "VCC18_IO";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+
-+		vcc28: REG12 {
-+			regulator-name = "VCC_28";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			regulator-always-on;
-+		};
- 	};
- };
+ 		pinctrl at 20008000 {
+ 			pcfg_output_low: pcfg_output_low {
+ 				output-low;
 -- 
 1.9.0
