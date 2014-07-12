@@ -1,57 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 09:37:49 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC soc-cleanup
- Updates for v3.17
-In-Reply-To: <cover.1404173049.git.horms+renesas@verge.net.au>
-References: <cover.1404173049.git.horms+renesas@verge.net.au>
-Message-ID: <20140712163749.GD3954@quad.lixom.net>
+From: dann.frazier@canonical.com (Dann Frazier)
+Date: Sat, 12 Jul 2014 10:40:35 -0600
+Subject: [PATCH 2/2] arm64: dts: Add PMU node for APM X-Gene Storm SOC
+In-Reply-To: <CACVXFVNpy3PM0FYO68afs_ffBErTWAOR2u9w0VNppp7RjD-0xg@mail.gmail.com>
+References: <1395308847-16317-1-git-send-email-vkale@apm.com>
+ <1395308847-16317-3-git-send-email-vkale@apm.com>
+ <CACVXFVMiOvV=CytiaLFgEdt3_f7frJ6afjz39iLhafOhvJ0m7g@mail.gmail.com>
+ <53A8F388.80101@redhat.com>
+ <CACVXFVNpy3PM0FYO68afs_ffBErTWAOR2u9w0VNppp7RjD-0xg@mail.gmail.com>
+Message-ID: <CALdTtnsBWHHTbzFV9U2m+rdpgYCQG4CrS72eZ3i_Z_7pQQktSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 09:28:37AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc-cleanup-for-v3.17,
-> which I have already sent a pull-request for.
-> 
-> This conflicts with other changes made to pm-r8a7790.c in the soc branch
-> of the renesas tree. A resolution can be found in the
-> renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
-> 
-> In short, the resulting includes should be:
-> 
-> #include <linux/kernel.h>
-> #include <linux/smp.h>
-> #include <asm/io.h>
-> #include "common.h"
-> #include "pm-rcar.h"
-> #include "r8a7790.h"
-> 
-> 
-> The following changes since commit d83fa4c9c27c4d8612e39e99506b5420fa05b58b:
-> 
->   ARM: shmobile: Remove unused r8a7790_init_early() (2014-06-17 19:50:35 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-cleanup2-for-v3.17
-> 
-> for you to fetch changes up to 113522ee3034427472bcb4b8665833719809b31a:
-> 
->   ARM: shmobile: Move sh7372.h (2014-06-25 16:50:00 +0900)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17
-> 
-> * Move SOC-specific headers out of mach directory.
->   This is part of a multi-stage effort to move headers
->   out of that directory.
+On Tue, Jun 24, 2014 at 1:00 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> Hi Jon and Vinayak,
+>
+> On Tue, Jun 24, 2014 at 11:42 AM, Jon Masters <jcm@redhat.com> wrote:
+>> On 06/23/2014 10:47 PM, Ming Lei wrote:
+>>
+>>> On Thu, Mar 20, 2014 at 5:47 PM, Vinayak Kale <vkale@apm.com> wrote:
+>>>> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+>>>>
+>>>> Please note that this patch has dependancy on a GIC driver patch [1] which is
+>>>> yet to be approved by maintainers.
+>>>>
+>>>> [1]- https://lkml.org/lkml/2014/2/27/605
+>>>> (irqchip:gic: change access of gicc_ctrl register to read modify write)
+>>
+>>> No matter if Feng Kan's gic patch is applied or not, perf(PMU)
+>>> still can't work well with your patch, and the failure[1] will be
+>>> triggered when 'perf top' is started.
+>>>
+>>> The failure happened during the 1st pmu overflow interrupt.
+>>>
+>>> I test several mustang boards, and all has the problem with
+>>> upstream kernel.
+>>
+>> Note that the GIC bypass register config is set by the firmware and this
+>> only preserves the original setting, so you could be running an older
+>> firmware (such as U-Boot). On our (UEFI-enabled systems, complete with
+>> correct patch) perf top runs correctly without any such problems.
+>
+> I am wondering if it is related with boot or firmware. We have a board
+> which is running APM internal 3.12 based kernel, and perf(pmu) works
+> well. But if I just replace the 3.12 based kernel with upstream kernel
+> and keep others(boot, kernel parameter, fs, ....) not changed, then
+> the problem still can happen.
 
-Merged, but I didn't notice any conflict here. I might have resolved it
-in the past already.
-
-
--Olof
+fyi, newer firmware is confirmed to fix this issue on u-boot based platforms.
+Tested-by: dann frazier <dann.frazier@canonical.com>
