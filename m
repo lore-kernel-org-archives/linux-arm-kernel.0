@@ -1,31 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 09:15:43 -0700
-Subject: [PATCH] ARM: at91: at91sam9x5: add clocks for usb device
-In-Reply-To: <1405096496-4139-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1405096496-4139-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20140712161543.GA3107@quad.lixom.net>
+Date: Sat, 12 Jul 2014 09:34:13 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig
+ Updates for v3.17
+In-Reply-To: <cover.1404172763.git.horms+renesas@verge.net.au>
+References: <cover.1404172763.git.horms+renesas@verge.net.au>
+Message-ID: <20140712163413.GA3954@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 06:34:56PM +0200, Nicolas Ferre wrote:
-> From: Bo Shen <voice.shen@atmel.com>
+On Tue, Jul 01, 2014 at 09:28:08AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Add clocks for usb device, or else switch to CCF, the gadget
-> won't work.
+> Please consider these Second Round of Renesas ARM Based SoC Defconfig
+> Updates for v3.17.
 > 
-> Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Tested-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Arnd, Olof, Kevin,
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-defconfig-for-v3.17,
+> which I have already sent a pull-request for.
 > 
-> This fix is the only one that I have for 3.16-rc currently. Can you please
-> take it as a patch and queue it? It can go on top of already sent AT91 fixes
-> for 3.16 or a 3.16-rc4.
+> 
+> The following changes since commit 468c570ed078f0326745bfe85868adb925659502:
+> 
+>   ARM: shmobile: Enable CPUFREQ configuration (2014-06-16 19:44:34 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-defconfig2-for-v3.17
+> 
+> for you to fetch changes up to c61010050d3baa3e1a3964bec7e62437d21107c6:
+> 
+>   ARM: shmobile: Enable genmai board in multiplatform defconfig (2014-06-25 16:46:31 +0900)
+> 
+> ----------------------------------------------------------------
+> Second Round of Renesas ARM Based SoC Defconfig Updates for v3.17
+> 
+> * Enable genmai board in multiplatform defconfig
+> 
+> ----------------------------------------------------------------
+> Simon Horman (1):
+>       ARM: shmobile: Enable genmai board in multiplatform defconfig
 
-Certainly. Appled to fixes now.
-
+Pulled, thanks.
 
 -Olof
