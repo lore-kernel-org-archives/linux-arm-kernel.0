@@ -1,165 +1,40 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Sat, 12 Jul 2014 07:49:53 -0400
-Subject: [PATCH] clk: qcom: Support bypass RCG configuration
-In-Reply-To: <1405108915-19234-1-git-send-email-sboyd@codeaurora.org>
-References: <1405106207-26638-1-git-send-email-robdclark@gmail.com>
- <1405108915-19234-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAF6AEGsMcosDoXB4OE_Yfa4QM+fDxVm5rg02DVZ3Gg-30K31mw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Jul 2014 14:22:01 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140712093917.GD18601@arm.com>
+ <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
+Message-ID: <201407121422.02078.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 4:01 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> In the case of HDMI clocks, we want to bypass the RCG's ability
-> to divide the output clock and pass through the parent HDMI PLL
-> rate through. Add a simple set of clk_ops to configure the RCG to
-> do this. This removes the need to keep adding more frequency
-> entries to the tv_src clock whenever we want to support a new
-> rate.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> On 07/11, Rob Clark wrote:
->> It would probably be better to get rid of the fixed table, which
->> duplicates the set of fixed frequences in the hdmi pll clk (in
->> drm/msm/hdmi).  But I'll leave that as an exercise for someone
->> who knows the clk driver better than myself.  Until then, this
->> trivial fix is useful.
->
-> Here's a quick attempt at that. Let me know if this works.
+On Saturday 12 July 2014, Rob Clark wrote:
+> >> Was there actually a good reason for having the device link to the
+> >> iommu rather than the other way around?  How much would people hate it
+> >> if I just ignore the generic bindings and use something that works for
+> >> me instead.  I mean, it isn't exactly like there is going to be .dts
+> >> re-use across different SoC's..  and at least with current IOMMU API
+> >> some sort of of_get_named_iommu() API doesn't really make sense.
+> >
+> > The thing is, if you end up ignoring the generic binding then we have two
+> > IOMMUs using the same (ARM SMMU) binding and it begs the question as to
+> > which is the more generic! I know we're keen to get this merged, but merging
+> > something that people won't use and calling it generic doesn't seem ideal
+> > either. We do, however, desperately need a generic binding.
+> 
+> yeah, ignoring the generic binding is not my first choice.  I'd rather
+> have something that works well for everyone.  But I wasn't really sure
+> if the current proposal was arbitrary, or if there are some
+> conflicting requirements between different platforms.
 
-yup, this works :-)
+The common case that needs to be simple is attaching one (master) device
+to an IOMMU using the shared global context for the purposes of implementing
+the dma-mapping API.
 
-Tested-by: Rob Clark <robdclark@gmail.com>
+The way that Thierry's binding does that is the obvious solution to this,
+and it mirrors what we do in practically every other subsystem. I definitely
+want the SMMU to change before anybody starts using it in a real system,
+which we fortunately do not have yet.
 
->  drivers/clk/qcom/clk-rcg.c      | 51 +++++++++++++++++++++++++++++++++++------
->  drivers/clk/qcom/clk-rcg.h      |  1 +
->  drivers/clk/qcom/mmcc-msm8960.c |  9 ++------
->  3 files changed, 47 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
-> index abfc2b675aea..b638c5846dbf 100644
-> --- a/drivers/clk/qcom/clk-rcg.c
-> +++ b/drivers/clk/qcom/clk-rcg.c
-> @@ -417,20 +417,25 @@ static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
->         return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
->  }
->
-> -static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
-> -                           unsigned long parent_rate)
-> +static long clk_rcg_bypass_determine_rate(struct clk_hw *hw, unsigned long rate,
-> +               unsigned long *p_rate, struct clk **p)
->  {
->         struct clk_rcg *rcg = to_clk_rcg(hw);
-> -       const struct freq_tbl *f;
-> +       const struct freq_tbl *f = rcg->freq_tbl;
-> +
-> +       *p = clk_get_parent_by_index(hw->clk, f->src);
-> +       *p_rate = __clk_round_rate(*p, rate);
-> +
-> +       return *p_rate;
-> +}
-> +
-> +static int __clk_rcg_set_rate(struct clk_rcg *rcg, const struct freq_tbl *f)
-> +{
->         u32 ns, md, ctl;
->         struct mn *mn = &rcg->mn;
->         u32 mask = 0;
->         unsigned int reset_reg;
->
-> -       f = find_freq(rcg->freq_tbl, rate);
-> -       if (!f)
-> -               return -EINVAL;
-> -
->         if (rcg->mn.reset_in_cc)
->                 reset_reg = rcg->clkr.enable_reg;
->         else
-> @@ -466,6 +471,27 @@ static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
->         return 0;
->  }
->
-> +static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                           unsigned long parent_rate)
-> +{
-> +       struct clk_rcg *rcg = to_clk_rcg(hw);
-> +       const struct freq_tbl *f;
-> +
-> +       f = find_freq(rcg->freq_tbl, rate);
-> +       if (!f)
-> +               return -EINVAL;
-> +
-> +       return __clk_rcg_set_rate(rcg, f);
-> +}
-> +
-> +static int clk_rcg_bypass_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                               unsigned long parent_rate)
-> +{
-> +       struct clk_rcg *rcg = to_clk_rcg(hw);
-> +
-> +       return __clk_rcg_set_rate(rcg, rcg->freq_tbl);
-> +}
-> +
->  static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
->  {
->         struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
-> @@ -503,6 +529,17 @@ const struct clk_ops clk_rcg_ops = {
->  };
->  EXPORT_SYMBOL_GPL(clk_rcg_ops);
->
-> +const struct clk_ops clk_rcg_bypass_ops = {
-> +       .enable = clk_enable_regmap,
-> +       .disable = clk_disable_regmap,
-> +       .get_parent = clk_rcg_get_parent,
-> +       .set_parent = clk_rcg_set_parent,
-> +       .recalc_rate = clk_rcg_recalc_rate,
-> +       .determine_rate = clk_rcg_bypass_determine_rate,
-> +       .set_rate = clk_rcg_bypass_set_rate,
-> +};
-> +EXPORT_SYMBOL_GPL(clk_rcg_bypass_ops);
-> +
->  const struct clk_ops clk_dyn_rcg_ops = {
->         .enable = clk_enable_regmap,
->         .is_enabled = clk_is_enabled_regmap,
-> diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
-> index b9ec11dfd1b4..ba0523cefd2e 100644
-> --- a/drivers/clk/qcom/clk-rcg.h
-> +++ b/drivers/clk/qcom/clk-rcg.h
-> @@ -95,6 +95,7 @@ struct clk_rcg {
->  };
->
->  extern const struct clk_ops clk_rcg_ops;
-> +extern const struct clk_ops clk_rcg_bypass_ops;
->
->  #define to_clk_rcg(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg, clkr)
->
-> diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-> index 12f3c0b64fcd..14eeeba005f3 100644
-> --- a/drivers/clk/qcom/mmcc-msm8960.c
-> +++ b/drivers/clk/qcom/mmcc-msm8960.c
-> @@ -1218,12 +1218,7 @@ static const char *mmcc_pxo_hdmi[] = {
->  };
->
->  static struct freq_tbl clk_tbl_tv[] = {
-> -       {  25200000, P_HDMI_PLL, 1, 0, 0 },
-> -       {  27000000, P_HDMI_PLL, 1, 0, 0 },
-> -       {  27030000, P_HDMI_PLL, 1, 0, 0 },
-> -       {  74250000, P_HDMI_PLL, 1, 0, 0 },
-> -       { 108000000, P_HDMI_PLL, 1, 0, 0 },
-> -       { 148500000, P_HDMI_PLL, 1, 0, 0 },
-> +       {  .src = P_HDMI_PLL, .pre_div = 1 },
->         { }
->  };
->
-> @@ -1254,7 +1249,7 @@ static struct clk_rcg tv_src = {
->                         .name = "tv_src",
->                         .parent_names = mmcc_pxo_hdmi,
->                         .num_parents = 2,
-> -                       .ops = &clk_rcg_ops,
-> +                       .ops = &clk_rcg_bypass_ops,
->                         .flags = CLK_SET_RATE_PARENT,
->                 },
->         },
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
+	Arnd
