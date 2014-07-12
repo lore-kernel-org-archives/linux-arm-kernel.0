@@ -1,97 +1,73 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 12 Jul 2014 15:23:17 +0200
-Subject: [PATCH v2 00/30] ARM: shmobile: Enable SCI and TMU using DT
-In-Reply-To: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-References: <1404719695-1634-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140712132315.GA19014@verge.net.au>
+Date: Sat, 12 Jul 2014 15:37:34 +0200
+Subject: [PATCH v2 0/2] ARM: shmobile: lager: USBHS callback elimination
+In-Reply-To: <20140711162348.GF22572@saruman.home>
+References: <53BF35B7.9000105@renesas.com>
+ <87oawxy69b.wl%kuninori.morimoto.gx@renesas.com>
+ <20140711090005.GH12420@verge.net.au>
+ <20140711151236.GG27864@saruman.home>
+ <20140711154152.GC1777@verge.net.au>
+ <20140711162348.GF22572@saruman.home>
+Message-ID: <20140712133734.GA23843@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 09:54:25AM +0200, Simon Horman wrote:
-> The purpose of this series is to enable SCI, CMT and TMU using DT
-> on boards that use DT-reference. Or in other-words boards other
-> than the mackerel that are not covered by Laurent Pinchart's work in
-> the same area.
+On Fri, Jul 11, 2014 at 11:23:48AM -0500, Felipe Balbi wrote:
+> On Fri, Jul 11, 2014 at 05:41:52PM +0200, Simon Horman wrote:
+> > On Fri, Jul 11, 2014 at 10:12:37AM -0500, Felipe Balbi wrote:
+> > > On Fri, Jul 11, 2014 at 11:00:07AM +0200, Simon Horman wrote:
+> > > > [Cc Felipe Balbi]
+> > > > 
+> > > > On Thu, Jul 10, 2014 at 01:20:34AM -0700, Kuninori Morimoto wrote:
+> > > > > 
+> > > > > Hi
+> > > > > 
+> > > > > > Changes in v2:
+> > > > > > - move phy handle to struct usbhs_priv
+> > > > > > - add new default pipe type to driver
+> > > > > > - remove pipe type from Lager board code
+> > > > > > 
+> > > > > > Ulrich Hecht (2):
+> > > > > >   usb: renesas_usbhs: add R-Car Gen. 2 init and power control
+> > > > > >   ARM: shmobile: lager: remove USBHS callbacks
+> > > > > > 
+> > > > > >  arch/arm/mach-shmobile/board-lager.c | 126 ++++-------------------------------
+> > > > > >  drivers/usb/renesas_usbhs/Makefile   |   2 +-
+> > > > > >  drivers/usb/renesas_usbhs/common.c   |  66 ++++++++++++++++--
+> > > > > >  drivers/usb/renesas_usbhs/common.h   |   2 +
+> > > > > >  drivers/usb/renesas_usbhs/rcar2.c    |  76 +++++++++++++++++++++
+> > > > > >  drivers/usb/renesas_usbhs/rcar2.h    |   4 ++
+> > > > > >  include/linux/usb/renesas_usbhs.h    |   6 ++
+> > > > > >  7 files changed, 163 insertions(+), 119 deletions(-)
+> > > > > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.c
+> > > > > >  create mode 100644 drivers/usb/renesas_usbhs/rcar2.h
+> > > > > 
+> > > > > For all patches
+> > > > > 
+> > > > > Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > > > 
+> > > > [snip]
+> > > > 
+> > > > > I tested these patches on Lager legacy, and these patches worked correctly.
+> > > > > 
+> > > > > Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> > > > 
+> > > > Hi,
+> > > > 
+> > > > it seems that the 2nd patch should go through my renesas tree
+> > > > but it depends on the first patch which should be taken by 
+> > > > Felipe Balbi (Cced).
+> > > > 
+> > > > Felipe, is there any chance that you could take this for v3.16?
+> > > > I am quite happy to make a branch for you to pull for renesas_usbhs
+> > > > if this would make your life easier.
+> > > 
+> > > you need to take both patches or just patch 1 ?
+> > 
+> > Please just take patch 1.
 > 
-> This series is based on a merge of:
-> 
-> * [GIT PULL v2 FOR v3.17] Renesas CMT, MTU2 and TMU timers DT support
-> * renesas-devel-v3.16-rc4-20140707
-> 
-> It also depends on
-> [PATCH v2] serial: sh-sci: Add device tree support for r8a7{778,740,3a4} and sh73a
+> will do.
 
-As Greg KH has merged the above patch I have queued up
-the SCI patches listed below.
+Thanks.
 
-> This series does not enable TMU for the sh73a0/kzm9g-reference
-> as:
-> 
-> * It appears to use sh-intc as an interrupt source and I am unsure
->   how to use this from DT at this time and;
-> * It is not currently enabled in dt-reference.
-> 
-> I will address this as a follow-up if appropriate.
-> 
-> 
-> Simon Horman (30):
->   ARM: shmobile: r8a7778: add SCI clock support for DT
->   ARM: shmobile: r8a7778: Add SCIF nodes
->   ARM: shmobile: bockw-reference: Initialise SCIF device using DT
->   ARM: shmobile: r8a7778: add TMU clock support for DT
->   ARM: shmobile: r8a7778: Add TMU nodes
->   ARM: shmobile: bockw-reference: Initialise TMU device using DT
->   ARM: shmobile: r8a73a4: add SCI clock support for DT
->   ARM: shmobile: r8a73a4: Add SCIF nodes
->   ARM: shmobile: ape6evm-reference: Initialise SCIF device using DT
->   ARM: shmobile: r8a73a4: add CMT1 clock support for DT
->   ARM: shmobile: r8a73a4: Add CMT1 node
->   ARM: shmobile: r8a73a4: Rename cmt registration helper
->   ARM: shmobile: ape6evm-reference: Initialise CMT1 device using DT
->   ARM: shmobile: r8a73a4: Remove empty r8a73a4_add_dt_devices
->   ARM: shmobile: r8a7740: correct SCI clock support for DT
->   ARM: shmobile: r8a7740: Add SCIF nodes
->   ARM: shmobile: armadillo800eva-reference: Initialise SCIF device using
->     DT
->   ARM: shmobile: r8a7740: add TMU clock support for DT
->   ARM: shmobile: r8a7740: Add TMU nodes
->   ARM: shmobile: armadillo800eva-reference: Initialise TMU device using
->     DT
->   ARM: shmobile: r8a7740: add CMT1 clock support for DT
->   ARM: shmobile: r8a7740: Add CMT1 node
->   ARM: shmobile: armadillo800eva-reference: Initialise CMT1 device using
->     DT
->   ARM: shmobile: r8a7740: Remove unnecessary
->     r8a7740_add_standard_devices_dt()
->   ARM: shmobile: sh73a0: add SCI clock support for DT
->   ARM: shmobile: sh73a0: Add SCIF nodes
->   ARM: shmobile: kzm9g-reference: Initialise SCIF device using DT
->   ARM: shmobile: sh73a0: add CMT1 clock support for DT
->   ARM: shmobile: sh73a0: Add CMT1 node
->   ARM: shmobile: kzm9g-reference: Initialise CMT1 device using DT
-> 
->  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 18 +++-
->  arch/arm/boot/dts/r8a73a4.dtsi                     | 52 ++++++++++++
->  .../boot/dts/r8a7740-armadillo800eva-reference.dts | 22 ++++-
->  arch/arm/boot/dts/r8a7740.dtsi                     | 97 ++++++++++++++++++++++
->  arch/arm/boot/dts/r8a7778-bockw-reference.dts      | 18 +++-
->  arch/arm/boot/dts/r8a7778.dtsi                     | 78 +++++++++++++++++
->  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       | 18 +++-
->  arch/arm/boot/dts/sh73a0.dtsi                      | 83 ++++++++++++++++++
->  arch/arm/mach-shmobile/board-ape6evm-reference.c   |  1 -
->  .../board-armadillo800eva-reference.c              |  3 +-
->  arch/arm/mach-shmobile/clock-r8a73a4.c             |  7 ++
->  arch/arm/mach-shmobile/clock-r8a7740.c             | 21 +++--
->  arch/arm/mach-shmobile/clock-r8a7778.c             |  8 ++
->  arch/arm/mach-shmobile/clock-sh73a0.c              | 10 +++
->  arch/arm/mach-shmobile/r8a73a4.h                   |  1 -
->  arch/arm/mach-shmobile/r8a7740.h                   |  1 -
->  arch/arm/mach-shmobile/setup-r8a73a4.c             | 21 ++---
->  arch/arm/mach-shmobile/setup-r8a7740.c             | 18 +---
->  arch/arm/mach-shmobile/setup-r8a7778.c             | 15 ++--
->  arch/arm/mach-shmobile/setup-sh73a0.c              | 11 +--
->  20 files changed, 431 insertions(+), 72 deletions(-)
-> 
-> -- 
-> 2.0.0.rc2
-> 
+Ulrich, please repost patch #2 once patch #1 hits an rc release.
