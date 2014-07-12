@@ -1,50 +1,74 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Sat, 12 Jul 2014 10:40:35 -0600
-Subject: [PATCH 2/2] arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <CACVXFVNpy3PM0FYO68afs_ffBErTWAOR2u9w0VNppp7RjD-0xg@mail.gmail.com>
-References: <1395308847-16317-1-git-send-email-vkale@apm.com>
- <1395308847-16317-3-git-send-email-vkale@apm.com>
- <CACVXFVMiOvV=CytiaLFgEdt3_f7frJ6afjz39iLhafOhvJ0m7g@mail.gmail.com>
- <53A8F388.80101@redhat.com>
- <CACVXFVNpy3PM0FYO68afs_ffBErTWAOR2u9w0VNppp7RjD-0xg@mail.gmail.com>
-Message-ID: <CALdTtnsBWHHTbzFV9U2m+rdpgYCQG4CrS72eZ3i_Z_7pQQktSw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 12 Jul 2014 09:46:17 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.17
+In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
+References: <cover.1404174157.git.horms+renesas@verge.net.au>
+Message-ID: <20140712164617.GE3954@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 1:00 AM, Ming Lei <ming.lei@canonical.com> wrote:
-> Hi Jon and Vinayak,
->
-> On Tue, Jun 24, 2014 at 11:42 AM, Jon Masters <jcm@redhat.com> wrote:
->> On 06/23/2014 10:47 PM, Ming Lei wrote:
->>
->>> On Thu, Mar 20, 2014 at 5:47 PM, Vinayak Kale <vkale@apm.com> wrote:
->>>> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
->>>>
->>>> Please note that this patch has dependancy on a GIC driver patch [1] which is
->>>> yet to be approved by maintainers.
->>>>
->>>> [1]- https://lkml.org/lkml/2014/2/27/605
->>>> (irqchip:gic: change access of gicc_ctrl register to read modify write)
->>
->>> No matter if Feng Kan's gic patch is applied or not, perf(PMU)
->>> still can't work well with your patch, and the failure[1] will be
->>> triggered when 'perf top' is started.
->>>
->>> The failure happened during the 1st pmu overflow interrupt.
->>>
->>> I test several mustang boards, and all has the problem with
->>> upstream kernel.
->>
->> Note that the GIC bypass register config is set by the firmware and this
->> only preserves the original setting, so you could be running an older
->> firmware (such as U-Boot). On our (UEFI-enabled systems, complete with
->> correct patch) perf top runs correctly without any such problems.
->
-> I am wondering if it is related with boot or firmware. We have a board
-> which is running APM internal 3.12 based kernel, and perf(pmu) works
-> well. But if I just replace the 3.12 based kernel with upstream kernel
-> and keep others(boot, kernel parameter, fs, ....) not changed, then
-> the problem still can happen.
+On Tue, Jul 01, 2014 at 09:28:47AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Second Round of Renesas ARM Based SoC Updates for v3.17.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc-for-v3.17,
+> which I have already sent a pull-request for.
+> 
+> This conflicts with other changes made to pm-r8a7790.c in the soc branch
+> of the renesas tree. A resolution can be found in the
+> renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
+> 
+> In short, the resulting includes should be:
+> 
+> #include <linux/kernel.h>
+> #include <linux/smp.h>
+> #include <asm/io.h>
+> #include "common.h"
+> #include "pm-rcar.h"
+> #include "r8a7790.h"
+> 
+> 
+> The following changes since commit 3ed66ec5ced8b801cb851b2b8548301df94f8f54:
+> 
+>   ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile (2014-06-23 09:53:55 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc2-for-v3.17
+> 
+> for you to fetch changes up to bfe4cfa8ae21628267f2b879b4396ee17ea4fd3a:
+> 
+>   ARM: shmobile: Allow r8a7791 to build non-SMP APMU code (2014-06-26 16:01:34 +0900)
+> 
+> ----------------------------------------------------------------
+> Second Round of Renesas ARM Based SoC Updates for v3.17
+> 
+> * Suspend on non-SMP update for r8a7790
+> * Move r8a7791.h out of mach directory.
+>   This is part of a multi-stage effort to move headers
+>   out of that directory.
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (1):
+>       ARM: shmobile: Move r8a7791.h
 
-fyi, newer firmware is confirmed to fix this issue on u-boot based platforms.
-Tested-by: dann frazier <dann.frazier@canonical.com>
+Merged, but:
+
+This is a bit confused. You've now sent me three branches in this batch
+alone that contain these header moves. One for next/soc that contained
+nothing but a header move, one for cleanup that contained a whole bunch
+of them, and now yet another one in this combined branch.
+
+Please collect all of these in the cleanup branch, and make the soc branch
+build on top of that if needed to avoid conflicts, instead of spreading them
+out like this.
+
+This is also where the conflict showed up that you mentioned in the
+preceding pull request. To avoid that, I merged in your cleanup branch
+on top, so that this conflict doesn't surface all the way up like it
+otherwise would.
+
+
+-Olof
