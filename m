@@ -1,39 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 09:50:26 -0700
-Subject: [GIT PULL v2][for 3.17] pull request from pxa git tree
-In-Reply-To: <CAD6h2NTMLXxEi+uFz74B-de2y6-gggxhWt8yPS6593cuJxdMrw@mail.gmail.com>
-References: <CAD6h2NTMLXxEi+uFz74B-de2y6-gggxhWt8yPS6593cuJxdMrw@mail.gmail.com>
-Message-ID: <20140712165026.GG3954@quad.lixom.net>
+Date: Sat, 12 Jul 2014 09:53:17 -0700
+Subject: [PATCH v4 0/4] ARM: pxa: Fix out of vmalloc space bug
+In-Reply-To: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1405076439-22038-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20140712165317.GH3954@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 09:01:07AM +0800, Haojian Zhuang wrote:
-> Hi Olof, Arnd, Kevin,
+On Fri, Jul 11, 2014 at 01:00:35PM +0200, Laurent Pinchart wrote:
+> Hello,
 > 
-> Please help to merge the pull request from pxa git tree.
+> This patch set reworks Ezequiel Garcia's previous fix [1] of an out of vmalloc
+> space bug on PXA2[57]x platforms caused by an attempt to map the start of
+> physical uncached outside of the vmalloc space.
 > 
-> BTW, Laurent's fixing IO mapping patch will be merged by Olof directly.
+> This first three patches perform a couple of cleanups, and the last patch
+> fixes the problem. I've decided to map the memory at address 0xfe000000 to
+> minimize changes to the code, but this causes a bit of fragmentation of
+> vmalloc space. I could map it to the very end of vmalloc space (0xfef00000)
+> instead if preferred, which would involve replacing a mov by an ldr in
+> pxa2[57]x_finish_suspend and pm_enter_standby_start.
 > 
-> Regards
-> Haojian
+> I've tested the patch set on a PXA270-based system.
 > 
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> [1] https://lkml.org/lkml/2013/11/28/474
 > 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/pxa-for-v3.17-2
-> 
-> for you to fetch changes up to 5837391bbc7ab4307abf957e6cce0b83f7f9869a:
-> 
->   ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER' (2014-07-11 08:50:53 +0800)
-> 
-> ----------------------------------------------------------------
-> pxa for v3.17 v2
+> Compared to v3, the patches have been rebased on top of v3.16-rc5. Olof, could
+> you please pick them up for v3.17 ?
 
-Merged into next/cleanup. Same with the tag description here.
+Thanks, applied to next/cleanup (since we're collecting some of the for-3.17
+fixes there too.
 
 
 -Olof
