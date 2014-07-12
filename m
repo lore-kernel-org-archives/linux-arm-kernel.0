@@ -1,55 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 13 Jul 2014 07:23:05 +0900
-Subject: [GIT PULL] Samsung fixes-3 for 3.16
-Message-ID: <53C1B549.1060706@samsung.com>
+Date: Sun, 13 Jul 2014 07:34:30 +0900
+Subject: [GIT PULL] Samsung cleanup for S5P SoCs for 3.17
+In-Reply-To: <20140712194416.GA6800@sirena.org.uk>
+References: <53BB2658.4050808@samsung.com>
+ <20140712165948.GA10012@quad.lixom.net> <20140712194416.GA6800@sirena.org.uk>
+Message-ID: <53C1B7F6.7050803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+On 07/13/14 04:44, Mark Brown wrote:
+> On Sat, Jul 12, 2014 at 09:59:48AM -0700, Olof Johansson wrote:
+>
+>> I've merged these in. I noticed lack of acked-by from Mark Brown, so I pinged
+>> him on IRC about it and the branch is currently at the top so it's easy to drop
+>> in case he has objections (cc:d here too).
+>
+> Don't know if I've seen these changes (though IIRC they might've gone to
+> the work account).  I suspect we're going to get some conflicts since
+> we've also got other changes going on in ASoC so it is probably going to
+> be easier to merge at least that patch via ASoC.
 
-   Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+OK.
 
-are available in the git repository at:
+Olof, I will resend the pull-request after sorting them out so please 
+drop this then pull new one.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-fixes-3
+Mark, please take following ASoC related patches.
+- ASoC: samsung: no more support for S5P6440 and S5P6450 SoCs
+- ASoC: Samsung: remove s5pc100 related codes
 
-for you to fetch changes up to bed7118988ef48063c72f67cc2701c72663b3870:
-
-   ARM: EXYNOS: Register cpuidle device only on exynos4210 and 5250 
-(2014-07-11 08:15:32 +0900)
-
-----------------------------------------------------------------
-Samsung fixes-3 for v3.16
-- update the parent for Auudss clock because kernel will be hang
-   during late boot if the parent clock is disabled in bootloader.
-- enable clk handing in power domain because while power domain
-   on/off, its regarding clock source will be reset and it causes
-   a problem so need to handle it.
-- add mux clocks to be used by power domain for exynos5420-mfc
-   during power domain on/off and property in device tree also.
-- register cpuidle only for exynos4210 and exynos5250 because a
-   system failure will be happened on other exynos SoCs.
-
-----------------------------------------------------------------
-Arun Kumar K (2):
-       clk: exynos5420: Add IDs for clocks used in PD mfc
-       ARM: dts: Add clock property for mfc_pd in exynos5420
-
-Prathyush K (1):
-       ARM: EXYNOS: Add support for clock handling in power domain
-
-Tomasz Figa (1):
-       ARM: EXYNOS: Register cpuidle device only on exynos4210 and 5250
-
-Tushar Behera (1):
-       ARM: dts: Update the parent for Audss clocks in Exynos5420
-
-  .../bindings/arm/exynos/power_domain.txt           | 20 +++++++
-  arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
-  arch/arm/mach-exynos/exynos.c                      |  6 +--
-  arch/arm/mach-exynos/pm_domains.c                  | 61 
-+++++++++++++++++++++-
-  drivers/clk/samsung/clk-exynos5420.c               |  6 ++-
-  include/dt-bindings/clock/exynos5420.h             |  2 +
-  6 files changed, 92 insertions(+), 8 deletions(-)
+Thanks,
+Kukjin
