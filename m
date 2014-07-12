@@ -1,31 +1,33 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 11 Jul 2014 17:44:51 -0700
-Subject: [PATCH v2 repost] serial: sh-sci: Add device tree support for
- r8a7{778,740,3a4} and sh73a0
-In-Reply-To: <20140711091107.GA25710@verge.net.au>
-References: <20140711091107.GA25710@verge.net.au>
-Message-ID: <20140712004451.GA9549@kroah.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 11 Jul 2014 17:51:22 -0700
+Subject: [PATCH 2/2] tty: serial: fsl_lpuart: add 32-bit register
+ interface support
+In-Reply-To: <1405057302-26041-3-git-send-email-jingchang.lu@freescale.com>
+References: <1405057302-26041-1-git-send-email-jingchang.lu@freescale.com>
+ <1405057302-26041-3-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20140712005122.GA31974@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 11:11:08AM +0200, Simon Horman wrote:
-> Simply document new compat strings.
-> There appears to be no need for a driver updates.
+On Fri, Jul 11, 2014 at 01:41:42PM +0800, Jingchang Lu wrote:
+> This add the 32-bit register version LPUART support with big-endian
+> byte order.
 > 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> --
-> v2
-> * Added r8a73a4, r8a7740 and sh73a0 support
-> 
-> Repost to Greg KH.
-> 
-> Greg, I am hoping to get the platform side of this change included in v3.16.
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+>  drivers/tty/serial/fsl_lpuart.c | 653 +++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 643 insertions(+), 10 deletions(-)
 
-Isn't it a bit late for 3.16?  I'll go add this to my 3.16 tree, as it's
-just a .txt file, and leave the fighting over new code to the other
-maintainers :)
+You didn't even test build this patch:
 
-thanks,
+  CC [M]  drivers/tty/serial/fsl_lpuart.o
+drivers/tty/serial/fsl_lpuart.c: In function ?lpuart_suspend?:
+drivers/tty/serial/fsl_lpuart.c:1856:22: error: ?lpuart32_reg? undeclared (first use in this function)
+   uart_suspend_port(&lpuart32_reg, &sport->port);
+                      ^
+
+No quicker way to make me grumpy...
+
+Please take some time to do this right.
 
 greg k-h
