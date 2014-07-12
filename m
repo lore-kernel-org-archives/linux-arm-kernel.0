@@ -1,18 +1,20 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 09:48:30 -0700
-Subject: [GIT][for v3.17] pull request from mmp git tree
-In-Reply-To: <CAD6h2NRQJ3X8xt=0idbDPVb53DR0JHiVbiKqoE1hnM32aiD2LQ@mail.gmail.com>
-References: <CAD6h2NRQJ3X8xt=0idbDPVb53DR0JHiVbiKqoE1hnM32aiD2LQ@mail.gmail.com>
-Message-ID: <20140712164830.GF3954@quad.lixom.net>
+Date: Sat, 12 Jul 2014 09:50:26 -0700
+Subject: [GIT PULL v2][for 3.17] pull request from pxa git tree
+In-Reply-To: <CAD6h2NTMLXxEi+uFz74B-de2y6-gggxhWt8yPS6593cuJxdMrw@mail.gmail.com>
+References: <CAD6h2NTMLXxEi+uFz74B-de2y6-gggxhWt8yPS6593cuJxdMrw@mail.gmail.com>
+Message-ID: <20140712165026.GG3954@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 04, 2014 at 09:21:57PM +0800, Haojian Zhuang wrote:
-> Hi Arnd, Olof, Kevin,
+On Fri, Jul 11, 2014 at 09:01:07AM +0800, Haojian Zhuang wrote:
+> Hi Olof, Arnd, Kevin,
 > 
-> Please help to merge pull request from mmp git tree.
+> Please help to merge the pull request from pxa git tree.
 > 
-> Best Regards
+> BTW, Laurent's fixing IO mapping patch will be merged by Olof directly.
+> 
+> Regards
 > Haojian
 > 
 > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
@@ -22,16 +24,16 @@ On Fri, Jul 04, 2014 at 09:21:57PM +0800, Haojian Zhuang wrote:
 > are available in the git repository at:
 > 
 >   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/mmp-for-v3.17
+> tags/pxa-for-v3.17-2
 > 
-> for you to fetch changes up to 02db444db1256341d14acb7813abd67ddd94c350:
+> for you to fetch changes up to 5837391bbc7ab4307abf957e6cce0b83f7f9869a:
 > 
->   ARM: mmp: remove duplicate SM_SCLK_SM_SCLK define (2014-07-04 21:19:08 +0800)
+>   ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER' (2014-07-11 08:50:53 +0800)
 > 
 > ----------------------------------------------------------------
-> mmp for v3.17
+> pxa for v3.17 v2
 
-Merged. Use better tag descriptions than this in the future.
+Merged into next/cleanup. Same with the tag description here.
 
 
 -Olof
