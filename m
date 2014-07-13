@@ -1,67 +1,186 @@
-From: Vincent.Yang@tw.fujitsu.com (Vincent Yang)
-Date: Sun, 13 Jul 2014 13:21:10 +0800
-Subject: [PATCH 4/4] mmc: core: hold SD Clock before CMD11 during Signal
-In-Reply-To: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1405228870-5088-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 13 Jul 2014 09:34:00 +0400
+Subject: [PATCH] ARM: i.MX: Use CLOCKSOURCE_OF_DECLARE() for DT targets
+Message-ID: <1405229640-29243-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Voltage Switch Procedure
+This patch uses clocksource_of_init() call for DT targets.
 
-This patch is to fix an issue found on mb86s7x platforms.
-
-[symptom]
-There are some UHS-1 SD memory cards sometimes cannot be detected correctly,
-e.g., Transcend 600x SDXC 64GB UHS-1 memory card.
-During Signal Voltage Switch Procedure, failure to switch is indicated
-by the card holding DAT[3:0] low.
-
-[analysis]
-According to SD Host Controller Simplified Specification Version 3.00
-chapter 3.6.1, the Signal Voltage Switch Procedure should be:
-(1) Check S18A; (2) Issue CMD11; (3) Check CMD 11 response;
-(4) Stop providing SD clock; (5) Check DAT[3:0] should be 0000b;
-(6) Set 1.8V Signal Enable; (7) Wait 5ms; (8) Check 1.8V Signal Enable;
-(9) Provide SD Clock; (10) Wait 1ms; (11) Check DAT[3:0] should be 1111b;
-(12) error handling
-
-With CONFIG_MMC_CLKGATE=y, sometimes there is one more gating/un-gating
-SD clock between (2) and (3). In this case, some UHS-1 SD cards will hold
-DAT[3:0] 0000b at (11) and thus fails Signal Voltage Switch Procedure.
-
-[solution]
-By mmc_host_clk_hold() before CMD11, the additional gating/un-gating
-SD clock between (2) and (3) can be prevented and thus no failure at (11).
-It has been verified with many UHS-1 SD cards on mb86s7x platforms and
-works correctly.
-
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/mmc/core/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/clk-imx1.c        |  2 --
+ arch/arm/mach-imx/clk-imx21.c       |  2 --
+ arch/arm/mach-imx/clk-imx25.c       |  2 --
+ arch/arm/mach-imx/clk-imx27.c       |  2 --
+ arch/arm/mach-imx/clk-imx51-imx53.c |  7 -------
+ arch/arm/mach-imx/clk-imx6q.c       |  2 --
+ arch/arm/mach-imx/clk-imx6sl.c      |  3 ---
+ arch/arm/mach-imx/clk-imx6sx.c      |  3 ---
+ arch/arm/mach-imx/common.h          |  1 -
+ arch/arm/mach-imx/time.c            | 13 ++++++++++++-
+ 10 files changed, 12 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 7dc0c85..764af63 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1428,6 +1428,8 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
- 		pr_warning("%s: cannot verify signal voltage switch\n",
- 				mmc_hostname(host));
- 
-+	mmc_host_clk_hold(host);
-+
- 	cmd.opcode = SD_SWITCH_VOLTAGE;
- 	cmd.arg = 0;
- 	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
-@@ -1438,8 +1440,6 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
- 
- 	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
- 		return -EIO;
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 42017e2..37c307a 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -113,7 +113,5 @@ static void __init mx1_clocks_init_dt(struct device_node *np)
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
 -
--	mmc_host_clk_hold(host);
- 	/*
- 	 * The card should drive cmd and dat[0:3] low immediately
- 	 * after the response of cmd11, but wait 1 ms to be sure
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
+ }
+ CLK_OF_DECLARE(imx1_ccm, "fsl,imx1-ccm", mx1_clocks_init_dt);
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+index 6b36738..4b4c753 100644
+--- a/arch/arm/mach-imx/clk-imx21.c
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -167,7 +167,5 @@ static void __init mx21_clocks_init_dt(struct device_node *np)
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+-
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
+ }
+ CLK_OF_DECLARE(imx27_ccm, "fsl,imx21-ccm", mx21_clocks_init_dt);
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index cab34c3..59c0c85 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -335,7 +335,5 @@ static void __init mx25_clocks_init_dt(struct device_node *np)
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+-
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt"));
+ }
+ CLK_OF_DECLARE(imx25_ccm, "fsl,imx25-ccm", mx25_clocks_init_dt);
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 07bc32c..ab6349e 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -254,7 +254,5 @@ static void __init mx27_clocks_init_dt(struct device_node *np)
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+-
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
+ }
+ CLK_OF_DECLARE(imx27_ccm, "fsl,imx27-ccm", mx27_clocks_init_dt);
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index ee57971..72d6521 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -370,8 +370,6 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 
+ 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
+ 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
+-
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt"));
+ }
+ CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
+ 
+@@ -443,9 +441,6 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 166250000);
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
+ 
+-	/* System timer */
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx51-gpt"));
+-
+ 	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
+ 	imx_print_silicon_rev("i.MX51", mx51_revision());
+ 	clk_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
+@@ -562,7 +557,5 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 
+ 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
+ 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
+-
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt"));
+ }
+ CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index f092ee13..b6b54f1 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -455,7 +455,5 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 
+ 	/* Set initial power mode */
+ 	imx6q_set_lpm(WAIT_CLOCKED);
+-
+-	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt"));
+ }
+ CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index 4602418..fef46fa 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -377,8 +377,5 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 
+ 	/* Set initial power mode */
+ 	imx6q_set_lpm(WAIT_CLOCKED);
+-
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
+-	mxc_timer_init_dt(np);
+ }
+ CLK_OF_DECLARE(imx6sl, "fsl,imx6sl-ccm", imx6sl_clocks_init);
+diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
+index 7cd3f03..ecde72b 100644
+--- a/arch/arm/mach-imx/clk-imx6sx.c
++++ b/arch/arm/mach-imx/clk-imx6sx.c
+@@ -515,8 +515,5 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+ 
+ 	/* Set initial power mode */
+ 	imx6q_set_lpm(WAIT_CLOCKED);
+-
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sx-gpt");
+-	mxc_timer_init_dt(np);
+ }
+ CLK_OF_DECLARE(imx6sx, "fsl,imx6sx-ccm", imx6sx_clocks_init);
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index f7189bc..22ba897 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -49,7 +49,6 @@ void imx31_soc_init(void);
+ void imx35_soc_init(void);
+ void epit_timer_init(void __iomem *base, int irq);
+ void mxc_timer_init(void __iomem *, int);
+-void mxc_timer_init_dt(struct device_node *);
+ int mx1_clocks_init(unsigned long fref);
+ int mx21_clocks_init(unsigned long lref, unsigned long fref);
+ int mx25_clocks_init(void);
+diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+index 1da2270..bf92e5a 100644
+--- a/arch/arm/mach-imx/time.c
++++ b/arch/arm/mach-imx/time.c
+@@ -337,11 +337,14 @@ void __init mxc_timer_init(void __iomem *base, int irq)
+ 	_mxc_timer_init(irq, clk_per, clk_ipg);
+ }
+ 
+-void __init mxc_timer_init_dt(struct device_node *np)
++static void __init mxc_timer_init_dt(struct device_node *np)
+ {
+ 	struct clk *clk_per, *clk_ipg;
+ 	int irq;
+ 
++	if (timer_base)
++		return;
++
+ 	timer_base = of_iomap(np, 0);
+ 	WARN_ON(!timer_base);
+ 	irq = irq_of_parse_and_map(np, 0);
+@@ -351,3 +354,11 @@ void __init mxc_timer_init_dt(struct device_node *np)
+ 
+ 	_mxc_timer_init(irq, clk_per, clk_ipg);
+ }
++CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx25_timer, "fsl,imx25-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx50_timer, "fsl,imx50-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx51_timer, "fsl,imx51-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx53_timer, "fsl,imx53-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx6q_timer, "fsl,imx6q-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx6sl_timer, "fsl,imx6sl-gpt", mxc_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(mx6sx_timer, "fsl,imx6sx-gpt", mxc_timer_init_dt);
 -- 
-1.9.0
+1.8.5.5
