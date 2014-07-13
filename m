@@ -1,186 +1,119 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 13 Jul 2014 09:34:00 +0400
-Subject: [PATCH] ARM: i.MX: Use CLOCKSOURCE_OF_DECLARE() for DT targets
-Message-ID: <1405229640-29243-1-git-send-email-shc_work@mail.ru>
+From: mollie.wu@linaro.org (Mollie Wu)
+Date: Sun, 13 Jul 2014 14:27:13 +0800
+Subject: [PATCH 0/8] Support for Fujitsu MB86S7X SoCs
+Message-ID: <1405232833-4531-1-git-send-email-mollie.wu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses clocksource_of_init() call for DT targets.
+Hello,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/clk-imx1.c        |  2 --
- arch/arm/mach-imx/clk-imx21.c       |  2 --
- arch/arm/mach-imx/clk-imx25.c       |  2 --
- arch/arm/mach-imx/clk-imx27.c       |  2 --
- arch/arm/mach-imx/clk-imx51-imx53.c |  7 -------
- arch/arm/mach-imx/clk-imx6q.c       |  2 --
- arch/arm/mach-imx/clk-imx6sl.c      |  3 ---
- arch/arm/mach-imx/clk-imx6sx.c      |  3 ---
- arch/arm/mach-imx/common.h          |  1 -
- arch/arm/mach-imx/time.c            | 13 ++++++++++++-
- 10 files changed, 12 insertions(+), 25 deletions(-)
+  Fujitsu have a series of SoC already shipping based around
+variations of 2 A15 + 2 A7 big.LITTLE architecture, and we would like
+to upstream the basic support in this series.
 
-diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-index 42017e2..37c307a 100644
---- a/arch/arm/mach-imx/clk-imx1.c
-+++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -113,7 +113,5 @@ static void __init mx1_clocks_init_dt(struct device_node *np)
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
- }
- CLK_OF_DECLARE(imx1_ccm, "fsl,imx1-ccm", mx1_clocks_init_dt);
-diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
-index 6b36738..4b4c753 100644
---- a/arch/arm/mach-imx/clk-imx21.c
-+++ b/arch/arm/mach-imx/clk-imx21.c
-@@ -167,7 +167,5 @@ static void __init mx21_clocks_init_dt(struct device_node *np)
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
- }
- CLK_OF_DECLARE(imx27_ccm, "fsl,imx21-ccm", mx21_clocks_init_dt);
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index cab34c3..59c0c85 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -335,7 +335,5 @@ static void __init mx25_clocks_init_dt(struct device_node *np)
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt"));
- }
- CLK_OF_DECLARE(imx25_ccm, "fsl,imx25-ccm", mx25_clocks_init_dt);
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 07bc32c..ab6349e 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -254,7 +254,5 @@ static void __init mx27_clocks_init_dt(struct device_node *np)
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
- }
- CLK_OF_DECLARE(imx27_ccm, "fsl,imx27-ccm", mx27_clocks_init_dt);
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index ee57971..72d6521 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -370,8 +370,6 @@ static void __init mx50_clocks_init(struct device_node *np)
- 
- 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
- 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt"));
- }
- CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
- 
-@@ -443,9 +441,6 @@ static void __init mx51_clocks_init(struct device_node *np)
- 	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 166250000);
- 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
- 
--	/* System timer */
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx51-gpt"));
--
- 	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
- 	imx_print_silicon_rev("i.MX51", mx51_revision());
- 	clk_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
-@@ -562,7 +557,5 @@ static void __init mx53_clocks_init(struct device_node *np)
- 
- 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
- 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt"));
- }
- CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index f092ee13..b6b54f1 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -455,7 +455,5 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 
- 	/* Set initial power mode */
- 	imx6q_set_lpm(WAIT_CLOCKED);
--
--	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt"));
- }
- CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 4602418..fef46fa 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -377,8 +377,5 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 
- 	/* Set initial power mode */
- 	imx6q_set_lpm(WAIT_CLOCKED);
--
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
--	mxc_timer_init_dt(np);
- }
- CLK_OF_DECLARE(imx6sl, "fsl,imx6sl-ccm", imx6sl_clocks_init);
-diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
-index 7cd3f03..ecde72b 100644
---- a/arch/arm/mach-imx/clk-imx6sx.c
-+++ b/arch/arm/mach-imx/clk-imx6sx.c
-@@ -515,8 +515,5 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 
- 	/* Set initial power mode */
- 	imx6q_set_lpm(WAIT_CLOCKED);
--
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sx-gpt");
--	mxc_timer_init_dt(np);
- }
- CLK_OF_DECLARE(imx6sx, "fsl,imx6sx-ccm", imx6sx_clocks_init);
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index f7189bc..22ba897 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -49,7 +49,6 @@ void imx31_soc_init(void);
- void imx35_soc_init(void);
- void epit_timer_init(void __iomem *base, int irq);
- void mxc_timer_init(void __iomem *, int);
--void mxc_timer_init_dt(struct device_node *);
- int mx1_clocks_init(unsigned long fref);
- int mx21_clocks_init(unsigned long lref, unsigned long fref);
- int mx25_clocks_init(void);
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 1da2270..bf92e5a 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -337,11 +337,14 @@ void __init mxc_timer_init(void __iomem *base, int irq)
- 	_mxc_timer_init(irq, clk_per, clk_ipg);
- }
- 
--void __init mxc_timer_init_dt(struct device_node *np)
-+static void __init mxc_timer_init_dt(struct device_node *np)
- {
- 	struct clk *clk_per, *clk_ipg;
- 	int irq;
- 
-+	if (timer_base)
-+		return;
-+
- 	timer_base = of_iomap(np, 0);
- 	WARN_ON(!timer_base);
- 	irq = irq_of_parse_and_map(np, 0);
-@@ -351,3 +354,11 @@ void __init mxc_timer_init_dt(struct device_node *np)
- 
- 	_mxc_timer_init(irq, clk_per, clk_ipg);
- }
-+CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx25_timer, "fsl,imx25-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx50_timer, "fsl,imx50-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx51_timer, "fsl,imx51-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx53_timer, "fsl,imx53-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx6q_timer, "fsl,imx6q-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx6sl_timer, "fsl,imx6sl-gpt", mxc_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(mx6sx_timer, "fsl,imx6sx-gpt", mxc_timer_init_dt);
+  MB86S70 is a bigLITTLE platform with 2xCA7+2xCA15 and an additional
+CM3 as the master. In this initial series we support boot from the A7 cluster, 
+we will provide patches later to implement full big.LITTLE. 
+MB86S73 is a simple 2xCA7 and an additional CM3 master.
+
+  The following series has dependencies on Jassi Brar's Mailbox series.
+[PATCHv8 0/2] Common Mailbox Framework : 
+http://www.spinics.net/lists/kernel/msg1783170.html
+
+  And some additional SDHCI quirks from Vincent Yang.
+[PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP : 
+http://article.gmane.org/gmane.linux.kernel.mmc/27904
+
+We welcome any comments or questions.
+Thanks.
+
+Mollie Wu (8):
+  ARM: Add platform support for Fujitsu MB86S7X SoCs
+  mmc: sdhci: host: add new f_sdh30
+  mmc: core: add manual resume capability
+  clk: Add clock driver for mb86s7x
+  pinctrl: add driver for MB86S7x
+  net: ethernet driver: Fujitsu OGMA
+  mailbox: f_mhu: add driver for Fujitsu MHU controller
+  of: add Fujitsu vendor prefix
+
+ .../bindings/arm/fujistu/power_domain.txt          |   22 +
+ .../bindings/clock/fujitsu,mb86s7x_clk.txt         |   32 +
+ .../bindings/gpio/fujitsu,mb86s7x-gpio.txt         |   22 +
+ .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |   36 +
+ .../devicetree/bindings/net/fujitsu-ogma.txt       |   43 +
+ .../bindings/pinctrl/fujitsu,mb86s7x-pinctrl.txt   |   30 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/mb86s70.dtsi                     |  635 ++++++++++
+ arch/arm/boot/dts/mb86s70eb.dts                    |   38 +
+ arch/arm/boot/dts/mb86s73.dtsi                     |  910 ++++++++++++++
+ arch/arm/boot/dts/mb86s73eb.dts                    |   73 ++
+ arch/arm/configs/fujitsu_defconfig                 |  156 +++
+ arch/arm/mach-mb86s7x/Kconfig                      |   18 +
+ arch/arm/mach-mb86s7x/Makefile                     |    2 +
+ arch/arm/mach-mb86s7x/board.c                      |   65 +
+ arch/arm/mach-mb86s7x/iomap.h                      |   34 +
+ arch/arm/mach-mb86s7x/mcpm.c                       |  293 +++++
+ arch/arm/mach-mb86s7x/pm_domains.c                 |  237 ++++
+ arch/arm/mach-mb86s7x/scb_mhu.c                    |  447 +++++++
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-mb86s7x.c                          |  352 ++++++
+ drivers/mailbox/Kconfig                            |    7 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/f_mhu.c                            |  227 ++++
+ drivers/mmc/core/core.c                            |    4 +
+ drivers/mmc/core/sd.c                              |    4 +
+ drivers/mmc/host/Kconfig                           |    7 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/sdhci_f_sdh30.c                   |  469 +++++++
+ drivers/net/ethernet/fujitsu/Kconfig               |   12 +
+ drivers/net/ethernet/fujitsu/Makefile              |    1 +
+ drivers/net/ethernet/fujitsu/ogma/Makefile         |    6 +
+ drivers/net/ethernet/fujitsu/ogma/ogma.h           |  380 ++++++
+ .../ethernet/fujitsu/ogma/ogma_desc_ring_access.c  |  627 ++++++++++
+ drivers/net/ethernet/fujitsu/ogma/ogma_ethtool.c   |   95 ++
+ .../net/ethernet/fujitsu/ogma/ogma_gmac_access.c   |  295 +++++
+ drivers/net/ethernet/fujitsu/ogma/ogma_netdev.c    |  592 +++++++++
+ drivers/net/ethernet/fujitsu/ogma/ogma_platform.c  |  333 +++++
+ drivers/pinctrl/Kconfig                            |    5 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-mb86s7x.c                  | 1281 ++++++++++++++++++++
+ include/linux/mmc/host.h                           |   14 +
+ include/linux/platform_data/mb86s7x_mbox.h         |  249 ++++
+ 46 files changed, 8063 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/fujistu/power_domain.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s7x-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+ create mode 100644 Documentation/devicetree/bindings/net/fujitsu-ogma.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fujitsu,mb86s7x-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
+ create mode 100644 arch/arm/configs/fujitsu_defconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Kconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Makefile
+ create mode 100644 arch/arm/mach-mb86s7x/board.c
+ create mode 100644 arch/arm/mach-mb86s7x/iomap.h
+ create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+ create mode 100644 arch/arm/mach-mb86s7x/pm_domains.c
+ create mode 100644 arch/arm/mach-mb86s7x/scb_mhu.c
+ create mode 100644 drivers/clk/clk-mb86s7x.c
+ create mode 100644 drivers/mailbox/f_mhu.c
+ create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/Makefile
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma.h
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_desc_ring_access.c
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_ethtool.c
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_gmac_access.c
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_netdev.c
+ create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
+ create mode 100644 drivers/pinctrl/pinctrl-mb86s7x.c
+ create mode 100644 include/linux/platform_data/mb86s7x_mbox.h
+
 -- 
-1.8.5.5
+1.8.1.2
