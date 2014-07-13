@@ -1,55 +1,33 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 13 Jul 2014 08:45:36 +0400
-Subject: [PATCH RESEND 2/2] clocksource: clps711x: Add DT bindings
- documentation
-Message-ID: <1405226736-5122-1-git-send-email-shc_work@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 12 Jul 2014 21:47:30 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC CPUFreq Updates
+ for v3.17
+In-Reply-To: <cover.1405172884.git.horms+renesas@verge.net.au>
+References: <cover.1405172884.git.horms+renesas@verge.net.au>
+Message-ID: <20140713044730.GG14206@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT binding documentation for the Cirrus Logic
-CLPS711X-based CPUs clocksource subsystem.
+On Sat, Jul 12, 2014 at 03:53:15PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC CPUFreq
+> updates for v3.17.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-cpufreq-for-v3.17,
+> which I have already sent a pull-request for.
+> 
+> 
+> The following changes since commit 06e32c91dbce3c24ccbe84e3af2a35199662bca0:
+> 
+>   ARM: shmobile: add cpufreq-cpu0 driver for common SH-Mobile (2014-06-16 19:50:54 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-cpufreq2-for-v3.17
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- .../bindings/timer/cirrus,clps711x-timer.txt       | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
+Merged, thanks.
 
-diff --git a/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-new file mode 100644
-index 0000000..cd55b52
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-@@ -0,0 +1,29 @@
-+* Cirrus Logic CLPS711X Timer Counter
-+
-+Required properties:
-+- compatible: Shall contain "cirrus,clps711x-timer".
-+- reg       : Address and length of the register set.
-+- interrupts: The interrupt number of the timer.
-+- clocks    : phandle of timer reference clock.
-+
-+Note: Each timer should have an alias correctly numbered in "aliases" node.
-+
-+Example:
-+	aliases {
-+		timer0 = &timer1;
-+		timer1 = &timer2;
-+	};
-+
-+	timer1: timer at 80000300 {
-+		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
-+		reg = <0x80000300 0x4>;
-+		interrupts = <8>;
-+		clocks = <&clks 5>;
-+	};
-+
-+	timer2: timer at 80000340 {
-+		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
-+		reg = <0x80000340 0x4>;
-+		interrupts = <9>;
-+		clocks = <&clks 6>;
-+	};
--- 
-1.8.5.5
+
+-Olof
