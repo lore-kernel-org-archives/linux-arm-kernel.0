@@ -1,27 +1,57 @@
 From: richard@nod.at (Richard Weinberger)
-Date: Sun, 13 Jul 2014 16:58:56 +0200
-Subject: [RFC] Remove remaining users of exec domains
-Message-ID: <1405263538-27589-1-git-send-email-richard@nod.at>
+Date: Sun, 13 Jul 2014 16:58:58 +0200
+Subject: [PATCH 2/2] ia64: Remove Linux/x86 domain support
+In-Reply-To: <1405263538-27589-1-git-send-email-richard@nod.at>
+References: <1405263538-27589-1-git-send-email-richard@nod.at>
+Message-ID: <1405263538-27589-3-git-send-email-richard@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two patches remove the last two in-tree users of exec domains.
-Both seem to be abandoned and historical.
-Russel, Tony, are you fine with that? 
+ia64 exec domain support seems to be incomplete and unused.
+It has no custom handler nor a custom signal map.
+All it does is showing up in /proc/execdomains.
+Let's rip it out.
 
-The plan is to get rid of exec domains at all. IOW no more register_exec_domain,
-no signal translation.
-I have a follow up series for that already in my local tree.
+Signed-off-by: Richard Weinberger <richard@nod.at>
+---
+ arch/ia64/mm/init.c | 25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-Thanks,
-//richard
-
-[PATCH 1/2] arm: Remove RISC OS personality
-[PATCH 2/2] ia64: Remove Linux/x86 domain support
-
- arch/arm/kernel/arthur.c          |   94 ------------------------------------
- arch/arm/Kconfig                  |   12 ----
- arch/arm/configs/badge4_defconfig |    1 
- arch/arm/kernel/Makefile          |    1 
- arch/ia64/mm/init.c               |   25 ---------
- 5 files changed, 133 deletions(-)
+diff --git a/arch/ia64/mm/init.c b/arch/ia64/mm/init.c
+index 25c3502..d4a6b79 100644
+--- a/arch/ia64/mm/init.c
++++ b/arch/ia64/mm/init.c
+@@ -660,31 +660,6 @@ int arch_remove_memory(u64 start, u64 size)
+ #endif
+ #endif
+ 
+-/*
+- * Even when CONFIG_IA32_SUPPORT is not enabled it is
+- * useful to have the Linux/x86 domain registered to
+- * avoid an attempted module load when emulators call
+- * personality(PER_LINUX32). This saves several milliseconds
+- * on each such call.
+- */
+-static struct exec_domain ia32_exec_domain;
+-
+-static int __init
+-per_linux32_init(void)
+-{
+-	ia32_exec_domain.name = "Linux/x86";
+-	ia32_exec_domain.handler = NULL;
+-	ia32_exec_domain.pers_low = PER_LINUX32;
+-	ia32_exec_domain.pers_high = PER_LINUX32;
+-	ia32_exec_domain.signal_map = default_exec_domain.signal_map;
+-	ia32_exec_domain.signal_invmap = default_exec_domain.signal_invmap;
+-	register_exec_domain(&ia32_exec_domain);
+-
+-	return 0;
+-}
+-
+-__initcall(per_linux32_init);
+-
+ /**
+  * show_mem - give short summary of memory stats
+  *
+-- 
+2.0.1
