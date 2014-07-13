@@ -1,170 +1,69 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Sun, 13 Jul 2014 16:58:57 +0200
-Subject: [PATCH 1/2] arm: Remove RISC OS personality
-In-Reply-To: <1405263538-27589-1-git-send-email-richard@nod.at>
-References: <1405263538-27589-1-git-send-email-richard@nod.at>
-Message-ID: <1405263538-27589-2-git-send-email-richard@nod.at>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 13 Jul 2014 08:30:24 -0700
+Subject: [PATCH v4 0/7] kernel: Add support for restart notifier call chain
+Message-ID: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RISC OS personality seems to be unused and untested for a long time.
-Let's rip it out.
+Various drivers implement architecture and/or device specific means
+to restart (reset) the system. Various mechanisms have been implemented
+to support those schemes. The best known mechanism is arm_pm_restart,
+which is a function pointer to be set either from platform specific code
+or from drivers. Another mechanism is to use hardware watchdogs to issue
+a reset; this mechanism is used if there is no other method available
+to reset a board or system. Two examples are alim7101_wdt, which currently
+uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
+the arm_pm_restart function. Several other restart drivers for arm, all
+directly calling arm_pm_restart, are in the process of being integrated
+into the kernel. All those drivers would benefit from the new API.
 
-Signed-off-by: Richard Weinberger <richard@nod.at>
+The existing mechanisms have a number of drawbacks. Typically only one scheme
+to restart the system is supported (at least if arm_pm_restart is used).
+At least in theory there can be multiple means to restart the system, some of
+which may be less desirable (for example one mechanism may only reset the CPU,
+while another may reset the entire system). Using arm_pm_restart can also be
+racy if the function pointer is set from a driver, as the driver may be in
+the process of being unloaded when arm_pm_restart is called.
+Using the reboot notifier is always racy, as it is unknown if and when
+other functions using the reboot notifier have completed execution
+by the time the watchdog fires.
+
+Introduce a system restart notifier to solve the described problems.
+This notifier is expected to be called from the architecture specific
+machine_restart() function. Drivers providing system restart functionality
+(such as the watchdog drivers mentioned above) are expected to register
+with this notifier. By using the priority field in the notifier block,
+callers can control notifier execution sequence and thus ensure that the
+notifier with the optimal restart capabilities for a given system
+is called first.
+
+Since the first revision of this patchset, a number of separate patch
+submissions have been made which either depend on it or could make use of it.
+
+http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
+	registers three notifiers.
+https://lkml.org/lkml/2014/7/8/962
+	would benefit from it.
+
+Patch 1 of this series implements the notifier function. Patches 2 and 3
+implement calling the notifier chain from arm and arm64 restart code.
+
+Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
+directly but machine_restart. This is done to avoid calling arm_pm_restart
+from more than one place. The change makes the driver architecture independent,
+so it would be possible to drop the arm dependency from its Kconfig entry.
+
+Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+to use the restart notifier. Patch 7 unexports arm_pm_restart to ensure
+that no one gets the idea to implement a restart handler as module.
+
 ---
- arch/arm/Kconfig                  | 12 -----
- arch/arm/configs/badge4_defconfig |  1 -
- arch/arm/kernel/Makefile          |  1 -
- arch/arm/kernel/arthur.c          | 94 ---------------------------------------
- 4 files changed, 108 deletions(-)
- delete mode 100644 arch/arm/kernel/arthur.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 245058b..b57afd3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2177,18 +2177,6 @@ menu "Userspace binary formats"
- 
- source "fs/Kconfig.binfmt"
- 
--config ARTHUR
--	tristate "RISC OS personality"
--	depends on !AEABI
--	help
--	  Say Y here to include the kernel code necessary if you want to run
--	  Acorn RISC OS/Arthur binaries under Linux. This code is still very
--	  experimental; if this sounds frightening, say N and sleep in peace.
--	  You can also say M here to compile this support as a module (which
--	  will be called arthur).
--
--endmenu
--
- menu "Power management options"
- 
- source "kernel/power/Kconfig"
-diff --git a/arch/arm/configs/badge4_defconfig b/arch/arm/configs/badge4_defconfig
-index 0494c8f..d590098 100644
---- a/arch/arm/configs/badge4_defconfig
-+++ b/arch/arm/configs/badge4_defconfig
-@@ -12,7 +12,6 @@ CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
- CONFIG_FPE_NWFPE=y
- CONFIG_BINFMT_AOUT=m
- CONFIG_BINFMT_MISC=m
--CONFIG_ARTHUR=m
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 38ddd9f..742e076 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -35,7 +35,6 @@ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ISA_DMA_API)	+= dma.o
- obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
- obj-$(CONFIG_MODULES)		+= armksyms.o module.o
--obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
-diff --git a/arch/arm/kernel/arthur.c b/arch/arm/kernel/arthur.c
-deleted file mode 100644
-index 321c529..0000000
---- a/arch/arm/kernel/arthur.c
-+++ /dev/null
-@@ -1,94 +0,0 @@
--/*
-- *  linux/arch/arm/kernel/arthur.c
-- *
-- *  Copyright (C) 1998, 1999, 2000, 2001 Philip Blundell
-- *
-- * Arthur personality
-- */
--
--/*
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
-- */
--
--#include <linux/module.h>
--#include <linux/personality.h>
--#include <linux/stddef.h>
--#include <linux/signal.h>
--#include <linux/init.h>
--#include <linux/sched.h>
--
--#include <asm/ptrace.h>
--
--/* Arthur doesn't have many signals, and a lot of those that it does
--   have don't map easily to any Linux equivalent.  Never mind.  */
--
--#define ARTHUR_SIGABRT		1
--#define ARTHUR_SIGFPE		2
--#define ARTHUR_SIGILL		3
--#define ARTHUR_SIGINT		4
--#define ARTHUR_SIGSEGV		5
--#define ARTHUR_SIGTERM		6
--#define ARTHUR_SIGSTAK		7
--#define ARTHUR_SIGUSR1		8
--#define ARTHUR_SIGUSR2		9
--#define ARTHUR_SIGOSERROR	10
--
--static unsigned long arthur_to_linux_signals[32] = {
--	0,	1,	2,	3,	4,	5,	6,	7,
--	8,	9,	10,	11,	12,	13,	14,	15,
--	16,	17,	18,	19,	20,	21,	22,	23,
--	24,	25,	26,	27,	28,	29,	30,	31
--};
--
--static unsigned long linux_to_arthur_signals[32] = {
--	0,		-1,		ARTHUR_SIGINT,	-1,
--       	ARTHUR_SIGILL,	5,		ARTHUR_SIGABRT,	7,
--	ARTHUR_SIGFPE,	9,		ARTHUR_SIGUSR1,	ARTHUR_SIGSEGV,	
--	ARTHUR_SIGUSR2,	13,		14,		ARTHUR_SIGTERM,
--	16,		17,		18,		19,
--	20,		21,		22,		23,
--	24,		25,		26,		27,
--	28,		29,		30,		31
--};
--
--static void arthur_lcall7(int nr, struct pt_regs *regs)
--{
--	struct siginfo info;
--	info.si_signo = SIGSWI;
--	info.si_errno = nr;
--	/* Bounce it to the emulator */
--	send_sig_info(SIGSWI, &info, current);
--}
--
--static struct exec_domain arthur_exec_domain = {
--	.name		= "Arthur",
--	.handler	= arthur_lcall7,
--	.pers_low	= PER_RISCOS,
--	.pers_high	= PER_RISCOS,
--	.signal_map	= arthur_to_linux_signals,
--	.signal_invmap	= linux_to_arthur_signals,
--	.module		= THIS_MODULE,
--};
--
--/*
-- * We could do with some locking to stop Arthur being removed while
-- * processes are using it.
-- */
--
--static int __init arthur_init(void)
--{
--	return register_exec_domain(&arthur_exec_domain);
--}
--
--static void __exit arthur_exit(void)
--{
--	unregister_exec_domain(&arthur_exec_domain);
--}
--
--module_init(arthur_init);
--module_exit(arthur_exit);
--
--MODULE_LICENSE("GPL");
--- 
-2.0.1
+v4: Document restart notifier priorities
+    Select 128 as default priority for newly introduced notifiers
+    Fix checkpatch warning (line too long) in moxart patch
+v3: Drop RFC.
+    Add kernel_restart_notify wrapper function to execute notifier
+    Improve documentation.
+    Move restart_notifier_list into kernel/reboot.c and make it static.
+v2: Add patch 4.
+    Only call blocking notifier call chain if arm_pm_restart was not set.
