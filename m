@@ -1,40 +1,65 @@
 From: Vincent.Yang@tw.fujitsu.com (Vincent Yang)
-Date: Sun, 13 Jul 2014 13:21:06 +0800
-Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
-Message-ID: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Date: Sun, 13 Jul 2014 13:21:07 +0800
+Subject: [PATCH 1/4] mmc: sdhci: add quirk for voltage switch callback
+In-Reply-To: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1405228870-5088-2-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-We are adding support for a new Fujitsu sdhci IP.
-These patches are preparations and will be used by Fujitsu
+This patch defines a quirk to do a callback when
+switching voltages so do controller-specific
+actions.
+It is a preparation and will be used by Fujitsu
 SDHCI controller f_sdh30 driver.
 
-These patches are against v3.16-rc4 mainline since nothing in
-mmc-next at this moment.
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+---
+ drivers/mmc/host/sdhci.c  | 5 +++++
+ drivers/mmc/host/sdhci.h  | 1 +
+ include/linux/mmc/sdhci.h | 2 ++
+ 3 files changed, 8 insertions(+)
 
-These patches are tested on 3.16-rc4 integration tree.
-
-We welcome any comment and advice about how to make any
-improvements or better align them with upstream.
-
-Thanks a lot!
-
-Best regards,
-Vincent Yang
-
-
-Vincent Yang (4):
-  mmc: sdhci: add quirk for voltage switch callback
-  mmc: sdhci: add quirk for tuning work around
-  mmc: sdhci: add quirk for single block transactions
-  mmc: core: hold SD Clock before CMD11 during Signal
-
- drivers/mmc/core/core.c   |  4 ++--
- drivers/mmc/host/sdhci.c  | 15 ++++++++++++---
- drivers/mmc/host/sdhci.h  |  1 +
- include/linux/mmc/sdhci.h |  6 ++++++
- 4 files changed, 21 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 47055f3..d62262b 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1763,6 +1763,11 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+ 		ctrl |= SDHCI_CTRL_VDD_180;
+ 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+ 
++		/* Some controller need to do more when switching */
++		if ((host->quirks2 & SDHCI_QUIRK2_VOLTAGE_SWITCH) &&
++		    host->ops->voltage_switch)
++			host->ops->voltage_switch(host);
++
+ 		/* Wait for 5ms */
+ 		usleep_range(5000, 5500);
+ 
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 4a5cd5e..63c7a46 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -292,6 +292,7 @@ struct sdhci_ops {
+ 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
+ 	void	(*platform_init)(struct sdhci_host *host);
+ 	void    (*card_event)(struct sdhci_host *host);
++	void	(*voltage_switch)(struct sdhci_host *host);
+ };
+ 
+ #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index 08abe99..5433f04 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -98,6 +98,8 @@ struct sdhci_host {
+ #define SDHCI_QUIRK2_BROKEN_HS200			(1<<6)
+ /* Controller does not support DDR50 */
+ #define SDHCI_QUIRK2_BROKEN_DDR50			(1<<7)
++/* Do a callback when switching voltages so do controller-specific actions */
++#define SDHCI_QUIRK2_VOLTAGE_SWITCH			(1<<8)
+ 
+ 	int irq;		/* Device IRQ */
+ 	void __iomem *ioaddr;	/* Mapped address */
 -- 
 1.9.0
