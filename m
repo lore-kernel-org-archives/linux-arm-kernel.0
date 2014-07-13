@@ -1,69 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 23:38:15 -0700
-Subject: [PATCH 00/12] Add NVIDIA Tegra FUSE driver
-In-Reply-To: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
-References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140713063815.GA24843@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 13 Jul 2014 09:21:36 +0100
+Subject: [PATCH 1/4] mmc: sdhci: add quirk for voltage switch callback
+In-Reply-To: <1405228870-5088-2-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1405228870-5088-2-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <20140713082136.GJ21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 02:15:59PM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This series is an extension of Peter's original series to add a proper
-> driver for the FUSE block on Tegra.
-> 
-> Patches 1 and 2 are preparatory work that cleans up include lists and
-> introduces a function to query the Tegra chip ID rather than accessing
-> a simple variable. This is used by subsequent patches to allow us to
-> execute code when the variable is accessed to help in pin-pointing
-> locations where it's accessed before the driver had a chance to
-> initialize.
-> 
-> Patches 3 through 8 are Peter's series with a fixup patch by Stephen. I
-> also moved the driver to drivers/soc/tegra/fuse as requested by Olof.
-> 
-> Patches 9 and 10 defer usages of the tegra_get_chip_id() function to a
-> later stage (pure_initcall). This allows patch 11 to set up the early
-> FUSE support code from an early initcall. This has the advantage of not
-> requiring an explicit call from SoC setup code in arch/arm/mach-tegra
-> and will allow the code to be shared on 64-bit variants of Tegra.
-> 
-> Patch 12 finally turns the PMC and powergate support code into a proper
-> driver which also sets up a minimal environment from an early initcall.
-> The driver isn't moved out of arch/arm/mach-tegra yet because people
-> have suggested drivers/power as a good home, but that whole directory
-> depends on the POWER_SUPPLY Kconfig symbol yet this driver doesn't have
-> anything to do with that. Once that debate has been settled the driver
-> can easily be moved out in a separate patch.
-> 
-> Some of the patches in this series introduce diagnostic WARN() messages
-> if functions are called without setup having completed. I've booted the
-> v3.16-rc1 kernel with these changes on top on Tegra20 (TrimSlice),
-> Tegra30 (Beaver), Tegra114 (Dalmore) and Tegra124 (Jetson TK1) without
-> encountering any of the diagnostic warnings and without noticing any
-> breakage.
-> 
-> Olof, this series should address the concerns you expressed after
-> reviewing Stephen's earlier pull request for Peter's FUSE driver series.
-> It would be great if you could take another look to see if this is more
-> according to your taste. I'll see if I can take this through linux-next
-> for a little and if you have no objections will submit another pull
-> request next week.
+On Sun, Jul 13, 2014 at 01:21:07PM +0800, Vincent Yang wrote:
+> @@ -1763,6 +1763,11 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+>  		ctrl |= SDHCI_CTRL_VDD_180;
+>  		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+>  
+> +		/* Some controller need to do more when switching */
+> +		if ((host->quirks2 & SDHCI_QUIRK2_VOLTAGE_SWITCH) &&
+> +		    host->ops->voltage_switch)
+> +			host->ops->voltage_switch(host);
+> +
 
-I haven't looked at all the patches in detail yet, but I do like
-the approach in general. I've also applied and pushed them out for
-build+test here, but they're queued behind a couple of other builds
-so I won't have it until morning (you can poll for boot logs at
-arm-soc.lixom.net/bootlogs/misc/v3.16-rc4-371-g2c9d948 if you want to
-preempt me).
+Why do you heed SDHCI_QUIRK2_VOLTAGE_SWITCH?  Isn't populating
+ops->voltage_switch enough? to indicate that something needs to be
+done?
 
-> Peter De Schrijver (5):
->   ARM: tegra: export apb dma readl/writel
+It would also be better to turn sdhci.c into a library, and have
+the platform driver call the appropriate functions in sdhci rather
+than having sdhci be a core driver with loads of quirks.  This is
+what I've done in my previous series where I changed stuff such as
+the set_bus_width(), set_uhs_signaling() and similar callbacks.
 
-I thought I saw a patch from Peter that moved the apbio read code to
-the fuse driver since there are no other consumers. I think that's a
-reasonable thing to do.
+So, it probably makes more sense to split
+sdhci_do_start_signal_voltage_switch() into a load of smaller library
+functions which drivers can call in an appropriate sequence, rather
+than having a quirk hook.
 
+The problem with quirk hooks is that what is right for one device
+is not right for another device - eventually you end up with lots
+of quirk callbacks scattered on every alternate line.  That doesn't
+scale.
 
--Olof
+Experienced kernel programmers know this and this is why words like
+"framework" fill those who have encountered this problem with dread.
+sdhci.c is a prime example of this kind of design mistake.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
