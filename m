@@ -1,280 +1,436 @@
 From: mollie.wu@linaro.org (Mollie Wu)
-Date: Sun, 13 Jul 2014 14:30:25 +0800
-Subject: [PATCH 3/8] mmc: core: add manual resume capability
+Date: Sun, 13 Jul 2014 14:30:52 +0800
+Subject: [PATCH 4/8] clk: Add clock driver for mb86s7x
 In-Reply-To: <message-id-of-cover-letter>
 References: <message-id-of-cover-letter>
-Message-ID: <1405233026-4649-1-git-send-email-mollie.wu@linaro.org>
+Message-ID: <1405233052-4688-1-git-send-email-mollie.wu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds manual resume for some embedded platforms with rootfs
-stored in SD card. It references CONFIG_MMC_BLOCK_DEFERRED_RESUME in
-kernel 3.10. It lets host controller driver to manually handle resume
-by itself.
+ The CRG11 clock controller is managed by remote f/w.
+This driver simply maps Linux CLK ops onto mailbox api.
 
-[symptom]
-This issue is found on mb86s7x platforms with rootfs stored in SD card.
-It failed to resume form STR suspend mode because SD card cannot be ready
-in time. It take longer time (e.g., 600ms) to be ready for access.
-The error log looks like below:
-
-root at localhost:~# echo mem > /sys/power/state
-[   30.441974] SUSPEND
-
-SCB Firmware : Category 01 Version 02.03 Rev. 00_
-    Config   : (no configuration)
-root at localhost:~# [   30.702976] Buffer I/O error on device mmcblk1p2, logical block 31349
-[   30.709678] Buffer I/O error on device mmcblk1p2, logical block 168073
-[   30.716220] Buffer I/O error on device mmcblk1p2, logical block 168074
-[   30.722759] Buffer I/O error on device mmcblk1p2, logical block 168075
-[   30.729456] Buffer I/O error on device mmcblk1p2, logical block 31349
-[   30.735916] Buffer I/O error on device mmcblk1p2, logical block 31350
-[   30.742370] Buffer I/O error on device mmcblk1p2, logical block 31351
-[   30.749025] Buffer I/O error on device mmcblk1p2, logical block 168075
-[   30.755657] Buffer I/O error on device mmcblk1p2, logical block 31351
-[   30.763130] Aborting journal on device mmcblk1p2-8.
-[   30.768060] JBD2: Error -5 detected when updating journal superblock for mmcblk1p2-8.
-[   30.776085] EXT4-fs error (device mmcblk1p2): ext4_journal_check_start:56: Detected aborted journal
-[   30.785259] EXT4-fs (mmcblk1p2): Remounting filesystem read-only
-[   31.370716] EXT4-fs error (device mmcblk1p2): ext4_find_entry:1309: inode #2490369: comm udevd: reading directory lblock 0
-[   31.382485] EXT4-fs error (device mmcblk1p2): ext4_find_entry:1309: inode #1048577: comm udevd: reading directory lblock 0
-
-[analysis]
-In system resume path, mmc_sd_resume() is failed with error code -123
-because at that time SD card is still not ready on mb86s7x platforms.
-
-[solution]
-In order to not blocking system resume path, this patch just sets a flag
-MMC_BUSRESUME_MANUAL_RESUME when this error happened, and then host controller
-driver can understand it by this flag. Then host controller driver have to
-resume SD card manually and asynchronously.
-
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof <olof@lixom.net>
 Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
 Signed-off-by: Mollie Wu <mollie.wu@linaro.org>
 ---
- drivers/mmc/core/core.c          |  4 ++
- drivers/mmc/core/sd.c            |  4 ++
- drivers/mmc/host/sdhci_f_sdh30.c | 89 ++++++++++++++++++++++++++++++++++++++++
- include/linux/mmc/host.h         | 14 +++++++
- 4 files changed, 111 insertions(+)
+ .../bindings/clock/fujitsu,mb86s7x_clk.txt         |  32 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-mb86s7x.c                          | 352 +++++++++++++++++++++
+ 3 files changed, 385 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+ create mode 100644 drivers/clk/clk-mb86s7x.c
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 764af63..51fce49 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -2648,6 +2648,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
- 	case PM_POST_RESTORE:
- 
- 		spin_lock_irqsave(&host->lock, flags);
-+		if (mmc_bus_manual_resume(host)) {
-+			spin_unlock_irqrestore(&host->lock, flags);
-+			break;
-+		}
- 		host->rescan_disable = 0;
- 		spin_unlock_irqrestore(&host->lock, flags);
- 		_mmc_detect_change(host, 0, false);
-diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-index 0c44510..859390d 100644
---- a/drivers/mmc/core/sd.c
-+++ b/drivers/mmc/core/sd.c
-@@ -1133,6 +1133,10 @@ static int mmc_sd_resume(struct mmc_host *host)
- 
- 	if (!(host->caps & MMC_CAP_RUNTIME_RESUME)) {
- 		err = _mmc_sd_resume(host);
-+		if ((host->caps2 & MMC_CAP2_MANUAL_RESUME) && err)
-+			mmc_set_bus_resume_policy(host, 1);
-+		else
-+			mmc_set_bus_resume_policy(host, 0);
- 		pm_runtime_set_active(&host->card->dev);
- 		pm_runtime_mark_last_busy(&host->card->dev);
- 	}
-diff --git a/drivers/mmc/host/sdhci_f_sdh30.c b/drivers/mmc/host/sdhci_f_sdh30.c
-index 8d23f2d..32864ba 100644
---- a/drivers/mmc/host/sdhci_f_sdh30.c
-+++ b/drivers/mmc/host/sdhci_f_sdh30.c
-@@ -29,6 +29,12 @@
- #include "../core/core.h"
- 
- #define DRIVER_NAME "f_sdh30"
-+#define RESUME_WAIT_COUNT	100
-+#define RESUME_WAIT_TIME	50
-+#define RESUME_WAIT_JIFFIES	msecs_to_jiffies(RESUME_DETECT_TIME)
-+#define RESUME_DETECT_COUNT	16
-+#define RESUME_DETECT_TIME	50
-+#define RESUME_DETECT_JIFFIES	msecs_to_jiffies(RESUME_DETECT_TIME)
- 
- /* F_SDH30 extended Controller registers */
- #define F_SDH30_AHB_CONFIG		0x100
-@@ -61,8 +67,59 @@ struct f_sdhost_priv {
- 	int gpio_select_1v8;
- 	u32 vendor_hs200;
- 	struct device *dev;
-+	unsigned int quirks;	/* Deviations from spec. */
+diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+new file mode 100644
+index 0000000..4a17d79
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+@@ -0,0 +1,32 @@
++Fujitsu CRG11 clock driver bindings
++-----------------------------------
 +
-+/* retry to detect mmc device when resume */
-+#define F_SDH30_QUIRK_RESUME_DETECT_RETRY		(1<<0)
++Required properties :
++- compatible : Shall contain "fujitsu,mb86s7x_clk"
++- #clock-cells : Shall be 0
++- cntrlr : 0->ALW, 1->DDR3, 2->MAIN, 3->CA15, 4->HDMI, 5->DPHY
++- domain : [0, 15]
++- port : [0,7] -> Gateable Clock Ports.  [8]->UngatedCLK
 +
-+	struct workqueue_struct *resume_detect_wq;
-+	struct delayed_work resume_detect_work;
-+	unsigned int		resume_detect_count;
-+	unsigned int		resume_wait_count;
- };
- 
-+static void sdhci_f_sdh30_resume_detect_work_func(struct work_struct *work)
++The consumer specifies the desired clock pointing to its phandle.
++
++Example:
++
++	clk_alw_2_1: clk_alw_2_1 {
++		compatible = "fujitsu,mb86s7x_clk";
++		#clock-cells = <0>;
++		cntrlr = <0>;
++		domain = <2>;
++		port = <1>;
++	};
++
++	mhu: mhu0 at 2b1f0000 {
++		#mbox-cells = <1>;
++		compatible = "fujitsu,mhu";
++		reg = <0 0x2B1F0000 0x1000>;
++		interrupts = <0 36 4>, /* LP Non-Sec */
++			     <0 35 4>, /* HP Non-Sec */
++			     <0 37 4>; /* Secure */
++		clocks = <&clk_alw_2_1>;
++		clock-names = "clk";
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 567f102..ccbce66 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
+ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
++obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
+ obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
+ obj-$(CONFIG_CLK_PPC_CORENET)		+= clk-ppc-corenet.o
+diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
+new file mode 100644
+index 0000000..ddb5f13
+--- /dev/null
++++ b/drivers/clk/clk-mb86s7x.c
+@@ -0,0 +1,352 @@
++/*
++ * Copyright (C) 2013-2014 FUJITSU SEMICONDUCTOR LIMITED
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clkdev.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/cpu.h>
++#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
++#include <linux/module.h>
++#include <linux/topology.h>
++#include <linux/mailbox_client.h>
++#include <linux/platform_device.h>
++#include <linux/platform_data/mb86s7x_mbox.h>
++
++#define to_crg_clk(p) container_of(p, struct crg_clk, hw)
++#define to_clc_clk(p) container_of(p, struct cl_clk, hw)
++
++struct hack_rate {
++	unsigned clk_id;
++	unsigned long rate;
++	int gated;
++};
++
++struct crg_clk {
++	struct clk_hw hw;
++	u8 cntrlr, domain, port;
++};
++
++static int crg_gate_control(struct clk_hw *hw, int en)
 +{
-+	struct f_sdhost_priv *priv = container_of(work, struct f_sdhost_priv,
-+		resume_detect_work.work);
-+	struct sdhci_host *host = dev_get_drvdata(priv->dev);
-+	int err = 0;
++	struct crg_clk *crgclk = to_crg_clk(hw);
++	struct mb86s7x_peri_clk cmd;
++	struct completion got_rsp;
++	int ret;
 +
-+	if (mmc_bus_manual_resume(host->mmc)) {
-+		pm_runtime_disable(&host->mmc->card->dev);
-+		mmc_card_set_suspended(host->mmc->card);
-+		err = host->mmc->bus_ops->resume(host->mmc);
-+		if (priv->resume_detect_count-- && err)
-+			queue_delayed_work(priv->resume_detect_wq,
-+					   &priv->resume_detect_work,
-+				RESUME_DETECT_JIFFIES);
-+		else
-+			pr_debug("%s: resume detection done (count:%d, wait:%d, err:%d)\n",
-+				 mmc_hostname(host->mmc),
-+				 priv->resume_detect_count,
-+				 priv->resume_wait_count, err);
-+	} else {
-+		if (priv->resume_wait_count--)
-+			queue_delayed_work(priv->resume_detect_wq,
-+					   &priv->resume_detect_work,
-+				RESUME_WAIT_JIFFIES);
-+		else
-+			pr_debug("%s: resume done\n", mmc_hostname(host->mmc));
++	cmd.payload_size = sizeof(cmd);
++	cmd.cntrlr = crgclk->cntrlr;
++	cmd.domain = crgclk->domain;
++	cmd.port = crgclk->port;
++	cmd.en = en;
++
++	/* Port-8 is UngatedCLK */
++	if (cmd.port == 8)
++		return en ? 0 : -EINVAL;
++
++	pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u En-%u}\n",
++		 __func__, __LINE__, cmd.cntrlr,
++		 cmd.domain, cmd.port, cmd.en);
++
++	init_completion(&got_rsp);
++	ret = mhu_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
++			      &cmd, sizeof(cmd), &got_rsp);
++	if (ret < 0) {
++		pr_err("%s:%d failed!\n", __func__, __LINE__);
++		return ret;
 +	}
-+}
++	if (ret)
++		wait_for_completion(&got_rsp);
 +
-+static void sdhci_f_sdh30_resume_detect(struct mmc_host *mmc,
-+					int detect, int wait)
-+{
-+	struct sdhci_host *host = mmc_priv(mmc);
-+	struct f_sdhost_priv *priv = sdhci_priv(host);
++	pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u En-%u}\n",
++		 __func__, __LINE__, cmd.cntrlr,
++		 cmd.domain, cmd.port, cmd.en);
 +
-+	priv->resume_detect_count = detect;
-+	priv->resume_wait_count = wait;
-+	queue_delayed_work(priv->resume_detect_wq,
-+			   &priv->resume_detect_work, 0);
-+}
-+
- void sdhci_f_sdh30_soft_voltage_switch(struct sdhci_host *host)
- {
- 	struct f_sdhost_priv *priv = sdhci_priv(host);
-@@ -173,6 +230,12 @@ static int sdhci_f_sdh30_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	if (of_find_property(pdev->dev.of_node, "resume-detect-retry", NULL)) {
-+		dev_info(dev, "Applying resume detect retry quirk\n");
-+		priv->quirks |= F_SDH30_QUIRK_RESUME_DETECT_RETRY;
-+		host->mmc->caps2 |= MMC_CAP2_MANUAL_RESUME;
-+	}
-+
- 	ret = mmc_of_parse_voltage(pdev->dev.of_node, &host->ocr_mask);
- 	if (ret) {
- 		dev_err(dev, "%s: parse voltage error\n", __func__);
-@@ -225,6 +288,18 @@ static int sdhci_f_sdh30_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	/* Init workqueue */
-+	if (priv->quirks & F_SDH30_QUIRK_RESUME_DETECT_RETRY) {
-+		priv->resume_detect_wq = create_workqueue("sdhci_f_sdh30");
-+		if (priv->resume_detect_wq == NULL) {
-+			ret = -ENOMEM;
-+			dev_err(dev, "Failed to create resume detection workqueue\n");
-+			goto err_init_wq;
-+		}
-+		INIT_DELAYED_WORK(&priv->resume_detect_work,
-+				  sdhci_f_sdh30_resume_detect_work_func);
-+	}
-+
- 	platform_set_drvdata(pdev, host);
- 
- #ifdef CONFIG_PM_RUNTIME
-@@ -263,6 +338,9 @@ static int sdhci_f_sdh30_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_add_host:
-+	if (priv->quirks & F_SDH30_QUIRK_RESUME_DETECT_RETRY)
-+		destroy_workqueue(priv->resume_detect_wq);
-+err_init_wq:
- 	if (gpio_is_valid(priv->gpio_select_1v8)) {
- 		gpio_direction_output(priv->gpio_select_1v8, 1);
- 		gpio_free(priv->gpio_select_1v8);
-@@ -302,6 +380,9 @@ static int sdhci_f_sdh30_remove(struct platform_device *pdev)
- 		gpio_free(priv->gpio_select_1v8);
- 	}
- 
-+	if (priv->quirks & F_SDH30_QUIRK_RESUME_DETECT_RETRY)
-+		destroy_workqueue(priv->resume_detect_wq);
-+
- 	sdhci_free_host(host);
- 	platform_set_drvdata(pdev, NULL);
- 
-@@ -319,7 +400,15 @@ static int sdhci_f_sdh30_suspend(struct device *dev)
- static int sdhci_f_sdh30_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct f_sdhost_priv *priv = sdhci_priv(host);
- 
-+	if (priv->quirks & F_SDH30_QUIRK_RESUME_DETECT_RETRY) {
-+		pr_debug("%s: start resume detect\n",
-+			 mmc_hostname(host->mmc));
-+		sdhci_f_sdh30_resume_detect(host->mmc,
-+					    RESUME_DETECT_COUNT,
-+					    RESUME_WAIT_COUNT);
-+	}
- 	return sdhci_resume_host(host);
- }
- #endif
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 7960424..55221dd 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -283,6 +283,7 @@ struct mmc_host {
- #define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
- 				 MMC_CAP2_HS400_1_2V)
- #define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 17)
-+#define MMC_CAP2_MANUAL_RESUME     (1 << 18)	/* Resume manually when error */
- 
- 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
- 
-@@ -338,6 +339,9 @@ struct mmc_host {
- 	const struct mmc_bus_ops *bus_ops;	/* current bus driver */
- 	unsigned int		bus_refs;	/* reference counter */
- 
-+	unsigned int		bus_resume_flags;
-+#define MMC_BUSRESUME_MANUAL_RESUME	(1 << 0)
-+
- 	unsigned int		sdio_irqs;
- 	struct task_struct	*sdio_irq_thread;
- 	bool			sdio_irq_pending;
-@@ -384,6 +388,16 @@ static inline void *mmc_priv(struct mmc_host *host)
- #define mmc_dev(x)	((x)->parent)
- #define mmc_classdev(x)	(&(x)->class_dev)
- #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
-+#define mmc_bus_manual_resume(host) ((host)->bus_resume_flags &		\
-+	MMC_BUSRESUME_MANUAL_RESUME)
-+
-+static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
-+{
-+	if (manual)
-+		host->bus_resume_flags |= MMC_BUSRESUME_MANUAL_RESUME;
++	/* If the request was rejected */
++	if (cmd.en != en)
++		ret = -EINVAL;
 +	else
-+		host->bus_resume_flags &= ~MMC_BUSRESUME_MANUAL_RESUME;
++		ret = 0;
++
++	return ret;
 +}
- 
- int mmc_power_save_host(struct mmc_host *host);
- int mmc_power_restore_host(struct mmc_host *host);
++
++static int crg_port_prepare(struct clk_hw *hw)
++{
++	return crg_gate_control(hw, 1);
++}
++
++static void crg_port_unprepare(struct clk_hw *hw)
++{
++	crg_gate_control(hw, 0);
++}
++
++static int
++crg_rate_control(struct clk_hw *hw, int set, unsigned long *rate)
++{
++	struct crg_clk *crgclk = to_crg_clk(hw);
++	struct mb86s7x_peri_clk cmd;
++	struct completion got_rsp;
++	int code, ret;
++
++	cmd.payload_size = sizeof(cmd);
++	cmd.cntrlr = crgclk->cntrlr;
++	cmd.domain = crgclk->domain;
++	cmd.port = crgclk->port;
++	cmd.freqency = *rate;
++
++	if (set) {
++		code = CMD_PERI_CLOCK_RATE_SET_REQ;
++		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port, cmd.freqency);
++	} else {
++		code = CMD_PERI_CLOCK_RATE_GET_REQ;
++		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-GET}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port);
++	}
++
++	init_completion(&got_rsp);
++	ret = mhu_send_packet(code, &cmd, sizeof(cmd), &got_rsp);
++	if (ret < 0) {
++		pr_err("%s:%d failed!\n", __func__, __LINE__);
++		return ret;
++	}
++	if (ret)
++		wait_for_completion(&got_rsp);
++
++	if (set)
++		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port, cmd.freqency);
++	else
++		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-GOT %lluHz}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port, cmd.freqency);
++
++	*rate = cmd.freqency;
++	return 0;
++}
++
++static unsigned long
++crg_port_recalc_rate(struct clk_hw *hw,	unsigned long parent_rate)
++{
++	unsigned long rate;
++
++	crg_rate_control(hw, 0, &rate);
++
++	return rate;
++}
++
++static long
++crg_port_round_rate(struct clk_hw *hw,
++		    unsigned long rate, unsigned long *pr)
++{
++	return rate;
++}
++
++static int
++crg_port_set_rate(struct clk_hw *hw,
++		  unsigned long rate, unsigned long parent_rate)
++{
++	return crg_rate_control(hw, 1, &rate);
++}
++
++const struct clk_ops crg_port_ops = {
++	.prepare = crg_port_prepare,
++	.unprepare = crg_port_unprepare,
++	.recalc_rate = crg_port_recalc_rate,
++	.round_rate = crg_port_round_rate,
++	.set_rate = crg_port_set_rate,
++};
++
++static void __init crg_port_init(struct device_node *node)
++{
++	struct clk_init_data init;
++	u32 cntrlr, domain, port;
++	struct crg_clk *crgclk;
++	struct clk *clk;
++	char clkp[20];
++	int rc;
++
++	rc = of_property_read_u32(node, "cntrlr", &cntrlr);
++	if (WARN_ON(rc))
++		return;
++	rc = of_property_read_u32(node, "domain", &domain);
++	if (WARN_ON(rc))
++		return;
++	rc = of_property_read_u32(node, "port", &port);
++	if (WARN_ON(rc))
++		return;
++
++	if (port > 7)
++		snprintf(clkp, 20, "UngatedCLK%d_%X", cntrlr, domain);
++	else
++		snprintf(clkp, 20, "CLK%d_%X_%d", cntrlr, domain, port);
++
++	clk = __clk_lookup(clkp);
++	if (clk)
++		return;
++
++	crgclk = kzalloc(sizeof(*crgclk), GFP_KERNEL);
++	if (!crgclk)
++		return;
++	init.name = clkp;
++	init.num_parents = 0;
++	init.ops = &crg_port_ops;
++	init.flags = CLK_IS_ROOT;
++	crgclk->hw.init = &init;
++	crgclk->cntrlr = cntrlr;
++	crgclk->domain = domain;
++	crgclk->port = port;
++	clk = clk_register(NULL, &crgclk->hw);
++	if (IS_ERR(clk))
++		pr_err("%s:%d Error!\n", __func__, __LINE__);
++	else
++		pr_debug("Registered %s\n", clkp);
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_register_clkdev(clk, clkp, NULL);
++}
++CLK_OF_DECLARE(crg11_gate, "fujitsu,mb86s7x_clk", crg_port_init);
++
++struct cl_clk {
++	struct clk_hw hw;
++	int cluster;
++};
++
++static void mhu_cluster_rate(struct clk_hw *hw, unsigned long *rate, int get)
++{
++	struct cl_clk *clc = to_clc_clk(hw);
++	struct mb86s7x_cpu_freq cmd;
++	struct completion got_rsp;
++	int code, ret;
++
++	cmd.payload_size = sizeof(cmd);
++	cmd.cluster_class = 0;
++	cmd.cluster_id = clc->cluster;
++	cmd.cpu_id = 0;
++	cmd.freqency = *rate;
++
++	if (get)
++		code = CMD_CPU_CLOCK_RATE_GET_REQ;
++	else
++		code = CMD_CPU_CLOCK_RATE_SET_REQ;
++
++	pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
++		 __func__, __LINE__, cmd.cluster_class,
++		 cmd.cluster_id, cmd.cpu_id, cmd.freqency);
++
++	init_completion(&got_rsp);
++	ret = mhu_send_packet(code, &cmd, sizeof(cmd), &got_rsp);
++	if (ret < 0) {
++		pr_err("%s:%d failed!\n", __func__, __LINE__);
++		return;
++	}
++	if (ret)
++		wait_for_completion(&got_rsp);
++
++	pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
++		 __func__, __LINE__, cmd.cluster_class,
++		 cmd.cluster_id, cmd.cpu_id, cmd.freqency);
++
++	*rate = cmd.freqency;
++}
++
++static unsigned long
++clc_recalc_rate(struct clk_hw *hw, unsigned long unused)
++{
++	unsigned long rate;
++
++	mhu_cluster_rate(hw, &rate, 1);
++	return rate;
++}
++
++static long
++clc_round_rate(struct clk_hw *hw, unsigned long rate,
++	       unsigned long *unused)
++{
++	return rate;
++}
++
++static int
++clc_set_rate(struct clk_hw *hw, unsigned long rate,
++	     unsigned long unused)
++{
++	unsigned long res = rate;
++
++	mhu_cluster_rate(hw, &res, 0);
++
++	return (res == rate) ? 0 : -EINVAL;
++}
++
++static struct clk_ops clk_clc_ops = {
++	.recalc_rate = clc_recalc_rate,
++	.round_rate = clc_round_rate,
++	.set_rate = clc_set_rate,
++};
++
++struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
++{
++	struct clk_init_data init;
++	struct cl_clk *clc;
++
++	clc = kzalloc(sizeof(*clc), GFP_KERNEL);
++	if (!clc) {
++		pr_err("could not allocate cl_clk\n");
++		return ERR_PTR(-ENOMEM);
++	}
++
++	clc->hw.init = &init;
++	clc->cluster = topology_physical_package_id(cpu_dev->id);
++
++	init.name = dev_name(cpu_dev);
++	init.ops = &clk_clc_ops;
++	init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
++	init.num_parents = 0;
++
++	return devm_clk_register(cpu_dev, &clc->hw);
++}
++
++static int mb86s7x_clclk_of_init(void)
++{
++	int cpu;
++	struct clk *clk;
++
++	for_each_possible_cpu(cpu) {
++		struct device *cpu_dev = get_cpu_device(cpu);
++
++		if (!cpu_dev) {
++			pr_err("failed to get cpu%d device\n", cpu);
++			continue;
++		}
++
++		clk = mb86s7x_clclk_register(cpu_dev);
++		if (IS_ERR(clk)) {
++			pr_err("failed to register cpu%d clock\n", cpu);
++			continue;
++		}
++		if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
++			pr_err("failed to register cpu%d clock lookup\n", cpu);
++			continue;
++		}
++		pr_debug("registered clk for %s\n", dev_name(cpu_dev));
++	}
++
++	platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
++
++	return 0;
++}
++module_init(mb86s7x_clclk_of_init);
 -- 
 1.8.1.2
