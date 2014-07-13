@@ -1,62 +1,67 @@
 From: Vincent.Yang@tw.fujitsu.com (Vincent Yang)
-Date: Sun, 13 Jul 2014 13:21:09 +0800
-Subject: [PATCH 3/4] mmc: sdhci: add quirk for single block transactions
+Date: Sun, 13 Jul 2014 13:21:10 +0800
+Subject: [PATCH 4/4] mmc: core: hold SD Clock before CMD11 during Signal
 In-Reply-To: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 References: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1405228870-5088-4-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1405228870-5088-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines a quirk to disable the block count
-for single block transactions.
-It is a preparation and will be used by Fujitsu
-SDHCI controller f_sdh30 driver.
+Voltage Switch Procedure
+
+This patch is to fix an issue found on mb86s7x platforms.
+
+[symptom]
+There are some UHS-1 SD memory cards sometimes cannot be detected correctly,
+e.g., Transcend 600x SDXC 64GB UHS-1 memory card.
+During Signal Voltage Switch Procedure, failure to switch is indicated
+by the card holding DAT[3:0] low.
+
+[analysis]
+According to SD Host Controller Simplified Specification Version 3.00
+chapter 3.6.1, the Signal Voltage Switch Procedure should be:
+(1) Check S18A; (2) Issue CMD11; (3) Check CMD 11 response;
+(4) Stop providing SD clock; (5) Check DAT[3:0] should be 0000b;
+(6) Set 1.8V Signal Enable; (7) Wait 5ms; (8) Check 1.8V Signal Enable;
+(9) Provide SD Clock; (10) Wait 1ms; (11) Check DAT[3:0] should be 1111b;
+(12) error handling
+
+With CONFIG_MMC_CLKGATE=y, sometimes there is one more gating/un-gating
+SD clock between (2) and (3). In this case, some UHS-1 SD cards will hold
+DAT[3:0] 0000b at (11) and thus fails Signal Voltage Switch Procedure.
+
+[solution]
+By mmc_host_clk_hold() before CMD11, the additional gating/un-gating
+SD clock between (2) and (3) can be prevented and thus no failure at (11).
+It has been verified with many UHS-1 SD cards on mb86s7x platforms and
+works correctly.
 
 Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
 ---
- drivers/mmc/host/sdhci.c  | 8 +++++---
- include/linux/mmc/sdhci.h | 2 ++
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ drivers/mmc/core/core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 900b4e4..169e17d 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -876,7 +876,7 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
- static void sdhci_set_transfer_mode(struct sdhci_host *host,
- 	struct mmc_command *cmd)
- {
--	u16 mode;
-+	u16 mode = 0;
- 	struct mmc_data *data = cmd->data;
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 7dc0c85..764af63 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1428,6 +1428,8 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
+ 		pr_warning("%s: cannot verify signal voltage switch\n",
+ 				mmc_hostname(host));
  
- 	if (data == NULL) {
-@@ -889,9 +889,11 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
- 
- 	WARN_ON(!host->data);
- 
--	mode = SDHCI_TRNS_BLK_CNT_EN;
-+	if (!(host->quirks2 & SDHCI_QUIRK2_SUPPORT_SINGLE))
-+		mode = SDHCI_TRNS_BLK_CNT_EN;
++	mmc_host_clk_hold(host);
 +
- 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1) {
--		mode |= SDHCI_TRNS_MULTI;
-+		mode = SDHCI_TRNS_BLK_CNT_EN | SDHCI_TRNS_MULTI;
- 		/*
- 		 * If we are sending CMD23, CMD12 never gets sent
- 		 * on successful completion (so no Auto-CMD12).
-diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
-index bcbad45..72072d1 100644
---- a/include/linux/mmc/sdhci.h
-+++ b/include/linux/mmc/sdhci.h
-@@ -102,6 +102,8 @@ struct sdhci_host {
- #define SDHCI_QUIRK2_VOLTAGE_SWITCH			(1<<8)
- /* forced tuned clock */
- #define SDHCI_QUIRK2_TUNING_WORK_AROUND		(1<<9)
-+/* disable the block count for single block transactions */
-+#define SDHCI_QUIRK2_SUPPORT_SINGLE			(1<<10)
+ 	cmd.opcode = SD_SWITCH_VOLTAGE;
+ 	cmd.arg = 0;
+ 	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+@@ -1438,8 +1440,6 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
  
- 	int irq;		/* Device IRQ */
- 	void __iomem *ioaddr;	/* Mapped address */
+ 	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
+ 		return -EIO;
+-
+-	mmc_host_clk_hold(host);
+ 	/*
+ 	 * The card should drive cmd and dat[0:3] low immediately
+ 	 * after the response of cmd11, but wait 1 ms to be sure
 -- 
 1.9.0
