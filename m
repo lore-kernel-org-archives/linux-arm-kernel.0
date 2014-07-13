@@ -1,66 +1,92 @@
-From: Vincent.Yang@tw.fujitsu.com (Vincent.Yang)
-Date: Sun, 13 Jul 2014 17:44:04 +0800
-Subject: [PATCH 1/4] mmc: sdhci: add quirk for voltage switch callback
-In-Reply-To: <20140713082136.GJ21766@n2100.arm.linux.org.uk>
-References: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1405228870-5088-2-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <20140713082136.GJ21766@n2100.arm.linux.org.uk>
-Message-ID: <830AC58E49A426478AC39824BC0FA915D8B8F21DDB@fmpitwmsex01.fmpi.sea.css.fujitsu.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 13 Jul 2014 11:55:01 +0200
+Subject: [GIT PULL v2 FOR v3.17] Renesas CMT, MTU2 and TMU timers DT
+ support
+In-Reply-To: <4780671.lrfQIxTHV3@avalon>
+References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2296815.Nb0BXfBtnT@avalon> <1688088.sd0hOOj9CE@avalon>
+ <4780671.lrfQIxTHV3@avalon>
+Message-ID: <20140713095457.GA21209@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
->On Sun, Jul 13, 2014 at 01:21:07PM +0800, Vincent Yang wrote:
->> @@ -1763,6 +1763,11 @@ static int sdhci_do_start_signal_voltage_switch(struct
->sdhci_host *host,
->>               ctrl |= SDHCI_CTRL_VDD_180;
->>               sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
->>
->> +             /* Some controller need to do more when switching */
->> +             if ((host->quirks2 & SDHCI_QUIRK2_VOLTAGE_SWITCH) &&
->> +                 host->ops->voltage_switch)
->> +                     host->ops->voltage_switch(host);
->> +
->
->Why do you heed SDHCI_QUIRK2_VOLTAGE_SWITCH?  Isn't populating
->ops->voltage_switch enough? to indicate that something needs to be
->done?
+[Cc Olof Johansson, ARM SoC Team]
 
-Hi Russell,
-I will update it as below and remove SDHCI_QUIRK2_VOLTAGE_SWITCH in
-next version.
-+               /* Some controller need to do more when switching */
-+               if (host->ops->voltage_switch)
-+                       host->ops->voltage_switch(host);
-+
+On Wed, Jul 09, 2014 at 11:59:16AM +0200, Laurent Pinchart wrote:
+> Hi Daniel,
+> 
+> On Friday 04 July 2014 15:53:32 Laurent Pinchart wrote:
+> > Hi Daniel,
+> > 
+> > Could you please pull the following changes and drop the first version of
+> > this pull request ? I've fixed one last typo noticed by Simon in patch
+> > 09/19.
+> > 
+> > As last time I have board and SoC changes that depend on the driver changes
+> > and that will need to go through Simon's tree. Could you thus please provide
+> > a stable branch based on one of the v3.16-rc tags ?
+> 
+> Given that I'd like to get the arch/ part of the change set in v3.17, could I 
+> ask you to fast track this pull request if possible ?
 
-Thanks a lot for your review!
 
-Best regards,
-Vincent Yang
+Hi Laurent, Hi Daniel,
 
->
->It would also be better to turn sdhci.c into a library, and have
->the platform driver call the appropriate functions in sdhci rather
->than having sdhci be a core driver with loads of quirks.  This is
->what I've done in my previous series where I changed stuff such as
->the set_bus_width(), set_uhs_signaling() and similar callbacks.
->
->So, it probably makes more sense to split
->sdhci_do_start_signal_voltage_switch() into a load of smaller library
->functions which drivers can call in an appropriate sequence, rather
->than having a quirk hook.
->
->The problem with quirk hooks is that what is right for one device
->is not right for another device - eventually you end up with lots
->of quirk callbacks scattered on every alternate line.  That doesn't
->scale.
->
->Experienced kernel programmers know this and this is why words like
->"framework" fill those who have encountered this problem with dread.
->sdhci.c is a prime example of this kind of design mistake.
->
->--
->FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
->according to speedtest.net.
+I am wondering what the status of this pull request is.  It would be nice
+to get the arch/ changes into v3.17 but we are getting closer to v3.16-rc6
+and I need to have things queued up before then.
+
+I have also CCed Olof and the ARM SoC team (via arm at kernel.org) as
+if Daniel does provide a stable branch that includes this pull request and
+I use it as the basis for a branch with the arch changes then the
+ARM SoC people would like to know about it before I send a pull request
+for the arch/ changes.
+
+> 
+> > The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+> > 
+> >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://linuxtv.org/pinchartl/fbdev.git timers/upstream/drivers
+> > 
+> > for you to fetch changes up to cca8d0596c4c7acb371ea1bc5eee9b404b30516a:
+> > 
+> >   clocksource: sh_mtu2: Add DT support (2014-07-04 15:50:29 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Laurent Pinchart (10):
+> >       clocksource: sh_cmt: Drop support for legacy platform data
+> >       clocksource: sh_cmt: Replace global spinlock with a per-device
+> > spinlock clocksource: sh_tmu: Drop support for legacy platform data
+> >       clocksource: sh_tmu: Replace global spinlock with a per-device
+> > spinlock clocksource: sh_mtu2: Drop support for legacy platform data
+> >       clocksource: sh_mtu2: Replace global spinlock with a per-device
+> > spinlock clocksource: shmobile: Remove unused sh_timer_config members
+> > clocksource: sh_cmt: Add DT support
+> >       clocksource: sh_tmu: Add DT support
+> >       clocksource: sh_mtu2: Add DT support
+> > 
+> >  Documentation/devicetree/bindings/timer/renesas,cmt.txt |  47 +++++
+> >  .../devicetree/bindings/timer/renesas,mtu2.txt          |  39 ++++
+> >  Documentation/devicetree/bindings/timer/renesas,tmu.txt |  39 ++++
+> >  drivers/clocksource/sh_cmt.c                            | 233 ++++++-------
+> >  drivers/clocksource/sh_mtu2.c                           | 146 +++++--------
+> >  drivers/clocksource/sh_tmu.c                            | 127 ++++++-------
+> >  include/linux/sh_timer.h                                |   5 -
+> >  7 files changed, 309 insertions(+), 327 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> >  create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+> >  create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
