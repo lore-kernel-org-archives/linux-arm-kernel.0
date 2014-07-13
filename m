@@ -1,149 +1,135 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 13 Jul 2014 11:30:06 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.16-rc
-Message-ID: <20140713183006.GA30422@quad.lixom.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 13 Jul 2014 12:46:22 -0700
+Subject: [PATCH v5 00/14] Clock support for rk3066,rk3188 and rk3288
+In-Reply-To: <156042792.J76K6jxIGl@diego>
+References: <156042792.J76K6jxIGl@diego>
+Message-ID: <20140713194622.9850.99668@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Quoting Heiko St?bner (2014-07-02 16:53:24)
+> This series adds a clock driver infrastructure for Rockchip SoCs in
+> general and clock-definitions for the RK3188 and RK3288 in particular.
+> 
+> Apart from the arch/arm patches included here, there are some more
+> in the waiting line, like adding the i2c nodes and possibly the pwm, i2s
+> and spi nodes if the relevant drivers get accepted, where the ids
+> defined in the dt-binding headers are needed.
+> 
+> So if the whole thing is acceptable could we either offer a branch
+> from the clk-tree that can get merged or take the whole series through
+> the arm tree?
 
-The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+Heiko,
 
-  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+This version looks good. I've pushed a branch with all 14 of these
+patches based on 3.16-rc3 to the clk tree. See:
 
-are available in the git repository at:
+git://git.linaro.org/people/mike.turquette/linux.git clk-rockchip
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+If everyone is OK to merge that stable branch then I will merge
+clk-rockchip into clk-next and we're all good. If the arm-soc guys want
+to carve it up a bit further or handle it in a different way then we can
+do that. I've Cc'd arm-soc for clarification.
 
-for you to fetch changes up to cacadb4ff969a82628d47db87b5a531be466b134:
+Regards,
+Mike
 
-  Merge tag 'samsung-fixes-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2014-07-12 21:19:21 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.16-rc
-
-This week's arm-soc fixes:
-
-- Another set of OMAP fixes
-  * Clock fixes
-  * Restart handling
-  * PHY regulators
-  * SATA hwmod data for DRA7
-  + Some trivial fixes and removal of a bit of dead code
-- Exynos fixes
-  * A bunch of clock fixes
-  * Some SMP fixes
-  * Exynos multi-core timer: register as clocksource and fix ftrace.
-  + a few other minor fixes
-
-There's also a couple more patches, and at91 fix for USB caused by common
-clock conversion, and more MAINTAINERS entries for shmobile.
-
-We're definitely switching to only regression fixes from here on out,
-we've been a little less strict than usual up until now.
-
-----------------------------------------------------------------
-Abhilash Kesavan (1):
-      ARM: EXYNOS: Fix the check for non-smp configuration
-
-Amit Daniel Kachhap (1):
-      clocksource: exynos_mct: Register the timer for stable udelay
-
-Arun Kumar K (2):
-      clk: exynos5420: Add IDs for clocks used in PD mfc
-      ARM: dts: Add clock property for mfc_pd in exynos5420
-
-Bo Shen (1):
-      ARM: at91: at91sam9x5: add clocks for usb device
-
-Doug Anderson (1):
-      clocksource: exynos_mct: Fix ftrace
-
-Enric Balletbo i Serra (1):
-      ARM: dts: Fix TI CPSW Phy mode selection on IGEP COM AQUILA.
-
-Guido Mart?nez (1):
-      ARM: OMAP2+: Make GPMC skip disabled devices
-
-Jaewon Kim (1):
-      ARM: dts: fix pwm-cells in pwm node for exynos4
-
-Jyri Sarha (1):
-      ARM: OMAP2+: Remove non working OMAP HDMI audio initialization
-
-Nishanth Menon (1):
-      ARM: DRA7/AM43XX: fix header definition for omap44xx_restart
-
-Olof Johansson (4):
-      Merge tag 'renesas-maintainers-for-v3.17' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'omap-for-v3.16/fixes-rc4' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'samsung-fixes-3' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-
-Peter Ujfalusi (2):
-      ARM: dts: am335x-evm: Enable the McASP FIFO for audio
-      ARM: dts: am335x-evmsk: Enable the McASP FIFO for audio
-
-Prathyush K (1):
-      ARM: EXYNOS: Add support for clock handling in power domain
-
-Rajendra Nayak (1):
-      ARM: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
-
-Roger Quadros (3):
-      ARM: DRA7: hwmod: Fixup SATA hwmod
-      ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
-      ARM: dts: dra7-evm: Make VDDA_1V8_PHY supply always on
-
-Sachin Kamat (1):
-      ARM: EXYNOS: Update secondary boot addr for secure mode
-
-Shawn Guo (1):
-      ARM: imx: fix shared gate clock
-
-Simon Horman (1):
-      ARM: shmobile: Add DT and defconfigs to MAINTAINERS
-
-Suman Anna (2):
-      ARM: OMAP3: PRM/CM: Add back macros used by TI DSP/Bridge driver
-      ARM: OMAP2+: create dsp device only on OMAP3 SoCs
-
-Tero Kristo (1):
-      ARM: OMAP2+: clock/dpll: fix _dpll_test_fint arithmetics overflow
-
-Tomasz Figa (1):
-      ARM: EXYNOS: Register cpuidle device only on exynos4210 and 5250
-
-Tony Lindgren (2):
-      Merge branch 'for-v3.16-rc/clk-dt-fixes' of https://github.com/t-kristo/linux-pm into fixes-rc4
-      Merge tag 'for-v3.16-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
-
-Tushar Behera (1):
-      ARM: dts: Update the parent for Audss clocks in Exynos5420
-
- .../bindings/arm/exynos/power_domain.txt           | 20 +++++++
- MAINTAINERS                                        | 14 +++++
- arch/arm/boot/dts/am335x-evm.dts                   |  4 +-
- arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +-
- arch/arm/boot/dts/am335x-igep0033.dtsi             |  6 +++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  2 +
- arch/arm/boot/dts/dra7-evm.dts                     |  1 +
- arch/arm/boot/dts/dra7xx-clocks.dtsi               | 10 ++--
- arch/arm/boot/dts/exynos4.dtsi                     |  2 +-
- arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
- arch/arm/mach-exynos/exynos.c                      |  8 ++-
- arch/arm/mach-exynos/firmware.c                    |  9 +++-
- arch/arm/mach-exynos/pm_domains.c                  | 61 +++++++++++++++++++++-
- arch/arm/mach-imx/clk-gate2.c                      | 31 ++++++++---
- arch/arm/mach-omap2/clkt_dpll.c                    |  2 +-
- arch/arm/mach-omap2/cm-regbits-34xx.h              |  3 ++
- arch/arm/mach-omap2/common.h                       |  3 +-
- arch/arm/mach-omap2/devices.c                      | 28 ----------
- arch/arm/mach-omap2/dsp.c                          | 10 ++++
- arch/arm/mach-omap2/gpmc.c                         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 18 +++++--
- arch/arm/mach-omap2/prm-regbits-34xx.h             |  6 +++
- drivers/clk/samsung/clk-exynos5420.c               |  6 ++-
- drivers/clocksource/exynos_mct.c                   | 20 ++++++-
- include/dt-bindings/clock/exynos5420.h             |  2 +
- 25 files changed, 211 insertions(+), 66 deletions(-)
+> 
+> 
+> changes since v4.2:
+> - fix uninitialized compiler warning in patch4
+> - add cleanup patch for clk-composite from Mike Turquette
+> - fix some softrst-issues in patch6
+> changes since v4.1:
+> - forgot the From override, Boris is the original author
+> changes since v4:
+> - address comments from Gabriel Fernandez
+>   - use abs()
+>   - init best_rate
+> changes since v3:
+> - add rk3288 clock controller
+> - add reset controller ids
+> - fix some incorrect values in rk3188-cru and export some more clocks
+> - fold new rk3066 clock tree into the rk3188 one, as can be easily seen
+>   the differences are not really big between them
+> - expand the composite fix description to highlight the underlying issue
+> changes since v2:
+> - drop the special cpuclk type until coordinated range changes
+>   matured, as mentioned in the Samsung cpufreq thread.
+> - add the patch from Boris BREZILLON that reenables correct rate
+>   calculations in composite clocks
+> - change pll handling to better handle the pll output mux and also
+>   the enabling/disabling of the pll clock
+> - change core code to handle composite clock branches instead of
+>   individual basic clock definitions
+> - use the newly defined GRF syscon instead of mapping a grf register
+>   individually
+> changes since v1:
+> - adapt to apply on current clk-next branch
+> - add saradc clock
+> - add rk3188a cru, which has a slightly different handling of one
+>   pll value (bwadj)
+> 
+> Boris BREZILLON (1):
+>   clk: composite: support determine_rate using rate_ops->round_rate +
+>     mux_ops->set_parent
+> 
+> Heiko Stuebner (12):
+>   clk: composite: allow read-only clocks
+>   clk: rockchip: add basic infrastructure for clock branches
+>   clk: rockchip: add clock type for pll clocks and pll used on rk3066
+>   clk: rockchip: add reset controller
+>   dt-bindings: add documentation for rk3188 clock and reset unit
+>   clk: rockchip: add clock driver for rk3188 and rk3066 clocks
+>   dt-bindings: add documentation for rk3288 cru
+>   clk: rockchip: add clock controller for rk3288
+>   ARM: rockchip: Select ARCH_HAS_RESET_CONTROLLER
+>   ARM: dts: rockchip: add cru nodes and update device clocks to use it
+>   ARM: dts: rockchip: move oscillator input clock into main dtsi
+>   arm: dts: rockchip: remove obsolete clock gate definitions
+> 
+> Mike Turquette (1):
+>   clk: composite: improve rate_hw sanity check logic
+> 
+>  .../bindings/clock/rockchip,rk3188-cru.txt         |  61 ++
+>  .../bindings/clock/rockchip,rk3288-cru.txt         |  61 ++
+>  .../devicetree/bindings/clock/rockchip.txt         |   3 +
+>  arch/arm/boot/dts/rk3066a-clocks.dtsi              | 299 ---------
+>  arch/arm/boot/dts/rk3066a.dtsi                     |  30 +-
+>  arch/arm/boot/dts/rk3188-clocks.dtsi               | 289 ---------
+>  arch/arm/boot/dts/rk3188.dtsi                      |  19 +-
+>  arch/arm/boot/dts/rk3xxx.dtsi                      |  22 +-
+>  arch/arm/mach-rockchip/Kconfig                     |   1 +
+>  drivers/clk/clk-composite.c                        |  79 ++-
+>  drivers/clk/rockchip/Makefile                      |   6 +
+>  drivers/clk/rockchip/clk-pll.c                     | 431 +++++++++++++
+>  drivers/clk/rockchip/clk-rk3188.c                  | 672 +++++++++++++++++++
+>  drivers/clk/rockchip/clk-rk3288.c                  | 717 +++++++++++++++++++++
+>  drivers/clk/rockchip/clk.c                         | 244 +++++++
+>  drivers/clk/rockchip/clk.h                         | 347 ++++++++++
+>  drivers/clk/rockchip/softrst.c                     | 118 ++++
+>  include/dt-bindings/clock/rk3066a-cru.h            |  35 +
+>  include/dt-bindings/clock/rk3188-cru-common.h      | 249 +++++++
+>  include/dt-bindings/clock/rk3188-cru.h             |  51 ++
+>  include/dt-bindings/clock/rk3288-cru.h             | 278 ++++++++
+>  21 files changed, 3386 insertions(+), 626 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
+>  delete mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
+>  delete mode 100644 arch/arm/boot/dts/rk3188-clocks.dtsi
+>  create mode 100644 drivers/clk/rockchip/clk-pll.c
+>  create mode 100644 drivers/clk/rockchip/clk-rk3188.c
+>  create mode 100644 drivers/clk/rockchip/clk-rk3288.c
+>  create mode 100644 drivers/clk/rockchip/clk.c
+>  create mode 100644 drivers/clk/rockchip/clk.h
+>  create mode 100644 drivers/clk/rockchip/softrst.c
+>  create mode 100644 include/dt-bindings/clock/rk3066a-cru.h
+>  create mode 100644 include/dt-bindings/clock/rk3188-cru-common.h
+>  create mode 100644 include/dt-bindings/clock/rk3188-cru.h
+>  create mode 100644 include/dt-bindings/clock/rk3288-cru.h
+> 
+> -- 
+> 1.9.0
+> 
+> 
