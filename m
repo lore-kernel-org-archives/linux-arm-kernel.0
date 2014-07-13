@@ -1,117 +1,149 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sun, 13 Jul 2014 16:56:35 +0100
-Subject: [PATCH] ARM: dts: imx6: RIoTboard explicitly define pad settings
-Message-ID: <53C2AC33.80906@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 13 Jul 2014 11:30:06 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.16-rc
+Message-ID: <20140713183006.GA30422@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of relying on defaults or bootloader settings, explicitly define
-all pad settings.
+Hi Linus,
 
-This resolves reported issues of no analogue audio output.
+The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
 
-Signed-off-by: Iain Paton <ipaton0@gmail.com>
----
+  Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
 
-I don't know if it's possible at this point, but it would be good if this 
-could make it into 3.16.
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
- arch/arm/boot/dts/imx6dl-riotboard.dts | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+for you to fetch changes up to cacadb4ff969a82628d47db87b5a531be466b134:
 
-diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-index 80c9268..43cb3fd 100644
---- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-@@ -334,10 +334,10 @@
- 	imx6-riotboard {
- 		pinctrl_audmux: audmuxgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x8000000
--				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x8000000
--				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x8000000
--				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x8000000
-+				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-+				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-+				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-+				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
- 				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0		/* CAM_MCLK */
- 			>;
- 		};
-@@ -375,7 +375,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
- 				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
--				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
-+				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
- 				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
- 				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
- 				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-@@ -388,9 +388,9 @@
- 				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
- 				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
- 				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
--				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000	/* GPIO16 -> AR8035 25MHz */
-+				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8	/* GPIO16 -> AR8035 25MHz */
- 			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
--				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x80000000	/* AR8035 interrupt */
-+				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0		/* AR8035 interrupt */
- 				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
- 			>;
- 		};
-@@ -425,8 +425,8 @@
- 
- 		pinctrl_led: ledgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
--				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
-+				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* user led0 */
-+				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* user led1 */
- 			>;
- 		};
- 
-@@ -492,8 +492,8 @@
- 		pinctrl_usbotg: usbotggrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
--				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x80000000	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
--				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x80000000
-+				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
-+				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
- 			>;
- 		};
- 
-@@ -505,8 +505,8 @@
- 				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
- 				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
- 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
--				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x80000000	/* SD2 CD */
--				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x80000000	/* SD2 WP */
-+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* SD2 CD */
-+				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* SD2 WP */
- 			>;
- 		};
- 
-@@ -518,8 +518,8 @@
- 				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
- 				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
- 				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
--				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x80000000	/* SD3 CD */
--				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x80000000	/* SD3 WP */
-+				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0	/* SD3 CD */
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1f0b0	/* SD3 WP */
- 			>;
- 		};
- 
-@@ -531,7 +531,7 @@
- 				MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
- 				MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
- 				MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
--				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x80000000	/* SD4 RST (eMMC) */
-+				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x17059	/* SD4 RST (eMMC) */
- 			>;
- 		};
- 	};
--- 
-1.8.5.1
+  Merge tag 'samsung-fixes-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2014-07-12 21:19:21 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.16-rc
+
+This week's arm-soc fixes:
+
+- Another set of OMAP fixes
+  * Clock fixes
+  * Restart handling
+  * PHY regulators
+  * SATA hwmod data for DRA7
+  + Some trivial fixes and removal of a bit of dead code
+- Exynos fixes
+  * A bunch of clock fixes
+  * Some SMP fixes
+  * Exynos multi-core timer: register as clocksource and fix ftrace.
+  + a few other minor fixes
+
+There's also a couple more patches, and at91 fix for USB caused by common
+clock conversion, and more MAINTAINERS entries for shmobile.
+
+We're definitely switching to only regression fixes from here on out,
+we've been a little less strict than usual up until now.
+
+----------------------------------------------------------------
+Abhilash Kesavan (1):
+      ARM: EXYNOS: Fix the check for non-smp configuration
+
+Amit Daniel Kachhap (1):
+      clocksource: exynos_mct: Register the timer for stable udelay
+
+Arun Kumar K (2):
+      clk: exynos5420: Add IDs for clocks used in PD mfc
+      ARM: dts: Add clock property for mfc_pd in exynos5420
+
+Bo Shen (1):
+      ARM: at91: at91sam9x5: add clocks for usb device
+
+Doug Anderson (1):
+      clocksource: exynos_mct: Fix ftrace
+
+Enric Balletbo i Serra (1):
+      ARM: dts: Fix TI CPSW Phy mode selection on IGEP COM AQUILA.
+
+Guido Mart?nez (1):
+      ARM: OMAP2+: Make GPMC skip disabled devices
+
+Jaewon Kim (1):
+      ARM: dts: fix pwm-cells in pwm node for exynos4
+
+Jyri Sarha (1):
+      ARM: OMAP2+: Remove non working OMAP HDMI audio initialization
+
+Nishanth Menon (1):
+      ARM: DRA7/AM43XX: fix header definition for omap44xx_restart
+
+Olof Johansson (4):
+      Merge tag 'renesas-maintainers-for-v3.17' of git://git.kernel.org/.../horms/renesas into fixes
+      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+      Merge tag 'omap-for-v3.16/fixes-rc4' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'samsung-fixes-3' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+
+Peter Ujfalusi (2):
+      ARM: dts: am335x-evm: Enable the McASP FIFO for audio
+      ARM: dts: am335x-evmsk: Enable the McASP FIFO for audio
+
+Prathyush K (1):
+      ARM: EXYNOS: Add support for clock handling in power domain
+
+Rajendra Nayak (1):
+      ARM: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
+
+Roger Quadros (3):
+      ARM: DRA7: hwmod: Fixup SATA hwmod
+      ARM: DRA7: hwmod: Add SYSCONFIG for usb_otg_ss
+      ARM: dts: dra7-evm: Make VDDA_1V8_PHY supply always on
+
+Sachin Kamat (1):
+      ARM: EXYNOS: Update secondary boot addr for secure mode
+
+Shawn Guo (1):
+      ARM: imx: fix shared gate clock
+
+Simon Horman (1):
+      ARM: shmobile: Add DT and defconfigs to MAINTAINERS
+
+Suman Anna (2):
+      ARM: OMAP3: PRM/CM: Add back macros used by TI DSP/Bridge driver
+      ARM: OMAP2+: create dsp device only on OMAP3 SoCs
+
+Tero Kristo (1):
+      ARM: OMAP2+: clock/dpll: fix _dpll_test_fint arithmetics overflow
+
+Tomasz Figa (1):
+      ARM: EXYNOS: Register cpuidle device only on exynos4210 and 5250
+
+Tony Lindgren (2):
+      Merge branch 'for-v3.16-rc/clk-dt-fixes' of https://github.com/t-kristo/linux-pm into fixes-rc4
+      Merge tag 'for-v3.16-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
+
+Tushar Behera (1):
+      ARM: dts: Update the parent for Audss clocks in Exynos5420
+
+ .../bindings/arm/exynos/power_domain.txt           | 20 +++++++
+ MAINTAINERS                                        | 14 +++++
+ arch/arm/boot/dts/am335x-evm.dts                   |  4 +-
+ arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +-
+ arch/arm/boot/dts/am335x-igep0033.dtsi             |  6 +++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |  2 +
+ arch/arm/boot/dts/dra7-evm.dts                     |  1 +
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               | 10 ++--
+ arch/arm/boot/dts/exynos4.dtsi                     |  2 +-
+ arch/arm/boot/dts/exynos5420.dtsi                  |  5 +-
+ arch/arm/mach-exynos/exynos.c                      |  8 ++-
+ arch/arm/mach-exynos/firmware.c                    |  9 +++-
+ arch/arm/mach-exynos/pm_domains.c                  | 61 +++++++++++++++++++++-
+ arch/arm/mach-imx/clk-gate2.c                      | 31 ++++++++---
+ arch/arm/mach-omap2/clkt_dpll.c                    |  2 +-
+ arch/arm/mach-omap2/cm-regbits-34xx.h              |  3 ++
+ arch/arm/mach-omap2/common.h                       |  3 +-
+ arch/arm/mach-omap2/devices.c                      | 28 ----------
+ arch/arm/mach-omap2/dsp.c                          | 10 ++++
+ arch/arm/mach-omap2/gpmc.c                         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 18 +++++--
+ arch/arm/mach-omap2/prm-regbits-34xx.h             |  6 +++
+ drivers/clk/samsung/clk-exynos5420.c               |  6 ++-
+ drivers/clocksource/exynos_mct.c                   | 20 ++++++-
+ include/dt-bindings/clock/exynos5420.h             |  2 +
+ 25 files changed, 211 insertions(+), 66 deletions(-)
