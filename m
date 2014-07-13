@@ -1,40 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 21:19:45 -0700
-Subject: [GIT PULL] Samsung fixes-3 for 3.16
-In-Reply-To: <53C1B549.1060706@samsung.com>
-References: <53C1B549.1060706@samsung.com>
-Message-ID: <20140713041945.GA14076@quad.lixom.net>
+Date: Sat, 12 Jul 2014 21:20:22 -0700
+Subject: [GIT PULL] Samsung cleanup for S5P SoCs for 3.17
+In-Reply-To: <20140712194416.GA6800@sirena.org.uk>
+References: <53BB2658.4050808@samsung.com>
+ <20140712165948.GA10012@quad.lixom.net>
+ <20140712194416.GA6800@sirena.org.uk>
+Message-ID: <20140713042022.GA14186@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 07:23:05AM +0900, Kukjin Kim wrote:
-> The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+On Sat, Jul 12, 2014 at 08:44:16PM +0100, Mark Brown wrote:
+> On Sat, Jul 12, 2014 at 09:59:48AM -0700, Olof Johansson wrote:
 > 
->   Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+> > I've merged these in. I noticed lack of acked-by from Mark Brown, so I pinged
+> > him on IRC about it and the branch is currently at the top so it's easy to drop
+> > in case he has objections (cc:d here too).
 > 
-> are available in the git repository at:
-> 
+> Don't know if I've seen these changes (though IIRC they might've gone to
+> the work account).  I suspect we're going to get some conflicts since
+> we've also got other changes going on in ASoC so it is probably going to
+> be easier to merge at least that patch via ASoC.
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-fixes-3
-> 
-> for you to fetch changes up to bed7118988ef48063c72f67cc2701c72663b3870:
-> 
->   ARM: EXYNOS: Register cpuidle device only on exynos4210 and 5250
-> (2014-07-11 08:15:32 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung fixes-3 for v3.16
-> - update the parent for Auudss clock because kernel will be hang
->   during late boot if the parent clock is disabled in bootloader.
-> - enable clk handing in power domain because while power domain
->   on/off, its regarding clock source will be reset and it causes
->   a problem so need to handle it.
-> - add mux clocks to be used by power domain for exynos5420-mfc
->   during power domain on/off and property in device tree also.
-> - register cpuidle only for exynos4210 and exynos5250 because a
->   system failure will be happened on other exynos SoCs.
+Ok, no problem -- dropped from arm-soc now (and I'll merge the new
+version shortly).
 
-Pulled, thanks.
 
 -Olof
