@@ -1,50 +1,117 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 13 Jul 2014 08:30:31 -0700
-Subject: [PATCH v4 7/7] arm/arm64: Unexport restart handlers
-In-Reply-To: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
-References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1405265431-4561-8-git-send-email-linux@roeck-us.net>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sun, 13 Jul 2014 16:56:35 +0100
+Subject: [PATCH] ARM: dts: imx6: RIoTboard explicitly define pad settings
+Message-ID: <53C2AC33.80906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing a restart handler in a module don't make sense
-as there would be no guarantee that the module is loaded when
-a restart is needed. Unexport arm_pm_restart to ensure that
-no one gets the idea to do it anyway.
+Instead of relying on defaults or bootloader settings, explicitly define
+all pad settings.
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+This resolves reported issues of no analogue audio output.
+
+Signed-off-by: Iain Paton <ipaton0@gmail.com>
 ---
-v4: No change
-v3: No change
-v2: No change
 
- arch/arm/kernel/process.c   | 1 -
- arch/arm64/kernel/process.c | 1 -
- 2 files changed, 2 deletions(-)
+I don't know if it's possible at this point, but it would be good if this 
+could make it into 3.16.
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 5d191e3..25c7f00 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -125,7 +125,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL(pm_power_off);
+
+ arch/arm/boot/dts/imx6dl-riotboard.dts | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index 80c9268..43cb3fd 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -334,10 +334,10 @@
+ 	imx6-riotboard {
+ 		pinctrl_audmux: audmuxgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x8000000
+-				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x8000000
+-				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x8000000
+-				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x8000000
++				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
++				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
++				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
++				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
+ 				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0		/* CAM_MCLK */
+ 			>;
+ 		};
+@@ -375,7 +375,7 @@
+ 			fsl,pins = <
+ 				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+ 				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+-				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
++				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
+ 				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+ 				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+ 				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+@@ -388,9 +388,9 @@
+ 				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
+ 				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
+ 				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
+-				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000	/* GPIO16 -> AR8035 25MHz */
++				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8	/* GPIO16 -> AR8035 25MHz */
+ 			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
+-				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x80000000	/* AR8035 interrupt */
++				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0		/* AR8035 interrupt */
+ 				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+ 			>;
+ 		};
+@@ -425,8 +425,8 @@
  
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
--EXPORT_SYMBOL_GPL(arm_pm_restart);
+ 		pinctrl_led: ledgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
+-				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
++				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* user led0 */
++				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* user led1 */
+ 			>;
+ 		};
  
- /*
-  * This is our default idle handler.
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index b2da6d5..5b07396 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -92,7 +92,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL_GPL(pm_power_off);
+@@ -492,8 +492,8 @@
+ 		pinctrl_usbotg: usbotggrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
+-				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x80000000	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
+-				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x80000000
++				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
++				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
+ 			>;
+ 		};
  
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
--EXPORT_SYMBOL_GPL(arm_pm_restart);
+@@ -505,8 +505,8 @@
+ 				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
+ 				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
+ 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+-				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x80000000	/* SD2 CD */
+-				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x80000000	/* SD2 WP */
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* SD2 CD */
++				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* SD2 WP */
+ 			>;
+ 		};
  
- /*
-  * This is our default idle handler.
+@@ -518,8 +518,8 @@
+ 				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
+ 				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
+ 				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
+-				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x80000000	/* SD3 CD */
+-				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x80000000	/* SD3 WP */
++				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0	/* SD3 CD */
++				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1f0b0	/* SD3 WP */
+ 			>;
+ 		};
+ 
+@@ -531,7 +531,7 @@
+ 				MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
+ 				MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
+ 				MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
+-				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x80000000	/* SD4 RST (eMMC) */
++				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x17059	/* SD4 RST (eMMC) */
+ 			>;
+ 		};
+ 	};
 -- 
-1.9.1
+1.8.5.1
