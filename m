@@ -1,80 +1,42 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 13 Jul 2014 18:33:21 -0400
-Subject: [PATCHv3 0/7] cpufreq support for Marvell Armada XP
-In-Reply-To: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140713223321.GI13108@titan.lakedaemon.net>
+Date: Sun, 13 Jul 2014 18:48:31 -0400
+Subject: [PATCH v2 02/15] ARM: pass IRQ domain to the core IRQ handler
+In-Reply-To: <1404827141-30381-1-git-send-email-marc.zyngier@arm.com>
+References: <1404827141-30381-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140713224831.GJ13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Marc,
 
-On Wed, Jul 09, 2014 at 05:45:08PM +0200, Thomas Petazzoni wrote:
-> Mike, Viresh, Rafael, Jason, Gregory, Andrew, Sebastian,
+On Tue, Jul 08, 2014 at 02:45:40PM +0100, Marc Zyngier wrote:
+> Calling irq_find_mapping from outside a irq_{enter,exit} section is
+> unsafe and produces ugly messages if CONFIG_PROVE_RCU is enabled:
+> If coming from the idle state, the rcu_read_lock call in irq_find_mapping
+> will generate an an unpleasant warning.
 > 
-> Here is the third version of the patches adding cpufreq support for
-> the Marvell Armada XP processor.
+> A solution is to add a new handle_domain_irq entry point into
+> the arm code that the interrupt controller code can call.
+> This new function takes an irq_domain, and calls into irq_find_domain
+> inside the irq_{enter,exit} block.
 > 
-> Changes since v2
-> ================
+> Interrupt controllers can then be updated to use the new mechanism.
 > 
->  - As suggested by Stephen Boyd, instead of using a new clock notifier
->    that somewhat "hides" the dependency of the clk-cpu clock driver on
->    the PMSU, use a direct call from the clk-cpu driver to the PMSU
->    driver.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Sending the right patch this time, with the missing includes that would
+> otherwise break the build...
 > 
->  - Add a comment that explains why the OPP are not removed on failure
->    in the PMSU code initializing the cpufreq logic, in answer to the
->    review from Ezequiel Garcia.
-> 
-> Changes since v1
-> ================
-> 
->  - Rework the patch series to use the generalized cpufreq-cpu0
->    (renamed cpufreq-generic) driver instead of having an Armada XP
->    specific cpufreq driver. This was suggested by Viresh
->    Kumar. Basically, it only involved adding a "clock-latency"
->    property in the DT, and changing the PMSU code to register the two
->    OPPs supported by each CPU, and registering the "cpufreq-generic"
->    platform device instead of the "armadaxp-cpufreq" one.
-> 
-> Jason, this patch series is based on 3.16-rc3, but it applies fine
-> even with mvebu/fixes and mvebu/soc merged (which contain some PMSU
-> changes), so I haven't based the patch series on those branches. To
-> _work_, the code needs the new cpufreq-generic driver which is pending
-> in Viresh Kumar's tree for 3.17, but there is no build dependency.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (7):
->   ARM: mvebu: ensure CPU clocks are enabled
->   ARM: mvebu: extend PMSU code to support dynamic frequency scaling
->   clk: mvebu: extend clk-cpu for dynamic frequency scaling
->   ARM: mvebu: update Armada XP DT for dynamic frequency scaling
->   ARM: mvebu: allow enabling of cpufreq on Armada XP
->   ARM: mvebu: update mvebu_v7_defconfig with cpufreq support
->   ARM: configs: add cpufreq-generic in multi_v7_defconfig
-> 
->  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   5 +-
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   2 +
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   2 +
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   4 +
->  arch/arm/boot/dts/armada-xp.dtsi                   |   2 +-
->  arch/arm/configs/multi_v7_defconfig                |   1 +
->  arch/arm/configs/mvebu_v7_defconfig                |   2 +
->  arch/arm/mach-mvebu/Kconfig                        |   1 +
->  arch/arm/mach-mvebu/platsmp.c                      |   1 +
->  arch/arm/mach-mvebu/pmsu.c                         | 162 +++++++++++++++++++++
->  drivers/clk/mvebu/clk-cpu.c                        |  80 +++++++++-
->  include/linux/mvebu-pmsu.h                         |  20 +++
->  12 files changed, 274 insertions(+), 8 deletions(-)
->  create mode 100644 include/linux/mvebu-pmsu.h
+>  arch/arm/include/asm/irq.h |  2 ++
+>  arch/arm/kernel/irq.c      | 25 +++++++++++++++++++++----
+>  2 files changed, 23 insertions(+), 4 deletions(-)
 
-Creating a clock branch for you to pull makes this series an unwieldy
-knot of dependencies. :(  Mind giving me an Ack to take it through the
-mvebu tree?
+Please place in Russell's patch tracker,
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+Once it lands in a release, we'll apply the rest.  Please send me a
+gentle reminder ;-)
 
 thx,
 
