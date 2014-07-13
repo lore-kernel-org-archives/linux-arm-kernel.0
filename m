@@ -1,44 +1,47 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 13 Jul 2014 08:38:20 +0400
-Subject: [PATCH v2 RESEND 2/2] clk: clps711x: Add DT bindings documentation
-Message-ID: <1405226300-3032-1-git-send-email-shc_work@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 12 Jul 2014 21:40:40 -0700
+Subject: [GIT PULL] Ux500 devicetree changes for v3.17
+In-Reply-To: <CACRpkda=5smrLuzHpAy_RxuEqcH9C=u3-sKmRgVxnEX4ko5bSg@mail.gmail.com>
+References: <CACRpkda=5smrLuzHpAy_RxuEqcH9C=u3-sKmRgVxnEX4ko5bSg@mail.gmail.com>
+Message-ID: <20140713044040.GE14206@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT binding documentation for the Cirrus Logic
-CLPS711X-based CPUs clock subsystem.
+On Thu, Jul 10, 2014 at 12:36:48PM +0200, Linus Walleij wrote:
+> Hi ARM SoC guys,
+> 
+> here are some three Ux500 device tree patches that I'd like
+> to have funneled upstream for v3.17. Sorry for the bad tag
+> name.
+> 
+> The dependent changes to drivers and bindings are merged
+> through subsystem trees.
+> 
+> Please pull it in!
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit cd3de83f147601356395b57a8673e9c5ff1e59d1:
+> 
+>   Linux 3.16-rc4 (2014-07-06 12:37:51 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-devicetree-v3.16-1
+> 
+> for you to fetch changes up to d0e3bc813359360fb94098fec9403820846577f3:
+> 
+>   ARM: ux500: add misc sensors to the device trees (2014-07-07 11:54:07 +0200)
+> 
+> ----------------------------------------------------------------
+> Ux500 device tree patches for v3.17:
+> - Add regulators to STMPE expanders
+> - Add proper DMA channels for all SD/MMC blocks
+> - Add sensors to the device tree
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- .../devicetree/bindings/clock/clps711x-clock.txt      | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
+Merged, thanks.
 
-diff --git a/Documentation/devicetree/bindings/clock/clps711x-clock.txt b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
-new file mode 100644
-index 0000000..ce5a747
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
-@@ -0,0 +1,19 @@
-+* Clock bindings for the Cirrus Logic CLPS711X CPUs
-+
-+Required properties:
-+- compatible       : Shall contain "cirrus,clps711x-clk".
-+- reg              : Address of the internal register set.
-+- startup-frequency: Factory set CPU startup frequency in HZ.
-+- #clock-cells     : Should be <1>.
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell. See include/dt-bindings/clock/clps711x-clock.h
-+for the full list of CLPS711X clock IDs.
-+
-+Example:
-+	clks: clks at 80000000 {
-+		#clock-cells = <1>;
-+		compatible = "cirrus,ep7312-clk", "cirrus,clps711x-clk";
-+		reg = <0x80000000 0xc000>;
-+		startup-frequency = <73728000>;
-+	};
--- 
-1.8.5.5
+
+-Olof
