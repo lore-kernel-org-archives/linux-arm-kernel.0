@@ -1,81 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 13 Jul 2014 10:43:41 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140712093917.GD18601@arm.com>
- <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
- <201407121422.02078.arnd@arndb.de>
- <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
-Message-ID: <20140713094341.GB23235@arm.com>
+From: Vincent.Yang@tw.fujitsu.com (Vincent.Yang)
+Date: Sun, 13 Jul 2014 17:44:04 +0800
+Subject: [PATCH 1/4] mmc: sdhci: add quirk for voltage switch callback
+In-Reply-To: <20140713082136.GJ21766@n2100.arm.linux.org.uk>
+References: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1405228870-5088-2-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <20140713082136.GJ21766@n2100.arm.linux.org.uk>
+Message-ID: <830AC58E49A426478AC39824BC0FA915D8B8F21DDB@fmpitwmsex01.fmpi.sea.css.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 01:57:31PM +0100, Rob Clark wrote:
-> On Sat, Jul 12, 2014 at 8:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 12 July 2014, Rob Clark wrote:
-> >> >> Was there actually a good reason for having the device link to the
-> >> >> iommu rather than the other way around?  How much would people hate it
-> >> >> if I just ignore the generic bindings and use something that works for
-> >> >> me instead.  I mean, it isn't exactly like there is going to be .dts
-> >> >> re-use across different SoC's..  and at least with current IOMMU API
-> >> >> some sort of of_get_named_iommu() API doesn't really make sense.
-> >> >
-> >> > The thing is, if you end up ignoring the generic binding then we have two
-> >> > IOMMUs using the same (ARM SMMU) binding and it begs the question as to
-> >> > which is the more generic! I know we're keen to get this merged, but merging
-> >> > something that people won't use and calling it generic doesn't seem ideal
-> >> > either. We do, however, desperately need a generic binding.
-> >>
-> >> yeah, ignoring the generic binding is not my first choice.  I'd rather
-> >> have something that works well for everyone.  But I wasn't really sure
-> >> if the current proposal was arbitrary, or if there are some
-> >> conflicting requirements between different platforms.
-> >
-> > The common case that needs to be simple is attaching one (master) device
-> > to an IOMMU using the shared global context for the purposes of implementing
-> > the dma-mapping API.
-> 
-> well, I don't disagree that IOMMU API has some problems.  It is too
-> tied to the bus type, which doesn't really seem to make sense for
-> platform devices.  (Unless we start having multiple platform busses?)
-> 
-> But at least given the current IOMMU API I'm not really sure how it
-> makes a difference which way the link goes.  But if there has already
-> been some discussion about how you want to handle the tie in with
-> dma-mapping, if you could point me at that then maybe your point will
-> make more sense to me.
+>-----Original Message-----
+>From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+>On Sun, Jul 13, 2014 at 01:21:07PM +0800, Vincent Yang wrote:
+>> @@ -1763,6 +1763,11 @@ static int sdhci_do_start_signal_voltage_switch(struct
+>sdhci_host *host,
+>>               ctrl |= SDHCI_CTRL_VDD_180;
+>>               sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+>>
+>> +             /* Some controller need to do more when switching */
+>> +             if ((host->quirks2 & SDHCI_QUIRK2_VOLTAGE_SWITCH) &&
+>> +                 host->ops->voltage_switch)
+>> +                     host->ops->voltage_switch(host);
+>> +
+>
+>Why do you heed SDHCI_QUIRK2_VOLTAGE_SWITCH?  Isn't populating
+>ops->voltage_switch enough? to indicate that something needs to be
+>done?
 
-If you look at the proposed binding in isolation, I think it *is* cleaner
-than the ARM SMMU binding (I've acked it...) and I believe it's more
-consistent with the way we describe linkages elsewhere.
+Hi Russell,
+I will update it as below and remove SDHCI_QUIRK2_VOLTAGE_SWITCH in
+next version.
++               /* Some controller need to do more when switching */
++               if (host->ops->voltage_switch)
++                       host->ops->voltage_switch(host);
++
 
-However, the issue you're raising is that it's more difficult to make use of
-in a Linux IOMMU driver. The reward you'll get for using it will come
-eventually when the DMA ops are automatically swizzled for devices using the
-generic binding.
+Thanks a lot for your review!
 
-My plan for the ARM SMMU driver is:
+Best regards,
+Vincent Yang
 
-  (1) Change ->probe() to walk the device-tree looking for all masters with
-      phandles back to the SMMU instance being probed
-
-  (2) For each master, extract the Stream IDs and add them to the internal
-      SMMU driver data structures (an rbtree per SMMU instance). For
-      hotpluggable buses, we'll need a way for the bus controller to
-      reserve a range of IDs -- this will likely be a later extension to
-      the binding.
-
-  (3) When we get an ->add() call, warn if it's a device we haven't seen
-      and reject the addition.
-
-That way, ->attach() should be the same as it is now, I think.
-
-Have you tried implementing something like that? We agreed that (1) isn't
-pretty, but I don't have a good alternative and it's only done at
-probe-time.
-
-Will
-
-BTW: Is the msm-v0 IOMMU compatible with the ARM SMMU driver, or is it a
-completely different design requiring a different driver?
+>
+>It would also be better to turn sdhci.c into a library, and have
+>the platform driver call the appropriate functions in sdhci rather
+>than having sdhci be a core driver with loads of quirks.  This is
+>what I've done in my previous series where I changed stuff such as
+>the set_bus_width(), set_uhs_signaling() and similar callbacks.
+>
+>So, it probably makes more sense to split
+>sdhci_do_start_signal_voltage_switch() into a load of smaller library
+>functions which drivers can call in an appropriate sequence, rather
+>than having a quirk hook.
+>
+>The problem with quirk hooks is that what is right for one device
+>is not right for another device - eventually you end up with lots
+>of quirk callbacks scattered on every alternate line.  That doesn't
+>scale.
+>
+>Experienced kernel programmers know this and this is why words like
+>"framework" fill those who have encountered this problem with dread.
+>sdhci.c is a prime example of this kind of design mistake.
+>
+>--
+>FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+>according to speedtest.net.
