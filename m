@@ -1,54 +1,81 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 13 Jul 2014 05:10:59 -0400 (EDT)
-Subject: [PATCH 0/6] LLVMLinux: Patches to enable the kernel to be compiled
- with clang/LLVM
-In-Reply-To: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
-References: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
-Message-ID: <alpine.LFD.2.11.1407130508580.3647@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 13 Jul 2014 10:43:41 +0100
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140712093917.GD18601@arm.com>
+ <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
+ <201407121422.02078.arnd@arndb.de>
+ <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
+Message-ID: <20140713094341.GB23235@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Jul 2014, behanw at converseincode.com wrote:
+On Sat, Jul 12, 2014 at 01:57:31PM +0100, Rob Clark wrote:
+> On Sat, Jul 12, 2014 at 8:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Saturday 12 July 2014, Rob Clark wrote:
+> >> >> Was there actually a good reason for having the device link to the
+> >> >> iommu rather than the other way around?  How much would people hate it
+> >> >> if I just ignore the generic bindings and use something that works for
+> >> >> me instead.  I mean, it isn't exactly like there is going to be .dts
+> >> >> re-use across different SoC's..  and at least with current IOMMU API
+> >> >> some sort of of_get_named_iommu() API doesn't really make sense.
+> >> >
+> >> > The thing is, if you end up ignoring the generic binding then we have two
+> >> > IOMMUs using the same (ARM SMMU) binding and it begs the question as to
+> >> > which is the more generic! I know we're keen to get this merged, but merging
+> >> > something that people won't use and calling it generic doesn't seem ideal
+> >> > either. We do, however, desperately need a generic binding.
+> >>
+> >> yeah, ignoring the generic binding is not my first choice.  I'd rather
+> >> have something that works well for everyone.  But I wasn't really sure
+> >> if the current proposal was arbitrary, or if there are some
+> >> conflicting requirements between different platforms.
+> >
+> > The common case that needs to be simple is attaching one (master) device
+> > to an IOMMU using the shared global context for the purposes of implementing
+> > the dma-mapping API.
+> 
+> well, I don't disagree that IOMMU API has some problems.  It is too
+> tied to the bus type, which doesn't really seem to make sense for
+> platform devices.  (Unless we start having multiple platform busses?)
+> 
+> But at least given the current IOMMU API I'm not really sure how it
+> makes a difference which way the link goes.  But if there has already
+> been some discussion about how you want to handle the tie in with
+> dma-mapping, if you could point me at that then maybe your point will
+> make more sense to me.
 
-> From: Behan Webster <behanw@converseincode.com>
-> 
-> The LLVMLinux project aims to fully build the Linux kernel using both gcc and
-> clang (the C front end for the LLVM compiler infrastructure project). 
-> 
-> Clang only supports global named registers for non-allocatable registers like
-> the stack pointer. By centralizing the definition of current_stack_pointer, the
-> use of named registers for ARM remains largely unchanged while working for both
-> gcc and clang.
+If you look at the proposed binding in isolation, I think it *is* cleaner
+than the ARM SMMU binding (I've acked it...) and I believe it's more
+consistent with the way we describe linkages elsewhere.
 
-You verified that the compiled code is identical on gcc?  If so:
+However, the issue you're raising is that it's more difficult to make use of
+in a Linux IOMMU driver. The reward you'll get for using it will come
+eventually when the DMA ops are automatically swizzled for devices using the
+generic binding.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+My plan for the ARM SMMU driver is:
 
-> 
-> Behan Webster (6):
->   arm: LLVMLinux: Add global named register current_stack_pointer for
->     ARM
->   arm: LLVMLinux: Use current_stack_pointer to calculate pt_regs address
->   arm: LLVMLinux: Use current_stack_pointer for return_address
->   arm: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
->   arm: LLVMLinux: Calculate current_thread_info from
->     current_stack_pointer
->   arm: LLVMLinux: Use current_stack_pointer in unwind_backtrace
-> 
->  arch/arm/include/asm/ptrace.h      | 5 ++---
->  arch/arm/include/asm/thread_info.h | 9 +++++++--
->  arch/arm/kernel/return_address.c   | 3 +--
->  arch/arm/kernel/stacktrace.c       | 4 +---
->  arch/arm/kernel/unwind.c           | 3 +--
->  5 files changed, 12 insertions(+), 12 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> 
+  (1) Change ->probe() to walk the device-tree looking for all masters with
+      phandles back to the SMMU instance being probed
+
+  (2) For each master, extract the Stream IDs and add them to the internal
+      SMMU driver data structures (an rbtree per SMMU instance). For
+      hotpluggable buses, we'll need a way for the bus controller to
+      reserve a range of IDs -- this will likely be a later extension to
+      the binding.
+
+  (3) When we get an ->add() call, warn if it's a device we haven't seen
+      and reject the addition.
+
+That way, ->attach() should be the same as it is now, I think.
+
+Have you tried implementing something like that? We agreed that (1) isn't
+pretty, but I don't have a good alternative and it's only done at
+probe-time.
+
+Will
+
+BTW: Is the msm-v0 IOMMU compatible with the ARM SMMU driver, or is it a
+completely different design requiring a different driver?
