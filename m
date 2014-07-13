@@ -1,33 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Jul 2014 21:49:30 -0700
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC r8a7779
- Multiplatform Updates for v3.17
-In-Reply-To: <cover.1405173109.git.horms+renesas@verge.net.au>
-References: <cover.1405173109.git.horms+renesas@verge.net.au>
-Message-ID: <20140713044930.GI14206@quad.lixom.net>
+From: Vincent.Yang@tw.fujitsu.com (Vincent Yang)
+Date: Sun, 13 Jul 2014 13:21:06 +0800
+Subject: [PATCH 0/4] mmc: sdhci: adding support for a new Fujitsu sdhci IP
+Message-ID: <1405228870-5088-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 03:53:33PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these third round of Renesas ARM based SoC
-> r8a7779 Multiplatform updates for v3.17.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-r8a7779-multiplatform2-for-v3.17,
-> which I have already sent a pull-request for.
-> 
-> 
-> The following changes since commit 1b55353c9214788b0d0797a5fd4585af1557a12c:
-> 
->   ARM: shmobile: Move r8a7779.h (2014-06-25 16:52:39 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-r8a7779-multiplatform3-for-v3.17
+Hi,
+We are adding support for a new Fujitsu sdhci IP.
+These patches are preparations and will be used by Fujitsu
+SDHCI controller f_sdh30 driver.
 
-Merged, thanks.
+These patches are against v3.16-rc4 mainline since nothing in
+mmc-next at this moment.
+
+These patches are tested on 3.16-rc4 integration tree.
+
+We welcome any comment and advice about how to make any
+improvements or better align them with upstream.
+
+Thanks a lot!
+
+Best regards,
+Vincent Yang
 
 
--Olof
+Vincent Yang (4):
+  mmc: sdhci: add quirk for voltage switch callback
+  mmc: sdhci: add quirk for tuning work around
+  mmc: sdhci: add quirk for single block transactions
+  mmc: core: hold SD Clock before CMD11 during Signal
+
+ drivers/mmc/core/core.c   |  4 ++--
+ drivers/mmc/host/sdhci.c  | 15 ++++++++++++---
+ drivers/mmc/host/sdhci.h  |  1 +
+ include/linux/mmc/sdhci.h |  6 ++++++
+ 4 files changed, 21 insertions(+), 5 deletions(-)
+
+-- 
+1.9.0
