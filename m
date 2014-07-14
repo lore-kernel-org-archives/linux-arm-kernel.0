@@ -1,102 +1,62 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Mon, 14 Jul 2014 11:33:34 +0530
-Subject: [PATCH v4 0/6] Add Keystone PCIe controller driver
-In-Reply-To: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
-References: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20140714060334.GB2930@pratyush-vbox>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 14 Jul 2014 11:39:48 +0530
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C0A12A.2060204@codeaurora.org>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+ <53C0A12A.2060204@codeaurora.org>
+Message-ID: <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh.. I see my reply from gmail is not readable at all. (I forgot to
-switch to plain text :( ) Please ignore last mail I am replying again
-here.
+On 12 July 2014 08:14, Saravana Kannan <skannan@codeaurora.org> wrote:
 
-On Sat, Jul 12, 2014 at 04:36:29AM +0800, Murali Karicheri wrote:
+>>> I'm just always adding the real nodes to the first CPU in a cluster
+>>> independent of which CPU gets added first. Makes it easier to know which
+>>> ones to symlink. See comment next to policy->cpu for full context.
+>>
+>>
+>> Yeah, and that is the order in which CPUs will boot and cpufreq_add_dev()
+>> will be called. So, isn't policy->cpu the right CPU always?
+>
+>
+> No, the "first" cpu in a cluster doesn't need to be the first one to be
+> added. An example is 2x2 cluster system where the system is booted with max
+> cpus = 2 and then cpu3 could be onlined first by userspace.
 
-[...]
+Because we are getting rid of much of the complexity now, I do not want
+policy->cpu to keep changing. Just fix it up to the cpu for which the policy
+gets created first. That's it. No more changes required. It doesn't matter at
+userspace which cpu owns it as symlinks would anyway duplicate it under
+every cpu.
 
-> Murali Karicheri (6):
->   PCI: designware: add rd[wr]_other_conf API
->   PCI: designware: refactor MSI code to work with v3.65 dw hardware
+> Yeah, it is pretty convolution. But pretty much anywhere in the gov code
+> where policy->cpu is used could cause this. The specific crash I hit was in
+> this code:
+>
+> static void od_dbs_timer(struct work_struct *work)
+> {
+>         struct od_cpu_dbs_info_s *dbs_info =
+>                 container_of(work, struct od_cpu_dbs_info_s,
+> cdbs.work.work);
+>         unsigned int cpu = dbs_info->cdbs.cur_policy->cpu;
+>
+> ======= CPU is policy->cpu here.
+>
+>         struct od_cpu_dbs_info_s *core_dbs_info = &per_cpu(od_cpu_dbs_info,
+>                         cpu);
+>
+> ======= Picks the per CPU struct of an offline CPU
+>
+> <snip>
+>
+>         mutex_lock(&core_dbs_info->cdbs.timer_mutex);
+>
+> ======= Dies trying to lock a destroyed mutex
 
-For  above two you can add my reviewed-by:
-
->   PCI: designware: refactor host init code to re-use on keystone PCI
->   PCI: designware: enhance dw core driver to support keystone PCI host
-
-In stead of using version number and then changing few functions from
-static to global , I would have used same philosophy of adding callbacks
-wherever needed. May be maintainers can give their view, instead of patch 
-3 and 4 I would have gone with something like this, where kc_pcie can be 
-passed through pp->plat_data.
- 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 905941c..b216192 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -490,16 +490,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-        }
- 
-        if (IS_ENABLED(CONFIG_PCI_MSI)) {
--               pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
--                                       MAX_MSI_IRQS, &msi_domain_ops,
--                                       &dw_pcie_msi_chip);
--               if (!pp->irq_domain) {
--                       dev_err(pp->dev, "irq domain init failed\n");
--                       return -ENXIO;
--               }
-+               if (!pp->ops->msi_init) {
-+                       pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-+                                               MAX_MSI_IRQS, &msi_domain_ops,
-+                                               &dw_pcie_msi_chip);
-+                       if (!pp->irq_domain) {
-+                               dev_err(pp->dev, "irq domain init failed\n");
-+                               return -ENXIO;
-+                       }
- 
--               for (i = 0; i < MAX_MSI_IRQS; i++)
--                       irq_create_mapping(pp->irq_domain, i);
-+                       for (i = 0; i < MAX_MSI_IRQS; i++)
-+                               irq_create_mapping(pp->irq_domain, i);
-+               } else {
-+                       pp->ops->msi_init(pp, &msi_domain_ops,
-+                                               &dw_pcie_msi_chip);
-+               }
-        }
- 
-        if (pp->ops->host_init)
-@@ -759,6 +764,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-                BUG();
-        }
- 
-+       if (bus && pp->ops->scan_bus)
-+               bus = pp->ops->scan_bus(pp);
-+
-        return bus;
- }
- 
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 387f69e..39ce496 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -52,6 +52,7 @@ struct pcie_port {
-        struct irq_domain       *irq_domain;
-        unsigned long           msi_data;
-        DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-+       void                    *plat_data;
- };
- 
- struct pcie_host_ops {
-@@ -70,6 +71,9 @@ struct pcie_host_ops {
-        void (*msi_set_irq)(struct pcie_port *pp, int irq);
-        void (*msi_clear_irq)(struct pcie_port *pp, int irq);
-        u32 (*get_msi_data)(struct pcie_port *pp);
-+       struct pci_bus *(*scan_bus)(struct pcie_port *pp);
-+       void (*msi_init) (struct pcie_port *pp, struct irq_domain_ops *ops,
-+                       struct msi_chip *chip);
- };
- 
- int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
-
-
-~Pratyush
+I am still not getting it. Why would we get into this if policy->cpu is fixed
+once at boot ?
