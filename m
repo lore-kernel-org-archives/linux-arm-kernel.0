@@ -1,83 +1,83 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 14 Jul 2014 08:57:57 +0200
-Subject: [PATCH 00/12] Add NVIDIA Tegra FUSE driver
-In-Reply-To: <20140713063815.GA24843@quad.lixom.net>
-References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
- <20140713063815.GA24843@quad.lixom.net>
-Message-ID: <20140714065756.GG2081@ulmo>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 Jul 2014 15:04:12 +0800
+Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
+In-Reply-To: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+Message-ID: <20140714070341.GC2197@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 11:38:15PM -0700, Olof Johansson wrote:
-> On Fri, Jul 11, 2014 at 02:15:59PM +0200, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > This series is an extension of Peter's original series to add a proper
-> > driver for the FUSE block on Tegra.
-> > 
-> > Patches 1 and 2 are preparatory work that cleans up include lists and
-> > introduces a function to query the Tegra chip ID rather than accessing
-> > a simple variable. This is used by subsequent patches to allow us to
-> > execute code when the variable is accessed to help in pin-pointing
-> > locations where it's accessed before the driver had a chance to
-> > initialize.
-> > 
-> > Patches 3 through 8 are Peter's series with a fixup patch by Stephen. I
-> > also moved the driver to drivers/soc/tegra/fuse as requested by Olof.
-> > 
-> > Patches 9 and 10 defer usages of the tegra_get_chip_id() function to a
-> > later stage (pure_initcall). This allows patch 11 to set up the early
-> > FUSE support code from an early initcall. This has the advantage of not
-> > requiring an explicit call from SoC setup code in arch/arm/mach-tegra
-> > and will allow the code to be shared on 64-bit variants of Tegra.
-> > 
-> > Patch 12 finally turns the PMC and powergate support code into a proper
-> > driver which also sets up a minimal environment from an early initcall.
-> > The driver isn't moved out of arch/arm/mach-tegra yet because people
-> > have suggested drivers/power as a good home, but that whole directory
-> > depends on the POWER_SUPPLY Kconfig symbol yet this driver doesn't have
-> > anything to do with that. Once that debate has been settled the driver
-> > can easily be moved out in a separate patch.
-> > 
-> > Some of the patches in this series introduce diagnostic WARN() messages
-> > if functions are called without setup having completed. I've booted the
-> > v3.16-rc1 kernel with these changes on top on Tegra20 (TrimSlice),
-> > Tegra30 (Beaver), Tegra114 (Dalmore) and Tegra124 (Jetson TK1) without
-> > encountering any of the diagnostic warnings and without noticing any
-> > breakage.
-> > 
-> > Olof, this series should address the concerns you expressed after
-> > reviewing Stephen's earlier pull request for Peter's FUSE driver series.
-> > It would be great if you could take another look to see if this is more
-> > according to your taste. I'll see if I can take this through linux-next
-> > for a little and if you have no objections will submit another pull
-> > request next week.
+Copy more i.MX people ...
+
+On Fri, Jul 11, 2014 at 08:34:19AM -0700, Tim Harvey wrote:
+> Shawn,
 > 
-> I haven't looked at all the patches in detail yet, but I do like
-> the approach in general. I've also applied and pushed them out for
-> build+test here, but they're queued behind a couple of other builds
-> so I won't have it until morning (you can poll for boot logs at
-> arm-soc.lixom.net/bootlogs/misc/v3.16-rc4-371-g2c9d948 if you want to
-> preempt me).
-
-Looks like Tegra boards are all fine. Thanks for testing these.
-
-> > Peter De Schrijver (5):
-> >   ARM: tegra: export apb dma readl/writel
+> I've noticed that for IMX6 the gpio-mxc gpio driver always returns 0
+> for gpio's configured as outputs regardless of if they are outputing
+> high or low.
 > 
-> I thought I saw a patch from Peter that moved the apbio read code to
-> the fuse driver since there are no other consumers. I think that's a
-> reasonable thing to do.
+> Digging into gpio-mxc.c I see that the basic memory-mapped generic
+> gpio controller is used, but its configured to use GPIO_PSR to obtain
+> the gpio value. For the IMX6 (I can't speak for the other MXC/IMX
+> users of this driver) the reference manual indicates that GPIO_PSR is
+> appropriate only if the GPIO is an input and that GPIO_DR will read
+> the proper state if its configured as an output or an input.
 
-That's a later patch in this series:
 
-	soc/tegra: fuse: move APB DMA into Tegra20 fuse driver
+The following note can be found in i.MX Reference Manual.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/39e3fcd8/attachment-0001.sig>
+			NOTE
+While the GPIO direction is set to input (GPIO_GDIR = 0), a
+read access to GPIO_DR does not return GPIO_DR data.
+Instead, it returns the GPIO_PSR data, which is the
+corresponding input signal value.
+
+That said for an input GPIO, reading GPIO_DR functionally equals to
+reading GPIO_PSR.  So reading either GPIO_DR or GPIO_PSR returns what we
+want to get.
+
+The remain question is what we want to get from an output GPIO, the
+value that register GPIO_DR holds or the one driven on pad.  I *think*
+both should be identical (but not so sure).  If that's the case, reading
+GPIO_DR should just work.  But otherwise, we should read GPIO_PSR with
+SION bit set to get what is actually driven on pad.
+
+> 
+> Even before the driver was converted to use the basic memory-mapped
+> generic gpio controller this was the case (GPIO_PSR used for get). Is
+> there a reason for this, or is it simply a bug that has been around
+> since the driver's original creation as I suspect?
+> 
+> The following patch resolves the issue and causes gpio get to always
+> return the proper setting when configured for an input or output:
+> 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 7176743..25b97db 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -458,8 +458,8 @@ static int mxc_gpio_probe(struct platform_device *pdev)
+>         }
+> 
+>         err = bgpio_init(&port->bgc, &pdev->dev, 4,
+> -                        port->base + GPIO_PSR,
+> -                        port->base + GPIO_DR, NULL,
+> +                        port->base + GPIO_DR,
+> +                        NULL, NULL,
+>                          port->base + GPIO_GDIR, NULL, 0);
+>         if (err)
+>                 goto out_iounmap;
+> 
+> If this looks right to you for all IMX users let me know and I'll post
+> a properly formatted patch with commit message.
+
+So the question comes down to, for an output GPIO, whether the value in
+GPIO_DR register is always identical to what we see on the pad.  If yes,
+your patch makes sense to me.  Otherwise, we have to set SION bit to
+read the value of an output GPIO from GPIO_PSR.
+
+Shawn
+
+> 
+> Regards,
+> 
+> Tim
