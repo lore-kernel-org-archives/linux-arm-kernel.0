@@ -1,104 +1,120 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Mon, 14 Jul 2014 11:06:28 +0200
-Subject: [PATCH 6/8] net: ethernet driver: Fujitsu OGMA
-In-Reply-To: <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
-References: <message-id-of-cover-letter>
- <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
-Message-ID: <20140714090628.GA7668@distanz.ch>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Mon, 14 Jul 2014 14:39:18 +0530
+Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
+In-Reply-To: <CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
+References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
+ <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
+ <53A12EA3.5010007@samsung.com>
+ <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
+ <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
+ <53BC0F8F.4010106@samsung.com>
+ <CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
+Message-ID: <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-07-13 at 08:31:47 +0200, Mollie Wu <mollie.wu@linaro.org> wrote:
-> This driver adds support for "ogma", a Fujitsu Semiconductor Ltd IP Gigabit
-> Ethernet + PHY IP used in a variety of their ARM-based ASICs.
-> 
-> This is being sent as part of a series including the arch support that uses it,
-> Fujitsu mb86s7x.
-> 
-> This driver was originally written by guys inside Fujitsu as an abstracted
-> "you can build this for Windows as well" type code, I've removed all that,
-> modernized various things, added runtime_pm, and ported it to work with
-> Device Tree, using only the bindings already mentioned in
-> 
-> ./Documentation/devicetree/bindings/net/ethernet.txt
-> 
-> Bindings documentation is added by this patch.
-> 
-> Signed-off-by: Andy Green <andy.green@linaro.org>
-> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
-> Signed-off-by: Mollie Wu <mollie.wu@linaro.org>
-> ---
->  .../devicetree/bindings/net/fujitsu-ogma.txt       |  43 ++
->  drivers/net/ethernet/fujitsu/Kconfig               |  12 +
->  drivers/net/ethernet/fujitsu/Makefile              |   1 +
->  drivers/net/ethernet/fujitsu/ogma/Makefile         |   6 +
->  drivers/net/ethernet/fujitsu/ogma/ogma.h           | 380 +++++++++++++
->  .../ethernet/fujitsu/ogma/ogma_desc_ring_access.c  | 627 +++++++++++++++++++++
->  drivers/net/ethernet/fujitsu/ogma/ogma_ethtool.c   |  95 ++++
->  .../net/ethernet/fujitsu/ogma/ogma_gmac_access.c   | 295 ++++++++++
->  drivers/net/ethernet/fujitsu/ogma/ogma_netdev.c    | 592 +++++++++++++++++++
->  drivers/net/ethernet/fujitsu/ogma/ogma_platform.c  | 333 +++++++++++
->  10 files changed, 2384 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/fujitsu-ogma.txt
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/Makefile
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma.h
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_desc_ring_access.c
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_ethtool.c
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_gmac_access.c
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_netdev.c
->  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
+Hi Kukjin,
 
-[...]
+Please consider this patch for your branch. This patch is important
+for Display for Exynos5 boards.
 
-> diff --git a/drivers/net/ethernet/fujitsu/ogma/ogma_platform.c b/drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
-> new file mode 100644
-> index 0000000..09071da
-> --- /dev/null
-> +++ b/drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
+Regards,
+Rahul Sharma.
 
-[...]
-
-> +#ifdef CONFIG_PM
-> +static const struct dev_pm_ops ogma_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(ogma_pm_suspend, ogma_pm_resume)
-> +	SET_RUNTIME_PM_OPS(ogma_runtime_suspend, ogma_runtime_resume, NULL)
-> +};
-> +#endif
-
-#ifdef CONFIG_PM can be omitted here since
-SET_{SYSTEM_SLEEP,RUNTIME}_PM_OPS will just evaluate empty if CONFIG_PM
-is not defined.
-
-> +
-> +static const struct of_device_id ogma_dt_ids[] = {
-> +	{.compatible = "fujitsu,ogma"},
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, ogma_dt_ids);
-> +
-> +static struct platform_driver ogma_driver = {
-> +	.probe = ogma_probe,
-> +	.remove = ogma_remove,
-> +	.driver = {
-> +		.name = "ogma",
-> +		.of_match_table = ogma_dt_ids,
-> +#ifdef CONFIG_PM
-> +		.pm = &ogma_pm_ops,
-> +#endif
-
-With the above #ifdef CONFIG_PM removed, ogma_pm_ops will be all NULL if
-CONFIG_PM is not set. Thus, the #ifdef can be removed as well.
-
-> +		},
-> +};
-> +
-> +module_platform_driver(ogma_driver);
-> +
-> +MODULE_AUTHOR("Fujitsu Semiconductor Ltd");
-> +MODULE_DESCRIPTION("OGMA Ethernet driver");
-> +MODULE_LICENSE("GPL");
-> +
-> +MODULE_ALIAS("platform:ogma");
-> -- 
-> 1.8.1.2
+On 9 July 2014 17:00, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> Hi Tomasz,
+>
+> On 8 July 2014 21:04, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hi Rahul,
+>>
+>> On 07.07.2014 15:37, Rahul Sharma wrote:
+>>> Hi Andrej, Inki,
+>>>
+>>> On 18 June 2014 12:06, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>>>> Hi Andrej,
+>>>>
+>>>> On 18 June 2014 11:46, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>>>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
+>>>>>> Hi All,
+>>>>>>
+>>>>>> Please review this patch.
+>>>>>>
+>>>>>> Regards,
+>>>>>> Rahul Sharma
+>>>>>>
+>>>>>> On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>>>>>>> Display domain is removed due to instability issues. Explaining
+>>>>>>> the problem below:
+>>>>>>>
+>>>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
+>>>>>>> powers off the unused power domains. This call hits before
+>>>>>>> the trigger to deferred probes.
+>>>>>>>
+>>>>>>> DRM DP Panel defers the probe due to supply get failure. By the
+>>>>>>> time, deferred probe is scheduled again, Display Power Domain is
+>>>>>>> powered off by pm_genpd_poweroff_unused.
+>>>>>>>
+>>>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
+>>>>>>> callbacks. If display domain is enabled/disabled around register
+>>>>>>> accesses, display domain gets unstable and we are getting Power
+>>>>>>> Domain Disable fail notification. Increasing the Timeout also
+>>>>>>> didn't help.
+>>>>>
+>>>>> As I understand the problem is that fimd and dp drivers access hw
+>>>>> registers without enabling power domain. So the proper solution is to
+>>>>> fix these drivers.
+>>>>
+>>>> That is also a problem but I fixed those accesses in my local kernel before
+>>>> hitting this issue. If we do register accesses in FIMD/DP probe/bind we
+>>>> observes "Prefetch abort" exception. But here the problem is that 'DP
+>>>> domain disable' starts failing if we enable/disable multiple times.
+>>>>
+>>>>>
+>>>>> Btw. there are already patches removing hw access from probe/bind of
+>>>>> fimd. I guess removing also hw access from dp probe/bind could be a good
+>>>>> solution.
+>>>>
+>>>> Please let me know the links for posted patches. I will test with those patches.
+>>>
+>>> Is there any update on this? Please share the patches which fixes the
+>>> above issue or avoid the above scenario of multiple PM Domain enable/disable.
+>>> I will test them for exynos5 based boards. Otherwise we should get this change
+>>> merged else display will remain broken for exynos5 based boards.
+>>
+>> Andrzej is on holidays right now, so he won't be able to reply in this
+>> thread until he's back. Here are two patches I was able to find on the
+>> related MLs that might be fixing the cause of your issues:
+>
+> Ok. thanks for the update.
+>
+> We should test with Ajay's patches which includes DP probe deferring
+> based on availability of bridge chip. +
+>
+> few patches which cleanup register access in FIMD and DP probe/bind
+> OR
+> few patches to enable Display power domain and clocks just before the
+> register access. As done in https://lkml.org/lkml/2014/7/4/188.
+>
+> Later solution results into display power domain enable failure in case of DRM
+> probe defer.
+>
+> I am just curious if Andrej has some solution for the first approach which can
+> be tested for defer probe and S2R scenarios.
+>
+> Regards,
+> Rahul Sharma.
+>
+>>
+>> [PATCH] drm/exynos: remove hardware overlays disable from fimd probe
+>> (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
+>>
+>> [PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
+>> (https://lkml.org/lkml/2014/7/4/188)
+>>
+>> Best regards,
+>> Tomasz
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
