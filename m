@@ -1,35 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 04:24:12 -0700
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140714112412.GE20068@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Jul 2014 12:31:18 +0100
+Subject: [PATCH V2 1/2] ASoC: samsung: Add machine driver for Odroid X2/U3
+In-Reply-To: <53C3BEB9.7000706@samsung.com>
+References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
+ <1403108551-25058-2-git-send-email-s.nawrocki@samsung.com>
+ <20140630184658.GE23300@sirena.org.uk>
+ <53C3BEB9.7000706@samsung.com>
+Message-ID: <20140714113118.GE6800@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140710 19:58]:
-> Hello,
-> 
-> This series adds suspend/resume support for am335x. Version 3 of this
-> series can be found at [1]. I apologize for the large delay between this
-> and the previous revision. This code has been heavily refined
-> since the last version based on the various comments received for v3. The
-> major change from previous version is moving all wkup_m3 code into a
-> remoteproc based driver. The new driver handles all IPC and fw loading
-> and exposes a small API to be used by PM code to achieve low power states.
+On Mon, Jul 14, 2014 at 01:27:53PM +0200, Sylwester Nawrocki wrote:
 
-Great, this is nice for all the am335x users. I made few comments
-on the series that should be quite simple to fix up.
+> Too bad, I noticed this comment only just now.  I'll consider this and
+> will try again and see how simple-card could be used.  There is also the
+> samsung-i2s-sec secondary 'overlay' CPU DAI that would need to be handled,
+> and we have it now internally specified in the machine driver through
+> cpu_dai_name, rather than cpu_of_node.
+> There might be some more work in the driver needed to support the
+> secondary I2S interface generically with DT.
 
-Then please split up your next version of this series into the
-following independet patches:
-
-1. Changes to the EDMA driver for suspend and resume support
-
-2. Patches to add the rproc driver
-
-3. SoC related changes to enable PM support
-
-Regards,
-
-Tony
+You should be converting the device to DPCM for both that and the
+compressed audio path.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/767589e9/attachment.sig>
