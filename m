@@ -1,88 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 14 Jul 2014 10:37:19 -0400
-Subject: [PATCH v4 03/11] ARM: OMAP2+: timer: Add suspend-resume callbacks
- for clkevent device
-In-Reply-To: <20140714111536.GC20068@atomide.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-4-git-send-email-d-gerlach@ti.com>
- <20140714111536.GC20068@atomide.com>
-Message-ID: <53C3EB1F.2010109@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Jul 2014 07:39:38 -0700
+Subject: [PATCH v4 7/7] arm/arm64: Unexport restart handlers
+In-Reply-To: <20140714142232.GB1112@arm.com>
+References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
+ <1405265431-4561-8-git-send-email-linux@roeck-us.net>
+ <20140714142232.GB1112@arm.com>
+Message-ID: <53C3EBAA.9050907@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 July 2014 07:15 AM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
->> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On 07/14/2014 07:22 AM, Catalin Marinas wrote:
+> On Sun, Jul 13, 2014 at 04:30:31PM +0100, Guenter Roeck wrote:
+>> Implementing a restart handler in a module don't make sense
+>> as there would be no guarantee that the module is loaded when
+>> a restart is needed. Unexport arm_pm_restart to ensure that
+>> no one gets the idea to do it anyway.
 >>
->> OMAP timer code registers two timers - one as clocksource
->> and one as clockevent. Since AM33XX has only one usable timer
->> in the WKUP domain one of the timers needs suspend-resume
->> support to restore the configuration to pre-suspend state.
->>
->> commit adc78e6 (timekeeping: Add suspend and resume
->> of clock event devices) introduced .suspend and .resume
->> callbacks for clock event devices. Leverages these
->> callbacks to have AM33XX clockevent timer which is
->> in not in WKUP domain to behave properly across system
->> suspend.
->>
->> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 >> ---
->> v3->v4:
->> 	Only use for am33xx soc now.
+>> v4: No change
+>> v3: No change
+>> v2: No change
 >>
->>  arch/arm/mach-omap2/timer.c | 28 ++++++++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
+>>   arch/arm/kernel/process.c   | 1 -
+>>   arch/arm64/kernel/process.c | 1 -
+>>   2 files changed, 2 deletions(-)
 >>
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index 43d03fb..6fc1748 100644
->> --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -128,6 +128,29 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->>  	}
->>  }
->>  
->> +static void omap_clkevt_suspend(struct clock_event_device *unused)
->> +{
->> +	struct omap_hwmod *oh;
->> +
->> +	oh = omap_hwmod_lookup(clockevent_gpt.name);
->> +	if (!oh)
->> +		return;
->> +
->> +	omap_hwmod_idle(oh);
->> +}
->> +
->> +static void omap_clkevt_resume(struct clock_event_device *unused)
->> +{
->> +	struct omap_hwmod *oh;
->> +
->> +	oh = omap_hwmod_lookup(clockevent_gpt.name);
->> +	if (!oh)
->> +		return;
->> +
->> +	omap_hwmod_enable(oh);
->> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
->> +}
->> +
-> 
-> This is going to make moving the timer code into drivers one step
-> tougher to do. And you don't need to look up the hwmod entry every
-> time, just initialize it during the init.
-> 
->> +	if (soc_is_am33xx()) {
->> +		clockevent_gpt.suspend = omap_clkevt_suspend;
->> +		clockevent_gpt.resume = omap_clkevt_resume;
->> +	}
->> +
-> 
-> Maybe try to set up things so we initialize the SoC specific
-> timer suspend and resume functions in mach-omap2/timer.c
-> in a way where eventually the device driver can easily use
-> them?
-> 
-+1. I had similar comments on the previous version too.
+>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>> index 5d191e3..25c7f00 100644
+>> --- a/arch/arm/kernel/process.c
+>> +++ b/arch/arm/kernel/process.c
+>> @@ -125,7 +125,6 @@ void (*pm_power_off)(void);
+>>   EXPORT_SYMBOL(pm_power_off);
+>>
+>>   void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+>> -EXPORT_SYMBOL_GPL(arm_pm_restart);
+>
+> Unless I miss something, how is this different from registering a
+> restart notifier from a module (blocking_notifier_chain_register is
+> exported)?
+>
 
-Regards,
-Santosh
+A notifier can be unregistered safely, and more than one notifier call
+is supported. If there is more than one driver setting arm_pm_restart,
+the first one to unregister will clear the pointer. Using the notifier
+is cleaner and not architecture dependent. One might argue that setting
+module external function pointers from module code isn't exactly clean
+coding.
+
+Anyway, this patch is not relevant for the series. If you prefer to have
+the function exported, and keep using it for arm drivers loaded as modules,
+be my guest, and I'll be more than happy drop it. I'll take your comment
+as a hint _not_ to convert existing code to use the notifier after the
+series is accepted. Cool, as I hate wasting my time.
+
+Guenter
