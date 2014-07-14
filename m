@@ -1,91 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Jul 2014 11:12:45 -0700
-Subject: [PATCH 1/1] ARM: dts: zynq: Add Parallella device tree
-In-Reply-To: <61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
-References: <1404075022-28745-1-git-send-email-afaerber@suse.de>
- <1404075022-28745-2-git-send-email-afaerber@suse.de>
- <CAOesGMhKY1Lb+o8AbtFXS5c7SLg2uGt4-oosdro2FMj_+bB6Tw@mail.gmail.com>
- <61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
-Message-ID: <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Jul 2014 19:13:38 +0100
+Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
+In-Reply-To: <53C3C77F.7080208@kpanic.de>
+References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
+ <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
+ <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
+Message-ID: <20140714181338.GR6800@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 8, 2014 at 4:18 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> On 06/30/2014 07:15 AM, Olof Johansson wrote:
->> Hi,
->>
->> On Sun, Jun 29, 2014 at 1:50 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>> This allows to boot the Adapteva Parallella board to serial console.
->>>
->>> Cc: Andreas Olofsson <andreas@adapteva.com>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>
->> Nice and clean DTS, just a couple of comments below.
->>
->>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
->>> new file mode 100644
->>> index 0000000..98df66c
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
->>> @@ -0,0 +1,63 @@
->>> +/*
->>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
->>> + *
->>> + * Derived from zynq-zed.dts:
->>> + *
->>> + *  Copyright (C) 2011 Xilinx
->>> + *  Copyright (C) 2012 National Instruments Corp.
->>> + *  Copyright (C) 2013 Xilinx
->>> + *
->>> + * This software is licensed under the terms of the GNU General Public
->>> + * License version 2, as published by the Free Software Foundation, and
->>> + * may be copied, distributed, and modified under those terms.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +/dts-v1/;
->>> +/include/ "zynq-7000.dtsi"
->>> +
->>> +/ {
->>> +       model = "Parallella Board";
+On Mon, Jul 14, 2014 at 02:05:19PM +0200, Stefan Assmann wrote:
+> On 14.07.2014 14:00, Mark Brown wrote:
 
-You might want to have this say "Adapteva Parallella Board" instead
-(just noticed).
+> >No, you need to implement clocks using the clock API.  Please read the
+> >changelogs for the above commits...
 
->>> +       compatible = "xlnx,zynq-7000";
->>
->> This should have a more specific compatible as the first one. Probably
->> something like:
->>    compatible = "adapteva,parallella", "xlnx,zynq-7000";
->
-> We were using these compatible properties but later there is no reason
-> to create them because they will be unused.
-> It is easy to add it when you need it which is not this case.
+> Yes, that's what I expected. Got any pointers for me how to do this?
+> Never done that before, a little help would be appreciated.
 
-No, please add it from day one, otherwise everybody needs to update
-their device tree, some will miss doing it, etc, etc. It's a simple
-and trivial thing to do, and no reason to leave it o ut.
-
->>> +
->>> +       memory {
->>> +               device_type = "memory";
->>> +               reg = <0 0x20000000>;
->>
->> Does the bootloader update this entry, or is it truly static? If it's
->> updated then it's become recent habit to leave the memory size empty
->> in the static file.
->
-> Depends on your bootloader. I think it is good to have it here.
-> Also this file can be used by u-boot for example and u-boot can be configured
-> from it that's why I think that make sense to keep this here.
-
-Ok. It's become commonplace to leave memory empty for the machines
-where it's guaranteed that the bootloader will have updated it, to
-avoid having stale or incorrect values in the static tree. I'm not
-going to be strict about it, but it's something to consider.
-
-
--Olof
+There should be plenty of examples in drivers/clk?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/5fda622a/attachment.sig>
