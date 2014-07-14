@@ -1,45 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jul 2014 14:08:24 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <20140709134646.GB479@lee--X1>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba>
- <20140709134646.GB479@lee--X1>
-Message-ID: <20140714130824.GA3993@lee--X1>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 14 Jul 2014 18:43:46 +0530
+Subject: [PATCH v2] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+Message-ID: <d081bdbeebec0e7f2a292a11513f96375aa35bd4.1405343188.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 09 Jul 2014, Lee Jones wrote:
-> On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > On Tue, 24 Jun 2014, Lee Jones wrote:
-> > > 
-> > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > is incorrect in the MAINTAINERS file.
-> > > > > 
-> > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > registers.
-> > > > 
-> > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > 
-> > > Anything at all?  It's been well over a month now.
-> > > 
-> > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > but as we didn't get any feedback from Eduardo, I will take them.
-> 
-> Thanks Rui.
-> 
-> So have you taken all 4 "thermal: sti: *" patches?
+On OMAP SOCs using PL310 controllers, power_ctrl register is not
+accessible from non-secure software even on PL310 versions which
+support it. The secure code takes care of setting it up correctly
+and power transitions are proven on these devices.
 
-Have you taken these yet?  I notice that these aren't in -next yet.
+For example, AM437x has L2C-310 version r3p3 and ROM code on that
+device does not support writing to L2C-310 power control register.
+The L2C driver, however, tries writing to this register for all
+revisions >= r3p0.
 
-> The ARM ones should go through Maxime.
+This leads to a warning dump on boot which leads most users to believe
+that L2 cache is non-functional.
 
+Since the problem is understood, and cannot be addressed through
+software, replace the warning with a pr_info() while maintaining the
+WARN_ON() for other truly unexpected scenarios.
+
+Reported-by: Nishanth Menon <nm@ti.com>
+Tested-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+Only description updated since v1
+
+ arch/arm/mach-omap2/omap4-common.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 326cd98..9139729 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -188,6 +188,10 @@ static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
+ 		smc_op = OMAP4_MON_L2X0_PREFETCH_INDEX;
+ 		break;
+ 
++	case L310_POWER_CTRL:
++		pr_info_once("OMAP L2C310: ROM does not support power control setting\n");
++		return;
++
+ 	default:
+ 		WARN_ONCE(1, "OMAP L2C310: ignoring write to reg 0x%x\n", reg);
+ 		return;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.1
