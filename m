@@ -1,65 +1,83 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 14 Jul 2014 17:56:53 +0100
-Subject: [PATCH v8 9/9] pci: Remap I/O bus resources into CPU space with
- pci_remap_iospace()
-In-Reply-To: <20140714165443.GI1112@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-10-git-send-email-Liviu.Dudau@arm.com>
- <20140714165443.GI1112@arm.com>
-Message-ID: <20140714165653.GD825@e106497-lin.cambridge.arm.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Mon, 14 Jul 2014 20:50:30 +0400
+Subject: [PATCH] arm: mach-iop13xx: fix possible build failure
+In-Reply-To: <20140714102903.GN21766@n2100.arm.linux.org.uk>
+References: <20140714102903.GN21766@n2100.arm.linux.org.uk>
+Message-ID: <1405356630-2411-1-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 05:54:43PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 01, 2014 at 07:43:34PM +0100, Liviu Dudau wrote:
-> > Introduce a default implementation for remapping PCI bus I/O resources
-> > onto the CPU address space. Architectures with special needs may
-> > provide their own version, but most should be able to use this one.
-> [...]
-> > +/**
-> > + *	pci_remap_iospace - Remap the memory mapped I/O space
-> > + *	@res: Resource describing the I/O space
-> > + *	@phys_addr: physical address where the range will be mapped.
-> > + *
-> > + *	Remap the memory mapped I/O space described by the @res
-> > + *	into the CPU physical address space. Only architectures
-> > + *	that have memory mapped IO defined (and hence PCI_IOBASE)
-> > + *	should call this function.
-> > + */
-> > +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> > +{
-> > +	int err = -ENODEV;
-> > +
-> > +#ifdef PCI_IOBASE
-> > +	if (!(res->flags & IORESOURCE_IO))
-> > +		return -EINVAL;
-> > +
-> > +	if (res->end > IO_SPACE_LIMIT)
-> > +		return -EINVAL;
-> > +
-> > +	err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
-> > +				res->end + 1 + (unsigned long)PCI_IOBASE,
-> > +				phys_addr, __pgprot(PROT_DEVICE_nGnRE));
-> 
-> Except that PROT_DEVICE_nGnRE is arm64 only. I think that's a function
-> that should remain arch specific.
+From: Arnd Bergmann <arnd@arndb.de>
 
-Yes, I was following Arnd's suggestion and lost track of the fact that
-PROT_DEVICE_nGnRE is arm64 specific.
+After applying patch:
+	"ARM: 8078/1: get rid of hardcoded assumptions about kernel stack size"
 
-Best regards,
-Liviu
+following build failure happens on iop13xx platform:
 
-> 
-> -- 
-> Catalin
+   In file included from include/linux/srcu.h:33:0,
+                    from include/linux/notifier.h:15,
+                    from include/linux/reboot.h:5,
+                    from arch/arm/mach-iop13xx/include/mach/iop13xx.h:6,
+                    from arch/arm/mach-iop13xx/include/mach/hardware.h:14,
+                    from arch/arm/mach-iop13xx/include/mach/memory.h:4,
+                    from arch/arm/include/asm/memory.h:24,
+                    from arch/arm/include/asm/page.h:163,
+                    from arch/arm/include/asm/thread_info.h:17,
+                    from include/linux/thread_info.h:54,
+                    from include/asm-generic/preempt.h:4,
+                    from arch/arm/include/generated/asm/preempt.h:1,
+                    from include/linux/preempt.h:18,
+                    from include/linux/spinlock.h:50,
+                    from include/linux/seqlock.h:35,
+                    from include/linux/time.h:5,
+                    from include/uapi/linux/timex.h:56,
+                    from include/linux/timex.h:56,
+                    from include/linux/sched.h:19,
+                    from arch/arm/kernel/asm-offsets.c:13:
+   include/linux/rcupdate.h: In function '__rcu_read_lock':
+>> include/linux/rcupdate.h:220:2: error: implicit declaration of function 'preempt_disable' [-Werror=implicit-function-declaration]
+     preempt_disable();
 
+The problem here is recursive header inclusion which could be avoided by
+removing linux/reboot.h from mach/iop13xxx.h.
+linux/reboot.h in include/mach/iop13xx.h is needed only for enum reboot_mode,
+so header it could be replaced with a enum declaration.
+
+Whatever patch "ARM: 8078/1: get rid of hardcoded assumptions about kernel stack size"
+does, I think it's good to avoid unnecessary header inclusion here in any case.
+
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+---
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h | 2 +-
+ arch/arm/mach-iop13xx/setup.c                | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+index 17b4027..9311ee2 100644
+--- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
++++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+@@ -3,7 +3,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
+-#include <linux/reboot.h>
++enum reboot_mode;
+ 
+ /* The ATU offsets can change based on the strapping */
+ extern u32 iop13xx_atux_pmmr_offset;
+diff --git a/arch/arm/mach-iop13xx/setup.c b/arch/arm/mach-iop13xx/setup.c
+index bca96f4..53c316f 100644
+--- a/arch/arm/mach-iop13xx/setup.c
++++ b/arch/arm/mach-iop13xx/setup.c
+@@ -20,6 +20,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/serial_8250.h>
+ #include <linux/io.h>
++#include <linux/reboot.h>
+ #ifdef CONFIG_MTD_PHYSMAP
+ #include <linux/mtd/physmap.h>
+ #endif
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.8.5.5
