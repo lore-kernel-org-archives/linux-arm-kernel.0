@@ -1,63 +1,129 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Mon, 14 Jul 2014 13:05:55 +0530
-Subject: [PATCH v3 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <20140714072146.GD1668@shlinux1.ap.freescale.net>
-References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
- <1405074557-5519-2-git-send-email-b29396@freescale.com>
- <53BFC6CE.9090408@gmail.com> <53BFD28A.5090202@pengutronix.de>
- <53BFD4DF.7030003@gmail.com>
- <20140714072146.GD1668@shlinux1.ap.freescale.net>
-Message-ID: <53C3885B.5020008@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 Jul 2014 15:37:42 +0800
+Subject: [PATCH] ARM: dts: imx6: RIoTboard explicitly define pad settings
+In-Reply-To: <53C2AC33.80906@gmail.com>
+References: <53C2AC33.80906@gmail.com>
+Message-ID: <20140714073741.GF2197@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 12:51 PM, Dong Aisheng wrote:
->
-> +    dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0
-> 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d\n",
-> +        priv->mram_base,
-> +        priv->mcfg[MRAM_SIDF].off, priv->mcfg[MRAM_SIDF].num,
-> +        priv->mcfg[MRAM_XIDF].off, priv->mcfg[MRAM_XIDF].num,
-> +        priv->mcfg[MRAM_RXF0].off, priv->mcfg[MRAM_RXF0].num,
-> +        priv->mcfg[MRAM_RXF1].off, priv->mcfg[MRAM_RXF1].num,
-> +        priv->mcfg[MRAM_RXB].off, priv->mcfg[MRAM_RXB].num,
-> +        priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
-> +        priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
-> +
->>>> dev_dbg() will insert the new lines in b/w. It wont print the values as
->>>> you expected.
->>>> Check this by enabling debug ...
->>> What do you mean by b/w?
->> You are expecting the data to be print in format like:
->> pdev->dev/name: mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d
->>
->> But when we use the dev_dbg()/pr_debug()... It will put data like:
->> pdev->dev/name: mram_base %p sidf 0x%x
->> 0x%x %d rxf0 0x%x
->> rxf1 0x%x %d rxb
->> ....
->>
->> check this by enable DEBUG...
->>
-> My test showed the format is:
-> root at imx6qdlsolo:~# uname -a
-> Linux imx6qdlsolo 3.16.0-rc2-next-20140627-00006-gd55dd62-dirty #373 SMP Fri Jul 11 18:12:31 CST 2014 armv7l GNU/Linux
-> root at imx6qdlsolo:~# dmesg | grep m_can
-> m_can 20e8000.can: mram_base c0990000 sidf 0x0 0 xidf 0x0 0 rxf0 0x0 32 rxf1 0x200 0 rxb 0x200 0 txe 0x200 0 txb 0x200 1
-> m_can 20e8000.can: m_can device registered (regs=c0988000, irq=146)
-> m_can 20f0000.can: mram_base c09a0000 sidf 0x400 0 xidf 0x400 0 rxf0 0x400 32 rxf1 0x600 0 rxb 0x600 0 txe 0x600 0 txb 0x600 1
-> m_can 20f0000.can: m_can device registered (regs=c0998000, irq=147)
->
-I think you got the expected result.
+On Sun, Jul 13, 2014 at 04:56:35PM +0100, Iain Paton wrote:
+> Instead of relying on defaults or bootloader settings, explicitly define
+> all pad settings.
+> 
+> This resolves reported issues of no analogue audio output.
+> 
+> Signed-off-by: Iain Paton <ipaton0@gmail.com>
+> ---
+> 
+> I don't know if it's possible at this point, but it would be good if this 
+> could make it into 3.16.
 
-I faced the above problem when i use pr_debug(). Can you check with this....?
+Sorry.  This is neither a regression nor a very critical bug fix I would
+send for 3.16 at this point (-rc5 is already out).
 
-This is good. Thanks for clarification.
+Applied for 3.17.
 
->
-> Regards
-> Dong Aisheng
->
--- 
-Regards,
-Varka Bhadram.
+Shawn
+
+> 
+> 
+>  arch/arm/boot/dts/imx6dl-riotboard.dts | 32 ++++++++++++++++----------------
+>  1 file changed, 16 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> index 80c9268..43cb3fd 100644
+> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> @@ -334,10 +334,10 @@
+>  	imx6-riotboard {
+>  		pinctrl_audmux: audmuxgrp {
+>  			fsl,pins = <
+> -				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x8000000
+> -				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x8000000
+> -				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x8000000
+> -				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
+> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
+> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
+> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
+>  				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0		/* CAM_MCLK */
+>  			>;
+>  		};
+> @@ -375,7 +375,7 @@
+>  			fsl,pins = <
+>  				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+>  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+> -				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
+> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
+>  				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+>  				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+>  				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+> @@ -388,9 +388,9 @@
+>  				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
+>  				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
+>  				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
+> -				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000	/* GPIO16 -> AR8035 25MHz */
+> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8	/* GPIO16 -> AR8035 25MHz */
+>  			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
+> -				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x80000000	/* AR8035 interrupt */
+> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0		/* AR8035 interrupt */
+>  				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+>  			>;
+>  		};
+> @@ -425,8 +425,8 @@
+>  
+>  		pinctrl_led: ledgrp {
+>  			fsl,pins = <
+> -				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
+> -				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
+> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* user led0 */
+> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* user led1 */
+>  			>;
+>  		};
+>  
+> @@ -492,8 +492,8 @@
+>  		pinctrl_usbotg: usbotggrp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
+> -				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x80000000	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
+> -				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x80000000
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
+> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
+>  			>;
+>  		};
+>  
+> @@ -505,8 +505,8 @@
+>  				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
+>  				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
+>  				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+> -				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x80000000	/* SD2 CD */
+> -				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x80000000	/* SD2 WP */
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* SD2 CD */
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* SD2 WP */
+>  			>;
+>  		};
+>  
+> @@ -518,8 +518,8 @@
+>  				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
+>  				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
+>  				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
+> -				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x80000000	/* SD3 CD */
+> -				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x80000000	/* SD3 WP */
+> +				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0	/* SD3 CD */
+> +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1f0b0	/* SD3 WP */
+>  			>;
+>  		};
+>  
+> @@ -531,7 +531,7 @@
+>  				MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
+>  				MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
+>  				MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
+> -				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x80000000	/* SD4 RST (eMMC) */
+> +				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x17059	/* SD4 RST (eMMC) */
+>  			>;
+>  		};
+>  	};
+> -- 
+> 1.8.5.1
+> 
