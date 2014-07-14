@@ -1,36 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 14 Jul 2014 10:31:25 -0400
-Subject: [PATCH v2] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <d081bdbeebec0e7f2a292a11513f96375aa35bd4.1405343188.git.nsekhar@ti.com>
-References: <d081bdbeebec0e7f2a292a11513f96375aa35bd4.1405343188.git.nsekhar@ti.com>
-Message-ID: <53C3E9BD.9010104@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 14 Jul 2014 15:33:21 +0100
+Subject: [PATCH v2 00/11] pwm: Introduce ST's PWM driver
+Message-ID: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 July 2014 09:13 AM, Sekhar Nori wrote:
-> On OMAP SOCs using PL310 controllers, power_ctrl register is not
-> accessible from non-secure software even on PL310 versions which
-> support it. The secure code takes care of setting it up correctly
-> and power transitions are proven on these devices.
-> 
-> For example, AM437x has L2C-310 version r3p3 and ROM code on that
-> device does not support writing to L2C-310 power control register.
-> The L2C driver, however, tries writing to this register for all
-> revisions >= r3p0.
-> 
-> This leads to a warning dump on boot which leads most users to believe
-> that L2 cache is non-functional.
-> 
-> Since the problem is understood, and cannot be addressed through
-> software, replace the warning with a pr_info() while maintaining the
-> WARN_ON() for other truly unexpected scenarios.
-> 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Tested-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-> Only description updated since v1
-> 
-Thanks for update.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Hi Thierry,
+
+I'm pretty sure all of your review comments have been tended to
+now.  Some have been fixed-up by myself and re-rolled into the
+original set.  The larger changes have been fixed as subsequent
+patches for ease of review and history tracking on the internal
+kernel.
+
+Kind regards,
+Lee
+
+Ajit Pal Singh (4):
+  pwm: st: Fix PWM prescaler handling
+  pwm: sti: Ensure same period values for all channels
+  pwm: sti: Sync between enable/disable calls
+  pwm: sti: Remove PWM period table
+
+Lee Jones (7):
+  ARM: stih407: Add DT nodes for for PWM
+  ARM: stih416: Add Pinctrl settings for PWM
+  ARM: stih416: Add DT nodes for PWM
+  ARM: stih416-b2020e: Enable PWM on the B2020 Rev-E
+  ARM: multi_v7_defconfig: Enable ST's PWM driver
+  pwm: sti: Add new driver for ST's PWM IP
+  pwm: sti: Supply Device Tree binding documentation for ST's PWM IP
+
+ Documentation/devicetree/bindings/pwm/pwm-st.txt |  41 +++
+ arch/arm/boot/dts/stih407.dtsi                   |  28 ++
+ arch/arm/boot/dts/stih416-b2020e.dts             |  10 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |  50 +++
+ arch/arm/boot/dts/stih416.dtsi                   |  44 ++-
+ arch/arm/configs/multi_v7_defconfig              |   1 +
+ drivers/pwm/Kconfig                              |  10 +
+ drivers/pwm/Makefile                             |   1 +
+ drivers/pwm/pwm-sti.c                            | 418 +++++++++++++++++++++++
+ 9 files changed, 602 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-st.txt
+ create mode 100644 drivers/pwm/pwm-sti.c
+
+-- 
+1.8.3.2
