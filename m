@@ -1,42 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Jul 2014 16:58:52 +0100
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <53C28B74.6010401@metafoo.de>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <1405086308-1461192-4-git-send-email-arnd@arndb.de>
- <53C153FF.4090705@metafoo.de> <20140712194903.GB6800@sirena.org.uk>
- <53C28B74.6010401@metafoo.de>
-Message-ID: <20140714155852.GG6800@sirena.org.uk>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Mon, 14 Jul 2014 10:59:57 -0500
+Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+In-Reply-To: <20140713231431.GM13108@titan.lakedaemon.net>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140713231431.GM13108@titan.lakedaemon.net>
+Message-ID: <53C3FE7D.3090805@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 03:36:52PM +0200, Lars-Peter Clausen wrote:
-> On 07/12/2014 09:49 PM, Mark Brown wrote:
+On 7/13/2014 6:14 PM, Jason Cooper wrote:
+> Suravee,
+>
+> On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> This patch set introduces support for MSI(-X) in GICv2m specification,
+>> which is implemented in some variation of GIC400.
+>>
+>> This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
+>> (https://lkml.org/lkml/2014/3/14/320).
+>
+> Grrr.  I mis-spoke against your v1 of this series.  There are more
+> changes to irq-gic.c than I originally thought in this series.
 
-> >OTOH that's a more invasive change that's harder to do mechanically -
-> >I'm not sure it's sensible to insist on someone doing it for generic
-> >cleanups (rather than actively working with the particular platform).
+I am not quite sure what your are referring to.
 
-> I don't think it is more invasive than using platform data. I did the same
-> recently for jz4740 qi-lb60[1] and the changes in the patch are fairly
-> trivial. The non-descriptor API is deprecated, so this even if this patch is
-> applied as is sooner or later somebody will mechanically convert it to the
-> descriptor API.
+> Additionally, we have a lot of other significant changes to that driver
+> as well this cycle.  It would be really helpful if I could take patches
+> 1-3 through irqchip/gic.  I can Ack #4 with the Subject change, and the
+> branch it lands in can depend on irqchip/gic, no problem there.
 
-> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=218e18a3728507ee82ed2eb10c789671a00e34bd
+Patch 1-3 should be able to go through the irqchip/gic along with the 
+gicv3 from Marc, which I have rebased this patch against.
 
-The translation into the GPIO_LOOKUP() macros isn't sufficiently direct,
-with platform data it's just a case of putting the same data in a
-different file but with this you need to figure out what the GPIO bank
-is called which won't appear in the diff typically.  Someone will
-doubtless want to finish up the gpiod_ transition at some point but it's
-not yet at the point where it's worth blocking unrelated cleanups for
-it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/188c61c2/attachment.sig>
+Patch 4 is arch64 architectural changes.  Therefore, it might need to be 
+going through a different branch. Marc/Mark/Will/Catalin, do you have 
+any suggestions on which branch this should go to?
+
+> My main concern is your statement above and your answer to my inquiry
+> against v1.
+>
+> Right now, I'm only concerned about breaking the build.  Can I take 1-3?
+> Or, do we need to wait until aarch64 PCI lands in mainline?
+
+1 and 2 should be trivial since there is no change functionally.
+
+3 mostly adding new files which should not get built if ARCH64 PCI is 
+not supported based on the arch/arm64/Kconfig below.
+
++++ b/arch/arm64/Kconfig
+@@ -9,6 +9,7 @@ config ARM64
+  	select ARM_AMBA
+  	select ARM_ARCH_TIMER
+  	select ARM_GIC
++	select ARM_GIC_V2M if (PCI && PCI_MSI)
+  	select ARM_GIC_V3
+  	select BUILDTIME_EXTABLE_SORT
+  	select CLONE_BACKWARDS
+
+The only thing is the change related to MSI in the irq-gic.c which 
+should not affect with the non-PCI system.
+
+Thanks,
+
+Suravee
