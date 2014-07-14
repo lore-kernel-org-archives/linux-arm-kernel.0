@@ -1,131 +1,70 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jul 2014 06:12:50 -0400 (EDT)
-Subject: [PATCH v11 04/12] ARM: hisi: enable MCPM implementation
-In-Reply-To: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <alpine.LFD.2.11.1407140553300.3647@knanqh.ubzr>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 14 Jul 2014 06:13:03 -0400
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140714062428.GC2081@ulmo>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140712093917.GD18601@arm.com>
+ <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
+ <201407121422.02078.arnd@arndb.de>
+ <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
+ <20140714062428.GC2081@ulmo>
+Message-ID: <CAF6AEGspVSxdEj_3LNtMp752LF-RbfQ+Y4EdWoWfT9O8wMnh-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014, Haojian Zhuang wrote:
+On Mon, Jul 14, 2014 at 2:24 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Sat, Jul 12, 2014 at 08:57:31AM -0400, Rob Clark wrote:
+>> On Sat, Jul 12, 2014 at 8:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> [...]
+>> > The way that Thierry's binding does that is the obvious solution to this,
+>> > and it mirrors what we do in practically every other subsystem. I definitely
+>> > want the SMMU to change before anybody starts using it in a real system,
+>> > which we fortunately do not have yet.
+>>
+>> hmm, well if some of the things I need for (like this or batching
+>> mappings) are too weird and gpu specific, I'm willing to duplicate the
+>> IOMMU driver in drm/msm.  It really isn't so much code, and that gives
+>> me a lot more more flexibility to do crazy things... at some point I'm
+>> probably going to want to do context switches by banging the IOMMU
+>> registers directly from the gpu.
+>
+> If the IOMMU API doesn't provide for what you need, then perhaps it's
+> time to enhance it? We do that all the time in other parts of the
+> kernel, why should IOMMU be special?
 
-> +static bool hip04_init_cluster0_snoop(void)
-> +{
-> +	unsigned long data;
-> +
-> +	if (!fabric) {
-> +		pr_err("failed to find fabric base\n");
-> +		return false;
-> +	}
-> +	data = readl_relaxed(fabric + FAB_SF_MODE);
-> +	data |= 1;
-> +	writel_relaxed(data, fabric + FAB_SF_MODE);
-> +	while (1) {
-> +		if (data == readl_relaxed(fabric + FAB_SF_MODE))
-> +			break;
-> +	}
-> +	return true;
-> +}
+sure.. and my comment was also about the map/unmap batching.
 
-In fact you probably should make this into something like:
+Bypassing IOMMU wouldn't be my first choice.  (Especially because I'd
+then get to implement it twice.)  But if some of the things I need are
+too specific to one driver (or worse, problematic for other IOMMU
+use-cases which I don't know about), then it is an option I'd be
+willing to consider.  If nothing else, it would get me out of
+allocating sglists for every buffer..  I wonder how much memory
+scatterlists take up for 500M of gfx buffers?
 
-static bool hip04_set_cluster_snoop(int cluster, bool active)
+> It seems to me like context switching for per-process address space
+> isolation is one of the important features of an IOMMU. If the current
+> API doesn't let you do that then we should think of ways how it can be
+> improved. And if it doesn't do it fast enough, then we should equally
+> find ways to speed it up.
+>
+> This is part of why I think it would be good to have explicit objects
+> associated with IOMMU contexts. That would give us a good place to add
+> caching for this kind of situation. Currently we're required to handle
+> most of this in drivers (map from struct device to context, ...).
 
-Eventually you'll want to turn snoops off when a cluster is completely 
-idle.  And this can be used to init snoops on cluster 0 during boot as 
-well.
+well, it is at least awkward that the current api conflates attaching
+device and attaching context.  I think we could get some use out of an
+iommu_swap() API which conceptually acts as:
 
-> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
-> +{
-> +	unsigned long data, mask;
-> +
-> +	if (!relocation || !sysctrl)
-> +		return -ENODEV;
-> +	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
-> +		return -EINVAL;
-> +
-> +	spin_lock_irq(&boot_lock);
-> +
-> +	if (hip04_cpu_table[cluster][cpu]) {
-> +		hip04_cpu_table[cluster][cpu]++;
-> +		spin_unlock_irq(&boot_lock);
-> +		return 0;
-> +	}
-> +
-> +	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
-> +	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
-> +	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
-> +	writel_relaxed(0, relocation + 12);
-> +
-> +	if (hip04_cluster_down(cluster)) {
-> +		data = CLUSTER_DEBUG_RESET_BIT;
-> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-> +		do {
-> +			mask = CLUSTER_DEBUG_RESET_STATUS;
-> +			data = readl_relaxed(sysctrl + \
-> +					     SC_CPU_RESET_STATUS(cluster));
-> +		} while (data & mask);
-> +	}
-> +
-> +	hip04_cpu_table[cluster][cpu]++;
-> +
-> +	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-> +	       CORE_DEBUG_RESET_BIT(cpu);
-> +	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-> +	spin_unlock_irq(&boot_lock);
-> +	msleep(POLL_MSEC);
+  iommu_swap(olddomain, newdomain, dev)
+  {
+     iommu_detach_device(olddomain, dev);
+     iommu_attach_device(newdomain, dev);
+  }
 
-Now that the booting CPU takes cares of snoops for itself, is this delay 
-still required?
+BR,
+-R
 
-> +	return 0;
-> +}
-> +
-> +static void hip04_mcpm_power_down(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster, data = 0;
-> +	bool skip_reset = false;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	__mcpm_cpu_going_down(cpu, cluster);
-> +
-> +	spin_lock(&boot_lock);
-> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> +	hip04_cpu_table[cluster][cpu]--;
-> +	if (hip04_cpu_table[cluster][cpu] == 1) {
-> +		/* A power_up request went ahead of us. */
-> +		skip_reset = true;
-> +	} else if (hip04_cpu_table[cluster][cpu] > 1) {
-> +		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
-> +		BUG();
-> +	}
-> +
-> +	v7_exit_coherency_flush(louis);
-> +
-> +	__mcpm_cpu_down(cpu, cluster);
-> +	spin_unlock(&boot_lock);
-
-You can't touch spinlocks after v7_exit_coherency_flush().  That has to 
-come before it.
-
-> +	if (!skip_reset) {
-> +		data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-> +		       CORE_DEBUG_RESET_BIT(cpu);
-> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
-> +	}
-
-And the race is still there.  If right before skip_reset is tested the 
-code in power_up() is executed, the CPU will then be shut down here 
-although it is expected to remain alive.
-
-You are certain no code is ever executed after SC_CPU_RESET_REQ is 
-written to? You don't need to execute wfi() for the reset to be 
-effective?  If so this write will have to be performed by another CPU 
-via a work queue or something unless there is simply no other CPU 
-running in the system.
-
-
-Nicolas
+> Thierry
