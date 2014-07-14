@@ -1,76 +1,82 @@
-From: a.heider@gmail.com (Andre Heider)
-Date: Mon, 14 Jul 2014 11:37:57 +0200
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <53C01F5A.6040409@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <20140711153019.GA75267@localhost> <53C01F5A.6040409@ti.com>
-Message-ID: <20140714093757.GA48810@localhost>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jul 2014 05:41:03 -0400 (EDT)
+Subject: [PATCH v10 03/11] ARM: hisi: enable MCPM implementation
+In-Reply-To: <CAD6h2NQzV_=y=OqmGonzZTspoZiV5oRg3c52cCO-F1rYJUzZRg@mail.gmail.com>
+References: <1404957850-13340-1-git-send-email-haojian.zhuang@linaro.org>
+ <1404957850-13340-4-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.DEB.2.10.1407101714400.2893@Yrabib>
+ <CAD6h2NQzV_=y=OqmGonzZTspoZiV5oRg3c52cCO-F1rYJUzZRg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1407140538030.3647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 12:31:06PM -0500, Dave Gerlach wrote:
-> >On Thu, Jul 10, 2014 at 09:55:38PM -0500, Dave Gerlach wrote:
-> >>Hello,
-> >>
-> >>This series adds suspend/resume support for am335x. Version 3 of this
-> >>series can be found at [1]. I apologize for the large delay between this
-> >>and the previous revision. This code has been heavily refined
-> >>since the last version based on the various comments received for v3. The
-> >>major change from previous version is moving all wkup_m3 code into a
-> >>remoteproc based driver. The new driver handles all IPC and fw loading
-> >>and exposes a small API to be used by PM code to achieve low power states.
-> >>
-> >>Firmware that can be used for testing this can be found at [2] on branch
-> >>pm-remote-proc-v3, using am335x-pm-firmware.elf found in bin directory.
-> >>Please note this has changed from all previous versions and is no longer
-> >>the .bin file. Firmware can be built into kernel or placed in /lib/firmware
-> >>in rootfs for automatic loading during boot.
-> >>
-> >>This series has several dependencies. The wkup_m3_rproc utilizes a mailbox
-> >>to communicate with the cm3 and depends on Suman's series for omap mbox
-> >>support [3], which has several dependencies of it's own, listed in the
-> >>cover letter. Also, a few changes to remoteproc itself were needed and
-> >>have been provided by Suman here [4]. The edma patch included in this
-> >>series was previously submitted by Daniel Mack and after discussion with
-> >>him we agreed to include an updated version with this series as resume
-> >>has a direct dependency on it due to hangs in mmc without it.
-> >>
-> >>Because of the high number of dependencies I have pushed a branch for
-> >>testing here [6] if anyone desires to try it out on branch pm-ds0-v3.16.
-> >>
-> >>As is this series will only suspend and resume one time and then
-> >>fail to resume afterwards due to the removal of direct PM code control
-> >>of hwmods that do not properly assert their MSTANDBY signal after a context
-> >>loss, discussed here [7]. In particular it is due to the usb_otg_hs hwmod
-> >>that currently has no driver controlling it in the kernel. The main
-> >>cause of the issue is that the SYSCONFIG register present within
-> >>the IP must be reprogrammed after every suspend cycle and this
-> >>only happens at boot if no driver is present. Work is in progress to
-> >>allow suspend to function with or without drivers for the troublesome
-> >>hwmods (cpgmac, usb_otg_hs, and tptc1-3) and will be provided in a separate
-> >>future patch. The previous suggestion of allowing omap_device to handle
-> >>it proved to be too invasive into both omap_device and omap_hwmod and
-> >>the approach of allowing the firmware to handle it is not possible due
-> >>to the inability of the CM3 to access the IPs causing the issue. I'd
-> >>be happy to discuss this at length if anybody is interested.
+On Mon, 14 Jul 2014, Haojian Zhuang wrote:
 
-...
-
-> >It fails to compile with CONFIG_THUMB2_KERNEL though:
-> >arch/arm/mach-omap2/sleep33xx.S:61: Error: cannot use register index
-> >with PC-relative addressing -- `str r1,emif_addr_virt'
+> On 13 July 2014 05:31, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 10 Jul 2014, Haojian Zhuang wrote:
+> >
+> >> +static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
+> >> +{
+> >> +     asm volatile ("                 \n"
+> >> +     /* calculate fabric phys address */
+> >> +"    adr     r2, 2f                  \n"
+> >> +"    ldmia   r2, {r1, r3}            \n"
+> >> +"    sub     r0, r2, r1              \n"
+> >> +"    add     r2, r0, r3              \n"
+> >> +"    ldr     r2, [r2]                \n"
+> >
+> > You may replace the above 2 instructions with "ldr r2, [r0, r3]".
+> >
+> OK.
 > 
-> Hmm, interestingly enough I can not reproduce this build error. Can you
-> share your config and compiler version?
+> >> +     /* get cluster id from MPIDR */
+> >> +"    mrc     p15, 0, r0, c0, c0, 5   \n"
+> >> +"    ubfx    r1, r0, #8, #8          \n"
+> >> +"    and     r1, r1, #0xf            \n"
+> >
+> > You don't need the "and" here.  It is implicit in ubfx.
+> >
+> OK.
+> 
+> >> +     /* 1 << cluster id */
+> >> +"    mov     r0, #1                  \n"
+> >> +"    mov     r3, r0, lsl r1          \n"
+> >> +"    ldr     r0, [r2, #"__stringify(FAB_SF_MODE)"]   \n"
+> >> +"    tst     r0, r3                  \n"
+> >> +"    bxne    lr                      \n"
+> >
+> > Instead of running all this code all the time, you could simply test r0
+> > at the very beginning and if it is not equal to 1 then return
+> > immediately. If it is 1 that means the CPU executing this code is the
+> > first one to run in the cluster, in which case you also don't have to
+> > test if the cluster snoop is already enabled here.
+> >
+> 
+> Since I need to enable the cluster snoop for cluster 0. At this time,
+> it's not enabled although core0 is running.
 
-While I have a stripped down .config for just boneblack I can reproduce this with:
-make multi_v7_defconfig
-./scripts/config -e THUMB2_KERNEL
+Yes, hence my next comment.
 
-Which may not make much sense (exposes other thumb2 related issues), but with that
-.config sleep33xx.S fails to assemble with binutils 2.24 and succeeds with 2.23.2.
+> >> +"    orr     r1, r0, r3              \n"
+> >> +"    str     r1, [r2, #"__stringify(FAB_SF_MODE)"]   \n"
+> >> +"1:  ldr     r0, [r2, #"__stringify(FAB_SF_MODE)"]   \n"
+> >> +"    tst     r0, r3                  \n"
+> >> +"    beq     1b                      \n"
+> >> +"    bx      lr                      \n"
+> >> +
+> >> +"    .align  2                       \n"
+> >> +"2:  .word   .                       \n"
+> >> +"    .word   fabric_phys_addr        \n"
+> >> +     );
+> >> +}
+> >
+> > Of course you will also have to enable the snoops for the current
+> > cluster in hip04_cpu_table_init() as well.
+> 
+> It means that I need to reserve the copy to enable the snoop in c code
+> for cluster 0. Is it right?
 
-Which may be binutils' fault, I can't judge since I don't speak ARM asm ;)
+Yes. And it can be __init just like hip04_cpu_table_init().
 
-Hope that helps,
-Andre
+
+Nicolas
