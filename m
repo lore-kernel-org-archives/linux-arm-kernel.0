@@ -1,35 +1,23 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Mon, 14 Jul 2014 16:41:25 +0100
-Subject: [PATCH v3 0/4] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
- secure firmware enabled
-In-Reply-To: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <CAD8Lp46mp-tHcwGpFd0YHRDE4pKWDoPpUvu-Y0QzxSi-jnYtWg@mail.gmail.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Mon, 14 Jul 2014 10:46:05 -0500
+Subject: [PATCH 0/2] ARM: minor sigpage enhancements
+Message-ID: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+Russell,
 
-On Wed, Jul 9, 2014 at 6:17 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> This patch series adds support for AFTR idle mode on boards with
-> secure firmware enabled and allows EXYNOS cpuidle driver usage on
-> Exynos4x12 SoCs.
->
-> It has been tested on Trats2 board (using Exynos4412 SoC with secure
-> firmware enabled) on which AFTR mode reduces power consumption by ~12%
-> when EXYNOS cpuidle driver is enabled (in both cases the default
-> exynos_defconfig config is used and CPU1-3 are offlined).
+Would you consider taking these for 3.17?  I've been carrying the
+sigpage placement randomization as part of the VDSO patch set but it
+seems worthwhile on its own.  Using _install_special_mapping for the
+VDSO and similar VMAs was recently suggested by Andy Lutomirski.
 
-Thanks for this, I have tested it on ODROID-U2.
+Nathan Lynch (2):
+  ARM: use _install_special_mapping for sigpage
+  ARM: place sigpage at a random offset above stack
 
-I don't have any equipment to measure the power usage, but after
-offlining CPUs 1,2,3 via sysfs "online" file, a printk I added
-confirms that the system is going to enter aftr mode, and system
-stability seems as good as ever.
+ arch/arm/kernel/process.c | 60 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 51 insertions(+), 9 deletions(-)
 
-Is there any automatic way that the cpus should be offlined, or is the
-intention that it must be done "by hand" like this?
-
-Thanks,
-Daniel
+-- 
+1.9.3
