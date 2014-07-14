@@ -1,47 +1,38 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Mon, 14 Jul 2014 22:14:37 +0800
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <20140714130824.GA3993@lee--X1>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba> <20140709134646.GB479@lee--X1>
- <20140714130824.GA3993@lee--X1>
-Message-ID: <1405347277.28592.25.camel@rzhang1-toshiba>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Jul 2014 15:19:04 +0100
+Subject: [PATCH v4 5/7] watchdog: moxart: Register restart handler with
+ restart notifier
+In-Reply-To: <1405265431-4561-6-git-send-email-linux@roeck-us.net>
+References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
+ <1405265431-4561-6-git-send-email-linux@roeck-us.net>
+Message-ID: <20140714141904.GA1112@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
-> On Wed, 09 Jul 2014, Lee Jones wrote:
-> > On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > > On Tue, 24 Jun 2014, Lee Jones wrote:
-> > > > 
-> > > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > > is incorrect in the MAINTAINERS file.
-> > > > > > 
-> > > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > > registers.
-> > > > > 
-> > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > > 
-> > > > Anything at all?  It's been well over a month now.
-> > > > 
-> > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > > but as we didn't get any feedback from Eduardo, I will take them.
-> > 
-> > Thanks Rui.
-> > 
-> > So have you taken all 4 "thermal: sti: *" patches?
-> 
-> Have you taken these yet?
-Not yet.
-will do tomorrow.
+On Sun, Jul 13, 2014 at 04:30:29PM +0100, Guenter Roeck wrote:
+> diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
+> index 4aa3a8a..5080b50 100644
+> --- a/drivers/watchdog/moxart_wdt.c
+> +++ b/drivers/watchdog/moxart_wdt.c
+[...]
+> -static void moxart_wdt_restart(enum reboot_mode reboot_mode, const char *cmd)
+> +static int moxart_restart_notify(struct notifier_block *this,
+> +				 unsigned long mode, void *cmd)
+>  {
+> -	writel(1, moxart_restart_ctx->base + REG_COUNT);
+> -	writel(0x5ab9, moxart_restart_ctx->base + REG_MODE);
+> -	writel(0x03, moxart_restart_ctx->base + REG_ENABLE);
+> +	struct moxart_wdt_dev *moxart_wdt = container_of(this,
+> +							 struct moxart_wdt_dev,
+> +							 restart_notifier);
+> +	writel(1, moxart_wdt->base + REG_COUNT);
+> +	writel(0x5ab9, moxart_wdt->base + REG_MODE);
+> +	writel(0x03, moxart_wdt->base + REG_ENABLE);
+> +
+> +	return NOTIFY_DONE;
+>  }
 
-thanks,
-rui
->   I notice that these aren't in -next yet.
-> 
-> > The ARM ones should go through Maxime.
-> 
+Wondering whether NOTIFY_OK or even NOTIFY_STOP_MASK is better here.
+
+-- 
+Catalin
