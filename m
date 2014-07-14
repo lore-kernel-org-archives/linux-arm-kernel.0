@@ -1,74 +1,91 @@
-From: jwerner@chromium.org (Julius Werner)
-Date: Mon, 14 Jul 2014 11:08:15 -0700
-Subject: [PATCH v3 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
-In-Reply-To: <1405342198-3870-3-git-send-email-gautam.vivek@samsung.com>
-References: <1405342198-3870-1-git-send-email-gautam.vivek@samsung.com>
- <1405342198-3870-3-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <CAODwPW_h2EBKtA+XwEvjCtS=FrcdHOjybwALGugd-ccQ-_vMWw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 14 Jul 2014 11:12:45 -0700
+Subject: [PATCH 1/1] ARM: dts: zynq: Add Parallella device tree
+In-Reply-To: <61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
+References: <1404075022-28745-1-git-send-email-afaerber@suse.de>
+ <1404075022-28745-2-git-send-email-afaerber@suse.de>
+ <CAOesGMhKY1Lb+o8AbtFXS5c7SLg2uGt4-oosdro2FMj_+bB6Tw@mail.gmail.com>
+ <61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
+Message-ID: <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 5:49 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> The host controller by itself may sometimes need to handle PHY
-> and/or calibrate some of the PHY settings to get full support out
-> of the PHY controller. The PHY core provides a calibration
-> funtionality now to do so.
-> Therefore, facilitate getting the two possible PHYs, viz.
-> USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3).
->
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->  drivers/usb/host/xhci-plat.c |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 1a0cf9f..d097d60 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
-> +#include <linux/phy/phy.h>
->  #include <linux/slab.h>
->  #include <linux/usb/xhci_pdriver.h>
->
-> @@ -180,6 +181,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
->                         goto put_hcd;
->         }
->
-> +       /* Get possile USB 2.0 type PHY (UTMI+) available with xhci */
-> +       hcd->gen_phy = devm_phy_get(&pdev->dev, "usb2-phy");
-> +       if (IS_ERR(hcd->gen_phy)) {
-> +               ret = PTR_ERR(hcd->gen_phy);
-> +               if (ret != -ENOSYS && ret != -ENODEV)
-> +                       dev_dbg(&pdev->dev, "no usb2 phy configured\n");
+On Tue, Jul 8, 2014 at 4:18 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 06/30/2014 07:15 AM, Olof Johansson wrote:
+>> Hi,
+>>
+>> On Sun, Jun 29, 2014 at 1:50 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> This allows to boot the Adapteva Parallella board to serial console.
+>>>
+>>> Cc: Andreas Olofsson <andreas@adapteva.com>
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>
+>> Nice and clean DTS, just a couple of comments below.
+>>
+>>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+>>> new file mode 100644
+>>> index 0000000..98df66c
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
+>>> @@ -0,0 +1,63 @@
+>>> +/*
+>>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
+>>> + *
+>>> + * Derived from zynq-zed.dts:
+>>> + *
+>>> + *  Copyright (C) 2011 Xilinx
+>>> + *  Copyright (C) 2012 National Instruments Corp.
+>>> + *  Copyright (C) 2013 Xilinx
+>>> + *
+>>> + * This software is licensed under the terms of the GNU General Public
+>>> + * License version 2, as published by the Free Software Foundation, and
+>>> + * may be copied, distributed, and modified under those terms.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +/dts-v1/;
+>>> +/include/ "zynq-7000.dtsi"
+>>> +
+>>> +/ {
+>>> +       model = "Parallella Board";
 
-nit: This message is not really accurate anymore, right? If there is
-no phy configured, you get ENODEV and (correctly) skip the message
-completely. What you probably want is dev_warn(..., "error retrieving
-usb2 phy: %d\n"); or something like that.
+You might want to have this say "Adapteva Parallella Board" instead
+(just noticed).
 
-> +       }
-> +
->         ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
->         if (ret)
->                 goto disable_clk;
-> @@ -209,6 +218,14 @@ static int xhci_plat_probe(struct platform_device *pdev)
->         if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->                 xhci->shared_hcd->can_do_streams = 1;
+>>> +       compatible = "xlnx,zynq-7000";
+>>
+>> This should have a more specific compatible as the first one. Probably
+>> something like:
+>>    compatible = "adapteva,parallella", "xlnx,zynq-7000";
 >
-> +       /* Get possile USB 3.0 type PHY (PIPE3) available with xhci */
-> +       xhci->shared_hcd->gen_phy = devm_phy_get(&pdev->dev, "usb3-phy");
-> +       if (IS_ERR(xhci->shared_hcd->gen_phy)) {
-> +               ret = PTR_ERR(xhci->shared_hcd->gen_phy);
-> +               if (ret != -ENOSYS && ret != -ENODEV)
-> +                       dev_dbg(&pdev->dev, "no usb3 phy configured\n");
-> +       }
-> +
->         ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
->         if (ret)
->                 goto put_usb3_hcd;
-> --
-> 1.7.10.4
+> We were using these compatible properties but later there is no reason
+> to create them because they will be unused.
+> It is easy to add it when you need it which is not this case.
+
+No, please add it from day one, otherwise everybody needs to update
+their device tree, some will miss doing it, etc, etc. It's a simple
+and trivial thing to do, and no reason to leave it o ut.
+
+>>> +
+>>> +       memory {
+>>> +               device_type = "memory";
+>>> +               reg = <0 0x20000000>;
+>>
+>> Does the bootloader update this entry, or is it truly static? If it's
+>> updated then it's become recent habit to leave the memory size empty
+>> in the static file.
 >
+> Depends on your bootloader. I think it is good to have it here.
+> Also this file can be used by u-boot for example and u-boot can be configured
+> from it that's why I think that make sense to keep this here.
+
+Ok. It's become commonplace to leave memory empty for the machines
+where it's guaranteed that the bootloader will have updated it, to
+avoid having stale or incorrect values in the static tree. I'm not
+going to be strict about it, but it's something to consider.
+
+
+-Olof
