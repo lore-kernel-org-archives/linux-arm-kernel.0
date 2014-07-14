@@ -1,136 +1,105 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 14 Jul 2014 11:24:53 +0800
-Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
-In-Reply-To: <53BFBF3F.8040804@gmail.com>
-References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
- <53BFBF3F.8040804@gmail.com>
-Message-ID: <20140714032451.GA1668@shlinux1.ap.freescale.net>
+From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
+Date: Sun, 13 Jul 2014 20:55:42 -0700
+Subject: Issue found in Armada 370: "No buffer space available" error
+ during continuous ping
+In-Reply-To: <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
+References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
+ <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
+ <20140708102142.0f7fe796@free-electrons.com>
+ <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
+Message-ID: <CAB8gEUuQUT_Ku8E2hg68OqVMH+ZF2E7hRYKAk5954K7eXbNGyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 04:11:03PM +0530, Varka Bhadram wrote:
-> On 07/11/2014 03:59 PM, Dong Aisheng wrote:
-> >add M_CAN device tree binding documentation
-> >
-> >Cc: Wolfgang Grandegger <wg@grandegger.com>
-> >Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> >Cc: Mark Rutland <mark.rutland@arm.com>
-> >Cc: Oliver Hartkopp <socketcan@hartkopp.net>
-> >Cc: Varka Bhadram <varkabhadram@gmail.com>
-> >Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> >---
-> >  .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
-> >  1 files changed, 65 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
-> >
-> >diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
-> >new file mode 100644
-> >index 0000000..c4cb263
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/net/can/m_can.txt
-> >@@ -0,0 +1,65 @@
-> >+Bosch MCAN controller Device Tree Bindings
-> >+-------------------------------------------------
-> >+
-> >+Required properties:
-> >+- compatible		: Should be "bosch,m_can" for M_CAN controllers
-> >+- reg			: physical base address and size of the M_CAN
-> >+			  registers map and Message RAM
-> >+- reg-names		: Should be "m_can" and "message_ram"
-> >+- interrupts		: Should be the interrupt number of M_CAN interrupt
-> >+			  line 0 and line 1, could be same if sharing
-> >+			  the same interrupt.
-> >+- interrupt-names	: Should contain "int0" and "int1"
-> >+- clocks		: Clocks used by controller, should be host clock
-> >+			  and CAN clock.
-> >+- clock-names		: Should contain "hclk" and "cclk"
-> >+- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
-> 
-> I think this should be pinctrl-0
-> 
+Hi Thomas,
+Good day.
 
-First, this part is defined by pinctrl binding doc.
-Second i think it may be possible someone wants to add other pinctrl states
-when implement low power state in the future.
-So i just keep it as pinctrl-<n>.
+Any update on my previous inquiry?
+Thank you.
 
-> >+- pinctrl-names		: Names corresponding to the numbered pinctrl states
-> 
-> remove 1 tab space before :
-> 
+Regards,
+Maggie Roxas
 
-It's a bit strange.
-Other line like pinctrl-<n> is also two tabs.
-And the code looks fine and already aligned.
-- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
-- pinctrl-names		: Names corresponding to the numbered pinctrl states
-Do you mean change line of pinctrl-names from two tabs to one space and a tab before :?
-
-> >+- mram-cfg		: Message RAM configuration data.
-> >+  Multiple M_CAN instances can share the same Message RAM and each element(e.g
-> >+  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
-> >+  so this property is telling driver how the shared or private Message RAM
-> >+  are used by this M_CAN controller.
-> >+
-> 
-> It may written like:
-> mram-cfg		: Message RAM configuration data
-> 			  Multiple M_CAN instances can share the same Message RAM and each element
-> 			  (e.g Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
-> 			  ...
-> 
-
-I'm fine with that.
-The question is it's easy to over 80 columns if writing like that,
-is it ok?
-
-Regards
-Dong Aisheng
-> >+  The format should be as follows:
-> >+  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems rxb_elems
-> >+   txe_elems txb_elems>
-> >+  The 'offset' is an address offset of the Message RAM where the following
-> >+  elements start from. This is usually set to 0x0 if you're using a private
-> >+  Message RAM. The remain cells are used to specify how many elements are used
-> >+  for each FIFO/Buffer.
-> >+
-> >+M_CAN includes the following elements according to user manual:
-> >+11-bit Filter	0-128 elements / 0-128 words
-> >+29-bit Filter	0-64 elements / 0-128 words
-> >+Rx FIFO 0	0-64 elements / 0-1152 words
-> >+Rx FIFO 1	0-64 elements / 0-1152 words
-> >+Rx Buffers	0-64 elements / 0-1152 words
-> >+Tx Event FIFO	0-32 elements / 0-64 words
-> >+Tx Buffers	0-32 elements / 0-576 words
-> >+
-> >+Please refer to 2.4.1 Message RAM Configuration in Bosch M_CAN user manual
-> >+for details.
-> >+
-> >+Example:
-> >+SoC dtsi:
-> >+m_can1: can at 020e8000 {
-> >+	compatible = "bosch,m_can";
-> >+	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
-> >+	reg-names = "m_can", "message_ram";
-> >+	interrupts = <0 114 0x04>,
-> >+		     <0 114 0x04>;
-> >+	interrupt-names = "int0", "int1";
-> >+	clocks = <&clks IMX6SX_CLK_CANFD>,
-> >+		 <&clks IMX6SX_CLK_CANFD>;
-> >+	clock-names = "hclk", "cclk";
-> >+	mram-cfg = <0x0 0 0 32 0 0 0 1>;
-> >+	status = "disabled";
-> >+};
-> >+
-> >+Board dtsi:
-> >+&m_can1 {
-> >+	pinctrl-names = "default";
-> >+	pinctrl-0 = <&pinctrl_m_can1>;
-> >+	status = "enabled";
-> >+};
-> 
-> 
-> -- 
+On Tue, Jul 8, 2014 at 11:35 PM, Maggie Mae Roxas
+<maggie.mae.roxas@gmail.com> wrote:
+> Hi Thomas,
+> Good day.
+>
+> As much as we'd like to switch to the latest v3.14.x, we need to stay
+> at kernel v3.13.9 as that is a hard requirement of our customer (I
+> think it's because it's the base platform for Ubuntu 14.04 FS which
+> we'll use).
+>
+> So I applied your patch in our v3.13.9 as suggested:
+> http://kernel.opensuse.org/cgit/kernel/patch/?id=cd71e246c16b30e3f396a85943d5f596202737ba
+>
+> Unfortunately, issue still exists after we applied it.
+>
+>> Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
+> network driver:
+>
+> Given this, we tried to replace mvneta.c of our v3.13.9 and replace it
+> with v3.13.5's mvneta.c.
+> Issue does not exist when we did that - but of course, we surely will
+> miss something, so we wanted to confirm this further with you.
+> It seems like applying cd71e246c16b30e3f396a85943d5f596202737ba in
+> v3.13.9 is not sufficient enough..?
+> Possibly there are v3.13.5 and v3.13.9 diff (see attached) needed
+> apart from just cd71e246c16b30e3f396a85943d5f596202737ba?
+>
+>> Thanks again for your report!
+> No problem. We're also thankful for your support!
+>
 > Regards,
-> Varka Bhadram.
-> 
+> Maggie Roxas
+>
+> On Tue, Jul 8, 2014 at 1:21 AM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+>> Dear Maggie Mae Roxas,
+>>
+>> On Mon, 7 Jul 2014 19:27:22 -0700, Maggie Mae Roxas wrote:
+>>> Sorry, correcting typo:
+>>>
+>>> - 3.13.9 (issue exists)
+>>> - 3.10.24 (issue does NOT exist)
+>>> - 3.13.5 (issue does NOT exist)
+>>
+>> Ok, thanks again for the report. Unfortunately, you're hitting a known
+>> problem that was fixed, but after the 3.13-stable cycle was closed.
+>> Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
+>> network driver:
+>>
+>> $ git slog --author=free-electrons v3.13.5..v3.13.9
+>> 396b229b683fdc08d8705883860ec5a1b810546a net: mvneta: fix usage as a module on RGMII configurations
+>> ea64e1f33d9d627da5d38da035e5d7443276e84e net: mvneta: rename MVNETA_GMAC2_PSC_ENABLE to MVNETA_GMAC2_PCS_ENABLE
+>>
+>> To fix the usage of mvneta on RGMII configurations. However, by doing
+>> so, I broke SGMII configurations. So, I sent a patch to revert "net:
+>> mvneta: fix usage as a module on RGMII configurations", which was
+>> accepted. But in the mean time, the 3.13-stable cycle was closed, so
+>> this revert was never merged in the 3.13.x series.
+>>
+>> If you want to stay on 3.13.x, you should therefore apply:
+>>
+>> cd71e246c16b30e3f396a85943d5f596202737ba Revert "net: mvneta: fix usage as a module on RGMII configurations"
+>>
+>> This commit is from the 3.14-stable branch, in Linus master branch,
+>> it's:
+>>
+>> cc6ca3023f2c2bbcd062e9d4cf6afc2ba2821ada Revert "net: mvneta: fix usage as a module on RGMII configurations"
+>>
+>> Some other commits, merged after that, fix the usage of mvneta as a
+>> module on both RGMII and SGMII configurations.
+>>
+>> Any reason you're still using 3.13.x ? You should really consider
+>> switching at least to v3.14.x, which is a long-term version, and
+>> therefore still maintained. If you use v3.14.x, all of your bug reports
+>> that end up in patches, will ultimately be fixed in v3.14.x.
+>>
+>> Thanks again for your report!
+>>
+>> Thomas
+>> --
+>> Thomas Petazzoni, CTO, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
