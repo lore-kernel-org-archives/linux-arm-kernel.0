@@ -1,78 +1,37 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 14 Jul 2014 11:34:37 -0700
-Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
- regs-clocks
-In-Reply-To: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
-References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <53C422BD.3070608@infradead.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Jul 2014 19:36:24 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <16507628.c6raaN50oI@wuerfel>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <4494372.fAWcxQ0qku@wuerfel> <53C402C4.5090908@metafoo.de>
+ <16507628.c6raaN50oI@wuerfel>
+Message-ID: <20140714183624.GV6800@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/14 11:14, Nicholas Krause wrote:
-> This patch addresses the fix me message in this file that states to
-> remove all definitions not related to reg-clocks in this header
-> file.
-> 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
->  1 file changed, 1 insertion(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-> index 4f44aac..46e64cc 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-> @@ -15,24 +15,4 @@
->  #ifndef __PLAT_REGS_CLOCK_H
->  #define __PLAT_REGS_CLOCK_H __FILE__
->  
-> -/*
-> - * FIXME: Remove remaining definitions
-> - */
-> -
-> -#define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
-> -
-> -#define S3C_PCLK_GATE		S3C_CLKREG(0x34)
+On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
+> On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
 
-There is another header file that uses the #define S3C_PCLK_GATE above.
-Deleting it here should be causing a problem here:
+> > Yes. But now that you say it the gpiod_direction_output() call is missing 
+> > from this patch.
 
-./arch/arm/mach-s3c64xx/include/mach/pm-core.h:24:	u32 tmp = __raw_readl(S3
-C_PCLK_GATE);
-./arch/arm/mach-s3c64xx/include/mach/pm-core.h:37:	__raw_writel(tmp, S3C_PC
-LK_GATE);
+> I'm lost now. The GPIO_ACTIVE_HIGH I added comes from Documentation/gpio/board.txt
+> and as Linus Walleij explained to me the other day, the lookup is supposed
+> to replace devm_gpio_request_one(), which in turn replaced both the
+> gpio_request and the gpio_direction_output(). Do I need to put the
+> gpiod_direction_output() back or is there another interface for that when
+> registering the board gpios?
 
-Please check things like this in advance.
-
-> -#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
-> -#define S3C_MEM_SYS_CFG		S3C_CLKREG(0x120)
-> -
-> -/* PCLK GATE Registers */
-> -#define S3C_CLKCON_PCLK_UART3		(1<<4)
-
-used by pm-core.h
-
-> -#define S3C_CLKCON_PCLK_UART2		(1<<3)
-
-used by pm-core.h
-
-> -#define S3C_CLKCON_PCLK_UART1		(1<<2)
-
-used by pm-core.h
-
-> -#define S3C_CLKCON_PCLK_UART0		(1<<1)
-
-used by pm-core.h
-
-> -
-> -/* MEM_SYS_CFG */
-> -#define MEM_SYS_CFG_INDEP_CF		0x4000
-> -#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON	0x30
-> -
-> -#endif /* _PLAT_REGS_CLOCK_H */
-> +/#endif /* _PLAT_REGS_CLOCK_H */
-> 
-
-
--- 
-~Randy
+Indeed.  If you *do* need an explicit _output() then that sounds to me
+like we either need a gpiod_get_one() or an extension to the table,
+looking at the code it seems like this is indeed the case.  We can set
+if the GPIO is active high/low, or open source/drain but there's no flag
+for the initial state.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/e30fb34a/attachment.sig>
