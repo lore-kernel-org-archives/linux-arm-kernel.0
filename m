@@ -1,196 +1,158 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jul 2014 15:33:30 +0100
-Subject: [PATCH v2 09/11] pwm: sti: Ensure same period values for all channels
+Date: Mon, 14 Jul 2014 15:33:32 +0100
+Subject: [PATCH v2 11/11] pwm: sti: Remove PWM period table
 In-Reply-To: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
 References: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1405348412-7352-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1405348412-7352-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ajit Pal Singh <ajitpal.singh@st.com>
 
-ST PWM IP shares the same clock prescaler across all the PWM
-channels. Hence configuration requests which change the period
-will affect all the channels. Do not allow period changes which
-will stomp period settings of the already configured channels.
+Removes the PWM period table. Instead the prescaler is computed
+from the period value passed in the config() function.
 
 Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pwm/pwm-sti.c | 140 ++++++++++++++++++++++++++++++++++----------------
- 1 file changed, 96 insertions(+), 44 deletions(-)
+ drivers/pwm/pwm-sti.c | 64 +++++++++++++--------------------------------------
+ 1 file changed, 16 insertions(+), 48 deletions(-)
 
 diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index 21d97bc2..0fdf4b4 100644
+index 1aa901d..ceeeef6 100644
 --- a/drivers/pwm/pwm-sti.c
 +++ b/drivers/pwm/pwm-sti.c
-@@ -58,6 +58,7 @@ struct sti_pwm_chip {
- 	struct regmap_field *pwm_int_en;
- 	unsigned long *pwm_periods;
- 	struct pwm_chip chip;
-+	struct pwm_device *cur;
- 	void __iomem *mmio;
- };
+@@ -10,7 +10,6 @@
+  * (at your option) any later version.
+  */
  
-@@ -99,6 +100,24 @@ static void sti_pwm_calc_periods(struct sti_pwm_chip *pc)
- 	}
+-#include <linux/bsearch.h>
+ #include <linux/clk.h>
+ #include <linux/math64.h>
+ #include <linux/mfd/syscon.h>
+@@ -56,7 +55,6 @@ struct sti_pwm_chip {
+ 	struct regmap_field *prescale_high;
+ 	struct regmap_field *pwm_en;
+ 	struct regmap_field *pwm_int_en;
+-	unsigned long *pwm_periods;
+ 	struct pwm_chip chip;
+ 	struct pwm_device *cur;
+ 	unsigned int en_count;
+@@ -77,29 +75,31 @@ static inline struct sti_pwm_chip *to_sti_pwmchip(struct pwm_chip *chip)
  }
  
-+/* Calculate the number of PWM devices configured with a period. */
-+unsigned int sti_pwm_count_configured(struct pwm_chip *chip)
-+{
-+	struct pwm_device *pwm;
-+	unsigned int ncfg = 0;
-+	unsigned int i;
-+
-+	for (i = 0; i < chip->npwm; i++) {
-+		pwm = &chip->pwms[i];
-+		if (test_bit(PWMF_REQUESTED, &pwm->flags)) {
-+			if (pwm_get_period(pwm))
-+				ncfg++;
-+		}
-+	}
-+
-+	return ncfg;
-+}
-+
- static int sti_pwm_cmp_periods(const void *key, const void *elt)
+ /*
+- * Calculate the period values supported by the PWM for the
+- * current clock rate.
++ * Calculate the prescaler value corresponding to the period.
+  */
+-static void sti_pwm_calc_periods(struct sti_pwm_chip *pc)
++static int sti_pwm_get_prescale(struct sti_pwm_chip *pc, unsigned long period,
++				unsigned int *prescale)
  {
- 	unsigned long i = *(unsigned long *)key;
-@@ -124,57 +143,90 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- {
- 	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
  	struct sti_pwm_compat_data *cdata = pc->cdata;
-+	struct pwm_device *cur = pc->cur;
- 	struct device *dev = pc->dev;
--	unsigned int prescale, pwmvalx;
-+	unsigned int prescale = 0, pwmvalx;
- 	unsigned long *found;
- 	int ret;
--
--	/*
--	 * Search for matching period value. The corresponding index is our
--	 * prescale value
-+	unsigned int ncfg;
-+	bool period_same = false;
-+
-+	ncfg = sti_pwm_count_configured(chip);
-+	if (ncfg)
-+		period_same = (period_ns == pwm_get_period(cur));
-+
-+	/* Allow configuration changes if one of the
-+	 * following conditions satisfy.
-+	 * 1. No channels have been configured.
-+	 * 2. Only one channel has been configured and the new request
-+	 *    is for the same channel.
-+	 * 3. Only one channel has been configured and the new request is
-+	 *    for a new channel and period of the new channel is same as
-+	 *    the current configured period.
-+	 * 4. More than one channels are configured and period of the new
-+	 *    requestis the same as the current period.
+-	struct device *dev = pc->dev;
+ 	unsigned long val;
+-	int i;
++	unsigned int ps;
+ 
+ 	/*
+-	 * period_ns = (10^9 * (prescaler + 1) * (MAX_PWM_COUNT + 1)) / CLK_RATE
++	 * prescale = ((period_ns * clk_rate) / (10^9 * (max_pwm_count + 1)) - 1
  	 */
--	found = bsearch(&period_ns, &pc->pwm_periods[0],
--			cdata->max_prescale + 1, sizeof(unsigned long),
--			sti_pwm_cmp_periods);
--	if (!found) {
--		dev_err(dev, "failed to find matching period\n");
-+	if (!ncfg ||
-+	    ((ncfg == 1) && (pwm->hwpwm == cur->hwpwm)) ||
-+	    ((ncfg == 1) && (pwm->hwpwm != cur->hwpwm) && period_same) ||
-+	    ((ncfg > 1) && period_same)) {
-+		/* Enable clock before writing to PWM registers. */
-+		ret = clk_enable(pc->clk);
-+		if (ret)
-+			return ret;
-+
-+		if (!period_same) {
-+			/*
-+			 * Search for matching period value.
-+			 * The corresponding index is our prescale value.
-+			 */
-+			found = bsearch(&period_ns, &pc->pwm_periods[0],
-+					cdata->max_prescale + 1,
-+					sizeof(unsigned long),
-+					sti_pwm_cmp_periods);
-+			if (!found) {
-+				dev_err(dev,
-+					"failed to find matching period\n");
-+				ret = -EINVAL;
-+				goto clk_dis;
-+			}
-+			prescale = found - &pc->pwm_periods[0];
-+
-+			ret =
-+			regmap_field_write(pc->prescale_low,
-+					   prescale & PWM_PRESCALE_LOW_MASK);
-+			if (ret)
-+				goto clk_dis;
-+
-+			ret =
-+			regmap_field_write(pc->prescale_high,
-+				(prescale & PWM_PRESCALE_HIGH_MASK) >> 4);
-+			if (ret)
-+				goto clk_dis;
-+		}
-+
-+		/*
-+		 * When PWMVal == 0, PWM pulse = 1 local clock cycle.
-+		 * When PWMVal == max_pwm_count,
-+		 * PWM pulse = (max_pwm_count + 1) local cycles,
-+		 * that is continuous pulse: signal never goes low.
-+		 */
-+		pwmvalx = cdata->max_pwm_cnt * duty_ns / period_ns;
-+
-+		ret = regmap_write(pc->regmap, STI_DS_REG(pwm->hwpwm), pwmvalx);
-+		if (ret)
-+			goto clk_dis;
-+
-+		ret = regmap_field_write(pc->pwm_int_en, 0);
-+
-+		pc->cur = pwm;
-+
-+		dev_dbg(dev, "prescale:%u, period:%lu, duty:%i, pwmvalx:%u\n",
-+			prescale, period_ns, duty_ns, pwmvalx);
+ 	val = NSEC_PER_SEC / pc->clk_rate;
+ 	val *= cdata->max_pwm_cnt + 1;
+ 
+-	dev_dbg(dev, "possible periods for clkrate[HZ]:%lu\n", pc->clk_rate);
+-
+-	for (i = 0; i <= cdata->max_prescale; i++) {
+-		pc->pwm_periods[i] = val * (i + 1);
+-		dev_dbg(dev, "prescale:%d, period[ns]:%lu\n",
+-			i, pc->pwm_periods[i]);
++	if (period % val) {
++		return -EINVAL;
 +	} else {
- 		return -EINVAL;
++		ps  = period / val - 1;
++		if (ps > cdata->max_prescale)
++			return -EINVAL;
+ 	}
++	*prescale = ps;
++
++	return 0;
+ }
+ 
+ /* Calculate the number of PWM devices configured with a period. */
+@@ -120,17 +120,6 @@ unsigned int sti_pwm_count_configured(struct pwm_chip *chip)
+ 	return ncfg;
+ }
+ 
+-static int sti_pwm_cmp_periods(const void *key, const void *elt)
+-{
+-	unsigned long i = *(unsigned long *)key;
+-	unsigned long j = *(unsigned long *)elt;
+-
+-	if (i < j)
+-		return -1;
+-	else
+-		return i == j ? 0 : 1;
+-}
+-
+ /*
+  * For STiH4xx PWM IP, the PWM period is fixed to 256 local clock cycles.
+  * The only way to change the period (apart from changing the PWM input clock)
+@@ -148,7 +137,6 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct pwm_device *cur = pc->cur;
+ 	struct device *dev = pc->dev;
+ 	unsigned int prescale = 0, pwmvalx;
+-	unsigned long *found;
+ 	int ret;
+ 	unsigned int ncfg;
+ 	bool period_same = false;
+@@ -178,21 +166,9 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			return ret;
+ 
+ 		if (!period_same) {
+-			/*
+-			 * Search for matching period value.
+-			 * The corresponding index is our prescale value.
+-			 */
+-			found = bsearch(&period_ns, &pc->pwm_periods[0],
+-					cdata->max_prescale + 1,
+-					sizeof(unsigned long),
+-					sti_pwm_cmp_periods);
+-			if (!found) {
+-				dev_err(dev,
+-					"failed to find matching period\n");
+-				ret = -EINVAL;
++			ret = sti_pwm_get_prescale(pc, period_ns, &prescale);
++			if (ret)
+ 				goto clk_dis;
+-			}
+-			prescale = found - &pc->pwm_periods[0];
+ 
+ 			ret =
+ 			regmap_field_write(pc->prescale_low,
+@@ -373,12 +349,6 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	pc->pwm_periods = devm_kzalloc(dev,
+-			sizeof(unsigned long) * (pc->cdata->max_prescale + 1),
+-			GFP_KERNEL);
+-	if (!pc->pwm_periods)
+-		return -ENOMEM;
+-
+ 	pc->clk = of_clk_get_by_name(np, "pwm");
+ 	if (IS_ERR(pc->clk)) {
+ 		dev_err(dev, "failed to get PWM clock\n");
+@@ -397,8 +367,6 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
--	prescale = found - &pc->pwm_periods[0];
+-	sti_pwm_calc_periods(pc);
 -
--	/*
--	 * When PWMVal == 0, PWM pulse = 1 local clock cycle.
--	 * When PWMVal == max_pwm_count,
--	 * PWM pulse = (max_pwm_count + 1) local cycles,
--	 * that is continuous pulse: signal never goes low.
--	 */
--	pwmvalx = cdata->max_pwm_cnt * duty_ns / period_ns;
--
--	dev_dbg(dev, "prescale:%u, period:%i, duty:%i, pwmvalx:%u\n",
--		prescale, period_ns, duty_ns, pwmvalx);
--
--	/* Enable clock before writing to PWM registers */
--	ret = clk_enable(pc->clk);
--	if (ret)
--		return ret;
--
--	ret = regmap_field_write(pc->prescale_low,
--				 prescale & PWM_PRESCALE_LOW_MASK);
--	if (ret)
--		goto clk_dis;
--
--	ret = regmap_field_write(pc->prescale_high,
--				 (prescale & PWM_PRESCALE_HIGH_MASK) >> 4);
--	if (ret)
--		goto clk_dis;
--
--	ret = regmap_write(pc->regmap, STI_PWMVAL(pwm->hwpwm), pwmvalx);
--	if (ret)
--		goto clk_dis;
--
--	ret = regmap_field_write(pc->pwm_int_en, 0);
--
- clk_dis:
- 	clk_disable(pc->clk);
- 	return ret;
+ 	pc->chip.dev = dev;
+ 	pc->chip.ops = &sti_pwm_ops;
+ 	pc->chip.base = -1;
 -- 
 1.8.3.2
