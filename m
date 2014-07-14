@@ -1,100 +1,135 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 14 Jul 2014 10:31:53 +0530
-Subject: [PATCH V9 1/7] pcie: Add designware wrapper driver for SPEAr13xx
-In-Reply-To: <20140710213937.GB15190@google.com>
-References: <cover.1404976058.git.viresh.kumar@linaro.org>
- <9430e4b284928e4919297de5602e803d03f82d7b.1404976058.git.viresh.kumar@linaro.org>
- <20140710213937.GB15190@google.com>
-Message-ID: <CAKohpokzzaTRJfyU2viB3cr6SJqeMSNEffXrN2VLY_n+umt9TQ@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 14 Jul 2014 13:04:04 +0800
+Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
+In-Reply-To: <53C35E72.2050902@gmail.com>
+References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+ <53BFBF3F.8040804@gmail.com>
+ <20140714032451.GA1668@shlinux1.ap.freescale.net>
+ <53C35E72.2050902@gmail.com>
+Message-ID: <20140714050403.GB1668@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2014 03:09, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> I guess I'm obsessive, but I think it's nice when people run
-> "git log --oneline" on the file or directory they're changing,
-> and then follow the existing style.
+On Mon, Jul 14, 2014 at 10:07:06AM +0530, Varka Bhadram wrote:
+> On 07/14/2014 08:54 AM, Dong Aisheng wrote:
+> >On Fri, Jul 11, 2014 at 04:11:03PM +0530, Varka Bhadram wrote:
+> >>On 07/11/2014 03:59 PM, Dong Aisheng wrote:
+> >>>add M_CAN device tree binding documentation
+> >>>
+> >>>Cc: Wolfgang Grandegger <wg@grandegger.com>
+> >>>Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> >>>Cc: Mark Rutland <mark.rutland@arm.com>
+> >>>Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+> >>>Cc: Varka Bhadram <varkabhadram@gmail.com>
+> >>>Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> >>>---
+> >>>  .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
+> >>>  1 files changed, 65 insertions(+), 0 deletions(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+> >>>
+> >>>diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+> >>>new file mode 100644
+> >>>index 0000000..c4cb263
+> >>>--- /dev/null
+> >>>+++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+> >>>@@ -0,0 +1,65 @@
+> >>>+Bosch MCAN controller Device Tree Bindings
+> >>>+-------------------------------------------------
+> >>>+
+> >>>+Required properties:
+> >>>+- compatible		: Should be "bosch,m_can" for M_CAN controllers
+> >>>+- reg			: physical base address and size of the M_CAN
+> >>>+			  registers map and Message RAM
+> >>>+- reg-names		: Should be "m_can" and "message_ram"
+> >>>+- interrupts		: Should be the interrupt number of M_CAN interrupt
+> >>>+			  line 0 and line 1, could be same if sharing
+> >>>+			  the same interrupt.
+> >>>+- interrupt-names	: Should contain "int0" and "int1"
+> >>>+- clocks		: Clocks used by controller, should be host clock
+> >>>+			  and CAN clock.
+> >>>+- clock-names		: Should contain "hclk" and "cclk"
+> >>>+- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> >>I think this should be pinctrl-0
+> >>
+> >First, this part is defined by pinctrl binding doc.
+> >Second i think it may be possible someone wants to add other pinctrl states
+> >when implement low power state in the future.
+> >So i just keep it as pinctrl-<n>.
+> 
+> Normally we will use pinctrl-0 for mentioning the pinctrl bindings.
+> 
+> If somebody going to add something to the pinctrl bindings they will
+> add separately with pinctrl-1: bla bla bla...
+> 
+
+Will it cause misleading that it only supports one state?
+And if we only define pinctrl-0 here, how do we describe pinctrl-names?
+It should be "default"? It looks not accurate enough to me.
+
+Per my understanding, I think it's better to leave it as standard
+pinctrl-binding doc states since anyhow people should read pinctrl-binding doc.
+
+> >>>+- pinctrl-names		: Names corresponding to the numbered pinctrl states
+> >>remove 1 tab space before :
+> >>
+> >It's a bit strange.
+> >Other line like pinctrl-<n> is also two tabs.
+> >And the code looks fine and already aligned.
+> >- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> >- pinctrl-names		: Names corresponding to the numbered pinctrl states
+> >Do you mean change line of pinctrl-names from two tabs to one space and a tab before :?
+> >
+> When i see in the patch the alignment is like this
+> pinctrl-<n>	:
+> pinctrl-name		:
+> 
+
+Yes,in the original patch it's like:
++- pinctrl-<n>          : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
++- pinctrl-names                : Names corresponding to the numbered pinctrl states
+
+If remove one tab:
++- pinctrl-<n>          : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
++- pinctrl-names        : Names corresponding to the numbered pinctrl states
+
+But in vim reading the code, it's like:
+- pinctrl-<n>           : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+- pinctrl-names : Names corresponding to the numbered pinctrl states
+I don't know why.
+What should we do about this case?
+
+
+> >>>+- mram-cfg		: Message RAM configuration data.
+> >>>+  Multiple M_CAN instances can share the same Message RAM and each element(e.g
+> >>>+  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+> >>>+  so this property is telling driver how the shared or private Message RAM
+> >>>+  are used by this M_CAN controller.
+> >>>+
+> >>It may written like:
+> >>mram-cfg		: Message RAM configuration data
+> >>			  Multiple M_CAN instances can share the same Message RAM and each element
+> >>			  (e.g Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+> >>			  ...
+> >>
+> >I'm fine with that.
+> >The question is it's easy to over 80 columns if writing like that,
+> >is it ok?
+> 
+> When we follow the above format it would be more readable.
+> 
+
+Okay.
+
+> >Regards
+> >Dong Aisheng
+> 
+> 
+> -- 
+> Regards,
+> Varka Bhadram.
 >
-> In this case, that would lead to a subject line like:
->
->     PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx
->
 
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 702ca10..443dd05 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -6820,6 +6820,12 @@ S:     Maintained
->>  F:   Documentation/devicetree/bindings/pci/host-generic-pci.txt
->>  F:   drivers/pci/host/pci-host-generic.c
->>
->> +PCIE DRIVER FOR ST SPEAR13XX
->> +M:   Mohit Kumar <mohit.kumar@st.com>
->> +L:   linux-pci at vger.kernel.org
->> +S:   Maintained
->> +F:   drivers/pci/host/pcie-spear13xx.c
->
-> Wildcards work here, so you could follow the lead of IMX6, MVEBU, RCAR,
-> and DESIGNWARE and use:
->
->     F:  drivers/pci/host/*spear*
->
->> --- /dev/null
->> +++ b/drivers/pci/host/pcie-spear13xx.c
->> ...
->> +#define PCI_CAP_ID_EXP_OFFSET                        0x70
->
-> A nit, but I'd use a name like EXP_CAP_ID_OFFSET to make it
-> more clear that this is specific to SPEAr, not something from
-> the PCI specs.
+Regards
+Dong Aisheng
 
-Hi Bjorn,
-
-So this is how the diff looks like over this patch:
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 443dd05..766948e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6824,7 +6824,7 @@ PCIE DRIVER FOR ST SPEAR13XX
- M:     Mohit Kumar <mohit.kumar@st.com>
- L:     linux-pci at vger.kernel.org
- S:     Maintained
--F:     drivers/pci/host/pcie-spear13xx.c
-+F:     drivers/pci/host/*spear*
-
- PCMCIA SUBSYSTEM
- P:     Linux PCMCIA Team
-diff --git a/drivers/pci/host/pcie-spear13xx.c
-b/drivers/pci/host/pcie-spear13xx.c
-index a6fc332..99738e4 100644
---- a/drivers/pci/host/pcie-spear13xx.c
-+++ b/drivers/pci/host/pcie-spear13xx.c
-@@ -139,7 +139,7 @@ struct pcie_app_reg {
- #define VEN_MSI_TC_MASK                ((u32)0x7 << VEN_MSI_TC_ID)
- #define VEN_MSI_VECTOR_MASK    ((u32)0x1F << VEN_MSI_VECTOR_ID)
-
--#define PCI_CAP_ID_EXP_OFFSET                  0x70
-+#define EXP_CAP_ID_OFFSET                      0x70
-
- #define to_spear13xx_pcie(x)   container_of(x, struct spear13xx_pcie, pp)
-
-@@ -149,7 +149,7 @@ static int spear13xx_pcie_establish_link(struct
-pcie_port *pp)
-        int count = 0;
-        struct spear13xx_pcie *spear13xx_pcie = to_spear13xx_pcie(pp);
-        struct pcie_app_reg *app_reg = spear13xx_pcie->app_base;
--       u32 exp_cap_off = PCI_CAP_ID_EXP_OFFSET;
-+       u32 exp_cap_off = EXP_CAP_ID_OFFSET;
-
-        if (dw_pcie_link_up(pp)) {
-                dev_err(pp->dev, "link already up\n");
-
-
-
-And the subject looks like this now:
-PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx
-
-I may skip sending a V10 for this and directly send a pull request as
-there aren't any significant changes suggested in V9.
-
-Thanks.
+ 
