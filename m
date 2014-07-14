@@ -1,114 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Jul 2014 15:50:52 +0200
-Subject: [PATCH 6/8] net: ethernet driver: Fujitsu OGMA
-In-Reply-To: <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
-References: <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
-Message-ID: <18609483.Jzi9Hxcq2r@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 14 Jul 2014 15:55:29 +0200
+Subject: [PATCH v2 2/4] ARM: imx: clk-vf610: fix FlexCAN clock gating
+In-Reply-To: <20140714133926.GH2197@dragon>
+References: <cover.1405322992.git.stefan@agner.ch>
+ <94282392d8355ac25bb998b89032c1c980d5ccce.1405322992.git.stefan@agner.ch>
+ <20140714133926.GH2197@dragon>
+Message-ID: <5a57efd52b0092ad61ff6a2b5bf68ba7@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 July 2014 14:31:47 Mollie Wu wrote:
-> +
-> +Example:
-> +	eth0: f_taiki {
-> +                compatible = "fujitsu,ogma";
-> +		reg = <0 0x31600000 0x10000>, <0 0x31618000 0x4000>, <0 0x3161c000 0x4000>;
-> +		interrupts = <0 163 0x4>;
-> +		clocks = <&clk_alw_0_8>;
-> +		phy-mode = "rgmii";
-> +		max-speed = <1000>;
-> +		max-frame-size = <9000>;
-> +		local-mac-address = [ a4 17 31 00 00 ed ];
-> +		phy-handle = <&ethphy0>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		ethphy0: ethernet-phy at 1 {
-> +			device_type = "ethernet-phy";
-> +			compatible = "ethernet-phy-ieee802.3-c22";
-> +			reg = <1>;
-> +		};
-> +	};
+Am 2014-07-14 15:39, schrieb Shawn Guo:
+> Copy Jingchang ...
+> 
+> On Mon, Jul 14, 2014 at 09:48:29AM +0200, Stefan Agner wrote:
+>> Extend the clock control for FlexCAN with the second gate which
+>> enable the clocks in the Clock Divider (CCM_CSCDR2) register too.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  arch/arm/mach-imx/clk-vf610.c | 6 ++++--
+>>  1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+>> index 22dc3ee..b12b888 100644
+>> --- a/arch/arm/mach-imx/clk-vf610.c
+>> +++ b/arch/arm/mach-imx/clk-vf610.c
+>> @@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+>>
+>>  	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
+>>
+>> -	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+>> -	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
+>> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
+>> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
+> 
+> I do not quite understand what "flexcan0_en" clock is and the
+> relationship between it and clock "flexcan0".  I do not think it's a
+> parent-child clock relationship.  Jingchang, do you have more info on
+> this?
+> 
+> Also when you add a new clock, you should have a new clock ID, something
+> like VF610_CLK_FLEXCAN0_EN.
 
-The name of the device should be "ethernet" rather than "f_taiki".
+There are two enable (gates) bits to enable the FlexCAN clocks: the
+first is in the divider register, the second in the clock gate register.
+For most clocks there is a divider in between, then it looks like this:
 
-For the compatible string, it would be good to have a version number included.
-If you cannot find out the version of the ogma hardware, add the identifier for
-the soc it is used in, e.g.
+clk[VF610_CLK_ESDHC0_SEL] = imx_clk_mux("esdhc0_sel", CCM_CSCMR1, 16, 2,
+esdhc_sels, 4);
+clk[VF610_CLK_ESDHC0_EN] = imx_clk_gate("esdhc0_en", "esdhc0_sel",
+CCM_CSCDR2, 28);
+clk[VF610_CLK_ESDHC0_DIV] = imx_clk_divider("esdhc0_div", "esdhc0_en",
+CCM_CSCDR2, 16, 4);
+clk[VF610_CLK_ESDHC0] = imx_clk_gate2("eshc0", "esdhc0_div", CCM_CCGR7,
+CCM_CCGRx_CGn(1));
 
-	compatible = "fujitsu,mb86s73-ogma", "fujitsu,ogma";
+However, for FlexCAN no clock selection and no divider is available,
+hence its just a chain of an enable and gate register...
 
-The driver only needs to match the generic string, but it's better
-to be prepared for the case where we have to support slightly different
-variants.
+But yes, there should be two clock entries for this (I just asking
+myself how this code actually could work, afaik the boot loader don't
+touches these clocks).
 
-> +static inline void ogma_writel(struct ogma_priv *priv, u32 reg_addr, u32 val)
-> +{
-> +	writel(val, priv->ioaddr + (reg_addr << 2));
-> +}
-> +
-> +static inline u32 ogma_readl(struct ogma_priv *priv, u32 reg_addr)
-> +{
-> +	return readl(priv->ioaddr + (reg_addr << 2));
-> +}
-for best performance, it may be better to use readl_relaxed() by default
-and only use the nonrelaxed accesses in the cases where you have to
-synchronize with DMA transfers.
+--
+Stefan
 
-> +
-> +#define TIMEOUT_SPINS_MAC 1000000
-> +
-> +static u32 ogma_clk_type(u32 freq)
-> +{
-> +	if (freq < 35 * OGMA_CLK_MHZ)
-> +		return OGMA_GMAC_GAR_REG_CR_25_35_MHZ;
-> +	if (freq < 60 * OGMA_CLK_MHZ)
-> +		return OGMA_GMAC_GAR_REG_CR_35_60_MHZ;
-> +	if (freq < 100 * OGMA_CLK_MHZ)
-> +		return OGMA_GMAC_GAR_REG_CR_60_100_MHZ;
-> +	if (freq < 150 * OGMA_CLK_MHZ)
-> +		return OGMA_GMAC_GAR_REG_CR_100_150_MHZ;
-> +	if (freq < 250 * OGMA_CLK_MHZ)
-> +		return OGMA_GMAC_GAR_REG_CR_150_250_MHZ;
-> +
-> +	return OGMA_GMAC_GAR_REG_CR_250_300_MHZ;
-> +}
-> +
-> +static int ogma_wait_while_busy(struct ogma_priv *priv, u32 addr, u32 mask)
-> +{
-> +	u32 timeout = TIMEOUT_SPINS_MAC;
-> +
-> +	while (--timeout && ogma_readl(priv, addr) & mask)
-> +		;
-> +	if (!timeout) {
-> +		netdev_WARN(priv->net_device, "%s: timeout\n", __func__);
-> +		return -ETIMEDOUT;
-> +	}
-> +
-> +	return 0;
-> +}
 
-The callers of this function seem to all be from non-atomic context, so it
-would be good to occasionally msleep() here, either after each try, or
-after initially spinning for as long as it takes to succeed most of the
-time.
-
-> +
-> +static void ogma_napi_tx_processing(struct napi_struct *napi_p)
-> +{
-> +	struct ogma_priv *priv = container_of(napi_p, struct ogma_priv, napi);
-> +
-> +	ogma_ring_irq_clr(priv, OGMA_RING_TX, OGMA_IRQ_EMPTY);
-> +	ogma_clean_tx_desc_ring(priv);
-> +
-> +	if (netif_queue_stopped(priv->net_device) &&
-> +	    ogma_get_tx_avail_num(priv) >= OGMA_NETDEV_TX_PKT_SCAT_NUM_MAX)
-> +		netif_wake_queue(priv->net_device);
-> +}
-
-You should probably call netdev_tx_completed_queue() here and 
-netdev_tx_sent_queue() when sending the frame. See http://lwn.net/Articles/454390/
-for a description of the API.
-
-	Arnd
+> 
+> Shawn
+> 
+>> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
+>> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
+>>
+>>  	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
+>>  	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
+>> --
+>> 2.0.1
+>>
