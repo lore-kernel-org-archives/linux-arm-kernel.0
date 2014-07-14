@@ -1,105 +1,106 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 14 Jul 2014 11:01:14 +0200
-Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
-In-Reply-To: <53C3220B.30506@renesas.com>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1474559.zFUJiypt1j@avalon> <53C3220B.30506@renesas.com>
-Message-ID: <1509851.5UQ4JhkPb5@avalon>
+Date: Mon, 14 Jul 2014 11:06:01 +0200
+Subject: [GIT PULL v2 FOR v3.17] Renesas CMT,
+ MTU2 and TMU timers DT support
+In-Reply-To: <53C29AC1.30606@linaro.org>
+References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1929656.0uZaK89oG1@avalon> <53C29AC1.30606@linaro.org>
+Message-ID: <1871523.mnvyZQ6N2g@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Khiem,
+Hi Daniel,
 
-On Monday 14 July 2014 09:19:23 Khiem Nguyen wrote:
-> On 7/10/2014 7:37 PM, Laurent Pinchart wrote:
-> > On Thursday 10 July 2014 09:03:26 Khiem Nguyen wrote:
-> >> On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
-> >>> Cache the micro-TLB number in archdata allocated in the .add_device
-> >>> handler instead of looking it up when the deviced is attached and
-> >>> detached. This simplifies the .attach_dev and .detach_dev operations and
-> >>> prepares for DT support.
+On Sunday 13 July 2014 16:42:09 Daniel Lezcano wrote:
+> On 07/13/2014 03:00 PM, Laurent Pinchart wrote:
+> > On Sunday 13 July 2014 11:55:01 Simon Horman wrote:
+> >> [Cc Olof Johansson, ARM SoC Team]
 > >> 
-> >> [snip]
+> >> On Wed, Jul 09, 2014 at 11:59:16AM +0200, Laurent Pinchart wrote:
+> >>> On Friday 04 July 2014 15:53:32 Laurent Pinchart wrote:
+> >>>> Hi Daniel,
+> >>>> 
+> >>>> Could you please pull the following changes and drop the first version
+> >>>> of this pull request ? I've fixed one last typo noticed by Simon in
+> >>>> patch 09/19.
+> >>>> 
+> >>>> As last time I have board and SoC changes that depend on the driver
+> >>>> changes and that will need to go through Simon's tree. Could you thus
+> >>>> please provide a stable branch based on one of the v3.16-rc tags ?
+> >>> 
+> >>> Given that I'd like to get the arch/ part of the change set in v3.17,
+> >>> could I ask you to fast track this pull request if possible ?
 > >> 
-> >>> Signed-off-by: Laurent Pinchart
-> >>> <laurent.pinchart+renesas@ideasonboard.com>
+> >> Hi Laurent, Hi Daniel,
 > >> 
-> >> [snip]
+> >> I am wondering what the status of this pull request is.  It would be nice
+> >> to get the arch/ changes into v3.17 but we are getting closer to
+> >> v3.16-rc6 and I need to have things queued up before then.
 > >> 
-> >>> +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device
-> >>> *dev)
-> >>> +{
-> >>> +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
-> >>> +	const char *devname = dev_name(dev);
-> >>> +	unsigned int i;
-> >>> +
-> >>> +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
-> >>> +		if (strcmp(master->name, devname) == 0)
-> >>> +			return master->utlb;
-> >>> +	}
-> >>> +
-> >>> +	return -1;
-> >>> +}
+> >> I have also CCed Olof and the ARM SoC team (via arm at kernel.org) as
+> >> if Daniel does provide a stable branch that includes this pull request
+> >> and I use it as the basis for a branch with the arch changes then the
+> >> ARM SoC people would like to know about it before I send a pull request
+> >> for the arch/ changes.
 > >> 
-> >> [snip]
-> >> 
-> >>>  static int ipmmu_add_device(struct device *dev)
-> >> 
-> >> [snip]
-> >> 
-> >>>  	list_for_each_entry(mmu, &ipmmu_devices, list) {
-> >>> -		master = ipmmu_find_master(mmu, dev);
-> >>> -		if (master) {
-> >>> +		utlb = ipmmu_find_utlb(mmu, dev);
-> >>> +		if (utlb >= 0) {
-> >>>  			/*
-> >>> -			 * TODO Take a reference to the master to protect
-> >>> +			 * TODO Take a reference to the MMU to protect
-> >>>  			 * against device removal.
-> >>>  			 */
-> >>>  			break;
-> >> 
-> >> [snip]
-> >> 
-> >>> +	archdata->mmu = mmu;
-> >>> +	archdata->utlb = utlb;
-> >> 
-> >> [snip]
-> >> 
-> >> I have one question for ipmmu_add_device().
-> >> 
-> >> In my understanding, your code will find utlb for device
-> >> base on device name.
-> >> For any device, it will /only/ return utlb number of first match.
-> >> 
-> >> How about the case that a device name connected with more than 1 utlb ?
-> >> e.g DU device (rcar-du-r8a7790) in Lager
-> >> 
-> >> Was that case already covered in your code ?
+> > From my point of view everything is ready for v3.17. Daniel, if you
+> > haven't been abducted by aliens, could you please process the pull request
+> > ? If you have, let us know what we can do to help negotiate your release.
+> 
+> Hi Laurent,
+> 
+> sorry for no giving some news. I am in vacation for these two weeks.
+> 
+> I will take care of the PR this evening or tomorrow evening and keep you
+> in touch rapidly.
+
+Thank you, and sorry for disturbing you during your holidays. Next time if you 
+setup an automatic e-mail reply I'll be more patient and won't worry about 
+aliens :-)
+
+> >>>> The following changes since commit
 > > 
-> > For the DU case, the R8A7790 contains /two DU devices/, each connected to
-> > a single utlb. The IPMMU driver will thus work fine in that case.
-> 
-> As my understanding, in board-lager-reference.c,
-> DU devices are registered with 1 device name "rcar-du-r8a7790".
-> 
-> I also added some logs in ipmmu_add_device() to observe
-> the mapping between device name and utlb number.
-> And I saw that only one utlb is mapped with DU.
-> 
-> Do I miss anything here ?
-
-No, you're right, my bad. This is definitely a limitation of the driver at the 
-moment.
-
-> > I agree that this is a problem in general though, other devices (such as
-> > the DMAC) are connected to more than one utlb. This is currently not
-> > supported by the driver.
-> 
-> Thanks for your confirmation.
-> I guess the driver will be improved in near future.
-
-Yes, it will.
+> > 4c834452aad01531db949414f94f817a86348d59:
+> >>>>    Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> >>>> 
+> >>>> are available in the git repository at:
+> >>>>    git://linuxtv.org/pinchartl/fbdev.git timers/upstream/drivers
+> >>>> 
+> >>>> for you to fetch changes up to 
+cca8d0596c4c7acb371ea1bc5eee9b404b30516a:
+> >>>>    clocksource: sh_mtu2: Add DT support (2014-07-04 15:50:29 +0200)
+> >>>> 
+> >>>> ----------------------------------------------------------------
+> >>>> 
+> >>>> Laurent Pinchart (10):
+> >>>>        clocksource: sh_cmt: Drop support for legacy platform data
+> >>>>        clocksource: sh_cmt: Replace global spinlock with a per-device
+> >>>> spinlock
+> >>>>        clocksource: sh_tmu: Drop support for legacy platform data
+> >>>>        clocksource: sh_tmu: Replace global spinlock with a per-device
+> >>>> spinlock
+> >>>>        clocksource: sh_mtu2: Drop support for legacy platform data
+> >>>>        clocksource: sh_mtu2: Replace global spinlock with a per-device
+> >>>> spinlock
+> >>>>        clocksource: shmobile: Remove unused sh_timer_config members
+> >>>>        clocksource: sh_cmt: Add DT support
+> >>>>        clocksource: sh_tmu: Add DT support
+> >>>>        clocksource: sh_mtu2: Add DT support
+> >>>>   
+> >>>> Documentation/devicetree/bindings/timer/renesas,cmt.txt |  47 +++++
+> >>>> .../devicetree/bindings/timer/renesas,mtu2.txt          |  39 ++++
+> >>>> Documentation/devicetree/bindings/timer/renesas,tmu.txt |  39 ++++
+> >>>> drivers/clocksource/sh_cmt.c                            | 233 ++++---
+> >>>> drivers/clocksource/sh_mtu2.c                           | 146 +++----
+> >>>> drivers/clocksource/sh_tmu.c                            | 127 ++++---
+> >>>> include/linux/sh_timer.h                                |   5 -
+> >>>> 7 files changed, 309 insertions(+), 327 deletions(-)
+> >>>> create mode 100644
+> >>>> Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> >>>> create mode 100644
+> >>>> Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+> >>>> create mode 100644
+> >>>> Documentation/devicetree/bindings/timer/renesas,tmu.txt
 
 -- 
 Regards,
