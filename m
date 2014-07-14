@@ -1,87 +1,104 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 14 Jul 2014 12:06:32 +0300
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <20140714081524.GI2081@ulmo>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
- <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
- <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
-Message-ID: <53C39D98.9040802@nvidia.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Mon, 14 Jul 2014 11:06:28 +0200
+Subject: [PATCH 6/8] net: ethernet driver: Fujitsu OGMA
+In-Reply-To: <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
+References: <message-id-of-cover-letter>
+ <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
+Message-ID: <20140714090628.GA7668@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/14 11:15, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Mon, Jul 14, 2014 at 10:55:51AM +0300, Mikko Perttunen wrote:
->> On 11/07/14 19:01, Mikko Perttunen wrote:
->>> On 07/11/2014 05:51 PM, Thierry Reding wrote:
->>>> On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
->>>>> ...
->>>> ...
->>>
->>> In this case, all the registers that will be written are such that the
->>> MC driver will never need to write them. They are shadowed registers,
->>> meaning that all writes are stored and are only effective starting from
->>> the next time the EMC rate change state machine is activated, so writing
->>> them from anywhere except than the EMC driver would be pointless.
->>>
->>> I can find two users of these registers in downstream:
->>> 1) mc.c saves and loads them on suspend/restore (I don't know why, that
->>> shouldn't do anything. They will be overridden anyway during the next
->>> EMC rate change).
->>> 2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to
->>> calculate a value which it then writes to a register that is also
->>> shadowed and that is part of downstream burst registers so that doesn't
->>> do anything either.
->>>
->>> The reason I implemented two ways to specify the MC register area was
->>> that this could be merged before an MC driver and retain
->>> backwards-compatibility after the MC driver arrives.
->>>
->>> If this is not acceptable, we can certainly wait for the MC driver to be
->>> merged first. (Although with the general rate of things, I hope I won't
->>> be back at school at that point..) I assume that this is blocked on the
->>> IOMMU bindings discussion? In that case, there are several options: the
->>> MC driver could have its own tables for each EMC rate or we could just
->>> make the EMC tables global (i.e. not under the EMC node). In any case,
->>> the MC driver would need to implement a function that would just write
->>> these values but be guaranteed to not do anything else, since that could
->>> cause nasty things during the EMC rate change sequence.
->>
->> Having taken another look at the code, I don't think the MC driver could do
->> anything that bad. There are also two other places where the EMC driver
->> needs to read MC registers: Inside the sequence, it reads a register but
->> discards its contents. According to comments, this acts as a memory barrier,
->> probably for the preceding step that writes into MC memory. If the register
->> writes are moved to the MC driver, it could also handle that. In another
->> place it reads the number of RAM modules from a MC register. The MC driver
->> could export this as another function.
->
-> Exporting this functionality from the MC driver is the right thing to do
-> in my opinion.
+On 2014-07-13 at 08:31:47 +0200, Mollie Wu <mollie.wu@linaro.org> wrote:
+> This driver adds support for "ogma", a Fujitsu Semiconductor Ltd IP Gigabit
+> Ethernet + PHY IP used in a variety of their ARM-based ASICs.
+> 
+> This is being sent as part of a series including the arch support that uses it,
+> Fujitsu mb86s7x.
+> 
+> This driver was originally written by guys inside Fujitsu as an abstracted
+> "you can build this for Windows as well" type code, I've removed all that,
+> modernized various things, added runtime_pm, and ported it to work with
+> Device Tree, using only the bindings already mentioned in
+> 
+> ./Documentation/devicetree/bindings/net/ethernet.txt
+> 
+> Bindings documentation is added by this patch.
+> 
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
+> Signed-off-by: Mollie Wu <mollie.wu@linaro.org>
+> ---
+>  .../devicetree/bindings/net/fujitsu-ogma.txt       |  43 ++
+>  drivers/net/ethernet/fujitsu/Kconfig               |  12 +
+>  drivers/net/ethernet/fujitsu/Makefile              |   1 +
+>  drivers/net/ethernet/fujitsu/ogma/Makefile         |   6 +
+>  drivers/net/ethernet/fujitsu/ogma/ogma.h           | 380 +++++++++++++
+>  .../ethernet/fujitsu/ogma/ogma_desc_ring_access.c  | 627 +++++++++++++++++++++
+>  drivers/net/ethernet/fujitsu/ogma/ogma_ethtool.c   |  95 ++++
+>  .../net/ethernet/fujitsu/ogma/ogma_gmac_access.c   | 295 ++++++++++
+>  drivers/net/ethernet/fujitsu/ogma/ogma_netdev.c    | 592 +++++++++++++++++++
+>  drivers/net/ethernet/fujitsu/ogma/ogma_platform.c  | 333 +++++++++++
+>  10 files changed, 2384 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/fujitsu-ogma.txt
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/Makefile
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma.h
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_desc_ring_access.c
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_ethtool.c
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_gmac_access.c
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_netdev.c
+>  create mode 100644 drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
 
-Ok, let's do that then. Do you think I could make a bare-bones MC driver 
-to support the EMC driver before your MC driver with IOMMU/LA is ready? 
-Can the MC device tree node be stabilized yet? Of course, if things go 
-well, that concern might turn out to be unnecessary.
+[...]
 
-Thanks, Mikko.
+> diff --git a/drivers/net/ethernet/fujitsu/ogma/ogma_platform.c b/drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
+> new file mode 100644
+> index 0000000..09071da
+> --- /dev/null
+> +++ b/drivers/net/ethernet/fujitsu/ogma/ogma_platform.c
 
->
->> That said, I still suspect it might not be worth it to divide this between
->> two drivers.
->
-> If we don't separate, then we make it easy for people to break things in
-> the future. Both drivers may not be accessing the same registers now,
-> but if there's no barrier in place to actively enforce this split, then
-> it's only a matter of time before it gets broken. A typical way to
-> ensure this is done properly is via request_resource() (called by the
-> devm_ioremap_resource() function). That will fail if two drivers try to
-> use the same memory region, and with good reason.
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
+[...]
+
+> +#ifdef CONFIG_PM
+> +static const struct dev_pm_ops ogma_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(ogma_pm_suspend, ogma_pm_resume)
+> +	SET_RUNTIME_PM_OPS(ogma_runtime_suspend, ogma_runtime_resume, NULL)
+> +};
+> +#endif
+
+#ifdef CONFIG_PM can be omitted here since
+SET_{SYSTEM_SLEEP,RUNTIME}_PM_OPS will just evaluate empty if CONFIG_PM
+is not defined.
+
+> +
+> +static const struct of_device_id ogma_dt_ids[] = {
+> +	{.compatible = "fujitsu,ogma"},
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, ogma_dt_ids);
+> +
+> +static struct platform_driver ogma_driver = {
+> +	.probe = ogma_probe,
+> +	.remove = ogma_remove,
+> +	.driver = {
+> +		.name = "ogma",
+> +		.of_match_table = ogma_dt_ids,
+> +#ifdef CONFIG_PM
+> +		.pm = &ogma_pm_ops,
+> +#endif
+
+With the above #ifdef CONFIG_PM removed, ogma_pm_ops will be all NULL if
+CONFIG_PM is not set. Thus, the #ifdef can be removed as well.
+
+> +		},
+> +};
+> +
+> +module_platform_driver(ogma_driver);
+> +
+> +MODULE_AUTHOR("Fujitsu Semiconductor Ltd");
+> +MODULE_DESCRIPTION("OGMA Ethernet driver");
+> +MODULE_LICENSE("GPL");
+> +
+> +MODULE_ALIAS("platform:ogma");
+> -- 
+> 1.8.1.2
