@@ -1,129 +1,188 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Jul 2014 15:37:42 +0800
-Subject: [PATCH] ARM: dts: imx6: RIoTboard explicitly define pad settings
-In-Reply-To: <53C2AC33.80906@gmail.com>
-References: <53C2AC33.80906@gmail.com>
-Message-ID: <20140714073741.GF2197@dragon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Jul 2014 09:45:53 +0200
+Subject: [PATCH v2] ARM: EXYNOS: Fix build with PM_SLEEP=n
+Message-ID: <1405323953-25954-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 04:56:35PM +0100, Iain Paton wrote:
-> Instead of relying on defaults or bootloader settings, explicitly define
-> all pad settings.
-> 
-> This resolves reported issues of no analogue audio output.
-> 
-> Signed-off-by: Iain Paton <ipaton0@gmail.com>
-> ---
-> 
-> I don't know if it's possible at this point, but it would be good if this 
-> could make it into 3.16.
+Fix building of exynos defconfig with disabled PM_SLEEP:
+CONFIG_PM_SLEEP=n
+CONFIG_PM_SLEEP_SMP=n
+CONFIG_SUSPEND=n
+by moving functions for power up/down of CPU and cluster to platsmp.c
 
-Sorry.  This is neither a regression nor a very critical bug fix I would
-send for 3.16 at this point (-rc5 is already out).
+The build error messages:
+arch/arm/mach-exynos/built-in.o: In function `exynos_boot_secondary':
+arch/arm/mach-exynos/platsmp.c:111: undefined reference to `exynos_cpu_power_state'
+arch/arm/mach-exynos/platsmp.c:112: undefined reference to `exynos_cpu_power_up'
+arch/arm/mach-exynos/platsmp.c:116: undefined reference to `exynos_cpu_power_state'
+make: *** [vmlinux] Error 1
 
-Applied for 3.17.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Shawn
+---
+Changes since v1:
+1. Use different solution - just move the power up/down functions to a
+   common place instead of adding stubs in common.h. Suggested by Tomasz
+   Figa.
+---
+ arch/arm/mach-exynos/platsmp.c | 66 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/pm.c      | 66 ------------------------------------------
+ 2 files changed, 66 insertions(+), 66 deletions(-)
 
-> 
-> 
->  arch/arm/boot/dts/imx6dl-riotboard.dts | 32 ++++++++++++++++----------------
->  1 file changed, 16 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> index 80c9268..43cb3fd 100644
-> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> @@ -334,10 +334,10 @@
->  	imx6-riotboard {
->  		pinctrl_audmux: audmuxgrp {
->  			fsl,pins = <
-> -				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x8000000
-> -				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x8000000
-> -				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x8000000
-> -				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x8000000
-> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
->  				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0		/* CAM_MCLK */
->  			>;
->  		};
-> @@ -375,7 +375,7 @@
->  			fsl,pins = <
->  				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
->  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> -				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
->  				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
->  				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
->  				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-> @@ -388,9 +388,9 @@
->  				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
->  				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
->  				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
-> -				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000	/* GPIO16 -> AR8035 25MHz */
-> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8	/* GPIO16 -> AR8035 25MHz */
->  			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
-> -				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x80000000	/* AR8035 interrupt */
-> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0		/* AR8035 interrupt */
->  				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
->  			>;
->  		};
-> @@ -425,8 +425,8 @@
->  
->  		pinctrl_led: ledgrp {
->  			fsl,pins = <
-> -				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
-> -				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
-> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* user led0 */
-> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* user led1 */
->  			>;
->  		};
->  
-> @@ -492,8 +492,8 @@
->  		pinctrl_usbotg: usbotggrp {
->  			fsl,pins = <
->  				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
-> -				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x80000000	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
-> -				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x80000000
-> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
-> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
->  			>;
->  		};
->  
-> @@ -505,8 +505,8 @@
->  				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
->  				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
->  				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-> -				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x80000000	/* SD2 CD */
-> -				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x80000000	/* SD2 WP */
-> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* SD2 CD */
-> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* SD2 WP */
->  			>;
->  		};
->  
-> @@ -518,8 +518,8 @@
->  				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
->  				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
->  				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-> -				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x80000000	/* SD3 CD */
-> -				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x80000000	/* SD3 WP */
-> +				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0	/* SD3 CD */
-> +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1f0b0	/* SD3 WP */
->  			>;
->  		};
->  
-> @@ -531,7 +531,7 @@
->  				MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
->  				MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
->  				MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
-> -				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x80000000	/* SD4 RST (eMMC) */
-> +				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x17059	/* SD4 RST (eMMC) */
->  			>;
->  		};
->  	};
-> -- 
-> 1.8.5.1
-> 
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index b15ea30faa7c..d435175671e0 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -31,6 +31,72 @@
+ 
+ extern void exynos4_secondary_startup(void);
+ 
++/**
++ * exynos_core_power_down : power down the specified cpu
++ * @cpu : the cpu to power down
++ *
++ * Power down the specified cpu. The sequence must be finished by a
++ * call to cpu_do_idle()
++ *
++ */
++void exynos_cpu_power_down(int cpu)
++{
++	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
++}
++
++/**
++ * exynos_cpu_power_up : power up the specified cpu
++ * @cpu : the cpu to power up
++ *
++ * Power up the specified cpu
++ */
++void exynos_cpu_power_up(int cpu)
++{
++	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
++		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
++}
++
++/**
++ * exynos_cpu_power_state : returns the power state of the cpu
++ * @cpu : the cpu to retrieve the power state from
++ *
++ */
++int exynos_cpu_power_state(int cpu)
++{
++	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
++			S5P_CORE_LOCAL_PWR_EN);
++}
++
++/**
++ * exynos_cluster_power_down : power down the specified cluster
++ * @cluster : the cluster to power down
++ */
++void exynos_cluster_power_down(int cluster)
++{
++	__raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
++}
++
++/**
++ * exynos_cluster_power_up : power up the specified cluster
++ * @cluster : the cluster to power up
++ */
++void exynos_cluster_power_up(int cluster)
++{
++	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
++		     EXYNOS_COMMON_CONFIGURATION(cluster));
++}
++
++/**
++ * exynos_cluster_power_state : returns the power state of the cluster
++ * @cluster : the cluster to retrieve the power state from
++ *
++ */
++int exynos_cluster_power_state(int cluster)
++{
++	return (__raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
++			S5P_CORE_LOCAL_PWR_EN);
++}
++
+ static inline void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index fa7218a99580..6ab68a068e93 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -101,72 +101,6 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ 	return -ENOENT;
+ }
+ 
+-/**
+- * exynos_core_power_down : power down the specified cpu
+- * @cpu : the cpu to power down
+- *
+- * Power down the specified cpu. The sequence must be finished by a
+- * call to cpu_do_idle()
+- *
+- */
+-void exynos_cpu_power_down(int cpu)
+-{
+-	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+-}
+-
+-/**
+- * exynos_cpu_power_up : power up the specified cpu
+- * @cpu : the cpu to power up
+- *
+- * Power up the specified cpu
+- */
+-void exynos_cpu_power_up(int cpu)
+-{
+-	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+-		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+-}
+-
+-/**
+- * exynos_cpu_power_state : returns the power state of the cpu
+- * @cpu : the cpu to retrieve the power state from
+- *
+- */
+-int exynos_cpu_power_state(int cpu)
+-{
+-	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
+-			S5P_CORE_LOCAL_PWR_EN);
+-}
+-
+-/**
+- * exynos_cluster_power_down : power down the specified cluster
+- * @cluster : the cluster to power down
+- */
+-void exynos_cluster_power_down(int cluster)
+-{
+-	__raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
+-}
+-
+-/**
+- * exynos_cluster_power_up : power up the specified cluster
+- * @cluster : the cluster to power up
+- */
+-void exynos_cluster_power_up(int cluster)
+-{
+-	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+-		     EXYNOS_COMMON_CONFIGURATION(cluster));
+-}
+-
+-/**
+- * exynos_cluster_power_state : returns the power state of the cluster
+- * @cluster : the cluster to retrieve the power state from
+- *
+- */
+-int exynos_cluster_power_state(int cluster)
+-{
+-	return (__raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
+-			S5P_CORE_LOCAL_PWR_EN);
+-}
+-
+ #define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+ 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+ 			(sysram_base_addr + 0x24) : S5P_INFORM0))
+-- 
+1.9.1
