@@ -1,148 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jul 2014 09:35:49 +0100
-Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <Pine.LNX.4.44L0.1407111656170.17043-100000@netrider.rowland.org>
-References: <20140711074417.GA8233@griffinp-ThinkPad-X1-Carbon-2nd>
- <Pine.LNX.4.44L0.1407111656170.17043-100000@netrider.rowland.org>
-Message-ID: <20140714083549.GK2954@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 10:38:56 +0200
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <53C01D17.2050906@nvidia.com>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+ <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
+ <53C01558.3090607@nvidia.com>
+ <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+ <53C01D17.2050906@nvidia.com>
+Message-ID: <20140714083854.GO2081@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Jul 2014, Alan Stern wrote:
-> On Fri, 11 Jul 2014, Peter Griffin wrote:
-> > On Thu, 10 Jul 2014, Alan Stern wrote:
-> > 
-> > > On Thu, 10 Jul 2014, Peter Griffin wrote:
-> > > 
-> > > > This driver adds support for the USB HCD present in STi
-> > > > SoC's from STMicroelectronics. It has been tested on the
-> > > > stih416-b2020 board.
-> > > 
-> > > This driver file, along with the Kconfig changes, belongs in the
-> > > arch/platform-specific source directory.  Not in drivers/usb/host/.  
-> > > It is, after all, a platform driver that registers two platform
-> > > devices.
-> > 
-> > Why do think that?
+On Fri, Jul 11, 2014 at 08:21:27PM +0300, Tuomas Tynkkynen wrote:
 > 
-> Because it is true.  One can easily see that st-hcd.c is a platform
-> driver: It contains a module_platform_driver() line and a struct
-> platform_driver definition near the end.  And it registers a platform
-> device by calling platform_device_add() in st_hcd_device_create(),
-> which is called twice by st_hcd_probe().
-
-You are correct that this is indeed a platform driver and in the 'old
-days' these would have been stuffed into the ARM sub-architecture
-directories.  However, these became far too bloated and created too
-much churn which angered Linus.  A great deal has changed since his
-ARM rant [1].  All drivers (platform or otherwise) are now to live in
-'drivers', which makes a great deal of sense really, doesn't it?
-
-Did you grep kernel wide for module_platform_driver()?
-
-$ git grep module_platform_driver -- arch/ | wc -l
-12
-
-$ git grep module_platform_driver -- drivers/ | wc -l
-1138
-
-Most platform drivers have already been moved.
-
-> > AFAIK certainly for ARM we are trying NOT to add code
-> > under the arch/platform directorys and get the code into the relevant subsystems.
 > 
-> This does not agree with my experiences.
-
-Then you haven't been following what's been going on for the past 3
-years or so.  The majority of platform drivers have been moved out to
-drivers.  Hence the creation of some fantastic new subsystems, such as
-clk and pinctrl, to name but two.  These (and others) were realised as
-part of a push to consolidate and remove all driver code out of the
-arch directories.
-
-> > In order to prove the above if you look in drivers/usb/host/ there are many other 
-> > similar platform drivers for other SoC families: -
-> > bcma-hcd.c
-> > ehci-atmel.c
-> > ssb-hcd.c
-> > ehci-exynos.c
-> > ehci-fsl.c
-> > ehci-mxc.c 
-> > ehci-omap.c
-> > ehci-orion.c
-> > ohci-nxp.c
-> > and more, but you get the idea. In short I believe this to be the
-> > correct directory :-)
+> On 11/07/14 20:08, Andrew Bresticker wrote:
+> >On Fri, Jul 11, 2014 at 9:48 AM, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+> >>
+> >>
+> >>On 11/07/14 19:28, Andrew Bresticker wrote:
+> >>>
+> >>>On Thu, Jul 10, 2014 at 2:42 PM, Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> >>>wrote:
+> >>>>
+> >>>>The DFLL is the main clocksource for the fast CPU cluster on Tegra124
+> >>>>and also provides automatic CPU rail voltage scaling as well. The DFLL
+> >>>>is a separate IP block from the usual Tegra124 clock-and-reset
+> >>>>controller, so it gets its own node in the device tree.
+> >>>
+> >>>
+> >>>>diff --git
+> >>>>a/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> >>>>b/Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+> >>>
+> >>>
+> >>>>+- nvidia,pmic-voltage-table: Array of 2-tuples.  Each entry should have
+> >>>>the
+> >>>>+  form <register-value voltage-in-uV>, indicating the register value
+> >>>>that
+> >>>>+  needs to be programmed to the PMIC for changing the VDD_CPU voltage to
+> >>>>+  the specified voltage. The table must be in ascending order by the
+> >>>>voltage.
+> >>>
+> >>>
+> >>>Instead of listing the register values for each voltage in the DT,
+> >>>can't you use regulator_list_voltage() to create this map?
+> >>>
+> >>
+> >>I don't see a way to get the register values that way, unless we assume that
+> >>the mapping is linear and doesn't have holes.
+> >
+> >Hmm... I guess if you don't assume it's linear and continuous you'd
+> >have to iterate over all 256 selectors.
+> >
 > 
-> No.  bcma-hcd.c and ssb-hcd.c are similar to your st-hcd.c, but the
-> others aren't.
-> 
-> Take ehci-atmel.c as a typical example.  It does not define any
-> ehci_pdata structure and does not call platform_device_add(); instead
-> it calls usb_add_hcd().  The others work the same way.  I would suggest
-> that bcma-hcd.c and ssb-hcd.c don't belong in drivers/usb/host either.
-> 
-> For examples of drivers that _do_ resemble st-hcd.c, look in:
-> 
-> arch/arm/mach-cns3xxx/cns3420vb.c
-> arch/arm/mach-cns3xxx/core.c
-> arch/arm/mach-shmobile/setup-r8a7778.c
-> arch/arm/mach-shmobile/setup-r8a7779.c
-> arch/arm/mach-omap2/board-cm-t3517.c
-> arch/mips/netlogic/xlr/platform.c
-> arch/mips/ath79/dev-usb.c
-> arch/mips/loongson1/common/platform.c
-> arch/mips/alchemy/common/platform.c
-> 
-> These files all define ehci_pdata structures and register platform 
-> devices.  And they obviously are all located in arch/platform-specific 
-> directories.
+> I don't think we can assume that each selector maps to a concrete register
+> value, though I'm not sure. include/linux/regulator/driver.h documents for
+> @list_voltage "Selectors range from zero to one less
+> regulator_desc.n_voltages." but maybe the consumer API could take different
+> values.
 
-Right, these are all 'old' platforms.  There is no way these drivers
-would be accepted into the architecture directories now days.
+I don't think the regulator API makes any guarantees that the selector
+corresponds to a register value. Adding Mark Brown, maybe he can help
+figure out the best way to do this.
 
-Drivers live in 'drivers'.
-
-New platforms also have to have Device Tree support, so even platform
-data (which I agree should live in arch/arm) doesn't live in
-arch/arm/{mach,plat}-* anymore.  For many of the more modern
-architectures the aforementioned directories are bare.
-
-> > > > +++ b/drivers/usb/host/Kconfig
-> > > > @@ -753,6 +753,23 @@ config USB_HCD_SSB
-> > > >  
-> > > >  	  If unsure, say N.
-> > > >  
-> > > > +config USB_HCD_ST
-> > > > +	tristate "STMicroelectronics STi family HCD support"
-> > > 
-> > > Why does this need to be tristate?  Why not always build it into the 
-> > > kernel?  Or at least make it boolean rather than tristate.
-> > 
-> > Building as a module is useful on these embedded SoCs usually as a mechanism for speeding up boot time.
-> > Anything which isn't critical to getting the core functionality of the device going (in this case decoding
-> > TV and outputting on HDMI), can be deffered to a later point. Things like USB drivers, can then be loaded in
-> > after that point (deffered module loading), to give the appearence of 'instant on' (which in consumer electronics
-> > is what everyone wishes to achieve).
-> 
-> But st-hcd.c takes very little time to run.  ehci-platform will cause a 
-> delay, so it makes sense for ehci-platform to be a module.  But there's 
-> no reason for st-hcd to be a module.
-> 
-> > Going back to my examples above, most of these platforms are also defined as tristate.
-> 
-> Probably for historical reasons.  They don't need to be tristate now.
-
-I'm not going to get into this too much, but it is _my oppinion_ that
-if a driver can be a module, the option for it to be a module should
-exist.
-
-[...]
-
-[1] https://lkml.org/lkml/2011/3/17/492
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/997fa9f6/attachment.sig>
