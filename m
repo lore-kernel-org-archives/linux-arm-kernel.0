@@ -1,52 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 13 Jul 2014 20:12:07 -0700
-Subject: [PATCH v5 00/14] Clock support for rk3066,rk3188 and rk3288
-In-Reply-To: <20140713194622.9850.99668@quantum>
-References: <156042792.J76K6jxIGl@diego>
-	<20140713194622.9850.99668@quantum>
-Message-ID: <CAOesGMgcM3Z68VUOu8g6Ee0FjvW4r3R2sLtf255e9pv+gGyqFA@mail.gmail.com>
+From: sdu.liu@huawei.com (Liu hua)
+Date: Mon, 14 Jul 2014 11:22:26 +0800
+Subject: [RFC PATCH 0/2] irqchip: GIC: check and clear GIC interupt active
+ status
+In-Reply-To: <20140711123507.GE12899@arm.com>
+References: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
+ <20140711123507.GE12899@arm.com>
+Message-ID: <53C34CF2.5050209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Jul 13, 2014 at 12:46 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Heiko St?bner (2014-07-02 16:53:24)
->> This series adds a clock driver infrastructure for Rockchip SoCs in
->> general and clock-definitions for the RK3188 and RK3288 in particular.
+On 2014/7/11 20:35, Will Deacon wrote:
+> [adding Marc]
+> 
+> On Fri, Jul 11, 2014 at 07:46:15AM +0100, Liu Hua wrote:
+>> For this version of GIC codes, kernel assumes that all the interrupt
+>> status of GIC is inactive. So the kernel does not check this when 
+>> booting.
 >>
->> Apart from the arch/arm patches included here, there are some more
->> in the waiting line, like adding the i2c nodes and possibly the pwm, i2s
->> and spi nodes if the relevant drivers get accepted, where the ids
->> defined in the dt-binding headers are needed.
+>> This is no problem on must sitations. But when kdump is deplayed.
+>> And a panic occurs when a interrupt is being handled (may be PPI 
+>> and SPI). We have no chance to write relative bit to GICC_EOIR.
+>> So this interrupt remains active. And GIC will not deliver this
+>> type interrupt to cpu interface. And the capture kernel may 
+>> fail to boot becase of lacking of certain interrupt (such as timer 
+>> interupt).
 >>
->> So if the whole thing is acceptable could we either offer a branch
->> from the clk-tree that can get merged or take the whole series through
->> the arm tree?
->
-> Heiko,
->
-> This version looks good. I've pushed a branch with all 14 of these
-> patches based on 3.16-rc3 to the clk tree. See:
->
-> git://git.linaro.org/people/mike.turquette/linux.git clk-rockchip
->
-> If everyone is OK to merge that stable branch then I will merge
-> clk-rockchip into clk-next and we're all good. If the arm-soc guys want
-> to carve it up a bit further or handle it in a different way then we can
-> do that. I've Cc'd arm-soc for clarification.
+>>
+>> I glanced over the GIC Architecture Specification, but did not 
+>> find a simple way to deactive state of all interrupts. For GICv1,
+>> I can only deal with one abnormal interrupt state one time. For 
+>> GICv2, I can deactive 32 one time.
+>>
+>>
+>> So guys, Do you know a better way to do that? 
+> 
+> What happens if, in the crash kernel, you disable the CPU interfaces
+> (GICC_CTLR.ENABLE) then disable the distributor (GICD_CTLR.ENABLE) before
+> enabling everything again in the reverse order? Is that enough to cause the
+> GIC to drop any active states? It's not clear to me from a quick look at
+> the TRM.
+> 
+Hi Will,
+
+Thanks for your reply!
+
+I did what you said at the beginning of "gic_dist_init". The active states
+remained (panic in local timer interrupt (PPI))and the kernel failed to boot,
+Did I do that at wrong place?
+
+-------------------
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index b6b0a81..94d6352 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -454,6 +455,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+        void __iomem *base = gic_data_dist_base(gic);
+        void __iomem *cpu_base = gic_data_cpu_base(gic);
+
++ writel_relaxed(0, base + GIC_CPU_CTRL);
+        writel_relaxed(0, base + GIC_DIST_CTRL);
+
+        /*
+------------------------
+
+As shown in GIC Architecture Specification manual,I think that the GICC_CTLR.ENABLE
+and GICD_CTLR.ENABLE only control the delivering of the interrupt, not the active
+states.
+
+As GIC manual says "For every read of a valid Interrupt ID from the GICC_IAR, the
+connected processor must perform a matching write to the GICC_EOIR". So we should
+find a way to drop the active states when booting, if we do not remain these active
+states by design.
+
+Thanks,
+Liu Hua
 
 
-Traditionally we usually take the DT changes through arm-soc, but as
-long as we share the branch we might be ok. We tend to stick them in
-different branches in our tree though, so rockchip will be a little
-mis-sorted this release. Not a big deal, and we can deal with it.
-
-So, I'll leave it to Heiko to choose here, he knows best what other DT
-changes are coming this release. If he wants to carry the DT changes
-separately, then patches 1-10 would be for the clk tree, so it should
-be easy to reset the branch back a bit (and 11-14 would be for
-arm-soc).
 
 
--Olof
+> Will
+> 
+> .
+> 
