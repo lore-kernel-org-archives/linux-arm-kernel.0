@@ -1,36 +1,45 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 14 Jul 2014 08:01:14 -0700
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Jul 2014 16:07:33 +0100
 Subject: [PATCH v4 2/7] arm64: Support restart through restart notifier
  call chain
-In-Reply-To: <20140714145504.GD1112@arm.com>
+In-Reply-To: <53C3F0BA.5020201@roeck-us.net>
 References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
  <1405265431-4561-3-git-send-email-linux@roeck-us.net>
- <20140714145504.GD1112@arm.com>
-Message-ID: <53C3F0BA.5020201@roeck-us.net>
+ <20140714145504.GD1112@arm.com> <53C3F0BA.5020201@roeck-us.net>
+Message-ID: <20140714150733.GE1112@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 07:55 AM, Catalin Marinas wrote:
-> On Sun, Jul 13, 2014 at 04:30:26PM +0100, Guenter Roeck wrote:
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 43b7c34..b2da6d5 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -174,6 +174,8 @@ void machine_restart(char *cmd)
->>   	/* Now call the architecture specific reboot code. */
->>   	if (arm_pm_restart)
->>   		arm_pm_restart(reboot_mode, cmd);
->> +	else
->> +		kernel_restart_notify(cmd);
->
-> There are couple of drivers specific to arm64, once they are converted
-> we can get rid of arm_pm_restart entirely here.
->
+On Mon, Jul 14, 2014 at 04:01:14PM +0100, Guenter Roeck wrote:
+> On 07/14/2014 07:55 AM, Catalin Marinas wrote:
+> > On Sun, Jul 13, 2014 at 04:30:26PM +0100, Guenter Roeck wrote:
+> >> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> >> index 43b7c34..b2da6d5 100644
+> >> --- a/arch/arm64/kernel/process.c
+> >> +++ b/arch/arm64/kernel/process.c
+> >> @@ -174,6 +174,8 @@ void machine_restart(char *cmd)
+> >>   	/* Now call the architecture specific reboot code. */
+> >>   	if (arm_pm_restart)
+> >>   		arm_pm_restart(reboot_mode, cmd);
+> >> +	else
+> >> +		kernel_restart_notify(cmd);
+> >
+> > There are couple of drivers specific to arm64, once they are converted
+> > we can get rid of arm_pm_restart entirely here.
+> 
+> I thought you wanted to keep exporting arm_pm_restart.
 
-I thought you wanted to keep exporting arm_pm_restart. That logically implies
-that you want to have the ability to write new drivers which use it, which
-in turn implies that converting existing drivers would not make much sense.
+No, I just thought you don't want the restart mechanism implemented in
+modules but the notifier registration still allows that, so I didn't
+fully get the reasoning. But I agree on the race aspect.
 
-Am I missing something ?
+> That logically implies
+> that you want to have the ability to write new drivers which use it, which
+> in turn implies that converting existing drivers would not make much sense.
 
-Guenter
+If the new handler registration mechanism gives the functionality, I
+don't see why we should keep arm_pm_restart around (for arm64 it's
+easier since there aren't many drivers setting it).
+
+-- 
+Catalin
