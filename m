@@ -1,47 +1,50 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 14 Jul 2014 12:47:35 -0500
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <20140714112412.GE20068@atomide.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <20140714112412.GE20068@atomide.com>
-Message-ID: <53C417B7.5050800@ti.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Mon, 14 Jul 2014 18:54:11 +0100
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+ <20140711151304.GD3935@laptop>
+ <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
+Message-ID: <53C41943.2000601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+[...]
 
-On 07/14/2014 06:24 AM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [140710 19:58]:
->> Hello,
->>
->> This series adds suspend/resume support for am335x. Version 3 of this
->> series can be found at [1]. I apologize for the large delay between this
->> and the previous revision. This code has been heavily refined
->> since the last version based on the various comments received for v3. The
->> major change from previous version is moving all wkup_m3 code into a
->> remoteproc based driver. The new driver handles all IPC and fw loading
->> and exposes a small API to be used by PM code to achieve low power states.
->
-> Great, this is nice for all the am335x users. I made few comments
-> on the series that should be quite simple to fix up.
->
-> Then please split up your next version of this series into the
-> following independet patches:
->
-> 1. Changes to the EDMA driver for suspend and resume support
->
-> 2. Patches to add the rproc driver
->
-> 3. SoC related changes to enable PM support
->
+>> In that same discussion ISTR a suggestion about adding avg_running time,
+>> as opposed to the current avg_runnable. The sum of avg_running should be
+>> much more accurate, and still react correctly to migrations.
+> 
+> I haven't look in details but I agree that avg_running would be much
+> more accurate than avg_runnable and should probably fit the
+> requirement. Does it means that we could re-add the avg_running (or
+> something similar) that has disappeared during the review of load avg
+> tracking patchset ?
 
-Thanks for the feedback. I will give some more time for additional comments and 
-then revise, split, and resend.
+Are you referring to '[RFC PATCH 14/14] sched: implement usage tracking'
+https://lkml.org/lkml/2012/2/1/769 from Paul Turner?
 
-Regards,
-Dave
+__update_entity_runnable_avg() has an additional parameter 'running' so
+that it can be called for
 
-> Regards,
->
-> Tony
->
+a) sched_entities in update_entity_load_avg():
+
+  __update_entity_runnable_avg(..., se->on_rq, cfs_rq->curr == se))
+
+
+b) rq's in update_rq_runnable_avg():
+
+  __update_entity_runnable_avg(..., runnable, runnable);
+
+I can see how it gives us two different signals for a sched_entity but
+for a rq?
+
+Do I miss something here?
+
+-- Dietmar
+
+[...]
