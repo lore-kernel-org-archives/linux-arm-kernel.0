@@ -1,57 +1,66 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 14 Jul 2014 11:24:35 +0200
-Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
- clocksource
-In-Reply-To: <20140714091233.GC6800@sirena.org.uk>
-References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
- <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
- <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
- <53C01558.3090607@nvidia.com>
- <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
- <53C01D17.2050906@nvidia.com> <20140714083854.GO2081@ulmo>
- <20140714091233.GC6800@sirena.org.uk>
-Message-ID: <20140714092434.GA9755@ulmo>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Mon, 14 Jul 2014 11:29:16 +0200
+Subject: [PATCH] s5p-mfc: limit the size of the CPB
+In-Reply-To: <1405322547-3216-1-git-send-email-panpan1.liu@samsung.com>
+References: <1405322547-3216-1-git-send-email-panpan1.liu@samsung.com>
+Message-ID: <122f01cf9f46$15d03f10$4170bd30$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 10:12:33AM +0100, Mark Brown wrote:
-> On Mon, Jul 14, 2014 at 10:38:56AM +0200, Thierry Reding wrote:
-> > On Fri, Jul 11, 2014 at 08:21:27PM +0300, Tuomas Tynkkynen wrote:
-> 
-> > > I don't think we can assume that each selector maps to a concrete register
-> > > value, though I'm not sure. include/linux/regulator/driver.h documents for
-> > > @list_voltage "Selectors range from zero to one less
-> > > regulator_desc.n_voltages." but maybe the consumer API could take different
-> > > values.
-> 
-> > I don't think the regulator API makes any guarantees that the selector
-> > corresponds to a register value. Adding Mark Brown, maybe he can help
-> > figure out the best way to do this.
-> 
-> The selector value is opaque, it's entirely up to the driver to define
-> it.  If you could tell me what "this" is I might be able to advise on
-> how to do it.
+Hi panpan,
 
-Tegra124 (and later, also some earlier variants) have this DFLL clock
-that can program a PMIC automatically depending on the CPU frequency.
-This DT binding did propose putting this into device tree as a table of
-<frequency value> pairs where the frequency corresponds to the CPU
-frequency and the value is the register value to be programmed into the
-PMIC by the DFLL hardware (there are two additional properties to define
-the slave address and the register offset).
+Thank you for your patch, please find my comments inline.
 
-Andrew proposed that this table could instead be built by using
-regulator_list_voltage() instead. However, due to the fact that the DFLL
-hardware needs to know the immediate value to write into a register, the
-requirement would be for a 1:1 mapping between selector and register
-value. Given that the API needs to cover the general case I don't see
-how it could practically ensure this.
+> From: panpan liu [mailto:panpan1.liu at samsung.com]
+> Sent: Monday, July 14, 2014 9:22 AM
+> 
+> The register of the CPB limits the size. The max size is 4M, so it is
+> more reasonable.
+> 
+> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)  mode change 100644 =>
+> 100755 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> old mode 100644
+> new mode 100755
+> index 0bae907..889cb06
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -466,7 +466,8 @@ static int vidioc_s_fmt(struct file *file, void
+> *priv, struct v4l2_format *f)
+>  	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+>  	pix_mp->height = 0;
+>  	pix_mp->width = 0;
+> -	if (pix_mp->plane_fmt[0].sizeimage)
+> +	if (pix_mp->plane_fmt[0].sizeimage &&
+> +			pix_mp->plane_fmt[0].sizeimage <= MAX_CPB_SIZE)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/b65d67c0/attachment.sig>
+The MAX_CPB_SIZE applies only to the v5 version of the MFC. To have this
+dependent on the actual variant used please use:
+...
+struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
+...
+if (pix_mp->plane_fmt[0].sizeimage &&
+	pix_mp->plane_fmt[0].sizeimage <= buf_size->cpb)
+...
+
+>  		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+>  	else
+>  		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
+
+Also, in case the desired buffer size is too large the driver should set
+the maximum size allowed and not the default size which is fairly small.
+
+So you should cover three cases:
+- no size set -> set default size
+- size set < max - set the desired size
+- size set > max - set the maximum size allowed
+
+Best wishes, 
+-- 
+Kamil Debski
+Samsung R&D Institute Poland
