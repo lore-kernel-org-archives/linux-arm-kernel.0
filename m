@@ -1,66 +1,84 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Mon, 14 Jul 2014 11:29:16 +0200
-Subject: [PATCH] s5p-mfc: limit the size of the CPB
-In-Reply-To: <1405322547-3216-1-git-send-email-panpan1.liu@samsung.com>
-References: <1405322547-3216-1-git-send-email-panpan1.liu@samsung.com>
-Message-ID: <122f01cf9f46$15d03f10$4170bd30$%debski@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 11:31:37 +0200
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <53C39D98.9040802@nvidia.com>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
+ <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
+ <53C39D98.9040802@nvidia.com>
+Message-ID: <20140714093136.GB9755@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi panpan,
-
-Thank you for your patch, please find my comments inline.
-
-> From: panpan liu [mailto:panpan1.liu at samsung.com]
-> Sent: Monday, July 14, 2014 9:22 AM
+On Mon, Jul 14, 2014 at 12:06:32PM +0300, Mikko Perttunen wrote:
+> On 14/07/14 11:15, Thierry Reding wrote:
+> >* PGP Signed by an unknown key
+> >
+> >On Mon, Jul 14, 2014 at 10:55:51AM +0300, Mikko Perttunen wrote:
+> >>On 11/07/14 19:01, Mikko Perttunen wrote:
+> >>>On 07/11/2014 05:51 PM, Thierry Reding wrote:
+> >>>>On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
+> >>>>>...
+> >>>>...
+> >>>
+> >>>In this case, all the registers that will be written are such that the
+> >>>MC driver will never need to write them. They are shadowed registers,
+> >>>meaning that all writes are stored and are only effective starting from
+> >>>the next time the EMC rate change state machine is activated, so writing
+> >>>them from anywhere except than the EMC driver would be pointless.
+> >>>
+> >>>I can find two users of these registers in downstream:
+> >>>1) mc.c saves and loads them on suspend/restore (I don't know why, that
+> >>>shouldn't do anything. They will be overridden anyway during the next
+> >>>EMC rate change).
+> >>>2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to
+> >>>calculate a value which it then writes to a register that is also
+> >>>shadowed and that is part of downstream burst registers so that doesn't
+> >>>do anything either.
+> >>>
+> >>>The reason I implemented two ways to specify the MC register area was
+> >>>that this could be merged before an MC driver and retain
+> >>>backwards-compatibility after the MC driver arrives.
+> >>>
+> >>>If this is not acceptable, we can certainly wait for the MC driver to be
+> >>>merged first. (Although with the general rate of things, I hope I won't
+> >>>be back at school at that point..) I assume that this is blocked on the
+> >>>IOMMU bindings discussion? In that case, there are several options: the
+> >>>MC driver could have its own tables for each EMC rate or we could just
+> >>>make the EMC tables global (i.e. not under the EMC node). In any case,
+> >>>the MC driver would need to implement a function that would just write
+> >>>these values but be guaranteed to not do anything else, since that could
+> >>>cause nasty things during the EMC rate change sequence.
+> >>
+> >>Having taken another look at the code, I don't think the MC driver could do
+> >>anything that bad. There are also two other places where the EMC driver
+> >>needs to read MC registers: Inside the sequence, it reads a register but
+> >>discards its contents. According to comments, this acts as a memory barrier,
+> >>probably for the preceding step that writes into MC memory. If the register
+> >>writes are moved to the MC driver, it could also handle that. In another
+> >>place it reads the number of RAM modules from a MC register. The MC driver
+> >>could export this as another function.
+> >
+> >Exporting this functionality from the MC driver is the right thing to do
+> >in my opinion.
 > 
-> The register of the CPB limits the size. The max size is 4M, so it is
-> more reasonable.
-> 
-> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)  mode change 100644 =>
-> 100755 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> old mode 100644
-> new mode 100755
-> index 0bae907..889cb06
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -466,7 +466,8 @@ static int vidioc_s_fmt(struct file *file, void
-> *priv, struct v4l2_format *f)
->  	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
->  	pix_mp->height = 0;
->  	pix_mp->width = 0;
-> -	if (pix_mp->plane_fmt[0].sizeimage)
-> +	if (pix_mp->plane_fmt[0].sizeimage &&
-> +			pix_mp->plane_fmt[0].sizeimage <= MAX_CPB_SIZE)
+> Ok, let's do that then. Do you think I could make a bare-bones MC driver to
+> support the EMC driver before your MC driver with IOMMU/LA is ready? Can the
+> MC device tree node be stabilized yet? Of course, if things go well, that
+> concern might turn out to be unnecessary.
 
-The MAX_CPB_SIZE applies only to the v5 version of the MFC. To have this
-dependent on the actual variant used please use:
-...
-struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
-...
-if (pix_mp->plane_fmt[0].sizeimage &&
-	pix_mp->plane_fmt[0].sizeimage <= buf_size->cpb)
-...
+Well, at this point this isn't 3.17 material anyway, so there's no need
+to rush things. I'd prefer to take a patch on top of my proposed MC
+driver patch in anticipation of merging that for 3.18. But if it turns
+out that for whatever reason we can't do that, having a separate patch
+makes it easy to extract the changes into a bare-bones driver.
 
->  		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
->  	else
->  		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
-
-Also, in case the desired buffer size is too large the driver should set
-the maximum size allowed and not the default size which is fairly small.
-
-So you should cover three cases:
-- no size set -> set default size
-- size set < max - set the desired size
-- size set > max - set the maximum size allowed
-
-Best wishes, 
--- 
-Kamil Debski
-Samsung R&D Institute Poland
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/ff6d249a/attachment-0001.sig>
