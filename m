@@ -1,52 +1,66 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 14 Jul 2014 09:48:30 +0200
-Subject: [PATCH v2 3/4] can: flexcan: switch on clocks before accessing ecr
- register
+Date: Mon, 14 Jul 2014 09:48:28 +0200
+Subject: [PATCH v2 1/4] ARM: dts: vf610: add FlexCAN node
 In-Reply-To: <cover.1405322992.git.stefan@agner.ch>
 References: <cover.1405322992.git.stefan@agner.ch>
-Message-ID: <3901272074d5a3e680a7ecfda3ffbfca4c544a86.1405322992.git.stefan@agner.ch>
+Message-ID: <2be5a3885653a02dc07bf96ce086fddd71285f5a.1405322992.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reported-by: Ashutosh Singh <ashuleapyear@gmail.com>
-Suggested-by: Marc Kleine-Budde <mkl@pengutronix.de>
-[stefan at agner.ch: added return check for clk_enable_prepare]
+Add FlexCAN node for the two FlexCAN IP instances in Vybrid.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/net/can/flexcan.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf610.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index f425ec2..4c598c9 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -383,11 +383,25 @@ static int flexcan_get_berr_counter(const struct net_device *dev,
- {
- 	const struct flexcan_priv *priv = netdev_priv(dev);
- 	struct flexcan_regs __iomem *regs = priv->base;
--	u32 reg = flexcan_read(&regs->ecr);
-+	u32 reg, err;
-+
-+	err = clk_prepare_enable(priv->clk_ipg);
-+	if (err)
-+		return err;
-+
-+	err = clk_prepare_enable(priv->clk_per);
-+	if (err)
-+		goto out_disable_ipg;
-+
-+	reg = flexcan_read(&regs->ecr);
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 3fb127a..9404853 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -14,6 +14,8 @@
  
- 	bec->txerr = (reg >> 0) & 0xff;
- 	bec->rxerr = (reg >> 8) & 0xff;
+ / {
+ 	aliases {
++		can0 = &can0;
++		can1 = &can1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+@@ -103,6 +105,16 @@
+ 					<&clks VF610_CLK_DMAMUX1>;
+ 			};
  
-+	clk_disable_unprepare(priv->clk_per);
-+ out_disable_ipg:
-+	clk_disable_unprepare(priv->clk_ipg);
++			can0: flexcan at 40020000 {
++				compatible = "fsl,vf610-flexcan";
++				reg = <0x40020000 0x4000>;
++				interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_FLEXCAN0>,
++					 <&clks VF610_CLK_FLEXCAN0>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
 +
- 	return 0;
- }
- 
+ 			uart0: serial at 40027000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x40027000 0x1000>;
+@@ -414,6 +426,17 @@
+ 				clock-names = "nfc";
+ 				status = "disabled";
+ 			};
++
++			can1: flexcan at 400d4000 {
++				compatible = "fsl,vf610-flexcan";
++				reg = <0x400d4000 0x4000>;
++				interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_FLEXCAN1>,
++					 <&clks VF610_CLK_FLEXCAN1>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 		};
+ 	};
+ };
 -- 
 2.0.1
