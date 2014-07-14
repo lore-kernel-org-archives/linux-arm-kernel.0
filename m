@@ -1,39 +1,53 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 14 Jul 2014 12:04:33 -0700
-Subject: [PATCH v10 0/11] seccomp: add thread sync ability
-In-Reply-To: <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
-References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
- <20140711164931.GA18473@redhat.com>
- <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
-Message-ID: <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Mon, 14 Jul 2014 21:04:26 +0200
+Subject: [PATCH] ARM: dts: rk3188-radxarock: add GPIO IR receiver node
+In-Reply-To: <2390327.HZxnbJmfOO@diego>
+References: <1405253401-15534-1-git-send-email-b.galvani@gmail.com>
+ <2390327.HZxnbJmfOO@diego>
+Message-ID: <20140714190355.GA16904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 10:55 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Jul 11, 2014 at 9:49 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->> On 07/10, Kees Cook wrote:
->>>
->>> This adds the ability for threads to request seccomp filter
->>> synchronization across their thread group (at filter attach time).
->>> For example, for Chrome to make sure graphic driver threads are fully
->>> confined after seccomp filters have been attached.
->>>
->>> To support this, locking on seccomp changes via thread-group-shared
->>> sighand lock is introduced, along with refactoring of no_new_privs. Races
->>> with thread creation are handled via delayed duplication of the seccomp
->>> task struct field and cred_guard_mutex.
->>>
->>> This includes a new syscall (instead of adding a new prctl option),
->>> as suggested by Andy Lutomirski and Michael Kerrisk.
->>
->> I do not not see any problems in this version,
->
-> Awesome! Thank you for all the reviews. :) If Andy and Michael are
-> happy with this too, I think this is in good shape. \o/
+On Sun, Jul 13, 2014 at 02:37:40PM +0200, Heiko St?bner wrote:
+> Am Sonntag, 13. Juli 2014, 14:10:01 schrieb Beniamino Galvani:
+> > This adds a device tree node for the infrared receiver connected to a
+> > GPIO pin on the Radxa Rock.
+> > 
+> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/rk3188-radxarock.dts |   13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts
+> > b/arch/arm/boot/dts/rk3188-radxarock.dts index 19d45b4..1d87bcb 100644
+> > --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+> > +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+> > @@ -23,6 +23,13 @@
+> >  		reg = <0x60000000 0x80000000>;
+> >  	};
+> > 
+> > +	ir_recv: ir-receiver {
+> > +		compatible = "gpio-ir-receiver";
+> > +		gpios = <&gpio0 10 1>;
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&ir_recv_pin>;
+> > +	};
+> > +
+> 
+> hmm, on second glance, I'm actually not sure if this shouldn't belong in the 
+> soc subnode, like the gpio-keys and leds.
 
-I think I'm happy with it.  Is it in git somewhere for easy perusal?
-I have a cold, so my reviewing ability is a bit off, but I want to
-take a look at the final version, and git is a little easier than
-email for this.
+(adding devicetree mailing list)
 
---Andy
+I placed the IR receiver under the root node after looking at what
+other boards do, for example:
+
+  imx6dl-hummingboard.dts
+  imx6qdl-cubox-i.dtsi
+  dove-cubox.dts
+
+On the other hand, if gpio-keys and leds are under the soc node
+probably it makes sense to follow the same rule also for the IR
+receiver.
+
+Beniamino
