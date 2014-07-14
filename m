@@ -1,57 +1,97 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 14 Jul 2014 11:23:26 -0700
-Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
- regs-clocks
-In-Reply-To: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
-References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <53C4201E.3020708@infradead.org>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Mon, 14 Jul 2014 20:23:13 +0200
+Subject: [PATCH 1/1] ARM: dts: zynq: Add Parallella device tree
+In-Reply-To: <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
+References: <1404075022-28745-1-git-send-email-afaerber@suse.de>	<1404075022-28745-2-git-send-email-afaerber@suse.de>	<CAOesGMhKY1Lb+o8AbtFXS5c7SLg2uGt4-oosdro2FMj_+bB6Tw@mail.gmail.com>	<61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
+ <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
+Message-ID: <53C42011.5070708@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/14 11:14, Nicholas Krause wrote:
-> This patch addresses the fix me message in this file that states to
-> remove all definitions not related to reg-clocks in this header
-> file.
+Am 14.07.2014 20:12, schrieb Olof Johansson:
+> On Tue, Jul 8, 2014 at 4:18 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 06/30/2014 07:15 AM, Olof Johansson wrote:
+>>> Hi,
+>>>
+>>> On Sun, Jun 29, 2014 at 1:50 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>> This allows to boot the Adapteva Parallella board to serial console.
+>>>>
+>>>> Cc: Andreas Olofsson <andreas@adapteva.com>
+>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>
+>>> Nice and clean DTS, just a couple of comments below.
+>>>
+>>>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+>>>> new file mode 100644
+>>>> index 0000000..98df66c
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
+>>>> @@ -0,0 +1,63 @@
+>>>> +/*
+>>>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
+>>>> + *
+>>>> + * Derived from zynq-zed.dts:
+>>>> + *
+>>>> + *  Copyright (C) 2011 Xilinx
+>>>> + *  Copyright (C) 2012 National Instruments Corp.
+>>>> + *  Copyright (C) 2013 Xilinx
+>>>> + *
+>>>> + * This software is licensed under the terms of the GNU General Public
+>>>> + * License version 2, as published by the Free Software Foundation, and
+>>>> + * may be copied, distributed, and modified under those terms.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + */
+>>>> +/dts-v1/;
+>>>> +/include/ "zynq-7000.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +       model = "Parallella Board";
 > 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
->  1 file changed, 1 insertion(+), 21 deletions(-)
+> You might want to have this say "Adapteva Parallella Board" instead
+> (just noticed).
 > 
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-> index 4f44aac..46e64cc 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
-> @@ -15,24 +15,4 @@
->  #ifndef __PLAT_REGS_CLOCK_H
->  #define __PLAT_REGS_CLOCK_H __FILE__
->  
-> -/*
-> - * FIXME: Remove remaining definitions
-> - */
-> -
-> -#define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
-> -
-> -#define S3C_PCLK_GATE		S3C_CLKREG(0x34)
-> -#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
-> -#define S3C_MEM_SYS_CFG		S3C_CLKREG(0x120)
-> -
-> -/* PCLK GATE Registers */
-> -#define S3C_CLKCON_PCLK_UART3		(1<<4)
-> -#define S3C_CLKCON_PCLK_UART2		(1<<3)
-> -#define S3C_CLKCON_PCLK_UART1		(1<<2)
-> -#define S3C_CLKCON_PCLK_UART0		(1<<1)
-> -
-> -/* MEM_SYS_CFG */
-> -#define MEM_SYS_CFG_INDEP_CF		0x4000
-> -#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON	0x30
-> -
-> -#endif /* _PLAT_REGS_CLOCK_H */
-> +/#endif /* _PLAT_REGS_CLOCK_H */
+>>>> +       compatible = "xlnx,zynq-7000";
+>>>
+>>> This should have a more specific compatible as the first one. Probably
+>>> something like:
+>>>    compatible = "adapteva,parallella", "xlnx,zynq-7000";
+>>
+>> We were using these compatible properties but later there is no reason
+>> to create them because they will be unused.
+>> It is easy to add it when you need it which is not this case.
+> 
+> No, please add it from day one, otherwise everybody needs to update
+> their device tree, some will miss doing it, etc, etc. It's a simple
+> and trivial thing to do, and no reason to leave it o ut.
 
-I don't know about the other changes, but that last line looks like an error.
-Did you build anything that #includes this header file?
+OK, I have that prepared already, including the appropriate documentation.
 
+>>>> +
+>>>> +       memory {
+>>>> +               device_type = "memory";
+>>>> +               reg = <0 0x20000000>;
+>>>
+>>> Does the bootloader update this entry, or is it truly static? If it's
+>>> updated then it's become recent habit to leave the memory size empty
+>>> in the static file.
+>>
+>> Depends on your bootloader. I think it is good to have it here.
+>> Also this file can be used by u-boot for example and u-boot can be configured
+>> from it that's why I think that make sense to keep this here.
+> 
+> Ok. It's become commonplace to leave memory empty for the machines
+> where it's guaranteed that the bootloader will have updated it, to
+> avoid having stale or incorrect values in the static tree. I'm not
+> going to be strict about it, but it's something to consider.
+
+Will update then, thanks.
+
+Andreas
 
 -- 
-~Randy
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
