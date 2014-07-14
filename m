@@ -1,39 +1,50 @@
-From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Mon, 14 Jul 2014 17:43:50 -0400
-Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
- regs-clocks
-In-Reply-To: Your message of "Mon, 14 Jul 2014 14:14:24 -0400."
- <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
-References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <36350.1405374230@turing-police.cc.vt.edu>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 14 Jul 2014 16:53:41 -0500
+Subject: [PATCHv2 0/5] OMAP Mailbox framework adoption & DT support
+In-Reply-To: <CAPdLdqnd36QQ5v9-owiSFptbdkDxyYXjfRW=PdvaXKUr3B6_pQ@mail.gmail.com>
+References: <1405116252-53612-1-git-send-email-s-anna@ti.com>	<CAPdLdq=ZnPBQiGVbKOk8G5soP=uPYpT7mEjigpR=W1Hc4btV3g@mail.gmail.com>	<53C3FE0C.4080502@ti.com>
+ <CAPdLdqnd36QQ5v9-owiSFptbdkDxyYXjfRW=PdvaXKUr3B6_pQ@mail.gmail.com>
+Message-ID: <53C45165.2030707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014 14:14:24 -0400, Nicholas Krause said:
-> This patch addresses the fix me message in this file that states to
-> remove all definitions not related to reg-clocks in this header
-> file.
+Hi Markus,
+
 >
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
->  1 file changed, 1 insertion(+), 21 deletions(-)
+>> There are couple of dependent preparatory series. You probably missed
+>> the following in the cover letter.
+>>> The series depends on the OMAP mailbox cleanup series [5] and the
+>>> refreshed OMAP mailbox DT/hwmod cleanup series [2].
+>>
+>> As long as you pick the two dependent series, they apply fine on any of
+>> the 3.16-rcs. I have posted all the series based on 3.16-rc2. Here's a
+>> merged branch for your reference (not for pulling though, it has one
+>> additional commit to allow me to test on OMAP2)
+>> https://github.com/sumananna/mailbox/commits/submit/3.16-rc2-omap-mbox-v8-fwk-v2
+>>
+>> The last 2 patches in the series also depend on the mailbox framework
+>> patches from Jassi to not throw any build errors if enabled.
+> 
+> That worked. Thanks for the pointer. FYI, there is a minor merge
+> conflict rebasing the series onto 3.16-rc5.
+> 
+> Applying: ARM: OMAP2+: Avoid mailbox legacy device creation for DT-boot
+> Using index info to reconstruct a base tree...
+> M arch/arm/mach-omap2/devices.c
+> Falling back to patching base and 3-way merge...
+> Auto-merging arch/arm/mach-omap2/devices.c
+> CONFLICT (content): Merge conflict in arch/arm/mach-omap2/devices.c
+> Failed to merge in the changes.
+> Patch failed at 0029 ARM: OMAP2+: Avoid mailbox legacy device creation
+> for DT-boot
+> 
+> That's due to this commit:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1d29a0722f6c38f79785c9ffb911730598de84e2
 
-> -#endif /* _PLAT_REGS_CLOCK_H */
-> +/#endif /* _PLAT_REGS_CLOCK_H */
+OK, thanks, that's because of the removal of the line immediately above
+the omap_init_mbox() deletion. Anyway, that should be a trivial rebase
+and the patch contents should remain the same. Once OMAP3 becomes
+DT-boot only, I will submit a patch to delete the omap_init_mbox().
 
-You're kidding us, right? Given that this was obviously *not* compile
-tested at all, why should we believe that in fact all those #defines
-are in fact no longer used?
-
-Hint: There's a very high chance that somebody stuck that FIXME in there rather
-than just cleaning it up themselves precisely *because* it was still in use in
-an inconvenient to fix place in the tree..
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 848 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/99d5cb05/attachment.sig>
+regards
+Suman
