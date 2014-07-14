@@ -1,66 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 09:23:24 -0700
-Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <53C3ED02.7020206@ti.com>
-References: <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
- <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
- <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
- <20140709105055.GP28884@atomide.com> <53BD1FC3.6050500@ti.com>
- <20140709110051.GQ28884@atomide.com> <53BD2249.2080808@ti.com>
- <53C3ED02.7020206@ti.com>
-Message-ID: <20140714162324.GF20068@atomide.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Jul 2014 09:26:37 -0700
+Subject: [PATCH v4 7/7] arm/arm64: Unexport restart handlers
+In-Reply-To: <20140714150909.GF1112@arm.com>
+References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
+ <1405265431-4561-8-git-send-email-linux@roeck-us.net>
+ <20140714142232.GB1112@arm.com> <53C3EBAA.9050907@roeck-us.net>
+ <20140714150909.GF1112@arm.com>
+Message-ID: <20140714162637.GA2826@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [140714 07:47]:
-> Hi Tony,
-> On Wednesday 09 July 2014 04:36 PM, Keerthy wrote:
-> > On Wednesday 09 July 2014 04:30 PM, Tony Lindgren wrote:
-> >> * Keerthy <a0393675@ti.com> [140709 03:59]:
-> >>> On Wednesday 09 July 2014 04:20 PM, Tony Lindgren wrote:
-> >>>> * Keerthy <a0393675@ti.com> [140709 03:39]:
-> >>>>> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
-> >>>>>> * Keerthy <a0393675@ti.com> [140709 02:36]:
-> >>>>>>> On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
-> >>>>>>>> * Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
-> >>>>>>>>> --- a/arch/arm/boot/dts/dra7-evm.dts
-> >>>>>>>>> +++ b/arch/arm/boot/dts/dra7-evm.dts
-> >>>>>>>>> @@ -249,6 +249,7 @@
-> >>>>>>>>>                       regulator-min-microvolt = <1050000>;
-> >>>>>>>>>                       regulator-max-microvolt = <1050000>;
-> >>>>>>>>>                       regulator-boot-on;
-> >>>>>>>>> +                    regulator-always-on;
-> >>>>>>>>>                   };
-> >>>>>>>> Is this regulator really always on?
-> >>>>>>> This feeds on to RTC which is a free running clock. So i guess always on is
-> >>>>>>> justified no?
-> >>>>>> Well the dts entries should describe the hardware. If the
-> >>>>>> regulator can be enabled and disabled, we should not claim it's
-> >>>>>> always on.
-> >>>>>  From the PMIC perspective every regulator can be enabled and
-> >>>>> disabled. From a Board perspective there are some which need
-> >>>>> to be always on. For Ex: SMPS123 which feeds on to the MPU.
-> >>>> Right, and we already have regulator-boot-on for those. Or are
-> >>>> you seeing some issue with that?
-> >>> regulator-boot-on describes that at boot a particular regulator is on.
-> >>> It does not guarantee that it will be on for the rest of the time. The
-> >>> regulator framework can go ahead and disable it if no one has requested
-> >>> for it. In case of RTC we do not want that to happen.
-> >> That's a bug in the RTC driver then. The driver should request a
-> >> regulator if it's specified.
+On Mon, Jul 14, 2014 at 04:09:09PM +0100, Catalin Marinas wrote:
+> On Mon, Jul 14, 2014 at 03:39:38PM +0100, Guenter Roeck wrote:
+> > On 07/14/2014 07:22 AM, Catalin Marinas wrote:
+> > > On Sun, Jul 13, 2014 at 04:30:31PM +0100, Guenter Roeck wrote:
+> > >> Implementing a restart handler in a module don't make sense
+> > >> as there would be no guarantee that the module is loaded when
+> > >> a restart is needed. Unexport arm_pm_restart to ensure that
+> > >> no one gets the idea to do it anyway.
+> > >>
+> > >> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > >> ---
+> > >> v4: No change
+> > >> v3: No change
+> > >> v2: No change
+> > >>
+> > >>   arch/arm/kernel/process.c   | 1 -
+> > >>   arch/arm64/kernel/process.c | 1 -
+> > >>   2 files changed, 2 deletions(-)
+> > >>
+> > >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > >> index 5d191e3..25c7f00 100644
+> > >> --- a/arch/arm/kernel/process.c
+> > >> +++ b/arch/arm/kernel/process.c
+> > >> @@ -125,7 +125,6 @@ void (*pm_power_off)(void);
+> > >>   EXPORT_SYMBOL(pm_power_off);
+> > >>
+> > >>   void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+> > >> -EXPORT_SYMBOL_GPL(arm_pm_restart);
+> > >
+> > > Unless I miss something, how is this different from registering a
+> > > restart notifier from a module (blocking_notifier_chain_register is
+> > > exported)?
+> > 
+> > A notifier can be unregistered safely, and more than one notifier call
+> > is supported. If there is more than one driver setting arm_pm_restart,
+> > the first one to unregister will clear the pointer. Using the notifier
+> > is cleaner and not architecture dependent. One might argue that setting
+> > module external function pointers from module code isn't exactly clean
+> > coding.
 > 
-> In my experiments I observed that when RTC regulator is switched
-> off and switched on, there is an abort while accessing RTC registers.
+> I agree.
+> 
+> > Anyway, this patch is not relevant for the series. If you prefer to have
+> > the function exported, and keep using it for arm drivers loaded as modules,
+> > be my guest, and I'll be more than happy drop it. I'll take your comment
+> > as a hint _not_ to convert existing code to use the notifier after the
+> > series is accepted. Cool, as I hate wasting my time.
+> 
+> No, it's actually the opposite ;) (and I would go further and remove
+> arm_pm_restart entirely for arm64).
+> 
+Ah, sorry, I misunderstood. As mentioned above, I had planned to submit
+patches to do just that after the initial series has been accepted.
+Guess I can start with arm64 to keep things simple.
 
-Right, then you know you have the right regulator :)
-
-> After discussing with hardware team, it is confirmed that this
-> LDO9 regulator powering RTC cannot be turned off when
-> SoC is active and expected to be always on.
-
-Hmm but sounds like you already proved it can be idled? So
-the regulator really should be managed by the driver?
-
-Regards,
-
-Tony
+Thanks,
+Guenter
