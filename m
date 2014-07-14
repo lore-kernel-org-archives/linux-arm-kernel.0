@@ -1,41 +1,52 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 14 Jul 2014 17:54:20 +0200
-Subject: [PATCH v2 3/6] arm: pxa: add clock pll selection bits
+Date: Mon, 14 Jul 2014 17:54:22 +0200
+Subject: [PATCH v2 5/6] dts: add devicetree bindings for pxa27x clocks
 In-Reply-To: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
 References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1405353263-13424-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1405353263-13424-6-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing bits for CCCR and CCSR :
- - CPLL and PPLL selection, either full speed or 13MHz
- - CPSR masks
+Add the clock tree description for the PXA27x based boards.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/include/mach/pxa2xx-regs.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/pxa27x.dtsi | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
-index ee6ced1..f1dd629 100644
---- a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
-@@ -143,6 +143,16 @@
- #define CCCR_M_MASK	0x0060	/* Memory Frequency to Run Mode Frequency Multiplier */
- #define CCCR_L_MASK	0x001f	/* Crystal Frequency to Memory Frequency Multiplier */
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index a705469..80fc5d7 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -1,5 +1,6 @@
+ /* The pxa3xx skeleton simply augments the 2xx version */
+-/include/ "pxa2xx.dtsi"
++#include "pxa2xx.dtsi"
++#include "dt-bindings/clock/pxa2xx-clock.h"
  
-+#define CCCR_CPDIS_BIT	(31)
-+#define CCCR_PPDIS_BIT	(30)
-+#define CCCR_LCD_26_BIT	(27)
-+#define CCCR_A_BIT	(25)
+ / {
+ 	model = "Marvell PXA27x familiy SoC";
+@@ -35,4 +36,21 @@
+ 			#pwm-cells = <1>;
+ 		};
+ 	};
 +
-+#define CCSR_N2_MASK	CCCR_N_MASK
-+#define CCSR_M_MASK	CCCR_M_MASK
-+#define CCSR_L_MASK	CCCR_L_MASK
-+#define CCSR_N2_SHIFT	7
++	clocks {
++	       /*
++		* The muxing of external clocks/internal dividers for osc* clock
++		* sources has been hidden under the carpet by now.
++		*/
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
- #define CKEN_AC97CONF   (31)    /* AC97 Controller Configuration */
- #define CKEN_CAMERA	(24)	/* Camera Interface Clock Enable */
- #define CKEN_SSP1	(23)	/* SSP1 Unit Clock Enable */
++		pxa2xx_clks: pxa2xx_clks at 41300004 {
++			compatible = "marvell,pxa-clocks";
++			#clock-cells = <1>;
++			status = "okay";
++		};
++	};
++
+ };
 -- 
 2.0.0.rc2
