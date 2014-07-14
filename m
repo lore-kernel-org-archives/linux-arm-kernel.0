@@ -1,85 +1,33 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Mon, 14 Jul 2014 14:56:17 -0400
-Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
- regs-clocks
-In-Reply-To: <53C4254A.3040900@infradead.org>
-References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
- <53C4201E.3020708@infradead.org> <1405363234.13661.12.camel@x220>
- <53C4254A.3040900@infradead.org>
-Message-ID: <CAPDOMVhUiMehj6U5GbukhWiTQ9FObvqphKZv4qzHieH_FsBh5A@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 14 Jul 2014 11:57:05 -0700
+Subject: [PATCH 0/2] ARM: minor sigpage enhancements
+In-Reply-To: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
+References: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <CAGXu5jJiJw3yk5SKGUk8BTHEd2jTwOKtHFDA2CppzXSy8CGUbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 2:45 PM, Randy Dunlap <rdunlap@infradead.org> wrote:
-> On 07/14/14 11:40, Paul Bolle wrote:
->> On Mon, 2014-07-14 at 11:23 -0700, Randy Dunlap wrote:
->>> On 07/14/14 11:14, Nicholas Krause wrote:
->>>> This patch addresses the fix me message in this file that states to
->>>> remove all definitions not related to reg-clocks in this header
->>>> file.
->>>>
->>>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
->>>> ---
->>>>  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
->>>>  1 file changed, 1 insertion(+), 21 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-cloclinux-kernel at vger.kernel.orgk.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
->>>> index 4f44aac..46e64cc 100644
->>>> --- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
->>>> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
->>>> @@ -15,24 +15,4 @@
->>>>  #ifndef __PLAT_REGS_CLOCK_H
->>>>  #define __PLAT_REGS_CLOCK_H __FILE__
->>>>
->>>> -/*
->>>> - * FIXME: Remove remaining definitions
->>>> - */
->>>> -
->>>> -#define S3C_CLKREG(x)              (S3C_VA_SYS + (x))
->>>> -
->>>> -#define S3C_PCLK_GATE              S3C_CLKREG(0x34)
->>>> -#define S3C6410_CLK_SRC2   S3C_CLKREG(0x10C)
->>>> -#define S3C_MEM_SYS_CFG            S3C_CLKREG(0x120)
->>>> -
->>>> -/* PCLK GATE Registers */
->>>> -#define S3C_CLKCON_PCLK_UART3              (1<<4)
->>>> -#define S3C_CLKCON_PCLK_UART2              (1<<3)
->>>> -#define S3C_CLKCON_PCLK_UART1              (1<<2)
->>>> -#define S3C_CLKCON_PCLK_UART0              (1<<1)
->>>> -
->>>> -/* MEM_SYS_CFG */
->>>> -#define MEM_SYS_CFG_INDEP_CF               0x4000
->>>> -#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON      0x30
->>>> -
->>>> -#endif /* _PLAT_REGS_CLOCK_H */
->>>> +/#endif /* _PLAT_REGS_CLOCK_H */
->>>
->>> I don't know about the other changes, but that last line looks like an error.
->>> Did you build anything that #includes this header file?
->>
->> I just did
->>     git grep -n S3C_CLKCON_PCLK_UART
->>
->> It was just a guess. I did not cherry pick the defines that covers! The
->> output of that command is, I think, pretty clear.
->>
->> Nicholas, I think you've been told already to stop doing what you're
->> doing again here. I try not to use colorful language on the net, but
->> you're really pushing me here.
->>
->> Please go find something other to do than grepping the kernel tree for
->> FIXMEs!
->linux-kernel at vger.kernel.org
-> Yes.
+On Mon, Jul 14, 2014 at 8:46 AM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
+> Russell,
 >
-> FIXMEs are not a suggested starting point for kernel beginners.
-> If they were easy to fix, they would already be fixed or most likely
-> would never have been introduced.
+> Would you consider taking these for 3.17?  I've been carrying the
+> sigpage placement randomization as part of the VDSO patch set but it
+> seems worthwhile on its own.  Using _install_special_mapping for the
+> VDSO and similar VMAs was recently suggested by Andy Lutomirski.
 >
+> Nathan Lynch (2):
+>   ARM: use _install_special_mapping for sigpage
+>   ARM: place sigpage at a random offset above stack
 >
-> --
-> ~Randy
-Randy,
-My mistake I didn't check the tree for files linking to these definitions.
-I will be more careful ,next time.
-Niclk
+>  arch/arm/kernel/process.c | 60 ++++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 51 insertions(+), 9 deletions(-)
+
+Cool! Thanks for this.
+
+Reviewed-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
