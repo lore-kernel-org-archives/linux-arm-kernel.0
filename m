@@ -1,363 +1,279 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 14 Jul 2014 17:54:18 +0200
-Subject: [PATCH v2 1/6] clk: add pxa clocks infrastructure
+Date: Mon, 14 Jul 2014 17:54:23 +0200
+Subject: [PATCH v2 6/6] arm: pxa: Transition pxa27x to clk framework
 In-Reply-To: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
 References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1405353263-13424-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1405353263-13424-7-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a the common code used by all PXA variants.
-
-This is the first step in the transition from architecture defined
-clocks (in arch/arm/mach-pxa) towards clock framework. The goal is to
-have the same features (and not all the features) of the existing
-clocks, and enable the transition of PXA to device-tree.
-
-All PXA rely on a "CKEN" type clock, which :
- - has a gate (bit in CKEN register)
- - is generated from a PLL, generally divided
- - has an alternate low power clock
-
-Each variant will specialize the CKEN clock :
- - pxa25x have no low power clock
- - pxa27x in low power use always the 13 MHz ring oscillator
- - pxa3xx in low power have specific dividers for each clock
-
-The device-tree provides a list of CLK_* (ex: CLK_USB or CLK_I2C) to get
-a handle on the clock. While pxa-clock.h will describe all the clocks of
-all the variants, each variant will only use a subset of it.
+Transition the PXA27x CPUs to the clock framework.
+This transition still enables legacy platforms to run without device
+tree as before, ie relying on platform data encoded in board specific
+files.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/clk/Makefile                  |   1 +
- drivers/clk/pxa/Makefile              |   1 +
- drivers/clk/pxa/clk-pxa.c             |  97 ++++++++++++++++++++++++++++++
- drivers/clk/pxa/clk-pxa.h             | 107 ++++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/pxa-clock.h |  77 ++++++++++++++++++++++++
- 5 files changed, 283 insertions(+)
- create mode 100644 drivers/clk/pxa/Makefile
- create mode 100644 drivers/clk/pxa/clk-pxa.c
- create mode 100644 drivers/clk/pxa/clk-pxa.h
- create mode 100644 include/dt-bindings/clock/pxa-clock.h
+ arch/arm/Kconfig           |   1 +
+ arch/arm/mach-pxa/Makefile |   8 +-
+ arch/arm/mach-pxa/pxa27x.c | 186 +++------------------------------------------
+ 3 files changed, 17 insertions(+), 178 deletions(-)
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 567f102..40390ea 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_ARCH_MMP)			+= mmp/
- endif
- obj-$(CONFIG_PLAT_ORION)		+= mvebu/
- obj-$(CONFIG_ARCH_MXS)			+= mxs/
-+obj-$(CONFIG_ARCH_PXA)			+= pxa/
- obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
- obj-$(CONFIG_COMMON_CLK_SAMSUNG)	+= samsung/
-diff --git a/drivers/clk/pxa/Makefile b/drivers/clk/pxa/Makefile
-new file mode 100644
-index 0000000..cb2bd8f
---- /dev/null
-+++ b/drivers/clk/pxa/Makefile
-@@ -0,0 +1 @@
-+obj-y				+= clk-pxa.o
-diff --git a/drivers/clk/pxa/clk-pxa.c b/drivers/clk/pxa/clk-pxa.c
-new file mode 100644
-index 0000000..ef3c053
---- /dev/null
-+++ b/drivers/clk/pxa/clk-pxa.c
-@@ -0,0 +1,97 @@
-+/*
-+ * Marvell PXA family clocks
-+ *
-+ * Copyright (C) 2014 Robert Jarzmik
-+ *
-+ * Common clock code for PXA clocks ("CKEN" type clocks + DT)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ */
-+#include <linux/clk.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 87b63fd..96bdc7b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -642,6 +642,7 @@ config ARCH_PXA
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+ 	select AUTO_ZRELADDR
++	select COMMON_CLK if PXA27x
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+index 648867a..ce15823 100644
+--- a/arch/arm/mach-pxa/Makefile
++++ b/arch/arm/mach-pxa/Makefile
+@@ -3,16 +3,16 @@
+ #
+ 
+ # Common support (must be linked before board specific support)
+-obj-y				+= clock.o devices.o generic.o irq.o \
++obj-y				+= devices.o generic.o irq.o \
+ 				   time.o reset.o
+ obj-$(CONFIG_PM)		+= pm.o sleep.o standby.o
+ 
+ # Generic drivers that other drivers may depend upon
+ 
+ # SoC-specific code
+-obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o clock-pxa2xx.o pxa2xx.o pxa25x.o
+-obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o clock-pxa2xx.o pxa2xx.o pxa27x.o
+-obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
++obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o clock.o clock-pxa2xx.o pxa2xx.o pxa25x.o
++obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o pxa2xx.o pxa27x.o
++obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock.o clock-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
+ obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
+ obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
+ obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 301471a..6beb32cd 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -37,7 +37,8 @@
+ 
+ #include "generic.h"
+ #include "devices.h"
+-#include "clock.h"
 +#include <linux/clk-provider.h>
 +#include <linux/clkdev.h>
-+#include <linux/of.h>
-+
-+#include <dt-bindings/clock/pxa-clock.h>
-+#include "clk-pxa.h"
-+
-+DEFINE_SPINLOCK(lock);
-+
-+static struct clk *pxa_clocks[CLK_MAX];
-+static struct clk_onecell_data onecell_data = {
-+	.clks = pxa_clocks,
-+	.clk_num = CLK_MAX,
-+};
-+
-+#define to_pxa_clk(_hw) container_of(_hw, struct pxa_clk_cken, hw)
-+
-+static unsigned long cken_recalc_rate(struct clk_hw *hw,
-+				      unsigned long parent_rate)
-+{
-+	struct pxa_clk_cken *pclk = to_pxa_clk(hw);
-+	struct clk_fixed_factor *fix;
-+
-+	if (!pclk->is_in_low_power || pclk->is_in_low_power())
-+		fix = &pclk->lp;
-+	else
-+		fix = &pclk->hp;
-+	fix->hw.clk = hw->clk;
-+	return clk_fixed_factor_ops.recalc_rate(&fix->hw, parent_rate);
-+}
-+
-+static struct clk_ops cken_rate_ops = {
-+	.recalc_rate = cken_recalc_rate,
-+};
-+
-+static u8 cken_get_parent(struct clk_hw *hw)
-+{
-+	struct pxa_clk_cken *pclk = to_pxa_clk(hw);
-+
-+	if (!pclk->is_in_low_power)
-+		return 0;
-+	return pclk->is_in_low_power() ? 0 : 1;
-+}
-+
-+static struct clk_ops cken_mux_ops = {
-+	.get_parent = cken_get_parent,
-+	.set_parent = dummy_clk_set_parent,
-+};
-+
-+void __init clkdev_pxa_register(int ckid, const char *con_id,
-+				const char *dev_id, struct clk *clk)
-+{
-+	if (!IS_ERR(clk) && (ckid != CLK_NONE))
-+		pxa_clocks[ckid] = clk;
-+	if (!IS_ERR(clk))
-+		clk_register_clkdev(clk, con_id, dev_id);
-+}
-+
-+int __init clk_pxa_cken_init(struct pxa_clk_cken *clks, int nb_clks)
-+{
-+	int i;
-+	struct pxa_clk_cken *pclk;
-+	struct clk *clk;
-+
-+	for (i = 0; i < nb_clks; i++) {
-+		pclk = clks + i;
-+		pclk->gate.lock = &lock;
-+		clk = clk_register_composite(NULL, pclk->name,
-+					     pclk->parent_names, 2,
-+					     &pclk->hw, &cken_mux_ops,
-+					     &pclk->hw, &cken_rate_ops,
-+					     &pclk->gate.hw, &clk_gate_ops,
-+					     pclk->flags);
-+		clkdev_pxa_register(pclk->ckid, pclk->con_id, pclk->dev_id,
-+				    clk);
-+	}
-+	return 0;
-+}
-+
-+static void __init pxa_dt_clocks_init(struct device_node *np)
-+{
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &onecell_data);
-+}
-+CLK_OF_DECLARE(pxa_clks, "marvell,pxa-clocks", pxa_dt_clocks_init);
-diff --git a/drivers/clk/pxa/clk-pxa.h b/drivers/clk/pxa/clk-pxa.h
-new file mode 100644
-index 0000000..5fe219d
---- /dev/null
-+++ b/drivers/clk/pxa/clk-pxa.h
-@@ -0,0 +1,107 @@
-+/*
-+ * Marvell PXA family clocks
-+ *
-+ * Copyright (C) 2014 Robert Jarzmik
-+ *
-+ * Common clock code for PXA clocks ("CKEN" type clocks + DT)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ */
-+#ifndef _CLK_PXA_
-+#define _CLK_PXA_
-+
-+#define PARENTS(name) \
-+	static const char *name ## _parents[] __initconst
-+#define MUX_RO_RATE_RO_OPS(name, clk_name)			\
-+	static struct clk_hw name ## _mux_hw;			\
-+	static struct clk_hw name ## _rate_hw;			\
-+	static struct clk_ops name ## _mux_ops = {		\
-+		.get_parent = name ## _get_parent,		\
-+		.set_parent = dummy_clk_set_parent,		\
-+	};							\
-+	static struct clk_ops name ## _rate_ops = {		\
-+		.recalc_rate = name ## _get_rate,		\
-+	};							\
-+	static struct clk *clk_register_ ## name(void)		\
-+	{							\
-+		return clk_register_composite(NULL, clk_name,	\
-+			name ## _parents,			\
-+			ARRAY_SIZE(name ## _parents),		\
-+			&name ## _mux_hw, &name ## _mux_ops,	\
-+			&name ## _rate_hw, &name ## _rate_ops,	\
-+			NULL, NULL, CLK_GET_RATE_NOCACHE);	\
-+	}
-+
-+#define RATE_RO_OPS(name, clk_name)			\
-+	static struct clk_hw name ## _rate_hw;			\
-+	static struct clk_ops name ## _rate_ops = {		\
-+		.recalc_rate = name ## _get_rate,		\
-+	};							\
-+	static struct clk *clk_register_ ## name(void)		\
-+	{							\
-+		return clk_register_composite(NULL, clk_name,	\
-+			name ## _parents,			\
-+			ARRAY_SIZE(name ## _parents),		\
-+			NULL, NULL,				\
-+			&name ## _rate_hw, &name ## _rate_ops,	\
-+			NULL, NULL, CLK_GET_RATE_NOCACHE);	\
-+	}
-+
-+/*
-+ * CKEN clock type
-+ * This clock takes it source from 2 possible parents :
-+ *  - a low power parent
-+ *  - a normal parent
-+ *
-+ *  +------------+     +-----------+
-+ *  |  Low Power | --- | x mult_lp |
-+ *  |    Clock   |     | / div_lp  |\
-+ *  +------------+     +-----------+ \+-----+   +-----------+
-+ *                                    | Mux |---| CKEN gate |
-+ *  +------------+     +-----------+ /+-----+   +-----------+
-+ *  | High Power |     | x mult_hp |/
-+ *  |    Clock   | --- | / div_hp  |
-+ *  +------------+     +-----------+
-+ */
-+struct pxa_clk_cken {
-+	struct clk_hw hw;
-+	int ckid;
-+	const char *name;
-+	const char *dev_id;
-+	const char *con_id;
-+	const char **parent_names;
-+	struct clk_fixed_factor lp;
-+	struct clk_fixed_factor hp;
-+	struct clk_gate gate;
-+	bool (*is_in_low_power)(void);
-+	const unsigned long flags;
-+};
-+
-+#define PXA_CKEN(_dev_id, _con_id, _name, parents, _mult_lp, _div_lp,	\
-+		 _mult_hp, _div_hp, is_lp, _cken_reg, _cken_bit, flag)	\
-+	{ .ckid = CLK_ ## _name, .name = #_name,			\
-+	  .dev_id = _dev_id, .con_id = _con_id,	.parent_names = parents,\
-+	  .lp = { .mult = _mult_lp, .div = _div_lp },			\
-+	  .hp = { .mult = _mult_hp, .div = _div_hp },			\
-+	  .is_in_low_power = is_lp,					\
-+	  .gate = { .reg = (void __iomem *)_cken_reg, .bit_idx = _cken_bit }, \
-+	  .flags = flag,						\
-+	}
-+#define PXA_CKEN_1RATE(dev_id, con_id, name, parents, cken_reg,		\
-+			    cken_bit, flag)				\
-+	PXA_CKEN(dev_id, con_id, name, parents, 1, 1, 1, 1,		\
-+		 NULL, cken_reg, cken_bit, flag)
-+
-+static int dummy_clk_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	return 0;
-+}
-+
-+extern void clkdev_pxa_register(int ckid, const char *con_id,
-+				const char *dev_id, struct clk *clk);
-+extern int clk_pxa_cken_init(struct pxa_clk_cken *clks, int nb_clks);
-+
-+#endif
-diff --git a/include/dt-bindings/clock/pxa-clock.h b/include/dt-bindings/clock/pxa-clock.h
-new file mode 100644
-index 0000000..e65803b
---- /dev/null
-+++ b/include/dt-bindings/clock/pxa-clock.h
-@@ -0,0 +1,77 @@
-+/*
-+ * Inspired by original work from pxa2xx-regs.h by Nicolas Pitre
-+ * Copyright (C) 2014 Robert Jarzmik
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __DT_BINDINGS_CLOCK_PXA2XX_H__
-+#define __DT_BINDINGS_CLOCK_PXA2XX_H__
-+
-+#define CLK_NONE 0
-+#define CLK_1WIRE 1
-+#define CLK_AC97 2
-+#define CLK_AC97CONF 3
-+#define CLK_ASSP 4
-+#define CLK_BOOT 5
-+#define CLK_BTUART 6
-+#define CLK_CAMERA 7
-+#define CLK_CIR 8
-+#define CLK_CORE 9
-+#define CLK_DMC 10
-+#define CLK_FFUART 11
-+#define CLK_FICP 12
-+#define CLK_GPIO 13
-+#define CLK_HSIO2 14
-+#define CLK_HWUART 15
-+#define CLK_I2C 16
-+#define CLK_I2S 17
-+#define CLK_IM 18
-+#define CLK_INC 19
-+#define CLK_ISC 20
-+#define CLK_KEYPAD 21
-+#define CLK_LCD 22
-+#define CLK_MEMC 23
-+#define CLK_MEMSTK 24
-+#define CLK_MINI_IM 25
-+#define CLK_MINI_LCD 26
-+#define CLK_MMC 27
-+#define CLK_MMC1 28
-+#define CLK_MMC2 29
-+#define CLK_MMC3 30
-+#define CLK_MSL 31
-+#define CLK_MSL0 32
-+#define CLK_MVED 33
-+#define CLK_NAND 34
-+#define CLK_NSSP 35
-+#define CLK_OSTIMER 36
-+#define CLK_PWM0 37
-+#define CLK_PWM1 38
-+#define CLK_PWM2 39
-+#define CLK_PWM3 40
-+#define CLK_PWRI2C 41
-+#define CLK_PXA300_GCU 42
-+#define CLK_PXA320_GCU 43
-+#define CLK_SMC 44
-+#define CLK_SSP 45
-+#define CLK_SSP1 46
-+#define CLK_SSP2 47
-+#define CLK_SSP3 48
-+#define CLK_SSP4 49
-+#define CLK_STUART 50
-+#define CLK_TOUCH 51
-+#define CLK_TPM 52
-+#define CLK_UDC 53
-+#define CLK_USB 54
-+#define CLK_USB2 55
-+#define CLK_USBH 56
-+#define CLK_USBHOST 57
-+#define CLK_USIM 58
-+#define CLK_USIM1 59
-+#define CLK_USMI0 60
-+#define CLK_MAX 61
-+
-+#endif
+ 
+ void pxa27x_clear_otgph(void)
+ {
+@@ -73,174 +74,6 @@ void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio)
+ }
+ EXPORT_SYMBOL_GPL(pxa27x_configure_ac97reset);
+ 
+-/* Crystal clock: 13MHz */
+-#define BASE_CLK	13000000
+-
+-/*
+- * Get the clock frequency as reflected by CCSR and the turbo flag.
+- * We assume these values have been applied via a fcs.
+- * If info is not 0 we also display the current settings.
+- */
+-unsigned int pxa27x_get_clk_frequency_khz(int info)
+-{
+-	unsigned long ccsr, clkcfg;
+-	unsigned int l, L, m, M, n2, N, S;
+-       	int cccr_a, t, ht, b;
+-
+-	ccsr = CCSR;
+-	cccr_a = CCCR & (1 << 25);
+-
+-	/* Read clkcfg register: it has turbo, b, half-turbo (and f) */
+-	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
+-	t  = clkcfg & (1 << 0);
+-	ht = clkcfg & (1 << 2);
+-	b  = clkcfg & (1 << 3);
+-
+-	l  = ccsr & 0x1f;
+-	n2 = (ccsr>>7) & 0xf;
+-	m  = (l <= 10) ? 1 : (l <= 20) ? 2 : 4;
+-
+-	L  = l * BASE_CLK;
+-	N  = (L * n2) / 2;
+-	M  = (!cccr_a) ? (L/m) : ((b) ? L : (L/2));
+-	S  = (b) ? L : (L/2);
+-
+-	if (info) {
+-		printk( KERN_INFO "Run Mode clock: %d.%02dMHz (*%d)\n",
+-			L / 1000000, (L % 1000000) / 10000, l );
+-		printk( KERN_INFO "Turbo Mode clock: %d.%02dMHz (*%d.%d, %sactive)\n",
+-			N / 1000000, (N % 1000000)/10000, n2 / 2, (n2 % 2)*5,
+-			(t) ? "" : "in" );
+-		printk( KERN_INFO "Memory clock: %d.%02dMHz (/%d)\n",
+-			M / 1000000, (M % 1000000) / 10000, m );
+-		printk( KERN_INFO "System bus clock: %d.%02dMHz \n",
+-			S / 1000000, (S % 1000000) / 10000 );
+-	}
+-
+-	return (t) ? (N/1000) : (L/1000);
+-}
+-
+-/*
+- * Return the current mem clock frequency as reflected by CCCR[A], B, and L
+- */
+-static unsigned long clk_pxa27x_mem_getrate(struct clk *clk)
+-{
+-	unsigned long ccsr, clkcfg;
+-	unsigned int l, L, m, M;
+-       	int cccr_a, b;
+-
+-	ccsr = CCSR;
+-	cccr_a = CCCR & (1 << 25);
+-
+-	/* Read clkcfg register: it has turbo, b, half-turbo (and f) */
+-	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
+-	b = clkcfg & (1 << 3);
+-
+-	l = ccsr & 0x1f;
+-	m = (l <= 10) ? 1 : (l <= 20) ? 2 : 4;
+-
+-	L = l * BASE_CLK;
+-	M = (!cccr_a) ? (L/m) : ((b) ? L : (L/2));
+-
+-	return M;
+-}
+-
+-static const struct clkops clk_pxa27x_mem_ops = {
+-	.enable		= clk_dummy_enable,
+-	.disable	= clk_dummy_disable,
+-	.getrate	= clk_pxa27x_mem_getrate,
+-};
+-
+-/*
+- * Return the current LCD clock frequency in units of 10kHz as
+- */
+-static unsigned int pxa27x_get_lcdclk_frequency_10khz(void)
+-{
+-	unsigned long ccsr;
+-	unsigned int l, L, k, K;
+-
+-	ccsr = CCSR;
+-
+-	l = ccsr & 0x1f;
+-	k = (l <= 7) ? 1 : (l <= 16) ? 2 : 4;
+-
+-	L = l * BASE_CLK;
+-	K = L / k;
+-
+-	return (K / 10000);
+-}
+-
+-static unsigned long clk_pxa27x_lcd_getrate(struct clk *clk)
+-{
+-	return pxa27x_get_lcdclk_frequency_10khz() * 10000;
+-}
+-
+-static const struct clkops clk_pxa27x_lcd_ops = {
+-	.enable		= clk_pxa2xx_cken_enable,
+-	.disable	= clk_pxa2xx_cken_disable,
+-	.getrate	= clk_pxa27x_lcd_getrate,
+-};
+-
+-static DEFINE_PXA2_CKEN(pxa27x_ffuart, FFUART, 14857000, 1);
+-static DEFINE_PXA2_CKEN(pxa27x_btuart, BTUART, 14857000, 1);
+-static DEFINE_PXA2_CKEN(pxa27x_stuart, STUART, 14857000, 1);
+-static DEFINE_PXA2_CKEN(pxa27x_i2s, I2S, 14682000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_i2c, I2C, 32842000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_usb, USB, 48000000, 5);
+-static DEFINE_PXA2_CKEN(pxa27x_mmc, MMC, 19500000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_ficp, FICP, 48000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_usbhost, USBHOST, 48000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_pwri2c, PWRI2C, 13000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_keypad, KEYPAD, 32768, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_ssp1, SSP1, 13000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_ssp2, SSP2, 13000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_ssp3, SSP3, 13000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_pwm0, PWM0, 13000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_pwm1, PWM1, 13000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_ac97, AC97, 24576000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_ac97conf, AC97CONF, 24576000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_msl, MSL, 48000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_usim, USIM, 48000000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_memstk, MEMSTK, 19500000, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_im, IM, 0, 0);
+-static DEFINE_PXA2_CKEN(pxa27x_memc, MEMC, 0, 0);
+-
+-static DEFINE_CK(pxa27x_lcd, LCD, &clk_pxa27x_lcd_ops);
+-static DEFINE_CK(pxa27x_camera, CAMERA, &clk_pxa27x_lcd_ops);
+-static DEFINE_CLK(pxa27x_mem, &clk_pxa27x_mem_ops, 0, 0);
+-
+-static struct clk_lookup pxa27x_clkregs[] = {
+-	INIT_CLKREG(&clk_pxa27x_lcd, "pxa2xx-fb", NULL),
+-	INIT_CLKREG(&clk_pxa27x_camera, "pxa27x-camera.0", NULL),
+-	INIT_CLKREG(&clk_pxa27x_ffuart, "pxa2xx-uart.0", NULL),
+-	INIT_CLKREG(&clk_pxa27x_btuart, "pxa2xx-uart.1", NULL),
+-	INIT_CLKREG(&clk_pxa27x_stuart, "pxa2xx-uart.2", NULL),
+-	INIT_CLKREG(&clk_pxa27x_i2s, "pxa2xx-i2s", NULL),
+-	INIT_CLKREG(&clk_pxa27x_i2c, "pxa2xx-i2c.0", NULL),
+-	INIT_CLKREG(&clk_pxa27x_usb, "pxa27x-udc", NULL),
+-	INIT_CLKREG(&clk_pxa27x_mmc, "pxa2xx-mci.0", NULL),
+-	INIT_CLKREG(&clk_pxa27x_stuart, "pxa2xx-ir", "UARTCLK"),
+-	INIT_CLKREG(&clk_pxa27x_ficp, "pxa2xx-ir", "FICPCLK"),
+-	INIT_CLKREG(&clk_pxa27x_usbhost, "pxa27x-ohci", NULL),
+-	INIT_CLKREG(&clk_pxa27x_pwri2c, "pxa2xx-i2c.1", NULL),
+-	INIT_CLKREG(&clk_pxa27x_keypad, "pxa27x-keypad", NULL),
+-	INIT_CLKREG(&clk_pxa27x_ssp1, "pxa27x-ssp.0", NULL),
+-	INIT_CLKREG(&clk_pxa27x_ssp2, "pxa27x-ssp.1", NULL),
+-	INIT_CLKREG(&clk_pxa27x_ssp3, "pxa27x-ssp.2", NULL),
+-	INIT_CLKREG(&clk_pxa27x_pwm0, "pxa27x-pwm.0", NULL),
+-	INIT_CLKREG(&clk_pxa27x_pwm1, "pxa27x-pwm.1", NULL),
+-	INIT_CLKREG(&clk_pxa27x_ac97, NULL, "AC97CLK"),
+-	INIT_CLKREG(&clk_pxa27x_ac97conf, NULL, "AC97CONFCLK"),
+-	INIT_CLKREG(&clk_pxa27x_msl, NULL, "MSLCLK"),
+-	INIT_CLKREG(&clk_pxa27x_usim, NULL, "USIMCLK"),
+-	INIT_CLKREG(&clk_pxa27x_memstk, NULL, "MSTKCLK"),
+-	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
+-	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
+-	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
+-	INIT_CLKREG(&clk_dummy, "pxa27x-gpio", NULL),
+-	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+-};
+-
+ #ifdef CONFIG_PM
+ 
+ #define SAVE(x)		sleep_save[SLEEP_SAVE_##x] = x
+@@ -460,8 +293,6 @@ static int __init pxa27x_init(void)
+ 
+ 		reset_status = RCSR;
+ 
+-		clkdev_add_table(pxa27x_clkregs, ARRAY_SIZE(pxa27x_clkregs));
+-
+ 		if ((ret = pxa_init_dma(IRQ_DMA, 32)))
+ 			return ret;
+ 
+@@ -469,10 +300,17 @@ static int __init pxa27x_init(void)
+ 
+ 		register_syscore_ops(&pxa_irq_syscore_ops);
+ 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
+-		register_syscore_ops(&pxa2xx_clock_syscore_ops);
+ 
+-		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
+-		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
++		if (!of_have_populated_dt()) {
++			ret = clk_register_clkdev(NULL, NULL,
++						  "pxa27x-gpio");
++			if (!ret)
++				pxa_register_device(&pxa27x_device_gpio,
++						    &pxa27x_gpio_info);
++			if (!ret)
++				ret = platform_add_devices(devices,
++							   ARRAY_SIZE(devices));
++		}
+ 	}
+ 
+ 	return ret;
 -- 
 2.0.0.rc2
