@@ -1,74 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Jul 2014 13:08:39 +0100
-Subject: [PATCH v2] ARM: Fix preemption disable in iwmmxt_task_enable()
-In-Reply-To: <1405163130-3927-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1405069813-9270-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1405163130-3927-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140714120839.GB31617@localhost>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Mon, 14 Jul 2014 17:36:17 +0530
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset DT node to the
+ exynos5800-peach-pi
+Message-ID: <1405339577-7878-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 12, 2014 at 12:05:30PM +0100, Sebastian Hesselbarth wrote:
-> commit 431a84b1a4f7d1a0085d5b91330c5053cc8e8b12
->  ("ARM: 8034/1: Disable preemption in iwmmxt_task_enable()")
-> introduced macros {inc,dec}_preempt_count to iwmmxt_task_enable
-> to make it run with preemption disabled.
-> 
-> Unfortunately, other functions in iwmmxt.S also use concan_{save,dump,load}
-> sections located in iwmmxt_task_enable() to deal with iWMMXt coprocessor.
-> This causes an unbalanced preempt_count due to excessive dec_preempt_count
-> and destroyed return addresses in callers of concan_ labels due to a register
-> collision:
-> 
-> Linux version 3.16.0-rc3-00062-gd92a333-dirty (jef at armhf) (gcc version 4.8.3 (Debian 4.8.3-4) ) #5 PREEMPT Thu Jul 3 19:46:39 CEST 2014
-> CPU: ARMv7 Processor [560f5815] revision 5 (ARMv7), cr=10c5387d
-> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> Machine model: SolidRun CuBox
-> ...
-> PJ4 iWMMXt v2 coprocessor enabled.
-> ...
-> Unable to handle kernel paging request at virtual address fffffffe
-> pgd = bb25c000
-> [fffffffe] *pgd=3bfde821, *pte=00000000, *ppte=00000000
-> Internal error: Oops: 80000007 [#1] PREEMPT ARM
-> Modules linked in:
-> CPU: 0 PID: 62 Comm: startpar Not tainted 3.16.0-rc3-00062-gd92a333-dirty #5
-> task: bb230b80 ti: bb256000 task.ti: bb256000
-> PC is at 0xfffffffe
-> LR is at iwmmxt_task_copy+0x44/0x4c
-> pc : [<fffffffe>]    lr : [<800130ac>]    psr: 40000033
-> sp : bb257de8  ip : 00000013  fp : bb257ea4
-> r10: bb256000  r9 : fffffdfe  r8 : 76e898e6
-> r7 : bb257ec8  r6 : bb256000  r5 : 7ea12760  r4 : 000000a0
-> r3 : ffffffff  r2 : 00000003  r1 : bb257df8  r0 : 00000000
-> Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
-> Control: 10c5387d  Table: 3b25c019  DAC: 00000015
-> Process startpar (pid: 62, stack limit = 0xbb256248)
-> 
-> This patch fixes the issue by moving concan_{save,dump,load} into separate
-> code sections and make iwmmxt_task_enable() call them in the same way the
-> other functions use concan_ symbols. The test for valid ownership is moved
-> to concan_save and is safe for the other user of it, iwmmxt_task_disable().
-> The register collision is also resolved by moving concan_ symbols as
-> {inc,dec}_preempt_count are now local to iwmmxt_task_enable().
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reported-by: Jean-Francois Moine <moinejf@free.fr>
-> Fixes: 431a84b1a4f7 ("ARM: 8034/1: Disable preemption in iwmmxt_task_enable()")
-> ---
-> The offending commit was intoduced past v3.15-rc1 and the corresponding fix
-> should also be queued up for stable v3.15+
-> 
-> Changelog
-> v1->v2:
-> - return immediately from concan_ instead of branch to 3f, i.e. replace
->   'beq 3f' with 'moveq pc, lr' (Suggested by Catalin Marinas)
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jean-Francois Moine <moinejf@free.fr>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+being reset across sleep/wake.  If we don't set it to anything then
+the TPM will be reset.  U-Boot will detect this as invalid
+and will reset the system on resume time. This GPIO can always be low
+and not hurt anything.  It will get pulled back high again during a
+normal warm reset when it will default back to an input.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+To properly preserve the TPM state across suspend/resume and to make
+the chrome U-Boot happy, properly set the GPIO to mask the
+reset to the TPM.
+
+Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+---
+ arch/arm/boot/dts/exynos5800-peach-pi.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 28f2a25..caa8952 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -209,6 +209,18 @@
+ 
+ 
+ &pinctrl_0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mask_tpm_reset>;
++
++	/* We need GPX0_6 to be low at sleep time; just keep it low always */
++	mask_tpm_reset: mask-tpm-reset {
++		samsung,pins = "gpx0-6";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++		samsung,pin-val = <0>;
++	};
++
+ 	max98091_irq: max98091-irq {
+ 		samsung,pins = "gpx0-2";
+ 		samsung,pin-function = <0>;
+-- 
+1.7.9.5
