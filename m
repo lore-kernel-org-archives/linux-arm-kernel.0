@@ -1,85 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 04:15:36 -0700
-Subject: [PATCH v4 03/11] ARM: OMAP2+: timer: Add suspend-resume
- callbacks for clkevent device
-In-Reply-To: <1405047349-15101-4-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-4-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140714111536.GC20068@atomide.com>
+From: panpan1.liu@samsung.com (panpan liu)
+Date: Mon, 14 Jul 2014 19:18:18 +0800
+Subject: [PATCH] s5p-mfc: limit the size of the CPB
+Message-ID: <1405336698-3873-1-git-send-email-panpan1.liu@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> 
-> OMAP timer code registers two timers - one as clocksource
-> and one as clockevent. Since AM33XX has only one usable timer
-> in the WKUP domain one of the timers needs suspend-resume
-> support to restore the configuration to pre-suspend state.
-> 
-> commit adc78e6 (timekeeping: Add suspend and resume
-> of clock event devices) introduced .suspend and .resume
-> callbacks for clock event devices. Leverages these
-> callbacks to have AM33XX clockevent timer which is
-> in not in WKUP domain to behave properly across system
-> suspend.
-> 
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v3->v4:
-> 	Only use for am33xx soc now.
-> 
->  arch/arm/mach-omap2/timer.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 43d03fb..6fc1748 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -128,6 +128,29 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
->  	}
->  }
->  
-> +static void omap_clkevt_suspend(struct clock_event_device *unused)
-> +{
-> +	struct omap_hwmod *oh;
-> +
-> +	oh = omap_hwmod_lookup(clockevent_gpt.name);
-> +	if (!oh)
-> +		return;
-> +
-> +	omap_hwmod_idle(oh);
-> +}
-> +
-> +static void omap_clkevt_resume(struct clock_event_device *unused)
-> +{
-> +	struct omap_hwmod *oh;
-> +
-> +	oh = omap_hwmod_lookup(clockevent_gpt.name);
-> +	if (!oh)
-> +		return;
-> +
-> +	omap_hwmod_enable(oh);
-> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-> +}
-> +
+The register of the CPB limits the size. The max size is 4M, so it
+is more reasonable.
 
-This is going to make moving the timer code into drivers one step
-tougher to do. And you don't need to look up the hwmod entry every
-time, just initialize it during the init.
 
-> +	if (soc_is_am33xx()) {
-> +		clockevent_gpt.suspend = omap_clkevt_suspend;
-> +		clockevent_gpt.resume = omap_clkevt_resume;
-> +	}
-> +
+Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
 
-Maybe try to set up things so we initialize the SoC specific
-timer suspend and resume functions in mach-omap2/timer.c
-in a way where eventually the device driver can easily use
-them?
-
-Regards,
-
-Tony
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+old mode 100644
+new mode 100755
+index 0bae907..70b9458
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -413,7 +413,8 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	int ret = 0;
+ 	struct s5p_mfc_fmt *fmt;
+ 	struct v4l2_pix_format_mplane *pix_mp;
+-
++	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
++
+ 	mfc_debug_enter();
+ 	ret = vidioc_try_fmt(file, priv, f);
+ 	pix_mp = &f->fmt.pix_mp;
+@@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+ 	pix_mp->height = 0;
+ 	pix_mp->width = 0;
+-	if (pix_mp->plane_fmt[0].sizeimage)
+-		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+-	else
++	if (pix_mp->plane_fmt[0].sizeimage == 0)
+ 		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
+ 								DEF_CPB_SIZE;
++	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
++		ctx->dec_src_buf_size = buf_size->cpb;
++	else
++		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+ 	pix_mp->plane_fmt[0].bytesperline = 0;
+ 	ctx->state = MFCINST_INIT;
+ out:
+--
+1.7.9.5
