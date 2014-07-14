@@ -1,33 +1,36 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 14 Jul 2014 11:57:05 -0700
-Subject: [PATCH 0/2] ARM: minor sigpage enhancements
-In-Reply-To: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
-References: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <CAGXu5jJiJw3yk5SKGUk8BTHEd2jTwOKtHFDA2CppzXSy8CGUbg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 14 Jul 2014 20:57:25 +0200
+Subject: [PATCH 1/2] ARM: dts: mx5: Split M53EVK into SoM and EVK parts
+In-Reply-To: <20140714144913.GA2607@dragon>
+References: <1403722113-5721-1-git-send-email-marex@denx.de>
+ <201407091355.34295.marex@denx.de> <20140714144913.GA2607@dragon>
+Message-ID: <201407142057.25858.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 8:46 AM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
-> Russell,
->
-> Would you consider taking these for 3.17?  I've been carrying the
-> sigpage placement randomization as part of the VDSO patch set but it
-> seems worthwhile on its own.  Using _install_special_mapping for the
-> VDSO and similar VMAs was recently suggested by Andy Lutomirski.
->
-> Nathan Lynch (2):
->   ARM: use _install_special_mapping for sigpage
->   ARM: place sigpage at a random offset above stack
->
->  arch/arm/kernel/process.c | 60 ++++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 51 insertions(+), 9 deletions(-)
+On Monday, July 14, 2014 at 04:49:15 PM, Shawn Guo wrote:
+> On Wed, Jul 09, 2014 at 01:55:34PM +0200, Marek Vasut wrote:
+> > On Saturday, June 28, 2014 at 05:15:53 PM, Shawn Guo wrote:
+> > > On Wed, Jun 25, 2014 at 08:48:32PM +0200, Marek Vasut wrote:
+> > > > @@ -226,14 +158,11 @@
+> > > > 
+> > > >  &iomuxc {
+> > > >  
+> > > >  	pinctrl-names = "default";
+> > > > 
+> > > > -	pinctrl-0 = <&pinctrl_hog>;
+> > > > +	pinctrl-0 = <&pinctrl_hog &pinctrl_usb>;
+> > > 
+> > > Hmm, shouldn't pinctrl_usb be put into some USB related node?
+> > 
+> > Sorry for the late reply. It should. I am sending a small patch
+> > in-reply-to this one. Please either squash them together or apply in
+> > sequence, as seen fit. Hopefully this will clarify the change. I will
+> > send a full v2 if needed be.
+> 
+> Squashed and applied, thanks.
 
-Cool! Thanks for this.
+Thanks!
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Best regards,
+Marek Vasut
