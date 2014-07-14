@@ -1,44 +1,89 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 14 Jul 2014 15:51:06 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
- <20140710111833.GY3935@laptop>
- <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
- <20140711145138.GC3935@laptop>
- <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
-Message-ID: <20140714135106.GZ19379@twins.programming.kicks-ass.net>
+From: hrhaan@gmail.com (Harro Haan)
+Date: Mon, 14 Jul 2014 15:51:21 +0200
+Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
+In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+ <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 05:17:44PM +0200, Vincent Guittot wrote:
-> > In any case, its feels rather arbitrary to me. What about machines where
-> > there's no cache sharing at all (the traditional SMP systems). This
-> > thing you're trying to do still seems to make sense there.
-> 
-> ok, I thought that traditional SMP systems have this flag set at core
-> level. 
+On 10 July 2014 10:03, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+>
+> This patchset makes it possible to use kgdb's NMI infrastructure on ARM
+> platforms.
+>
+> The patches have been previously circulated as part of a large patchset
+> mixing together ARM architecture code and driver changes
+> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901 ). This
+> patchset is dramatically cut down to include only the arch/arm code. The
+> driver code (irqchip and tty/serial) will follow when/if the arch code
+> is accepted.
+>
+> The first two patches modify the FIQ infrastructure to allow interrupt
+> controller drivers to register callbacks (the fiq_chip structure) to
+> manage FIQ routings and to ACK and EOI the FIQ. This makes it possible
+> to use FIQ in multi-platform kernels and with recent ARM interrupt
+> controllers.
+>
 
-Yeah, with 1 core, so its effectively disabled.
+Daniel,
 
-> I mean ARM platforms have the flag for CPUs in the same cluster
-> (which include current ARM SMP system) and the corei7 of my laptop has
-> the flag at the cores level.
+Thanks for the patches. I have tested the fiq and irq-gic patches on
+an i.MX6 (SabreSD board) for a different purpose:
+A FIQ timer interrupt at 1 kHz. The TWD watchdog block is used in
+timer mode for this (interrupt ID 30). The GIC affinity is set to CPU
+core 0 only for this interrupt ID.
 
-So I can see 'small' parts reducing shared caches in order to improve
-idle performance.
+I was surprised by the following behavior:
+$ cat /proc/interrupts
+           CPU0       CPU1       CPU2       CPU3
+ 29:       5459       3381       3175       3029       GIC  29  twd
+ 30:         11          0          0          0       GIC  30  fake-fiq
 
-The point being that LLC seems a somewhat arbitrary measure for this.
+Once every few seconds is interrupt ID 30 handled by the regular GIC
+handler instead of the FIQ exception path (which causes for example a
+bit more latencies). The other thousands of FIQ's are handled by the
+FIQ exception path. The problem is also confirmed by the following
+stackframe of the Lauterbach tooling:
+fake_fiq_handler(irq = 30, ...)
+handle_percpu_devid_irq(irq = 30, ...)
+generic_handle_irq(irq = 30)
+handle_IRQ(irq = 30, ...)
+gic_handle_irq
+__irq_svc
+-->exception
 
-Can we try and see what happens if you remove the limit. Its always best
-to try the simpler things first and only make it more complex if we have
-to.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/16efc181/attachment-0001.sig>
+Notes:
+- The problem will occur more often by executing the following command:
+  $ while true; do hackbench 20; done &
+- Reading the GIC_CPU_INTACK register returns the interrupt ID of the
+highest priority pending interrupt.
+- The GIC_CPU_INTACK register (used by fiq_ack) will return spurious
+interrupt ID 0x3FF when read in fake_fiq_handler, because
+GIC_CPU_INTACK is already read by gic_handle_irq.
+- The FIQ exception will not occur anymore after gic_handle_irq
+read/acknowledges the FIQ by reading the GIC_CPU_INTACK register
+
+>From the behavior above I conclude that the GIC_CPU_INTACK register is
+first updated before the FIQ exception is generated, so there is a
+small period of time that gic_handle_irq can read/acknowledge the FIQ.
+
+I can reduce the number of occurrences (not prevent it) by adding the
+following hack to irq-gic.c
+@@ -297,10 +309,12 @@ static asmlinkage void __exception_irq_entry
+gic_handle_irq(struct pt_regs *regs
+  u32 irqstat, irqnr;
+  struct gic_chip_data *gic = &gic_data[0];
+  void __iomem *cpu_base = gic_data_cpu_base(gic);
+
+  do {
++ while(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_PENDING_SET)
+& (1 << 30))
++   printk(KERN_ERR "TEMP: gic_handle_irq: wait for FIQ exception\n");
+  irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+  irqnr = irqstat & ~0x1c00;
+
+Regards,
+
+Harro Haan
