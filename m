@@ -1,79 +1,93 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 14 Jul 2014 11:45:30 -0700
-Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
- regs-clocks
-In-Reply-To: <1405363234.13661.12.camel@x220>
-References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>	
- <53C4201E.3020708@infradead.org> <1405363234.13661.12.camel@x220>
-Message-ID: <53C4254A.3040900@infradead.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 14 Jul 2014 13:48:47 -0500
+Subject: [PATCH v4 04/11] ARM: OMAP2+: Use pdata-quirks for wkup_m3
+ deassert_hardreset
+In-Reply-To: <1405047349-15101-5-git-send-email-d-gerlach@ti.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <1405047349-15101-5-git-send-email-d-gerlach@ti.com>
+Message-ID: <53C4260F.6010202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/14 11:40, Paul Bolle wrote:
-> On Mon, 2014-07-14 at 11:23 -0700, Randy Dunlap wrote:
->> On 07/14/14 11:14, Nicholas Krause wrote:
->>> This patch addresses the fix me message in this file that states to
->>> remove all definitions not related to reg-clocks in this header
->>> file.
->>>
->>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
->>> ---
->>>  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
->>>  1 file changed, 1 insertion(+), 21 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
->>> index 4f44aac..46e64cc 100644
->>> --- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
->>> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
->>> @@ -15,24 +15,4 @@
->>>  #ifndef __PLAT_REGS_CLOCK_H
->>>  #define __PLAT_REGS_CLOCK_H __FILE__
->>>  
->>> -/*
->>> - * FIXME: Remove remaining definitions
->>> - */
->>> -
->>> -#define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
->>> -
->>> -#define S3C_PCLK_GATE		S3C_CLKREG(0x34)
->>> -#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
->>> -#define S3C_MEM_SYS_CFG		S3C_CLKREG(0x120)
->>> -
->>> -/* PCLK GATE Registers */
->>> -#define S3C_CLKCON_PCLK_UART3		(1<<4)
->>> -#define S3C_CLKCON_PCLK_UART2		(1<<3)
->>> -#define S3C_CLKCON_PCLK_UART1		(1<<2)
->>> -#define S3C_CLKCON_PCLK_UART0		(1<<1)
->>> -
->>> -/* MEM_SYS_CFG */
->>> -#define MEM_SYS_CFG_INDEP_CF		0x4000
->>> -#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON	0x30
->>> -
->>> -#endif /* _PLAT_REGS_CLOCK_H */
->>> +/#endif /* _PLAT_REGS_CLOCK_H */
->>
->> I don't know about the other changes, but that last line looks like an error.
->> Did you build anything that #includes this header file?
-> 
-> I just did
->     git grep -n S3C_CLKCON_PCLK_UART
-> 
-> It was just a guess. I did not cherry pick the defines that covers! The
-> output of that command is, I think, pretty clear. 
-> 
-> Nicholas, I think you've been told already to stop doing what you're
-> doing again here. I try not to use colorful language on the net, but
-> you're really pushing me here.
-> 
-> Please go find something other to do than grepping the kernel tree for
-> FIXMEs!
+Hi Dave,
 
-Yes.
+On 07/10/2014 09:55 PM, Dave Gerlach wrote:
+> Use pdata-quirks to reset the wkup_m3 during boot.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c    | 12 ++++++++++++
+>  include/linux/platform_data/wkup_m3.h | 17 +++++++++++++++++
+>  2 files changed, 29 insertions(+)
+>  create mode 100644 include/linux/platform_data/wkup_m3.h
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 90c88d4..8e4a541 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -17,6 +17,7 @@
+>  
+>  #include <linux/platform_data/pinctrl-single.h>
+>  #include <linux/platform_data/iommu-omap.h>
+> +#include <linux/platform_data/wkup_m3.h>
+>  
+>  #include "am35xx.h"
+>  #include "common.h"
+> @@ -255,6 +256,13 @@ static void __init nokia_n900_legacy_init(void)
+>  }
+>  #endif /* CONFIG_ARCH_OMAP3 */
+>  
+> +#ifdef CONFIG_SOC_AM33XX
+> +static struct wkup_m3_platform_data wkup_m3_data = {
+> +	.reset_name = "wkup_m3",
+> +	.deassert_reset = omap_device_deassert_hardreset,
 
-FIXMEs are not a suggested starting point for kernel beginners.
-If they were easy to fix, they would already be fixed or most likely
-would never have been introduced.
+Probably need to add assert_reset too
 
+> +};
+> +#endif
+> +
+>  #ifdef CONFIG_ARCH_OMAP4
+>  static void __init omap4_sdp_legacy_init(void)
+>  {
+> @@ -348,6 +356,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+>  	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+>  		       &am35xx_emac_pdata),
+>  #endif
+> +#ifdef CONFIG_SOC_AM33XX
+> +	OF_DEV_AUXDATA("ti,am3353-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
+> +		       &wkup_m3_data),
+> +#endif
+>  #ifdef CONFIG_ARCH_OMAP4
+>  	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
+>  	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
+> diff --git a/include/linux/platform_data/wkup_m3.h b/include/linux/platform_data/wkup_m3.h
+> new file mode 100644
+> index 0000000..07282bd
+> --- /dev/null
+> +++ b/include/linux/platform_data/wkup_m3.h
+> @@ -0,0 +1,17 @@
+> +/*
+> + * omap wkup_m3: platform data
+> + *
+> + * Copyright (C) 2014 Texas Instruments, Inc.
+> + *
+> + * Dave Gerlach <d-gerlach@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
 
--- 
-~Randy
+protect against double inclusion..
+
+regards
+Suman
+
+> +struct wkup_m3_platform_data {
+> +	const char *reset_name;
+> +
+> +	int (*deassert_reset)(struct platform_device *pdev, const char *name);
+> +};
+> 
