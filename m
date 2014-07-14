@@ -1,89 +1,114 @@
-From: hrhaan@gmail.com (Harro Haan)
-Date: Mon, 14 Jul 2014 15:51:21 +0200
-Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
-In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
-References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
- <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Jul 2014 15:50:52 +0200
+Subject: [PATCH 6/8] net: ethernet driver: Fujitsu OGMA
+In-Reply-To: <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
+References: <1405233107-4762-1-git-send-email-mollie.wu@linaro.org>
+Message-ID: <18609483.Jzi9Hxcq2r@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 10:03, Daniel Thompson <daniel.thompson@linaro.org> wrote:
->
-> This patchset makes it possible to use kgdb's NMI infrastructure on ARM
-> platforms.
->
-> The patches have been previously circulated as part of a large patchset
-> mixing together ARM architecture code and driver changes
-> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901 ). This
-> patchset is dramatically cut down to include only the arch/arm code. The
-> driver code (irqchip and tty/serial) will follow when/if the arch code
-> is accepted.
->
-> The first two patches modify the FIQ infrastructure to allow interrupt
-> controller drivers to register callbacks (the fiq_chip structure) to
-> manage FIQ routings and to ACK and EOI the FIQ. This makes it possible
-> to use FIQ in multi-platform kernels and with recent ARM interrupt
-> controllers.
->
+On Sunday 13 July 2014 14:31:47 Mollie Wu wrote:
+> +
+> +Example:
+> +	eth0: f_taiki {
+> +                compatible = "fujitsu,ogma";
+> +		reg = <0 0x31600000 0x10000>, <0 0x31618000 0x4000>, <0 0x3161c000 0x4000>;
+> +		interrupts = <0 163 0x4>;
+> +		clocks = <&clk_alw_0_8>;
+> +		phy-mode = "rgmii";
+> +		max-speed = <1000>;
+> +		max-frame-size = <9000>;
+> +		local-mac-address = [ a4 17 31 00 00 ed ];
+> +		phy-handle = <&ethphy0>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ethphy0: ethernet-phy at 1 {
+> +			device_type = "ethernet-phy";
+> +			compatible = "ethernet-phy-ieee802.3-c22";
+> +			reg = <1>;
+> +		};
+> +	};
 
-Daniel,
+The name of the device should be "ethernet" rather than "f_taiki".
 
-Thanks for the patches. I have tested the fiq and irq-gic patches on
-an i.MX6 (SabreSD board) for a different purpose:
-A FIQ timer interrupt at 1 kHz. The TWD watchdog block is used in
-timer mode for this (interrupt ID 30). The GIC affinity is set to CPU
-core 0 only for this interrupt ID.
+For the compatible string, it would be good to have a version number included.
+If you cannot find out the version of the ogma hardware, add the identifier for
+the soc it is used in, e.g.
 
-I was surprised by the following behavior:
-$ cat /proc/interrupts
-           CPU0       CPU1       CPU2       CPU3
- 29:       5459       3381       3175       3029       GIC  29  twd
- 30:         11          0          0          0       GIC  30  fake-fiq
+	compatible = "fujitsu,mb86s73-ogma", "fujitsu,ogma";
 
-Once every few seconds is interrupt ID 30 handled by the regular GIC
-handler instead of the FIQ exception path (which causes for example a
-bit more latencies). The other thousands of FIQ's are handled by the
-FIQ exception path. The problem is also confirmed by the following
-stackframe of the Lauterbach tooling:
-fake_fiq_handler(irq = 30, ...)
-handle_percpu_devid_irq(irq = 30, ...)
-generic_handle_irq(irq = 30)
-handle_IRQ(irq = 30, ...)
-gic_handle_irq
-__irq_svc
--->exception
+The driver only needs to match the generic string, but it's better
+to be prepared for the case where we have to support slightly different
+variants.
 
-Notes:
-- The problem will occur more often by executing the following command:
-  $ while true; do hackbench 20; done &
-- Reading the GIC_CPU_INTACK register returns the interrupt ID of the
-highest priority pending interrupt.
-- The GIC_CPU_INTACK register (used by fiq_ack) will return spurious
-interrupt ID 0x3FF when read in fake_fiq_handler, because
-GIC_CPU_INTACK is already read by gic_handle_irq.
-- The FIQ exception will not occur anymore after gic_handle_irq
-read/acknowledges the FIQ by reading the GIC_CPU_INTACK register
+> +static inline void ogma_writel(struct ogma_priv *priv, u32 reg_addr, u32 val)
+> +{
+> +	writel(val, priv->ioaddr + (reg_addr << 2));
+> +}
+> +
+> +static inline u32 ogma_readl(struct ogma_priv *priv, u32 reg_addr)
+> +{
+> +	return readl(priv->ioaddr + (reg_addr << 2));
+> +}
+for best performance, it may be better to use readl_relaxed() by default
+and only use the nonrelaxed accesses in the cases where you have to
+synchronize with DMA transfers.
 
->From the behavior above I conclude that the GIC_CPU_INTACK register is
-first updated before the FIQ exception is generated, so there is a
-small period of time that gic_handle_irq can read/acknowledge the FIQ.
+> +
+> +#define TIMEOUT_SPINS_MAC 1000000
+> +
+> +static u32 ogma_clk_type(u32 freq)
+> +{
+> +	if (freq < 35 * OGMA_CLK_MHZ)
+> +		return OGMA_GMAC_GAR_REG_CR_25_35_MHZ;
+> +	if (freq < 60 * OGMA_CLK_MHZ)
+> +		return OGMA_GMAC_GAR_REG_CR_35_60_MHZ;
+> +	if (freq < 100 * OGMA_CLK_MHZ)
+> +		return OGMA_GMAC_GAR_REG_CR_60_100_MHZ;
+> +	if (freq < 150 * OGMA_CLK_MHZ)
+> +		return OGMA_GMAC_GAR_REG_CR_100_150_MHZ;
+> +	if (freq < 250 * OGMA_CLK_MHZ)
+> +		return OGMA_GMAC_GAR_REG_CR_150_250_MHZ;
+> +
+> +	return OGMA_GMAC_GAR_REG_CR_250_300_MHZ;
+> +}
+> +
+> +static int ogma_wait_while_busy(struct ogma_priv *priv, u32 addr, u32 mask)
+> +{
+> +	u32 timeout = TIMEOUT_SPINS_MAC;
+> +
+> +	while (--timeout && ogma_readl(priv, addr) & mask)
+> +		;
+> +	if (!timeout) {
+> +		netdev_WARN(priv->net_device, "%s: timeout\n", __func__);
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	return 0;
+> +}
 
-I can reduce the number of occurrences (not prevent it) by adding the
-following hack to irq-gic.c
-@@ -297,10 +309,12 @@ static asmlinkage void __exception_irq_entry
-gic_handle_irq(struct pt_regs *regs
-  u32 irqstat, irqnr;
-  struct gic_chip_data *gic = &gic_data[0];
-  void __iomem *cpu_base = gic_data_cpu_base(gic);
+The callers of this function seem to all be from non-atomic context, so it
+would be good to occasionally msleep() here, either after each try, or
+after initially spinning for as long as it takes to succeed most of the
+time.
 
-  do {
-+ while(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_PENDING_SET)
-& (1 << 30))
-+   printk(KERN_ERR "TEMP: gic_handle_irq: wait for FIQ exception\n");
-  irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
-  irqnr = irqstat & ~0x1c00;
+> +
+> +static void ogma_napi_tx_processing(struct napi_struct *napi_p)
+> +{
+> +	struct ogma_priv *priv = container_of(napi_p, struct ogma_priv, napi);
+> +
+> +	ogma_ring_irq_clr(priv, OGMA_RING_TX, OGMA_IRQ_EMPTY);
+> +	ogma_clean_tx_desc_ring(priv);
+> +
+> +	if (netif_queue_stopped(priv->net_device) &&
+> +	    ogma_get_tx_avail_num(priv) >= OGMA_NETDEV_TX_PKT_SCAT_NUM_MAX)
+> +		netif_wake_queue(priv->net_device);
+> +}
 
-Regards,
+You should probably call netdev_tx_completed_queue() here and 
+netdev_tx_sent_queue() when sending the frame. See http://lwn.net/Articles/454390/
+for a description of the API.
 
-Harro Haan
+	Arnd
