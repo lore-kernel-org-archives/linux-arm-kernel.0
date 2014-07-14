@@ -1,63 +1,79 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 Jul 2014 20:44:50 +0200
-Subject: [PATCH] cpuidle: big.LITTLE: add MCPM dependency
-In-Reply-To: <4345351.RJRQd7ghCF@wuerfel>
-References: <4345351.RJRQd7ghCF@wuerfel>
-Message-ID: <53C42522.9060907@linaro.org>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 14 Jul 2014 11:45:30 -0700
+Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
+ regs-clocks
+In-Reply-To: <1405363234.13661.12.camel@x220>
+References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>	
+ <53C4201E.3020708@infradead.org> <1405363234.13661.12.camel@x220>
+Message-ID: <53C4254A.3040900@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 01:23 PM, Arnd Bergmann wrote:
-> 662322fcb6d ("cpuidle: big.LITTLE: Add ARCH_EXYNOS entry in config")
-> made it possible for the big-little cpuidle driver to run on exynos,
-> which may or may not include MCPM support at compile time, so we
-> run into a link error when it is disabled:
->
-> drivers/built-in.o: In function `bl_enter_powerdown':
-> :(.text+0x1889a0): undefined reference to `mcpm_cpu_powered_up'
-> drivers/built-in.o: In function `bl_powerdown_finisher':
-> :(.text+0x1889e8): undefined reference to `mcpm_set_entry_vector'
-> :(.text+0x1889ec): undefined reference to `mcpm_cpu_suspend'
->
-> This adds an explicit dependency to CONFIG_MCPM to avoid that
-> case.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Chander Kashyap <chander.kashyap@linaro.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
-> I believe the broken commit is only present in the samsung/for-next
-> tree (through v3.17-next/cpuidle-exynos), so it should be fixed there.
->
-> On a side note, I wonder if we should have platform dependencies at
-> all, or just the MCPM dependency by itself.
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 2f6b33ea6e08..459b7c91407a 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -10,6 +10,7 @@ config ARM_ARMADA_370_XP_CPUIDLE
->   config ARM_BIG_LITTLE_CPUIDLE
->   	bool "Support for ARM big.LITTLE processors"
->   	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
-> +	depends on MCPM
+On 07/14/14 11:40, Paul Bolle wrote:
+> On Mon, 2014-07-14 at 11:23 -0700, Randy Dunlap wrote:
+>> On 07/14/14 11:14, Nicholas Krause wrote:
+>>> This patch addresses the fix me message in this file that states to
+>>> remove all definitions not related to reg-clocks in this header
+>>> file.
+>>>
+>>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+>>> ---
+>>>  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
+>>>  1 file changed, 1 insertion(+), 21 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+>>> index 4f44aac..46e64cc 100644
+>>> --- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+>>> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+>>> @@ -15,24 +15,4 @@
+>>>  #ifndef __PLAT_REGS_CLOCK_H
+>>>  #define __PLAT_REGS_CLOCK_H __FILE__
+>>>  
+>>> -/*
+>>> - * FIXME: Remove remaining definitions
+>>> - */
+>>> -
+>>> -#define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
+>>> -
+>>> -#define S3C_PCLK_GATE		S3C_CLKREG(0x34)
+>>> -#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
+>>> -#define S3C_MEM_SYS_CFG		S3C_CLKREG(0x120)
+>>> -
+>>> -/* PCLK GATE Registers */
+>>> -#define S3C_CLKCON_PCLK_UART3		(1<<4)
+>>> -#define S3C_CLKCON_PCLK_UART2		(1<<3)
+>>> -#define S3C_CLKCON_PCLK_UART1		(1<<2)
+>>> -#define S3C_CLKCON_PCLK_UART0		(1<<1)
+>>> -
+>>> -/* MEM_SYS_CFG */
+>>> -#define MEM_SYS_CFG_INDEP_CF		0x4000
+>>> -#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON	0x30
+>>> -
+>>> -#endif /* _PLAT_REGS_CLOCK_H */
+>>> +/#endif /* _PLAT_REGS_CLOCK_H */
+>>
+>> I don't know about the other changes, but that last line looks like an error.
+>> Did you build anything that #includes this header file?
+> 
+> I just did
+>     git grep -n S3C_CLKCON_PCLK_UART
+> 
+> It was just a guess. I did not cherry pick the defines that covers! The
+> output of that command is, I think, pretty clear. 
+> 
+> Nicholas, I think you've been told already to stop doing what you're
+> doing again here. I try not to use colorful language on the net, but
+> you're really pushing me here.
+> 
+> Please go find something other to do than grepping the kernel tree for
+> FIXMEs!
 
-Why do we want to depend on MCPM ? If I want to enable the cpuidle 
-driver, the Kconfig should select the dependencies instead of letting 
-the user to figure out what dependency is missing in order to enable the 
-cpuidle option, no ?
+Yes.
 
-+	select MCPM
-
->   	select ARM_CPU_SUSPEND
->   	select CPU_IDLE_MULTIPLE_DRIVERS
->   	help
->
+FIXMEs are not a suggested starting point for kernel beginners.
+If they were easy to fix, they would already be fixed or most likely
+would never have been introduced.
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+~Randy
