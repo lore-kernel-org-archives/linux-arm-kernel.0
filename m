@@ -1,114 +1,179 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Jul 2014 17:46:22 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <53C3CFCA.9050800@metafoo.de>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <4755712.cJmZ5fnaQH@wuerfel> <53C3CFCA.9050800@metafoo.de>
-Message-ID: <4494372.fAWcxQ0qku@wuerfel>
+Date: Mon, 14 Jul 2014 17:47:41 +0200
+Subject: [PATCH v2] ASoC: samsung/smartq: use dynamic registration
+Message-ID: <5305965.e8NLE5ngVl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 July 2014 14:40:42 Lars-Peter Clausen wrote:
-> [...]
-> > I've given it a try now. Can you confirm that this is a valid transformation?
-> >
-> > If it's ok, I'll fold it into the original patch and re-send.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> >   ./arch/arm/mach-s3c64xx/mach-smartq.c           |   15 ++++++++-------
-> >   ./sound/soc/samsung/smartq_wm8987.c             |   19 +++++++------------
-> >   ./include/linux/platform_data/asoc-s3c-smartq.h |   10 ----------
-> >   3 files changed, 15 insertions(+), 29 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-> > index 4c111f60dbf2..dce449c0e855 100644
-> > --- a/arch/arm/mach-s3c64xx/mach-smartq.c
-> > +++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-> > @@ -20,7 +20,6 @@
-> >   #include <linux/spi/spi_gpio.h>
-> >   #include <linux/usb/gpio_vbus.h>
-> >   #include <linux/platform_data/s3c-hsotg.h>
-> > -#include <linux/platform_data/asoc-s3c-smartq.h>
-> 
-> #include <linux/gpio/driver.h>
+As a prerequisite for moving s3c64xx into multiplatform configurations,
+we need to change the smartq audio driver to stop using hardcoded
+gpio numbers from the header file, and instead pass the gpio data
+through platform_data.
 
-ok.
+In order to do that, we also move the code to use module_platform_driver
+and register the platform device using platform_device_register_simple
+and register the gpios through the gpiod API.
 
-> >
-> >   #include <asm/mach-types.h>
-> >   #include <asm/mach/map.h>
-> > @@ -380,9 +379,12 @@ void __init smartq_map_io(void)
-> >   	smartq_lcd_mode_set();
-> >   }
-> >
-> > -static const __initconst struct smartq_audio_pdata smartq_audio_pdata = {
-> > -	.gpio_jack = S3C64XX_GPL(12),
-> > -	.gpio_amp = S3C64XX_GPK(12),
-> > +static struct gpiod_lookup_table smartq_audio_gpios = {
-> > +	.dev_id = "smartq-audio",
-> > +	.table = {
-> > +		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
-> > +		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
-> 
-> There is no such thing as GPIO_ACTIVE_HIGH, just 0 for flags.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The original driver does gpio_direction_output(..., 1); 
-
-For some reason I earlier concluded that this was what the '1' would need
-to get converted to. Are you sure '0' is correct then?
-
-> This needs a { } terminating entry.
-
-ok
-
-> > +	},
-> >   };
-> >
-> >   void __init smartq_machine_init(void)
-> > @@ -404,7 +406,6 @@ void __init smartq_machine_init(void)
-> >
-> >   	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
-> >
-> > -	platform_device_register_data(NULL, "smartq-audio", -1,
-> > -				      &smartq_audio_pdata,
-> > -				      sizeof (smartq_audio_pdata));
-> > +	platform_device_register_simple("smartq-audio", -1, NULL, 0);
-> > +	gpiod_add_lookup_table(&smartq_audio_gpios);
-> 
-> To avoid a extra round of -EPROBE_DEFER the lookup table should be 
-> registered before the device.
-
-ok
-
-> >   }
-> [...]
-> > diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
-> > index 8c4a0a285ce7..8da7c67903c6 100644
-> > --- a/sound/soc/samsung/smartq_wm8987.c
-> > +++ b/sound/soc/samsung/smartq_wm8987.c
-> > @@ -19,8 +19,6 @@
-> >   #include <sound/soc.h>
-> >   #include <sound/jack.h>
-> 
-> #include <linux/gpio/consumer.h>
-> 
-> >
-> [..]
-> > -
-> > -	smartq_jack_gpios[0].gpio = pdata->gpio_jack;
-> 
-> smartq_jack_gpios[0].gpiod_dev = &pdev->dev;
-> 
-> > +	platform_set_drvdata(pdev, gpio);
-> 
-> This unfortunately wont work. snd_soc_register_card() will overwrite the 
-> devices drvdata. Use snd_soc_card_set_drvdata(card, gpio) and in the speaker 
-> event handler snd_soc_card_get_drvdata(w->dapm->card);
-
-ok.
-
-Thanks for the review!
-
-	Arnd
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index b3d13537a7f0..deed4dd2d0e4 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -12,6 +12,7 @@
+ #include <linux/delay.h>
+ #include <linux/fb.h>
+ #include <linux/gpio.h>
++#include <linux/gpio/driver.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/pwm_backlight.h>
+@@ -379,6 +380,15 @@ void __init smartq_map_io(void)
+ 	smartq_lcd_mode_set();
+ }
+ 
++static struct gpiod_lookup_table smartq_audio_gpios = {
++	.dev_id = "smartq-audio",
++	.table = {
++		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
++		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
++		{ },
++	},
++};
++
+ void __init smartq_machine_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -397,4 +407,7 @@ void __init smartq_machine_init(void)
+ 	WARN_ON(smartq_wifi_init());
+ 
+ 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
++
++	gpiod_add_lookup_table(&smartq_audio_gpios);
++	platform_device_register_simple("smartq-audio", -1, NULL, 0);
+ }
+diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+index 9b0ffacab790..b13f60e402ae 100644
+--- a/sound/soc/samsung/smartq_wm8987.c
++++ b/sound/soc/samsung/smartq_wm8987.c
+@@ -13,15 +13,12 @@
+  *
+  */
+ 
+-#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/module.h>
+ 
+ #include <sound/soc.h>
+ #include <sound/jack.h>
+ 
+-#include <mach/gpio-samsung.h>
+-#include <asm/mach-types.h>
+-
+ #include "i2s.h"
+ #include "../codecs/wm8750.h"
+ 
+@@ -110,7 +107,7 @@ static struct snd_soc_jack_pin smartq_jack_pins[] = {
+ 
+ static struct snd_soc_jack_gpio smartq_jack_gpios[] = {
+ 	{
+-		.gpio		= S3C64XX_GPL(12),
++		.gpio		= -1,
+ 		.name		= "headphone detect",
+ 		.report		= SND_JACK_HEADPHONE,
+ 		.debounce_time	= 200,
+@@ -127,7 +124,9 @@ static int smartq_speaker_event(struct snd_soc_dapm_widget *w,
+ 				struct snd_kcontrol *k,
+ 				int event)
+ {
+-	gpio_set_value(S3C64XX_GPK(12), SND_SOC_DAPM_EVENT_OFF(event));
++	struct gpio_desc *gpio = snd_soc_card_get_drvdata(&snd_soc_smartq);
++
++	gpiod_set_value(gpio, SND_SOC_DAPM_EVENT_OFF(event));
+ 
+ 	return 0;
+ }
+@@ -218,62 +217,39 @@ static struct snd_soc_card snd_soc_smartq = {
+ 	.num_controls = ARRAY_SIZE(wm8987_smartq_controls),
+ };
+ 
+-static struct platform_device *smartq_snd_device;
+-
+-static int __init smartq_init(void)
++static int smartq_probe(struct platform_device *pdev)
+ {
++	struct gpio_desc *gpio;
+ 	int ret;
+ 
+-	if (!machine_is_smartq7() && !machine_is_smartq5()) {
+-		pr_info("Only SmartQ is supported by this ASoC driver\n");
+-		return -ENODEV;
+-	}
+-
+-	smartq_snd_device = platform_device_alloc("soc-audio", -1);
+-	if (!smartq_snd_device)
+-		return -ENOMEM;
+-
+-	platform_set_drvdata(smartq_snd_device, &snd_soc_smartq);
+-
+-	ret = platform_device_add(smartq_snd_device);
+-	if (ret) {
+-		platform_device_put(smartq_snd_device);
+-		return ret;
+-	}
++	platform_set_drvdata(pdev, &snd_soc_smartq);
+ 
+ 	/* Initialise GPIOs used by amplifiers */
+-	ret = gpio_request(S3C64XX_GPK(12), "amplifiers shutdown");
+-	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to register GPK12\n");
+-		goto err_unregister_device;
++	gpio = devm_gpiod_get(&pdev->dev, "amplifiers shutdown");
++	if (IS_ERR(gpio)) {
++		dev_err(&pdev->dev, "Failed to register GPK12\n");
++		ret = PTR_ERR(gpio);
++		goto out;
+ 	}
++	snd_soc_card_set_drvdata(&snd_soc_smartq, gpio);
+ 
+-	/* Disable amplifiers */
+-	ret = gpio_direction_output(S3C64XX_GPK(12), 1);
+-	if (ret) {
+-		dev_err(&smartq_snd_device->dev, "Failed to configure GPK12\n");
+-		goto err_free_gpio_amp_shut;
+-	}
+-
+-	return 0;
+-
+-err_free_gpio_amp_shut:
+-	gpio_free(S3C64XX_GPK(12));
+-err_unregister_device:
+-	platform_device_unregister(smartq_snd_device);
++	ret = devm_snd_soc_register_card(&pdev->dev, &snd_soc_smartq);
++	if (ret)
++		dev_err(&pdev->dev, "Failed to register card\n");
+ 
++out:
+ 	return ret;
+ }
+ 
+-static void __exit smartq_exit(void)
+-{
+-	gpio_free(S3C64XX_GPK(12));
+-
+-	platform_device_unregister(smartq_snd_device);
+-}
++static struct platform_driver smartq_driver = {
++	.driver = {
++		.name = "smartq-audio",
++		.owner = THIS_MODULE,
++	},
++	.probe = smartq_probe,
++};
+ 
+-module_init(smartq_init);
+-module_exit(smartq_exit);
++module_platform_driver(smartq_driver);
+ 
+ /* Module information */
+ MODULE_AUTHOR("Maurus Cuelenaere <mcuelenaere@gmail.com>");
