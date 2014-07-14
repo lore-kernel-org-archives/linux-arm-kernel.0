@@ -1,70 +1,54 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 14 Jul 2014 06:13:03 -0400
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140714062428.GC2081@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140712093917.GD18601@arm.com>
- <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
- <201407121422.02078.arnd@arndb.de>
- <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
- <20140714062428.GC2081@ulmo>
-Message-ID: <CAF6AEGspVSxdEj_3LNtMp752LF-RbfQ+Y4EdWoWfT9O8wMnh-g@mail.gmail.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Mon, 14 Jul 2014 10:16:12 +0000
+Subject: [PATCH 2/2] tty: serial: fsl_lpuart: add 32-bit register
+ interface support
+In-Reply-To: <20140712005122.GA31974@kroah.com>
+References: <1405057302-26041-1-git-send-email-jingchang.lu@freescale.com>
+ <1405057302-26041-3-git-send-email-jingchang.lu@freescale.com>
+ <20140712005122.GA31974@kroah.com>
+Message-ID: <ea314532262d449aac50e4eb0a79f9f6@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 2:24 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Sat, Jul 12, 2014 at 08:57:31AM -0400, Rob Clark wrote:
->> On Sat, Jul 12, 2014 at 8:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> [...]
->> > The way that Thierry's binding does that is the obvious solution to this,
->> > and it mirrors what we do in practically every other subsystem. I definitely
->> > want the SMMU to change before anybody starts using it in a real system,
->> > which we fortunately do not have yet.
+
+
+>-----Original Message-----
+>From: Greg KH [mailto:gregkh at linuxfoundation.org]
+>Sent: Saturday, July 12, 2014 8:51 AM
+>To: Lu Jingchang-B35083
+>Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH 2/2] tty: serial: fsl_lpuart: add 32-bit register
+>interface support
+>
+>On Fri, Jul 11, 2014 at 01:41:42PM +0800, Jingchang Lu wrote:
+>> This add the 32-bit register version LPUART support with big-endian
+>> byte order.
 >>
->> hmm, well if some of the things I need for (like this or batching
->> mappings) are too weird and gpu specific, I'm willing to duplicate the
->> IOMMU driver in drm/msm.  It really isn't so much code, and that gives
->> me a lot more more flexibility to do crazy things... at some point I'm
->> probably going to want to do context switches by banging the IOMMU
->> registers directly from the gpu.
+>> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+>> ---
+>>  drivers/tty/serial/fsl_lpuart.c | 653
+>> +++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 643 insertions(+), 10 deletions(-)
 >
-> If the IOMMU API doesn't provide for what you need, then perhaps it's
-> time to enhance it? We do that all the time in other parts of the
-> kernel, why should IOMMU be special?
-
-sure.. and my comment was also about the map/unmap batching.
-
-Bypassing IOMMU wouldn't be my first choice.  (Especially because I'd
-then get to implement it twice.)  But if some of the things I need are
-too specific to one driver (or worse, problematic for other IOMMU
-use-cases which I don't know about), then it is an option I'd be
-willing to consider.  If nothing else, it would get me out of
-allocating sglists for every buffer..  I wonder how much memory
-scatterlists take up for 500M of gfx buffers?
-
-> It seems to me like context switching for per-process address space
-> isolation is one of the important features of an IOMMU. If the current
-> API doesn't let you do that then we should think of ways how it can be
-> improved. And if it doesn't do it fast enough, then we should equally
-> find ways to speed it up.
+>You didn't even test build this patch:
 >
-> This is part of why I think it would be good to have explicit objects
-> associated with IOMMU contexts. That would give us a good place to add
-> caching for this kind of situation. Currently we're required to handle
-> most of this in drivers (map from struct device to context, ...).
+>  CC [M]  drivers/tty/serial/fsl_lpuart.o
+>drivers/tty/serial/fsl_lpuart.c: In function ?lpuart_suspend?:
+>drivers/tty/serial/fsl_lpuart.c:1856:22: error: ?lpuart32_reg? undeclared
+>(first use in this function)
+>   uart_suspend_port(&lpuart32_reg, &sport->port);
+>                      ^
+>
+>No quicker way to make me grumpy...
+>
+>Please take some time to do this right.
+>
+>greg k-h
 
-well, it is at least awkward that the current api conflates attaching
-device and attaching context.  I think we could get some use out of an
-iommu_swap() API which conceptually acts as:
+Sorry for the mistake, I only test the functionality without option of CONFIG_PM_SLEEP,
+I will fix that and send the patch again. Thanks.
 
-  iommu_swap(olddomain, newdomain, dev)
-  {
-     iommu_detach_device(olddomain, dev);
-     iommu_attach_device(newdomain, dev);
-  }
 
-BR,
--R
 
-> Thierry
+Best Regards,
+Jingchang
