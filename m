@@ -1,188 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 14 Jul 2014 09:45:53 +0200
-Subject: [PATCH v2] ARM: EXYNOS: Fix build with PM_SLEEP=n
-Message-ID: <1405323953-25954-1-git-send-email-k.kozlowski@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 14 Jul 2014 09:48:30 +0200
+Subject: [PATCH v2 3/4] can: flexcan: switch on clocks before accessing ecr
+ register
+In-Reply-To: <cover.1405322992.git.stefan@agner.ch>
+References: <cover.1405322992.git.stefan@agner.ch>
+Message-ID: <3901272074d5a3e680a7ecfda3ffbfca4c544a86.1405322992.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix building of exynos defconfig with disabled PM_SLEEP:
-CONFIG_PM_SLEEP=n
-CONFIG_PM_SLEEP_SMP=n
-CONFIG_SUSPEND=n
-by moving functions for power up/down of CPU and cluster to platsmp.c
+Reported-by: Ashutosh Singh <ashuleapyear@gmail.com>
+Suggested-by: Marc Kleine-Budde <mkl@pengutronix.de>
+[stefan at agner.ch: added return check for clk_enable_prepare]
 
-The build error messages:
-arch/arm/mach-exynos/built-in.o: In function `exynos_boot_secondary':
-arch/arm/mach-exynos/platsmp.c:111: undefined reference to `exynos_cpu_power_state'
-arch/arm/mach-exynos/platsmp.c:112: undefined reference to `exynos_cpu_power_up'
-arch/arm/mach-exynos/platsmp.c:116: undefined reference to `exynos_cpu_power_state'
-make: *** [vmlinux] Error 1
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-Changes since v1:
-1. Use different solution - just move the power up/down functions to a
-   common place instead of adding stubs in common.h. Suggested by Tomasz
-   Figa.
----
- arch/arm/mach-exynos/platsmp.c | 66 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/pm.c      | 66 ------------------------------------------
- 2 files changed, 66 insertions(+), 66 deletions(-)
+ drivers/net/can/flexcan.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index b15ea30faa7c..d435175671e0 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -31,6 +31,72 @@
- 
- extern void exynos4_secondary_startup(void);
- 
-+/**
-+ * exynos_core_power_down : power down the specified cpu
-+ * @cpu : the cpu to power down
-+ *
-+ * Power down the specified cpu. The sequence must be finished by a
-+ * call to cpu_do_idle()
-+ *
-+ */
-+void exynos_cpu_power_down(int cpu)
-+{
-+	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+}
-+
-+/**
-+ * exynos_cpu_power_up : power up the specified cpu
-+ * @cpu : the cpu to power up
-+ *
-+ * Power up the specified cpu
-+ */
-+void exynos_cpu_power_up(int cpu)
-+{
-+	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-+		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+}
-+
-+/**
-+ * exynos_cpu_power_state : returns the power state of the cpu
-+ * @cpu : the cpu to retrieve the power state from
-+ *
-+ */
-+int exynos_cpu_power_state(int cpu)
-+{
-+	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
-+			S5P_CORE_LOCAL_PWR_EN);
-+}
-+
-+/**
-+ * exynos_cluster_power_down : power down the specified cluster
-+ * @cluster : the cluster to power down
-+ */
-+void exynos_cluster_power_down(int cluster)
-+{
-+	__raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
-+}
-+
-+/**
-+ * exynos_cluster_power_up : power up the specified cluster
-+ * @cluster : the cluster to power up
-+ */
-+void exynos_cluster_power_up(int cluster)
-+{
-+	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-+		     EXYNOS_COMMON_CONFIGURATION(cluster));
-+}
-+
-+/**
-+ * exynos_cluster_power_state : returns the power state of the cluster
-+ * @cluster : the cluster to retrieve the power state from
-+ *
-+ */
-+int exynos_cluster_power_state(int cluster)
-+{
-+	return (__raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
-+			S5P_CORE_LOCAL_PWR_EN);
-+}
-+
- static inline void __iomem *cpu_boot_reg_base(void)
+diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+index f425ec2..4c598c9 100644
+--- a/drivers/net/can/flexcan.c
++++ b/drivers/net/can/flexcan.c
+@@ -383,11 +383,25 @@ static int flexcan_get_berr_counter(const struct net_device *dev,
  {
- 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index fa7218a99580..6ab68a068e93 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -101,72 +101,6 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
- 	return -ENOENT;
+ 	const struct flexcan_priv *priv = netdev_priv(dev);
+ 	struct flexcan_regs __iomem *regs = priv->base;
+-	u32 reg = flexcan_read(&regs->ecr);
++	u32 reg, err;
++
++	err = clk_prepare_enable(priv->clk_ipg);
++	if (err)
++		return err;
++
++	err = clk_prepare_enable(priv->clk_per);
++	if (err)
++		goto out_disable_ipg;
++
++	reg = flexcan_read(&regs->ecr);
+ 
+ 	bec->txerr = (reg >> 0) & 0xff;
+ 	bec->rxerr = (reg >> 8) & 0xff;
+ 
++	clk_disable_unprepare(priv->clk_per);
++ out_disable_ipg:
++	clk_disable_unprepare(priv->clk_ipg);
++
+ 	return 0;
  }
  
--/**
-- * exynos_core_power_down : power down the specified cpu
-- * @cpu : the cpu to power down
-- *
-- * Power down the specified cpu. The sequence must be finished by a
-- * call to cpu_do_idle()
-- *
-- */
--void exynos_cpu_power_down(int cpu)
--{
--	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
--}
--
--/**
-- * exynos_cpu_power_up : power up the specified cpu
-- * @cpu : the cpu to power up
-- *
-- * Power up the specified cpu
-- */
--void exynos_cpu_power_up(int cpu)
--{
--	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
--}
--
--/**
-- * exynos_cpu_power_state : returns the power state of the cpu
-- * @cpu : the cpu to retrieve the power state from
-- *
-- */
--int exynos_cpu_power_state(int cpu)
--{
--	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
--			S5P_CORE_LOCAL_PWR_EN);
--}
--
--/**
-- * exynos_cluster_power_down : power down the specified cluster
-- * @cluster : the cluster to power down
-- */
--void exynos_cluster_power_down(int cluster)
--{
--	__raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
--}
--
--/**
-- * exynos_cluster_power_up : power up the specified cluster
-- * @cluster : the cluster to power up
-- */
--void exynos_cluster_power_up(int cluster)
--{
--	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--		     EXYNOS_COMMON_CONFIGURATION(cluster));
--}
--
--/**
-- * exynos_cluster_power_state : returns the power state of the cluster
-- * @cluster : the cluster to retrieve the power state from
-- *
-- */
--int exynos_cluster_power_state(int cluster)
--{
--	return (__raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
--			S5P_CORE_LOCAL_PWR_EN);
--}
--
- #define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
- 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
- 			(sysram_base_addr + 0x24) : S5P_INFORM0))
 -- 
-1.9.1
+2.0.1
