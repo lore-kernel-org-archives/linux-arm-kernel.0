@@ -1,141 +1,74 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Mon, 14 Jul 2014 10:48:23 +0530
-Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
-In-Reply-To: <20140714050403.GB1668@shlinux1.ap.freescale.net>
-References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
- <53BFBF3F.8040804@gmail.com>
- <20140714032451.GA1668@shlinux1.ap.freescale.net>
- <53C35E72.2050902@gmail.com>
- <20140714050403.GB1668@shlinux1.ap.freescale.net>
-Message-ID: <53C3681F.90308@gmail.com>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Mon, 14 Jul 2014 13:22:21 +0800
+Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
+In-Reply-To: <53BFA120.2070005@ti.com>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+ <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
+ <53BE926A.2070005@ti.com>
+ <CAKohpokNijH37NAmuh5cYEZxYFJE-COKwVNP3RNHSEoS03YYAA@mail.gmail.com>
+ <53BFA120.2070005@ti.com>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB661A47A2A7BF3@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 10:34 AM, Dong Aisheng wrote:
-> On Mon, Jul 14, 2014 at 10:07:06AM +0530, Varka Bhadram wrote:
->> On 07/14/2014 08:54 AM, Dong Aisheng wrote:
->>> On Fri, Jul 11, 2014 at 04:11:03PM +0530, Varka Bhadram wrote:
->>>> On 07/11/2014 03:59 PM, Dong Aisheng wrote:
->>>>> add M_CAN device tree binding documentation
->>>>>
->>>>> Cc: Wolfgang Grandegger<wg@grandegger.com>
->>>>> Cc: Marc Kleine-Budde<mkl@pengutronix.de>
->>>>> Cc: Mark Rutland<mark.rutland@arm.com>
->>>>> Cc: Oliver Hartkopp<socketcan@hartkopp.net>
->>>>> Cc: Varka Bhadram<varkabhadram@gmail.com>
->>>>> Signed-off-by: Dong Aisheng<b29396@freescale.com>
->>>>> ---
->>>>>   .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
->>>>>   1 files changed, 65 insertions(+), 0 deletions(-)
->>>>>   create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
->>>>> new file mode 100644
->>>>> index 0000000..c4cb263
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
->>>>> @@ -0,0 +1,65 @@
->>>>> +Bosch MCAN controller Device Tree Bindings
->>>>> +-------------------------------------------------
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
->>>>> +- reg			: physical base address and size of the M_CAN
->>>>> +			  registers map and Message RAM
->>>>> +- reg-names		: Should be "m_can" and "message_ram"
->>>>> +- interrupts		: Should be the interrupt number of M_CAN interrupt
->>>>> +			  line 0 and line 1, could be same if sharing
->>>>> +			  the same interrupt.
->>>>> +- interrupt-names	: Should contain "int0" and "int1"
->>>>> +- clocks		: Clocks used by controller, should be host clock
->>>>> +			  and CAN clock.
->>>>> +- clock-names		: Should contain "hclk" and "cclk"
->>>>> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
->>>> I think this should be pinctrl-0
->>>>
->>> First, this part is defined by pinctrl binding doc.
->>> Second i think it may be possible someone wants to add other pinctrl states
->>> when implement low power state in the future.
->>> So i just keep it as pinctrl-<n>.
->> Normally we will use pinctrl-0 for mentioning the pinctrl bindings.
->>
->> If somebody going to add something to the pinctrl bindings they will
->> add separately with pinctrl-1: bla bla bla...
->>
-> Will it cause misleading that it only supports one state?
-> And if we only define pinctrl-0 here, how do we describe pinctrl-names?
-> It should be "default"? It looks not accurate enough to me.
->
-> Per my understanding, I think it's better to leave it as standard
-> pinctrl-binding doc states since anyhow people should read pinctrl-binding doc.
->
->>>>> +- pinctrl-names		: Names corresponding to the numbered pinctrl states
->>>> remove 1 tab space before :
->>>>
->>> It's a bit strange.
->>> Other line like pinctrl-<n> is also two tabs.
->>> And the code looks fine and already aligned.
->>> - pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
->>> - pinctrl-names		: Names corresponding to the numbered pinctrl states
->>> Do you mean change line of pinctrl-names from two tabs to one space and a tab before :?
->>>
->> When i see in the patch the alignment is like this
->> pinctrl-<n>	:
->> pinctrl-name		:
->>
-> Yes,in the original patch it's like:
-> +- pinctrl-<n>          : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
-> +- pinctrl-names                : Names corresponding to the numbered pinctrl states
->
-> If remove one tab:
-> +- pinctrl-<n>          : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
-> +- pinctrl-names        : Names corresponding to the numbered pinctrl states
->
-> But in vim reading the code, it's like:
-> - pinctrl-<n>           : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
-> - pinctrl-names : Names corresponding to the numbered pinctrl states
-> I don't know why.
-> What should we do about this case?
+Hello Kishon/Viresh,
 
-It seems to me that the style followed in bindings/pinctrl/pinctrl-bindings.txt
-looks good to me.
-
-pinctrl-<n>:		Pinctrl states as described in
-			bindings/pinctrl/pinctrl-bindings.txt
-pinctrl-names: 		Names corresponding to the
-			numbered pinctrl states
-
->>>>> +- mram-cfg		: Message RAM configuration data.
->>>>> +  Multiple M_CAN instances can share the same Message RAM and each element(e.g
->>>>> +  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
->>>>> +  so this property is telling driver how the shared or private Message RAM
->>>>> +  are used by this M_CAN controller.
->>>>> +
->>>> It may written like:
->>>> mram-cfg		: Message RAM configuration data
->>>> 			  Multiple M_CAN instances can share the same Message RAM and each element
->>>> 			  (e.g Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
->>>> 			  ...
->>>>
->>> I'm fine with that.
->>> The question is it's easy to over 80 columns if writing like that,
->>> is it ok?
->> When we follow the above format it would be more readable.
->>
-> Okay.
->
->>> Regards
->>> Dong Aisheng
->> -- 
->> Regards,
->> Varka Bhadram.
->>
-> Regards
-> Dong Aisheng
->
->   
+> -----Original Message-----
+> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
+> Sent: Friday, July 11, 2014 2:03 PM
+> To: Viresh Kumar
+> Cc: Arnd Bergmann; olof at lixom.net; linux-arm-kernel at lists.infradead.org;
+> spear-devel; Bartlomiej Zolnierkiewicz; Bjorn Helgaas; Mark Nicholson; linux-
+> pci at vger.kernel.org; Pratyush ANAND
+> Subject: Re: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on
+> SPEAr13xx
+> 
+> 
+> 
+> On Thursday 10 July 2014 07:00 PM, Viresh Kumar wrote:
+> > On 10 July 2014 18:47, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> >> On Thursday 10 July 2014 12:56 PM, Viresh Kumar wrote:
+> >>> From: Pratyush Anand <pratyush.anand@st.com>
+> >>>
 
 
--- 
-Regards,
-Varka Bhadram.
+[...]
+
+> >>> +
+> >>> +static int spear1340_miphy_sata_init(struct spear1340_miphy_priv
+> >>> +*priv) {
+> >>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> >>> +                        SPEAR1340_PCIE_SATA_CFG_MASK,
+> >>> +                        SPEAR1340_SATA_CFG_VAL);
+> >>> +     regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> >>> +                        SPEAR1340_PCIE_MIPHY_CFG_MASK,
+> >>> +
+> SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
+> >>> +     /* Switch on sata power domain */
+> >>> +     regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
+> >>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN,
+> >>> +                        SPEAR1340_PCM_CFG_SATA_POWER_EN);
+> >>> +     msleep(20);
+> >>> +     /* Disable PCIE SATA Controller reset */
+> >>> +     regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
+> >>> +                        SPEAR1340_PERIP1_SW_RSATA, 0);
+> >>> +     msleep(20);
+> >>
+> >> Please add a comment for all delays added.
+> >
+> > @Pratyush/Mohit: please let me know what to add here.
+> >
+
+- I think we should read regmap_*() and msleep() in continuation and so the comment above it
+is valid for both the operations.
+
+Otherwise we can add comment line for msleep() like:
+/* Wait for SATA power domain on */
+/* Wait for SATA reset de-assert completion */
+
+Similarily in *_exit routine:
+/* Wait for SATA power domain off */
+/* Wait for SATA reset assert completion */
+
+Thanks
+Mohit
