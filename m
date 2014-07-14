@@ -1,22 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 14 Jul 2014 00:01:50 -0300
-Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
-In-Reply-To: <20140711160238.GD21766@n2100.arm.linux.org.uk>
-References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
- <20140711160238.GD21766@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5DqixwxXK-=8_9Xwntd3_F9f3p8qJRU2R1+C5KVL=phRw@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 14 Jul 2014 11:08:14 +0800
+Subject: [PATCH] ARM: at91: at91sam9x5: correct typo error for ohci clock
+Message-ID: <1405307294-17708-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 1:02 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 11, 2014 at 08:34:19AM -0700, Tim Harvey wrote:
->> I've noticed that for IMX6 the gpio-mxc gpio driver always returns 0
->> for gpio's configured as outputs regardless of if they are outputing
->> high or low.
->
-> There's a different way which this can be solved - set the SION but on
-> your GPIOs.  You will then be able to read back the state of the
-> output pin.
+Correct the typo error for the second "uhphs_clk".
 
-Yes, setting the SION bit is the correct way to solve this.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 2ebc421..727d3a4 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -1155,8 +1155,7 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00600000 0x100000>;
+ 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
+-				 <&uhpck>;
++			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
+ 			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+-- 
+1.8.5.2
