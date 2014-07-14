@@ -1,55 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 04:21:21 -0700
-Subject: [PATCH v4 11/11] ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into
- OMAP builds
-In-Reply-To: <1405047349-15101-12-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-12-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140714112121.GD20068@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Jul 2014 13:23:47 +0200
+Subject: [PATCH] cpuidle: big.LITTLE: add MCPM dependency
+Message-ID: <4345351.RJRQd7ghCF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
-> With all the requisite changes in place we can now enable the basic
-> PM support for AM33xx. This patch updates the various OMAP files
-> to enable suspend-resume on AM33xx.
-> 
-> Because the suspend resume functionality is different on AM33xx
-> than other OMAP platforms due to the need for M3 firmware and an
-> IPC channel to be in place, separate PM ops are used instead of
-> omap_pm_ops. These are now set using omap2_common_suspend_init
-> so the AM33xx can make a decision at runtime to enable suspend based
-> on the availabilty of aforementioned requirements.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v3->v4:
-> 	Updated for rproc usage now.
-> 
->  arch/arm/mach-omap2/Kconfig  |  1 +
->  arch/arm/mach-omap2/Makefile |  2 ++
->  arch/arm/mach-omap2/common.h |  9 +++++++++
->  arch/arm/mach-omap2/io.c     |  1 +
->  arch/arm/mach-omap2/pm.h     |  5 +++++
->  arch/arm/mach-omap2/sram.c   | 10 +++++++++-
->  arch/arm/mach-omap2/sram.h   |  2 ++
->  7 files changed, 29 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 1c1ed73..f8a56e5 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -59,6 +59,7 @@ config SOC_AM33XX
->  	select ARCH_OMAP2PLUS
->  	select ARCH_HAS_OPP
->  	select ARM_CPU_SUSPEND if PM
-> +	select WKUP_M3_RPROC if PM
+662322fcb6d ("cpuidle: big.LITTLE: Add ARCH_EXYNOS entry in config")
+made it possible for the big-little cpuidle driver to run on exynos,
+which may or may not include MCPM support at compile time, so we
+run into a link error when it is disabled:
 
-You should not do a select in Kconfig for a driver,
-that will lead into various randconfig build errors
-at some point. It's probably best to make the PM code
-depend on the WKUP_M3_RPROC driver instead.
+drivers/built-in.o: In function `bl_enter_powerdown':
+:(.text+0x1889a0): undefined reference to `mcpm_cpu_powered_up'
+drivers/built-in.o: In function `bl_powerdown_finisher':
+:(.text+0x1889e8): undefined reference to `mcpm_set_entry_vector'
+:(.text+0x1889ec): undefined reference to `mcpm_cpu_suspend'
 
-Regards,
+This adds an explicit dependency to CONFIG_MCPM to avoid that
+case.
 
-Tony 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Chander Kashyap <chander.kashyap@linaro.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+I believe the broken commit is only present in the samsung/for-next
+tree (through v3.17-next/cpuidle-exynos), so it should be fixed there.
+
+On a side note, I wonder if we should have platform dependencies at
+all, or just the MCPM dependency by itself.
+
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index 2f6b33ea6e08..459b7c91407a 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -10,6 +10,7 @@ config ARM_ARMADA_370_XP_CPUIDLE
+ config ARM_BIG_LITTLE_CPUIDLE
+ 	bool "Support for ARM big.LITTLE processors"
+ 	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
++	depends on MCPM
+ 	select ARM_CPU_SUSPEND
+ 	select CPU_IDLE_MULTIPLE_DRIVERS
+ 	help
