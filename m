@@ -1,73 +1,55 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 14 Jul 2014 07:58:59 -0700
-Subject: [PATCH v4 1/7] kernel: Add support for restart notifier call chain
-In-Reply-To: <20140714145311.GC1112@arm.com>
-References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
- <1405265431-4561-2-git-send-email-linux@roeck-us.net>
- <20140714145311.GC1112@arm.com>
-Message-ID: <53C3F033.9070408@roeck-us.net>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 14 Jul 2014 10:58:54 -0400 (EDT)
+Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
+In-Reply-To: <20140714083549.GK2954@lee--X1>
+Message-ID: <Pine.LNX.4.44L0.1407141054010.10763-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 07:53 AM, Catalin Marinas wrote:
-> On Sun, Jul 13, 2014 at 04:30:25PM +0100, Guenter Roeck wrote:
->> diff --git a/include/linux/reboot.h b/include/linux/reboot.h
->> index 48bf152..120db73 100644
->> --- a/include/linux/reboot.h
->> +++ b/include/linux/reboot.h
->> @@ -38,6 +38,9 @@ extern int reboot_force;
->>   extern int register_reboot_notifier(struct notifier_block *);
->>   extern int unregister_reboot_notifier(struct notifier_block *);
->>
->> +extern int register_restart_notifier(struct notifier_block *);
->> +extern int unregister_restart_notifier(struct notifier_block *);
->> +extern void kernel_restart_notify(char *cmd);
->>
->>   /*
->>    * Architecture-specific implementations of sys_reboot commands.
->> diff --git a/kernel/reboot.c b/kernel/reboot.c
->> index a3a9e24..1bc9bf2 100644
->> --- a/kernel/reboot.c
->> +++ b/kernel/reboot.c
->> @@ -104,6 +104,87 @@ int unregister_reboot_notifier(struct notifier_block *nb)
->>   }
->>   EXPORT_SYMBOL(unregister_reboot_notifier);
->>
->> +/*
->> + *	Notifier list for kernel code which wants to be called
->> + *	to restart the system.
->> + */
->> +static BLOCKING_NOTIFIER_HEAD(restart_notifier_list);
->> +
->> +/**
->> + *	register_restart_notifier - Register function to be called to reset
->> + *				    the system
->> + *	@nb: Info about notifier function to be called
->> + *	@nb->priority:	Notifier priority. Notifiers should follow the
->> + *			following guidelines for setting priorities.
->> + *			0:	Restart notifier of last resort,
->> + *				with limited restart capabilities
->> + *			128:	Default notifier; use if no other
->> + *				notifier is expected to be available,
->> + *				and/or if restart functionality is
->> + *				sufficient to restart the entire system
->> + *			255:	Highest priority notifier, will preempt
->> + *				all other notifier functions
->
-> I'm not fully convinced implying a 'notifier' is the right approach
-> here. By analogy with the reboot notifier, this is something drivers
-> would want to know about and do some work before the actual system
-> restart (e.g. disable watchdogs as in the reboot notifier case). The
-> restart notifier here is meant to perform the actual system restart.
-> Arguably, the actual restart should be handled by priority 0 with some
-> preparation before but we have reboot notifier already, so I don't think
-> it's worth another notifier.
->
-> While re-using the notifier mechanism behind the scene is fine, I think
-> we should at least rename the functions to something like
-> (un)register_restart_handler().
->
+On Mon, 14 Jul 2014, Lee Jones wrote:
 
-Fine with me. Any other comments / suggestions on the name of the function ?
+> On Fri, 11 Jul 2014, Alan Stern wrote:
+> > On Fri, 11 Jul 2014, Peter Griffin wrote:
+> > > On Thu, 10 Jul 2014, Alan Stern wrote:
+> > > 
+> > > > On Thu, 10 Jul 2014, Peter Griffin wrote:
+> > > > 
+> > > > > This driver adds support for the USB HCD present in STi
+> > > > > SoC's from STMicroelectronics. It has been tested on the
+> > > > > stih416-b2020 board.
+> > > > 
+> > > > This driver file, along with the Kconfig changes, belongs in the
+> > > > arch/platform-specific source directory.  Not in drivers/usb/host/.  
+> > > > It is, after all, a platform driver that registers two platform
+> > > > devices.
+> > > 
+> > > Why do think that?
+> > 
+> > Because it is true.  One can easily see that st-hcd.c is a platform
+> > driver: It contains a module_platform_driver() line and a struct
+> > platform_driver definition near the end.  And it registers a platform
+> > device by calling platform_device_add() in st_hcd_device_create(),
+> > which is called twice by st_hcd_probe().
+> 
+> You are correct that this is indeed a platform driver and in the 'old
+> days' these would have been stuffed into the ARM sub-architecture
+> directories.  However, these became far too bloated and created too
+> much churn which angered Linus.  A great deal has changed since his
+> ARM rant [1].  All drivers (platform or otherwise) are now to live in
+> 'drivers', which makes a great deal of sense really, doesn't it?
+> 
+> Did you grep kernel wide for module_platform_driver()?
+> 
+> $ git grep module_platform_driver -- arch/ | wc -l
+> 12
+> 
+> $ git grep module_platform_driver -- drivers/ | wc -l
+> 1138
+> 
+> Most platform drivers have already been moved.
 
-Guenter
+Okay, I grant the point.  Objections withdrawn.  Fix up the spelling 
+error and the other stuff in the Kconfig help text, and this will be 
+acceptable.
+
+Alan Stern
