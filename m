@@ -1,28 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Jul 2014 19:13:38 +0100
-Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
-In-Reply-To: <53C3C77F.7080208@kpanic.de>
-References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
- <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
- <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
-Message-ID: <20140714181338.GR6800@sirena.org.uk>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Mon, 14 Jul 2014 14:14:24 -0400
+Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to regs-clocks
+Message-ID: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 02:05:19PM +0200, Stefan Assmann wrote:
-> On 14.07.2014 14:00, Mark Brown wrote:
+This patch addresses the fix me message in this file that states to
+remove all definitions not related to reg-clocks in this header
+file.
 
-> >No, you need to implement clocks using the clock API.  Please read the
-> >changelogs for the above commits...
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
+ 1 file changed, 1 insertion(+), 21 deletions(-)
 
-> Yes, that's what I expected. Got any pointers for me how to do this?
-> Never done that before, a little help would be appreciated.
-
-There should be plenty of examples in drivers/clk?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/5fda622a/attachment.sig>
+diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+index 4f44aac..46e64cc 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
++++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+@@ -15,24 +15,4 @@
+ #ifndef __PLAT_REGS_CLOCK_H
+ #define __PLAT_REGS_CLOCK_H __FILE__
+ 
+-/*
+- * FIXME: Remove remaining definitions
+- */
+-
+-#define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
+-
+-#define S3C_PCLK_GATE		S3C_CLKREG(0x34)
+-#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
+-#define S3C_MEM_SYS_CFG		S3C_CLKREG(0x120)
+-
+-/* PCLK GATE Registers */
+-#define S3C_CLKCON_PCLK_UART3		(1<<4)
+-#define S3C_CLKCON_PCLK_UART2		(1<<3)
+-#define S3C_CLKCON_PCLK_UART1		(1<<2)
+-#define S3C_CLKCON_PCLK_UART0		(1<<1)
+-
+-/* MEM_SYS_CFG */
+-#define MEM_SYS_CFG_INDEP_CF		0x4000
+-#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON	0x30
+-
+-#endif /* _PLAT_REGS_CLOCK_H */
++/#endif /* _PLAT_REGS_CLOCK_H */
+-- 
+1.9.1
