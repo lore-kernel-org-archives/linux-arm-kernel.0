@@ -1,75 +1,87 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 14 Jul 2014 10:05:35 +0100
-Subject: [PATCH v7 0/4] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <20140712111004.GI21766@n2100.arm.linux.org.uk>
-References: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
- <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
- <20140712101602.GH21766@n2100.arm.linux.org.uk>
- <20140712111004.GI21766@n2100.arm.linux.org.uk>
-Message-ID: <53C39D5F.6050901@linaro.org>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 14 Jul 2014 12:06:32 +0300
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <20140714081524.GI2081@ulmo>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
+ <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
+Message-ID: <53C39D98.9040802@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/14 12:10, Russell King - ARM Linux wrote:
-> On Sat, Jul 12, 2014 at 11:16:02AM +0100, Russell King - ARM Linux wrote:
->> On Mon, Jun 30, 2014 at 12:30:51PM +0100, Daniel Thompson wrote:
->>> This patchset removes some single-platform compatibility tricks related
->>> to DEBUG_LL and, as a result, allows multi_v7_defconfig derived builds
->>> to enable DEBUG_LL. Currently the user selected kbuild setting is
->>> ignored and the PL01X's DEBUG_LL stub is silently selected instead. This
->>> is a pain if your hardware doesn't have this cell, not least because it
->>> takes a little time to figure out that kbuild built the wrong code.
+On 14/07/14 11:15, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Mon, Jul 14, 2014 at 10:55:51AM +0300, Mikko Perttunen wrote:
+>> On 11/07/14 19:01, Mikko Perttunen wrote:
+>>> On 07/11/2014 05:51 PM, Thierry Reding wrote:
+>>>> On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
+>>>>> ...
+>>>> ...
+>>>
+>>> In this case, all the registers that will be written are such that the
+>>> MC driver will never need to write them. They are shadowed registers,
+>>> meaning that all writes are stored and are only effective starting from
+>>> the next time the EMC rate change state machine is activated, so writing
+>>> them from anywhere except than the EMC driver would be pointless.
+>>>
+>>> I can find two users of these registers in downstream:
+>>> 1) mc.c saves and loads them on suspend/restore (I don't know why, that
+>>> shouldn't do anything. They will be overridden anyway during the next
+>>> EMC rate change).
+>>> 2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to
+>>> calculate a value which it then writes to a register that is also
+>>> shadowed and that is part of downstream burst registers so that doesn't
+>>> do anything either.
+>>>
+>>> The reason I implemented two ways to specify the MC register area was
+>>> that this could be merged before an MC driver and retain
+>>> backwards-compatibility after the MC driver arrives.
+>>>
+>>> If this is not acceptable, we can certainly wait for the MC driver to be
+>>> merged first. (Although with the general rate of things, I hope I won't
+>>> be back at school at that point..) I assume that this is blocked on the
+>>> IOMMU bindings discussion? In that case, there are several options: the
+>>> MC driver could have its own tables for each EMC rate or we could just
+>>> make the EMC tables global (i.e. not under the EMC node). In any case,
+>>> the MC driver would need to implement a function that would just write
+>>> these values but be guaranteed to not do anything else, since that could
+>>> cause nasty things during the EMC rate change sequence.
 >>
->> I don't think this is quite right, because I'm now seeing randconfig
->> finding build errors with this.  We can end up with this configuration:
->>
->> CONFIG_DEBUG_LL=y
->> CONFIG_DEBUG_LL_UART_NONE=y
->> # CONFIG_DEBUG_ICEDCC is not set
->> # CONFIG_DEBUG_SEMIHOSTING is not set
->> # CONFIG_DEBUG_LL_UART_8250 is not set
->> # CONFIG_DEBUG_LL_UART_PL01X is not set
->> CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
->> # CONFIG_DEBUG_UART_8250 is not set
->>
->> which results in:
->>
->> arch/arm/kernel/debug.S:24:33: fatal error: mach/debug-macro.S: No such file or directory
->> make[2]: *** [arch/arm/kernel/debug.o] Error 1
->> arch/arm/kernel/head.S:27:33: fatal error: mach/debug-macro.S: No such file or directory
->> make[2]: *** [arch/arm/kernel/head.o] Error 1
->> Full config file:
->> http://www.arm.linux.org.uk/developer/build/file.php?lid=11023
+>> Having taken another look at the code, I don't think the MC driver could do
+>> anything that bad. There are also two other places where the EMC driver
+>> needs to read MC registers: Inside the sequence, it reads a register but
+>> discards its contents. According to comments, this acts as a memory barrier,
+>> probably for the preceding step that writes into MC memory. If the register
+>> writes are moved to the MC driver, it could also handle that. In another
+>> place it reads the number of RAM modules from a MC register. The MC driver
+>> could export this as another function.
+>
+> Exporting this functionality from the MC driver is the right thing to do
+> in my opinion.
 
-Thanks. I will look at this.
+Ok, let's do that then. Do you think I could make a bare-bones MC driver 
+to support the EMC driver before your MC driver with IOMMU/LA is ready? 
+Can the MC device tree node be stabilized yet? Of course, if things go 
+well, that concern might turn out to be unnecessary.
 
-Problem is that by making the build system honour the user choice we end
-up breaking the build when the user makes a bad choice (albeit a bad
-choice that they should not have been given in the first place).
+Thanks, Mikko.
 
-I guess the best fix is to get rid of CONFIG_DEBUG_LL_UART_NONE altogether.
-
-
-> Note that this also breaks building versatile as an oldconfig.  I'll drop
-> the patch series from my tree for the time being.
-
-There is a difficult problem with oldconfig.
-
-Today DEBUG_LL only works on versatile defconfigs (and oldconfig
-upgrades from there) because although CONFIG_DEBUG_LL_UART_NONE is
-selected the build system does not honour this and behaves as though the
-use selected CONFIG_DEBUG_LL_UART_PL01X instead.
-
-Unfortunately if we fix this and remove CONFIG_DEBUG_LL_UART_NONE as
-proposed above then the oldconfig will silently select
-CONFIG_DEBUG_SEMIHOSTING.
-
-In other words I will be able to offer a patch so that oldconfig
-*compiles* but I don't know how to get it to preserve behaviour (or
-whether this matters).
-
-Hints about what to do would be very welcome.
-
-
-Daniel.
+>
+>> That said, I still suspect it might not be worth it to divide this between
+>> two drivers.
+>
+> If we don't separate, then we make it easy for people to break things in
+> the future. Both drivers may not be accessing the same registers now,
+> but if there's no barrier in place to actively enforce this split, then
+> it's only a matter of time before it gets broken. A typical way to
+> ensure this is done properly is via request_resource() (called by the
+> devm_ioremap_resource() function). That will fail if two drivers try to
+> use the same memory region, and with good reason.
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
