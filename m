@@ -1,39 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Jul 2014 18:17:49 +0200
-Subject: [PATCH 0/2] arm64: use Image header fields in EFI stub
-Message-ID: <1405354671-14031-1-git-send-email-ard.biesheuvel@linaro.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 14 Jul 2014 18:18:12 +0200
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <4494372.fAWcxQ0qku@wuerfel>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <4755712.cJmZ5fnaQH@wuerfel> <53C3CFCA.9050800@metafoo.de>
+ <4494372.fAWcxQ0qku@wuerfel>
+Message-ID: <53C402C4.5090908@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a followup on the RFC series I sent a week ago that changes the EFI
-stub Image loader to stop using linker arithmetic and build time defines and
-use data obtained at runtime instead.
+On 07/14/2014 05:46 PM, Arnd Bergmann wrote:
+[...]
+>>> +static struct gpiod_lookup_table smartq_audio_gpios = {
+>>> +	.dev_id = "smartq-audio",
+>>> +	.table = {
+>>> +		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
+>>> +		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
+>>
+>> There is no such thing as GPIO_ACTIVE_HIGH, just 0 for flags.
+>
+> The original driver does gpio_direction_output(..., 1);
+>
+> For some reason I earlier concluded that this was what the '1' would need
+> to get converted to. Are you sure '0' is correct then?
+>
 
-This series is now rebased on top of Catalin's arm64 for-next/core branch, which
-contains a relevant set of patches by Mark. This means I could drop my former
-patch #1 against Documentation/booting.txt.
+Yes. But now that you say it the gpiod_direction_output() call is missing 
+from this patch.
 
-Patch #1 adds <asm/image_hdr.h>. I incorporated Geoff's feedback to improve the
-comments and make the header suitable for sharing with userland.
-
-Patch #2 contains the changes to the actual stub loader itself. This patch
-depends on the stub loader bug fix patch I sent out today. It drops all
-references to linker symbols and uses text_offset and image_size from the Image
-header, and uses the loaded Image size as reported by EFI. This patch also fixes
-the corner case where Image happens to be loaded at exactly the right offset,
-but the allocation is actually too small to satisfy the requirement imposed by
-image_size as set in the header.
-
-Ard Biesheuvel (2):
-  arm64: add C struct definition for Image header
-  arm64/efi: efistub: get text offset and image size from the Image
-    header
-
- arch/arm64/include/asm/image_hdr.h | 75 ++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile         |  2 -
- arch/arm64/kernel/efi-stub.c       | 29 ++++++++-------
- 3 files changed, 91 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm64/include/asm/image_hdr.h
-
--- 
-1.8.3.2
+- Lars
