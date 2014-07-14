@@ -1,56 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jul 2014 10:57:47 +0100
-Subject: [RFC PATCH 0/2] irqchip: GIC: check and clear GIC interupt
- active status
-In-Reply-To: <53C34CF2.5050209@huawei.com>
-References: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
- <20140711123507.GE12899@arm.com> <53C34CF2.5050209@huawei.com>
-Message-ID: <20140714095747.GB1779@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 12:05:43 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140714100542.GB9870@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 04:22:26AM +0100, Liu hua wrote:
-> On 2014/7/11 20:35, Will Deacon wrote:
-> > On Fri, Jul 11, 2014 at 07:46:15AM +0100, Liu Hua wrote:
-> >> So guys, Do you know a better way to do that? 
-> > What happens if, in the crash kernel, you disable the CPU interfaces
-> > (GICC_CTLR.ENABLE) then disable the distributor (GICD_CTLR.ENABLE) before
-> > enabling everything again in the reverse order? Is that enough to cause the
-> > GIC to drop any active states? It's not clear to me from a quick look at
-> > the TRM.
-> > 
+On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
+> at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
+> controller device.
 > 
-> I did what you said at the beginning of "gic_dist_init". The active states
-> remained (panic in local timer interrupt (PPI))and the kernel failed to boot,
-> Did I do that at wrong place?
+> The HLCDC block provides a single RGB output port, and only supports LCD
+> panels connection to LCD panels for now.
 > 
-> -------------------
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index b6b0a81..94d6352 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -454,6 +455,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->         void __iomem *base = gic_data_dist_base(gic);
->         void __iomem *cpu_base = gic_data_cpu_base(gic);
+> The atmel,panel property link the HLCDC RGB output with the LCD panel
+> connected on this port (note that the HLCDC RGB connector implementation
+> makes use of the DRM panel framework).
 > 
-> + writel_relaxed(0, base + GIC_CPU_CTRL);
->         writel_relaxed(0, base + GIC_DIST_CTRL);
+> Connection to other external devices (DRM bridges) might be added later by
+> mean of a new atmel,xxx (atmel,bridge) property.
 > 
->         /*
-> ------------------------
-> 
-> As shown in GIC Architecture Specification manual,I think that the GICC_CTLR.ENABLE
-> and GICD_CTLR.ENABLE only control the delivering of the interrupt, not the active
-> states.
-> 
-> As GIC manual says "For every read of a valid Interrupt ID from the GICC_IAR, the
-> connected processor must perform a matching write to the GICC_EOIR". So we should
-> find a way to drop the active states when booting, if we do not remain these active
-> states by design.
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
 
-Understood, my suggestion above was a speculative effort to see what the
-hardware would do. Something along the lines of what you've done in your
-patch makes sense to me, but we'll need to wait for Marc's input (he's on
-holiday at the moment).
+This is the wrong directory. Device tree bindings describe hardware, but
+DRM is a Linux-specific framework. And yes, there are already files in
+that directory, I know, but that doesn't make it any better.
 
-Will
+I suggest either devicetree/bindings/gpu or devicetree/bindings/video.
+
+> diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+[...]
+> +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
+> +See Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt for more details.
+
+I think it's better to refer to these using relative filenames. When the
+device tree bindings are moved out of the kernel tree, they may no
+longer use the same hierarchy.
+
+> +Required properties:
+> + - compatible: value should be one of the following:
+> +   "atmel,hlcdc-dc"
+
+There's only one value, so perhaps: should be "atmel,hlcdc-dc".
+
+> + - atmel,panel: Should contain a phandle with 2 parameters.
+> +   The first cell is a phandle to a DRM panel device
+> +   The second cell encodes the RGB mode, which can take the following values:
+> +   * 0: RGB444
+> +   * 1: RGB565
+> +   * 2: RGB666
+> +   * 3: RGB888
+
+These are properties of the panel and should be obtained from the panel
+directly rather than an additional cell in this specifier.
+
+> +   The third cell encodes specific flags describing LCD signals configuration
+> +   (see Atmel's datasheet for a full description of these fields):
+> +   * bit 0: HSPOL: Horizontal Synchronization Pulse Polarity
+> +   * bit 1: VSPOL: Vertical Synchronization Pulse Polarity
+> +   * bit 2: VSPDLYS: Vertical Synchronization Pulse Start
+> +   * bit 3: VSPDLYE: Vertical Synchronization Pulse End
+> +   * bit 4: DISPPOL: Display Signal Polarity
+> +   * bit 7: DISPDLY: LCD Controller Display Power Signal Synchronization
+> +   * bit 12: VSPSU: LCD Controller Vertical synchronization Pulse Setup Configuration
+> +   * bit 13: VSPHO: LCD Controller Vertical synchronization Pulse Hold Configuration
+> +   * bit 16-20: GUARDTIME: LCD DISPLAY Guard Time
+
+Similarly for most of these: HSPOL and VSPOL seem to correspond to the
+DRM_MODE_FLAG_{{P,N},{H,V}}SYNC flags in struct drm_display_mode. And
+VSPDLYS as well as VSPDLYE sound like they may be vsync_start and
+vsync_end of the same structure.
+
+As for the others, maybe if you could explain what exactly they are we
+may be able to find a better fit.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/b4cf2773/attachment.sig>
