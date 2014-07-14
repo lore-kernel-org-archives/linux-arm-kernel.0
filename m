@@ -1,104 +1,83 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 14 Jul 2014 13:35:58 +0200
-Subject: [PATCH v8 02/13] mfd: max77802: Add DT binding documentation
+Date: Mon, 14 Jul 2014 13:36:00 +0200
+Subject: [PATCH v8 04/13] clk: max77686: Add DT include for MAX77686 PMIC clock
 In-Reply-To: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1405337769-3741-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1405337769-3741-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1405337769-3741-5-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Device Tree binding documentation for Maxim 77802 PMIC.
+This patch adds a dt-binding include for Maxim 77686
+PMIC clock IDs that can be used by both the max77686
+clock driver and Device Tree source files.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Mike Turquette <mturquette@linaro.org>
 ---
-
-Changes since v7:
- - Remove information about DVS since that will be added as a follow up.
 
 Changes since v6: None
 
 Changes since v5:
- - Use max77686,* properties instead of max77802,* since the support is
-   now in the max77686 driver and that IP defined the properties first.
- - Fix issues in DT binding documentation. Suggested by Andreas Farber.
+ - Improve wording in commit message. Suggested by Andreas Farber.
 
 Changes since v4: None
 
-Changes since v3: None
-
-Changes since v2:
- - Explain better the Dynamic Voltage Scaling (DVS) support in some Buck
-   regulators and the max77802,pmic-buck-{dvs,selb}-gpios properties.
-   Suggested by Mark Brown.
+Changes since v3:
+ - Keep the note that this patch needs another change due wakeup
+   ordering problems.
 ---
- Documentation/devicetree/bindings/mfd/max77802.txt | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+ drivers/clk/clk-max77686.c                 |  7 +------
+ include/dt-bindings/clock/maxim,max77686.h | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+), 6 deletions(-)
+ create mode 100644 include/dt-bindings/clock/maxim,max77686.h
 
-diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+index 3d7e8dd..185b611 100644
+--- a/drivers/clk/clk-max77686.c
++++ b/drivers/clk/clk-max77686.c
+@@ -30,12 +30,7 @@
+ #include <linux/mutex.h>
+ #include <linux/clkdev.h>
+ 
+-enum {
+-	MAX77686_CLK_AP = 0,
+-	MAX77686_CLK_CP,
+-	MAX77686_CLK_PMIC,
+-	MAX77686_CLKS_NUM,
+-};
++#include <dt-bindings/clock/maxim,max77686.h>
+ 
+ struct max77686_clk {
+ 	struct max77686_dev *iodev;
+diff --git a/include/dt-bindings/clock/maxim,max77686.h b/include/dt-bindings/clock/maxim,max77686.h
 new file mode 100644
-index 0000000..9f72b8f
+index 0000000..7b28b09
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/max77802.txt
-@@ -0,0 +1,59 @@
-+Maxim MAX77802 multi-function device
++++ b/include/dt-bindings/clock/maxim,max77686.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2014 Google, Inc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Device Tree binding constants clocks for the Maxim 77686 PMIC.
++ */
 +
-+MAX77802 is a Multifunction device with PMIC, RTC and Charger on chip. It is
-+interfaced to host controller using i2c interface. PMIC, Charger and RTC
-+submodules are addressed using same i2c slave address.
++#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
++#define _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
 +
-+This document describes the binding for mfd device and PMIC submodule.
++/* Fixed rate clocks. */
 +
-+Binding for the built-in 32k clock generator block is defined separately
-+in bindings/clk/maxim,max77802.txt file.
++#define MAX77686_CLK_AP		0
++#define MAX77686_CLK_CP		1
++#define MAX77686_CLK_PMIC	2
 +
-+Required properties:
-+- compatible : Must be "maxim,max77802";
-+- reg : Specifies the i2c slave address of PMIC block.
-+- interrupts : This i2c device has an IRQ line connected to the main SoC.
-+- interrupt-parent : The parent interrupt controller.
++/* Total number of clocks. */
++#define MAX77686_CLKS_NUM		(MAX77686_CLK_PMIC + 1)
 +
-+Optional node:
-+- regulators : The regulators of max77802 have to be instantiated
-+  under subnode named "regulators" using the following format.
-+
-+	regulator-name {
-+		standard regulator constraints....
-+	};
-+	refer Documentation/devicetree/bindings/regulator/regulator.txt
-+
-+  The regulator node name should be initialized with a string
-+to get matched with their hardware counterparts as follow. The valid names are:
-+
-+	-LDOn 	:	for LDOs, where n can lie in range 1 to 35.
-+			example: LDO1, LDO2, LDO35.
-+	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 10.
-+			example: BUCK1, BUCK5, BUCK10.
-+Example:
-+
-+	max77802 at 09 {
-+		compatible = "maxim,max77802";
-+		interrupt-parent = <&wakeup_eint>;
-+		interrupts = <26 0>;
-+		reg = <0x09>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		regulators {
-+			ldo11_reg: LDO11 {
-+				regulator-name = "vdd_ldo11";
-+				regulator-min-microvolt = <1900000>;
-+				regulator-max-microvolt = <1900000>;
-+				regulator-always-on;
-+			};
-+
-+			buck1_reg: BUCK1 {
-+				regulator-name = "vdd_mif";
-+				regulator-min-microvolt = <950000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+	};
++#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H */
 -- 
 2.0.0.rc2
