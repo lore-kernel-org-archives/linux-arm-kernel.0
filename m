@@ -1,39 +1,98 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 14 Jul 2014 14:36:22 +0200
-Subject: socfpga/sockit ethernet problems
-In-Reply-To: <737g3ogvwq.fsf@unicorn.hi.pengutronix.de>
-References: <20140507104518.GB18139@amd.pavel.ucw.cz>
- <20140703093548.GA9937@amd.pavel.ucw.cz>
- <1404764751.14294.3.camel@linux-builds1>
- <20140707214340.GA29061@amd.pavel.ucw.cz>
- <737g3ogvwq.fsf@unicorn.hi.pengutronix.de>
-Message-ID: <20140714123622.GG14300@amd.pavel.ucw.cz>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 14 Jul 2014 14:40:42 +0200
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <4755712.cJmZ5fnaQH@wuerfel>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <20140712194903.GB6800@sirena.org.uk> <53C28B74.6010401@metafoo.de>
+ <4755712.cJmZ5fnaQH@wuerfel>
+Message-ID: <53C3CFCA.9050800@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+[...]
+> I've given it a try now. Can you confirm that this is a valid transformation?
+>
+> If it's ok, I'll fold it into the original patch and re-send.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+>   ./arch/arm/mach-s3c64xx/mach-smartq.c           |   15 ++++++++-------
+>   ./sound/soc/samsung/smartq_wm8987.c             |   19 +++++++------------
+>   ./include/linux/platform_data/asoc-s3c-smartq.h |   10 ----------
+>   3 files changed, 15 insertions(+), 29 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+> index 4c111f60dbf2..dce449c0e855 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smartq.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+> @@ -20,7 +20,6 @@
+>   #include <linux/spi/spi_gpio.h>
+>   #include <linux/usb/gpio_vbus.h>
+>   #include <linux/platform_data/s3c-hsotg.h>
+> -#include <linux/platform_data/asoc-s3c-smartq.h>
 
-> >> All of this stuff is not needed as it's already taken care of by the
-> >> Micrel phy driver. The clock skew values are now represented in the DTS.
-> >> Please look at:
-> >> 
-> >> Documentation/devicetree/bindings/net/micrel-ksz90x1.txt
-> >
-> > Aah, thanks for the pointer. 
-> >
-> > At least socfpga_cyclone5_socrates.dts is in the mainline, but it does
-> > not have any skew configuration. That may explain why the board seems
-> > to have problems with ethernet... (or not).
-> 
-> The socrates does not have these values, because it does not have a
-> Micrel PHY...
+#include <linux/gpio/driver.h>
 
-Hmm, that is not it, then :-(. Is there any other setup that needs to
-be done? Because from the experience with the socrates boards, they
-are quite picky about cabling used.
+>
+>   #include <asm/mach-types.h>
+>   #include <asm/mach/map.h>
+> @@ -380,9 +379,12 @@ void __init smartq_map_io(void)
+>   	smartq_lcd_mode_set();
+>   }
+>
+> -static const __initconst struct smartq_audio_pdata smartq_audio_pdata = {
+> -	.gpio_jack = S3C64XX_GPL(12),
+> -	.gpio_amp = S3C64XX_GPK(12),
+> +static struct gpiod_lookup_table smartq_audio_gpios = {
+> +	.dev_id = "smartq-audio",
+> +	.table = {
+> +		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
+> +		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
 
-Thanks and best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+There is no such thing as GPIO_ACTIVE_HIGH, just 0 for flags.
+
+
+This needs a { } terminating entry.
+
+> +	},
+>   };
+>
+>   void __init smartq_machine_init(void)
+> @@ -404,7 +406,6 @@ void __init smartq_machine_init(void)
+>
+>   	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
+>
+> -	platform_device_register_data(NULL, "smartq-audio", -1,
+> -				      &smartq_audio_pdata,
+> -				      sizeof (smartq_audio_pdata));
+> +	platform_device_register_simple("smartq-audio", -1, NULL, 0);
+> +	gpiod_add_lookup_table(&smartq_audio_gpios);
+
+To avoid a extra round of -EPROBE_DEFER the lookup table should be 
+registered before the device.
+
+>   }
+[...]
+> diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+> index 8c4a0a285ce7..8da7c67903c6 100644
+> --- a/sound/soc/samsung/smartq_wm8987.c
+> +++ b/sound/soc/samsung/smartq_wm8987.c
+> @@ -19,8 +19,6 @@
+>   #include <sound/soc.h>
+>   #include <sound/jack.h>
+
+#include <linux/gpio/consumer.h>
+
+>
+[..]
+> -
+> -	smartq_jack_gpios[0].gpio = pdata->gpio_jack;
+
+smartq_jack_gpios[0].gpiod_dev = &pdev->dev;
+
+> +	platform_set_drvdata(pdev, gpio);
+
+This unfortunately wont work. snd_soc_register_card() will overwrite the 
+devices drvdata. Use snd_soc_card_set_drvdata(card, gpio) and in the speaker 
+event handler snd_soc_card_get_drvdata(w->dapm->card);
