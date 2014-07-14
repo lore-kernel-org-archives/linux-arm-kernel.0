@@ -1,153 +1,122 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Mon, 14 Jul 2014 15:49:24 +0530
-Subject: [RFC/PATCH 06/12] clk: qcom: Add MSM8960's HFPLLs
-In-Reply-To: <1403654783-7176-7-git-send-email-sboyd@codeaurora.org>
-References: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
- <1403654783-7176-7-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAMf-jSnyKmH4ROaEQfMG2BXDiMeSAe9A4kMPBzxs61hLbiYGsw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 14 Jul 2014 12:20:42 +0200
+Subject: [GIT PULL v2 FOR v3.17] Renesas CMT,
+ MTU2 and TMU timers DT support
+In-Reply-To: <1871523.mnvyZQ6N2g@avalon>
+References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1929656.0uZaK89oG1@avalon> <53C29AC1.30606@linaro.org>
+ <1871523.mnvyZQ6N2g@avalon>
+Message-ID: <53C3AEFA.7090406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-
-
-On Wed, Jun 25, 2014 at 5:36 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Describe the HFPLLs present on MSM8960 devices.
+On 07/14/2014 11:06 AM, Laurent Pinchart wrote:
+> Hi Daniel,
 >
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/qcom/gcc-msm8960.c | 82 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 82 insertions(+)
+> On Sunday 13 July 2014 16:42:09 Daniel Lezcano wrote:
+>> On 07/13/2014 03:00 PM, Laurent Pinchart wrote:
+>>> On Sunday 13 July 2014 11:55:01 Simon Horman wrote:
+>>>> [Cc Olof Johansson, ARM SoC Team]
+>>>>
+>>>> On Wed, Jul 09, 2014 at 11:59:16AM +0200, Laurent Pinchart wrote:
+>>>>> On Friday 04 July 2014 15:53:32 Laurent Pinchart wrote:
+>>>>>> Hi Daniel,
+>>>>>>
+>>>>>> Could you please pull the following changes and drop the first version
+>>>>>> of this pull request ? I've fixed one last typo noticed by Simon in
+>>>>>> patch 09/19.
+>>>>>>
+>>>>>> As last time I have board and SoC changes that depend on the driver
+>>>>>> changes and that will need to go through Simon's tree. Could you thus
+>>>>>> please provide a stable branch based on one of the v3.16-rc tags ?
+>>>>>
+>>>>> Given that I'd like to get the arch/ part of the change set in v3.17,
+>>>>> could I ask you to fast track this pull request if possible ?
+>>>>
+>>>> Hi Laurent, Hi Daniel,
+>>>>
+>>>> I am wondering what the status of this pull request is.  It would be nice
+>>>> to get the arch/ changes into v3.17 but we are getting closer to
+>>>> v3.16-rc6 and I need to have things queued up before then.
+>>>>
+>>>> I have also CCed Olof and the ARM SoC team (via arm at kernel.org) as
+>>>> if Daniel does provide a stable branch that includes this pull request
+>>>> and I use it as the basis for a branch with the arch changes then the
+>>>> ARM SoC people would like to know about it before I send a pull request
+>>>> for the arch/ changes.
+>>>>
+>>>  From my point of view everything is ready for v3.17. Daniel, if you
+>>> haven't been abducted by aliens, could you please process the pull request
+>>> ? If you have, let us know what we can do to help negotiate your release.
+>>
+>> Hi Laurent,
+>>
+>> sorry for no giving some news. I am in vacation for these two weeks.
+>>
+>> I will take care of the PR this evening or tomorrow evening and keep you
+>> in touch rapidly.
 >
-> diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-> index f4ffd91901f8..d04fc99541e4 100644
-> --- a/drivers/clk/qcom/gcc-msm8960.c
-> +++ b/drivers/clk/qcom/gcc-msm8960.c
-> @@ -30,6 +30,7 @@
->  #include "clk-pll.h"
->  #include "clk-rcg.h"
->  #include "clk-branch.h"
-> +#include "clk-hfpll.h"
->  #include "reset.h"
+> Thank you, and sorry for disturbing you during your holidays. Next time if you
+> setup an automatic e-mail reply I'll be more patient and won't worry about
+> aliens :-)
+
+:)
+
+right, I should have. I didn't think about it.
+
+Thanks
+
+   -- Daniel
+
+>>>>>> The following changes since commit
+>>>
+>>> 4c834452aad01531db949414f94f817a86348d59:
+>>>>>>     Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+>>>>>>
+>>>>>> are available in the git repository at:
+>>>>>>     git://linuxtv.org/pinchartl/fbdev.git timers/upstream/drivers
+>>>>>>
+>>>>>> for you to fetch changes up to
+> cca8d0596c4c7acb371ea1bc5eee9b404b30516a:
+>>>>>>     clocksource: sh_mtu2: Add DT support (2014-07-04 15:50:29 +0200)
+>>>>>>
+>>>>>> ----------------------------------------------------------------
+>>>>>>
+>>>>>> Laurent Pinchart (10):
+>>>>>>         clocksource: sh_cmt: Drop support for legacy platform data
+>>>>>>         clocksource: sh_cmt: Replace global spinlock with a per-device
+>>>>>> spinlock
+>>>>>>         clocksource: sh_tmu: Drop support for legacy platform data
+>>>>>>         clocksource: sh_tmu: Replace global spinlock with a per-device
+>>>>>> spinlock
+>>>>>>         clocksource: sh_mtu2: Drop support for legacy platform data
+>>>>>>         clocksource: sh_mtu2: Replace global spinlock with a per-device
+>>>>>> spinlock
+>>>>>>         clocksource: shmobile: Remove unused sh_timer_config members
+>>>>>>         clocksource: sh_cmt: Add DT support
+>>>>>>         clocksource: sh_tmu: Add DT support
+>>>>>>         clocksource: sh_mtu2: Add DT support
+>>>>>>
+>>>>>> Documentation/devicetree/bindings/timer/renesas,cmt.txt |  47 +++++
+>>>>>> .../devicetree/bindings/timer/renesas,mtu2.txt          |  39 ++++
+>>>>>> Documentation/devicetree/bindings/timer/renesas,tmu.txt |  39 ++++
+>>>>>> drivers/clocksource/sh_cmt.c                            | 233 ++++---
+>>>>>> drivers/clocksource/sh_mtu2.c                           | 146 +++----
+>>>>>> drivers/clocksource/sh_tmu.c                            | 127 ++++---
+>>>>>> include/linux/sh_timer.h                                |   5 -
+>>>>>> 7 files changed, 309 insertions(+), 327 deletions(-)
+>>>>>> create mode 100644
+>>>>>> Documentation/devicetree/bindings/timer/renesas,cmt.txt
+>>>>>> create mode 100644
+>>>>>> Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+>>>>>> create mode 100644
+>>>>>> Documentation/devicetree/bindings/timer/renesas,tmu.txt
 >
->  static struct clk_pll pll3 = {
-> @@ -75,6 +76,84 @@ static struct clk_regmap pll8_vote = {
->         },
->  };
->
-> +static struct hfpll_data hfpll0_data = {
-> +       .mode_reg = 0x3200,
-> +       .l_reg = 0x3208,
-> +       .m_reg = 0x320c,
-> +       .n_reg = 0x3210,
-> +       .config_reg = 0x3204,
-> +       .status_reg = 0x321c,
-> +        .config_val = 0x7845c665,
-> +        .droop_reg = 0x3214,
-
-Needs tabs at the beginning as indent. Checkpatch fails at above three lines.
-
-> +        .droop_val = 0x0108c000,
-> +       .min_rate = 600000000UL,
-> +       .max_rate = 1800000000UL,
-> +};
-> +
-> +static struct clk_hfpll hfpll0 = {
-> +       .d = &hfpll0_data,
-> +       .clkr.hw.init = &(struct clk_init_data){
-> +               .parent_names = (const char *[]){ "pxo" },
-> +               .num_parents = 1,
-> +               .name = "hfpll0",
-> +               .ops = &clk_ops_hfpll,
-> +               .flags = CLK_IGNORE_UNUSED,
-> +       },
-> +       .lock = __SPIN_LOCK_UNLOCKED(hfpll0.lock),
-> +};
-> +
-> +static struct hfpll_data hfpll1_data = {
-> +       .mode_reg = 0x3300,
-> +       .l_reg = 0x3308,
-> +       .m_reg = 0x330c,
-> +       .n_reg = 0x3310,
-> +       .config_reg = 0x3304,
-> +       .status_reg = 0x331c,
-> +        .config_val = 0x7845c665,
-> +        .droop_reg = 0x3314,
-> +        .droop_val = 0x0108c000,
-
-Needs tabs and the beginning as indent. Checkpatch fails at above three lines.
-
-> +       .min_rate = 600000000UL,
-> +       .max_rate = 1800000000UL,
-> +};
-> +
-> +static struct clk_hfpll hfpll1 = {
-> +       .d = &hfpll1_data,
-> +       .clkr.hw.init = &(struct clk_init_data){
-> +               .parent_names = (const char *[]){ "pxo" },
-> +               .num_parents = 1,
-> +               .name = "hfpll1",
-> +               .ops = &clk_ops_hfpll,
-> +               .flags = CLK_IGNORE_UNUSED,
-> +       },
-> +       .lock = __SPIN_LOCK_UNLOCKED(hfpll1.lock),
-> +};
-> +
-> +static struct hfpll_data hfpll_l2_data = {
-> +       .mode_reg = 0x3400,
-> +       .l_reg = 0x3408,
-> +       .m_reg = 0x340c,
-> +       .n_reg = 0x3410,
-> +       .config_reg = 0x3404,
-> +       .status_reg = 0x341c,
-> +        .config_val = 0x7845c665,
-> +        .droop_reg = 0x3414,
-
-Same at above three lines.
-
-> +        .droop_val = 0x0108c000,
-> +       .min_rate = 600000000UL,
-> +       .max_rate = 1800000000UL,
-> +};
-> +
-> +static struct clk_hfpll hfpll_l2 = {
-> +       .d = &hfpll_l2_data,
-> +       .clkr.hw.init = &(struct clk_init_data){
-> +               .parent_names = (const char *[]){ "pxo" },
-> +               .num_parents = 1,
-> +               .name = "hfpll_l2",
-> +               .ops = &clk_ops_hfpll,
-> +               .flags = CLK_IGNORE_UNUSED,
-> +       },
-> +       .lock = __SPIN_LOCK_UNLOCKED(hfpll_l2.lock),
-> +};
-> +
->  static struct clk_pll pll14 = {
->         .l_reg = 0x31c4,
->         .m_reg = 0x31c8,
-> @@ -2763,6 +2842,9 @@ static struct clk_regmap *gcc_msm8960_clks[] = {
->         [PMIC_ARB1_H_CLK] = &pmic_arb1_h_clk.clkr,
->         [PMIC_SSBI2_CLK] = &pmic_ssbi2_clk.clkr,
->         [RPM_MSG_RAM_H_CLK] = &rpm_msg_ram_h_clk.clkr,
-> +       [PLL9] = &hfpll0.clkr,
-> +       [PLL10] = &hfpll1.clkr,
-> +       [PLL12] = &hfpll_l2.clkr,
->  };
->
->  static const struct qcom_reset_map gcc_msm8960_resets[] = {
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
 
 
 -- 
-Thanks and Regards
-Pramod
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
