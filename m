@@ -1,79 +1,49 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 14 Jul 2014 15:55:29 +0200
-Subject: [PATCH v2 2/4] ARM: imx: clk-vf610: fix FlexCAN clock gating
-In-Reply-To: <20140714133926.GH2197@dragon>
-References: <cover.1405322992.git.stefan@agner.ch>
- <94282392d8355ac25bb998b89032c1c980d5ccce.1405322992.git.stefan@agner.ch>
- <20140714133926.GH2197@dragon>
-Message-ID: <5a57efd52b0092ad61ff6a2b5bf68ba7@agner.ch>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Jul 2014 15:57:12 +0200
+Subject: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <20140714133644.GE1779@arm.com>
+References: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140714133644.GE1779@arm.com>
+Message-ID: <CAKv+Gu_2CYU+Th4xZ3EfjCFqQzBfJ88Hrtx1LwUbG79+1=cqJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-07-14 15:39, schrieb Shawn Guo:
-> Copy Jingchang ...
-> 
-> On Mon, Jul 14, 2014 at 09:48:29AM +0200, Stefan Agner wrote:
->> Extend the clock control for FlexCAN with the second gate which
->> enable the clocks in the Clock Divider (CCM_CSCDR2) register too.
+On 14 July 2014 15:36, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jul 11, 2014 at 12:46:50PM +0100, Ard Biesheuvel wrote:
+>> From: Yi Li <yi.li@linaro.org>
 >>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> SMbios is important for server hardware vendors. It implements a spec for
+>> providing descriptive information about the platform. Things like serial
+>> numbers, physical layout of the ports, build configuration data, and the like.
+>>
+>> This has been tested by dmidecode and lshw tools.
+>>
+>> Signed-off-by: Yi Li <yi.li@linaro.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >> ---
->>  arch/arm/mach-imx/clk-vf610.c | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
->> index 22dc3ee..b12b888 100644
->> --- a/arch/arm/mach-imx/clk-vf610.c
->> +++ b/arch/arm/mach-imx/clk-vf610.c
->> @@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->>
->>  	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
->>
->> -	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
->> -	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
->> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
->> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
-> 
-> I do not quite understand what "flexcan0_en" clock is and the
-> relationship between it and clock "flexcan0".  I do not think it's a
-> parent-child clock relationship.  Jingchang, do you have more info on
-> this?
-> 
-> Also when you add a new clock, you should have a new clock ID, something
-> like VF610_CLK_FLEXCAN0_EN.
+>> Changes since previous version:
+>> - changed double inclusion guard to arm64 flavour
+>> - use kzalloc(GFP_KERNEL) as GFP_ATOMIC is not needed
+>> - do a sanity check on the size of the requested mapping
+>
+> Technically, this patch looks fine to me:
+>
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
+>
 
-There are two enable (gates) bits to enable the FlexCAN clocks: the
-first is in the divider register, the second in the clock gate register.
-For most clocks there is a divider in between, then it looks like this:
+Thanks.
 
-clk[VF610_CLK_ESDHC0_SEL] = imx_clk_mux("esdhc0_sel", CCM_CSCMR1, 16, 2,
-esdhc_sels, 4);
-clk[VF610_CLK_ESDHC0_EN] = imx_clk_gate("esdhc0_en", "esdhc0_sel",
-CCM_CSCDR2, 28);
-clk[VF610_CLK_ESDHC0_DIV] = imx_clk_divider("esdhc0_div", "esdhc0_en",
-CCM_CSCDR2, 16, 4);
-clk[VF610_CLK_ESDHC0] = imx_clk_gate2("eshc0", "esdhc0_div", CCM_CCGR7,
-CCM_CCGRx_CGn(1));
+> It would be good if somebody with a relevant platform could confirm that
+> it works/is useful though.
+>
 
-However, for FlexCAN no clock selection and no divider is available,
-hence its just a chain of an enable and gate register...
+The usefulness has been debated here a couple of times before:
+Grant's take on it is here
+http://marc.info/?l=linux-arm-kernel&m=140206407411522&w=2
 
-But yes, there should be two clock entries for this (I just asking
-myself how this code actually could work, afaik the boot loader don't
-touches these clocks).
+As to whether it works: I have asked Yi to retest this version of the
+patch with lshw and dmidecode
+@Yi: could you please share your findings here?
 
---
-Stefan
-
-
-> 
-> Shawn
-> 
->> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
->> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
->>
->>  	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
->>  	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
->> --
->> 2.0.1
->>
+-- 
+Ard.
