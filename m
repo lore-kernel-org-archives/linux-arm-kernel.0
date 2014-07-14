@@ -1,42 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Jul 2014 15:22:32 +0100
-Subject: [PATCH v4 7/7] arm/arm64: Unexport restart handlers
-In-Reply-To: <1405265431-4561-8-git-send-email-linux@roeck-us.net>
-References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
- <1405265431-4561-8-git-send-email-linux@roeck-us.net>
-Message-ID: <20140714142232.GB1112@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 14 Jul 2014 15:27:03 +0100
+Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
+In-Reply-To: <1405347277.28592.25.camel@rzhang1-toshiba>
+References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
+ <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
+ <1404911964.28592.4.camel@rzhang1-toshiba>
+ <20140709134646.GB479@lee--X1> <20140714130824.GA3993@lee--X1>
+ <1405347277.28592.25.camel@rzhang1-toshiba>
+Message-ID: <20140714142703.GC3993@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 04:30:31PM +0100, Guenter Roeck wrote:
-> Implementing a restart handler in a module don't make sense
-> as there would be no guarantee that the module is loaded when
-> a restart is needed. Unexport arm_pm_restart to ensure that
-> no one gets the idea to do it anyway.
-> 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
-> v4: No change
-> v3: No change
-> v2: No change
-> 
->  arch/arm/kernel/process.c   | 1 -
->  arch/arm64/kernel/process.c | 1 -
->  2 files changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 5d191e3..25c7f00 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -125,7 +125,6 @@ void (*pm_power_off)(void);
->  EXPORT_SYMBOL(pm_power_off);
->  
->  void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
-> -EXPORT_SYMBOL_GPL(arm_pm_restart);
+On Mon, 14 Jul 2014, Zhang Rui wrote:
 
-Unless I miss something, how is this different from registering a
-restart notifier from a module (blocking_notifier_chain_register is
-exported)?
+> On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
+> > On Wed, 09 Jul 2014, Lee Jones wrote:
+> > > On Wed, 09 Jul 2014, Zhang Rui wrote:
+> > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
+> > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
+> > > > > 
+> > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
+> > > > > > > is incorrect in the MAINTAINERS file.
+> > > > > > > 
+> > > > > > > This patchset adds full support for 2 types of Thermal Controllers
+> > > > > > > produced by STMicroelectronics.  One is a more traditional memory
+> > > > > > > mapped variant, the other is controlled solely by system configuration
+> > > > > > > registers.
+> > > > > > 
+> > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
+> > > > > 
+> > > > > Anything at all?  It's been well over a month now.
+> > > > > 
+> > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
+> > > > but as we didn't get any feedback from Eduardo, I will take them.
+> > > 
+> > > Thanks Rui.
+> > > 
+> > > So have you taken all 4 "thermal: sti: *" patches?
+> > 
+> > Have you taken these yet?
+> Not yet.
+> will do tomorrow.
+
+Perfect, thanks for the update.
+
+> >   I notice that these aren't in -next yet.
+> > 
+> > > The ARM ones should go through Maxime.
+> > 
+> 
+> 
 
 -- 
-Catalin
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
