@@ -1,46 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 14 Jul 2014 11:01:47 +0530
-Subject: [PATCH V9 2/7] phy: Add drivers for PCIe and SATA phy on SPEAr13xx
-In-Reply-To: <53BE926A.2070005@ti.com>
-References: <cover.1404976058.git.viresh.kumar@linaro.org>
- <d1ef8db8704d09ba4f276c954dc22b555998f957.1404976058.git.viresh.kumar@linaro.org>
- <53BE926A.2070005@ti.com>
-Message-ID: <CAKohpo=aoWgQseciOiZcYqupKZyz5eMFNA4A+VRSHoCbQuqeGw@mail.gmail.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Mon, 14 Jul 2014 05:41:24 +0000
+Subject: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable()
+In-Reply-To: <1405301778.29716.72.camel@mars>
+References: <1405301778.29716.72.camel@mars>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EB02569@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2014 18:47, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-
->> diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
->> new file mode 100644
->> index 0000000..b9b281a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+>From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
 >
-> We generally create a single document for a SoC vendor. So just use st-phy.txt.
+>This patch adds bch8 ecc software fallback which is mostly used by
+>omap3s because they lack hardware elm support.
+>
+>Fixes: 0611c41934ab35ce84dea34ab291897ad3cbc7be (ARM: OMAP2+: gpmc:
+>update gpmc_hwecc_bch_capable() for new platforms and ECC schemes)
+>Cc: <stable@vger.kernel.org> # 3.15.x+
+>Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+>---
+> arch/arm/mach-omap2/gpmc-nand.c |   18 ++++++++++--------
+> 1 file changed, 10 insertions(+), 8 deletions(-)
+>
+>diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+>index 17cd393..93914d2 100644
+>--- a/arch/arm/mach-omap2/gpmc-nand.c
+>+++ b/arch/arm/mach-omap2/gpmc-nand.c
+>@@ -50,6 +50,16 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+> 		 soc_is_omap54xx() || soc_is_dra7xx())
+> 		return 1;
+>
+>+	if (ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW ||
+>+		 ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW) {
+>+		if (cpu_is_omap24xx())
+>+			return 0;
+>+		else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
+>+			return 0;
+>+		else
+>+			return 1;
+>+	}
+>+
+> 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
+> 	 * which require H/W based ECC error detection */
+> 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
+>@@ -57,14 +67,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+> 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
+> 		return 0;
+>
+>-	/*
+>-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
+>-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
+>-	 */
+>-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
+>-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
+>-		return 0;
+>-
+> 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
+> 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
+> 		return 1;
+>--
+>1.7.10.4
+>
+Thanks much for this fix.
+Reviewed-by: Pekon Gupta <pekon@ti.com>
 
-st-phy may not be appropriate as this is specifically for SPEAr. New
-binding doc looks like this:
 
-diff --git a/Documentation/devicetree/bindings/phy/st-spear-miphy.txt
-b/Documentation/devicetree/bindings/phy/st-spear-miphy.txt
-new file mode 100644
-index 0000000..2a6bfdc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/st-spear-miphy.txt
-@@ -0,0 +1,15 @@
-+ST SPEAr miphy DT details
-+=========================
-+
-+ST Microelectronics SPEAr miphy is a phy controller supporting PCIe and SATA.
-+
-+Required properties:
-+- compatible : should be "st,spear1310-miphy" or "st,spear1340-miphy"
-+- reg : offset and length of the PHY register set.
-+- misc: phandle for the syscon node to access misc registers
-+- #phy-cells : from the generic PHY bindings, must be 1.
-+       - cell[1]: 0 if phy used for SATA, 1 for PCIe.
-+
-+Optional properties:
-+- phy-id: Instance id of the phy. Only required when there are multiple phys
-+  present on a implementation.
+with regards, pekon
