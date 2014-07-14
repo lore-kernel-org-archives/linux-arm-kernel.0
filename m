@@ -1,30 +1,102 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Jul 2014 14:04:01 +0800
-Subject: [PATCH] can: flexcan: add vf61x support for flexcan
-In-Reply-To: <dac76ccd134f41b86f00352d10cfae4b@agner.ch>
-References: <1405075933-22317-1-git-send-email-stefan@agner.ch>
- <53BFD401.8030101@pengutronix.de> <dac76ccd134f41b86f00352d10cfae4b@agner.ch>
-Message-ID: <20140714060344.GB2197@dragon>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Mon, 14 Jul 2014 11:33:34 +0530
+Subject: [PATCH v4 0/6] Add Keystone PCIe controller driver
+In-Reply-To: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
+References: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20140714060334.GB2930@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 03:58:37PM +0200, Stefan Agner wrote:
-> >> @@ -362,7 +374,7 @@
-> >>
-> >>  			esdhc1: esdhc at 400b2000 {
-> >>  				compatible = "fsl,imx53-esdhc";
-> >> -				reg = <0x400b2000 0x4000>;
-> >> +				reg = <0x400b2000 0x1000>;
-> > 
-> > What's that doing here? :)
-> 
-> That's an error I just stumbled upon.
+Oh.. I see my reply from gmail is not readable at all. (I forgot to
+switch to plain text :( ) Please ignore last mail I am replying again
+here.
 
-I do not see why it's an error.  From Table 2-1. System Memory Map in
-i.MX53 RM, the size of ESDHC1 is 16K.
+On Sat, Jul 12, 2014 at 04:36:29AM +0800, Murali Karicheri wrote:
 
-Shawn
+[...]
 
-> I know it's not related but it's
-> such a small change... Do I need to make a separate patch for that or
-> can I include it in the FlexCAN dt commit?
+> Murali Karicheri (6):
+>   PCI: designware: add rd[wr]_other_conf API
+>   PCI: designware: refactor MSI code to work with v3.65 dw hardware
+
+For  above two you can add my reviewed-by:
+
+>   PCI: designware: refactor host init code to re-use on keystone PCI
+>   PCI: designware: enhance dw core driver to support keystone PCI host
+
+In stead of using version number and then changing few functions from
+static to global , I would have used same philosophy of adding callbacks
+wherever needed. May be maintainers can give their view, instead of patch 
+3 and 4 I would have gone with something like this, where kc_pcie can be 
+passed through pp->plat_data.
+ 
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 905941c..b216192 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -490,16 +490,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+        }
+ 
+        if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-               pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+-                                       MAX_MSI_IRQS, &msi_domain_ops,
+-                                       &dw_pcie_msi_chip);
+-               if (!pp->irq_domain) {
+-                       dev_err(pp->dev, "irq domain init failed\n");
+-                       return -ENXIO;
+-               }
++               if (!pp->ops->msi_init) {
++                       pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
++                                               MAX_MSI_IRQS, &msi_domain_ops,
++                                               &dw_pcie_msi_chip);
++                       if (!pp->irq_domain) {
++                               dev_err(pp->dev, "irq domain init failed\n");
++                               return -ENXIO;
++                       }
+ 
+-               for (i = 0; i < MAX_MSI_IRQS; i++)
+-                       irq_create_mapping(pp->irq_domain, i);
++                       for (i = 0; i < MAX_MSI_IRQS; i++)
++                               irq_create_mapping(pp->irq_domain, i);
++               } else {
++                       pp->ops->msi_init(pp, &msi_domain_ops,
++                                               &dw_pcie_msi_chip);
++               }
+        }
+ 
+        if (pp->ops->host_init)
+@@ -759,6 +764,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+                BUG();
+        }
+ 
++       if (bus && pp->ops->scan_bus)
++               bus = pp->ops->scan_bus(pp);
++
+        return bus;
+ }
+ 
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index 387f69e..39ce496 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -52,6 +52,7 @@ struct pcie_port {
+        struct irq_domain       *irq_domain;
+        unsigned long           msi_data;
+        DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
++       void                    *plat_data;
+ };
+ 
+ struct pcie_host_ops {
+@@ -70,6 +71,9 @@ struct pcie_host_ops {
+        void (*msi_set_irq)(struct pcie_port *pp, int irq);
+        void (*msi_clear_irq)(struct pcie_port *pp, int irq);
+        u32 (*get_msi_data)(struct pcie_port *pp);
++       struct pci_bus *(*scan_bus)(struct pcie_port *pp);
++       void (*msi_init) (struct pcie_port *pp, struct irq_domain_ops *ops,
++                       struct msi_chip *chip);
+ };
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+
+
+~Pratyush
