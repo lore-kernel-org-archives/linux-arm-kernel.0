@@ -1,53 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Jul 2014 20:15:48 +0200
-Subject: [PATCH v8 9/9] pci: Remap I/O bus resources into CPU space with
- pci_remap_iospace()
-In-Reply-To: <20140714165443.GI1112@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-10-git-send-email-Liviu.Dudau@arm.com>
- <20140714165443.GI1112@arm.com>
-Message-ID: <7345495.UDsgOtKzyQ@wuerfel>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 14 Jul 2014 11:23:26 -0700
+Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
+ regs-clocks
+In-Reply-To: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
+References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <53C4201E.3020708@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 July 2014 17:54:43 Catalin Marinas wrote:
-> On Tue, Jul 01, 2014 at 07:43:34PM +0100, Liviu Dudau wrote:
-> > Introduce a default implementation for remapping PCI bus I/O resources
-> > onto the CPU address space. Architectures with special needs may
-> > provide their own version, but most should be able to use this one.
-> [...]
-> > +/**
-> > + *   pci_remap_iospace - Remap the memory mapped I/O space
-> > + *   @res: Resource describing the I/O space
-> > + *   @phys_addr: physical address where the range will be mapped.
-> > + *
-> > + *   Remap the memory mapped I/O space described by the @res
-> > + *   into the CPU physical address space. Only architectures
-> > + *   that have memory mapped IO defined (and hence PCI_IOBASE)
-> > + *   should call this function.
-> > + */
-> > +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> > +{
-> > +     int err = -ENODEV;
-> > +
-> > +#ifdef PCI_IOBASE
-> > +     if (!(res->flags & IORESOURCE_IO))
-> > +             return -EINVAL;
-> > +
-> > +     if (res->end > IO_SPACE_LIMIT)
-> > +             return -EINVAL;
-> > +
-> > +     err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
-> > +                             res->end + 1 + (unsigned long)PCI_IOBASE,
-> > +                             phys_addr, __pgprot(PROT_DEVICE_nGnRE));
+On 07/14/14 11:14, Nicholas Krause wrote:
+> This patch addresses the fix me message in this file that states to
+> remove all definitions not related to reg-clocks in this header
+> file.
 > 
-> Except that PROT_DEVICE_nGnRE is arm64 only. I think that's a function
-> that should remain arch specific.
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
+>  1 file changed, 1 insertion(+), 21 deletions(-)
 > 
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+> index 4f44aac..46e64cc 100644
+> --- a/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-clock.h
+> @@ -15,24 +15,4 @@
+>  #ifndef __PLAT_REGS_CLOCK_H
+>  #define __PLAT_REGS_CLOCK_H __FILE__
+>  
+> -/*
+> - * FIXME: Remove remaining definitions
+> - */
+> -
+> -#define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
+> -
+> -#define S3C_PCLK_GATE		S3C_CLKREG(0x34)
+> -#define S3C6410_CLK_SRC2	S3C_CLKREG(0x10C)
+> -#define S3C_MEM_SYS_CFG		S3C_CLKREG(0x120)
+> -
+> -/* PCLK GATE Registers */
+> -#define S3C_CLKCON_PCLK_UART3		(1<<4)
+> -#define S3C_CLKCON_PCLK_UART2		(1<<3)
+> -#define S3C_CLKCON_PCLK_UART1		(1<<2)
+> -#define S3C_CLKCON_PCLK_UART0		(1<<1)
+> -
+> -/* MEM_SYS_CFG */
+> -#define MEM_SYS_CFG_INDEP_CF		0x4000
+> -#define MEM_SYS_CFG_EBI_FIX_PRI_CFCON	0x30
+> -
+> -#endif /* _PLAT_REGS_CLOCK_H */
+> +/#endif /* _PLAT_REGS_CLOCK_H */
 
-How about #defining a macro with the correct pgprot value in asm/pci.h
-or asm/pgtable.h?
-We can provide a default for that in another architecture independent
-location.
+I don't know about the other changes, but that last line looks like an error.
+Did you build anything that #includes this header file?
 
-	Arnd
+
+-- 
+~Randy
