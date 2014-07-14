@@ -1,54 +1,43 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 14 Jul 2014 10:16:12 +0000
-Subject: [PATCH 2/2] tty: serial: fsl_lpuart: add 32-bit register
- interface support
-In-Reply-To: <20140712005122.GA31974@kroah.com>
-References: <1405057302-26041-1-git-send-email-jingchang.lu@freescale.com>
- <1405057302-26041-3-git-send-email-jingchang.lu@freescale.com>
- <20140712005122.GA31974@kroah.com>
-Message-ID: <ea314532262d449aac50e4eb0a79f9f6@BL2PR03MB467.namprd03.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 12:18:08 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140711140025.62873695@bbrezillon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1584022.nQ4HpIUW7J@avalon> <20140710145626.48cb956f@bbrezillon>
+ <33456066.4Q4p6nxKdU@avalon> <20140711140025.62873695@bbrezillon>
+Message-ID: <20140714101807.GC9870@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 11, 2014 at 02:00:25PM +0200, Boris BREZILLON wrote:
+> On Fri, 11 Jul 2014 12:37:46 +0200 Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+> > On Thursday 10 July 2014 14:56:26 Boris BREZILLON wrote:
+[...]
+> > > BTW, is there any reason for not defining an RGB connector type (I'm
+> > > currently defining HLCDC connector as an LVDS connector) ?
+> > 
+> > Not that I know of. The DRM API has been developed before display on embedded 
+> > systems became such a hot topic. If we had to redo it today, panels might be 
+> > exposed to userspace as such, with a connector. We have to live with the past, 
+> > so the connector will stay, but adding a new RGB connector type could make 
+> > sense (although we might need a different name, in a way the VGA and LVDS 
+> > connectors also carry RGB signals).
+> 
+> I had the same concern: I didn't find how this kind of connectors
+> was named (most of the time they're just referenced as RGB) :-).
+> What about RAW_RGB ?
 
+Are there even panels that take raw RGB as input? In all cases I've seen
+(which admittedly may not be all that many) there's always a transparent
+RGB/LVDS bridge, so the "connector" is in fact LVDS, not RGB, even if
+the display controller outputs RGB directly.
 
->-----Original Message-----
->From: Greg KH [mailto:gregkh at linuxfoundation.org]
->Sent: Saturday, July 12, 2014 8:51 AM
->To: Lu Jingchang-B35083
->Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH 2/2] tty: serial: fsl_lpuart: add 32-bit register
->interface support
->
->On Fri, Jul 11, 2014 at 01:41:42PM +0800, Jingchang Lu wrote:
->> This add the 32-bit register version LPUART support with big-endian
->> byte order.
->>
->> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
->> ---
->>  drivers/tty/serial/fsl_lpuart.c | 653
->> +++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 643 insertions(+), 10 deletions(-)
->
->You didn't even test build this patch:
->
->  CC [M]  drivers/tty/serial/fsl_lpuart.o
->drivers/tty/serial/fsl_lpuart.c: In function ?lpuart_suspend?:
->drivers/tty/serial/fsl_lpuart.c:1856:22: error: ?lpuart32_reg? undeclared
->(first use in this function)
->   uart_suspend_port(&lpuart32_reg, &sport->port);
->                      ^
->
->No quicker way to make me grumpy...
->
->Please take some time to do this right.
->
->greg k-h
-
-Sorry for the mistake, I only test the functionality without option of CONFIG_PM_SLEEP,
-I will fix that and send the patch again. Thanks.
-
-
-
-Best Regards,
-Jingchang
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/cadcc8c0/attachment-0001.sig>
