@@ -1,74 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 15 Jul 2014 01:24:36 +0800
-Subject: [PATCH 1/2] pinctrl: sunxi: use gpiolib API to mark a GPIO used as an
- IRQ
-In-Reply-To: <1405358677-23657-1-git-send-email-wens@csie.org>
-References: <1405358677-23657-1-git-send-email-wens@csie.org>
-Message-ID: <1405358677-23657-2-git-send-email-wens@csie.org>
+Date: Tue, 15 Jul 2014 01:24:35 +0800
+Subject: [PATCH 0/2] pinctrl: sunxi: misc improvements for gpio
+Message-ID: <1405358677-23657-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
-the gpiolib so we can keep track of the usage centrally.
+Hi,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+These 2 patches are fixes / improvements to the gpio side of the
+sunxi pinctrl driver. They are based on pinctrl/devel (3a19805).
+The patches change the same lines of code, so they are sent together.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 47f5e1b..23c1b9f 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -541,18 +541,33 @@ static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
- 	struct sunxi_desc_function *func;
-+	int ret;
- 
- 	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
- 					pctl->irq_array[d->hwirq], "irq");
- 	if (!func)
- 		return -EINVAL;
- 
-+	ret = gpio_lock_as_irq(pctl->chip, pctl->irq_array[d->hwirq]);
-+	if (ret) {
-+		dev_err(pctl->dev, "unable to lock HW IRQ %lu for IRQ\n",
-+			irqd_to_hwirq(d));
-+		return ret;
-+	}
-+
- 	/* Change muxing to INT mode */
- 	sunxi_pmx_set(pctl->pctl_dev, pctl->irq_array[d->hwirq], func->muxval);
- 
- 	return 0;
- }
- 
-+static void sunxi_pinctrl_irq_release_resources(struct irq_data *d)
-+{
-+	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-+
-+	gpio_unlock_as_irq(pctl->chip, pctl->irq_array[d->hwirq]);
-+}
-+
- static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-@@ -657,6 +672,7 @@ static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
- 	.irq_mask	= sunxi_pinctrl_irq_mask,
- 	.irq_unmask	= sunxi_pinctrl_irq_unmask,
- 	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
-+	.irq_release_resources = sunxi_pinctrl_irq_release_resources,
- 	.irq_set_type	= sunxi_pinctrl_irq_set_type,
- 	.flags		= IRQCHIP_SKIP_SET_WAKE,
- };
-@@ -670,6 +686,7 @@ static struct irq_chip sunxi_pinctrl_level_irq_chip = {
- 	.irq_enable	= sunxi_pinctrl_irq_ack_unmask,
- 	.irq_disable	= sunxi_pinctrl_irq_mask,
- 	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
-+	.irq_release_resources = sunxi_pinctrl_irq_release_resources,
- 	.irq_set_type	= sunxi_pinctrl_irq_set_type,
- 	.flags		= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED |
- 			  IRQCHIP_EOI_IF_HANDLED,
+Patch 1 adds locking gpio lines when used as external interrupts.
+Similar patches were done by Linus and other maintainers for various
+platforms.
+
+A somewhat related issue is that the sunxi pinctrl driver does not
+block users from requesting an already muxed pin as a gpio line.
+Maybe we should do some locking there as well? Are there any kernel
+interfaces for this? Or do we need to do it in the driver specifically
+for our hardware?
+
+(I had the unfortunate experience of poking GPIOs listed in the fex
+files, not noticing they were used by the uart console.)
+
+
+Patch 2 changes the gpio ranges registered by the pinctrl driver.
+Instead of just passing the pin number, we pass the pin offset,
+so that the range is not out of bounds (with respect to gpiochip.ngpio).
+This happens on sun6i/sun8i platforms for the R_PIO controllers.
+
+As gpiochip.base currently matches the pin number base, we get the nice
+result that gpio numbers match pin numbers again.
+
+AFAIK pinctrl pin numbers are device specific, so I'm wondering if we
+should also number them in terms of offsets, rather than absolute pin
+numbers. It's more of an asthetic change though. Any thoughts?
+
+Thank you
+
+
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  pinctrl: sunxi: use gpiolib API to mark a GPIO used as an IRQ
+  pinctrl: sunxi: number gpio ranges starting from 0
+
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
+
 -- 
 2.0.1
