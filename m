@@ -1,55 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 14 Jul 2014 10:58:54 -0400 (EDT)
-Subject: [PATCH 1/3] usb: host: st-hcd: Add USB HCD support for STi SoCs
-In-Reply-To: <20140714083549.GK2954@lee--X1>
-Message-ID: <Pine.LNX.4.44L0.1407141054010.10763-100000@netrider.rowland.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Jul 2014 08:01:14 -0700
+Subject: [PATCH v4 2/7] arm64: Support restart through restart notifier
+ call chain
+In-Reply-To: <20140714145504.GD1112@arm.com>
+References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
+ <1405265431-4561-3-git-send-email-linux@roeck-us.net>
+ <20140714145504.GD1112@arm.com>
+Message-ID: <53C3F0BA.5020201@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014, Lee Jones wrote:
+On 07/14/2014 07:55 AM, Catalin Marinas wrote:
+> On Sun, Jul 13, 2014 at 04:30:26PM +0100, Guenter Roeck wrote:
+>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> index 43b7c34..b2da6d5 100644
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -174,6 +174,8 @@ void machine_restart(char *cmd)
+>>   	/* Now call the architecture specific reboot code. */
+>>   	if (arm_pm_restart)
+>>   		arm_pm_restart(reboot_mode, cmd);
+>> +	else
+>> +		kernel_restart_notify(cmd);
+>
+> There are couple of drivers specific to arm64, once they are converted
+> we can get rid of arm_pm_restart entirely here.
+>
 
-> On Fri, 11 Jul 2014, Alan Stern wrote:
-> > On Fri, 11 Jul 2014, Peter Griffin wrote:
-> > > On Thu, 10 Jul 2014, Alan Stern wrote:
-> > > 
-> > > > On Thu, 10 Jul 2014, Peter Griffin wrote:
-> > > > 
-> > > > > This driver adds support for the USB HCD present in STi
-> > > > > SoC's from STMicroelectronics. It has been tested on the
-> > > > > stih416-b2020 board.
-> > > > 
-> > > > This driver file, along with the Kconfig changes, belongs in the
-> > > > arch/platform-specific source directory.  Not in drivers/usb/host/.  
-> > > > It is, after all, a platform driver that registers two platform
-> > > > devices.
-> > > 
-> > > Why do think that?
-> > 
-> > Because it is true.  One can easily see that st-hcd.c is a platform
-> > driver: It contains a module_platform_driver() line and a struct
-> > platform_driver definition near the end.  And it registers a platform
-> > device by calling platform_device_add() in st_hcd_device_create(),
-> > which is called twice by st_hcd_probe().
-> 
-> You are correct that this is indeed a platform driver and in the 'old
-> days' these would have been stuffed into the ARM sub-architecture
-> directories.  However, these became far too bloated and created too
-> much churn which angered Linus.  A great deal has changed since his
-> ARM rant [1].  All drivers (platform or otherwise) are now to live in
-> 'drivers', which makes a great deal of sense really, doesn't it?
-> 
-> Did you grep kernel wide for module_platform_driver()?
-> 
-> $ git grep module_platform_driver -- arch/ | wc -l
-> 12
-> 
-> $ git grep module_platform_driver -- drivers/ | wc -l
-> 1138
-> 
-> Most platform drivers have already been moved.
+I thought you wanted to keep exporting arm_pm_restart. That logically implies
+that you want to have the ability to write new drivers which use it, which
+in turn implies that converting existing drivers would not make much sense.
 
-Okay, I grant the point.  Objections withdrawn.  Fix up the spelling 
-error and the other stuff in the Kconfig help text, and this will be 
-acceptable.
+Am I missing something ?
 
-Alan Stern
+Guenter
