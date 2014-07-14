@@ -1,201 +1,75 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 14 Jul 2014 10:28:07 +0200
-Subject: [PATCH v2 RESEND 4/4] drivers: dma-contiguous: add initialization from
- device tree
-In-Reply-To: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
-References: <1405326487-15346-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1405326487-15346-5-git-send-email-m.szyprowski@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 14 Jul 2014 16:24:34 +0800
+Subject: [PATCH v3 2/2] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <53C3885B.5020008@gmail.com>
+References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+ <1405074557-5519-2-git-send-email-b29396@freescale.com>
+ <53BFC6CE.9090408@gmail.com> <53BFD28A.5090202@pengutronix.de>
+ <53BFD4DF.7030003@gmail.com>
+ <20140714072146.GD1668@shlinux1.ap.freescale.net>
+ <53C3885B.5020008@gmail.com>
+Message-ID: <20140714082432.GA21584@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to create CMA region from previously reserved memory
-and add support for handling 'shared-dma-pool' reserved-memory device
-tree nodes.
+On Mon, Jul 14, 2014 at 01:05:55PM +0530, Varka Bhadram wrote:
+> On 07/14/2014 12:51 PM, Dong Aisheng wrote:
+> >
+> >+    dev_dbg(&pdev->dev, "mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0
+> >0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d\n",
+> >+        priv->mram_base,
+> >+        priv->mcfg[MRAM_SIDF].off, priv->mcfg[MRAM_SIDF].num,
+> >+        priv->mcfg[MRAM_XIDF].off, priv->mcfg[MRAM_XIDF].num,
+> >+        priv->mcfg[MRAM_RXF0].off, priv->mcfg[MRAM_RXF0].num,
+> >+        priv->mcfg[MRAM_RXF1].off, priv->mcfg[MRAM_RXF1].num,
+> >+        priv->mcfg[MRAM_RXB].off, priv->mcfg[MRAM_RXB].num,
+> >+        priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
+> >+        priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
+> >+
+> >>>>dev_dbg() will insert the new lines in b/w. It wont print the values as
+> >>>>you expected.
+> >>>>Check this by enabling debug ...
+> >>>What do you mean by b/w?
+> >>You are expecting the data to be print in format like:
+> >>pdev->dev/name: mram_base %p sidf 0x%x %d xidf 0x%x %d rxf0 0x%x %d rxf1 0x%x %d rxb 0x%x %d txe 0x%x %d txb 0x%x %d
+> >>
+> >>But when we use the dev_dbg()/pr_debug()... It will put data like:
+> >>pdev->dev/name: mram_base %p sidf 0x%x
+> >>0x%x %d rxf0 0x%x
+> >>rxf1 0x%x %d rxb
+> >>....
+> >>
+> >>check this by enable DEBUG...
+> >>
+> >My test showed the format is:
+> >root at imx6qdlsolo:~# uname -a
+> >Linux imx6qdlsolo 3.16.0-rc2-next-20140627-00006-gd55dd62-dirty #373 SMP Fri Jul 11 18:12:31 CST 2014 armv7l GNU/Linux
+> >root at imx6qdlsolo:~# dmesg | grep m_can
+> >m_can 20e8000.can: mram_base c0990000 sidf 0x0 0 xidf 0x0 0 rxf0 0x0 32 rxf1 0x200 0 rxb 0x200 0 txe 0x200 0 txb 0x200 1
+> >m_can 20e8000.can: m_can device registered (regs=c0988000, irq=146)
+> >m_can 20f0000.can: mram_base c09a0000 sidf 0x400 0 xidf 0x400 0 rxf0 0x400 32 rxf1 0x600 0 rxb 0x600 0 txe 0x600 0 txb 0x600 1
+> >m_can 20f0000.can: m_can device registered (regs=c0998000, irq=147)
+> >
+> I think you got the expected result.
+> 
+> I faced the above problem when i use pr_debug(). Can you check with this....?
+> 
 
-Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+It works too.
+root at imx6qdlsolo:~# dmesg | grep mram 
+mram_base c0990000 sidf 0x0 0 xidf 0x0 0 rxf0 0x0 32 rxf1 0x200 0 rxb 0x200 0 txe 0x200 0 txb 0x200 1
+mram_base c09a0000 sidf 0x400 0 xidf 0x400 0 rxf0 0x400 32 rxf1 0x600 0 rxb 0x600 0 txe 0x600 0 txb 0x600 1
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/base/dma-contiguous.c | 67 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/cma.h           |  3 ++
- mm/cma.c                      | 62 ++++++++++++++++++++++++++++++++-------
- 3 files changed, 121 insertions(+), 11 deletions(-)
+> This is good. Thanks for clarification.
+> 
+> >
+> >Regards
+> >Dong Aisheng
+> >
+> -- 
+> Regards,
+> Varka Bhadram.
+> 
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 6606abdf880c..b77ea8bac176 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -211,3 +211,70 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
- {
- 	return cma_release(dev_get_cma_area(dev), pages, count);
- }
-+
-+/*
-+ * Support for reserved memory regions defined in device tree
-+ */
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt) fmt
-+
-+static void rmem_cma_device_init(struct reserved_mem *rmem, struct device *dev)
-+{
-+	struct cma *cma = rmem->priv;
-+	dev_set_cma_area(dev, cma);
-+}
-+
-+static void rmem_cma_device_release(struct reserved_mem *rmem,
-+				    struct device *dev)
-+{
-+	dev_set_cma_area(dev, NULL);
-+}
-+
-+static const struct reserved_mem_ops rmem_cma_ops = {
-+	.device_init	= rmem_cma_device_init,
-+	.device_release = rmem_cma_device_release,
-+};
-+
-+static int __init rmem_cma_setup(struct reserved_mem *rmem)
-+{
-+	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
-+	phys_addr_t mask = align - 1;
-+	unsigned long node = rmem->fdt_node;
-+	struct cma *cma;
-+	int err;
-+
-+	if (!of_get_flat_dt_prop(node, "reusable", NULL) ||
-+	    of_get_flat_dt_prop(node, "no-map", NULL))
-+		return -EINVAL;
-+
-+	if ((rmem->base & mask) || (rmem->size & mask)) {
-+		pr_err("Reserved memory: incorrect alignment of CMA region\n");
-+		return -EINVAL;
-+	}
-+
-+	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
-+	if (err) {
-+		pr_err("Reserved memory: unable to setup CMA region\n");
-+		return err;
-+	}
-+	/* Architecture specific contiguous memory fixup. */
-+	dma_contiguous_early_fixup(rmem->base, rmem->size);
-+
-+	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
-+		dma_contiguous_set_default(cma);
-+
-+	rmem->ops = &rmem_cma_ops;
-+	rmem->priv = cma;
-+
-+	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld MiB\n",
-+		&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+
-+	return 0;
-+}
-+RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
-+#endif
-diff --git a/include/linux/cma.h b/include/linux/cma.h
-index 32cab7a425f9..9a18a2b1934c 100644
---- a/include/linux/cma.h
-+++ b/include/linux/cma.h
-@@ -16,6 +16,9 @@ extern int __init cma_declare_contiguous(phys_addr_t size,
- 			phys_addr_t base, phys_addr_t limit,
- 			phys_addr_t alignment, unsigned int order_per_bit,
- 			bool fixed, struct cma **res_cma);
-+extern int cma_init_reserved_mem(phys_addr_t size,
-+					phys_addr_t base, int order_per_bit,
-+					struct cma **res_cma);
- extern struct page *cma_alloc(struct cma *cma, int count, unsigned int align);
- extern bool cma_release(struct cma *cma, struct page *pages, int count);
- #endif
-diff --git a/mm/cma.c b/mm/cma.c
-index 4b251b037e1b..b3d8b925ad34 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -140,6 +140,54 @@ static int __init cma_init_reserved_areas(void)
- core_initcall(cma_init_reserved_areas);
- 
- /**
-+ * cma_init_reserved_mem() - create custom contiguous area from reserved memory
-+ * @base: Base address of the reserved area
-+ * @size: Size of the reserved area (in bytes),
-+ * @order_per_bit: Order of pages represented by one bit on bitmap.
-+ * @res_cma: Pointer to store the created cma region.
-+ *
-+ * This function creates custom contiguous area from already reserved memory.
-+ */
-+int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
-+				 int order_per_bit, struct cma **res_cma)
-+{
-+	struct cma *cma;
-+	phys_addr_t alignment;
-+
-+	/* Sanity checks */
-+	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-+		pr_err("Not enough slots for CMA reserved regions!\n");
-+		return -ENOSPC;
-+	}
-+
-+	if (!size || !memblock_is_region_reserved(base, size))
-+		return -EINVAL;
-+
-+	/* ensure minimal alignment requied by mm core */
-+	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
-+
-+	/* alignment should be aligned with order_per_bit */
-+	if (!IS_ALIGNED(alignment >> PAGE_SHIFT, 1 << order_per_bit))
-+		return -EINVAL;
-+
-+	if (ALIGN(base, alignment) != base || ALIGN(size, alignment) != size)
-+		return -EINVAL;
-+
-+	/*
-+	 * Each reserved area must be initialised later, when more kernel
-+	 * subsystems (like slab allocator) are available.
-+	 */
-+	cma = &cma_areas[cma_area_count];
-+	cma->base_pfn = PFN_DOWN(base);
-+	cma->count = size >> PAGE_SHIFT;
-+	cma->order_per_bit = order_per_bit;
-+	*res_cma = cma;
-+	cma_area_count++;
-+
-+	return 0;
-+}
-+
-+/**
-  * cma_declare_contiguous() - reserve custom contiguous area
-  * @base: Base address of the reserved area optional, use 0 for any
-  * @size: Size of the reserved area (in bytes),
-@@ -162,7 +210,6 @@ int __init cma_declare_contiguous(phys_addr_t base,
- 			phys_addr_t alignment, unsigned int order_per_bit,
- 			bool fixed, struct cma **res_cma)
- {
--	struct cma *cma;
- 	int ret = 0;
- 
- 	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
-@@ -214,16 +261,9 @@ int __init cma_declare_contiguous(phys_addr_t base,
- 		}
- 	}
- 
--	/*
--	 * Each reserved area must be initialised later, when more kernel
--	 * subsystems (like slab allocator) are available.
--	 */
--	cma = &cma_areas[cma_area_count];
--	cma->base_pfn = PFN_DOWN(base);
--	cma->count = size >> PAGE_SHIFT;
--	cma->order_per_bit = order_per_bit;
--	*res_cma = cma;
--	cma_area_count++;
-+	ret = cma_init_reserved_mem(base, size, order_per_bit, res_cma);
-+	if (ret)
-+		goto err;
- 
- 	pr_info("Reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
- 		(unsigned long)base);
--- 
-1.9.2
+Regards
+Dong Aisheng
