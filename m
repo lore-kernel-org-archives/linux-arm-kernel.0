@@ -1,114 +1,36 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 14 Jul 2014 10:28:21 -0400
-Subject: [PATCH v4 0/6] Add Keystone PCIe controller driver
-In-Reply-To: <20140714060334.GB2930@pratyush-vbox>
-References: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
- <20140714060334.GB2930@pratyush-vbox>
-Message-ID: <53C3E905.3080806@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 14 Jul 2014 10:31:25 -0400
+Subject: [PATCH v2] ARM: OMAP2+: l2c: squelch warning dump on power control
+ setting
+In-Reply-To: <d081bdbeebec0e7f2a292a11513f96375aa35bd4.1405343188.git.nsekhar@ti.com>
+References: <d081bdbeebec0e7f2a292a11513f96375aa35bd4.1405343188.git.nsekhar@ti.com>
+Message-ID: <53C3E9BD.9010104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 02:03 AM, Pratyush Anand wrote:
-> Oh.. I see my reply from gmail is not readable at all. (I forgot to
-> switch to plain text :( ) Please ignore last mail I am replying again
-> here.
->
-> On Sat, Jul 12, 2014 at 04:36:29AM +0800, Murali Karicheri wrote:
->
-> [...]
->
->> Murali Karicheri (6):
->>    PCI: designware: add rd[wr]_other_conf API
->>    PCI: designware: refactor MSI code to work with v3.65 dw hardware
->
-> For  above two you can add my reviewed-by:
->
->>    PCI: designware: refactor host init code to re-use on keystone PCI
->>    PCI: designware: enhance dw core driver to support keystone PCI host
->
-> In stead of using version number and then changing few functions from
-> static to global , I would have used same philosophy of adding callbacks
-> wherever needed. May be maintainers can give their view, instead of patch
-> 3 and 4 I would have gone with something like this, where kc_pcie can be
-> passed through pp->plat_data.
->
-
-Pratyush,
-
-Thanks for the response. I will look into your proposal and respond back 
-when I get a chance.
-
-Thanks and regards,
-
-Murali
-
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 905941c..b216192 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -490,16 +490,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->          }
->
->          if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -               pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-> -                                       MAX_MSI_IRQS,&msi_domain_ops,
-> -&dw_pcie_msi_chip);
-> -               if (!pp->irq_domain) {
-> -                       dev_err(pp->dev, "irq domain init failed\n");
-> -                       return -ENXIO;
-> -               }
-> +               if (!pp->ops->msi_init) {
-> +                       pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-> +                                               MAX_MSI_IRQS,&msi_domain_ops,
-> +&dw_pcie_msi_chip);
-> +                       if (!pp->irq_domain) {
-> +                               dev_err(pp->dev, "irq domain init failed\n");
-> +                               return -ENXIO;
-> +                       }
->
-> -               for (i = 0; i<  MAX_MSI_IRQS; i++)
-> -                       irq_create_mapping(pp->irq_domain, i);
-> +                       for (i = 0; i<  MAX_MSI_IRQS; i++)
-> +                               irq_create_mapping(pp->irq_domain, i);
-> +               } else {
-> +                       pp->ops->msi_init(pp,&msi_domain_ops,
-> +&dw_pcie_msi_chip);
-> +               }
->          }
->
->          if (pp->ops->host_init)
-> @@ -759,6 +764,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->                  BUG();
->          }
->
-> +       if (bus&&  pp->ops->scan_bus)
-> +               bus = pp->ops->scan_bus(pp);
-> +
->          return bus;
->   }
->
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index 387f69e..39ce496 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -52,6 +52,7 @@ struct pcie_port {
->          struct irq_domain       *irq_domain;
->          unsigned long           msi_data;
->          DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-> +       void                    *plat_data;
->   };
->
->   struct pcie_host_ops {
-> @@ -70,6 +71,9 @@ struct pcie_host_ops {
->          void (*msi_set_irq)(struct pcie_port *pp, int irq);
->          void (*msi_clear_irq)(struct pcie_port *pp, int irq);
->          u32 (*get_msi_data)(struct pcie_port *pp);
-> +       struct pci_bus *(*scan_bus)(struct pcie_port *pp);
-> +       void (*msi_init) (struct pcie_port *pp, struct irq_domain_ops *ops,
-> +                       struct msi_chip *chip);
->   };
->
->   int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
->
->
-> ~Pratyush
+On Monday 14 July 2014 09:13 AM, Sekhar Nori wrote:
+> On OMAP SOCs using PL310 controllers, power_ctrl register is not
+> accessible from non-secure software even on PL310 versions which
+> support it. The secure code takes care of setting it up correctly
+> and power transitions are proven on these devices.
+> 
+> For example, AM437x has L2C-310 version r3p3 and ROM code on that
+> device does not support writing to L2C-310 power control register.
+> The L2C driver, however, tries writing to this register for all
+> revisions >= r3p0.
+> 
+> This leads to a warning dump on boot which leads most users to believe
+> that L2 cache is non-functional.
+> 
+> Since the problem is understood, and cannot be addressed through
+> software, replace the warning with a pr_info() while maintaining the
+> WARN_ON() for other truly unexpected scenarios.
+> 
+> Reported-by: Nishanth Menon <nm@ti.com>
+> Tested-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> Only description updated since v1
+> 
+Thanks for update.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
