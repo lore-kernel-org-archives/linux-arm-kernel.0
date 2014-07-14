@@ -1,107 +1,96 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 14 Jul 2014 21:23:28 +0900
-Subject: [PATCH v4 0/6] Add Keystone PCIe controller driver
-In-Reply-To: <20140714060334.GB2930@pratyush-vbox>
-References: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
- <20140714060334.GB2930@pratyush-vbox>
-Message-ID: <00bb01cf9f5e$6aac4250$4004c6f0$%han@samsung.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 14 Jul 2014 15:28:54 +0300
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <20140714111007.GB31460@ulmo>
+References: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
+ <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
+ <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
+ <53C3A986.9050602@nvidia.com> <20140714102954.GD9870@ulmo>
+ <53C3B6EC.9090904@nvidia.com> <20140714111007.GB31460@ulmo>
+Message-ID: <53C3CD06.8070907@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 14, 2014 3:04 PM, Pratyush Anand wrote:
-> On Sat, Jul 12, 2014 at 04:36:29AM +0800, Murali Karicheri wrote:
-> 
-> [...]
-> 
-> > Murali Karicheri (6):
-> >   PCI: designware: add rd[wr]_other_conf API
-> >   PCI: designware: refactor MSI code to work with v3.65 dw hardware
-> 
-> For  above two you can add my reviewed-by:
-> 
-> >   PCI: designware: refactor host init code to re-use on keystone PCI
-> >   PCI: designware: enhance dw core driver to support keystone PCI host
-> 
-> In stead of using version number and then changing few functions from
-> static to global , I would have used same philosophy of adding callbacks
-> wherever needed. May be maintainers can give their view, instead of patch
-> 3 and 4 I would have gone with something like this, where kc_pcie can be
-> passed through pp->plat_data.
+On 14/07/14 14:10, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Mon, Jul 14, 2014 at 01:54:36PM +0300, Mikko Perttunen wrote:
+>> On 14/07/14 13:29, Thierry Reding wrote:
+>>>> Old Signed by an unknown key
+>>> ...
+>>>> Yes, this sounds sensible. I'll make such a patch. I suppose having another
+>>>> timings table in the MC node with just the rate and mc-burst-data would
+>>>> separate the concerns best. It occurs to me that we could also write the
+>>>> regs in the pre-rate change notifier, but this would turn the dependency
+>>>> around and would mean that the regs are not written when entering backup
+>>>> rates. The latter shouldn't be a problem but the reversed dependency would,
+>>>> so I guess a custom function is the way to go, and we need to add at least
+>>>> one anyway.
+>>>
+>>> It sounds like maybe moving enough code and data into the MC driver to
+>>> handle frequency changes would be a good move. From the above it sounds
+>>> like all the MC driver needs to know is that a frequency change is about
+>>> to happen and what the new frequency is.
+>>>
+>>> In addition to exposing things like number of DRAM banks, etc.
+>>>
+>>
+>> Yes, so there are two ways to do this:
+>> 1) EMC calls tegra_mc_emem_update(freq) at the correct time
+>> 2) MC has an optional clock phandle to the EMC clock and registers a
+>> pre-change notifier.
+>>
+>> Both work, but the dependency is reversed. In both cases, the other driver
+>> is also optional. In the first case, the EMC driver can give a warning if
+>> the call fails. (As mentioned, if the MC_EMEM updates don't happen, things
+>> still work but potentially with a hefty perf loss.)
+>> TBH, I haven't yet decided which one is better. If you have an opinion,
+>> I'll go with it.
+>
+> I think I prefer 1. Using an explicit call into the MC driver allow us
+> to precisely determine the moment in time when the registers should be
+> updated. The pre-change notifier, as I understand it, doesn't give us
+> that. Also, the notifier doesn't give us a way to determine success or
+> failure of the MC call.
 
-I agree with your suggestion. I don't want to use the version number.
-The call back would be better.
+Indeed. I'll go with this.
 
-Best regards,
-Jingoo Han
+>
+>>>> The downstream kernel also overwrites most LA registers during EMC rate
+>>>> change without regard for the driver-set values, and we might have to read
+>>>> those values from the device tree too. Upstream can do this in rate change
+>>>> notifiers if needed. I'll look into this a bit more.
+>>>
+>>> As I understand it, the latency allowance should be specified in terms
+>>> of the maximum amount of time that requests are delayed, so that the
+>>> proper values for the LA registers can be recomputed on an EMC rate
+>>> change.
+>>
+>> That's how I understand it too, but in downstream, the LA register values
+>> are hardcoded into EMC tables in platform data/DTS that are just written
+>> into the LA registers as-is during rate change.
+>
+> Hehe, well, we don't want any of that upstream. =) If it can be computed
+> at runtime, then let's compute it. Also, if it's encoded in platform
+> data or DTS, then there's no way it can be adjusted based on use-case.
+> For example if you have a device with two display outputs (an internal
+> panel and HDMI for example) but you never have HDMI plugged in, then
+> there's no reason why you would want to program the latency allowance
+> for the second display controller. If you provide the values in a static
+> frequency/register value table, then you need to account for any
+> possible scenario up front, irrespective of what (if any) HDMI monitor
+> is attached.
 
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 905941c..b216192 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -490,16 +490,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->         }
-> 
->         if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -               pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-> -                                       MAX_MSI_IRQS, &msi_domain_ops,
-> -                                       &dw_pcie_msi_chip);
-> -               if (!pp->irq_domain) {
-> -                       dev_err(pp->dev, "irq domain init failed\n");
-> -                       return -ENXIO;
-> -               }
-> +               if (!pp->ops->msi_init) {
-> +                       pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-> +                                               MAX_MSI_IRQS, &msi_domain_ops,
-> +                                               &dw_pcie_msi_chip);
-> +                       if (!pp->irq_domain) {
-> +                               dev_err(pp->dev, "irq domain init failed\n");
-> +                               return -ENXIO;
-> +                       }
-> 
-> -               for (i = 0; i < MAX_MSI_IRQS; i++)
-> -                       irq_create_mapping(pp->irq_domain, i);
-> +                       for (i = 0; i < MAX_MSI_IRQS; i++)
-> +                               irq_create_mapping(pp->irq_domain, i);
-> +               } else {
-> +                       pp->ops->msi_init(pp, &msi_domain_ops,
-> +                                               &dw_pcie_msi_chip);
-> +               }
->         }
-> 
->         if (pp->ops->host_init)
-> @@ -759,6 +764,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->                 BUG();
->         }
-> 
-> +       if (bus && pp->ops->scan_bus)
-> +               bus = pp->ops->scan_bus(pp);
-> +
->         return bus;
->  }
-> 
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index 387f69e..39ce496 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -52,6 +52,7 @@ struct pcie_port {
->         struct irq_domain       *irq_domain;
->         unsigned long           msi_data;
->         DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-> +       void                    *plat_data;
->  };
-> 
->  struct pcie_host_ops {
-> @@ -70,6 +71,9 @@ struct pcie_host_ops {
->         void (*msi_set_irq)(struct pcie_port *pp, int irq);
->         void (*msi_clear_irq)(struct pcie_port *pp, int irq);
->         u32 (*get_msi_data)(struct pcie_port *pp);
-> +       struct pci_bus *(*scan_bus)(struct pcie_port *pp);
-> +       void (*msi_init) (struct pcie_port *pp, struct irq_domain_ops *ops,
-> +                       struct msi_chip *chip);
->  };
-> 
->  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
-> 
-> 
-> ~Pratyush
+Yeah, I guess the values in downstream must be designed for the worst 
+case :P the strange thing is that downstream also has an API for drivers 
+to specify their requirements. I guess the clients that have hardcoded 
+values and that use the API don't overlap. But I definitely agree that 
+on upstream we can have something nicer.
+
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
