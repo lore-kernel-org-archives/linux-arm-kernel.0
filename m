@@ -1,86 +1,66 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 14 Jul 2014 16:16:21 +0530
-Subject: [PATCH] ARM: OMAP2+: l2c: squelch warning dump on power control
- setting
-In-Reply-To: <53BD4E9A.7060903@ti.com>
-References: <20140707110249.GO28884@atomide.com> <53BA8983.3030803@ti.com>
- <20140707121512.GT3705@n2100.arm.linux.org.uk>
- <20140707123925.GW28884@atomide.com>
- <20140707134008.GU3705@n2100.arm.linux.org.uk>
- <20140707151024.GJ5582@saruman.home> <53BB7980.2060909@ti.com>
- <20140708082948.GE28884@atomide.com> <20140709092531.GK28884@atomide.com>
- <53BD34FD.5070005@ti.com> <20140709123950.GV3705@n2100.arm.linux.org.uk>
- <53BD4E9A.7060903@ti.com>
-Message-ID: <53C3B4FD.9040806@ti.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 14 Jul 2014 13:54:36 +0300
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <20140714102954.GD9870@ulmo>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
+ <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
+ <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
+ <53C3A986.9050602@nvidia.com> <20140714102954.GD9870@ulmo>
+Message-ID: <53C3B6EC.9090904@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 July 2014 07:45 PM, Santosh Shilimkar wrote:
-> On Wednesday 09 July 2014 08:39 AM, Russell King - ARM Linux wrote:
->> On Wed, Jul 09, 2014 at 05:56:37PM +0530, Sekhar Nori wrote:
->>> On Wednesday 09 July 2014 02:55 PM, Tony Lindgren wrote:
->>>> I guess no more comments. Took a look at the patch again, Sekhar, can
->>>> you please update the description with what has been discovered in this
->>>> thread and repost?
->>>
->>> How does the following sound:
->>>
->>> ---
->>> AM437x has L2C-310 version r3p2 and ROM code on that device does not
->>> support writing to L2C-310 power control register. The L2C driver,
->>> however, tries writing to this register for all revisions >= r3p0.
->>>
->>> This leads to a warning dump on boot which leads most users to believe
->>> that L2 cache is non-functional.
->>>
-> Power controller register setting doesn't make cache controller
-> functional but it is for really clock gating and standby.
-> So please reword, the above statement accordingly.
+On 14/07/14 13:29, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+ > ...
+>> Yes, this sounds sensible. I'll make such a patch. I suppose having another
+>> timings table in the MC node with just the rate and mc-burst-data would
+>> separate the concerns best. It occurs to me that we could also write the
+>> regs in the pre-rate change notifier, but this would turn the dependency
+>> around and would mean that the regs are not written when entering backup
+>> rates. The latter shouldn't be a problem but the reversed dependency would,
+>> so I guess a custom function is the way to go, and we need to add at least
+>> one anyway.
+>
+> It sounds like maybe moving enough code and data into the MC driver to
+> handle frequency changes would be a good move. From the above it sounds
+> like all the MC driver needs to know is that a frequency change is about
+> to happen and what the new frequency is.
+>
+> In addition to exposing things like number of DRAM banks, etc.
+>
 
-I think you misunderstood the context here. I am not claiming that power
-controller setting (or the absence of it) is  making the L2 cache
-non-functional. The line addresses the "Why?" part of why I am creating
-the patch - because the warning misleads people into thinking something
-went wrong with cache initialization when nothing is wrong really.
+Yes, so there are two ways to do this:
+1) EMC calls tegra_mc_emem_update(freq) at the correct time
+2) MC has an optional clock phandle to the EMC clock and registers a 
+pre-change notifier.
 
-> 
->>> Since the problem is understood, and cannot be addressed through
->>> software, replace the warning with a pr_info() while maintaining the
->>> WARN_ON() for other truly unexpected scenarios.
->>>
-> Instead of being vague here and below, I will just make it very simple as
-> below.
-> 
-> On OMAP SOCs using PL310 controllers, Power_ctrl register is not
-> accessible from non-secure software on PL310 versions which supports
-> it. The secure code takes care of setting it up correctly and the
-> power transitions are proven on these devices.
-> 
-> So lets add the ignore write check for PL310 Power_ctrl register
-> write.
+Both work, but the dependency is reversed. In both cases, the other 
+driver is also optional. In the first case, the EMC driver can give a 
+warning if the call fails. (As mentioned, if the MC_EMEM updates don't 
+happen, things still work but potentially with a hefty perf loss.)
+TBH, I haven't yet decided which one is better. If you have an opinion,
+I'll go with it.
 
-Since the description is already okayed by others, instead of changing
-it completely and starting a re-review, I just prepended your input into
-an opening paragraph and removed the last para on OMAP4. I will send out
-a v2 shortly with this description.
+>> The downstream kernel also overwrites most LA registers during EMC rate
+>> change without regard for the driver-set values, and we might have to read
+>> those values from the device tree too. Upstream can do this in rate change
+>> notifiers if needed. I'll look into this a bit more.
+>
+> As I understand it, the latency allowance should be specified in terms
+> of the maximum amount of time that requests are delayed, so that the
+> proper values for the LA registers can be recomputed on an EMC rate
+> change.
 
----
-On OMAP SOCs using PL310 controllers, power_ctrl register is not
-accessible from non-secure software on PL310 versions which supports
-it. The secure code takes care of setting it up correctly and the
-power transitions are proven on these devices.
+That's how I understand it too, but in downstream, the LA register 
+values are hardcoded into EMC tables in platform data/DTS that are just 
+written into the LA registers as-is during rate change.
 
-For example, AM437x has L2C-310 version r3p3 and ROM code on that device
-does not support writing to L2C-310 power control register. The L2C
-driver, however, tries writing to this register for all revisions >= r3p0.
-
-This leads to a warning dump on boot which leads most users to believe
-that L2 cache is non-functional.
-
-Since the problem is understood, and cannot be addressed through
-software, replace the warning with a pr_info() while maintaining the
-WARN_ON() for other truly unexpected scenarios.
----
-
-Thanks,
-Sekhar
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
