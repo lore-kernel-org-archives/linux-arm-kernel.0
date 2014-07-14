@@ -1,50 +1,35 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 14 Jul 2014 17:34:34 +0200
-Subject: [PATCH V2 3/3] clk: exynos-audss: Use samsung clock APIs to
- register/unregister clocks
-In-Reply-To: <1405080036-6651-4-git-send-email-tushar.b@samsung.com>
-References: <1405080036-6651-1-git-send-email-tushar.b@samsung.com>
- <1405080036-6651-4-git-send-email-tushar.b@samsung.com>
-Message-ID: <53C3F88A.8080005@samsung.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Mon, 14 Jul 2014 16:41:25 +0100
+Subject: [PATCH v3 0/4] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
+ secure firmware enabled
+In-Reply-To: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAD8Lp46mp-tHcwGpFd0YHRDE4pKWDoPpUvu-Y0QzxSi-jnYtWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/14 14:00, Tushar Behera wrote:
-> @@ -103,17 +140,11 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
->  		return PTR_ERR(reg_base);
->  	}
->  
-> -	clk_table = devm_kzalloc(&pdev->dev,
-> -				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
-> -				GFP_KERNEL);
-> -	if (!clk_table)
-> +	ctx = samsung_clk_init(pdev->dev.of_node, reg_base, nr_clks);
+Hi Bartlomiej,
 
-There is an issue here that this registers the clk provider before all
-its clocks are registered with the clk core. Therefore it introduces
-a race condition.
+On Wed, Jul 9, 2014 at 6:17 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> This patch series adds support for AFTR idle mode on boards with
+> secure firmware enabled and allows EXYNOS cpuidle driver usage on
+> Exynos4x12 SoCs.
+>
+> It has been tested on Trats2 board (using Exynos4412 SoC with secure
+> firmware enabled) on which AFTR mode reduces power consumption by ~12%
+> when EXYNOS cpuidle driver is enabled (in both cases the default
+> exynos_defconfig config is used and CPU1-3 are offlined).
 
-Please have a look at patch [1], you may want to rebase this series
-onto that patch.
+Thanks for this, I have tested it on ODROID-U2.
 
-> +	samsung_clk_register_div(ctx, exynos_audss_div_clks,
-> +				ARRAY_SIZE(exynos_audss_div_clks));
-[...]
-> +	samsung_clk_register_gate(ctx, exynos_audss_gate_clks,
-> +				ARRAY_SIZE(exynos_audss_gate_clks));
-[...]
-> -	ret = of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
-> -					&clk_data);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "failed to add clock provider\n");
-> -		goto unregister;
-> +		samsung_clk_register_gate(ctx, exynos5420_audss_gate_clks,
-> +					ARRAY_SIZE(exynos5420_audss_gate_clks));
->  	}
+I don't have any equipment to measure the power usage, but after
+offlining CPUs 1,2,3 via sysfs "online" file, a printk I added
+confirms that the system is going to enter aftr mode, and system
+stability seems as good as ever.
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/tfiga/samsung-clk.git/commit/?h=samsung-clk-next&id=d5e136a21b2028fb1f45143ea7112d5869bfc6c7
+Is there any automatic way that the cpus should be offlined, or is the
+intention that it must be done "by hand" like this?
 
---
-Regards,
-Sylwester
+Thanks,
+Daniel
