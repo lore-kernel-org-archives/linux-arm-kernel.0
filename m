@@ -1,64 +1,58 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Jul 2014 11:18:09 -0400 (EDT)
-Subject: [PATCH] cpuidle: big.LITTLE: add MCPM dependency
-In-Reply-To: <4345351.RJRQd7ghCF@wuerfel>
-References: <4345351.RJRQd7ghCF@wuerfel>
-Message-ID: <alpine.LFD.2.11.1407141115500.3647@knanqh.ubzr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Jul 2014 17:25:21 +0200
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is occupied
+Message-ID: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014, Arnd Bergmann wrote:
+If we fail to relocate the kernel Image to its preferred offset of TEXT_OFFSET
+bytes above the base of DRAM, accept the lowest alternative mapping available
+instead of aborting. We may lose a bit of memory at the low end, but we can
+still proceed normally otherwise.
 
-> 662322fcb6d ("cpuidle: big.LITTLE: Add ARCH_EXYNOS entry in config")
-> made it possible for the big-little cpuidle driver to run on exynos,
-> which may or may not include MCPM support at compile time, so we
-> run into a link error when it is disabled:
-> 
-> drivers/built-in.o: In function `bl_enter_powerdown':
-> :(.text+0x1889a0): undefined reference to `mcpm_cpu_powered_up'
-> drivers/built-in.o: In function `bl_powerdown_finisher':
-> :(.text+0x1889e8): undefined reference to `mcpm_set_entry_vector'
-> :(.text+0x1889ec): undefined reference to `mcpm_cpu_suspend'
-> 
-> This adds an explicit dependency to CONFIG_MCPM to avoid that
-> case.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Chander Kashyap <chander.kashyap@linaro.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
-> I believe the broken commit is only present in the samsung/for-next
-> tree (through v3.17-next/cpuidle-exynos), so it should be fixed there.
-> 
-> On a side note, I wonder if we should have platform dependencies at
-> all, or just the MCPM dependency by itself.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+This is a proposed bug fix for arm64 platforms that fail to boot through EFI
+due to the fact that some bits of EFI itself are occupying the low end of DRAM. 
 
-This was discussed in some other thread already but I'm too lazy to dig 
-a reference to it.
+Note that this code now triggers an 'unused function' warning for
+efi_relocate_kernel(), as that is no longer used. This warning will disappear
+automatically once the already queued up EFISTUB refactoring patches will
+get merged for 3.17.
 
-Only a dependency on MCPM alone is needed here.  And then:
+ arch/arm64/kernel/efi-stub.c | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index 60e98a639ac5..5165b3accefe 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -60,20 +60,16 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 	kernel_size = _edata - _text;
+ 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+ 		kernel_memsize = kernel_size + (_end - _edata);
+-		status = efi_relocate_kernel(sys_table, image_addr,
+-					     kernel_size, kernel_memsize,
+-					     dram_base + TEXT_OFFSET,
+-					     PAGE_SIZE);
++		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
++				       SZ_2M, reserve_addr);
+ 		if (status != EFI_SUCCESS) {
+ 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
+ 			return status;
+ 		}
+-		if (*image_addr != (dram_base + TEXT_OFFSET)) {
+-			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+-			efi_free(sys_table, kernel_memsize, *image_addr);
+-			return EFI_ERROR;
+-		}
+-		*image_size = kernel_memsize;
++		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
++		       kernel_size);
++		*image_addr = *reserve_addr + TEXT_OFFSET;
++		*reserve_size = kernel_memsize;
+ 	}
 
-> 
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 2f6b33ea6e08..459b7c91407a 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -10,6 +10,7 @@ config ARM_ARMADA_370_XP_CPUIDLE
->  config ARM_BIG_LITTLE_CPUIDLE
->  	bool "Support for ARM big.LITTLE processors"
->  	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
-> +	depends on MCPM
->  	select ARM_CPU_SUSPEND
->  	select CPU_IDLE_MULTIPLE_DRIVERS
->  	help
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+
+-- 
+1.8.3.2
