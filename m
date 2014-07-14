@@ -1,110 +1,67 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 14 Jul 2014 15:20:52 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <20140714125529.GN26542@e103034-lin>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
- <20140711151304.GD3935@laptop>
- <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
- <20140711201238.GY20603@laptop.programming.kicks-ass.net>
- <20140714125529.GN26542@e103034-lin>
-Message-ID: <20140714132052.GY9918@twins.programming.kicks-ass.net>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Mon, 14 Jul 2014 16:24:56 +0300
+Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
+ gpio block
+In-Reply-To: <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
+References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
+ <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
+Message-ID: <1405344296.13503.8.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 01:55:29PM +0100, Morten Rasmussen wrote:
-> On Fri, Jul 11, 2014 at 09:12:38PM +0100, Peter Zijlstra wrote:
-> > On Fri, Jul 11, 2014 at 07:39:29PM +0200, Vincent Guittot wrote:
-> > > In my mind, arch_scale_cpu_freq was intend to scale the capacity of
-> > > the CPU according to the current dvfs operating point.
-> > > As it's no more use anywhere now that we have arch_scale_cpu, we could
-> > > probably remove it .. and see when it will become used.
-> > 
-> > I probably should have written comments when I wrote that code, but it
-> > was meant to be used only where, as described above, we limit things.
-> > Ondemand and such, which will temporarily decrease freq, will ramp it up
-> > again at demand, and therefore lowering the capacity will skew things.
-> > 
-> > You'll put less load on because its run slower, and then you'll run it
-> > slower because there's less load on -> cyclic FAIL.
+On Wed, 2014-07-09 at 14:18 -0700, Bjorn Andersson wrote:
+> On Wed, Jul 9, 2014 at 1:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
+> > <bjorn.andersson@sonymobile.com> wrote:
+
+
+> [...]
+> >> +
+> >> +       pm8921_gpio: gpio at 150 {
+> >> +               compatible = "qcom,pm8921-gpio";
+> >> +               reg = <0x150>;
+> >> +               interrupts = <192 1>, <193 1>, <194 1>,
+> >> +                            <195 1>, <196 1>, <197 1>,
+> >> +                            <198 1>, <199 1>, <200 1>,
+> >> +                            <201 1>, <202 1>, <203 1>,
+> >> +                            <204 1>, <205 1>, <206 1>,
+> >> +                            <207 1>, <208 1>, <209 1>,
+> >> +                            <210 1>, <211 1>, <212 1>,
+> >> +                            <213 1>, <214 1>, <215 1>,
+> >> +                            <216 1>, <217 1>, <218 1>,
+> >> +                            <219 1>, <220 1>, <221 1>,
+> >> +                            <222 1>, <223 1>, <224 1>,
+> >> +                            <225 1>, <226 1>, <227 1>,
+> >> +                            <228 1>, <229 1>, <230 1>,
+> >> +                            <231 1>, <232 1>, <233 1>,
+> >> +                            <234 1>, <235 1>;
+> >
+> >
+> > So this looks a bit weird. But if I just get to understand the hardware
+> > I guess it won't anymore.
+> >
+> > So there is an interrupt parent to which the IRQ lines from the PMIC
+> > are routed back through external lines to IRQ offsets 192 thru 235?
+> >
 > 
-> Agreed. We can't use a frequency scaled compute capacity for all
-> load-balancing decisions. However, IMHO, it would be useful to have know
-> the current compute capacity in addition to the max compute capacity
-> when considering energy costs. So we would have something like:
+> The pm8921-core exposes 256 interrupts, the listed 44 interrupts here are what
+> comes out of that.
 > 
-> * capacity_max: cpu capacity at highest frequency.
+> I was really reluctant to list all the interrupts, but I think it turned out
+> nicer than any of my other attempts; like only providing a base and then
+> relying on interrupts being consecutive.
 > 
-> * capacity_cur: cpu capacity at current frequency.
-> 
-> * capacity_avail: cpu capacity currently available. Basically
->   capacity_cur taking rt, deadline, and irq accounting into account.
-> 
-> capacity_max should probably include rt, deadline, and irq accounting as
-> well. Or we need both?
+> Suggestions on how this "should" be solved are welcome, as we have the same
+> setup for the newer pmics (Ivan's patches) and the TLMM hardware (pinctrl-msm)
+> supports using dedicated interrupts for certain gpio pins (instead of passing
+> through the chain handler).
 
-I'm struggling to fully grasp your intent. We need DVFS like accounting
-for sure, and that means a current freq hook, but I'm not entirely sure
-how that relates to capacity.
+This is something that is already known in the driver, numbers did not
+change at run time, right? Could we hard-code IRQ base in driver, like 
+"ti,palmas-gpio" did? reg property is also not strictly required, but
+this is different story :-).
 
-> Based on your description arch_scale_freq_capacity() can't be abused to
-> implement capacity_cur (and capacity_avail) unless it is repurposed.
-> Nobody seems to implement it. Otherwise we would need something similar
-> to update capacity_cur (and capacity_avail).
-
-Yeah, I never got around to doing so. I started doing a APERF/MPERF SMT
-capacity thing for x86 but never finished that. The naive implementation
-suffered the same FAIL loop as above because APERF stops on idle. So
-when idle your capacity drops to nothing, leading to no new work,
-leading to more idle etc.
-
-I never got around to fixing that -- adding an idle filter, and ever
-since things have somewhat bitrotted.
-
-> As a side note, we can potentially get into a similar fail cycle already
-> due to the lack of scale invariance in the entity load tracking.
-
-Yah, I think that got mentioned a long while ago.
-
-> > > > In that same discussion ISTR a suggestion about adding avg_running time,
-> > > > as opposed to the current avg_runnable. The sum of avg_running should be
-> > > > much more accurate, and still react correctly to migrations.
-> > > 
-> > > I haven't look in details but I agree that avg_running would be much
-> > > more accurate than avg_runnable and should probably fit the
-> > > requirement. Does it means that we could re-add the avg_running (or
-> > > something similar) that has disappeared during the review of load avg
-> > > tracking patchset ?
-> > 
-> > Sure, I think we killed it there because there wasn't an actual use for
-> > it and I'm always in favour of stripping everything to their bare bones,
-> > esp big and complex things.
-> > 
-> > And then later, add things back once we have need for it.
-> 
-> I think it is a useful addition to the set of utilization metrics. I
-> don't think it is universally more accurate than runnable_avg. Actually
-> quite the opposite when the cpu is overloaded. But for partially loaded
-> cpus it is very useful if you don't want to factor in waiting time on
-> the rq.
-
-Well, different things different names. Utilization as per literature is
-simply the fraction of CPU time actually used. In that sense running_avg
-is about right for that. Our current runnable_avg is entirely different
-(as I think we all agree by now).
-
-But yes, for application the tipping point is u == 1, up until that
-point pure utilization makes sense, after that our runnable_avg makes
-more sense.
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/1ceff0b0/attachment.sig>
+Regards,
+Ivan
