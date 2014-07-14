@@ -1,54 +1,101 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 14 Jul 2014 16:09:04 +0200
-Subject: [PATCH v2 4/4] can: flexcan: add vf610 support for FlexCAN
-In-Reply-To: <5b42e19c9741a0b54420ade131f84408@agner.ch>
-References: <cover.1405322992.git.stefan@agner.ch>
- <3b047f9eb64ef01a958d83706af8f7e973358420.1405322992.git.stefan@agner.ch>
- <53C38FD9.8070403@pengutronix.de> <5b42e19c9741a0b54420ade131f84408@agner.ch>
-Message-ID: <53C3E480.9050509@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Jul 2014 16:08:57 +0200
+Subject: [PATCH 4/8] clk: Add clock driver for mb86s7x
+In-Reply-To: <1405233052-4688-1-git-send-email-mollie.wu@linaro.org>
+References: <1405233052-4688-1-git-send-email-mollie.wu@linaro.org>
+Message-ID: <4408359.eoFHS4QiM2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 03:37 PM, Stefan Agner wrote:
-> Am 2014-07-14 10:07, schrieb Marc Kleine-Budde:
-> <snip>
->>> +	/*
->>> +	 * On Vybrid, disable memory error detection interrupts
->>> +	 * and freeze mode.
->>> +	 * This also works around errata e5295 which generates
->>> +	 * false positive memory errors and put the device in
->>> +	 * freeze mode.
->>> +	 */
->>> +	if (priv->devtype_data->features & FLEXCAN_HAS_MECR_FEATURES) {
->>> +		/*
->>> +		 * Follow the protocol as described in "Detection
->>> +		 * and Correction of Memory Errors" to write to
->>> +		 * MECR register
->>> +		 */
->>
->>
->> One nitpick regarding the comment. In driver/net, the preferred
->> multi-line comment style is
->>
+On Sunday 13 July 2014 14:30:52 Mollie Wu wrote:
+
+> ---
+>  .../bindings/clock/fujitsu,mb86s7x_clk.txt         |  32 ++
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-mb86s7x.c                          | 352 +++++++++++++++++++++
+>  3 files changed, 385 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+>  create mode 100644 drivers/clk/clk-mb86s7x.c
 > 
-> Just a few lines above that one, another multi-line comment is written
-> with the empty line at start... With this changed to the net comment
-> style, we would end up in a mixed style... What do you think?
+> diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+> new file mode 100644
+> index 0000000..4a17d79
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+> @@ -0,0 +1,32 @@
+> +Fujitsu CRG11 clock driver bindings
+> +-----------------------------------
+> +
+> +Required properties :
+> +- compatible : Shall contain "fujitsu,mb86s7x_clk"
 
-Okay, keep the commenting style of the driver.
+No wildcards in compatible strings please.
 
-Marc
+> +- #clock-cells : Shall be 0
+> +- cntrlr : 0->ALW, 1->DDR3, 2->MAIN, 3->CA15, 4->HDMI, 5->DPHY
+> +- domain : [0, 15]
+> +- port : [0,7] -> Gateable Clock Ports.  [8]->UngatedCLK
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+It would be good to be a bit more verbose here.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/a258af90/attachment.sig>
+> +
+> +struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
+> +{
+> +	struct clk_init_data init;
+> +	struct cl_clk *clc;
+> +
+> +	clc = kzalloc(sizeof(*clc), GFP_KERNEL);
+> +	if (!clc) {
+> +		pr_err("could not allocate cl_clk\n");
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	clc->hw.init = &init;
+> +	clc->cluster = topology_physical_package_id(cpu_dev->id);
+> +
+> +	init.name = dev_name(cpu_dev);
+> +	init.ops = &clk_clc_ops;
+> +	init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
+> +	init.num_parents = 0;
+> +
+> +	return devm_clk_register(cpu_dev, &clc->hw);
+> +}
+> +
+> +static int mb86s7x_clclk_of_init(void)
+> +{
+> +	int cpu;
+> +	struct clk *clk;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		struct device *cpu_dev = get_cpu_device(cpu);
+> +
+> +		if (!cpu_dev) {
+> +			pr_err("failed to get cpu%d device\n", cpu);
+> +			continue;
+> +		}
+> +
+> +		clk = mb86s7x_clclk_register(cpu_dev);
+> +		if (IS_ERR(clk)) {
+> +			pr_err("failed to register cpu%d clock\n", cpu);
+> +			continue;
+> +		}
+> +		if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
+> +			pr_err("failed to register cpu%d clock lookup\n", cpu);
+> +			continue;
+> +		}
+> +		pr_debug("registered clk for %s\n", dev_name(cpu_dev));
+> +	}
+> +
+> +	platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
+> +
+> +	return 0;
+> +}
+> +module_init(mb86s7x_clclk_of_init);
+> 
+
+This looks weird: why don't you probe the clocks from DT like normal?
+
+Why do you register a platform device here? Are you trying to hide the fact that
+the cpufreq stuff still doesn't use proper DT probing?
+
+	Arnd
