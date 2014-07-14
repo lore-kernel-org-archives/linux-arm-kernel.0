@@ -1,66 +1,70 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 14 Jul 2014 09:12:44 +0200
-Subject: [PATCH v2 2/4] drivers: of: initialize and assign reserved memory to
- newly created devices
+Date: Mon, 14 Jul 2014 09:12:45 +0200
+Subject: [PATCH v2 3/4] drivers: dma-coherent: add initialization from device
+ tree
 In-Reply-To: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
 References: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1405321966-28184-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1405321966-28184-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently introduced of_reserved_mem_device_init() function to
-automatically assign respective reserved memory region to the newly created
-platform and amba device.
+Add support for handling 'shared-dma-pool' reserved-memory device tree
+nodes.
+
+Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/of/platform.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/base/dma-coherent.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 6c48d73a7fd7..a7f967866f13 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -21,6 +21,7 @@
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 7d6e84a51424..b20cbe095d86 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -218,3 +218,43 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 	return 0;
+ }
+ EXPORT_SYMBOL(dma_mmap_from_coherent);
++
++/*
++ * Support for reserved memory regions defined in device tree
++ */
++#ifdef CONFIG_OF_RESERVED_MEM
++#include <linux/of.h>
++#include <linux/of_fdt.h>
 +#include <linux/of_reserved_mem.h>
- #include <linux/platform_device.h>
- 
- const struct of_device_id of_default_bus_match_table[] = {
-@@ -237,12 +238,15 @@ static struct platform_device *of_platform_device_create_pdata(
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 
-+	of_reserved_mem_device_init(&dev->dev);
 +
- 	/* We do not fill the DMA ops for platform devices by default.
- 	 * This is currently the responsibility of the platform code
- 	 * to do such, possibly using a device notifier
- 	 */
- 
- 	if (of_device_add(dev) != 0) {
-+		of_reserved_mem_device_release(&dev->dev);
- 		platform_device_put(dev);
- 		goto err_clear_flag;
- 	}
-@@ -304,6 +308,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 	else
- 		of_device_make_bus_id(&dev->dev);
- 
-+	of_reserved_mem_device_init(&dev->dev);
++static void rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
++{
++	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
++		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++}
 +
- 	/* Allow the HW Peripheral ID to be overridden */
- 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
- 	if (prop)
-@@ -330,6 +336,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 	return dev;
- 
- err_free:
-+	of_reserved_mem_device_release(&dev->dev);
- 	amba_device_put(dev);
- err_clear_flag:
- 	of_node_clear_flag(node, OF_POPULATED);
++static void rmem_dma_device_release(struct reserved_mem *rmem,
++				    struct device *dev)
++{
++	dma_release_declared_memory(dev);
++}
++
++static const struct reserved_mem_ops rmem_dma_ops = {
++	.device_init	= rmem_dma_device_init,
++	.device_release	= rmem_dma_device_release,
++};
++
++static int __init rmem_dma_setup(struct reserved_mem *rmem)
++{
++	unsigned long node = rmem->fdt_node;
++
++	if (of_get_flat_dt_prop(node, "reusable", NULL))
++		return -EINVAL;
++
++	rmem->ops = &rmem_dma_ops;
++	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
++		&rmem->base, (unsigned long)rmem->size / SZ_1M);
++	return 0;
++}
++RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
++#endif
 -- 
 1.9.2
