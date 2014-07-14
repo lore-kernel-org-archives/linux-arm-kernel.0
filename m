@@ -1,90 +1,103 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 14 Jul 2014 11:54:48 +0200
-Subject: [PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
-In-Reply-To: <1403697175-13476-1-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403697175-13476-1-git-send-email-t.figa@samsung.com>
-Message-ID: <53C3A8E8.4090009@gmail.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 14 Jul 2014 12:57:26 +0300
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <20140714093136.GB9755@ulmo>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
+ <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
+ <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
+Message-ID: <53C3A986.9050602@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On 14/07/14 12:31, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Mon, Jul 14, 2014 at 12:06:32PM +0300, Mikko Perttunen wrote:
+>> On 14/07/14 11:15, Thierry Reding wrote:
+>>>> Old Signed by an unknown key
+>>>
+>>> On Mon, Jul 14, 2014 at 10:55:51AM +0300, Mikko Perttunen wrote:
+>>>> On 11/07/14 19:01, Mikko Perttunen wrote:
+>>>>> On 07/11/2014 05:51 PM, Thierry Reding wrote:
+>>>>>> On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
+>>>>>>> ...
+>>>>>> ...
+>>>>>
+>>>>> In this case, all the registers that will be written are such that the
+>>>>> MC driver will never need to write them. They are shadowed registers,
+>>>>> meaning that all writes are stored and are only effective starting from
+>>>>> the next time the EMC rate change state machine is activated, so writing
+>>>>> them from anywhere except than the EMC driver would be pointless.
+>>>>>
+>>>>> I can find two users of these registers in downstream:
+>>>>> 1) mc.c saves and loads them on suspend/restore (I don't know why, that
+>>>>> shouldn't do anything. They will be overridden anyway during the next
+>>>>> EMC rate change).
+>>>>> 2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to
+>>>>> calculate a value which it then writes to a register that is also
+>>>>> shadowed and that is part of downstream burst registers so that doesn't
+>>>>> do anything either.
+>>>>>
+>>>>> The reason I implemented two ways to specify the MC register area was
+>>>>> that this could be merged before an MC driver and retain
+>>>>> backwards-compatibility after the MC driver arrives.
+>>>>>
+>>>>> If this is not acceptable, we can certainly wait for the MC driver to be
+>>>>> merged first. (Although with the general rate of things, I hope I won't
+>>>>> be back at school at that point..) I assume that this is blocked on the
+>>>>> IOMMU bindings discussion? In that case, there are several options: the
+>>>>> MC driver could have its own tables for each EMC rate or we could just
+>>>>> make the EMC tables global (i.e. not under the EMC node). In any case,
+>>>>> the MC driver would need to implement a function that would just write
+>>>>> these values but be guaranteed to not do anything else, since that could
+>>>>> cause nasty things during the EMC rate change sequence.
+>>>>
+>>>> Having taken another look at the code, I don't think the MC driver could do
+>>>> anything that bad. There are also two other places where the EMC driver
+>>>> needs to read MC registers: Inside the sequence, it reads a register but
+>>>> discards its contents. According to comments, this acts as a memory barrier,
+>>>> probably for the preceding step that writes into MC memory. If the register
+>>>> writes are moved to the MC driver, it could also handle that. In another
+>>>> place it reads the number of RAM modules from a MC register. The MC driver
+>>>> could export this as another function.
+>>>
+>>> Exporting this functionality from the MC driver is the right thing to do
+>>> in my opinion.
+>>
+>> Ok, let's do that then. Do you think I could make a bare-bones MC driver to
+>> support the EMC driver before your MC driver with IOMMU/LA is ready? Can the
+>> MC device tree node be stabilized yet? Of course, if things go well, that
+>> concern might turn out to be unnecessary.
+>
+> Well, at this point this isn't 3.17 material anyway, so there's no need
+> to rush things.
 
-On 25.06.2014 13:52, Tomasz Figa wrote:
-> Due to recent consolidation of Exynos suspend and cpuidle code, some
-> parts of suspend and resume sequences are executed two times, once from
-> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
-> breaks suspend, at least on Exynos4-based boards.
-> 
-> This patch fixes the issue by removing exynos_pm_syscore_ops completely
-> and making the code rely only on CPU PM notifier.
-> 
-> Tested on Exynos4210-based Trats board.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c | 23 ++++-------------------
->  1 file changed, 4 insertions(+), 19 deletions(-)
-> 
-> Changes since v1:
->  - rebased onto Kukjin's fixes branch.
-> 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 202ca73..f23cc77 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -364,11 +364,6 @@ early_wakeup:
->  	return;
->  }
->  
-> -static struct syscore_ops exynos_pm_syscore_ops = {
-> -	.suspend	= exynos_pm_suspend,
-> -	.resume		= exynos_pm_resume,
-> -};
-> -
->  /*
->   * Suspend Ops
->   */
-> @@ -438,22 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->  
->  	switch (cmd) {
->  	case CPU_PM_ENTER:
-> -		if (cpu == 0) {
-> -			exynos_pm_central_suspend();
-> -			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> -				exynos_cpu_save_register();
-> -		}
-> +		if (cpu == 0)
-> +			exynos_pm_suspend();
->  		break;
->  
->  	case CPU_PM_EXIT:
-> -		if (cpu == 0) {
-> -			if (read_cpuid_part_number() ==
-> -					ARM_CPU_PART_CORTEX_A9) {
-> -				scu_enable(S5P_VA_SCU);
-> -				exynos_cpu_restore_register();
-> -			}
-> -			exynos_pm_central_resume();
-> -		}
-> +		if (cpu == 0)
-> +			exynos_pm_resume();
->  		break;
->  	}
->  
-> @@ -478,6 +464,5 @@ void __init exynos_pm_init(void)
->  	tmp |= ((0xFF << 8) | (0x1F << 1));
->  	__raw_writel(tmp, S5P_WAKEUP_MASK);
->  
-> -	register_syscore_ops(&exynos_pm_syscore_ops);
->  	suspend_set_ops(&exynos_suspend_ops);
->  }
-> 
+Very true.
 
-Please consider this patch for next fixes pull request. Without it
-suspend/resume is broken for Exynos4 and probably other SoCs. This patch
-just restores the sequence from before the patch moving things to PM
-notifier, so I don't think it should need any special treatment.
+> I'd prefer to take a patch on top of my proposed MC
+> driver patch in anticipation of merging that for 3.18. But if it turns
+> out that for whatever reason we can't do that, having a separate patch
+> makes it easy to extract the changes into a bare-bones driver.
 
-Best regards,
-Tomasz
+Yes, this sounds sensible. I'll make such a patch. I suppose having 
+another timings table in the MC node with just the rate and 
+mc-burst-data would separate the concerns best. It occurs to me that we 
+could also write the regs in the pre-rate change notifier, but this 
+would turn the dependency around and would mean that the regs are not 
+written when entering backup rates. The latter shouldn't be a problem 
+but the reversed dependency would, so I guess a custom function is the 
+way to go, and we need to add at least one anyway.
+
+The downstream kernel also overwrites most LA registers during EMC rate 
+change without regard for the driver-set values, and we might have to 
+read those values from the device tree too. Upstream can do this in rate 
+change notifiers if needed. I'll look into this a bit more.
+
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
