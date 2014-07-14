@@ -1,56 +1,32 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Mon, 14 Jul 2014 11:11:45 +0530
-Subject: [PATCH 2/3 v6] spi: s3c64xx: for DT platofrms always get the
- chipselect info from DT node
-In-Reply-To: <1405316506-27855-1-git-send-email-ch.naveen@samsung.com>
-References: <1405316506-27855-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1405316506-27855-3-git-send-email-ch.naveen@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 14 Jul 2014 11:15:15 +0530
+Subject: [PATCH V9 0/7] ARM: SPEAr13xx: Add PCIe support
+In-Reply-To: <cover.1404976058.git.viresh.kumar@linaro.org>
+References: <cover.1404976058.git.viresh.kumar@linaro.org>
+Message-ID: <CAKohpomvafkZcQiqC4+FXCH8cj5PnArd3wDzvUJMPU-dgWcygA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use controller_data structure only for the Non Device tree  platforms.
-For Device tree platforms, always derive the chipselect info from
-DT node.
+On 10 July 2014 12:56, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> This adds PCIe support for ARM based ST Microelectronics SPEAr13xx SoCs.
+>
+> V8 was here: https://lkml.org/lkml/2014/4/15/260 and just before being pulled by
+> Olof this happened: https://lkml.org/lkml/2014/7/9/641.
+>
+> An detailed look at the patches make it clear why Olof was unhappy.
+> Patches weren't in right order, groups, etc..
+>
+> So, this is an attempt to fix all those issues. Pushed here:
+> git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git spear/pcie-support-v9
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Doug Anderson <dianders@chromium.org>
----
-Changes since v5:
-None
+It may not be worth enough to send V10 as there aren't many updates.
+I have provided proper diff's in response to the comments I got.
 
-Changes since v4:
-1. Added reviewed by from Javier and Tested by from Doug
+V10 is here:
+git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git
+spear/pcie-support-v10
 
-Changes since v3:
-New change
- drivers/spi/spi-s3c64xx.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Let me know if something is still missing before I send a pull request tomorrow.
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index b61ff3d..a4b1af0 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -795,14 +795,15 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
- 	int err;
- 
- 	sdd = spi_master_get_devdata(spi->master);
--	if (!cs && spi->dev.of_node) {
-+	if (spi->dev.of_node) {
- 		cs = s3c64xx_get_slave_ctrldata(spi);
- 		spi->controller_data = cs;
--	}
--
--	/* For the non-DT platforms derive chip selects from controller data */
--	if (!spi->dev.of_node)
-+	} else {
-+		/* For the non-DT platforms derive chip
-+		 * selects from controller data
-+		 */
- 		spi->cs_gpio = cs->line;
-+	}
- 
- 	if (IS_ERR_OR_NULL(cs)) {
- 		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
--- 
-1.7.9.5
+--
+Viresh
