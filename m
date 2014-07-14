@@ -1,54 +1,30 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Mon, 14 Jul 2014 12:03:22 +0530
-Subject: [PATCH v2] ARM: dts: Add mask-tpm-reset to the device tree
-Message-ID: <1405319602-29892-1-git-send-email-vikas.sajjan@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 14 Jul 2014 08:39:27 +0200
+Subject: [PATCH] ARM: at91/dt: fix usb0 clocks definition in sam9n12 dtsi
+Message-ID: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+udphs_clk (USB Device Controller clock) is referenced instead of
+uhphs_clk (USB Host Controller clock).
 
-The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
-being reset across sleep/wake.  If we don't set it to anything then
-the TPM will be reset.  U-Boot will detect this as invalid
-and will reset the system on resume time. This GPIO can always be low
-and not hurt anything.  It will get pulled back high again during a
-normal warm reset when it will default back to an input.
-
-To properly preserve the TPM state across suspend/resume and to make
-the chrome U-Boot happy, properly set the GPIO to mask the
-reset to the TPM.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
-changes since v1:
-	- removed fixed regulator and used hogs instead.
+ arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 6c7cab0..c036d9e 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -211,6 +211,18 @@
- 
- 
- &pinctrl_0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mask_tpm_reset>;
-+
-+	/* We need GPX0_6 to be low at sleep time; just keep it low always */
-+	mask_tpm_reset: mask-tpm-reset {
-+		samsung,pins = "gpx0-6";
-+		samsung,pin-function = <1>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+		samsung,pin-val = <0>;
-+	};
-+
- 	max98090_irq: max98090-irq {
- 		samsung,pins = "gpx0-2";
- 		samsung,pin-function = <0>;
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 2877959..b84bac5 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -925,7 +925,7 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x00100000>;
+ 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
++			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
+ 				 <&uhpck>;
+ 			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
 -- 
-1.7.9.5
+1.8.3.2
