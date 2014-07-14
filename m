@@ -1,82 +1,131 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jul 2014 11:08:13 +0100
-Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140714064452.GD2081@ulmo>
-References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
- <20140712093917.GD18601@arm.com>
- <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
- <201407121422.02078.arnd@arndb.de>
- <CAF6AEGs7=3UByP2DLm-uwU03wr7M14x2t-0hLX-VPJ6_eZbU3g@mail.gmail.com>
- <20140713094341.GB23235@arm.com> <20140714064452.GD2081@ulmo>
-Message-ID: <20140714100813.GC1779@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jul 2014 06:12:50 -0400 (EDT)
+Subject: [PATCH v11 04/12] ARM: hisi: enable MCPM implementation
+In-Reply-To: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <alpine.LFD.2.11.1407140553300.3647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Mon, 14 Jul 2014, Haojian Zhuang wrote:
 
-On Mon, Jul 14, 2014 at 07:44:53AM +0100, Thierry Reding wrote:
-> On Sun, Jul 13, 2014 at 10:43:41AM +0100, Will Deacon wrote:
-> > My plan for the ARM SMMU driver is:
-> > 
-> >   (1) Change ->probe() to walk the device-tree looking for all masters with
-> >       phandles back to the SMMU instance being probed
-> 
-> You and Rob mentioned this several times and I don't understand why the
-> SMMU needs to know all masters up front. Is this necessary because it
-> needs to program all registers at .probe() time and they can't be
-> reprogrammed subsequently? Or is this just some kind of optimization?
+> +static bool hip04_init_cluster0_snoop(void)
+> +{
+> +	unsigned long data;
+> +
+> +	if (!fabric) {
+> +		pr_err("failed to find fabric base\n");
+> +		return false;
+> +	}
+> +	data = readl_relaxed(fabric + FAB_SF_MODE);
+> +	data |= 1;
+> +	writel_relaxed(data, fabric + FAB_SF_MODE);
+> +	while (1) {
+> +		if (data == readl_relaxed(fabric + FAB_SF_MODE))
+> +			break;
+> +	}
+> +	return true;
+> +}
 
-It's an optimization to reduce resource usage in the IOMMU, but one that
-is *required* by certain platforms (e.g. Olav mentioned his 43-ID master
-and Calxeda had something similar).
+In fact you probably should make this into something like:
 
-Basically, in order to perform an ->attach() for a master to a domain, we
-need complete knowledge of the system so that we can avoid accidentally
-attaching other masters to the same domain. The programming is done using
-a form of StreamID wildcarding, so at this point we would need to have
-parsed the entire DT to ensure our wildcard doesn't match other masters.
+static bool hip04_set_cluster_snoop(int cluster, bool active)
 
-> >   (2) For each master, extract the Stream IDs and add them to the internal
-> >       SMMU driver data structures (an rbtree per SMMU instance). For
-> >       hotpluggable buses, we'll need a way for the bus controller to
-> >       reserve a range of IDs -- this will likely be a later extension to
-> >       the binding.
-> > 
-> >   (3) When we get an ->add() call, warn if it's a device we haven't seen
-> >       and reject the addition.
-> 
-> It seems to me like this would be the logical place to parse stream IDs.
+Eventually you'll want to turn snoops off when a cluster is completely 
+idle.  And this can be used to init snoops on cluster 0 during boot as 
+well.
 
-We could do that only if we were guaranteed to have an ->add() call for
-*every* master before an ->attach() call for *any* master. I don't think
-that is necessarily true.
+> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned long data, mask;
+> +
+> +	if (!relocation || !sysctrl)
+> +		return -ENODEV;
+> +	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irq(&boot_lock);
+> +
+> +	if (hip04_cpu_table[cluster][cpu]) {
+> +		hip04_cpu_table[cluster][cpu]++;
+> +		spin_unlock_irq(&boot_lock);
+> +		return 0;
+> +	}
+> +
+> +	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+> +	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+> +	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+> +	writel_relaxed(0, relocation + 12);
+> +
+> +	if (hip04_cluster_down(cluster)) {
+> +		data = CLUSTER_DEBUG_RESET_BIT;
+> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+> +		do {
+> +			mask = CLUSTER_DEBUG_RESET_STATUS;
+> +			data = readl_relaxed(sysctrl + \
+> +					     SC_CPU_RESET_STATUS(cluster));
+> +		} while (data & mask);
+> +	}
+> +
+> +	hip04_cpu_table[cluster][cpu]++;
+> +
+> +	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +	       CORE_DEBUG_RESET_BIT(cpu);
+> +	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+> +	spin_unlock_irq(&boot_lock);
+> +	msleep(POLL_MSEC);
 
-> You could for example have a case where some device tree contains a node
-> for which no driver will ever be loaded (for example because it hasn't
-> been built-in, or the device is never used and the module is therefore
-> never loaded). That's a situation that you cannot determine by simply
-> walking the device tree in the IOMMU's .probe().
+Now that the booting CPU takes cares of snoops for itself, is this delay 
+still required?
 
-Why not? If we're simply searching for phandles to the IOMMU, why does it
-matter whether a driver is bound to the master?
+> +	return 0;
+> +}
+> +
+> +static void hip04_mcpm_power_down(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster, data = 0;
+> +	bool skip_reset = false;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	__mcpm_cpu_going_down(cpu, cluster);
+> +
+> +	spin_lock(&boot_lock);
+> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+> +	hip04_cpu_table[cluster][cpu]--;
+> +	if (hip04_cpu_table[cluster][cpu] == 1) {
+> +		/* A power_up request went ahead of us. */
+> +		skip_reset = true;
+> +	} else if (hip04_cpu_table[cluster][cpu] > 1) {
+> +		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
+> +		BUG();
+> +	}
+> +
+> +	v7_exit_coherency_flush(louis);
+> +
+> +	__mcpm_cpu_down(cpu, cluster);
+> +	spin_unlock(&boot_lock);
 
-> I've always thought about IOMMU masters much in the same way as other
-> types of resources, such as memory or interrupts. In the rest of the
-> kernel we do carefully try to postpone allocation of these resources
-> until they are required, specifically so we don't waste resources when
-> they're unused.
+You can't touch spinlocks after v7_exit_coherency_flush().  That has to 
+come before it.
 
-See above, they are all required the moment anybody tries an ->attach().
+> +	if (!skip_reset) {
+> +		data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +		       CORE_DEBUG_RESET_BIT(cpu);
+> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
+> +	}
 
-> That's also one of the reasons why I think associating an IOMMU with the
-> bus type is bad. Currently if an IOMMU driver thinks it should enable
-> translation for a given device, then there's no way for that device's
-> driver to opt out again. There may be reasons (performance, hardware
-> bugs, ...) for the driver to decide against using the IOMMU for
-> translation, but there's currently no way to do that if the IOMMU driver
-> disagrees.
+And the race is still there.  If right before skip_reset is tested the 
+code in power_up() is executed, the CPU will then be shut down here 
+although it is expected to remain alive.
 
-Yes, we need a way to associate an IOMMU with a bus instance, but I think
-that's a separate topic, no?
+You are certain no code is ever executed after SC_CPU_RESET_REQ is 
+written to? You don't need to execute wfi() for the reset to be 
+effective?  If so this write will have to be performed by another CPU 
+via a work queue or something unless there is simply no other CPU 
+running in the system.
 
-Will
+
+Nicolas
