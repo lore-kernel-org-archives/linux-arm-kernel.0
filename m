@@ -1,106 +1,100 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 14 Jul 2014 09:40:59 +0530
-Subject: [PATCH v6 2/6] ARM: EXYNOS: Move cpufreq and cpuidle device
- registration to init_machine
-In-Reply-To: <026701cf9c43$98b20860$ca161920$@samsung.com>
-References: <1404705056-11965-1-git-send-email-pankaj.dubey@samsung.com>
- <1404705056-11965-3-git-send-email-pankaj.dubey@samsung.com>
- <53BB25B7.6000500@samsung.com> <000801cf9a7f$3896e150$a9c4a3f0$@samsung.com>
- <026701cf9c43$98b20860$ca161920$@samsung.com>
-Message-ID: <000301cf9f19$9fff2110$dffd6330$@samsung.com>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Mon, 14 Jul 2014 10:07:06 +0530
+Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
+In-Reply-To: <20140714032451.GA1668@shlinux1.ap.freescale.net>
+References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+ <53BFBF3F.8040804@gmail.com>
+ <20140714032451.GA1668@shlinux1.ap.freescale.net>
+Message-ID: <53C35E72.2050902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On 07/14/2014 08:54 AM, Dong Aisheng wrote:
+> On Fri, Jul 11, 2014 at 04:11:03PM +0530, Varka Bhadram wrote:
+>> On 07/11/2014 03:59 PM, Dong Aisheng wrote:
+>>> add M_CAN device tree binding documentation
+>>>
+>>> Cc: Wolfgang Grandegger <wg@grandegger.com>
+>>> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+>>> Cc: Varka Bhadram <varkabhadram@gmail.com>
+>>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>>> ---
+>>>   .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
+>>>   1 files changed, 65 insertions(+), 0 deletions(-)
+>>>   create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+>>> new file mode 100644
+>>> index 0000000..c4cb263
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+>>> @@ -0,0 +1,65 @@
+>>> +Bosch MCAN controller Device Tree Bindings
+>>> +-------------------------------------------------
+>>> +
+>>> +Required properties:
+>>> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
+>>> +- reg			: physical base address and size of the M_CAN
+>>> +			  registers map and Message RAM
+>>> +- reg-names		: Should be "m_can" and "message_ram"
+>>> +- interrupts		: Should be the interrupt number of M_CAN interrupt
+>>> +			  line 0 and line 1, could be same if sharing
+>>> +			  the same interrupt.
+>>> +- interrupt-names	: Should contain "int0" and "int1"
+>>> +- clocks		: Clocks used by controller, should be host clock
+>>> +			  and CAN clock.
+>>> +- clock-names		: Should contain "hclk" and "cclk"
+>>> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+>> I think this should be pinctrl-0
+>>
+> First, this part is defined by pinctrl binding doc.
+> Second i think it may be possible someone wants to add other pinctrl states
+> when implement low power state in the future.
+> So i just keep it as pinctrl-<n>.
 
-On Thursday, July 10, 2014 7:04 PM, Kukjin wrote:
-> Pankaj Dubey wrote:
-> >
-> > Hi Kukjin,
-> >
-> Hi,
-> 
-> > >
-> > > On 07/07/14 12:50, Pankaj Dubey wrote:
-> > > > As exynos_cpuidle_init and exynos_cpufreq_init function have just
-> > > > one lines of code for registering platform devices. We can move
-> > > > these lines to exynos_dt_machine_init and delete
-> > > > exynos_cpuidle_init and exynos_cpufreq_init function. This will
-> > > > help in reducing lines of code in exynos.c, making it more cleaner.
-> > > >
-> > > > Suggested-by: Tomasz Figa<t.figa@samsung.com>
-> > > > Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
-> > > > Reviewed-by: Tomasz Figa<t.figa@samsung.com>
-> > > > ---
-> > > >   arch/arm/mach-exynos/exynos.c |   20 ++++----------------
-> > > >   1 file changed, 4 insertions(+), 16 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm/mach-exynos/exynos.c
-> > > > b/arch/arm/mach-exynos/exynos.c index ff60b4c..47170eb 100644
-> > > > --- a/arch/arm/mach-exynos/exynos.c
-> > > > +++ b/arch/arm/mach-exynos/exynos.c
-> > > > @@ -171,19 +171,6 @@ static struct platform_device exynos_cpuidle =
-{
-> > > >   	.id                = -1,
-> > > >   };
-> > > >
-> > > > -void __init exynos_cpuidle_init(void) -{
-> > > > -	if (soc_is_exynos5440())
-> > > > -		return;
-> > > > -
-> > > > -	platform_device_register(&exynos_cpuidle);
-> > > > -}
-> > > > -
-> > > > -void __init exynos_cpufreq_init(void) -{
-> > > > -	platform_device_register_simple("exynos-cpufreq", -1, NULL,
-0);
-> > > > -}
-> > > > -
-> > > >   void __iomem *sysram_base_addr;
-> > > >   void __iomem *sysram_ns_base_addr;
-> > > >
-> > > > @@ -300,10 +287,11 @@ static void __init
-exynos_dt_machine_init(void)
-> > > >   	if (!IS_ENABLED(CONFIG_SMP))
-> > > >   		exynos_sysram_init();
-> > > >
-> > > > -	if (!of_machine_is_compatible("samsung,exynos5420"))
-> > > > -		exynos_cpuidle_init();
-> > > > +	if (!of_machine_is_compatible("samsung,exynos5420") ||
-> > > > +
-!of_machine_is_compatible("samsung,exynos5440"))
-> > > > +		platform_device_register(&exynos_cpuidle);
-> > > >
-> > > > -	exynos_cpufreq_init();
-> > > > +	platform_device_register_simple("exynos-cpufreq", -1, NULL,
-0);
-> > > >
-> > > >   	of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> NULL);
-> > > >   }
-> > >
-> > > This cannot be applied in my tree now....
-> > >
-> >
-> > May I know what the issue is? As I am able to rebase this patch on
-> > today's kgene/for-next and could not see any merge conflict.
-> > If you think I need to respin this patch please let me know.
-> >
-> 
-> Pankaj, I found this is based on cpuidle related branch in my tree, BTW
-this
-> has a dependency with following so please respin your patch once I take
-the
-> patch in my tree maybe tonight.
-> 
-> https://lkml.org/lkml/2014/6/24/286
-> 
+Normally we will use pinctrl-0 for mentioning the pinctrl bindings.
 
-Thanks. I have respinned this after resolving merge conflict. 
+If somebody going to add something to the pinctrl bindings they will
+add separately with pinctrl-1: bla bla bla...
+
+>>> +- pinctrl-names		: Names corresponding to the numbered pinctrl states
+>> remove 1 tab space before :
+>>
+> It's a bit strange.
+> Other line like pinctrl-<n> is also two tabs.
+> And the code looks fine and already aligned.
+> - pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> - pinctrl-names		: Names corresponding to the numbered pinctrl states
+> Do you mean change line of pinctrl-names from two tabs to one space and a tab before :?
+>
+When i see in the patch the alignment is like this
+pinctrl-<n>	:
+pinctrl-name		:
+
+>>> +- mram-cfg		: Message RAM configuration data.
+>>> +  Multiple M_CAN instances can share the same Message RAM and each element(e.g
+>>> +  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+>>> +  so this property is telling driver how the shared or private Message RAM
+>>> +  are used by this M_CAN controller.
+>>> +
+>> It may written like:
+>> mram-cfg		: Message RAM configuration data
+>> 			  Multiple M_CAN instances can share the same Message RAM and each element
+>> 			  (e.g Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+>> 			  ...
+>>
+> I'm fine with that.
+> The question is it's easy to over 80 columns if writing like that,
+> is it ok?
+
+When we follow the above format it would be more readable.
+
+> Regards
+> Dong Aisheng
 
 
-Thanks,
-Pankaj Dubey
-
-> Thanks,
-> Kukjin
+-- 
+Regards,
+Varka Bhadram.
