@@ -1,23 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Jul 2014 19:54:01 +0100
-Subject: [PATCH 4/4] ASoC: samsung: remove unused DMA data
-In-Reply-To: <1405086308-1461192-7-git-send-email-arnd@arndb.de>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <1405086308-1461192-7-git-send-email-arnd@arndb.de>
-Message-ID: <20140714185401.GD6800@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Jul 2014 20:55:53 +0200
+Subject: [PATCH] cpuidle: big.LITTLE: add MCPM dependency
+In-Reply-To: <53C42522.9060907@linaro.org>
+References: <4345351.RJRQd7ghCF@wuerfel> <53C42522.9060907@linaro.org>
+Message-ID: <6876751.hCLZ4zM0XT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 03:45:08PM +0200, Arnd Bergmann wrote:
-> The s3c_dma_client structures and the 'ch' and 'ops' members in
-> s3c_dma_params were only used by the legacy DMA driver and serve
-> no function any more. This removes any reference to them.
+On Monday 14 July 2014 20:44:50 Daniel Lezcano wrote:
+> > --- a/drivers/cpuidle/Kconfig.arm
+> > +++ b/drivers/cpuidle/Kconfig.arm
+> > @@ -10,6 +10,7 @@ config ARM_ARMADA_370_XP_CPUIDLE
+> >   config ARM_BIG_LITTLE_CPUIDLE
+> >       bool "Support for ARM big.LITTLE processors"
+> >       depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
+> > +     depends on MCPM
+> 
+> Why do we want to depend on MCPM ? If I want to enable the cpuidle 
+> driver, the Kconfig should select the dependencies instead of letting 
+> the user to figure out what dependency is missing in order to enable the 
+> cpuidle option, no ?
+> 
+> +       select MCPM
+> 
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/1d2de040/attachment.sig>
+MCPM is a user-selectable option, which doesn't mix well with 'select'.
+
+If you want to use 'select' here, better also change
+
+	bool "Multi-Cluster Power Management"
+
+to just
+
+	bool
+
+in the ARM global Kconfig. The normal way to deal with these dependencies
+though is to have platforms 'select' the features they allow and have
+device drivers 'depends on' the same symbol.
+
+	Arnd
