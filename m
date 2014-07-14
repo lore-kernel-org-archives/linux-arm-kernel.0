@@ -1,32 +1,102 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 14 Jul 2014 18:18:12 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <4494372.fAWcxQ0qku@wuerfel>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <4755712.cJmZ5fnaQH@wuerfel> <53C3CFCA.9050800@metafoo.de>
- <4494372.fAWcxQ0qku@wuerfel>
-Message-ID: <53C402C4.5090908@metafoo.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Jul 2014 18:17:50 +0200
+Subject: [PATCH 1/2] arm64: add C struct definition for Image header
+In-Reply-To: <1405354671-14031-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1405354671-14031-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1405354671-14031-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 05:46 PM, Arnd Bergmann wrote:
-[...]
->>> +static struct gpiod_lookup_table smartq_audio_gpios = {
->>> +	.dev_id = "smartq-audio",
->>> +	.table = {
->>> +		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
->>> +		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
->>
->> There is no such thing as GPIO_ACTIVE_HIGH, just 0 for flags.
->
-> The original driver does gpio_direction_output(..., 1);
->
-> For some reason I earlier concluded that this was what the '1' would need
-> to get converted to. Are you sure '0' is correct then?
->
+In order to be able to interpret the Image header from C code, we need a
+struct definition that reflects the specification for Image headers as laid
+out in Documentation/arm64/booting.txt.
 
-Yes. But now that you say it the gpiod_direction_output() call is missing 
-from this patch.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/image_hdr.h | 75 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 arch/arm64/include/asm/image_hdr.h
 
-- Lars
+diff --git a/arch/arm64/include/asm/image_hdr.h b/arch/arm64/include/asm/image_hdr.h
+new file mode 100644
+index 000000000000..9dc74b672124
+--- /dev/null
++++ b/arch/arm64/include/asm/image_hdr.h
+@@ -0,0 +1,75 @@
++/*
++ * image_hdr.h - C struct definition of the arm64 Image header format
++ *
++ * Copyright (C) 2014 Linaro Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_IMAGE_HDR_H
++#define __ASM_IMAGE_HDR_H
++
++#ifdef __KERNEL__
++#include <linux/types.h>
++#else
++#include <stdint.h>
++#endif
++
++/**
++ * struct arm64_image_hdr - arm64 kernel Image binary header format
++ * @code0:		entry point, first instruction to jump to when booting
++ *			the Image
++ * @code1:		second instruction of entry point
++ * @text_offset:	mandatory offset (little endian) beyond a 2 megabyte
++ * 			aligned boundary that needs to be taken into account
++ * 			when deciding where to load the image
++ * @image_size:		total size (little endian) of the memory area (counted
++ *			from the offset where the image was loaded) that may be
++ *			used by the booting kernel before memory reservations
++ *			can be honoured
++ * @flags:		little endian bit field
++ *			Bit 0:		Kernel endianness.  1 if BE, 0 if LE.
++ *			Bits 1-63:	Reserved.
++ * @res2:		reserved, must be 0
++ * @res3:		reserved, must be 0
++ * @res4:		reserved, must be 0
++ * @magic:		Magic number (little endian): "ARM\x64"
++ * @res5:		reserved (used for PE COFF offset)
++ *
++ * This definition reflects the definition in Documentation/arm64/booting.txt in
++ * the Linux source tree.
++ */
++struct arm64_image_hdr {
++	uint32_t code0;
++	uint32_t code1;
++	uint64_t text_offset;
++	uint64_t image_size;
++	uint64_t flags;
++	uint64_t res2;
++	uint64_t res3;
++	uint64_t res4;
++	uint32_t magic;
++	uint32_t res5;
++};
++
++static const union {
++	uint8_t		le_val[4];
++	uint32_t	cpu_val;
++} arm64_image_hdr_magic = {
++	.le_val		= "ARM\x64"
++};
++
++/**
++ * int arm64_image_hdr_check() - check whether hdr points to an arm64 Image
++ * @hdr:	pointer to an arm64 Image
++ *
++ * Return: 1 if check is successful, 0 otherwise
++ */
++static inline int arm64_image_hdr_check(struct arm64_image_hdr const *hdr)
++{
++	return hdr->magic == arm64_image_hdr_magic.cpu_val;
++}
++
++#endif
+-- 
+1.8.3.2
