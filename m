@@ -1,64 +1,78 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 14 Jul 2014 14:55:16 +0200
-Subject: [PATCH] ARM: EXYNOS: Fix MCPM build with SUSPEND=n
-In-Reply-To: <alpine.LFD.2.11.1407140730080.3647@knanqh.ubzr>
-References: <1405337093-15377-1-git-send-email-k.kozlowski@samsung.com>
- <alpine.LFD.2.11.1407140730080.3647@knanqh.ubzr>
-Message-ID: <1405342516.13970.0.camel@AMDC1943>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Mon, 14 Jul 2014 13:55:29 +0100
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <20140711201238.GY20603@laptop.programming.kicks-ass.net>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+ <20140711151304.GD3935@laptop>
+ <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
+ <20140711201238.GY20603@laptop.programming.kicks-ass.net>
+Message-ID: <20140714125529.GN26542@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-07-14 at 07:35 -0400, Nicolas Pitre wrote:
-> On Mon, 14 Jul 2014, Krzysztof Kozlowski wrote:
+On Fri, Jul 11, 2014 at 09:12:38PM +0100, Peter Zijlstra wrote:
+> On Fri, Jul 11, 2014 at 07:39:29PM +0200, Vincent Guittot wrote:
+> > In my mind, arch_scale_cpu_freq was intend to scale the capacity of
+> > the CPU according to the current dvfs operating point.
+> > As it's no more use anywhere now that we have arch_scale_cpu, we could
+> > probably remove it .. and see when it will become used.
 > 
-> > Building of EXYNOS5420_MCPM with disabled SUSPEND fails:
-> > arch/arm/mach-exynos/built-in.o: In function `exynos_mcpm_init':
-> > arch/arm/mach-exynos/mcpm-exynos.c:361: undefined reference to `mcpm_loopback'
-> > 
-> > The exynos_mcpm_init() in mcp-exynos.c calls mcpm_loopback() which
-> > depends on cpu_suspend function (ARM_CPU_SUSPEND).
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Cc: <stable@vger.kernel.org>
+> I probably should have written comments when I wrote that code, but it
+> was meant to be used only where, as described above, we limit things.
+> Ondemand and such, which will temporarily decrease freq, will ramp it up
+> again at demand, and therefore lowering the capacity will skew things.
 > 
-> No need to CC stable here as this code has not reached a released kernel 
-> yet.
-> 
-> > Fixes: a6a4d3152e3cbb6 ("ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster using the MCPM loopback")
-> 
-> And this is not clear yet if this commit ID is stable.
-> 
-> Other than that:
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Please send to RMK's patch system.
+> You'll put less load on because its run slower, and then you'll run it
+> slower because there's less load on -> cyclic FAIL.
 
-Sure, I'll remove the cc-stable tag, add your ack and send to the patch
-system.
+Agreed. We can't use a frequency scaled compute capacity for all
+load-balancing decisions. However, IMHO, it would be useful to have know
+the current compute capacity in addition to the max compute capacity
+when considering energy costs. So we would have something like:
 
-Thanks,
-Krzysztof
+* capacity_max: cpu capacity at highest frequency.
+
+* capacity_cur: cpu capacity at current frequency.
+
+* capacity_avail: cpu capacity currently available. Basically
+  capacity_cur taking rt, deadline, and irq accounting into account.
+
+capacity_max should probably include rt, deadline, and irq accounting as
+well. Or we need both?
+
+Based on your description arch_scale_freq_capacity() can't be abused to
+implement capacity_cur (and capacity_avail) unless it is repurposed.
+Nobody seems to implement it. Otherwise we would need something similar
+to update capacity_cur (and capacity_avail). 
+
+As a side note, we can potentially get into a similar fail cycle already
+due to the lack of scale invariance in the entity load tracking.
 
 > 
+> > > In that same discussion ISTR a suggestion about adding avg_running time,
+> > > as opposed to the current avg_runnable. The sum of avg_running should be
+> > > much more accurate, and still react correctly to migrations.
+> > 
+> > I haven't look in details but I agree that avg_running would be much
+> > more accurate than avg_runnable and should probably fit the
+> > requirement. Does it means that we could re-add the avg_running (or
+> > something similar) that has disappeared during the review of load avg
+> > tracking patchset ?
 > 
-> > ---
-> >  arch/arm/mach-exynos/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> > index 8f9b66c4ac78..5d4ff6571dcd 100644
-> > --- a/arch/arm/mach-exynos/Kconfig
-> > +++ b/arch/arm/mach-exynos/Kconfig
-> > @@ -119,6 +119,7 @@ config EXYNOS5420_MCPM
-> >  	bool "Exynos5420 Multi-Cluster PM support"
-> >  	depends on MCPM && SOC_EXYNOS5420
-> >  	select ARM_CCI
-> > +	select ARM_CPU_SUSPEND
-> >  	help
-> >  	  This is needed to provide CPU and cluster power management
-> >  	  on Exynos5420 implementing big.LITTLE.
-> > -- 
-> > 1.9.1
-> > 
-> > 
+> Sure, I think we killed it there because there wasn't an actual use for
+> it and I'm always in favour of stripping everything to their bare bones,
+> esp big and complex things.
+> 
+> And then later, add things back once we have need for it.
+
+I think it is a useful addition to the set of utilization metrics. I
+don't think it is universally more accurate than runnable_avg. Actually
+quite the opposite when the cpu is overloaded. But for partially loaded
+cpus it is very useful if you don't want to factor in waiting time on
+the rq.
+
+Morten
