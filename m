@@ -1,50 +1,105 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Jul 2014 15:32:35 +0800
-Subject: [PATCH] can: flexcan: add vf61x support for flexcan
-In-Reply-To: <cecd42e333cdf65ad512f719125f9180@agner.ch>
-References: <1405075933-22317-1-git-send-email-stefan@agner.ch>
- <53BFD401.8030101@pengutronix.de> <dac76ccd134f41b86f00352d10cfae4b@agner.ch>
- <20140714060344.GB2197@dragon> <cecd42e333cdf65ad512f719125f9180@agner.ch>
-Message-ID: <20140714073234.GD2197@dragon>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 14 Jul 2014 09:12:42 +0200
+Subject: [PATCH v2 0/4] CMA & device tree, once again
+Message-ID: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 09:06:33AM +0200, Stefan Agner wrote:
-> Am 2014-07-14 08:04, schrieb Shawn Guo:
-> > On Fri, Jul 11, 2014 at 03:58:37PM +0200, Stefan Agner wrote:
-> >> >> @@ -362,7 +374,7 @@
-> >> >>
-> >> >>  			esdhc1: esdhc at 400b2000 {
-> >> >>  				compatible = "fsl,imx53-esdhc";
-> >> >> -				reg = <0x400b2000 0x4000>;
-> >> >> +				reg = <0x400b2000 0x1000>;
-> >> >
-> >> > What's that doing here? :)
-> >>
-> >> That's an error I just stumbled upon.
-> > 
-> > I do not see why it's an error.  From Table 2-1. System Memory Map in
-> > i.MX53 RM, the size of ESDHC1 is 16K.
-> > 
-> > Shawn
-> 
-> Hi Shawn,
-> 
-> In the Vybrid RM memory map, 0x400B4000 is allocated to USB. 0x400B3000
-> is empty, whereas for other peripherals (e.g. FlexCAN) which use
-> multiple 0x1000 blocks, they are all explicitly stated. That is why I
-> assumed 0x1000 is correct.
+Hello,
 
-Ah, sorry.  I thought you're on i.MX53.  You're right about Vybrid, and
-it should be 0x1000.
+This is one more respin of the patches which add support for creating
+reserved memory regions defined in device tree. The last attempt
+(http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html)
+ended in merging only half of the code, so right now we have complete
+documentation merged and only basic code, which implements a half of it
+is written in the documentation. Although the merged patches allow to
+reserve memory, there is no way of using it for devices and drivers.
 
-> 
-> But then, the memory map within the SDHC peripheral has some registers
-> also located in 0x400B3000.
+This situation makes CMA rather useless, as the main architecture (ARM),
+which used it, has been converted from board-file based system
+initialization to device tree. Thus there is no place to use direct
+calls to dma_declare_contiguous() and some new solution, which bases on
+device tree, is urgently needed.
 
-Really?  Which one?
+This patch series fixes this issue. It provides two, already widely
+discussed and already present in the kernel, drivers for reserved
+memory: first based on DMA-coherent allocator, second using Contiguous
+Memory Allocator. The first one nicely implements typical 'carved out'
+reserved memory way of allocating contiguous buffers in a kernel-style
+way. The memory is used exclusively by devices assigned to the given
+memory region. The second one allows to reuse reserved memory for
+movable kernel pages (like disk buffers, anonymous memory) and migrates
+it out when device to allocates contiguous memory buffer. Both driver
+provides memory buffers via standard dma-mapping API.
 
-Shawn
+The patches have been rebased on top of latest CMA and mm changes merged
+to akmp kernel tree.
 
-> Hence I think 0x2000 is correct. Will send
-> an updated and separated patch.
+To define a 64MiB CMA region following node is needed:
+
+multimedia_reserved: multimedia_mem_region {
+	compatible = "shared-dma-pool";
+	reusable;
+	size = <0x4000000>;
+	alignment = <0x400000>;
+};
+
+Similarly, one can define 64MiB region with DMA coherent memory:
+
+multimedia_reserved: multimedia_mem_region {
+	compatible = "shared-dma-pool";
+	no-map;
+	size = <0x4000000>;
+	alignment = <0x400000>;
+};
+
+Then the defined region can be assigned to devices:
+
+scaler: scaler at 12500000 {
+	memory-region = <&multimedia_reserved>;
+	/* ... */
+};
+codec: codec at 12600000 {
+	memory-region = <&multimedia_reserved>;
+	/* ... */
+};
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Changes since v1:
+(http://www.spinics.net/lists/arm-kernel/msg343702.html)
+- fixed possible memory leak in case of reserved memory allocation failure
+  (thanks to Joonsoo Kim)
+
+Changes since the version posted in '[PATCH v6 00/11] reserved-memory 
+regions/CMA in devicetree, again' thread 
+http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html:
+- rebased on top of '[PATCH v3 -next 0/9] CMA: generalize CMA reserved
+area management code' patch series on v3.16-rc3
+- improved dma-coherent driver, now it correctly handles assigning more
+than one device to the given memory region
+
+
+Patch summary:
+
+Marek Szyprowski (4):
+  drivers: of: add automated assignment of reserved regions to client
+    devices
+  drivers: of: initialize and assign reserved memory to newly created
+    devices
+  drivers: dma-coherent: add initialization from device tree
+  drivers: dma-contiguous: add initialization from device tree
+
+ drivers/base/dma-coherent.c     | 40 +++++++++++++++++++++++
+ drivers/base/dma-contiguous.c   | 60 +++++++++++++++++++++++++++++++++++
+ drivers/of/of_reserved_mem.c    | 70 +++++++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c           |  7 +++++
+ include/linux/cma.h             |  3 ++
+ include/linux/of_reserved_mem.h |  7 +++++
+ mm/cma.c                        | 62 +++++++++++++++++++++++++++++-------
+ 7 files changed, 238 insertions(+), 11 deletions(-)
+
+-- 
+1.9.2
