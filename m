@@ -1,151 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Jul 2014 14:15:24 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <53C28B74.6010401@metafoo.de>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <20140712194903.GB6800@sirena.org.uk> <53C28B74.6010401@metafoo.de>
-Message-ID: <4755712.cJmZ5fnaQH@wuerfel>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 14 Jul 2014 21:23:28 +0900
+Subject: [PATCH v4 0/6] Add Keystone PCIe controller driver
+In-Reply-To: <20140714060334.GB2930@pratyush-vbox>
+References: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
+ <20140714060334.GB2930@pratyush-vbox>
+Message-ID: <00bb01cf9f5e$6aac4250$4004c6f0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 July 2014 15:36:52 Lars-Peter Clausen wrote:
-> On 07/12/2014 09:49 PM, Mark Brown wrote:
-> > On Sat, Jul 12, 2014 at 05:27:59PM +0200, Lars-Peter Clausen wrote:
-> >> On 07/11/2014 03:45 PM, Arnd Bergmann wrote:
-> >
-> >>> As a prerequisite for moving s3c64xx into multiplatform configurations,
-> >>> we need to change the smartq audio driver to stop using hardcoded
-> >>> gpio numbers from the header file, and instead pass the gpio data
-> >>> through platform_data.
-> >
-> >> This should be using the gpiod API. The gpiod API allows you to pass the
-> >> GPIOs without having to add a platform_data struct.
-> >
-> > OTOH that's a more invasive change that's harder to do mechanically -
-> > I'm not sure it's sensible to insist on someone doing it for generic
-> > cleanups (rather than actively working with the particular platform).
+On Monday, July 14, 2014 3:04 PM, Pratyush Anand wrote:
+> On Sat, Jul 12, 2014 at 04:36:29AM +0800, Murali Karicheri wrote:
 > 
-> I don't think it is more invasive than using platform data. I did the same 
-> recently for jz4740 qi-lb60[1] and the changes in the patch are fairly trivial. 
-> The non-descriptor API is deprecated, so this even if this patch is applied as 
-> is sooner or later somebody will mechanically convert it to the descriptor API.
+> [...]
+> 
+> > Murali Karicheri (6):
+> >   PCI: designware: add rd[wr]_other_conf API
+> >   PCI: designware: refactor MSI code to work with v3.65 dw hardware
+> 
+> For  above two you can add my reviewed-by:
+> 
+> >   PCI: designware: refactor host init code to re-use on keystone PCI
+> >   PCI: designware: enhance dw core driver to support keystone PCI host
+> 
+> In stead of using version number and then changing few functions from
+> static to global , I would have used same philosophy of adding callbacks
+> wherever needed. May be maintainers can give their view, instead of patch
+> 3 and 4 I would have gone with something like this, where kc_pcie can be
+> passed through pp->plat_data.
 
-I've given it a try now. Can you confirm that this is a valid transformation?
+I agree with your suggestion. I don't want to use the version number.
+The call back would be better.
 
-If it's ok, I'll fold it into the original patch and re-send.
+Best regards,
+Jingoo Han
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
- ./arch/arm/mach-s3c64xx/mach-smartq.c           |   15 ++++++++-------
- ./sound/soc/samsung/smartq_wm8987.c             |   19 +++++++------------
- ./include/linux/platform_data/asoc-s3c-smartq.h |   10 ----------
- 3 files changed, 15 insertions(+), 29 deletions(-)
-
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index 4c111f60dbf2..dce449c0e855 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -20,7 +20,6 @@
- #include <linux/spi/spi_gpio.h>
- #include <linux/usb/gpio_vbus.h>
- #include <linux/platform_data/s3c-hsotg.h>
--#include <linux/platform_data/asoc-s3c-smartq.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
-@@ -380,9 +379,12 @@ void __init smartq_map_io(void)
- 	smartq_lcd_mode_set();
- }
- 
--static const __initconst struct smartq_audio_pdata smartq_audio_pdata = {
--	.gpio_jack = S3C64XX_GPL(12),
--	.gpio_amp = S3C64XX_GPK(12),
-+static struct gpiod_lookup_table smartq_audio_gpios = {
-+	.dev_id = "smartq-audio",
-+	.table = {
-+		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
-+		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
-+	},
- };
- 
- void __init smartq_machine_init(void)
-@@ -404,7 +406,6 @@ void __init smartq_machine_init(void)
- 
- 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
- 
--	platform_device_register_data(NULL, "smartq-audio", -1,
--				      &smartq_audio_pdata,
--				      sizeof (smartq_audio_pdata));
-+	platform_device_register_simple("smartq-audio", -1, NULL, 0);
-+	gpiod_add_lookup_table(&smartq_audio_gpios);
- }
-diff --git a/include/linux/platform_data/asoc-s3c-smartq.h b/include/linux/platform_data/asoc-s3c-smartq.h
-deleted file mode 100644
-index 5bddc3586802..000000000000
---- a/include/linux/platform_data/asoc-s3c-smartq.h
-+++ /dev/null
-@@ -1,10 +0,0 @@
--#ifndef __PLATFORM_DATA_ASOC_S3C_SMARTQ
--#define __PLATFORM_DATA_ASOC_S3C_SMARTQ
--
--struct smartq_audio_pdata {
--	int gpio_jack;
--	int gpio_amp;
--};
--
--#endif
--
-diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
-index 8c4a0a285ce7..8da7c67903c6 100644
---- a/sound/soc/samsung/smartq_wm8987.c
-+++ b/sound/soc/samsung/smartq_wm8987.c
-@@ -19,8 +19,6 @@
- #include <sound/soc.h>
- #include <sound/jack.h>
- 
--#include <linux/platform_data/asoc-s3c-smartq.h>
--
- #include "i2s.h"
- #include "../codecs/wm8750.h"
- 
-@@ -126,10 +124,9 @@ static int smartq_speaker_event(struct snd_soc_dapm_widget *w,
- 				struct snd_kcontrol *k,
- 				int event)
- {
--	struct smartq_audio_pdata *pdata;
--	pdata = snd_soc_smartq.dev->platform_data;
-+	struct gpio_desc *gpio = dev_get_drvdata(snd_soc_smartq.dev);
- 
--	gpio_set_value(pdata->gpio_amp, SND_SOC_DAPM_EVENT_OFF(event));
-+	gpiod_set_value(gpio, SND_SOC_DAPM_EVENT_OFF(event));
- 
- 	return 0;
- }
-@@ -222,21 +219,19 @@ static struct snd_soc_card snd_soc_smartq = {
- 
- static int smartq_probe(struct platform_device *pdev)
- {
--	struct smartq_audio_pdata *pdata = pdev->dev.platform_data;
-+	struct gpio_desc *gpio;
- 	int ret;
- 
- 	platform_set_drvdata(pdev, &snd_soc_smartq);
- 
- 	/* Initialise GPIOs used by amplifiers */
--	ret = devm_gpio_request_one(&pdev->dev, pdata->gpio_amp,
--				    GPIOF_DIR_OUT | GPIOF_INIT_HIGH,
--				    "amplifiers shutdown");
--	if (ret) {
-+	gpio = devm_gpiod_get(&pdev->dev, "amplifiers shutdown");
-+	if (IS_ERR(gpio)) {
- 		dev_err(&pdev->dev, "Failed to register GPK12\n");
-+		ret = PTR_ERR(gpio);
- 		goto out;
- 	}
--
--	smartq_jack_gpios[0].gpio = pdata->gpio_jack;
-+	platform_set_drvdata(pdev, gpio);
- 
- 	ret = devm_snd_soc_register_card(&pdev->dev, &snd_soc_smartq);
- 	if (ret)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 905941c..b216192 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -490,16 +490,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>         }
+> 
+>         if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -               pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+> -                                       MAX_MSI_IRQS, &msi_domain_ops,
+> -                                       &dw_pcie_msi_chip);
+> -               if (!pp->irq_domain) {
+> -                       dev_err(pp->dev, "irq domain init failed\n");
+> -                       return -ENXIO;
+> -               }
+> +               if (!pp->ops->msi_init) {
+> +                       pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+> +                                               MAX_MSI_IRQS, &msi_domain_ops,
+> +                                               &dw_pcie_msi_chip);
+> +                       if (!pp->irq_domain) {
+> +                               dev_err(pp->dev, "irq domain init failed\n");
+> +                               return -ENXIO;
+> +                       }
+> 
+> -               for (i = 0; i < MAX_MSI_IRQS; i++)
+> -                       irq_create_mapping(pp->irq_domain, i);
+> +                       for (i = 0; i < MAX_MSI_IRQS; i++)
+> +                               irq_create_mapping(pp->irq_domain, i);
+> +               } else {
+> +                       pp->ops->msi_init(pp, &msi_domain_ops,
+> +                                               &dw_pcie_msi_chip);
+> +               }
+>         }
+> 
+>         if (pp->ops->host_init)
+> @@ -759,6 +764,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>                 BUG();
+>         }
+> 
+> +       if (bus && pp->ops->scan_bus)
+> +               bus = pp->ops->scan_bus(pp);
+> +
+>         return bus;
+>  }
+> 
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 387f69e..39ce496 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -52,6 +52,7 @@ struct pcie_port {
+>         struct irq_domain       *irq_domain;
+>         unsigned long           msi_data;
+>         DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
+> +       void                    *plat_data;
+>  };
+> 
+>  struct pcie_host_ops {
+> @@ -70,6 +71,9 @@ struct pcie_host_ops {
+>         void (*msi_set_irq)(struct pcie_port *pp, int irq);
+>         void (*msi_clear_irq)(struct pcie_port *pp, int irq);
+>         u32 (*get_msi_data)(struct pcie_port *pp);
+> +       struct pci_bus *(*scan_bus)(struct pcie_port *pp);
+> +       void (*msi_init) (struct pcie_port *pp, struct irq_domain_ops *ops,
+> +                       struct msi_chip *chip);
+>  };
+> 
+>  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+> 
+> 
+> ~Pratyush
