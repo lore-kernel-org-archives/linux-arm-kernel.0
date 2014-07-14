@@ -1,83 +1,125 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Mon, 14 Jul 2014 20:50:30 +0400
-Subject: [PATCH] arm: mach-iop13xx: fix possible build failure
-In-Reply-To: <20140714102903.GN21766@n2100.arm.linux.org.uk>
-References: <20140714102903.GN21766@n2100.arm.linux.org.uk>
-Message-ID: <1405356630-2411-1-git-send-email-a.ryabinin@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Jul 2014 17:58:51 +0100
+Subject: [PATCH 1/2] arm64: add C struct definition for Image header
+In-Reply-To: <1405354671-14031-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1405354671-14031-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405354671-14031-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140714165851.GO26465@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Hi Ard,
 
-After applying patch:
-	"ARM: 8078/1: get rid of hardcoded assumptions about kernel stack size"
+On Mon, Jul 14, 2014 at 05:17:50PM +0100, Ard Biesheuvel wrote:
+> In order to be able to interpret the Image header from C code, we need a
+> struct definition that reflects the specification for Image headers as laid
+> out in Documentation/arm64/booting.txt.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/image_hdr.h | 75 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/image_hdr.h
+> 
+> diff --git a/arch/arm64/include/asm/image_hdr.h b/arch/arm64/include/asm/image_hdr.h
+> new file mode 100644
+> index 000000000000..9dc74b672124
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/image_hdr.h
+> @@ -0,0 +1,75 @@
+> +/*
+> + * image_hdr.h - C struct definition of the arm64 Image header format
+> + *
+> + * Copyright (C) 2014 Linaro Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_IMAGE_HDR_H
+> +#define __ASM_IMAGE_HDR_H
+> +
+> +#ifdef __KERNEL__
+> +#include <linux/types.h>
+> +#else
+> +#include <stdint.h>
+> +#endif
+> +
+> +/**
+> + * struct arm64_image_hdr - arm64 kernel Image binary header format
+> + * @code0:		entry point, first instruction to jump to when booting
+> + *			the Image
+> + * @code1:		second instruction of entry point
+> + * @text_offset:	mandatory offset (little endian) beyond a 2 megabyte
+> + * 			aligned boundary that needs to be taken into account
+> + * 			when deciding where to load the image
+> + * @image_size:		total size (little endian) of the memory area (counted
+> + *			from the offset where the image was loaded) that may be
+> + *			used by the booting kernel before memory reservations
+> + *			can be honoured
+> + * @flags:		little endian bit field
+> + *			Bit 0:		Kernel endianness.  1 if BE, 0 if LE.
+> + *			Bits 1-63:	Reserved.
+> + * @res2:		reserved, must be 0
+> + * @res3:		reserved, must be 0
+> + * @res4:		reserved, must be 0
+> + * @magic:		Magic number (little endian): "ARM\x64"
+> + * @res5:		reserved (used for PE COFF offset)
+> + *
+> + * This definition reflects the definition in Documentation/arm64/booting.txt in
+> + * the Linux source tree.
+> + */
 
-following build failure happens on iop13xx platform:
+Can we not just say "See Documentation/arm64/booting.txt" rather than
+duplicating the description?
 
-   In file included from include/linux/srcu.h:33:0,
-                    from include/linux/notifier.h:15,
-                    from include/linux/reboot.h:5,
-                    from arch/arm/mach-iop13xx/include/mach/iop13xx.h:6,
-                    from arch/arm/mach-iop13xx/include/mach/hardware.h:14,
-                    from arch/arm/mach-iop13xx/include/mach/memory.h:4,
-                    from arch/arm/include/asm/memory.h:24,
-                    from arch/arm/include/asm/page.h:163,
-                    from arch/arm/include/asm/thread_info.h:17,
-                    from include/linux/thread_info.h:54,
-                    from include/asm-generic/preempt.h:4,
-                    from arch/arm/include/generated/asm/preempt.h:1,
-                    from include/linux/preempt.h:18,
-                    from include/linux/spinlock.h:50,
-                    from include/linux/seqlock.h:35,
-                    from include/linux/time.h:5,
-                    from include/uapi/linux/timex.h:56,
-                    from include/linux/timex.h:56,
-                    from include/linux/sched.h:19,
-                    from arch/arm/kernel/asm-offsets.c:13:
-   include/linux/rcupdate.h: In function '__rcu_read_lock':
->> include/linux/rcupdate.h:220:2: error: implicit declaration of function 'preempt_disable' [-Werror=implicit-function-declaration]
-     preempt_disable();
+> +struct arm64_image_hdr {
+> +	uint32_t code0;
+> +	uint32_t code1;
+> +	uint64_t text_offset;
+> +	uint64_t image_size;
+> +	uint64_t flags;
+> +	uint64_t res2;
+> +	uint64_t res3;
+> +	uint64_t res4;
+> +	uint32_t magic;
+> +	uint32_t res5;
+> +};
+> +
+> +static const union {
+> +	uint8_t		le_val[4];
+> +	uint32_t	cpu_val;
+> +} arm64_image_hdr_magic = {
+> +	.le_val		= "ARM\x64"
+> +};
+> +
+> +/**
+> + * int arm64_image_hdr_check() - check whether hdr points to an arm64 Image
+> + * @hdr:	pointer to an arm64 Image
+> + *
+> + * Return: 1 if check is successful, 0 otherwise
+> + */
+> +static inline int arm64_image_hdr_check(struct arm64_image_hdr const *hdr)
+> +{
+> +	return hdr->magic == arm64_image_hdr_magic.cpu_val;
+> +}
 
-The problem here is recursive header inclusion which could be avoided by
-removing linux/reboot.h from mach/iop13xxx.h.
-linux/reboot.h in include/mach/iop13xx.h is needed only for enum reboot_mode,
-so header it could be replaced with a enum declaration.
+Rather than the arm64_image_hdr_magic union trick above, could we not
+just use the magic inline with a memcmp, e.g.
 
-Whatever patch "ARM: 8078/1: get rid of hardcoded assumptions about kernel stack size"
-does, I think it's good to avoid unnecessary header inclusion here in any case.
+static inline int arm64_image_hdr_check(struct arm64_image_hdr const *hdr)
+{
+	return !memcmp(&hdr->magic, "ARM\x64", 4);
+}
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
----
- arch/arm/mach-iop13xx/include/mach/iop13xx.h | 2 +-
- arch/arm/mach-iop13xx/setup.c                | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+I'm a little hesitant to expose this to userspace in case the size of
+the structure grows and userspace starts relying on it having a
+particular length (though perhaps that's unfounded).
 
-diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-index 17b4027..9311ee2 100644
---- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-+++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-@@ -3,7 +3,7 @@
- 
- #ifndef __ASSEMBLY__
- 
--#include <linux/reboot.h>
-+enum reboot_mode;
- 
- /* The ATU offsets can change based on the strapping */
- extern u32 iop13xx_atux_pmmr_offset;
-diff --git a/arch/arm/mach-iop13xx/setup.c b/arch/arm/mach-iop13xx/setup.c
-index bca96f4..53c316f 100644
---- a/arch/arm/mach-iop13xx/setup.c
-+++ b/arch/arm/mach-iop13xx/setup.c
-@@ -20,6 +20,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/serial_8250.h>
- #include <linux/io.h>
-+#include <linux/reboot.h>
- #ifdef CONFIG_MTD_PHYSMAP
- #include <linux/mtd/physmap.h>
- #endif
--- 
-1.8.5.5
+It's also a little unfortunate that we lose the nice endianness
+annotations here, as it gives a wrong impression of the structure as a
+set of native-endian fields.
+
+Thanks,
+Mark.
