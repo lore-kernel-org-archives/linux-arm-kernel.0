@@ -1,158 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jul 2014 15:33:32 +0100
-Subject: [PATCH v2 11/11] pwm: sti: Remove PWM period table
-In-Reply-To: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
-References: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1405348412-7352-12-git-send-email-lee.jones@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 14 Jul 2014 10:37:19 -0400
+Subject: [PATCH v4 03/11] ARM: OMAP2+: timer: Add suspend-resume callbacks
+ for clkevent device
+In-Reply-To: <20140714111536.GC20068@atomide.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <1405047349-15101-4-git-send-email-d-gerlach@ti.com>
+ <20140714111536.GC20068@atomide.com>
+Message-ID: <53C3EB1F.2010109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ajit Pal Singh <ajitpal.singh@st.com>
+On Monday 14 July 2014 07:15 AM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
+>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>
+>> OMAP timer code registers two timers - one as clocksource
+>> and one as clockevent. Since AM33XX has only one usable timer
+>> in the WKUP domain one of the timers needs suspend-resume
+>> support to restore the configuration to pre-suspend state.
+>>
+>> commit adc78e6 (timekeeping: Add suspend and resume
+>> of clock event devices) introduced .suspend and .resume
+>> callbacks for clock event devices. Leverages these
+>> callbacks to have AM33XX clockevent timer which is
+>> in not in WKUP domain to behave properly across system
+>> suspend.
+>>
+>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>> v3->v4:
+>> 	Only use for am33xx soc now.
+>>
+>>  arch/arm/mach-omap2/timer.c | 28 ++++++++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index 43d03fb..6fc1748 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -128,6 +128,29 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+>>  	}
+>>  }
+>>  
+>> +static void omap_clkevt_suspend(struct clock_event_device *unused)
+>> +{
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	oh = omap_hwmod_lookup(clockevent_gpt.name);
+>> +	if (!oh)
+>> +		return;
+>> +
+>> +	omap_hwmod_idle(oh);
+>> +}
+>> +
+>> +static void omap_clkevt_resume(struct clock_event_device *unused)
+>> +{
+>> +	struct omap_hwmod *oh;
+>> +
+>> +	oh = omap_hwmod_lookup(clockevent_gpt.name);
+>> +	if (!oh)
+>> +		return;
+>> +
+>> +	omap_hwmod_enable(oh);
+>> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
+>> +}
+>> +
+> 
+> This is going to make moving the timer code into drivers one step
+> tougher to do. And you don't need to look up the hwmod entry every
+> time, just initialize it during the init.
+> 
+>> +	if (soc_is_am33xx()) {
+>> +		clockevent_gpt.suspend = omap_clkevt_suspend;
+>> +		clockevent_gpt.resume = omap_clkevt_resume;
+>> +	}
+>> +
+> 
+> Maybe try to set up things so we initialize the SoC specific
+> timer suspend and resume functions in mach-omap2/timer.c
+> in a way where eventually the device driver can easily use
+> them?
+> 
++1. I had similar comments on the previous version too.
 
-Removes the PWM period table. Instead the prescaler is computed
-from the period value passed in the config() function.
-
-Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/pwm/pwm-sti.c | 64 +++++++++++++--------------------------------------
- 1 file changed, 16 insertions(+), 48 deletions(-)
-
-diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index 1aa901d..ceeeef6 100644
---- a/drivers/pwm/pwm-sti.c
-+++ b/drivers/pwm/pwm-sti.c
-@@ -10,7 +10,6 @@
-  * (at your option) any later version.
-  */
- 
--#include <linux/bsearch.h>
- #include <linux/clk.h>
- #include <linux/math64.h>
- #include <linux/mfd/syscon.h>
-@@ -56,7 +55,6 @@ struct sti_pwm_chip {
- 	struct regmap_field *prescale_high;
- 	struct regmap_field *pwm_en;
- 	struct regmap_field *pwm_int_en;
--	unsigned long *pwm_periods;
- 	struct pwm_chip chip;
- 	struct pwm_device *cur;
- 	unsigned int en_count;
-@@ -77,29 +75,31 @@ static inline struct sti_pwm_chip *to_sti_pwmchip(struct pwm_chip *chip)
- }
- 
- /*
-- * Calculate the period values supported by the PWM for the
-- * current clock rate.
-+ * Calculate the prescaler value corresponding to the period.
-  */
--static void sti_pwm_calc_periods(struct sti_pwm_chip *pc)
-+static int sti_pwm_get_prescale(struct sti_pwm_chip *pc, unsigned long period,
-+				unsigned int *prescale)
- {
- 	struct sti_pwm_compat_data *cdata = pc->cdata;
--	struct device *dev = pc->dev;
- 	unsigned long val;
--	int i;
-+	unsigned int ps;
- 
- 	/*
--	 * period_ns = (10^9 * (prescaler + 1) * (MAX_PWM_COUNT + 1)) / CLK_RATE
-+	 * prescale = ((period_ns * clk_rate) / (10^9 * (max_pwm_count + 1)) - 1
- 	 */
- 	val = NSEC_PER_SEC / pc->clk_rate;
- 	val *= cdata->max_pwm_cnt + 1;
- 
--	dev_dbg(dev, "possible periods for clkrate[HZ]:%lu\n", pc->clk_rate);
--
--	for (i = 0; i <= cdata->max_prescale; i++) {
--		pc->pwm_periods[i] = val * (i + 1);
--		dev_dbg(dev, "prescale:%d, period[ns]:%lu\n",
--			i, pc->pwm_periods[i]);
-+	if (period % val) {
-+		return -EINVAL;
-+	} else {
-+		ps  = period / val - 1;
-+		if (ps > cdata->max_prescale)
-+			return -EINVAL;
- 	}
-+	*prescale = ps;
-+
-+	return 0;
- }
- 
- /* Calculate the number of PWM devices configured with a period. */
-@@ -120,17 +120,6 @@ unsigned int sti_pwm_count_configured(struct pwm_chip *chip)
- 	return ncfg;
- }
- 
--static int sti_pwm_cmp_periods(const void *key, const void *elt)
--{
--	unsigned long i = *(unsigned long *)key;
--	unsigned long j = *(unsigned long *)elt;
--
--	if (i < j)
--		return -1;
--	else
--		return i == j ? 0 : 1;
--}
--
- /*
-  * For STiH4xx PWM IP, the PWM period is fixed to 256 local clock cycles.
-  * The only way to change the period (apart from changing the PWM input clock)
-@@ -148,7 +137,6 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	struct pwm_device *cur = pc->cur;
- 	struct device *dev = pc->dev;
- 	unsigned int prescale = 0, pwmvalx;
--	unsigned long *found;
- 	int ret;
- 	unsigned int ncfg;
- 	bool period_same = false;
-@@ -178,21 +166,9 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			return ret;
- 
- 		if (!period_same) {
--			/*
--			 * Search for matching period value.
--			 * The corresponding index is our prescale value.
--			 */
--			found = bsearch(&period_ns, &pc->pwm_periods[0],
--					cdata->max_prescale + 1,
--					sizeof(unsigned long),
--					sti_pwm_cmp_periods);
--			if (!found) {
--				dev_err(dev,
--					"failed to find matching period\n");
--				ret = -EINVAL;
-+			ret = sti_pwm_get_prescale(pc, period_ns, &prescale);
-+			if (ret)
- 				goto clk_dis;
--			}
--			prescale = found - &pc->pwm_periods[0];
- 
- 			ret =
- 			regmap_field_write(pc->prescale_low,
-@@ -373,12 +349,6 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	pc->pwm_periods = devm_kzalloc(dev,
--			sizeof(unsigned long) * (pc->cdata->max_prescale + 1),
--			GFP_KERNEL);
--	if (!pc->pwm_periods)
--		return -ENOMEM;
--
- 	pc->clk = of_clk_get_by_name(np, "pwm");
- 	if (IS_ERR(pc->clk)) {
- 		dev_err(dev, "failed to get PWM clock\n");
-@@ -397,8 +367,6 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	sti_pwm_calc_periods(pc);
--
- 	pc->chip.dev = dev;
- 	pc->chip.ops = &sti_pwm_ops;
- 	pc->chip.base = -1;
--- 
-1.8.3.2
+Regards,
+Santosh
