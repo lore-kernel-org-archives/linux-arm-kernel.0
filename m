@@ -1,35 +1,52 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 14 Jul 2014 11:43:24 +0530
-Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C0A648.9080909@codeaurora.org>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
- <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
- <53C0A648.9080909@codeaurora.org>
-Message-ID: <CAKohpokdvtPj7jg88mon+EnHRCbUF7nqFWvmkFEMVh5WRzSS5A@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 14 Jul 2014 08:14:21 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: correct typo error for ohci clock
+In-Reply-To: <1405307294-17708-1-git-send-email-voice.shen@atmel.com>
+References: <1405307294-17708-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20140714081421.5f539287@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 July 2014 08:36, Saravana Kannan <skannan@codeaurora.org> wrote:
-> On 07/10/2014 11:19 PM, Viresh Kumar wrote:
->
->>
->> Please make sure you take care of these issues:
->> - suspend/resume
->> - hotplug
->> - module insert/remove
->
-> Ok, I was just at the current code. Does cpufreq_unregister_driver() even
-> really work correctly as it stands?
->
-> It doesn't even seem to stop any of the governors/policies before it just
-> set the cpufreq_driver pointer to NULL.
->
-> So, technically my v2 patch doesn't even make anything worse when it comes
-> to unregistering the cpufreq driver.
+On Mon, 14 Jul 2014 11:08:14 +0800
+Bo Shen <voice.shen@atmel.com> wrote:
 
-Are you really sure about this? I have tested this *myself* earlier..
+> Correct the typo error for the second "uhphs_clk".
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-subsys_interface_unregister() should take care of stopping/freeing governor
-stuff..
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+sam9n12 dtsi has the same bug, I'll fix it
+
+And sorry for the mess when moving sam9n12 and sam9x5 to the CCF, I
+should have checked my clock definitions more carefully :-(.
+
+Best Regards,
+
+Bros
+
+> ---
+>  arch/arm/boot/dts/at91sam9x5.dtsi | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 2ebc421..727d3a4 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -1155,8 +1155,7 @@
+>  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>  			reg = <0x00600000 0x100000>;
+>  			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+> -			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
+> -				 <&uhpck>;
+> +			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
+>  			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+>  			status = "disabled";
+>  		};
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
