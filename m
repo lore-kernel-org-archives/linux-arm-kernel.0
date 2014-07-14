@@ -1,76 +1,54 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Mon, 14 Jul 2014 16:07:56 +0200
-Subject: [PATCH] s5p-mfc: limit the size of the CPB
-In-Reply-To: <1405336698-3873-1-git-send-email-panpan1.liu@samsung.com>
-References: <1405336698-3873-1-git-send-email-panpan1.liu@samsung.com>
-Message-ID: <126d01cf9f6d$038b82c0$0aa28840$%debski@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 14 Jul 2014 16:09:04 +0200
+Subject: [PATCH v2 4/4] can: flexcan: add vf610 support for FlexCAN
+In-Reply-To: <5b42e19c9741a0b54420ade131f84408@agner.ch>
+References: <cover.1405322992.git.stefan@agner.ch>
+ <3b047f9eb64ef01a958d83706af8f7e973358420.1405322992.git.stefan@agner.ch>
+ <53C38FD9.8070403@pengutronix.de> <5b42e19c9741a0b54420ade131f84408@agner.ch>
+Message-ID: <53C3E480.9050509@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> From: panpan liu [mailto:panpan1.liu at samsung.com]
-> Sent: Monday, July 14, 2014 1:18 PM
-> Subject: [PATCH] s5p-mfc: limit the size of the CPB
+On 07/14/2014 03:37 PM, Stefan Agner wrote:
+> Am 2014-07-14 10:07, schrieb Marc Kleine-Budde:
+> <snip>
+>>> +	/*
+>>> +	 * On Vybrid, disable memory error detection interrupts
+>>> +	 * and freeze mode.
+>>> +	 * This also works around errata e5295 which generates
+>>> +	 * false positive memory errors and put the device in
+>>> +	 * freeze mode.
+>>> +	 */
+>>> +	if (priv->devtype_data->features & FLEXCAN_HAS_MECR_FEATURES) {
+>>> +		/*
+>>> +		 * Follow the protocol as described in "Detection
+>>> +		 * and Correction of Memory Errors" to write to
+>>> +		 * MECR register
+>>> +		 */
+>>
+>>
+>> One nitpick regarding the comment. In driver/net, the preferred
+>> multi-line comment style is
+>>
 > 
-> The register of the CPB limits the size. The max size is 4M, so it
-> is more reasonable.
+> Just a few lines above that one, another multi-line comment is written
+> with the empty line at start... With this changed to the net comment
+> style, we would end up in a mixed style... What do you think?
 
-The commit message should be rephrased as well. It is no longer fixed
-to 4MB.
+Okay, keep the commenting style of the driver.
 
-"The CPB size is limited by the hardware. Add this limit to the s_fmt."
+Marc
 
-> 
-> 
-> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |   11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
->  mode change 100644 => 100755 drivers/media/platform/s5p-
-> mfc/s5p_mfc_dec.c
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> old mode 100644
-> new mode 100755
-> index 0bae907..70b9458
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -413,7 +413,8 @@ static int vidioc_s_fmt(struct file *file, void
-> *priv, struct v4l2_format *f)
->  	int ret = 0;
->  	struct s5p_mfc_fmt *fmt;
->  	struct v4l2_pix_format_mplane *pix_mp;
-> -
-> +	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
-> +
->  	mfc_debug_enter();
->  	ret = vidioc_try_fmt(file, priv, f);
->  	pix_mp = &f->fmt.pix_mp;
-> @@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void
-> *priv, struct v4l2_format *f)
->  	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
->  	pix_mp->height = 0;
->  	pix_mp->width = 0;
-> -	if (pix_mp->plane_fmt[0].sizeimage)
-> -		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
-> -	else
-> +	if (pix_mp->plane_fmt[0].sizeimage == 0)
->  		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
->
-DEF_CPB_SIZE;
-> +	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
-> +		ctx->dec_src_buf_size = buf_size->cpb;
-> +	else
-> +		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
->  	pix_mp->plane_fmt[0].bytesperline = 0;
->  	ctx->state = MFCINST_INIT;
->  out:
-> --
-> 1.7.9.5
-
-Best wishes,
 -- 
-Kamil Debski
-Samsung R&D Institute Poland
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/a258af90/attachment.sig>
