@@ -1,96 +1,38 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 14 Jul 2014 15:28:54 +0300
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <20140714111007.GB31460@ulmo>
-References: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
- <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
- <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
- <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
- <53C3A986.9050602@nvidia.com> <20140714102954.GD9870@ulmo>
- <53C3B6EC.9090904@nvidia.com> <20140714111007.GB31460@ulmo>
-Message-ID: <53C3CD06.8070907@nvidia.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 14 Jul 2014 14:34:16 +0200
+Subject: socfpga/sockit ethernet problems
+In-Reply-To: <53BBA219.8000607@roese.nl>
+References: <20140507104518.GB18139@amd.pavel.ucw.cz>
+ <20140703093548.GA9937@amd.pavel.ucw.cz>
+ <1404764751.14294.3.camel@linux-builds1>
+ <20140707214340.GA29061@amd.pavel.ucw.cz>
+ <53BBA219.8000607@roese.nl>
+Message-ID: <20140714123416.GF14300@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/14 14:10, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Mon, Jul 14, 2014 at 01:54:36PM +0300, Mikko Perttunen wrote:
->> On 14/07/14 13:29, Thierry Reding wrote:
->>>> Old Signed by an unknown key
->>> ...
->>>> Yes, this sounds sensible. I'll make such a patch. I suppose having another
->>>> timings table in the MC node with just the rate and mc-burst-data would
->>>> separate the concerns best. It occurs to me that we could also write the
->>>> regs in the pre-rate change notifier, but this would turn the dependency
->>>> around and would mean that the regs are not written when entering backup
->>>> rates. The latter shouldn't be a problem but the reversed dependency would,
->>>> so I guess a custom function is the way to go, and we need to add at least
->>>> one anyway.
->>>
->>> It sounds like maybe moving enough code and data into the MC driver to
->>> handle frequency changes would be a good move. From the above it sounds
->>> like all the MC driver needs to know is that a frequency change is about
->>> to happen and what the new frequency is.
->>>
->>> In addition to exposing things like number of DRAM banks, etc.
->>>
->>
->> Yes, so there are two ways to do this:
->> 1) EMC calls tegra_mc_emem_update(freq) at the correct time
->> 2) MC has an optional clock phandle to the EMC clock and registers a
->> pre-change notifier.
->>
->> Both work, but the dependency is reversed. In both cases, the other driver
->> is also optional. In the first case, the EMC driver can give a warning if
->> the call fails. (As mentioned, if the MC_EMEM updates don't happen, things
->> still work but potentially with a hefty perf loss.)
->> TBH, I haven't yet decided which one is better. If you have an opinion,
->> I'll go with it.
->
-> I think I prefer 1. Using an explicit call into the MC driver allow us
-> to precisely determine the moment in time when the registers should be
-> updated. The pre-change notifier, as I understand it, doesn't give us
-> that. Also, the notifier doesn't give us a way to determine success or
-> failure of the MC call.
+Hi!
 
-Indeed. I'll go with this.
+> >Are there suitable default values?
+> >
+> >u-boot uses these defaults:
+> >
+> >include/configs/socfpga_common.h:#define CONFIG_KSZ9021_CLK_SKEW_VAL
+> >0xf0f0
+> >include/configs/socfpga_common.h:#define CONFIG_KSZ9021_DATA_SKEW_VAL
+> >0x0
+> >
+> >...that should correspond to txc-skew-ps == rxc-skew-ps == 3000, all
+> >other skew values == 0?
+> >
+> >Could someone with socrates board and network problems test if this
+> >makes any difference?
+> 
+> SoCrates uses a different PHY, the Lantiq PEF7071 (PHY11G). So those
+> dts additions have no effect on SoCrates.
 
->
->>>> The downstream kernel also overwrites most LA registers during EMC rate
->>>> change without regard for the driver-set values, and we might have to read
->>>> those values from the device tree too. Upstream can do this in rate change
->>>> notifiers if needed. I'll look into this a bit more.
->>>
->>> As I understand it, the latency allowance should be specified in terms
->>> of the maximum amount of time that requests are delayed, so that the
->>> proper values for the LA registers can be recomputed on an EMC rate
->>> change.
->>
->> That's how I understand it too, but in downstream, the LA register values
->> are hardcoded into EMC tables in platform data/DTS that are just written
->> into the LA registers as-is during rate change.
->
-> Hehe, well, we don't want any of that upstream. =) If it can be computed
-> at runtime, then let's compute it. Also, if it's encoded in platform
-> data or DTS, then there's no way it can be adjusted based on use-case.
-> For example if you have a device with two display outputs (an internal
-> panel and HDMI for example) but you never have HDMI plugged in, then
-> there's no reason why you would want to program the latency allowance
-> for the second display controller. If you provide the values in a static
-> frequency/register value table, then you need to account for any
-> possible scenario up front, irrespective of what (if any) HDMI monitor
-> is attached.
-
-Yeah, I guess the values in downstream must be designed for the worst 
-case :P the strange thing is that downstream also has an API for drivers 
-to specify their requirements. I guess the clients that have hardcoded 
-values and that use the API don't overlap. But I definitely agree that 
-on upstream we can have something nicer.
-
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
+Oops, I guess I was confused.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
