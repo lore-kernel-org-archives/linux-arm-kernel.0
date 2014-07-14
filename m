@@ -1,84 +1,136 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Mon, 14 Jul 2014 11:22:26 +0800
-Subject: [RFC PATCH 0/2] irqchip: GIC: check and clear GIC interupt active
- status
-In-Reply-To: <20140711123507.GE12899@arm.com>
-References: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
- <20140711123507.GE12899@arm.com>
-Message-ID: <53C34CF2.5050209@huawei.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 14 Jul 2014 11:24:53 +0800
+Subject: [PATCH v3 1/2] can: m_can: add device tree binding documentation
+In-Reply-To: <53BFBF3F.8040804@gmail.com>
+References: <1405074557-5519-1-git-send-email-b29396@freescale.com>
+ <53BFBF3F.8040804@gmail.com>
+Message-ID: <20140714032451.GA1668@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/7/11 20:35, Will Deacon wrote:
-> [adding Marc]
+On Fri, Jul 11, 2014 at 04:11:03PM +0530, Varka Bhadram wrote:
+> On 07/11/2014 03:59 PM, Dong Aisheng wrote:
+> >add M_CAN device tree binding documentation
+> >
+> >Cc: Wolfgang Grandegger <wg@grandegger.com>
+> >Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> >Cc: Mark Rutland <mark.rutland@arm.com>
+> >Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+> >Cc: Varka Bhadram <varkabhadram@gmail.com>
+> >Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> >---
+> >  .../devicetree/bindings/net/can/m_can.txt          |   65 ++++++++++++++++++++
+> >  1 files changed, 65 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+> >
+> >diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+> >new file mode 100644
+> >index 0000000..c4cb263
+> >--- /dev/null
+> >+++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+> >@@ -0,0 +1,65 @@
+> >+Bosch MCAN controller Device Tree Bindings
+> >+-------------------------------------------------
+> >+
+> >+Required properties:
+> >+- compatible		: Should be "bosch,m_can" for M_CAN controllers
+> >+- reg			: physical base address and size of the M_CAN
+> >+			  registers map and Message RAM
+> >+- reg-names		: Should be "m_can" and "message_ram"
+> >+- interrupts		: Should be the interrupt number of M_CAN interrupt
+> >+			  line 0 and line 1, could be same if sharing
+> >+			  the same interrupt.
+> >+- interrupt-names	: Should contain "int0" and "int1"
+> >+- clocks		: Clocks used by controller, should be host clock
+> >+			  and CAN clock.
+> >+- clock-names		: Should contain "hclk" and "cclk"
+> >+- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
 > 
-> On Fri, Jul 11, 2014 at 07:46:15AM +0100, Liu Hua wrote:
->> For this version of GIC codes, kernel assumes that all the interrupt
->> status of GIC is inactive. So the kernel does not check this when 
->> booting.
->>
->> This is no problem on must sitations. But when kdump is deplayed.
->> And a panic occurs when a interrupt is being handled (may be PPI 
->> and SPI). We have no chance to write relative bit to GICC_EOIR.
->> So this interrupt remains active. And GIC will not deliver this
->> type interrupt to cpu interface. And the capture kernel may 
->> fail to boot becase of lacking of certain interrupt (such as timer 
->> interupt).
->>
->>
->> I glanced over the GIC Architecture Specification, but did not 
->> find a simple way to deactive state of all interrupts. For GICv1,
->> I can only deal with one abnormal interrupt state one time. For 
->> GICv2, I can deactive 32 one time.
->>
->>
->> So guys, Do you know a better way to do that? 
+> I think this should be pinctrl-0
 > 
-> What happens if, in the crash kernel, you disable the CPU interfaces
-> (GICC_CTLR.ENABLE) then disable the distributor (GICD_CTLR.ENABLE) before
-> enabling everything again in the reverse order? Is that enough to cause the
-> GIC to drop any active states? It's not clear to me from a quick look at
-> the TRM.
+
+First, this part is defined by pinctrl binding doc.
+Second i think it may be possible someone wants to add other pinctrl states
+when implement low power state in the future.
+So i just keep it as pinctrl-<n>.
+
+> >+- pinctrl-names		: Names corresponding to the numbered pinctrl states
 > 
-Hi Will,
-
-Thanks for your reply!
-
-I did what you said at the beginning of "gic_dist_init". The active states
-remained (panic in local timer interrupt (PPI))and the kernel failed to boot,
-Did I do that at wrong place?
-
--------------------
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index b6b0a81..94d6352 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -454,6 +455,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
-        void __iomem *base = gic_data_dist_base(gic);
-        void __iomem *cpu_base = gic_data_cpu_base(gic);
-
-+ writel_relaxed(0, base + GIC_CPU_CTRL);
-        writel_relaxed(0, base + GIC_DIST_CTRL);
-
-        /*
-------------------------
-
-As shown in GIC Architecture Specification manual,I think that the GICC_CTLR.ENABLE
-and GICD_CTLR.ENABLE only control the delivering of the interrupt, not the active
-states.
-
-As GIC manual says "For every read of a valid Interrupt ID from the GICC_IAR, the
-connected processor must perform a matching write to the GICC_EOIR". So we should
-find a way to drop the active states when booting, if we do not remain these active
-states by design.
-
-Thanks,
-Liu Hua
-
-
-
-
-> Will
+> remove 1 tab space before :
 > 
-> .
+
+It's a bit strange.
+Other line like pinctrl-<n> is also two tabs.
+And the code looks fine and already aligned.
+- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+- pinctrl-names		: Names corresponding to the numbered pinctrl states
+Do you mean change line of pinctrl-names from two tabs to one space and a tab before :?
+
+> >+- mram-cfg		: Message RAM configuration data.
+> >+  Multiple M_CAN instances can share the same Message RAM and each element(e.g
+> >+  Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+> >+  so this property is telling driver how the shared or private Message RAM
+> >+  are used by this M_CAN controller.
+> >+
+> 
+> It may written like:
+> mram-cfg		: Message RAM configuration data
+> 			  Multiple M_CAN instances can share the same Message RAM and each element
+> 			  (e.g Rx FIFO or Tx Buffer and etc) number in Message RAM is also configurable,
+> 			  ...
+> 
+
+I'm fine with that.
+The question is it's easy to over 80 columns if writing like that,
+is it ok?
+
+Regards
+Dong Aisheng
+> >+  The format should be as follows:
+> >+  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems rxb_elems
+> >+   txe_elems txb_elems>
+> >+  The 'offset' is an address offset of the Message RAM where the following
+> >+  elements start from. This is usually set to 0x0 if you're using a private
+> >+  Message RAM. The remain cells are used to specify how many elements are used
+> >+  for each FIFO/Buffer.
+> >+
+> >+M_CAN includes the following elements according to user manual:
+> >+11-bit Filter	0-128 elements / 0-128 words
+> >+29-bit Filter	0-64 elements / 0-128 words
+> >+Rx FIFO 0	0-64 elements / 0-1152 words
+> >+Rx FIFO 1	0-64 elements / 0-1152 words
+> >+Rx Buffers	0-64 elements / 0-1152 words
+> >+Tx Event FIFO	0-32 elements / 0-64 words
+> >+Tx Buffers	0-32 elements / 0-576 words
+> >+
+> >+Please refer to 2.4.1 Message RAM Configuration in Bosch M_CAN user manual
+> >+for details.
+> >+
+> >+Example:
+> >+SoC dtsi:
+> >+m_can1: can at 020e8000 {
+> >+	compatible = "bosch,m_can";
+> >+	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
+> >+	reg-names = "m_can", "message_ram";
+> >+	interrupts = <0 114 0x04>,
+> >+		     <0 114 0x04>;
+> >+	interrupt-names = "int0", "int1";
+> >+	clocks = <&clks IMX6SX_CLK_CANFD>,
+> >+		 <&clks IMX6SX_CLK_CANFD>;
+> >+	clock-names = "hclk", "cclk";
+> >+	mram-cfg = <0x0 0 0 32 0 0 0 1>;
+> >+	status = "disabled";
+> >+};
+> >+
+> >+Board dtsi:
+> >+&m_can1 {
+> >+	pinctrl-names = "default";
+> >+	pinctrl-0 = <&pinctrl_m_can1>;
+> >+	status = "enabled";
+> >+};
+> 
+> 
+> -- 
+> Regards,
+> Varka Bhadram.
 > 
