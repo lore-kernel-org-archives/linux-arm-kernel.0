@@ -1,35 +1,59 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Mon, 14 Jul 2014 16:25:42 +0100
-Subject: [alsa-devel] [PATCH V3 2/2] ASoC: samsung: Add machine driver for
- Odroid X2/U3
-In-Reply-To: <53BEBC3F.6030205@samsung.com>
-References: <1404479625-25385-1-git-send-email-s.nawrocki@samsung.com>
- <1404479625-25385-2-git-send-email-s.nawrocki@samsung.com>
- <CAD8Lp44JFtbcD22c+0PVb5S4U1kVTTxHD=PgqiKzhVypFW5Prg@mail.gmail.com>
- <53BEBC3F.6030205@samsung.com>
-Message-ID: <CAD8Lp460Ym1y5OS8ya=jddO-spnojyGVWkUWhXmKCfbOOGL61A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Jul 2014 17:27:52 +0200
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu-NDUe77uneEmZbcWN+FcFq2qHFgaF3scyjSbQMfV2J0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 5:15 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 08/07/14 11:15, Daniel Drake wrote:
->> Testing on ODROID-U2, v3 is not quite working for me, but v2 of the
->> patch was fine.
->> I boot up, run:
->> # speaker-test -c 2 -t wav
->>
->> As soon as I hear the word "front" I press ctrl+c and then run the
->> command again.
->> Now the command hangs with no audible output.
->>
->> Any ideas? Let me know if you have trouble reproducing.
+On 14 July 2014 17:25, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> If we fail to relocate the kernel Image to its preferred offset of TEXT_OFFSET
+> bytes above the base of DRAM, accept the lowest alternative mapping available
+> instead of aborting. We may lose a bit of memory at the low end, but we can
+> still proceed normally otherwise.
 >
-> I just posted a patch addressing this, please let me know
-> if there are any further issues.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> This is a proposed bug fix for arm64 platforms that fail to boot through EFI
+> due to the fact that some bits of EFI itself are occupying the low end of DRAM.
+>
+> Note that this code now triggers an 'unused function' warning for
+> efi_relocate_kernel(), as that is no longer used. This warning will disappear
+> automatically once the already queued up EFISTUB refactoring patches will
+> get merged for 3.17.
+>
+>  arch/arm64/kernel/efi-stub.c | 18 ++++++------------
+>  1 file changed, 6 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> index 60e98a639ac5..5165b3accefe 100644
+> --- a/arch/arm64/kernel/efi-stub.c
+> +++ b/arch/arm64/kernel/efi-stub.c
+> @@ -60,20 +60,16 @@ static efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+>         kernel_size = _edata - _text;
+>         if (*image_addr != (dram_base + TEXT_OFFSET)) {
+>                 kernel_memsize = kernel_size + (_end - _edata);
+> -               status = efi_relocate_kernel(sys_table, image_addr,
+> -                                            kernel_size, kernel_memsize,
+> -                                            dram_base + TEXT_OFFSET,
+> -                                            PAGE_SIZE);
+> +               status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+> +                                      SZ_2M, reserve_addr);
+>                 if (status != EFI_SUCCESS) {
+>                         pr_efi_err(sys_table, "Failed to relocate kernel\n");
+>                         return status;
+>                 }
+> -               if (*image_addr != (dram_base + TEXT_OFFSET)) {
+> -                       pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+> -                       efi_free(sys_table, kernel_memsize, *image_addr);
+> -                       return EFI_ERROR;
+> -               }
+> -               *image_size = kernel_memsize;
+> +               memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
+> +                      kernel_size);
+> +               *image_addr = *reserve_addr + TEXT_OFFSET;
+> +               *reserve_size = kernel_memsize;
 
-
-Sorry for not testing sooner. Your patch solves the issue.
-
-Thanks
-Daniel
+This still needs a '+ TEXT_OFFSET' btw
