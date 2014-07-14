@@ -1,169 +1,137 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Jul 2014 16:04:08 +0200
-Subject: [PATCH 2/8] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <1405232971-4607-1-git-send-email-mollie.wu@linaro.org>
-References: <1405232971-4607-1-git-send-email-mollie.wu@linaro.org>
-Message-ID: <7710458.qT0KZ5qsA6@wuerfel>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Mon, 14 Jul 2014 15:04:35 +0100
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <20140714132052.GY9918@twins.programming.kicks-ass.net>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+ <20140711151304.GD3935@laptop>
+ <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
+ <20140711201238.GY20603@laptop.programming.kicks-ass.net>
+ <20140714125529.GN26542@e103034-lin>
+ <20140714132052.GY9918@twins.programming.kicks-ass.net>
+Message-ID: <20140714140435.GO26542@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 July 2014 14:29:31 Mollie Wu wrote:
-> +Required properties:
-> +- compatible: "fujitsu,f-sdh30"
-> +- voltage-ranges : This is a list of pairs. In each pair, two cells
-> +  are required. First cell specifies minimum slot voltage (mV), second
-> +  cell specifies maximum slot voltage (mV). In case of supported voltage
-> +  range is discontinuous, several ranges could be specified as a list.
-> +
-> +Optional properties:
-> +- pwr-mux-gpios: This is one optional gpio for controlling a power mux
-> +  which switches between two power supplies. 3.3V is selected when gpio
-> +  is high, and 1.8V is selected when gpio is low. This voltage is used
-> +  for signal level.
+On Mon, Jul 14, 2014 at 02:20:52PM +0100, Peter Zijlstra wrote:
+> On Mon, Jul 14, 2014 at 01:55:29PM +0100, Morten Rasmussen wrote:
+> > On Fri, Jul 11, 2014 at 09:12:38PM +0100, Peter Zijlstra wrote:
+> > > On Fri, Jul 11, 2014 at 07:39:29PM +0200, Vincent Guittot wrote:
+> > > > In my mind, arch_scale_cpu_freq was intend to scale the capacity of
+> > > > the CPU according to the current dvfs operating point.
+> > > > As it's no more use anywhere now that we have arch_scale_cpu, we could
+> > > > probably remove it .. and see when it will become used.
+> > > 
+> > > I probably should have written comments when I wrote that code, but it
+> > > was meant to be used only where, as described above, we limit things.
+> > > Ondemand and such, which will temporarily decrease freq, will ramp it up
+> > > again at demand, and therefore lowering the capacity will skew things.
+> > > 
+> > > You'll put less load on because its run slower, and then you'll run it
+> > > slower because there's less load on -> cyclic FAIL.
+> > 
+> > Agreed. We can't use a frequency scaled compute capacity for all
+> > load-balancing decisions. However, IMHO, it would be useful to have know
+> > the current compute capacity in addition to the max compute capacity
+> > when considering energy costs. So we would have something like:
+> > 
+> > * capacity_max: cpu capacity at highest frequency.
+> > 
+> > * capacity_cur: cpu capacity at current frequency.
+> > 
+> > * capacity_avail: cpu capacity currently available. Basically
+> >   capacity_cur taking rt, deadline, and irq accounting into account.
+> > 
+> > capacity_max should probably include rt, deadline, and irq accounting as
+> > well. Or we need both?
+> 
+> I'm struggling to fully grasp your intent. We need DVFS like accounting
+> for sure, and that means a current freq hook, but I'm not entirely sure
+> how that relates to capacity.
 
-It sounds like what you really want here is a reference to a gpio-regulator
-node and, and to put the details of the voltage switching in there.
+We can abstract all the factors that affect current compute capacity
+(frequency, P-states, big.LITTLE,...) in the scheduler by having
+something like capacity_{cur,avail} to tell us how much capacity does a
+particular cpu have in its current state. Assuming that implement scale
+invariance for entity load tracking (we are working on that), we can
+directly compare task utilization with compute capacity for balancing
+decisions. For example, we can figure out how much spare capacity a cpu
+has in its current state by simply:
 
-> diff --git a/drivers/mmc/host/sdhci_f_sdh30.c b/drivers/mmc/host/sdhci_f_sdh30.c
-> new file mode 100644
-> index 0000000..8d23f2d
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci_f_sdh30.c
-> @@ -0,0 +1,380 @@
-> +/*
-> + * linux/drivers/mmc/host/sdhci_f_sdh30.c
-> + *
-> + * Copyright (C) 2013 - 2014 Fujitsu Semiconductor, Ltd
-> + *              Vincent Yang <vincent.yang@tw.fujitsu.com>
-> + * Copyright (C) 2014 Linaro Ltd  Andy Green <andy.green@linaro.org>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation, version 2 of the License.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/delay.h>
-> +#include <linux/module.h>
-> +#include <linux/mmc/sd.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/mmc/card.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/suspend.h>
-> +
-> +#include "sdhci.h"
-> +#include "sdhci-pltfm.h"
-> +#include "../core/core.h"
+spare_capacity(cpu) = capacity_avail(cpu) - \sum_{tasks(cpu)}^{t} util(t)
 
-Should this be <linux/mmc/core.h>? A device driver should not be looking
-at the drivers/mmc/core/core.h.
+If you put more than spare_capacity(cpu) worth of task utilization on
+the cpu, you will cause the cpu (and any affected cpus) to change
+P-state and potentially be less energy-efficient.
 
-> +#define DRIVER_NAME "f_sdh30"
+Does that make any sense?
 
-This macro doesn't seem to serve any purpose, it would be easier to
-read if you open-code this.
+Instead of dealing with frequencies directly in the scheduler code, we
+can abstract it by just having scalable compute capacity.
 
-> +
-> +void sdhci_f_sdh30_soft_voltage_switch(struct sdhci_host *host)
-> +{
-> +	struct f_sdhost_priv *priv = sdhci_priv(host);
-> +	u32 ctrl = 0;
-> +
-> +	usleep_range(2500, 3000);
-> +	ctrl = sdhci_readl(host, F_SDH30_IO_CONTROL2);
-> +	ctrl |= F_SDH30_CRES_O_DN;
-> +	sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
-> +	ctrl |= F_SDH30_MSEL_O_1_8;
-> +	sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
-> +
-> +	if (gpio_is_valid(priv->gpio_select_1v8)) {
-> +		dev_info(priv->dev, "%s: setting gpio\n", __func__);
-> +		gpio_direction_output(priv->gpio_select_1v8, 0);
-> +	}
-> +
-> +	ctrl &= ~F_SDH30_CRES_O_DN;
-> +	sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
-> +	usleep_range(2500, 3000);
-> +
-> +	if (priv->vendor_hs200) {
-> +		dev_info(priv->dev, "%s: setting hs200\n", __func__);
-> +		ctrl = sdhci_readl(host, F_SDH30_ESD_CONTROL);
-> +		ctrl |= priv->vendor_hs200;
-> +		sdhci_writel(host, ctrl, F_SDH30_ESD_CONTROL);
-> +	}
-> +
-> +	ctrl = sdhci_readl(host, F_SDH30_TUNING_SETTING);
-> +	ctrl |= F_SDH30_CMD_CHK_DIS;
-> +	sdhci_writel(host, ctrl, F_SDH30_TUNING_SETTING);
-> +}
+> 
+> > Based on your description arch_scale_freq_capacity() can't be abused to
+> > implement capacity_cur (and capacity_avail) unless it is repurposed.
+> > Nobody seems to implement it. Otherwise we would need something similar
+> > to update capacity_cur (and capacity_avail).
+> 
+> Yeah, I never got around to doing so. I started doing a APERF/MPERF SMT
+> capacity thing for x86 but never finished that. The naive implementation
+> suffered the same FAIL loop as above because APERF stops on idle. So
+> when idle your capacity drops to nothing, leading to no new work,
+> leading to more idle etc.
+> 
+> I never got around to fixing that -- adding an idle filter, and ever
+> since things have somewhat bitrotted.
 
-I think this should really use the regulator API.
+I see.
 
-If the regular is defined properly, this will work without any extra code.
+> 
+> > As a side note, we can potentially get into a similar fail cycle already
+> > due to the lack of scale invariance in the entity load tracking.
+> 
+> Yah, I think that got mentioned a long while ago.
 
-> +unsigned int sdhci_f_sdh30_get_min_clock(struct sdhci_host *host)
-> +{
-> +	return F_SDH30_MIN_CLOCK;
-> +}
-> +
-> +void sdhci_f_sdh30_reset(struct sdhci_host *host, u8 mask)
-> +{
-> +	struct f_sdhost_priv *priv = sdhci_priv(host);
-> +
-> +	if (gpio_is_valid(priv->gpio_select_1v8))
-> +		gpio_direction_output(priv->gpio_select_1v8, 1);
-> +
-> +	if (sdhci_readw(host, SDHCI_CLOCK_CONTROL) == 0) {
-> +		sdhci_writew(host, 0xBC01, SDHCI_CLOCK_CONTROL);
-> +		mmiowb();
-> +	}
+It did :-)
 
-Can you explain the mmiowb call here?
+> 
+> > > > > In that same discussion ISTR a suggestion about adding avg_running time,
+> > > > > as opposed to the current avg_runnable. The sum of avg_running should be
+> > > > > much more accurate, and still react correctly to migrations.
+> > > > 
+> > > > I haven't look in details but I agree that avg_running would be much
+> > > > more accurate than avg_runnable and should probably fit the
+> > > > requirement. Does it means that we could re-add the avg_running (or
+> > > > something similar) that has disappeared during the review of load avg
+> > > > tracking patchset ?
+> > > 
+> > > Sure, I think we killed it there because there wasn't an actual use for
+> > > it and I'm always in favour of stripping everything to their bare bones,
+> > > esp big and complex things.
+> > > 
+> > > And then later, add things back once we have need for it.
+> > 
+> > I think it is a useful addition to the set of utilization metrics. I
+> > don't think it is universally more accurate than runnable_avg. Actually
+> > quite the opposite when the cpu is overloaded. But for partially loaded
+> > cpus it is very useful if you don't want to factor in waiting time on
+> > the rq.
+> 
+> Well, different things different names. Utilization as per literature is
+> simply the fraction of CPU time actually used. In that sense running_avg
+> is about right for that. Our current runnable_avg is entirely different
+> (as I think we all agree by now).
+> 
+> But yes, for application the tipping point is u == 1, up until that
+> point pure utilization makes sense, after that our runnable_avg makes
+> more sense.
 
-> +
-> +	if (!of_property_read_u32(pdev->dev.of_node, "bus-width", &bus_width)) {
-> +		switch (bus_width) {
-> +		case 8:
-> +			dev_info(dev, "Applying 8 bit bus width\n");
-> +			host->mmc->caps |= MMC_CAP_8_BIT_DATA;
-> +			break;
-> +		case 4:
-> +			dev_info(dev, "Applying 4 bit bus width\n");
-> +			host->mmc->caps |= MMC_CAP_4_BIT_DATA;
-> +			break;
-> +		case 1:
-> +		default:
-> +			dev_err(dev, "Invalid bus width: %u\n", bus_width);
-> +			break;
-> +		}
-> +	}
+Agreed.
 
-This should probably be done in generic sdhci code somewhere. How about
-adding it to sdhci_get_of_property instead_
-> +	priv->clk_sd4 = clk_get(&pdev->dev, "sd_sd4clk");
-> +	if (!IS_ERR(priv->clk_sd4)) {
-> +		ret = clk_prepare_enable(priv->clk_sd4);
-> +		if (ret < 0) {
-> +			dev_err(dev, "Failed to enable sd4 clock: %d\n", ret);
-> +			goto err_clk1;
-> +		}
-> +	}
-> +	priv->clk_b = clk_get(&pdev->dev, "sd_bclk");
-> +	if (!IS_ERR(priv->clk_b)) {
-> +		ret = clk_prepare_enable(priv->clk_b);
-> +		if (ret < 0) {
-> +			dev_err(dev, "Failed to enable clk_b clock: %d\n", ret);
-> +			goto err_clk2;
-> +		}
-> +	}
-
-Please pick clock names that match what some of the other drivers use.
-
-Ideally some of that should also move to common code.
-
-	Arnd
+If you really care about latency/performance you might be interested in
+comparing running_avg and runnable_avg even for u < 1. If the
+running_avg/runnable_avg ratio is significantly less than one, tasks are
+waiting on the rq to be scheduled.
