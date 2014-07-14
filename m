@@ -1,73 +1,64 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 14 Jul 2014 17:05:29 +0900
-Subject: [PATCH 1/6] mmc: sdhci-s3c: Fix local I/O clock gating
-In-Reply-To: <1403618235-19353-2-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-2-git-send-email-t.figa@samsung.com>
-Message-ID: <53C38F49.7050504@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 14 Jul 2014 10:07:01 +0200
+Subject: [PATCH v5 00/14] Clock support for rk3066,rk3188 and rk3288
+In-Reply-To: <CAOesGMgcM3Z68VUOu8g6Ee0FjvW4r3R2sLtf255e9pv+gGyqFA@mail.gmail.com>
+References: <156042792.J76K6jxIGl@diego> <20140713194622.9850.99668@quantum>
+ <CAOesGMgcM3Z68VUOu8g6Ee0FjvW4r3R2sLtf255e9pv+gGyqFA@mail.gmail.com>
+Message-ID: <2878354.yVHl3h6vxm@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good to me.
+Hi Olof,
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Am Sonntag, 13. Juli 2014, 20:12:07 schrieb Olof Johansson:
+> Hi,
+> 
+> On Sun, Jul 13, 2014 at 12:46 PM, Mike Turquette <mturquette@linaro.org> 
+wrote:
+> > Quoting Heiko St?bner (2014-07-02 16:53:24)
+> > 
+> >> This series adds a clock driver infrastructure for Rockchip SoCs in
+> >> general and clock-definitions for the RK3188 and RK3288 in particular.
+> >> 
+> >> Apart from the arch/arm patches included here, there are some more
+> >> in the waiting line, like adding the i2c nodes and possibly the pwm, i2s
+> >> and spi nodes if the relevant drivers get accepted, where the ids
+> >> defined in the dt-binding headers are needed.
+> >> 
+> >> So if the whole thing is acceptable could we either offer a branch
+> >> from the clk-tree that can get merged or take the whole series through
+> >> the arm tree?
+> > 
+> > Heiko,
+> > 
+> > This version looks good. I've pushed a branch with all 14 of these
+> > patches based on 3.16-rc3 to the clk tree. See:
+> > 
+> > git://git.linaro.org/people/mike.turquette/linux.git clk-rockchip
+> > 
+> > If everyone is OK to merge that stable branch then I will merge
+> > clk-rockchip into clk-next and we're all good. If the arm-soc guys want
+> > to carve it up a bit further or handle it in a different way then we can
+> > do that. I've Cc'd arm-soc for clarification.
+> 
+> Traditionally we usually take the DT changes through arm-soc, but as
+> long as we share the branch we might be ok. We tend to stick them in
+> different branches in our tree though, so rockchip will be a little
+> mis-sorted this release. Not a big deal, and we can deal with it.
+> 
+> So, I'll leave it to Heiko to choose here, he knows best what other DT
+> changes are coming this release. If he wants to carry the DT changes
+> separately, then patches 1-10 would be for the clk tree, so it should
+> be easy to reset the branch back a bit (and 11-14 would be for
+> arm-soc).
 
-On 06/24/2014 10:57 PM, Tomasz Figa wrote:
-> For internal card detection mechanism it is required that the local I/O
-> clock is always running. However while current implementation accounts
-> for this, it does so incorrectly leading to race conditions and warnings
-> about unbalanced clock disables.
-> 
-> This patch fixes it by inverting the logic, which now increases local
-> I/O clock enable count when internal card detect is used, instead of
-> decreasing it otherwise.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Chris Ball <chris@printf.net>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: linux-mmc at vger.kernel.org
-> ---
->  drivers/mmc/host/sdhci-s3c.c | 17 ++++++++++-------
->  1 file changed, 10 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index fa5954a..1795e1f 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -487,8 +487,13 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
->  		goto err_pdata_io_clk;
->  	}
->  
-> -	/* enable the local io clock and keep it running for the moment. */
-> -	clk_prepare_enable(sc->clk_io);
-> +	/*
-> +	 * Keep local I/O clock enabled for internal card detect pin
-> +	 * or runtime PM is disabled.
-> +	 */
-> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL
-> +	    || !IS_ENABLED(CONFIG_PM_RUNTIME))
-> +		clk_prepare_enable(sc->clk_io);
->  
->  	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
->  		char name[14];
-> @@ -611,15 +616,13 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
->  		goto err_req_regs;
->  	}
->  
-> -#ifdef CONFIG_PM_RUNTIME
-> -	if (pdata->cd_type != S3C_SDHCI_CD_INTERNAL)
-> -		clk_disable_unprepare(sc->clk_io);
-> -#endif
->  	return 0;
->  
->   err_req_regs:
->   err_no_busclks:
-> -	clk_disable_unprepare(sc->clk_io);
-> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL
-> +	    || !IS_ENABLED(CONFIG_PM_RUNTIME))
-> +		clk_disable_unprepare(sc->clk_io);
->  
->   err_pdata_io_clk:
->  	sdhci_free_host(host);
-> 
+hmm, there are essentially two changeset/branches upcoming:
+- the collected dts changes for rk3066 and rk3188 I posted saturday
+  These essentially extend patches 12-14
+- rk3288 support which would start off patch 11 (the reset controller)
+
+So if we were to separate the series I would say patches 1-11 in the shared 
+branch and patch 12-14 as the first ones for a rk3066/rk3188 specific branch.
+
+
+Heiko
