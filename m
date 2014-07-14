@@ -1,68 +1,45 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 14 Jul 2014 15:02:48 +0200
-Subject: [PATCH] ARM: mm: fix the boundary checking on bitmaps
-In-Reply-To: <1404959313-15198-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1404959313-15198-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <53C3D4F8.9060001@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 14 Jul 2014 14:08:24 +0100
+Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
+In-Reply-To: <20140709134646.GB479@lee--X1>
+References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
+ <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
+ <1404911964.28592.4.camel@rzhang1-toshiba>
+ <20140709134646.GB479@lee--X1>
+Message-ID: <20140714130824.GA3993@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 09 Jul 2014, Lee Jones wrote:
+> On Wed, 09 Jul 2014, Zhang Rui wrote:
+> > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
+> > > On Tue, 24 Jun 2014, Lee Jones wrote:
+> > > 
+> > > > > I'm re-sending this set, as one of the maintainers' email addresses
+> > > > > is incorrect in the MAINTAINERS file.
+> > > > > 
+> > > > > This patchset adds full support for 2 types of Thermal Controllers
+> > > > > produced by STMicroelectronics.  One is a more traditional memory
+> > > > > mapped variant, the other is controlled solely by system configuration
+> > > > > registers.
+> > > > 
+> > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
+> > > 
+> > > Anything at all?  It's been well over a month now.
+> > > 
+> > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
+> > but as we didn't get any feedback from Eduardo, I will take them.
+> 
+> Thanks Rui.
+> 
+> So have you taken all 4 "thermal: sti: *" patches?
 
-On 2014-07-10 04:28, Haojian Zhuang wrote:
-> The issue of boundary checking on bitmaps is introduced by this commit
-> in below.
->
-> commit 4d852ef8c2544ce21ae41414099a7504c61164a0
-> Author: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> Date:   Tue Feb 25 13:09:53 2014 +0100
->
->      arm: dma-mapping: Add support to extend DMA IOMMU mappings
->
-> Multiple bitmaps were introduced as extension. If it needs to extend
-> a bitmap, it still check whether the allocation exceeding the total
-> size, not current bitmap size. So change the condition from
-> mapping->bits to PAGE_SIZE.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Have you taken these yet?  I notice that these aren't in -next yet.
 
-NACK, this patch is not correct. mapping->bits contains the correct size of
-a single bitmap, see the beginning of arm_iommu_create_mapping() function.
+> The ARM ones should go through Maxime.
 
-> ---
->   arch/arm/mm/dma-mapping.c | 8 ++++----
->   1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 4c88935..d7da5c3 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1089,9 +1089,9 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
->   	spin_lock_irqsave(&mapping->lock, flags);
->   	for (i = 0; i < mapping->nr_bitmaps; i++) {
->   		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
-> -				mapping->bits, 0, count, align);
-> +				PAGE_SIZE, 0, count, align);
->   
-> -		if (start > mapping->bits)
-> +		if (start > PAGE_SIZE)
->   			continue;
->   
->   		bitmap_set(mapping->bitmaps[i], start, count);
-> @@ -1110,9 +1110,9 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
->   		}
->   
->   		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
-> -				mapping->bits, 0, count, align);
-> +				PAGE_SIZE, 0, count, align);
->   
-> -		if (start > mapping->bits) {
-> +		if (start > PAGE_SIZE) {
->   			spin_unlock_irqrestore(&mapping->lock, flags);
->   			return DMA_ERROR_CODE;
->   		}
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
