@@ -1,47 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 04:12:23 -0700
-Subject: [PATCH v4 02/11] memory: emif: Move EMIF register defines to
- include/linux/
-In-Reply-To: <1405047349-15101-3-git-send-email-d-gerlach@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-3-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140714111222.GB20068@atomide.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 13:10:08 +0200
+Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
+In-Reply-To: <53C3B6EC.9090904@nvidia.com>
+References: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
+ <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
+ <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
+ <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
+ <53C3A986.9050602@nvidia.com> <20140714102954.GD9870@ulmo>
+ <53C3B6EC.9090904@nvidia.com>
+Message-ID: <20140714111007.GB31460@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
-> OMAP4 and AM33XX share the same EMIF controller IP. Although there
-> are significant differences in the IP integration due to which
-> AM33XX can't reuse the EMIF driver DVFS similar to OMAP4,
-> it can definitely benefit by reusing the EMIF related macros
-> defined in drivers/memory/emif.h.
+On Mon, Jul 14, 2014 at 01:54:36PM +0300, Mikko Perttunen wrote:
+> On 14/07/14 13:29, Thierry Reding wrote:
+> >* PGP Signed by an unknown key
+> > ...
+> >>Yes, this sounds sensible. I'll make such a patch. I suppose having another
+> >>timings table in the MC node with just the rate and mc-burst-data would
+> >>separate the concerns best. It occurs to me that we could also write the
+> >>regs in the pre-rate change notifier, but this would turn the dependency
+> >>around and would mean that the regs are not written when entering backup
+> >>rates. The latter shouldn't be a problem but the reversed dependency would,
+> >>so I guess a custom function is the way to go, and we need to add at least
+> >>one anyway.
+> >
+> >It sounds like maybe moving enough code and data into the MC driver to
+> >handle frequency changes would be a good move. From the above it sounds
+> >like all the MC driver needs to know is that a frequency change is about
+> >to happen and what the new frequency is.
+> >
+> >In addition to exposing things like number of DRAM banks, etc.
+> >
 > 
-> In the current OMAP PM framework the PM code resides under
-> arch/arm/mach-omap2/. To enable reuse of the register defines move
-> the register defines in the emif header file to include/linux so that
-> both the EMIF driver and the AM33XX PM code can benefit.
+> Yes, so there are two ways to do this:
+> 1) EMC calls tegra_mc_emem_update(freq) at the correct time
+> 2) MC has an optional clock phandle to the EMC clock and registers a
+> pre-change notifier.
 > 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Reviewed-by: Russ Dill <russ.dill@ti.com>
-> Acked-by: Santosh Shililmar <santosh.shilimkar@ti.com>
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
-> v3->v4:
-> patch unchanged from original:
-> 	http://www.spinics.net/lists/linux-omap/msg95314.html
+> Both work, but the dependency is reversed. In both cases, the other driver
+> is also optional. In the first case, the EMC driver can give a warning if
+> the call fails. (As mentioned, if the MC_EMEM updates don't happen, things
+> still work but potentially with a hefty perf loss.)
+> TBH, I haven't yet decided which one is better. If you have an opinion,
+> I'll go with it.
+
+I think I prefer 1. Using an explicit call into the MC driver allow us
+to precisely determine the moment in time when the registers should be
+updated. The pre-change notifier, as I understand it, doesn't give us
+that. Also, the notifier doesn't give us a way to determine success or
+failure of the MC call.
+
+> >>The downstream kernel also overwrites most LA registers during EMC rate
+> >>change without regard for the driver-set values, and we might have to read
+> >>those values from the device tree too. Upstream can do this in rate change
+> >>notifiers if needed. I'll look into this a bit more.
+> >
+> >As I understand it, the latency allowance should be specified in terms
+> >of the maximum amount of time that requests are delayed, so that the
+> >proper values for the LA registers can be recomputed on an EMC rate
+> >change.
 > 
->  drivers/memory/emif.h   | 543 +---------------------------------------------
->  include/linux/ti_emif.h | 558 ++++++++++++++++++++++++++++++++++++++++++++++++
+> That's how I understand it too, but in downstream, the LA register values
+> are hardcoded into EMC tables in platform data/DTS that are just written
+> into the LA registers as-is during rate change.
 
-So far we've seen that exposing hardware registers like this
-will lead into various drivers misusing them. I think a better
-solution is to implement few targeted functions that allow
-sharing code between the platform idle code and memory driver.
+Hehe, well, we don't want any of that upstream. =) If it can be computed
+at runtime, then let's compute it. Also, if it's encoded in platform
+data or DTS, then there's no way it can be adjusted based on use-case.
+For example if you have a device with two display outputs (an internal
+panel and HDMI for example) but you never have HDMI plugged in, then
+there's no reason why you would want to program the latency allowance
+for the second display controller. If you provide the values in a static
+frequency/register value table, then you need to account for any
+possible scenario up front, irrespective of what (if any) HDMI monitor
+is attached.
 
-Maybe you can have the shared functions in in something like
-drivers/memory/ti-emif.c that's always built in? The idle
-code won't need any of that early on.
-
-Regards,
-
-Tony
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/72999219/attachment.sig>
