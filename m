@@ -1,69 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 14 Jul 2014 09:26:37 -0700
-Subject: [PATCH v4 7/7] arm/arm64: Unexport restart handlers
-In-Reply-To: <20140714150909.GF1112@arm.com>
-References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
- <1405265431-4561-8-git-send-email-linux@roeck-us.net>
- <20140714142232.GB1112@arm.com> <53C3EBAA.9050907@roeck-us.net>
- <20140714150909.GF1112@arm.com>
-Message-ID: <20140714162637.GA2826@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jul 2014 09:25:52 -0700
+Subject: [PATCH v2] ARM: OMAP2+: l2c: squelch warning dump on power
+ control setting
+In-Reply-To: <53C3E9BD.9010104@ti.com>
+References: <d081bdbeebec0e7f2a292a11513f96375aa35bd4.1405343188.git.nsekhar@ti.com>
+ <53C3E9BD.9010104@ti.com>
+Message-ID: <20140714162551.GG20068@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 04:09:09PM +0100, Catalin Marinas wrote:
-> On Mon, Jul 14, 2014 at 03:39:38PM +0100, Guenter Roeck wrote:
-> > On 07/14/2014 07:22 AM, Catalin Marinas wrote:
-> > > On Sun, Jul 13, 2014 at 04:30:31PM +0100, Guenter Roeck wrote:
-> > >> Implementing a restart handler in a module don't make sense
-> > >> as there would be no guarantee that the module is loaded when
-> > >> a restart is needed. Unexport arm_pm_restart to ensure that
-> > >> no one gets the idea to do it anyway.
-> > >>
-> > >> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > >> ---
-> > >> v4: No change
-> > >> v3: No change
-> > >> v2: No change
-> > >>
-> > >>   arch/arm/kernel/process.c   | 1 -
-> > >>   arch/arm64/kernel/process.c | 1 -
-> > >>   2 files changed, 2 deletions(-)
-> > >>
-> > >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > >> index 5d191e3..25c7f00 100644
-> > >> --- a/arch/arm/kernel/process.c
-> > >> +++ b/arch/arm/kernel/process.c
-> > >> @@ -125,7 +125,6 @@ void (*pm_power_off)(void);
-> > >>   EXPORT_SYMBOL(pm_power_off);
-> > >>
-> > >>   void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
-> > >> -EXPORT_SYMBOL_GPL(arm_pm_restart);
-> > >
-> > > Unless I miss something, how is this different from registering a
-> > > restart notifier from a module (blocking_notifier_chain_register is
-> > > exported)?
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [140714 07:33]:
+> On Monday 14 July 2014 09:13 AM, Sekhar Nori wrote:
+> > On OMAP SOCs using PL310 controllers, power_ctrl register is not
+> > accessible from non-secure software even on PL310 versions which
+> > support it. The secure code takes care of setting it up correctly
+> > and power transitions are proven on these devices.
 > > 
-> > A notifier can be unregistered safely, and more than one notifier call
-> > is supported. If there is more than one driver setting arm_pm_restart,
-> > the first one to unregister will clear the pointer. Using the notifier
-> > is cleaner and not architecture dependent. One might argue that setting
-> > module external function pointers from module code isn't exactly clean
-> > coding.
+> > For example, AM437x has L2C-310 version r3p3 and ROM code on that
+> > device does not support writing to L2C-310 power control register.
+> > The L2C driver, however, tries writing to this register for all
+> > revisions >= r3p0.
+> > 
+> > This leads to a warning dump on boot which leads most users to believe
+> > that L2 cache is non-functional.
+> > 
+> > Since the problem is understood, and cannot be addressed through
+> > software, replace the warning with a pr_info() while maintaining the
+> > WARN_ON() for other truly unexpected scenarios.
+> > 
+> > Reported-by: Nishanth Menon <nm@ti.com>
+> > Tested-by: Felipe Balbi <balbi@ti.com>
+> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> > ---
+> > Only description updated since v1
+> > 
+> Thanks for update.
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> I agree.
-> 
-> > Anyway, this patch is not relevant for the series. If you prefer to have
-> > the function exported, and keep using it for arm drivers loaded as modules,
-> > be my guest, and I'll be more than happy drop it. I'll take your comment
-> > as a hint _not_ to convert existing code to use the notifier after the
-> > series is accepted. Cool, as I hate wasting my time.
-> 
-> No, it's actually the opposite ;) (and I would go further and remove
-> arm_pm_restart entirely for arm64).
-> 
-Ah, sorry, I misunderstood. As mentioned above, I had planned to submit
-patches to do just that after the initial series has been accepted.
-Guess I can start with arm64 to keep things simple.
 
-Thanks,
-Guenter
+Thanks applying into omap-for-v3.16/fixes.
+
+Tony 
