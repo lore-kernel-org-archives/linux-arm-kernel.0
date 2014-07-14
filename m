@@ -1,119 +1,141 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 14 Jul 2014 12:29:56 +0200
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <53C3A986.9050602@nvidia.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
- <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
- <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
- <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
- <53C3A986.9050602@nvidia.com>
-Message-ID: <20140714102954.GD9870@ulmo>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 14 Jul 2014 16:04:57 +0530
+Subject: [PATCH v2] arm: dra7xx: Add hwmod data for pcie1 and pcie2
+ subsystems
+In-Reply-To: <53BD2136.9030009@ti.com>
+References: <1403719366-9656-3-git-send-email-kishon@ti.com>
+ <1404896567-32204-1-git-send-email-kishon@ti.com> <53BD2136.9030009@ti.com>
+Message-ID: <53C3B251.8000209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 12:57:26PM +0300, Mikko Perttunen wrote:
-> On 14/07/14 12:31, Thierry Reding wrote:
-> >* PGP Signed by an unknown key
-> >
-> >On Mon, Jul 14, 2014 at 12:06:32PM +0300, Mikko Perttunen wrote:
-> >>On 14/07/14 11:15, Thierry Reding wrote:
-> >>>>Old Signed by an unknown key
-> >>>
-> >>>On Mon, Jul 14, 2014 at 10:55:51AM +0300, Mikko Perttunen wrote:
-> >>>>On 11/07/14 19:01, Mikko Perttunen wrote:
-> >>>>>On 07/11/2014 05:51 PM, Thierry Reding wrote:
-> >>>>>>On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
-> >>>>>>>...
-> >>>>>>...
-> >>>>>
-> >>>>>In this case, all the registers that will be written are such that the
-> >>>>>MC driver will never need to write them. They are shadowed registers,
-> >>>>>meaning that all writes are stored and are only effective starting from
-> >>>>>the next time the EMC rate change state machine is activated, so writing
-> >>>>>them from anywhere except than the EMC driver would be pointless.
-> >>>>>
-> >>>>>I can find two users of these registers in downstream:
-> >>>>>1) mc.c saves and loads them on suspend/restore (I don't know why, that
-> >>>>>shouldn't do anything. They will be overridden anyway during the next
-> >>>>>EMC rate change).
-> >>>>>2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to
-> >>>>>calculate a value which it then writes to a register that is also
-> >>>>>shadowed and that is part of downstream burst registers so that doesn't
-> >>>>>do anything either.
-> >>>>>
-> >>>>>The reason I implemented two ways to specify the MC register area was
-> >>>>>that this could be merged before an MC driver and retain
-> >>>>>backwards-compatibility after the MC driver arrives.
-> >>>>>
-> >>>>>If this is not acceptable, we can certainly wait for the MC driver to be
-> >>>>>merged first. (Although with the general rate of things, I hope I won't
-> >>>>>be back at school at that point..) I assume that this is blocked on the
-> >>>>>IOMMU bindings discussion? In that case, there are several options: the
-> >>>>>MC driver could have its own tables for each EMC rate or we could just
-> >>>>>make the EMC tables global (i.e. not under the EMC node). In any case,
-> >>>>>the MC driver would need to implement a function that would just write
-> >>>>>these values but be guaranteed to not do anything else, since that could
-> >>>>>cause nasty things during the EMC rate change sequence.
-> >>>>
-> >>>>Having taken another look at the code, I don't think the MC driver could do
-> >>>>anything that bad. There are also two other places where the EMC driver
-> >>>>needs to read MC registers: Inside the sequence, it reads a register but
-> >>>>discards its contents. According to comments, this acts as a memory barrier,
-> >>>>probably for the preceding step that writes into MC memory. If the register
-> >>>>writes are moved to the MC driver, it could also handle that. In another
-> >>>>place it reads the number of RAM modules from a MC register. The MC driver
-> >>>>could export this as another function.
-> >>>
-> >>>Exporting this functionality from the MC driver is the right thing to do
-> >>>in my opinion.
-> >>
-> >>Ok, let's do that then. Do you think I could make a bare-bones MC driver to
-> >>support the EMC driver before your MC driver with IOMMU/LA is ready? Can the
-> >>MC device tree node be stabilized yet? Of course, if things go well, that
-> >>concern might turn out to be unnecessary.
-> >
-> >Well, at this point this isn't 3.17 material anyway, so there's no need
-> >to rush things.
+On Wednesday 09 July 2014 04:32 PM, Rajendra Nayak wrote:
+> On Wednesday 09 July 2014 02:32 PM, Kishon Vijay Abraham I wrote:
+>> Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
+>>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>> Changes from v1:
+>> * changed the clock domain to "pcie_clkdm"
+>> * Added PCIe as a slave port for l3_main.
 > 
-> Very true.
+> Looks good to me,
+> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
+
+Paul,
+
+Can you pick this one?
+
+Thanks
+Kishon
 > 
-> >I'd prefer to take a patch on top of my proposed MC
-> >driver patch in anticipation of merging that for 3.18. But if it turns
-> >out that for whatever reason we can't do that, having a separate patch
-> >makes it easy to extract the changes into a bare-bones driver.
+>>
+>> Boot log for dra7xx can be found at http://paste.ubuntu.com/7769402/
+>>
+>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   73 +++++++++++++++++++++++++++++
+>>  1 file changed, 73 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> index 6ff40a6..2f37ca8 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> @@ -1290,6 +1290,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>>  };
+>>  
+>>  /*
+>> + * 'PCIE' class
+>> + *
+>> + */
+>> +
+>> +static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
+>> +	.name	= "pcie",
+>> +};
+>> +
+>> +/* pcie1 */
+>> +static struct omap_hwmod dra7xx_pcie1_hwmod = {
+>> +	.name		= "pcie1",
+>> +	.class		= &dra7xx_pcie_hwmod_class,
+>> +	.clkdm_name	= "pcie_clkdm",
+>> +	.main_clk	= "l4_root_clk_div",
+>> +	.prcm = {
+>> +		.omap4 = {
+>> +			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+>> +			.modulemode	= MODULEMODE_SWCTRL,
+>> +		},
+>> +	},
+>> +};
+>> +
+>> +/* pcie2 */
+>> +static struct omap_hwmod dra7xx_pcie2_hwmod = {
+>> +	.name		= "pcie2",
+>> +	.class		= &dra7xx_pcie_hwmod_class,
+>> +	.clkdm_name	= "pcie_clkdm",
+>> +	.main_clk	= "l4_root_clk_div",
+>> +	.prcm = {
+>> +		.omap4 = {
+>> +			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
+>> +			.modulemode   = MODULEMODE_SWCTRL,
+>> +		},
+>> +	},
+>> +};
+>> +
+>> +/*
+>>   * 'PCIE PHY' class
+>>   *
+>>   */
+>> @@ -2448,6 +2485,38 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
+>>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>  };
+>>  
+>> +/* l3_main_1 -> pcie1 */
+>> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pcie1 = {
+>> +	.master		= &dra7xx_l3_main_1_hwmod,
+>> +	.slave		= &dra7xx_pcie1_hwmod,
+>> +	.clk		= "l3_iclk_div",
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> +/* l4_cfg -> pcie1 */
+>> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
+>> +	.master		= &dra7xx_l4_cfg_hwmod,
+>> +	.slave		= &dra7xx_pcie1_hwmod,
+>> +	.clk		= "l4_root_clk_div",
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> +/* l3_main_1 -> pcie2 */
+>> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__pcie2 = {
+>> +	.master		= &dra7xx_l3_main_1_hwmod,
+>> +	.slave		= &dra7xx_pcie2_hwmod,
+>> +	.clk		= "l3_iclk_div",
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>> +/* l4_cfg -> pcie2 */
+>> +static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
+>> +	.master		= &dra7xx_l4_cfg_hwmod,
+>> +	.slave		= &dra7xx_pcie2_hwmod,
+>> +	.clk		= "l4_root_clk_div",
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>>  /* l4_cfg -> pcie1 phy */
+>>  static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
+>>  	.master		= &dra7xx_l4_cfg_hwmod,
+>> @@ -2813,6 +2882,10 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>>  	&dra7xx_l4_cfg__mpu,
+>>  	&dra7xx_l4_cfg__ocp2scp1,
+>>  	&dra7xx_l4_cfg__ocp2scp3,
+>> +	&dra7xx_l3_main_1__pcie1,
+>> +	&dra7xx_l4_cfg__pcie1,
+>> +	&dra7xx_l3_main_1__pcie2,
+>> +	&dra7xx_l4_cfg__pcie2,
+>>  	&dra7xx_l4_cfg__pcie1_phy,
+>>  	&dra7xx_l4_cfg__pcie2_phy,
+>>  	&dra7xx_l3_main_1__qspi,
+>>
 > 
-> Yes, this sounds sensible. I'll make such a patch. I suppose having another
-> timings table in the MC node with just the rate and mc-burst-data would
-> separate the concerns best. It occurs to me that we could also write the
-> regs in the pre-rate change notifier, but this would turn the dependency
-> around and would mean that the regs are not written when entering backup
-> rates. The latter shouldn't be a problem but the reversed dependency would,
-> so I guess a custom function is the way to go, and we need to add at least
-> one anyway.
-
-It sounds like maybe moving enough code and data into the MC driver to
-handle frequency changes would be a good move. From the above it sounds
-like all the MC driver needs to know is that a frequency change is about
-to happen and what the new frequency is.
-
-In addition to exposing things like number of DRAM banks, etc.
-
-> The downstream kernel also overwrites most LA registers during EMC rate
-> change without regard for the driver-set values, and we might have to read
-> those values from the device tree too. Upstream can do this in rate change
-> notifiers if needed. I'll look into this a bit more.
-
-As I understand it, the latency allowance should be specified in terms
-of the maximum amount of time that requests are delayed, so that the
-proper values for the LA registers can be recomputed on an EMC rate
-change.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/9009e80a/attachment.sig>
