@@ -1,102 +1,29 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Mon, 14 Jul 2014 09:19:23 +0900
-Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
-In-Reply-To: <1474559.zFUJiypt1j@avalon>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1400150451-13469-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <53BDD84E.4090206@renesas.com> <1474559.zFUJiypt1j@avalon>
-Message-ID: <53C3220B.30506@renesas.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 14 Jul 2014 11:06:05 +1000
+Subject: linux-next: manual merge of the mvebu tree with Linus' tree
+Message-ID: <20140714110605.045e5cf5@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi all,
 
-On 7/10/2014 7:37 PM, Laurent Pinchart wrote:
-> On Thursday 10 July 2014 09:03:26 Khiem Nguyen wrote:
->> On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
->>> Cache the micro-TLB number in archdata allocated in the .add_device
->>> handler instead of looking it up when the deviced is attached and
->>> detached. This simplifies the .attach_dev and .detach_dev operations and
->>> prepares for DT support.
->>
->> [snip]
->>
->>> Signed-off-by: Laurent Pinchart
->>> <laurent.pinchart+renesas@ideasonboard.com>
->>
->> [snip]
->>
->>> +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device
->>> *dev)
->>> +{
->>> +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
->>> +	const char *devname = dev_name(dev);
->>> +	unsigned int i;
->>> +
->>> +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
->>> +		if (strcmp(master->name, devname) == 0)
->>> +			return master->utlb;
->>> +	}
->>> +
->>> +	return -1;
->>> +}
->>
->> [snip]
->>
->>>  static int ipmmu_add_device(struct device *dev)
->>
->> [snip]
->>
->>>  	list_for_each_entry(mmu, &ipmmu_devices, list) {
->>> -		master = ipmmu_find_master(mmu, dev);
->>> -		if (master) {
->>> +		utlb = ipmmu_find_utlb(mmu, dev);
->>> +		if (utlb >= 0) {
->>>  			/*
->>> -			 * TODO Take a reference to the master to protect
->>> +			 * TODO Take a reference to the MMU to protect
->>>  			 * against device removal.
->>>  			 */
->>>  			break;
->>
->> [snip]
->>
->>> +	archdata->mmu = mmu;
->>> +	archdata->utlb = utlb;
->>
->> [snip]
->>
->> I have one question for ipmmu_add_device().
->>
->> In my understanding, your code will find utlb for device
->> base on device name.
->> For any device, it will /only/ return utlb number of first match.
->>
->> How about the case that a device name connected with more than 1 utlb ?
->> e.g DU device (rcar-du-r8a7790) in Lager
->>
->> Was that case already covered in your code ?
-> 
-> For the DU case, the R8A7790 contains /two DU devices/, each connected to a 
-> single utlb. The IPMMU driver will thus work fine in that case.
+Today's linux-next merge of the mvebu tree got a conflict in
+arch/arm/Kconfig between commit 19682f72f5db ("ARM: Remove
+ARCH_HAS_CPUFREQ config option") from Linus' tree and commit
+ba364fc752da ("ARM: Kirkwood: Remove mach-kirkwood") from the mvebu
+tree.
 
-As my understanding, in board-lager-reference.c,
-DU devices are registered with 1 device name "rcar-du-r8a7790".
-
-I also added some logs in ipmmu_add_device() to observe
-the mapping between device name and utlb number.
-And I saw that only one utlb is mapped with DU.
-
-Do I miss anything here ?
-
-> 
-> I agree that this is a problem in general though, other devices (such as the 
-> DMAC) are connected to more than one utlb. This is currently not supported by 
-> the driver.
-> 
-Thanks for your confirmation.
-I guess the driver will be improved in near future.
+I fixed it up (The latter just removed the whole ARCH_KIRKWOOD entry,
+so I did that) and can carry the fix as necessary (no action is
+required).
 
 -- 
-Best regards,
-KHIEM Nguyen
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/6a985e7b/attachment.sig>
