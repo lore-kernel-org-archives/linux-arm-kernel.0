@@ -1,44 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Jul 2014 13:23:47 +0200
-Subject: [PATCH] cpuidle: big.LITTLE: add MCPM dependency
-Message-ID: <4345351.RJRQd7ghCF@wuerfel>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Jul 2014 13:24:53 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix MCPM build with SUSPEND=n
+Message-ID: <1405337093-15377-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-662322fcb6d ("cpuidle: big.LITTLE: Add ARCH_EXYNOS entry in config")
-made it possible for the big-little cpuidle driver to run on exynos,
-which may or may not include MCPM support at compile time, so we
-run into a link error when it is disabled:
+Building of EXYNOS5420_MCPM with disabled SUSPEND fails:
+arch/arm/mach-exynos/built-in.o: In function `exynos_mcpm_init':
+arch/arm/mach-exynos/mcpm-exynos.c:361: undefined reference to `mcpm_loopback'
 
-drivers/built-in.o: In function `bl_enter_powerdown':
-:(.text+0x1889a0): undefined reference to `mcpm_cpu_powered_up'
-drivers/built-in.o: In function `bl_powerdown_finisher':
-:(.text+0x1889e8): undefined reference to `mcpm_set_entry_vector'
-:(.text+0x1889ec): undefined reference to `mcpm_cpu_suspend'
+The exynos_mcpm_init() in mcp-exynos.c calls mcpm_loopback() which
+depends on cpu_suspend function (ARM_CPU_SUSPEND).
 
-This adds an explicit dependency to CONFIG_MCPM to avoid that
-case.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Chander Kashyap <chander.kashyap@linaro.org>
-Cc: Tomasz Figa <t.figa@samsung.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: <stable@vger.kernel.org>
+Fixes: a6a4d3152e3cbb6 ("ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster using the MCPM loopback")
 ---
-I believe the broken commit is only present in the samsung/for-next
-tree (through v3.17-next/cpuidle-exynos), so it should be fixed there.
+ arch/arm/mach-exynos/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-On a side note, I wonder if we should have platform dependencies at
-all, or just the MCPM dependency by itself.
-
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 2f6b33ea6e08..459b7c91407a 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -10,6 +10,7 @@ config ARM_ARMADA_370_XP_CPUIDLE
- config ARM_BIG_LITTLE_CPUIDLE
- 	bool "Support for ARM big.LITTLE processors"
- 	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
-+	depends on MCPM
- 	select ARM_CPU_SUSPEND
- 	select CPU_IDLE_MULTIPLE_DRIVERS
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 8f9b66c4ac78..5d4ff6571dcd 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -119,6 +119,7 @@ config EXYNOS5420_MCPM
+ 	bool "Exynos5420 Multi-Cluster PM support"
+ 	depends on MCPM && SOC_EXYNOS5420
+ 	select ARM_CCI
++	select ARM_CPU_SUSPEND
  	help
+ 	  This is needed to provide CPU and cluster power management
+ 	  on Exynos5420 implementing big.LITTLE.
+-- 
+1.9.1
