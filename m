@@ -1,23 +1,26 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 14 Jul 2014 16:12:16 +0530
-Subject: [RESEND PATCH 1/8] ARM: dts: dra7xx-clocks: Add divider table to
- optfclk_pciephy_div clock
+Date: Mon, 14 Jul 2014 16:12:17 +0530
+Subject: [RESEND PATCH 2/8] ARM: dts: dra7xx-clocks: Change the parent of
+ apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
 In-Reply-To: <1405334543-25509-1-git-send-email-kishon@ti.com>
 References: <1405334543-25509-1-git-send-email-kishon@ti.com>
-Message-ID: <1405334543-25509-2-git-send-email-kishon@ti.com>
+Message-ID: <1405334543-25509-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Keerthy <j-keerthy@ti.com>
 
-Add divider table to optfclk_pciephy_div clock. The 8th bit of
-CM_CLKMODE_APLL_PCIE can be programmed to either 0x0 or 0x1
-based on if the divider value is 0x2 or 0x1.
+Change the parent of apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
+from dpll_pcie_ref_ck.
 
-Figure 26-21. PCIe PHY Clock Generator Overview in vE of DRA7xx ES1.0 shows the
-block diagram of Clock Generator Subsystem of PCIe PHY module. The divider
-value if '1' should be programmed in order to get the correct
-PCIE_PHY_DIV_GCLK frequency (2.5GHz).
+Figure 26-22. DPLL_PCIE_REF Functional Block Diagram in vE of DRA7xx ES1.0 TRM
+shows the signal name for the output of post divider (M2) is CLKOUTLDO.
+
+Figure 26-21. PCIe PHY Clock Generator Overview shows CLKOUTLDO is used as
+input to apll mux.
+
+So the actual output of dpll is dpll_pcie_ref_m2ldo_ck which is also the input
+of apll.
 
 Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Tero Kristo <t-kristo@ti.com>
@@ -25,20 +28,21 @@ Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index b03cfe4..7148e7c 100644
+index 7148e7c..f5dca1f 100644
 --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1170,6 +1170,7 @@
- 		clocks = <&apll_pcie_ck>;
+@@ -1152,7 +1152,7 @@
+ 
+ 	apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
+ 		compatible = "ti,mux-clock";
+-		clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
++		clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
  		#clock-cells = <0>;
- 		reg = <0x021c>;
-+		ti,dividers = <2>, <1>;
- 		ti,bit-shift = <8>;
- 		ti,max-div = <2>;
- 	};
+ 		reg = <0x021c 0x4>;
+ 		ti,bit-shift = <7>;
 -- 
 1.7.9.5
