@@ -1,81 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jul 2014 15:33:24 +0100
-Subject: [PATCH v2 03/11] ARM: stih416: Add DT nodes for PWM
+Date: Mon, 14 Jul 2014 15:33:25 +0100
+Subject: [PATCH v2 04/11] ARM: stih416-b2020e: Enable PWM on the B2020 Rev-E
 In-Reply-To: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
 References: <1405348412-7352-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1405348412-7352-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1405348412-7352-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supply top level nodes for the STiH416 based development boards.
-The Pinctrl configuration has already been applied, so the only
-missing piece of the DT puzzle is for a board's DTB to enable
-the nodes.
+All the infrastructure is now in place for ST's PWM controller.  This
+patch takes the final step and enables the IP on the 2020 Rev-E
+development platform.
 
 Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416.dtsi | 44 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/stih416-b2020e.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 84758d7..c28ef85 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -102,7 +102,7 @@
- 			interrupts	= <0 210 0>;
- 			pinctrl-names 	= "default";
- 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
--			clocks          = <&clk_sysin>;
-+			clocks		= <&clk_sysin>;
- 		};
- 
- 		i2c at fed40000 {
-@@ -236,5 +236,47 @@
- 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
- 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
+diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
+index ba0fa2c..07cbf5b 100644
+--- a/arch/arm/boot/dts/stih416-b2020e.dts
++++ b/arch/arm/boot/dts/stih416-b2020e.dts
+@@ -31,5 +31,15 @@
+ 		ethernet1: dwmac at fef08000 {
+ 			snps,reset-gpio = <&PIO0 7>;
  		};
 +
 +		/* SAS PWM Module */
 +		pwm0: pwm at fed10000 {
-+			compatible	= "st,sti-pwm";
-+			status		= "disabled";
-+			#pwm-cells	= <2>;
-+			reg		= <0xfed10000 0x68>;
-+
-+			pinctrl-names	= "default";
-+			pinctrl-0 = 	<&pinctrl_pwm0_chan0_default
-+					&pinctrl_pwm0_chan1_default
-+					&pinctrl_pwm0_chan2_default
-+					&pinctrl_pwm0_chan3_default>;
-+
-+			clock-names	= "pwm";
-+			clocks		= <&clk_sysin>;
-+			st,pwm-num-chan = <4>;
++			status		= "okay";
 +		};
 +
 +		/* SBC PWM Module */
 +		pwm1: pwm at fe510000 {
-+			compatible	= "st,sti-pwm";
-+			status		= "disabled";
-+			#pwm-cells	= <2>;
-+			reg		= <0xfe510000 0x68>;
-+
-+			pinctrl-names	= "default";
-+			pinctrl-0	= <&pinctrl_pwm1_chan0_default
-+					/*
-+					 * Shared with SBC_OBS_NOTRST.  Don't
-+					 * enable unless you really know what
-+					 * you're doing.
-+					 *
-+					 * &pinctrl_pwm1_chan1_default
-+					 */
-+					&pinctrl_pwm1_chan2_default
-+					&pinctrl_pwm1_chan3_default>;
-+
-+			clock-names	= "pwm";
-+			clocks		= <&clk_sysin>;
-+			st,pwm-num-chan = <3>;
++			status		= "okay";
 +		};
  	};
  };
