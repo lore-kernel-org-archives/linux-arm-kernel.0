@@ -1,29 +1,36 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 14 Jul 2014 09:48:27 +0200
-Subject: [PATCH v2 0/4] ARM: vf610: add FlexCAN support
-Message-ID: <cover.1405322992.git.stefan@agner.ch>
+Date: Mon, 14 Jul 2014 09:48:29 +0200
+Subject: [PATCH v2 2/4] ARM: imx: clk-vf610: fix FlexCAN clock gating
+In-Reply-To: <cover.1405322992.git.stefan@agner.ch>
+References: <cover.1405322992.git.stefan@agner.ch>
+Message-ID: <94282392d8355ac25bb998b89032c1c980d5ccce.1405322992.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Vybrid (aka vf610) to the FlexCAN
-controller and extends the device tree accordingly.
+Extend the clock control for FlexCAN with the second gate which
+enable the clocks in the Clock Divider (CCM_CSCDR2) register too.
 
-Changes in v2:
-- Split out patch (seperate dt, clocks and driver changes)
-- Use spaces for hardware feature flags table
-- Remove drive-by change of esdhc register length
-- Added related fix which enables clock in berr_counter
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/mach-imx/clk-vf610.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Stefan Agner (4):
-  ARM: dts: vf610: add FlexCAN node
-  ARM: imx: clk-vf610: fix FlexCAN clock gating
-  can: flexcan: switch on clocks before accessing ecr register
-  can: flexcan: add vf610 support for FlexCAN
-
- arch/arm/boot/dts/vf610.dtsi  | 23 +++++++++++
- arch/arm/mach-imx/clk-vf610.c |  6 ++-
- drivers/net/can/flexcan.c     | 89 ++++++++++++++++++++++++++++++++++++++-----
- 3 files changed, 106 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index 22dc3ee..b12b888 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
+ 
+-	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+-	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
++	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
++	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
++	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
+ 
+ 	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
+ 	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
 -- 
 2.0.1
