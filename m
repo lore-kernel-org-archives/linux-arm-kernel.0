@@ -1,83 +1,114 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Mon, 14 Jul 2014 10:46:07 -0500
-Subject: [PATCH 2/2] ARM: place sigpage at a random offset above stack
-In-Reply-To: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
-References: <1405352767-28768-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1405352767-28768-3-git-send-email-nathan_lynch@mentor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Jul 2014 17:46:22 +0200
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <53C3CFCA.9050800@metafoo.de>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <4755712.cJmZ5fnaQH@wuerfel> <53C3CFCA.9050800@metafoo.de>
+Message-ID: <4494372.fAWcxQ0qku@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sigpage is currently placed alongside shared libraries etc in the
-address space.  Similar to what x86_64 does for its VDSO, place the
-sigpage at a randomized offset above the stack so that learning the
-base address of the sigpage doesn't help expose where shared libraries
-are loaded in the address space (and vice versa).
+On Monday 14 July 2014 14:40:42 Lars-Peter Clausen wrote:
+> [...]
+> > I've given it a try now. Can you confirm that this is a valid transformation?
+> >
+> > If it's ok, I'll fold it into the original patch and re-send.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> >   ./arch/arm/mach-s3c64xx/mach-smartq.c           |   15 ++++++++-------
+> >   ./sound/soc/samsung/smartq_wm8987.c             |   19 +++++++------------
+> >   ./include/linux/platform_data/asoc-s3c-smartq.h |   10 ----------
+> >   3 files changed, 15 insertions(+), 29 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+> > index 4c111f60dbf2..dce449c0e855 100644
+> > --- a/arch/arm/mach-s3c64xx/mach-smartq.c
+> > +++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+> > @@ -20,7 +20,6 @@
+> >   #include <linux/spi/spi_gpio.h>
+> >   #include <linux/usb/gpio_vbus.h>
+> >   #include <linux/platform_data/s3c-hsotg.h>
+> > -#include <linux/platform_data/asoc-s3c-smartq.h>
+> 
+> #include <linux/gpio/driver.h>
 
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
- arch/arm/kernel/process.c | 36 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
+ok.
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 46fbbb3701a0..9e0d931dd475 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -475,6 +475,38 @@ const char *arch_vma_name(struct vm_area_struct *vma)
- 	return is_gate_vma(vma) ? "[vectors]" : NULL;
- }
- 
-+/* If possible, provide a placement hint at a random offset from the
-+ * stack for the signal page.
-+ */
-+static unsigned long sigpage_addr(const struct mm_struct *mm, unsigned int npages)
-+{
-+	unsigned long offset;
-+	unsigned long first;
-+	unsigned long last;
-+	unsigned long addr;
-+	unsigned int slots;
-+
-+	first = PAGE_ALIGN(mm->start_stack);
-+
-+	last = TASK_SIZE - (npages << PAGE_SHIFT);
-+
-+	/* No room after stack? */
-+	if (first > last)
-+		return 0;
-+
-+	/* Just enough room? */
-+	if (first == last)
-+		return first;
-+
-+	slots = ((last - first) >> PAGE_SHIFT) + 1;
-+
-+	offset = get_random_int() % slots;
-+
-+	addr = first + (offset << PAGE_SHIFT);
-+
-+	return addr;
-+}
-+
- static struct page *signal_page;
- extern struct page *get_signal_page(void);
- 
-@@ -488,6 +520,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- 	struct mm_struct *mm = current->mm;
- 	struct vm_area_struct *vma;
- 	unsigned long addr;
-+	unsigned long hint;
- 	int ret = 0;
- 
- 	if (!signal_page)
-@@ -496,7 +529,8 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- 		return -ENOMEM;
- 
- 	down_write(&mm->mmap_sem);
--	addr = get_unmapped_area(NULL, 0, PAGE_SIZE, 0, 0);
-+	hint = sigpage_addr(mm, 1);
-+	addr = get_unmapped_area(NULL, hint, PAGE_SIZE, 0, 0);
- 	if (IS_ERR_VALUE(addr)) {
- 		ret = addr;
- 		goto up_fail;
--- 
-1.9.3
+> >
+> >   #include <asm/mach-types.h>
+> >   #include <asm/mach/map.h>
+> > @@ -380,9 +379,12 @@ void __init smartq_map_io(void)
+> >   	smartq_lcd_mode_set();
+> >   }
+> >
+> > -static const __initconst struct smartq_audio_pdata smartq_audio_pdata = {
+> > -	.gpio_jack = S3C64XX_GPL(12),
+> > -	.gpio_amp = S3C64XX_GPK(12),
+> > +static struct gpiod_lookup_table smartq_audio_gpios = {
+> > +	.dev_id = "smartq-audio",
+> > +	.table = {
+> > +		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
+> > +		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", GPIO_ACTIVE_HIGH),
+> 
+> There is no such thing as GPIO_ACTIVE_HIGH, just 0 for flags.
+
+The original driver does gpio_direction_output(..., 1); 
+
+For some reason I earlier concluded that this was what the '1' would need
+to get converted to. Are you sure '0' is correct then?
+
+> This needs a { } terminating entry.
+
+ok
+
+> > +	},
+> >   };
+> >
+> >   void __init smartq_machine_init(void)
+> > @@ -404,7 +406,6 @@ void __init smartq_machine_init(void)
+> >
+> >   	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
+> >
+> > -	platform_device_register_data(NULL, "smartq-audio", -1,
+> > -				      &smartq_audio_pdata,
+> > -				      sizeof (smartq_audio_pdata));
+> > +	platform_device_register_simple("smartq-audio", -1, NULL, 0);
+> > +	gpiod_add_lookup_table(&smartq_audio_gpios);
+> 
+> To avoid a extra round of -EPROBE_DEFER the lookup table should be 
+> registered before the device.
+
+ok
+
+> >   }
+> [...]
+> > diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+> > index 8c4a0a285ce7..8da7c67903c6 100644
+> > --- a/sound/soc/samsung/smartq_wm8987.c
+> > +++ b/sound/soc/samsung/smartq_wm8987.c
+> > @@ -19,8 +19,6 @@
+> >   #include <sound/soc.h>
+> >   #include <sound/jack.h>
+> 
+> #include <linux/gpio/consumer.h>
+> 
+> >
+> [..]
+> > -
+> > -	smartq_jack_gpios[0].gpio = pdata->gpio_jack;
+> 
+> smartq_jack_gpios[0].gpiod_dev = &pdev->dev;
+> 
+> > +	platform_set_drvdata(pdev, gpio);
+> 
+> This unfortunately wont work. snd_soc_register_card() will overwrite the 
+> devices drvdata. Use snd_soc_card_set_drvdata(card, gpio) and in the speaker 
+> event handler snd_soc_card_get_drvdata(w->dapm->card);
+
+ok.
+
+Thanks for the review!
+
+	Arnd
