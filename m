@@ -1,154 +1,50 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Mon, 14 Jul 2014 22:20:28 +0200
-Subject: [PATCH 5/5] arm: dts: Add gta04+b3 model bindings
-In-Reply-To: <1405369228-27197-1-git-send-email-marek@goldelico.com>
-References: <1405369228-27197-1-git-send-email-marek@goldelico.com>
-Message-ID: <1405369228-27197-6-git-send-email-marek@goldelico.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 14 Jul 2014 13:34:36 -0700
+Subject: [PATCH v10 0/11] seccomp: add thread sync ability
+In-Reply-To: <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
+References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
+ <20140711164931.GA18473@redhat.com>
+ <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
+ <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
+Message-ID: <CAGXu5j+A0GodNCnjqpYQXC2HL+S08_yP5H_n_v51VpE4UnnK7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/omap3-gta04+b3.dts | 118 +++++++++++++++++++++++++++++++++++
- 2 files changed, 119 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-gta04+b3.dts
+On Mon, Jul 14, 2014 at 12:04 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Fri, Jul 11, 2014 at 10:55 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Fri, Jul 11, 2014 at 9:49 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>>> On 07/10, Kees Cook wrote:
+>>>>
+>>>> This adds the ability for threads to request seccomp filter
+>>>> synchronization across their thread group (at filter attach time).
+>>>> For example, for Chrome to make sure graphic driver threads are fully
+>>>> confined after seccomp filters have been attached.
+>>>>
+>>>> To support this, locking on seccomp changes via thread-group-shared
+>>>> sighand lock is introduced, along with refactoring of no_new_privs. Races
+>>>> with thread creation are handled via delayed duplication of the seccomp
+>>>> task struct field and cred_guard_mutex.
+>>>>
+>>>> This includes a new syscall (instead of adding a new prctl option),
+>>>> as suggested by Andy Lutomirski and Michael Kerrisk.
+>>>
+>>> I do not not see any problems in this version,
+>>
+>> Awesome! Thank you for all the reviews. :) If Andy and Michael are
+>> happy with this too, I think this is in good shape. \o/
+>
+> I think I'm happy with it.  Is it in git somewhere for easy perusal?
+> I have a cold, so my reviewing ability is a bit off, but I want to
+> take a look at the final version, and git is a little easier than
+> email for this.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b04a57e..e869f18 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -282,6 +282,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += am3517-craneboard.dtb \
- 	omap3-gta04a3.dtb \
- 	omap3-gta04a4.dtb \
- 	omap3-gta04+b2.dtb \
-+	omap3-gta04+b3.dtb \
- 	omap3-igep0020.dtb \
- 	omap3-igep0030.dtb \
- 	omap3-ldp.dtb \
-diff --git a/arch/arm/boot/dts/omap3-gta04+b3.dts b/arch/arm/boot/dts/omap3-gta04+b3.dts
-new file mode 100644
-index 0000000..83446b3
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-gta04+b3.dts
-@@ -0,0 +1,118 @@
-+/*
-+ * Copyright (C) 2014 H. Nikolaus Schaller <hns@goldelico.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "omap3-gta04.dtsi"
-+
-+/ {
-+	model = "Goldelico GTA04b3/Letux 7004";
-+
-+	aliases {
-+		display0 = &lcd_b3;
-+	};
-+
-+	lcd_b3: lcd {
-+		compatible =	"sharp,lq070y3dg3b",
-+				"panel-dpi";
-+		label = "lcd";
-+		enable-gpios = <&gpio1 12 0>;
-+
-+		panel-timing {
-+			clock-frequency = <33260000>;
-+
-+			hback-porch = <64>;
-+			hactive = <800>;
-+			hfront-porch = <64>;
-+			hsync-len = <128>;
-+
-+			vback-porch = <35>;
-+			vactive = <480>;
-+			vfront-porch = <8>;
-+			vsync-len = <2>;
-+
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			de-active = <1>;
-+			pixelclk-active = <1>;
-+
-+		};
-+
-+		port {
-+			lcd_b3_in: endpoint {
-+				remote-endpoint = <&dpi_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&dss {
-+	pinctrl-names = "default";
-+	pinctrl-0 = < &dss_dpi_pins >;
-+
-+	status = "okay";
-+
-+	port {
-+		dpi_out: endpoint {
-+			remote-endpoint = <&lcd_b3_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
-+
-+&spi_lcd {
-+	compatible = "none";
-+};
-+
-+&madc_battery {
-+	capacity = <3900000>;
-+};
-+
-+&i2c2 {
-+	/* we have a different set of LEDs */
-+	tca_gpios: tca6507 at 45 {
-+		compatible = "ti,tca6507";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x45>;
-+
-+		gta04_led0: red_aux at 0 {
-+			label = "gta04:red:aux";
-+			reg = <0x0>;
-+		};
-+
-+		gta04_led1: green_aux at 1 {
-+			label = "gta04:green:aux";
-+			reg = <0x1>;
-+		};
-+
-+		gta04_led2: green_aux at 2 {
-+			label = "gta04:blue:aux";
-+			reg = <0x2>;
-+		};
-+
-+		gta04_led3: red_power at 3 {
-+			label = "gta04:red:power";
-+			reg = <0x3>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		gta04_led4: green_power at 4 {
-+			label = "gta04:green:power";
-+			reg = <0x4>;
-+		};
-+
-+		gta04_led5: green_power at 5 {
-+			label = "gta04:blue:aux";
-+			reg = <0x5>;
-+		};
-+
-+		wifi_reset: wifi_reset at 6 {
-+			reg = <0x6>;
-+			compatible = "gpio";
-+		};
-+	};
-+};
+Yes, absolutely:
+https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp-tsync
+
+Thanks for looking it over, and I hope you feel better soon!
+
+-Kees
+
 -- 
-1.9.1
+Kees Cook
+Chrome OS Security
