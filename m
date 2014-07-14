@@ -1,58 +1,114 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Jul 2014 15:27:03 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <1405347277.28592.25.camel@rzhang1-toshiba>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
- <20140624092309.GD13803@lee--X1> <20140709120823.GA32573@lee--X1>
- <1404911964.28592.4.camel@rzhang1-toshiba>
- <20140709134646.GB479@lee--X1> <20140714130824.GA3993@lee--X1>
- <1405347277.28592.25.camel@rzhang1-toshiba>
-Message-ID: <20140714142703.GC3993@lee--X1>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 14 Jul 2014 10:28:21 -0400
+Subject: [PATCH v4 0/6] Add Keystone PCIe controller driver
+In-Reply-To: <20140714060334.GB2930@pratyush-vbox>
+References: <1405110995-24676-1-git-send-email-m-karicheri2@ti.com>
+ <20140714060334.GB2930@pratyush-vbox>
+Message-ID: <53C3E905.3080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014, Zhang Rui wrote:
+On 07/14/2014 02:03 AM, Pratyush Anand wrote:
+> Oh.. I see my reply from gmail is not readable at all. (I forgot to
+> switch to plain text :( ) Please ignore last mail I am replying again
+> here.
+>
+> On Sat, Jul 12, 2014 at 04:36:29AM +0800, Murali Karicheri wrote:
+>
+> [...]
+>
+>> Murali Karicheri (6):
+>>    PCI: designware: add rd[wr]_other_conf API
+>>    PCI: designware: refactor MSI code to work with v3.65 dw hardware
+>
+> For  above two you can add my reviewed-by:
+>
+>>    PCI: designware: refactor host init code to re-use on keystone PCI
+>>    PCI: designware: enhance dw core driver to support keystone PCI host
+>
+> In stead of using version number and then changing few functions from
+> static to global , I would have used same philosophy of adding callbacks
+> wherever needed. May be maintainers can give their view, instead of patch
+> 3 and 4 I would have gone with something like this, where kc_pcie can be
+> passed through pp->plat_data.
+>
 
-> On Mon, 2014-07-14 at 14:08 +0100, Lee Jones wrote:
-> > On Wed, 09 Jul 2014, Lee Jones wrote:
-> > > On Wed, 09 Jul 2014, Zhang Rui wrote:
-> > > > On Wed, 2014-07-09 at 13:08 +0100, Lee Jones wrote:
-> > > > > On Tue, 24 Jun 2014, Lee Jones wrote:
-> > > > > 
-> > > > > > > I'm re-sending this set, as one of the maintainers' email addresses
-> > > > > > > is incorrect in the MAINTAINERS file.
-> > > > > > > 
-> > > > > > > This patchset adds full support for 2 types of Thermal Controllers
-> > > > > > > produced by STMicroelectronics.  One is a more traditional memory
-> > > > > > > mapped variant, the other is controlled solely by system configuration
-> > > > > > > registers.
-> > > > > > 
-> > > > > > Any thing from the Thermal guys? Has this set fallen through the gaps?
-> > > > > 
-> > > > > Anything at all?  It's been well over a month now.
-> > > > > 
-> > > > Well, for the soc thermal drivers, I'd prefer to take them via Eduardo,
-> > > > but as we didn't get any feedback from Eduardo, I will take them.
-> > > 
-> > > Thanks Rui.
-> > > 
-> > > So have you taken all 4 "thermal: sti: *" patches?
-> > 
-> > Have you taken these yet?
-> Not yet.
-> will do tomorrow.
+Pratyush,
 
-Perfect, thanks for the update.
+Thanks for the response. I will look into your proposal and respond back 
+when I get a chance.
 
-> >   I notice that these aren't in -next yet.
-> > 
-> > > The ARM ones should go through Maxime.
-> > 
-> 
-> 
+Thanks and regards,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Murali
+
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 905941c..b216192 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -490,16 +490,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>          }
+>
+>          if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -               pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+> -                                       MAX_MSI_IRQS,&msi_domain_ops,
+> -&dw_pcie_msi_chip);
+> -               if (!pp->irq_domain) {
+> -                       dev_err(pp->dev, "irq domain init failed\n");
+> -                       return -ENXIO;
+> -               }
+> +               if (!pp->ops->msi_init) {
+> +                       pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+> +                                               MAX_MSI_IRQS,&msi_domain_ops,
+> +&dw_pcie_msi_chip);
+> +                       if (!pp->irq_domain) {
+> +                               dev_err(pp->dev, "irq domain init failed\n");
+> +                               return -ENXIO;
+> +                       }
+>
+> -               for (i = 0; i<  MAX_MSI_IRQS; i++)
+> -                       irq_create_mapping(pp->irq_domain, i);
+> +                       for (i = 0; i<  MAX_MSI_IRQS; i++)
+> +                               irq_create_mapping(pp->irq_domain, i);
+> +               } else {
+> +                       pp->ops->msi_init(pp,&msi_domain_ops,
+> +&dw_pcie_msi_chip);
+> +               }
+>          }
+>
+>          if (pp->ops->host_init)
+> @@ -759,6 +764,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>                  BUG();
+>          }
+>
+> +       if (bus&&  pp->ops->scan_bus)
+> +               bus = pp->ops->scan_bus(pp);
+> +
+>          return bus;
+>   }
+>
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 387f69e..39ce496 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -52,6 +52,7 @@ struct pcie_port {
+>          struct irq_domain       *irq_domain;
+>          unsigned long           msi_data;
+>          DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
+> +       void                    *plat_data;
+>   };
+>
+>   struct pcie_host_ops {
+> @@ -70,6 +71,9 @@ struct pcie_host_ops {
+>          void (*msi_set_irq)(struct pcie_port *pp, int irq);
+>          void (*msi_clear_irq)(struct pcie_port *pp, int irq);
+>          u32 (*get_msi_data)(struct pcie_port *pp);
+> +       struct pci_bus *(*scan_bus)(struct pcie_port *pp);
+> +       void (*msi_init) (struct pcie_port *pp, struct irq_domain_ops *ops,
+> +                       struct msi_chip *chip);
+>   };
+>
+>   int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+>
+>
+> ~Pratyush
