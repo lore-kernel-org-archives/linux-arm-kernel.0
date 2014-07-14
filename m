@@ -1,113 +1,57 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Mon, 14 Jul 2014 18:15:27 +0900
-Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
-In-Reply-To: <1509851.5UQ4JhkPb5@avalon>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1474559.zFUJiypt1j@avalon> <53C3220B.30506@renesas.com>
- <1509851.5UQ4JhkPb5@avalon>
-Message-ID: <53C39FAF.2060306@renesas.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 11:24:35 +0200
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <20140714091233.GC6800@sirena.org.uk>
+References: <1405028569-14253-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+ <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
+ <53C01558.3090607@nvidia.com>
+ <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+ <53C01D17.2050906@nvidia.com> <20140714083854.GO2081@ulmo>
+ <20140714091233.GC6800@sirena.org.uk>
+Message-ID: <20140714092434.GA9755@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On 7/14/2014 6:01 PM, Laurent Pinchart wrote:
-> On Monday 14 July 2014 09:19:23 Khiem Nguyen wrote:
->> On 7/10/2014 7:37 PM, Laurent Pinchart wrote:
->>> On Thursday 10 July 2014 09:03:26 Khiem Nguyen wrote:
->>>> On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
->>>>> Cache the micro-TLB number in archdata allocated in the .add_device
->>>>> handler instead of looking it up when the deviced is attached and
->>>>> detached. This simplifies the .attach_dev and .detach_dev operations and
->>>>> prepares for DT support.
->>>>
->>>> [snip]
->>>>
->>>>> Signed-off-by: Laurent Pinchart
->>>>> <laurent.pinchart+renesas@ideasonboard.com>
->>>>
->>>> [snip]
->>>>
->>>>> +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device
->>>>> *dev)
->>>>> +{
->>>>> +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
->>>>> +	const char *devname = dev_name(dev);
->>>>> +	unsigned int i;
->>>>> +
->>>>> +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
->>>>> +		if (strcmp(master->name, devname) == 0)
->>>>> +			return master->utlb;
->>>>> +	}
->>>>> +
->>>>> +	return -1;
->>>>> +}
->>>>
->>>> [snip]
->>>>
->>>>>  static int ipmmu_add_device(struct device *dev)
->>>>
->>>> [snip]
->>>>
->>>>>  	list_for_each_entry(mmu, &ipmmu_devices, list) {
->>>>> -		master = ipmmu_find_master(mmu, dev);
->>>>> -		if (master) {
->>>>> +		utlb = ipmmu_find_utlb(mmu, dev);
->>>>> +		if (utlb >= 0) {
->>>>>  			/*
->>>>> -			 * TODO Take a reference to the master to protect
->>>>> +			 * TODO Take a reference to the MMU to protect
->>>>>  			 * against device removal.
->>>>>  			 */
->>>>>  			break;
->>>>
->>>> [snip]
->>>>
->>>>> +	archdata->mmu = mmu;
->>>>> +	archdata->utlb = utlb;
->>>>
->>>> [snip]
->>>>
->>>> I have one question for ipmmu_add_device().
->>>>
->>>> In my understanding, your code will find utlb for device
->>>> base on device name.
->>>> For any device, it will /only/ return utlb number of first match.
->>>>
->>>> How about the case that a device name connected with more than 1 utlb ?
->>>> e.g DU device (rcar-du-r8a7790) in Lager
->>>>
->>>> Was that case already covered in your code ?
->>>
->>> For the DU case, the R8A7790 contains /two DU devices/, each connected to
->>> a single utlb. The IPMMU driver will thus work fine in that case.
->>
->> As my understanding, in board-lager-reference.c,
->> DU devices are registered with 1 device name "rcar-du-r8a7790".
->>
->> I also added some logs in ipmmu_add_device() to observe
->> the mapping between device name and utlb number.
->> And I saw that only one utlb is mapped with DU.
->>
->> Do I miss anything here ?
+On Mon, Jul 14, 2014 at 10:12:33AM +0100, Mark Brown wrote:
+> On Mon, Jul 14, 2014 at 10:38:56AM +0200, Thierry Reding wrote:
+> > On Fri, Jul 11, 2014 at 08:21:27PM +0300, Tuomas Tynkkynen wrote:
 > 
-> No, you're right, my bad. This is definitely a limitation of the driver at the 
-> moment.
-
-OK. Thanks for your confirmation.
-
+> > > I don't think we can assume that each selector maps to a concrete register
+> > > value, though I'm not sure. include/linux/regulator/driver.h documents for
+> > > @list_voltage "Selectors range from zero to one less
+> > > regulator_desc.n_voltages." but maybe the consumer API could take different
+> > > values.
 > 
->>> I agree that this is a problem in general though, other devices (such as
->>> the DMAC) are connected to more than one utlb. This is currently not
->>> supported by the driver.
->>
->> Thanks for your confirmation.
->> I guess the driver will be improved in near future.
+> > I don't think the regulator API makes any guarantees that the selector
+> > corresponds to a register value. Adding Mark Brown, maybe he can help
+> > figure out the best way to do this.
 > 
-> Yes, it will.
-> 
-I'm happy to wait for your update. :)
+> The selector value is opaque, it's entirely up to the driver to define
+> it.  If you could tell me what "this" is I might be able to advise on
+> how to do it.
 
--- 
-Best regards,
-KHIEM Nguyen
+Tegra124 (and later, also some earlier variants) have this DFLL clock
+that can program a PMIC automatically depending on the CPU frequency.
+This DT binding did propose putting this into device tree as a table of
+<frequency value> pairs where the frequency corresponds to the CPU
+frequency and the value is the register value to be programmed into the
+PMIC by the DFLL hardware (there are two additional properties to define
+the slave address and the register offset).
+
+Andrew proposed that this table could instead be built by using
+regulator_list_voltage() instead. However, due to the fact that the DFLL
+hardware needs to know the immediate value to write into a register, the
+requirement would be for a 1:1 mapping between selector and register
+value. Given that the API needs to cover the general case I don't see
+how it could practically ensure this.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/b65d67c0/attachment.sig>
