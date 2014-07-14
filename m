@@ -1,24 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Jul 2014 10:52:33 +0200
-Subject: [GIT PULL] at91: dt for 3.17 #1
-In-Reply-To: <20140713043544.GD14206@quad.lixom.net>
-References: <1404926979-31356-1-git-send-email-nicolas.ferre@atmel.com>
- <20140713043544.GD14206@quad.lixom.net>
-Message-ID: <20140714085233.GB3112@piout.net>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 14 Jul 2014 10:55:05 +0200
+Subject: ARM: Kirkwood: mach-kirkwood's removal
+Message-ID: <1405328105.8281.27.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+0) Commit ba364fc752da ("ARM: Kirkwood: Remove mach-kirkwood") is
+included in next-20140714. It removes quite a bit of code.
 
-On 12/07/2014 at 21:35:44 -0700, Olof Johansson wrote :
-> Looks good, you might want to ask him to write better tag descriptions though,
-> or fill them in a bit yourself when you do the merge.
-> 
+1) The code it removes includes the Kconfig entries for
+    ARCH_KIRKWOOD
+    MACH_OPENRD_CLIENT
+    MACH_OPENRD_ULTIMATE
+    MACH_T5325
 
-I will definitely do better next time, I was thinking this would not
-appear anywhere.
+There are a few references to these Kconfig symbols still left in the
+tree. Are patches to remove these references queued somewhere?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2) And is a patch to remove the "arch/arm/mach-kirkwood/" pattern from
+MAINTAINERS queued somewhere?
+
+3) By the way, MACH_KIRKWOOD looks related but is not removed in that
+commit. That's not an oversight, is it?
+
+
+Paul Bolle
