@@ -1,16 +1,18 @@
 From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Mon, 14 Jul 2014 18:11:52 +0530
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset DT node to the
- exynos5800-peach-pi
-In-Reply-To: <1405339577-7878-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1405339577-7878-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAHfPSqCCvmgYYkPpXtA2H9CWwNsvkvhre7ipHN3rxHD=9Ea-8A@mail.gmail.com>
+Date: Mon, 14 Jul 2014 18:12:48 +0530
+Subject: [PATCH v2] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <1405319602-29892-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1405319602-29892-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CAHfPSqDphnUB27tfp+8peQpbSKAAtatAEnzAHmmDottxv6yy-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Vikas,
 
-On 14 July 2014 17:36, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+
+On 14 July 2014 12:03, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> From: Doug Anderson <dianders@chromium.org>
+>
 > The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
 > being reset across sleep/wake.  If we don't set it to anything then
 > the TPM will be reset.  U-Boot will detect this as invalid
@@ -22,23 +24,26 @@ On 14 July 2014 17:36, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
 > the chrome U-Boot happy, properly set the GPIO to mask the
 > reset to the TPM.
 >
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
 
-After merging Linus Walleij's for-next of pinctrl git.
+After merging Linus Walleij's for-next branch of pinctrl git.
 
-S2R on Exynos5800 based Peach PI works fine.
+S2R on Exynos5420 based Peach PIT works fine.
 
 Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-
 > ---
->  arch/arm/boot/dts/exynos5800-peach-pi.dts |   12 ++++++++++++
+> changes since v1:
+>         - removed fixed regulator and used hogs instead.
+>
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
 >  1 file changed, 12 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index 28f2a25..caa8952 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -209,6 +209,18 @@
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 6c7cab0..c036d9e 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -211,6 +211,18 @@
 >
 >
 >  &pinctrl_0 {
@@ -54,7 +59,7 @@ Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 > +               samsung,pin-val = <0>;
 > +       };
 > +
->         max98091_irq: max98091-irq {
+>         max98090_irq: max98090-irq {
 >                 samsung,pins = "gpx0-2";
 >                 samsung,pin-function = <0>;
 > --
