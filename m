@@ -1,56 +1,109 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 14 Jul 2014 09:58:57 +0200
-Subject: [PATCH v2 3/4] can: flexcan: switch on clocks before accessing
- ecr register
-In-Reply-To: <3901272074d5a3e680a7ecfda3ffbfca4c544a86.1405322992.git.stefan@agner.ch>
-References: <cover.1405322992.git.stefan@agner.ch>
- <3901272074d5a3e680a7ecfda3ffbfca4c544a86.1405322992.git.stefan@agner.ch>
-Message-ID: <53C38DC1.30000@pengutronix.de>
+Date: Mon, 14 Jul 2014 13:52:09 +0200
+Subject: [PATCH v4 1/2] can: m_can: add device tree binding documentation
+In-Reply-To: <1405338041-19945-1-git-send-email-b29396@freescale.com>
+References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
+Message-ID: <53C3C469.6080705@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 09:48 AM, Stefan Agner wrote:
-> Reported-by: Ashutosh Singh <ashuleapyear@gmail.com>
-> Suggested-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> [stefan at agner.ch: added return check for clk_enable_prepare]
+On 07/14/2014 01:40 PM, Dong Aisheng wrote:
+> add M_CAN device tree binding documentation
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Cc: Wolfgang Grandegger <wg@grandegger.com>
+> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+> Cc: Varka Bhadram <varkabhadram@gmail.com>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > ---
->  drivers/net/can/flexcan.c | 16 +++++++++++++++-
->  1 file changed, 15 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-> index f425ec2..4c598c9 100644
-> --- a/drivers/net/can/flexcan.c
-> +++ b/drivers/net/can/flexcan.c
-> @@ -383,11 +383,25 @@ static int flexcan_get_berr_counter(const struct net_device *dev,
->  {
->  	const struct flexcan_priv *priv = netdev_priv(dev);
->  	struct flexcan_regs __iomem *regs = priv->base;
-> -	u32 reg = flexcan_read(&regs->ecr);
-> +	u32 reg, err;
+> Changes since v3:
+> - change mram-cfg property name to bosch,mram-cfg
+> - indent change
+> ---
+>  .../devicetree/bindings/net/can/m_can.txt          |   67 ++++++++++++++++++++
+>  1 files changed, 67 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+> new file mode 100644
+> index 0000000..5cff839
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+> @@ -0,0 +1,67 @@
+> +Bosch MCAN controller Device Tree Bindings
+> +-------------------------------------------------
 > +
-> +	err = clk_prepare_enable(priv->clk_ipg);
-> +	if (err)
-> +		return err;
+> +Required properties:
+> +- compatible		: Should be "bosch,m_can" for M_CAN controllers
+> +- reg			: physical base address and size of the M_CAN
+> +			  registers map and Message RAM
+> +- reg-names		: Should be "m_can" and "message_ram"
+> +- interrupts		: Should be the interrupt number of M_CAN interrupt
+> +			  line 0 and line 1, could be same if sharing
+> +			  the same interrupt.
+> +- interrupt-names	: Should contain "int0" and "int1"
+> +- clocks		: Clocks used by controller, should be host clock
+> +			  and CAN clock.
+> +- clock-names		: Should contain "hclk" and "cclk"
+> +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> +- pinctrl-names 	: Names corresponding to the numbered pinctrl states
+> +- bosch,mram-cfg	: Message RAM configuration data.
+> +			  Multiple M_CAN instances can share the same Message
+> +			  RAM and each element(e.g Rx FIFO or Tx Buffer and etc)
+> +			  number in Message RAM is also configurable,
+> +			  so this property is telling driver how the shared or
+> +			  private Message RAM are used by this M_CAN controller.
 > +
-> +	err = clk_prepare_enable(priv->clk_per);
-> +	if (err)
-> +		goto out_disable_ipg;
+> +			  The format should be as follows:
+> +			  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems
+> +			   rxb_elems txe_elems txb_elems>
+> +			  The 'offset' is an address offset of the Message RAM
+> +			  where the following elements start from. This is
+> +			  usually set to 0x0 if you're using a private Message
+> +			  RAM. The remain cells are used to specify how many
+> +			  elements are used for each FIFO/Buffer.
 > +
-> +	reg = flexcan_read(&regs->ecr);
->  
->  	bec->txerr = (reg >> 0) & 0xff;
->  	bec->rxerr = (reg >> 8) & 0xff;
->  
-> +	clk_disable_unprepare(priv->clk_per);
-> + out_disable_ipg:
-> +	clk_disable_unprepare(priv->clk_ipg);
+> +			  M_CAN includes the following elements according to user manual:
+> +			  11-bit Filter	0-128 elements / 0-128 words
+> +			  29-bit Filter	0-64 elements / 0-128 words
+> +			  Rx FIFO 0	0-64 elements / 0-1152 words
+> +			  Rx FIFO 1	0-64 elements / 0-1152 words
+> +			  Rx Buffers	0-64 elements / 0-1152 words
+> +			  Tx Event FIFO	0-32 elements / 0-64 words
+> +			  Tx Buffers	0-32 elements / 0-576 words
 > +
->  	return 0;
+> +			  Please refer to 2.4.1 Message RAM Configuration in
+> +			  Bosch M_CAN user manual for details.
+> +
+> +Example:
+> +SoC dtsi:
+> +m_can1: can at 020e8000 {
+> +	compatible = "bosch,m_can";
+> +	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
+> +	reg-names = "m_can", "message_ram";
+> +	interrupts = <0 114 0x04>,
+> +		     <0 114 0x04>;
+> +	interrupt-names = "int0", "int1";
+> +	clocks = <&clks IMX6SX_CLK_CANFD>,
+> +		 <&clks IMX6SX_CLK_CANFD>;
+> +	clock-names = "hclk", "cclk";
+> +	bosch,mram-cfg = <0x0 0 0 32 0 0 0 1>;
+> +	status = "disabled";
+> +};
+> +
+> +Board dtsi:
+         ^^^^
 
-You should return an error in case of an error.
+The board is typically a dts, isn't it?
 
+> +&m_can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_m_can1>;
+> +	status = "enabled";
+> +};
+> 
 Marc
 
 -- 
@@ -65,4 +118,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 242 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/bdeb5094/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/3339d7c9/attachment-0001.sig>
