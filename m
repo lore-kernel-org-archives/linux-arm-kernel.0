@@ -1,213 +1,39 @@
-From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
-Date: Mon, 14 Jul 2014 17:07:20 +0100
-Subject: [RFC V1] devicetree: Dialog Semiconductor consolidate existing vendor
- prefixes to standardise on 'dlg'
-Message-ID: <201407141616.s6EGG7uK022881@swsrvapps-01.diasemi.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Jul 2014 18:17:49 +0200
+Subject: [PATCH 0/2] arm64: use Image header fields in EFI stub
+Message-ID: <1405354671-14031-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Opensource [Steve Twiss] <stwiss.opensource@diasemi.com>
+This is a followup on the RFC series I sent a week ago that changes the EFI
+stub Image loader to stop using linker arithmetic and build time defines and
+use data obtained at runtime instead.
 
-This patch series updates the device tree vendor prefix for
-Dialog Semiconductor
+This series is now rebased on top of Catalin's arm64 for-next/core branch, which
+contains a relevant set of patches by Mark. This means I could drop my former
+patch #1 against Documentation/booting.txt.
 
-Various methods are currently used throughout the kernel: 'diasemi',
-'dialog' and 'dlg'. Others have also been suggested.
+Patch #1 adds <asm/image_hdr.h>. I incorporated Geoff's feedback to improve the
+comments and make the header suitable for sharing with userland.
 
-This patch set aims to consolidate the usage of the vendor prefix to
-use a common standard. The prefix 'dlg' is used.
+Patch #2 contains the changes to the actual stub loader itself. This patch
+depends on the stub loader bug fix patch I sent out today. It drops all
+references to linker symbols and uses text_offset and image_size from the Image
+header, and uses the loaded Image size as reported by EFI. This patch also fixes
+the corner case where Image happens to be loaded at exactly the right offset,
+but the allocation is actually too small to satisfy the requirement imposed by
+image_size as set in the header.
 
-This e-mail is in response to the previous thread here:
+Ard Biesheuvel (2):
+  arm64: add C struct definition for Image header
+  arm64/efi: efistub: get text offset and image size from the Image
+    header
 
-- https://lkml.org/lkml/2014/6/11/262
+ arch/arm64/include/asm/image_hdr.h | 75 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/Makefile         |  2 -
+ arch/arm64/kernel/efi-stub.c       | 29 ++++++++-------
+ 3 files changed, 91 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm64/include/asm/image_hdr.h
 
-
-Signed-off-by: Opensource [Steve Twiss] <stwiss.opensource@diasemi.com>
----
-Checks performed with linux-next/next-20140714/scripts/checkpatch.pl
- trivial-devices.txt       total: 0 errors, 0 warnings, 89 lines checked
- da9210.txt                total: 0 errors, 0 warnings, 21 lines checked
- vendor-prefixes.txt       total: 0 errors, 0 warnings, 149 lines checked
- imx53-smd.dts             total: 0 errors, 2 warnings, 279 lines checked
- imx6qdl-phytec-pfla02.dtsi total: 0 errors, 2 warnings, 357 lines checked
- da9055-core.c             total: 0 errors, 0 warnings, 428 lines checked
-
-This patch applies against linux-next and next-20140714
-
-Regards,
-Steve Twiss, Dialog Semiconductor Ltd.
-
- .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
- .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
- drivers/mfd/da9055-core.c                          | 26 +++++++++++-----------
- 6 files changed, 19 insertions(+), 18 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index 37803eb..a02b8a1 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -44,7 +44,7 @@ dallas,ds1775		Tiny Digital Thermometer and Thermostat
- dallas,ds3232		Extremely Accurate I??C RTC with Integrated Crystal and SRAM
- dallas,ds4510		CPU Supervisor with Nonvolatile Memory and Programmable I/O
- dallas,ds75		Digital Thermometer and Thermostat
--dialog,da9053		DA9053: flexible system level PMIC with multicore support
-+dlg,da9053		DA9053: flexible system level PMIC with multicore support
- epson,rx8025		High-Stability. I2C-Bus INTERFACE REAL TIME CLOCK MODULE
- epson,rx8581		I2C-BUS INTERFACE REAL TIME CLOCK MODULE
- fsl,mag3110		MAG3110: Xtrinsic High Accuracy, 3D Magnetometer
-diff --git a/Documentation/devicetree/bindings/regulator/da9210.txt b/Documentation/devicetree/bindings/regulator/da9210.txt
-index f120f22..3297c53 100644
---- a/Documentation/devicetree/bindings/regulator/da9210.txt
-+++ b/Documentation/devicetree/bindings/regulator/da9210.txt
-@@ -2,7 +2,7 @@
- 
- Required properties:
- 
--- compatible:	must be "diasemi,da9210"
-+- compatible:	must be "dlg,da9210"
- - reg:		the i2c slave address of the regulator. It should be 0x68.
- 
- Any standard regulator properties can be used to configure the single da9210
-@@ -11,7 +11,7 @@ DCDC.
- Example:
- 
- 	da9210 at 68 {
--		compatible = "diasemi,da9210";
-+		compatible = "dlg,da9210";
- 		reg = <0x68>;
- 
- 		regulator-min-microvolt = <900000>;
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 5d27e5a..35a833e 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -37,6 +37,7 @@ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
- davicom	DAVICOM Semiconductor, Inc.
- denx	Denx Software Engineering
- digi	Digi International Inc.
-+dlg	Dialog Semiconductor
- dlink	D-Link Corporation
- dmo	Data Modul AG
- ebv	EBV Elektronik
-diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
-index 5ec1590..1d32557 100644
---- a/arch/arm/boot/dts/imx53-smd.dts
-+++ b/arch/arm/boot/dts/imx53-smd.dts
-@@ -265,7 +265,7 @@
- 	};
- 
- 	pmic: dialog at 48 {
--		compatible = "dialog,da9053", "dialog,da9052";
-+		compatible = "dlg,da9053", "dlg,da9052";
- 		reg = <0x48>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index 2694aa8..0e50bb0 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -83,7 +83,7 @@
- 	};
- 
- 	pmic at 58 {
--		compatible = "dialog,da9063";
-+		compatible = "dlg,da9063";
- 		reg = <0x58>;
- 		interrupt-parent = <&gpio4>;
- 		interrupts = <17 0x8>; /* active-low GPIO4_17 */
-diff --git a/drivers/mfd/da9055-core.c b/drivers/mfd/da9055-core.c
-index caf8dcf..b4d920c 100644
---- a/drivers/mfd/da9055-core.c
-+++ b/drivers/mfd/da9055-core.c
-@@ -296,73 +296,73 @@ static struct resource da9055_ld05_6_resource = {
- 
- static const struct mfd_cell da9055_devs[] = {
- 	{
--		.of_compatible = "dialog,da9055-gpio",
-+		.of_compatible = "dlg,da9055-gpio",
- 		.name = "da9055-gpio",
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 1,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 2,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 3,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 4,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 5,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 6,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.id = 7,
- 		.resources = &da9055_ld05_6_resource,
- 		.num_resources = 1,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-regulator",
-+		.of_compatible = "dlg,da9055-regulator",
- 		.name = "da9055-regulator",
- 		.resources = &da9055_ld05_6_resource,
- 		.num_resources = 1,
- 		.id = 8,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-onkey",
-+		.of_compatible = "dlg,da9055-onkey",
- 		.name = "da9055-onkey",
- 		.resources = &da9055_onkey_resource,
- 		.num_resources = 1,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-rtc",
-+		.of_compatible = "dlg,da9055-rtc",
- 		.name = "da9055-rtc",
- 		.resources = da9055_rtc_resource,
- 		.num_resources = ARRAY_SIZE(da9055_rtc_resource),
- 	},
- 	{
--		.of_compatible = "dialog,da9055-hwmon",
-+		.of_compatible = "dlg,da9055-hwmon",
- 		.name = "da9055-hwmon",
- 		.resources = &da9055_hwmon_resource,
- 		.num_resources = 1,
- 	},
- 	{
--		.of_compatible = "dialog,da9055-watchdog",
-+		.of_compatible = "dlg,da9055-watchdog",
- 		.name = "da9055-watchdog",
- 	},
- };
 -- 
-end-of-patch for RFC V1
+1.8.3.2
