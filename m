@@ -1,86 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 14 Jul 2014 13:10:08 +0200
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <53C3B6EC.9090904@nvidia.com>
-References: <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
- <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
- <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
- <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
- <53C3A986.9050602@nvidia.com> <20140714102954.GD9870@ulmo>
- <53C3B6EC.9090904@nvidia.com>
-Message-ID: <20140714111007.GB31460@ulmo>
+From: panpan1.liu@samsung.com (panpan liu)
+Date: Mon, 14 Jul 2014 19:16:35 +0800
+Subject: [PATCH] s5p-mfc: limit the size of the CPB
+Message-ID: <1405336595-3827-1-git-send-email-panpan1.liu@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 01:54:36PM +0300, Mikko Perttunen wrote:
-> On 14/07/14 13:29, Thierry Reding wrote:
-> >* PGP Signed by an unknown key
-> > ...
-> >>Yes, this sounds sensible. I'll make such a patch. I suppose having another
-> >>timings table in the MC node with just the rate and mc-burst-data would
-> >>separate the concerns best. It occurs to me that we could also write the
-> >>regs in the pre-rate change notifier, but this would turn the dependency
-> >>around and would mean that the regs are not written when entering backup
-> >>rates. The latter shouldn't be a problem but the reversed dependency would,
-> >>so I guess a custom function is the way to go, and we need to add at least
-> >>one anyway.
-> >
-> >It sounds like maybe moving enough code and data into the MC driver to
-> >handle frequency changes would be a good move. From the above it sounds
-> >like all the MC driver needs to know is that a frequency change is about
-> >to happen and what the new frequency is.
-> >
-> >In addition to exposing things like number of DRAM banks, etc.
-> >
-> 
-> Yes, so there are two ways to do this:
-> 1) EMC calls tegra_mc_emem_update(freq) at the correct time
-> 2) MC has an optional clock phandle to the EMC clock and registers a
-> pre-change notifier.
-> 
-> Both work, but the dependency is reversed. In both cases, the other driver
-> is also optional. In the first case, the EMC driver can give a warning if
-> the call fails. (As mentioned, if the MC_EMEM updates don't happen, things
-> still work but potentially with a hefty perf loss.)
-> TBH, I haven't yet decided which one is better. If you have an opinion,
-> I'll go with it.
+The register of the CPB limits the size. The max size is 4M, so it
+is more reasonable.
 
-I think I prefer 1. Using an explicit call into the MC driver allow us
-to precisely determine the moment in time when the registers should be
-updated. The pre-change notifier, as I understand it, doesn't give us
-that. Also, the notifier doesn't give us a way to determine success or
-failure of the MC call.
+Change-Id: I4ffe90ac8b4de7aed8f396b3072d5db6ead9741c
+Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
 
-> >>The downstream kernel also overwrites most LA registers during EMC rate
-> >>change without regard for the driver-set values, and we might have to read
-> >>those values from the device tree too. Upstream can do this in rate change
-> >>notifiers if needed. I'll look into this a bit more.
-> >
-> >As I understand it, the latency allowance should be specified in terms
-> >of the maximum amount of time that requests are delayed, so that the
-> >proper values for the LA registers can be recomputed on an EMC rate
-> >change.
-> 
-> That's how I understand it too, but in downstream, the LA register values
-> are hardcoded into EMC tables in platform data/DTS that are just written
-> into the LA registers as-is during rate change.
-
-Hehe, well, we don't want any of that upstream. =) If it can be computed
-at runtime, then let's compute it. Also, if it's encoded in platform
-data or DTS, then there's no way it can be adjusted based on use-case.
-For example if you have a device with two display outputs (an internal
-panel and HDMI for example) but you never have HDMI plugged in, then
-there's no reason why you would want to program the latency allowance
-for the second display controller. If you provide the values in a static
-frequency/register value table, then you need to account for any
-possible scenario up front, irrespective of what (if any) HDMI monitor
-is attached.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/72999219/attachment.sig>
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+old mode 100644
+new mode 100755
+index 0bae907..70b9458
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -413,7 +413,8 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	int ret = 0;
+ 	struct s5p_mfc_fmt *fmt;
+ 	struct v4l2_pix_format_mplane *pix_mp;
+-
++	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
++
+ 	mfc_debug_enter();
+ 	ret = vidioc_try_fmt(file, priv, f);
+ 	pix_mp = &f->fmt.pix_mp;
+@@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+ 	pix_mp->height = 0;
+ 	pix_mp->width = 0;
+-	if (pix_mp->plane_fmt[0].sizeimage)
+-		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+-	else
++	if (pix_mp->plane_fmt[0].sizeimage == 0)
+ 		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
+ 								DEF_CPB_SIZE;
++	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
++		ctx->dec_src_buf_size = buf_size->cpb;
++	else
++		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+ 	pix_mp->plane_fmt[0].bytesperline = 0;
+ 	ctx->state = MFCINST_INIT;
+ out:
+--
+1.7.9.5
