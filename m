@@ -1,56 +1,76 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 14 Jul 2014 16:06:06 +0200
-Subject: [PATCH v2 0/4] ARM: vf610: add FlexCAN support
-In-Reply-To: <20140714140404.GJ2197@dragon>
-References: <cover.1405322992.git.stefan@agner.ch>
- <53C39052.7040400@pengutronix.de> <20140714140404.GJ2197@dragon>
-Message-ID: <53C3E3CE.10609@pengutronix.de>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Mon, 14 Jul 2014 16:07:56 +0200
+Subject: [PATCH] s5p-mfc: limit the size of the CPB
+In-Reply-To: <1405336698-3873-1-git-send-email-panpan1.liu@samsung.com>
+References: <1405336698-3873-1-git-send-email-panpan1.liu@samsung.com>
+Message-ID: <126d01cf9f6d$038b82c0$0aa28840$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 04:04 PM, Shawn Guo wrote:
-> On Mon, Jul 14, 2014 at 10:09:54AM +0200, Marc Kleine-Budde wrote:
->> On 07/14/2014 09:48 AM, Stefan Agner wrote:
->>> This series adds support for Vybrid (aka vf610) to the FlexCAN
->>> controller and extends the device tree accordingly.
->>>
->>> Changes in v2:
->>> - Split out patch (seperate dt, clocks and driver changes)
->>> - Use spaces for hardware feature flags table
->>> - Remove drive-by change of esdhc register length
->>> - Added related fix which enables clock in berr_counter
->>>
->>> Stefan Agner (4):
->>>   ARM: dts: vf610: add FlexCAN node
->>>   ARM: imx: clk-vf610: fix FlexCAN clock gating
->>>   can: flexcan: switch on clocks before accessing ecr register
->>>   can: flexcan: add vf610 support for FlexCAN
->>>
->>>  arch/arm/boot/dts/vf610.dtsi  | 23 +++++++++++
->>>  arch/arm/mach-imx/clk-vf610.c |  6 ++-
->>>  drivers/net/can/flexcan.c     | 89 ++++++++++++++++++++++++++++++++++++++-----
->>>  3 files changed, 106 insertions(+), 12 deletions(-)
->>
->> Shawn, what's the best way to upstream this? With your Ack, I can take
->> everything via linux-can-next.
+Hi,
+
+> From: panpan liu [mailto:panpan1.liu at samsung.com]
+> Sent: Monday, July 14, 2014 1:18 PM
+> Subject: [PATCH] s5p-mfc: limit the size of the CPB
 > 
-> Since this is a new support and there is nothing to maintain git bisect,
-> I think the best way is to have the first two patches to go via my tree.
+> The register of the CPB limits the size. The max size is 4M, so it
+> is more reasonable.
 
-Fine, with me.
+The commit message should be rephrased as well. It is no longer fixed
+to 4MB.
 
-Marc
+"The CPB size is limited by the hardware. Add this limit to the s_fmt."
 
+> 
+> 
+> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |   11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+>  mode change 100644 => 100755 drivers/media/platform/s5p-
+> mfc/s5p_mfc_dec.c
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> old mode 100644
+> new mode 100755
+> index 0bae907..70b9458
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -413,7 +413,8 @@ static int vidioc_s_fmt(struct file *file, void
+> *priv, struct v4l2_format *f)
+>  	int ret = 0;
+>  	struct s5p_mfc_fmt *fmt;
+>  	struct v4l2_pix_format_mplane *pix_mp;
+> -
+> +	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
+> +
+>  	mfc_debug_enter();
+>  	ret = vidioc_try_fmt(file, priv, f);
+>  	pix_mp = &f->fmt.pix_mp;
+> @@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void
+> *priv, struct v4l2_format *f)
+>  	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+>  	pix_mp->height = 0;
+>  	pix_mp->width = 0;
+> -	if (pix_mp->plane_fmt[0].sizeimage)
+> -		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+> -	else
+> +	if (pix_mp->plane_fmt[0].sizeimage == 0)
+>  		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
+>
+DEF_CPB_SIZE;
+> +	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
+> +		ctx->dec_src_buf_size = buf_size->cpb;
+> +	else
+> +		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+>  	pix_mp->plane_fmt[0].bytesperline = 0;
+>  	ctx->state = MFCINST_INIT;
+>  out:
+> --
+> 1.7.9.5
+
+Best wishes,
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/1a244771/attachment.sig>
+Kamil Debski
+Samsung R&D Institute Poland
