@@ -1,40 +1,59 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 14 Jul 2014 11:50:54 +0200
-Subject: [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug
- code
-In-Reply-To: <031001cf9aaf$959cf6c0$c0d6e440$@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-3-git-send-email-t.figa@samsung.com>
- <031001cf9aaf$959cf6c0$c0d6e440$@samsung.com>
-Message-ID: <53C3A7FE.8000401@gmail.com>
+Date: Mon, 14 Jul 2014 11:52:21 +0200
+Subject: [PATCH v2 4/6] ARM: SAMSUNG: Restore Samsung PM Debug
+ functionality
+In-Reply-To: <1403696634-12779-1-git-send-email-t.figa@samsung.com>
+References: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
+ <1403696634-12779-1-git-send-email-t.figa@samsung.com>
+Message-ID: <53C3A855.5040002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Kukjin,
 
-On 08.07.2014 15:21, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> When CPU topology is specified in device tree, cpu_logical_map() does
->> not return core ID anymore, but rather full MPIDR value. This breaks
->> existing calculation of PMU register offsets on Exynos SoCs.
->>
->> This patch fixes the problem by adjusting the code to use only core ID
->> bits of the value returned by cpu_logical_map() to allow CPU topology to
->> be specified in device tree on Exynos SoCs.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+On 25.06.2014 13:43, Tomasz Figa wrote:
+> Due to recently merged patches and previous merge conflicts, the Samsung
+> PM Debug functionality no longer can be enabled. This patch fixes
+> incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
+> missing header inclusion.
 > 
-> Looks good to me, but I think we don't need this fix in 3.16 because the CPU
-> topology is not specified in DT yet...if I'm wrong, please correct me.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/plat-samsung/Kconfig    | 5 +++--
+>  arch/arm/plat-samsung/pm-debug.c | 1 +
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 301b892..ad9515f 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -413,8 +413,9 @@ config S5P_DEV_MFC
+>  comment "Power management"
+>  
+>  config SAMSUNG_PM_DEBUG
+> -	bool "S3C2410 PM Suspend debug"
+> -	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
+> +	bool "Samsung PM Suspend debug"
+> +	depends on PM && DEBUG_KERNEL
+> +	depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
+>  	help
+>  	  Say Y here if you want verbose debugging from the PM Suspend and
+>  	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
+> diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
+> index 8f19f66..3960960 100644
+> --- a/arch/arm/plat-samsung/pm-debug.c
+> +++ b/arch/arm/plat-samsung/pm-debug.c
+> @@ -14,6 +14,7 @@
+>   */
+>  
+>  #include <linux/serial_core.h>
+> +#include <linux/serial_s3c.h>
+>  #include <linux/io.h>
+>  
+>  #include <asm/mach/map.h>
+> 
 
-CPU topology is already specified in DT for Exynos3250, 5250, 5260, 5410
-and 5420/5800.
-
-This patch also fixes CPU hotplug on SoCs with more than 2 cores,
-because it removes incorrect condition check in platform_do_lowpower().
-
-Please take this fix for next -rc release.
+Please consider this patch for next fixes pull request.
 
 Best regards,
 Tomasz
