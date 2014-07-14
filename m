@@ -1,386 +1,76 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 14 Jul 2014 17:34:13 +0800
-Subject: [PATCH v11 04/12] ARM: hisi: enable MCPM implementation
-Message-ID: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
+From: a.heider@gmail.com (Andre Heider)
+Date: Mon, 14 Jul 2014 11:37:57 +0200
+Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <53C01F5A.6040409@ti.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <20140711153019.GA75267@localhost> <53C01F5A.6040409@ti.com>
+Message-ID: <20140714093757.GA48810@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
-framework to manage power on HiP04 SoC.
+On Fri, Jul 11, 2014 at 12:31:06PM -0500, Dave Gerlach wrote:
+> >On Thu, Jul 10, 2014 at 09:55:38PM -0500, Dave Gerlach wrote:
+> >>Hello,
+> >>
+> >>This series adds suspend/resume support for am335x. Version 3 of this
+> >>series can be found at [1]. I apologize for the large delay between this
+> >>and the previous revision. This code has been heavily refined
+> >>since the last version based on the various comments received for v3. The
+> >>major change from previous version is moving all wkup_m3 code into a
+> >>remoteproc based driver. The new driver handles all IPC and fw loading
+> >>and exposes a small API to be used by PM code to achieve low power states.
+> >>
+> >>Firmware that can be used for testing this can be found at [2] on branch
+> >>pm-remote-proc-v3, using am335x-pm-firmware.elf found in bin directory.
+> >>Please note this has changed from all previous versions and is no longer
+> >>the .bin file. Firmware can be built into kernel or placed in /lib/firmware
+> >>in rootfs for automatic loading during boot.
+> >>
+> >>This series has several dependencies. The wkup_m3_rproc utilizes a mailbox
+> >>to communicate with the cm3 and depends on Suman's series for omap mbox
+> >>support [3], which has several dependencies of it's own, listed in the
+> >>cover letter. Also, a few changes to remoteproc itself were needed and
+> >>have been provided by Suman here [4]. The edma patch included in this
+> >>series was previously submitted by Daniel Mack and after discussion with
+> >>him we agreed to include an updated version with this series as resume
+> >>has a direct dependency on it due to hangs in mmc without it.
+> >>
+> >>Because of the high number of dependencies I have pushed a branch for
+> >>testing here [6] if anyone desires to try it out on branch pm-ds0-v3.16.
+> >>
+> >>As is this series will only suspend and resume one time and then
+> >>fail to resume afterwards due to the removal of direct PM code control
+> >>of hwmods that do not properly assert their MSTANDBY signal after a context
+> >>loss, discussed here [7]. In particular it is due to the usb_otg_hs hwmod
+> >>that currently has no driver controlling it in the kernel. The main
+> >>cause of the issue is that the SYSCONFIG register present within
+> >>the IP must be reprogrammed after every suspend cycle and this
+> >>only happens at boot if no driver is present. Work is in progress to
+> >>allow suspend to function with or without drivers for the troublesome
+> >>hwmods (cpgmac, usb_otg_hs, and tptc1-3) and will be provided in a separate
+> >>future patch. The previous suggestion of allowing omap_device to handle
+> >>it proved to be too invasive into both omap_device and omap_hwmod and
+> >>the approach of allowing the firmware to handle it is not possible due
+> >>to the inability of the CM3 to access the IPs causing the issue. I'd
+> >>be happy to discuss this at length if anybody is interested.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mach-hisi/Makefile   |   1 +
- arch/arm/mach-hisi/platmcpm.c | 351 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 352 insertions(+)
- create mode 100644 arch/arm/mach-hisi/platmcpm.c
+...
 
-diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
-index ee2506b..d64831e 100644
---- a/arch/arm/mach-hisi/Makefile
-+++ b/arch/arm/mach-hisi/Makefile
-@@ -3,4 +3,5 @@
- #
- 
- obj-y	+= hisilicon.o
-+obj-$(CONFIG_MCPM)		+= platmcpm.o
- obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
-diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
-new file mode 100644
-index 0000000..933f1c47
---- /dev/null
-+++ b/arch/arm/mach-hisi/platmcpm.c
-@@ -0,0 +1,351 @@
-+/*
-+ * Copyright (c) 2013-2014 Linaro Ltd.
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/cp15.h>
-+#include <asm/mcpm.h>
-+
-+#include "core.h"
-+
-+/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
-+ * 1 -- unreset; 0 -- reset
-+ */
-+#define CORE_RESET_BIT(x)		(1 << x)
-+#define NEON_RESET_BIT(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
-+#define CLUSTER_L2_RESET_BIT		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
-+
-+/*
-+ * bits definition in SC_CPU_RESET_STATUS[x]
-+ * 1 -- reset status; 0 -- unreset status
-+ */
-+#define CORE_RESET_STATUS(x)		(1 << x)
-+#define NEON_RESET_STATUS(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
-+#define CLUSTER_L2_RESET_STATUS		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
-+#define CORE_WFI_STATUS(x)		(1 << (x + 16))
-+#define CORE_WFE_STATUS(x)		(1 << (x + 20))
-+#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
-+
-+#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
-+#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
-+#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
-+
-+#define FAB_SF_MODE			0x0c
-+#define FAB_SF_INVLD			0x10
-+
-+/* bits definition in FB_SF_INVLD */
-+#define FB_SF_INVLD_START		(1 << 8)
-+
-+#define HIP04_MAX_CLUSTERS		4
-+#define HIP04_MAX_CPUS_PER_CLUSTER	4
-+
-+#define POLL_MSEC	10
-+#define TIMEOUT_MSEC	1000
-+
-+struct hip04_secondary_cpu_data {
-+	u32	bootwrapper_phys;
-+	u32	bootwrapper_size;
-+	u32	bootwrapper_magic;
-+	u32	relocation_entry;
-+	u32	relocation_size;
-+};
-+
-+static void __iomem *relocation, *sysctrl, *fabric;
-+static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
-+static DEFINE_SPINLOCK(boot_lock);
-+static struct hip04_secondary_cpu_data hip04_boot;
-+static u32 fabric_phys_addr;
-+
-+static bool hip04_cluster_down(unsigned int cluster)
-+{
-+	int i;
-+
-+	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
-+		if (hip04_cpu_table[cluster][i])
-+			return false;
-+	return true;
-+}
-+
-+static bool hip04_init_cluster0_snoop(void)
-+{
-+	unsigned long data;
-+
-+	if (!fabric) {
-+		pr_err("failed to find fabric base\n");
-+		return false;
-+	}
-+	data = readl_relaxed(fabric + FAB_SF_MODE);
-+	data |= 1;
-+	writel_relaxed(data, fabric + FAB_SF_MODE);
-+	while (1) {
-+		if (data == readl_relaxed(fabric + FAB_SF_MODE))
-+			break;
-+	}
-+	return true;
-+}
-+
-+static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
-+{
-+	unsigned long data, mask;
-+
-+	if (!relocation || !sysctrl)
-+		return -ENODEV;
-+	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
-+		return -EINVAL;
-+
-+	spin_lock_irq(&boot_lock);
-+
-+	if (hip04_cpu_table[cluster][cpu]) {
-+		hip04_cpu_table[cluster][cpu]++;
-+		spin_unlock_irq(&boot_lock);
-+		return 0;
-+	}
-+
-+	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
-+	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
-+	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+
-+	if (hip04_cluster_down(cluster)) {
-+		data = CLUSTER_DEBUG_RESET_BIT;
-+		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-+		do {
-+			mask = CLUSTER_DEBUG_RESET_STATUS;
-+			data = readl_relaxed(sysctrl + \
-+					     SC_CPU_RESET_STATUS(cluster));
-+		} while (data & mask);
-+	}
-+
-+	hip04_cpu_table[cluster][cpu]++;
-+
-+	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+	       CORE_DEBUG_RESET_BIT(cpu);
-+	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-+	spin_unlock_irq(&boot_lock);
-+	msleep(POLL_MSEC);
-+
-+	return 0;
-+}
-+
-+static void hip04_mcpm_power_down(void)
-+{
-+	unsigned int mpidr, cpu, cluster, data = 0;
-+	bool skip_reset = false;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	__mcpm_cpu_going_down(cpu, cluster);
-+
-+	spin_lock(&boot_lock);
-+	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-+	hip04_cpu_table[cluster][cpu]--;
-+	if (hip04_cpu_table[cluster][cpu] == 1) {
-+		/* A power_up request went ahead of us. */
-+		skip_reset = true;
-+	} else if (hip04_cpu_table[cluster][cpu] > 1) {
-+		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
-+		BUG();
-+	}
-+
-+	v7_exit_coherency_flush(louis);
-+
-+	__mcpm_cpu_down(cpu, cluster);
-+	spin_unlock(&boot_lock);
-+
-+	if (!skip_reset) {
-+		data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+		       CORE_DEBUG_RESET_BIT(cpu);
-+		writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
-+	}
-+}
-+
-+static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
-+{
-+	unsigned int data, tries;
-+
-+	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
-+	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
-+
-+	for (tries = 0; tries < TIMEOUT_MSEC / POLL_MSEC; tries++) {
-+		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
-+		if (!(data & CORE_RESET_STATUS(cpu))) {
-+			msleep(POLL_MSEC);
-+			continue;
-+		}
-+		return 0;
-+	}
-+	return -ETIMEDOUT;
-+}
-+
-+static void hip04_mcpm_powered_up(void)
-+{
-+	if (!relocation)
-+		return;
-+	spin_lock(&boot_lock);
-+	writel_relaxed(0, relocation);
-+	writel_relaxed(0, relocation + 4);
-+	writel_relaxed(0, relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+	spin_unlock(&boot_lock);
-+}
-+
-+static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
-+{
-+	asm volatile ("			\n"
-+"	cmp	r0, #0			\n"
-+"	bxeq	lr			\n"
-+	/* calculate fabric phys address */
-+"	adr	r2, 2f			\n"
-+"	ldmia	r2, {r1, r3}		\n"
-+"	sub	r0, r2, r1		\n"
-+"	ldr	r2, [r0, r3]		\n"
-+	/* get cluster id from MPIDR */
-+"	mrc	p15, 0, r0, c0, c0, 5	\n"
-+"	ubfx	r1, r0, #8, #8		\n"
-+	/* 1 << cluster id */
-+"	mov	r0, #1			\n"
-+"	mov	r3, r0, lsl r1		\n"
-+"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	bxne	lr			\n"
-+"	orr	r1, r0, r3		\n"
-+"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	beq	1b			\n"
-+"	bx	lr			\n"
-+
-+"	.align	2			\n"
-+"2:	.word	.			\n"
-+"	.word	fabric_phys_addr	\n"
-+	);
-+}
-+
-+static const struct mcpm_platform_ops hip04_mcpm_ops = {
-+	.power_up		= hip04_mcpm_power_up,
-+	.power_down		= hip04_mcpm_power_down,
-+	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
-+	.powered_up		= hip04_mcpm_powered_up,
-+};
-+
-+static bool __init hip04_cpu_table_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	if (cluster >= HIP04_MAX_CLUSTERS ||
-+	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
-+		pr_err("%s: boot CPU is out of bound!\n", __func__);
-+		return false;
-+	}
-+	if (!hip04_init_cluster0_snoop())
-+		return false;
-+	hip04_cpu_table[cluster][cpu] = 1;
-+	return true;
-+}
-+
-+static int __init hip04_mcpm_init(void)
-+{
-+	struct device_node *np, *np_fab;
-+	struct resource fab_res;
-+	int ret = -ENODEV;
-+
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+	if (!np)
-+		goto err;
-+	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
-+	if (!np_fab)
-+		goto err;
-+
-+	if (of_property_read_u32(np, "bootwrapper-phys",
-+				 &hip04_boot.bootwrapper_phys)) {
-+		pr_err("failed to get bootwrapper-phys\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "bootwrapper-size",
-+				 &hip04_boot.bootwrapper_size)) {
-+		pr_err("failed to get bootwrapper-size\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "bootwrapper-magic",
-+				 &hip04_boot.bootwrapper_magic)) {
-+		pr_err("failed to get bootwrapper-magic\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "relocation-entry",
-+				 &hip04_boot.relocation_entry)) {
-+		pr_err("failed to get relocation-entry\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "relocation-size",
-+				 &hip04_boot.relocation_size)) {
-+		pr_err("failed to get relocation-size\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	relocation = ioremap(hip04_boot.relocation_entry,
-+			     hip04_boot.relocation_size);
-+	if (!relocation) {
-+		pr_err("failed to map relocation space\n");
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+	sysctrl = of_iomap(np, 0);
-+	if (!sysctrl) {
-+		pr_err("failed to get sysctrl base\n");
-+		ret = -ENOMEM;
-+		goto err_sysctrl;
-+	}
-+	ret = of_address_to_resource(np_fab, 0, &fab_res);
-+	if (ret) {
-+		pr_err("failed to get fabric base phys\n");
-+		goto err_fabric;
-+	}
-+	fabric_phys_addr = fab_res.start;
-+	sync_cache_w(&fabric_phys_addr);
-+	fabric = of_iomap(np_fab, 0);
-+	if (!fabric) {
-+		pr_err("failed to get fabric base\n");
-+		ret = -ENOMEM;
-+		goto err_fabric;
-+	}
-+
-+	if (!hip04_cpu_table_init())
-+		return -EINVAL;
-+	ret = mcpm_platform_register(&hip04_mcpm_ops);
-+	if (!ret) {
-+		mcpm_sync_init(hip04_mcpm_power_up_setup);
-+		pr_info("HiP04 MCPM initialized\n");
-+	}
-+	mcpm_smp_set_ops();
-+	return ret;
-+err_fabric:
-+	iounmap(sysctrl);
-+err_sysctrl:
-+	iounmap(relocation);
-+err:
-+	return ret;
-+}
-+early_initcall(hip04_mcpm_init);
--- 
-1.9.1
+> >It fails to compile with CONFIG_THUMB2_KERNEL though:
+> >arch/arm/mach-omap2/sleep33xx.S:61: Error: cannot use register index
+> >with PC-relative addressing -- `str r1,emif_addr_virt'
+> 
+> Hmm, interestingly enough I can not reproduce this build error. Can you
+> share your config and compiler version?
+
+While I have a stripped down .config for just boneblack I can reproduce this with:
+make multi_v7_defconfig
+./scripts/config -e THUMB2_KERNEL
+
+Which may not make much sense (exposes other thumb2 related issues), but with that
+.config sleep33xx.S fails to assemble with binutils 2.24 and succeeds with 2.23.2.
+
+Which may be binutils' fault, I can't judge since I don't speak ARM asm ;)
+
+Hope that helps,
+Andre
