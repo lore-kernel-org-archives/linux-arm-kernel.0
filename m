@@ -1,78 +1,102 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 13 Jul 2014 19:14:31 -0400
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140713231431.GM13108@titan.lakedaemon.net>
+From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
+Date: Mon, 14 Jul 2014 09:19:23 +0900
+Subject: [PATCH v2 01/10] iommu/ipmmu-vmsa: Refactor micro-TLB lookup
+In-Reply-To: <1474559.zFUJiypt1j@avalon>
+References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1400150451-13469-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <53BDD84E.4090206@renesas.com> <1474559.zFUJiypt1j@avalon>
+Message-ID: <53C3220B.30506@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suravee,
+Hi Laurent,
 
-On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On 7/10/2014 7:37 PM, Laurent Pinchart wrote:
+> On Thursday 10 July 2014 09:03:26 Khiem Nguyen wrote:
+>> On 5/15/2014 7:40 PM, Laurent Pinchart wrote:
+>>> Cache the micro-TLB number in archdata allocated in the .add_device
+>>> handler instead of looking it up when the deviced is attached and
+>>> detached. This simplifies the .attach_dev and .detach_dev operations and
+>>> prepares for DT support.
+>>
+>> [snip]
+>>
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> [snip]
+>>
+>>> +static int ipmmu_find_utlb(struct ipmmu_vmsa_device *mmu, struct device
+>>> *dev)
+>>> +{
+>>> +	const struct ipmmu_vmsa_master *master = mmu->pdata->masters;
+>>> +	const char *devname = dev_name(dev);
+>>> +	unsigned int i;
+>>> +
+>>> +	for (i = 0; i < mmu->pdata->num_masters; ++i, ++master) {
+>>> +		if (strcmp(master->name, devname) == 0)
+>>> +			return master->utlb;
+>>> +	}
+>>> +
+>>> +	return -1;
+>>> +}
+>>
+>> [snip]
+>>
+>>>  static int ipmmu_add_device(struct device *dev)
+>>
+>> [snip]
+>>
+>>>  	list_for_each_entry(mmu, &ipmmu_devices, list) {
+>>> -		master = ipmmu_find_master(mmu, dev);
+>>> -		if (master) {
+>>> +		utlb = ipmmu_find_utlb(mmu, dev);
+>>> +		if (utlb >= 0) {
+>>>  			/*
+>>> -			 * TODO Take a reference to the master to protect
+>>> +			 * TODO Take a reference to the MMU to protect
+>>>  			 * against device removal.
+>>>  			 */
+>>>  			break;
+>>
+>> [snip]
+>>
+>>> +	archdata->mmu = mmu;
+>>> +	archdata->utlb = utlb;
+>>
+>> [snip]
+>>
+>> I have one question for ipmmu_add_device().
+>>
+>> In my understanding, your code will find utlb for device
+>> base on device name.
+>> For any device, it will /only/ return utlb number of first match.
+>>
+>> How about the case that a device name connected with more than 1 utlb ?
+>> e.g DU device (rcar-du-r8a7790) in Lager
+>>
+>> Was that case already covered in your code ?
 > 
-> This patch set introduces support for MSI(-X) in GICv2m specification,
-> which is implemented in some variation of GIC400.
+> For the DU case, the R8A7790 contains /two DU devices/, each connected to a 
+> single utlb. The IPMMU driver will thus work fine in that case.
+
+As my understanding, in board-lager-reference.c,
+DU devices are registered with 1 device name "rcar-du-r8a7790".
+
+I also added some logs in ipmmu_add_device() to observe
+the mapping between device name and utlb number.
+And I saw that only one utlb is mapped with DU.
+
+Do I miss anything here ?
+
 > 
-> This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
-> (https://lkml.org/lkml/2014/3/14/320).
-
-Grrr.  I mis-spoke against your v1 of this series.  There are more
-changes to irq-gic.c than I originally thought in this series.
-
-Additionally, we have a lot of other significant changes to that driver
-as well this cycle.  It would be really helpful if I could take patches
-1-3 through irqchip/gic.  I can Ack #4 with the Subject change, and the
-branch it lands in can depend on irqchip/gic, no problem there.
-
-My main concern is your statement above and your answer to my inquiry
-against v1.
-
-Right now, I'm only concerned about breaking the build.  Can I take 1-3?
-Or, do we need to wait until aarch64 PCI lands in mainline?
-
-If I can take them, I'll fix up the commit log of the one patch when I
-apply them.
-
-thx,
-
-Jason.
-
-> Changes in V3:
->     * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
->       (per Jason Cooper request)
->     * Misc fix/clean up per Mark Rutland comments
->     * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
->     * Patch 4 is new to the series:
->         * Add ARM64-specific version arch_setup_msi_irqs() to allow support
->           for Multiple MSI.
->         * Add support for Multiple MSI for GICv2m.
+> I agree that this is a problem in general though, other devices (such as the 
+> DMAC) are connected to more than one utlb. This is currently not supported by 
+> the driver.
 > 
-> Suravee Suthikulpanit (4):
->   irqchip: gic: Add binding probe for ARM GIC400
->   irqchip: gic: Restructuring ARM GIC code
->   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
->   irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
-> 
->  Documentation/devicetree/bindings/arm/gic.txt |  20 +-
->  arch/arm64/Kconfig                            |   1 +
->  arch/arm64/include/asm/msi.h                  |  15 ++
->  arch/arm64/kernel/Makefile                    |   1 +
->  arch/arm64/kernel/msi.c                       |  57 +++++
->  drivers/irqchip/Kconfig                       |   7 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 331 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v2m.h                 |  13 +
->  drivers/irqchip/irq-gic.c                     |  90 ++++---
->  drivers/irqchip/irq-gic.h                     |  67 ++++++
->  11 files changed, 562 insertions(+), 41 deletions(-)
->  create mode 100644 arch/arm64/include/asm/msi.h
->  create mode 100644 arch/arm64/kernel/msi.c
->  create mode 100644 drivers/irqchip/irq-gic-v2m.c
->  create mode 100644 drivers/irqchip/irq-gic-v2m.h
->  create mode 100644 drivers/irqchip/irq-gic.h
-> 
-> -- 
-> 1.9.0
-> 
+Thanks for your confirmation.
+I guess the driver will be improved in near future.
+
+-- 
+Best regards,
+KHIEM Nguyen
