@@ -1,65 +1,66 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 14 Jul 2014 18:22:49 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <20140714140435.GO26542@e103034-lin>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
- <20140711151304.GD3935@laptop>
- <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
- <20140711201238.GY20603@laptop.programming.kicks-ass.net>
- <20140714125529.GN26542@e103034-lin>
- <20140714132052.GY9918@twins.programming.kicks-ass.net>
- <20140714140435.GO26542@e103034-lin>
-Message-ID: <20140714162249.GE9918@twins.programming.kicks-ass.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jul 2014 09:23:24 -0700
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <53C3ED02.7020206@ti.com>
+References: <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
+ <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
+ <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
+ <20140709105055.GP28884@atomide.com> <53BD1FC3.6050500@ti.com>
+ <20140709110051.GQ28884@atomide.com> <53BD2249.2080808@ti.com>
+ <53C3ED02.7020206@ti.com>
+Message-ID: <20140714162324.GF20068@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 03:04:35PM +0100, Morten Rasmussen wrote:
-> > I'm struggling to fully grasp your intent. We need DVFS like accounting
-> > for sure, and that means a current freq hook, but I'm not entirely sure
-> > how that relates to capacity.
+* Lokesh Vutla <lokeshvutla@ti.com> [140714 07:47]:
+> Hi Tony,
+> On Wednesday 09 July 2014 04:36 PM, Keerthy wrote:
+> > On Wednesday 09 July 2014 04:30 PM, Tony Lindgren wrote:
+> >> * Keerthy <a0393675@ti.com> [140709 03:59]:
+> >>> On Wednesday 09 July 2014 04:20 PM, Tony Lindgren wrote:
+> >>>> * Keerthy <a0393675@ti.com> [140709 03:39]:
+> >>>>> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
+> >>>>>> * Keerthy <a0393675@ti.com> [140709 02:36]:
+> >>>>>>> On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
+> >>>>>>>> * Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
+> >>>>>>>>> --- a/arch/arm/boot/dts/dra7-evm.dts
+> >>>>>>>>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+> >>>>>>>>> @@ -249,6 +249,7 @@
+> >>>>>>>>>                       regulator-min-microvolt = <1050000>;
+> >>>>>>>>>                       regulator-max-microvolt = <1050000>;
+> >>>>>>>>>                       regulator-boot-on;
+> >>>>>>>>> +                    regulator-always-on;
+> >>>>>>>>>                   };
+> >>>>>>>> Is this regulator really always on?
+> >>>>>>> This feeds on to RTC which is a free running clock. So i guess always on is
+> >>>>>>> justified no?
+> >>>>>> Well the dts entries should describe the hardware. If the
+> >>>>>> regulator can be enabled and disabled, we should not claim it's
+> >>>>>> always on.
+> >>>>>  From the PMIC perspective every regulator can be enabled and
+> >>>>> disabled. From a Board perspective there are some which need
+> >>>>> to be always on. For Ex: SMPS123 which feeds on to the MPU.
+> >>>> Right, and we already have regulator-boot-on for those. Or are
+> >>>> you seeing some issue with that?
+> >>> regulator-boot-on describes that at boot a particular regulator is on.
+> >>> It does not guarantee that it will be on for the rest of the time. The
+> >>> regulator framework can go ahead and disable it if no one has requested
+> >>> for it. In case of RTC we do not want that to happen.
+> >> That's a bug in the RTC driver then. The driver should request a
+> >> regulator if it's specified.
 > 
-> We can abstract all the factors that affect current compute capacity
-> (frequency, P-states, big.LITTLE,...) in the scheduler by having
-> something like capacity_{cur,avail} to tell us how much capacity does a
-> particular cpu have in its current state. Assuming that implement scale
-> invariance for entity load tracking (we are working on that), we can
-> directly compare task utilization with compute capacity for balancing
-> decisions. For example, we can figure out how much spare capacity a cpu
-> has in its current state by simply:
-> 
-> spare_capacity(cpu) = capacity_avail(cpu) - \sum_{tasks(cpu)}^{t} util(t)
-> 
-> If you put more than spare_capacity(cpu) worth of task utilization on
-> the cpu, you will cause the cpu (and any affected cpus) to change
-> P-state and potentially be less energy-efficient.
-> 
-> Does that make any sense?
-> 
-> Instead of dealing with frequencies directly in the scheduler code, we
-> can abstract it by just having scalable compute capacity.
+> In my experiments I observed that when RTC regulator is switched
+> off and switched on, there is an abort while accessing RTC registers.
 
-Ah, ok. Same thing then.
+Right, then you know you have the right regulator :)
 
-> > But yes, for application the tipping point is u == 1, up until that
-> > point pure utilization makes sense, after that our runnable_avg makes
-> > more sense.
-> 
-> Agreed.
-> 
-> If you really care about latency/performance you might be interested in
-> comparing running_avg and runnable_avg even for u < 1. If the
-> running_avg/runnable_avg ratio is significantly less than one, tasks are
-> waiting on the rq to be scheduled.
+> After discussing with hardware team, it is confirmed that this
+> LDO9 regulator powering RTC cannot be turned off when
+> SoC is active and expected to be always on.
 
-Indeed, that gives a measure of queueing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/cd8fbd65/attachment.sig>
+Hmm but sounds like you already proved it can be idled? So
+the regulator really should be managed by the driver?
+
+Regards,
+
+Tony
