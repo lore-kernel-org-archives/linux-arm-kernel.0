@@ -1,103 +1,56 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 14 Jul 2014 12:57:26 +0300
-Subject: [PATCH 5/8] of: Add Tegra124 EMC bindings
-In-Reply-To: <20140714093136.GB9755@ulmo>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-6-git-send-email-mperttunen@nvidia.com>
- <20140711145146.GA6523@ulmo> <53C00A57.5070102@kapsi.fi>
- <53C38D07.4030402@nvidia.com> <20140714081524.GI2081@ulmo>
- <53C39D98.9040802@nvidia.com> <20140714093136.GB9755@ulmo>
-Message-ID: <53C3A986.9050602@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Jul 2014 10:57:47 +0100
+Subject: [RFC PATCH 0/2] irqchip: GIC: check and clear GIC interupt
+ active status
+In-Reply-To: <53C34CF2.5050209@huawei.com>
+References: <1405061177-43834-1-git-send-email-sdu.liu@huawei.com>
+ <20140711123507.GE12899@arm.com> <53C34CF2.5050209@huawei.com>
+Message-ID: <20140714095747.GB1779@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/14 12:31, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Mon, Jul 14, 2014 at 12:06:32PM +0300, Mikko Perttunen wrote:
->> On 14/07/14 11:15, Thierry Reding wrote:
->>>> Old Signed by an unknown key
->>>
->>> On Mon, Jul 14, 2014 at 10:55:51AM +0300, Mikko Perttunen wrote:
->>>> On 11/07/14 19:01, Mikko Perttunen wrote:
->>>>> On 07/11/2014 05:51 PM, Thierry Reding wrote:
->>>>>> On Fri, Jul 11, 2014 at 05:18:30PM +0300, Mikko Perttunen wrote:
->>>>>>> ...
->>>>>> ...
->>>>>
->>>>> In this case, all the registers that will be written are such that the
->>>>> MC driver will never need to write them. They are shadowed registers,
->>>>> meaning that all writes are stored and are only effective starting from
->>>>> the next time the EMC rate change state machine is activated, so writing
->>>>> them from anywhere except than the EMC driver would be pointless.
->>>>>
->>>>> I can find two users of these registers in downstream:
->>>>> 1) mc.c saves and loads them on suspend/restore (I don't know why, that
->>>>> shouldn't do anything. They will be overridden anyway during the next
->>>>> EMC rate change).
->>>>> 2) tegra12x_la.c reads MC_EMEM_ARB_MISC0 during a core_initcall to
->>>>> calculate a value which it then writes to a register that is also
->>>>> shadowed and that is part of downstream burst registers so that doesn't
->>>>> do anything either.
->>>>>
->>>>> The reason I implemented two ways to specify the MC register area was
->>>>> that this could be merged before an MC driver and retain
->>>>> backwards-compatibility after the MC driver arrives.
->>>>>
->>>>> If this is not acceptable, we can certainly wait for the MC driver to be
->>>>> merged first. (Although with the general rate of things, I hope I won't
->>>>> be back at school at that point..) I assume that this is blocked on the
->>>>> IOMMU bindings discussion? In that case, there are several options: the
->>>>> MC driver could have its own tables for each EMC rate or we could just
->>>>> make the EMC tables global (i.e. not under the EMC node). In any case,
->>>>> the MC driver would need to implement a function that would just write
->>>>> these values but be guaranteed to not do anything else, since that could
->>>>> cause nasty things during the EMC rate change sequence.
->>>>
->>>> Having taken another look at the code, I don't think the MC driver could do
->>>> anything that bad. There are also two other places where the EMC driver
->>>> needs to read MC registers: Inside the sequence, it reads a register but
->>>> discards its contents. According to comments, this acts as a memory barrier,
->>>> probably for the preceding step that writes into MC memory. If the register
->>>> writes are moved to the MC driver, it could also handle that. In another
->>>> place it reads the number of RAM modules from a MC register. The MC driver
->>>> could export this as another function.
->>>
->>> Exporting this functionality from the MC driver is the right thing to do
->>> in my opinion.
->>
->> Ok, let's do that then. Do you think I could make a bare-bones MC driver to
->> support the EMC driver before your MC driver with IOMMU/LA is ready? Can the
->> MC device tree node be stabilized yet? Of course, if things go well, that
->> concern might turn out to be unnecessary.
->
-> Well, at this point this isn't 3.17 material anyway, so there's no need
-> to rush things.
+On Mon, Jul 14, 2014 at 04:22:26AM +0100, Liu hua wrote:
+> On 2014/7/11 20:35, Will Deacon wrote:
+> > On Fri, Jul 11, 2014 at 07:46:15AM +0100, Liu Hua wrote:
+> >> So guys, Do you know a better way to do that? 
+> > What happens if, in the crash kernel, you disable the CPU interfaces
+> > (GICC_CTLR.ENABLE) then disable the distributor (GICD_CTLR.ENABLE) before
+> > enabling everything again in the reverse order? Is that enough to cause the
+> > GIC to drop any active states? It's not clear to me from a quick look at
+> > the TRM.
+> > 
+> 
+> I did what you said at the beginning of "gic_dist_init". The active states
+> remained (panic in local timer interrupt (PPI))and the kernel failed to boot,
+> Did I do that at wrong place?
+> 
+> -------------------
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index b6b0a81..94d6352 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -454,6 +455,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+>         void __iomem *base = gic_data_dist_base(gic);
+>         void __iomem *cpu_base = gic_data_cpu_base(gic);
+> 
+> + writel_relaxed(0, base + GIC_CPU_CTRL);
+>         writel_relaxed(0, base + GIC_DIST_CTRL);
+> 
+>         /*
+> ------------------------
+> 
+> As shown in GIC Architecture Specification manual,I think that the GICC_CTLR.ENABLE
+> and GICD_CTLR.ENABLE only control the delivering of the interrupt, not the active
+> states.
+> 
+> As GIC manual says "For every read of a valid Interrupt ID from the GICC_IAR, the
+> connected processor must perform a matching write to the GICC_EOIR". So we should
+> find a way to drop the active states when booting, if we do not remain these active
+> states by design.
 
-Very true.
+Understood, my suggestion above was a speculative effort to see what the
+hardware would do. Something along the lines of what you've done in your
+patch makes sense to me, but we'll need to wait for Marc's input (he's on
+holiday at the moment).
 
-> I'd prefer to take a patch on top of my proposed MC
-> driver patch in anticipation of merging that for 3.18. But if it turns
-> out that for whatever reason we can't do that, having a separate patch
-> makes it easy to extract the changes into a bare-bones driver.
-
-Yes, this sounds sensible. I'll make such a patch. I suppose having 
-another timings table in the MC node with just the rate and 
-mc-burst-data would separate the concerns best. It occurs to me that we 
-could also write the regs in the pre-rate change notifier, but this 
-would turn the dependency around and would mean that the regs are not 
-written when entering backup rates. The latter shouldn't be a problem 
-but the reversed dependency would, so I guess a custom function is the 
-way to go, and we need to add at least one anyway.
-
-The downstream kernel also overwrites most LA registers during EMC rate 
-change without regard for the driver-set values, and we might have to 
-read those values from the device tree too. Upstream can do this in rate 
-change notifiers if needed. I'll look into this a bit more.
-
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
+Will
