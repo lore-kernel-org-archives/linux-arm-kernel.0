@@ -1,52 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 14 Jul 2014 08:14:21 +0200
-Subject: [PATCH] ARM: at91: at91sam9x5: correct typo error for ohci clock
-In-Reply-To: <1405307294-17708-1-git-send-email-voice.shen@atmel.com>
-References: <1405307294-17708-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140714081421.5f539287@bbrezillon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 14 Jul 2014 08:15:34 +0200
+Subject: [PATCH v4] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <201407121422.02078.arnd@arndb.de>
+References: <1404487757-18829-1-git-send-email-thierry.reding@gmail.com>
+ <20140712093917.GD18601@arm.com>
+ <CAF6AEGutHp+3f3iPA+jjaRkqq=5T_vytZ_ESoSqsQ4RHZ8F8yQ@mail.gmail.com>
+ <201407121422.02078.arnd@arndb.de>
+Message-ID: <20140714061532.GB2081@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014 11:08:14 +0800
-Bo Shen <voice.shen@atmel.com> wrote:
-
-> Correct the typo error for the second "uhphs_clk".
+On Sat, Jul 12, 2014 at 02:22:01PM +0200, Arnd Bergmann wrote:
+> On Saturday 12 July 2014, Rob Clark wrote:
+> > >> Was there actually a good reason for having the device link to the
+> > >> iommu rather than the other way around?  How much would people hate it
+> > >> if I just ignore the generic bindings and use something that works for
+> > >> me instead.  I mean, it isn't exactly like there is going to be .dts
+> > >> re-use across different SoC's..  and at least with current IOMMU API
+> > >> some sort of of_get_named_iommu() API doesn't really make sense.
+> > >
+> > > The thing is, if you end up ignoring the generic binding then we have two
+> > > IOMMUs using the same (ARM SMMU) binding and it begs the question as to
+> > > which is the more generic! I know we're keen to get this merged, but merging
+> > > something that people won't use and calling it generic doesn't seem ideal
+> > > either. We do, however, desperately need a generic binding.
+> > 
+> > yeah, ignoring the generic binding is not my first choice.  I'd rather
+> > have something that works well for everyone.  But I wasn't really sure
+> > if the current proposal was arbitrary, or if there are some
+> > conflicting requirements between different platforms.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-sam9n12 dtsi has the same bug, I'll fix it
-
-And sorry for the mess when moving sam9n12 and sam9x5 to the CCF, I
-should have checked my clock definitions more carefully :-(.
-
-Best Regards,
-
-Bros
-
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> The common case that needs to be simple is attaching one (master) device
+> to an IOMMU using the shared global context for the purposes of implementing
+> the dma-mapping API.
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 2ebc421..727d3a4 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -1155,8 +1155,7 @@
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00600000 0x100000>;
->  			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-> -			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
-> -				 <&uhpck>;
-> +			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
->  			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
->  			status = "disabled";
->  		};
+> The way that Thierry's binding does that is the obvious solution to this,
+> and it mirrors what we do in practically every other subsystem.
 
+That wasn't really the intention, though. We shouldn't be designing
+bindings to work well in one use-case or another. My motivation for
+doing it this way was that I think it naturally models the flow of
+master IDs. They originate within the masters and flow towards the
+IOMMU device. In other words, they are a property of the masters so
+quite literally should be described in the device tree nodes of the
+masters.
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/378e34f9/attachment.sig>
