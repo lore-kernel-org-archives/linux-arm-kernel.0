@@ -1,34 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Jul 2014 14:36:44 +0100
-Subject: [PATCH resend v2] arm64: dmi: Add SMBIOS/DMI support
-In-Reply-To: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1405079210-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140714133644.GE1779@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 14 Jul 2014 15:36:48 +0200
+Subject: [PATCH v2 6/7] ata: Add support for the Tegra124 SATA controller
+In-Reply-To: <20140708132216.GA4979@htj.dyndns.org>
+References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
+ <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
+ <20140708132216.GA4979@htj.dyndns.org>
+Message-ID: <53C3DCF0.3030001@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 12:46:50PM +0100, Ard Biesheuvel wrote:
-> From: Yi Li <yi.li@linaro.org>
+Hi,
+
+On 07/08/2014 03:22 PM, Tejun Heo wrote:
+> (cc'ing Hans)
 > 
-> SMbios is important for server hardware vendors. It implements a spec for
-> providing descriptive information about the platform. Things like serial
-> numbers, physical layout of the ports, build configuration data, and the like.
-> 
-> This has been tested by dmidecode and lshw tools.
-> 
-> Signed-off-by: Yi Li <yi.li@linaro.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Changes since previous version:
-> - changed double inclusion guard to arm64 flavour
-> - use kzalloc(GFP_KERNEL) as GFP_ATOMIC is not needed
-> - do a sanity check on the size of the requested mapping
+> Hans, can you please review this patch?
 
-Technically, this patch looks fine to me:
+Done.
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+Mikko, it looks like you are doing a lot of stuff
+the DIY way. I can see there are good reasons for
+that though.
 
-It would be good if somebody with a relevant platform could confirm that
-it works/is useful though.
+Still it would be nice if you could use a little bit
+more of the helper functions provided by libahci_platform.c
 
-Will
+Specifically I think it would be better if you used
+ahci_platform_get_resources, that would remove a lot of
+duplicate code from the new driver.
+
+To be specific I would like to suggest that you
+raise AHCI_MAX_CLKS to 4, and then specify an order
+in which the clks must be listed in the devicetree
+binding. Then you can put that order in an enum
+and use hpriv->clks[CLK_FOO] in your driver, where
+CLK_FOO comes from the enum.
+
+This way you should be able to use ahci_platform_get_resources
+and drop doing the iomap of the base registers, all the
+clk_gets and the phy_get yourself.
+
+You could then also use ahci_platform_disable_clks() in
+tegra_ahci_power_off
+
+Regards,
+
+Hans
