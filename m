@@ -1,50 +1,55 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 14 Jul 2014 19:44:40 +0930
-Subject: [PATCH] ARM: avoid ARM binutils leaking ELF local symbols
-In-Reply-To: <E1X6HWN-0006io-Od@rmk-PC.arm.linux.org.uk>
-References: <E1X6HWN-0006io-Od@rmk-PC.arm.linux.org.uk>
-Message-ID: <87oaws457z.fsf@rustcorp.com.au>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Jul 2014 07:35:15 -0400 (EDT)
+Subject: [PATCH] ARM: EXYNOS: Fix MCPM build with SUSPEND=n
+In-Reply-To: <1405337093-15377-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405337093-15377-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <alpine.LFD.2.11.1407140730080.3647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King <rmk+kernel@arm.linux.org.uk> writes:
-> Symbols starting with .L are ELF local symbols and should not appear
-> in ELF symbol tables.  However, unfortunately ARM binutils leaks the
-> .LANCHOR symbols into the symbol table, which leads kallsyms to report
-> these symbols rather than the real name.  It is not very useful when
-> %pf reports symbols against these leaked .LANCHOR symbols.
->
-> Arrange for kallsyms to ignore these symbols using the same mechanism
-> that is used for the ARM mapping symbols.
+On Mon, 14 Jul 2014, Krzysztof Kozlowski wrote:
 
-Yech... Applied.
+> Building of EXYNOS5420_MCPM with disabled SUSPEND fails:
+> arch/arm/mach-exynos/built-in.o: In function `exynos_mcpm_init':
+> arch/arm/mach-exynos/mcpm-exynos.c:361: undefined reference to `mcpm_loopback'
+> 
+> The exynos_mcpm_init() in mcp-exynos.c calls mcpm_loopback() which
+> depends on cpu_suspend function (ARM_CPU_SUSPEND).
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: <stable@vger.kernel.org>
 
-Thanks,
-Rusty.
+No need to CC stable here as this code has not reached a released kernel 
+yet.
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Fixes: a6a4d3152e3cbb6 ("ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster using the MCPM loopback")
+
+And this is not clear yet if this commit ID is stable.
+
+Other than that:
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Please send to RMK's patch system.
+
+
 > ---
->  kernel/module.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/kernel/module.c b/kernel/module.c
-> index 81e727cf6df9..cecd78d06025 100644
-> --- a/kernel/module.c
-> +++ b/kernel/module.c
-> @@ -3385,6 +3385,8 @@ static inline int within(unsigned long addr, void *start, unsigned long size)
->   */
->  static inline int is_arm_mapping_symbol(const char *str)
->  {
-> +	if (str[0] == '.' && str[1] == 'L')
-> +		return true;
->  	return str[0] == '$' && strchr("atd", str[1])
->  	       && (str[2] == '\0' || str[2] == '.');
->  }
+>  arch/arm/mach-exynos/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 8f9b66c4ac78..5d4ff6571dcd 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -119,6 +119,7 @@ config EXYNOS5420_MCPM
+>  	bool "Exynos5420 Multi-Cluster PM support"
+>  	depends on MCPM && SOC_EXYNOS5420
+>  	select ARM_CCI
+> +	select ARM_CPU_SUSPEND
+>  	help
+>  	  This is needed to provide CPU and cluster power management
+>  	  on Exynos5420 implementing big.LITTLE.
 > -- 
-> 1.8.3.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 1.9.1
+> 
+> 
