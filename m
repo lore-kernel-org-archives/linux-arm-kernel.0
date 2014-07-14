@@ -1,35 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 14 Jul 2014 13:24:53 +0200
-Subject: [PATCH] ARM: EXYNOS: Fix MCPM build with SUSPEND=n
-Message-ID: <1405337093-15377-1-git-send-email-k.kozlowski@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jul 2014 04:24:12 -0700
+Subject: [PATCH v4 00/11] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <20140714112412.GE20068@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building of EXYNOS5420_MCPM with disabled SUSPEND fails:
-arch/arm/mach-exynos/built-in.o: In function `exynos_mcpm_init':
-arch/arm/mach-exynos/mcpm-exynos.c:361: undefined reference to `mcpm_loopback'
+* Dave Gerlach <d-gerlach@ti.com> [140710 19:58]:
+> Hello,
+> 
+> This series adds suspend/resume support for am335x. Version 3 of this
+> series can be found at [1]. I apologize for the large delay between this
+> and the previous revision. This code has been heavily refined
+> since the last version based on the various comments received for v3. The
+> major change from previous version is moving all wkup_m3 code into a
+> remoteproc based driver. The new driver handles all IPC and fw loading
+> and exposes a small API to be used by PM code to achieve low power states.
 
-The exynos_mcpm_init() in mcp-exynos.c calls mcpm_loopback() which
-depends on cpu_suspend function (ARM_CPU_SUSPEND).
+Great, this is nice for all the am335x users. I made few comments
+on the series that should be quite simple to fix up.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: <stable@vger.kernel.org>
-Fixes: a6a4d3152e3cbb6 ("ARM: 8083/1: exynos: activate the CCI on boot CPU/cluster using the MCPM loopback")
----
- arch/arm/mach-exynos/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Then please split up your next version of this series into the
+following independet patches:
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 8f9b66c4ac78..5d4ff6571dcd 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -119,6 +119,7 @@ config EXYNOS5420_MCPM
- 	bool "Exynos5420 Multi-Cluster PM support"
- 	depends on MCPM && SOC_EXYNOS5420
- 	select ARM_CCI
-+	select ARM_CPU_SUSPEND
- 	help
- 	  This is needed to provide CPU and cluster power management
- 	  on Exynos5420 implementing big.LITTLE.
--- 
-1.9.1
+1. Changes to the EDMA driver for suspend and resume support
+
+2. Patches to add the rproc driver
+
+3. SoC related changes to enable PM support
+
+Regards,
+
+Tony
