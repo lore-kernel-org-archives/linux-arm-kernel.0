@@ -1,52 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Jul 2014 21:39:29 +0800
-Subject: [PATCH v2 2/4] ARM: imx: clk-vf610: fix FlexCAN clock gating
-In-Reply-To: <94282392d8355ac25bb998b89032c1c980d5ccce.1405322992.git.stefan@agner.ch>
-References: <cover.1405322992.git.stefan@agner.ch>
- <94282392d8355ac25bb998b89032c1c980d5ccce.1405322992.git.stefan@agner.ch>
-Message-ID: <20140714133926.GH2197@dragon>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 14 Jul 2014 15:51:06 +0200
+Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
+ <20140710111833.GY3935@laptop>
+ <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
+ <20140711145138.GC3935@laptop>
+ <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
+Message-ID: <20140714135106.GZ19379@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy Jingchang ...
-
-On Mon, Jul 14, 2014 at 09:48:29AM +0200, Stefan Agner wrote:
-> Extend the clock control for FlexCAN with the second gate which
-> enable the clocks in the Clock Divider (CCM_CSCDR2) register too.
+On Fri, Jul 11, 2014 at 05:17:44PM +0200, Vincent Guittot wrote:
+> > In any case, its feels rather arbitrary to me. What about machines where
+> > there's no cache sharing at all (the traditional SMP systems). This
+> > thing you're trying to do still seems to make sense there.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/mach-imx/clk-vf610.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-> index 22dc3ee..b12b888 100644
-> --- a/arch/arm/mach-imx/clk-vf610.c
-> +++ b/arch/arm/mach-imx/clk-vf610.c
-> @@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  
->  	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
->  
-> -	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
-> -	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
-> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
-> +	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
+> ok, I thought that traditional SMP systems have this flag set at core
+> level. 
 
-I do not quite understand what "flexcan0_en" clock is and the
-relationship between it and clock "flexcan0".  I do not think it's a
-parent-child clock relationship.  Jingchang, do you have more info on
-this?
+Yeah, with 1 core, so its effectively disabled.
 
-Also when you add a new clock, you should have a new clock ID, something
-like VF610_CLK_FLEXCAN0_EN.
+> I mean ARM platforms have the flag for CPUs in the same cluster
+> (which include current ARM SMP system) and the corei7 of my laptop has
+> the flag at the cores level.
 
-Shawn
+So I can see 'small' parts reducing shared caches in order to improve
+idle performance.
 
-> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
-> +	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
->  
->  	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
->  	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
-> -- 
-> 2.0.1
-> 
+The point being that LLC seems a somewhat arbitrary measure for this.
+
+Can we try and see what happens if you remove the limit. Its always best
+to try the simpler things first and only make it more complex if we have
+to.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140714/16efc181/attachment-0001.sig>
