@@ -1,57 +1,109 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Tue, 15 Jul 2014 19:02:56 +0400
-Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan when
- touching unaccessible memory
-In-Reply-To: <alpine.DEB.2.11.1407150924320.10593@gentwo.org>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
- <20140715060405.GI11317@js1304-P5Q-DELUXE> <53C4DA54.3010502@samsung.com>
- <20140715081852.GL11317@js1304-P5Q-DELUXE>
- <alpine.DEB.2.11.1407150924320.10593@gentwo.org>
-Message-ID: <53C542A0.5050107@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 15 Jul 2014 20:41:19 +0530
+Subject: [PATCH v5 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+In-Reply-To: <1403030008-20675-1-git-send-email-galak@codeaurora.org>
+References: <1403030008-20675-1-git-send-email-galak@codeaurora.org>
+Message-ID: <53C54497.4010704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/14 18:26, Christoph Lameter wrote:
-> On Tue, 15 Jul 2014, Joonsoo Kim wrote:
-> 
->>> I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
->>> If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
->>> for kasan.
->>
->> I don't agree with this.
->>
->> If someone is going to add a slab_pad_check() in other places in
->> slub.c, we should disable/enable kasan there, too. This looks same
->> maintenance problem to me. Putting disable/enable only where we
->> strictly need at least ensures that we don't need to care when using
->> slub internal functions.
->>
->> And, if memchr_inv() is problem, I think that you also need to add hook
->> into validate_slab_cache().
->>
->> validate_slab_cache() -> validate_slab_slab() -> validate_slab() ->
->> check_object() -> check_bytes_and_report() -> memchr_inv()
-> 
-> I think adding disable/enable is good because it separates the payload
-> access from metadata accesses. This may be useful for future checkers.
-> Maybe call it something different so that this is more generic.
-> 
-> metadata_access_enable()
-> 
-> metadata_access_disable()
-> 
-> ?
-> 
-It sounds like a good idea to me. However in this patch, besides from protecting metadata accesses,
-this calls also used in setup_objects for wrapping ctor call. It used there because all pages in allocate_slab
-are poisoned, so at the time when ctors are called all object's memory marked as poisoned.
+Hi,
 
-I think this could be solved by removing kasan_alloc_slab_pages() hook form allocate_slab() and adding
-kasan_slab_free() hook after ctor call.
-But I guess in that case padding at the end of slab will be unpoisoined.
+On Wednesday 18 June 2014 12:03 AM, Kumar Gala wrote:
+> Add a PHY driver for uses with AHCI based SATA controller driver on the
+> IPQ806x family of SoCs.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+> v5:
+> * Fix copy/paste error when killing qcom_ipq806x_sata_delay_us
+> 
+> v4:
+> * removed qcom_ipq806x_sata_delay_us as it was only used one
+> 
+> v3:
+> * Added Kconfig HAS_IOMEM dep
+> * re-ordered probe function so phy_provider_register is last
+>  
+> v2:
+> * dropped unused dev pointer in struct qcom_ipq806x_sata_phy
+> * remove unnecessary reg initializaiton
+> * Removed unneeded error message
+> * Added remove function to disable the clock
+> 
+>  drivers/phy/Kconfig                 |   7 ++
+>  drivers/phy/Makefile                |   1 +
+>  drivers/phy/phy-qcom-ipq806x-sata.c | 206 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 214 insertions(+)
+>  create mode 100644 drivers/phy/phy-qcom-ipq806x-sata.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 16a2f06..b7b6bce 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -178,4 +178,11 @@ config PHY_XGENE
+>  	help
+>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>
+.
+.
+<snip>
+.
+.
+> +
+> +static int qcom_ipq806x_sata_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	struct phy_provider *phy_provider;
+> +	struct phy *generic_phy;
+> +	int ret;
+> +
+> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+> +	if (!phy) {
+> +		dev_err(dev, "%s: failed to allocate phy\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	phy->mmio = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(phy->mmio))
+> +		return PTR_ERR(phy->mmio);
+> +
+> +	generic_phy = devm_phy_create(dev, &qcom_ipq806x_sata_phy_ops, NULL);
+> +	if (IS_ERR(generic_phy)) {
+> +		dev_err(dev, "%s: failed to create phy\n", __func__);
+> +		return PTR_ERR(generic_phy);
+> +	}
+> +
+> +	phy_set_drvdata(generic_phy, phy);
+> +
+> +	phy->cfg_clk = devm_clk_get(dev, "cfg");
+> +	if (IS_ERR(phy->cfg_clk)) {
+> +		dev_err(dev, "Failed to get sata cfg clock\n");
+> +		return PTR_ERR(phy->cfg_clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(phy->cfg_clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +	if (IS_ERR(phy_provider)) {
+> +		clk_disable_unprepare(phy->cfg_clk);
+> +		dev_err(dev, "%s: failed to register phy\n", __func__);
+> +		return PTR_ERR(phy_provider);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int qcom_ipq806x_sata_phy_remove(struct platform_device *pdev)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy = platform_get_drvdata(pdev);
 
-> Maybe someone else has a better idea?
-> 
-> 
-> 
+Where is platform_set_drvdata()?
+
+Thanks
+Kishon
