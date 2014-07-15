@@ -1,100 +1,100 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Jul 2014 12:52:54 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <1645765.yCSTbHcZMC@avalon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417324.PxofUz16v0@avalon> <20140715103718.GB6616@ulmo>
- <1645765.yCSTbHcZMC@avalon>
-Message-ID: <20140715105253.GE6616@ulmo>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 15 Jul 2014 12:53:56 +0200
+Subject: [PATCH 1/1] ARM: dts: zynq: Add Parallella device tree
+In-Reply-To: <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
+References: <1404075022-28745-1-git-send-email-afaerber@suse.de>
+ <1404075022-28745-2-git-send-email-afaerber@suse.de>
+ <CAOesGMhKY1Lb+o8AbtFXS5c7SLg2uGt4-oosdro2FMj_+bB6Tw@mail.gmail.com>
+ <61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
+ <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
+Message-ID: <74ed2164-b1cf-4470-a853-e8f4c7804f41@BN1BFFO11FD008.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 12:43:02PM +0200, Laurent Pinchart wrote:
-> Hi Thierry,
+On 07/14/2014 08:12 PM, Olof Johansson wrote:
+> On Tue, Jul 8, 2014 at 4:18 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 06/30/2014 07:15 AM, Olof Johansson wrote:
+>>> Hi,
+>>>
+>>> On Sun, Jun 29, 2014 at 1:50 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>> This allows to boot the Adapteva Parallella board to serial console.
+>>>>
+>>>> Cc: Andreas Olofsson <andreas@adapteva.com>
+>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>
+>>> Nice and clean DTS, just a couple of comments below.
+>>>
+>>>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+>>>> new file mode 100644
+>>>> index 0000000..98df66c
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
+>>>> @@ -0,0 +1,63 @@
+>>>> +/*
+>>>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
+>>>> + *
+>>>> + * Derived from zynq-zed.dts:
+>>>> + *
+>>>> + *  Copyright (C) 2011 Xilinx
+>>>> + *  Copyright (C) 2012 National Instruments Corp.
+>>>> + *  Copyright (C) 2013 Xilinx
+>>>> + *
+>>>> + * This software is licensed under the terms of the GNU General Public
+>>>> + * License version 2, as published by the Free Software Foundation, and
+>>>> + * may be copied, distributed, and modified under those terms.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + */
+>>>> +/dts-v1/;
+>>>> +/include/ "zynq-7000.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +       model = "Parallella Board";
 > 
-> On Tuesday 15 July 2014 12:37:19 Thierry Reding wrote:
-> > On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
-> > > On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
-> > >> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
-> > >>> On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
-> > >>>> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs
-> > >>>> (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family) provides a
-> > >>>> display controller device.
-> > >>>> 
-> > >>>> The HLCDC block provides a single RGB output port, and only supports
-> > >>>> LCD panels connection to LCD panels for now.
-> > >>>> 
-> > >>>> The atmel,panel property link the HLCDC RGB output with the LCD
-> > >>>> panel connected on this port (note that the HLCDC RGB connector
-> > >>>> implementation makes use of the DRM panel framework).
-> > >>>> 
-> > >>>> Connection to other external devices (DRM bridges) might be added
-> > >>>> later by mean of a new atmel,xxx (atmel,bridge) property.
-> > >>>> 
-> > >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > >>>> ---
-> > >>>> 
-> > >>>>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++
-> > >>>>  1 file changed, 59 insertions(+)
-> > >>>>  create mode 100644
-> > >>>>  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > 
-> > > [snip]
-> > > 
-> > >>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> > >>>> +   The first cell is a phandle to a DRM panel device
-> > >>>> +   The second cell encodes the RGB mode, which can take the
-> > >>>> following values:
-> > >>>> +   * 0: RGB444
-> > >>>> +   * 1: RGB565
-> > >>>> +   * 2: RGB666
-> > >>>> +   * 3: RGB888
-> > >>> 
-> > >>> These are properties of the panel and should be obtained from the
-> > >>> panel directly rather than an additional cell in this specifier.
-> > >> 
-> > >> Okay.
-> > >> What's the preferred way of doing this ?
-> > >> What about defining an rgb-mode property in the panel node.
-> > > 
-> > > You could do that, but it won't help you much, as the HLCDC driver must
-> > > not parse properties from the panel node. You should instead extend the
-> > > drm_panel API with a function to retrieve panel properties. The HLCDC
-> > > driver will then query the panel driver at runtime for the interface
-> > > type. The panel driver will get the information from hardcoded data in
-> > > the driver, from DT or possibly in some cases by querying the panel
-> > > hardware directly.
-> > 
-> > My preference for this would be that we either add this to some existing
-> > structure (struct drm_display_info seems like a good candidate) or if
-> > the number of parameters grows out of hands, then maybe even introduce a
-> > new type of device that's specific for the interface. DRM panels are an
-> > abstraction for panels, that is, interface-agnostic, and if we start
-> > exposing interface specific parameters things will start to become very
-> > unwieldy.
+> You might want to have this say "Adapteva Parallella Board" instead
+> (just noticed).
 > 
-> I agree with the goal of keeping drm_panel interface-agnostic. However, one 
-> way or another, interface parameters will need to be communicated between the 
-> panel driver and the controller driver. My preference, if we need to extend 
-> the number and/or scope of parameters beyond what drm_display_info could 
-> reasonably contain, would be to implement a new drm_panel operation to 
-> query/configure interface parameters, using a structure that contains the 
-> interface type and a union of type-specific structures. This would keep the 
-> API generic in the sense of not requiring explicit knowledge of all interfaces 
-> in the drivers, while offering the flexibility we need with a way to easily 
-> detect the interface type at runtime and react on unknown/unsupported types.
+>>>> +       compatible = "xlnx,zynq-7000";
+>>>
+>>> This should have a more specific compatible as the first one. Probably
+>>> something like:
+>>>    compatible = "adapteva,parallella", "xlnx,zynq-7000";
+>>
+>> We were using these compatible properties but later there is no reason
+>> to create them because they will be unused.
+>> It is easy to add it when you need it which is not this case.
+> 
+> No, please add it from day one, otherwise everybody needs to update
+> their device tree, some will miss doing it, etc, etc. It's a simple
+> and trivial thing to do, and no reason to leave it o ut.
 
-That's exactly what I was hoping could be avoided. If instead we modeled
-the interface type as a bus, we could for example have an lvds_bus along
-with an lvds_device and then use that as the natural place to store
-these properties. Much like we do for DSI.
+It is trivial. None will just probably use it and upgrading DTS is simple
+but I don't really care.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/3a881c50/attachment.sig>
+
+>>>> +
+>>>> +       memory {
+>>>> +               device_type = "memory";
+>>>> +               reg = <0 0x20000000>;
+>>>
+>>> Does the bootloader update this entry, or is it truly static? If it's
+>>> updated then it's become recent habit to leave the memory size empty
+>>> in the static file.
+>>
+>> Depends on your bootloader. I think it is good to have it here.
+>> Also this file can be used by u-boot for example and u-boot can be configured
+>> from it that's why I think that make sense to keep this here.
+> 
+> Ok. It's become commonplace to leave memory empty for the machines
+> where it's guaranteed that the bootloader will have updated it, to
+> avoid having stale or incorrect values in the static tree. I'm not
+> going to be strict about it, but it's something to consider.
+
+I personally don't like this bootloader feature and IRC it is disabled
+for xilinx u-boot too.
+
+Thanks,
+Michal
