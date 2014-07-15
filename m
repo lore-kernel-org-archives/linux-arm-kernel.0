@@ -1,88 +1,28 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 15 Jul 2014 18:24:35 +0300
-Subject: [PATCH 5/6] clk: tegra: Add support for Tegra132 CAR clocks
+Date: Tue, 15 Jul 2014 18:24:36 +0300
+Subject: [PATCH 6/6] clk: tegra: Add Tegra132 ccplex clocks
 In-Reply-To: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1405437890-6468-6-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1405437890-6468-7-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra132 CAR supports almost the same clocks as Tegra124 CAR. This patch
-deals with the small differences.
-
---
-I'm not entirely sure why the soc_therm clock needs to be enabled on Tegra132,
-but turning it off results in a system hang. I presume this might be because
-of fastboot initializing soc_therm.
+Add support for the ccplex clocks in Tegra132.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/clk/tegra/clk-tegra124.c |   32 ++++++++++++++++++++++++++++++++
- 1 files changed, 32 insertions(+), 0 deletions(-)
+ drivers/clk/tegra/Makefile |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 80efe51..b857aab 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -1369,6 +1369,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
- 	{TEGRA124_CLK_XUSB_HS_SRC, TEGRA124_CLK_PLL_U_60M, 60000000, 0},
- 	{TEGRA124_CLK_XUSB_FALCON_SRC, TEGRA124_CLK_PLL_RE_OUT, 224000000, 0},
- 	{TEGRA124_CLK_XUSB_HOST_SRC, TEGRA124_CLK_PLL_RE_OUT, 112000000, 0},
-+	{TEGRA124_CLK_SOC_THERM, TEGRA124_CLK_PLL_P, 51000000, 0},
- 	/* This MUST be the last entry. */
- 	{TEGRA124_CLK_CLK_MAX, TEGRA124_CLK_CLK_MAX, 0, 0},
- };
-@@ -1378,9 +1379,25 @@ static void __init tegra124_clock_apply_init_table(void)
- 	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
- }
- 
-+enum {
-+	TEGRA124_CLK,
-+	TEGRA132_CLK,
-+};
-+
-+static const struct of_device_id tegra_clock_of_match[] = {
-+	{ .compatible = "nvidia,tegra124-car", .data = (void *)TEGRA124_CLK },
-+	{ .compatible = "nvidia,tegra132-car", .data = (void *)TEGRA132_CLK },
-+	{},
-+};
-+
- static void __init tegra124_clock_init(struct device_node *np)
- {
- 	struct device_node *node;
-+	const struct of_device_id *match;
-+	uintptr_t id;
-+
-+	match = of_match_node(tegra_clock_of_match, np);
-+	id = (uintptr_t)match->data;
- 
- 	clk_base = of_iomap(np, 0);
- 	if (!clk_base) {
-@@ -1416,6 +1433,20 @@ static void __init tegra124_clock_init(struct device_node *np)
- 	tegra_audio_clk_init(clk_base, pmc_base, tegra124_clks, &pll_a_params);
- 	tegra_pmc_clk_init(pmc_base, tegra124_clks);
- 
-+	if (id == TEGRA132_CLK) {
-+		int i;
-+
-+		tegra124_clks[tegra_clk_cclk_g].present = false;
-+		tegra124_clks[tegra_clk_cclk_lp].present = false;
-+		tegra124_clks[tegra_clk_pll_x].present = false;
-+		tegra124_clks[tegra_clk_pll_x_out0].present = false;
-+
-+		/* Tegra132 requires the soc_therm clock to be always on */
-+		for (i = 0; i < ARRAY_SIZE(init_table); i++) {
-+			if (init_table[i].clk_id == TEGRA124_CLK_SOC_THERM)
-+				init_table[i].state = 1;
-+		}
-+	}
- 	tegra_super_clk_gen4_init(clk_base, pmc_base, tegra124_clks,
- 					&pll_x_params);
- 	tegra_add_of_provider(np);
-@@ -1426,3 +1457,4 @@ static void __init tegra124_clock_init(struct device_node *np)
- 	tegra_cpu_car_ops = &tegra124_cpu_car_ops;
- }
- CLK_OF_DECLARE(tegra124, "nvidia,tegra124-car", tegra124_clock_init);
-+CLK_OF_DECLARE(tegra132, "nvidia,tegra132-car", tegra124_clock_init);
+diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+index f7dfb72..4231865 100644
+--- a/drivers/clk/tegra/Makefile
++++ b/drivers/clk/tegra/Makefile
+@@ -15,3 +15,5 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
+ obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
+ obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
++obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.c
++obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra132-ccplex.c
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
