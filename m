@@ -1,102 +1,155 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 15 Jul 2014 17:20:30 +0200
-Subject: [PATCH v3 14/15] drivers: clk: st: Update frequency tables for
- fs660c32 and fs432c65
+Date: Tue, 15 Jul 2014 17:20:18 +0200
+Subject: [PATCH v3 02/15] drivers: clk: st: use static const for stm_fs tables
 In-Reply-To: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1405437631-23623-15-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1405437631-23623-3-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extend the range of possible frequencies of the fs432c65
-and fs660c32 Quad frequency synthesizers.
+converts stm_fs tables into static const
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/clk/st/clkgen-fsyn.c | 67 ++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 59 insertions(+), 8 deletions(-)
+ drivers/clk/st/clkgen-fsyn.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index dc5bcb7..af94ed8 100644
+index 4f53ee0..a7e5db4 100644
 --- a/drivers/clk/st/clkgen-fsyn.c
 +++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -50,17 +50,68 @@ static const struct stm_fs fs216c65_rtbl[] = {
+@@ -41,7 +41,7 @@ struct stm_fs {
+ 	unsigned long nsdiv;
  };
  
- static const struct stm_fs fs432c65_rtbl[] = {
--	{ .mdiv = 0x1f, .pe = 0x0,	.sdiv = 0x7,	.nsdiv = 0 },	/* 625   Khz */
--	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108   MHz */
--	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297   MHz */
-+	{ .mdiv = 0x1f, .pe = 0x0,	.sdiv = 0x7,	.nsdiv = 0 },	/* 625     Khz */
-+	{ .mdiv = 0x13, .pe = 0x777c,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.175  MHz */
-+	{ .mdiv = 0x19, .pe = 0x4d35,	.sdiv = 0x2,	.nsdiv = 0 },	/* 25.200  MHz */
-+	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x4,	.nsdiv = 1 },	/* 27.000  MHz */
-+	{ .mdiv = 0x17, .pe = 0x28f5,	.sdiv = 0x2,	.nsdiv = 0 },	/* 27.027  MHz */
-+	{ .mdiv = 0x16, .pe = 0x3359,	.sdiv = 0x2,	.nsdiv = 0 },	/* 28.320  MHz */
-+	{ .mdiv = 0x1f, .pe = 0x2083,	.sdiv = 0x3,	.nsdiv = 1 },	/* 30.240  MHz */
-+	{ .mdiv = 0x1e, .pe = 0x430d,	.sdiv = 0x3,	.nsdiv = 1 },	/* 31.500  MHz */
-+	{ .mdiv = 0x17, .pe = 0x0,	.sdiv = 0x3,	.nsdiv = 1 },	/* 40.000  MHz */
-+	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x1,	.nsdiv = 0 },	/* 49.500  MHz */
-+	{ .mdiv = 0x13, .pe = 0x6667,	.sdiv = 0x3,	.nsdiv = 1 },	/* 50.000  MHz */
-+	{ .mdiv = 0x10, .pe = 0x1ee6,	.sdiv = 0x3,	.nsdiv = 1 },	/* 57.284  MHz */
-+	{ .mdiv = 0x1d, .pe = 0x3b14,	.sdiv = 0x2,	.nsdiv = 1 },	/* 65.000  MHz */
-+	{ .mdiv = 0x12, .pe = 0x7c65,	.sdiv = 0x1,	.nsdiv = 0 },	/* 71.000  MHz */
-+	{ .mdiv = 0x19, .pe = 0xecd,	.sdiv = 0x2,	.nsdiv = 1 },	/* 74.176  MHz */
-+	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x2,	.nsdiv = 1 },	/* 74.250  MHz */
-+	{ .mdiv = 0x19, .pe = 0x3334,	.sdiv = 0x2,	.nsdiv = 1 },	/* 75.000  MHz */
-+	{ .mdiv = 0x18, .pe = 0x5138,	.sdiv = 0x2,	.nsdiv = 1 },	/* 78.800  MHz */
-+	{ .mdiv = 0x1d, .pe = 0x77d,	.sdiv = 0x0,	.nsdiv = 0 },	/* 85.500  MHz */
-+	{ .mdiv = 0x1c, .pe = 0x13d5,	.sdiv = 0x0,	.nsdiv = 0 },	/* 88.750  MHz */
-+	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108.000 MHz */
-+	{ .mdiv = 0x17, .pe = 0x28f5,	.sdiv = 0x0,	.nsdiv = 0 },	/* 108.108 MHz */
-+	{ .mdiv = 0x10, .pe = 0x6e26,	.sdiv = 0x2,	.nsdiv = 1 },	/* 118.963 MHz */
-+	{ .mdiv = 0x15, .pe = 0x3e63,	.sdiv = 0x0,	.nsdiv = 0 },	/* 119.000 MHz */
-+	{ .mdiv = 0x1c, .pe = 0x471d,	.sdiv = 0x1,	.nsdiv = 1 },	/* 135.000 MHz */
-+	{ .mdiv = 0x19, .pe = 0xecd,	.sdiv = 0x1,	.nsdiv = 1 },	/* 148.352 MHz */
-+	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x1,	.nsdiv = 1 },	/* 148.500 MHz */
-+	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297     MHz */
+-static struct stm_fs fs216c65_rtbl[] = {
++static const struct stm_fs fs216c65_rtbl[] = {
+ 	{ .mdiv = 0x1f, .pe = 0x0,	.sdiv = 0x7,	.nsdiv = 0 },	/* 312.5 Khz */
+ 	{ .mdiv = 0x17, .pe = 0x25ed,	.sdiv = 0x1,	.nsdiv = 0 },	/* 27    MHz */
+ 	{ .mdiv = 0x1a, .pe = 0x7b36,	.sdiv = 0x2,	.nsdiv = 1 },	/* 36.87 MHz */
+@@ -49,13 +49,13 @@ static struct stm_fs fs216c65_rtbl[] = {
+ 	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x1,	.nsdiv = 1 },	/* 108   MHz */
  };
  
- static const struct stm_fs fs660c32_rtbl[] = {
--	{ .mdiv = 0x01, .pe = 0x2aaa,	.sdiv = 0x8,	.nsdiv = 0 },	/* 600   KHz */
--	{ .mdiv = 0x02, .pe = 0x3d33,	.sdiv = 0x0,	.nsdiv = 0 },	/* 148.5 Mhz */
--	{ .mdiv = 0x13, .pe = 0x5bcc,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297   Mhz */
--	{ .mdiv = 0x0e, .pe = 0x1025,	.sdiv = 0x0,	.nsdiv = 1 },	/* 333   Mhz */
--	{ .mdiv = 0x0b, .pe = 0x715f,	.sdiv = 0x0,	.nsdiv = 1 },	/* 350   Mhz */
-+	{ .mdiv = 0x14, .pe = 0x376b,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.175  MHz */
-+	{ .mdiv = 0x14, .pe = 0x30c3,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.200  MHz */
-+	{ .mdiv = 0x10, .pe = 0x71c7,	.sdiv = 0x4,	.nsdiv = 1 },	/* 27.000  MHz */
-+	{ .mdiv = 0x00, .pe = 0x47af,	.sdiv = 0x3,	.nsdiv = 0 },	/* 27.027  MHz */
-+	{ .mdiv = 0x0e, .pe = 0x4e1a,	.sdiv = 0x4,	.nsdiv = 1 },	/* 28.320  MHz */
-+	{ .mdiv = 0x0b, .pe = 0x534d,	.sdiv = 0x4,	.nsdiv = 1 },	/* 30.240  MHz */
-+	{ .mdiv = 0x17, .pe = 0x6fbf,	.sdiv = 0x2,	.nsdiv = 0 },	/* 31.500  MHz */
-+	{ .mdiv = 0x01, .pe = 0x0,	.sdiv = 0x4,	.nsdiv = 1 },	/* 40.000  MHz */
-+	{ .mdiv = 0x15, .pe = 0x2aab,	.sdiv = 0x3,	.nsdiv = 1 },	/* 49.500  MHz */
-+	{ .mdiv = 0x14, .pe = 0x6666,	.sdiv = 0x3,	.nsdiv = 1 },	/* 50.000  MHz */
-+	{ .mdiv = 0x1d, .pe = 0x395f,	.sdiv = 0x1,	.nsdiv = 0 },	/* 57.284  MHz */
-+	{ .mdiv = 0x08, .pe = 0x4ec5,	.sdiv = 0x3,	.nsdiv = 1 },	/* 65.000  MHz */
-+	{ .mdiv = 0x05, .pe = 0x1770,	.sdiv = 0x3,	.nsdiv = 1 },	/* 71.000  MHz */
-+	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x3,	.nsdiv = 1 },	/* 74.176  MHz */
-+	{ .mdiv = 0x0f, .pe = 0x3426,	.sdiv = 0x1,	.nsdiv = 0 },	/* 74.250  MHz */
-+	{ .mdiv = 0x0e, .pe = 0x7777,	.sdiv = 0x1,	.nsdiv = 0 },	/* 75.000  MHz */
-+	{ .mdiv = 0x01, .pe = 0x4053,	.sdiv = 0x3,	.nsdiv = 1 },	/* 78.800  MHz */
-+	{ .mdiv = 0x09, .pe = 0x15b5,	.sdiv = 0x1,	.nsdiv = 0 },	/* 85.500  MHz */
-+	{ .mdiv = 0x1b, .pe = 0x3f19,	.sdiv = 0x2,	.nsdiv = 1 },	/* 88.750  MHz */
-+	{ .mdiv = 0x10, .pe = 0x71c7,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108.000 MHz */
-+	{ .mdiv = 0x00, .pe = 0x47af,	.sdiv = 0x1,	.nsdiv = 0 },	/* 108.108 MHz */
-+	{ .mdiv = 0x0c, .pe = 0x3118,	.sdiv = 0x2,	.nsdiv = 1 },	/* 118.963 MHz */
-+	{ .mdiv = 0x0c, .pe = 0x2f54,	.sdiv = 0x2,	.nsdiv = 1 },	/* 119.000 MHz */
-+	{ .mdiv = 0x07, .pe = 0xe39,	.sdiv = 0x2,	.nsdiv = 1 },	/* 135.000 MHz */
-+	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x2,	.nsdiv = 1 },	/* 148.352 MHz */
-+	{ .mdiv = 0x0f, .pe = 0x3426,	.sdiv = 0x0,	.nsdiv = 0 },	/* 148.500 MHz */
-+	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x1,	.nsdiv = 1 },	/* 296.704 MHz */
-+	{ .mdiv = 0x03, .pe = 0x471c,	.sdiv = 0x1,	.nsdiv = 1 },	/* 297.000 MHz */
-+	{ .mdiv = 0x00, .pe = 0x295f,	.sdiv = 0x1,	.nsdiv = 1 },	/* 326.700 MHz */
-+	{ .mdiv = 0x1f, .pe = 0x3633,	.sdiv = 0x0,	.nsdiv = 1 },	/* 333.000 MHz */
-+	{ .mdiv = 0x1c, .pe = 0x0,	.sdiv = 0x0,	.nsdiv = 1 },	/* 352.000 Mhz */
+-static struct stm_fs fs432c65_rtbl[] = {
++static const struct stm_fs fs432c65_rtbl[] = {
+ 	{ .mdiv = 0x1f, .pe = 0x0,	.sdiv = 0x7,	.nsdiv = 0 },	/* 625   Khz */
+ 	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108   MHz */
+ 	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297   MHz */
  };
  
- struct clkgen_quadfs_data {
+-static struct stm_fs fs660c32_rtbl[] = {
++static const struct stm_fs fs660c32_rtbl[] = {
+ 	{ .mdiv = 0x01, .pe = 0x2aaa,	.sdiv = 0x8,	.nsdiv = 0 },	/* 600   KHz */
+ 	{ .mdiv = 0x02, .pe = 0x3d33,	.sdiv = 0x0,	.nsdiv = 0 },	/* 148.5 Mhz */
+ 	{ .mdiv = 0x13, .pe = 0x5bcc,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297   Mhz */
+@@ -82,9 +82,9 @@ struct clkgen_quadfs_data {
+ 	struct clkgen_field nsdiv[QUADFS_MAX_CHAN];
+ 
+ 	const struct clk_ops *pll_ops;
+-	struct stm_fs *rtbl;
++	const struct stm_fs *rtbl;
+ 	u8 rtbl_cnt;
+-	int  (*get_rate)(unsigned long , struct stm_fs *,
++	int  (*get_rate)(unsigned long , const struct stm_fs *,
+ 			unsigned long *);
+ };
+ 
+@@ -94,11 +94,11 @@ static const struct clk_ops st_quadfs_fs216c65_ops;
+ static const struct clk_ops st_quadfs_fs432c65_ops;
+ static const struct clk_ops st_quadfs_fs660c32_ops;
+ 
+-static int clk_fs216c65_get_rate(unsigned long, struct stm_fs *,
++static int clk_fs216c65_get_rate(unsigned long, const struct stm_fs *,
+ 		unsigned long *);
+-static int clk_fs432c65_get_rate(unsigned long, struct stm_fs *,
++static int clk_fs432c65_get_rate(unsigned long, const struct stm_fs *,
+ 		unsigned long *);
+-static int clk_fs660c32_dig_get_rate(unsigned long, struct stm_fs *,
++static int clk_fs660c32_dig_get_rate(unsigned long, const struct stm_fs *,
+ 		unsigned long *);
+ /*
+  * Values for all of the standalone instances of this clock
+@@ -106,7 +106,7 @@ static int clk_fs660c32_dig_get_rate(unsigned long, struct stm_fs *,
+  * that the individual channel standby control bits (nsb) are in the
+  * first register along with the PLL control bits.
+  */
+-static struct clkgen_quadfs_data st_fs216c65_416 = {
++static const struct clkgen_quadfs_data st_fs216c65_416 = {
+ 	/* 416 specific */
+ 	.npda	= CLKGEN_FIELD(0x0, 0x1, 14),
+ 	.nsb	= { CLKGEN_FIELD(0x0, 0x1, 10),
+@@ -143,7 +143,7 @@ static struct clkgen_quadfs_data st_fs216c65_416 = {
+ 	.get_rate	= clk_fs216c65_get_rate,
+ };
+ 
+-static struct clkgen_quadfs_data st_fs432c65_416 = {
++static const struct clkgen_quadfs_data st_fs432c65_416 = {
+ 	.npda	= CLKGEN_FIELD(0x0, 0x1, 14),
+ 	.nsb	= { CLKGEN_FIELD(0x0, 0x1, 10),
+ 		    CLKGEN_FIELD(0x0, 0x1, 11),
+@@ -179,7 +179,7 @@ static struct clkgen_quadfs_data st_fs432c65_416 = {
+ 	.get_rate	= clk_fs432c65_get_rate,
+ };
+ 
+-static struct clkgen_quadfs_data st_fs660c32_E_416 = {
++static const struct clkgen_quadfs_data st_fs660c32_E_416 = {
+ 	.npda	= CLKGEN_FIELD(0x0, 0x1, 14),
+ 	.nsb	= { CLKGEN_FIELD(0x0, 0x1, 10),
+ 		    CLKGEN_FIELD(0x0, 0x1, 11),
+@@ -215,7 +215,7 @@ static struct clkgen_quadfs_data st_fs660c32_E_416 = {
+ 	.get_rate	= clk_fs660c32_dig_get_rate,
+ };
+ 
+-static struct clkgen_quadfs_data st_fs660c32_F_416 = {
++static const struct clkgen_quadfs_data st_fs660c32_F_416 = {
+ 	.npda	= CLKGEN_FIELD(0x0, 0x1, 14),
+ 	.nsb	= { CLKGEN_FIELD(0x0, 0x1, 10),
+ 		    CLKGEN_FIELD(0x0, 0x1, 11),
+@@ -650,7 +650,7 @@ static int quadfs_fsynth_is_enabled(struct clk_hw *hw)
+ 
+ #define P15			(uint64_t)(1 << 15)
+ 
+-static int clk_fs216c65_get_rate(unsigned long input, struct stm_fs *fs,
++static int clk_fs216c65_get_rate(unsigned long input, const struct stm_fs *fs,
+ 		unsigned long *rate)
+ {
+ 	uint64_t res;
+@@ -670,7 +670,7 @@ static int clk_fs216c65_get_rate(unsigned long input, struct stm_fs *fs,
+ 	return 0;
+ }
+ 
+-static int clk_fs432c65_get_rate(unsigned long input, struct stm_fs *fs,
++static int clk_fs432c65_get_rate(unsigned long input, const struct stm_fs *fs,
+ 		unsigned long *rate)
+ {
+ 	uint64_t res;
+@@ -693,7 +693,7 @@ static int clk_fs432c65_get_rate(unsigned long input, struct stm_fs *fs,
+ #define P20		(uint64_t)(1 << 20)
+ 
+ static int clk_fs660c32_dig_get_rate(unsigned long input,
+-				struct stm_fs *fs, unsigned long *rate)
++				const struct stm_fs *fs, unsigned long *rate)
+ {
+ 	unsigned long s = (1 << fs->sdiv);
+ 	unsigned long ns;
+@@ -749,7 +749,7 @@ static long quadfs_find_best_rate(struct clk_hw *hw, unsigned long drate,
+ {
+ 	struct st_clk_quadfs_fsynth *fs = to_quadfs_fsynth(hw);
+ 	int (*clk_fs_get_rate)(unsigned long ,
+-				struct stm_fs *, unsigned long *);
++				const struct stm_fs *, unsigned long *);
+ 	struct stm_fs prev_params;
+ 	unsigned long prev_rate, rate = 0;
+ 	unsigned long diff_rate, prev_diff_rate = ~0;
+@@ -793,7 +793,7 @@ static unsigned long quadfs_recalc_rate(struct clk_hw *hw,
+ 	unsigned long rate = 0;
+ 	struct stm_fs params;
+ 	int (*clk_fs_get_rate)(unsigned long ,
+-				struct stm_fs *, unsigned long *);
++				const struct stm_fs *, unsigned long *);
+ 
+ 	clk_fs_get_rate = fs->data->get_rate;
+ 
 -- 
 1.9.1
