@@ -1,42 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 15 Jul 2014 17:19:37 +0400
-Subject: [PATCH 4/4] ARM: shmobile: sh73a0: add SCI clock support for
- DT
-In-Reply-To: <ff4ce48e1f163d945c037c1c90ce12950961d91d.1405398284.git.horms+renesas@verge.net.au>
-References: <cover.1405398284.git.horms+renesas@verge.net.au>
- <ff4ce48e1f163d945c037c1c90ce12950961d91d.1405398284.git.horms+renesas@verge.net.au>
-Message-ID: <53C52A69.7080808@cogentembedded.com>
+From: afenkart@gmail.com (Andreas Fenkart)
+Date: Tue, 15 Jul 2014 15:25:17 +0200
+Subject: mwifiex card reset
+In-Reply-To: <CAD=FV=Xi5B2=tssgQSgjeKtYVcw-x9pS6Ci580M6OfroPCb+RA@mail.gmail.com>
+References: <CALtMJEBWPM+75wxM2Mp5EX_o6NWtZUJdYRCv6psbvdUn4k295w@mail.gmail.com>
+ <20140628052220.GG10407@us.netrek.org>
+ <20140628072322.GC7410@atomide.com>
+ <CALtMJED5vfgkAhMBXKaDP6u9U9n41c-wziyTxt6e_7XTSxG3oQ@mail.gmail.com>
+ <20140630061912.GA2461@atomide.com> <53B1BAC1.3090902@zonque.org>
+ <477F20668A386D41ADCC57781B1F70430FE5F37540@SC-VEXCH1.marvell.com>
+ <20140701065721.GM24891@us.netrek.org>
+ <CA+NduCAuRFTQneJUBiKP2Aeq2HCxe71yxg_iDDStkNvhzRg-Rg@mail.gmail.com>
+ <CAD=FV=Xi5B2=tssgQSgjeKtYVcw-x9pS6Ci580M6OfroPCb+RA@mail.gmail.com>
+Message-ID: <CALtMJEBWVgxbc+Kqna41EBSc8Rwn=jFO-3BNjNWibvp6EQvAUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+2014-07-01 17:09 GMT+02:00 Doug Anderson <dianders@chromium.org>:
+> +Olof who posted the patch that Yuvaraj referenced.
+>
+> On Tue, Jul 1, 2014 at 5:20 AM, Yuvaraj Cd <yuvaraj.lkml@gmail.com> wrote:
+>> On Tue, Jul 1, 2014 at 12:27 PM, James Cameron <quozl@laptop.org> wrote:
+>>> On Mon, Jun 30, 2014 at 11:44:29PM -0700, Bing Zhao wrote:
+>>>> I may have missed something, but doesn't the MMC_POWER_OFF and
+>>>> MMC_POWER_ON|UP handling in controller driver help?
+>>>> Anyway the clocks/GPIOs/regulators are sort of platform
+>>>> dependent. Would it be better putting it in /arch/arm/mach-xxxxx/?
+>>>
+>>> Wouldn't device tree for mmc be better?
+>> I have come across same problem.Below is the thread in which more
+>> discussions happened on this.
+>>  http://patchwork.ozlabs.org/patch/312444/
+>> I am adding few more those who are interested in this solution.
+>
+> Thanks to Yuvaraj for referencing the old thread.
 
-On 07/15/2014 01:16 PM, Simon Horman wrote:
+http://www.spinics.net/lists/linux-mmc/msg26564.html
 
-> This will be used when initialising SCI devices using DT
-> until common clock framework support is added.
+Quite a read indeed
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/mach-shmobile/clock-sh73a0.c | 9 +++++++++
->   1 file changed, 9 insertions(+)
+Meanwhile I got a working prototype for omap_hsmmc/mwifiex based on this series:
+http://www.spinics.net/lists/linux-mmc/msg27228.html
 
-> diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-> index 0d9cd1f..4990e03 100644
-> --- a/arch/arm/mach-shmobile/clock-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-> @@ -638,16 +638,25 @@ static struct clk_lookup lookups[] = {
->   	CLKDEV_DEV_ID("e6820000.i2c", &mstp_clks[MSTP116]), /* I2C0 */
->   	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.0", &mstp_clks[MSTP100]), /* LCDC0 */
->   	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP219]), /* SCIFA7 */
-> +	CLKDEV_DEV_ID("e6cd0000.serial", &mstp_clks[MSTP219]), /* SCIFA7 */
->   	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]), /* SY-DMAC */
->   	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP217]), /* MP-DMAC */
->   	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
-> +	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
->   	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
-> +	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-
-    Eh, are you sure there should be "0x"?
-
-WBR, Sergei
+I will post my patches, once the FDT format is set in stone, and Ulf
+has had some time to work on v2 of his series.
