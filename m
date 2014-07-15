@@ -1,30 +1,116 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 15 Jul 2014 17:09:22 -0600
-Subject: [PATCH 0/2] Fix GPL v2 license string typos
-In-Reply-To: <20140715225503.22578.32174.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20140715225503.22578.32174.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAErSpo4nVjnu_fmFa1M5eZmu+fFfb=xcyd2meHYZ=JkAs2qzuw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Jul 2014 08:35:50 +0900
+Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
+In-Reply-To: <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
+References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>	<CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>	<53A12EA3.5010007@samsung.com>	<CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>	<CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>	<53BC0F8F.4010106@samsung.com>	<CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
+ <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
+Message-ID: <53C5BAD6.5030603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 4:56 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> Thierry posted similar patches for tegra and mvebu.  These change the rest
-> of the occurrences in drivers/pci from:
+On 07/14/14 18:09, Rahul Sharma wrote:
+> Hi Kukjin,
 >
->   -MODULE_LICENSE("GPLv2");
->   +MODULE_LICENSE("GPL v2");
+Hi Rahul,
 
-I should have done the research earlier, but the relevant code that
-checks these strings is license_is_gpl_compatible().  That looks for
-"GPL v2" but not "GPLv2".
+> Please consider this patch for your branch. This patch is important
+> for Display for Exynos5 boards.
+>
+OK, I will take this for exynos5420 display for 3.17...BTW I'm not sure 
+this is a regression for 3.16 or not...if so, please let me know.
 
-> ---
+Thanks,
+Kukjin
+
+> Regards,
+> Rahul Sharma.
 >
-> Bjorn Helgaas (2):
->       PCI: generic: Fix GPL v2 license string typo
->       PCI: rcar: Fix GPL v2 license string typo
->
->
->  drivers/pci/host/pci-host-generic.c |    2 +-
->  drivers/pci/host/pcie-rcar.c        |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+> On 9 July 2014 17:00, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
+>> Hi Tomasz,
+>>
+>> On 8 July 2014 21:04, Tomasz Figa<t.figa@samsung.com>  wrote:
+>>> Hi Rahul,
+>>>
+>>> On 07.07.2014 15:37, Rahul Sharma wrote:
+>>>> Hi Andrej, Inki,
+>>>>
+>>>> On 18 June 2014 12:06, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
+>>>>> Hi Andrej,
+>>>>>
+>>>>> On 18 June 2014 11:46, Andrzej Hajda<a.hajda@samsung.com>  wrote:
+>>>>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
+>>>>>>> Hi All,
+>>>>>>>
+>>>>>>> Please review this patch.
+>>>>>>>
+>>>>>>> Regards,
+>>>>>>> Rahul Sharma
+>>>>>>>
+>>>>>>> On 9 June 2014 16:58, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
+>>>>>>>> Display domain is removed due to instability issues. Explaining
+>>>>>>>> the problem below:
+>>>>>>>>
+>>>>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
+>>>>>>>> powers off the unused power domains. This call hits before
+>>>>>>>> the trigger to deferred probes.
+>>>>>>>>
+>>>>>>>> DRM DP Panel defers the probe due to supply get failure. By the
+>>>>>>>> time, deferred probe is scheduled again, Display Power Domain is
+>>>>>>>> powered off by pm_genpd_poweroff_unused.
+>>>>>>>>
+>>>>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
+>>>>>>>> callbacks. If display domain is enabled/disabled around register
+>>>>>>>> accesses, display domain gets unstable and we are getting Power
+>>>>>>>> Domain Disable fail notification. Increasing the Timeout also
+>>>>>>>> didn't help.
+>>>>>>
+>>>>>> As I understand the problem is that fimd and dp drivers access hw
+>>>>>> registers without enabling power domain. So the proper solution is to
+>>>>>> fix these drivers.
+>>>>>
+>>>>> That is also a problem but I fixed those accesses in my local kernel before
+>>>>> hitting this issue. If we do register accesses in FIMD/DP probe/bind we
+>>>>> observes "Prefetch abort" exception. But here the problem is that 'DP
+>>>>> domain disable' starts failing if we enable/disable multiple times.
+>>>>>
+>>>>>>
+>>>>>> Btw. there are already patches removing hw access from probe/bind of
+>>>>>> fimd. I guess removing also hw access from dp probe/bind could be a good
+>>>>>> solution.
+>>>>>
+>>>>> Please let me know the links for posted patches. I will test with those patches.
+>>>>
+>>>> Is there any update on this? Please share the patches which fixes the
+>>>> above issue or avoid the above scenario of multiple PM Domain enable/disable.
+>>>> I will test them for exynos5 based boards. Otherwise we should get this change
+>>>> merged else display will remain broken for exynos5 based boards.
+>>>
+>>> Andrzej is on holidays right now, so he won't be able to reply in this
+>>> thread until he's back. Here are two patches I was able to find on the
+>>> related MLs that might be fixing the cause of your issues:
+>>
+>> Ok. thanks for the update.
+>>
+>> We should test with Ajay's patches which includes DP probe deferring
+>> based on availability of bridge chip. +
+>>
+>> few patches which cleanup register access in FIMD and DP probe/bind
+>> OR
+>> few patches to enable Display power domain and clocks just before the
+>> register access. As done in https://lkml.org/lkml/2014/7/4/188.
+>>
+>> Later solution results into display power domain enable failure in case of DRM
+>> probe defer.
+>>
+>> I am just curious if Andrej has some solution for the first approach which can
+>> be tested for defer probe and S2R scenarios.
+>>
+>> Regards,
+>> Rahul Sharma.
+>>
+>>>
+>>> [PATCH] drm/exynos: remove hardware overlays disable from fimd probe
+>>> (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
+>>>
+>>> [PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
+>>> (https://lkml.org/lkml/2014/7/4/188)
