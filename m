@@ -1,60 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Jul 2014 10:09:40 +0100
-Subject: [PATCH v8 9/9] pci: Remap I/O bus resources into CPU space with
- pci_remap_iospace()
-In-Reply-To: <7345495.UDsgOtKzyQ@wuerfel>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-10-git-send-email-Liviu.Dudau@arm.com>
- <20140714165443.GI1112@arm.com> <7345495.UDsgOtKzyQ@wuerfel>
-Message-ID: <20140715090939.GA18203@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Jul 2014 11:10:02 +0200
+Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly,
+ not through the header
+Message-ID: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 07:15:48PM +0100, Arnd Bergmann wrote:
-> On Monday 14 July 2014 17:54:43 Catalin Marinas wrote:
-> > On Tue, Jul 01, 2014 at 07:43:34PM +0100, Liviu Dudau wrote:
-> > > Introduce a default implementation for remapping PCI bus I/O resources
-> > > onto the CPU address space. Architectures with special needs may
-> > > provide their own version, but most should be able to use this one.
-> > [...]
-> > > +/**
-> > > + *   pci_remap_iospace - Remap the memory mapped I/O space
-> > > + *   @res: Resource describing the I/O space
-> > > + *   @phys_addr: physical address where the range will be mapped.
-> > > + *
-> > > + *   Remap the memory mapped I/O space described by the @res
-> > > + *   into the CPU physical address space. Only architectures
-> > > + *   that have memory mapped IO defined (and hence PCI_IOBASE)
-> > > + *   should call this function.
-> > > + */
-> > > +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> > > +{
-> > > +     int err = -ENODEV;
-> > > +
-> > > +#ifdef PCI_IOBASE
-> > > +     if (!(res->flags & IORESOURCE_IO))
-> > > +             return -EINVAL;
-> > > +
-> > > +     if (res->end > IO_SPACE_LIMIT)
-> > > +             return -EINVAL;
-> > > +
-> > > +     err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
-> > > +                             res->end + 1 + (unsigned long)PCI_IOBASE,
-> > > +                             phys_addr, __pgprot(PROT_DEVICE_nGnRE));
-> > 
-> > Except that PROT_DEVICE_nGnRE is arm64 only. I think that's a function
-> > that should remain arch specific.
-> > 
-> 
-> How about #defining a macro with the correct pgprot value in asm/pci.h
-> or asm/pgtable.h?
-> We can provide a default for that in another architecture independent
-> location.
+After the EFI stub has done its business, it jumps into the kernel by branching
+to offset #0 of the loaded Image, which is where it expects to find the header
+containing a 'branch to stext' instruction.
+However, the header is not covered by any PE/COFF section, so the header may
+not actually be loaded at the expected offset. So instead, jump to 'stext'
+directly, which is at the base of the PE/COFF .text section.
 
-That should work. We already have pgprot_noncached/writecombine in
-asm-generic/pgtable.h which all architectures seem to include. The
-default can be pgprot_noncached and we would invoke it as
-pgprot_device(PAGE_KERNEL).
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi-entry.S |  2 +-
+ arch/arm64/kernel/head.S      | 10 ++++++----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index 619b1dd7bcde..6ef541731d9e 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
+ 	 */
+ 	mov	x20, x0		// DTB address
+ 	ldr	x0, [sp, #16]	// relocated _text address
+-	mov	x21, x0
++	add	x21, x0, #:lo12:stext_offset
+ 
+ 	/*
+ 	 * Flush dcache covering current runtime addresses
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index a2c1195abb7f..78ddae28b090 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -137,6 +137,8 @@ efi_head:
+ #endif
+ 
+ #ifdef CONFIG_EFI
++	.globl	stext_offset
++	.set	stext_offset, stext - efi_head
+ 	.align 3
+ pe_header:
+ 	.ascii	"PE"
+@@ -160,7 +162,7 @@ optional_header:
+ 	.long	0				// SizeOfInitializedData
+ 	.long	0				// SizeOfUninitializedData
+ 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+-	.long	stext - efi_head		// BaseOfCode
++	.long	stext_offset			// BaseOfCode
+ 
+ extra_header_fields:
+ 	.quad	0				// ImageBase
+@@ -177,7 +179,7 @@ extra_header_fields:
+ 	.long	_edata - efi_head		// SizeOfImage
+ 
+ 	// Everything before the kernel image is considered part of the header
+-	.long	stext - efi_head		// SizeOfHeaders
++	.long	stext_offset			// SizeOfHeaders
+ 	.long	0				// CheckSum
+ 	.short	0xa				// Subsystem (EFI application)
+ 	.short	0				// DllCharacteristics
+@@ -222,9 +224,9 @@ section_table:
+ 	.byte	0
+ 	.byte	0        		// end of 0 padding of section name
+ 	.long	_edata - stext		// VirtualSize
+-	.long	stext - efi_head	// VirtualAddress
++	.long	stext_offset		// VirtualAddress
+ 	.long	_edata - stext		// SizeOfRawData
+-	.long	stext - efi_head	// PointerToRawData
++	.long	stext_offset		// PointerToRawData
+ 
+ 	.long	0		// PointerToRelocations (0 for executables)
+ 	.long	0		// PointerToLineNumbers (0 for executables)
 -- 
-Catalin
+1.8.3.2
