@@ -1,70 +1,95 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Tue, 15 Jul 2014 17:50:59 +0530
-Subject: [PATCH 2/3] spi: s3c64xx: validate s3c64xx_spi_csinfo before using
+Date: Tue, 15 Jul 2014 17:51:00 +0530
+Subject: [PATCH 3/3] ARM: DTS: fix the chip select gpios definition in the SPI
+ nodes
 In-Reply-To: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
 References: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1405426860-18404-3-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1405426860-18404-4-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch validates the cs->line (Chip select gpio) and
-struct s3c64xx_spi_csinfo *cs object for both DT and NON-DT
-platforms before using in .setup().
+This patch replaces the "cs-gpio" from "controller-data" node
+as was specified in the old binding and use the standard
+"cs-gpios" property expected by the SPI core as is defined in
+the new binding.
 
-Also, check gpio_is_valid(spi->cs_gpio) in cleanup() before
-freeing up.
+Respective changes are preposed to spi-s3c64xx.c driver.
+@ http://www.spinics.net/lists/linux-samsung-soc/msg32282.html
 
 Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Cc: Doug Anderson <dianders@chromium.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c |   15 ++++-----------
- 1 file changed, 4 insertions(+), 11 deletions(-)
+This change is being reviewed @
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 72bfba6..8971076 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -773,12 +773,6 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
- 	/* The CS line is asserted/deasserted by the gpio pin */
- 	cs->line = spi->cs_gpio;
+http://www.mail-archive.com/devicetree at vger.kernel.org/msg34498.html
+
+ arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts   |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index 636d166..676e6e0 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -168,6 +168,7 @@
+ 	};
  
--	if (!gpio_is_valid(cs->line)) {
--		dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
--		kfree(cs);
--		return ERR_PTR(-EINVAL);
--	}
--
- 	data_np = of_get_child_by_name(slave_np, "controller-data");
- 	if (!data_np) {
- 		dev_err(&spi->dev, "child node 'controller-data' not found\n");
-@@ -805,15 +799,14 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
- 	int err;
+ 	spi_2: spi at 13940000 {
++		cs-gpios = <&gpc1 2 0>;
+ 		status = "okay";
  
- 	sdd = spi_master_get_devdata(spi->master);
--	if (!cs && spi->dev.of_node) {
-+	if (spi->dev.of_node)
- 		cs = s3c64xx_get_slave_ctrldata(spi);
--		spi->controller_data = cs;
--	}
+ 		w25x80 at 0 {
+@@ -178,7 +179,6 @@
+ 			spi-max-frequency = <1000000>;
  
--	if (IS_ERR_OR_NULL(cs)) {
-+	if (IS_ERR_OR_NULL(cs) || !gpio_is_valid(cs->line)) {
- 		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
- 		return -ENODEV;
- 	}
-+	spi->controller_data = cs;
+ 			controller-data {
+-				cs-gpio = <&gpc1 2 0>;
+ 				samsung,spi-feedback-delay = <0>;
+ 			};
  
- 	if (!spi_get_ctldata(spi)) {
- 		/* Request gpio only if cs line is asserted by gpio pins */
-@@ -898,7 +891,7 @@ static void s3c64xx_spi_cleanup(struct spi_device *spi)
- 	struct s3c64xx_spi_driver_data *sdd;
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 7787844..11967f4 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -589,6 +589,7 @@
+ 	spi_1: spi at 13930000 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi1_bus>;
++		cs-gpios = <&gpb 5 0>;
+ 		status = "okay";
  
- 	sdd = spi_master_get_devdata(spi->master);
--	if (spi->cs_gpio) {
-+	if (gpio_is_valid(spi->cs_gpio)) {
- 		gpio_free(spi->cs_gpio);
- 		if (spi->dev.of_node)
- 			kfree(cs);
+ 		s5c73m3_spi: s5c73m3 {
+@@ -596,7 +597,6 @@
+ 			spi-max-frequency = <50000000>;
+ 			reg = <0>;
+ 			controller-data {
+-				cs-gpio = <&gpb 5 0>;
+ 				samsung,spi-feedback-delay = <2>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index a794a70..0c6433a 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -316,6 +316,7 @@
+ 	};
+ 
+ 	spi_1: spi at 12d30000 {
++		cs-gpios = <&gpa2 5 0>;
+ 		status = "okay";
+ 
+ 		w25q80bw at 0 {
+@@ -326,7 +327,6 @@
+ 			spi-max-frequency = <1000000>;
+ 
+ 			controller-data {
+-				cs-gpio = <&gpa2 5 0>;
+ 				samsung,spi-feedback-delay = <0>;
+ 			};
+ 
 -- 
 1.7.9.5
