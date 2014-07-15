@@ -1,38 +1,243 @@
-From: sassmann@kpanic.de (Stefan Assmann)
-Date: Tue, 15 Jul 2014 14:59:14 +0200
-Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
-In-Reply-To: <20140714181338.GR6800@sirena.org.uk>
-References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
- <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
- <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
- <20140714181338.GR6800@sirena.org.uk>
-Message-ID: <53C525A2.8080609@kpanic.de>
+From: hrhaan@gmail.com (Harro Haan)
+Date: Tue, 15 Jul 2014 15:04:04 +0200
+Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
+In-Reply-To: <53C4F745.3070701@linaro.org>
+References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+ <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+ <CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>
+ <53C4F745.3070701@linaro.org>
+Message-ID: <CAB5oZtBSZJVqyO8GKdKqh0+3=GDkCyuqrAOQhMRxN0JFBnmZ6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.07.2014 20:13, Mark Brown wrote:
-> On Mon, Jul 14, 2014 at 02:05:19PM +0200, Stefan Assmann wrote:
->> On 14.07.2014 14:00, Mark Brown wrote:
+On 15 July 2014 11:41, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> On 14/07/14 14:51, Harro Haan wrote:
+>> On 10 July 2014 10:03, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+>>>
+>>> This patchset makes it possible to use kgdb's NMI infrastructure on ARM
+>>> platforms.
+>>>
+>>> The patches have been previously circulated as part of a large patchset
+>>> mixing together ARM architecture code and driver changes
+>>> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901 ). This
+>>> patchset is dramatically cut down to include only the arch/arm code. The
+>>> driver code (irqchip and tty/serial) will follow when/if the arch code
+>>> is accepted.
+>>>
+>>> The first two patches modify the FIQ infrastructure to allow interrupt
+>>> controller drivers to register callbacks (the fiq_chip structure) to
+>>> manage FIQ routings and to ACK and EOI the FIQ. This makes it possible
+>>> to use FIQ in multi-platform kernels and with recent ARM interrupt
+>>> controllers.
+>>>
+>>
+>> Daniel,
+>>
+>> Thanks for the patches. I have tested the fiq and irq-gic patches on
+>> an i.MX6 (SabreSD board) for a different purpose:
+>> A FIQ timer interrupt at 1 kHz. The TWD watchdog block is used in
+>> timer mode for this (interrupt ID 30). The GIC affinity is set to CPU
+>> core 0 only for this interrupt ID.
+>>
+>> I was surprised by the following behavior:
+>> $ cat /proc/interrupts
+>>            CPU0       CPU1       CPU2       CPU3
+>>  29:       5459       3381       3175       3029       GIC  29  twd
+>>  30:         11          0          0          0       GIC  30  fake-fiq
+>>
+>> Once every few seconds is interrupt ID 30 handled by the regular GIC
+>> handler instead of the FIQ exception path (which causes for example a
+>> bit more latencies). The other thousands of FIQ's are handled by the
+>> FIQ exception path. The problem is also confirmed by the following
+>> stackframe of the Lauterbach tooling:
+>> fake_fiq_handler(irq = 30, ...)
+>> handle_percpu_devid_irq(irq = 30, ...)
+>> generic_handle_irq(irq = 30)
+>> handle_IRQ(irq = 30, ...)
+>> gic_handle_irq
+>> __irq_svc
+>> -->exception
+>>
+>> Notes:
+>> - The problem will occur more often by executing the following command:
+>>   $ while true; do hackbench 20; done &
+>> - Reading the GIC_CPU_INTACK register returns the interrupt ID of the
+>> highest priority pending interrupt.
+>> - The GIC_CPU_INTACK register (used by fiq_ack) will return spurious
+>> interrupt ID 0x3FF when read in fake_fiq_handler, because
+>> GIC_CPU_INTACK is already read by gic_handle_irq.
+>> - The FIQ exception will not occur anymore after gic_handle_irq
+>> read/acknowledges the FIQ by reading the GIC_CPU_INTACK register
+>>
+>> From the behavior above I conclude that the GIC_CPU_INTACK register is
+>> first updated before the FIQ exception is generated, so there is a
+>> small period of time that gic_handle_irq can read/acknowledge the FIQ.
 >
->>> No, you need to implement clocks using the clock API.  Please read the
->>> changelogs for the above commits...
+> Makes sense.
 >
->> Yes, that's what I expected. Got any pointers for me how to do this?
->> Never done that before, a little help would be appreciated.
+> Avoiding this problem on GICv2 is easy (thanks to the aliased intack
+> register) but on iMX.6 we have only a GICv1.
 >
-> There should be plenty of examples in drivers/clk?
+>
+>> I can reduce the number of occurrences (not prevent it) by adding the
+>> following hack to irq-gic.c
+>> @@ -297,10 +309,12 @@ static asmlinkage void __exception_irq_entry
+>> gic_handle_irq(struct pt_regs *regs
+>>   u32 irqstat, irqnr;
+>>   struct gic_chip_data *gic = &gic_data[0];
+>>   void __iomem *cpu_base = gic_data_cpu_base(gic);
+>>
+>>   do {
+>> + while(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_PENDING_SET)
+>> & (1 << 30))
+>> +   printk(KERN_ERR "TEMP: gic_handle_irq: wait for FIQ exception\n");
+>>   irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+>>   irqnr = irqstat & ~0x1c00;
+>
+> I've made a more complete attempt to fix this. Could you test the
+> following? (and be prepared to fuzz the line numbers)
 
-Looking at this more closely it seems to me that it's a regulator thing
-after all. In the end it all boils down to a single register write.
-twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x41, 0x8e);
-This is a write to the CLK32KG_CFG_STATE [1] register to power on the
-device.
+Thanks Daniel, I have tested it, see the comments below.
 
-I tried moving that to omap4xxx_dt_clk_init() but that won't work
-because the twl core structures aren't initialized yet.
+>
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 73ae896..309bf2c 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -303,6 +303,28 @@ static int gic_set_wake(struct irq_data *d,
+> unsigned int on)
+>  #define gic_set_wake   NULL
+>  #endif
+>
+> +/* Check for group 0 interrupt spuriously acked as a normal IRQ. This
+> + * workaround will only work for level triggered interrupts (and in
+> + * its current form is actively harmful on systems that don't support
+> + * FIQ).
+> + */
+> +static u32 gic_handle_spurious_group_0(struct gic_chip_data *gic, u32
+> irqstat)
+> +{
+> +       u32 irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+> +
+> +       if (!gic_data_fiq_enable(gic) || irqnr >= 1021)
+> +               return irqnr;
+> +
+> +       if (readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_IGROUP +
+> +                         (irqnr / 32 * 4)) &
+> +           BIT(irqnr % 32))
+> +               return irqnr;
+> +
+> +       /* this interrupt was spurious (needs to be handled as FIQ) */
+> +       writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
 
-Any suggestions?
+This will NOT work, because of the note I mentioned above:
+"The FIQ exception will not occur anymore after gic_handle_irq
+read/acknowledges the FIQ by reading the GIC_CPU_INTACK register"
+So with this code you will say End Of Interrupt at the GIC level,
+without actually handling the interrupt, so you are missing an
+interrupt.
+I did the following test to confirm the missing interrupt:
+I have changed the periodic timer interrupt by an one-shot timer
+interrupt. The one-shot timer interrupt is programmed by the FIQ
+handler for the next FIQ interrupt. As expected: When the problem
+occurs, no more FIQ interrupts are generated.
 
-   Stefan
+> +       return 1023;
+> +}
+> +
+>  static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>  {
+>         u32 irqstat, irqnr;
+> @@ -310,8 +332,10 @@ static void __exception_irq_entry
+> gic_handle_irq(struct pt_regs *regs)
+>         void __iomem *cpu_base = gic_data_cpu_base(gic);
+>
+>         do {
+> +               local_fiq_disable();
 
-[1] http://www.cjemicros.f2s.com/public/datasheets/TWL6030_Register_Map.pdf page 196
+It is a bit weird to disable the "Non-Maskable Interrupt" at every
+interrupt, because of a problem that occurs once every few thousand
+interrupts
+
+>                 irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+> -               irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+> +               irqnr = gic_handle_spurious_group_0(gic, irqstat);
+> +               local_fiq_enable();
+>
+>                 if (likely(irqnr > 15 && irqnr < 1021)) {
+>                         irqnr = irq_find_mapping(gic->domain, irqnr);
+
+
+The following type of changes could fix the problem for me:
+
+@@ -290,19 +290,66 @@ static int gic_set_wake(struct irq_data *d,
+unsigned int on)
+
+ #else
+ #define gic_set_wake NULL
+ #endif
+
++extern void (*fiq_handler)(void);
++
++/* Check for group 0 interrupt spuriously acked as a normal IRQ. This
++ * workaround will only work for level triggered interrupts (and in
++ * its current form is actively harmful on systems that don't support
++ * FIQ).
++ */
++static u32 gic_handle_spurious_group_0(struct gic_chip_data *gic, u32 irqstat)
++{
++ u32 irqnr = irqstat & ~0x1c00;
++
++ if (!gic_data_fiq_enable(gic) || irqnr >= 1021)
++ return irqnr;
++
++ if (readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_IGROUP +
++  (irqnr / 32 * 4)) & BIT(irqnr % 32))
++ return irqnr;
++
++ /*
++ * The FIQ should be disabled before the next FIQ interrupt occurs,
++ * so this only works when the next FIQ interrupt is not "too fast"
++ * after the previous one.
++ */
++ local_fiq_disable();
++
++ /*
++ * Notes:
++ * - The FIQ exception will not occur anymore for this current
++ *   interrupt, because gic_handle_irq has already read/acknowledged
++ *   the GIC_CPU_INTACK register. So handle the FIQ here.
++ * - The fiq_handler below should not call ack_fiq and eoi_fiq,
++ *   because rereading the GIC_CPU_INTACK register returns spurious
++ *   interrupt ID 0x3FF. So probably you will have to add sometime like
++ *   the following to fiq_handler:
++ *   u32 cpsr, irqstat;
++ *   __asm__("mrs %0, cpsr" : "=r" (cpsr));
++ *   if ((cpsr & MODE_MASK) == FIQ_MODE)
++ *   irqstat = ack_fiq();
++ */
++ (*fiq_handler)();
++
++ writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
++ local_fiq_enable();
++
++ return 1023;
++}
++
+ static asmlinkage void __exception_irq_entry gic_handle_irq(struct
+pt_regs *regs)
+ {
+  u32 irqstat, irqnr;
+  struct gic_chip_data *gic = &gic_data[0];
+  void __iomem *cpu_base = gic_data_cpu_base(gic);
+
+  do {
+  irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+- irqnr = irqstat & ~0x1c00;
++ irqnr = gic_handle_spurious_group_0(gic, irqstat);
+
+  if (likely(irqnr > 15 && irqnr < 1021)) {
+
+Regards,
+
+Harro
