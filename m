@@ -1,34 +1,155 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 15 Jul 2014 15:42:31 -0700
-Subject: [PATCH 2/2] clk: qcom: mdp_lut_clk is a child of mdp_src
+Date: Tue, 15 Jul 2014 15:42:30 -0700
+Subject: [PATCH 1/2] clk: qcom: Fix PLL rate configurations
 In-Reply-To: <1405464151-16152-1-git-send-email-sboyd@codeaurora.org>
 References: <1405464151-16152-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1405464151-16152-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1405464151-16152-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mdp_lut_clk isn't a child of the mdp_clk. Instead it's the
-child of the mdp_src clock. Fix it.
+Sometimes we need to program PLLs with a fixed rate
+configuration during driver probe. Doing this after we register
+the PLLs with the clock framework causes the common clock
+framework to assume the rate of the PLLs are 0. This causes all
+sorts of problems for rate recalculations because the common
+clock framework caches the rate once at registration time unless
+a flag is set to always recalculate the rates.
 
-Fixes: 6d00b56fe "clk: qcom: Add support for MSM8960's multimedia clock controller (MMCC)"
+Split the qcom_cc_probe() function into two pieces, map and
+everything else, so that drivers which need to configure some
+PLL rates or otherwise twiddle bits in the clock controller can
+do so before registering clocks. This allows us to properly
+detect the rates of PLLs that are programmed at boot.
+
+Fixes: 49fc825f0cc2 "clk: qcom: Consolidate common probe code"
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/mmcc-msm8960.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/qcom/common.c       | 39 ++++++++++++++++++++++++++++-----------
+ drivers/clk/qcom/common.h       |  6 ++++++
+ drivers/clk/qcom/mmcc-msm8974.c | 10 ++++------
+ 3 files changed, 38 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-index b050433af38e..7985982ab4e9 100644
---- a/drivers/clk/qcom/mmcc-msm8960.c
-+++ b/drivers/clk/qcom/mmcc-msm8960.c
-@@ -1117,7 +1117,7 @@ static struct clk_branch mdp_lut_clk = {
- 		.enable_reg = 0x016c,
- 		.enable_mask = BIT(0),
- 		.hw.init = &(struct clk_init_data){
--			.parent_names = (const char *[]){ "mdp_clk" },
-+			.parent_names = (const char *[]){ "mdp_src" },
- 			.num_parents = 1,
- 			.name = "mdp_lut_clk",
- 			.ops = &clk_branch_ops,
+diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+index 9b5a1cfc6b91..eeb3eea01f4c 100644
+--- a/drivers/clk/qcom/common.c
++++ b/drivers/clk/qcom/common.c
+@@ -27,30 +27,35 @@ struct qcom_cc {
+ 	struct clk *clks[];
+ };
+ 
+-int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
++struct regmap *
++qcom_cc_map(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+ {
+ 	void __iomem *base;
+ 	struct resource *res;
++	struct device *dev = &pdev->dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(base))
++		return ERR_CAST(base);
++
++	return devm_regmap_init_mmio(dev, base, desc->config);
++}
++EXPORT_SYMBOL_GPL(qcom_cc_map);
++
++int qcom_cc_really_probe(struct platform_device *pdev,
++			 const struct qcom_cc_desc *desc, struct regmap *regmap)
++{
+ 	int i, ret;
+ 	struct device *dev = &pdev->dev;
+ 	struct clk *clk;
+ 	struct clk_onecell_data *data;
+ 	struct clk **clks;
+-	struct regmap *regmap;
+ 	struct qcom_reset_controller *reset;
+ 	struct qcom_cc *cc;
+ 	size_t num_clks = desc->num_clks;
+ 	struct clk_regmap **rclks = desc->clks;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
+-
+-	regmap = devm_regmap_init_mmio(dev, base, desc->config);
+-	if (IS_ERR(regmap))
+-		return PTR_ERR(regmap);
+-
+ 	cc = devm_kzalloc(dev, sizeof(*cc) + sizeof(*clks) * num_clks,
+ 			  GFP_KERNEL);
+ 	if (!cc)
+@@ -91,6 +96,18 @@ int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
++
++int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
++{
++	struct regmap *regmap;
++
++	regmap = qcom_cc_map(pdev, desc);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
++
++	return qcom_cc_really_probe(pdev, desc, regmap);
++}
+ EXPORT_SYMBOL_GPL(qcom_cc_probe);
+ 
+ void qcom_cc_remove(struct platform_device *pdev)
+diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
+index 2c3cfc860348..2765e9d3da97 100644
+--- a/drivers/clk/qcom/common.h
++++ b/drivers/clk/qcom/common.h
+@@ -17,6 +17,7 @@ struct platform_device;
+ struct regmap_config;
+ struct clk_regmap;
+ struct qcom_reset_map;
++struct regmap;
+ 
+ struct qcom_cc_desc {
+ 	const struct regmap_config *config;
+@@ -26,6 +27,11 @@ struct qcom_cc_desc {
+ 	size_t num_resets;
+ };
+ 
++extern struct regmap *qcom_cc_map(struct platform_device *pdev,
++				  const struct qcom_cc_desc *desc);
++extern int qcom_cc_really_probe(struct platform_device *pdev,
++				const struct qcom_cc_desc *desc,
++				struct regmap *regmap);
+ extern int qcom_cc_probe(struct platform_device *pdev,
+ 			 const struct qcom_cc_desc *desc);
+ 
+diff --git a/drivers/clk/qcom/mmcc-msm8974.c b/drivers/clk/qcom/mmcc-msm8974.c
+index c65b90515872..bc8f519c47aa 100644
+--- a/drivers/clk/qcom/mmcc-msm8974.c
++++ b/drivers/clk/qcom/mmcc-msm8974.c
+@@ -2547,18 +2547,16 @@ MODULE_DEVICE_TABLE(of, mmcc_msm8974_match_table);
+ 
+ static int mmcc_msm8974_probe(struct platform_device *pdev)
+ {
+-	int ret;
+ 	struct regmap *regmap;
+ 
+-	ret = qcom_cc_probe(pdev, &mmcc_msm8974_desc);
+-	if (ret)
+-		return ret;
++	regmap = qcom_cc_map(pdev, &mmcc_msm8974_desc);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
+ 
+-	regmap = dev_get_regmap(&pdev->dev, NULL);
+ 	clk_pll_configure_sr_hpm_lp(&mmpll1, regmap, &mmpll1_config, true);
+ 	clk_pll_configure_sr_hpm_lp(&mmpll3, regmap, &mmpll3_config, false);
+ 
+-	return 0;
++	return qcom_cc_really_probe(pdev, &mmcc_msm8974_desc, regmap);
+ }
+ 
+ static int mmcc_msm8974_remove(struct platform_device *pdev)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
