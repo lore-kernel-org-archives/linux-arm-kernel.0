@@ -1,85 +1,87 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 15 Jul 2014 09:35:14 +0300
-Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
- gpio block
-In-Reply-To: <53C449A3.2010404@codeaurora.org>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
- <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
- <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
- <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
- <53C095EA.90000@codeaurora.org> <1405346335.13503.25.camel@iivanov-dev>
- <53C449A3.2010404@codeaurora.org>
-Message-ID: <1405406114.13503.40.camel@iivanov-dev>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jul 2014 23:38:30 -0700
+Subject: [PATCH v4 02/11] memory: emif: Move EMIF register defines to
+ include/linux/
+In-Reply-To: <53C41696.6020004@ti.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <1405047349-15101-3-git-send-email-d-gerlach@ti.com>
+ <20140714111222.GB20068@atomide.com> <53C41696.6020004@ti.com>
+Message-ID: <20140715063830.GI20068@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-07-14 at 14:20 -0700, Stephen Boyd wrote:
-> On 07/14/14 06:58, Ivan T. Ivanov wrote:
-> > On Fri, 2014-07-11 at 18:56 -0700, Stephen Boyd wrote:
-> >> On 07/10/14 02:53, Linus Walleij wrote:
-> >>> On Wed, Jul 9, 2014 at 11:18 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
-> >>>> On Wed, Jul 9, 2014 at 1:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >>>>> On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
-> >>>>> <bjorn.andersson@sonymobile.com> wrote:
-> >>>>>
-> >>>>> +- function:
-> >>>>> +       Usage: optional
-> >>>>> +       Value type: <string>
-> >>>>> +       Definition: Specify the alternative function to be configured for the
-> >>>>> +                   specified pins.  Valid values are:
-> >>>>> +                       "normal",
-> >>>>> +                       "paired",
-> >>>>> +                       "func1",
-> >>>>> +                       "func2",
-> >>>>> +                       "dtest1",
-> >>>>> +                       "dtest2",
-> >>>>> +                       "dtest3",
-> >>>>> +                       "dtest4"
-> >>>>> These are a bit ambigous, why doesn't the driver present functions that
-> >>>>> are more specific than "func1", "func2"? Or "dtest1"?
-> >>>> I agree, unfortunately I have only seen traces of the actual function matrix;
-> >>>> for pm8xxx I have no documentation and for pm8x41 they are only listed as
-> >>>> func[1-2] and dtest[1-4].
-> >>>>
-> >>>> Maybe if someone at Qualcomm could release such a list we could provide a
-> >>>> proper table instead.
-> >>> I guess Stephen Boyd can help us. (?)
-> >> Ok. "normal" is pretty much gpio mode, i.e. don't mux anything. "paired"
-> >> is where we take the output of the gpio next to it and loop it back into
-> >> this gpio (and vice versa). So gpio1 is paired with gpio2, gpio 3 is
-> >> paired with gpio 4, etc. This allows us to make level translators by
-> >> choosing different supply voltages for the paired gpios. "func1" and
-> >> "func2" are used for muxing things internally. "dtest" is used to mux
-> >> specific things out for testing purposes, not really used in any
-> >> end-products but still useful while debugging. I can provide the
-> >> function to pin mapping if necessary. There are lots of pmics.
-> > Thank you Stephen. If understand it right, this is more like option for
-> > the pin when it is GPIO. Next generation of PMIC's have support for pin
-> > acting like analog-input/output and current sink.
+* Dave Gerlach <d-gerlach@ti.com> [140714 10:44]:
+> On 07/14/2014 06:12 AM, Tony Lindgren wrote:
+> >* Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
+> >>OMAP4 and AM33XX share the same EMIF controller IP. Although there
+> >>are significant differences in the IP integration due to which
+> >>AM33XX can't reuse the EMIF driver DVFS similar to OMAP4,
+> >>it can definitely benefit by reusing the EMIF related macros
+> >>defined in drivers/memory/emif.h.
+> >>
+> >>In the current OMAP PM framework the PM code resides under
+> >>arch/arm/mach-omap2/. To enable reuse of the register defines move
+> >>the register defines in the emif header file to include/linux so that
+> >>both the EMIF driver and the AM33XX PM code can benefit.
+> >>
+> >>Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> >>Reviewed-by: Russ Dill <russ.dill@ti.com>
+> >>Acked-by: Santosh Shililmar <santosh.shilimkar@ti.com>
+> >>Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >>---
+> >>v3->v4:
+> >>patch unchanged from original:
+> >>	http://www.spinics.net/lists/linux-omap/msg95314.html
+> >>
+> >>  drivers/memory/emif.h   | 543 +---------------------------------------------
+> >>  include/linux/ti_emif.h | 558 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >
+> >So far we've seen that exposing hardware registers like this
+> >will lead into various drivers misusing them. I think a better
+> >solution is to implement few targeted functions that allow
+> >sharing code between the platform idle code and memory driver.
+> >
+> >Maybe you can have the shared functions in in something like
+> >drivers/memory/ti-emif.c that's always built in? The idle
+> >code won't need any of that early on.
 > 
-> Isn't this document only for the gpios? I think you're talking about the
-> MPPs, which also exist on these generation of pmics. We should probably
-> avoid mixing the two (gpios and mpps) in one binding because they're
-> really different hardware.
+> Well the reason it was done this way was to utilize all of the addresses of
+> EMIF register in the ASM sleep code to do relative addressing from the EMIF
+> base address. The ASM sleep code (patch 9) needs to save and restore emif
+> context and set and unset self refresh in emif. The issues will come from
+> the ASM being copied to and running from SRAM without the ability to access
+> code in DDR (because we are shutting the EMIF off), so we would need to copy
+> these functions as well and have to worry about any issues we introduce by
+> relocating c code. Is it worth the added maintenance burden?
 
-I don't know. For me "gpio" looks like function of the pin hardware.
+Ah right it needs to run in SRAM. There were some relocatable
+c code patches posted a while back, so it might be worth
+revisiting that.
 
-> 
-> >  So I will like
-> > to keep "function" property for selecting one of the above functions.
-> > Choosing between "normal", "paired"... options in QPNP pinctrl driver
-> > is supported trough passing values, defined in DT header file, to
-> > "output-high" property. Please don't kill me :-).
-> 
-> Overloading output-high to choose the MPP mode doesn't seem to follow
-> the generic pinconfig binding. Does output-high even take a value? Why
-> can't we use the function property?
+I think it can also be done with assembly with something like
+this:
 
-No, no.  using value of the output-high|low" is just to select
-"normal", "paired"... thing. Function selection is via "function" 
-property. Currently QPNP support following functions "gpio", "mpp-ain",
-"mpp-aout", "mpp-cs".
+1. Make am335x idle code depends on TI_EMIF && WKUP_M3_RPROC
+
+2. Add the memory save and restore assembly functions into
+   drivers/memory/ti-emif-sram.S
+
+3. Allocate the SRAM preferrably with drivers/misc/sram.c
+   instead of the legacy mach-omap2/sram.c
+
+4. Map the idle assembly code and EMIF save and restore
+   functions into SRAM
+
+5. Call the EMIF save and restore functions from the idle
+   assembly code at the SRAM locations and pass the save and
+   restore area in a register
+
+So basically we need to figure out a generic way to do driver
+hooks in the PM idle code even very late and early in the
+assembly code so we can keep most of the code in drivers.
+Eventually also the idle assembly code should be in the drivers
+too..
 
 Regards,
-Ivan
+
+Tony
