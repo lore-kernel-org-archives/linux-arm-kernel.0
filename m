@@ -1,12 +1,13 @@
 From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Tue, 15 Jul 2014 16:01:34 +0530
-Subject: [PATCH v3 2/2] ARM: dts: Add mask-tpm-reset DT node to the
- exynos5800-peach-pi
+Date: Tue, 15 Jul 2014 16:01:33 +0530
+Subject: [PATCH v3 1/2] ARM: dts: Add mask-tpm-reset to the device tree
 In-Reply-To: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
 References: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <1405420294-9323-3-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <1405420294-9323-2-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Doug Anderson <dianders@chromium.org>
 
 The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
 being reset across sleep/wake.  If we don't set it to anything then
@@ -19,26 +20,27 @@ To properly preserve the TPM state across suspend/resume and to make
 the chrome U-Boot happy, properly set the GPIO to mask the
 reset to the TPM.
 
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
 ---
- arch/arm/boot/dts/exynos5800-peach-pi.dts |   12 ++++++++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 28f2a25..0bc97d9 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -209,6 +209,9 @@
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 6c7cab0..c7b2bba 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -211,6 +211,9 @@
  
  
  &pinctrl_0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&mask_tpm_reset>;
 +
- 	max98091_irq: max98091-irq {
+ 	max98090_irq: max98090-irq {
  		samsung,pins = "gpx0-2";
  		samsung,pin-function = <0>;
-@@ -216,6 +219,15 @@
+@@ -218,6 +221,15 @@
  		samsung,pin-drv = <0>;
  	};
  
