@@ -1,72 +1,71 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 15 Jul 2014 14:43:33 +0200
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <20140715142431.4eccbcd6@free-electrons.com>
-References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
- <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
- <20140708102142.0f7fe796@free-electrons.com>
- <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
- <20140715142431.4eccbcd6@free-electrons.com>
-Message-ID: <20140715124333.GF12333@1wt.eu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Jul 2014 13:44:32 +0100
+Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu_1vYA+akR4_fAeTd+p22kt-EfcJHu+9sVBBToUnSO8_Q@mail.gmail.com>
+References: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140715095704.GV26465@leverpostej>
+ <CAKv+Gu_PUJVXbDqp5Y3jdVouWhSqPVzaOi_6bpFM6BaLVrwvTQ@mail.gmail.com>
+ <20140715113138.GZ26465@leverpostej>
+ <CAKv+Gu_1vYA+akR4_fAeTd+p22kt-EfcJHu+9sVBBToUnSO8_Q@mail.gmail.com>
+Message-ID: <20140715124432.GA26465@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Tue, Jul 15, 2014 at 12:49:07PM +0100, Ard Biesheuvel wrote:
+> On 15 July 2014 13:31, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> >> >> index 619b1dd7bcde..6ef541731d9e 100644
+> >> >> --- a/arch/arm64/kernel/efi-entry.S
+> >> >> +++ b/arch/arm64/kernel/efi-entry.S
+> >> >> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
+> >> >>        */
+> >> >>       mov     x20, x0         // DTB address
+> >> >>       ldr     x0, [sp, #16]   // relocated _text address
+> >> >> -     mov     x21, x0
+> >> >> +     add     x21, x0, #:lo12:stext_offset
+> >> >
+> >> > I think we can drop the :lo12: here, which will allow us to have a
+> >> > warning if stext_offset is unexpectedly large (I believe this will
+> >> > currently silently mask bits were that to happen?).
+> >> >
+> >>
+> >> There is no alternative lo12 relocation that errors out when the value
+> >> does not fit, so it would have to use a literal instead.
+> >
+> > Ah, that's a shame. What happens when the value doesn't fit if the
+> > linker / assembler don't error out?
+> >
+> 
+> Obviously, it will jump into the wrong place if stext ever gets pushed
+> beyond a 4k boundary, which is not that likely (current value is
+> 0x160, we may want to up it to 0x200 at some point if we need to
+> increase the PE/COFF section alignment, which some versions of the
+> (poor) PE/COFF documentation say should be 0x200 at the minimum)
+> 
+> However, doing ldr x21, =stext_offset works fine as well
+> 
+> > That sounds like a toolchain bug if they're silently doing the wrong
+> > thing.
+> >
+> 
+> Meh, don't think so, really. You get what you pay for, and :lo12: just
+> isn't supposed to care. (It's mainly used with adrp to get a +/- 4gb
+> PC relative reach)
 
-On Tue, Jul 15, 2014 at 02:24:31PM +0200, Thomas Petazzoni wrote:
-> Dear Maggie Mae Roxas,
-> 
-> On Tue, 8 Jul 2014 23:35:36 -0700, Maggie Mae Roxas wrote:
-> 
-> > As much as we'd like to switch to the latest v3.14.x, we need to stay
-> > at kernel v3.13.9 as that is a hard requirement of our customer (I
-> > think it's because it's the base platform for Ubuntu 14.04 FS which
-> > we'll use).
-> > 
-> > So I applied your patch in our v3.13.9 as suggested:
-> > http://kernel.opensuse.org/cgit/kernel/patch/?id=cd71e246c16b30e3f396a85943d5f596202737ba
-> > 
-> > Unfortunately, issue still exists after we applied it.
-> > 
-> > > Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
-> > network driver:
-> > 
-> > Given this, we tried to replace mvneta.c of our v3.13.9 and replace it
-> > with v3.13.5's mvneta.c.
-> > Issue does not exist when we did that - but of course, we surely will
-> > miss something, so we wanted to confirm this further with you.
-> > It seems like applying cd71e246c16b30e3f396a85943d5f596202737ba in
-> > v3.13.9 is not sufficient enough..?
-> > Possibly there are v3.13.5 and v3.13.9 diff (see attached) needed
-> > apart from just cd71e246c16b30e3f396a85943d5f596202737ba?
-> 
-> Hum, there are indeed more commits than I thought between 3.13.5 and
-> 3.13.9 :
-> 
-> 396b229b683fdc08d8705883860ec5a1b810546a net: mvneta: fix usage as a module on RGMII configurations
-> ea64e1f33d9d627da5d38da035e5d7443276e84e net: mvneta: rename MVNETA_GMAC2_PSC_ENABLE to MVNETA_GMAC2_PCS_ENABLE
-> 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922 net: mvneta: replace Tx timer with a real interrupt
-> 0ce58acf529bacd25dbe01298ff51a5c4d59a4f4 net: mvneta: add missing bit descriptions for interrupt masks and causes
-> 8c2c9b1efcc4b04b4625d0613b9e74ef17016dea net: mvneta: do not schedule in mvneta_tx_timeout
-> 92817335465090aecfde6caef9bab6923f209664 net: mvneta: use per_cpu stats to fix an SMP lock up
-> fbfbed33a5effba7dc6f33e3ed598f9bd31b0cdf net: mvneta: increase the 64-bit rx/tx stats out of the hot path
-> 
-> Willy: many of the patches in this list are yours. The patch "net:
-> mvneta: fix usage as a module on RGMII configurations" is known to
-> break SGMII configurations, but even after reverting it, Maggie Mae
-> reports that mvneta in 3.13.9 doesn't work, but mvneta works on 3.13.5.
-> Do you see any missing patch on the TX rework that you did and that was
-> included betweeen 3.13.5 and 3.13.9 ?
+We appear to have a misunderstanding.
 
-No, everything seems to be there. Additionally, my local development branch
-was actually based on the commits above as it was rebased on v3.13.9.
+I was suggesting we use:
 
-Maggie, do you know if it is possible that for any reason your board
-would not deliver an IRQ on Tx completion ? That could explain things.
-You can easily test reverting commit 4f3a4f701b just in case. If that's
-the case, then the next step will be to figure out how it is possible
-that IRQs are disabled!
+	add	x21, x0, #stext_offset
 
-Regards,
-Willy
+... and I thought you meant that wouldn't produce an error if the
+immediate was out of range. I understand that :lo12: cuts the top bits
+off, and for its intended use that makes sense.
+
+>From testing I see see that gas isn't happy to accept an undefined
+symbol as an immediate without :lo12:, and I can see why that makes
+sense. My suggestion was bad, sorry.
+
+Thanks,
+Mark.
