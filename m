@@ -1,51 +1,72 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 16 Jul 2014 01:15:42 +0800
-Subject: [PATCH v2 0/5] ARM: dts: sun6i: Add support for GMAC
-Message-ID: <1405444547-21870-1-git-send-email-wens@csie.org>
+Date: Wed, 16 Jul 2014 01:15:43 +0800
+Subject: [PATCH v2 1/5] ARM: dts: sun6i: Add pin muxing options for GMAC
+In-Reply-To: <1405444547-21870-1-git-send-email-wens@csie.org>
+References: <1405444547-21870-1-git-send-email-wens@csie.org>
+Message-ID: <1405444547-21870-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The A31 SoC has a GMAC gigabit ethernet controller supporting
+MII, GMII, RGMII modes. Add pin muxing options for these modes.
 
-This is v2 of the A31 GMAC support series. The GMAC is the same as in
-the A20, except it has an extra reset control. The GMAC clock module is
-mostly the same as in the A20, without the extra dividers, which I left
-out intentionally from the clock driver.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-The register offsets and interrupts were copied from A31 SDK in Rhombus
-Tech's repository. The pin muxes were from the EVB fex file.
-
-I've tested this on my A31 Hummingbird under 100M and 1000M.
-
-Patch 5 adds support for the A31 Hummingbird. It is based on your work,
-so it has your name on it. I cleaned up the format and descriptions,
-got rid of missing devices, and added usb and the external rtc. 
-
-
-Changes since v1:
-
-- Dropped Colombus board patch, as it needs AXP221 regulator support.
-- Added reset-name to GMAC node.
-- Added A31 Hummingbird support.
-
-
-Cheers,
-ChenYu
-
-Chen-Yu Tsai (4):
-  ARM: dts: sun6i: Add pin muxing options for GMAC
-  ARM: dts: sun6i: Add GMAC clock node to the A31 dtsi
-  ARM: dts: sun6i: Add A31 GMAC gigabit ethernet controller node
-  ARM: dts: sun6i: Add ethernet alias for GMAC
-
-Maxime Ripard (1):
-  ARM: dts: sun6i: Add Merrii A31 Hummingbird support
-
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 119 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun6i-a31.dtsi            |  88 ++++++++++++++++++++
- 3 files changed, 208 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index baf8eff..47e143a 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -467,6 +467,48 @@
+ 				allwinner,drive = <2>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			gmac_pins_mii_a: gmac_mii at 0 {
++				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
++						"PA8", "PA9", "PA11",
++						"PA12", "PA13", "PA14", "PA19",
++						"PA20", "PA21", "PA22", "PA23",
++						"PA24", "PA26", "PA27";
++				allwinner,function = "gmac";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			gmac_pins_gmii_a: gmac_gmii at 0 {
++				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
++						"PA4", "PA5", "PA6", "PA7",
++						"PA8", "PA9", "PA10", "PA11",
++						"PA12", "PA13", "PA14",	"PA15",
++						"PA16", "PA17", "PA18", "PA19",
++						"PA20", "PA21", "PA22", "PA23",
++						"PA24", "PA25", "PA26", "PA27";
++				allwinner,function = "gmac";
++				/*
++				 * data lines in GMII mode run at 125MHz and
++				 * might need a higher signal drive strength
++				 */
++				allwinner,drive = <2>;
++				allwinner,pull = <0>;
++			};
++
++			gmac_pins_rgmii_a: gmac_rgmii at 0 {
++				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
++						"PA9", "PA10", "PA11",
++						"PA12", "PA13", "PA14", "PA19",
++						"PA20", "PA25", "PA26", "PA27";
++				allwinner,function = "gmac";
++				/*
++				 * data lines in RGMII mode use DDR mode
++				 * and need a higher signal drive strength
++				 */
++				allwinner,drive = <3>;
++				allwinner,pull = <0>;
++			};
+ 		};
+ 
+ 		ahb1_rst: reset at 01c202c0 {
 -- 
 2.0.1
