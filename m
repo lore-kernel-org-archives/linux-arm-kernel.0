@@ -1,97 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 15 Jul 2014 12:56:52 -0500
-Subject: [RFC/PATCH 5/5] ARM: dts: am437x-sk-evm: add vpfe support and ov2659
- sensor
-In-Reply-To: <1405447012-5340-1-git-send-email-balbi@ti.com>
-References: <1405447012-5340-1-git-send-email-balbi@ti.com>
-Message-ID: <1405447012-5340-6-git-send-email-balbi@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Jul 2014 03:00:12 +0900
+Subject: [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug
+ code
+In-Reply-To: <53C3A7FE.8000401@gmail.com>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+ <1403618235-19353-3-git-send-email-t.figa@samsung.com>
+ <031001cf9aaf$959cf6c0$c0d6e440$@samsung.com> <53C3A7FE.8000401@gmail.com>
+Message-ID: <53C56C2C.8010801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Darren Etheridge <detheridge@ti.com>
+On 07/14/14 18:50, Tomasz Figa wrote:
+> Hi Kukjin,
+>
+Hi,
 
-Adding necessary dts nodes to enable vpfe and ov2659 sensor on the correct i2c
-bus and correct vpfe instance.
+> On 08.07.2014 15:21, Kukjin Kim wrote:
+>> Tomasz Figa wrote:
+>>>
+>>> When CPU topology is specified in device tree, cpu_logical_map() does
+>>> not return core ID anymore, but rather full MPIDR value. This breaks
+>>> existing calculation of PMU register offsets on Exynos SoCs.
+>>>
+>>> This patch fixes the problem by adjusting the code to use only core ID
+>>> bits of the value returned by cpu_logical_map() to allow CPU topology to
+>>> be specified in device tree on Exynos SoCs.
+>>>
+>>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>>
+>> Looks good to me, but I think we don't need this fix in 3.16 because the CPU
+>> topology is not specified in DT yet...if I'm wrong, please correct me.
+>
+> CPU topology is already specified in DT for Exynos3250, 5250, 5260, 5410
+> and 5420/5800.
+>
+> This patch also fixes CPU hotplug on SoCs with more than 2 cores,
+> because it removes incorrect condition check in platform_do_lowpower().
+>
+> Please take this fix for next -rc release.
+>
+Agreed and I've applied this into fixes for 3.16...
 
-Signed-off-by: Darren Etheridge <detheridge@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/boot/dts/am437x-sk-evm.dts | 63 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index 859ff3d..ca6b4fe 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -184,6 +184,46 @@
- 		>;
- 	};
- 
-+	vpfe0_pins_default: vpfe0_pins_default {
-+		pinctrl-single,pins = <
-+			0x1b0 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_hd mode 0*/
-+			0x1b4 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_vd mode 0*/
-+			0x1b8 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_field mode 0*/
-+			0x1bc (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_wen mode 0*/
-+			0x1c0 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_pclk mode 0*/
-+			0x1c4 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data8 mode 0*/
-+			0x1c8 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data9 mode 0*/
-+			0x208 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data0 mode 0*/
-+			0x20c (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data1 mode 0*/
-+			0x210 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data2 mode 0*/
-+			0x214 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data3 mode 0*/
-+			0x218 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data4 mode 0*/
-+			0x21c (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data5 mode 0*/
-+			0x220 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data6 mode 0*/
-+			0x224 (PIN_INPUT_PULLUP | MUX_MODE0)  /* cam0_data7 mode 0*/
-+		>;
-+	};
-+
-+	vpfe0_pins_sleep: vpfe0_pins_sleep {
-+		pinctrl-single,pins = <
-+			0x1b0 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x1b4 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x1b8 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x1bc (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x1c0 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x1c4 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x1c8 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x208 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x20c (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x210 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x214 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x218 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x21c (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x220 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+			0x224 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
-+		>;
-+	};
-+
- 	cpsw_default: cpsw_default {
- 		pinctrl-single,pins = <
- 			/* Slave 1 */
-@@ -611,3 +655,22 @@
- &wdt {
- 	status = "okay";
- };
-+
-+
-+&vpfe0 {
-+	status = "okay";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&vpfe0_pins_default>;
-+	pinctrl-1 = <&vpfe0_pins_sleep>;
-+
-+	/* Camera port */
-+	port {
-+		vpfe0_ep: endpoint {
-+			/* remote-endpoint = <&sensor>; add once we have it */
-+			if_type = <2>;
-+			bus_width = <8>;
-+			hdpol = <0>;
-+			vdpol = <0>;
-+		};
-+	};
-+};
--- 
-2.0.0.390.gcb682f8
+Thanks,
+Kukjin
