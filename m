@@ -1,86 +1,62 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 15 Jul 2014 18:16:38 +0900
-Subject: [PATCH 8/8] ARM: shmobile: kzm9g-reference: Initialise SCIF device
- using DT
-In-Reply-To: <cover.1405398515.git.horms+renesas@verge.net.au>
-References: <cover.1405398515.git.horms+renesas@verge.net.au>
-Message-ID: <700ce7c2bb2a4963472d95eba1436d6b0945918e.1405398515.git.horms+renesas@verge.net.au>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Tue, 15 Jul 2014 11:18:09 +0200
+Subject: [PATCH 11/15] irqchip: sun4i: convert to handle_domain_irq
+In-Reply-To: <1404825038-547-12-git-send-email-marc.zyngier@arm.com>
+References: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
+ <1404825038-547-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140715091809.GD1011@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise SCIF device using DT when booting armadillo800eva
-using DT reference.
+Hi Marc,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 14 +++++++++++---
- arch/arm/mach-shmobile/setup-sh73a0.c        |  8 ++++----
- 2 files changed, 15 insertions(+), 7 deletions(-)
+On Tue, Jul 08, 2014 at 02:10:34PM +0100, Marc Zyngier wrote:
+> Use the new handle_domain_irq method to handle interrupts.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 838f93e4..18662ae 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -21,6 +21,10 @@
- 	model = "KZM-A9-GT";
- 	compatible = "renesas,kzm9g-reference", "renesas,sh73a0";
- 
-+	aliases {
-+		serial4 = &scifa4;
-+	};
-+
- 	cpus {
- 		cpu at 0 {
- 			cpu0-supply = <&vdd_dvfs>;
-@@ -276,9 +280,6 @@
- };
- 
- &pfc {
--	pinctrl-0 = <&scifa4_pins>;
--	pinctrl-names = "default";
--
- 	i2c3_pins: i2c3 {
- 		renesas,groups = "i2c3_1";
- 		renesas,function = "i2c3";
-@@ -318,6 +319,13 @@
- 	};
- };
- 
-+&scifa4 {
-+	pinctrl-0 = <&scifa4_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index ad00724..2e1e289 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -696,6 +696,10 @@ static struct platform_device irqpin3_device = {
- };
- 
- static struct platform_device *sh73a0_devices_dt[] __initdata = {
-+	&cmt1_device,
-+};
-+
-+static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
- 	&scif2_device,
-@@ -705,10 +709,6 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
- 	&scif6_device,
- 	&scif7_device,
- 	&scif8_device,
--	&cmt1_device,
--};
--
--static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&tmu0_device,
- 	&ipmmu_device,
- };
+I tested this one on an A13 olinuxino. It worked well. I also tested
+with CONFIG_PROVE_RCU enabled.
+
+Antoine
+
+> ---
+>  drivers/irqchip/irq-sun4i.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+> index 6fcef4a..64155b6 100644
+> --- a/drivers/irqchip/irq-sun4i.c
+> +++ b/drivers/irqchip/irq-sun4i.c
+> @@ -136,7 +136,7 @@ IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-a10-ic", sun4i_of_init);
+>  
+>  static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
+>  {
+> -	u32 irq, hwirq;
+> +	u32 hwirq;
+>  
+>  	/*
+>  	 * hwirq == 0 can mean one of 3 things:
+> @@ -154,8 +154,7 @@ static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
+>  		return;
+>  
+>  	do {
+> -		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
+> -		handle_IRQ(irq, regs);
+> +		handle_domain_irq(sun4i_irq_domain, hwirq, regs);
+>  		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+>  	} while (hwirq != 0);
+>  }
+> -- 
+> 2.0.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-2.0.0
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
