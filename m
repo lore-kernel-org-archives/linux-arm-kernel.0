@@ -1,60 +1,80 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Tue, 15 Jul 2014 16:01:33 +0530
-Subject: [PATCH v3 1/2] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <1405420294-9323-2-git-send-email-vikas.sajjan@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Jul 2014 12:37:19 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <1417324.PxofUz16v0@avalon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
+ <1417324.PxofUz16v0@avalon>
+Message-ID: <20140715103718.GB6616@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
+> Hi Boris,
+> 
+> On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
+> > On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
+> > > On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> > > > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
+> > > > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
+> > > > controller device.
+> > > > 
+> > > > The HLCDC block provides a single RGB output port, and only supports LCD
+> > > > panels connection to LCD panels for now.
+> > > > 
+> > > > The atmel,panel property link the HLCDC RGB output with the LCD panel
+> > > > connected on this port (note that the HLCDC RGB connector implementation
+> > > > makes use of the DRM panel framework).
+> > > > 
+> > > > Connection to other external devices (DRM bridges) might be added later
+> > > > by mean of a new atmel,xxx (atmel,bridge) property.
+> > > > 
+> > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > ---
+> > > > 
+> > > >  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++++++
+> > > >  1 file changed, 59 insertions(+)
+> > > >  create mode 100644
+> > > >  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+> 
+> [snip]
+> 
+> > > > + - atmel,panel: Should contain a phandle with 2 parameters.
+> > > > +   The first cell is a phandle to a DRM panel device
+> > > > +   The second cell encodes the RGB mode, which can take the following
+> > > > values: +   * 0: RGB444
+> > > > +   * 1: RGB565
+> > > > +   * 2: RGB666
+> > > > +   * 3: RGB888
+> > > 
+> > > These are properties of the panel and should be obtained from the panel
+> > > directly rather than an additional cell in this specifier.
+> > 
+> > Okay.
+> > What's the preferred way of doing this ?
+> > What about defining an rgb-mode property in the panel node.
+> 
+> You could do that, but it won't help you much, as the HLCDC driver must not 
+> parse properties from the panel node. You should instead extend the drm_panel 
+> API with a function to retrieve panel properties. The HLCDC driver will then 
+> query the panel driver at runtime for the interface type. The panel driver 
+> will get the information from hardcoded data in the driver, from DT or 
+> possibly in some cases by querying the panel hardware directly.
 
-The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
-being reset across sleep/wake.  If we don't set it to anything then
-the TPM will be reset.  U-Boot will detect this as invalid
-and will reset the system on resume time. This GPIO can always be low
-and not hurt anything.  It will get pulled back high again during a
-normal warm reset when it will default back to an input.
+My preference for this would be that we either add this to some existing
+structure (struct drm_display_info seems like a good candidate) or if
+the number of parameters grows out of hands, then maybe even introduce a
+new type of device that's specific for the interface. DRM panels are an
+abstraction for panels, that is, interface-agnostic, and if we start
+exposing interface specific parameters things will start to become very
+unwieldy.
 
-To properly preserve the TPM state across suspend/resume and to make
-the chrome U-Boot happy, properly set the GPIO to mask the
-reset to the TPM.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 6c7cab0..c7b2bba 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -211,6 +211,9 @@
- 
- 
- &pinctrl_0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mask_tpm_reset>;
-+
- 	max98090_irq: max98090-irq {
- 		samsung,pins = "gpx0-2";
- 		samsung,pin-function = <0>;
-@@ -218,6 +221,15 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	/* We need GPX0_6 to be low at sleep time; just keep it low always */
-+	mask_tpm_reset: mask-tpm-reset {
-+		samsung,pins = "gpx0-6";
-+		samsung,pin-function = <1>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+		samsung,pin-val = <0>;
-+	};
-+
- 	tpm_irq: tpm-irq {
- 		samsung,pins = "gpx1-0";
- 		samsung,pin-function = <0>;
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/4a4ecd4a/attachment-0001.sig>
