@@ -1,22 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Jul 2014 08:53:38 +0200
-Subject: [PATCH v4 2/6] clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0
- support
-In-Reply-To: <1404892479-12222-3-git-send-email-wens@csie.org>
+Date: Tue, 15 Jul 2014 08:54:30 +0200
+Subject: [PATCH v4 6/6] ARM: sun8i: Add PRCM clock and reset controller
+ nodes to the DTSI
+In-Reply-To: <1404892479-12222-7-git-send-email-wens@csie.org>
 References: <1404892479-12222-1-git-send-email-wens@csie.org>
- <1404892479-12222-3-git-send-email-wens@csie.org>
-Message-ID: <20140715065338.GC3745@lukather>
+ <1404892479-12222-7-git-send-email-wens@csie.org>
+Message-ID: <20140715065430.GD3745@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 03:54:35PM +0800, Chen-Yu Tsai wrote:
-> This patch adds "allwinner,sun8i-a23-apb0-gates-clk", a A23 specific
-> compatible to the sun6i-a31-apb0-gates clock driver, along with the
-> gate bitmap.
+On Wed, Jul 09, 2014 at 03:54:39PM +0800, Chen-Yu Tsai wrote:
+> With sun8i PRCM support available, we can add the PRCM clock and
+> reset controller nodes to the DTSI. Also update R_UART's clock
+> phandle and add it's reset control phandle.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied, thanks.
+Applied, thanks!
 
 Maxime
 
@@ -30,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/8557062c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/e31ae3db/attachment-0001.sig>
