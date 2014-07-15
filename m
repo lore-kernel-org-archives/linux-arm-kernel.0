@@ -1,312 +1,70 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 15 Jul 2014 14:45:53 +0200
-Subject: [PATCH 1/5] arm: dts: omap3-gta04: Add missing nodes to fully
- describe gta04 board
-In-Reply-To: <1405369228-27197-2-git-send-email-marek@goldelico.com>
-References: <1405369228-27197-1-git-send-email-marek@goldelico.com>
- <1405369228-27197-2-git-send-email-marek@goldelico.com>
-Message-ID: <CAGhQ9Vx1gm9=vda9dUVYR25JK4VSUe9Qk5_xc_bo9ZPLFCtExA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 15 Jul 2014 14:49:20 +0200
+Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
+In-Reply-To: <1404862900.76779.YahooMailNeo@web160102.mail.bf1.yahoo.com>
+References: <1404862900.76779.YahooMailNeo@web160102.mail.bf1.yahoo.com>
+Message-ID: <53C52350.6020109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hello,
 
-You seem to add some DT nodes for hw that doesn't have drivers in
-mainline. I think you should leave those out until the driver itself
-is upstream and the bindings for it is documented.
-
-On 14 July 2014 22:20, Marek Belisko <marek@goldelico.com> wrote:
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> ---
->  arch/arm/boot/dts/omap3-gta04.dts | 443 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 412 insertions(+), 31 deletions(-)
+On 2014-07-09 01:41, PINTU KUMAR wrote:
+> Hi,
 >
-> diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-> index 215513b..bd6a71d 100644
-> --- a/arch/arm/boot/dts/omap3-gta04.dts
-> +++ b/arch/arm/boot/dts/omap3-gta04.dts
-> @@ -12,7 +12,7 @@
->  #include "omap36xx.dtsi"
+> We are facing one problem on linux 3.10 when we try to use CMA as large as 56MB for 256MB RAM device.
+> We found that after certain point of time (during boot), min watermark check is failing when "free_pages" and "free_cma_pages" are almost equal and falls below the min level.
 >
->  / {
-> -       model = "OMAP3 GTA04";
-> +       model = "Goldelico GTA04";
->         compatible = "ti,omap3-gta04", "ti,omap36xx", "ti,omap3";
+> system details:
+> ARM embedded device: RAM: 256MB
+> Kernel version: 3.10.17
+> Fixed Reserved memory: ~40MB
+> Available memory: 217MB
+> CMA reserved 1 : 56MB
+> ZRAM configured: 128MB or 64MB
+> min_free_kbytes: 1625 (default)
+> Memory controller group enabled (MEMCG)
 >
->         cpus {
-> @@ -26,6 +26,11 @@
->                 reg = <0x80000000 0x20000000>; /* 512 MB */
->         };
 >
-> +       aliases {
-> +               display0 = &lcd;
-> +               display1 = &tv0;
-> +       };
-> +
->         gpio-keys {
->                 compatible = "gpio-keys";
+> After boot-up the "free -tm" command shows free memory as: ~50MB
+> CMA is used for all UI display purposes. CMA used during bootup is close to ~6MB.
+> Thus most of the free memory is in the form of CMA free memory.
+> ZRAM getting uses was around ~5MB.
 >
-> @@ -37,15 +42,78 @@
->                 };
->         };
 >
-> +       gpio-keys-wwan-wakeup {
-> +               compatible = "gpio-keys";
-> +
-> +               wwan_wakeup_button: wwan-wakeup-button {
-> +                       label = "3G_WOE";
-> +                       linux,code = <240>;
-> +                       gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-> +                       gpio-key,wakeup;
-> +               };
-> +       };
-> +
-> +       hsusb2_phy: hsusb2_phy {
-> +               compatible = "usb-nop-xceiv";
-> +               reset-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>; /* gpio_174 = reset for USB3322 */
-> +       };
-> +
-> +       antenna-detect {
-> +               compatible = "linux,extcon-gpio";
-> +               label = "gps_antenna";
-> +               gpios = <&gpio5 16 0>; /* gpio_144 */
-> +               debounce-delay-ms = <10>;
-> +               irq-flags = <IRQ_TYPE_EDGE_BOTH>;
-> +               state-on = "external";
-> +               state-off = "internal";
-> +       };
-> +
->         sound {
->                 compatible = "ti,omap-twl4030";
->                 ti,model = "gta04";
+> During boot-up itself we observe that the following conditions are met.
 >
->                 ti,mcbsp = <&mcbsp2>;
->                 ti,codec = <&twl_audio>;
-> +
-> +               ti,mcbsp-voice = <&mcbsp4>;
-> +       };
-> +
-> +       sound_card {
-> +               compatible = "goldelico,gta04-audio";
-> +               gta04,cpu-dai = <&mcbsp2>;
-> +       };
-> +
-> +       gtm601_codec: voice_codec {
-> +               compatible = "gtm601-codec";
-> +       };
-> +
-> +       sound_voice {
-> +               compatible = "goldelico,gta04-voice";
-> +               gta04,cpu-dai = <&mcbsp4>;
-> +               gta04,codec = <&gtm601_codec>;
->         };
 >
-> -       spi_lcd {
-> +       w2cbw003_codec: headset_codec {
-> +               compatible = "w2cbw003-codec";
-> +       };
-> +
-> +       sound_headset {
-> +               compatible = "goldelico,gta04-headset";
-> +               gta04,cpu-dai = <&mcbsp3>;
-> +               gta04,codec = <&w2cbw003_codec>;
-> +       };
-> +
-> +       sound_fm {
-> +               compatible = "goldelico,gta04-fm";
-> +               gta04,cpu-dai = <&mcbsp1>;
-> +               gta04,codec = <&si4721_codec>;
-> +       };
-> +
-> +       madc-hwmon {
-> +               compatible = "ti,twl4030-madc-hwmon";
-> +       };
-> +
-> +       spi_lcd: spi_lcd {
->                 compatible = "spi-gpio";
->                 #address-cells = <0x1>;
->                 #size-cells = <0x0>;
-> @@ -75,7 +143,7 @@
->                 };
->         };
+> if (free_pages - free_cma <= min + lowmem_reserve) {
+>      printk"[PINTU]: __zone_watermark_ok: failed !\n");
 >
-> -       battery {
-> +       madc_battery: battery {
->                 compatible = "ti,twl4030-madc-battery";
->                 capacity = <1200000>;
->                 charging-calibration-data = <4200 100
-> @@ -100,6 +168,83 @@
->                                    "ichg",
->                                    "vbat";
->         };
-> +
-> +       backlight {
-> +               compatible = "pwm-backlight";
-> +               pwms = <&pwm 0 2000000>;
-> +               brightness-levels = <0 11 20 30 40 50 60 70 80 90 100>;
-> +               default-brightness-level = <10>;
-> +               pinctrl-names = "default";
-> +               pintcrl-0 = <&backlight_pins>;
-> +               power-supply = <&power>;
-> +       };
-> +
-> +       pwm: omap_pwm {
-> +               compatible = "ti,omap-pwm";
-> +               timers = <&timer11>;
-> +               #pwm-cells = <2>;
-> +       };
-
-The omap-pwm driver is not yet upstream and thus the bindings are not final.
-
-> +       /* should be a PWM */
-> +       power: fixed_regulator at 0 {
-> +              compatible = "regulator-fixed";
-> +              regulator-name = "bl-enable";
-> +              regulator-boot-on;
-> +              regulator-always-on;
-> +              regulator-min-microvolt = "1000000";
-> +              regulator-max-microvolt = "1000000";
-> +              gpio = <&gpio2 25 0>;    /* GPT11/PWM */
-> +              enable-active-high;
-> +       };
-> +
-> +       tv0: connector at 1 {
-> +               compatible = "svideo-connector";
-> +               label = "tv";
-> +
-> +               port {
-> +                       tv_connector_in: endpoint {
-> +                               remote-endpoint = <&venc_out>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       tv_amp: opa362 {
-> +               compatible = "ti,opa362";
-> +               gpio = <&gpio1 23 0>;   /* GPIO to enable video out amplifier */
-> +       };
-
-Driver for a OPAMP?
-
-> +       /* presents a single gpio to be plumbed to uart1 dts */
-> +       bt_en: w2cbw003 {
-> +               compatible = "wi2wi,w2cbw003";
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +
-> +               vdd-supply = <&vaux4>;
-> +       };
-> +
-> +       /* presents a single gpio to be plumbed to uart2 dts */
-> +       gps_en: w2sg0004 {
-> +               compatible = "wi2wi,w2sg0004";
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +
-> +               lna-supply = <&vsim>;   /* LNA regulator */
-> +               on-off-gpio = <&gpio5 17 0>;    /* gpio_145: trigger for turning on/off w2sg0004 */
-> +               rx-gpio = <&gpio5 19 0>;        /* gpio_147: RX */
-> +               rx-on-mux = < (PIN_INPUT_PULLUP | MUX_MODE0) >;
-> +               rx-off-mux = < (PIN_INPUT_PULLUP | MUX_MODE4) >;
-> +       };
-> +
-> +       /* control modem power through rfkill */
-> +       modem_en: modem {
-> +               compatible = "option,gtm601";
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +
-> +               usb-port = <&hsusb2_phy>;
-> +               on-off-gpio = <&gpio6 26 0>;    /* gpio_186: trigger to power on modem */
-> +               on-indicator-gpio = <0>;
-> +       };
->  };
-
-I don't think any of the above devices have documented bindings so I
-don't think it is a good idea to add the nodes now.
-
->  &omap3_pmx_core {
-> @@ -168,11 +313,72 @@
->                 >;
->         };
+>      return false;
+> }
+> Here: free_pages was: 12940, free_cma was: 12380, min: 566, lowmem: 0
 >
-> +       backlight_pins: backlight_pins_pimnux {
-> +               pinctrl-single,pins = <0x8a MUX_MODE4>;
-> +       };
-> +
-> +       hsusb2_pins: pinmux_hsusb2_pins {
-> +               pinctrl-single,pins = <
-> +                       OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)       /* mcspi1_cs3.hsusb2_data2 */
-> +                       OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)       /* mcspi2_clk.hsusb2_data7 */
-> +                       OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)       /* mcspi2_simo.hsusb2_data4 */
-> +                       OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)       /* mcspi2_somi.hsusb2_data5 */
-> +                       OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)       /* mcspi2_cs0.hsusb2_data6 */
-> +                       OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)       /* mcspi2_cs1.hsusb2_data3 */
-> +               >;
-> +       };
-> +
-> +       i2c1_pins: pinmux_i2c1_pins {
-> +               pinctrl-single,pins = <
-> +                       0x18a (PIN_INPUT_PULLUP | MUX_MODE0)   /* i2c1_scl.i2c1_scl */
-> +                       0x18c (PIN_INPUT_PULLUP | MUX_MODE0)   /* i2c1_sda.i2c1_sda */
-> +               >;
-> +       };
-> +
-> +       i2c2_pins: pinmux_i2c2_pins {
-> +               pinctrl-single,pins = <
-> +                       0x18e (PIN_INPUT_PULLUP | MUX_MODE0)   /* i2c2_scl.i2c2_scl */
-> +                       0x190 (PIN_INPUT_PULLUP | MUX_MODE0)   /* i2c2_sda.i2c2_sda */
-> +               >;
-> +       };
-> +
-> +       i2c3_pins: pinmux_i2c3_pins {
-> +               pinctrl-single,pins = <
-> +                       0x192 (PIN_INPUT_PULLUP | MUX_MODE0)   /* i2c3_scl.i2c3_scl */
-> +                       0x194 (PIN_INPUT_PULLUP | MUX_MODE0)   /* i2c3_sda.i2c3_sda */
-> +               >;
-> +       };
+>
+> Thus is condition is met most of the time.
+> And because of this watermark failure, Kswapd is waking up frequently.
+> The /proc/pagetypeinfo reports that most of the higher order pages are from CMA regions.
+>
+>
+> We also observed that ZRAM is trying to allocate memory from CMA region and failing.
+>
+> We also tried by decreasing the CMA region to 20MB. With this the watermark failure is not happening in boot time. But if we launch more than 3 apps {Browser, music-player etc}, again the watermark started failing.
+>
+> Also we tried decreasing the min_free_kbytes=256, and with this also watermark is passed.
+>
+> Our observation is that ZRAM/zsmalloc trying to allocate memory from CMA areas and failed.
+>
+>
+> Please let us know if anybody have come across the same problem and how to resolve this issue.
 
-Any reason why you don't use OMAP_IOPAD macro for the I2C pins?
+Frankly I really have no idea what is going on. ZRAM/zsmalloc should not 
+try to alloc memory from CMA. I don't have access you the mentioned 
+source code. What flags are passed to alloc_pages() in zram/zsmalloc? It 
+should get pages from non-movable pool.
 
-> +
-> +       bma180_pins: pinmux_bma180_pins {
-> +               pinctrl-single,pins = <
-> +                       OMAP3_CORE1_IOPAD(0x213a, PIN_INPUT_PULLUP | MUX_MODE4)   /* gpio_115 */
-> +               >;
-> +       };
-> +};
-> +
-> +&omap3_pmx_core2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <
-> +                       &hsusb2_2_pins
-> +       >;
-> +
-> +       hsusb2_2_pins: pinmux_hsusb2_2_pins {
-> +               pinctrl-single,pins = <
-> +                       OMAP3630_CORE2_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)            /* etk_d10.hsusb2_clk */
-> +                       OMAP3630_CORE2_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)            /* etk_d11.hsusb2_stp */
-> +                       OMAP3630_CORE2_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)    /* etk_d12.hsusb2_dir */
-> +                       OMAP3630_CORE2_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)    /* etk_d13.hsusb2_nxt */
-> +                       OMAP3630_CORE2_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)    /* etk_d14.hsusb2_data0 */
-> +                       OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)    /* etk_d15.hsusb2_data1 */
-> +               >;
-> +       };
-> +
->         spi_gpio_pins: spi_gpio_pinmux {
-> -               pinctrl-single,pins = <0x5a8 (PIN_OUTPUT | MUX_MODE4) /* clk */
-> -                       0x5b6 (PIN_OUTPUT | MUX_MODE4) /* cs */
-> -                       0x5b8 (PIN_OUTPUT | MUX_MODE4) /* tx */
-> -                       0x5b4 (PIN_INPUT | MUX_MODE4) /* rx */
-> +               pinctrl-single,pins = <
-> +                       OMAP3630_CORE2_IOPAD(0x25d8, PIN_OUTPUT | MUX_MODE4) /* clk */
-> +                       OMAP3630_CORE2_IOPAD(0x25e6, PIN_OUTPUT | MUX_MODE4) /* cs */
-> +                       OMAP3630_CORE2_IOPAD(0x25e8, PIN_OUTPUT | MUX_MODE4) /* tx */
-> +                       OMAP3630_CORE2_IOPAD(0x25e4, PIN_INPUT | MUX_MODE4) /* rx */
->                 >;
->         };
->  };
-
-regards,
-Joachim Eastwood
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
