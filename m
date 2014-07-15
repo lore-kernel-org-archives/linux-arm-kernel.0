@@ -1,39 +1,30 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Tue, 15 Jul 2014 18:32:23 +0400
-Subject: [RFC/PATCH -next 00/21] Address sanitizer for kernel (kasan) -
- dynamic memory error detector.
-In-Reply-To: <alpine.DEB.2.11.1407141012520.25405@gentwo.org>
-References: <1404903678-8257-1-git-send-email-a.ryabinin@samsung.com>
- <53C08876.10209@zytor.com>
- <CAPAsAGwb2sLmu0o_o-pFP5pXhMs-1sZSJbA3ji=W+JPOZRepgg@mail.gmail.com>
- <alpine.DEB.2.11.1407141012520.25405@gentwo.org>
-Message-ID: <53C53B77.3080000@samsung.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 15 Jul 2014 07:47:26 -0700
+Subject: [PATCH v3] arm64, ia64, ppc, s390, sh, tile, um, x86,
+ mm: Remove default gate area
+In-Reply-To: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
+References: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
+Message-ID: <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/14 19:13, Christoph Lameter wrote:
-> On Sun, 13 Jul 2014, Andrey Ryabinin wrote:
-> 
->>> How does that work when memory is sparsely populated?
->>>
->>
->> Sparsemem configurations currently may not work with kasan.
->> I suppose I will have to move shadow area to vmalloc address space and
->> make it (shadow) sparse too if needed.
-> 
-> Well it seems to work with sparsemem / vmemmap? So non vmmemmapped configs
-> of sparsemem only. vmemmmap can also handle holes in memory.
-> 
-> 
+On Sun, Jul 13, 2014 at 1:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> The core mm code will provide a default gate area based on
+> FIXADDR_USER_START and FIXADDR_USER_END if
+> !defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
+>
+> This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
+> 64-bit UML, and x86_32 have their own code just to disable it.  arm,
+> 32-bit UML, and x86_64 have gate areas, but they have their own
+> implementations.
+>
+> This gets rid of the default and moves the code into ia64.
+>
+> This should save some code on architectures without a gate area: it's
+> now possible to inline the gate_area functions in the default case.
 
-Not sure. This sparsemem/vmemmap thing is kinda new to me, so I need to dig some more
-to understand how it i?teracts with kasan.
+Can one of you pull this somewhere?  Otherwise I can put it somewhere
+stable and ask for -next inclusion, but that seems like overkill for a
+single patch.
 
-As far as I understand the main problem with sparsemem & kasan is shadow allocation:
-
-	unsigned long lowmem_size = (unsigned long)high_memory - PAGE_OFFSET;
-	shadow_size = lowmem_size >> KASAN_SHADOW_SCALE_SHIFT;
-
-	shadow_phys_start = memblock_alloc(shadow_size, PAGE_SIZE);
-
-If we don't have one big enough physically contiguous block for shadow it will fail.
+--Andy
