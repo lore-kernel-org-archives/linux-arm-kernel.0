@@ -1,100 +1,65 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 15 Jul 2014 12:53:56 +0200
-Subject: [PATCH 1/1] ARM: dts: zynq: Add Parallella device tree
-In-Reply-To: <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
-References: <1404075022-28745-1-git-send-email-afaerber@suse.de>
- <1404075022-28745-2-git-send-email-afaerber@suse.de>
- <CAOesGMhKY1Lb+o8AbtFXS5c7SLg2uGt4-oosdro2FMj_+bB6Tw@mail.gmail.com>
- <61d660b7-17a9-4817-ba34-40a5c1674d28@BY2FFO11FD032.protection.gbl>
- <CAOesGMjMEiQkrCfYyc6y+s9kst74jAjTghbYvxUJ+9KvPGXj1Q@mail.gmail.com>
-Message-ID: <74ed2164-b1cf-4470-a853-e8f4c7804f41@BN1BFFO11FD008.protection.gbl>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 15 Jul 2014 11:54:25 +0100
+Subject: [PATCH v7 0/4] arm: Fix DEBUG_LL for multi-platform kernels
+ (without PL01X)
+In-Reply-To: <4736066.znnQ63vBqX@wuerfel>
+References: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
+ <53C39D5F.6050901@linaro.org> <4527083.RFD2neZ6Bp@wuerfel>
+ <4736066.znnQ63vBqX@wuerfel>
+Message-ID: <53C50861.3060300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 08:12 PM, Olof Johansson wrote:
-> On Tue, Jul 8, 2014 at 4:18 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> On 06/30/2014 07:15 AM, Olof Johansson wrote:
->>> Hi,
->>>
->>> On Sun, Jun 29, 2014 at 1:50 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>>> This allows to boot the Adapteva Parallella board to serial console.
->>>>
->>>> Cc: Andreas Olofsson <andreas@adapteva.com>
->>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>>
->>> Nice and clean DTS, just a couple of comments below.
->>>
->>>> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
->>>> new file mode 100644
->>>> index 0000000..98df66c
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/zynq-parallella.dts
->>>> @@ -0,0 +1,63 @@
->>>> +/*
->>>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
->>>> + *
->>>> + * Derived from zynq-zed.dts:
->>>> + *
->>>> + *  Copyright (C) 2011 Xilinx
->>>> + *  Copyright (C) 2012 National Instruments Corp.
->>>> + *  Copyright (C) 2013 Xilinx
->>>> + *
->>>> + * This software is licensed under the terms of the GNU General Public
->>>> + * License version 2, as published by the Free Software Foundation, and
->>>> + * may be copied, distributed, and modified under those terms.
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + */
->>>> +/dts-v1/;
->>>> +/include/ "zynq-7000.dtsi"
->>>> +
->>>> +/ {
->>>> +       model = "Parallella Board";
-> 
-> You might want to have this say "Adapteva Parallella Board" instead
-> (just noticed).
-> 
->>>> +       compatible = "xlnx,zynq-7000";
->>>
->>> This should have a more specific compatible as the first one. Probably
->>> something like:
->>>    compatible = "adapteva,parallella", "xlnx,zynq-7000";
+On 15/07/14 11:32, Arnd Bergmann wrote:
+> On Monday 14 July 2014 17:27:49 Arnd Bergmann wrote:
 >>
->> We were using these compatible properties but later there is no reason
->> to create them because they will be unused.
->> It is easy to add it when you need it which is not this case.
-> 
-> No, please add it from day one, otherwise everybody needs to update
-> their device tree, some will miss doing it, etc, etc. It's a simple
-> and trivial thing to do, and no reason to leave it o ut.
-
-It is trivial. None will just probably use it and upgrading DTS is simple
-but I don't really care.
-
-
->>>> +
->>>> +       memory {
->>>> +               device_type = "memory";
->>>> +               reg = <0 0x20000000>;
->>>
->>> Does the bootloader update this entry, or is it truly static? If it's
->>> updated then it's become recent habit to leave the memory size empty
->>> in the static file.
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 >>
->> Depends on your bootloader. I think it is good to have it here.
->> Also this file can be used by u-boot for example and u-boot can be configured
->> from it that's why I think that make sense to keep this here.
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 8f90595069a1..0f89d1b84524 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -200,6 +200,14 @@ choice
+>>  		  Say Y here if you want the debug print routines to direct
+>>  		  their output to the serial port in the DC21285 (Footbridge).
+>>  
+>> +	config DEBUG_EP93XX
+>> +		bool "Kernel low-level debugging messages via ep93xx UART"
+>> +		depends on ARCH_EP93XX
+>> +		select DEBUG_UART_PL01X
+>> +		help
+>> +		  Say Y here if you want kernel low-level debugging support
+>> +		  on Cirrus Logic EP93xx based platforms.
+>> +
 > 
-> Ok. It's become commonplace to leave memory empty for the machines
-> where it's guaranteed that the bootloader will have updated it, to
-> avoid having stale or incorrect values in the static tree. I'm not
-> going to be strict about it, but it's something to consider.
+> FWIW, this part was broken, fixup below. The problem is that the decompress.h
+> for ep93xx uses CONFIG_DEBUG_UART_PHYS even when DEBUG_LL is disabled.
 
-I personally don't like this bootloader feature and IRC it is disabled
-for xilinx u-boot too.
+Thanks (this fix is already in my patchset but your proposal means it
+needs changing slightly).
 
-Thanks,
-Michal
+
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 362d764cd358..a99b28029983 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1139,7 +1139,7 @@ config DEBUG_UART_PHYS
+>  	default 0x80070000 if DEBUG_IMX23_UART
+>  	default 0x80074000 if DEBUG_IMX28_UART
+>  	default 0x80230000 if DEBUG_PICOXCELL_UART
+> -	default 0x808c0000 if DEBUG_EP93XX
+> +	default 0x808c0000 if DEBUG_EP93XX || ARCH_EP93XX
+>  	default 0x90020000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
+>  	default 0xa9a00000 if DEBUG_MSM_UART
+>  	default 0xb0090000 if DEBUG_VEXPRESS_UART0_CRX
+> @@ -1166,7 +1166,8 @@ config DEBUG_UART_PHYS
+>  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+>  		DEBUG_LL_UART_EFM32 || \
+>  		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+> -		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
+> +		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
+> +		ARCH_EP93XX
+>  
+>  config DEBUG_UART_VIRT
+>  	hex "Virtual base address of debug UART"
+> 
