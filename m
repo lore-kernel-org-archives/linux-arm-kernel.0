@@ -1,99 +1,101 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Tue, 15 Jul 2014 13:51:23 +0400
-Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan when
- touching unaccessible memory
-In-Reply-To: <20140715081852.GL11317@js1304-P5Q-DELUXE>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
- <20140715060405.GI11317@js1304-P5Q-DELUXE> <53C4DA54.3010502@samsung.com>
- <20140715081852.GL11317@js1304-P5Q-DELUXE>
-Message-ID: <53C4F99B.5010007@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Jul 2014 10:57:05 +0100
+Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140715095704.GV26465@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/14 12:18, Joonsoo Kim wrote:
-> On Tue, Jul 15, 2014 at 11:37:56AM +0400, Andrey Ryabinin wrote:
->> On 07/15/14 10:04, Joonsoo Kim wrote:
->>> On Wed, Jul 09, 2014 at 03:30:08PM +0400, Andrey Ryabinin wrote:
->>>> Some code in slub could validly touch memory marked by kasan as unaccessible.
->>>> Even though slub.c doesn't instrumented, functions called in it are instrumented,
->>>> so to avoid false positive reports such places are protected by
->>>> kasan_disable_local()/kasan_enable_local() calls.
->>>>
->>>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
->>>> ---
->>>>  mm/slub.c | 21 +++++++++++++++++++--
->>>>  1 file changed, 19 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/mm/slub.c b/mm/slub.c
->>>> index 6ddedf9..c8dbea7 100644
->>>> --- a/mm/slub.c
->>>> +++ b/mm/slub.c
->>>> @@ -560,8 +560,10 @@ static void print_tracking(struct kmem_cache *s, void *object)
->>>>  	if (!(s->flags & SLAB_STORE_USER))
->>>>  		return;
->>>>  
->>>> +	kasan_disable_local();
->>>>  	print_track("Allocated", get_track(s, object, TRACK_ALLOC));
->>>>  	print_track("Freed", get_track(s, object, TRACK_FREE));
->>>> +	kasan_enable_local();
->>>
->>> I don't think that this is needed since print_track() doesn't call
->>> external function with object pointer. print_track() call pr_err(), but,
->>> before calling, it retrieve t->addrs[i] so memory access only occurs
->>> in slub.c.
->>>
->> Agree.
->>
->>>>  }
->>>>  
->>>>  static void print_page_info(struct page *page)
->>>> @@ -604,6 +606,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
->>>>  	unsigned int off;	/* Offset of last byte */
->>>>  	u8 *addr = page_address(page);
->>>>  
->>>> +	kasan_disable_local();
->>>> +
->>>>  	print_tracking(s, p);
->>>>  
->>>>  	print_page_info(page);
->>>> @@ -632,6 +636,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
->>>>  		/* Beginning of the filler is the free pointer */
->>>>  		print_section("Padding ", p + off, s->size - off);
->>>>  
->>>> +	kasan_enable_local();
->>>> +
->>>>  	dump_stack();
->>>>  }
->>>
->>> And, I recommend that you put this hook on right place.
->>> At a glance, the problematic function is print_section() which have
->>> external function call, print_hex_dump(), with object pointer.
->>> If you disable kasan in print_section, all the below thing won't be
->>> needed, I guess.
->>>
->>
->> Nope, at least memchr_inv() call in slab_pad_check will be a problem.
->>
->> I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
->> If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
->> for kasan.
-> 
-> I don't agree with this.
-> 
-> If someone is going to add a slab_pad_check() in other places in
-> slub.c, we should disable/enable kasan there, too. This looks same
-> maintenance problem to me. Putting disable/enable only where we
-> strictly need at least ensures that we don't need to care when using
-> slub internal functions.
-> 
-> And, if memchr_inv() is problem, I think that you also need to add hook
-> into validate_slab_cache().
-> 
-> validate_slab_cache() -> validate_slab_slab() -> validate_slab() ->
-> check_object() -> check_bytes_and_report() -> memchr_inv()
-> 
-> Thanks.
-> 
+Hi Ard,
 
-Ok, you convinced me. I'll do it.
+On Tue, Jul 15, 2014 at 10:10:02AM +0100, Ard Biesheuvel wrote:
+> After the EFI stub has done its business, it jumps into the kernel by branching
+> to offset #0 of the loaded Image, which is where it expects to find the header
+> containing a 'branch to stext' instruction.
+> However, the header is not covered by any PE/COFF section, so the header may
+> not actually be loaded at the expected offset. So instead, jump to 'stext'
+> directly, which is at the base of the PE/COFF .text section.
+
+It would be nice to point out in the commit message that the other
+changes in the patch are just cleanup to use stext_offset rather than
+open-coding it.
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi-entry.S |  2 +-
+>  arch/arm64/kernel/head.S      | 10 ++++++----
+>  2 files changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> index 619b1dd7bcde..6ef541731d9e 100644
+> --- a/arch/arm64/kernel/efi-entry.S
+> +++ b/arch/arm64/kernel/efi-entry.S
+> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
+>  	 */
+>  	mov	x20, x0		// DTB address
+>  	ldr	x0, [sp, #16]	// relocated _text address
+> -	mov	x21, x0
+> +	add	x21, x0, #:lo12:stext_offset
+
+I think we can drop the :lo12: here, which will allow us to have a
+warning if stext_offset is unexpectedly large (I believe this will
+currently silently mask bits were that to happen?).
+
+Other than that, this looks like a sensible thing to do given that we
+cannot rely on the header being present.
+
+Cheers,
+Mark.
+
+>  
+>  	/*
+>  	 * Flush dcache covering current runtime addresses
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index a2c1195abb7f..78ddae28b090 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -137,6 +137,8 @@ efi_head:
+>  #endif
+>  
+>  #ifdef CONFIG_EFI
+> +	.globl	stext_offset
+> +	.set	stext_offset, stext - efi_head
+>  	.align 3
+>  pe_header:
+>  	.ascii	"PE"
+> @@ -160,7 +162,7 @@ optional_header:
+>  	.long	0				// SizeOfInitializedData
+>  	.long	0				// SizeOfUninitializedData
+>  	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+> -	.long	stext - efi_head		// BaseOfCode
+> +	.long	stext_offset			// BaseOfCode
+>  
+>  extra_header_fields:
+>  	.quad	0				// ImageBase
+> @@ -177,7 +179,7 @@ extra_header_fields:
+>  	.long	_edata - efi_head		// SizeOfImage
+>  
+>  	// Everything before the kernel image is considered part of the header
+> -	.long	stext - efi_head		// SizeOfHeaders
+> +	.long	stext_offset			// SizeOfHeaders
+>  	.long	0				// CheckSum
+>  	.short	0xa				// Subsystem (EFI application)
+>  	.short	0				// DllCharacteristics
+> @@ -222,9 +224,9 @@ section_table:
+>  	.byte	0
+>  	.byte	0        		// end of 0 padding of section name
+>  	.long	_edata - stext		// VirtualSize
+> -	.long	stext - efi_head	// VirtualAddress
+> +	.long	stext_offset		// VirtualAddress
+>  	.long	_edata - stext		// SizeOfRawData
+> -	.long	stext - efi_head	// PointerToRawData
+> +	.long	stext_offset		// PointerToRawData
+>  
+>  	.long	0		// PointerToRelocations (0 for executables)
+>  	.long	0		// PointerToLineNumbers (0 for executables)
+> -- 
+> 1.8.3.2
+> 
+> 
