@@ -1,95 +1,47 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 15 Jul 2014 17:18:52 +0900
-Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan
- when touching unaccessible memory
-In-Reply-To: <53C4DA54.3010502@samsung.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
- <20140715060405.GI11317@js1304-P5Q-DELUXE>
- <53C4DA54.3010502@samsung.com>
-Message-ID: <20140715081852.GL11317@js1304-P5Q-DELUXE>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Jul 2014 09:20:40 +0100
+Subject: [PATCH] arm64: Move struct stat64 to uapi.
+In-Reply-To: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
+References: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
+Message-ID: <20140715082040.GB24269@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 11:37:56AM +0400, Andrey Ryabinin wrote:
-> On 07/15/14 10:04, Joonsoo Kim wrote:
-> > On Wed, Jul 09, 2014 at 03:30:08PM +0400, Andrey Ryabinin wrote:
-> >> Some code in slub could validly touch memory marked by kasan as unaccessible.
-> >> Even though slub.c doesn't instrumented, functions called in it are instrumented,
-> >> so to avoid false positive reports such places are protected by
-> >> kasan_disable_local()/kasan_enable_local() calls.
-> >>
-> >> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
-> >> ---
-> >>  mm/slub.c | 21 +++++++++++++++++++--
-> >>  1 file changed, 19 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/mm/slub.c b/mm/slub.c
-> >> index 6ddedf9..c8dbea7 100644
-> >> --- a/mm/slub.c
-> >> +++ b/mm/slub.c
-> >> @@ -560,8 +560,10 @@ static void print_tracking(struct kmem_cache *s, void *object)
-> >>  	if (!(s->flags & SLAB_STORE_USER))
-> >>  		return;
-> >>  
-> >> +	kasan_disable_local();
-> >>  	print_track("Allocated", get_track(s, object, TRACK_ALLOC));
-> >>  	print_track("Freed", get_track(s, object, TRACK_FREE));
-> >> +	kasan_enable_local();
-> > 
-> > I don't think that this is needed since print_track() doesn't call
-> > external function with object pointer. print_track() call pr_err(), but,
-> > before calling, it retrieve t->addrs[i] so memory access only occurs
-> > in slub.c.
-> > 
-> Agree.
+Hi Ian,
+
+On Tue, Jul 15, 2014 at 08:39:06AM +0100, Ian Campbell wrote:
+> This struct is part of the user API for compat tasks so I think it belongs in
+> uapi and should use the __uFOO types.
+
+I don't think we should be exposing compat structures through the arm64
+UAPI. Compat tasks should be built against the native arm headers and
+nothing else.
+
+What happens if you turn compat off (CONFIG_COMPAT=n)?
+
+> This was exposed by the Debian kernel's application of the aufs patches which
+> led to:
 > 
-> >>  }
-> >>  
-> >>  static void print_page_info(struct page *page)
-> >> @@ -604,6 +606,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
-> >>  	unsigned int off;	/* Offset of last byte */
-> >>  	u8 *addr = page_address(page);
-> >>  
-> >> +	kasan_disable_local();
-> >> +
-> >>  	print_tracking(s, p);
-> >>  
-> >>  	print_page_info(page);
-> >> @@ -632,6 +636,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
-> >>  		/* Beginning of the filler is the free pointer */
-> >>  		print_section("Padding ", p + off, s->size - off);
-> >>  
-> >> +	kasan_enable_local();
-> >> +
-> >>  	dump_stack();
-> >>  }
-> > 
-> > And, I recommend that you put this hook on right place.
-> > At a glance, the problematic function is print_section() which have
-> > external function call, print_hex_dump(), with object pointer.
-> > If you disable kasan in print_section, all the below thing won't be
-> > needed, I guess.
-> > 
+> In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
+>                  from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
+>                  from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
+>                  from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
+>                  from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
+>                  from /?PKGBUILDDIR?/include/linux/stat.h:5,
+>                  from /?PKGBUILDDIR?/include/linux/module.h:10,
+>                  from /?PKGBUILDDIR?/init/main.c:15:
+> /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
+>   int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+>                                                                 ^
+> /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
 > 
-> Nope, at least memchr_inv() call in slab_pad_check will be a problem.
-> 
-> I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
-> If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
-> for kasan.
+> This is due to an extra fs.h include added to mm.h. arm64 was the only arch built by
+> Debian which had an issue with this, so I think it is an issue with the arm64
+> headers rather than the aufs patches.
 
-I don't agree with this.
+Hmm, but struct kstat is defined in linux/stat.h so I'm not sure why this is
+arm64-specific. linux/fs.h includes that on line 10.
 
-If someone is going to add a slab_pad_check() in other places in
-slub.c, we should disable/enable kasan there, too. This looks same
-maintenance problem to me. Putting disable/enable only where we
-strictly need at least ensures that we don't need to care when using
-slub internal functions.
+Can you help me unconfuse myself, please?
 
-And, if memchr_inv() is problem, I think that you also need to add hook
-into validate_slab_cache().
-
-validate_slab_cache() -> validate_slab_slab() -> validate_slab() ->
-check_object() -> check_bytes_and_report() -> memchr_inv()
-
-Thanks.
+Will
