@@ -1,64 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Jul 2014 06:30:13 -0700
-Subject: [PATCHv2 06/10] ARM: DRA7: hwmod_data: Add mailbox hwmod data
-In-Reply-To: <1405115083-52977-7-git-send-email-s-anna@ti.com>
-References: <1405115083-52977-1-git-send-email-s-anna@ti.com>
- <1405115083-52977-7-git-send-email-s-anna@ti.com>
-Message-ID: <20140715133013.GA2605@atomide.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 15 Jul 2014 21:32:17 +0800
+Subject: [PATCH v11 04/12] ARM: hisi: enable MCPM implementation
+In-Reply-To: <alpine.LFD.2.11.1407150712110.3647@knanqh.ubzr>
+References: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1407140553300.3647@knanqh.ubzr>
+ <CAD6h2NT-dC_yqkx3iy3BXp7SPy_+nC+mkGk2DGRs9RF5bKZQAw@mail.gmail.com>
+ <alpine.LFD.2.11.1407150712110.3647@knanqh.ubzr>
+Message-ID: <CAD6h2NS3UU6z1hZOPZ8doNy8yNxsFcutCkp96Ls3YSbq0iSZ2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [140711 14:47]:
-> Add the hwmod data for the 13 instances of the system mailbox
-> IP in DRA7 SoC. The patch is needed for performing a soft-reset
-> while configuring the respective mailbox instance, otherwise is
-> a non-essential change for functionality. The modules are smart
-> idled on reset, and the IP module mode is hardware controlled.
-> 
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 305 ++++++++++++++++++++++++++++++
->  1 file changed, 305 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 20b4398..e35f5b1 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -939,6 +939,194 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
->  };
->  
->  /*
-> + * 'mailbox' class
-> + *
-> + */
-> +
-> +static struct omap_hwmod_class_sysconfig dra7xx_mailbox_sysc = {
-> +	.rev_offs	= 0x0000,
-> +	.sysc_offs	= 0x0010,
-> +	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-> +			   SYSC_HAS_SOFTRESET),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-> +	.sysc_fields	= &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class dra7xx_mailbox_hwmod_class = {
-> +	.name	= "mailbox",
-> +	.sysc	= &dra7xx_mailbox_sysc,
-> +};
+On 15 July 2014 19:44, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 15 Jul 2014, Haojian Zhuang wrote:
+>
+>> On 14 July 2014 18:12, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Mon, 14 Jul 2014, Haojian Zhuang wrote:
+>> >
+>> >> +static bool hip04_init_cluster0_snoop(void)
+>> >> +{
+>> >> +     unsigned long data;
+>> >> +
+>> >> +     if (!fabric) {
+>> >> +             pr_err("failed to find fabric base\n");
+>> >> +             return false;
+>> >> +     }
+>> >> +     data = readl_relaxed(fabric + FAB_SF_MODE);
+>> >> +     data |= 1;
+>> >> +     writel_relaxed(data, fabric + FAB_SF_MODE);
+>> >> +     while (1) {
+>> >> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
+>> >> +                     break;
+>> >> +     }
+>> >> +     return true;
+>> >> +}
+>> >
+>> > In fact you probably should make this into something like:
+>> >
+>> > static bool hip04_set_cluster_snoop(int cluster, bool active)
+>> >
+>> > Eventually you'll want to turn snoops off when a cluster is completely
+>> > idle.  And this can be used to init snoops on cluster 0 during boot as
+>> > well.
+>> >
+>> I don't plan to implement power down by resetting cores since the
+>> operation of disabling cluster snoop is not good. It'll make core
+>> hang.
+>>
+>> Now I plan to use wfi instead. Only the first time, we need to make cores
+>> out of reset. For the next times, we only need to use IPI to wakeup
+>> secondary cores instead.
+>
+> Well...
+>
+> If the following conditions are true:
+>
+> 1) snoops can be turned on even for a CPU that is not running, and
+>
+> 2) you do not plan to ever disable snoops after boot, and
+>
+> 3) you do not plan to actually power off CPUs when hotplugged out, and
+>    only use WFI when they are idle
+>
+> ... then MCPM is providing you absolutely no gain at all.  You might as
+> well create your own smp_operations structure directly and skip all the
+> extra MCPM complexity you are not benefiting from.
+>
+> The fundamental reason why MCPM exists is to safely manage cluster wide
+> resources in the presence of concurrent powering up and down of CPUs
+> when standard race avoidance mechanisms can't be used.  You apparently
+> don't have such resources to manage. That certainly will make for
+> suboptimal power consumption but there is so far nothing more sensible
+> that can be done unless more documentation for this hardware is made
+> available.
+>
+>
+> Nicolas
 
-Hmm I'm seeing just the following MAILBOX_SYSCONFIG in at least
-am57xx TRM:
+You're right.
 
-31:4	RESERVED
-3:2	SIDLEMODE	0 = force-idle 1 = no-idle, 2 = smart-idle, 3 = reserved
-1	RESERVED
-0	SOFTRESET
+Now I tried some code. It seems that power down could work. Let me do
+more tests on it.
 
-So it seems that SYSC_HAS_RESET_STATUS above is wrong? Can you guys
-please check.
-
-Regards,
-
-Tony
+Best Regards
+Haojian
