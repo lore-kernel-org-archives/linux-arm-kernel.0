@@ -1,70 +1,66 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 15 Jul 2014 14:49:20 +0200
-Subject: [linux-3.10.17] Could not allocate memory from free CMA areas
-In-Reply-To: <1404862900.76779.YahooMailNeo@web160102.mail.bf1.yahoo.com>
-References: <1404862900.76779.YahooMailNeo@web160102.mail.bf1.yahoo.com>
-Message-ID: <53C52350.6020109@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 15 Jul 2014 14:56:18 +0200
+Subject: [PATCH v3 1/4] ARM: dts: vf610: add FlexCAN node
+In-Reply-To: <cover.1405428166.git.stefan@agner.ch>
+References: <cover.1405428166.git.stefan@agner.ch>
+Message-ID: <2be5a3885653a02dc07bf96ce086fddd71285f5a.1405428166.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add FlexCAN node for the two FlexCAN IP instances in Vybrid.
 
-On 2014-07-09 01:41, PINTU KUMAR wrote:
-> Hi,
->
-> We are facing one problem on linux 3.10 when we try to use CMA as large as 56MB for 256MB RAM device.
-> We found that after certain point of time (during boot), min watermark check is failing when "free_pages" and "free_cma_pages" are almost equal and falls below the min level.
->
-> system details:
-> ARM embedded device: RAM: 256MB
-> Kernel version: 3.10.17
-> Fixed Reserved memory: ~40MB
-> Available memory: 217MB
-> CMA reserved 1 : 56MB
-> ZRAM configured: 128MB or 64MB
-> min_free_kbytes: 1625 (default)
-> Memory controller group enabled (MEMCG)
->
->
-> After boot-up the "free -tm" command shows free memory as: ~50MB
-> CMA is used for all UI display purposes. CMA used during bootup is close to ~6MB.
-> Thus most of the free memory is in the form of CMA free memory.
-> ZRAM getting uses was around ~5MB.
->
->
-> During boot-up itself we observe that the following conditions are met.
->
->
-> if (free_pages - free_cma <= min + lowmem_reserve) {
->      printk"[PINTU]: __zone_watermark_ok: failed !\n");
->
->      return false;
-> }
-> Here: free_pages was: 12940, free_cma was: 12380, min: 566, lowmem: 0
->
->
-> Thus is condition is met most of the time.
-> And because of this watermark failure, Kswapd is waking up frequently.
-> The /proc/pagetypeinfo reports that most of the higher order pages are from CMA regions.
->
->
-> We also observed that ZRAM is trying to allocate memory from CMA region and failing.
->
-> We also tried by decreasing the CMA region to 20MB. With this the watermark failure is not happening in boot time. But if we launch more than 3 apps {Browser, music-player etc}, again the watermark started failing.
->
-> Also we tried decreasing the min_free_kbytes=256, and with this also watermark is passed.
->
-> Our observation is that ZRAM/zsmalloc trying to allocate memory from CMA areas and failed.
->
->
-> Please let us know if anybody have come across the same problem and how to resolve this issue.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf610.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Frankly I really have no idea what is going on. ZRAM/zsmalloc should not 
-try to alloc memory from CMA. I don't have access you the mentioned 
-source code. What flags are passed to alloc_pages() in zram/zsmalloc? It 
-should get pages from non-movable pool.
-
-Best regards
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 3fb127a..9404853 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -14,6 +14,8 @@
+ 
+ / {
+ 	aliases {
++		can0 = &can0;
++		can1 = &can1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+@@ -103,6 +105,16 @@
+ 					<&clks VF610_CLK_DMAMUX1>;
+ 			};
+ 
++			can0: flexcan at 40020000 {
++				compatible = "fsl,vf610-flexcan";
++				reg = <0x40020000 0x4000>;
++				interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_FLEXCAN0>,
++					 <&clks VF610_CLK_FLEXCAN0>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 			uart0: serial at 40027000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x40027000 0x1000>;
+@@ -414,6 +426,17 @@
+ 				clock-names = "nfc";
+ 				status = "disabled";
+ 			};
++
++			can1: flexcan at 400d4000 {
++				compatible = "fsl,vf610-flexcan";
++				reg = <0x400d4000 0x4000>;
++				interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_FLEXCAN1>,
++					 <&clks VF610_CLK_FLEXCAN1>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 		};
+ 	};
+ };
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.0.1
