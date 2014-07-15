@@ -1,264 +1,111 @@
-From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
-Date: Tue, 15 Jul 2014 10:07:57 +0000
-Subject: [RFC V1] devicetree: Dialog Semiconductor consolidate existing
- vendor prefixes to standardise on 'dlg'
-In-Reply-To: <20140714162101.GM26465@leverpostej>
-References: <201407141616.s6EGG7uK022881@swsrvapps-01.diasemi.com>
- <20140714162101.GM26465@leverpostej>
-Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B269FA@SW-EX-MBX02.diasemi.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 15 Jul 2014 12:20:02 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140715120619.7f29c458@bbrezillon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
+Message-ID: <1417324.PxofUz16v0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Boris,
 
+On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
+> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
+> > On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> > > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
+> > > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
+> > > controller device.
+> > > 
+> > > The HLCDC block provides a single RGB output port, and only supports LCD
+> > > panels connection to LCD panels for now.
+> > > 
+> > > The atmel,panel property link the HLCDC RGB output with the LCD panel
+> > > connected on this port (note that the HLCDC RGB connector implementation
+> > > makes use of the DRM panel framework).
+> > > 
+> > > Connection to other external devices (DRM bridges) might be added later
+> > > by mean of a new atmel,xxx (atmel,bridge) property.
+> > > 
+> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > ---
+> > > 
+> > >  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++++++
+> > >  1 file changed, 59 insertions(+)
+> > >  create mode 100644
+> > >  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
 
-On 14 July 2014 17:21, Mark Rutland wrote:
->From: Mark Rutland [mailto:mark.rutland at arm.com]
->
->On Mon, Jul 14, 2014 at 05:07:20PM +0100, Opensource [Steve Twiss] wrote:
->> From: Opensource [Steve Twiss] <stwiss.opensource@diasemi.com>
->>
->> This patch series updates the device tree vendor prefix for
->> Dialog Semiconductor
->>
->> Various methods are currently used throughout the kernel: 'diasemi',
->> 'dialog' and 'dlg'. Others have also been suggested.
->>
->> This patch set aims to consolidate the usage of the vendor prefix to
->> use a common standard. The prefix 'dlg' is used.
->>
->> This e-mail is in response to the previous thread here:
->>
->> - https://lkml.org/lkml/2014/6/11/262
->
->In that response, Rob pointed out the old forms should be marked
->deprecated, but the patch seems to outright remove them.
->
->Are we sure this doesn't break an existing DTB anywhere?
->
->Thanks,
->Mark.
+[snip]
 
-Hi Mark,
+> > > + - atmel,panel: Should contain a phandle with 2 parameters.
+> > > +   The first cell is a phandle to a DRM panel device
+> > > +   The second cell encodes the RGB mode, which can take the following
+> > > values: +   * 0: RGB444
+> > > +   * 1: RGB565
+> > > +   * 2: RGB666
+> > > +   * 3: RGB888
+> > 
+> > These are properties of the panel and should be obtained from the panel
+> > directly rather than an additional cell in this specifier.
+> 
+> Okay.
+> What's the preferred way of doing this ?
+> What about defining an rgb-mode property in the panel node.
 
-Rob said that the old forms should be marked as deprecated, but I didn't
-deprecate any "dialog" or "diasemi" entries in this patch because I have
-only made two types of change:
+You could do that, but it won't help you much, as the HLCDC driver must not 
+parse properties from the panel node. You should instead extend the drm_panel 
+API with a function to retrieve panel properties. The HLCDC driver will then 
+query the panel driver at runtime for the interface type. The panel driver 
+will get the information from hardcoded data in the driver, from DT or 
+possibly in some cases by querying the panel hardware directly.
 
-(1) definitions of "diasemi" or "dialog" that have not been used in the kernel;
-(2) definitions of "diasemi" or "dialog" that are incompatible with existing driver code.
+> BTW, have you received this series [1] adding support for the LCD panel
+> I'm testing this driver with.
+> 
+> [1] https://lkml.org/lkml/2014/6/5/612
+> 
+> > > +   The third cell encodes specific flags describing LCD signals
+> > > configuration
+> > > +   (see Atmel's datasheet for a full description of these fields):
+> > > +   * bit 0: HSPOL: Horizontal Synchronization Pulse Polarity
+> > > +   * bit 1: VSPOL: Vertical Synchronization Pulse Polarity
+> > > +   * bit 2: VSPDLYS: Vertical Synchronization Pulse Start
+> > > +   * bit 3: VSPDLYE: Vertical Synchronization Pulse End
+> > > +   * bit 4: DISPPOL: Display Signal Polarity
+> > > +   * bit 7: DISPDLY: LCD Controller Display Power Signal
+> > > Synchronization
+> > > +   * bit 12: VSPSU: LCD Controller Vertical synchronization Pulse Setup
+> > > Configuration
+> > > +   * bit 13: VSPHO: LCD Controller Vertical synchronization Pulse Hold
+> > > Configuration
+> > > +   * bit 16-20: GUARDTIME: LCD DISPLAY Guard Time
+> > 
+> > Similarly for most of these: HSPOL and VSPOL seem to correspond to the
+> > DRM_MODE_FLAG_{{P,N},{H,V}}SYNC flags in struct drm_display_mode. And
+> > VSPDLYS as well as VSPDLYE sound like they may be vsync_start and
+> > vsync_end of the same structure.
+> 
+> I agree with HSPOL and VSPOL.
+> 
+> > As for the others, maybe if you could explain what exactly they are we
+> > may be able to find a better fit.
+> 
+> Atmel datasheets include several timing diagrams [2] (chapter "32.6.17
+> Output Timing Generation" page 603), and I think you will get more
+> informations from these diagrams than if I try to explain what I
+> understood ;-).
 
-In both of these cases they cannot affect any working DTB.
+The VSP* bits fine-tune the VSYNC pulse generation timings by specifying the 
+relationship between the VSYNC edges and the HSYNC pulses at the beginning and 
+end of the VSYNC pulse. It might make sense to turn that into standard DRM 
+properties, but we'll need to research if and how other vendor offer similar 
+features.
 
-Actually -- I will need to resend a V2 to this patch because I did miss out two
-files for DA9210 which reference the unused compatible flag "diasemi" and I
-might as well fix those while I am doing this change.
+As for GUARDTIME, I would split it into its own property. What are the typical 
+values you have seen being used in read systems ?
 
-I will resend those changes all my "working" in my next patch RFC V2.
-
+-- 
 Regards,
-Steve
 
->>
->> Signed-off-by: Opensource [Steve Twiss] <stwiss.opensource@diasemi.com>
->> ---
->> Checks performed with linux-next/next-20140714/scripts/checkpatch.pl
->>  trivial-devices.txt       total: 0 errors, 0 warnings, 89 lines checked
->>  da9210.txt                total: 0 errors, 0 warnings, 21 lines checked
->>  vendor-prefixes.txt       total: 0 errors, 0 warnings, 149 lines checked
->>  imx53-smd.dts             total: 0 errors, 2 warnings, 279 lines checked
->>  imx6qdl-phytec-pfla02.dtsi total: 0 errors, 2 warnings, 357 lines checked
->>  da9055-core.c             total: 0 errors, 0 warnings, 428 lines checked
->>
->> This patch applies against linux-next and next-20140714
->>
->> Regards,
->> Steve Twiss, Dialog Semiconductor Ltd.
->>
->>  .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
->>  .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
->>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>  arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
->>  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
->>  drivers/mfd/da9055-core.c                          | 26 +++++++++++-----------
->>  6 files changed, 19 insertions(+), 18 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
->b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
->> index 37803eb..a02b8a1 100644
->> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
->> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
->> @@ -44,7 +44,7 @@ dallas,ds1775		Tiny Digital Thermometer and
->Thermostat
->>  dallas,ds3232		Extremely Accurate I??C RTC with Integrated Crystal and
->SRAM
->>  dallas,ds4510		CPU Supervisor with Nonvolatile Memory and
->Programmable I/O
->>  dallas,ds75		Digital Thermometer and Thermostat
->> -dialog,da9053		DA9053: flexible system level PMIC with
->multicore support
->> +dlg,da9053		DA9053: flexible system level PMIC with multicore
->support
->>  epson,rx8025		High-Stability. I2C-Bus INTERFACE REAL TIME CLOCK
->MODULE
->>  epson,rx8581		I2C-BUS INTERFACE REAL TIME CLOCK MODULE
->>  fsl,mag3110		MAG3110: Xtrinsic High Accuracy, 3D Magnetometer
->> diff --git a/Documentation/devicetree/bindings/regulator/da9210.txt
->b/Documentation/devicetree/bindings/regulator/da9210.txt
->> index f120f22..3297c53 100644
->> --- a/Documentation/devicetree/bindings/regulator/da9210.txt
->> +++ b/Documentation/devicetree/bindings/regulator/da9210.txt
->> @@ -2,7 +2,7 @@
->>
->>  Required properties:
->>
->> -- compatible:	must be "diasemi,da9210"
->> +- compatible:	must be "dlg,da9210"
->>  - reg:		the i2c slave address of the regulator. It should be 0x68.
->>
->>  Any standard regulator properties can be used to configure the single da9210
->> @@ -11,7 +11,7 @@ DCDC.
->>  Example:
->>
->>  	da9210 at 68 {
->> -		compatible = "diasemi,da9210";
->> +		compatible = "dlg,da9210";
->>  		reg = <0x68>;
->>
->>  		regulator-min-microvolt = <900000>;
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
->b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 5d27e5a..35a833e 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -37,6 +37,7 @@ dallas	Maxim Integrated Products (formerly Dallas
->Semiconductor)
->>  davicom	DAVICOM Semiconductor, Inc.
->>  denx	Denx Software Engineering
->>  digi	Digi International Inc.
->> +dlg	Dialog Semiconductor
->>  dlink	D-Link Corporation
->>  dmo	Data Modul AG
->>  ebv	EBV Elektronik
->> diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-
->smd.dts
->> index 5ec1590..1d32557 100644
->> --- a/arch/arm/boot/dts/imx53-smd.dts
->> +++ b/arch/arm/boot/dts/imx53-smd.dts
->> @@ -265,7 +265,7 @@
->>  	};
->>
->>  	pmic: dialog at 48 {
->> -		compatible = "dialog,da9053", "dialog,da9052";
->> +		compatible = "dlg,da9053", "dlg,da9052";
->>  		reg = <0x48>;
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
->b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
->> index 2694aa8..0e50bb0 100644
->> --- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
->> @@ -83,7 +83,7 @@
->>  	};
->>
->>  	pmic at 58 {
->> -		compatible = "dialog,da9063";
->> +		compatible = "dlg,da9063";
->>  		reg = <0x58>;
->>  		interrupt-parent = <&gpio4>;
->>  		interrupts = <17 0x8>; /* active-low GPIO4_17 */
->> diff --git a/drivers/mfd/da9055-core.c b/drivers/mfd/da9055-core.c
->> index caf8dcf..b4d920c 100644
->> --- a/drivers/mfd/da9055-core.c
->> +++ b/drivers/mfd/da9055-core.c
->> @@ -296,73 +296,73 @@ static struct resource da9055_ld05_6_resource = {
->>
->>  static const struct mfd_cell da9055_devs[] = {
->>  	{
->> -		.of_compatible = "dialog,da9055-gpio",
->> +		.of_compatible = "dlg,da9055-gpio",
->>  		.name = "da9055-gpio",
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 1,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 2,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 3,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 4,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 5,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 6,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.id = 7,
->>  		.resources = &da9055_ld05_6_resource,
->>  		.num_resources = 1,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-regulator",
->> +		.of_compatible = "dlg,da9055-regulator",
->>  		.name = "da9055-regulator",
->>  		.resources = &da9055_ld05_6_resource,
->>  		.num_resources = 1,
->>  		.id = 8,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-onkey",
->> +		.of_compatible = "dlg,da9055-onkey",
->>  		.name = "da9055-onkey",
->>  		.resources = &da9055_onkey_resource,
->>  		.num_resources = 1,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-rtc",
->> +		.of_compatible = "dlg,da9055-rtc",
->>  		.name = "da9055-rtc",
->>  		.resources = da9055_rtc_resource,
->>  		.num_resources = ARRAY_SIZE(da9055_rtc_resource),
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-hwmon",
->> +		.of_compatible = "dlg,da9055-hwmon",
->>  		.name = "da9055-hwmon",
->>  		.resources = &da9055_hwmon_resource,
->>  		.num_resources = 1,
->>  	},
->>  	{
->> -		.of_compatible = "dialog,da9055-watchdog",
->> +		.of_compatible = "dlg,da9055-watchdog",
->>  		.name = "da9055-watchdog",
->>  	},
->>  };
->> --
->> end-of-patch for RFC V1
->>
->>
+Laurent Pinchart
