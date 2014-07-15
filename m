@@ -1,55 +1,41 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 15 Jul 2014 11:20:21 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <20140711201238.GY20603@laptop.programming.kicks-ass.net>
+Date: Tue, 15 Jul 2014 11:21:24 +0200
+Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <20140714135106.GZ19379@twins.programming.kicks-ass.net>
 References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
- <20140711151304.GD3935@laptop>
- <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
- <20140711201238.GY20603@laptop.programming.kicks-ass.net>
-Message-ID: <CAKfTPtD0=xNfi46Y6NybAax11RmyZizA39jxK35YroEKE3ZmJQ@mail.gmail.com>
+ <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
+ <20140710111833.GY3935@laptop>
+ <CAKfTPtD=TiURcppZ+oVUmhMf6Ofxbp4BPA0SCFViu0SDb05oRw@mail.gmail.com>
+ <20140711145138.GC3935@laptop>
+ <CAKfTPtCdd6uR_qBuW2W4asMgEV=OfsNvrOCVQCci+w3C8RAoCQ@mail.gmail.com>
+ <20140714135106.GZ19379@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCoBpt5aOe9z2LjvOZBsiNnnC5wCFRyyOS_RPoqshJCxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2014 22:12, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Fri, Jul 11, 2014 at 07:39:29PM +0200, Vincent Guittot wrote:
->> In my mind, arch_scale_cpu_freq was intend to scale the capacity of
->> the CPU according to the current dvfs operating point.
->> As it's no more use anywhere now that we have arch_scale_cpu, we could
->> probably remove it .. and see when it will become used.
->
-> I probably should have written comments when I wrote that code, but it
-> was meant to be used only where, as described above, we limit things.
-> Ondemand and such, which will temporarily decrease freq, will ramp it up
-> again at demand, and therefore lowering the capacity will skew things.
->
-> You'll put less load on because its run slower, and then you'll run it
-> slower because there's less load on -> cyclic FAIL.
->
->> > In that same discussion ISTR a suggestion about adding avg_running time,
->> > as opposed to the current avg_runnable. The sum of avg_running should be
->> > much more accurate, and still react correctly to migrations.
+On 14 July 2014 15:51, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, Jul 11, 2014 at 05:17:44PM +0200, Vincent Guittot wrote:
+>> > In any case, its feels rather arbitrary to me. What about machines where
+>> > there's no cache sharing at all (the traditional SMP systems). This
+>> > thing you're trying to do still seems to make sense there.
 >>
->> I haven't look in details but I agree that avg_running would be much
->> more accurate than avg_runnable and should probably fit the
->> requirement. Does it means that we could re-add the avg_running (or
->> something similar) that has disappeared during the review of load avg
->> tracking patchset ?
+>> ok, I thought that traditional SMP systems have this flag set at core
+>> level.
 >
-> Sure, I think we killed it there because there wasn't an actual use for
-> it and I'm always in favour of stripping everything to their bare bones,
-> esp big and complex things.
+> Yeah, with 1 core, so its effectively disabled.
 >
-> And then later, add things back once we have need for it.
+>> I mean ARM platforms have the flag for CPUs in the same cluster
+>> (which include current ARM SMP system) and the corei7 of my laptop has
+>> the flag at the cores level.
+>
+> So I can see 'small' parts reducing shared caches in order to improve
+> idle performance.
+>
+> The point being that LLC seems a somewhat arbitrary measure for this.
+>
+> Can we try and see what happens if you remove the limit. Its always best
+> to try the simpler things first and only make it more complex if we have
+> to.
 
-Ok, i'm going to look how to add it back taking nto account current
-Yuyang's rework of load_avg
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+ok. i will remove the condition in the next version
