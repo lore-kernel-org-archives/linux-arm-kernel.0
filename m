@@ -1,141 +1,61 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 15 Jul 2014 17:20:27 +0200
-Subject: [PATCH v3 11/15] drivers: clk: st: STiH407: Support for clockgenC0
-In-Reply-To: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1405437631-23623-12-git-send-email-gabriel.fernandez@linaro.org>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Tue, 15 Jul 2014 17:22:30 +0200
+Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
+In-Reply-To: <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140627032506.GA18039@shlinux1.ap.freescale.net>
+ <20140630133313.GA11880@kwain>
+ <20140701002112.GA26146@shlinux1.ap.freescale.net>
+ <53B27789.3090509@gmail.com>
+ <20140701083007.GB26146@shlinux1.ap.freescale.net>
+ <20140701104254.GD3427@piout.net>
+ <53B2D151.60404@cogentembedded.com>
+ <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <20140715152230.GE1011@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch added support for DT registration of ClockGenC0
-It includes 2 c32 type PLL and a 660 Quadfs.
+Hi guys,
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/clk/st/clkgen-fsyn.c | 51 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/st/clkgen-pll.c  | 32 +++++++++++++++++++++++++++
- 2 files changed, 83 insertions(+)
+On Wed, Jul 02, 2014 at 01:10:00AM +0000, Peter Chen wrote:
+> > On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
+> > 
+> > >>>>> Well, there is nothing specific about the Berlin CI. Some
+> > >>>>> subsystems use the 'generic' keyword in these cases. Do you see a
+> > >>>>> particular reason I should use some Berlin related compatible here?
+> > 
+> > >>>> Not must, one suggestion is: can you change the compatible string
+> > >>>> to "chipidea-usb-generic"?
+> > 
+> > >>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
+> > >>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
+> > >>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
+> > 
+> > >> The recommended format for compatible string is:
+> > >> "manufacturer,model", I agree with "chipidea,ci13xxx", thanks.
+> > 
+> > > I think we should probably avoid using wildcards in the compatible
+> > > string.
+> > 
+> >     I'm sure wildcards shouldn't be allowed there. :-)
+> 
+> Then, what's your guys recommend, how about "chipidea,usb2-generic"?
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 4cd10b2..84fcf71 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -255,6 +255,49 @@ static const struct clkgen_quadfs_data st_fs660c32_F_416 = {
- 	.get_rate	= clk_fs660c32_dig_get_rate,
- };
- 
-+static const struct clkgen_quadfs_data st_fs660c32_C_407 = {
-+	.nrst_present = true,
-+	.nrst	= { CLKGEN_FIELD(0x2f0, 0x1, 0),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 1),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 2),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 3) },
-+	.npda	= CLKGEN_FIELD(0x2f0, 0x1, 12),
-+	.nsb	= { CLKGEN_FIELD(0x2f0, 0x1, 8),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 9),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 10),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 11) },
-+	.nsdiv_present = true,
-+	.nsdiv	= { CLKGEN_FIELD(0x304, 0x1, 24),
-+		    CLKGEN_FIELD(0x308, 0x1, 24),
-+		    CLKGEN_FIELD(0x30c, 0x1, 24),
-+		    CLKGEN_FIELD(0x310, 0x1, 24) },
-+	.mdiv	= { CLKGEN_FIELD(0x304, 0x1f, 15),
-+		    CLKGEN_FIELD(0x308, 0x1f, 15),
-+		    CLKGEN_FIELD(0x30c, 0x1f, 15),
-+		    CLKGEN_FIELD(0x310, 0x1f, 15) },
-+	.en	= { CLKGEN_FIELD(0x2fc, 0x1, 0),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 1),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 2),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 3) },
-+	.ndiv	= CLKGEN_FIELD(0x2f4, 0x7, 16),
-+	.pe	= { CLKGEN_FIELD(0x304, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x308, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x30c, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x310, 0x7fff, 0) },
-+	.sdiv	= { CLKGEN_FIELD(0x304, 0xf, 20),
-+		    CLKGEN_FIELD(0x308, 0xf, 20),
-+		    CLKGEN_FIELD(0x30c, 0xf, 20),
-+		    CLKGEN_FIELD(0x310, 0xf, 20) },
-+	.lockstatus_present = true,
-+	.lock_status = CLKGEN_FIELD(0x2A0, 0x1, 24),
-+	.powerup_polarity = 1,
-+	.standby_polarity = 1,
-+	.pll_ops	= &st_quadfs_pll_c32_ops,
-+	.rtbl		= fs660c32_rtbl,
-+	.rtbl_cnt	= ARRAY_SIZE(fs660c32_rtbl),
-+	.get_rate	= clk_fs660c32_dig_get_rate,
-+};
-+
- /**
-  * DOC: A Frequency Synthesizer that multiples its input clock by a fixed factor
-  *
-@@ -938,6 +981,14 @@ static struct of_device_id quadfs_of_match[] = {
- 		.compatible = "st,stih416-quadfs660-F",
- 		.data = &st_fs660c32_F_416
- 	},
-+	{
-+		.compatible = "st,stih407-quadfs660-C",
-+		.data = &st_fs660c32_C_407
-+	},
-+	{
-+		.compatible = "st,stih407-quadfs660-D",
-+		.data = &st_fs660c32_D_407
-+	},
- 	{}
- };
- 
-diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-index d4ef4f4..5327a74 100644
---- a/drivers/clk/st/clkgen-pll.c
-+++ b/drivers/clk/st/clkgen-pll.c
-@@ -192,6 +192,30 @@ static const struct clkgen_pll_data st_pll3200c32_407_a0 = {
- 	.ops		= &stm_pll3200c32_ops,
- };
- 
-+static const struct clkgen_pll_data st_pll3200c32_407_c0_0 = {
-+	/* 407 C0 PLL0 */
-+	.pdn_status	= CLKGEN_FIELD(0x2a0,	0x1,			8),
-+	.locked_status	= CLKGEN_FIELD(0x2a0,	0x1,			24),
-+	.ndiv		= CLKGEN_FIELD(0x2a4,	C32_NDIV_MASK,		16),
-+	.idf		= CLKGEN_FIELD(0x2a4,	C32_IDF_MASK,		0x0),
-+	.num_odfs = 1,
-+	.odf		= { CLKGEN_FIELD(0x2b4, C32_ODF_MASK,		0) },
-+	.odf_gate	= { CLKGEN_FIELD(0x2b4, 0x1,			6) },
-+	.ops		= &stm_pll3200c32_ops,
-+};
-+
-+static const struct clkgen_pll_data st_pll3200c32_407_c0_1 = {
-+	/* 407 C0 PLL1 */
-+	.pdn_status	= CLKGEN_FIELD(0x2c8,	0x1,			8),
-+	.locked_status	= CLKGEN_FIELD(0x2c8,	0x1,			24),
-+	.ndiv		= CLKGEN_FIELD(0x2cc,	C32_NDIV_MASK,		16),
-+	.idf		= CLKGEN_FIELD(0x2cc,	C32_IDF_MASK,		0x0),
-+	.num_odfs = 1,
-+	.odf		= { CLKGEN_FIELD(0x2dc, C32_ODF_MASK,		0) },
-+	.odf_gate	= { CLKGEN_FIELD(0x2dc, 0x1,			6) },
-+	.ops		= &stm_pll3200c32_ops,
-+};
-+
- /**
-  * DOC: Clock Generated by PLL, rate set and enabled by bootloader
-  *
-@@ -586,6 +610,14 @@ static struct of_device_id c32_pll_of_match[] = {
- 		.compatible = "st,stih407-plls-c32-a0",
- 		.data = &st_pll3200c32_407_a0,
- 	},
-+	{
-+		.compatible = "st,stih407-plls-c32-c0_0",
-+		.data = &st_pll3200c32_407_c0_0,
-+	},
-+	{
-+		.compatible = "st,stih407-plls-c32-c0_1",
-+		.data = &st_pll3200c32_407_c0_1,
-+	},
- 	{}
- };
- 
+So what do you think? "chipidea,ci13", "chipidea,usb2-generic" or
+something else?
+
+I tend to prefer something without the 'generic' keyword.
+
+After updating the compatible I'll send a v3 based on USB changes
+introducing the generic PHY support[1].
+
+[1] https://lkml.org/lkml/2014/7/15/330
+
+
+Antoine
+
 -- 
-1.9.1
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
