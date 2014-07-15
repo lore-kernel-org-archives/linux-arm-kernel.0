@@ -1,51 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Jul 2014 21:28:31 +0900
-Subject: [PATCH v5 8/8] ARM: shmobile: genmai-reference: Enable MTU2 in
- device tree
-In-Reply-To: <20140715113606.GB25203@verge.net.au>
-References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1404911564-17380-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140710095430.GD2728@katana>
- <20140715085430.GB17806@verge.net.au>
- <20140715085815.GD17806@verge.net.au>
- <20140715113606.GB25203@verge.net.au>
-Message-ID: <20140715122831.GG25333@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Jul 2014 13:35:57 +0100
+Subject: [PATCH 1/3 v6] spi: s3c64xx: fix broken "cs_gpios" usage in the
+ driver
+In-Reply-To: <CABxcv==yuWJYmSiVV=HELMdwi-8aAG-aiT9o12HUBp8uRaBxkQ@mail.gmail.com>
+References: <1405316506-27855-1-git-send-email-ch.naveen@samsung.com>
+ <1405316506-27855-2-git-send-email-ch.naveen@samsung.com>
+ <20140714172524.GH6800@sirena.org.uk>
+ <CABxcv==yuWJYmSiVV=HELMdwi-8aAG-aiT9o12HUBp8uRaBxkQ@mail.gmail.com>
+Message-ID: <20140715123557.GB17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 08:36:06PM +0900, Simon Horman wrote:
-> On Tue, Jul 15, 2014 at 05:58:15PM +0900, Simon Horman wrote:
-> > On Tue, Jul 15, 2014 at 05:54:32PM +0900, Simon Horman wrote:
-> > > On Thu, Jul 10, 2014 at 11:54:30AM +0200, Wolfram Sang wrote:
-> > > > On Wed, Jul 09, 2014 at 03:12:44PM +0200, Laurent Pinchart wrote:
-> > > > > No more device needs to be added from platform code when booting the
-> > > > > reference platform, move MTU2 registration from setup-r7s72100.c to
-> > > > > board-genmai.c and remove the now empty r7s72100_add_dt_devices()
-> > > > > function.
-> > > > > 
-> > > > > As the genmai_add_standard_devices() function is now identical to the
-> > > > > default init_machine implementation, remove it as well.
-> > > > > 
-> > > > > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > > 
-> > > > Yay, tasty!
-> > > > 
-> > > > Reviewed-by: Wolfram Sang <wsa@sang-engineering.com>
-> > > 
-> > > Hi Laurent,
-> > > 
-> > > I am having some trouble with this patch.
-> > > In particular the shmobile defconfig with an initrd added
-> > > (to compensate for the lack of ethernet and thus NFS) does
-> > > not seem to make it to userspace with this patch applied :(
-> > > 
-> > > I am dropping it for now, but could you look into it?
-> > 
-> > I have likewise dropped "ARM: shmobile: r7s72100: Add MTU2 device to DT"
-> > for now.
-> 
-> I believe that I have tracked down the problem and that it is
-> in "ARM: shmobile: r7s72100: Add MTU2 device to DT".
-> I will describe it in a response to that patch.
+On Tue, Jul 15, 2014 at 12:38:58PM +0200, Javier Martinez Canillas wrote:
+> Hello Mark,
 
-Now that problem has been resolved I have re-queued-up this patch.
+Don't top post.
+
+> On Mon, Jul 14, 2014 at 7:25 PM, Mark Brown <broonie@kernel.org> wrote:
+> > On Mon, Jul 14, 2014 at 11:11:44AM +0530, Naveen Krishna Chatradhi wrote:
+
+> So, the .line field is used to specify a GPIO, not a chip select. So
+> gpio_is_valid() should also be used to check that cs->line is a valid
+> GPIO. If board file does not want to use a GPIO and wants to use a
+> built-in chip select then it should either not use a struct
+> s3c64xx_spi_csinfo at all or set .line to -ENOENT in order to be
+> consistent with the SPI core.
+
+This sort of "let's make everyone instabuggy" change is not good
+practice, especially when it's mixed in with some other not obviously
+related change, has an unclear benefit and is barely mentioned in the
+commit log - I found this through code review, not through it being a
+clearly intentional and considered part of the change.
+
+> As I said before this patch is fixing a bug in the SPI driver, the
+> first version of the series was posted on June, 10 so many other
+> patches already depend on this fix. So it would be great if we can
+> move this forward since this is hurting the platform support as a
+> whole.
+
+So provide a clear, easy to understand patch series then.  As I've said
+before this series is setting off lots of alarm bells - the large number
+of versions, the difficulty in understanding what it was supposed to do
+both for the overall goal of the series and the individual changes, and
+the fact that several people have found bugs for use cases other than
+your own (all the way up to removing non-DT support) are all saying that
+this is something that needs careful review and also making that review
+difficult.
+
+Code review is an important part of the process, we need people to work
+to make that review easy, address review comments and allow a reasonable
+time for the review to happen (something that's obviously going to be
+quicker with submissions that are easier to review).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/81a984f1/attachment.sig>
