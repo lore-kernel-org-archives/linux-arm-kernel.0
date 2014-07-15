@@ -1,43 +1,107 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 15 Jul 2014 08:59:45 -0700
-Subject: [PATCH] ARM: config: update multi_v7_defconfig
-In-Reply-To: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
-References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 15 Jul 2014 12:11:49 -0400 (EDT)
+Subject: [PATCH 1/8] ARM: Add platform support for Fujitsu MB86S7X SoCs
+In-Reply-To: <CAL_JsqKvwxjEDZPVwL646PhPKr7oemBzxr6cZ+X=uJQ2u_XZ8g@mail.gmail.com>
+References: <1405232911-4569-1-git-send-email-mollie.wu@linaro.org>
+ <CAL_JsqKvwxjEDZPVwL646PhPKr7oemBzxr6cZ+X=uJQ2u_XZ8g@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1407151154450.3647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen,
+On Tue, 15 Jul 2014, Rob Herring wrote:
 
-On Tue, Jul 15, 2014 at 1:02 AM, Naveen Krishna Chatradhi
-<ch.naveen@samsung.com> wrote:
-> Enabled S3C24XX I2C driver and MAX77686 PMIC MFD and Voltage
-> regulator drivers used on Exynos5250 based Snow board.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
-> By enabling the symbols to compile S3C24XX I2C driver, MAX77686 PMIC
-> under MFD and REGULATOR.
->
-> http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
-> The warnings by cpufreq on Snow board are fixed.
->
-> Booted and verified on  on Exynos5420 based Snow board
->
->  arch/arm/configs/multi_v7_defconfig |    3 +++
->  1 file changed, 3 insertions(+)
+> Adding Nico for cluster PM code.
 
-Is there a reason not to add more of the max77686 configs?
+Thanks.
 
-+CONFIG_RTC_DRV_MAX77686=y
-+CONFIG_COMMON_CLK_MAX77686=y
+This really ought to be split into smaller patches.
 
-I also seems like it would be nice to reconcile this with Sacin's
-latest patch.  For starters I notice that you're missing:
-  CONFIG_EXYNOS5420_MCPM=y
+[...]
 
-I'll leave it up to you to look for other things that might be
-missing.  If some of the things in exynos5_defconfig can't go into the
-multi-config, please explain.
+> > index 0000000..86d223f
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mb86s7x/mcpm.c
+> > @@ -0,0 +1,293 @@
+> > +/*
+> > + * arch/arm/mach-mb86s7x/mcpm.c
+> > + *
+> > + * "Inspired" by tc_pm.c
+> > + * Copyright:  (C) 2013-2014  Fujitsu Semiconductor Limited
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/io.h>
+> > +#include <linux/pm.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/reboot.h>
+> > +#include <linux/arm-cci.h>
+> > +#include <linux/spinlock.h>
+> > +#include <linux/irqchip/arm-gic.h>
+> > +#include <linux/platform_data/mb86s7x_mbox.h>
+> > +
+> > +#include <asm/mcpm.h>
+> > +#include <asm/cp15.h>
+> > +#include <asm/cputype.h>
+> > +#include <asm/system_misc.h>
+> > +
+> > +#include "iomap.h"
+> > +
+> > +static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> 
+> You should not be using arch_spinlock_t directly.
 
--Doug
+Depends.  See comment from line 48 in arch/arm/mach-vexpress/tc2_pm.c.
+
+> > +static int mb86s7x_pm_use_count[2][2];
+> > +
+> > +#define MB86S7X_WFICOLOR_VIRT (MB86S7X_ISRAM_VIRT + WFI_COLOR_REG_OFFSET)
+> > +
+> > +static void mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr)
+> > +{
+> > +       u8 val;
+> > +
+> > +       if (clr & ~AT_WFI_COLOR_MASK)
+> > +               return;
+> > +
+> > +       val = readb_relaxed(MB86S7X_WFICOLOR_VIRT + clstr * 2 + cpu);
+> > +       val &= ~AT_WFI_COLOR_MASK;
+> > +       val |= clr;
+> > +       writeb_relaxed(val, MB86S7X_WFICOLOR_VIRT + clstr * 2 + cpu);
+> > +}
+> > +
+> > +static int mb86s7x_pm_power_up(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +       struct completion got_rsp;
+> > +       int ret = 0;
+> > +
+> > +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> > +
+> > +       arch_spin_lock(&mb86s7x_pm_lock);
+
+This is called in a preemptible context so local_irq_disable() has to be 
+used before arch_spin_lock().  There is no combined operator for it.
+
+> > +       mb86s7x_pm_use_count[cpu][cluster]++;
+> > +
+> > +       if (mb86s7x_pm_use_count[cpu][cluster] == 1) {
+> > +               struct mb86s7x_cpu_gate cmd;
+> > +
+> > +               arch_spin_unlock(&mb86s7x_pm_lock);
+> 
+> Can't you use atomic operations here (i.e. atomic_inc_return) instead of a lock?
+
+There is more than the count that has to be atomic.
+
+> In any case, Nicolas should review the cluster PM code if he hasn't
+> already. As Arnd pointed out, this patch should be split up into
+> multiple patches. I'd suggest splitting into DT bindings, DTS files,
+> base support, mailbox, MCPM, and PM domains.
+
+Agreed.
+
+
+Nicolas
