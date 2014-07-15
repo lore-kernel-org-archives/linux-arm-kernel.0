@@ -1,43 +1,55 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Jul 2014 01:01:55 +0200
-Subject: [PATCH 4/6] ARM: rockchip: enable support for RK3288 SoCs
-In-Reply-To: <1471578.ILeMmG2DL6@diego>
-References: <1471578.ILeMmG2DL6@diego>
-Message-ID: <4355781.cnmcVo5AVu@diego>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 15 Jul 2014 16:00:38 -0700
+Subject: [PATCH v4 0/3] Qualcomm Resource Power Manager driver
+Message-ID: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HAVE_ARM_ARCH_TIMER and add a rockchip,rk3288 compatible.
+This series adds a regulator driver for the Resource Power Manager found in
+Qualcomm 8660, 8960 and 8064 based devices.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/mach-rockchip/Kconfig    | 1 +
- arch/arm/mach-rockchip/rockchip.c | 1 +
- 2 files changed, 2 insertions(+)
+The RPM driver exposes resources to its child devices, that can be accessed to
+implement drivers for the regulators, clocks and bus frequency control that's
+owned by the RPM in these devices.
 
-diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-index e4564c2..d168669 100644
---- a/arch/arm/mach-rockchip/Kconfig
-+++ b/arch/arm/mach-rockchip/Kconfig
-@@ -6,6 +6,7 @@ config ARCH_ROCKCHIP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_GIC
- 	select CACHE_L2X0
-+	select HAVE_ARM_ARCH_TIMER
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select DW_APB_TIMER_OF
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 968cc34..8ab9e0e 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -29,6 +29,7 @@ static const char * const rockchip_board_dt_compat[] = {
- 	"rockchip,rk3066a",
- 	"rockchip,rk3066b",
- 	"rockchip,rk3188",
-+	"rockchip,rk3288",
- 	NULL,
- };
- 
+Changes since v3:
+  - IPC register is acquired through syscon, as it's shared with others
+
+Changes since v2:
+  - Fix copy-paste error in dt binding
+  - Correct incomplete move from mfd to soc
+  - Correct const mistake in regulator driver
+
+Changes since v1:
+  - Moved rpm driver to drivers/soc
+  - Extracted resource table structs from rpm struct, as per Srinivas request
+  - Dropped mode setting support for the regulators for now. Unsure if we need
+    it and it requires some rework from the codeaurora solution.
+  - Using set_voltage_sel instead of rolling my own "snapping", as per Marks
+    request
+  - Split regulator ops in mV, uV and swtich versions as per Marks request.
+  - Added devicetree property to enable pull down.
+
+Bjorn Andersson (3):
+  soc: devicetree: bindings: Add Qualcomm RPM DT binding
+  soc: qcom-rpm: Driver for the Qualcomm RPM
+  regulator: qcom-rpm: Regulator driver for the Qualcomm RPM
+
+ .../devicetree/bindings/soc/qcom/qcom,rpm.txt      | 263 +++++++
+ drivers/regulator/Kconfig                          |  12 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/qcom_rpm-regulator.c             | 787 +++++++++++++++++++++
+ drivers/soc/qcom/Kconfig                           |  14 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/qcom_rpm.c                        | 596 ++++++++++++++++
+ include/dt-bindings/soc/qcom,rpm.h                 | 142 ++++
+ include/linux/soc/qcom_rpm.h                       |  12 +
+ 9 files changed, 1828 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
+ create mode 100644 drivers/regulator/qcom_rpm-regulator.c
+ create mode 100644 drivers/soc/qcom/qcom_rpm.c
+ create mode 100644 include/dt-bindings/soc/qcom,rpm.h
+ create mode 100644 include/linux/soc/qcom_rpm.h
+
 -- 
-1.9.0
+1.8.2.2
