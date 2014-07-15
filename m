@@ -1,60 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Jul 2014 15:31:11 +0100
-Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <1405434206.25580.31.camel@deneb.redhat.com>
-References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405363248.25580.12.camel@deneb.redhat.com>
- <20140715100221.GU4179@bivouac.eciton.net>
- <1405429860.25580.25.camel@deneb.redhat.com>
- <20140715135418.GV4179@bivouac.eciton.net>
- <1405434206.25580.31.camel@deneb.redhat.com>
-Message-ID: <20140715143110.GB26465@leverpostej>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 15 Jul 2014 18:32:23 +0400
+Subject: [RFC/PATCH -next 00/21] Address sanitizer for kernel (kasan) -
+ dynamic memory error detector.
+In-Reply-To: <alpine.DEB.2.11.1407141012520.25405@gentwo.org>
+References: <1404903678-8257-1-git-send-email-a.ryabinin@samsung.com>
+ <53C08876.10209@zytor.com>
+ <CAPAsAGwb2sLmu0o_o-pFP5pXhMs-1sZSJbA3ji=W+JPOZRepgg@mail.gmail.com>
+ <alpine.DEB.2.11.1407141012520.25405@gentwo.org>
+Message-ID: <53C53B77.3080000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 03:23:26PM +0100, Mark Salter wrote:
-> On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
-> > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
-> > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
-> > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
-> > > > >                       continue;
-> > > > >               }
-> > > > >  
-> > > > > +             /* Don't free anything below kernel */
-> > > > > +             if (md->phys_addr < PHYS_OFFSET)
-> > > > > +                     continue;
-> > > > > +
-> > > > 
-> > > > Is the spin table area really allocated as BOOT_SERVICES_*?
-> > > 
-> > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
-> > > then there could be BS code/data memory which we'd want to ignore.
-> > 
-> > Well, if it is boot service code/data - then there is no need for us
-> > to keep it around after ExitBootServices().
-> > 
-> > /
-> >     Leif
+On 07/14/14 19:13, Christoph Lameter wrote:
+> On Sun, 13 Jul 2014, Andrey Ryabinin wrote:
 > 
-> One would think, but EFI has proven to be less than strictly compliant
-> in that regard in the past. I'm inclined to keep the boot services
-> around until after SetVirtualAddressMap just in case.
+>>> How does that work when memory is sparsely populated?
+>>>
+>>
+>> Sparsemem configurations currently may not work with kasan.
+>> I suppose I will have to move shadow area to vmalloc address space and
+>> make it (shadow) sparse too if needed.
+> 
+> Well it seems to work with sparsemem / vmemmap? So non vmmemmapped configs
+> of sparsemem only. vmemmmap can also handle holes in memory.
+> 
+> 
 
-Why should we add a work around for a potential bug that doesn't exist
-yet?
+Not sure. This sparsemem/vmemmap thing is kinda new to me, so I need to dig some more
+to understand how it i?teracts with kasan.
 
-That just provides fertile ground for such a bug to spring into
-existence and for people to ignore it when bringing up their SoC. The
-comment doesn't explain the rationale and the code doesn't make sense
-given a sane implementation.
+As far as I understand the main problem with sparsemem & kasan is shadow allocation:
 
-For the moment it's better to be strict, IMO. Otherwise there are plenty
-of other potential bugs we could attempt to work around to enable people
-to write firmware with even lower standards...
+	unsigned long lowmem_size = (unsigned long)high_memory - PAGE_OFFSET;
+	shadow_size = lowmem_size >> KASAN_SHADOW_SCALE_SHIFT;
 
-If we have to work around something then we should have an actual issue
-to work around first.
+	shadow_phys_start = memblock_alloc(shadow_size, PAGE_SIZE);
 
-Thanks,
-Mark.
+If we don't have one big enough physically contiguous block for shadow it will fail.
