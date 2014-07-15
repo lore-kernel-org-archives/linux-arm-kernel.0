@@ -1,94 +1,44 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Tue, 15 Jul 2014 17:35:27 -0000
-Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C4D12E.3040807@mit.edu>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
- <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
- <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
- <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
- <53C0A12A.2060204@codeaurora.org>
- <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
- <53C42AA8.8010107@codeaurora.org>
- <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
- <53C4BDFB.70707@codeaurora.org> <53C4D12E.3040807@mit.edu>
-Message-ID: <03e76981eb3d84e8397a39616ac0cfa1.squirrel@www.codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Jul 2014 02:35:56 +0900
+Subject: [PATCH v3 1/2] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <CAD=FV=XJD=Dt8z5Vmy2wXs4_FWqiW3=AhVw=sSZXFxv31+FHhA@mail.gmail.com>
+References: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
+ <1405420294-9323-2-git-send-email-vikas.sajjan@samsung.com>
+ <CAD=FV=XJD=Dt8z5Vmy2wXs4_FWqiW3=AhVw=sSZXFxv31+FHhA@mail.gmail.com>
+Message-ID: <53C5667C.9070207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Srivatsa S. Bhat wrote:
-> On 07/15/2014 11:06 AM, Saravana Kannan wrote:
->> On 07/14/2014 09:35 PM, Viresh Kumar wrote:
->>> On 15 July 2014 00:38, Saravana Kannan <skannan@codeaurora.org> wrote:
->>>> Yeah, it definitely crashes if policy->cpu if an offline cpu. Because
->>>> the
->>>> mutex would be uninitialized if it's stopped after boot or it would
->>>> never
->>>> have been initialized (depending on how you fix policy->cpu at boot).
->>>>
->>>> Look at this snippet on the actual tree and it should be pretty
->>>> evident.
->>>
->>> Yeah, I missed it. So the problem is we initialize timer_mutex's for
->>> policy->cpus. So we need to do that just for policy->cpu and also we
->>> don't
->>> need a per-cpu timer_mutex anymore.
->>>
+On 07/16/14 01:19, Doug Anderson wrote:
+> Vikas,
+>
+> On Tue, Jul 15, 2014 at 3:31 AM, Vikas Sajjan<vikas.sajjan@samsung.com>  wrote:
+>> From: Doug Anderson<dianders@chromium.org>
 >>
->> Btw, I tried to take a stab at removing any assumption in cpufreq code
->> about policy->cpu being ONLINE.
->
-> Wait, allowing an offline CPU to be the policy->cpu (i.e., the CPU which
-> is
-> considered as the master of the policy/group) is just absurd. If there is
-> no leader, there is no army. We should NOT sacrifice sane semantics for
-> the
-> sake of simplifying the code.
->
->> There are 160 instances of those of with
->> 23 are in cpufreq.c
+>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>> being reset across sleep/wake.  If we don't set it to anything then
+>> the TPM will be reset.  U-Boot will detect this as invalid
+>> and will reset the system on resume time. This GPIO can always be low
+>> and not hurt anything.  It will get pulled back high again during a
+>> normal warm reset when it will default back to an input.
 >>
+>> To properly preserve the TPM state across suspend/resume and to make
+>> the chrome U-Boot happy, properly set the GPIO to mask the
+>> reset to the TPM.
+>>
+>> Signed-off-by: Doug Anderson<dianders@chromium.org>
+>> Signed-off-by: Vikas Sajjan<vikas.sajjan@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
+>>   1 file changed, 12 insertions(+)
 >
-> And that explains why. It is just *natural* to assume that the CPUs
-> governed
-> by a policy are online. Especially so for the CPU which is supposed to be
-> the policy leader. Let us please not change that - it will become
-> counter-intuitive if we do so. [ The other reason is that physical hotplug
-> is also possible on some systems... in that case your code might make a
-> CPU
-> which is not even present (but possible) as the policy->cpu.. and great
-> 'fun'
-> will ensue after that ;-( ]
+> Looks good to me.  I'll assume Kukjin will add the words
+> "exynos5420-peach-pit" into the patch description when applying.
 >
-> The goal of this patchset should be to just de-couple the sysfs
-> files/ownership
-> from the policy->cpu to an extent where it doesn't matter who owns those
-> files, and probably make it easier to do CPU hotplug without having to
-> destroy and recreate the files on every hotplug operation.
->
-> This is exactly why the _implementation_ matters in this particular case -
-> if we can't achieve the simplification by keeping sane semantics, then we
-> shouldn't do the simplification!
->
-> That said, I think we should keep trying - we haven't exhausted all ideas
-> yet :-)
->
+Yes :)
 
-I don't think we disagree. To summarize this topic: I tried to keep the
-policy->cpu an actual online CPU so as to not break existing semantics in
-this patch. Viresh asked "why not fix it at boot?". My response was to
-keep it an online CPU and give it a shot in a separate patch if we really
-want that. It's too risky to do that in this patch and also not a
-mandatory change for this patch.
+> Reviewed-by: Doug Anderson<dianders@chromium.org>
+>
+I've applied this series, thanks.
 
-I think we can work out the details on the need to fixing policy->cpu at
-boot and whether there's even a need for policy->cpu (when we already have
-policy->cpus) in a separate thread after the dust settles on this one?
-
--Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+- Kukjin
