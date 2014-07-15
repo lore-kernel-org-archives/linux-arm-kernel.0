@@ -1,103 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Jul 2014 12:31:37 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140715120619.7f29c458@bbrezillon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-7-git-send-email-boris.brezillon@free-electrons.com>
- <20140714100542.GB9870@ulmo> <20140715120619.7f29c458@bbrezillon>
-Message-ID: <20140715103136.GA6616@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Jul 2014 12:32:09 +0200
+Subject: [PATCH v7 0/4] arm: Fix DEBUG_LL for multi-platform kernels
+ (without PL01X)
+In-Reply-To: <4527083.RFD2neZ6Bp@wuerfel>
+References: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
+ <53C39D5F.6050901@linaro.org> <4527083.RFD2neZ6Bp@wuerfel>
+Message-ID: <4736066.znnQ63vBqX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 12:06:19PM +0200, Boris BREZILLON wrote:
-> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding <thierry.reding@gmail.com> wrote:
-> > On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
-[...]
-> > > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > [...]
-> > > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
-> > > +See Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt for more details.
-> > 
-> > I think it's better to refer to these using relative filenames. When the
-> > device tree bindings are moved out of the kernel tree, they may no
-> > longer use the same hierarchy.
+On Monday 14 July 2014 17:27:49 Arnd Bergmann wrote:
 > 
-> Sure.
-> By relative path you mean ../../mfd/atmel-hlcdc.txt or just
-> mfd/atmel-hlcdc.txt ?
-
-I think the former is more explicit.
-
-> > > + - atmel,panel: Should contain a phandle with 2 parameters.
-> > > +   The first cell is a phandle to a DRM panel device
-> > > +   The second cell encodes the RGB mode, which can take the following values:
-> > > +   * 0: RGB444
-> > > +   * 1: RGB565
-> > > +   * 2: RGB666
-> > > +   * 3: RGB888
-> > 
-> > These are properties of the panel and should be obtained from the panel
-> > directly rather than an additional cell in this specifier.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> Okay.
-> What's the preferred way of doing this ?
-> What about defining an rgb-mode property in the panel node.
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 8f90595069a1..0f89d1b84524 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -200,6 +200,14 @@ choice
+>  		  Say Y here if you want the debug print routines to direct
+>  		  their output to the serial port in the DC21285 (Footbridge).
+>  
+> +	config DEBUG_EP93XX
+> +		bool "Kernel low-level debugging messages via ep93xx UART"
+> +		depends on ARCH_EP93XX
+> +		select DEBUG_UART_PL01X
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on Cirrus Logic EP93xx based platforms.
+> +
 
-There's .bpc in struct drm_display_info, I suspect that it could be used
-for this. Alternatively, maybe we could extend the list of color formats
-that go into drm_display_info.color_formats? RGB444 is already covered.
+FWIW, this part was broken, fixup below. The problem is that the decompress.h
+for ep93xx uses CONFIG_DEBUG_UART_PHYS even when DEBUG_LL is disabled.
 
-Also, like Laurent said, this shouldn't go into the device tree, since
-it's already implied by the panel's compatible value, so we'd be
-duplicating information.
-
-> BTW, have you received this series [1] adding support for the LCD panel
-> I'm testing this driver with.
-> 
-> [1] https://lkml.org/lkml/2014/6/5/612
-
-I don't think I've seen it in my inbox, let me check my archives.
-
-> > > +   The third cell encodes specific flags describing LCD signals configuration
-> > > +   (see Atmel's datasheet for a full description of these fields):
-> > > +   * bit 0: HSPOL: Horizontal Synchronization Pulse Polarity
-> > > +   * bit 1: VSPOL: Vertical Synchronization Pulse Polarity
-> > > +   * bit 2: VSPDLYS: Vertical Synchronization Pulse Start
-> > > +   * bit 3: VSPDLYE: Vertical Synchronization Pulse End
-> > > +   * bit 4: DISPPOL: Display Signal Polarity
-> > > +   * bit 7: DISPDLY: LCD Controller Display Power Signal Synchronization
-> > > +   * bit 12: VSPSU: LCD Controller Vertical synchronization Pulse Setup Configuration
-> > > +   * bit 13: VSPHO: LCD Controller Vertical synchronization Pulse Hold Configuration
-> > > +   * bit 16-20: GUARDTIME: LCD DISPLAY Guard Time
-> > 
-> > Similarly for most of these: HSPOL and VSPOL seem to correspond to the
-> > DRM_MODE_FLAG_{{P,N},{H,V}}SYNC flags in struct drm_display_mode. And
-> > VSPDLYS as well as VSPDLYE sound like they may be vsync_start and
-> > vsync_end of the same structure.
-> 
-> I agree with HSPOL and VSPOL.
-> 
-> > 
-> > As for the others, maybe if you could explain what exactly they are we
-> > may be able to find a better fit.
-> 
-> Atmel datasheets include several timing diagrams [2] (chapter "32.6.17
-> Output Timing Generation" page 603), and I think you will get more
-> informations from these diagrams than if I try to explain what I
-> understood ;-).
-
-These look like knobs to tune the signal in a very fine-grained manner.
-To be honest, maybe the best way to solve this would be by omitting them
-for now and choose some default that's likely to work on most devices.
-Does the panel that you use specify how it expects HSYNC to be timed vs.
-VSYNC?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/91760266/attachment.sig>
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 362d764cd358..a99b28029983 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1139,7 +1139,7 @@ config DEBUG_UART_PHYS
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+-	default 0x808c0000 if DEBUG_EP93XX
++	default 0x808c0000 if DEBUG_EP93XX || ARCH_EP93XX
+ 	default 0x90020000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
+ 	default 0xa9a00000 if DEBUG_MSM_UART
+ 	default 0xb0090000 if DEBUG_VEXPRESS_UART0_CRX
+@@ -1166,7 +1166,8 @@ config DEBUG_UART_PHYS
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
++		ARCH_EP93XX
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
