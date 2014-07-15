@@ -1,66 +1,51 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 15 Jul 2014 14:56:18 +0200
-Subject: [PATCH v3 1/4] ARM: dts: vf610: add FlexCAN node
+Date: Tue, 15 Jul 2014 14:56:19 +0200
+Subject: [PATCH v3 2/4] ARM: imx: clk-vf610: fix FlexCAN clock gating
 In-Reply-To: <cover.1405428166.git.stefan@agner.ch>
 References: <cover.1405428166.git.stefan@agner.ch>
-Message-ID: <2be5a3885653a02dc07bf96ce086fddd71285f5a.1405428166.git.stefan@agner.ch>
+Message-ID: <4c6656872b8e827671a4bf20a50fb62552b20dee.1405428166.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add FlexCAN node for the two FlexCAN IP instances in Vybrid.
+Extend the clock control for FlexCAN with the second gate which
+enable the clocks in the Clock Divider (CCM_CSCDR2) register too.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/mach-imx/clk-vf610.c           | 6 ++++--
+ include/dt-bindings/clock/vf610-clock.h | 4 +++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 3fb127a..9404853 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -14,6 +14,8 @@
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index 22dc3ee..f964079 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -295,8 +295,10 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
  
- / {
- 	aliases {
-+		can0 = &can0;
-+		can1 = &can1;
- 		serial0 = &uart0;
- 		serial1 = &uart1;
- 		serial2 = &uart2;
-@@ -103,6 +105,16 @@
- 					<&clks VF610_CLK_DMAMUX1>;
- 			};
+ 	clk[VF610_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
  
-+			can0: flexcan at 40020000 {
-+				compatible = "fsl,vf610-flexcan";
-+				reg = <0x40020000 0x4000>;
-+				interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_FLEXCAN0>,
-+					 <&clks VF610_CLK_FLEXCAN0>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
- 			uart0: serial at 40027000 {
- 				compatible = "fsl,vf610-lpuart";
- 				reg = <0x40027000 0x1000>;
-@@ -414,6 +426,17 @@
- 				clock-names = "nfc";
- 				status = "disabled";
- 			};
-+
-+			can1: flexcan at 400d4000 {
-+				compatible = "fsl,vf610-flexcan";
-+				reg = <0x400d4000 0x4000>;
-+				interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_FLEXCAN1>,
-+					 <&clks VF610_CLK_FLEXCAN1>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
- 		};
- 	};
- };
+-	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+-	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_FLEXCAN0_EN] = imx_clk_gate("flexcan0_en", "ipg_bus", CCM_CSCDR2, 11);
++	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "flexcan0_en", CCM_CCGR0, CCM_CCGRx_CGn(0));
++	clk[VF610_CLK_FLEXCAN1_EN] = imx_clk_gate("flexcan1_en", "ipg_bus", CCM_CSCDR2, 12);
++	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "flexcan1_en", CCM_CCGR9, CCM_CCGRx_CGn(4));
+ 
+ 	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
+ 	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index a916029..00953d9 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -164,6 +164,8 @@
+ #define VF610_CLK_DMAMUX1		151
+ #define VF610_CLK_DMAMUX2		152
+ #define VF610_CLK_DMAMUX3		153
+-#define VF610_CLK_END			154
++#define VF610_CLK_FLEXCAN0_EN		154
++#define VF610_CLK_FLEXCAN1_EN		155
++#define VF610_CLK_END			156
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 2.0.1
