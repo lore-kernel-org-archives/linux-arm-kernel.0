@@ -1,46 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 23:04:31 -0700
-Subject: OMAP baseline test results for v3.16-rc4
-In-Reply-To: <alpine.DEB.2.02.1407141719560.22162@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1407062339420.15016@utopia.booyaka.com>
- <20140707080238.GF28884@atomide.com>
- <alpine.DEB.2.02.1407141719560.22162@utopia.booyaka.com>
-Message-ID: <20140715060431.GH20068@atomide.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 15 Jul 2014 15:12:19 +0900
+Subject: [RFC/PATCH RESEND -next 20/21] fs: dcache: manually unpoison
+ dname after allocation to shut up kasan's reports
+In-Reply-To: <1404905415-9046-21-git-send-email-a.ryabinin@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-21-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20140715061219.GK11317@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140714 10:32]:
-> On Mon, 7 Jul 2014, Tony Lindgren wrote:
+On Wed, Jul 09, 2014 at 03:30:14PM +0400, Andrey Ryabinin wrote:
+> We need to manually unpoison rounded up allocation size for dname
+> to avoid kasan's reports in __d_lookup_rcu.
+> __d_lookup_rcu may validly read a little beyound allocated size.
+
+If it read a little beyond allocated size, IMHO, it is better to
+allocate correct size.
+
+kmalloc(name->len + 1, GFP_KERNEL); -->
+kmalloc(roundup(name->len + 1, sizeof(unsigned long ), GFP_KERNEL);
+
+Isn't it?
+
+Thanks.
+
 > 
-> > With v3.16-rc4 the PM features for omap3 should be working
-> > finally for device tree based booting. At lest beaglexm and
-> > 3xxevm should work.
-> > 
-> > Maybe you are using legacy booting path to idle the UARTs still?
-> > 
-> > FYI, I'm doing this to find the UART entries:
-> > 
-> > uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
-> > for uart in $uarts; do
-> >         echo 3000 > $uart/autosuspend_delay_ms
-> > done
-> > 
-> > uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
-> > for uart in $uarts; do
-> >         echo enabled > $uart/wakeup
-> >         echo auto > $uart/control
-> > done
-> > 
-> > echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+> Reported-by: Dmitry Vyukov <dvyukov@google.com>
+> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> ---
+>  fs/dcache.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> OK thanks, I'll take a close look at it.  It's not using the legacy paths, 
-> but based on a glance at the 37xxevm logs, it looks like the bus address 
-> of the UART isn't right.
-
-Hmm for which UART? I'm using ttyO2 on my 37xxevm FYI, it can be selected
-on the board based on some switch settings. I may have patched my u-boot
-for that too but don't remember for sure.
-
-Regards,
-
-Tony
+> diff --git a/fs/dcache.c b/fs/dcache.c
+> index b7e8b20..dff64f2 100644
+> --- a/fs/dcache.c
+> +++ b/fs/dcache.c
+> @@ -38,6 +38,7 @@
+>  #include <linux/prefetch.h>
+>  #include <linux/ratelimit.h>
+>  #include <linux/list_lru.h>
+> +#include <linux/kasan.h>
+>  #include "internal.h"
+>  #include "mount.h"
+>  
+> @@ -1412,6 +1413,8 @@ struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
+>  			kmem_cache_free(dentry_cache, dentry); 
+>  			return NULL;
+>  		}
+> +		unpoison_shadow(dname,
+> +				roundup(name->len + 1, sizeof(unsigned long)));
+>  	} else  {
+>  		dname = dentry->d_iname;
+>  	}	
+> -- 
+> 1.8.5.5
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
