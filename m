@@ -1,39 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Jul 2014 12:31:38 +0100
-Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <CAKv+Gu_PUJVXbDqp5Y3jdVouWhSqPVzaOi_6bpFM6BaLVrwvTQ@mail.gmail.com>
-References: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140715095704.GV26465@leverpostej>
- <CAKv+Gu_PUJVXbDqp5Y3jdVouWhSqPVzaOi_6bpFM6BaLVrwvTQ@mail.gmail.com>
-Message-ID: <20140715113138.GZ26465@leverpostej>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Jul 2014 20:35:10 +0900
+Subject: [PATCH v5 0/8] Enable timers DT devices for Marzen, Genmai,
+ Lager and Koelsch
+In-Reply-To: <20140715085536.GC17806@verge.net.au>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140715050106.GG5277@verge.net.au>
+ <20140715085536.GC17806@verge.net.au>
+Message-ID: <20140715113505.GA25203@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-> >> index 619b1dd7bcde..6ef541731d9e 100644
-> >> --- a/arch/arm64/kernel/efi-entry.S
-> >> +++ b/arch/arm64/kernel/efi-entry.S
-> >> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
-> >>        */
-> >>       mov     x20, x0         // DTB address
-> >>       ldr     x0, [sp, #16]   // relocated _text address
-> >> -     mov     x21, x0
-> >> +     add     x21, x0, #:lo12:stext_offset
-> >
-> > I think we can drop the :lo12: here, which will allow us to have a
-> > warning if stext_offset is unexpectedly large (I believe this will
-> > currently silently mask bits were that to happen?).
-> >
+On Tue, Jul 15, 2014 at 05:55:36PM +0900, Simon Horman wrote:
+> On Tue, Jul 15, 2014 at 02:01:07PM +0900, Simon Horman wrote:
+> > On Wed, Jul 09, 2014 at 03:12:36PM +0200, Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > This patch set enables timer devices in DT for the Marzen, Genmai, Lager and
+> > > Koelsch boards. It has previously been posted as part of the "[PATCH v4 00/19]
+> > > Renesas CMT, MTU2 and TMU timers DT support" series, and is now split into its
+> > > own patch set for merge in v3.17.
+> > > 
+> > > The series depends on the driver changes of the "[PATCH v4 00/19] Renesas CMT,
+> > > MTU2 and TMU timers DT support" series, for which a pull request has been sent.
+> > 
+> > Thanks, I have queued these up.
 > 
-> There is no alternative lo12 relocation that errors out when the value
-> does not fit, so it would have to use a literal instead.
+> As reported elsewhere I am having a bit of trouble with the dependencies
+> for this series so I have dropped it for now.
 
-Ah, that's a shame. What happens when the value doesn't fit if the
-linker / assembler don't error out?
+Please ignore that remark, it was supposed to be about
+"ARM: shmobile: r7s72100: Remove legacy board support".
 
-That sounds like a toolchain bug if they're silently doing the wrong
-thing.
-
-Cheers,
-Mark.
+I have only dropped the 72100/genmai patches of this series.
