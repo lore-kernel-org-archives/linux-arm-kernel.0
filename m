@@ -1,54 +1,67 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 15 Jul 2014 19:22:27 +0200
-Subject: [PATCH 1/3 v6] spi: s3c64xx: fix broken "cs_gpios" usage in the
- driver
-In-Reply-To: <CAHfPSqA5MMtaY5kb85xmZXkN62a+otgDAM93Gxn9d9fHv39k=g@mail.gmail.com>
-References: <1405316506-27855-1-git-send-email-ch.naveen@samsung.com>
- <1405316506-27855-2-git-send-email-ch.naveen@samsung.com>
- <53C55D17.90109@samsung.com>
- <CAHfPSqA5MMtaY5kb85xmZXkN62a+otgDAM93Gxn9d9fHv39k=g@mail.gmail.com>
-Message-ID: <53C56353.2040902@samsung.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Tue, 15 Jul 2014 22:55:41 +0530
+Subject: [PATCH] ARM: config: update multi_v7_defconfig
+In-Reply-To: <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
+References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
+ <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
+Message-ID: <CAHfPSqBuVWSCdJCv7xJ8UEpiq_GRiiL=OX6-u1KtZ-3jpRNTYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.07.2014 19:21, Naveen Krishna Ch wrote:
-> Hello Tomasz,
-> 
-> On 15 July 2014 22:25, Tomasz Figa <t.figa@samsung.com> wrote:
->> Hi Naveen,
->>
->> On 14.07.2014 07:41, Naveen Krishna Chatradhi wrote:
->>> Since, (3146bee spi: s3c64xx: Added provision for dedicated cs pin)
->>>
->>> spi-s3c64xx.c driver expects
->>> 1. chip select gpios from "cs-gpio"(singular) under the
->>>    "controller-data" node of the client/slave device of the SPI.
->>
->> Please work a bit more on readability of your commit messages,
->> especially in terms of using correct terminology to avoid unnecessary
->> confusion.
->>
->> s/'chip select gpios'/'chip select GPIO pins'/
->> s/'"cs-gpio"(singular)'/'"cs-gpio" property'/
->> s/'client/slave device of the SPI'/'SPI device'/
-> 
-> Sure, I'm working on that.
-> 
->>
->> More things like this follow in rest of the text below.
->>
->> Otherwise I believe the code after this patch does the right thing, so:
->>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> I've submitted another patch set which does the same functionality
-> as this patch set. I believe the new series is more cleaner in terms of
-> patch separation and documentation.
-> 
-> Kindly, let me know your comments on that series.
-> http://www.spinics.net/lists/arm-kernel/msg347634.html
+Hello Doug
 
-Right. I noticed it just now and am looking at it.
+On 15 July 2014 21:29, Doug Anderson <dianders@chromium.org> wrote:
+> Naveen,
+>
+> On Tue, Jul 15, 2014 at 1:02 AM, Naveen Krishna Chatradhi
+> <ch.naveen@samsung.com> wrote:
+>> Enabled S3C24XX I2C driver and MAX77686 PMIC MFD and Voltage
+>> regulator drivers used on Exynos5250 based Snow board.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> ---
+>> By enabling the symbols to compile S3C24XX I2C driver, MAX77686 PMIC
+>> under MFD and REGULATOR.
+>>
+>> http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
+>> The warnings by cpufreq on Snow board are fixed.
+>>
+>> Booted and verified on  on Exynos5420 based Snow board
+>>
+>>  arch/arm/configs/multi_v7_defconfig |    3 +++
+>>  1 file changed, 3 insertions(+)
+>
+> Is there a reason not to add more of the max77686 configs?
 
-Best regards,
-Tomasz
+I was trying to address the warnings posted @
+http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
+
+>
+> +CONFIG_RTC_DRV_MAX77686=y
+> +CONFIG_COMMON_CLK_MAX77686=y
+>
+> I also seems like it would be nice to reconcile this with Sacin's
+> latest patch.  For starters I notice that you're missing:
+>   CONFIG_EXYNOS5420_MCPM=y
+
+Right
+>
+> I'll leave it up to you to look for other things that might be
+> missing.  If some of the things in exynos5_defconfig can't go into the
+> multi-config, please explain.
+
+Will try to bring the symbols from Sachin's patch for exynos_defconfig
+to multi_v7_defconfig.
+
+>
+> -Doug
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Regards,
+(: Naveen :)
