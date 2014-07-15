@@ -1,50 +1,69 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 15 Jul 2014 13:45:25 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140714101807.GC9870@ulmo>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1584022.nQ4HpIUW7J@avalon> <20140710145626.48cb956f@bbrezillon>
- <33456066.4Q4p6nxKdU@avalon> <20140711140025.62873695@bbrezillon>
- <20140714101807.GC9870@ulmo>
-Message-ID: <20140715134525.43d209f2@bbrezillon>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Jul 2014 20:47:41 +0900
+Subject: [PATCH v5 4/8] ARM: shmobile: r7s72100: Add MTU2 device to DT
+In-Reply-To: <1404911564-17380-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1404911564-17380-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140715114741.GB25333@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Jul 2014 12:18:08 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
-
-> On Fri, Jul 11, 2014 at 02:00:25PM +0200, Boris BREZILLON wrote:
-> > On Fri, 11 Jul 2014 12:37:46 +0200 Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-> > > On Thursday 10 July 2014 14:56:26 Boris BREZILLON wrote:
-> [...]
-> > > > BTW, is there any reason for not defining an RGB connector type (I'm
-> > > > currently defining HLCDC connector as an LVDS connector) ?
-> > > 
-> > > Not that I know of. The DRM API has been developed before display on embedded 
-> > > systems became such a hot topic. If we had to redo it today, panels might be 
-> > > exposed to userspace as such, with a connector. We have to live with the past, 
-> > > so the connector will stay, but adding a new RGB connector type could make 
-> > > sense (although we might need a different name, in a way the VGA and LVDS 
-> > > connectors also carry RGB signals).
-> > 
-> > I had the same concern: I didn't find how this kind of connectors
-> > was named (most of the time they're just referenced as RGB) :-).
-> > What about RAW_RGB ?
+On Wed, Jul 09, 2014 at 03:12:40PM +0200, Laurent Pinchart wrote:
+> Add the MTU2 counter to the r7s72100 device tree and make it disabled by
+> default.
 > 
-> Are there even panels that take raw RGB as input? In all cases I've seen
-> (which admittedly may not be all that many) there's always a transparent
-> RGB/LVDS bridge, so the "connector" is in fact LVDS, not RGB, even if
-> the display controller outputs RGB directly.
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+> index bdee225..c902b0b 100644
+> --- a/arch/arm/boot/dts/r7s72100.dtsi
+> +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> @@ -229,6 +229,16 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	mtu2: timer at fcff0000 {
+> +		compatible = "renesas,mtu2";
+> +		reg = <0xfcff0000 0x400>;
+> +		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "tgi0a";
+> +		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+> +		clock-names = "fck";
+> +		status = "disabled";
+> +	};
+> +
+>  	scif0: serial at e8007000 {
+>  		compatible = "renesas,scif-r7s72100", "renesas,scif";
+>  		reg = <0xe8007000 64>;
 
-At least the LCD module I'm using (FL500WVR00-A0T) is taking raw RGB as
-input ;-).
+I believe that I claimed to have tested this in the past but that
+my testing was by booting a config to userspace that as it happens
+did not require to timer to get that far.
 
-Best Regards,
+I now believe there is a minor error: the interrupt number should be
+(139 - 32 =) 107 rather than 139.
 
-Boris
+This allows a system with this and the related genmai patch applied
+on top of renesas-next-v3.16-rc3-20140715 to boot to uerspace
+when compiled with shmobile_defconfig (+ an initrd).
+Without the irq number change the boot gets stuck in
+ip_auto_config (which presumably sleeps).
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Laurent, should I squash the following in and queue-up the result?
+
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index c902b0b..1d28d01 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -232,7 +232,7 @@
+ 	mtu2: timer at fcff0000 {
+ 		compatible = "renesas,mtu2";
+ 		reg = <0xfcff0000 0x400>;
+-		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "tgi0a";
+ 		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+ 		clock-names = "fck";
