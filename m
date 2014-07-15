@@ -1,102 +1,123 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 15 Jul 2014 11:10:06 +0900
-Subject: [PATCH RESEND] drm/ttm: expose CPU address of DMA-allocated pages
-Message-ID: <1405390206-5081-1-git-send-email-acourbot@nvidia.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 15 Jul 2014 10:26:35 +0800
+Subject: [PATCH v4 1/2] can: m_can: add device tree binding documentation
+In-Reply-To: <53C3C469.6080705@pengutronix.de>
+References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
+ <53C3C469.6080705@pengutronix.de>
+Message-ID: <20140715022634.GB21584@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pages allocated using the DMA API have a coherent memory mapping. Make
-this mapping visible to drivers so they can decide to use it instead of
-creating their own redundant one.
+On Mon, Jul 14, 2014 at 01:52:09PM +0200, Marc Kleine-Budde wrote:
+> On 07/14/2014 01:40 PM, Dong Aisheng wrote:
+> > add M_CAN device tree binding documentation
+> > 
+> > Cc: Wolfgang Grandegger <wg@grandegger.com>
+> > Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+> > Cc: Varka Bhadram <varkabhadram@gmail.com>
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > ---
+> > 
+> > Changes since v3:
+> > - change mram-cfg property name to bosch,mram-cfg
+> > - indent change
+> > ---
+> >  .../devicetree/bindings/net/can/m_can.txt          |   67 ++++++++++++++++++++
+> >  1 files changed, 67 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+> > new file mode 100644
+> > index 0000000..5cff839
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+> > @@ -0,0 +1,67 @@
+> > +Bosch MCAN controller Device Tree Bindings
+> > +-------------------------------------------------
+> > +
+> > +Required properties:
+> > +- compatible		: Should be "bosch,m_can" for M_CAN controllers
+> > +- reg			: physical base address and size of the M_CAN
+> > +			  registers map and Message RAM
+> > +- reg-names		: Should be "m_can" and "message_ram"
+> > +- interrupts		: Should be the interrupt number of M_CAN interrupt
+> > +			  line 0 and line 1, could be same if sharing
+> > +			  the same interrupt.
+> > +- interrupt-names	: Should contain "int0" and "int1"
+> > +- clocks		: Clocks used by controller, should be host clock
+> > +			  and CAN clock.
+> > +- clock-names		: Should contain "hclk" and "cclk"
+> > +- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
+> > +- pinctrl-names 	: Names corresponding to the numbered pinctrl states
+> > +- bosch,mram-cfg	: Message RAM configuration data.
+> > +			  Multiple M_CAN instances can share the same Message
+> > +			  RAM and each element(e.g Rx FIFO or Tx Buffer and etc)
+> > +			  number in Message RAM is also configurable,
+> > +			  so this property is telling driver how the shared or
+> > +			  private Message RAM are used by this M_CAN controller.
+> > +
+> > +			  The format should be as follows:
+> > +			  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems
+> > +			   rxb_elems txe_elems txb_elems>
+> > +			  The 'offset' is an address offset of the Message RAM
+> > +			  where the following elements start from. This is
+> > +			  usually set to 0x0 if you're using a private Message
+> > +			  RAM. The remain cells are used to specify how many
+> > +			  elements are used for each FIFO/Buffer.
+> > +
+> > +			  M_CAN includes the following elements according to user manual:
+> > +			  11-bit Filter	0-128 elements / 0-128 words
+> > +			  29-bit Filter	0-64 elements / 0-128 words
+> > +			  Rx FIFO 0	0-64 elements / 0-1152 words
+> > +			  Rx FIFO 1	0-64 elements / 0-1152 words
+> > +			  Rx Buffers	0-64 elements / 0-1152 words
+> > +			  Tx Event FIFO	0-32 elements / 0-64 words
+> > +			  Tx Buffers	0-32 elements / 0-576 words
+> > +
+> > +			  Please refer to 2.4.1 Message RAM Configuration in
+> > +			  Bosch M_CAN user manual for details.
+> > +
+> > +Example:
+> > +SoC dtsi:
+> > +m_can1: can at 020e8000 {
+> > +	compatible = "bosch,m_can";
+> > +	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
+> > +	reg-names = "m_can", "message_ram";
+> > +	interrupts = <0 114 0x04>,
+> > +		     <0 114 0x04>;
+> > +	interrupt-names = "int0", "int1";
+> > +	clocks = <&clks IMX6SX_CLK_CANFD>,
+> > +		 <&clks IMX6SX_CLK_CANFD>;
+> > +	clock-names = "hclk", "cclk";
+> > +	bosch,mram-cfg = <0x0 0 0 32 0 0 0 1>;
+> > +	status = "disabled";
+> > +};
+> > +
+> > +Board dtsi:
+>          ^^^^
+> 
+> The board is typically a dts, isn't it?
+> 
 
-This is not a mere optimization: for instance, on ARM it is illegal to
-have several memory mappings to the same memory with different protection.
-The mapping provided by dma_alloc_coherent() and exposed by this patch is
-guaranteed to be safe, but subsequent mappings performed by drivers are
-not. Thus drivers using the DMA page allocator should use this mapping
-instead of creating their own.
+IMX has board dtsi.
+But yes, i could change to dts which is more common.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
-This patch was previously part of a series but I figured it would make more
-sense to send it separately. It is to be used by Nouveau (and hopefully
-other drivers) on ARM.
+> > +&m_can1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_m_can1>;
+> > +	status = "enabled";
+> > +};
+> > 
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
 
- drivers/gpu/drm/ttm/ttm_page_alloc_dma.c | 2 ++
- drivers/gpu/drm/ttm/ttm_tt.c             | 6 +++++-
- include/drm/ttm/ttm_bo_driver.h          | 2 ++
- 3 files changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c b/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c
-index fb8259f69839..0301fac5badd 100644
---- a/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c
-+++ b/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c
-@@ -847,6 +847,7 @@ static int ttm_dma_pool_get_pages(struct dma_pool *pool,
- 	if (count) {
- 		d_page = list_first_entry(&pool->free_list, struct dma_page, page_list);
- 		ttm->pages[index] = d_page->p;
-+		ttm_dma->cpu_address[index] = d_page->vaddr;
- 		ttm_dma->dma_address[index] = d_page->dma;
- 		list_move_tail(&d_page->page_list, &ttm_dma->pages_list);
- 		r = 0;
-@@ -978,6 +979,7 @@ void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
- 	INIT_LIST_HEAD(&ttm_dma->pages_list);
- 	for (i = 0; i < ttm->num_pages; i++) {
- 		ttm->pages[i] = NULL;
-+		ttm_dma->cpu_address[i] = 0;
- 		ttm_dma->dma_address[i] = 0;
- 	}
- 
-diff --git a/drivers/gpu/drm/ttm/ttm_tt.c b/drivers/gpu/drm/ttm/ttm_tt.c
-index 75f319090043..341594ede596 100644
---- a/drivers/gpu/drm/ttm/ttm_tt.c
-+++ b/drivers/gpu/drm/ttm/ttm_tt.c
-@@ -58,6 +58,8 @@ static void ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
- 	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages, sizeof(void*));
- 	ttm->dma_address = drm_calloc_large(ttm->ttm.num_pages,
- 					    sizeof(*ttm->dma_address));
-+	ttm->cpu_address = drm_calloc_large(ttm->ttm.num_pages,
-+					    sizeof(*ttm->cpu_address));
- }
- 
- #ifdef CONFIG_X86
-@@ -228,7 +230,7 @@ int ttm_dma_tt_init(struct ttm_dma_tt *ttm_dma, struct ttm_bo_device *bdev,
- 
- 	INIT_LIST_HEAD(&ttm_dma->pages_list);
- 	ttm_dma_tt_alloc_page_directory(ttm_dma);
--	if (!ttm->pages || !ttm_dma->dma_address) {
-+	if (!ttm->pages || !ttm_dma->dma_address || !ttm_dma->cpu_address) {
- 		ttm_tt_destroy(ttm);
- 		pr_err("Failed allocating page table\n");
- 		return -ENOMEM;
-@@ -243,6 +245,8 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
- 
- 	drm_free_large(ttm->pages);
- 	ttm->pages = NULL;
-+	drm_free_large(ttm_dma->cpu_address);
-+	ttm_dma->cpu_address = NULL;
- 	drm_free_large(ttm_dma->dma_address);
- 	ttm_dma->dma_address = NULL;
- }
-diff --git a/include/drm/ttm/ttm_bo_driver.h b/include/drm/ttm/ttm_bo_driver.h
-index 202f0a7171e8..1d9f0f1ff52d 100644
---- a/include/drm/ttm/ttm_bo_driver.h
-+++ b/include/drm/ttm/ttm_bo_driver.h
-@@ -133,6 +133,7 @@ struct ttm_tt {
-  * struct ttm_dma_tt
-  *
-  * @ttm: Base ttm_tt struct.
-+ * @cpu_address: The CPU address of the pages
-  * @dma_address: The DMA (bus) addresses of the pages
-  * @pages_list: used by some page allocation backend
-  *
-@@ -142,6 +143,7 @@ struct ttm_tt {
-  */
- struct ttm_dma_tt {
- 	struct ttm_tt ttm;
-+	void **cpu_address;
- 	dma_addr_t *dma_address;
- 	struct list_head pages_list;
- };
--- 
-2.0.1
+Regards
+Dong Aisheng
