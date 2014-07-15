@@ -1,35 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 15 Jul 2014 09:12:51 -0700
-Subject: [PATCH v4 1/7] kernel: Add support for restart notifier call chain
-In-Reply-To: <53C3F033.9070408@roeck-us.net>
-References: <1405265431-4561-1-git-send-email-linux@roeck-us.net>
- <1405265431-4561-2-git-send-email-linux@roeck-us.net>
- <20140714145311.GC1112@arm.com> <53C3F033.9070408@roeck-us.net>
-Message-ID: <20140715161251.GA14534@roeck-us.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 15 Jul 2014 09:19:12 -0700
+Subject: [PATCH v3 1/2] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <1405420294-9323-2-git-send-email-vikas.sajjan@samsung.com>
+References: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
+ <1405420294-9323-2-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CAD=FV=XJD=Dt8z5Vmy2wXs4_FWqiW3=AhVw=sSZXFxv31+FHhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 07:58:59AM -0700, Guenter Roeck wrote:
-> On 07/14/2014 07:53 AM, Catalin Marinas wrote:
-[ ... ]
-> >
-> >I'm not fully convinced implying a 'notifier' is the right approach
-> >here. By analogy with the reboot notifier, this is something drivers
-> >would want to know about and do some work before the actual system
-> >restart (e.g. disable watchdogs as in the reboot notifier case). The
-> >restart notifier here is meant to perform the actual system restart.
-> >Arguably, the actual restart should be handled by priority 0 with some
-> >preparation before but we have reboot notifier already, so I don't think
-> >it's worth another notifier.
-> >
-> >While re-using the notifier mechanism behind the scene is fine, I think
-> >we should at least rename the functions to something like
-> >(un)register_restart_handler().
-> >
-> 
-> Fine with me. Any other comments / suggestions on the name of the function ?
-> 
-Any further feedback on the function names ? If not I'll resubmit the series
-tonight or tomorrow morning with the functions renamed as suggested above.
+Vikas,
 
-Guenter
+On Tue, Jul 15, 2014 at 3:31 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> From: Doug Anderson <dianders@chromium.org>
+>
+> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+> being reset across sleep/wake.  If we don't set it to anything then
+> the TPM will be reset.  U-Boot will detect this as invalid
+> and will reset the system on resume time. This GPIO can always be low
+> and not hurt anything.  It will get pulled back high again during a
+> normal warm reset when it will default back to an input.
+>
+> To properly preserve the TPM state across suspend/resume and to make
+> the chrome U-Boot happy, properly set the GPIO to mask the
+> reset to the TPM.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+
+Looks good to me.  I'll assume Kukjin will add the words
+"exynos5420-peach-pit" into the patch description when applying.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+
+-Doug
