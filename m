@@ -1,65 +1,84 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 15 Jul 2014 11:54:25 +0100
-Subject: [PATCH v7 0/4] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <4736066.znnQ63vBqX@wuerfel>
-References: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
- <53C39D5F.6050901@linaro.org> <4527083.RFD2neZ6Bp@wuerfel>
- <4736066.znnQ63vBqX@wuerfel>
-Message-ID: <53C50861.3060300@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Jul 2014 12:58:06 +0200
+Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly,
+ not through the header
+Message-ID: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/14 11:32, Arnd Bergmann wrote:
-> On Monday 14 July 2014 17:27:49 Arnd Bergmann wrote:
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 8f90595069a1..0f89d1b84524 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -200,6 +200,14 @@ choice
->>  		  Say Y here if you want the debug print routines to direct
->>  		  their output to the serial port in the DC21285 (Footbridge).
->>  
->> +	config DEBUG_EP93XX
->> +		bool "Kernel low-level debugging messages via ep93xx UART"
->> +		depends on ARCH_EP93XX
->> +		select DEBUG_UART_PL01X
->> +		help
->> +		  Say Y here if you want kernel low-level debugging support
->> +		  on Cirrus Logic EP93xx based platforms.
->> +
-> 
-> FWIW, this part was broken, fixup below. The problem is that the decompress.h
-> for ep93xx uses CONFIG_DEBUG_UART_PHYS even when DEBUG_LL is disabled.
+After the EFI stub has done its business, it jumps into the kernel by branching
+to offset #0 of the loaded Image, which is where it expects to find the header
+containing a 'branch to stext' instruction.
 
-Thanks (this fix is already in my patchset but your proposal means it
-needs changing slightly).
+However, the header is not covered by any PE/COFF section, so the header may
+not actually be loaded at the expected offset. So instead, jump to 'stext'
+directly, which is at the base of the PE/COFF .text section, by supplying a
+symbol 'stext_offset' to efi-entry.o which contains the relative offset of
+stext into the Image. Also replace other open coded calculations of the same
+value with a reference to 'stext_offset'
 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi-entry.S |  3 ++-
+ arch/arm64/kernel/head.S      | 10 ++++++----
+ 2 files changed, 8 insertions(+), 5 deletions(-)
 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 362d764cd358..a99b28029983 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1139,7 +1139,7 @@ config DEBUG_UART_PHYS
->  	default 0x80070000 if DEBUG_IMX23_UART
->  	default 0x80074000 if DEBUG_IMX28_UART
->  	default 0x80230000 if DEBUG_PICOXCELL_UART
-> -	default 0x808c0000 if DEBUG_EP93XX
-> +	default 0x808c0000 if DEBUG_EP93XX || ARCH_EP93XX
->  	default 0x90020000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
->  	default 0xa9a00000 if DEBUG_MSM_UART
->  	default 0xb0090000 if DEBUG_VEXPRESS_UART0_CRX
-> @@ -1166,7 +1166,8 @@ config DEBUG_UART_PHYS
->  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
->  		DEBUG_LL_UART_EFM32 || \
->  		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
-> -		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-> +		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
-> +		ARCH_EP93XX
->  
->  config DEBUG_UART_VIRT
->  	hex "Virtual base address of debug UART"
-> 
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index 619b1dd7bcde..a0016d3a17da 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
+ 	 */
+ 	mov	x20, x0		// DTB address
+ 	ldr	x0, [sp, #16]	// relocated _text address
+-	mov	x21, x0
++	ldr	x21, =stext_offset
++	add	x21, x0, x21
+ 
+ 	/*
+ 	 * Flush dcache covering current runtime addresses
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index a2c1195abb7f..78ddae28b090 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -137,6 +137,8 @@ efi_head:
+ #endif
+ 
+ #ifdef CONFIG_EFI
++	.globl	stext_offset
++	.set	stext_offset, stext - efi_head
+ 	.align 3
+ pe_header:
+ 	.ascii	"PE"
+@@ -160,7 +162,7 @@ optional_header:
+ 	.long	0				// SizeOfInitializedData
+ 	.long	0				// SizeOfUninitializedData
+ 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+-	.long	stext - efi_head		// BaseOfCode
++	.long	stext_offset			// BaseOfCode
+ 
+ extra_header_fields:
+ 	.quad	0				// ImageBase
+@@ -177,7 +179,7 @@ extra_header_fields:
+ 	.long	_edata - efi_head		// SizeOfImage
+ 
+ 	// Everything before the kernel image is considered part of the header
+-	.long	stext - efi_head		// SizeOfHeaders
++	.long	stext_offset			// SizeOfHeaders
+ 	.long	0				// CheckSum
+ 	.short	0xa				// Subsystem (EFI application)
+ 	.short	0				// DllCharacteristics
+@@ -222,9 +224,9 @@ section_table:
+ 	.byte	0
+ 	.byte	0        		// end of 0 padding of section name
+ 	.long	_edata - stext		// VirtualSize
+-	.long	stext - efi_head	// VirtualAddress
++	.long	stext_offset		// VirtualAddress
+ 	.long	_edata - stext		// SizeOfRawData
+-	.long	stext - efi_head	// PointerToRawData
++	.long	stext_offset		// PointerToRawData
+ 
+ 	.long	0		// PointerToRelocations (0 for executables)
+ 	.long	0		// PointerToLineNumbers (0 for executables)
+-- 
+1.8.3.2
