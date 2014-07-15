@@ -1,62 +1,55 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 15 Jul 2014 11:18:09 +0200
-Subject: [PATCH 11/15] irqchip: sun4i: convert to handle_domain_irq
-In-Reply-To: <1404825038-547-12-git-send-email-marc.zyngier@arm.com>
-References: <1404825038-547-1-git-send-email-marc.zyngier@arm.com>
- <1404825038-547-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140715091809.GD1011@kwain>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 15 Jul 2014 11:20:21 +0200
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <20140711201238.GY20603@laptop.programming.kicks-ass.net>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+ <20140711151304.GD3935@laptop>
+ <CAKfTPtCL6mta75k9eoK724wCm7S3w7E+psa1XDrxhN1YVDONPw@mail.gmail.com>
+ <20140711201238.GY20603@laptop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtD0=xNfi46Y6NybAax11RmyZizA39jxK35YroEKE3ZmJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 11 July 2014 22:12, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, Jul 11, 2014 at 07:39:29PM +0200, Vincent Guittot wrote:
+>> In my mind, arch_scale_cpu_freq was intend to scale the capacity of
+>> the CPU according to the current dvfs operating point.
+>> As it's no more use anywhere now that we have arch_scale_cpu, we could
+>> probably remove it .. and see when it will become used.
+>
+> I probably should have written comments when I wrote that code, but it
+> was meant to be used only where, as described above, we limit things.
+> Ondemand and such, which will temporarily decrease freq, will ramp it up
+> again at demand, and therefore lowering the capacity will skew things.
+>
+> You'll put less load on because its run slower, and then you'll run it
+> slower because there's less load on -> cyclic FAIL.
+>
+>> > In that same discussion ISTR a suggestion about adding avg_running time,
+>> > as opposed to the current avg_runnable. The sum of avg_running should be
+>> > much more accurate, and still react correctly to migrations.
+>>
+>> I haven't look in details but I agree that avg_running would be much
+>> more accurate than avg_runnable and should probably fit the
+>> requirement. Does it means that we could re-add the avg_running (or
+>> something similar) that has disappeared during the review of load avg
+>> tracking patchset ?
+>
+> Sure, I think we killed it there because there wasn't an actual use for
+> it and I'm always in favour of stripping everything to their bare bones,
+> esp big and complex things.
+>
+> And then later, add things back once we have need for it.
 
-On Tue, Jul 08, 2014 at 02:10:34PM +0100, Marc Zyngier wrote:
-> Use the new handle_domain_irq method to handle interrupts.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Ok, i'm going to look how to add it back taking nto account current
+Yuyang's rework of load_avg
 
-I tested this one on an A13 olinuxino. It worked well. I also tested
-with CONFIG_PROVE_RCU enabled.
-
-Antoine
-
-> ---
->  drivers/irqchip/irq-sun4i.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> index 6fcef4a..64155b6 100644
-> --- a/drivers/irqchip/irq-sun4i.c
-> +++ b/drivers/irqchip/irq-sun4i.c
-> @@ -136,7 +136,7 @@ IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-a10-ic", sun4i_of_init);
->  
->  static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
->  {
-> -	u32 irq, hwirq;
-> +	u32 hwirq;
->  
->  	/*
->  	 * hwirq == 0 can mean one of 3 things:
-> @@ -154,8 +154,7 @@ static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
->  		return;
->  
->  	do {
-> -		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
-> -		handle_IRQ(irq, regs);
-> +		handle_domain_irq(sun4i_irq_domain, hwirq, regs);
->  		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
->  	} while (hwirq != 0);
->  }
-> -- 
-> 2.0.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
