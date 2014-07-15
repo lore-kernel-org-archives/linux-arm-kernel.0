@@ -1,62 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 Jul 2014 14:09:16 -0700
-Subject: [GIT PULL] the great <mach/gpio.h> purge
-In-Reply-To: <CACRpkdZGg_=bUzVK6A_S50ZEbsuu1AnM-rzNs9u5w-_dHgqVGw@mail.gmail.com>
-References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
- <CACRpkdZGg_=bUzVK6A_S50ZEbsuu1AnM-rzNs9u5w-_dHgqVGw@mail.gmail.com>
-Message-ID: <CAOesGMimwbdpmBOYJwQhh2B6SgSEcT7y=LRxydpiMQmSrB+MpQ@mail.gmail.com>
+From: Catalin.Marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Jul 2014 22:44:56 +0100
+Subject: [PATCH v6 2/7] arm64: Introduce VA_BITS and translation level
+ options
+In-Reply-To: <3AF98E68-6818-416A-BC33-57148F1EC246@gmail.com>
+References: <000101cf6dc6$3b93d510$b2bb7f30$@samsung.com>
+ <CAOZdJXWCu-zHuQoAUdiieqsKqCfG9BsZariFqQP=NCgQP-zpNA@mail.gmail.com>
+ <53C43FE3.1050008@amd.com> <20140714224159.GA9829@arm.com>
+ <3AF98E68-6818-416A-BC33-57148F1EC246@gmail.com>
+Message-ID: <95F7642B-124A-4E03-ACDE-5BF9D70E8E15@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 12:32 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Mon, Jun 30, 2014 at 10:06 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
+On 15 Jul 2014, at 15:53, Jungseok Lee <jungseoklee85@gmail.com> wrote:
+> On Jul 15, 2014, at 7:41 AM, Catalin Marinas wrote:
+>> On Mon, Jul 14, 2014 at 09:38:59PM +0100, Joel Schopp wrote:
+>>> I agree that these patches would be very useful.  I just rebased my fix
+>>> for a VTTBR_BADDR_MASK bug on one of these patches that could be pulled
+>>> out independently.  See
+>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010480.html
+>>>
+>>> The original author Jungseok Lee is no longer available to work on
+>>> future versions of these patches.  I was thinking that if they didn't
+>>> get picked up as they are that with the original author's blessing I
+>>> would pick them up and keep them forward ported/resubmitted.  I have an
+>>> SOC to test them on.
+>>
+>> The patches are pretty good. I'll give them a try tomorrow and if there
+>> isn't something fundamental missing I'll consider taking them for 3.17.
 >
->> Hi ARM SoC guys,
->>
->> please pull in this patch set removing <mach/gpio.h> for good.
->> I guess it could collide with some S5P deletion.
->> If you decide to pull the S5P purge first, tell me so I can rebase.
->>
->> Yours,
->> Linus Walleij
->>
->>
->> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
->>
->>   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
->> tags/gpio-h-purge
->>
->> for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
->>
->>   ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
->>
->> ----------------------------------------------------------------
->> This is a purge of all things <mach/gpio.h>, now I never
->> want to see it again.
->>
->> - Remove the need for <mach/gpio.h> from S5P
->> - Kill CONFIG_NEED_MACH_GPIO_H
->> - Kill remnants of ARM_GPIOLIB_COMPLEX
->>
->> ----------------------------------------------------------------
->> Linus Walleij (4):
->>       ARM: s5p: cut the custom ARCH_NR_GPIOS definition
->>       ARM: mach-s5p: get rid of all <mach/gpio.h> headers
->>       ARM: kill CONFIG_NEED_MACH_GPIO_H
->>       ARM: delete old reference to ARM_GPIOLIB_COMPLEX
+> Hi All,
 >
-> So ARM SoC folks, what do we do about this?
+> If only stage1 side is taken and merged, KVM should be disabled under 4 level
+> lookups with the following configuration adjustment. I've tested it on top of
+> arm64/for-next/core branch and it works fine.
 >
-> Shall I rebase it or can you pull this in as-is?
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -18,6 +18,7 @@ if VIRTUALIZATION
+>
+> config KVM
+>        bool "Kernel-based Virtual Machine (KVM) support"
+> +       depends on !ARM64_4_LEVELS
+>        select MMU_NOTIFIER
+>        select PREEMPT_NOTIFIERS
+>        select ANON_INODES
+>
+> However, I don't know whether it does make sense or not.
 
-I'll pull it in as-is. It fell off my list since the thread got marked
-read by mistake. I'll likely get to it tonight or so.
+I added some patches on top of your series, I hope to be able to post
+them tomorrow. My interim approach was to disable 4-levels if KVM is
+enabled.
 
+> In other words, stage2 side should be prepared to fully support 4 level lookups.
+>
+> In order to cover all combinations of host and guest, VTTBR_X should be determined
+> dynamically as referring to hardware capability. At this point, the patches have
+> been revised many times, but they don't have got ACKs from Christoffer and Marc yet.
+>
+> That is why the patches are pending now in the author's point of view.
 
--Olof
+I have some clean-up for stage 1 on top but nothing major.
+
+Catalin
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
