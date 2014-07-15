@@ -1,75 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 15 Jul 2014 07:44:48 -0400 (EDT)
-Subject: [PATCH v11 04/12] ARM: hisi: enable MCPM implementation
-In-Reply-To: <CAD6h2NT-dC_yqkx3iy3BXp7SPy_+nC+mkGk2DGRs9RF5bKZQAw@mail.gmail.com>
-References: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1407140553300.3647@knanqh.ubzr>
- <CAD6h2NT-dC_yqkx3iy3BXp7SPy_+nC+mkGk2DGRs9RF5bKZQAw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1407150712110.3647@knanqh.ubzr>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 15 Jul 2014 13:45:25 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140714101807.GC9870@ulmo>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1584022.nQ4HpIUW7J@avalon> <20140710145626.48cb956f@bbrezillon>
+ <33456066.4Q4p6nxKdU@avalon> <20140711140025.62873695@bbrezillon>
+ <20140714101807.GC9870@ulmo>
+Message-ID: <20140715134525.43d209f2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Jul 2014, Haojian Zhuang wrote:
+On Mon, 14 Jul 2014 12:18:08 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-> On 14 July 2014 18:12, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Mon, 14 Jul 2014, Haojian Zhuang wrote:
-> >
-> >> +static bool hip04_init_cluster0_snoop(void)
-> >> +{
-> >> +     unsigned long data;
-> >> +
-> >> +     if (!fabric) {
-> >> +             pr_err("failed to find fabric base\n");
-> >> +             return false;
-> >> +     }
-> >> +     data = readl_relaxed(fabric + FAB_SF_MODE);
-> >> +     data |= 1;
-> >> +     writel_relaxed(data, fabric + FAB_SF_MODE);
-> >> +     while (1) {
-> >> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
-> >> +                     break;
-> >> +     }
-> >> +     return true;
-> >> +}
-> >
-> > In fact you probably should make this into something like:
-> >
-> > static bool hip04_set_cluster_snoop(int cluster, bool active)
-> >
-> > Eventually you'll want to turn snoops off when a cluster is completely
-> > idle.  And this can be used to init snoops on cluster 0 during boot as
-> > well.
-> >
-> I don't plan to implement power down by resetting cores since the
-> operation of disabling cluster snoop is not good. It'll make core
-> hang.
+> On Fri, Jul 11, 2014 at 02:00:25PM +0200, Boris BREZILLON wrote:
+> > On Fri, 11 Jul 2014 12:37:46 +0200 Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+> > > On Thursday 10 July 2014 14:56:26 Boris BREZILLON wrote:
+> [...]
+> > > > BTW, is there any reason for not defining an RGB connector type (I'm
+> > > > currently defining HLCDC connector as an LVDS connector) ?
+> > > 
+> > > Not that I know of. The DRM API has been developed before display on embedded 
+> > > systems became such a hot topic. If we had to redo it today, panels might be 
+> > > exposed to userspace as such, with a connector. We have to live with the past, 
+> > > so the connector will stay, but adding a new RGB connector type could make 
+> > > sense (although we might need a different name, in a way the VGA and LVDS 
+> > > connectors also carry RGB signals).
+> > 
+> > I had the same concern: I didn't find how this kind of connectors
+> > was named (most of the time they're just referenced as RGB) :-).
+> > What about RAW_RGB ?
 > 
-> Now I plan to use wfi instead. Only the first time, we need to make cores
-> out of reset. For the next times, we only need to use IPI to wakeup
-> secondary cores instead.
+> Are there even panels that take raw RGB as input? In all cases I've seen
+> (which admittedly may not be all that many) there's always a transparent
+> RGB/LVDS bridge, so the "connector" is in fact LVDS, not RGB, even if
+> the display controller outputs RGB directly.
 
-Well...
+At least the LCD module I'm using (FL500WVR00-A0T) is taking raw RGB as
+input ;-).
 
-If the following conditions are true:
+Best Regards,
 
-1) snoops can be turned on even for a CPU that is not running, and
+Boris
 
-2) you do not plan to ever disable snoops after boot, and
-
-3) you do not plan to actually power off CPUs when hotplugged out, and
-   only use WFI when they are idle
-
-... then MCPM is providing you absolutely no gain at all.  You might as 
-well create your own smp_operations structure directly and skip all the 
-extra MCPM complexity you are not benefiting from.
-
-The fundamental reason why MCPM exists is to safely manage cluster wide 
-resources in the presence of concurrent powering up and down of CPUs 
-when standard race avoidance mechanisms can't be used.  You apparently 
-don't have such resources to manage. That certainly will make for 
-suboptimal power consumption but there is so far nothing more sensible 
-that can be done unless more documentation for this hardware is made 
-available.
-
-
-Nicolas
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
