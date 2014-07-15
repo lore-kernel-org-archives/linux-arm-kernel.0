@@ -1,460 +1,159 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Tue, 15 Jul 2014 23:07:58 +0530
-Subject: [PATCH 1/8] ARM: Add platform support for Fujitsu MB86S7X SoCs
-In-Reply-To: <4458430.zQQyY0X6FH@wuerfel>
-References: <1405232911-4569-1-git-send-email-mollie.wu@linaro.org>
- <4458430.zQQyY0X6FH@wuerfel>
-Message-ID: <CAJe_Zhc9MVrX_Yi_u91qeSCWdO65MqEro=eQ1U_nWPfzM0ayjw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 15 Jul 2014 19:41:04 +0200
+Subject: [PATCH 2/2] cpuidle: Exynos: fix cpuidle for all states
+In-Reply-To: <1404225158-8453-3-git-send-email-k.chander@samsung.com>
+References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
+ <1404225158-8453-3-git-send-email-k.chander@samsung.com>
+Message-ID: <53C567B0.6020009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 July 2014 19:03, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 13 July 2014 14:28:31 Mollie Wu wrote:
->> The MB86S7X is a bigLITTLE configuration of 2xCA7 & 2xCA15 under Linux.
->> And the remote master firmware (called SCB) running on CM3. Linux asks
->> for things to be done over Mailbox API, to SCB which controls most of
->> the important things. variations S70 & S73 are supported.
->>
->> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Olof <olof@lixom.net>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
->> Signed-off-by: Mollie Wu <mollie.wu@linaro.org>
->> ---
->>  .../bindings/arm/fujistu/power_domain.txt          |  22 +
->>  arch/arm/Kconfig                                   |   2 +
->>  arch/arm/Makefile                                  |   1 +
->>  arch/arm/boot/dts/Makefile                         |   1 +
->>  arch/arm/boot/dts/mb86s70.dtsi                     | 635 ++++++++++++++
->>  arch/arm/boot/dts/mb86s70eb.dts                    |  38 +
->>  arch/arm/boot/dts/mb86s73.dtsi                     | 910 +++++++++++++++++++++
->>  arch/arm/boot/dts/mb86s73eb.dts                    |  73 ++
->>  arch/arm/configs/fujitsu_defconfig                 | 156 ++++
->>  arch/arm/mach-mb86s7x/Kconfig                      |  18 +
->>  arch/arm/mach-mb86s7x/Makefile                     |   2 +
->>  arch/arm/mach-mb86s7x/board.c                      |  65 ++
->>  arch/arm/mach-mb86s7x/iomap.h                      |  34 +
->>  arch/arm/mach-mb86s7x/mcpm.c                       | 293 +++++++
->>  arch/arm/mach-mb86s7x/pm_domains.c                 | 237 ++++++
->>  arch/arm/mach-mb86s7x/scb_mhu.c                    | 447 ++++++++++
->>  include/linux/platform_data/mb86s7x_mbox.h         | 249 ++++++
->
-> Better split out the dts additions into a separate patch, to make the actual code
-> easier to review.
->
-OK.
+Hi Chander,
 
->> diff --git a/Documentation/devicetree/bindings/arm/fujistu/power_domain.txt b/Documentation/devicetree/bindings/arm/fujistu/power_domain.txt
->> new file mode 100644
->> index 0000000..44abfe8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/fujistu/power_domain.txt
->> @@ -0,0 +1,22 @@
->> +* Fujitsu MB86S7x Power Domains
->> +
->> +Remote f/w on MB86S7x can enable/disable power to various IPs.
->> +
->> +Required Properties:
->> +- compatible: Should be "fujitsu,mb86s7x-pd"
->> +- index: Index of the power gate control for the block
->
-> Please always use actual part names in a compatible string, not wildcards
-> with 'x' in them. If two models are mutually compatible, use the string
-> for the older product (possibly the smaller number if they
-> are the same age). In C code, wildcards are fine/.
->
-OK and we'll change other such occurrences too.
+Please see my comments inline.
 
->> +Example:
->> +
->> +     pd_cpu: genpd at 3 {
->> +             compatible = "fujitsu,mb86s7x-pd";
->> +             index = <3>;
->> +     };
->> +
->> +Example of the node using power domain:
->> +
->> +     node {
->> +             /* ... */
->> +             fujitsu,power-domain = <&pd_cpu>;
->> +             /* ... */
->> +     };
->
-> I believe there has been a submission for a generic power domain binding
-> now. We really shouldn't use vendor specific power domain bindings
-> any more.
->
-IIUC the last submission v4 of that patchset was in May
-http://comments.gmane.org/gmane.linux.kernel.samsung-soc/31029
-Do we have to wait for that to get upstream? Or maybe we could adopt
-that binding now so it becomes trivial to convert to that when that
-gets upstream?
+On 01.07.2014 16:32, Chander Kashyap wrote:
+> Pre/post platform specific cpuidle operations are handled by pm_notifier.
+> But these operations are not same for all cpuidle states. Handle this by
+> moving cpuidle specific code from pm_notifier to cpuidle specific function.
+> 
+> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.h    |    2 +-
+>  arch/arm/mach-exynos/pm.c        |   45 ++++++++++----------------------------
+>  drivers/cpuidle/cpuidle-exynos.c |    7 ++++--
+>  3 files changed, 17 insertions(+), 37 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 1ee9176..7769f58 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -166,7 +166,7 @@ extern int  exynos_cpu_power_state(int cpu);
+>  extern void exynos_cluster_power_down(int cluster);
+>  extern void exynos_cluster_power_up(int cluster);
+>  extern int  exynos_cluster_power_state(int cluster);
+> -extern void exynos_enter_aftr(void);
+> +extern void exynos_enter_aftr(int entering_idle);
+>  
+>  extern void s5p_init_cpu(void __iomem *cpuid_addr);
+>  extern unsigned int samsung_rev(void);
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index a092cc3..328644f 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -188,14 +188,6 @@ static void exynos_cpu_set_boot_vector(long flags)
+>  	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
+>  }
+>  
+> -void exynos_enter_aftr(void)
+> -{
+> -	exynos_set_wakeupmask(0x0000ff3e);
+> -	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
+> -	/* Set value of power down register for aftr mode */
+> -	exynos_sys_powerdown_conf(SYS_AFTR);
+> -}
+> -
+>  static int exynos_cpu_suspend(unsigned long arg)
+>  {
+>  #ifdef CONFIG_CACHE_L2X0
+> @@ -386,40 +378,25 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+>  	.valid		= suspend_valid_only_mem,
+>  };
+>  
+> -static int exynos_cpu_pm_notifier(struct notifier_block *self,
+> -				  unsigned long cmd, void *v)
+> +void exynos_enter_aftr(int entering_idle)
+>  {
+> -	int cpu = smp_processor_id();
+> -
+> -	switch (cmd) {
+> -	case CPU_PM_ENTER:
+> -		if (cpu == 0)
+> -			exynos_pm_central_suspend();
+> -		break;
+> -
+> -	case CPU_PM_EXIT:
+> -		if (cpu == 0) {
+> -			if (read_cpuid_part_number() ==
+> -					ARM_CPU_PART_CORTEX_A9)
+> -				scu_enable(S5P_VA_SCU);
+> -			exynos_pm_central_resume();
+> -		}
+> -		break;
+> +	if (entering_idle) {
+> +		exynos_set_wakeupmask(0x0000ff3e);
+> +		exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
+> +		/* Set value of power down register for aftr mode */
+> +		exynos_sys_powerdown_conf(SYS_AFTR);
+> +		exynos_pm_central_suspend();
+> +	} else {
+> +		if (scu_a9_has_base())
+> +			scu_enable(S5P_VA_SCU);
+> +		exynos_pm_central_resume();
 
+Hmm. This is not very readable. Basically you have two functions that do
+completely different things packed into one function. I would suggest
+moving the calls to cpu_pm_enter/exit() and everything in between to
+this function then you wouldn't need anything like this and the whole
+low level logic would be in one place.
 
->> --- /dev/null
->> +++ b/arch/arm/configs/fujitsu_defconfig
->
-> Do you need your own defconfig, or can you just add this to the multi_v7_defconfig
-> file instead?
->
-> In either case, please also add an entry to multi_v7_defconfig and enable
-> all the drivers you need there.
->
-OK
+>  	}
+> -
+> -	return NOTIFY_OK;
+>  }
+>  
+> -static struct notifier_block exynos_cpu_pm_notifier_block = {
+> -	.notifier_call = exynos_cpu_pm_notifier,
+> -};
+> -
+>  void __init exynos_pm_init(void)
+>  {
+>  	u32 tmp;
+>  
+> -	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
+> -
+>  	/* Platform-specific GIC callback */
+>  	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+>  
+> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+> index 7c01512..1196ca7 100644
+> --- a/drivers/cpuidle/cpuidle-exynos.c
+> +++ b/drivers/cpuidle/cpuidle-exynos.c
+> @@ -18,11 +18,10 @@
+>  #include <asm/suspend.h>
+>  #include <asm/cpuidle.h>
+>  
+> -static void (*exynos_enter_aftr)(void);
+> +static void (*exynos_enter_aftr)(int);
+>  
+>  static int idle_finisher(unsigned long flags)
+>  {
+> -	exynos_enter_aftr();
+>  	cpu_do_idle();
+>  
+>  	return 1;
+> @@ -32,8 +31,12 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+>  				struct cpuidle_driver *drv,
+>  				int index)
+>  {
+> +	int entering_idle = true;
+>  	cpu_pm_enter();
+> +	exynos_enter_aftr(entering_idle);
+>  	cpu_suspend(0, idle_finisher);
+> +	entering_idle = false;
+> +	exynos_enter_aftr(entering_idle);
 
->> diff --git a/arch/arm/mach-mb86s7x/Kconfig b/arch/arm/mach-mb86s7x/Kconfig
->> new file mode 100644
->> index 0000000..44f5b0c
->> --- /dev/null
->> +++ b/arch/arm/mach-mb86s7x/Kconfig
->> @@ -0,0 +1,18 @@
->> +config ARCH_MB86S7X
->> +     bool "Fujitsu MB86S7x platforms" if (ARCH_MULTI_V7 && ARM_LPAE)
->> +     select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
->
-> Why the LPAE dependency? Is none of the RAM reachable by regular
-> kernels?
->
-Some devices like PCI, LLI need it and the S70-evb has half of its ram
-above 4GB.
-Maybe ARM_LPAE should be selected by inclusion of support for those?
+This doesn't look good. Couldn't you just have called it with constant
+arguments? E.g.
 
+	exynos_enter_aftr(true);
+	[...]
+	exynos_enter_aftr(false);
 
->> +
->> +bool __init mb86s7x_smp_init_ops(void)
->> +{
->> +     struct device_node *node;
->> +
->> +     node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
->> +     if (node && of_device_is_available(node)) {
->> +             mcpm_smp_set_ops();
->> +             return true;
->> +     }
->> +
->> +     return false;
->> +}
->
-> Can you use the CPU_METHOD_OF_DECLARE() macro to set your
-> SMP ops instead?
->
-CPU_METHOD_OF_DECLARE() directly takes smp_ops but here we use mcpm's
-smp_ops which are statically defined. We have to call
-mcpm_smp_set_ops() which does the real job.
+Well, sorry for late comments, I have missed this series, probably
+because I'm not on Cc list. Anyway, since this patch will need to be
+respun anyway, maybe it would be better to use the one I just posted
+today, which IMHO is a bit cleaner.
 
-
->> +#define IOMAP_DEV(name) { \
->> +             .virtual = (unsigned long) MB86S7X_##name##_VIRT, \
->> +             .pfn = __phys_to_pfn(MB86S7X_##name##_PHYS), \
->> +             .length = MB86S7X_##name##_SIZE, \
->> +             .type = MT_DEVICE, \
->> +     }
->> +
->> +static struct map_desc mb86s7x_io_desc[] = {
->> +     IOMAP_DEV(MHU),
->> +     IOMAP_DEV(ISRAM),
->> +};
->
-> What do you need these entries for? You should be able to just ioremap
-> the registers where needed.
->
-Yes should be doable, unless I am overlooking some issue. Will try doing that.
-
-
->> diff --git a/arch/arm/mach-mb86s7x/iomap.h b/arch/arm/mach-mb86s7x/iomap.h
->> new file mode 100644
->> index 0000000..2b8db1d
->> --- /dev/null
->> +++ b/arch/arm/mach-mb86s7x/iomap.h
->> @@ -0,0 +1,34 @@
->> +/*
->> + * arch/arm/mach-mb86s7x/iomap.h
->> + *
->> + * Created by: Jassi Brar <jassisinghbrar@gmail.com>
->> + * Copyright:        (C) 2013-2014 Linaro Limited
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef __MB86S7X_IOMAP_H
->> +#define __MB86S7X_IOMAP_H
->> +
->> +#include <linux/sizes.h>
->> +
->> +#define SEC_RSTADDR_OFF              0x3fc
->> +
->> +#define MB86S7X_MHU_PHYS     0x2b1f0000
->> +#define MB86S7X_MHU_SIZE     SZ_4K
->> +
->> +/* Internal SRAM */
->> +#define MB86S7X_ISRAM_PHYS   0x2e000000
->> +#define MB86S7X_ISRAM_SIZE   SZ_16K
->> +#define MB86S7X_TRAMPOLINE_PHYS      (MB86S7X_ISRAM_PHYS + 0x3c00)
->> +
->> +#define MB86S7X_ISRAM_VIRT   IOMEM(0xfe000000)
->> +#define MB86S7X_MHU_VIRT     (MB86S7X_ISRAM_VIRT + MB86S7X_ISRAM_SIZE)
->> +
->> +/* Non-Secure High-Priority Channel is used */
->> +#define MB86S7X_SHM_FROM_SCB_VIRT    (MB86S7X_ISRAM_VIRT + 0x3800)
->> +#define MB86S7X_TRAMPOLINE_VIRT              (MB86S7X_ISRAM_VIRT + 0x3c00)
->> +
->> +#endif /* __MB86S7X_IOMAP_H */
->
-> None of the hardcoded register locations should really be needed, please
-> move them into the device tree.
->
-OK
-
-> For the SRAM, we now have a binding that is already shared between multiple
-> platforms, see rockchips for an example.
->
-OK, will look at that.
-
->> diff --git a/arch/arm/mach-mb86s7x/scb_mhu.c b/arch/arm/mach-mb86s7x/scb_mhu.c
->> new file mode 100644
->> index 0000000..fd5f034
->> --- /dev/null
->> +++ b/arch/arm/mach-mb86s7x/scb_mhu.c
->> @@ -0,0 +1,447 @@
->> +/*
->> + * arch/arm/mach-mb86s7x/scb_mhu.c Shim 'server' for Mailbox clients
->> + *
->> + * Created by: Jassi Brar <jassisinghbrar@gmail.com>
->> + * Copyright:        (C) 2013-2014 Linaro Limited
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->
-> This should probably go into drivers/soc/
->
-OK
-
->> +#define INTR_STAT_OFS        0x0
->> +#define INTR_SET_OFS 0x8
->> +#define INTR_CLR_OFS 0x10
->> +
->> +static int do_xfer(void);
->> +static void try_xfer(struct work_struct *ignored);
->
-> Please remove the forward declarations by reordering the code.
->
-OK
-
->> +static void __iomem *cmd_from_scb = MB86S7X_SHM_FROM_SCB_VIRT;
->> +static void __iomem *rsp_from_scb = MB86S7X_SHM_FROM_SCB_VIRT + 0x100;
->> +static void __iomem *cmd_to_scb = MB86S7X_SHM_FROM_SCB_VIRT + 0x200;
->> +static void __iomem *rsp_to_scb = MB86S7X_SHM_FROM_SCB_VIRT + 0x300;
->> +
->> +static LIST_HEAD(free_xfers);
->> +static LIST_HEAD(pending_xfers);
->> +static DEFINE_SPINLOCK(fsm_lock);
->> +static struct mbox_client mhu_cl;
->> +static struct mbox_chan *mhu_chan;
->> +static DECLARE_WORK(scb_work, try_xfer);
->> +static mhu_handler_t handler[MHU_NUM_CMDS];
->> +
->> +static enum {
->> +     MHU_PARK = 0,
->> +     MHU_WRR, /* Waiting to get Remote's Reply */
->> +     MHU_WRL, /* Waiting to send Reply */
->> +     MHU_WRRL, /* WAIT_Ra && WAIT_Rb */
->> +     MHU_INVLD,
->> +} fsm_state;
->
-> Ideally, these should all be part of a per-device data structure
-> referenced from pdev_get_drvdata().
->
-I saw that coming :)
-We need this driver as early as when timers are populated and then for
-secondary CPU power control ... when we don't have any platform_device
-to hook the data on. And I think it is ok because this is the 'server'
-driver for the platform which by definition won't have another
-instance.
-
-
->> +static void got_data(u32 code)
->> +{
->> +     struct completion *c = NULL;
->> +     mhu_handler_t hndlr = NULL;
->> +     unsigned long flags;
->> +     int ev;
->> +
->> +     if (code & RESP_BIT)
->> +             ev = EV_RR;
->> +     else
->> +             ev = EV_RC;
->> +
->> +     spin_lock_irqsave(&fsm_lock, flags);
->> +
->> +     if (mhu_fsm[fsm_state][ev] == MHU_INVLD) {
->> +             spin_unlock_irqrestore(&fsm_lock, flags);
->> +             pr_err("State-%d EV-%d FSM Broken!\n", fsm_state, ev);
->> +             return;
->> +     }
->> +     fsm_state = mhu_fsm[fsm_state][ev];
->> +
->> +     if (code & RESP_BIT) {
->> +             c = ax->c;
->> +             memcpy_fromio(ax->buf, rsp_from_scb, ax->len);
->> +             list_move(&ax->node, &free_xfers);
->> +             ax = NULL;
->> +     } else {
->> +             /* Find and dispatch relevant registered handler */
->> +             if (code < MHU_NUM_CMDS)
->> +                     hndlr = handler[code];
->> +             if (!hndlr)
->> +                     pr_err("No handler for CMD_%u\n", code);
->> +     }
->> +
->> +     spin_unlock_irqrestore(&fsm_lock, flags);
->> +
->> +     if (hndlr)
->> +             hndlr(code, cmd_from_scb);
->> +     if (c)
->> +             complete(c);
->> +}
->> +
->> +static void mhu_recv(struct mbox_client *cl, void *data)
->> +{
->> +     got_data((u32)data);
->> +     schedule_work(&scb_work);
->> +}
->
-> Why the cast between integer and pointer?
->
-The common mailbox framework passes around pointers to data packets.
-Its completely between controller and client drivers to decide the
-format of the packet. In my case the packet is a simple u32 value.
-
->> +                     do {
->> +retry:
->> +                             /* Wait until we get reply */
->> +                             count = 0x1000000;
->> +                             do {
->> +                                     cpu_relax();
->> +                                     val = readl_relaxed(
->> +                                             rx_reg + INTR_STAT_OFS);
->> +                             } while (--count && !val);
->> +
->> +                             if (!val) {
->> +                                     pr_err("%s:%d SCB didn't reply\n",
->> +                                            __func__, __LINE__);
->> +                                     goto retry;
->
-> It seems like this loop is unbounded and will just print an error every
-> 16M loops but never give up or re-enable interrupts if called with
-> interrupts disabled.
->
-> It should probably be changed to either enforce being called with interrupts
-> enabled so you can call msleep() inbetween, or you should add error-handling
-> in case the remote side does not reply.
->
-We can do that for completeness but otherwise my platform is as good
-as dead if the remote doesn't reply for some reason. And there is no
-fool-proof way to recover the state-machine from a failed
-communication.
-
->> +int mhu_hndlr_set(u32 cmd, mhu_handler_t hndlr)
->> +{
->> +     unsigned long flags;
->> +     int ret = -EINVAL;
->> +
->> +     spin_lock_irqsave(&fsm_lock, flags);
->> +     if (cmd < MHU_NUM_CMDS && !handler[cmd]) {
->> +             ret = 0;
->> +             handler[cmd] = hndlr;
->> +     }
->> +     spin_unlock_irqrestore(&fsm_lock, flags);
->> +
->> +     if (!mhu_chan) {
->> +             struct mbox_chan *_ch;
->> +
->> +             _ch = mbox_request_channel(&mhu_cl);
->> +             if (!IS_ERR(_ch))
->> +                     mhu_chan = _ch;
->> +     }
->> +
->> +     return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(mhu_hndlr_set);
->
-> This is a rather generic name for an exported symbol, can you prefix
-> it with the platform name or something appropriate?
->
-OK
-
->> +static const struct of_device_id scb_dt_ids[] = {
->> +     { .compatible = "fujitsu,scb" },
->> +     { /* sentinel */ }
->> +};
->
-> I don't see a binding for "fujitsu,scb", and it seems like a far too generic
-> string. Fujitsu is a large company, I wouldn't be surprised if some other
-> product besides MB87S7X also came with something called an "scb".
->
-OK
-
->> diff --git a/include/linux/platform_data/mb86s7x_mbox.h b/include/linux/platform_data/mb86s7x_mbox.h
->> new file mode 100644
->> index 0000000..4f4287e
->> --- /dev/null
->> +++ b/include/linux/platform_data/mb86s7x_mbox.h
->> @@ -0,0 +1,249 @@
->> +/*
->> + * include/linux/platform_data/mb86s7x_mbox.h
->> + *
->> + * Created by: Jassi Brar <jassisinghbrar@gmail.com>
->> + * Copyright:        (C) 2013-2014 Linaro Limited
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->
-> None of the contents in here are actually platform data, and it seems
-> they should not be shared across drivers. Most of the data structures
-> in this file look like they should only be used by one mailbox client
-> and get moved into the respective driver.
->
-OK will do that. My idea was to keep all info about the mailbox
-protocol at one place.
-
->> +struct mb86s7x_peri_clk {
->> +     u32 payload_size;
->> +     u32 cntrlr;
->> +     u32 domain;
->> +     u32 port;
->> +     u32 en;
->> +     u64 freqency;
->> +} __packed;
->
-> Just mark the last member by itself __packed. I assume you didn't
-> actually mean to change the alignment of the data structure to one
-> byte, but just want to say that the last one is misaligned.
->
-This and others, are data packets that are passed between local and
-remote via SharedMemory. __packed is only meant to specify that these
-data structures have no holes in them.
-
-
->> +int mhu_send_packet(int cmd, void *buf, int len, struct completion *c);
->> +void mb86s7x_reboot(u32 delay);
->> +
->> +/* This function must not sleep */
->> +typedef void (*mhu_handler_t)(u32 cmd, u8 rcbuf[]);
->> +
->> +int mhu_hndlr_set(u32 cmd, mhu_handler_t);
->> +void mhu_hndlr_clr(u32 cmd, mhu_handler_t);
->
-> Doesn't belong here.
->
-OK
-
-Thanks for review. We'll address the comments in next revision soon.
-
-Thanks
-Jassi
+Best regards,
+Tomasz
