@@ -1,31 +1,79 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Tue, 15 Jul 2014 10:32:34 +0100
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <CAKfTPtDeTnPVM5nFR19eWRQZMtAZ3B2dB36q4qGNH=URgfLfHw@mail.gmail.com>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
- <20140711161344.GD26542@e103034-lin>
- <CAKfTPtDeTnPVM5nFR19eWRQZMtAZ3B2dB36q4qGNH=URgfLfHw@mail.gmail.com>
-Message-ID: <20140715093234.GA8700@e103034-lin>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 15 Jul 2014 13:34:33 +0400
+Subject: [RFC/PATCH RESEND -next 20/21] fs: dcache: manually unpoison dname
+ after allocation to shut up kasan's reports
+In-Reply-To: <20140715061219.GK11317@js1304-P5Q-DELUXE>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-21-git-send-email-a.ryabinin@samsung.com>
+ <20140715061219.GK11317@js1304-P5Q-DELUXE>
+Message-ID: <53C4F5A9.6030202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 10:27:19AM +0100, Vincent Guittot wrote:
-> On 11 July 2014 18:13, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+On 07/15/14 10:12, Joonsoo Kim wrote:
+> On Wed, Jul 09, 2014 at 03:30:14PM +0400, Andrey Ryabinin wrote:
+>> We need to manually unpoison rounded up allocation size for dname
+>> to avoid kasan's reports in __d_lookup_rcu.
+>> __d_lookup_rcu may validly read a little beyound allocated size.
 > 
-> [snip]
+> If it read a little beyond allocated size, IMHO, it is better to
+> allocate correct size.
 > 
-> >
-> > In this example using rq->avg leads to imbalance whereas unweighted load
-> > would not. Correct me if I missed anything.
+> kmalloc(name->len + 1, GFP_KERNEL); -->
+> kmalloc(roundup(name->len + 1, sizeof(unsigned long ), GFP_KERNEL);
 > 
-> You just miss to take into account how the imbalance is computed
+> Isn't it?
+> 
 
-I don't think so. I'm aware that the imbalance is calculated based on
-the runnable_load_avg of the cpus. But if you pick the wrong cpus to
-compare to begin with, it doesn't matter.
+It's not needed here because kmalloc always roundup allocation size.
 
-Morten
+This out of bound access happens in dentry_string_cmp() if CONFIG_DCACHE_WORD_ACCESS=y.
+dentry_string_cmp() relays on fact that kmalloc always round up allocation size,
+in other words it's by design.
+
+That was discussed some time ago here - https://lkml.org/lkml/2013/10/3/493.
+Since filesystem's maintainer don't want to add needless round up here, I'm not going to do it.
+
+I think this patch needs only more detailed description why we not simply allocate more.
+Also I think it would be better to rename unpoisoin_shadow to something like kasan_mark_allocated().
+
+
+> Thanks.
+> 
+>>
+>> Reported-by: Dmitry Vyukov <dvyukov@google.com>
+>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+>> ---
+>>  fs/dcache.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/fs/dcache.c b/fs/dcache.c
+>> index b7e8b20..dff64f2 100644
+>> --- a/fs/dcache.c
+>> +++ b/fs/dcache.c
+>> @@ -38,6 +38,7 @@
+>>  #include <linux/prefetch.h>
+>>  #include <linux/ratelimit.h>
+>>  #include <linux/list_lru.h>
+>> +#include <linux/kasan.h>
+>>  #include "internal.h"
+>>  #include "mount.h"
+>>  
+>> @@ -1412,6 +1413,8 @@ struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
+>>  			kmem_cache_free(dentry_cache, dentry); 
+>>  			return NULL;
+>>  		}
+>> +		unpoison_shadow(dname,
+>> +				roundup(name->len + 1, sizeof(unsigned long)));
+>>  	} else  {
+>>  		dname = dentry->d_iname;
+>>  	}	
+>> -- 
+>> 1.8.5.5
+>>
+>> --
+>> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+>> the body to majordomo at kvack.org.  For more info on Linux MM,
+>> see: http://www.linux-mm.org/ .
+>> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
