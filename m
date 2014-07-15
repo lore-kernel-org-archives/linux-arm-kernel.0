@@ -1,79 +1,187 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Jul 2014 11:10:02 +0200
-Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly,
- not through the header
-Message-ID: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 15 Jul 2014 17:07:21 +0800
+Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <53C4EA68.5090606@pengutronix.de>
+References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
+ <1405338041-19945-2-git-send-email-b29396@freescale.com>
+ <53C3C97A.7080102@pengutronix.de>
+ <20140715033324.GC21584@shlinux1.ap.freescale.net>
+ <53C4D872.9060707@pengutronix.de>
+ <20140715082637.GA2601@shlinux1.ap.freescale.net>
+ <53C4EA68.5090606@pengutronix.de>
+Message-ID: <20140715090719.GA3374@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the EFI stub has done its business, it jumps into the kernel by branching
-to offset #0 of the loaded Image, which is where it expects to find the header
-containing a 'branch to stext' instruction.
-However, the header is not covered by any PE/COFF section, so the header may
-not actually be loaded at the expected offset. So instead, jump to 'stext'
-directly, which is at the base of the PE/COFF .text section.
+On Tue, Jul 15, 2014 at 10:46:32AM +0200, Marc Kleine-Budde wrote:
+> On 07/15/2014 10:26 AM, Dong Aisheng wrote:
+> >>>>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> >>>>> +			    u32 rxfs)
+> >>>>> +{
+> >>>>> +	struct m_can_priv *priv = netdev_priv(dev);
+> >>>>> +	u32 flags, fgi;
+> >>>>> +
+> >>>>> +	/* calculate the fifo get index for where to read data */
+> >>>>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> >>>>> +	flags = m_can_fifo_read(priv, fgi, 0x0);
+> >>>>                                            ^^^
+> >>>>
+> >>>> Can you introduce an enum for the offsets, please adjust the signature
+> >>>> of m_can_fifo_read() accordingly.
+> >>>>
+> >>>
+> >>> I wonder enum may not be suitable.
+> >>> The Rx Buffer and FIFO Element is as follows:
+> >>>    31 24 23 16 15 8 7 0
+> >>> R0 ESI XTD RTR ID[28:0]
+> >>
+> >> M_CAN_FIFO_ID
+> >>
+> >>> R1 ANMF FIDX[6:0] res EDL BRS DLC[3:0] RXTS[15:0]
+> >>
+> >> M_CAN_FIFO_DLC
+> >>
+> >>> R2 DB3[7:0] DB2[7:0] DB1[7:0] DB0[7:0]
+> >>> R3 DB7[7:0] DB6[7:0] DB5[7:0] DB4[7:0]
+> >>
+> >> M_CAN_FIFO_DATA0
+> >> M_CAN_FIFO_DATA1
+> >>
+> > 
+> > You mean as follows?
+> > enum m_can_fifo {
+> >         M_CAN_FIFO_ID = 0,
+> >         M_CAN_FIFO_DLC,
+> = 0x4,
+> >         M_CAN_FIFO_DATA0,
+> = 0x8,
+> >         M_CAN_FIFO_DATA1,
+> = 0xc,
+> > };
+> > 
+> > static inline u32 m_can_fifo_read(const struct m_can_priv *priv,
+> >                                   u32 fgi, enum m_can_fifo fifo)
+> > {
+> >         return readl(priv->mram_base + priv->mcfg[MRAM_RXF0].off +
+> >                      fgi * RXF0_ELEMENT_SIZE + fifo * 0x4);
+> > }
+> 
+> without the * 0x4
+> 
+> > id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+> > 
+> > The problem is when adding long frames support, it becomes:
+> > enum m_can_fifo {
+> >         M_CAN_FIFO_ID = 0,
+> >         M_CAN_FIFO_DLC,
+> >         M_CAN_FIFO_DATA0,
+> >         M_CAN_FIFO_DATA1,
+> >         ....
+> >         M_CAN_FIFO_DATA15,
+> > };
+> 
+> #define M_CAN_FIFO_DATA(n)
+> 	(enum m_can_fifo)(M_CAN_FIFO_DATA_0 + (n) << 2)
+> 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-entry.S |  2 +-
- arch/arm64/kernel/head.S      | 10 ++++++----
- 2 files changed, 7 insertions(+), 5 deletions(-)
+This is a bit strange using and we may still have to define other M_CAN_FIFO_DATAx
+to avoid the enum value exceeds the defined range.
+enum m_can_fifo {
+        M_CAN_FIFO_ID = 0,
+        M_CAN_FIFO_DLC = 0x4,
+        M_CAN_FIFO_DATA0 = 0x8,
+        M_CAN_FIFO_DATA1 = 0xc,
+	....
+        M_CAN_FIFO_DATA15 = 0xc,
+};
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 619b1dd7bcde..6ef541731d9e 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	mov	x21, x0
-+	add	x21, x0, #:lo12:stext_offset
- 
- 	/*
- 	 * Flush dcache covering current runtime addresses
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index a2c1195abb7f..78ddae28b090 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -137,6 +137,8 @@ efi_head:
- #endif
- 
- #ifdef CONFIG_EFI
-+	.globl	stext_offset
-+	.set	stext_offset, stext - efi_head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -160,7 +162,7 @@ optional_header:
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
- 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
--	.long	stext - efi_head		// BaseOfCode
-+	.long	stext_offset			// BaseOfCode
- 
- extra_header_fields:
- 	.quad	0				// ImageBase
-@@ -177,7 +179,7 @@ extra_header_fields:
- 	.long	_edata - efi_head		// SizeOfImage
- 
- 	// Everything before the kernel image is considered part of the header
--	.long	stext - efi_head		// SizeOfHeaders
-+	.long	stext_offset			// SizeOfHeaders
- 	.long	0				// CheckSum
- 	.short	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
-@@ -222,9 +224,9 @@ section_table:
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
- 	.long	_edata - stext		// VirtualSize
--	.long	stext - efi_head	// VirtualAddress
-+	.long	stext_offset		// VirtualAddress
- 	.long	_edata - stext		// SizeOfRawData
--	.long	stext - efi_head	// PointerToRawData
-+	.long	stext_offset		// PointerToRawData
- 
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
--- 
-1.8.3.2
+However, actually we will not use them at all after introducing M_CAN_FIFO_DATA(n).
+If that, why we still need define them in enum?
+
+Comparing to this way, why not simply just do as follows:
+#define M_CAN_FIFO_ID		0x0
+#define M_CAN_FIFO_DLC		0x4
+#define M_CAN_FIFO_DATA(n)	(0x8 + (n) << 2)
+
+What do you think?
+
+> > But it's useless because we may not use enum to read fifo data anymore.
+> > It's not suitable to read fifo one by one:
+> > m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA0);
+> > m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA1);
+> > ..
+> > m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA15);
+> > 
+> > 
+> > Instead, we may read data according to real dlc value within a for loop like:
+> > #define M_CAN_FIFO(n)   (n * 0x4)
+> > id = m_can_fifo_read(priv, fgi, M_CAN_FIFO(0));
+> > dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO(1));
+> > for (i = 0; dlc > 0; dlc -= 0x4, i++) {
+> >         ....
+> >         data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO(i + 2));
+> > }
+> 
+> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+> dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> for (i = 0; i <= dlc; i++)
+> 	data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i));
+
+Does it work?
+The dlc is in bytes while m_can_fifo_read is read in words.
+
+Regards
+Dong Aisheng
+
+> 
+> > So i'm not sure define that enum now is really needed.
+> 
+> [...]
+> 
+> >>>>> +static int m_can_handle_lec_err(struct net_device *dev,
+> >>>>> +				enum m_can_lec_type lec_type)
+> >>>>> +{
+> >>>>> +	struct m_can_priv *priv = netdev_priv(dev);
+> >>>>> +	struct net_device_stats *stats = &dev->stats;
+> >>>>> +	struct can_frame *cf;
+> >>>>> +	struct sk_buff *skb;
+> >>>>> +
+> >>>>> +	/* early exit if no lec update */
+> >>>>> +	if (lec_type == LEC_UNUSED)
+> >>>>> +		return 0;
+> >>>>
+> >>>> I think this is not needed, as checked by the only caller.
+> >>>
+> >>> You mean move it to caller as follows?
+> >>>         /* handle lec errors on the bus */
+> >>>         if ((psr & LEC_UNUSED) && ((psr & LEC_UNUSED)!= LEC_UNUSED) &&
+> >>
+> >> yes - or something like this:
+> >>
+> >> static inline bool is_lec(u32 psr)
+> >> {
+> >> 	u32 psr &= LEC_UNUSED
+> >>
+> >> 	return psr && (psr != LEC_UNUSED)
+> >> }
+> >>
+> >> 	if ((priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING) &&
+> >> 		is_lec(psr)) {
+> >> 	}
+> >>
+> > 
+> > 
+> > Looks fine.
+> > Maybe is_lec_err(u32 psr) better? :-)
+> 
+> Yes, is_lec() was just a random placeholder :) Descriptive function
+> names are always preferred.
+> 
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
