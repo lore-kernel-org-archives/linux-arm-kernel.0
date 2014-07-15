@@ -1,30 +1,49 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 15 Jul 2014 07:47:26 -0700
-Subject: [PATCH v3] arm64, ia64, ppc, s390, sh, tile, um, x86,
- mm: Remove default gate area
-In-Reply-To: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
-References: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
-Message-ID: <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 15 Jul 2014 15:49:44 +0100
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <1405434206.25580.31.camel@deneb.redhat.com>
+References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405363248.25580.12.camel@deneb.redhat.com>
+ <20140715100221.GU4179@bivouac.eciton.net>
+ <1405429860.25580.25.camel@deneb.redhat.com>
+ <20140715135418.GV4179@bivouac.eciton.net>
+ <1405434206.25580.31.camel@deneb.redhat.com>
+Message-ID: <20140715144944.GW4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 13, 2014 at 1:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> The core mm code will provide a default gate area based on
-> FIXADDR_USER_START and FIXADDR_USER_END if
-> !defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
->
-> This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
-> 64-bit UML, and x86_32 have their own code just to disable it.  arm,
-> 32-bit UML, and x86_64 have gate areas, but they have their own
-> implementations.
->
-> This gets rid of the default and moves the code into ia64.
->
-> This should save some code on architectures without a gate area: it's
-> now possible to inline the gate_area functions in the default case.
+On Tue, Jul 15, 2014 at 10:23:26AM -0400, Mark Salter wrote:
+> On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
+> > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
+> > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
+> > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
+> > > > >                       continue;
+> > > > >               }
+> > > > >  
+> > > > > +             /* Don't free anything below kernel */
+> > > > > +             if (md->phys_addr < PHYS_OFFSET)
+> > > > > +                     continue;
+> > > > > +
+> > > > 
+> > > > Is the spin table area really allocated as BOOT_SERVICES_*?
+> > > 
+> > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
+> > > then there could be BS code/data memory which we'd want to ignore.
+> > 
+> > Well, if it is boot service code/data - then there is no need for us
+> > to keep it around after ExitBootServices().
+> 
+> One would think, but EFI has proven to be less than strictly compliant
+> in that regard in the past. I'm inclined to keep the boot services
+> around until after SetVirtualAddressMap just in case.
 
-Can one of you pull this somewhere?  Otherwise I can put it somewhere
-stable and ask for -next inclusion, but that seems like overkill for a
-single patch.
+But the function you add this clause to will still throw away all boot
+services code/data regions - just with this modification it skips
+those that happen to lie lower in the address space than the kernel.
 
---Andy
+(And I do agree with Mark R here - let's not work around bugs that
+don't exist yet.)
+
+/
+    Leif
