@@ -1,56 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Jul 2014 21:32:03 +0200
-Subject: [GIT PULL] the great <mach/gpio.h> purge
-In-Reply-To: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
-References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
-Message-ID: <CACRpkdZGg_=bUzVK6A_S50ZEbsuu1AnM-rzNs9u5w-_dHgqVGw@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 15 Jul 2014 12:32:29 -0700
+Subject: [PATCH 0/7] Two-phase seccomp and x86 tracing changes
+Message-ID: <cover.1405452484.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:06 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+This is both a cleanup and a speedup.  It reduces overhead due to
+installing a trivial seccomp filter by 87%.  The speedup comes from
+avoiding the full syscall tracing mechanism for filters that don't
+return SECCOMP_RET_TRACE.
 
-> Hi ARM SoC guys,
->
-> please pull in this patch set removing <mach/gpio.h> for good.
-> I guess it could collide with some S5P deletion.
-> If you decide to pull the S5P purge first, tell me so I can rebase.
->
-> Yours,
-> Linus Walleij
->
->
-> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
->
->   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
-> tags/gpio-h-purge
->
-> for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
->
->   ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
->
-> ----------------------------------------------------------------
-> This is a purge of all things <mach/gpio.h>, now I never
-> want to see it again.
->
-> - Remove the need for <mach/gpio.h> from S5P
-> - Kill CONFIG_NEED_MACH_GPIO_H
-> - Kill remnants of ARM_GPIOLIB_COMPLEX
->
-> ----------------------------------------------------------------
-> Linus Walleij (4):
->       ARM: s5p: cut the custom ARCH_NR_GPIOS definition
->       ARM: mach-s5p: get rid of all <mach/gpio.h> headers
->       ARM: kill CONFIG_NEED_MACH_GPIO_H
->       ARM: delete old reference to ARM_GPIOLIB_COMPLEX
+This series works by splitting the seccomp hooks into two phases.
+The first phase evaluates the filter; it can skip syscalls, allow
+them, kill the calling task, or pass a u32 to the second phase.  The
+second phase requires a full tracing context, and it sends ptrace
+events if necessary.
 
-So ARM SoC folks, what do we do about this?
+Once this is done, I implemented a similar split for the x86 syscall
+entry work.  The C callback is invoked in two phases: the first has
+only a partial frame, and it can request phase 2 processing with a
+full frame.
 
-Shall I rebase it or can you pull this in as-is?
+Finally, I switch the 64-bit system_call code to use the new split
+entry work.  This is a net deletion of assembly code: it replaces
+all of the audit entry muck.
 
-Yours,
-Linus Walleij
+In the process, I fixed some bugs.
+
+If this is acceptable, someone can do the same tweak for the
+ia32entry and entry_32 code.
+
+This passes all seccomp tests that I know of, except for the ones
+that don't work on current kernels.
+
+Presumably, once everyone gets a chance to poke at this, it should
+go in to some combination of James' and hpa's trees.
+
+Changes from RFC version:
+ - The first three patches are more or less the same
+ - The rest is more or less a rewrite
+
+Andy Lutomirski (7):
+  seccomp,x86,arm,mips,s390: Remove nr parameter from secure_computing
+  seccomp: Refactor the filter callback and the API
+  seccomp: Allow arch code to provide seccomp_data
+  x86,x32,audit: Fix x32's AUDIT_ARCH wrt audit
+  x86: Split syscall_trace_enter into two phases
+  x86_64,entry: Treat regs->ax the same in fastpath and slowpath
+    syscalls
+  x86_64,entry: Use split-phase syscall_trace_enter for 64-bit syscalls
+
+ arch/arm/kernel/ptrace.c       |   7 +-
+ arch/mips/kernel/ptrace.c      |   2 +-
+ arch/s390/kernel/ptrace.c      |   2 +-
+ arch/x86/include/asm/calling.h |   6 +-
+ arch/x86/include/asm/ptrace.h  |   5 +
+ arch/x86/kernel/entry_64.S     |  51 ++++-----
+ arch/x86/kernel/ptrace.c       | 146 +++++++++++++++++++-----
+ arch/x86/kernel/vsyscall_64.c  |   2 +-
+ include/linux/seccomp.h        |  25 +++--
+ kernel/seccomp.c               | 246 +++++++++++++++++++++++++++--------------
+ 10 files changed, 339 insertions(+), 153 deletions(-)
+
+-- 
+1.9.3
