@@ -1,23 +1,52 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 15 Jul 2014 10:01:26 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.17
-In-Reply-To: <53C4D874.2040206@samsung.com>
-References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
- <53C4D874.2040206@samsung.com>
-Message-ID: <53C54246.2040002@gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 15 Jul 2014 11:04:37 -0400
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <20140715144944.GW4179@bivouac.eciton.net>
+References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405363248.25580.12.camel@deneb.redhat.com>
+ <20140715100221.GU4179@bivouac.eciton.net>
+ <1405429860.25580.25.camel@deneb.redhat.com>
+ <20140715135418.GV4179@bivouac.eciton.net>
+ <1405434206.25580.31.camel@deneb.redhat.com>
+ <20140715144944.GW4179@bivouac.eciton.net>
+Message-ID: <1405436677.25580.34.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+On Tue, 2014-07-15 at 15:49 +0100, Leif Lindholm wrote:
+> On Tue, Jul 15, 2014 at 10:23:26AM -0400, Mark Salter wrote:
+> > On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
+> > > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
+> > > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
+> > > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
+> > > > > >                       continue;
+> > > > > >               }
+> > > > > >  
+> > > > > > +             /* Don't free anything below kernel */
+> > > > > > +             if (md->phys_addr < PHYS_OFFSET)
+> > > > > > +                     continue;
+> > > > > > +
+> > > > > 
+> > > > > Is the spin table area really allocated as BOOT_SERVICES_*?
+> > > > 
+> > > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
+> > > > then there could be BS code/data memory which we'd want to ignore.
+> > > 
+> > > Well, if it is boot service code/data - then there is no need for us
+> > > to keep it around after ExitBootServices().
+> > 
+> > One would think, but EFI has proven to be less than strictly compliant
+> > in that regard in the past. I'm inclined to keep the boot services
+> > around until after SetVirtualAddressMap just in case.
+> 
+> But the function you add this clause to will still throw away all boot
+> services code/data regions - just with this modification it skips
+> those that happen to lie lower in the address space than the kernel.
+> 
+> (And I do agree with Mark R here - let's not work around bugs that
+> don't exist yet.)
+> 
 
-On 07/15/2014 02:29 AM, Jaehoon Chung wrote:
-> Hi Dinh.
->
-> Could you check this patch?
-> https://patchwork.kernel.org/patch/4529891/
->
-
-Sorry that I missed this. I just applied it. Will test and send out an 
-updated pull-request.
-
-Dinh
+I'm not sure if they still exist or not, but on Foundation, I saw a
+crash in SetVirtualAddressMap unless I kept BS regions around.
