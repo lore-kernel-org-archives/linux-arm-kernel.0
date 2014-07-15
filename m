@@ -1,83 +1,39 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 15 Jul 2014 13:26:24 +0200
-Subject: [RESEND PATCH v3 05/11] drm: add Atmel HLCDC Display Controller
- support
-In-Reply-To: <CAF6AEGv=irY0B-Cg6No7voadnShYQTwSLpZjk19xxX5qGcZeMw@mail.gmail.com>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1404751384-5077-6-git-send-email-boris.brezillon@free-electrons.com>
- <20140712201654.565472d8@bbrezillon>
- <CAF6AEGv=irY0B-Cg6No7voadnShYQTwSLpZjk19xxX5qGcZeMw@mail.gmail.com>
-Message-ID: <20140715132624.00add008@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Jul 2014 12:31:38 +0100
+Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu_PUJVXbDqp5Y3jdVouWhSqPVzaOi_6bpFM6BaLVrwvTQ@mail.gmail.com>
+References: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140715095704.GV26465@leverpostej>
+ <CAKv+Gu_PUJVXbDqp5Y3jdVouWhSqPVzaOi_6bpFM6BaLVrwvTQ@mail.gmail.com>
+Message-ID: <20140715113138.GZ26465@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Jul 2014 14:37:16 -0400
-Rob Clark <robdclark@gmail.com> wrote:
-
-> On Sat, Jul 12, 2014 at 2:16 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
-> > Hello,
+> >> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> >> index 619b1dd7bcde..6ef541731d9e 100644
+> >> --- a/arch/arm64/kernel/efi-entry.S
+> >> +++ b/arch/arm64/kernel/efi-entry.S
+> >> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
+> >>        */
+> >>       mov     x20, x0         // DTB address
+> >>       ldr     x0, [sp, #16]   // relocated _text address
+> >> -     mov     x21, x0
+> >> +     add     x21, x0, #:lo12:stext_offset
 > >
-> > On Mon,  7 Jul 2014 18:42:58 +0200
-> > Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+> > I think we can drop the :lo12: here, which will allow us to have a
+> > warning if stext_offset is unexpectedly large (I believe this will
+> > currently silently mask bits were that to happen?).
 > >
-> >
-> >> +int atmel_hlcdc_layer_disable(struct atmel_hlcdc_layer *layer)
-> >> +{
-> >> +     struct atmel_hlcdc_layer_dma_channel *dma = &layer->dma;
-> >> +     unsigned long flags;
-> >> +     int i;
-> >> +
-> >> +     spin_lock_irqsave(&dma->lock, flags);
-> >> +     for (i = 0; i < layer->max_planes; i++) {
-> >> +             if (!dma->cur[i])
-> >> +                     break;
-> >> +
-> >> +             dma->cur[i]->ctrl = 0;
-> >> +     }
-> >> +     spin_unlock_irqrestore(&dma->lock, flags);
-> >> +
-> >> +     return 0;
-> >> +}
-> >
-> >
-> > I'm trying to simplify the hlcdc_layer code and in order to do that I
-> > need to know what's expected when a user calls plane_disable (or more
-> > exactly DRM_IOCTL_MODE_SETPLANE ioctl call with the frame buffer ID set
-> > to 0).
-> >
-> > The HLCDC Display Controller support two types of disable:
-> >
-> > 1) The plane is disabled at the end of the current frame (the is the
-> > solution I'm using)
-> >
-> > 2) The plane is disabled right away (I haven't tested it, but I think
-> > this solution could generate some sort of artifacts for a short period
-> > of time, because the framebuffer might be partially displayed)
-> >
-> > If solution 1 is chosen, should I wait for the plane to be actually
-> > disabled before returning ?
 > 
-> for cursor in particular, if you block, it is going to be a massive
-> slowdown for some apps.  I remember at least older gdm would rapidly
-> flash a spinning cursor.  As a result, if you wait for vsync each
-> time, it would take a couple minutes to login!
+> There is no alternative lo12 relocation that errors out when the value
+> does not fit, so it would have to use a literal instead.
 
-That makes sense.
+Ah, that's a shame. What happens when the value doesn't fit if the
+linker / assembler don't error out?
 
-> 
-> if #2 works, I'd recommend it.  Otherwise you may have to do some of
-> the same hijinks that I have to do in mdp4_crtc for the cursor.
+That sounds like a toolchain bug if they're silently doing the wrong
+thing.
 
-I already have a working solution which does not block with #1, I was
-just trying to simplify my code ;-).
-I'll try #2 and if it works without any side effects I'll go for it.
-
-Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Cheers,
+Mark.
