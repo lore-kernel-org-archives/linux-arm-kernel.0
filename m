@@ -1,37 +1,35 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 15 Jul 2014 16:51:59 -0600
-Subject: [PATCH 2/2] PCI: tegra: Fix license string
-In-Reply-To: <1405061938-2191-2-git-send-email-thierry.reding@gmail.com>
-References: <1405061938-2191-1-git-send-email-thierry.reding@gmail.com>
- <1405061938-2191-2-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140715225159.GB22303@google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Jul 2014 23:52:52 +0100
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <53C58DCB.90502@nvidia.com>
+References: <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
+ <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
+ <53C01558.3090607@nvidia.com>
+ <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+ <53C01D17.2050906@nvidia.com> <20140714083854.GO2081@ulmo>
+ <20140714091233.GC6800@sirena.org.uk> <20140714092434.GA9755@ulmo>
+ <20140714102203.GD6800@sirena.org.uk> <53C58DCB.90502@nvidia.com>
+Message-ID: <20140715225252.GD17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 08:58:58AM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The proper MODULE_LICENSE() string for the GPL v2 is "GPL v2", not
-> "GPLv2".
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+On Tue, Jul 15, 2014 at 11:23:39PM +0300, Tuomas Tynkkynen wrote:
 
-Applied with Jingoo's reviewed-by to pci/host-tegra for v3.17, thanks!
+> That sounds indeed useful for this case. How'd the following interface
+> sound for the register offset / selector-to-register-value conversion?
+> The I2C address would be a bit trickier to get as it would touch the
+> regmap stuff as well, but perhaps it would be a good idea to have a
+> phandle to the I2C device itself, and then parse the reg field for
+> the address.
 
-> ---
->  drivers/pci/host/pci-tegra.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-> index 7df5aaf58921..14ec5b2c69e0 100644
-> --- a/drivers/pci/host/pci-tegra.c
-> +++ b/drivers/pci/host/pci-tegra.c
-> @@ -1742,4 +1742,4 @@ module_platform_driver(tegra_pcie_driver);
->  
->  MODULE_AUTHOR("Thierry Reding <treding@nvidia.com>");
->  MODULE_DESCRIPTION("NVIDIA Tegra PCIe driver");
-> -MODULE_LICENSE("GPLv2");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 2.0.1
-> 
+This looks fine, can you submit properly please?  For the I2C address
+why not just have an interface to get the regmap and then provide a way
+to get the underlying device back from the regmap?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/c8ef49e4/attachment.sig>
