@@ -1,43 +1,133 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Jul 2014 08:52:35 +0900
-Subject: [PATCH 4/4] ARM: shmobile: sh73a0: add SCI clock support for DT
-In-Reply-To: <53C52A69.7080808@cogentembedded.com>
-References: <cover.1405398284.git.horms+renesas@verge.net.au>
- <ff4ce48e1f163d945c037c1c90ce12950961d91d.1405398284.git.horms+renesas@verge.net.au>
- <53C52A69.7080808@cogentembedded.com>
-Message-ID: <20140715235233.GH557@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Jul 2014 08:54:12 +0900
+Subject: [PATCH 13/19] ARM: s5pv210: move debug-macro.S into the common
+ space
+In-Reply-To: <1404496099-26708-14-git-send-email-t.figa@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-14-git-send-email-t.figa@samsung.com>
+Message-ID: <53C5BF24.9030302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 05:19:37PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07/15/2014 01:16 PM, Simon Horman wrote:
-> 
-> >This will be used when initialising SCI devices using DT
-> >until common clock framework support is added.
-> 
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/clock-sh73a0.c | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> 
-> >diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-> >index 0d9cd1f..4990e03 100644
-> >--- a/arch/arm/mach-shmobile/clock-sh73a0.c
-> >+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-> >@@ -638,16 +638,25 @@ static struct clk_lookup lookups[] = {
-> >  	CLKDEV_DEV_ID("e6820000.i2c", &mstp_clks[MSTP116]), /* I2C0 */
-> >  	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.0", &mstp_clks[MSTP100]), /* LCDC0 */
-> >  	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP219]), /* SCIFA7 */
-> >+	CLKDEV_DEV_ID("e6cd0000.serial", &mstp_clks[MSTP219]), /* SCIFA7 */
-> >  	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]), /* SY-DMAC */
-> >  	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP217]), /* MP-DMAC */
-> >  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
-> >+	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
-> >  	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
-> >+	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-> 
->    Eh, are you sure there should be "0x"?
+On 07/05/14 02:48, Tomasz Figa wrote:
+> Move debug-macro.S from mach/include to include/debug where
+> all other common debug macros are.
+>
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/Kconfig.debug                           | 12 +++++--
+>   arch/arm/include/debug/s5pv210.S                 | 34 ++++++++++++++++++++
+>   arch/arm/mach-s5pv210/include/mach/debug-macro.S | 41 ------------------------
+>   3 files changed, 44 insertions(+), 43 deletions(-)
+>   create mode 100644 arch/arm/include/debug/s5pv210.S
+>   delete mode 100644 arch/arm/mach-s5pv210/include/mach/debug-macro.S
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 8f90595..c2bcfcf 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -617,6 +617,7 @@ choice
+>   		depends on PLAT_SAMSUNG
+>   		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+>   		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+> +		select DEBUG_S5PV210_UART if ARCH_S5PV210
+>   		bool "Use S3C UART 0 for low-level debug"
+>   		help
+>   		  Say Y here if you want the debug print routines to direct
+> @@ -630,6 +631,7 @@ choice
+>   		depends on PLAT_SAMSUNG
+>   		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+>   		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+> +		select DEBUG_S5PV210_UART if ARCH_S5PV210
+>   		bool "Use S3C UART 1 for low-level debug"
+>   		help
+>   		  Say Y here if you want the debug print routines to direct
+> @@ -643,6 +645,7 @@ choice
+>   		depends on PLAT_SAMSUNG
+>   		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+>   		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+> +		select DEBUG_S5PV210_UART if ARCH_S5PV210
+>   		bool "Use S3C UART 2 for low-level debug"
+>   		help
+>   		  Say Y here if you want the debug print routines to direct
+> @@ -653,8 +656,9 @@ choice
+>   		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+>
+>   	config DEBUG_S3C_UART3
+> -		depends on PLAT_SAMSUNG&&  ARCH_EXYNOS
+> -		select DEBUG_EXYNOS_UART
+> +		depends on PLAT_SAMSUNG&&  (ARCH_EXYNOS || ARCH_S5PV210)
+> +		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
+> +		select DEBUG_S5PV210_UART if ARCH_S5PV210
+>   		bool "Use S3C UART 3 for low-level debug"
+>   		help
+>   		  Say Y here if you want the debug print routines to direct
+> @@ -949,6 +953,9 @@ config DEBUG_S3C2410_UART
+>   config DEBUG_S3C24XX_UART
+>   	bool
+>
+> +config DEBUG_S5PV210_UART
+> +	bool
+> +
+>   config DEBUG_OMAP2PLUS_UART
+>   	bool
+>   	depends on ARCH_OMAP2PLUS
+> @@ -1009,6 +1016,7 @@ config DEBUG_LL_INCLUDE
+>   	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+>   	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+>   	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+> +	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+>   	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+>   	default "debug/sti.S" if DEBUG_STI_UART
+>   	default "debug/tegra.S" if DEBUG_TEGRA_UART
+> diff --git a/arch/arm/include/debug/s5pv210.S b/arch/arm/include/debug/s5pv210.S
+> new file mode 100644
+> index 0000000..4f1a73e
+> --- /dev/null
+> +++ b/arch/arm/include/debug/s5pv210.S
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/* pull in the relevant register and map files. */
+> +
+> +#define S3C_ADDR_BASE   0xF6000000
+> +#define S3C_VA_UART	S3C_ADDR_BASE + 0x01000000
+> +#define S5PV210_PA_UART	0xe2900000
+> +
+> +	/* note, for the boot process to work we have to keep the UART
+> +	 * virtual address aligned to an 1MiB boundary for the L1
+> +	 * mapping the head code makes. We keep the UART virtual address
+> +	 * aligned and add in the offset when we load the value here.
+> +	 */
+> +
+> +	.macro addruart, rp, rv, tmp
+> +		ldr	\rp, =S5PV210_PA_UART
+> +		ldr	\rv, =S3C_VA_UART
+> +#if CONFIG_DEBUG_S3C_UART != 0
+> +		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
+> +		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
+> +#endif
+> +	.endm
+> +
+> +#define fifo_full fifo_full_s5pv210
+> +#define fifo_level fifo_level_s5pv210
+> +
+> +#include<debug/samsung.S>
+> diff --git a/arch/arm/mach-s5pv210/include/mach/debug-macro.S b/arch/arm/mach-s5pv210/include/mach/debug-macro.S
+> deleted file mode 100644
+> index 30b511a..0000000
 
-Thanks, I'll clean that up in a follow-up patch.
+Tomasz,
+
+I couldn't apply this one from this your series because of conflict with 
+others. Can you please respin this one?
+
+Thanks,
+-Kukjin
