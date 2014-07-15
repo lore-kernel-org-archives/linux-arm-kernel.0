@@ -1,33 +1,54 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 15 Jul 2014 09:19:38 -0700
-Subject: [PATCH v3 2/2] ARM: dts: Add mask-tpm-reset DT node to the
- exynos5800-peach-pi
-In-Reply-To: <1405420294-9323-3-git-send-email-vikas.sajjan@samsung.com>
-References: <1405420294-9323-1-git-send-email-vikas.sajjan@samsung.com>
- <1405420294-9323-3-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAD=FV=VtrMTbaaN9MA+8=rM23UY9efktsOHab51H=Nm7JVJz4A@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 15 Jul 2014 11:29:13 -0500
+Subject: [PATCH v6 2/2] phy: qcom: Add device tree bindings for IPQ806x SATA
+ PHY
+In-Reply-To: <1405441753-18511-1-git-send-email-galak@codeaurora.org>
+References: <1405441753-18511-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1405441753-18511-2-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas,
+Add binding spec for Qualcomm SoC PHYs, starting with the SATA PHY on
+the IPQ806x family of SoCs.
 
-On Tue, Jul 15, 2014 at 3:31 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
-> being reset across sleep/wake.  If we don't set it to anything then
-> the TPM will be reset.  U-Boot will detect this as invalid
-> and will reset the system on resume time. This GPIO can always be low
-> and not hurt anything.  It will get pulled back high again during a
-> normal warm reset when it will default back to an input.
->
-> To properly preserve the TPM state across suspend/resume and to make
-> the chrome U-Boot happy, properly set the GPIO to mask the
-> reset to the TPM.
->
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5800-peach-pi.dts |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+v6:
+* Moved binding to qcom-ipq806x-sata-phy.txt instead of qcom-phy.txt
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+ .../bindings/phy/qcom-ipq806x-sata-phy.txt         | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/qcom-ipq806x-sata-phy.txt
 
--Doug
+diff --git a/Documentation/devicetree/bindings/phy/qcom-ipq806x-sata-phy.txt b/Documentation/devicetree/bindings/phy/qcom-ipq806x-sata-phy.txt
+new file mode 100644
+index 0000000..76bfbd0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/qcom-ipq806x-sata-phy.txt
+@@ -0,0 +1,23 @@
++Qualcomm IPQ806x SATA PHY Controller
++------------------------------------
++
++SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
++Each SATA PHY controller should have its own node.
++
++Required properties:
++- compatible: compatible list, contains "qcom,ipq806x-sata-phy"
++- reg: offset and length of the SATA PHY register set;
++- #phy-cells: must be zero
++- clocks: must be exactly one entry
++- clock-names: must be "cfg"
++
++Example:
++	sata_phy: sata-phy at 1b400000 {
++		compatible = "qcom,ipq806x-sata-phy";
++		reg = <0x1b400000 0x200>;
++
++		clocks = <&gcc SATA_PHY_CFG_CLK>;
++		clock-names = "cfg";
++
++		#phy-cells = <0>;
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
