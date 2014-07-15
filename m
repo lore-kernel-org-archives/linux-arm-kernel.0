@@ -1,69 +1,25 @@
-From: Catalin.Marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Jul 2014 22:44:56 +0100
-Subject: [PATCH v6 2/7] arm64: Introduce VA_BITS and translation level
- options
-In-Reply-To: <3AF98E68-6818-416A-BC33-57148F1EC246@gmail.com>
-References: <000101cf6dc6$3b93d510$b2bb7f30$@samsung.com>
- <CAOZdJXWCu-zHuQoAUdiieqsKqCfG9BsZariFqQP=NCgQP-zpNA@mail.gmail.com>
- <53C43FE3.1050008@amd.com> <20140714224159.GA9829@arm.com>
- <3AF98E68-6818-416A-BC33-57148F1EC246@gmail.com>
-Message-ID: <95F7642B-124A-4E03-ACDE-5BF9D70E8E15@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Jul 2014 15:42:29 -0700
+Subject: [PATCH 0/2] qcom clock fixes
+Message-ID: <1405464151-16152-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 Jul 2014, at 15:53, Jungseok Lee <jungseoklee85@gmail.com> wrote:
-> On Jul 15, 2014, at 7:41 AM, Catalin Marinas wrote:
->> On Mon, Jul 14, 2014 at 09:38:59PM +0100, Joel Schopp wrote:
->>> I agree that these patches would be very useful.  I just rebased my fix
->>> for a VTTBR_BADDR_MASK bug on one of these patches that could be pulled
->>> out independently.  See
->>> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010480.html
->>>
->>> The original author Jungseok Lee is no longer available to work on
->>> future versions of these patches.  I was thinking that if they didn't
->>> get picked up as they are that with the original author's blessing I
->>> would pick them up and keep them forward ported/resubmitted.  I have an
->>> SOC to test them on.
->>
->> The patches are pretty good. I'll give them a try tomorrow and if there
->> isn't something fundamental missing I'll consider taking them for 3.17.
->
-> Hi All,
->
-> If only stage1 side is taken and merged, KVM should be disabled under 4 level
-> lookups with the following configuration adjustment. I've tested it on top of
-> arm64/for-next/core branch and it works fine.
->
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -18,6 +18,7 @@ if VIRTUALIZATION
->
-> config KVM
->        bool "Kernel-based Virtual Machine (KVM) support"
-> +       depends on !ARM64_4_LEVELS
->        select MMU_NOTIFIER
->        select PREEMPT_NOTIFIERS
->        select ANON_INODES
->
-> However, I don't know whether it does make sense or not.
+Here's two small fixes for the qcom clock drivers. Nobody has reported
+these as regressions so we can safely wait for 3.17, but I've marked
+them with the "Fixes" tag so that stable trees can pick them up as
+necessary.
 
-I added some patches on top of your series, I hope to be able to post
-them tomorrow. My interim approach was to disable 4-levels if KVM is
-enabled.
+Stephen Boyd (2):
+  clk: qcom: Fix PLL rate configurations
+  clk: qcom: mdp_lut_clk is a child of mdp_src
 
-> In other words, stage2 side should be prepared to fully support 4 level lookups.
->
-> In order to cover all combinations of host and guest, VTTBR_X should be determined
-> dynamically as referring to hardware capability. At this point, the patches have
-> been revised many times, but they don't have got ACKs from Christoffer and Marc yet.
->
-> That is why the patches are pending now in the author's point of view.
+ drivers/clk/qcom/common.c       | 39 ++++++++++++++++++++++++++++-----------
+ drivers/clk/qcom/common.h       |  6 ++++++
+ drivers/clk/qcom/mmcc-msm8960.c |  2 +-
+ drivers/clk/qcom/mmcc-msm8974.c | 10 ++++------
+ 4 files changed, 39 insertions(+), 18 deletions(-)
 
-I have some clean-up for stage 1 on top but nothing major.
-
-Catalin
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
-
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
