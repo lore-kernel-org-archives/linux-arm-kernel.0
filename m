@@ -1,148 +1,374 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 15 Jul 2014 15:55:49 +0800
-Subject: [PATCH v11 04/12] ARM: hisi: enable MCPM implementation
-In-Reply-To: <alpine.LFD.2.11.1407140553300.3647@knanqh.ubzr>
-References: <1405330453-15104-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1407140553300.3647@knanqh.ubzr>
-Message-ID: <CAD6h2NT-dC_yqkx3iy3BXp7SPy_+nC+mkGk2DGRs9RF5bKZQAw@mail.gmail.com>
+Date: Tue, 15 Jul 2014 15:57:19 +0800
+Subject: [PATCH v12 03/11] ARM: hisi: enable MCPM implementation
+Message-ID: <1405411039-30484-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 July 2014 18:12, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 14 Jul 2014, Haojian Zhuang wrote:
->
->> +static bool hip04_init_cluster0_snoop(void)
->> +{
->> +     unsigned long data;
->> +
->> +     if (!fabric) {
->> +             pr_err("failed to find fabric base\n");
->> +             return false;
->> +     }
->> +     data = readl_relaxed(fabric + FAB_SF_MODE);
->> +     data |= 1;
->> +     writel_relaxed(data, fabric + FAB_SF_MODE);
->> +     while (1) {
->> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
->> +                     break;
->> +     }
->> +     return true;
->> +}
->
-> In fact you probably should make this into something like:
->
-> static bool hip04_set_cluster_snoop(int cluster, bool active)
->
-> Eventually you'll want to turn snoops off when a cluster is completely
-> idle.  And this can be used to init snoops on cluster 0 during boot as
-> well.
->
-I don't plan to implement power down by resetting cores since the
-operation of disabling cluster snoop is not good. It'll make core
-hang.
+Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+framework to manage power on HiP04 SoC.
 
-Now I plan to use wfi instead. Only the first time, we need to make cores
-out of reset. For the next times, we only need to use IPI to wakeup
-secondary cores instead.
+Changelog:
+v12:
+  * Use wfi as power down state in MCPM.
+  * Remove wait_for_powerdown() in MCPM because wfi is used now.
 
->> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
->> +{
->> +     unsigned long data, mask;
->> +
->> +     if (!relocation || !sysctrl)
->> +             return -ENODEV;
->> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
->> +             return -EINVAL;
->> +
->> +     spin_lock_irq(&boot_lock);
->> +
->> +     if (hip04_cpu_table[cluster][cpu]) {
->> +             hip04_cpu_table[cluster][cpu]++;
->> +             spin_unlock_irq(&boot_lock);
->> +             return 0;
->> +     }
->> +
->> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
->> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
->> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
->> +     writel_relaxed(0, relocation + 12);
->> +
->> +     if (hip04_cluster_down(cluster)) {
->> +             data = CLUSTER_DEBUG_RESET_BIT;
->> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->> +             do {
->> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
->> +                     data = readl_relaxed(sysctrl + \
->> +                                          SC_CPU_RESET_STATUS(cluster));
->> +             } while (data & mask);
->> +     }
->> +
->> +     hip04_cpu_table[cluster][cpu]++;
->> +
->> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> +            CORE_DEBUG_RESET_BIT(cpu);
->> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->> +     spin_unlock_irq(&boot_lock);
->> +     msleep(POLL_MSEC);
->
-> Now that the booting CPU takes cares of snoops for itself, is this delay
-> still required?
->
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mach-hisi/Makefile   |   1 +
+ arch/arm/mach-hisi/platmcpm.c | 334 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 335 insertions(+)
+ create mode 100644 arch/arm/mach-hisi/platmcpm.c
 
-Oh, this msleep() is removed in the next patch "enable HiP04". I
-should move it here instead.
-
->> +     return 0;
->> +}
->> +
->> +static void hip04_mcpm_power_down(void)
->> +{
->> +     unsigned int mpidr, cpu, cluster, data = 0;
->> +     bool skip_reset = false;
->> +
->> +     mpidr = read_cpuid_mpidr();
->> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> +
->> +     __mcpm_cpu_going_down(cpu, cluster);
->> +
->> +     spin_lock(&boot_lock);
->> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
->> +     hip04_cpu_table[cluster][cpu]--;
->> +     if (hip04_cpu_table[cluster][cpu] == 1) {
->> +             /* A power_up request went ahead of us. */
->> +             skip_reset = true;
->> +     } else if (hip04_cpu_table[cluster][cpu] > 1) {
->> +             pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
->> +             BUG();
->> +     }
->> +
->> +     v7_exit_coherency_flush(louis);
->> +
->> +     __mcpm_cpu_down(cpu, cluster);
->> +     spin_unlock(&boot_lock);
->
-> You can't touch spinlocks after v7_exit_coherency_flush().  That has to
-> come before it.
->
->> +     if (!skip_reset) {
->> +             data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> +                    CORE_DEBUG_RESET_BIT(cpu);
->> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
->> +     }
->
-> And the race is still there.  If right before skip_reset is tested the
-> code in power_up() is executed, the CPU will then be shut down here
-> although it is expected to remain alive.
->
-> You are certain no code is ever executed after SC_CPU_RESET_REQ is
-> written to? You don't need to execute wfi() for the reset to be
-> effective?  If so this write will have to be performed by another CPU
-> via a work queue or something unless there is simply no other CPU
-> running in the system.
->
-I think that wfi is better now. I'll use wfi instead. And we don't
-worry about the reset mode any more.
-
-Best Regards
-Haojian
+diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+index ee2506b..d64831e 100644
+--- a/arch/arm/mach-hisi/Makefile
++++ b/arch/arm/mach-hisi/Makefile
+@@ -3,4 +3,5 @@
+ #
+ 
+ obj-y	+= hisilicon.o
++obj-$(CONFIG_MCPM)		+= platmcpm.o
+ obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
+diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+new file mode 100644
+index 0000000..5f038c5
+--- /dev/null
++++ b/arch/arm/mach-hisi/platmcpm.c
+@@ -0,0 +1,334 @@
++/*
++ * Copyright (c) 2013-2014 Linaro Ltd.
++ * Copyright (c) 2013-2014 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ */
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++
++#include <asm/cputype.h>
++#include <asm/cp15.h>
++#include <asm/mcpm.h>
++
++#include "core.h"
++
++/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
++ * 1 -- unreset; 0 -- reset
++ */
++#define CORE_RESET_BIT(x)		(1 << x)
++#define NEON_RESET_BIT(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
++#define CLUSTER_L2_RESET_BIT		(1 << 8)
++#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
++
++/*
++ * bits definition in SC_CPU_RESET_STATUS[x]
++ * 1 -- reset status; 0 -- unreset status
++ */
++#define CORE_RESET_STATUS(x)		(1 << x)
++#define NEON_RESET_STATUS(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
++#define CLUSTER_L2_RESET_STATUS		(1 << 8)
++#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
++#define CORE_WFI_STATUS(x)		(1 << (x + 16))
++#define CORE_WFE_STATUS(x)		(1 << (x + 20))
++#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
++
++#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
++#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
++#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
++
++#define FAB_SF_MODE			0x0c
++#define FAB_SF_INVLD			0x10
++
++/* bits definition in FB_SF_INVLD */
++#define FB_SF_INVLD_START		(1 << 8)
++
++#define HIP04_MAX_CLUSTERS		4
++#define HIP04_MAX_CPUS_PER_CLUSTER	4
++
++#define POLL_MSEC	10
++#define TIMEOUT_MSEC	1000
++
++struct hip04_secondary_cpu_data {
++	u32	bootwrapper_phys;
++	u32	bootwrapper_size;
++	u32	bootwrapper_magic;
++	u32	relocation_entry;
++	u32	relocation_size;
++};
++
++static void __iomem *relocation, *sysctrl, *fabric;
++static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
++static int hip04_init_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
++static DEFINE_SPINLOCK(boot_lock);
++static struct hip04_secondary_cpu_data hip04_boot;
++static u32 fabric_phys_addr;
++
++static bool hip04_cluster_down(unsigned int cluster)
++{
++	int i;
++
++	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
++		if (hip04_cpu_table[cluster][i])
++			return false;
++	return true;
++}
++
++static bool hip04_init_cluster0_snoop(void)
++{
++	unsigned long data;
++
++	if (!fabric) {
++		pr_err("failed to find fabric base\n");
++		return false;
++	}
++	data = readl_relaxed(fabric + FAB_SF_MODE);
++	data |= 1;
++	writel_relaxed(data, fabric + FAB_SF_MODE);
++	while (1) {
++		if (data == readl_relaxed(fabric + FAB_SF_MODE))
++			break;
++	}
++	return true;
++}
++
++static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
++{
++	unsigned long data, mask;
++
++	if (!relocation || !sysctrl)
++		return -ENODEV;
++	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
++		return -EINVAL;
++
++	spin_lock_irq(&boot_lock);
++
++	/*
++	 * hip04_init_table is used to mark whether power up operation is
++	 * executed. If it's not the first time power up, it'll wakeup by
++	 * IPI.
++	 */
++	if (hip04_cpu_table[cluster][cpu] || hip04_init_table[cluster][cpu])
++		goto out;
++
++	/* Make secondary core out of reset if cluster isn't initialized. */
++	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
++	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
++	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
++	writel_relaxed(0, relocation + 12);
++
++	if (hip04_cluster_down(cluster)) {
++		data = CLUSTER_DEBUG_RESET_BIT;
++		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
++		do {
++			mask = CLUSTER_DEBUG_RESET_STATUS;
++			data = readl_relaxed(sysctrl + \
++					     SC_CPU_RESET_STATUS(cluster));
++		} while (data & mask);
++	}
++
++	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
++	       CORE_DEBUG_RESET_BIT(cpu);
++	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
++	hip04_init_table[cluster][cpu] = 1;
++out:
++	hip04_cpu_table[cluster][cpu]++;
++	spin_unlock_irq(&boot_lock);
++
++	return 0;
++}
++
++static void hip04_mcpm_power_down(void)
++{
++	unsigned int mpidr, cpu, cluster;
++	bool skip_wfi = false;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	__mcpm_cpu_going_down(cpu, cluster);
++
++	spin_lock(&boot_lock);
++	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
++	hip04_cpu_table[cluster][cpu]--;
++	if (hip04_cpu_table[cluster][cpu] == 1) {
++		/* A power_up request went ahead of us. */
++		skip_wfi = true;
++	} else if (hip04_cpu_table[cluster][cpu] > 1) {
++		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
++		BUG();
++	}
++	spin_unlock(&boot_lock);
++
++	v7_exit_coherency_flush(louis);
++
++	__mcpm_cpu_down(cpu, cluster);
++
++	if (!skip_wfi)
++		wfi();
++}
++
++static void hip04_mcpm_powered_up(void)
++{
++	if (!relocation)
++		return;
++	spin_lock(&boot_lock);
++	writel_relaxed(0, relocation);
++	writel_relaxed(0, relocation + 4);
++	writel_relaxed(0, relocation + 8);
++	writel_relaxed(0, relocation + 12);
++	spin_unlock(&boot_lock);
++}
++
++static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
++{
++	asm volatile ("			\n"
++"	cmp	r0, #0			\n"
++"	bxeq	lr			\n"
++	/* calculate fabric phys address */
++"	adr	r2, 2f			\n"
++"	ldmia	r2, {r1, r3}		\n"
++"	sub	r0, r2, r1		\n"
++"	ldr	r2, [r0, r3]		\n"
++	/* get cluster id from MPIDR */
++"	mrc	p15, 0, r0, c0, c0, 5	\n"
++"	ubfx	r1, r0, #8, #8		\n"
++	/* 1 << cluster id */
++"	mov	r0, #1			\n"
++"	mov	r3, r0, lsl r1		\n"
++"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
++"	tst	r0, r3			\n"
++"	bxne	lr			\n"
++"	orr	r1, r0, r3		\n"
++"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
++"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
++"	tst	r0, r3			\n"
++"	beq	1b			\n"
++"	bx	lr			\n"
++
++"	.align	2			\n"
++"2:	.word	.			\n"
++"	.word	fabric_phys_addr	\n"
++	);
++}
++
++static const struct mcpm_platform_ops hip04_mcpm_ops = {
++	.power_up		= hip04_mcpm_power_up,
++	.power_down		= hip04_mcpm_power_down,
++	.powered_up		= hip04_mcpm_powered_up,
++};
++
++static bool __init hip04_cpu_table_init(void)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	if (cluster >= HIP04_MAX_CLUSTERS ||
++	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
++		pr_err("%s: boot CPU is out of bound!\n", __func__);
++		return false;
++	}
++	if (!hip04_init_cluster0_snoop())
++		return false;
++	hip04_cpu_table[cluster][cpu] = 1;
++	hip04_init_table[0][0] = 1;
++	return true;
++}
++
++static int __init hip04_mcpm_init(void)
++{
++	struct device_node *np, *np_fab;
++	struct resource fab_res;
++	int ret = -ENODEV;
++
++	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
++	if (!np)
++		goto err;
++	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
++	if (!np_fab)
++		goto err;
++
++	if (of_property_read_u32(np, "bootwrapper-phys",
++				 &hip04_boot.bootwrapper_phys)) {
++		pr_err("failed to get bootwrapper-phys\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "bootwrapper-size",
++				 &hip04_boot.bootwrapper_size)) {
++		pr_err("failed to get bootwrapper-size\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "bootwrapper-magic",
++				 &hip04_boot.bootwrapper_magic)) {
++		pr_err("failed to get bootwrapper-magic\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "relocation-entry",
++				 &hip04_boot.relocation_entry)) {
++		pr_err("failed to get relocation-entry\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "relocation-size",
++				 &hip04_boot.relocation_size)) {
++		pr_err("failed to get relocation-size\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	relocation = ioremap(hip04_boot.relocation_entry,
++			     hip04_boot.relocation_size);
++	if (!relocation) {
++		pr_err("failed to map relocation space\n");
++		ret = -ENOMEM;
++		goto err;
++	}
++	sysctrl = of_iomap(np, 0);
++	if (!sysctrl) {
++		pr_err("failed to get sysctrl base\n");
++		ret = -ENOMEM;
++		goto err_sysctrl;
++	}
++	ret = of_address_to_resource(np_fab, 0, &fab_res);
++	if (ret) {
++		pr_err("failed to get fabric base phys\n");
++		goto err_fabric;
++	}
++	fabric_phys_addr = fab_res.start;
++	sync_cache_w(&fabric_phys_addr);
++	fabric = of_iomap(np_fab, 0);
++	if (!fabric) {
++		pr_err("failed to get fabric base\n");
++		ret = -ENOMEM;
++		goto err_fabric;
++	}
++
++	if (!hip04_cpu_table_init())
++		return -EINVAL;
++	ret = mcpm_platform_register(&hip04_mcpm_ops);
++	if (!ret) {
++		mcpm_sync_init(hip04_mcpm_power_up_setup);
++		pr_info("HiP04 MCPM initialized\n");
++	}
++	mcpm_smp_set_ops();
++	return ret;
++err_fabric:
++	iounmap(sysctrl);
++err_sysctrl:
++	iounmap(relocation);
++err:
++	return ret;
++}
++early_initcall(hip04_mcpm_init);
+-- 
+1.9.1
