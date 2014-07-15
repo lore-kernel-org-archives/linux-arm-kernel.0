@@ -1,54 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Jul 2014 02:14:35 -0700
-Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
-In-Reply-To: <20140103164055.GA18722@saruman.home>
-References: <1384970958-4118-1-git-send-email-balbi@ti.com>
- <20131219184815.GU27438@atomide.com>
- <20131219232153.GE707@saruman.home>
- <20131221005309.GH26054@atomide.com>
- <20131223173409.GA10536@saruman.home>
- <20140102220101.GA8652@saruman.home> <52C6A939.70708@ti.com>
- <20140103164055.GA18722@saruman.home>
-Message-ID: <20140715091435.GB28715@atomide.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 15 Jul 2014 18:16:25 +0900
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add SCI clock support for DT
+In-Reply-To: <cover.1405398284.git.horms+renesas@verge.net.au>
+References: <cover.1405398284.git.horms+renesas@verge.net.au>
+Message-ID: <7a0c99478dca80f862912be02bf8ec240a9098d1.1405398284.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140103 08:43]:
-> On Fri, Jan 03, 2014 at 05:42:41PM +0530, Rajendra Nayak wrote:
-> > []..
-> > 
-> > >>> so a bit more work is needed. Maybe also rebase these against
-> > >>> omap-for-v3.14/dt too?
-> > >>
-> > >> Will do.
-> > > 
-> > > Rebased on top of omap-for-v3.14/omap3-board-removal. Patches are on my
-> > > k.org tree:
-> > > 
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git wip/omap-fix-intc
-> > 
-> > It needs a minor build fix though..
-> > 
-> > diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-> > index b58c5d5..d03b5a3 100644
-> > --- a/drivers/irqchip/irq-omap-intc.c
-> > +++ b/drivers/irqchip/irq-omap-intc.c
-> > @@ -151,7 +151,7 @@ static void omap_mask_ack_irq(struct irq_data *d)
-> >  static void omap_suspend_irq(struct irq_data *d)
-> >  {
-> >         omap_intc_save_context();
-> > -       omap3_intc_prepare_idle();
-> > +       omap_intc_prepare_idle();
-> 
-> fixed now, thanks. Wonder how come I didn't see that, I was building
-> every commit with omap2plus_defconfig :-( Oh well...
+This will be used when initialising SCI devices using DT
+until common clock framework support is added.
 
-Felipe, care to refresh this series against v3.16-rc4 and
-repost? We now finally have the DT based booting working for
-PM for omap3 the same way as legacy booting so I can test
-this easily for regressions. But I don't seem to have the
-patches in my mailbox any longer.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7778.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 13f8f3a..a6dd601 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -202,11 +202,17 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
+ 	CLKDEV_DEV_ID("ffc73000.i2c", &mstp_clks[MSTP027]), /* I2C3 */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
++	CLKDEV_DEV_ID("ffe40000.serial", &mstp_clks[MSTP026]), /* SCIF0 */
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
++	CLKDEV_DEV_ID("ffe41000.serial", &mstp_clks[MSTP025]), /* SCIF1 */
+ 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
++	CLKDEV_DEV_ID("ffe42000.serial", &mstp_clks[MSTP024]), /* SCIF2 */
+ 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
++	CLKDEV_DEV_ID("ffe43000.serial", &mstp_clks[MSTP023]), /* SCIF3 */
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
++	CLKDEV_DEV_ID("ffe44000.serial", &mstp_clks[MSTP022]), /* SCIF4 */
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
++	CLKDEV_DEV_ID("ffe45000.serial", &mstp_clks[MSTP021]), /* SCIF5 */
+ 	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
+ 	CLKDEV_DEV_ID("fffc7000.spi", &mstp_clks[MSTP007]), /* HSPI0 */
+ 	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
+-- 
+2.0.0
