@@ -1,76 +1,100 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Tue, 15 Jul 2014 12:51:16 +0200
-Subject: [PATCH] s5p-mfc: limit the size of the CPB
-In-Reply-To: <1405393670-2808-1-git-send-email-panpan1.liu@samsung.com>
-References: <1405393670-2808-1-git-send-email-panpan1.liu@samsung.com>
-Message-ID: <000001cfa01a$bb569040$3203b0c0$%debski@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Jul 2014 12:52:54 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <1645765.yCSTbHcZMC@avalon>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417324.PxofUz16v0@avalon> <20140715103718.GB6616@ulmo>
+ <1645765.yCSTbHcZMC@avalon>
+Message-ID: <20140715105253.GE6616@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Please also rebase the patches onto the master branch of the media tree.
-
-http://git.linuxtv.org/cgit.cgi/media_tree.git/
-
-Best wishes,
--- 
-Kamil Debski
-Samsung R&D Institute Poland
-
-
-> -----Original Message-----
-> From: panpan liu [mailto:panpan1.liu at samsung.com]
-> Sent: Tuesday, July 15, 2014 5:08 AM
-> To: kyungmin.park at samsung.com; k.debski at samsung.com;
-> jtp.park at samsung.com; mchehab at redhat.com
-> Cc: linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: [PATCH] s5p-mfc: limit the size of the CPB
+On Tue, Jul 15, 2014 at 12:43:02PM +0200, Laurent Pinchart wrote:
+> Hi Thierry,
 > 
-> The CPB size is limited by the hardware. Add this limit to the s_fmt.
+> On Tuesday 15 July 2014 12:37:19 Thierry Reding wrote:
+> > On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
+> > > On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
+> > >> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
+> > >>> On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> > >>>> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs
+> > >>>> (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family) provides a
+> > >>>> display controller device.
+> > >>>> 
+> > >>>> The HLCDC block provides a single RGB output port, and only supports
+> > >>>> LCD panels connection to LCD panels for now.
+> > >>>> 
+> > >>>> The atmel,panel property link the HLCDC RGB output with the LCD
+> > >>>> panel connected on this port (note that the HLCDC RGB connector
+> > >>>> implementation makes use of the DRM panel framework).
+> > >>>> 
+> > >>>> Connection to other external devices (DRM bridges) might be added
+> > >>>> later by mean of a new atmel,xxx (atmel,bridge) property.
+> > >>>> 
+> > >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > >>>> ---
+> > >>>> 
+> > >>>>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++
+> > >>>>  1 file changed, 59 insertions(+)
+> > >>>>  create mode 100644
+> > >>>>  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+> > > 
+> > > [snip]
+> > > 
+> > >>>> + - atmel,panel: Should contain a phandle with 2 parameters.
+> > >>>> +   The first cell is a phandle to a DRM panel device
+> > >>>> +   The second cell encodes the RGB mode, which can take the
+> > >>>> following values:
+> > >>>> +   * 0: RGB444
+> > >>>> +   * 1: RGB565
+> > >>>> +   * 2: RGB666
+> > >>>> +   * 3: RGB888
+> > >>> 
+> > >>> These are properties of the panel and should be obtained from the
+> > >>> panel directly rather than an additional cell in this specifier.
+> > >> 
+> > >> Okay.
+> > >> What's the preferred way of doing this ?
+> > >> What about defining an rgb-mode property in the panel node.
+> > > 
+> > > You could do that, but it won't help you much, as the HLCDC driver must
+> > > not parse properties from the panel node. You should instead extend the
+> > > drm_panel API with a function to retrieve panel properties. The HLCDC
+> > > driver will then query the panel driver at runtime for the interface
+> > > type. The panel driver will get the information from hardcoded data in
+> > > the driver, from DT or possibly in some cases by querying the panel
+> > > hardware directly.
+> > 
+> > My preference for this would be that we either add this to some existing
+> > structure (struct drm_display_info seems like a good candidate) or if
+> > the number of parameters grows out of hands, then maybe even introduce a
+> > new type of device that's specific for the interface. DRM panels are an
+> > abstraction for panels, that is, interface-agnostic, and if we start
+> > exposing interface specific parameters things will start to become very
+> > unwieldy.
 > 
-> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |   11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)  mode change 100644 =>
-> 100755 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> old mode 100644
-> new mode 100755
-> index 0bae907..70b9458
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -413,7 +413,8 @@ static int vidioc_s_fmt(struct file *file, void
-> *priv, struct v4l2_format *f)
->  	int ret = 0;
->  	struct s5p_mfc_fmt *fmt;
->  	struct v4l2_pix_format_mplane *pix_mp;
-> -
-> +	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
-> +
->  	mfc_debug_enter();
->  	ret = vidioc_try_fmt(file, priv, f);
->  	pix_mp = &f->fmt.pix_mp;
-> @@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void
-> *priv, struct v4l2_format *f)
->  	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
->  	pix_mp->height = 0;
->  	pix_mp->width = 0;
-> -	if (pix_mp->plane_fmt[0].sizeimage)
-> -		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
-> -	else
-> +	if (pix_mp->plane_fmt[0].sizeimage == 0)
->  		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
->
-DEF_CPB_SIZE;
-> +	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
-> +		ctx->dec_src_buf_size = buf_size->cpb;
-> +	else
-> +		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
->  	pix_mp->plane_fmt[0].bytesperline = 0;
->  	ctx->state = MFCINST_INIT;
->  out:
-> --
-> 1.7.9.5
+> I agree with the goal of keeping drm_panel interface-agnostic. However, one 
+> way or another, interface parameters will need to be communicated between the 
+> panel driver and the controller driver. My preference, if we need to extend 
+> the number and/or scope of parameters beyond what drm_display_info could 
+> reasonably contain, would be to implement a new drm_panel operation to 
+> query/configure interface parameters, using a structure that contains the 
+> interface type and a union of type-specific structures. This would keep the 
+> API generic in the sense of not requiring explicit knowledge of all interfaces 
+> in the drivers, while offering the flexibility we need with a way to easily 
+> detect the interface type at runtime and react on unknown/unsupported types.
+
+That's exactly what I was hoping could be avoided. If instead we modeled
+the interface type as a bus, we could for example have an lvds_bus along
+with an lvds_device and then use that as the natural place to store
+these properties. Much like we do for DSI.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/3a881c50/attachment.sig>
