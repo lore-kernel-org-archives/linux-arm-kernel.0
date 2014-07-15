@@ -1,116 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 16 Jul 2014 08:35:50 +0900
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>	<CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>	<53A12EA3.5010007@samsung.com>	<CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>	<CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>	<53BC0F8F.4010106@samsung.com>	<CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
- <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
-Message-ID: <53C5BAD6.5030603@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Jul 2014 16:38:20 -0700
+Subject: [PATCH v1] clk: qcom: Add APQ8084 Multimedia Clock Controller
+ (MMCC) support
+In-Reply-To: <53C04ED9.6030508@codeaurora.org>
+References: <1402591302-12100-1-git-send-email-gdjakov@mm-sol.com>
+ <53C04ED9.6030508@codeaurora.org>
+Message-ID: <53C5BB6C.3090006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/14 18:09, Rahul Sharma wrote:
-> Hi Kukjin,
+On 07/11/14 13:53, Stephen Boyd wrote:
+> On 06/12/14 09:41, Georgi Djakov wrote:
+>> Add support for the multimedia clock controller found on the APQ8084
+>> based platforms. This will allow the multimedia device drivers to
+>> control their clocks.
+>>
+>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> ---
+> I started picking up the qcom clock patches from the list. I see that
+> this one has a small problem though:
 >
-Hi Rahul,
-
-> Please consider this patch for your branch. This patch is important
-> for Display for Exynos5 boards.
+> drivers/clk/qcom/mmcc-apq8084.c:169:10: warning: Initializer entry
+> defined twice
+> drivers/clk/qcom/mmcc-apq8084.c:170:10:   also defined here
+> drivers/clk/qcom/mmcc-apq8084.c:185:10: warning: Initializer entry
+> defined twice
+> drivers/clk/qcom/mmcc-apq8084.c:187:10:   also defined here
+> drivers/clk/qcom/mmcc-apq8084.c:203:10: warning: Initializer entry
+> defined twice
+> drivers/clk/qcom/mmcc-apq8084.c:205:10:   also defined here
 >
-OK, I will take this for exynos5420 display for 3.17...BTW I'm not sure 
-this is a regression for 3.16 or not...if so, please let me know.
 
-Thanks,
-Kukjin
+Ok I've squashed in this fix:
 
-> Regards,
-> Rahul Sharma.
->
-> On 9 July 2014 17:00, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
->> Hi Tomasz,
->>
->> On 8 July 2014 21:04, Tomasz Figa<t.figa@samsung.com>  wrote:
->>> Hi Rahul,
->>>
->>> On 07.07.2014 15:37, Rahul Sharma wrote:
->>>> Hi Andrej, Inki,
->>>>
->>>> On 18 June 2014 12:06, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
->>>>> Hi Andrej,
->>>>>
->>>>> On 18 June 2014 11:46, Andrzej Hajda<a.hajda@samsung.com>  wrote:
->>>>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
->>>>>>> Hi All,
->>>>>>>
->>>>>>> Please review this patch.
->>>>>>>
->>>>>>> Regards,
->>>>>>> Rahul Sharma
->>>>>>>
->>>>>>> On 9 June 2014 16:58, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
->>>>>>>> Display domain is removed due to instability issues. Explaining
->>>>>>>> the problem below:
->>>>>>>>
->>>>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
->>>>>>>> powers off the unused power domains. This call hits before
->>>>>>>> the trigger to deferred probes.
->>>>>>>>
->>>>>>>> DRM DP Panel defers the probe due to supply get failure. By the
->>>>>>>> time, deferred probe is scheduled again, Display Power Domain is
->>>>>>>> powered off by pm_genpd_poweroff_unused.
->>>>>>>>
->>>>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
->>>>>>>> callbacks. If display domain is enabled/disabled around register
->>>>>>>> accesses, display domain gets unstable and we are getting Power
->>>>>>>> Domain Disable fail notification. Increasing the Timeout also
->>>>>>>> didn't help.
->>>>>>
->>>>>> As I understand the problem is that fimd and dp drivers access hw
->>>>>> registers without enabling power domain. So the proper solution is to
->>>>>> fix these drivers.
->>>>>
->>>>> That is also a problem but I fixed those accesses in my local kernel before
->>>>> hitting this issue. If we do register accesses in FIMD/DP probe/bind we
->>>>> observes "Prefetch abort" exception. But here the problem is that 'DP
->>>>> domain disable' starts failing if we enable/disable multiple times.
->>>>>
->>>>>>
->>>>>> Btw. there are already patches removing hw access from probe/bind of
->>>>>> fimd. I guess removing also hw access from dp probe/bind could be a good
->>>>>> solution.
->>>>>
->>>>> Please let me know the links for posted patches. I will test with those patches.
->>>>
->>>> Is there any update on this? Please share the patches which fixes the
->>>> above issue or avoid the above scenario of multiple PM Domain enable/disable.
->>>> I will test them for exynos5 based boards. Otherwise we should get this change
->>>> merged else display will remain broken for exynos5 based boards.
->>>
->>> Andrzej is on holidays right now, so he won't be able to reply in this
->>> thread until he's back. Here are two patches I was able to find on the
->>> related MLs that might be fixing the cause of your issues:
->>
->> Ok. thanks for the update.
->>
->> We should test with Ajay's patches which includes DP probe deferring
->> based on availability of bridge chip. +
->>
->> few patches which cleanup register access in FIMD and DP probe/bind
->> OR
->> few patches to enable Display power domain and clocks just before the
->> register access. As done in https://lkml.org/lkml/2014/7/4/188.
->>
->> Later solution results into display power domain enable failure in case of DRM
->> probe defer.
->>
->> I am just curious if Andrej has some solution for the first approach which can
->> be tested for defer probe and S2R scenarios.
->>
->> Regards,
->> Rahul Sharma.
->>
->>>
->>> [PATCH] drm/exynos: remove hardware overlays disable from fimd probe
->>> (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
->>>
->>> [PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
->>> (https://lkml.org/lkml/2014/7/4/188)
+diff --git a/drivers/clk/qcom/mmcc-apq8084.c b/drivers/clk/qcom/mmcc-apq8084.c
+index 9cc956a5e9c9..751eea376a2b 100644
+--- a/drivers/clk/qcom/mmcc-apq8084.c
++++ b/drivers/clk/qcom/mmcc-apq8084.c
+@@ -34,12 +34,12 @@
+ #define P_HDMIPLL      2
+ #define P_GPLL0                3
+ #define P_EDPVCO       3
+-#define P_MMPLL4       3
+-#define P_GPLL1                4
++#define P_MMPLL4       4
+ #define P_DSI0PLL      4
+ #define P_DSI0PLL_BYTE 4
+ #define P_MMPLL2       4
+ #define P_MMPLL3       4
++#define P_GPLL1                5
+ #define P_DSI1PLL      5
+ #define P_DSI1PLL_BYTE 5
+ #define P_MMSLEEP      6
+@@ -166,8 +166,8 @@ static const u8 mmcc_xo_mmpll0_1_4_gpll0_map[] = {
+        [P_XO]          = 0,
+        [P_MMPLL0]      = 1,
+        [P_MMPLL1]      = 2,
+-       [P_MMPLL4]      = 3,
+        [P_GPLL0]       = 5,
++       [P_MMPLL4]      = 3,
+ };
+ 
+ static const char *mmcc_xo_mmpll0_1_4_gpll0[] = {
+@@ -183,8 +183,8 @@ static const u8 mmcc_xo_mmpll0_1_4_gpll1_0_map[] = {
+        [P_MMPLL0]      = 1,
+        [P_MMPLL1]      = 2,
+        [P_MMPLL4]      = 3,
+-       [P_GPLL1]       = 4,
+        [P_GPLL0]       = 5,
++       [P_GPLL1]       = 4,
+ };
+ 
+ static const char *mmcc_xo_mmpll0_1_4_gpll1_0[] = {
+@@ -201,8 +201,8 @@ static const u8 mmcc_xo_mmpll0_1_4_gpll1_0_sleep_map[] = {
+        [P_MMPLL0]      = 1,
+        [P_MMPLL1]      = 2,
+        [P_MMPLL4]      = 3,
+-       [P_GPLL1]       = 4,
+        [P_GPLL0]       = 5,
++       [P_GPLL1]       = 4,
+        [P_MMSLEEP]     = 6,
+ };
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
