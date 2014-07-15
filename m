@@ -1,123 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 23:48:08 -0700
-Subject: [PATCH v4 03/11] ARM: OMAP2+: timer: Add suspend-resume
- callbacks for clkevent device
-In-Reply-To: <53C4166F.1050003@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-4-git-send-email-d-gerlach@ti.com>
- <20140714111536.GC20068@atomide.com> <53C3EB1F.2010109@ti.com>
- <53C4166F.1050003@ti.com>
-Message-ID: <20140715064807.GJ20068@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Jul 2014 08:53:38 +0200
+Subject: [PATCH v4 2/6] clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0
+ support
+In-Reply-To: <1404892479-12222-3-git-send-email-wens@csie.org>
+References: <1404892479-12222-1-git-send-email-wens@csie.org>
+ <1404892479-12222-3-git-send-email-wens@csie.org>
+Message-ID: <20140715065338.GC3745@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140714 10:44]:
-> Santosh, Tony,
+On Wed, Jul 09, 2014 at 03:54:35PM +0800, Chen-Yu Tsai wrote:
+> This patch adds "allwinner,sun8i-a23-apb0-gates-clk", a A23 specific
+> compatible to the sun6i-a31-apb0-gates clock driver, along with the
+> gate bitmap.
 > 
-> On 07/14/2014 09:37 AM, Santosh Shilimkar wrote:
-> >On Monday 14 July 2014 07:15 AM, Tony Lindgren wrote:
-> >>* Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
-> >>>From: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> >>>
-> >>>OMAP timer code registers two timers - one as clocksource
-> >>>and one as clockevent. Since AM33XX has only one usable timer
-> >>>in the WKUP domain one of the timers needs suspend-resume
-> >>>support to restore the configuration to pre-suspend state.
-> >>>
-> >>>commit adc78e6 (timekeeping: Add suspend and resume
-> >>>of clock event devices) introduced .suspend and .resume
-> >>>callbacks for clock event devices. Leverages these
-> >>>callbacks to have AM33XX clockevent timer which is
-> >>>in not in WKUP domain to behave properly across system
-> >>>suspend.
-> >>>
-> >>>Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> >>>Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >>>---
-> >>>v3->v4:
-> >>>	Only use for am33xx soc now.
-> >>>
-> >>>  arch/arm/mach-omap2/timer.c | 28 ++++++++++++++++++++++++++++
-> >>>  1 file changed, 28 insertions(+)
-> >>>
-> >>>diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> >>>index 43d03fb..6fc1748 100644
-> >>>--- a/arch/arm/mach-omap2/timer.c
-> >>>+++ b/arch/arm/mach-omap2/timer.c
-> >>>@@ -128,6 +128,29 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
-> >>>  	}
-> >>>  }
-> >>>
-> >>>+static void omap_clkevt_suspend(struct clock_event_device *unused)
-> >>>+{
-> >>>+	struct omap_hwmod *oh;
-> >>>+
-> >>>+	oh = omap_hwmod_lookup(clockevent_gpt.name);
-> >>>+	if (!oh)
-> >>>+		return;
-> >>>+
-> >>>+	omap_hwmod_idle(oh);
-> >>>+}
-> >>>+
-> >>>+static void omap_clkevt_resume(struct clock_event_device *unused)
-> >>>+{
-> >>>+	struct omap_hwmod *oh;
-> >>>+
-> >>>+	oh = omap_hwmod_lookup(clockevent_gpt.name);
-> >>>+	if (!oh)
-> >>>+		return;
-> >>>+
-> >>>+	omap_hwmod_enable(oh);
-> >>>+	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-> >>>+}
-> >>>+
-> >>
-> >>This is going to make moving the timer code into drivers one step
-> >>tougher to do. And you don't need to look up the hwmod entry every
-> >>time, just initialize it during the init.
-> 
-> Yes you are right about looking up only at init I need to change that. I
-> agree that this makes moving the timers harder but I'm not sure there's any
-> way around this. I attempted to use the omap_device layer here but there is
-> no device at all created here, it does not hook into the normal PM layer
-> through omap_device. This clock must be shut off as it sits in the
-> peripheral power domain and any active clock within the domain will prevent
-> suspend from happening, so we end up with a platform specific issue here. It
-> seems that the only way I can get to the clock is through the hwmod.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-It's best to register these kind of functions as platform_data
-in pdata-quirks.c auxdata. That way when this moves to live
-in drivers/clocksource the driver does not need to know anything
-about the interconnect specific registers.
+Applied, thanks.
 
-Also, please don't use Linux generic names here.. Maybe use
-omap_clkevt_idle/unidle? The linux suspend and resume hooks
-and runtime PM could all use these functions then.
+Maxime
 
-> >>>+	if (soc_is_am33xx()) {
-> >>>+		clockevent_gpt.suspend = omap_clkevt_suspend;
-> >>>+		clockevent_gpt.resume = omap_clkevt_resume;
-> >>>+	}
-> >>>+
-> >>
-> >>Maybe try to set up things so we initialize the SoC specific
-> >>timer suspend and resume functions in mach-omap2/timer.c
-> >>in a way where eventually the device driver can easily use
-> >>them?
-> >>
-> >+1. I had similar comments on the previous version too.
-> 
-> This was my attempt to make things specific to only am335x based on
-> Santosh's previous comments as last time they were populated for every
-> device even when unneeded. These are not standard suspend/resume handlers,
-> they are specific to clock event. I know there will always need to be at
-> least some code here for the early timer init based on previous timer
-> cleanup series I've seen, so perhaps I could hook it in there when the time
-> comes?
-
-Well just adding a minimal include/linux/platform_data/timer-omap.h
-to pass those function pointers to the driver should do the trick.
-
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/8557062c/attachment-0001.sig>
