@@ -1,41 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Jul 2014 12:13:50 +0100
-Subject: [RFC V1] devicetree: Dialog Semiconductor consolidate existing
- vendor prefixes to standardise on 'dlg'
-In-Reply-To: <20140715110944.GY26465@leverpostej>
-References: <201407141616.s6EGG7uK022881@swsrvapps-01.diasemi.com>
- <20140714162101.GM26465@leverpostej>
- <6ED8E3B22081A4459DAC7699F3695FB7D0B269FA@SW-EX-MBX02.diasemi.com>
- <20140715110944.GY26465@leverpostej>
-Message-ID: <20140715111350.GA18495@sirena.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 15 Jul 2014 13:19:29 +0200
+Subject: [PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
+In-Reply-To: <53C3A8E8.4090009@gmail.com>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+ <1403697175-13476-1-git-send-email-t.figa@samsung.com>
+ <53C3A8E8.4090009@gmail.com>
+Message-ID: <2740751.gTMSlJs48H@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 12:09:44PM +0100, Mark Rutland wrote:
-> On Tue, Jul 15, 2014 at 11:07:57AM +0100, Opensource [Steve Twiss] wrote:
 
-> > Rob said that the old forms should be marked as deprecated, but I didn't
-> > deprecate any "dialog" or "diasemi" entries in this patch because I have
-> > only made two types of change:
+Hi,
 
-> > (1) definitions of "diasemi" or "dialog" that have not been used in the kernel;
-> > (2) definitions of "diasemi" or "dialog" that are incompatible with existing driver code.
+On Monday, July 14, 2014 11:54:48 AM Tomasz Figa wrote:
+> Hi Kukjin,
+> 
+> On 25.06.2014 13:52, Tomasz Figa wrote:
+> > Due to recent consolidation of Exynos suspend and cpuidle code, some
+> > parts of suspend and resume sequences are executed two times, once from
+> > exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+> > breaks suspend, at least on Exynos4-based boards.
+> > 
+> > This patch fixes the issue by removing exynos_pm_syscore_ops completely
+> > and making the code rely only on CPU PM notifier.
+> > 
+> > Tested on Exynos4210-based Trats board.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/pm.c | 23 ++++-------------------
+> >  1 file changed, 4 insertions(+), 19 deletions(-)
+> > 
+> > Changes since v1:
+> >  - rebased onto Kukjin's fixes branch.
+> > 
+> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> > index 202ca73..f23cc77 100644
+> > --- a/arch/arm/mach-exynos/pm.c
+> > +++ b/arch/arm/mach-exynos/pm.c
+> > @@ -364,11 +364,6 @@ early_wakeup:
+> >  	return;
+> >  }
+> >  
+> > -static struct syscore_ops exynos_pm_syscore_ops = {
+> > -	.suspend	= exynos_pm_suspend,
+> > -	.resume		= exynos_pm_resume,
+> > -};
+> > -
+> >  /*
+> >   * Suspend Ops
+> >   */
+> > @@ -438,22 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+> >  
+> >  	switch (cmd) {
+> >  	case CPU_PM_ENTER:
+> > -		if (cpu == 0) {
+> > -			exynos_pm_central_suspend();
+> > -			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+> > -				exynos_cpu_save_register();
+> > -		}
+> > +		if (cpu == 0)
+> > +			exynos_pm_suspend();
+> >  		break;
+> >  
+> >  	case CPU_PM_EXIT:
+> > -		if (cpu == 0) {
+> > -			if (read_cpuid_part_number() ==
+> > -					ARM_CPU_PART_CORTEX_A9) {
+> > -				scu_enable(S5P_VA_SCU);
+> > -				exynos_cpu_restore_register();
+> > -			}
+> > -			exynos_pm_central_resume();
+> > -		}
+> > +		if (cpu == 0)
+> > +			exynos_pm_resume();
+> >  		break;
+> >  	}
+> >  
+> > @@ -478,6 +464,5 @@ void __init exynos_pm_init(void)
+> >  	tmp |= ((0xFF << 8) | (0x1F << 1));
+> >  	__raw_writel(tmp, S5P_WAKEUP_MASK);
+> >  
+> > -	register_syscore_ops(&exynos_pm_syscore_ops);
+> >  	suspend_set_ops(&exynos_suspend_ops);
+> >  }
+> > 
+> 
+> Please consider this patch for next fixes pull request. Without it
+> suspend/resume is broken for Exynos4 and probably other SoCs. This patch
+> just restores the sequence from before the patch moving things to PM
+> notifier, so I don't think it should need any special treatment.
 
-> > In both of these cases they cannot affect any working DTB.
+Your patch fixes the regression and is a step in the good direction but it
+seems that it needs a bit more work:
 
-> Ok, that sounds fine then. That just wasn't immediately obvious.
+Your patch adds to cpuidle AFTR code path restoring of exynos_core_save and
+exynos5_sys_save registers without saving them first (restoring is done
+through exynos_pm_resume() which is used by both suspend and cpuidle while
+saving is done through exynos_pm_prepare() which is used only by suspend). 
 
-> Could you please note those facts in the commit message when you next
-> post?
-
-I thought we were already trying to do the stable ABI thing in wich case
-at least the first case (where we just happen to not have in tree DTs
-using the identifiers) should still remain supported?  It's not like it
-really costs us anything to do it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/635fc26d/attachment.sig>
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
