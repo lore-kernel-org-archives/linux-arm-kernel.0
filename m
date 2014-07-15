@@ -1,30 +1,43 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Jul 2014 01:01:22 +0200
-Subject: [PATCH 3/6] ARM: Kconfig: set default gpio number for rockchip SoCs
+Date: Wed, 16 Jul 2014 01:01:55 +0200
+Subject: [PATCH 4/6] ARM: rockchip: enable support for RK3288 SoCs
 In-Reply-To: <1471578.ILeMmG2DL6@diego>
 References: <1471578.ILeMmG2DL6@diego>
-Message-ID: <2242498.pAI32mTkmn@diego>
+Message-ID: <4355781.cnmcVo5AVu@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new rk3288 needs a bigger gpio space, as it has 9 gpio banks.
+Enable HAVE_ARM_ARCH_TIMER and add a rockchip,rk3288 compatible.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-rockchip/Kconfig    | 1 +
+ arch/arm/mach-rockchip/rockchip.c | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 87b63fd..8d1dee0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1574,6 +1574,7 @@ config ARCH_NR_GPIO
- 	default 416 if ARCH_SUNXI
- 	default 392 if ARCH_U8500
- 	default 352 if ARCH_VT8500
-+	default 288 if ARCH_ROCKCHIP
- 	default 264 if MACH_H4700
- 	default 0
- 	help
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index e4564c2..d168669 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -6,6 +6,7 @@ config ARCH_ROCKCHIP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_GIC
+ 	select CACHE_L2X0
++	select HAVE_ARM_ARCH_TIMER
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select DW_APB_TIMER_OF
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 968cc34..8ab9e0e 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -29,6 +29,7 @@ static const char * const rockchip_board_dt_compat[] = {
+ 	"rockchip,rk3066a",
+ 	"rockchip,rk3066b",
+ 	"rockchip,rk3188",
++	"rockchip,rk3288",
+ 	NULL,
+ };
+ 
 -- 
 1.9.0
