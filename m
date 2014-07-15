@@ -1,26 +1,85 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 15 Jul 2014 14:28:34 +0800
-Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <53C3D4BF.8030409@pengutronix.de>
-References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
- <1405338041-19945-2-git-send-email-b29396@freescale.com>
- <53C3D155.8080005@gmail.com> <53C3D4BF.8030409@pengutronix.de>
-Message-ID: <20140715062833.GB9796@shlinux1.ap.freescale.net>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 15 Jul 2014 09:35:14 +0300
+Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
+ gpio block
+In-Reply-To: <53C449A3.2010404@codeaurora.org>
+References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
+ <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
+ <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
+ <53C095EA.90000@codeaurora.org> <1405346335.13503.25.camel@iivanov-dev>
+ <53C449A3.2010404@codeaurora.org>
+Message-ID: <1405406114.13503.40.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 03:01:51PM +0200, Marc Kleine-Budde wrote:
-[...]
-> >> +#define IR_ERR_STATE    (IR_BO | IR_EW | IR_EP)
-> >> +#define IR_ERR_LEC    (IR_STE    | IR_FOE | IR_ACKE | IR_BE | IR_CRCE)
-> >> +#define IR_ERR_BUS    (IR_ERR_LEC | IR_WDI | IR_ELO | IR_BEU | IR_BEC \
-> >> +            | IR_TOO | IR_MRAF | IR_TSW | IR_TEFL | IR_RF1L \
-> >> +            | IR_RF0L)
+On Mon, 2014-07-14 at 14:20 -0700, Stephen Boyd wrote:
+> On 07/14/14 06:58, Ivan T. Ivanov wrote:
+> > On Fri, 2014-07-11 at 18:56 -0700, Stephen Boyd wrote:
+> >> On 07/10/14 02:53, Linus Walleij wrote:
+> >>> On Wed, Jul 9, 2014 at 11:18 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
+> >>>> On Wed, Jul 9, 2014 at 1:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >>>>> On Tue, Jul 8, 2014 at 3:26 AM, Bjorn Andersson
+> >>>>> <bjorn.andersson@sonymobile.com> wrote:
+> >>>>>
+> >>>>> +- function:
+> >>>>> +       Usage: optional
+> >>>>> +       Value type: <string>
+> >>>>> +       Definition: Specify the alternative function to be configured for the
+> >>>>> +                   specified pins.  Valid values are:
+> >>>>> +                       "normal",
+> >>>>> +                       "paired",
+> >>>>> +                       "func1",
+> >>>>> +                       "func2",
+> >>>>> +                       "dtest1",
+> >>>>> +                       "dtest2",
+> >>>>> +                       "dtest3",
+> >>>>> +                       "dtest4"
+> >>>>> These are a bit ambigous, why doesn't the driver present functions that
+> >>>>> are more specific than "func1", "func2"? Or "dtest1"?
+> >>>> I agree, unfortunately I have only seen traces of the actual function matrix;
+> >>>> for pm8xxx I have no documentation and for pm8x41 they are only listed as
+> >>>> func[1-2] and dtest[1-4].
+> >>>>
+> >>>> Maybe if someone at Qualcomm could release such a list we could provide a
+> >>>> proper table instead.
+> >>> I guess Stephen Boyd can help us. (?)
+> >> Ok. "normal" is pretty much gpio mode, i.e. don't mux anything. "paired"
+> >> is where we take the output of the gpio next to it and loop it back into
+> >> this gpio (and vice versa). So gpio1 is paired with gpio2, gpio 3 is
+> >> paired with gpio 4, etc. This allows us to make level translators by
+> >> choosing different supply voltages for the paired gpios. "func1" and
+> >> "func2" are used for muxing things internally. "dtest" is used to mux
+> >> specific things out for testing purposes, not really used in any
+> >> end-products but still useful while debugging. I can provide the
+> >> function to pin mapping if necessary. There are lots of pmics.
+> > Thank you Stephen. If understand it right, this is more like option for
+> > the pin when it is GPIO. Next generation of PMIC's have support for pin
+> > acting like analog-input/output and current sink.
 > 
-> Please move the '|' to the end of the line.
+> Isn't this document only for the gpios? I think you're talking about the
+> MPPs, which also exist on these generation of pmics. We should probably
+> avoid mixing the two (gpios and mpps) in one binding because they're
+> really different hardware.
+
+I don't know. For me "gpio" looks like function of the pin hardware.
+
 > 
+> >  So I will like
+> > to keep "function" property for selecting one of the above functions.
+> > Choosing between "normal", "paired"... options in QPNP pinctrl driver
+> > is supported trough passing values, defined in DT header file, to
+> > "output-high" property. Please don't kill me :-).
+> 
+> Overloading output-high to choose the MPP mode doesn't seem to follow
+> the generic pinconfig binding. Does output-high even take a value? Why
+> can't we use the function property?
 
-Got it.
+No, no.  using value of the output-high|low" is just to select
+"normal", "paired"... thing. Function selection is via "function" 
+property. Currently QPNP support following functions "gpio", "mpp-ain",
+"mpp-aout", "mpp-cs".
 
-Regards
-Dong Aisheng
+Regards,
+Ivan
