@@ -1,67 +1,87 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Tue, 15 Jul 2014 16:03:04 +0530
-Subject: [RFC/PATCH 00/12] Krait clocks + Krait CPUfreq
-In-Reply-To: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
-References: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAMf-jSnLDhJKhRbohM17kadTtbKQBqSNZ1Jj8yvPYV_hL+fRNg@mail.gmail.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue, 15 Jul 2014 11:33:33 +0100
+Subject: [PATCH] arm64: Move struct stat64 to uapi.
+In-Reply-To: <20140715082040.GB24269@arm.com>
+References: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
+ <20140715082040.GB24269@arm.com>
+Message-ID: <1405420413.9794.10.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+(dropping second incorrect CC to the wrong l-a-k)
 
-On Wed, Jun 25, 2014 at 5:36 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Tue, 2014-07-15 at 09:20 +0100, Will Deacon wrote:
+> Hi Ian,
+> 
+> On Tue, Jul 15, 2014 at 08:39:06AM +0100, Ian Campbell wrote:
+> > This struct is part of the user API for compat tasks so I think it belongs in
+> > uapi and should use the __uFOO types.
+> 
+> I don't think we should be exposing compat structures through the arm64
+> UAPI. Compat tasks should be built against the native arm headers and
+> nothing else.
 
->
-> Stephen Boyd (12):
->   ARM: Add Krait L2 register accessor functions
->   clk: Add safe switch hook
->   clk: qcom: Add support for muxes, dividers, and mux dividers
->   clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
->   clk: qcom: Add HFPLL driver
->   clk: qcom: Add MSM8960's HFPLLs
->   clk: qcom: Add support for Krait clocks
->   clk: qcom: Add KPSS ACC/GCC driver
->   clk: qcom: Add Krait clock controller driver
->   cpufreq: Add a cpufreq-krait based on cpufreq-cpu0
->   cpufreq: Add module to register cpufreq-krait device
->   ARM: dts: qcom: Add necessary DT data for Krait cpufreq
->
+Other 64bit arches do appear to define a struct stat64 in
+uapi/asm/stat.h though, arm64 is the only arch which even has asm/stat.h
+at all.
 
-I have applied all these patches on 3.16-rc3. Compiled with below
-minor change in drivers/cpufreq/Makefile to get cpufreq-krait.c
-compiled:
+AIUI the idea is that the compat version provided by the 64bit headers
+is supposed to provide the appropriate padding/packing such that the in
+memory layout matches the 32-bit version even when built with a 64-bit
+compiler, which might have different sized longs, different alignment
+requirements etc.
 
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 6b8917b..8afbea4 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -14,7 +14,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)       +=
-cpufreq_conservative.o
- obj-$(CONFIG_CPU_FREQ_GOV_COMMON)              += cpufreq_governor.o
+I suppose this is for the benefit of 64-bit tools which want to
+introspect 32-bit core dumps/processes or something. (I'm hoping David
+can clarify what the intention was here...)
 
- obj-$(CONFIG_GENERIC_CPUFREQ_CPU0)     += cpufreq-cpu0.o
--obj-$(CONFIG_CPUFREQ_KRAIT)            += cpufreq-krait.o
-+obj-$(CONFIG_GENERIC_CPUFREQ_KRAIT)    += cpufreq-krait.o
+> What happens if you turn compat off (CONFIG_COMPAT=n)?
 
- ##################################################################################
- # x86 drivers.
+Due to the #ifdef CONFIG_COMPAT in the current asm/stat.h I'm pretty
+sure it'll be fine.
 
-Tested cpufreq by enabling all governors in kernel. Tests done on
-DB8074 board and Seen the frequency scaling as expected.
+> > This was exposed by the Debian kernel's application of the aufs patches which
+> > led to:
+> > 
+> > In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
+> >                  from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
+> >                  from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
+> >                  from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
+> >                  from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
+> >                  from /?PKGBUILDDIR?/include/linux/stat.h:5,
+> >                  from /?PKGBUILDDIR?/include/linux/module.h:10,
+> >                  from /?PKGBUILDDIR?/init/main.c:15:
+> > /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
+> >   int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+> >                                                                 ^
+> > /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> > 
+> > This is due to an extra fs.h include added to mm.h. arm64 was the only arch built by
+> > Debian which had an issue with this, so I think it is an issue with the arm64
+> > headers rather than the aufs patches.
+> 
+> Hmm, but struct kstat is defined in linux/stat.h so I'm not sure why this is
+> arm64-specific. linux/fs.h includes that on line 10.
 
->
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+That include won't do anything because we already got here via
+linux/stat.h (6th line of "In file included from" above), so the guard
+has already been defined. IOW there is a loop in the includes, which
+starts before kstat is struct defined:
 
+linux/stat.h -> asm/stat.h -> arm/compat.h -> linux/ptrace.h ->
+linux_pidnamespace.h -> linux/mm.h -> linux/fs.h
 
+The last link here is added by aufs patches, but all the other arches
+are ok with this because none of them have asm/stat.h, they only have
+uapi/asm/stat.h.
 
--- 
-Thanks and Regards
-Pramod
+The issue ultimately is down to the asm/stat.h -> asm/compat.h link
+though I think so an alternative fix could be to switch to a different
+set of types for the existing definition and ditching asm/compat.h from
+asm/stat.h. I don't think that's the correct fix though.
+
+> Can you help me unconfuse myself, please?
+
+I hope I've managed to reduce rather than increase the confusion ;-)
+
+Ian.
