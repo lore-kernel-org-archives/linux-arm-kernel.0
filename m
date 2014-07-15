@@ -1,56 +1,50 @@
-From: tushar.b@samsung.com (Tushar Behera)
-Date: Tue, 15 Jul 2014 08:32:57 +0530
-Subject: [PATCH V2 3/3] clk: exynos-audss: Use samsung clock APIs to
- register/unregister clocks
-In-Reply-To: <53C3F88A.8080005@samsung.com>
-References: <1405080036-6651-1-git-send-email-tushar.b@samsung.com>
- <1405080036-6651-4-git-send-email-tushar.b@samsung.com>
- <53C3F88A.8080005@samsung.com>
-Message-ID: <CAC5m3Bwq5cGkN+kk+vWFdj6qjGJUCS3BduwhHMyVAQ6Mdbmh2A@mail.gmail.com>
+From: panpan1.liu@samsung.com (panpan liu)
+Date: Tue, 15 Jul 2014 11:07:50 +0800
+Subject: [PATCH] s5p-mfc: limit the size of the CPB
+Message-ID: <1405393670-2808-1-git-send-email-panpan1.liu@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 9:04 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 11/07/14 14:00, Tushar Behera wrote:
->> @@ -103,17 +140,11 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
->>               return PTR_ERR(reg_base);
->>       }
->>
->> -     clk_table = devm_kzalloc(&pdev->dev,
->> -                             sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
->> -                             GFP_KERNEL);
->> -     if (!clk_table)
->> +     ctx = samsung_clk_init(pdev->dev.of_node, reg_base, nr_clks);
->
-> There is an issue here that this registers the clk provider before all
-> its clocks are registered with the clk core. Therefore it introduces
-> a race condition.
->
-> Please have a look at patch [1], you may want to rebase this series
-> onto that patch.
->
+The CPB size is limited by the hardware. Add this limit to the s_fmt.
 
-Thanks for the pointer. I will re-post.
+Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
 
->> +     samsung_clk_register_div(ctx, exynos_audss_div_clks,
->> +                             ARRAY_SIZE(exynos_audss_div_clks));
-> [...]
->> +     samsung_clk_register_gate(ctx, exynos_audss_gate_clks,
->> +                             ARRAY_SIZE(exynos_audss_gate_clks));
-> [...]
->> -     ret = of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
->> -                                     &clk_data);
->> -     if (ret) {
->> -             dev_err(&pdev->dev, "failed to add clock provider\n");
->> -             goto unregister;
->> +             samsung_clk_register_gate(ctx, exynos5420_audss_gate_clks,
->> +                                     ARRAY_SIZE(exynos5420_audss_gate_clks));
->>       }
->
-> [1]
-> https://git.kernel.org/cgit/linux/kernel/git/tfiga/samsung-clk.git/commit/?h=samsung-clk-next&id=d5e136a21b2028fb1f45143ea7112d5869bfc6c7
->
-> --
-> Regards,
-> Sylwester
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+old mode 100644
+new mode 100755
+index 0bae907..70b9458
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -413,7 +413,8 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	int ret = 0;
+ 	struct s5p_mfc_fmt *fmt;
+ 	struct v4l2_pix_format_mplane *pix_mp;
+-
++	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
++
+ 	mfc_debug_enter();
+ 	ret = vidioc_try_fmt(file, priv, f);
+ 	pix_mp = &f->fmt.pix_mp;
+@@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+ 	pix_mp->height = 0;
+ 	pix_mp->width = 0;
+-	if (pix_mp->plane_fmt[0].sizeimage)
+-		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+-	else
++	if (pix_mp->plane_fmt[0].sizeimage == 0)
+ 		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
+ 								DEF_CPB_SIZE;
++	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
++		ctx->dec_src_buf_size = buf_size->cpb;
++	else
++		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+ 	pix_mp->plane_fmt[0].bytesperline = 0;
+ 	ctx->state = MFCINST_INIT;
+ out:
+--
+1.7.9.5
