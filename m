@@ -1,374 +1,73 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 15 Jul 2014 15:57:19 +0800
-Subject: [PATCH v12 03/11] ARM: hisi: enable MCPM implementation
-Message-ID: <1405411039-30484-1-git-send-email-haojian.zhuang@linaro.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 15 Jul 2014 09:58:05 +0200
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
+ <4657735.1VKsbQGuH6@wuerfel>
+ <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
+Message-ID: <53C4DF0D.8010208@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
-framework to manage power on HiP04 SoC.
+On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
+> On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Monday 14 July 2014 19:36:24 Mark Brown wrote:
+>>> On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
+>>>> On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
+>>>
+>>>>> Yes. But now that you say it the gpiod_direction_output() call is missing
+>>>>> from this patch.
+>>>
+>>>> I'm lost now. The GPIO_ACTIVE_HIGH I added comes from Documentation/gpio/board.txt
+>>>> and as Linus Walleij explained to me the other day, the lookup is supposed
+>>>> to replace devm_gpio_request_one(), which in turn replaced both the
+>>>> gpio_request and the gpio_direction_output(). Do I need to put the
+>>>> gpiod_direction_output() back or is there another interface for that when
+>>>> registering the board gpios?
+>>>
+>>> Indeed.  If you *do* need an explicit _output() then that sounds to me
+>>> like we either need a gpiod_get_one() or an extension to the table,
+>>> looking at the code it seems like this is indeed the case.  We can set
+>>> if the GPIO is active high/low, or open source/drain but there's no flag
+>>> for the initial state.
+>>
+>> (adding Alexandre and the gpio list)
+>>
+>> GPIO people: any guidance on how a board file should set a gpio to
+>> output/default-high in a GPIO_LOOKUP() table to replace a
+>> devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
+>> Do we need to add an interface extension to do this, e.g. passing
+>> GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
+>
+> The way I see it, GPIO mappings (whether they are done using the
+> lookup tables, DT, or ACPI) should only care about details that are
+> relevant to the device layout and that should be abstracted to the
+> driver (e.g. whether the GPIO is active low or open drain) so drivers
+> do not need to check X conditions every time they want to drive the
+> GPIO.
+>
+> Direction and initial value, on the other hand, are clearly properties
+> that ought to be set by the driver itself. Thus my expectation here
+> would be that the driver sets the GPIO direction and initial value as
+> soon as it gets it using gpiod_direction_output(). In other words,
+> there is no replacement for gpio_request_one() with the gpiod
+> interface. Is there any use-case that cannot be covered by calling
+> gpiod_direction_output() right after gpiod_get()? AFAICT this is what
+> gpio_request_one() was doing anyway.
 
-Changelog:
-v12:
-  * Use wfi as power down state in MCPM.
-  * Remove wait_for_powerdown() in MCPM because wfi is used now.
+I agree with you that this is something that should be done in the driver 
+and not in the lookup table. I think that it is still a good idea to have a 
+replacement for gpio_request_one with the new GPIO descriptor API. A large 
+share of the drivers want to call either gpio_direction_input() or 
+gpio_direction_output() right after requesting the GPIO. Combining both the 
+requesting and the configuration of the GPIO into one function call makes 
+the code a bit shorter and also simplifies the error handling. Even more so 
+if e.g. the GPIO is optional. This was one of the main reasons why 
+gpio_request_one was introduced, see the commit[1] that added it.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mach-hisi/Makefile   |   1 +
- arch/arm/mach-hisi/platmcpm.c | 334 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 335 insertions(+)
- create mode 100644 arch/arm/mach-hisi/platmcpm.c
+- Lars
 
-diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
-index ee2506b..d64831e 100644
---- a/arch/arm/mach-hisi/Makefile
-+++ b/arch/arm/mach-hisi/Makefile
-@@ -3,4 +3,5 @@
- #
- 
- obj-y	+= hisilicon.o
-+obj-$(CONFIG_MCPM)		+= platmcpm.o
- obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
-diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
-new file mode 100644
-index 0000000..5f038c5
---- /dev/null
-+++ b/arch/arm/mach-hisi/platmcpm.c
-@@ -0,0 +1,334 @@
-+/*
-+ * Copyright (c) 2013-2014 Linaro Ltd.
-+ * Copyright (c) 2013-2014 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/cp15.h>
-+#include <asm/mcpm.h>
-+
-+#include "core.h"
-+
-+/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
-+ * 1 -- unreset; 0 -- reset
-+ */
-+#define CORE_RESET_BIT(x)		(1 << x)
-+#define NEON_RESET_BIT(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
-+#define CLUSTER_L2_RESET_BIT		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
-+
-+/*
-+ * bits definition in SC_CPU_RESET_STATUS[x]
-+ * 1 -- reset status; 0 -- unreset status
-+ */
-+#define CORE_RESET_STATUS(x)		(1 << x)
-+#define NEON_RESET_STATUS(x)		(1 << (x + 4))
-+#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
-+#define CLUSTER_L2_RESET_STATUS		(1 << 8)
-+#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
-+#define CORE_WFI_STATUS(x)		(1 << (x + 16))
-+#define CORE_WFE_STATUS(x)		(1 << (x + 20))
-+#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
-+
-+#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
-+#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
-+#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
-+
-+#define FAB_SF_MODE			0x0c
-+#define FAB_SF_INVLD			0x10
-+
-+/* bits definition in FB_SF_INVLD */
-+#define FB_SF_INVLD_START		(1 << 8)
-+
-+#define HIP04_MAX_CLUSTERS		4
-+#define HIP04_MAX_CPUS_PER_CLUSTER	4
-+
-+#define POLL_MSEC	10
-+#define TIMEOUT_MSEC	1000
-+
-+struct hip04_secondary_cpu_data {
-+	u32	bootwrapper_phys;
-+	u32	bootwrapper_size;
-+	u32	bootwrapper_magic;
-+	u32	relocation_entry;
-+	u32	relocation_size;
-+};
-+
-+static void __iomem *relocation, *sysctrl, *fabric;
-+static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
-+static int hip04_init_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
-+static DEFINE_SPINLOCK(boot_lock);
-+static struct hip04_secondary_cpu_data hip04_boot;
-+static u32 fabric_phys_addr;
-+
-+static bool hip04_cluster_down(unsigned int cluster)
-+{
-+	int i;
-+
-+	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
-+		if (hip04_cpu_table[cluster][i])
-+			return false;
-+	return true;
-+}
-+
-+static bool hip04_init_cluster0_snoop(void)
-+{
-+	unsigned long data;
-+
-+	if (!fabric) {
-+		pr_err("failed to find fabric base\n");
-+		return false;
-+	}
-+	data = readl_relaxed(fabric + FAB_SF_MODE);
-+	data |= 1;
-+	writel_relaxed(data, fabric + FAB_SF_MODE);
-+	while (1) {
-+		if (data == readl_relaxed(fabric + FAB_SF_MODE))
-+			break;
-+	}
-+	return true;
-+}
-+
-+static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
-+{
-+	unsigned long data, mask;
-+
-+	if (!relocation || !sysctrl)
-+		return -ENODEV;
-+	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
-+		return -EINVAL;
-+
-+	spin_lock_irq(&boot_lock);
-+
-+	/*
-+	 * hip04_init_table is used to mark whether power up operation is
-+	 * executed. If it's not the first time power up, it'll wakeup by
-+	 * IPI.
-+	 */
-+	if (hip04_cpu_table[cluster][cpu] || hip04_init_table[cluster][cpu])
-+		goto out;
-+
-+	/* Make secondary core out of reset if cluster isn't initialized. */
-+	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
-+	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
-+	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+
-+	if (hip04_cluster_down(cluster)) {
-+		data = CLUSTER_DEBUG_RESET_BIT;
-+		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-+		do {
-+			mask = CLUSTER_DEBUG_RESET_STATUS;
-+			data = readl_relaxed(sysctrl + \
-+					     SC_CPU_RESET_STATUS(cluster));
-+		} while (data & mask);
-+	}
-+
-+	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-+	       CORE_DEBUG_RESET_BIT(cpu);
-+	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-+	hip04_init_table[cluster][cpu] = 1;
-+out:
-+	hip04_cpu_table[cluster][cpu]++;
-+	spin_unlock_irq(&boot_lock);
-+
-+	return 0;
-+}
-+
-+static void hip04_mcpm_power_down(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+	bool skip_wfi = false;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	__mcpm_cpu_going_down(cpu, cluster);
-+
-+	spin_lock(&boot_lock);
-+	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-+	hip04_cpu_table[cluster][cpu]--;
-+	if (hip04_cpu_table[cluster][cpu] == 1) {
-+		/* A power_up request went ahead of us. */
-+		skip_wfi = true;
-+	} else if (hip04_cpu_table[cluster][cpu] > 1) {
-+		pr_err("Cluster %d CPU%d boots multiple times\n", cluster, cpu);
-+		BUG();
-+	}
-+	spin_unlock(&boot_lock);
-+
-+	v7_exit_coherency_flush(louis);
-+
-+	__mcpm_cpu_down(cpu, cluster);
-+
-+	if (!skip_wfi)
-+		wfi();
-+}
-+
-+static void hip04_mcpm_powered_up(void)
-+{
-+	if (!relocation)
-+		return;
-+	spin_lock(&boot_lock);
-+	writel_relaxed(0, relocation);
-+	writel_relaxed(0, relocation + 4);
-+	writel_relaxed(0, relocation + 8);
-+	writel_relaxed(0, relocation + 12);
-+	spin_unlock(&boot_lock);
-+}
-+
-+static void __naked hip04_mcpm_power_up_setup(unsigned int affinity_level)
-+{
-+	asm volatile ("			\n"
-+"	cmp	r0, #0			\n"
-+"	bxeq	lr			\n"
-+	/* calculate fabric phys address */
-+"	adr	r2, 2f			\n"
-+"	ldmia	r2, {r1, r3}		\n"
-+"	sub	r0, r2, r1		\n"
-+"	ldr	r2, [r0, r3]		\n"
-+	/* get cluster id from MPIDR */
-+"	mrc	p15, 0, r0, c0, c0, 5	\n"
-+"	ubfx	r1, r0, #8, #8		\n"
-+	/* 1 << cluster id */
-+"	mov	r0, #1			\n"
-+"	mov	r3, r0, lsl r1		\n"
-+"	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	bxne	lr			\n"
-+"	orr	r1, r0, r3		\n"
-+"	str	r1, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"1:	ldr	r0, [r2, #"__stringify(FAB_SF_MODE)"]	\n"
-+"	tst	r0, r3			\n"
-+"	beq	1b			\n"
-+"	bx	lr			\n"
-+
-+"	.align	2			\n"
-+"2:	.word	.			\n"
-+"	.word	fabric_phys_addr	\n"
-+	);
-+}
-+
-+static const struct mcpm_platform_ops hip04_mcpm_ops = {
-+	.power_up		= hip04_mcpm_power_up,
-+	.power_down		= hip04_mcpm_power_down,
-+	.powered_up		= hip04_mcpm_powered_up,
-+};
-+
-+static bool __init hip04_cpu_table_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	if (cluster >= HIP04_MAX_CLUSTERS ||
-+	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
-+		pr_err("%s: boot CPU is out of bound!\n", __func__);
-+		return false;
-+	}
-+	if (!hip04_init_cluster0_snoop())
-+		return false;
-+	hip04_cpu_table[cluster][cpu] = 1;
-+	hip04_init_table[0][0] = 1;
-+	return true;
-+}
-+
-+static int __init hip04_mcpm_init(void)
-+{
-+	struct device_node *np, *np_fab;
-+	struct resource fab_res;
-+	int ret = -ENODEV;
-+
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+	if (!np)
-+		goto err;
-+	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
-+	if (!np_fab)
-+		goto err;
-+
-+	if (of_property_read_u32(np, "bootwrapper-phys",
-+				 &hip04_boot.bootwrapper_phys)) {
-+		pr_err("failed to get bootwrapper-phys\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "bootwrapper-size",
-+				 &hip04_boot.bootwrapper_size)) {
-+		pr_err("failed to get bootwrapper-size\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "bootwrapper-magic",
-+				 &hip04_boot.bootwrapper_magic)) {
-+		pr_err("failed to get bootwrapper-magic\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "relocation-entry",
-+				 &hip04_boot.relocation_entry)) {
-+		pr_err("failed to get relocation-entry\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+	if (of_property_read_u32(np, "relocation-size",
-+				 &hip04_boot.relocation_size)) {
-+		pr_err("failed to get relocation-size\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	relocation = ioremap(hip04_boot.relocation_entry,
-+			     hip04_boot.relocation_size);
-+	if (!relocation) {
-+		pr_err("failed to map relocation space\n");
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+	sysctrl = of_iomap(np, 0);
-+	if (!sysctrl) {
-+		pr_err("failed to get sysctrl base\n");
-+		ret = -ENOMEM;
-+		goto err_sysctrl;
-+	}
-+	ret = of_address_to_resource(np_fab, 0, &fab_res);
-+	if (ret) {
-+		pr_err("failed to get fabric base phys\n");
-+		goto err_fabric;
-+	}
-+	fabric_phys_addr = fab_res.start;
-+	sync_cache_w(&fabric_phys_addr);
-+	fabric = of_iomap(np_fab, 0);
-+	if (!fabric) {
-+		pr_err("failed to get fabric base\n");
-+		ret = -ENOMEM;
-+		goto err_fabric;
-+	}
-+
-+	if (!hip04_cpu_table_init())
-+		return -EINVAL;
-+	ret = mcpm_platform_register(&hip04_mcpm_ops);
-+	if (!ret) {
-+		mcpm_sync_init(hip04_mcpm_power_up_setup);
-+		pr_info("HiP04 MCPM initialized\n");
-+	}
-+	mcpm_smp_set_ops();
-+	return ret;
-+err_fabric:
-+	iounmap(sysctrl);
-+err_sysctrl:
-+	iounmap(relocation);
-+err:
-+	return ret;
-+}
-+early_initcall(hip04_mcpm_init);
--- 
-1.9.1
+[1] 
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3e45f1d1155894e6f4291f5536b224874d52d8e2
