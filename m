@@ -1,167 +1,275 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Tue, 15 Jul 2014 11:37:56 +0400
-Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan when
- touching unaccessible memory
-In-Reply-To: <20140715060405.GI11317@js1304-P5Q-DELUXE>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
- <20140715060405.GI11317@js1304-P5Q-DELUXE>
-Message-ID: <53C4DA54.3010502@samsung.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Tue, 15 Jul 2014 09:48:31 +0200
+Subject: [PATCH v9 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <1405376285-23008-5-git-send-email-isubramanian@apm.com>
+References: <1405376285-23008-1-git-send-email-isubramanian@apm.com>
+ <1405376285-23008-5-git-send-email-isubramanian@apm.com>
+Message-ID: <20140715074829.GC7668@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/14 10:04, Joonsoo Kim wrote:
-> On Wed, Jul 09, 2014 at 03:30:08PM +0400, Andrey Ryabinin wrote:
->> Some code in slub could validly touch memory marked by kasan as unaccessible.
->> Even though slub.c doesn't instrumented, functions called in it are instrumented,
->> so to avoid false positive reports such places are protected by
->> kasan_disable_local()/kasan_enable_local() calls.
->>
->> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
->> ---
->>  mm/slub.c | 21 +++++++++++++++++++--
->>  1 file changed, 19 insertions(+), 2 deletions(-)
->>
->> diff --git a/mm/slub.c b/mm/slub.c
->> index 6ddedf9..c8dbea7 100644
->> --- a/mm/slub.c
->> +++ b/mm/slub.c
->> @@ -560,8 +560,10 @@ static void print_tracking(struct kmem_cache *s, void *object)
->>  	if (!(s->flags & SLAB_STORE_USER))
->>  		return;
->>  
->> +	kasan_disable_local();
->>  	print_track("Allocated", get_track(s, object, TRACK_ALLOC));
->>  	print_track("Freed", get_track(s, object, TRACK_FREE));
->> +	kasan_enable_local();
+On 2014-07-15 at 00:18:05 +0200, Iyappan Subramanian <isubramanian@apm.com> wrote:
+> This patch adds network driver for APM X-Gene SoC ethernet.
 > 
-> I don't think that this is needed since print_track() doesn't call
-> external function with object pointer. print_track() call pr_err(), but,
-> before calling, it retrieve t->addrs[i] so memory access only occurs
-> in slub.c.
-> 
-Agree.
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Ravi Patel <rapatel@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> ---
+>  drivers/net/ethernet/Kconfig                       |   1 +
+>  drivers/net/ethernet/Makefile                      |   1 +
+>  drivers/net/ethernet/apm/Kconfig                   |   1 +
+>  drivers/net/ethernet/apm/Makefile                  |   5 +
+>  drivers/net/ethernet/apm/xgene/Kconfig             |   9 +
+>  drivers/net/ethernet/apm/xgene/Makefile            |   6 +
+>  .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 125 +++
+>  drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     | 747 ++++++++++++++++
+>  drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     | 375 ++++++++
+>  drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 962 +++++++++++++++++++++
+>  drivers/net/ethernet/apm/xgene/xgene_enet_main.h   | 107 +++
+>  11 files changed, 2339 insertions(+)
+>  create mode 100644 drivers/net/ethernet/apm/Kconfig
+>  create mode 100644 drivers/net/ethernet/apm/Makefile
+>  create mode 100644 drivers/net/ethernet/apm/xgene/Kconfig
+>  create mode 100644 drivers/net/ethernet/apm/xgene/Makefile
+>  create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+>  create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+>  create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+>  create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+>  create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_main.h
 
->>  }
->>  
->>  static void print_page_info(struct page *page)
->> @@ -604,6 +606,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
->>  	unsigned int off;	/* Offset of last byte */
->>  	u8 *addr = page_address(page);
->>  
->> +	kasan_disable_local();
->> +
->>  	print_tracking(s, p);
->>  
->>  	print_page_info(page);
->> @@ -632,6 +636,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
->>  		/* Beginning of the filler is the free pointer */
->>  		print_section("Padding ", p + off, s->size - off);
->>  
->> +	kasan_enable_local();
->> +
->>  	dump_stack();
->>  }
-> 
-> And, I recommend that you put this hook on right place.
-> At a glance, the problematic function is print_section() which have
-> external function call, print_hex_dump(), with object pointer.
-> If you disable kasan in print_section, all the below thing won't be
-> needed, I guess.
-> 
+[...]
 
-Nope, at least memchr_inv() call in slab_pad_check will be a problem.
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+> new file mode 100644
+> index 0000000..e52af60
+> --- /dev/null
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+> @@ -0,0 +1,747 @@
 
-I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
-If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
-for kasan.
+[...]
 
+> +int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata)
+> +{
+> +	struct net_device *ndev = pdata->ndev;
+> +	struct device *dev = &pdata->pdev->dev;
+> +	struct device_node *child_np;
+> +	struct device_node *mdio_np = NULL;
+> +	struct mii_bus *mdio_bus;
+> +	int ret;
+> +
+> +	for_each_child_of_node(dev->of_node, child_np) {
+> +		if (of_device_is_compatible(child_np, "apm,xgene-mdio")) {
+> +			mdio_np = child_np;
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (!mdio_np) {
+> +		netdev_dbg(ndev, "No mdio node in the dts\n");
+> +		return -1;
+> +	}
+> +
+> +	mdio_bus = mdiobus_alloc();
+> +	if (!mdio_bus)
+> +		return -ENOMEM;
+> +
+> +	mdio_bus->name = "APM X-Gene MDIO bus";
+> +	mdio_bus->read = xgene_enet_mdio_read;
+> +	mdio_bus->write = xgene_enet_mdio_write;
+> +	snprintf(mdio_bus->id, MII_BUS_ID_SIZE, "%s-%s", "xgene-mii",
+> +		 ndev->name);
+> +
+> +	mdio_bus->priv = pdata;
+> +	mdio_bus->parent = &ndev->dev;
+> +
+> +	ret = of_mdiobus_register(mdio_bus, mdio_np);
+> +	if (ret) {
+> +		netdev_err(ndev, "Failed to register MDIO bus\n");
+> +		goto err;
+> +	}
+> +	pdata->mdio_bus = mdio_bus;
+> +
+> +	ret = xgene_enet_phy_connect(ndev);
+> +	if (ret)
 
+mdiobus_unregister() should be called on this error path.
 
-> Thanks.
-> 
->>  
->> @@ -1012,6 +1018,8 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
->>  					struct page *page,
->>  					void *object, unsigned long addr)
->>  {
->> +
->> +	kasan_disable_local();
->>  	if (!check_slab(s, page))
->>  		goto bad;
->>  
->> @@ -1028,6 +1036,7 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
->>  		set_track(s, object, TRACK_ALLOC, addr);
->>  	trace(s, page, object, 1);
->>  	init_object(s, object, SLUB_RED_ACTIVE);
->> +	kasan_enable_local();
->>  	return 1;
->>  
->>  bad:
->> @@ -1041,6 +1050,7 @@ bad:
->>  		page->inuse = page->objects;
->>  		page->freelist = NULL;
->>  	}
->> +	kasan_enable_local();
->>  	return 0;
->>  }
->>  
->> @@ -1052,6 +1062,7 @@ static noinline struct kmem_cache_node *free_debug_processing(
->>  
->>  	spin_lock_irqsave(&n->list_lock, *flags);
->>  	slab_lock(page);
->> +	kasan_disable_local();
->>  
->>  	if (!check_slab(s, page))
->>  		goto fail;
->> @@ -1088,6 +1099,7 @@ static noinline struct kmem_cache_node *free_debug_processing(
->>  	trace(s, page, object, 0);
->>  	init_object(s, object, SLUB_RED_INACTIVE);
->>  out:
->> +	kasan_enable_local();
->>  	slab_unlock(page);
->>  	/*
->>  	 * Keep node_lock to preserve integrity
->> @@ -1096,6 +1108,7 @@ out:
->>  	return n;
->>  
->>  fail:
->> +	kasan_enable_local();
->>  	slab_unlock(page);
->>  	spin_unlock_irqrestore(&n->list_lock, *flags);
->>  	slab_fix(s, "Object at 0x%p not freed", object);
->> @@ -1371,8 +1384,11 @@ static void setup_object(struct kmem_cache *s, struct page *page,
->>  				void *object)
->>  {
->>  	setup_object_debug(s, page, object);
->> -	if (unlikely(s->ctor))
->> +	if (unlikely(s->ctor)) {
->> +		kasan_disable_local();
->>  		s->ctor(object);
->> +		kasan_enable_local();
->> +	}
->>  }
->>  static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
->> @@ -1425,11 +1441,12 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
->>  
->>  	if (kmem_cache_debug(s)) {
->>  		void *p;
->> -
->> +		kasan_disable_local();
->>  		slab_pad_check(s, page);
->>  		for_each_object(p, s, page_address(page),
->>  						page->objects)
->>  			check_object(s, page, p, SLUB_RED_INACTIVE);
->> +		kasan_enable_local();
->>  	}
->>  
->>  	kmemcheck_free_shadow(page, compound_order(page));
->> -- 
->> 1.8.5.5
->>
->> --
->> To unsubscribe, send a message with 'unsubscribe linux-mm' in
->> the body to majordomo at kvack.org.  For more info on Linux MM,
->> see: http://www.linux-mm.org/ .
->> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-> 
+> +		goto err;
+> +
+> +	return ret;
+> +
+> +err:
+> +	mdiobus_free(mdio_bus);
+> +
+> +	return ret;
+> +}
+
+[...]
+
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> new file mode 100644
+> index 0000000..756523a
+> --- /dev/null
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+
+[...]
+
+> +static struct rtnl_link_stats64 *xgene_enet_get_stats64(
+> +			struct net_device *ndev,
+> +			struct rtnl_link_stats64 *storage)
+> +{
+> +	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+> +	struct rtnl_link_stats64 *stats = &pdata->stats;
+> +
+> +	spin_lock(&pdata->stats_lock);
+
+What is the purpose of this spinlock? It doesn't seem to protect any
+hardware-specific stats readout. Is it really necessary?
+
+> +	stats->rx_errors += stats->rx_length_errors +
+> +			    stats->rx_crc_errors +
+> +			    stats->rx_frame_errors +
+> +			    stats->rx_fifo_errors;
+> +	memcpy(storage, &pdata->stats, sizeof(struct rtnl_link_stats64));
+> +	spin_unlock(&pdata->stats_lock);
+> +
+> +	return storage;
+> +}
+
+[...]
+
+> +static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
+> +{
+> +	struct net_device *ndev = pdata->ndev;
+> +	struct xgene_enet_desc_ring *buf_pool;
+> +	u16 dst_ring_num;
+> +	int ret;
+> +
+> +	xgene_gmac_tx_disable(pdata);
+> +	xgene_gmac_rx_disable(pdata);
+> +
+> +	ret = xgene_enet_create_desc_rings(ndev);
+> +	if (ret) {
+> +		netdev_err(ndev, "Error in ring configuration\n");
+> +		return ret;
+> +	}
+> +
+> +	/* setup buffer pool */
+> +	buf_pool = pdata->rx_ring->buf_pool;
+> +	xgene_enet_init_bufpool(buf_pool);
+> +	ret = xgene_enet_refill_bufpool(buf_pool, pdata->rx_buff_cnt);
+> +	if (ret)
+
+Shouldn't xgene_enet_delete_desc_rings() be called here?
+
+> +		return ret;
+> +
+> +	dst_ring_num = xgene_enet_dst_ring_num(pdata->rx_ring);
+> +	xgene_enet_cle_bypass(pdata, dst_ring_num, buf_pool->id);
+> +
+> +	return ret;
+> +}
+> +
+> +static int xgene_enet_probe(struct platform_device *pdev)
+> +{
+> +	struct net_device *ndev;
+> +	struct xgene_enet_pdata *pdata;
+> +	struct device *dev = &pdev->dev;
+> +	struct napi_struct *napi;
+> +	int ret;
+> +
+> +	ndev = alloc_etherdev(sizeof(struct xgene_enet_pdata));
+> +	if (!ndev)
+> +		return -ENOMEM;
+> +
+> +	pdata = netdev_priv(ndev);
+> +
+> +	pdata->pdev = pdev;
+> +	pdata->ndev = ndev;
+> +	SET_NETDEV_DEV(ndev, dev);
+> +	platform_set_drvdata(pdev, pdata);
+> +	ndev->netdev_ops = &xgene_ndev_ops;
+> +	xgene_enet_set_ethtool_ops(ndev);
+> +	ndev->features |= NETIF_F_IP_CSUM |
+> +			  NETIF_F_GSO |
+> +			  NETIF_F_GRO;
+> +
+> +	ret = xgene_enet_get_resources(pdata);
+> +	if (ret)
+> +		goto err;
+> +
+> +	xgene_enet_reset(pdata);
+> +	xgene_gmac_init(pdata, SPEED_1000);
+> +
+> +	spin_lock_init(&pdata->stats_lock);
+> +	ret = register_netdev(ndev);
+> +	if (ret) {
+> +		netdev_err(ndev, "Failed to register netdev\n");
+> +		goto err;
+> +	}
+> +
+> +	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+> +	if (ret) {
+> +		netdev_err(ndev, "No usable DMA configuration\n");
+> +		goto err;
+> +	}
+> +
+> +	ret = xgene_enet_init_hw(pdata);
+> +	if (ret)
+> +		goto err;
+> +
+> +	napi = &pdata->rx_ring->napi;
+> +	netif_napi_add(ndev, napi, xgene_enet_napi, NAPI_POLL_WEIGHT);
+> +	ret = xgene_enet_mdio_config(pdata);
+> +
+> +	return ret;
+> +err:
+> +	free_netdev(ndev);
+> +	return ret;
+> +}
+> +
+> +static int xgene_enet_remove(struct platform_device *pdev)
+> +{
+> +	struct xgene_enet_pdata *pdata;
+> +	struct net_device *ndev;
+> +
+> +	pdata = platform_get_drvdata(pdev);
+> +	ndev = pdata->ndev;
+> +
+> +	xgene_gmac_rx_disable(pdata);
+> +	xgene_gmac_tx_disable(pdata);
+> +
+> +	netif_napi_del(&pdata->rx_ring->napi);
+> +	xgene_enet_mdio_remove(pdata);
+> +	xgene_enet_delete_desc_rings(pdata);
+> +	unregister_netdev(ndev);
+> +	xgene_gport_shutdown(pdata);
+> +	free_netdev(ndev);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id xgene_enet_match[] = {
+> +	{.compatible = "apm,xgene-enet",},
+> +	{},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, xgene_enet_match);
+> +
+> +static struct platform_driver xgene_enet_driver = {
+> +	.driver = {
+> +		   .name = "xgene-enet",
+> +		   .owner = THIS_MODULE,
+> +		   .of_match_table = xgene_enet_match,
+> +		   },
+> +	.probe = xgene_enet_probe,
+> +	.remove = xgene_enet_remove,
+> +};
+> +
+> +module_platform_driver(xgene_enet_driver);
+> +
+> +MODULE_DESCRIPTION("APM X-Gene SoC Ethernet driver");
+> +MODULE_VERSION(XGENE_DRV_VERSION);
+> +MODULE_AUTHOR("Keyur Chudgar <kchudgar@apm.com>");
+> +MODULE_LICENSE("GPL");
