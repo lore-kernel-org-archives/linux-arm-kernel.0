@@ -1,58 +1,51 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 15 Jul 2014 22:40:00 +0530
-Subject: [PATCH] ARM: config: update multi_v7_defconfig
-In-Reply-To: <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
-References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
- <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
-Message-ID: <CAK5sBcGcnG9FMuJLSkFamcTw3VR1KeLNKRRo7Xhp05s=og-+zg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 16 Jul 2014 01:15:42 +0800
+Subject: [PATCH v2 0/5] ARM: dts: sun6i: Add support for GMAC
+Message-ID: <1405444547-21870-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi Maxime,
 
-On Tue, Jul 15, 2014 at 9:29 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Naveen,
->
-> On Tue, Jul 15, 2014 at 1:02 AM, Naveen Krishna Chatradhi
-> <ch.naveen@samsung.com> wrote:
->> Enabled S3C24XX I2C driver and MAX77686 PMIC MFD and Voltage
->> regulator drivers used on Exynos5250 based Snow board.
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> ---
->> By enabling the symbols to compile S3C24XX I2C driver, MAX77686 PMIC
->> under MFD and REGULATOR.
->>
->> http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
->> The warnings by cpufreq on Snow board are fixed.
->>
->> Booted and verified on  on Exynos5420 based Snow board
->>
->>  arch/arm/configs/multi_v7_defconfig |    3 +++
->>  1 file changed, 3 insertions(+)
->
-> Is there a reason not to add more of the max77686 configs?
->
-> +CONFIG_RTC_DRV_MAX77686=y
-> +CONFIG_COMMON_CLK_MAX77686=y
->
-> I also seems like it would be nice to reconcile this with Sacin's
-> latest patch.  For starters I notice that you're missing:
->   CONFIG_EXYNOS5420_MCPM=y
->
-> I'll leave it up to you to look for other things that might be
-> missing.  If some of the things in exynos5_defconfig can't go into the
-> multi-config, please explain.
+This is v2 of the A31 GMAC support series. The GMAC is the same as in
+the A20, except it has an extra reset control. The GMAC clock module is
+mostly the same as in the A20, without the extra dividers, which I left
+out intentionally from the clock driver.
 
-multi_v7_defconfig update patch, inline with exynos_defconfig is already on my
-TODO list. I wanted to send this one along with the next update of
-exynos_defconfig
-(around -rc7) as Olof preferred to have a single patch updating most
-of the available
-things. By then I believe remaining drivers like 5420/5800 regulators,
-display and cpufreq
-drivers would have been merged.
+The register offsets and interrupts were copied from A31 SDK in Rhombus
+Tech's repository. The pin muxes were from the EVB fex file.
 
- --
-Regards,
-Sachin.
+I've tested this on my A31 Hummingbird under 100M and 1000M.
+
+Patch 5 adds support for the A31 Hummingbird. It is based on your work,
+so it has your name on it. I cleaned up the format and descriptions,
+got rid of missing devices, and added usb and the external rtc. 
+
+
+Changes since v1:
+
+- Dropped Colombus board patch, as it needs AXP221 regulator support.
+- Added reset-name to GMAC node.
+- Added A31 Hummingbird support.
+
+
+Cheers,
+ChenYu
+
+Chen-Yu Tsai (4):
+  ARM: dts: sun6i: Add pin muxing options for GMAC
+  ARM: dts: sun6i: Add GMAC clock node to the A31 dtsi
+  ARM: dts: sun6i: Add A31 GMAC gigabit ethernet controller node
+  ARM: dts: sun6i: Add ethernet alias for GMAC
+
+Maxime Ripard (1):
+  ARM: dts: sun6i: Add Merrii A31 Hummingbird support
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 119 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31.dtsi            |  88 ++++++++++++++++++++
+ 3 files changed, 208 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+
+-- 
+2.0.1
