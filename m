@@ -1,34 +1,63 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 15 Jul 2014 17:20:31 +0200
-Subject: [PATCH v3 15/15] drivers: clk: st: Use round to closest divider flag
-In-Reply-To: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1405437631-23623-16-git-send-email-gabriel.fernandez@linaro.org>
+Date: Tue, 15 Jul 2014 17:20:16 +0200
+Subject: [PATCH v3 00/15] Add Flexgen Clock support
+Message-ID: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses CLK_DIVIDER_ROUND_CLOSEST flag to specify
-the divider has to round to closest div.
+Changes in v3:
+ - Change commit message
+ - Remove uncessary (void *) cast
+ - add a block diagram for flexgen clock binding documentation
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/clk/st/clkgen-mux.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Changes in v2:
+ - use static const for clkgen_pll_data and stm_fs tables (from
+   Peter Griffin review)
+ - add 326 and 333 Mhz frequencies
+ - cosmetic correction in st,clkgen-vcc.txt
+ - use of kcalloc instead of kzalloc in drivers/clk/st/clk-flexgen.c
 
-diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-index 9bdedc8..79dc40b 100644
---- a/drivers/clk/st/clkgen-mux.c
-+++ b/drivers/clk/st/clkgen-mux.c
-@@ -774,7 +774,8 @@ void __init st_of_clkgen_vcc_setup(struct device_node *np)
- 		div->reg = reg + VCC_DIV_OFFSET;
- 		div->shift = 2 * i;
- 		div->width = 2;
--		div->flags = CLK_DIVIDER_POWER_OF_TWO;
-+		div->flags = CLK_DIVIDER_POWER_OF_TWO |
-+			CLK_DIVIDER_ROUND_CLOSEST;
- 
- 		mux->reg = reg + VCC_MUX_OFFSET;
- 		mux->shift = 2 * i;
+The goal of this series is to add Flexgen clock support to ST SoCs.
+
+A Flexgen clock is composed by:
+  - a clock cross bar (represented by a mux element)
+  - a pre and final dividers (represented by a divider and gate elements)
+
+Tested on B2120 board.
+
+Gabriel Fernandez (15):
+  clk: st: Update ST clock binding documentation
+  drivers: clk: st: use static const for stm_fs tables
+  drivers: clk: st: use static const for clkgen_pll_data tables
+  drivers: clk: st: Remove uncessary (void *) cast
+  clk: st: Adds Flexgen clock binding
+  drivers: clk: st: STiH407: Support for Flexgen Clocks
+  drivers: clk: st: STiH407: Support for A9 MUX Clocks
+  drivers: clk: st: STiH407: Support for clockgenA0
+  drivers: clk: st: Add polarity bit indication
+  drivers: clk: st: Add quadfs reset handling
+  drivers: clk: st: STiH407: Support for clockgenC0
+  drivers: clk: st: STiH407: Support for clockgenD0/D2/D3
+  drivers: clk: st: STiH407: Support for clockgenA9
+  drivers: clk: st: Update frequency tables for fs660c32 and fs432c65
+  drivers: clk: st: Use round to closest divider flag
+
+ .../bindings/clock/st/st,clkgen-divmux.txt         |  28 +-
+ .../devicetree/bindings/clock/st/st,clkgen-mux.txt |   6 +-
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  17 +-
+ .../bindings/clock/st/st,clkgen-prediv.txt         |   8 +-
+ .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  34 ++-
+ .../devicetree/bindings/clock/st/st,clkgen.txt     |  59 ++--
+ .../devicetree/bindings/clock/st/st,flexgen.txt    | 119 ++++++++
+ .../devicetree/bindings/clock/st/st,quadfs.txt     |  15 +-
+ drivers/clk/st/Makefile                            |   2 +-
+ drivers/clk/st/clk-flexgen.c                       | 331 +++++++++++++++++++++
+ drivers/clk/st/clkgen-fsyn.c                       | 223 +++++++++++---
+ drivers/clk/st/clkgen-mux.c                        |  12 +-
+ drivers/clk/st/clkgen-pll.c                        |  94 +++++-
+ 13 files changed, 828 insertions(+), 120 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+ create mode 100644 drivers/clk/st/clk-flexgen.c
+
 -- 
 1.9.1
