@@ -1,52 +1,57 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 15 Jul 2014 11:04:37 -0400
-Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <20140715144944.GW4179@bivouac.eciton.net>
-References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405363248.25580.12.camel@deneb.redhat.com>
- <20140715100221.GU4179@bivouac.eciton.net>
- <1405429860.25580.25.camel@deneb.redhat.com>
- <20140715135418.GV4179@bivouac.eciton.net>
- <1405434206.25580.31.camel@deneb.redhat.com>
- <20140715144944.GW4179@bivouac.eciton.net>
-Message-ID: <1405436677.25580.34.camel@deneb.redhat.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 15 Jul 2014 19:02:56 +0400
+Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan when
+ touching unaccessible memory
+In-Reply-To: <alpine.DEB.2.11.1407150924320.10593@gentwo.org>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
+ <20140715060405.GI11317@js1304-P5Q-DELUXE> <53C4DA54.3010502@samsung.com>
+ <20140715081852.GL11317@js1304-P5Q-DELUXE>
+ <alpine.DEB.2.11.1407150924320.10593@gentwo.org>
+Message-ID: <53C542A0.5050107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-15 at 15:49 +0100, Leif Lindholm wrote:
-> On Tue, Jul 15, 2014 at 10:23:26AM -0400, Mark Salter wrote:
-> > On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
-> > > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
-> > > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
-> > > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
-> > > > > >                       continue;
-> > > > > >               }
-> > > > > >  
-> > > > > > +             /* Don't free anything below kernel */
-> > > > > > +             if (md->phys_addr < PHYS_OFFSET)
-> > > > > > +                     continue;
-> > > > > > +
-> > > > > 
-> > > > > Is the spin table area really allocated as BOOT_SERVICES_*?
-> > > > 
-> > > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
-> > > > then there could be BS code/data memory which we'd want to ignore.
-> > > 
-> > > Well, if it is boot service code/data - then there is no need for us
-> > > to keep it around after ExitBootServices().
-> > 
-> > One would think, but EFI has proven to be less than strictly compliant
-> > in that regard in the past. I'm inclined to keep the boot services
-> > around until after SetVirtualAddressMap just in case.
+On 07/15/14 18:26, Christoph Lameter wrote:
+> On Tue, 15 Jul 2014, Joonsoo Kim wrote:
 > 
-> But the function you add this clause to will still throw away all boot
-> services code/data regions - just with this modification it skips
-> those that happen to lie lower in the address space than the kernel.
+>>> I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
+>>> If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
+>>> for kasan.
+>>
+>> I don't agree with this.
+>>
+>> If someone is going to add a slab_pad_check() in other places in
+>> slub.c, we should disable/enable kasan there, too. This looks same
+>> maintenance problem to me. Putting disable/enable only where we
+>> strictly need at least ensures that we don't need to care when using
+>> slub internal functions.
+>>
+>> And, if memchr_inv() is problem, I think that you also need to add hook
+>> into validate_slab_cache().
+>>
+>> validate_slab_cache() -> validate_slab_slab() -> validate_slab() ->
+>> check_object() -> check_bytes_and_report() -> memchr_inv()
 > 
-> (And I do agree with Mark R here - let's not work around bugs that
-> don't exist yet.)
+> I think adding disable/enable is good because it separates the payload
+> access from metadata accesses. This may be useful for future checkers.
+> Maybe call it something different so that this is more generic.
 > 
+> metadata_access_enable()
+> 
+> metadata_access_disable()
+> 
+> ?
+> 
+It sounds like a good idea to me. However in this patch, besides from protecting metadata accesses,
+this calls also used in setup_objects for wrapping ctor call. It used there because all pages in allocate_slab
+are poisoned, so at the time when ctors are called all object's memory marked as poisoned.
 
-I'm not sure if they still exist or not, but on Foundation, I saw a
-crash in SetVirtualAddressMap unless I kept BS regions around.
+I think this could be solved by removing kasan_alloc_slab_pages() hook form allocate_slab() and adding
+kasan_slab_free() hook after ctor call.
+But I guess in that case padding at the end of slab will be unpoisoined.
+
+> Maybe someone else has a better idea?
+> 
+> 
+> 
