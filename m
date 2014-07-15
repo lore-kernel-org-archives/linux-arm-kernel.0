@@ -1,61 +1,42 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 15 Jul 2014 17:22:30 +0200
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140627032506.GA18039@shlinux1.ap.freescale.net>
- <20140630133313.GA11880@kwain>
- <20140701002112.GA26146@shlinux1.ap.freescale.net>
- <53B27789.3090509@gmail.com>
- <20140701083007.GB26146@shlinux1.ap.freescale.net>
- <20140701104254.GD3427@piout.net>
- <53B2D151.60404@cogentembedded.com>
- <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <20140715152230.GE1011@kwain>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 15 Jul 2014 18:24:30 +0300
+Subject: [PATCH 0/6] clock support for Tegra132
+Message-ID: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Tegra132 has almost the same clock structure as Tegra124, except for the CPU
+related clocks.
 
-On Wed, Jul 02, 2014 at 01:10:00AM +0000, Peter Chen wrote:
-> > On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
-> > 
-> > >>>>> Well, there is nothing specific about the Berlin CI. Some
-> > >>>>> subsystems use the 'generic' keyword in these cases. Do you see a
-> > >>>>> particular reason I should use some Berlin related compatible here?
-> > 
-> > >>>> Not must, one suggestion is: can you change the compatible string
-> > >>>> to "chipidea-usb-generic"?
-> > 
-> > >>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
-> > >>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
-> > >>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
-> > 
-> > >> The recommended format for compatible string is:
-> > >> "manufacturer,model", I agree with "chipidea,ci13xxx", thanks.
-> > 
-> > > I think we should probably avoid using wildcards in the compatible
-> > > string.
-> > 
-> >     I'm sure wildcards shouldn't be allowed there. :-)
-> 
-> Then, what's your guys recommend, how about "chipidea,usb2-generic"?
+Patch 1 is a small change to not stop initializing clocks when an error is
+	encountered
+Patch 2 makes tegra_clocks_apply_init_table an arch_initcall to make it work
+	on ARM64
+Patch 3 updates the Tegra124 binding doc with the details about the clock
+	changes for Tegra132
+Patch 4 adds a new binding for the CPU clocks on Tegra132
+Patch 5 Implements the changes to the CAR clocks for Tegra132
+Patch 6 Implements the new Tegar132 ccplex clocks
 
-So what do you think? "chipidea,ci13", "chipidea,usb2-generic" or
-something else?
+Peter De Schrijver (6):
+  clk: tegra: don't abort clk init on error
+  clk: tegra: make tegra_clocks_apply_init_table arch_initcall
+  clk: tegra: Update binding doc Tegra132
+  clk: tegra: add nvidia,tegra132-ccplex-clk binding
+  clk: tegra: Add support for Tegra132 CAR clocks
+  clk: tegra: Add Tegra132 ccplex clocks
 
-I tend to prefer something without the 'generic' keyword.
-
-After updating the compatible I'll send a v3 based on USB changes
-introducing the generic PHY support[1].
-
-[1] https://lkml.org/lkml/2014/7/15/330
-
-
-Antoine
+ .../bindings/clock/nvidia,tegra124-car.txt         |    8 +++--
+ .../bindings/clock/nvidia,tegra132-ccplex-clk.txt  |   27 ++++++++++++++++
+ arch/arm/mach-tegra/tegra.c                        |    3 --
+ drivers/clk/tegra/Makefile                         |    2 +
+ drivers/clk/tegra/clk-tegra124.c                   |   32 ++++++++++++++++++++
+ drivers/clk/tegra/clk.c                            |    9 ++++--
+ include/dt-bindings/clock/tegra132-ccplex.h        |   12 +++++++
+ include/linux/clk/tegra.h                          |    2 -
+ 8 files changed, 84 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt
+ create mode 100644 include/dt-bindings/clock/tegra132-ccplex.h
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.7.rc0.72.g4b5ea.dirty
