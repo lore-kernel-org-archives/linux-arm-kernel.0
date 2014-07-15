@@ -1,91 +1,32 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Jul 2014 21:23:09 +0900
-Subject: [PATCH v5 4/8] ARM: shmobile: r7s72100: Add MTU2 device to DT
-In-Reply-To: <4380270.nzol65dDjU@avalon>
-References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1404911564-17380-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140715114741.GB25333@verge.net.au> <4380270.nzol65dDjU@avalon>
-Message-ID: <20140715122308.GC25333@verge.net.au>
+Date: Tue, 15 Jul 2014 21:23:50 +0900
+Subject: [PATCH] ARM: shmobile: genmai: remove defconfig
+In-Reply-To: <3624228.NbiLenVez0@avalon>
+References: <1405409364-23378-1-git-send-email-horms+renesas@verge.net.au>
+ <3624228.NbiLenVez0@avalon>
+Message-ID: <20140715122350.GD25333@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 01:55:25PM +0200, Laurent Pinchart wrote:
+On Tue, Jul 15, 2014 at 01:58:21PM +0200, Laurent Pinchart wrote:
 > Hi Simon,
 > 
-> On Tuesday 15 July 2014 20:47:41 Simon Horman wrote:
-> > On Wed, Jul 09, 2014 at 03:12:40PM +0200, Laurent Pinchart wrote:
-> > > Add the MTU2 counter to the r7s72100 device tree and make it disabled by
-> > > default.
-> > > 
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
-> > >  1 file changed, 10 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
-> > > b/arch/arm/boot/dts/r7s72100.dtsi index bdee225..c902b0b 100644
-> > > --- a/arch/arm/boot/dts/r7s72100.dtsi
-> > > +++ b/arch/arm/boot/dts/r7s72100.dtsi
-> > > @@ -229,6 +229,16 @@
-> > >  		status = "disabled";
-> > >  	};
-> > > 
-> > > +	mtu2: timer at fcff0000 {
-> > > +		compatible = "renesas,mtu2";
-> > > +		reg = <0xfcff0000 0x400>;
-> > > +		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
-> > > +		interrupt-names = "tgi0a";
-> > > +		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-> > > +		clock-names = "fck";
-> > > +		status = "disabled";
-> > > +	};
-> > > +
-> > >  	scif0: serial at e8007000 {
-> > >  		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > >  		reg = <0xe8007000 64>;
-> > 
-> > I believe that I claimed to have tested this in the past but that
-> > my testing was by booting a config to userspace that as it happens
-> > did not require to timer to get that far.
-> > 
-> > I now believe there is a minor error: the interrupt number should be
-> > (139 - 32 =) 107 rather than 139.
-> > 
-> > This allows a system with this and the related genmai patch applied
-> > on top of renesas-next-v3.16-rc3-20140715 to boot to uerspace
-> > when compiled with shmobile_defconfig (+ an initrd).
-> > Without the irq number change the boot gets stuck in
-> > ip_auto_config (which presumably sleeps).
-> > 
-> > Laurent, should I squash the following in and queue-up the result?
+> Thank you for the patch.
 > 
-> Please do, and sorry for the mistake.
+> On Tuesday 15 July 2014 16:29:24 Simon Horman wrote:
+> > The genmai board code is scheduled for removal and once
+> > that occurs the defconfig will be of no use. Remove it.
+> > 
+> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Now that the MTU2 boot issue has been solved (thank you for tracking it down), 
+> am I correct to assume that all timer patches, the genmai board file removal 
+> series and this patch will make it to v3.17 ?
 
-Not at all. I've made the same one several times myself.
+Yes, that is my plan.
 
-> > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
-> > b/arch/arm/boot/dts/r7s72100.dtsi index c902b0b..1d28d01 100644
-> > --- a/arch/arm/boot/dts/r7s72100.dtsi
-> > +++ b/arch/arm/boot/dts/r7s72100.dtsi
-> > @@ -232,7 +232,7 @@
-> >  	mtu2: timer at fcff0000 {
-> >  		compatible = "renesas,mtu2";
-> >  		reg = <0xfcff0000 0x400>;
-> > -		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
-> > +		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-> >  		interrupt-names = "tgi0a";
-> >  		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-> >  		clock-names = "fck";
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I hope to have them queued up this evening.
