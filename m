@@ -1,155 +1,135 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 15 Jul 2014 15:42:30 -0700
-Subject: [PATCH 1/2] clk: qcom: Fix PLL rate configurations
-In-Reply-To: <1405464151-16152-1-git-send-email-sboyd@codeaurora.org>
-References: <1405464151-16152-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1405464151-16152-2-git-send-email-sboyd@codeaurora.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 15 Jul 2014 15:47:53 -0700
+Subject: [PATCH v3 2/2] cpufreq: Simplify and fix mutual exclusion with hotplug
+In-Reply-To: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <1405464473-3916-3-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes we need to program PLLs with a fixed rate
-configuration during driver probe. Doing this after we register
-the PLLs with the clock framework causes the common clock
-framework to assume the rate of the PLLs are 0. This causes all
-sorts of problems for rate recalculations because the common
-clock framework caches the rate once at registration time unless
-a flag is set to always recalculate the rates.
+Since we no longer alloc and destroy/freeze policy and sysfs nodes during
+hotplug and suspend, we don't need to lock sysfs with hotplug. We can
+achieve the same effect by checking if policy->cpus is empty.
 
-Split the qcom_cc_probe() function into two pieces, map and
-everything else, so that drivers which need to configure some
-PLL rates or otherwise twiddle bits in the clock controller can
-do so before registering clocks. This allows us to properly
-detect the rates of PLLs that are programmed at boot.
+Hotplug mutual exclusion was only done for sysfs writes. But reads need the
+same protection too.  So, this patch adds that too.
 
-Fixes: 49fc825f0cc2 "clk: qcom: Consolidate common probe code"
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Also, cpufreq driver (un)register can race with hotplug since CPU online
+state can change between adding/removing the currently online devices and
+registering/unregistering for hotplug notifiers. So, fix that by
+registering for hotplug notifiers first before adding devices and
+unregistering from hotplug notifiers first before removing devices.
+
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 ---
- drivers/clk/qcom/common.c       | 39 ++++++++++++++++++++++++++++-----------
- drivers/clk/qcom/common.h       |  6 ++++++
- drivers/clk/qcom/mmcc-msm8974.c | 10 ++++------
- 3 files changed, 38 insertions(+), 17 deletions(-)
+ drivers/cpufreq/cpufreq.c | 44 ++++++++++++++++++++------------------------
+ 1 file changed, 20 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index 9b5a1cfc6b91..eeb3eea01f4c 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -27,30 +27,35 @@ struct qcom_cc {
- 	struct clk *clks[];
- };
- 
--int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
-+struct regmap *
-+qcom_cc_map(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index a0a2ec2..f72b2b7 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -748,17 +748,18 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
  {
- 	void __iomem *base;
- 	struct resource *res;
-+	struct device *dev = &pdev->dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return ERR_CAST(base);
-+
-+	return devm_regmap_init_mmio(dev, base, desc->config);
-+}
-+EXPORT_SYMBOL_GPL(qcom_cc_map);
-+
-+int qcom_cc_really_probe(struct platform_device *pdev,
-+			 const struct qcom_cc_desc *desc, struct regmap *regmap)
-+{
- 	int i, ret;
- 	struct device *dev = &pdev->dev;
- 	struct clk *clk;
- 	struct clk_onecell_data *data;
- 	struct clk **clks;
--	struct regmap *regmap;
- 	struct qcom_reset_controller *reset;
- 	struct qcom_cc *cc;
- 	size_t num_clks = desc->num_clks;
- 	struct clk_regmap **rclks = desc->clks;
+ 	struct cpufreq_policy *policy = to_policy(kobj);
+ 	struct freq_attr *fattr = to_attr(attr);
+-	ssize_t ret;
++	ssize_t ret = -EINVAL;
  
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
+ 	if (!down_read_trylock(&cpufreq_rwsem))
+-		return -EINVAL;
 -
--	regmap = devm_regmap_init_mmio(dev, base, desc->config);
--	if (IS_ERR(regmap))
--		return PTR_ERR(regmap);
++		return ret;
+ 	down_read(&policy->rwsem);
+ 
+-	if (fattr->show)
+-		ret = fattr->show(policy, buf);
+-	else
+-		ret = -EIO;
++	if (!cpumask_empty(policy->cpus)) {
++		if (fattr->show)
++			ret = fattr->show(policy, buf);
++		else
++			ret = -EIO;
++	}
+ 
+ 	up_read(&policy->rwsem);
+ 	up_read(&cpufreq_rwsem);
+@@ -773,26 +774,19 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
+ 	struct freq_attr *fattr = to_attr(attr);
+ 	ssize_t ret = -EINVAL;
+ 
+-	get_online_cpus();
 -
- 	cc = devm_kzalloc(dev, sizeof(*cc) + sizeof(*clks) * num_clks,
- 			  GFP_KERNEL);
- 	if (!cc)
-@@ -91,6 +96,18 @@ int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+-	if (!cpu_online(policy->cpu))
+-		goto unlock;
+-
+ 	if (!down_read_trylock(&cpufreq_rwsem))
+-		goto unlock;
+-
++		return ret;
+ 	down_write(&policy->rwsem);
+ 
+-	if (fattr->store)
+-		ret = fattr->store(policy, buf, count);
+-	else
+-		ret = -EIO;
++	if (!cpumask_empty(policy->cpus)) {
++		if (fattr->store)
++			ret = fattr->store(policy, buf, count);
++		else
++			ret = -EIO;
++	}
+ 
+ 	up_write(&policy->rwsem);
+-
+ 	up_read(&cpufreq_rwsem);
+-unlock:
+-	put_online_cpus();
  
  	return ret;
  }
-+EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
+@@ -2270,6 +2264,8 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
+ 		}
+ 	}
+ 
++	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 +
-+int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
-+{
-+	struct regmap *regmap;
+ 	ret = subsys_interface_register(&cpufreq_interface);
+ 	if (ret)
+ 		goto err_boost_unreg;
+@@ -2293,13 +2289,13 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
+ 		}
+ 	}
+ 
+-	register_hotcpu_notifier(&cpufreq_cpu_notifier);
+ 	pr_debug("driver %s up and running\n", driver_data->name);
+ 
+ 	return 0;
+ err_if_unreg:
+ 	subsys_interface_unregister(&cpufreq_interface);
+ err_boost_unreg:
++	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
+ 	if (cpufreq_boost_supported())
+ 		cpufreq_sysfs_remove_file(&boost.attr);
+ err_null_driver:
+@@ -2327,12 +2323,12 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
+ 
+ 	pr_debug("unregistering driver %s\n", driver->name);
+ 
++	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
 +
-+	regmap = qcom_cc_map(pdev, desc);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
-+	return qcom_cc_really_probe(pdev, desc, regmap);
-+}
- EXPORT_SYMBOL_GPL(qcom_cc_probe);
+ 	subsys_interface_unregister(&cpufreq_interface);
+ 	if (cpufreq_boost_supported())
+ 		cpufreq_sysfs_remove_file(&boost.attr);
  
- void qcom_cc_remove(struct platform_device *pdev)
-diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
-index 2c3cfc860348..2765e9d3da97 100644
---- a/drivers/clk/qcom/common.h
-+++ b/drivers/clk/qcom/common.h
-@@ -17,6 +17,7 @@ struct platform_device;
- struct regmap_config;
- struct clk_regmap;
- struct qcom_reset_map;
-+struct regmap;
+-	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
+-
+ 	down_write(&cpufreq_rwsem);
+ 	write_lock_irqsave(&cpufreq_driver_lock, flags);
  
- struct qcom_cc_desc {
- 	const struct regmap_config *config;
-@@ -26,6 +27,11 @@ struct qcom_cc_desc {
- 	size_t num_resets;
- };
- 
-+extern struct regmap *qcom_cc_map(struct platform_device *pdev,
-+				  const struct qcom_cc_desc *desc);
-+extern int qcom_cc_really_probe(struct platform_device *pdev,
-+				const struct qcom_cc_desc *desc,
-+				struct regmap *regmap);
- extern int qcom_cc_probe(struct platform_device *pdev,
- 			 const struct qcom_cc_desc *desc);
- 
-diff --git a/drivers/clk/qcom/mmcc-msm8974.c b/drivers/clk/qcom/mmcc-msm8974.c
-index c65b90515872..bc8f519c47aa 100644
---- a/drivers/clk/qcom/mmcc-msm8974.c
-+++ b/drivers/clk/qcom/mmcc-msm8974.c
-@@ -2547,18 +2547,16 @@ MODULE_DEVICE_TABLE(of, mmcc_msm8974_match_table);
- 
- static int mmcc_msm8974_probe(struct platform_device *pdev)
- {
--	int ret;
- 	struct regmap *regmap;
- 
--	ret = qcom_cc_probe(pdev, &mmcc_msm8974_desc);
--	if (ret)
--		return ret;
-+	regmap = qcom_cc_map(pdev, &mmcc_msm8974_desc);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
- 
--	regmap = dev_get_regmap(&pdev->dev, NULL);
- 	clk_pll_configure_sr_hpm_lp(&mmpll1, regmap, &mmpll1_config, true);
- 	clk_pll_configure_sr_hpm_lp(&mmpll3, regmap, &mmpll3_config, false);
- 
--	return 0;
-+	return qcom_cc_really_probe(pdev, &mmcc_msm8974_desc, regmap);
- }
- 
- static int mmcc_msm8974_remove(struct platform_device *pdev)
 -- 
+1.8.2.1
+
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
