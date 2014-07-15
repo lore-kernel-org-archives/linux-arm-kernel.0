@@ -1,89 +1,54 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 15 Jul 2014 18:14:04 +0900
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <53C4DF0D.8010208@metafoo.de>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
- <4657735.1VKsbQGuH6@wuerfel>
- <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
- <53C4DF0D.8010208@metafoo.de>
-Message-ID: <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Jul 2014 02:14:35 -0700
+Subject: [RFT/RFC/PATCH 00/31] arm: omap: irq: cleanup INTC driver
+In-Reply-To: <20140103164055.GA18722@saruman.home>
+References: <1384970958-4118-1-git-send-email-balbi@ti.com>
+ <20131219184815.GU27438@atomide.com>
+ <20131219232153.GE707@saruman.home>
+ <20131221005309.GH26054@atomide.com>
+ <20131223173409.GA10536@saruman.home>
+ <20140102220101.GA8652@saruman.home> <52C6A939.70708@ti.com>
+ <20140103164055.GA18722@saruman.home>
+Message-ID: <20140715091435.GB28715@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 4:58 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
->>
->> On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>> On Monday 14 July 2014 19:36:24 Mark Brown wrote:
->>>>
->>>> On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
->>>>>
->>>>> On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
->>>>
->>>>
->>>>>> Yes. But now that you say it the gpiod_direction_output() call is
->>>>>> missing
->>>>>> from this patch.
->>>>
->>>>
->>>>> I'm lost now. The GPIO_ACTIVE_HIGH I added comes from
->>>>> Documentation/gpio/board.txt
->>>>> and as Linus Walleij explained to me the other day, the lookup is
->>>>> supposed
->>>>> to replace devm_gpio_request_one(), which in turn replaced both the
->>>>> gpio_request and the gpio_direction_output(). Do I need to put the
->>>>> gpiod_direction_output() back or is there another interface for that
->>>>> when
->>>>> registering the board gpios?
->>>>
->>>>
->>>> Indeed.  If you *do* need an explicit _output() then that sounds to me
->>>> like we either need a gpiod_get_one() or an extension to the table,
->>>> looking at the code it seems like this is indeed the case.  We can set
->>>> if the GPIO is active high/low, or open source/drain but there's no flag
->>>> for the initial state.
->>>
->>>
->>> (adding Alexandre and the gpio list)
->>>
->>> GPIO people: any guidance on how a board file should set a gpio to
->>> output/default-high in a GPIO_LOOKUP() table to replace a
->>> devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
->>> Do we need to add an interface extension to do this, e.g. passing
->>> GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
->>
->>
->> The way I see it, GPIO mappings (whether they are done using the
->> lookup tables, DT, or ACPI) should only care about details that are
->> relevant to the device layout and that should be abstracted to the
->> driver (e.g. whether the GPIO is active low or open drain) so drivers
->> do not need to check X conditions every time they want to drive the
->> GPIO.
->>
->> Direction and initial value, on the other hand, are clearly properties
->> that ought to be set by the driver itself. Thus my expectation here
->> would be that the driver sets the GPIO direction and initial value as
->> soon as it gets it using gpiod_direction_output(). In other words,
->> there is no replacement for gpio_request_one() with the gpiod
->> interface. Is there any use-case that cannot be covered by calling
->> gpiod_direction_output() right after gpiod_get()? AFAICT this is what
->> gpio_request_one() was doing anyway.
->
->
-> I agree with you that this is something that should be done in the driver
-> and not in the lookup table. I think that it is still a good idea to have a
-> replacement for gpio_request_one with the new GPIO descriptor API. A large
-> share of the drivers want to call either gpio_direction_input() or
-> gpio_direction_output() right after requesting the GPIO. Combining both the
-> requesting and the configuration of the GPIO into one function call makes
-> the code a bit shorter and also simplifies the error handling. Even more so
-> if e.g. the GPIO is optional. This was one of the main reasons why
-> gpio_request_one was introduced, see the commit[1] that added it.
+* Felipe Balbi <balbi@ti.com> [140103 08:43]:
+> On Fri, Jan 03, 2014 at 05:42:41PM +0530, Rajendra Nayak wrote:
+> > []..
+> > 
+> > >>> so a bit more work is needed. Maybe also rebase these against
+> > >>> omap-for-v3.14/dt too?
+> > >>
+> > >> Will do.
+> > > 
+> > > Rebased on top of omap-for-v3.14/omap3-board-removal. Patches are on my
+> > > k.org tree:
+> > > 
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git wip/omap-fix-intc
+> > 
+> > It needs a minor build fix though..
+> > 
+> > diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+> > index b58c5d5..d03b5a3 100644
+> > --- a/drivers/irqchip/irq-omap-intc.c
+> > +++ b/drivers/irqchip/irq-omap-intc.c
+> > @@ -151,7 +151,7 @@ static void omap_mask_ack_irq(struct irq_data *d)
+> >  static void omap_suspend_irq(struct irq_data *d)
+> >  {
+> >         omap_intc_save_context();
+> > -       omap3_intc_prepare_idle();
+> > +       omap_intc_prepare_idle();
+> 
+> fixed now, thanks. Wonder how come I didn't see that, I was building
+> every commit with omap2plus_defconfig :-( Oh well...
 
-I am not opposed to it as a convenience function. Note that since the
-open-source and open-drain flags are already handled by the lookup
-table, the only flags it should handle are those related to direction,
-value, and (maybe) sysfs export.
+Felipe, care to refresh this series against v3.16-rc4 and
+repost? We now finally have the DT based booting working for
+PM for omap3 the same way as legacy booting so I can test
+this easily for regressions. But I don't seem to have the
+patches in my mailbox any longer.
+
+Regards,
+
+Tony
