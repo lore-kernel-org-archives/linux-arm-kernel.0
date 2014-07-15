@@ -1,75 +1,205 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 15 Jul 2014 16:28:36 +0100
-Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <1405436677.25580.34.camel@deneb.redhat.com>
-References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405363248.25580.12.camel@deneb.redhat.com>
- <20140715100221.GU4179@bivouac.eciton.net>
- <1405429860.25580.25.camel@deneb.redhat.com>
- <20140715135418.GV4179@bivouac.eciton.net>
- <1405434206.25580.31.camel@deneb.redhat.com>
- <20140715144944.GW4179@bivouac.eciton.net>
- <1405436677.25580.34.camel@deneb.redhat.com>
-Message-ID: <20140715152836.GX4179@bivouac.eciton.net>
+From: hrhaan@gmail.com (Harro Haan)
+Date: Tue, 15 Jul 2014 17:59:31 +0200
+Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
+In-Reply-To: <53C54042.2030507@linaro.org>
+References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+ <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+ <CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>
+ <53C4F745.3070701@linaro.org>
+ <CAB5oZtBSZJVqyO8GKdKqh0+3=GDkCyuqrAOQhMRxN0JFBnmZ6w@mail.gmail.com>
+ <53C54042.2030507@linaro.org>
+Message-ID: <CAB5oZtDy=TDz12_6ua_M3g=bQ+zB6cJTH3bUT9oA8snLDRBMTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 11:04:37AM -0400, Mark Salter wrote:
-> On Tue, 2014-07-15 at 15:49 +0100, Leif Lindholm wrote:
-> > On Tue, Jul 15, 2014 at 10:23:26AM -0400, Mark Salter wrote:
-> > > On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
-> > > > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
-> > > > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
-> > > > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
-> > > > > > >                       continue;
-> > > > > > >               }
-> > > > > > >  
-> > > > > > > +             /* Don't free anything below kernel */
-> > > > > > > +             if (md->phys_addr < PHYS_OFFSET)
-> > > > > > > +                     continue;
-> > > > > > > +
-> > > > > > 
-> > > > > > Is the spin table area really allocated as BOOT_SERVICES_*?
-> > > > > 
-> > > > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
-> > > > > then there could be BS code/data memory which we'd want to ignore.
-> > > > 
-> > > > Well, if it is boot service code/data - then there is no need for us
-> > > > to keep it around after ExitBootServices().
-> > > 
-> > > One would think, but EFI has proven to be less than strictly compliant
-> > > in that regard in the past. I'm inclined to keep the boot services
-> > > around until after SetVirtualAddressMap just in case.
-> > 
-> > But the function you add this clause to will still throw away all boot
-> > services code/data regions - just with this modification it skips
-> > those that happen to lie lower in the address space than the kernel.
+On 15 July 2014 16:52, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> On 15/07/14 14:04, Harro Haan wrote:
+>>> Makes sense.
+>>>
+>>> Avoiding this problem on GICv2 is easy (thanks to the aliased intack
+>>> register) but on iMX.6 we have only a GICv1.
+>>>
+>>>
+>>>> I can reduce the number of occurrences (not prevent it) by adding the
+>>>> following hack to irq-gic.c
+>>>> @@ -297,10 +309,12 @@ static asmlinkage void __exception_irq_entry
+>>>> gic_handle_irq(struct pt_regs *regs
+>>>>   u32 irqstat, irqnr;
+>>>>   struct gic_chip_data *gic = &gic_data[0];
+>>>>   void __iomem *cpu_base = gic_data_cpu_base(gic);
+>>>>
+>>>>   do {
+>>>> + while(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_PENDING_SET)
+>>>> & (1 << 30))
+>>>> +   printk(KERN_ERR "TEMP: gic_handle_irq: wait for FIQ exception\n");
+>>>>   irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+>>>>   irqnr = irqstat & ~0x1c00;
+>>>
+>>> I've made a more complete attempt to fix this. Could you test the
+>>> following? (and be prepared to fuzz the line numbers)
+>>
+>> Thanks Daniel, I have tested it, see the comments below.
+>>
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index 73ae896..309bf2c 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -303,6 +303,28 @@ static int gic_set_wake(struct irq_data *d,
+>>> unsigned int on)
+>>>  #define gic_set_wake   NULL
+>>>  #endif
+>>>
+>>> +/* Check for group 0 interrupt spuriously acked as a normal IRQ. This
+>>> + * workaround will only work for level triggered interrupts (and in
+>>> + * its current form is actively harmful on systems that don't support
+>>> + * FIQ).
+>>> + */
+>>> +static u32 gic_handle_spurious_group_0(struct gic_chip_data *gic, u32
+>>> irqstat)
+>>> +{
+>>> +       u32 irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+>>> +
+>>> +       if (!gic_data_fiq_enable(gic) || irqnr >= 1021)
+>>> +               return irqnr;
+>>> +
+>>> +       if (readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_IGROUP +
+>>> +                         (irqnr / 32 * 4)) &
+>>> +           BIT(irqnr % 32))
+>>> +               return irqnr;
+>>> +
+>>> +       /* this interrupt was spurious (needs to be handled as FIQ) */
+>>> +       writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
+>>
+>> This will NOT work, because of the note I mentioned above:
+>> "The FIQ exception will not occur anymore after gic_handle_irq
+>> read/acknowledges the FIQ by reading the GIC_CPU_INTACK register"
+>> So with this code you will say End Of Interrupt at the GIC level,
+>> without actually handling the interrupt, so you are missing an
+>> interrupt.
+>> I did the following test to confirm the missing interrupt:
+>> I have changed the periodic timer interrupt by an one-shot timer
+>> interrupt. The one-shot timer interrupt is programmed by the FIQ
+>> handler for the next FIQ interrupt. As expected: When the problem
+>> occurs, no more FIQ interrupts are generated.
+>
+> Can you confirm whether your timer interrupts are configured level or
+> edge triggered? Or whether EOIing the GIC causes them to be cleared by
+> some other means.
 
-Returning to the actual code we are discussing here:
-The hunk above has no bearing on whether boot services regions are
-generally unmapped or not. It only filters explicitly those boot
-services regions that happen to be lower in memory than the kernel,
-and keep them around for the duration of the system.
+>From page 48 of DDI0407I_cortex_a9_mpcore_r4p1_trm.pdf:
+Watchdog timers, PPI(3)
+Each Cortex-A9 processor has its own watchdog timers that can generate
+interrupts, using ID30.
 
-> > 
-> > (And I do agree with Mark R here - let's not work around bugs that
-> > don't exist yet.)
-> > 
-> 
-> I'm not sure if they still exist or not, but on Foundation, I saw a
-> crash in SetVirtualAddressMap unless I kept BS regions around.
+>From page 56:
+PPI[0], [2],and[3]:b11
+interrupt is rising-edge sensitive.
 
-For the topic of keeping boot services code around:
-I did also see issues with not keeping boot services regions on v7 -
-ages ago. I have not seen it this year, and I _really_ want to see if
-any such issues resurface. So post-3.16 I would quite like to see the
-call to free_boot_services() moved earlier to flush out any such
-issues before we see large-scale deployments.
+>
+> A level triggered interrupt that hasn't been serviced should return the
+> pending state (shouldn't it?).
+>
+>
+>>> +       return 1023;
+>>> +}
+>>> +
+>>>  static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>>>  {
+>>>         u32 irqstat, irqnr;
+>>> @@ -310,8 +332,10 @@ static void __exception_irq_entry
+>>> gic_handle_irq(struct pt_regs *regs)
+>>>         void __iomem *cpu_base = gic_data_cpu_base(gic);
+>>>
+>>>         do {
+>>> +               local_fiq_disable();
+>>
+>> It is a bit weird to disable the "Non-Maskable Interrupt" at every
+>> interrupt, because of a problem that occurs once every few thousand
+>> interrupts
+>
+> Given that simply reading from GIC_CPU_INTACK has significantly
+> interferes with FIQ reception means that I'm not too worried about this.
+>
+> Note also that leaving the FIQ unmasked increases worst case latency
+> here because once we get a group 0 interrupt back from intack then
+> spurious entry to the FIQ handler (which would see an ACK of 1023) just
+> wastes cycles.
+>
+>
+>>>                 irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+>>> -               irqnr = irqstat & GICC_IAR_INT_ID_MASK;
+>>> +               irqnr = gic_handle_spurious_group_0(gic, irqstat);
+>>> +               local_fiq_enable();
+>>>
+>>>                 if (likely(irqnr > 15 && irqnr < 1021)) {
+>>>                         irqnr = irq_find_mapping(gic->domain, irqnr);
+>>
+>>
+>> The following type of changes could fix the problem for me:
+>>
+>> @@ -290,19 +290,66 @@ static int gic_set_wake(struct irq_data *d,
+>> unsigned int on)
+>>
+>>  #else
+>>  #define gic_set_wake NULL
+>>  #endif
+>>
+>> +extern void (*fiq_handler)(void);
+>> +
+>> +/* Check for group 0 interrupt spuriously acked as a normal IRQ. This
+>> + * workaround will only work for level triggered interrupts (and in
+>> + * its current form is actively harmful on systems that don't support
+>> + * FIQ).
+>> + */
+>> +static u32 gic_handle_spurious_group_0(struct gic_chip_data *gic, u32 irqstat)
+>> +{
+>> + u32 irqnr = irqstat & ~0x1c00;
+>> +
+>> + if (!gic_data_fiq_enable(gic) || irqnr >= 1021)
+>> + return irqnr;
+>> +
+>> + if (readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_IGROUP +
+>> +  (irqnr / 32 * 4)) & BIT(irqnr % 32))
+>> + return irqnr;
+>> +
+>> + /*
+>> + * The FIQ should be disabled before the next FIQ interrupt occurs,
+>> + * so this only works when the next FIQ interrupt is not "too fast"
+>> + * after the previous one.
+>> + */
+>> + local_fiq_disable();
+>> +
+>> + /*
+>> + * Notes:
+>> + * - The FIQ exception will not occur anymore for this current
+>> + *   interrupt, because gic_handle_irq has already read/acknowledged
+>> + *   the GIC_CPU_INTACK register. So handle the FIQ here.
+>> + * - The fiq_handler below should not call ack_fiq and eoi_fiq,
+>> + *   because rereading the GIC_CPU_INTACK register returns spurious
+>> + *   interrupt ID 0x3FF. So probably you will have to add sometime like
+>> + *   the following to fiq_handler:
+>> + *   u32 cpsr, irqstat;
+>> + *   __asm__("mrs %0, cpsr" : "=r" (cpsr));
+>> + *   if ((cpsr & MODE_MASK) == FIQ_MODE)
+>> + *   irqstat = ack_fiq();
+>> + */
+>> + (*fiq_handler)();
+>
+> Any portable approach would have to switch to FIQ mode to run the
+> handler in order to provide the proper register banks for FIQ handlers
+> written in assembler.
+>
+> If we can't get level triggering to work then we have to:
+>
+> 1. Write code to jump correctly into FIQ mode.
+>
+> 2. Modify the gic's ack_fiq() callback to automatically avoid reading
+>    intack when the workaround is deployed.
+>
+> The above is why I wanted to see if we can make do with level triggering
+> (and automatic re-triggering for interrupts such as SGIs that are
+> cleared by EOI).
 
-The foundation model is a development tool, not a production system,
-so any issue reproducable only there is a pure bonus - since that
-firmware can _always_ be updated.
-
-/
-    Leif
+But the re-triggering introduces extra latencies and a lot of use
+cases of FIQ's try to avoid that.
