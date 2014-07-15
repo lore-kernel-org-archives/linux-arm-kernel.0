@@ -1,28 +1,88 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Jul 2014 21:41:07 -0700
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.17
-In-Reply-To: <1405397216-909-1-git-send-email-dinguyen@altera.com>
-References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
-Message-ID: <CAOesGMjHGiR0ht=2qUAiiS79UJbmAhxDmuZWMx=OCZADbN0c9w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Jul 2014 14:01:07 +0900
+Subject: [PATCH v5 0/8] Enable timers DT devices for Marzen, Genmai,
+ Lager and Koelsch
+In-Reply-To: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140715050106.GG5277@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 09, 2014 at 03:12:36PM +0200, Laurent Pinchart wrote:
+> Hello,
+> 
+> This patch set enables timer devices in DT for the Marzen, Genmai, Lager and
+> Koelsch boards. It has previously been posted as part of the "[PATCH v4 00/19]
+> Renesas CMT, MTU2 and TMU timers DT support" series, and is now split into its
+> own patch set for merge in v3.17.
+> 
+> The series depends on the driver changes of the "[PATCH v4 00/19] Renesas CMT,
+> MTU2 and TMU timers DT support" series, for which a pull request has been sent.
 
+Thanks, I have queued these up.
 
-
-On Mon, Jul 14, 2014 at 9:06 PM,  <dinguyen@altera.com> wrote:
-> Hi Arnd, Kevin and Olof,
->
-> Please consider pulling in these 2 patches for v3.17. 1 is just a defconfig
-> update and the other is a simple DTS fix.
-
-They're for different topics here (one goes into next/defconfig, the
-other in next/dt). It's silly to ask you to make one pull request per
-patch though, so I just cherry-picked them into the two branches.
-
-In other words: Patches have been applied, but I didn't merge the
-branch. Thanks!
-
-
--Olof
+> 
+> Changes since v4:
+> 
+> - Rebased on top of Simon's latest devel branch
+> - Dropped driver patches merged through the clocksource tree
+> 
+> Changes since v3:
+> 
+> - Fixed TMU interrupt numbers
+> - Fixed NULL platform device ID dereference in TMU driver
+> - Removed interrupt-parent property from documentation
+> - Add missing of_match_ptr() and __maybe_unused() annotations
+> 
+> Changes since v2:
+> 
+> - Rebased on top of Simon's latest devel branch
+> 
+> Changes since v1:
+> 
+> - Dropped the channel subnodes from the CMT DT bindings and just use a
+>   channels mask, as we don't need to specify per-channel properties.
+> 
+> Laurent Pinchart (8):
+>   ARM: shmobile: r8a7790: Add CMT devices to DT
+>   ARM: shmobile: r8a7791: Add CMT devices to DT
+>   ARM: shmobile: r8a7779: Add TMU devices to DT
+>   ARM: shmobile: r7s72100: Add MTU2 device to DT
+>   ARM: shmobile: lager-reference: Enable CMT0 in device tree
+>   ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
+>   ARM: shmobile: marzen-reference: Enable TMU0 in device tree
+>   ARM: shmobile: genmai-reference: Enable MTU2 in device tree
+> 
+>  arch/arm/boot/dts/r7s72100-genmai.dts            |  4 +++
+>  arch/arm/boot/dts/r7s72100.dtsi                  | 10 ++++++
+>  arch/arm/boot/dts/r8a7779-marzen.dts             |  4 +++
+>  arch/arm/boot/dts/r8a7779.dtsi                   | 42 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/r8a7790-lager.dts              |  4 +++
+>  arch/arm/boot/dts/r8a7790.dtsi                   | 32 ++++++++++++++++++
+>  arch/arm/boot/dts/r8a7791-koelsch.dts            |  4 +++
+>  arch/arm/boot/dts/r8a7791.dtsi                   | 32 ++++++++++++++++++
+>  arch/arm/mach-shmobile/board-genmai-reference.c  | 20 -----------
+>  arch/arm/mach-shmobile/board-genmai.c            | 14 +++++++-
+>  arch/arm/mach-shmobile/board-koelsch-reference.c |  2 --
+>  arch/arm/mach-shmobile/board-lager-reference.c   |  2 --
+>  arch/arm/mach-shmobile/board-marzen-reference.c  | 10 ------
+>  arch/arm/mach-shmobile/r7s72100.h                |  1 -
+>  arch/arm/mach-shmobile/r8a7779.h                 |  1 -
+>  arch/arm/mach-shmobile/r8a7790.h                 |  1 -
+>  arch/arm/mach-shmobile/r8a7791.h                 |  1 -
+>  arch/arm/mach-shmobile/setup-r7s72100.c          | 21 ------------
+>  arch/arm/mach-shmobile/setup-r8a7779.c           | 17 +++-------
+>  arch/arm/mach-shmobile/setup-r8a7790.c           |  7 +---
+>  arch/arm/mach-shmobile/setup-r8a7791.c           |  7 +---
+>  21 files changed, 152 insertions(+), 84 deletions(-)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
