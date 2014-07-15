@@ -1,118 +1,285 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 15 Jul 2014 10:55:29 +0200
-Subject: [PATCH v2 6/7] ata: Add support for the Tegra124 SATA controller
-In-Reply-To: <53C4D472.9010507@nvidia.com>
-References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
- <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
- <20140708132216.GA4979@htj.dyndns.org> <53C3DCF0.3030001@redhat.com>
- <53C4D472.9010507@nvidia.com>
-Message-ID: <53C4EC81.1040304@redhat.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Jul 2014 17:58:15 +0900
+Subject: [PATCH v5 8/8] ARM: shmobile: genmai-reference: Enable MTU2 in
+ device tree
+In-Reply-To: <20140715085430.GB17806@verge.net.au>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1404911564-17380-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140710095430.GD2728@katana>
+ <20140715085430.GB17806@verge.net.au>
+Message-ID: <20140715085815.GD17806@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/15/2014 09:12 AM, Mikko Perttunen wrote:
-> Heh, what you are describing is the v1 of this series :)
+On Tue, Jul 15, 2014 at 05:54:32PM +0900, Simon Horman wrote:
+> On Thu, Jul 10, 2014 at 11:54:30AM +0200, Wolfram Sang wrote:
+> > On Wed, Jul 09, 2014 at 03:12:44PM +0200, Laurent Pinchart wrote:
+> > > No more device needs to be added from platform code when booting the
+> > > reference platform, move MTU2 registration from setup-r7s72100.c to
+> > > board-genmai.c and remove the now empty r7s72100_add_dt_devices()
+> > > function.
+> > > 
+> > > As the genmai_add_standard_devices() function is now identical to the
+> > > default init_machine implementation, remove it as well.
+> > > 
+> > > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > Yay, tasty!
+> > 
+> > Reviewed-by: Wolfram Sang <wsa@sang-engineering.com>
 > 
-> However,
+> Hi Laurent,
 > 
-> 17/06/14 Thierry Reding wrote:
->> I would've preferred tegra_powergate_sequence_power_up() to be used
->> consistently in all drivers. I'm still not convinced that using the
->> platform AHCI driver this way is really the best option, since we're
->> bending over backwards to fit into what this driver dictates. There
->> shouldn't be a need for that.
+> I am having some trouble with this patch.
+> In particular the shmobile defconfig with an initrd added
+> (to compensate for the lack of ethernet and thus NFS) does
+> not seem to make it to userspace with this patch applied :(
 > 
-> As you probably noticed, the issue is that on Tegra we want to use tegra_powergate_sequence_power_up to enable the SATA power rail. That function assumes that it gets a disabled clock and returns with the clock enabled. If we use ahci_platform's resource management functions,
-> this is not doable, since it wants to handle clocks by itself.
+> I am dropping it for now, but could you look into it?
 
-Right, note I was not suggesting that you use ahci_platform_enable_resources /
-ahci_platform_disable_resources, that clearly won't work for your case.
-
-As I said "I can see there are good reasons for that though."
-
-> To be honest, I too would prefer handling the resources in the driver. The driver needs other resources than what ahci_platform currently manages (at least reset_controls and multiple regulators, later we might get more) and managing them in the driver allows the driver to do proper error handling and manage all resources consistently and in one place. Also, I don't think it is sensible to add support for loading every possible kind of DT resource to ahci_platform, since most drivers won't need them.
-
-Actually I have considered asking you to add support for reset controllers
-to libahci_platform too, since I see a pattern where more and more
-SOCs are starting to use those. I've refrained from asking that for now,
-but once a second ahci implementation needing those pops up we will likely
-go that route. So you might as well do it now :)
-
-> Other subsystems I've been in don't have this kind of helper library, so diverging here seems weird.
-
-Well the usb uhci-platform and ehci-platform drivers are doing the same,
-what we're trying to do here is avoid needless code duplication and
-if possible (for ehci and uhci it currently is) make it so that adding
-support for a new soc only requires adding dt stuff + a phy driver,
-without touching the ?hci code at all. Again I can see that this
-is not possible for the Tegra124.
-
-> That said, if you feel strongly about this, I can do what you described.
-
-I think you can safe a nice bit of code duplication (and if we ever find
-we have bugs there bug duplication) by switching to
-ahci_platform_get_resources, as described in my original mail.
-
-I can understand if you don't want to use any of the other ahci_platform_*
-functions, that makes total sense.
-
-I would not say this is something you must do, but I have a strong
-preference for you taking a shot at doing this. So can you please give
-this a try, and if it turns out to become ugly, just say so (with
-some explanation), and then you can keep things as is.
-Does that work for you?
-
-Regards,
-
-Hans
-
-
-
-
-
+I have likewise dropped "ARM: shmobile: r7s72100: Add MTU2 device to DT"
+for now.
 
 > 
-> Thanks,
-> Mikko
+> For the record it seems to stop right near the end.
+> A bad boot looks like this:
 > 
-> On 14/07/14 16:36, Hans de Goede wrote:
->> Hi,
->>
->> On 07/08/2014 03:22 PM, Tejun Heo wrote:
->>> (cc'ing Hans)
->>>
->>> Hans, can you please review this patch?
->>
->> Done.
->>
->> Mikko, it looks like you are doing a lot of stuff
->> the DIY way. I can see there are good reasons for
->> that though.
->>
->> Still it would be nice if you could use a little bit
->> more of the helper functions provided by libahci_platform.c
->>
->> Specifically I think it would be better if you used
->> ahci_platform_get_resources, that would remove a lot of
->> duplicate code from the new driver.
->>
->> To be specific I would like to suggest that you
->> raise AHCI_MAX_CLKS to 4, and then specify an order
->> in which the clks must be listed in the devicetree
->> binding. Then you can put that order in an enum
->> and use hpriv->clks[CLK_FOO] in your driver, where
->> CLK_FOO comes from the enum.
->>
->> This way you should be able to use ahci_platform_get_resources
->> and drop doing the iomap of the base registers, all the
->> clk_gets and the phy_get yourself.
->>
->> You could then also use ahci_platform_disable_clks() in
->> tegra_ahci_power_off
->>
->> Regards,
->>
->> Hans
->>
+> Booting Linux on physical CPU 0x0
+> Linux version 3.16.0-rc3-00750-g004c383-dirty (horms at ayumi.isobedori.kobe.vergenet.net) (gcc version 4.6.3 (GCC) ) #463 SMP Tue Jul 15 16:58:01 JST 2014
+> CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=18c5347d
+> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> Machine model: Genmai
+> debug: ignoring loglevel setting.
+> Memory policy: Data cache writeback
+> On node 0 totalpages: 32768
+> free_area_init_node: node 0, pgdat c071f640, node_mem_map c7ef9000
+>   Normal zone: 256 pages used for memmap
+>   Normal zone: 0 pages reserved
+>   Normal zone: 32768 pages, LIFO batch:7
+> CPU: All CPU(s) started in SVC mode.
+> PERCPU: Embedded 5 pages/cpu @c7eea000 s7488 r0 d12992 u32768
+> pcpu-alloc: s7488 r0 d12992 u32768 alloc=8*4096
+> pcpu-alloc: [0] 0 
+> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
+> Kernel command line: console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp
+> PID hash table entries: 512 (order: -1, 2048 bytes)
+> Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+> Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> Memory: 122388K/131072K available (4327K kernel code, 227K rwdata, 1016K rodata, 1691K init, 197K bss, 8684K reserved, 0K highmem)
+> Virtual kernel memory layout:
+>     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+>     fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
+>     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+>     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+>     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+>       .text : 0xc0008000 - 0xc0540fc4   (5348 kB)
+>       .init : 0xc0541000 - 0xc06e7d40   (1692 kB)
+>       .data : 0xc06e8000 - 0xc0720dc0   ( 228 kB)
+>        .bss : 0xc0720dc8 - 0xc07521fc   ( 198 kB)
+> Hierarchical RCU implementation.
+>         RCU restricting CPUs from NR_CPUS=8 to nr_cpu_ids=1.
+> RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+> NR_IRQS:16 nr_irqs:16 16
+> clocksource_of_init: no matching clocksources found
+> sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 21474836480000000ns
+> Console: colour dummy device 80x30
+> Calibrating delay loop (skipped) preset value.. 266.66 BogoMIPS (lpj=1333333)
+> pid_max: default: 32768 minimum: 301
+> Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> CPU: Testing write buffer coherency: ok
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Setting up static identity map for 0x84405f8 - 0x8440650
+> Brought up 1 CPUs
+> SMP: Total of 1 processors activated.
+> CPU: All CPU(s) started in SVC mode.
+> devtmpfs: initialized
+> VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 4
+> pinctrl core: initialized pinctrl subsystem
+> regulator-dummy: no parameters
+> NET: Registered protocol family 16
+> DMA: preallocated 256 KiB pool for atomic coherent allocations
+> No ATAGs?
+> hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
+> hw-breakpoint: maximum watchpoint size is 4 bytes.
+> vgaarb: loaded
+> SCSI subsystem initialized
+> libata version 3.00 loaded.
+> usbcore: registered new interface driver usbfs
+> usbcore: registered new interface driver hub
+> usbcore: registered new device driver usb
+> media: Linux media interface: v0.10
+> Linux video capture interface: v2.00
+> sh_mtu2 fcff0000.timer: ch0: used for clock events
+> sh_mtu2 fcff0000.timer: ch0: used for periodic clock events
+> Advanced Linux Sound Architecture Driver Initialized.
+> NET: Registered protocol family 2
+> TCP established hash table entries: 1024 (order: 0, 4096 bytes)
+> TCP bind hash table entries: 1024 (order: 1, 8192 bytes)
+> TCP: Hash tables configured (established 1024 bind 1024)
+> TCP: reno registered
+> UDP hash table entries: 256 (order: 1, 8192 bytes)
+> UDP-Lite hash table entries: 256 (order: 1, 8192 bytes)
+> NET: Registered protocol family 1
+> RPC: Registered named UNIX socket transport module.
+> RPC: Registered udp transport module.
+> RPC: Registered tcp transport module.
+> RPC: Registered tcp NFSv4.1 backchannel transport module.
+> PCI: CLS 0 bytes, default 64
+> futex hash table entries: 256 (order: 2, 16384 bytes)
+> NFS: Registering the id_resolver key type
+> Key type id_resolver registered
+> Key type id_legacy registered
+> nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+> msgmni has been set to 239
+> Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+> io scheduler noop registered
+> io scheduler deadline registered
+> io scheduler cfq registered (default)
+> Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+> SuperH (H)SCI(F) driver initialized
+> e8008000.serial: ttySC2 at MMIO 0xe8008000 (irq = 231, base_baud = 0) is a scif
+> console [ttySC2] enabled
+> [drm] Initialized drm 1.1.0 20060810
+> renesas_spi e800e800.spi: probed
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> ehci-pci: EHCI PCI platform driver
+> ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> ohci-pci: OHCI PCI platform driver
+> mousedev: PS/2 mouse device common for all mice
+> usbcore: registered new interface driver usbhid
+> usbhid: USB HID core driver
+> TCP: cubic registered
+> NET: Registered protocol family 10
+> sit: IPv6 over IPv4 tunneling driver
+> NET: Registered protocol family 17
+> Key type dns_resolver registered
+> drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
+> 
+> 
+> And a good one looks like this:
+> 
+> 
+> Booting Linux on physical CPU 0x0
+> Linux version 3.16.0-rc3-00751-gd14f001 (horms at ayumi.isobedori.kobe.vergenet.net) (gcc version 4.6.3 (GCC) ) #461 SMP Tue Jul 15 16:48:13 JST 2014
+> CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=18c5347d
+> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> Machine model: Genmai
+> debug: ignoring loglevel setting.
+> Memory policy: Data cache writeback
+> On node 0 totalpages: 32768
+> free_area_init_node: node 0, pgdat c071f640, node_mem_map c7ef9000
+>   Normal zone: 256 pages used for memmap
+>   Normal zone: 0 pages reserved
+>   Normal zone: 32768 pages, LIFO batch:7
+> CPU: All CPU(s) started in SVC mode.
+> PERCPU: Embedded 5 pages/cpu @c7eea000 s7488 r0 d12992 u32768
+> pcpu-alloc: s7488 r0 d12992 u32768 alloc=8*4096
+> pcpu-alloc: [0] 0 
+> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 32512
+> Kernel command line: console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp
+> PID hash table entries: 512 (order: -1, 2048 bytes)
+> Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+> Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> Memory: 122388K/131072K available (4327K kernel code, 227K rwdata, 1016K rodata, 1691K init, 197K bss, 8684K reserved, 0K highmem)
+> Virtual kernel memory layout:
+>     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+>     fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
+>     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+>     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+>     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+>       .text : 0xc0008000 - 0xc0540fc4   (5348 kB)
+>       .init : 0xc0541000 - 0xc06e7d40   (1692 kB)
+>       .data : 0xc06e8000 - 0xc0720dc0   ( 228 kB)
+>        .bss : 0xc0720dc8 - 0xc07521fc   ( 198 kB)
+> Hierarchical RCU implementation.
+>         RCU restricting CPUs from NR_CPUS=8 to nr_cpu_ids=1.
+> RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+> NR_IRQS:16 nr_irqs:16 16
+> clocksource_of_init: no matching clocksources found
+> sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 21474836480000000ns
+> Console: colour dummy device 80x30
+> Calibrating delay loop (skipped) preset value.. 266.66 BogoMIPS (lpj=1333333)
+> pid_max: default: 32768 minimum: 301
+> Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+> CPU: Testing write buffer coherency: ok
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Setting up static identity map for 0x84405f8 - 0x8440650
+> Brought up 1 CPUs
+> SMP: Total of 1 processors activated.
+> CPU: All CPU(s) started in SVC mode.
+> devtmpfs: initialized
+> VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 4
+> pinctrl core: initialized pinctrl subsystem
+> regulator-dummy: no parameters
+> NET: Registered protocol family 16
+> DMA: preallocated 256 KiB pool for atomic coherent allocations
+> No ATAGs?
+> hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
+> hw-breakpoint: maximum watchpoint size is 4 bytes.
+> vgaarb: loaded
+> SCSI subsystem initialized
+> libata version 3.00 loaded.
+> usbcore: registered new interface driver usbfs
+> usbcore: registered new interface driver hub
+> usbcore: registered new device driver usb
+> media: Linux media interface: v0.10
+> Linux video capture interface: v2.00
+> sh_mtu2 sh-mtu2: ch0: used for clock events
+> sh_mtu2 sh-mtu2: ch0: used for periodic clock events
+> Advanced Linux Sound Architecture Driver Initialized.
+> NET: Registered protocol family 2
+> TCP established hash table entries: 1024 (order: 0, 4096 bytes)
+> TCP bind hash table entries: 1024 (order: 1, 8192 bytes)
+> TCP: Hash tables configured (established 1024 bind 1024)
+> TCP: reno registered
+> UDP hash table entries: 256 (order: 1, 8192 bytes)
+> UDP-Lite hash table entries: 256 (order: 1, 8192 bytes)
+> NET: Registered protocol family 1
+> RPC: Registered named UNIX socket transport module.
+> RPC: Registered udp transport module.
+> RPC: Registered tcp transport module.
+> RPC: Registered tcp NFSv4.1 backchannel transport module.
+> PCI: CLS 0 bytes, default 64
+> futex hash table entries: 256 (order: 2, 16384 bytes)
+> NFS: Registering the id_resolver key type
+> Key type id_resolver registered
+> Key type id_legacy registered
+> nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+> msgmni has been set to 239
+> Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+> io scheduler noop registered
+> io scheduler deadline registered
+> io scheduler cfq registered (default)
+> Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+> SuperH (H)SCI(F) driver initialized
+> e8008000.serial: ttySC2 at MMIO 0xe8008000 (irq = 231, base_baud = 0) is a scif
+> console [ttySC2] enabled
+> [drm] Initialized drm 1.1.0 20060810
+> renesas_spi e800e800.spi: probed
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> ehci-pci: EHCI PCI platform driver
+> ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> ohci-pci: OHCI PCI platform driver
+> mousedev: PS/2 mouse device common for all mice
+> usbcore: registered new interface driver usbhid
+> usbhid: USB HID core driver
+> TCP: cubic registered
+> NET: Registered protocol family 10
+> sit: IPv6 over IPv4 tunneling driver
+> NET: Registered protocol family 17
+> Key type dns_resolver registered
+> drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
+> ALSA device list:
+>   No soundcards found.
+> Freeing unused kernel memory: 1688K (c0541000 - c06e7000)
+> 
+> 
+> boot (Linux 3.16.0-rc3-00751-gd14f001, BusyBox v1.16.0.git, kexec-tools 2.0.1-git)
+> / # 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
