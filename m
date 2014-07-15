@@ -1,35 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Jul 2014 23:52:52 +0100
-Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
- clocksource
-In-Reply-To: <53C58DCB.90502@nvidia.com>
-References: <1405028569-14253-2-git-send-email-ttynkkynen@nvidia.com>
- <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
- <53C01558.3090607@nvidia.com>
- <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
- <53C01D17.2050906@nvidia.com> <20140714083854.GO2081@ulmo>
- <20140714091233.GC6800@sirena.org.uk> <20140714092434.GA9755@ulmo>
- <20140714102203.GD6800@sirena.org.uk> <53C58DCB.90502@nvidia.com>
-Message-ID: <20140715225252.GD17528@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Jul 2014 00:58 +0200
+Subject: [PATCH 0/6] ARM: rockchip: add initial support for rk3288
+Message-ID: <1471578.ILeMmG2DL6@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 11:23:39PM +0300, Tuomas Tynkkynen wrote:
+This series adds the initial support for Rockchip rk3288 socs including
+debug uart and devicetree files for the rk3288 evaluation board and
+enables these boards to boot into an initramfs.
 
-> That sounds indeed useful for this case. How'd the following interface
-> sound for the register offset / selector-to-register-value conversion?
-> The I2C address would be a bit trickier to get as it would touch the
-> regmap stuff as well, but perhaps it would be a good idea to have a
-> phandle to the I2C device itself, and then parse the reg field for
-> the address.
+The series depends on an updated bootloader, which must start the timer
+supplying the architected timer, which we will hopefully get in the next
+days. It also depends on the patch
+    "irqchip: gic: Add binding probe for ARM GIC400"
+which will hopefully make it into the irqchip tree shortly.
 
-This looks fine, can you submit properly please?  For the I2C address
-why not just have an interface to get the regmap and then provide a way
-to get the underlying device back from the regmap?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/c8ef49e4/attachment.sig>
+
+Heiko Stuebner (6):
+  dt-bindings: arm: add arm,cortex-a12 cpu compatible property
+  ARM: rockchip: add debug uart used by rk3288
+  ARM: Kconfig: set default gpio number for rockchip SoCs
+  ARM: rockchip: enable support for RK3288 SoCs
+  ARM: dts: rockchip: add core rk3288 dtsi
+  ARM: dts: add rk3288 evaluation board
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   1 +
+ arch/arm/Kconfig                               |   1 +
+ arch/arm/Kconfig.debug                         |  12 +-
+ arch/arm/boot/dts/rk3288-evb-act8846.dts       | 136 ++++++
+ arch/arm/boot/dts/rk3288-evb-rk808.dts         |  19 +
+ arch/arm/boot/dts/rk3288-evb.dtsi              |  77 ++++
+ arch/arm/boot/dts/rk3288.dtsi                  | 561 +++++++++++++++++++++++++
+ arch/arm/mach-rockchip/Kconfig                 |   1 +
+ arch/arm/mach-rockchip/rockchip.c              |   1 +
+ 9 files changed, 808 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-evb-act8846.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-evb-rk808.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-evb.dtsi
+ create mode 100644 arch/arm/boot/dts/rk3288.dtsi
+
+-- 
+1.9.0
