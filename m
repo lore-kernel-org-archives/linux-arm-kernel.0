@@ -1,88 +1,293 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 15 Jul 2014 16:38:20 -0700
-Subject: [PATCH v1] clk: qcom: Add APQ8084 Multimedia Clock Controller
- (MMCC) support
-In-Reply-To: <53C04ED9.6030508@codeaurora.org>
-References: <1402591302-12100-1-git-send-email-gdjakov@mm-sol.com>
- <53C04ED9.6030508@codeaurora.org>
-Message-ID: <53C5BB6C.3090006@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Jul 2014 08:52:13 +0900
+Subject: [PATCH 17/19] gpio: samsung: Remove legacy support of S5PV210
+In-Reply-To: <1404496099-26708-18-git-send-email-t.figa@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-18-git-send-email-t.figa@samsung.com>
+Message-ID: <53C5BEAD.7080605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/14 13:53, Stephen Boyd wrote:
-> On 06/12/14 09:41, Georgi Djakov wrote:
->> Add support for the multimedia clock controller found on the APQ8084
->> based platforms. This will allow the multimedia device drivers to
->> control their clocks.
->>
->> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
->> ---
-> I started picking up the qcom clock patches from the list. I see that
-> this one has a small problem though:
+On 07/05/14 02:48, Tomasz Figa wrote:
+> GPIO support of S5PV210 SoC is now fully handled by pinctrl-samsung
+> driver making the old code in gpio-samsung driver unused. This patch
+> removes it which will also let us remove more code from arch subtree.
 >
-> drivers/clk/qcom/mmcc-apq8084.c:169:10: warning: Initializer entry
-> defined twice
-> drivers/clk/qcom/mmcc-apq8084.c:170:10:   also defined here
-> drivers/clk/qcom/mmcc-apq8084.c:185:10: warning: Initializer entry
-> defined twice
-> drivers/clk/qcom/mmcc-apq8084.c:187:10:   also defined here
-> drivers/clk/qcom/mmcc-apq8084.c:203:10: warning: Initializer entry
-> defined twice
-> drivers/clk/qcom/mmcc-apq8084.c:205:10:   also defined here
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> Cc: Linus Walleij<linus.walleij@linaro.org>
+
+Hi Linus,
+
+I've applied this in samsung tree for 3.17 if you have any comments, 
+please kindly let me know.
+
+Thanks,
+Kukjin
+
+> Cc: Alexandre Courbot<gnurou@gmail.com>
+> Cc: linux-gpio at vger.kernel.org
+> ---
+>   drivers/gpio/gpio-samsung.c | 240 --------------------------------------------
+>   1 file changed, 240 deletions(-)
 >
-
-Ok I've squashed in this fix:
-
-diff --git a/drivers/clk/qcom/mmcc-apq8084.c b/drivers/clk/qcom/mmcc-apq8084.c
-index 9cc956a5e9c9..751eea376a2b 100644
---- a/drivers/clk/qcom/mmcc-apq8084.c
-+++ b/drivers/clk/qcom/mmcc-apq8084.c
-@@ -34,12 +34,12 @@
- #define P_HDMIPLL      2
- #define P_GPLL0                3
- #define P_EDPVCO       3
--#define P_MMPLL4       3
--#define P_GPLL1                4
-+#define P_MMPLL4       4
- #define P_DSI0PLL      4
- #define P_DSI0PLL_BYTE 4
- #define P_MMPLL2       4
- #define P_MMPLL3       4
-+#define P_GPLL1                5
- #define P_DSI1PLL      5
- #define P_DSI1PLL_BYTE 5
- #define P_MMSLEEP      6
-@@ -166,8 +166,8 @@ static const u8 mmcc_xo_mmpll0_1_4_gpll0_map[] = {
-        [P_XO]          = 0,
-        [P_MMPLL0]      = 1,
-        [P_MMPLL1]      = 2,
--       [P_MMPLL4]      = 3,
-        [P_GPLL0]       = 5,
-+       [P_MMPLL4]      = 3,
- };
- 
- static const char *mmcc_xo_mmpll0_1_4_gpll0[] = {
-@@ -183,8 +183,8 @@ static const u8 mmcc_xo_mmpll0_1_4_gpll1_0_map[] = {
-        [P_MMPLL0]      = 1,
-        [P_MMPLL1]      = 2,
-        [P_MMPLL4]      = 3,
--       [P_GPLL1]       = 4,
-        [P_GPLL0]       = 5,
-+       [P_GPLL1]       = 4,
- };
- 
- static const char *mmcc_xo_mmpll0_1_4_gpll1_0[] = {
-@@ -201,8 +201,8 @@ static const u8 mmcc_xo_mmpll0_1_4_gpll1_0_sleep_map[] = {
-        [P_MMPLL0]      = 1,
-        [P_MMPLL1]      = 2,
-        [P_MMPLL4]      = 3,
--       [P_GPLL1]       = 4,
-        [P_GPLL0]       = 5,
-+       [P_GPLL1]       = 4,
-        [P_MMSLEEP]     = 6,
- };
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+> index 7d4281e..27298fd 100644
+> --- a/drivers/gpio/gpio-samsung.c
+> +++ b/drivers/gpio/gpio-samsung.c
+> @@ -1169,234 +1169,9 @@ static struct samsung_gpio_chip s3c64xx_gpios_2bit[] = {
+>   #endif
+>   };
+>
+> -/*
+> - * Followings are the gpio banks in S5PV210/S5PC110
+> - *
+> - * The 'config' member when left to NULL, is initialized to the default
+> - * structure samsung_gpio_cfgs[3] in the init function below.
+> - *
+> - * The 'base' member is also initialized in the init function below.
+> - * Note: The initialization of 'base' member of samsung_gpio_chip structure
+> - * uses the above macro and depends on the banks being listed in order here.
+> - */
+> -
+> -static struct samsung_gpio_chip s5pv210_gpios_4bit[] = {
+> -#ifdef CONFIG_CPU_S5PV210
+> -	{
+> -		.chip	= {
+> -			.base	= S5PV210_GPA0(0),
+> -			.ngpio	= S5PV210_GPIO_A0_NR,
+> -			.label	= "GPA0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPA1(0),
+> -			.ngpio	= S5PV210_GPIO_A1_NR,
+> -			.label	= "GPA1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPB(0),
+> -			.ngpio	= S5PV210_GPIO_B_NR,
+> -			.label	= "GPB",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPC0(0),
+> -			.ngpio	= S5PV210_GPIO_C0_NR,
+> -			.label	= "GPC0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPC1(0),
+> -			.ngpio	= S5PV210_GPIO_C1_NR,
+> -			.label	= "GPC1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPD0(0),
+> -			.ngpio	= S5PV210_GPIO_D0_NR,
+> -			.label	= "GPD0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPD1(0),
+> -			.ngpio	= S5PV210_GPIO_D1_NR,
+> -			.label	= "GPD1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPE0(0),
+> -			.ngpio	= S5PV210_GPIO_E0_NR,
+> -			.label	= "GPE0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPE1(0),
+> -			.ngpio	= S5PV210_GPIO_E1_NR,
+> -			.label	= "GPE1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPF0(0),
+> -			.ngpio	= S5PV210_GPIO_F0_NR,
+> -			.label	= "GPF0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPF1(0),
+> -			.ngpio	= S5PV210_GPIO_F1_NR,
+> -			.label	= "GPF1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPF2(0),
+> -			.ngpio	= S5PV210_GPIO_F2_NR,
+> -			.label	= "GPF2",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPF3(0),
+> -			.ngpio	= S5PV210_GPIO_F3_NR,
+> -			.label	= "GPF3",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPG0(0),
+> -			.ngpio	= S5PV210_GPIO_G0_NR,
+> -			.label	= "GPG0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPG1(0),
+> -			.ngpio	= S5PV210_GPIO_G1_NR,
+> -			.label	= "GPG1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPG2(0),
+> -			.ngpio	= S5PV210_GPIO_G2_NR,
+> -			.label	= "GPG2",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPG3(0),
+> -			.ngpio	= S5PV210_GPIO_G3_NR,
+> -			.label	= "GPG3",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPI(0),
+> -			.ngpio	= S5PV210_GPIO_I_NR,
+> -			.label	= "GPI",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPJ0(0),
+> -			.ngpio	= S5PV210_GPIO_J0_NR,
+> -			.label	= "GPJ0",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPJ1(0),
+> -			.ngpio	= S5PV210_GPIO_J1_NR,
+> -			.label	= "GPJ1",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPJ2(0),
+> -			.ngpio	= S5PV210_GPIO_J2_NR,
+> -			.label	= "GPJ2",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPJ3(0),
+> -			.ngpio	= S5PV210_GPIO_J3_NR,
+> -			.label	= "GPJ3",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_GPJ4(0),
+> -			.ngpio	= S5PV210_GPIO_J4_NR,
+> -			.label	= "GPJ4",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_MP01(0),
+> -			.ngpio	= S5PV210_GPIO_MP01_NR,
+> -			.label	= "MP01",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_MP02(0),
+> -			.ngpio	= S5PV210_GPIO_MP02_NR,
+> -			.label	= "MP02",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_MP03(0),
+> -			.ngpio	= S5PV210_GPIO_MP03_NR,
+> -			.label	= "MP03",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_MP04(0),
+> -			.ngpio	= S5PV210_GPIO_MP04_NR,
+> -			.label	= "MP04",
+> -		},
+> -	}, {
+> -		.chip	= {
+> -			.base	= S5PV210_MP05(0),
+> -			.ngpio	= S5PV210_GPIO_MP05_NR,
+> -			.label	= "MP05",
+> -		},
+> -	}, {
+> -		.base	= (S5P_VA_GPIO + 0xC00),
+> -		.irq_base = IRQ_EINT(0),
+> -		.chip	= {
+> -			.base	= S5PV210_GPH0(0),
+> -			.ngpio	= S5PV210_GPIO_H0_NR,
+> -			.label	= "GPH0",
+> -			.to_irq = samsung_gpiolib_to_irq,
+> -		},
+> -	}, {
+> -		.base	= (S5P_VA_GPIO + 0xC20),
+> -		.irq_base = IRQ_EINT(8),
+> -		.chip	= {
+> -			.base	= S5PV210_GPH1(0),
+> -			.ngpio	= S5PV210_GPIO_H1_NR,
+> -			.label	= "GPH1",
+> -			.to_irq = samsung_gpiolib_to_irq,
+> -		},
+> -	}, {
+> -		.base	= (S5P_VA_GPIO + 0xC40),
+> -		.irq_base = IRQ_EINT(16),
+> -		.chip	= {
+> -			.base	= S5PV210_GPH2(0),
+> -			.ngpio	= S5PV210_GPIO_H2_NR,
+> -			.label	= "GPH2",
+> -			.to_irq = samsung_gpiolib_to_irq,
+> -		},
+> -	}, {
+> -		.base	= (S5P_VA_GPIO + 0xC60),
+> -		.irq_base = IRQ_EINT(24),
+> -		.chip	= {
+> -			.base	= S5PV210_GPH3(0),
+> -			.ngpio	= S5PV210_GPIO_H3_NR,
+> -			.label	= "GPH3",
+> -			.to_irq = samsung_gpiolib_to_irq,
+> -		},
+> -	},
+> -#endif
+> -};
+> -
+>   /* TODO: cleanup soc_is_* */
+>   static __init int samsung_gpiolib_init(void)
+>   {
+> -	struct samsung_gpio_chip *chip;
+> -	int i, nr_chips;
+> -	int group = 0;
+> -
+>   	/*
+>   	 * Currently there are two drivers that can provide GPIO support for
+>   	 * Samsung SoCs. For device tree enabled platforms, the new
+> @@ -1420,21 +1195,6 @@ static __init int samsung_gpiolib_init(void)
+>   				S3C64XX_VA_GPIO);
+>   		samsung_gpiolib_add_4bit2_chips(s3c64xx_gpios_4bit2,
+>   				ARRAY_SIZE(s3c64xx_gpios_4bit2));
+> -	} else if (soc_is_s5pv210()) {
+> -		group = 0;
+> -		chip = s5pv210_gpios_4bit;
+> -		nr_chips = ARRAY_SIZE(s5pv210_gpios_4bit);
+> -
+> -		for (i = 0; i<  nr_chips; i++, chip++) {
+> -			if (!chip->config) {
+> -				chip->config =&samsung_gpio_cfgs[3];
+> -				chip->group = group++;
+> -			}
+> -		}
+> -		samsung_gpiolib_add_4bit_chips(s5pv210_gpios_4bit, nr_chips, S5P_VA_GPIO);
+> -#if defined(CONFIG_CPU_S5PV210)&&  defined(CONFIG_S5P_GPIO_INT)
+> -		s5p_register_gpioint_bank(IRQ_GPIOINT, 0, S5P_GPIOINT_GROUP_MAXNR);
+> -#endif
+>   	} else {
+>   		WARN(1, "Unknown SoC in gpio-samsung, no GPIOs added\n");
+>   		return -ENODEV;
