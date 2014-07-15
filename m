@@ -1,50 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Jul 2014 08:55:15 +0200
-Subject: [PATCH v4 3/6] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
-In-Reply-To: <20140710093707.GC11948@lee--X1>
-References: <1404892479-12222-1-git-send-email-wens@csie.org>
- <1404892479-12222-4-git-send-email-wens@csie.org>
- <20140710093707.GC11948@lee--X1>
-Message-ID: <20140715065515.GE3745@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Jul 2014 23:59:28 -0700
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <53C4A8F5.2000302@ti.com>
+References: <53BD0C43.1090002@ti.com> <20140709100914.GL28884@atomide.com>
+ <53BD1AF8.2060609@ti.com> <20140709105055.GP28884@atomide.com>
+ <53BD1FC3.6050500@ti.com> <20140709110051.GQ28884@atomide.com>
+ <53BD2249.2080808@ti.com> <53C3ED02.7020206@ti.com>
+ <20140714162324.GF20068@atomide.com> <53C4A8F5.2000302@ti.com>
+Message-ID: <20140715065928.GK20068@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Thu, Jul 10, 2014 at 10:37:07AM +0100, Lee Jones wrote:
-> On Wed, 09 Jul 2014, Chen-Yu Tsai wrote:
-> 
-> > The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
-> > The differences are the AR100 clock can no longer be modified,
-> > the APB0 clock has different divisors, and some clock gates are
-> > gone.
+* Lokesh Vutla <lokeshvutla@ti.com> [140714 21:09]:
+> On Monday 14 July 2014 09:53 PM, Tony Lindgren wrote:
+> > * Lokesh Vutla <lokeshvutla@ti.com> [140714 07:47]:
+> >>
+> >> In my experiments I observed that when RTC regulator is switched
+> >> off and switched on, there is an abort while accessing RTC registers.
 > > 
-> > This patch adds a compatible with a modified subdevice list for
-> > the A23.
+> > Right, then you know you have the right regulator :)
+>
+> Once we switch it off it is expected, but then if it is *switched on*
+> it is expected that we should be able to access registers. Here there
+> is an abort accessing these registers. 
+
+Most likely you need to also reconfigure the registers or
+re-enable the clock or reset it at the interconnect too.
+
+> >> After discussing with hardware team, it is confirmed that this
+> >> LDO9 regulator powering RTC cannot be turned off when
+> >> SoC is active and expected to be always on.
 > > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
-> >  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
-> >  2 files changed, 31 insertions(+), 1 deletion(-)
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> > Hmm but sounds like you already proved it can be idled? So
+> > the regulator really should be managed by the driver?
+>
+> Actually I adapted the driver to support a power regulator.
+> Then I observed that if rtc is loaded as  a module there is
+> an abort(  which is happening because the regulator is disabled
+> once and re-enabled). So when we checked with the hardware team,
+> they confirmed that ldo9 should not be disabled. 
 
-We don't have any dependency on this driver, so it would be simpler if
-you could just take it through your tree I guess.
+Hmm so how is it enabled initially then?
 
-Thanks!
-Maxime
+To me it sounds like very standard stuff to reinitialize
+a driver for any omap device when waking from suspend or
+returning from off-idle. If the RTC device cannot be reset,
+idled and re-initialized properly, there's something wrong
+with the RTC driver, clocks, regulators, or hwmod data for
+that device.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/83aeb343/attachment.sig>
+Regards,
+
+Tony
