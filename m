@@ -1,37 +1,99 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 15 Jul 2014 11:53:41 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <20140715093234.GA8700@e103034-lin>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
- <20140711161344.GD26542@e103034-lin>
- <CAKfTPtDeTnPVM5nFR19eWRQZMtAZ3B2dB36q4qGNH=URgfLfHw@mail.gmail.com>
- <20140715093234.GA8700@e103034-lin>
-Message-ID: <CAKfTPtB0K43THAEqaGhdXHcT5d4vLp_DRzi+c7Oiq3XjZQRySA@mail.gmail.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 15 Jul 2014 13:51:23 +0400
+Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan when
+ touching unaccessible memory
+In-Reply-To: <20140715081852.GL11317@js1304-P5Q-DELUXE>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
+ <20140715060405.GI11317@js1304-P5Q-DELUXE> <53C4DA54.3010502@samsung.com>
+ <20140715081852.GL11317@js1304-P5Q-DELUXE>
+Message-ID: <53C4F99B.5010007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 July 2014 11:32, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Tue, Jul 15, 2014 at 10:27:19AM +0100, Vincent Guittot wrote:
->> On 11 July 2014 18:13, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+On 07/15/14 12:18, Joonsoo Kim wrote:
+> On Tue, Jul 15, 2014 at 11:37:56AM +0400, Andrey Ryabinin wrote:
+>> On 07/15/14 10:04, Joonsoo Kim wrote:
+>>> On Wed, Jul 09, 2014 at 03:30:08PM +0400, Andrey Ryabinin wrote:
+>>>> Some code in slub could validly touch memory marked by kasan as unaccessible.
+>>>> Even though slub.c doesn't instrumented, functions called in it are instrumented,
+>>>> so to avoid false positive reports such places are protected by
+>>>> kasan_disable_local()/kasan_enable_local() calls.
+>>>>
+>>>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+>>>> ---
+>>>>  mm/slub.c | 21 +++++++++++++++++++--
+>>>>  1 file changed, 19 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/mm/slub.c b/mm/slub.c
+>>>> index 6ddedf9..c8dbea7 100644
+>>>> --- a/mm/slub.c
+>>>> +++ b/mm/slub.c
+>>>> @@ -560,8 +560,10 @@ static void print_tracking(struct kmem_cache *s, void *object)
+>>>>  	if (!(s->flags & SLAB_STORE_USER))
+>>>>  		return;
+>>>>  
+>>>> +	kasan_disable_local();
+>>>>  	print_track("Allocated", get_track(s, object, TRACK_ALLOC));
+>>>>  	print_track("Freed", get_track(s, object, TRACK_FREE));
+>>>> +	kasan_enable_local();
+>>>
+>>> I don't think that this is needed since print_track() doesn't call
+>>> external function with object pointer. print_track() call pr_err(), but,
+>>> before calling, it retrieve t->addrs[i] so memory access only occurs
+>>> in slub.c.
+>>>
+>> Agree.
 >>
->> [snip]
+>>>>  }
+>>>>  
+>>>>  static void print_page_info(struct page *page)
+>>>> @@ -604,6 +606,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+>>>>  	unsigned int off;	/* Offset of last byte */
+>>>>  	u8 *addr = page_address(page);
+>>>>  
+>>>> +	kasan_disable_local();
+>>>> +
+>>>>  	print_tracking(s, p);
+>>>>  
+>>>>  	print_page_info(page);
+>>>> @@ -632,6 +636,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+>>>>  		/* Beginning of the filler is the free pointer */
+>>>>  		print_section("Padding ", p + off, s->size - off);
+>>>>  
+>>>> +	kasan_enable_local();
+>>>> +
+>>>>  	dump_stack();
+>>>>  }
+>>>
+>>> And, I recommend that you put this hook on right place.
+>>> At a glance, the problematic function is print_section() which have
+>>> external function call, print_hex_dump(), with object pointer.
+>>> If you disable kasan in print_section, all the below thing won't be
+>>> needed, I guess.
+>>>
 >>
->> >
->> > In this example using rq->avg leads to imbalance whereas unweighted load
->> > would not. Correct me if I missed anything.
+>> Nope, at least memchr_inv() call in slab_pad_check will be a problem.
 >>
->> You just miss to take into account how the imbalance is computed
->
-> I don't think so. I'm aware that the imbalance is calculated based on
-> the runnable_load_avg of the cpus. But if you pick the wrong cpus to
-> compare to begin with, it doesn't matter.
+>> I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
+>> If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
+>> for kasan.
+> 
+> I don't agree with this.
+> 
+> If someone is going to add a slab_pad_check() in other places in
+> slub.c, we should disable/enable kasan there, too. This looks same
+> maintenance problem to me. Putting disable/enable only where we
+> strictly need at least ensures that we don't need to care when using
+> slub internal functions.
+> 
+> And, if memchr_inv() is problem, I think that you also need to add hook
+> into validate_slab_cache().
+> 
+> validate_slab_cache() -> validate_slab_slab() -> validate_slab() ->
+> check_object() -> check_bytes_and_report() -> memchr_inv()
+> 
+> Thanks.
+> 
 
-The average load of your sched_domain is 1 task per CPU so CPU1 will
-pull only 1 task and not 2
-
->
-> Morten
+Ok, you convinced me. I'll do it.
