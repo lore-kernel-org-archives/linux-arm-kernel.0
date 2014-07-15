@@ -1,41 +1,46 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 15 Jul 2014 11:27:19 +0200
-Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
- CONFIG_FAIR_GROUP_SCHED"
-In-Reply-To: <20140711161344.GD26542@e103034-lin>
-References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
- <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
- <20140710131646.GB3935@laptop>
- <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
- <20140711161344.GD26542@e103034-lin>
-Message-ID: <CAKfTPtDeTnPVM5nFR19eWRQZMtAZ3B2dB36q4qGNH=URgfLfHw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Jul 2014 11:31:49 +0200
+Subject: [PATCH v2 6/7] ata: Add support for the Tegra124 SATA controller
+In-Reply-To: <53C4EC81.1040304@redhat.com>
+References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
+ <1403101406-15439-7-git-send-email-mperttunen@nvidia.com>
+ <20140708132216.GA4979@htj.dyndns.org>
+ <53C3DCF0.3030001@redhat.com> <53C4D472.9010507@nvidia.com>
+ <53C4EC81.1040304@redhat.com>
+Message-ID: <20140715093148.GA13878@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2014 18:13, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+On Tue, Jul 15, 2014 at 10:55:29AM +0200, Hans de Goede wrote:
+> On 07/15/2014 09:12 AM, Mikko Perttunen wrote:
+[...]
+> > Other subsystems I've been in don't have this kind of helper
+> > library, so diverging here seems weird.
+> 
+> Well the usb uhci-platform and ehci-platform drivers are doing the same,
+> what we're trying to do here is avoid needless code duplication and
+> if possible (for ehci and uhci it currently is) make it so that adding
+> support for a new soc only requires adding dt stuff + a phy driver,
+> without touching the ?hci code at all. Again I can see that this
+> is not possible for the Tegra124.
 
-[snip]
+I don't think helper libraries are good at managing resources. They are
+very good for extracting common /functionality/ so that it doesn't have
+to be duplicated. That's where the commonalities really are. Resource
+allocation and setup are usually where the differences are. Trying to
+extract that into common helpers often results in clumsy code.
 
->
-> In this example using rq->avg leads to imbalance whereas unweighted load
-> would not. Correct me if I missed anything.
+Also, since resources and setup sequences are often very different, the
+chances are that adding support for a new SoC will always require
+extending the helpers to cope with that new type of resource that the
+new SoC now requires, or bumping the maximum number of resources of an
+existing type.
 
-You just miss to take into account how the imbalance is computed
-
->
-> Coming back to the previous example. I'm not convinced that inflation of
-> the unweighted load sum when tasks overlap in time is a bad thing. I
-> have mentioned this before. The average cpu utilization over the 40ms
-> period is 50%. However the true compute capacity demand is 200% for the
-> first 15ms of the period, 100% for the next 5ms and 0% for the remaining
-> 25ms. The cpu is actually overloaded for 15ms every 40ms. This fact is
-> factored into the unweighted load whereas rq->avg would give you the
-> same utilization no matter if the tasks are overlapped or not. Hence
-> unweighted load would give us an indication that the mix of tasks isn't
-> optimal even if the cpu has spare cycles.
->
-> If you don't care about overlap and latency, the unweighted sum of task
-> running time (that Peter has proposed a number of times) is better
-> metric, IMHO. As long the cpu isn't fully utilized.
->
-> Morten
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/1f255e55/attachment.sig>
