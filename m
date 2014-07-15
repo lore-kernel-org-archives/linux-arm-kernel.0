@@ -1,40 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Jul 2014 09:19:58 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <20140714183624.GV6800@sirena.org.uk>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
-Message-ID: <4657735.1VKsbQGuH6@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Jul 2014 00:18:59 -0700
+Subject: [RESEND PATCH 0/8] arm: dts: dra7: Add PCIe data and PCIe PHY data
+In-Reply-To: <1405334543-25509-1-git-send-email-kishon@ti.com>
+References: <1405334543-25509-1-git-send-email-kishon@ti.com>
+Message-ID: <20140715071859.GL20068@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 July 2014 19:36:24 Mark Brown wrote:
-> On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
-> > On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
+* Kishon Vijay Abraham I <kishon@ti.com> [140714 03:44]:
+> [1] is split into separate series in order for individual subsystem
+> Maintainers to pick up the patches. This series handles the PCIe
+> dt data for DRA7.
 > 
-> > > Yes. But now that you say it the gpiod_direction_output() call is missing 
-> > > from this patch.
+> This series has better commit logs than the previous one modified as
+> suggested by Tero.
 > 
-> > I'm lost now. The GPIO_ACTIVE_HIGH I added comes from Documentation/gpio/board.txt
-> > and as Linus Walleij explained to me the other day, the lookup is supposed
-> > to replace devm_gpio_request_one(), which in turn replaced both the
-> > gpio_request and the gpio_direction_output(). Do I need to put the
-> > gpiod_direction_output() back or is there another interface for that when
-> > registering the board gpios?
+> [1] -> https://lkml.org/lkml/2014/5/29/258
 > 
-> Indeed.  If you *do* need an explicit _output() then that sounds to me
-> like we either need a gpiod_get_one() or an extension to the table,
-> looking at the code it seems like this is indeed the case.  We can set
-> if the GPIO is active high/low, or open source/drain but there's no flag
-> for the initial state.
+> Keerthy (2):
+>   ARM: dts: dra7xx-clocks: Add divider table to optfclk_pciephy_div
+>     clock
+>   ARM: dts: dra7xx-clocks: Change the parent of apll_pcie_in_clk_mux to
+>     dpll_pcie_ref_m2ldo_ck
+> 
+> Kishon Vijay Abraham I (6):
+>   ARM: dts: dra7xx-clocks: Add missing 32KHz clocks used for PHY
+>   ARM: dts: dra7xx-clocks: rename pcie clocks to accommodate second PHY
+>     instance
+>   ARM: dts: dra7xx-clocks: Add missing clocks for second PCIe PHY
+>     instance
+>   ARM: dts: dra7: Add dt data for PCIe PHY control module
+>   ARM: dts: dra7: Add dt data for PCIe PHY
+>   ARM: dts: dra7: Add dt data for PCIe controller
+> 
+>  arch/arm/boot/dts/dra7.dtsi          |  127 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi |   39 ++++++++++-
+>  2 files changed, 163 insertions(+), 3 deletions(-)
 
-(adding Alexandre and the gpio list)
+Applying this series into omap-for-v3.17/dt thanks.
 
-GPIO people: any guidance on how a board file should set a gpio to
-output/default-high in a GPIO_LOOKUP() table to replace a
-devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
-Do we need to add an interface extension to do this, e.g. passing
-GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
-
-	Arnd
+Tony
