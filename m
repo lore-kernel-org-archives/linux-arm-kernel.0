@@ -1,36 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Jul 2014 22:04:59 +0900
-Subject: [PATCH] ARM: shmobile: genmai: remove defconfig
-In-Reply-To: <20140715122350.GD25333@verge.net.au>
-References: <1405409364-23378-1-git-send-email-horms+renesas@verge.net.au>
- <3624228.NbiLenVez0@avalon> <20140715122350.GD25333@verge.net.au>
-Message-ID: <20140715130458.GI25333@verge.net.au>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 15 Jul 2014 09:11:00 -0400
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <20140715100221.GU4179@bivouac.eciton.net>
+References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405363248.25580.12.camel@deneb.redhat.com>
+ <20140715100221.GU4179@bivouac.eciton.net>
+Message-ID: <1405429860.25580.25.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 09:23:50PM +0900, Simon Horman wrote:
-> On Tue, Jul 15, 2014 at 01:58:21PM +0200, Laurent Pinchart wrote:
-> > Hi Simon,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Tuesday 15 July 2014 16:29:24 Simon Horman wrote:
-> > > The genmai board code is scheduled for removal and once
-> > > that occurs the defconfig will be of no use. Remove it.
-> > > 
-> > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > Now that the MTU2 boot issue has been solved (thank you for tracking it down), 
-> > am I correct to assume that all timer patches, the genmai board file removal 
-> > series and this patch will make it to v3.17 ?
+On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
+> > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
+> >                       continue;
+> >               }
+> >  
+> > +             /* Don't free anything below kernel */
+> > +             if (md->phys_addr < PHYS_OFFSET)
+> > +                     continue;
+> > +
 > 
-> Yes, that is my plan.
+> Is the spin table area really allocated as BOOT_SERVICES_*?
 > 
-> I hope to have them queued up this evening.
 
-Please take a look at renesas-next-v3.16-rc3-20140715v2 and let
-me know if anything is missing.
+No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
+then there could be BS code/data memory which we'd want to ignore.
