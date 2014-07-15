@@ -1,49 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 15 Jul 2014 18:16:28 +0900
-Subject: [PATCH 4/4] ARM: shmobile: sh73a0: add SCI clock support for DT
-In-Reply-To: <cover.1405398284.git.horms+renesas@verge.net.au>
-References: <cover.1405398284.git.horms+renesas@verge.net.au>
-Message-ID: <ff4ce48e1f163d945c037c1c90ce12950961d91d.1405398284.git.horms+renesas@verge.net.au>
+Date: Tue, 15 Jul 2014 18:16:36 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for v3.17
+Message-ID: <cover.1405398515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will be used when initialising SCI devices using DT
-until common clock framework support is added.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-sh73a0.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Please consider these third round of Renesas ARM based SoC DT updates for v3.17.
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 0d9cd1f..4990e03 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -638,16 +638,25 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6820000.i2c", &mstp_clks[MSTP116]), /* I2C0 */
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.0", &mstp_clks[MSTP100]), /* LCDC0 */
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP219]), /* SCIFA7 */
-+	CLKDEV_DEV_ID("e6cd0000.serial", &mstp_clks[MSTP219]), /* SCIFA7 */
- 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]), /* SY-DMAC */
- 	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP217]), /* MP-DMAC */
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
-+	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
-+	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
-+	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
-+	CLKDEV_DEV_ID("e6c50000.serial", &mstp_clks[MSTP203]), /* SCIFA1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP202]), /* SCIFA2 */
-+	CLKDEV_DEV_ID("e6c60000.serial", &mstp_clks[MSTP202]), /* SCIFA2 */
- 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP201]), /* SCIFA3 */
-+	CLKDEV_DEV_ID("e6c70000.serial", &mstp_clks[MSTP201]), /* SCIFA3 */
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
-+	CLKDEV_DEV_ID("e6c80000.serial", &mstp_clks[MSTP200]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP331]), /* SCIFA6 */
-+	CLKDEV_DEV_ID("e6cc0000.serial", &mstp_clks[MSTP331]), /* SCIFA6 */
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
- 	CLKDEV_DEV_ID("ec230000.sound", &mstp_clks[MSTP328]), /* FSI */
- 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
--- 
-2.0.0
+This pull request is based on a merge of:
+
+* The previous round of such requests, tagged as renesas-dt2-for-v3.17,
+  which you have already pulled into next/dt and;
+* The second round of Renesas ARM Based SoC Clock Updates for v3.17,
+  tagged as renesas-clock2-for-v3.17, which I have send a pull request for.
+
+The reason for the clock update is to provide run-time dependencies
+to allow SCI to be initialised on DT on SoCs that do not yet have
+CCF support. The key word being yet, it is being worked on.
+
+which I have already sent a pull-request for.
+
+
+The following changes since commit 963b0c359bf5d284fc597bed07a668cb7396bfd2:
+
+  Merge branch 'clock-for-v3.17' into dt-for-v3.17 (2014-07-12 15:16:37 +0200)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.17
+
+for you to fetch changes up to 700ce7c2bb2a4963472d95eba1436d6b0945918e:
+
+  ARM: shmobile: kzm9g-reference: Initialise SCIF device using DT (2014-07-12 15:16:58 +0200)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC DT Updates for v3.17
+
+* Initialise SCI using DT when booting the kzm9g, armadillo800eva,
+  ape6evm and bockw boards without legacy-C code.
+
+----------------------------------------------------------------
+Simon Horman (8):
+      ARM: shmobile: r8a7778: Add SCIF nodes
+      ARM: shmobile: bockw-reference: Initialise SCIF device using DT
+      ARM: shmobile: r8a73a4: Add SCIF nodes
+      ARM: shmobile: ape6evm-reference: Initialise SCIF device using DT
+      ARM: shmobile: r8a7740: Add SCIF nodes
+      ARM: shmobile: armadillo800eva-reference: Initialise SCIF device using DT
+      ARM: shmobile: sh73a0: Add SCIF nodes
+      ARM: shmobile: kzm9g-reference: Initialise SCIF device using DT
+
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    | 14 ++++-
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 42 +++++++++++++
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts | 14 ++++-
+ arch/arm/boot/dts/r8a7740.dtsi                     | 63 +++++++++++++++++++
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts      | 14 ++++-
+ arch/arm/boot/dts/r8a7778.dtsi                     | 42 +++++++++++++
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       | 14 ++++-
+ arch/arm/boot/dts/sh73a0.dtsi                      | 72 ++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a73a4.c             | 12 ++--
+ arch/arm/mach-shmobile/setup-r8a7740.c             |  8 +--
+ arch/arm/mach-shmobile/setup-r8a7778.c             | 12 ++--
+ arch/arm/mach-shmobile/setup-sh73a0.c              |  8 +--
+ 12 files changed, 283 insertions(+), 32 deletions(-)
