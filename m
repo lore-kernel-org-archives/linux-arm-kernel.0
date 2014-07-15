@@ -1,95 +1,124 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Tue, 15 Jul 2014 17:51:00 +0530
-Subject: [PATCH 3/3] ARM: DTS: fix the chip select gpios definition in the SPI
- nodes
-In-Reply-To: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
-References: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1405426860-18404-4-git-send-email-ch.naveen@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Jul 2014 21:28:02 +0900
+Subject: [PATCH v5 4/8] ARM: shmobile: r7s72100: Add MTU2 device to DT
+In-Reply-To: <20140715122308.GC25333@verge.net.au>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1404911564-17380-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140715114741.GB25333@verge.net.au> <4380270.nzol65dDjU@avalon>
+ <20140715122308.GC25333@verge.net.au>
+Message-ID: <20140715122801.GF25333@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the "cs-gpio" from "controller-data" node
-as was specified in the old binding and use the standard
-"cs-gpios" property expected by the SPI core as is defined in
-the new binding.
+On Tue, Jul 15, 2014 at 09:23:09PM +0900, Simon Horman wrote:
+> On Tue, Jul 15, 2014 at 01:55:25PM +0200, Laurent Pinchart wrote:
+> > Hi Simon,
+> > 
+> > On Tuesday 15 July 2014 20:47:41 Simon Horman wrote:
+> > > On Wed, Jul 09, 2014 at 03:12:40PM +0200, Laurent Pinchart wrote:
+> > > > Add the MTU2 counter to the r7s72100 device tree and make it disabled by
+> > > > default.
+> > > > 
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > ---
+> > > > 
+> > > >  arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
+> > > >  1 file changed, 10 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
+> > > > b/arch/arm/boot/dts/r7s72100.dtsi index bdee225..c902b0b 100644
+> > > > --- a/arch/arm/boot/dts/r7s72100.dtsi
+> > > > +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> > > > @@ -229,6 +229,16 @@
+> > > >  		status = "disabled";
+> > > >  	};
+> > > > 
+> > > > +	mtu2: timer at fcff0000 {
+> > > > +		compatible = "renesas,mtu2";
+> > > > +		reg = <0xfcff0000 0x400>;
+> > > > +		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
+> > > > +		interrupt-names = "tgi0a";
+> > > > +		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+> > > > +		clock-names = "fck";
+> > > > +		status = "disabled";
+> > > > +	};
+> > > > +
+> > > >  	scif0: serial at e8007000 {
+> > > >  		compatible = "renesas,scif-r7s72100", "renesas,scif";
+> > > >  		reg = <0xe8007000 64>;
+> > > 
+> > > I believe that I claimed to have tested this in the past but that
+> > > my testing was by booting a config to userspace that as it happens
+> > > did not require to timer to get that far.
+> > > 
+> > > I now believe there is a minor error: the interrupt number should be
+> > > (139 - 32 =) 107 rather than 139.
+> > > 
+> > > This allows a system with this and the related genmai patch applied
+> > > on top of renesas-next-v3.16-rc3-20140715 to boot to uerspace
+> > > when compiled with shmobile_defconfig (+ an initrd).
+> > > Without the irq number change the boot gets stuck in
+> > > ip_auto_config (which presumably sleeps).
+> > > 
+> > > Laurent, should I squash the following in and queue-up the result?
+> > 
+> > Please do, and sorry for the mistake.
+> 
+> Not at all. I've made the same one several times myself.
+> 
+> > > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
+> > > b/arch/arm/boot/dts/r7s72100.dtsi index c902b0b..1d28d01 100644
+> > > --- a/arch/arm/boot/dts/r7s72100.dtsi
+> > > +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> > > @@ -232,7 +232,7 @@
+> > >  	mtu2: timer at fcff0000 {
+> > >  		compatible = "renesas,mtu2";
+> > >  		reg = <0xfcff0000 0x400>;
+> > > -		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
+> > > +		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+> > >  		interrupt-names = "tgi0a";
+> > >  		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+> > >  		clock-names = "fck";
 
-Respective changes are preposed to spi-s3c64xx.c driver.
-@ http://www.spinics.net/lists/linux-samsung-soc/msg32282.html
+For reference I have queued up the following.
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Cc: Tomasz Figa <t.figa@samsung.com>
+
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+ARM: shmobile: r7s72100: Add MTU2 device to DT
+
+Add the MTU2 counter to the r7s72100 device tree and make it disabled by
+default.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+[horms+renesas at verge.net.au correct irq number]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-This change is being reviewed @
+ arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-http://www.mail-archive.com/devicetree at vger.kernel.org/msg34498.html
-
- arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
- arch/arm/boot/dts/exynos4412-trats2.dts   |    2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-index 636d166..676e6e0 100644
---- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-+++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-@@ -168,6 +168,7 @@
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index bdee225..1d28d01 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -229,6 +229,16 @@
+ 		status = "disabled";
  	};
  
- 	spi_2: spi at 13940000 {
-+		cs-gpios = <&gpc1 2 0>;
- 		status = "okay";
- 
- 		w25x80 at 0 {
-@@ -178,7 +179,6 @@
- 			spi-max-frequency = <1000000>;
- 
- 			controller-data {
--				cs-gpio = <&gpc1 2 0>;
- 				samsung,spi-feedback-delay = <0>;
- 			};
- 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 7787844..11967f4 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -589,6 +589,7 @@
- 	spi_1: spi at 13930000 {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&spi1_bus>;
-+		cs-gpios = <&gpb 5 0>;
- 		status = "okay";
- 
- 		s5c73m3_spi: s5c73m3 {
-@@ -596,7 +597,6 @@
- 			spi-max-frequency = <50000000>;
- 			reg = <0>;
- 			controller-data {
--				cs-gpio = <&gpb 5 0>;
- 				samsung,spi-feedback-delay = <2>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index a794a70..0c6433a 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -316,6 +316,7 @@
- 	};
- 
- 	spi_1: spi at 12d30000 {
-+		cs-gpios = <&gpa2 5 0>;
- 		status = "okay";
- 
- 		w25q80bw at 0 {
-@@ -326,7 +327,6 @@
- 			spi-max-frequency = <1000000>;
- 
- 			controller-data {
--				cs-gpio = <&gpa2 5 0>;
- 				samsung,spi-feedback-delay = <0>;
- 			};
- 
++	mtu2: timer at fcff0000 {
++		compatible = "renesas,mtu2";
++		reg = <0xfcff0000 0x400>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tgi0a";
++		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
++		clock-names = "fck";
++		status = "disabled";
++	};
++
+ 	scif0: serial at e8007000 {
+ 		compatible = "renesas,scif-r7s72100", "renesas,scif";
+ 		reg = <0xe8007000 64>;
 -- 
-1.7.9.5
+2.0.0
