@@ -1,63 +1,51 @@
-From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Tue, 15 Jul 2014 18:58:26 +0800
-Subject: [PATCH v1 3/3] mtd: hisilicon: add device tree binding documentation
-In-Reply-To: <1405421906-660-1-git-send-email-wangzhou.bry@gmail.com>
-References: <1405421906-660-1-git-send-email-wangzhou.bry@gmail.com>
-Message-ID: <1405421906-660-4-git-send-email-wangzhou.bry@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 15 Jul 2014 13:00:30 +0200
+Subject: [PATCH v3 0/4] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
+ secure firmware enabled
+In-Reply-To: <CAD8Lp46mp-tHcwGpFd0YHRDE4pKWDoPpUvu-Y0QzxSi-jnYtWg@mail.gmail.com>
+References: <1404926274-18411-1-git-send-email-b.zolnierkie@samsung.com>
+ <CAD8Lp46mp-tHcwGpFd0YHRDE4pKWDoPpUvu-Y0QzxSi-jnYtWg@mail.gmail.com>
+Message-ID: <12227526.hKTn2dDzxP@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
----
- .../devicetree/bindings/mtd/hisi-nand.txt          |   40 ++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/hisi-nand.txt
+On Monday, July 14, 2014 04:41:25 PM Daniel Drake wrote:
+> Hi Bartlomiej,
 
-diff --git a/Documentation/devicetree/bindings/mtd/hisi-nand.txt b/Documentation/devicetree/bindings/mtd/hisi-nand.txt
-new file mode 100644
-index 0000000..c8b3988
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/hisi-nand.txt
-@@ -0,0 +1,40 @@
-+Hisilicon Hip04 Soc NAND controller DT binding
-+
-+Required properties:
-+- compatible:          Should be "hisilicon,504-nfc".
-+- reg:                 The first contains base physical address and size of
-+                       NAND controller's registers. The second contains base
-+                       physical address and size of NAND controller's buffer.
-+- interrupts:          Interrupt number for nfc.
-+- nand-bus-width:      See nand.txt.
-+- nand-ecc-mode:       See nand.txt.
-+- hisi,nand-ecc-bits:  ECC bits type support.
-+                 <0>:  none ecc
-+                 <1>:  Can correct 1bit per 512byte.
-+                 <6>:  Can correct 16bits per 1K byte.
-+- #address-cells:      partition address, should be set 1.
-+- #size-cells:         partition size, should be set 1.
-+
-+Flash chip may optionally contain additional sub-nodes describing partitions of
-+the address space. See partition.txt for more detail.
-+
-+Example:
-+
-+	nand: nand at 4020000 {
-+		compatible = "hisilicon,504-nfc";
-+		reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
-+		interrupts = <0 379 4>;
-+		nand-bus-width = <8>;
-+		nand-ecc-mode = "hw";
-+		hisi,nand-ecc-bits = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "nand_text";
-+			reg = <0x00000000 0x00400000>;
-+		};
-+
-+		...
-+
-+	};
--- 
-1.7.9.5
+Hi,
+
+> On Wed, Jul 9, 2014 at 6:17 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> > This patch series adds support for AFTR idle mode on boards with
+> > secure firmware enabled and allows EXYNOS cpuidle driver usage on
+> > Exynos4x12 SoCs.
+> >
+> > It has been tested on Trats2 board (using Exynos4412 SoC with secure
+> > firmware enabled) on which AFTR mode reduces power consumption by ~12%
+> > when EXYNOS cpuidle driver is enabled (in both cases the default
+> > exynos_defconfig config is used and CPU1-3 are offlined).
+> 
+> Thanks for this, I have tested it on ODROID-U2.
+> 
+> I don't have any equipment to measure the power usage, but after
+> offlining CPUs 1,2,3 via sysfs "online" file, a printk I added
+> confirms that the system is going to enter aftr mode, and system
+> stability seems as good as ever.
+
+Thank you for testing!
+
+> Is there any automatic way that the cpus should be offlined, or is the
+> intention that it must be done "by hand" like this?
+
+AFAIK Android kernel disables unused CPUs by itself.  There is also
+ongoing work on Exynos coupled cpuidle driver for upstream kernels
+which will handle offlining of CPUs for AFTR mode transparently to
+the kernel (currently only Exynos4210 SoC is supported by the driver
+posted by Daniel Lezcano, we are working on Exynos3250 SoC support
+and once it is done we might try to also do Exynos4x12 SoCs version).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
