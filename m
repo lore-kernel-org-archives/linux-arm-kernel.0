@@ -1,156 +1,41 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 15 Jul 2014 11:21:57 +0200
-Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <20140715090719.GA3374@shlinux1.ap.freescale.net>
-References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
- <1405338041-19945-2-git-send-email-b29396@freescale.com>
- <53C3C97A.7080102@pengutronix.de>
- <20140715033324.GC21584@shlinux1.ap.freescale.net>
- <53C4D872.9060707@pengutronix.de>
- <20140715082637.GA2601@shlinux1.ap.freescale.net>
- <53C4EA68.5090606@pengutronix.de>
- <20140715090719.GA3374@shlinux1.ap.freescale.net>
-Message-ID: <53C4F2B5.7050704@pengutronix.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 15 Jul 2014 11:27:19 +0200
+Subject: [PATCH v3 09/12] Revert "sched: Put rq's sched_avg under
+ CONFIG_FAIR_GROUP_SCHED"
+In-Reply-To: <20140711161344.GD26542@e103034-lin>
+References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
+ <1404144343-18720-10-git-send-email-vincent.guittot@linaro.org>
+ <20140710131646.GB3935@laptop>
+ <CAKfTPtDzxyrzVmX016VB8j_y19wcCBVB1Rj46FYngMA+Ajft6g@mail.gmail.com>
+ <20140711161344.GD26542@e103034-lin>
+Message-ID: <CAKfTPtDeTnPVM5nFR19eWRQZMtAZ3B2dB36q4qGNH=URgfLfHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2014 11:07 AM, Dong Aisheng wrote:
-> On Tue, Jul 15, 2014 at 10:46:32AM +0200, Marc Kleine-Budde wrote:
->> On 07/15/2014 10:26 AM, Dong Aisheng wrote:
->>>>>>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
->>>>>>> +			    u32 rxfs)
->>>>>>> +{
->>>>>>> +	struct m_can_priv *priv = netdev_priv(dev);
->>>>>>> +	u32 flags, fgi;
->>>>>>> +
->>>>>>> +	/* calculate the fifo get index for where to read data */
->>>>>>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
->>>>>>> +	flags = m_can_fifo_read(priv, fgi, 0x0);
->>>>>>                                            ^^^
->>>>>>
->>>>>> Can you introduce an enum for the offsets, please adjust the signature
->>>>>> of m_can_fifo_read() accordingly.
->>>>>>
->>>>>
->>>>> I wonder enum may not be suitable.
->>>>> The Rx Buffer and FIFO Element is as follows:
->>>>>    31 24 23 16 15 8 7 0
->>>>> R0 ESI XTD RTR ID[28:0]
->>>>
->>>> M_CAN_FIFO_ID
->>>>
->>>>> R1 ANMF FIDX[6:0] res EDL BRS DLC[3:0] RXTS[15:0]
->>>>
->>>> M_CAN_FIFO_DLC
->>>>
->>>>> R2 DB3[7:0] DB2[7:0] DB1[7:0] DB0[7:0]
->>>>> R3 DB7[7:0] DB6[7:0] DB5[7:0] DB4[7:0]
->>>>
->>>> M_CAN_FIFO_DATA0
->>>> M_CAN_FIFO_DATA1
->>>>
->>>
->>> You mean as follows?
->>> enum m_can_fifo {
->>>         M_CAN_FIFO_ID = 0,
->>>         M_CAN_FIFO_DLC,
->> = 0x4,
->>>         M_CAN_FIFO_DATA0,
->> = 0x8,
->>>         M_CAN_FIFO_DATA1,
->> = 0xc,
->>> };
->>>
->>> static inline u32 m_can_fifo_read(const struct m_can_priv *priv,
->>>                                   u32 fgi, enum m_can_fifo fifo)
->>> {
->>>         return readl(priv->mram_base + priv->mcfg[MRAM_RXF0].off +
->>>                      fgi * RXF0_ELEMENT_SIZE + fifo * 0x4);
->>> }
->>
->> without the * 0x4
->>
->>> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
->>>
->>> The problem is when adding long frames support, it becomes:
->>> enum m_can_fifo {
->>>         M_CAN_FIFO_ID = 0,
->>>         M_CAN_FIFO_DLC,
->>>         M_CAN_FIFO_DATA0,
->>>         M_CAN_FIFO_DATA1,
->>>         ....
->>>         M_CAN_FIFO_DATA15,
->>> };
->>
->> #define M_CAN_FIFO_DATA(n)
->> 	(enum m_can_fifo)(M_CAN_FIFO_DATA_0 + (n) << 2)
->>
-> 
-> This is a bit strange using and we may still have to define other M_CAN_FIFO_DATAx
-> to avoid the enum value exceeds the defined range.
-> enum m_can_fifo {
->         M_CAN_FIFO_ID = 0,
->         M_CAN_FIFO_DLC = 0x4,
->         M_CAN_FIFO_DATA0 = 0x8,
->         M_CAN_FIFO_DATA1 = 0xc,
-> 	....
->         M_CAN_FIFO_DATA15 = 0xc,
-> };
-> 
-> However, actually we will not use them at all after introducing M_CAN_FIFO_DATA(n).
-> If that, why we still need define them in enum?
-> 
-> Comparing to this way, why not simply just do as follows:
-> #define M_CAN_FIFO_ID		0x0
-> #define M_CAN_FIFO_DLC		0x4
-> #define M_CAN_FIFO_DATA(n)	(0x8 + (n) << 2)
-> 
-> What do you think?
+On 11 July 2014 18:13, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
 
-Looks good.
+[snip]
 
-> 
->>> But it's useless because we may not use enum to read fifo data anymore.
->>> It's not suitable to read fifo one by one:
->>> m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA0);
->>> m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA1);
->>> ..
->>> m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA15);
->>>
->>>
->>> Instead, we may read data according to real dlc value within a for loop like:
->>> #define M_CAN_FIFO(n)   (n * 0x4)
->>> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO(0));
->>> dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO(1));
->>> for (i = 0; dlc > 0; dlc -= 0x4, i++) {
->>>         ....
->>>         data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO(i + 2));
->>> }
->>
->> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
->> dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
->> for (i = 0; i <= dlc; i++)
->> 	data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i));
-> 
-> Does it work?
-> The dlc is in bytes while m_can_fifo_read is read in words.
+>
+> In this example using rq->avg leads to imbalance whereas unweighted load
+> would not. Correct me if I missed anything.
 
-Doh! probably not :) But should work with something like this:
+You just miss to take into account how the imbalance is computed
 
-int len = DIV_ROUND_UP(dlc, 4);
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/0265cfa9/attachment.sig>
+>
+> Coming back to the previous example. I'm not convinced that inflation of
+> the unweighted load sum when tasks overlap in time is a bad thing. I
+> have mentioned this before. The average cpu utilization over the 40ms
+> period is 50%. However the true compute capacity demand is 200% for the
+> first 15ms of the period, 100% for the next 5ms and 0% for the remaining
+> 25ms. The cpu is actually overloaded for 15ms every 40ms. This fact is
+> factored into the unweighted load whereas rq->avg would give you the
+> same utilization no matter if the tasks are overlapped or not. Hence
+> unweighted load would give us an indication that the mix of tasks isn't
+> optimal even if the cpu has spare cycles.
+>
+> If you don't care about overlap and latency, the unweighted sum of task
+> running time (that Peter has proposed a number of times) is better
+> metric, IMHO. As long the cpu isn't fully utilized.
+>
+> Morten
