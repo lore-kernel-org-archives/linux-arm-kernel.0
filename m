@@ -1,163 +1,167 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 15 Jul 2014 08:39:06 +0100
-Subject: [PATCH] arm64: Move struct stat64 to uapi.
-Message-ID: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 15 Jul 2014 11:37:56 +0400
+Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan when
+ touching unaccessible memory
+In-Reply-To: <20140715060405.GI11317@js1304-P5Q-DELUXE>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
+ <20140715060405.GI11317@js1304-P5Q-DELUXE>
+Message-ID: <53C4DA54.3010502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This struct is part of the user API for compat tasks so I think it belongs in
-uapi and should use the __uFOO types.
+On 07/15/14 10:04, Joonsoo Kim wrote:
+> On Wed, Jul 09, 2014 at 03:30:08PM +0400, Andrey Ryabinin wrote:
+>> Some code in slub could validly touch memory marked by kasan as unaccessible.
+>> Even though slub.c doesn't instrumented, functions called in it are instrumented,
+>> so to avoid false positive reports such places are protected by
+>> kasan_disable_local()/kasan_enable_local() calls.
+>>
+>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+>> ---
+>>  mm/slub.c | 21 +++++++++++++++++++--
+>>  1 file changed, 19 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/mm/slub.c b/mm/slub.c
+>> index 6ddedf9..c8dbea7 100644
+>> --- a/mm/slub.c
+>> +++ b/mm/slub.c
+>> @@ -560,8 +560,10 @@ static void print_tracking(struct kmem_cache *s, void *object)
+>>  	if (!(s->flags & SLAB_STORE_USER))
+>>  		return;
+>>  
+>> +	kasan_disable_local();
+>>  	print_track("Allocated", get_track(s, object, TRACK_ALLOC));
+>>  	print_track("Freed", get_track(s, object, TRACK_FREE));
+>> +	kasan_enable_local();
+> 
+> I don't think that this is needed since print_track() doesn't call
+> external function with object pointer. print_track() call pr_err(), but,
+> before calling, it retrieve t->addrs[i] so memory access only occurs
+> in slub.c.
+> 
+Agree.
 
-This was exposed by the Debian kernel's application of the aufs patches which
-led to:
+>>  }
+>>  
+>>  static void print_page_info(struct page *page)
+>> @@ -604,6 +606,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+>>  	unsigned int off;	/* Offset of last byte */
+>>  	u8 *addr = page_address(page);
+>>  
+>> +	kasan_disable_local();
+>> +
+>>  	print_tracking(s, p);
+>>  
+>>  	print_page_info(page);
+>> @@ -632,6 +636,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+>>  		/* Beginning of the filler is the free pointer */
+>>  		print_section("Padding ", p + off, s->size - off);
+>>  
+>> +	kasan_enable_local();
+>> +
+>>  	dump_stack();
+>>  }
+> 
+> And, I recommend that you put this hook on right place.
+> At a glance, the problematic function is print_section() which have
+> external function call, print_hex_dump(), with object pointer.
+> If you disable kasan in print_section, all the below thing won't be
+> needed, I guess.
+> 
 
-In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
-                 from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
-                 from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
-                 from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
-                 from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
-                 from /?PKGBUILDDIR?/include/linux/stat.h:5,
-                 from /?PKGBUILDDIR?/include/linux/module.h:10,
-                 from /?PKGBUILDDIR?/init/main.c:15:
-/?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
-  int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
-                                                                ^
-/?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+Nope, at least memchr_inv() call in slab_pad_check will be a problem.
 
-This is due to an extra fs.h include added to mm.h. arm64 was the only arch built by
-Debian which had an issue with this, so I think it is an issue with the arm64
-headers rather than the aufs patches.
+I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
+If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
+for kasan.
 
-Full logs in http://buildd.debian-ports.org/status/fetch.php?pkg=linux&arch=arm64&ver=3.14.12-1&stamp=1405234443
 
-Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: David Howells <dhowells@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm64/include/asm/stat.h      | 61 --------------------------------------
- arch/arm64/include/uapi/asm/stat.h | 42 ++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 61 deletions(-)
- delete mode 100644 arch/arm64/include/asm/stat.h
 
-diff --git a/arch/arm64/include/asm/stat.h b/arch/arm64/include/asm/stat.h
-deleted file mode 100644
-index 15e3559..0000000
---- a/arch/arm64/include/asm/stat.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#ifndef __ASM_STAT_H
--#define __ASM_STAT_H
--
--#include <uapi/asm/stat.h>
--
--#ifdef CONFIG_COMPAT
--
--#include <asm/compat.h>
--
--/*
-- * struct stat64 is needed for compat tasks only. Its definition is different
-- * from the generic struct stat64.
-- */
--struct stat64 {
--	compat_u64	st_dev;
--	unsigned char   __pad0[4];
--
--#define STAT64_HAS_BROKEN_ST_INO	1
--	compat_ulong_t	__st_ino;
--	compat_uint_t	st_mode;
--	compat_uint_t	st_nlink;
--
--	compat_ulong_t	st_uid;
--	compat_ulong_t	st_gid;
--
--	compat_u64	st_rdev;
--	unsigned char   __pad3[4];
--
--	compat_s64	st_size;
--	compat_ulong_t	st_blksize;
--	compat_u64	st_blocks;	/* Number of 512-byte blocks allocated. */
--
--	compat_ulong_t	st_atime;
--	compat_ulong_t	st_atime_nsec;
--
--	compat_ulong_t	st_mtime;
--	compat_ulong_t	st_mtime_nsec;
--
--	compat_ulong_t	st_ctime;
--	compat_ulong_t	st_ctime_nsec;
--
--	compat_u64	st_ino;
--};
--
--#endif
--#endif
-diff --git a/arch/arm64/include/uapi/asm/stat.h b/arch/arm64/include/uapi/asm/stat.h
-index eeb702e..4bc1f59 100644
---- a/arch/arm64/include/uapi/asm/stat.h
-+++ b/arch/arm64/include/uapi/asm/stat.h
-@@ -13,4 +13,46 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#ifndef __ASM_STAT_H
-+#define __ASM_STAT_H
-+
-+#include <asm/types.h>
-+
- #include <asm-generic/stat.h>
-+
-+/*
-+ * struct stat64 is needed for compat tasks only. Its definition is different
-+ * from the generic struct stat64.
-+ */
-+struct stat64 {
-+	__u64		st_dev;
-+	__u8		__pad0[4];
-+
-+#define STAT64_HAS_BROKEN_ST_INO	1
-+	__u32		__st_ino;
-+	__u32		st_mode;
-+	__u32		st_nlink;
-+
-+	__u32		st_uid;
-+	__u32		st_gid;
-+
-+	__u64		st_rdev;
-+	__u8		__pad3[4];
-+
-+	__s64		st_size;
-+	__u32		st_blksize;
-+	__u64		st_blocks;	/* Number of 512-byte blocks allocated. */
-+
-+	__u32		st_atime;
-+	__u32		st_atime_nsec;
-+
-+	__u32		st_mtime;
-+	__u32		st_mtime_nsec;
-+
-+	__u32		st_ctime;
-+	__u32		st_ctime_nsec;
-+
-+	__u64		st_ino;
-+};
-+
-+#endif
--- 
-2.0.1
+> Thanks.
+> 
+>>  
+>> @@ -1012,6 +1018,8 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
+>>  					struct page *page,
+>>  					void *object, unsigned long addr)
+>>  {
+>> +
+>> +	kasan_disable_local();
+>>  	if (!check_slab(s, page))
+>>  		goto bad;
+>>  
+>> @@ -1028,6 +1036,7 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
+>>  		set_track(s, object, TRACK_ALLOC, addr);
+>>  	trace(s, page, object, 1);
+>>  	init_object(s, object, SLUB_RED_ACTIVE);
+>> +	kasan_enable_local();
+>>  	return 1;
+>>  
+>>  bad:
+>> @@ -1041,6 +1050,7 @@ bad:
+>>  		page->inuse = page->objects;
+>>  		page->freelist = NULL;
+>>  	}
+>> +	kasan_enable_local();
+>>  	return 0;
+>>  }
+>>  
+>> @@ -1052,6 +1062,7 @@ static noinline struct kmem_cache_node *free_debug_processing(
+>>  
+>>  	spin_lock_irqsave(&n->list_lock, *flags);
+>>  	slab_lock(page);
+>> +	kasan_disable_local();
+>>  
+>>  	if (!check_slab(s, page))
+>>  		goto fail;
+>> @@ -1088,6 +1099,7 @@ static noinline struct kmem_cache_node *free_debug_processing(
+>>  	trace(s, page, object, 0);
+>>  	init_object(s, object, SLUB_RED_INACTIVE);
+>>  out:
+>> +	kasan_enable_local();
+>>  	slab_unlock(page);
+>>  	/*
+>>  	 * Keep node_lock to preserve integrity
+>> @@ -1096,6 +1108,7 @@ out:
+>>  	return n;
+>>  
+>>  fail:
+>> +	kasan_enable_local();
+>>  	slab_unlock(page);
+>>  	spin_unlock_irqrestore(&n->list_lock, *flags);
+>>  	slab_fix(s, "Object at 0x%p not freed", object);
+>> @@ -1371,8 +1384,11 @@ static void setup_object(struct kmem_cache *s, struct page *page,
+>>  				void *object)
+>>  {
+>>  	setup_object_debug(s, page, object);
+>> -	if (unlikely(s->ctor))
+>> +	if (unlikely(s->ctor)) {
+>> +		kasan_disable_local();
+>>  		s->ctor(object);
+>> +		kasan_enable_local();
+>> +	}
+>>  }
+>>  static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
+>> @@ -1425,11 +1441,12 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
+>>  
+>>  	if (kmem_cache_debug(s)) {
+>>  		void *p;
+>> -
+>> +		kasan_disable_local();
+>>  		slab_pad_check(s, page);
+>>  		for_each_object(p, s, page_address(page),
+>>  						page->objects)
+>>  			check_object(s, page, p, SLUB_RED_INACTIVE);
+>> +		kasan_enable_local();
+>>  	}
+>>  
+>>  	kmemcheck_free_shadow(page, compound_order(page));
+>> -- 
+>> 1.8.5.5
+>>
+>> --
+>> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+>> the body to majordomo at kvack.org.  For more info on Linux MM,
+>> see: http://www.linux-mm.org/ .
+>> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
