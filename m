@@ -1,134 +1,94 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Tue, 15 Jul 2014 23:01:43 +0530
-Subject: [PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
-In-Reply-To: <53C51B57.9040404@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403697175-13476-1-git-send-email-t.figa@samsung.com>
- <53C3A8E8.4090009@gmail.com> <2740751.gTMSlJs48H@amdc1032>
- <53C51B57.9040404@samsung.com>
-Message-ID: <CADWw7OgQpJh+5V10QfKQyeUk3kV+AiKJ8yk_+jqW9QywgHAqFA@mail.gmail.com>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Tue, 15 Jul 2014 17:35:27 -0000
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C4D12E.3040807@mit.edu>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+ <53C0A12A.2060204@codeaurora.org>
+ <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
+ <53C42AA8.8010107@codeaurora.org>
+ <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
+ <53C4BDFB.70707@codeaurora.org> <53C4D12E.3040807@mit.edu>
+Message-ID: <03e76981eb3d84e8397a39616ac0cfa1.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 5:45 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> On 15.07.2014 13:19, Bartlomiej Zolnierkiewicz wrote:
->>
->> Hi,
->>
->> On Monday, July 14, 2014 11:54:48 AM Tomasz Figa wrote:
->>> Hi Kukjin,
+
+Srivatsa S. Bhat wrote:
+> On 07/15/2014 11:06 AM, Saravana Kannan wrote:
+>> On 07/14/2014 09:35 PM, Viresh Kumar wrote:
+>>> On 15 July 2014 00:38, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>>> Yeah, it definitely crashes if policy->cpu if an offline cpu. Because
+>>>> the
+>>>> mutex would be uninitialized if it's stopped after boot or it would
+>>>> never
+>>>> have been initialized (depending on how you fix policy->cpu at boot).
+>>>>
+>>>> Look at this snippet on the actual tree and it should be pretty
+>>>> evident.
 >>>
->>> On 25.06.2014 13:52, Tomasz Figa wrote:
->>>> Due to recent consolidation of Exynos suspend and cpuidle code, some
->>>> parts of suspend and resume sequences are executed two times, once from
->>>> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
->>>> breaks suspend, at least on Exynos4-based boards.
->>>>
->>>> This patch fixes the issue by removing exynos_pm_syscore_ops completely
->>>> and making the code rely only on CPU PM notifier.
->>>>
->>>> Tested on Exynos4210-based Trats board.
->>>>
->>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->>>> ---
->>>>  arch/arm/mach-exynos/pm.c | 23 ++++-------------------
->>>>  1 file changed, 4 insertions(+), 19 deletions(-)
->>>>
->>>> Changes since v1:
->>>>  - rebased onto Kukjin's fixes branch.
->>>>
->>>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->>>> index 202ca73..f23cc77 100644
->>>> --- a/arch/arm/mach-exynos/pm.c
->>>> +++ b/arch/arm/mach-exynos/pm.c
->>>> @@ -364,11 +364,6 @@ early_wakeup:
->>>>     return;
->>>>  }
->>>>
->>>> -static struct syscore_ops exynos_pm_syscore_ops = {
->>>> -   .suspend        = exynos_pm_suspend,
->>>> -   .resume         = exynos_pm_resume,
->>>> -};
->>>> -
->>>>  /*
->>>>   * Suspend Ops
->>>>   */
->>>> @@ -438,22 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->>>>
->>>>     switch (cmd) {
->>>>     case CPU_PM_ENTER:
->>>> -           if (cpu == 0) {
->>>> -                   exynos_pm_central_suspend();
->>>> -                   if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->>>> -                           exynos_cpu_save_register();
->>>> -           }
->>>> +           if (cpu == 0)
->>>> +                   exynos_pm_suspend();
->>>>             break;
->>>>
->>>>     case CPU_PM_EXIT:
->>>> -           if (cpu == 0) {
->>>> -                   if (read_cpuid_part_number() ==
->>>> -                                   ARM_CPU_PART_CORTEX_A9) {
->>>> -                           scu_enable(S5P_VA_SCU);
->>>> -                           exynos_cpu_restore_register();
->>>> -                   }
->>>> -                   exynos_pm_central_resume();
->>>> -           }
->>>> +           if (cpu == 0)
->>>> +                   exynos_pm_resume();
->>>>             break;
->>>>     }
->>>>
->>>> @@ -478,6 +464,5 @@ void __init exynos_pm_init(void)
->>>>     tmp |= ((0xFF << 8) | (0x1F << 1));
->>>>     __raw_writel(tmp, S5P_WAKEUP_MASK);
->>>>
->>>> -   register_syscore_ops(&exynos_pm_syscore_ops);
->>>>     suspend_set_ops(&exynos_suspend_ops);
->>>>  }
->>>>
+>>> Yeah, I missed it. So the problem is we initialize timer_mutex's for
+>>> policy->cpus. So we need to do that just for policy->cpu and also we
+>>> don't
+>>> need a per-cpu timer_mutex anymore.
 >>>
->>> Please consider this patch for next fixes pull request. Without it
->>> suspend/resume is broken for Exynos4 and probably other SoCs. This patch
->>> just restores the sequence from before the patch moving things to PM
->>> notifier, so I don't think it should need any special treatment.
 >>
->> Your patch fixes the regression and is a step in the good direction but it
->> seems that it needs a bit more work:
+>> Btw, I tried to take a stab at removing any assumption in cpufreq code
+>> about policy->cpu being ONLINE.
+>
+> Wait, allowing an offline CPU to be the policy->cpu (i.e., the CPU which
+> is
+> considered as the master of the policy/group) is just absurd. If there is
+> no leader, there is no army. We should NOT sacrifice sane semantics for
+> the
+> sake of simplifying the code.
+>
+>> There are 160 instances of those of with
+>> 23 are in cpufreq.c
 >>
->> Your patch adds to cpuidle AFTR code path restoring of exynos_core_save and
->> exynos5_sys_save registers without saving them first (restoring is done
->> through exynos_pm_resume() which is used by both suspend and cpuidle while
->> saving is done through exynos_pm_prepare() which is used only by suspend).
 >
-> That's right, unfortunately. Interestingly enough AFTR worked fine on
-> Exynos4210 with this patch, but still this needs to be fixed.
+> And that explains why. It is just *natural* to assume that the CPUs
+> governed
+> by a policy are online. Especially so for the CPU which is supposed to be
+> the policy leader. Let us please not change that - it will become
+> counter-intuitive if we do so. [ The other reason is that physical hotplug
+> is also possible on some systems... in that case your code might make a
+> CPU
+> which is not even present (but possible) as the policy->cpu.. and great
+> 'fun'
+> will ensue after that ;-( ]
 >
-> Now, in fact, I recall that Chander had some objections to this patch as
-> well and we decided that he will send another patch to replace mine [1],
-> but I haven't heard from him since that.
+> The goal of this patchset should be to just de-couple the sysfs
+> files/ownership
+> from the policy->cpu to an extent where it doesn't matter who owns those
+> files, and probably make it easier to do CPU hotplug without having to
+> destroy and recreate the files on every hotplug operation.
+>
+> This is exactly why the _implementation_ matters in this particular case -
+> if we can't achieve the simplification by keeping sane semantics, then we
+> shouldn't do the simplification!
+>
+> That said, I think we should keep trying - we haven't exhausted all ideas
+> yet :-)
+>
 
-Patch for the same has been already posted.
-Below is the link for the same
-http://www.spinics.net/lists/arm-kernel/msg343402.html
+I don't think we disagree. To summarize this topic: I tried to keep the
+policy->cpu an actual online CPU so as to not break existing semantics in
+this patch. Viresh asked "why not fix it at boot?". My response was to
+keep it an online CPU and give it a shot in a separate patch if we really
+want that. It's too risky to do that in this patch and also not a
+mandatory change for this patch.
 
-This patch has conflict with Russel's patch, so i will rebase on his
-tree and resend
+I think we can work out the details on the need to fixing policy->cpu at
+boot and whether there's even a need for policy->cpu (when we already have
+policy->cpus) in a separate thread after the dust settles on this one?
 
-This patch can be ignored in that case.
+-Saravana
 
->
-> Chander, do you have any progress with this? Keep in mind that we need
-> this as an rc fix and we already have rc5, so not much time left. If you
-> don't have time to work on this I can take care of this, proceeding as
-> we discussed in [1].
->
-> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29085/focus=33975
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
