@@ -1,187 +1,89 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 15 Jul 2014 17:07:21 +0800
-Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <53C4EA68.5090606@pengutronix.de>
-References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
- <1405338041-19945-2-git-send-email-b29396@freescale.com>
- <53C3C97A.7080102@pengutronix.de>
- <20140715033324.GC21584@shlinux1.ap.freescale.net>
- <53C4D872.9060707@pengutronix.de>
- <20140715082637.GA2601@shlinux1.ap.freescale.net>
- <53C4EA68.5090606@pengutronix.de>
-Message-ID: <20140715090719.GA3374@shlinux1.ap.freescale.net>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 15 Jul 2014 18:14:04 +0900
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <53C4DF0D.8010208@metafoo.de>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
+ <4657735.1VKsbQGuH6@wuerfel>
+ <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
+ <53C4DF0D.8010208@metafoo.de>
+Message-ID: <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 10:46:32AM +0200, Marc Kleine-Budde wrote:
-> On 07/15/2014 10:26 AM, Dong Aisheng wrote:
-> >>>>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
-> >>>>> +			    u32 rxfs)
-> >>>>> +{
-> >>>>> +	struct m_can_priv *priv = netdev_priv(dev);
-> >>>>> +	u32 flags, fgi;
-> >>>>> +
-> >>>>> +	/* calculate the fifo get index for where to read data */
-> >>>>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
-> >>>>> +	flags = m_can_fifo_read(priv, fgi, 0x0);
-> >>>>                                            ^^^
-> >>>>
-> >>>> Can you introduce an enum for the offsets, please adjust the signature
-> >>>> of m_can_fifo_read() accordingly.
-> >>>>
-> >>>
-> >>> I wonder enum may not be suitable.
-> >>> The Rx Buffer and FIFO Element is as follows:
-> >>>    31 24 23 16 15 8 7 0
-> >>> R0 ESI XTD RTR ID[28:0]
-> >>
-> >> M_CAN_FIFO_ID
-> >>
-> >>> R1 ANMF FIDX[6:0] res EDL BRS DLC[3:0] RXTS[15:0]
-> >>
-> >> M_CAN_FIFO_DLC
-> >>
-> >>> R2 DB3[7:0] DB2[7:0] DB1[7:0] DB0[7:0]
-> >>> R3 DB7[7:0] DB6[7:0] DB5[7:0] DB4[7:0]
-> >>
-> >> M_CAN_FIFO_DATA0
-> >> M_CAN_FIFO_DATA1
-> >>
-> > 
-> > You mean as follows?
-> > enum m_can_fifo {
-> >         M_CAN_FIFO_ID = 0,
-> >         M_CAN_FIFO_DLC,
-> = 0x4,
-> >         M_CAN_FIFO_DATA0,
-> = 0x8,
-> >         M_CAN_FIFO_DATA1,
-> = 0xc,
-> > };
-> > 
-> > static inline u32 m_can_fifo_read(const struct m_can_priv *priv,
-> >                                   u32 fgi, enum m_can_fifo fifo)
-> > {
-> >         return readl(priv->mram_base + priv->mcfg[MRAM_RXF0].off +
-> >                      fgi * RXF0_ELEMENT_SIZE + fifo * 0x4);
-> > }
-> 
-> without the * 0x4
-> 
-> > id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
-> > 
-> > The problem is when adding long frames support, it becomes:
-> > enum m_can_fifo {
-> >         M_CAN_FIFO_ID = 0,
-> >         M_CAN_FIFO_DLC,
-> >         M_CAN_FIFO_DATA0,
-> >         M_CAN_FIFO_DATA1,
-> >         ....
-> >         M_CAN_FIFO_DATA15,
-> > };
-> 
-> #define M_CAN_FIFO_DATA(n)
-> 	(enum m_can_fifo)(M_CAN_FIFO_DATA_0 + (n) << 2)
-> 
+On Tue, Jul 15, 2014 at 4:58 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
+>>
+>> On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>
+>>> On Monday 14 July 2014 19:36:24 Mark Brown wrote:
+>>>>
+>>>> On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
+>>>>>
+>>>>> On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
+>>>>
+>>>>
+>>>>>> Yes. But now that you say it the gpiod_direction_output() call is
+>>>>>> missing
+>>>>>> from this patch.
+>>>>
+>>>>
+>>>>> I'm lost now. The GPIO_ACTIVE_HIGH I added comes from
+>>>>> Documentation/gpio/board.txt
+>>>>> and as Linus Walleij explained to me the other day, the lookup is
+>>>>> supposed
+>>>>> to replace devm_gpio_request_one(), which in turn replaced both the
+>>>>> gpio_request and the gpio_direction_output(). Do I need to put the
+>>>>> gpiod_direction_output() back or is there another interface for that
+>>>>> when
+>>>>> registering the board gpios?
+>>>>
+>>>>
+>>>> Indeed.  If you *do* need an explicit _output() then that sounds to me
+>>>> like we either need a gpiod_get_one() or an extension to the table,
+>>>> looking at the code it seems like this is indeed the case.  We can set
+>>>> if the GPIO is active high/low, or open source/drain but there's no flag
+>>>> for the initial state.
+>>>
+>>>
+>>> (adding Alexandre and the gpio list)
+>>>
+>>> GPIO people: any guidance on how a board file should set a gpio to
+>>> output/default-high in a GPIO_LOOKUP() table to replace a
+>>> devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
+>>> Do we need to add an interface extension to do this, e.g. passing
+>>> GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
+>>
+>>
+>> The way I see it, GPIO mappings (whether they are done using the
+>> lookup tables, DT, or ACPI) should only care about details that are
+>> relevant to the device layout and that should be abstracted to the
+>> driver (e.g. whether the GPIO is active low or open drain) so drivers
+>> do not need to check X conditions every time they want to drive the
+>> GPIO.
+>>
+>> Direction and initial value, on the other hand, are clearly properties
+>> that ought to be set by the driver itself. Thus my expectation here
+>> would be that the driver sets the GPIO direction and initial value as
+>> soon as it gets it using gpiod_direction_output(). In other words,
+>> there is no replacement for gpio_request_one() with the gpiod
+>> interface. Is there any use-case that cannot be covered by calling
+>> gpiod_direction_output() right after gpiod_get()? AFAICT this is what
+>> gpio_request_one() was doing anyway.
+>
+>
+> I agree with you that this is something that should be done in the driver
+> and not in the lookup table. I think that it is still a good idea to have a
+> replacement for gpio_request_one with the new GPIO descriptor API. A large
+> share of the drivers want to call either gpio_direction_input() or
+> gpio_direction_output() right after requesting the GPIO. Combining both the
+> requesting and the configuration of the GPIO into one function call makes
+> the code a bit shorter and also simplifies the error handling. Even more so
+> if e.g. the GPIO is optional. This was one of the main reasons why
+> gpio_request_one was introduced, see the commit[1] that added it.
 
-This is a bit strange using and we may still have to define other M_CAN_FIFO_DATAx
-to avoid the enum value exceeds the defined range.
-enum m_can_fifo {
-        M_CAN_FIFO_ID = 0,
-        M_CAN_FIFO_DLC = 0x4,
-        M_CAN_FIFO_DATA0 = 0x8,
-        M_CAN_FIFO_DATA1 = 0xc,
-	....
-        M_CAN_FIFO_DATA15 = 0xc,
-};
-
-However, actually we will not use them at all after introducing M_CAN_FIFO_DATA(n).
-If that, why we still need define them in enum?
-
-Comparing to this way, why not simply just do as follows:
-#define M_CAN_FIFO_ID		0x0
-#define M_CAN_FIFO_DLC		0x4
-#define M_CAN_FIFO_DATA(n)	(0x8 + (n) << 2)
-
-What do you think?
-
-> > But it's useless because we may not use enum to read fifo data anymore.
-> > It's not suitable to read fifo one by one:
-> > m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA0);
-> > m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA1);
-> > ..
-> > m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA15);
-> > 
-> > 
-> > Instead, we may read data according to real dlc value within a for loop like:
-> > #define M_CAN_FIFO(n)   (n * 0x4)
-> > id = m_can_fifo_read(priv, fgi, M_CAN_FIFO(0));
-> > dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO(1));
-> > for (i = 0; dlc > 0; dlc -= 0x4, i++) {
-> >         ....
-> >         data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO(i + 2));
-> > }
-> 
-> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
-> dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
-> for (i = 0; i <= dlc; i++)
-> 	data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i));
-
-Does it work?
-The dlc is in bytes while m_can_fifo_read is read in words.
-
-Regards
-Dong Aisheng
-
-> 
-> > So i'm not sure define that enum now is really needed.
-> 
-> [...]
-> 
-> >>>>> +static int m_can_handle_lec_err(struct net_device *dev,
-> >>>>> +				enum m_can_lec_type lec_type)
-> >>>>> +{
-> >>>>> +	struct m_can_priv *priv = netdev_priv(dev);
-> >>>>> +	struct net_device_stats *stats = &dev->stats;
-> >>>>> +	struct can_frame *cf;
-> >>>>> +	struct sk_buff *skb;
-> >>>>> +
-> >>>>> +	/* early exit if no lec update */
-> >>>>> +	if (lec_type == LEC_UNUSED)
-> >>>>> +		return 0;
-> >>>>
-> >>>> I think this is not needed, as checked by the only caller.
-> >>>
-> >>> You mean move it to caller as follows?
-> >>>         /* handle lec errors on the bus */
-> >>>         if ((psr & LEC_UNUSED) && ((psr & LEC_UNUSED)!= LEC_UNUSED) &&
-> >>
-> >> yes - or something like this:
-> >>
-> >> static inline bool is_lec(u32 psr)
-> >> {
-> >> 	u32 psr &= LEC_UNUSED
-> >>
-> >> 	return psr && (psr != LEC_UNUSED)
-> >> }
-> >>
-> >> 	if ((priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING) &&
-> >> 		is_lec(psr)) {
-> >> 	}
-> >>
-> > 
-> > 
-> > Looks fine.
-> > Maybe is_lec_err(u32 psr) better? :-)
-> 
-> Yes, is_lec() was just a random placeholder :) Descriptive function
-> names are always preferred.
-> 
-> Marc
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+I am not opposed to it as a convenience function. Note that since the
+open-source and open-drain flags are already handled by the lookup
+table, the only flags it should handle are those related to direction,
+value, and (maybe) sysfs export.
