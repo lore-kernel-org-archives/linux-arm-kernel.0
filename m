@@ -1,25 +1,40 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 15 Jul 2014 06:59:13 -0700
-Subject: [GIT PULL] Mediatek basic support for v3.17
-In-Reply-To: <CABuKBe+h0Et5_+o4_i-Eu7EQ8Xka7YFoKmO=U0B7NnVQBdQ8FA@mail.gmail.com>
-References: <CABuKBe+h0Et5_+o4_i-Eu7EQ8Xka7YFoKmO=U0B7NnVQBdQ8FA@mail.gmail.com>
-Message-ID: <20140715135913.GA18571@kroah.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 15 Jul 2014 10:23:26 -0400
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <20140715135418.GV4179@bivouac.eciton.net>
+References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405363248.25580.12.camel@deneb.redhat.com>
+ <20140715100221.GU4179@bivouac.eciton.net>
+ <1405429860.25580.25.camel@deneb.redhat.com>
+ <20140715135418.GV4179@bivouac.eciton.net>
+Message-ID: <1405434206.25580.31.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 01:11:42PM +0200, Matthias Brugger wrote:
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
+> On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
+> > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
+> > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
+> > > >                       continue;
+> > > >               }
+> > > >  
+> > > > +             /* Don't free anything below kernel */
+> > > > +             if (md->phys_addr < PHYS_OFFSET)
+> > > > +                     continue;
+> > > > +
+> > > 
+> > > Is the spin table area really allocated as BOOT_SERVICES_*?
+> > 
+> > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
+> > then there could be BS code/data memory which we'd want to ignore.
 > 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> Well, if it is boot service code/data - then there is no need for us
+> to keep it around after ExitBootServices().
 > 
-> are available in the git repository at:
-> 
->   https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-basic-support
+> /
+>     Leif
 
-As these are only 7 patches, why do a git pull?  And I know I can't take
-pull requests from github, I'm not sure what the rules are for the ARM
-SoC developers either...
-
-Just send patches, it's easier that way.
-
-greg k-h
+One would think, but EFI has proven to be less than strictly compliant
+in that regard in the past. I'm inclined to keep the boot services
+around until after SetVirtualAddressMap just in case.
