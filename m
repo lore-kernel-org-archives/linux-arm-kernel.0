@@ -1,99 +1,134 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 15 Jul 2014 19:30:08 +0200
-Subject: [PATCH 1/3] spi: s3c64xx: move "cs-gpio" from subnode to SPI DT
- node
-In-Reply-To: <1405426860-18404-2-git-send-email-ch.naveen@samsung.com>
-References: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
- <1405426860-18404-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <53C56520.8030801@samsung.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Tue, 15 Jul 2014 23:01:43 +0530
+Subject: [PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
+In-Reply-To: <53C51B57.9040404@samsung.com>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+ <1403697175-13476-1-git-send-email-t.figa@samsung.com>
+ <53C3A8E8.4090009@gmail.com> <2740751.gTMSlJs48H@amdc1032>
+ <53C51B57.9040404@samsung.com>
+Message-ID: <CADWw7OgQpJh+5V10QfKQyeUk3kV+AiKJ8yk_+jqW9QywgHAqFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naveen,
+On Tue, Jul 15, 2014 at 5:45 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> On 15.07.2014 13:19, Bartlomiej Zolnierkiewicz wrote:
+>>
+>> Hi,
+>>
+>> On Monday, July 14, 2014 11:54:48 AM Tomasz Figa wrote:
+>>> Hi Kukjin,
+>>>
+>>> On 25.06.2014 13:52, Tomasz Figa wrote:
+>>>> Due to recent consolidation of Exynos suspend and cpuidle code, some
+>>>> parts of suspend and resume sequences are executed two times, once from
+>>>> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+>>>> breaks suspend, at least on Exynos4-based boards.
+>>>>
+>>>> This patch fixes the issue by removing exynos_pm_syscore_ops completely
+>>>> and making the code rely only on CPU PM notifier.
+>>>>
+>>>> Tested on Exynos4210-based Trats board.
+>>>>
+>>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>>> ---
+>>>>  arch/arm/mach-exynos/pm.c | 23 ++++-------------------
+>>>>  1 file changed, 4 insertions(+), 19 deletions(-)
+>>>>
+>>>> Changes since v1:
+>>>>  - rebased onto Kukjin's fixes branch.
+>>>>
+>>>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+>>>> index 202ca73..f23cc77 100644
+>>>> --- a/arch/arm/mach-exynos/pm.c
+>>>> +++ b/arch/arm/mach-exynos/pm.c
+>>>> @@ -364,11 +364,6 @@ early_wakeup:
+>>>>     return;
+>>>>  }
+>>>>
+>>>> -static struct syscore_ops exynos_pm_syscore_ops = {
+>>>> -   .suspend        = exynos_pm_suspend,
+>>>> -   .resume         = exynos_pm_resume,
+>>>> -};
+>>>> -
+>>>>  /*
+>>>>   * Suspend Ops
+>>>>   */
+>>>> @@ -438,22 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+>>>>
+>>>>     switch (cmd) {
+>>>>     case CPU_PM_ENTER:
+>>>> -           if (cpu == 0) {
+>>>> -                   exynos_pm_central_suspend();
+>>>> -                   if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+>>>> -                           exynos_cpu_save_register();
+>>>> -           }
+>>>> +           if (cpu == 0)
+>>>> +                   exynos_pm_suspend();
+>>>>             break;
+>>>>
+>>>>     case CPU_PM_EXIT:
+>>>> -           if (cpu == 0) {
+>>>> -                   if (read_cpuid_part_number() ==
+>>>> -                                   ARM_CPU_PART_CORTEX_A9) {
+>>>> -                           scu_enable(S5P_VA_SCU);
+>>>> -                           exynos_cpu_restore_register();
+>>>> -                   }
+>>>> -                   exynos_pm_central_resume();
+>>>> -           }
+>>>> +           if (cpu == 0)
+>>>> +                   exynos_pm_resume();
+>>>>             break;
+>>>>     }
+>>>>
+>>>> @@ -478,6 +464,5 @@ void __init exynos_pm_init(void)
+>>>>     tmp |= ((0xFF << 8) | (0x1F << 1));
+>>>>     __raw_writel(tmp, S5P_WAKEUP_MASK);
+>>>>
+>>>> -   register_syscore_ops(&exynos_pm_syscore_ops);
+>>>>     suspend_set_ops(&exynos_suspend_ops);
+>>>>  }
+>>>>
+>>>
+>>> Please consider this patch for next fixes pull request. Without it
+>>> suspend/resume is broken for Exynos4 and probably other SoCs. This patch
+>>> just restores the sequence from before the patch moving things to PM
+>>> notifier, so I don't think it should need any special treatment.
+>>
+>> Your patch fixes the regression and is a step in the good direction but it
+>> seems that it needs a bit more work:
+>>
+>> Your patch adds to cpuidle AFTR code path restoring of exynos_core_save and
+>> exynos5_sys_save registers without saving them first (restoring is done
+>> through exynos_pm_resume() which is used by both suspend and cpuidle while
+>> saving is done through exynos_pm_prepare() which is used only by suspend).
+>
+> That's right, unfortunately. Interestingly enough AFTR worked fine on
+> Exynos4210 with this patch, but still this needs to be fixed.
+>
+> Now, in fact, I recall that Chander had some objections to this patch as
+> well and we decided that he will send another patch to replace mine [1],
+> but I haven't heard from him since that.
 
-Please see my comments inline.
+Patch for the same has been already posted.
+Below is the link for the same
+http://www.spinics.net/lists/arm-kernel/msg343402.html
 
-On 15.07.2014 14:20, Naveen Krishna Chatradhi wrote:
-> This patch modifies the spi-s3c64xx.c driver to fetch the 
-> Chip select or Slave select gpio line property "cs-gpios"
-> from SPI node instead of "controller_data" subnode.
-> 
-> Rename the property "cs-gpio" to "cs-gpios" in accordance
-> with the SPI core. Such that s3c64xx.c can use spi->cs_gpio
-> instead of parsing the property in the driver.
-> 
-> Update the dt-bindings ion spi/spi-samsung.txt
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> ---
-> This patch is a rework of the change @
-> http://www.mail-archive.com/devicetree at vger.kernel.org/msg34500.html
-> 
-> I'm not sure if i can carry forward the other Signed-offs and Tested-bys
+This patch has conflict with Russel's patch, so i will rebase on his
+tree and resend
 
-[snip]
+This patch can be ignored in that case.
 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 75a5696..72bfba6 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -764,12 +764,6 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
->  		return ERR_PTR(-EINVAL);
->  	}
->  
-> -	data_np = of_get_child_by_name(slave_np, "controller-data");
-> -	if (!data_np) {
-> -		dev_err(&spi->dev, "child node 'controller-data' not found\n");
-> -		return ERR_PTR(-EINVAL);
-> -	}
-
-Do you need to move this code block?
-
-> -
->  	cs = kzalloc(sizeof(*cs), GFP_KERNEL);
->  	if (!cs) {
->  		of_node_put(data_np);
-> @@ -777,13 +771,17 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
->  	}
->  
->  	/* The CS line is asserted/deasserted by the gpio pin */
-> -	if (sdd->cs_gpio)
-> -		cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
-> +	cs->line = spi->cs_gpio;
->  
->  	if (!gpio_is_valid(cs->line)) {
-
-This check is wrong when native chip select is used. However I'm not
-sure how to distinguish this from a situation when invalid GPIO was
-specified, because cs->line will be -ENOENT in both cases. Mark, any ideas?
-
->  		dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
->  		kfree(cs);
-> -		of_node_put(data_np);
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	data_np = of_get_child_by_name(slave_np, "controller-data");
-> +	if (!data_np) {
-> +		dev_err(&spi->dev, "child node 'controller-data' not found\n");
->  		return ERR_PTR(-EINVAL);
->  	}
->  
-> @@ -1077,7 +1075,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
->  	sdd->sfr_start = mem_res->start;
->  	sdd->cs_gpio = true;
->  	if (pdev->dev.of_node) {
-> -		if (!of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
-> +		if (!of_find_property(pdev->dev.of_node, "cs-gpios", NULL))
->  			sdd->cs_gpio = false;
-
-What is this boolean flag used for now? If cs->line now either contains
-a valid GPIO or a negative error, why gpio_is_valid() couldn't be used
-on it? I believe it was done correctly in previous version.
-
-Best regards,
-Tomasz
+>
+> Chander, do you have any progress with this? Keep in mind that we need
+> this as an rc fix and we already have rc5, so not much time left. If you
+> don't have time to work on this I can take care of this, proceeding as
+> we discussed in [1].
+>
+> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29085/focus=33975
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
