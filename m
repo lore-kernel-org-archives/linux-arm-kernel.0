@@ -1,114 +1,114 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 16 Jul 2014 03:18:45 +0900
-Subject: [PATCH] ARM: dts: Add sound nodes for Odroid-X2/U3 boards
-In-Reply-To: <1405350752-25795-1-git-send-email-s.nawrocki@samsung.com>
-References: <1405350752-25795-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <53C57085.4020905@samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 15 Jul 2014 20:45:06 +0200
+Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
+In-Reply-To: <53C4F745.3070701@linaro.org>
+References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+ <CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>
+ <53C4F745.3070701@linaro.org>
+Message-ID: <201407152045.06517.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/14 00:12, Sylwester Nawrocki wrote:
-> Add MAX98090 audio codec, I2S interface and the sound complex
-> nodes to enable audio on Odroid-X2/U3 boards.
->
-> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> ---
-> This patch depends on the series from Marek [1] adding dt sources
-> for Odroid X2/U3. My testing branch can be pulled from [2].
->
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg32544.html
-> [2] git://linuxtv.org/snawrocki/samsung.git v3.16-rc5-odroid-sound
->
->   arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   27 +++++++++++++++++++++++
->   arch/arm/boot/dts/exynos4412-odroidu3.dts       |   12 ++++++++++
->   arch/arm/boot/dts/exynos4412-odroidx2.dts       |    9 ++++++++
->   3 files changed, 48 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> index 0bc1a9b..6d6d23c 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> @@ -32,6 +32,21 @@
->   		};
->   	};
->
-> +	i2s0: i2s at 03830000 {
-> +		pinctrl-0 =<&i2s0_bus>;
-> +		pinctrl-names = "default";
-> +		status = "okay";
-> +		clocks =<&clock_audss EXYNOS_I2S_BUS>,
-> +			<&clock_audss EXYNOS_DOUT_AUD_BUS>;
-> +		clock-names = "iis", "i2s_opclk0";
-> +	};
-> +
-> +	sound: sound {
-> +		compatible = "samsung,odroidx2-audio";
-> +		samsung,i2s-controller =<&i2s0>;
-> +		samsung,audio-codec =<&max98090>;
-> +	};
-> +
->   	mmc at 12550000 {
->   		pinctrl-0 =<&sd4_clk&sd4_cmd&sd4_bus4&sd4_bus8>;
->   		pinctrl-names = "default";
-> @@ -321,6 +336,18 @@
->   		};
->   	};
->
-> +	i2c at 13870000 {
-> +		pinctrl-names = "default";
-> +		pinctrl-0 =<&i2c1_bus>;
-> +		status = "okay";
-> +		max98090: max98090 at 10 {
-> +			compatible = "maxim,max98090";
-> +			reg =<0x10>;
-> +			interrupt-parent =<&gpx0>;
-> +			interrupts =<0 0>;
-> +		};
-> +	};
-> +
->   	exynos-usbphy at 125B0000 {
->   		status = "okay";
->   	};
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-> index 287aa0d..c8a64be 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-> @@ -47,3 +47,15 @@
->   		status = "okay";
->   	};
->   };
-> +
-> +&sound {
-> +	compatible = "samsung,odroidu3-audio";
-> +	samsung,model = "Odroid-U3";
-> +	samsung,audio-routing =
-> +		"Headphone Jack", "HPL",
-> +		"Headphone Jack", "HPR",
-> +		"Headphone Jack", "MICBIAS",
-> +		"IN1", "Headphone Jack",
-> +		"Speakers", "SPKL",
-> +		"Speakers", "SPKR";
-> +};
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidx2.dts b/arch/arm/boot/dts/exynos4412-odroidx2.dts
-> index e9ae161..96b43f4 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidx2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidx2.dts
-> @@ -21,3 +21,12 @@
->   		reg =<0x40000000 0x7FF00000>;
->   	};
->   };
-> +
-> +&sound {
-> +	samsung,model = "Odroid-X2";
-> +	samsung,audio-routing =
-> +		"Headphone Jack", "HPL",
-> +		"Headphone Jack", "HPR",
-> +		"IN1", "Mic Jack",
-> +		"Mic Jack", "MICBIAS";
-> +};
-> --
+On Tuesday, July 15, 2014 at 11:41:25 AM, Daniel Thompson wrote:
+> On 14/07/14 14:51, Harro Haan wrote:
+> > On 10 July 2014 10:03, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> >> This patchset makes it possible to use kgdb's NMI infrastructure on ARM
+> >> platforms.
+> >> 
+> >> The patches have been previously circulated as part of a large patchset
+> >> mixing together ARM architecture code and driver changes
+> >> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901 ). This
+> >> patchset is dramatically cut down to include only the arch/arm code. The
+> >> driver code (irqchip and tty/serial) will follow when/if the arch code
+> >> is accepted.
+> >> 
+> >> The first two patches modify the FIQ infrastructure to allow interrupt
+> >> controller drivers to register callbacks (the fiq_chip structure) to
+> >> manage FIQ routings and to ACK and EOI the FIQ. This makes it possible
+> >> to use FIQ in multi-platform kernels and with recent ARM interrupt
+> >> controllers.
+> > 
+> > Daniel,
+> > 
+> > Thanks for the patches. I have tested the fiq and irq-gic patches on
+> > an i.MX6 (SabreSD board) for a different purpose:
+> > A FIQ timer interrupt at 1 kHz. The TWD watchdog block is used in
+> > timer mode for this (interrupt ID 30). The GIC affinity is set to CPU
+> > core 0 only for this interrupt ID.
+> > 
+> > I was surprised by the following behavior:
+> > $ cat /proc/interrupts
+> > 
+> >            CPU0       CPU1       CPU2       CPU3
+> >  
+> >  29:       5459       3381       3175       3029       GIC  29  twd
+> >  30:         11          0          0          0       GIC  30  fake-fiq
+> > 
+> > Once every few seconds is interrupt ID 30 handled by the regular GIC
+> > handler instead of the FIQ exception path (which causes for example a
+> > bit more latencies). The other thousands of FIQ's are handled by the
+> > FIQ exception path. The problem is also confirmed by the following
+> > stackframe of the Lauterbach tooling:
+> > fake_fiq_handler(irq = 30, ...)
+> > handle_percpu_devid_irq(irq = 30, ...)
+> > generic_handle_irq(irq = 30)
+> > handle_IRQ(irq = 30, ...)
+> > gic_handle_irq
+> > __irq_svc
+> > -->exception
+> > 
+> > Notes:
+> > 
+> > - The problem will occur more often by executing the following command:
+> >   $ while true; do hackbench 20; done &
+> > 
+> > - Reading the GIC_CPU_INTACK register returns the interrupt ID of the
+> > highest priority pending interrupt.
+> > - The GIC_CPU_INTACK register (used by fiq_ack) will return spurious
+> > interrupt ID 0x3FF when read in fake_fiq_handler, because
+> > GIC_CPU_INTACK is already read by gic_handle_irq.
+> > - The FIQ exception will not occur anymore after gic_handle_irq
+> > read/acknowledges the FIQ by reading the GIC_CPU_INTACK register
+> > 
+> > From the behavior above I conclude that the GIC_CPU_INTACK register is
+> > first updated before the FIQ exception is generated, so there is a
+> > small period of time that gic_handle_irq can read/acknowledge the FIQ.
+> 
+> Makes sense.
+> 
+> Avoiding this problem on GICv2 is easy (thanks to the aliased intack
+> register) but on iMX.6 we have only a GICv1.
 
+Yep.
 
-Applied, thanks.
+> > I can reduce the number of occurrences (not prevent it) by adding the
+> > following hack to irq-gic.c
+> > @@ -297,10 +309,12 @@ static asmlinkage void __exception_irq_entry
+> > gic_handle_irq(struct pt_regs *regs
+> > 
+> >   u32 irqstat, irqnr;
+> >   struct gic_chip_data *gic = &gic_data[0];
+> >   void __iomem *cpu_base = gic_data_cpu_base(gic);
+> >   
+> >   do {
+> > 
+> > + while(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_PENDING_SET)
+> > & (1 << 30))
+> > +   printk(KERN_ERR "TEMP: gic_handle_irq: wait for FIQ exception\n");
+> > 
+> >   irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
+> >   irqnr = irqstat & ~0x1c00;
+> 
+> I've made a more complete attempt to fix this. Could you test the
+> following? (and be prepared to fuzz the line numbers)
 
-- Kukjin
+There's also another workaround, look at [1], but it's really a perverse hack 
+thus far (blush). What I did there is I got hinted that an L1 page table can 
+have this NS bit set. If this bit is set for a mapping, all accesses to memory 
+area via that mapping will be non-secure. And then, in turn, by doing a non-
+secure read of the INTACK register, it will not ever happen that the FIQ number 
+will pop up in the INTACK. I only do a non-secure read of the INTACK register,
+all other registers of the GICv1 are read via regular secure-mode accesses.
+
+[1] http://git.denx.de/?p=linux-denx/linux-denx-
+marex.git;a=shortlog;h=refs/heads/topic/socfpga/fiq-2014-07-10_01
