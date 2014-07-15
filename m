@@ -1,64 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 Jul 2014 14:24:31 +0200
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
-References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
- <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
- <20140708102142.0f7fe796@free-electrons.com>
- <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
-Message-ID: <20140715142431.4eccbcd6@free-electrons.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Tue, 15 Jul 2014 17:50:57 +0530
+Subject: [PATCH 0/3] spi: s3c64xx: fix the driver to use "cs-gpios" property
+Message-ID: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maggie Mae Roxas,
+Current SPI core has generic implementation for configuring
+the Chip select gpios during .setup() & .cleanup(). By modifying
+the spi-s3c64xx.c driver to expect the "cs-gpios" property in SPI
+device node instead of the subnode "controller-data".
 
-On Tue, 8 Jul 2014 23:35:36 -0700, Maggie Mae Roxas wrote:
+This way we can avoid parsing the "cs-gpios" in the driver.
 
-> As much as we'd like to switch to the latest v3.14.x, we need to stay
-> at kernel v3.13.9 as that is a hard requirement of our customer (I
-> think it's because it's the base platform for Ubuntu 14.04 FS which
-> we'll use).
-> 
-> So I applied your patch in our v3.13.9 as suggested:
-> http://kernel.opensuse.org/cgit/kernel/patch/?id=cd71e246c16b30e3f396a85943d5f596202737ba
-> 
-> Unfortunately, issue still exists after we applied it.
-> 
-> > Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
-> network driver:
-> 
-> Given this, we tried to replace mvneta.c of our v3.13.9 and replace it
-> with v3.13.5's mvneta.c.
-> Issue does not exist when we did that - but of course, we surely will
-> miss something, so we wanted to confirm this further with you.
-> It seems like applying cd71e246c16b30e3f396a85943d5f596202737ba in
-> v3.13.9 is not sufficient enough..?
-> Possibly there are v3.13.5 and v3.13.9 diff (see attached) needed
-> apart from just cd71e246c16b30e3f396a85943d5f596202737ba?
+This patch set also does the following
+1. Validate the "struct s3c64xx_spi_csinfo *cs" object and the
+   CS gpio for both DT and NON-DT before using them.
+2. Correct the dt-bindings for exynos4210-smdkv310.dts, exynos4412-trats2.dts
+   and exynos5250-smdk5250.dts
+3. Updates the DT bindings.
 
-Hum, there are indeed more commits than I thought between 3.13.5 and
-3.13.9 :
+Note: 
+This patchset is a rework of the changes under review @
+http://www.mail-archive.com/devicetree at vger.kernel.org/msg34501.html
 
-396b229b683fdc08d8705883860ec5a1b810546a net: mvneta: fix usage as a module on RGMII configurations
-ea64e1f33d9d627da5d38da035e5d7443276e84e net: mvneta: rename MVNETA_GMAC2_PSC_ENABLE to MVNETA_GMAC2_PCS_ENABLE
-4f3a4f701b59a3e4b5c8503ac3d905c0a326f922 net: mvneta: replace Tx timer with a real interrupt
-0ce58acf529bacd25dbe01298ff51a5c4d59a4f4 net: mvneta: add missing bit descriptions for interrupt masks and causes
-8c2c9b1efcc4b04b4625d0613b9e74ef17016dea net: mvneta: do not schedule in mvneta_tx_timeout
-92817335465090aecfde6caef9bab6923f209664 net: mvneta: use per_cpu stats to fix an SMP lock up
-fbfbed33a5effba7dc6f33e3ed598f9bd31b0cdf net: mvneta: increase the 64-bit rx/tx stats out of the hot path
+Tested on Exynos5420 and Exynos5250 based Peach PIT, PI and Snow boards
+respectively using the flashrom utility to access SPI flash.
 
-Willy: many of the patches in this list are yours. The patch "net:
-mvneta: fix usage as a module on RGMII configurations" is known to
-break SGMII configurations, but even after reverting it, Maggie Mae
-reports that mvneta in 3.13.9 doesn't work, but mvneta works on 3.13.5.
-Do you see any missing patch on the TX rework that you did and that was
-included betweeen 3.13.5 and 3.13.9 ?
+This patchset is needed by the changes
+http://www.gossamer-threads.com/lists/linux/kernel/1951607
 
-Thanks,
+Tested-by on boards based on Exynos4, S5P, S3C series SoCs
+would be appreciated.
 
-Thomas
+Naveen Krishna Chatradhi (3):
+  spi: s3c64xx: move property "cs-gpio" from controller_data subnode   
+      to SPI DT node
+  spi: s3c64xx: validate s3c64xx_spi_csinfo before using
+  ARM: DTS: fix the chip select gpios definition in the SPI nodes
+
+ .../devicetree/bindings/spi/spi-samsung.txt        |   10 ++++----
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
+ drivers/spi/spi-s3c64xx.c                          |   27 +++++++-------------
+ 5 files changed, 17 insertions(+), 26 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
