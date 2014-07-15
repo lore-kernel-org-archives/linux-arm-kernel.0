@@ -1,50 +1,119 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 14 Jul 2014 22:36:59 -0700
-Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
- <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
- <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
- <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
- <53C0A12A.2060204@codeaurora.org>
- <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
- <53C42AA8.8010107@codeaurora.org>
- <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
-Message-ID: <53C4BDFB.70707@codeaurora.org>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Tue, 15 Jul 2014 11:15:22 +0530
+Subject: [PATCH v9 2/4] Documentation: dts: Add bindings for APM X-Gene
+ SoC ethernet driver
+In-Reply-To: <1405376285-23008-3-git-send-email-isubramanian@apm.com>
+References: <1405376285-23008-1-git-send-email-isubramanian@apm.com>
+ <1405376285-23008-3-git-send-email-isubramanian@apm.com>
+Message-ID: <53C4BFF2.5080103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2014 09:35 PM, Viresh Kumar wrote:
-> On 15 July 2014 00:38, Saravana Kannan <skannan@codeaurora.org> wrote:
->> Yeah, it definitely crashes if policy->cpu if an offline cpu. Because the
->> mutex would be uninitialized if it's stopped after boot or it would never
->> have been initialized (depending on how you fix policy->cpu at boot).
->>
->> Look at this snippet on the actual tree and it should be pretty evident.
+On 07/15/2014 03:48 AM, Iyappan Subramanian wrote:
+> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
 >
-> Yeah, I missed it. So the problem is we initialize timer_mutex's for
-> policy->cpus. So we need to do that just for policy->cpu and also we don't
-> need a per-cpu timer_mutex anymore.
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Ravi Patel <rapatel@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> ---
+>   .../devicetree/bindings/net/apm-xgene-enet.txt     | 72 ++++++++++++++++++++++
+>   1 file changed, 72 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
 >
+> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+> new file mode 100644
+> index 0000000..3e2a295
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+> @@ -0,0 +1,72 @@
+> +APM X-Gene SoC Ethernet nodes
+> +
+> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
+> +APM X-Gene SoC.
+> +
+> +Required properties:
+> +- compatible:		Should be "apm,xgene-enet"
+> +- reg: Address and length of the register set for the device. It contains the
+> +       information of registers in the same order as described by reg-names
+> +- reg-names: Should contain the register set names
 
-Btw, I tried to take a stab at removing any assumption in cpufreq code 
-about policy->cpu being ONLINE. There are 160 instances of those of with 
-23 are in cpufreq.c
+These are not aligned properly...
 
-So, even if we are sure cpufreq.c is fine, it's 137 other uses spread 
-across all the other files. I definitely don't want to try and fix those 
-as part of this patch. Way too risky and hard to get the test coverage 
-it would need. Even some of the acpi cpufreq drivers seem to be making 
-this assumption.
+Required properties:
+- compatble		: Should be "apm,xgene-enet"
+- reg			: Address and length of the register set for the device.
+			  It contains the information of registers in the same order
+			  as described by reg-names
 
-Btw, I think v3 is done. I did some testing and it was fine. But made 
-some minor changes. Will test tomorrow to make sure I didn't break 
-anything with the minor changes and then send them out.
+.....
 
--Saravana
+> +  "enet_csr":		Ethernet control and status register address space
+> +  "ring_csr":		Descriptor ring control and status register address space
+> +  "ring_cmd":		Descriptor ring command register address space
+> +- interrupts:		Ethernet main interrupt
+> +- clocks:		Reference to the clock entry.
+> +- local-mac-address:	MAC address assigned to this device
+> +- phy-connection-type:	Interface type between ethernet device and PHY device
+> +- phy-handle:		Reference to a PHY node connected to this device
+> +
+> +- mdio: 		Device tree subnode with the following required
+> +			properties:
+> +
+> +	- compatible: Must be "apm,xgene-mdio".
+> +	- #address-cells: Must be <1>.
+> +	- #size-cells: Must be <0>.
+> +
+> +	For the phy on the mdio bus, there must be a node with the following
+> +	fields:
+> +
+> +	- compatible: PHY identifier.  Please refer ./phy.txt for the format.
+> +	- reg: The ID number for the phy.
+> +
+
+alignment...  :-)
+
+> +Optional properties:
+> +- status		: Should be "ok" or "disabled" for enabled/disabled.
+> +			  Default is "ok".
+> +
+> +
+> +Example:
+> +	menetclk: menetclk {
+> +		compatible = "apm,xgene-device-clock";
+> +		clock-output-names = "menetclk";
+> +		status = "ok";
+> +	};
+> +
+> +	menet: ethernet at 17020000 {
+> +		compatible = "apm,xgene-enet";
+> +		status = "disabled";
+> +		reg = <0x0 0x17020000 0x0 0xd100>,
+> +		      <0x0 0X17030000 0x0 0X400>,
+> +		      <0x0 0X10000000 0x0 0X200>;
+> +		reg-names = "enet_csr", "ring_csr", "ring_cmd";
+> +		interrupts = <0x0 0x3c 0x4>;
+> +		clocks = <&menetclk 0>;
+> +		local-mac-address = [00 01 73 00 00 01];
+> +		phy-connection-type = "rgmii";
+> +		phy-handle = <&menetphy>;
+> +		mdio {
+> +			compatible = "apm,xgene-mdio";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			menetphy: menetphy at 3 {
+> +				compatible = "ethernet-phy-id001c.c915";
+> +				reg = <0x3>;
+> +			};
+> +
+> +		};
+> +	};
+> +
+> +/* Board-specific peripheral configurations */
+> +&menet {
+> +        status = "ok";
+> +};
+
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Varka Bhadram.
