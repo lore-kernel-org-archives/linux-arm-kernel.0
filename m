@@ -1,37 +1,22 @@
 From: k.debski@samsung.com (Kamil Debski)
-Date: Tue, 15 Jul 2014 12:51:21 +0200
+Date: Tue, 15 Jul 2014 12:51:16 +0200
 Subject: [PATCH] s5p-mfc: limit the size of the CPB
 In-Reply-To: <1405393670-2808-1-git-send-email-panpan1.liu@samsung.com>
 References: <1405393670-2808-1-git-send-email-panpan1.liu@samsung.com>
-Message-ID: <000101cfa01a$be5fffb0$3b1fff10$%debski@samsung.com>
+Message-ID: <000001cfa01a$bb569040$3203b0c0$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Panpan,
+Hi,
 
-Checkpatch gives errors on your patch.
+Please also rebase the patches onto the master branch of the media tree.
 
-------------------------------
-Applying 24839 hit enter to continue...
-------------------------------
-Checkpatch:
-------------------------------
-ERROR: do not set execute permissions for source files
-#34: FILE: drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+http://git.linuxtv.org/cgit.cgi/media_tree.git/
 
-ERROR: space required before the open parenthesis '('
-#58: FILE: drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:473:
-+	else if(pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
-
-total: 2 errors, 0 warnings, 25 lines checked
-
-NOTE: Ignored message types: PATCH_PREFIX
-
-24839 has style problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-
+Best wishes,
+-- 
+Kamil Debski
+Samsung R&D Institute Poland
 
 
 > -----Original Message-----
@@ -89,8 +74,3 @@ DEF_CPB_SIZE;
 >  out:
 > --
 > 1.7.9.5
-
-Best wishes,
--- 
-Kamil Debski
-Samsung R&D Institute Poland
