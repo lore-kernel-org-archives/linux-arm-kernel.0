@@ -1,51 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 15 Jul 2014 15:18:12 -0500
-Subject: [PATCH] arm: omap: hwmod: drop unnecessary list initialization
-Message-ID: <1405455492-1087-1-git-send-email-balbi@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 15 Jul 2014 20:21:21 +0000 (UTC)
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <20140709100147.GB25154@breakpoint.cc>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+ <20140709095552.GA25154@breakpoint.cc> <20140709100147.GB25154@breakpoint.cc>
+Message-ID: <alpine.DEB.2.02.1407152019020.21432@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ml->node and sl->node are currently initialized
-by means of INIT_LIST_HEAD(). That initialiation
-is followed by a list_add() call.
+Hi Sebastian,
 
-Looking at what both these functions do we will have:
+On Wed, 9 Jul 2014, Sebastian Andrzej Siewior wrote:
 
-	ml->node.next = &ml->node;
-	ml->node.prev = &ml->node;
-	oi->master->master_ports.next.prev = &ml->node;
-	ml->node.next = &oi->master->master_ports.next;
-	ml->node.prev = &oi->master->master_ports;
-	oi->master->master_ports.next = &ml->node;
+> On 2014-07-09 11:55:52 [+0200], Sebastian Andrzej Siewior wrote:
+> > On 2014-07-08 18:46:39 [+0530], Mugunthan V N wrote:
+> > > Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
+> > 
+> > I reverted my patch, applied this one and after boot I got:
+> Oh me dum dum. I had --dry-run?
+> 
+> Acked-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+> 
+> This is basically what Tony hasked me to do: No IRQ numbers & iomem.
 
-from this, it's clear that both INIT_LIST_HEAD() calls
-are unnecessary and can be safely removed.
+Sorry - I'm a bit confused - Sebastian, did you test this one?  If so, is 
+it okay to add a Tested-by from you?
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+Mugunthan, could you please get a Reviewed-by: from one of the folks on 
+the DRA7xx SoC integration reviewers list that I sent earlier?
 
-found by code inspection, boot tested on am437x SK on today's
-linux-next + pending patches.
 
- arch/arm/mach-omap2/omap_hwmod.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6c074f3..8194990 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2828,12 +2828,10 @@ static int __init _add_link(struct omap_hwmod_ocp_if *oi)
- 	_alloc_links(&ml, &sl);
- 
- 	ml->ocp_if = oi;
--	INIT_LIST_HEAD(&ml->node);
- 	list_add(&ml->node, &oi->master->master_ports);
- 	oi->master->masters_cnt++;
- 
- 	sl->ocp_if = oi;
--	INIT_LIST_HEAD(&sl->node);
- 	list_add(&sl->node, &oi->slave->slave_ports);
- 	oi->slave->slaves_cnt++;
- 
--- 
-2.0.1.563.g66f467c
+- Paul
