@@ -1,47 +1,27 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Tue, 15 Jul 2014 10:04:00 +0530
-Subject: [PATCH v2] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <CAD=FV=UQfQpJ3Tp-cBAfPsH9wHXb1yknget6iMQcgOVnH1PwFA@mail.gmail.com>
-References: <1405319602-29892-1-git-send-email-vikas.sajjan@samsung.com>
- <CAD=FV=UQfQpJ3Tp-cBAfPsH9wHXb1yknget6iMQcgOVnH1PwFA@mail.gmail.com>
-Message-ID: <CAGm_ybhE62Hjn6H5CJTMG92ZtFdx5wugyprjwLdidHoh6f9wBw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 15 Jul 2014 10:05:19 +0530
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C42AA8.8010107@codeaurora.org>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+ <53C0A12A.2060204@codeaurora.org>
+ <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
+ <53C42AA8.8010107@codeaurora.org>
+Message-ID: <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+On 15 July 2014 00:38, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Yeah, it definitely crashes if policy->cpu if an offline cpu. Because the
+> mutex would be uninitialized if it's stopped after boot or it would never
+> have been initialized (depending on how you fix policy->cpu at boot).
+>
+> Look at this snippet on the actual tree and it should be pretty evident.
 
-On Mon, Jul 14, 2014 at 10:30 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Vikas,
->
-> On Sun, Jul 13, 2014 at 11:33 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->> From: Doug Anderson <dianders@chromium.org>
->>
->> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
->> being reset across sleep/wake.  If we don't set it to anything then
->> the TPM will be reset.  U-Boot will detect this as invalid
->> and will reset the system on resume time. This GPIO can always be low
->> and not hurt anything.  It will get pulled back high again during a
->> normal warm reset when it will default back to an input.
->>
->> To properly preserve the TPM state across suspend/resume and to make
->> the chrome U-Boot happy, properly set the GPIO to mask the
->> reset to the TPM.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->> ---
->> changes since v1:
->>         - removed fixed regulator and used hogs instead.
->>
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->
-> This looks reasonable to me except for two things:
->
-> 1. You need to apply this to pit and pi (not just pi)
->
-> 2. The proper sort ordering for elements within a pin control group is
-> by pin number, so this pin should be _after_ gpx0-2, not before.
-
-
-Sure, will repost both pit and pi by reordering the pin as you suggested.
+Yeah, I missed it. So the problem is we initialize timer_mutex's for
+policy->cpus. So we need to do that just for policy->cpu and also we don't
+need a per-cpu timer_mutex anymore.
