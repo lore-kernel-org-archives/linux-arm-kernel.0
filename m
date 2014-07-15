@@ -1,169 +1,47 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 15 Jul 2014 09:10:52 +0200
-Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <53C4D0B6.4010302@gmail.com>
-References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
- <1405338041-19945-2-git-send-email-b29396@freescale.com>
- <53C3D155.8080005@gmail.com>
- <20140715062712.GA9796@shlinux1.ap.freescale.net>
- <53C4D0B6.4010302@gmail.com>
-Message-ID: <53C4D3FC.1030401@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 15 Jul 2014 08:11:30 +0100
+Subject: [PATCH v4 3/6] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
+In-Reply-To: <20140715065515.GE3745@lukather>
+References: <1404892479-12222-1-git-send-email-wens@csie.org>
+ <1404892479-12222-4-git-send-email-wens@csie.org>
+ <20140710093707.GC11948@lee--X1> <20140715065515.GE3745@lukather>
+Message-ID: <20140715071130.GA4282@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2014 08:56 AM, Varka Bhadram wrote:
-> On 07/15/2014 11:57 AM, Dong Aisheng wrote:
->> On Mon, Jul 14, 2014 at 06:17:17PM +0530, Varka Bhadram wrote:
->>>
->>> +/* Test Register (TEST) */
->>> +#define TEST_LBCK    BIT(4)
->>> +
->>> +/* CC Control Register(CCCR) */
->>> +#define CCCR_TEST    BIT(7)
->>> +#define CCCR_MON    BIT(5)
->>> +#define CCCR_CCE    BIT(1)
->>> +#define CCCR_INIT    BIT(0)
->>> +
->>> +/* Bit Timing & Prescaler Register (BTP) */
->>> +#define BTR_BRP_MASK        0x3ff
->>> +#define BTR_BRP_SHIFT        16
->>> +#define BTR_TSEG1_SHIFT        8
->>> +#define BTR_TSEG1_MASK        (0x3f << BTR_TSEG1_SHIFT)
->>> +#define BTR_TSEG2_SHIFT        4
->>> +#define BTR_TSEG2_MASK        (0xf << BTR_TSEG2_SHIFT)
->>> +#define BTR_SJW_SHIFT        0
->>> +#define BTR_SJW_MASK        0xf
->>> +
->>> +/* Error Counter Register(ECR) */
->>> +#define ECR_RP            BIT(15)
->>> +#define ECR_REC_SHIFT        8
->>> +#define ECR_REC_MASK        (0x7f << ECR_REC_SHIFT)
->>> +#define ECR_TEC_SHIFT        0
->>> +#define ECR_TEC_MASK        0xff
->>> +
->>> +/* Protocol Status Register(PSR) */
->>> +#define PSR_BO        BIT(7)
->>> +#define PSR_EW        BIT(6)
->>> +#define PSR_EP        BIT(5)
->>> +#define PSR_LEC_MASK    0x7
->>> +
->>> +/* Interrupt Register(IR) */
->>> +#define IR_ALL_INT    0xffffffff
->>> +#define IR_STE        BIT(31)
->>> +#define IR_FOE        BIT(30)
->>> +#define IR_ACKE        BIT(29)
->>> +#define IR_BE        BIT(28)
->>> +#define IR_CRCE        BIT(27)
->>> +#define IR_WDI        BIT(26)
->>> +#define IR_BO        BIT(25)
->>> +#define IR_EW        BIT(24)
->>> +#define IR_EP        BIT(23)
->>> +#define IR_ELO        BIT(22)
->>> +#define IR_BEU        BIT(21)
->>> +#define IR_BEC        BIT(20)
->>> +#define IR_DRX        BIT(19)
->>> +#define IR_TOO        BIT(18)
->>> +#define IR_MRAF        BIT(17)
->>> +#define IR_TSW        BIT(16)
->>> +#define IR_TEFL        BIT(15)
->>> +#define IR_TEFF        BIT(14)
->>> +#define IR_TEFW        BIT(13)
->>> +#define IR_TEFN        BIT(12)
->>> +#define IR_TFE        BIT(11)
->>> +#define IR_TCF        BIT(10)
->>> +#define IR_TC        BIT(9)
->>> +#define IR_HPM        BIT(8)
->>> +#define IR_RF1L        BIT(7)
->>> +#define IR_RF1F        BIT(6)
->>> +#define IR_RF1W        BIT(5)
->>> +#define IR_RF1N        BIT(4)
->>> +#define IR_RF0L        BIT(3)
->>> +#define IR_RF0F        BIT(2)
->>> +#define IR_RF0W        BIT(1)
->>> +#define IR_RF0N        BIT(0)
->>> +#define IR_ERR_STATE    (IR_BO | IR_EW | IR_EP)
->>> +#define IR_ERR_LEC    (IR_STE    | IR_FOE | IR_ACKE | IR_BE | IR_CRCE)
->>> +#define IR_ERR_BUS    (IR_ERR_LEC | IR_WDI | IR_ELO | IR_BEU | IR_BEC \
->>> +            | IR_TOO | IR_MRAF | IR_TSW | IR_TEFL | IR_RF1L \
->>> +            | IR_RF0L)
->>> +#define IR_ERR_ALL    (IR_ERR_STATE | IR_ERR_BUS)
->>> +
->>> +/* Interrupt Line Select (ILS) */
->>> +#define ILS_ALL_INT0    0x0
->>> +#define ILS_ALL_INT1    0xFFFFFFFF
->>> +
->>> +/* Interrupt Line Enable (ILE) */
->>> +#define ILE_EINT0    BIT(0)
->>> +#define ILE_EINT1    BIT(1)
->>> +
->>> +/* Rx FIFO 0/1 Configuration (RXF0C/RXF1C) */
->>> +#define RXFC_FWM_OFF    24
->>> +#define RXFC_FWM_MASK    0x7f
->>> +#define RXFC_FWM_1    (1 << RXFC_FWM_OFF)
->>> +#define RXFC_FS_OFF    16
->>> +#define RXFC_FS_MASK    0x7f
->>> +
->>> +/* Rx FIFO 0/1 Status (RXF0S/RXF1S) */
->>> +#define RXFS_RFL    BIT(25)
->>> +#define RXFS_FF        BIT(24)
->>> +#define RXFS_FPI_OFF    16
->>> +#define RXFS_FPI_MASK    0x3f0000
->>> +#define RXFS_FGI_OFF    8
->>> +#define RXFS_FGI_MASK    0x3f00
->>> +#define RXFS_FFL_MASK    0x7f
->>> +
->>> +/* Tx Buffer Configuration(TXBC) */
->>> +#define TXBC_NDTB_OFF    16
->>> +#define TXBC_NDTB_MASK    0x3f
->>> +
->>> +/* Tx Buffer Element Size Configuration(TXESC) */
->>> +#define TXESC_TBDS_8BYTES    0x0
->>> +/* Tx Buffer Element */
->>> +#define TX_BUF_XTD    BIT(30)
->>> +#define TX_BUF_RTR    BIT(29)
->>> +
->>> +/* Rx Buffer Element Size Configuration(TXESC) */
->>> +#define M_CAN_RXESC_8BYTES    0x0
->>> +/* Tx Buffer Element */
->>> +#define RX_BUF_ESI    BIT(31)
->>> +#define RX_BUF_XTD    BIT(30)
->>> +#define RX_BUF_RTR    BIT(29)
->>> +
->>> +/* Tx Event FIFO Con.guration (TXEFC) */
->>> +#define TXEFC_EFS_OFF    16
->>> +#define TXEFC_EFS_MASK    0x3f
->>> +
->>> +/* Message RAM Configuration (in bytes) */
->>> +#define SIDF_ELEMENT_SIZE    4
->>> +#define XIDF_ELEMENT_SIZE    8
->>> +#define RXF0_ELEMENT_SIZE    16
->>> +#define RXF1_ELEMENT_SIZE    16
->>> +#define RXB_ELEMENT_SIZE    16
->>> +#define TXE_ELEMENT_SIZE    8
->>> +#define TXB_ELEMENT_SIZE    16
->>> Alignment for all the includes
->>>
->> What do you mean?
->>
-> I mean all the #define from top not aligned.
-> It would be looks good if aligned properly.
+On Tue, 15 Jul 2014, Maxime Ripard wrote:
+
+> Hi Lee,
 > 
-> Give common tab spaces for all the #defines...
+> On Thu, Jul 10, 2014 at 10:37:07AM +0100, Lee Jones wrote:
+> > On Wed, 09 Jul 2014, Chen-Yu Tsai wrote:
+> > 
+> > > The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
+> > > The differences are the AR100 clock can no longer be modified,
+> > > the APB0 clock has different divisors, and some clock gates are
+> > > gone.
+> > > 
+> > > This patch adds a compatible with a modified subdevice list for
+> > > the A23.
+> > > 
+> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
+> > >  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
+> > >  2 files changed, 31 insertions(+), 1 deletion(-)
+> > 
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> We don't have any dependency on this driver, so it would be simpler if
+> you could just take it through your tree I guess.
 
-As I argumented in my other mail, I prefer one space, so no alignment.
+Verll well, applied thanks.
 
-Marc
+
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/9ee3cb2b/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
