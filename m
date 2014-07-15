@@ -1,34 +1,60 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 15 Jul 2014 14:54:19 +0100
-Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <1405429860.25580.25.camel@deneb.redhat.com>
-References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405363248.25580.12.camel@deneb.redhat.com>
- <20140715100221.GU4179@bivouac.eciton.net>
- <1405429860.25580.25.camel@deneb.redhat.com>
-Message-ID: <20140715135418.GV4179@bivouac.eciton.net>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 15 Jul 2014 15:54:26 +0200
+Subject: [PATCH v3 3/4] can: flexcan: switch on clocks before accessing
+ ecr register
+In-Reply-To: <c80f9d2ec80d01088e51be61a4e7845cbfe58f6a.1405428166.git.stefan@agner.ch>
+References: <cover.1405428166.git.stefan@agner.ch>
+ <c80f9d2ec80d01088e51be61a4e7845cbfe58f6a.1405428166.git.stefan@agner.ch>
+Message-ID: <20140715155426.3c03f0d8@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
-> On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
-> > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
-> > >                       continue;
-> > >               }
-> > >  
-> > > +             /* Don't free anything below kernel */
-> > > +             if (md->phys_addr < PHYS_OFFSET)
-> > > +                     continue;
-> > > +
-> > 
-> > Is the spin table area really allocated as BOOT_SERVICES_*?
+Hi,
+
+Stefan Agner wrote:
+> Reported-by: Ashutosh Singh <ashuleapyear@gmail.com>
+> Suggested-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> [stefan at agner.ch: added return check for clk_enable_prepare]
 > 
-> No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
-> then there could be BS code/data memory which we'd want to ignore.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/net/can/flexcan.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+> index f425ec2..89745aa 100644
+> --- a/drivers/net/can/flexcan.c
+> +++ b/drivers/net/can/flexcan.c
+> @@ -383,12 +383,26 @@ static int flexcan_get_berr_counter(const struct net_device *dev,
+>  {
+>  	const struct flexcan_priv *priv = netdev_priv(dev);
+>  	struct flexcan_regs __iomem *regs = priv->base;
+> -	u32 reg = flexcan_read(&regs->ecr);
+> +	u32 reg, err;
+> +
+> +	err = clk_prepare_enable(priv->clk_ipg);
+> +	if (err)
+> +		return err;
+> +
+> +	err = clk_prepare_enable(priv->clk_per);
+> +	if (err)
+> +		goto out_disable_ipg;
+> +
+> +	reg = flexcan_read(&regs->ecr);
+>  
+flexcan_get_berr_counter() may be called from interrupt context and
+thus must not call any functions that can sleep.
+Compiling the driver with CONFIG_DEBUG_ATOMIC_SLEEP would catch this!
 
-Well, if it is boot service code/data - then there is no need for us
-to keep it around after ExitBootServices().
 
-/
-    Leif
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
