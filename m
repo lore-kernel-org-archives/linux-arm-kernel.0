@@ -1,61 +1,41 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 15 Jul 2014 13:11:42 +0200
-Subject: [GIT PULL] Mediatek basic support for v3.17
-Message-ID: <CABuKBe+h0Et5_+o4_i-Eu7EQ8Xka7YFoKmO=U0B7NnVQBdQ8FA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Jul 2014 12:13:50 +0100
+Subject: [RFC V1] devicetree: Dialog Semiconductor consolidate existing
+ vendor prefixes to standardise on 'dlg'
+In-Reply-To: <20140715110944.GY26465@leverpostej>
+References: <201407141616.s6EGG7uK022881@swsrvapps-01.diasemi.com>
+ <20140714162101.GM26465@leverpostej>
+ <6ED8E3B22081A4459DAC7699F3695FB7D0B269FA@SW-EX-MBX02.diasemi.com>
+ <20140715110944.GY26465@leverpostej>
+Message-ID: <20140715111350.GA18495@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+On Tue, Jul 15, 2014 at 12:09:44PM +0100, Mark Rutland wrote:
+> On Tue, Jul 15, 2014 at 11:07:57AM +0100, Opensource [Steve Twiss] wrote:
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> > Rob said that the old forms should be marked as deprecated, but I didn't
+> > deprecate any "dialog" or "diasemi" entries in this patch because I have
+> > only made two types of change:
 
-are available in the git repository at:
+> > (1) definitions of "diasemi" or "dialog" that have not been used in the kernel;
+> > (2) definitions of "diasemi" or "dialog" that are incompatible with existing driver code.
 
-  https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-basic-support
+> > In both of these cases they cannot affect any working DTB.
 
-for you to fetch changes up to 747eec721f99b3d2eb3985c3199bfb54888c716d:
+> Ok, that sounds fine then. That just wasn't immediately obvious.
 
-  arm: mediatek: add dts for Aquaris5 mobile phone (2014-07-15 11:15:00 +0200)
+> Could you please note those facts in the commit message when you next
+> post?
 
-----------------------------------------------------------------
-This patch set adds basic support for the Mediatek Cortex-A7 SoCs.
-Support is quite basic, as the only component working up to now are the
-timers.
-
-----------------------------------------------------------------
-Matthias Brugger (7):
-      of: Provide function to request and map memory
-      clocksource: Add support for the Mediatek SoCs
-      dt-bindings: add mtk-timer bindings
-      vendor-prefixes: add prefix for Mediatek Inc.
-      arm: add basic support for Mediatek MT6589 boards
-      dt-bindings: add documentation for Mediatek SoC
-      arm: mediatek: add dts for Aquaris5 mobile phone
-
- Documentation/devicetree/bindings/arm/mediatek.txt |    8 +
- .../bindings/timer/mediatek,mtk-timer.txt          |   17 ++
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/mt6589-aquaris5.dts              |   25 ++
- arch/arm/boot/dts/mt6589.dtsi                      |   94 +++++++
- arch/arm/mach-mediatek/Kconfig                     |    6 +
- arch/arm/mach-mediatek/Makefile                    |    1 +
- arch/arm/mach-mediatek/mediatek.c                  |   27 ++
- drivers/clocksource/Kconfig                        |    5 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/mtk_timer.c                    |  261 ++++++++++++++++++++
- drivers/of/address.c                               |   36 +++
- include/linux/io.h                                 |    2 +
- include/linux/of_address.h                         |   11 +
- lib/devres.c                                       |    2 -
- 17 files changed, 498 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
- create mode 100644
-Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
- create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
- create mode 100644 arch/arm/boot/dts/mt6589.dtsi
- create mode 100644 arch/arm/mach-mediatek/Kconfig
- create mode 100644 arch/arm/mach-mediatek/Makefile
- create mode 100644 arch/arm/mach-mediatek/mediatek.c
- create mode 100644 drivers/clocksource/mtk_timer.c
+I thought we were already trying to do the stable ABI thing in wich case
+at least the first case (where we just happen to not have in tree DTs
+using the identifiers) should still remain supported?  It's not like it
+really costs us anything to do it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/635fc26d/attachment.sig>
