@@ -1,67 +1,69 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 15 Jul 2014 09:20:34 +0530
-Subject: [PATCH v7 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
-References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAJuA9ahWbL8v2nS6wuDosn-bi+pga57KUe5wQN14Mot_-RTc6w@mail.gmail.com>
+From: a0393675@ti.com (Keerthy)
+Date: Tue, 15 Jul 2014 09:21:38 +0530
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <53C3ED02.7020206@ti.com>
+References: <alpine.DEB.2.02.1407060031120.23762@utopia.booyaka.com>
+ <1404894932-26677-1-git-send-email-lokeshvutla@ti.com>
+ <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
+ <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
+ <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
+ <20140709105055.GP28884@atomide.com> <53BD1FC3.6050500@ti.com>
+ <20140709110051.GQ28884@atomide.com> <53BD2249.2080808@ti.com>
+ <53C3ED02.7020206@ti.com>
+Message-ID: <53C4A54A.1070500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Monday 14 July 2014 08:15 PM, Lokesh Vutla wrote:
+> Hi Tony,
+> On Wednesday 09 July 2014 04:36 PM, Keerthy wrote:
+>> On Wednesday 09 July 2014 04:30 PM, Tony Lindgren wrote:
+>>> * Keerthy <a0393675@ti.com> [140709 03:59]:
+>>>> On Wednesday 09 July 2014 04:20 PM, Tony Lindgren wrote:
+>>>>> * Keerthy <a0393675@ti.com> [140709 03:39]:
+>>>>>> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
+>>>>>>> * Keerthy <a0393675@ti.com> [140709 02:36]:
+>>>>>>>> On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
+>>>>>>>>> * Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
+>>>>>>>>>> --- a/arch/arm/boot/dts/dra7-evm.dts
+>>>>>>>>>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+>>>>>>>>>> @@ -249,6 +249,7 @@
+>>>>>>>>>>                        regulator-min-microvolt = <1050000>;
+>>>>>>>>>>                        regulator-max-microvolt = <1050000>;
+>>>>>>>>>>                        regulator-boot-on;
+>>>>>>>>>> +                    regulator-always-on;
+>>>>>>>>>>                    };
+>>>>>>>>> Is this regulator really always on?
+>>>>>>>> This feeds on to RTC which is a free running clock. So i guess always on is
+>>>>>>>> justified no?
+>>>>>>> Well the dts entries should describe the hardware. If the
+>>>>>>> regulator can be enabled and disabled, we should not claim it's
+>>>>>>> always on.
+>>>>>>   From the PMIC perspective every regulator can be enabled and
+>>>>>> disabled. From a Board perspective there are some which need
+>>>>>> to be always on. For Ex: SMPS123 which feeds on to the MPU.
+>>>>> Right, and we already have regulator-boot-on for those. Or are
+>>>>> you seeing some issue with that?
+>>>> regulator-boot-on describes that at boot a particular regulator is on.
+>>>> It does not guarantee that it will be on for the rest of the time. The
+>>>> regulator framework can go ahead and disable it if no one has requested
+>>>> for it. In case of RTC we do not want that to happen.
+>>> That's a bug in the RTC driver then. The driver should request a
+>>> regulator if it's specified.
+> In my experiments I observed that when RTC regulator is switched off and switched on, there is an abort while
+> accessing RTC registers.
+> After discussing with hardware team, it is confirmed that this LDO9 regulator powering RTC cannot be turned off when
+> SoC is active and expected to be always on.
+As confirmed by the PMIC hardware team this regulator should be an always-on
+regulator.
 
-On Mon, Jul 14, 2014 at 7:08 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> Changes since v6:
-> - Fixes suggested by Amit Daniel <amit.daniel@samsung.com>.
+Acked-by: Keerthy <j-keerthy@ti.com>
 >
-> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
-> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
-> series also enabled cpufreq support for Exynos5420 using arm_big_little cpufreq
-> driver.
+> Thanks and regards,
+> Lokesh
 >
-> Thomas Abraham (6):
->   clk: samsung: add infrastructure to register cpu clocks
->   clk: samsung: register exynos5420 apll/kpll configuration data
->   clk: exynos: use cpu-clock provider type to represent arm clock
->   ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
->   ARM: Exynos: switch to using generic cpufreq driver for exynos4210/5250
->   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
-
-In this series, support for Exynos5420 has been included. If there are
-any more changes required, could you please let me know.
-
-Thanks,
-Thomas.
-
->
->  arch/arm/boot/dts/exynos4210-origen.dts         |    6 +
->  arch/arm/boot/dts/exynos4210-trats.dts          |    6 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 +
->  arch/arm/boot/dts/exynos4210.dtsi               |   27 ++
->  arch/arm/boot/dts/exynos5250-arndale.dts        |    6 +
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 +
->  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 +
->  arch/arm/boot/dts/exynos5250.dtsi               |   23 +
->  arch/arm/boot/dts/exynos5420-smdk5420.dts       |    6 +
->  arch/arm/boot/dts/exynos5420.dtsi               |   32 ++
->  arch/arm/mach-exynos/exynos.c                   |   15 +-
->  drivers/clk/samsung/Makefile                    |    2 +-
->  drivers/clk/samsung/clk-cpu.c                   |  576 +++++++++++++++++++++++
->  drivers/clk/samsung/clk-exynos4.c               |   25 +-
->  drivers/clk/samsung/clk-exynos5250.c            |   16 +-
->  drivers/clk/samsung/clk-exynos5420.c            |   60 ++-
->  drivers/clk/samsung/clk.h                       |    5 +
->  drivers/cpufreq/Kconfig.arm                     |   22 -
->  drivers/cpufreq/Makefile                        |    2 -
->  drivers/cpufreq/exynos4210-cpufreq.c            |  184 --------
->  drivers/cpufreq/exynos5250-cpufreq.c            |  210 ---------
->  include/dt-bindings/clock/exynos5250.h          |    1 +
->  include/dt-bindings/clock/exynos5420.h          |    2 +
->  23 files changed, 802 insertions(+), 442 deletions(-)
->  create mode 100644 drivers/clk/samsung/clk-cpu.c
->  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
->
-> --
-> 1.7.9.5
->
+>> Okay.
+>>
+>>> Regards,
+>>>
+>>> Tony
