@@ -1,41 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 15 Jul 2014 18:16:26 +0900
-Subject: [PATCH 2/4] ARM: shmobile: r8a73a4: add SCI clock support for DT
+Date: Tue, 15 Jul 2014 18:16:27 +0900
+Subject: [PATCH 3/4] ARM: shmobile: r8a7740: correct SCI clock support for DT
 In-Reply-To: <cover.1405398284.git.horms+renesas@verge.net.au>
 References: <cover.1405398284.git.horms+renesas@verge.net.au>
-Message-ID: <9947efaac0545fd833b0ff5147578aba79d297bc.1405398284.git.horms+renesas@verge.net.au>
+Message-ID: <d1ec90f2875471df2c954f7cbd45b2389ff86aa2.1405398284.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+When initialising SCI devices their names will be .serial
+not .sci.
 
 This will be used when initialising SCI devices using DT
 until common clock framework support is added.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7740.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index b5bc22c..1d2fe05 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -574,11 +574,17 @@ static struct clk_lookup lookups[] = {
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 50931e3..68592b7 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -555,27 +555,27 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_ceu.1",	&mstp_clks[MSTP128]),
  
- 	/* MSTP */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
-+	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
-+	CLKDEV_DEV_ID("e6c50000.serial", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
-+	CLKDEV_DEV_ID("e6c20000.serial", &mstp_clks[MSTP206]),
- 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
-+	CLKDEV_DEV_ID("e6c30000.serial", &mstp_clks[MSTP207]),
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
-+	CLKDEV_DEV_ID("e6ce0000.serial", &mstp_clks[MSTP216]),
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
-+	CLKDEV_DEV_ID("e6cf0000.serial", &mstp_clks[MSTP217]),
- 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]),
- 	CLKDEV_DEV_ID("e6700020.dma-controller", &mstp_clks[MSTP218]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("sh-sci.4",		&mstp_clks[MSTP200]),
+-	CLKDEV_DEV_ID("e6c80000.sci",		&mstp_clks[MSTP200]),
++	CLKDEV_DEV_ID("e6c80000.serial",	&mstp_clks[MSTP200]),
+ 	CLKDEV_DEV_ID("sh-sci.3",		&mstp_clks[MSTP201]),
+-	CLKDEV_DEV_ID("e6c70000.sci",		&mstp_clks[MSTP201]),
++	CLKDEV_DEV_ID("e6c70000.serial",	&mstp_clks[MSTP201]),
+ 	CLKDEV_DEV_ID("sh-sci.2",		&mstp_clks[MSTP202]),
+-	CLKDEV_DEV_ID("e6c60000.sci",		&mstp_clks[MSTP202]),
++	CLKDEV_DEV_ID("e6c60000.serial",	&mstp_clks[MSTP202]),
+ 	CLKDEV_DEV_ID("sh-sci.1",		&mstp_clks[MSTP203]),
+-	CLKDEV_DEV_ID("e6c50000.sci",		&mstp_clks[MSTP203]),
++	CLKDEV_DEV_ID("e6c50000.serial",	&mstp_clks[MSTP203]),
+ 	CLKDEV_DEV_ID("sh-sci.0",		&mstp_clks[MSTP204]),
+-	CLKDEV_DEV_ID("e6c40000.sci",		&mstp_clks[MSTP204]),
++	CLKDEV_DEV_ID("e6c40000.serial",	&mstp_clks[MSTP204]),
+ 	CLKDEV_DEV_ID("sh-sci.8",		&mstp_clks[MSTP206]),
+-	CLKDEV_DEV_ID("e6c30000.sci",		&mstp_clks[MSTP206]),
++	CLKDEV_DEV_ID("e6c30000.serial",	&mstp_clks[MSTP206]),
+ 	CLKDEV_DEV_ID("sh-sci.5",		&mstp_clks[MSTP207]),
+-	CLKDEV_DEV_ID("e6cb0000.sci",		&mstp_clks[MSTP207]),
++	CLKDEV_DEV_ID("e6cb0000.serial",	&mstp_clks[MSTP207]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.3",	&mstp_clks[MSTP214]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.2",	&mstp_clks[MSTP216]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.1",	&mstp_clks[MSTP217]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.0",	&mstp_clks[MSTP218]),
+ 	CLKDEV_DEV_ID("sh-sci.7",		&mstp_clks[MSTP222]),
+-	CLKDEV_DEV_ID("e6cd0000.sci",		&mstp_clks[MSTP222]),
++	CLKDEV_DEV_ID("e6cd0000.serial",	&mstp_clks[MSTP222]),
+ 	CLKDEV_DEV_ID("sh-sci.6",		&mstp_clks[MSTP230]),
+-	CLKDEV_DEV_ID("e6cc0000.sci",		&mstp_clks[MSTP230]),
++	CLKDEV_DEV_ID("e6cc0000.serial",	&mstp_clks[MSTP230]),
+ 
+ 	CLKDEV_DEV_ID("sh_fsi2",		&mstp_clks[MSTP328]),
+ 	CLKDEV_DEV_ID("fe1f0000.sound",		&mstp_clks[MSTP328]),
 -- 
 2.0.0
