@@ -1,28 +1,75 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 15 Jul 2014 18:24:36 +0300
-Subject: [PATCH 6/6] clk: tegra: Add Tegra132 ccplex clocks
-In-Reply-To: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1405437890-6468-7-git-send-email-pdeschrijver@nvidia.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 15 Jul 2014 16:28:36 +0100
+Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <1405436677.25580.34.camel@deneb.redhat.com>
+References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405363248.25580.12.camel@deneb.redhat.com>
+ <20140715100221.GU4179@bivouac.eciton.net>
+ <1405429860.25580.25.camel@deneb.redhat.com>
+ <20140715135418.GV4179@bivouac.eciton.net>
+ <1405434206.25580.31.camel@deneb.redhat.com>
+ <20140715144944.GW4179@bivouac.eciton.net>
+ <1405436677.25580.34.camel@deneb.redhat.com>
+Message-ID: <20140715152836.GX4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the ccplex clocks in Tegra132.
+On Tue, Jul 15, 2014 at 11:04:37AM -0400, Mark Salter wrote:
+> On Tue, 2014-07-15 at 15:49 +0100, Leif Lindholm wrote:
+> > On Tue, Jul 15, 2014 at 10:23:26AM -0400, Mark Salter wrote:
+> > > On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
+> > > > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
+> > > > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
+> > > > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
+> > > > > > >                       continue;
+> > > > > > >               }
+> > > > > > >  
+> > > > > > > +             /* Don't free anything below kernel */
+> > > > > > > +             if (md->phys_addr < PHYS_OFFSET)
+> > > > > > > +                     continue;
+> > > > > > > +
+> > > > > > 
+> > > > > > Is the spin table area really allocated as BOOT_SERVICES_*?
+> > > > > 
+> > > > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
+> > > > > then there could be BS code/data memory which we'd want to ignore.
+> > > > 
+> > > > Well, if it is boot service code/data - then there is no need for us
+> > > > to keep it around after ExitBootServices().
+> > > 
+> > > One would think, but EFI has proven to be less than strictly compliant
+> > > in that regard in the past. I'm inclined to keep the boot services
+> > > around until after SetVirtualAddressMap just in case.
+> > 
+> > But the function you add this clause to will still throw away all boot
+> > services code/data regions - just with this modification it skips
+> > those that happen to lie lower in the address space than the kernel.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/Makefile |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Returning to the actual code we are discussing here:
+The hunk above has no bearing on whether boot services regions are
+generally unmapped or not. It only filters explicitly those boot
+services regions that happen to be lower in memory than the kernel,
+and keep them around for the duration of the system.
 
-diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-index f7dfb72..4231865 100644
---- a/drivers/clk/tegra/Makefile
-+++ b/drivers/clk/tegra/Makefile
-@@ -15,3 +15,5 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
-+obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.c
-+obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra132-ccplex.c
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+> > 
+> > (And I do agree with Mark R here - let's not work around bugs that
+> > don't exist yet.)
+> > 
+> 
+> I'm not sure if they still exist or not, but on Foundation, I saw a
+> crash in SetVirtualAddressMap unless I kept BS regions around.
+
+For the topic of keeping boot services code around:
+I did also see issues with not keeping boot services regions on v7 -
+ages ago. I have not seen it this year, and I _really_ want to see if
+any such issues resurface. So post-3.16 I would quite like to see the
+call to free_boot_services() moved earlier to flush out any such
+issues before we see large-scale deployments.
+
+The foundation model is a development tool, not a production system,
+so any issue reproducable only there is a pure bonus - since that
+firmware can _always_ be updated.
+
+/
+    Leif
