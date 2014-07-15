@@ -1,159 +1,102 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 15 Jul 2014 19:41:04 +0200
-Subject: [PATCH 2/2] cpuidle: Exynos: fix cpuidle for all states
-In-Reply-To: <1404225158-8453-3-git-send-email-k.chander@samsung.com>
-References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
- <1404225158-8453-3-git-send-email-k.chander@samsung.com>
-Message-ID: <53C567B0.6020009@samsung.com>
+Date: Tue, 15 Jul 2014 19:49:28 +0200
+Subject: [PATCH 2/3] spi: s3c64xx: validate s3c64xx_spi_csinfo before using
+In-Reply-To: <1405426860-18404-3-git-send-email-ch.naveen@samsung.com>
+References: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
+ <1405426860-18404-3-git-send-email-ch.naveen@samsung.com>
+Message-ID: <53C569A8.1000103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+Hi Naveen,
 
 Please see my comments inline.
 
-On 01.07.2014 16:32, Chander Kashyap wrote:
-> Pre/post platform specific cpuidle operations are handled by pm_notifier.
-> But these operations are not same for all cpuidle states. Handle this by
-> moving cpuidle specific code from pm_notifier to cpuidle specific function.
+On 15.07.2014 14:20, Naveen Krishna Chatradhi wrote:
+> This patch validates the cs->line (Chip select gpio) and
+> struct s3c64xx_spi_csinfo *cs object for both DT and NON-DT
+> platforms before using in .setup().
 > 
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> Also, check gpio_is_valid(spi->cs_gpio) in cleanup() before
+> freeing up.
+
+Missing reason of the change.
+
+> 
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Doug Anderson <dianders@chromium.org>
 > ---
->  arch/arm/mach-exynos/common.h    |    2 +-
->  arch/arm/mach-exynos/pm.c        |   45 ++++++++++----------------------------
->  drivers/cpuidle/cpuidle-exynos.c |    7 ++++--
->  3 files changed, 17 insertions(+), 37 deletions(-)
+>  drivers/spi/spi-s3c64xx.c |   15 ++++-----------
+>  1 file changed, 4 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 1ee9176..7769f58 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -166,7 +166,7 @@ extern int  exynos_cpu_power_state(int cpu);
->  extern void exynos_cluster_power_down(int cluster);
->  extern void exynos_cluster_power_up(int cluster);
->  extern int  exynos_cluster_power_state(int cluster);
-> -extern void exynos_enter_aftr(void);
-> +extern void exynos_enter_aftr(int entering_idle);
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index 72bfba6..8971076 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+> @@ -773,12 +773,6 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+>  	/* The CS line is asserted/deasserted by the gpio pin */
+>  	cs->line = spi->cs_gpio;
 >  
->  extern void s5p_init_cpu(void __iomem *cpuid_addr);
->  extern unsigned int samsung_rev(void);
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index a092cc3..328644f 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -188,14 +188,6 @@ static void exynos_cpu_set_boot_vector(long flags)
->  	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
->  }
+> -	if (!gpio_is_valid(cs->line)) {
+> -		dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
+> -		kfree(cs);
+> -		return ERR_PTR(-EINVAL);
+> -	}
+> -
+>  	data_np = of_get_child_by_name(slave_np, "controller-data");
+>  	if (!data_np) {
+>  		dev_err(&spi->dev, "child node 'controller-data' not found\n");
+> @@ -805,15 +799,14 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>  	int err;
 >  
-> -void exynos_enter_aftr(void)
-> -{
-> -	exynos_set_wakeupmask(0x0000ff3e);
-> -	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-> -	/* Set value of power down register for aftr mode */
-> -	exynos_sys_powerdown_conf(SYS_AFTR);
-> -}
-> -
->  static int exynos_cpu_suspend(unsigned long arg)
->  {
->  #ifdef CONFIG_CACHE_L2X0
-> @@ -386,40 +378,25 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
->  	.valid		= suspend_valid_only_mem,
->  };
->  
-> -static int exynos_cpu_pm_notifier(struct notifier_block *self,
-> -				  unsigned long cmd, void *v)
-> +void exynos_enter_aftr(int entering_idle)
->  {
-> -	int cpu = smp_processor_id();
-> -
-> -	switch (cmd) {
-> -	case CPU_PM_ENTER:
-> -		if (cpu == 0)
-> -			exynos_pm_central_suspend();
-> -		break;
-> -
-> -	case CPU_PM_EXIT:
-> -		if (cpu == 0) {
-> -			if (read_cpuid_part_number() ==
-> -					ARM_CPU_PART_CORTEX_A9)
-> -				scu_enable(S5P_VA_SCU);
-> -			exynos_pm_central_resume();
-> -		}
-> -		break;
-> +	if (entering_idle) {
-> +		exynos_set_wakeupmask(0x0000ff3e);
-> +		exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-> +		/* Set value of power down register for aftr mode */
-> +		exynos_sys_powerdown_conf(SYS_AFTR);
-> +		exynos_pm_central_suspend();
-> +	} else {
-> +		if (scu_a9_has_base())
-> +			scu_enable(S5P_VA_SCU);
-> +		exynos_pm_central_resume();
+>  	sdd = spi_master_get_devdata(spi->master);
+> -	if (!cs && spi->dev.of_node) {
+> +	if (spi->dev.of_node)
 
-Hmm. This is not very readable. Basically you have two functions that do
-completely different things packed into one function. I would suggest
-moving the calls to cpu_pm_enter/exit() and everything in between to
-this function then you wouldn't need anything like this and the whole
-low level logic would be in one place.
+This check is equivalent, i.e. cs will always be NULL whenever
+spi->dev.of_node is not.
 
+>  		cs = s3c64xx_get_slave_ctrldata(spi);
+> -		spi->controller_data = cs;
+> -	}
+>  
+> -	if (IS_ERR_OR_NULL(cs)) {
+> +	if (IS_ERR_OR_NULL(cs) || !gpio_is_valid(cs->line)) {
+
+I'm not sure this is correct. It will error out even if hardware chip
+select is used.
+
+Otherwise you need to free cs here if wrong GPIO was the cause of
+entering this block, so if this extra check is to stay, I'd suggest
+splitting this into two separate if blocks.
+
+>  		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
+>  		return -ENODEV;
 >  	}
-> -
-> -	return NOTIFY_OK;
->  }
->  
-> -static struct notifier_block exynos_cpu_pm_notifier_block = {
-> -	.notifier_call = exynos_cpu_pm_notifier,
-> -};
-> -
->  void __init exynos_pm_init(void)
->  {
->  	u32 tmp;
->  
-> -	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
-> -
->  	/* Platform-specific GIC callback */
->  	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
->  
-> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-> index 7c01512..1196ca7 100644
-> --- a/drivers/cpuidle/cpuidle-exynos.c
-> +++ b/drivers/cpuidle/cpuidle-exynos.c
-> @@ -18,11 +18,10 @@
->  #include <asm/suspend.h>
->  #include <asm/cpuidle.h>
->  
-> -static void (*exynos_enter_aftr)(void);
-> +static void (*exynos_enter_aftr)(int);
->  
->  static int idle_finisher(unsigned long flags)
->  {
-> -	exynos_enter_aftr();
->  	cpu_do_idle();
->  
->  	return 1;
-> @@ -32,8 +31,12 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
->  				struct cpuidle_driver *drv,
->  				int index)
->  {
-> +	int entering_idle = true;
->  	cpu_pm_enter();
-> +	exynos_enter_aftr(entering_idle);
->  	cpu_suspend(0, idle_finisher);
-> +	entering_idle = false;
-> +	exynos_enter_aftr(entering_idle);
+> +	spi->controller_data = cs;
 
-This doesn't look good. Couldn't you just have called it with constant
-arguments? E.g.
+I'm not sure what's the point of moving this assignment here.
 
-	exynos_enter_aftr(true);
-	[...]
-	exynos_enter_aftr(false);
+>  
+>  	if (!spi_get_ctldata(spi)) {
+>  		/* Request gpio only if cs line is asserted by gpio pins */
+> @@ -898,7 +891,7 @@ static void s3c64xx_spi_cleanup(struct spi_device *spi)
+>  	struct s3c64xx_spi_driver_data *sdd;
+>  
+>  	sdd = spi_master_get_devdata(spi->master);
+> -	if (spi->cs_gpio) {
+> +	if (gpio_is_valid(spi->cs_gpio)) {
+>  		gpio_free(spi->cs_gpio);
+>  		if (spi->dev.of_node)
+>  			kfree(cs);
 
-Well, sorry for late comments, I have missed this series, probably
-because I'm not on Cc list. Anyway, since this patch will need to be
-respun anyway, maybe it would be better to use the one I just posted
-today, which IMHO is a bit cleaner.
+I believe this is completely wrong. cs is allocated even if GPIO chip
+select is not used, so the only thing that should be done conditionally
+is gpio_free().
+
+In general, I liked previous version of this series much more, as it was
+doing what it should as opposed to this one.
 
 Best regards,
 Tomasz
