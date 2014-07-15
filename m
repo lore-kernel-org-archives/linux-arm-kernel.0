@@ -1,127 +1,118 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 15 Jul 2014 14:14:16 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140715105253.GE6616@ulmo>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417324.PxofUz16v0@avalon> <20140715103718.GB6616@ulmo>
- <1645765.yCSTbHcZMC@avalon> <20140715105253.GE6616@ulmo>
-Message-ID: <20140715141416.0af2de62@bbrezillon>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 15 Jul 2014 14:15:19 +0200
+Subject: [PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
+In-Reply-To: <2740751.gTMSlJs48H@amdc1032>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+ <1403697175-13476-1-git-send-email-t.figa@samsung.com>
+ <53C3A8E8.4090009@gmail.com> <2740751.gTMSlJs48H@amdc1032>
+Message-ID: <53C51B57.9040404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Jul 2014 12:52:54 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
-
-> On Tue, Jul 15, 2014 at 12:43:02PM +0200, Laurent Pinchart wrote:
-> > Hi Thierry,
-> > 
-> > On Tuesday 15 July 2014 12:37:19 Thierry Reding wrote:
-> > > On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
-> > > > On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
-> > > >> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
-> > > >>> On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
-> > > >>>> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs
-> > > >>>> (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family) provides a
-> > > >>>> display controller device.
-> > > >>>> 
-> > > >>>> The HLCDC block provides a single RGB output port, and only supports
-> > > >>>> LCD panels connection to LCD panels for now.
-> > > >>>> 
-> > > >>>> The atmel,panel property link the HLCDC RGB output with the LCD
-> > > >>>> panel connected on this port (note that the HLCDC RGB connector
-> > > >>>> implementation makes use of the DRM panel framework).
-> > > >>>> 
-> > > >>>> Connection to other external devices (DRM bridges) might be added
-> > > >>>> later by mean of a new atmel,xxx (atmel,bridge) property.
-> > > >>>> 
-> > > >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > >>>> ---
-> > > >>>> 
-> > > >>>>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++
-> > > >>>>  1 file changed, 59 insertions(+)
-> > > >>>>  create mode 100644
-> > > >>>>  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > > 
-> > > > [snip]
-> > > > 
-> > > >>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> > > >>>> +   The first cell is a phandle to a DRM panel device
-> > > >>>> +   The second cell encodes the RGB mode, which can take the
-> > > >>>> following values:
-> > > >>>> +   * 0: RGB444
-> > > >>>> +   * 1: RGB565
-> > > >>>> +   * 2: RGB666
-> > > >>>> +   * 3: RGB888
-> > > >>> 
-> > > >>> These are properties of the panel and should be obtained from the
-> > > >>> panel directly rather than an additional cell in this specifier.
-> > > >> 
-> > > >> Okay.
-> > > >> What's the preferred way of doing this ?
-> > > >> What about defining an rgb-mode property in the panel node.
-> > > > 
-> > > > You could do that, but it won't help you much, as the HLCDC driver must
-> > > > not parse properties from the panel node. You should instead extend the
-> > > > drm_panel API with a function to retrieve panel properties. The HLCDC
-> > > > driver will then query the panel driver at runtime for the interface
-> > > > type. The panel driver will get the information from hardcoded data in
-> > > > the driver, from DT or possibly in some cases by querying the panel
-> > > > hardware directly.
-> > > 
-> > > My preference for this would be that we either add this to some existing
-> > > structure (struct drm_display_info seems like a good candidate) or if
-> > > the number of parameters grows out of hands, then maybe even introduce a
-> > > new type of device that's specific for the interface. DRM panels are an
-> > > abstraction for panels, that is, interface-agnostic, and if we start
-> > > exposing interface specific parameters things will start to become very
-> > > unwieldy.
-> > 
-> > I agree with the goal of keeping drm_panel interface-agnostic. However, one 
-> > way or another, interface parameters will need to be communicated between the 
-> > panel driver and the controller driver. My preference, if we need to extend 
-> > the number and/or scope of parameters beyond what drm_display_info could 
-> > reasonably contain, would be to implement a new drm_panel operation to 
-> > query/configure interface parameters, using a structure that contains the 
-> > interface type and a union of type-specific structures. This would keep the 
-> > API generic in the sense of not requiring explicit knowledge of all interfaces 
-> > in the drivers, while offering the flexibility we need with a way to easily 
-> > detect the interface type at runtime and react on unknown/unsupported types.
+On 15.07.2014 13:19, Bartlomiej Zolnierkiewicz wrote:
 > 
-> That's exactly what I was hoping could be avoided. If instead we modeled
-> the interface type as a bus, we could for example have an lvds_bus along
-> with an lvds_device and then use that as the natural place to store
-> these properties. Much like we do for DSI.
+> Hi,
+> 
+> On Monday, July 14, 2014 11:54:48 AM Tomasz Figa wrote:
+>> Hi Kukjin,
+>>
+>> On 25.06.2014 13:52, Tomasz Figa wrote:
+>>> Due to recent consolidation of Exynos suspend and cpuidle code, some
+>>> parts of suspend and resume sequences are executed two times, once from
+>>> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+>>> breaks suspend, at least on Exynos4-based boards.
+>>>
+>>> This patch fixes the issue by removing exynos_pm_syscore_ops completely
+>>> and making the code rely only on CPU PM notifier.
+>>>
+>>> Tested on Exynos4210-based Trats board.
+>>>
+>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos/pm.c | 23 ++++-------------------
+>>>  1 file changed, 4 insertions(+), 19 deletions(-)
+>>>
+>>> Changes since v1:
+>>>  - rebased onto Kukjin's fixes branch.
+>>>
+>>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+>>> index 202ca73..f23cc77 100644
+>>> --- a/arch/arm/mach-exynos/pm.c
+>>> +++ b/arch/arm/mach-exynos/pm.c
+>>> @@ -364,11 +364,6 @@ early_wakeup:
+>>>  	return;
+>>>  }
+>>>  
+>>> -static struct syscore_ops exynos_pm_syscore_ops = {
+>>> -	.suspend	= exynos_pm_suspend,
+>>> -	.resume		= exynos_pm_resume,
+>>> -};
+>>> -
+>>>  /*
+>>>   * Suspend Ops
+>>>   */
+>>> @@ -438,22 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+>>>  
+>>>  	switch (cmd) {
+>>>  	case CPU_PM_ENTER:
+>>> -		if (cpu == 0) {
+>>> -			exynos_pm_central_suspend();
+>>> -			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+>>> -				exynos_cpu_save_register();
+>>> -		}
+>>> +		if (cpu == 0)
+>>> +			exynos_pm_suspend();
+>>>  		break;
+>>>  
+>>>  	case CPU_PM_EXIT:
+>>> -		if (cpu == 0) {
+>>> -			if (read_cpuid_part_number() ==
+>>> -					ARM_CPU_PART_CORTEX_A9) {
+>>> -				scu_enable(S5P_VA_SCU);
+>>> -				exynos_cpu_restore_register();
+>>> -			}
+>>> -			exynos_pm_central_resume();
+>>> -		}
+>>> +		if (cpu == 0)
+>>> +			exynos_pm_resume();
+>>>  		break;
+>>>  	}
+>>>  
+>>> @@ -478,6 +464,5 @@ void __init exynos_pm_init(void)
+>>>  	tmp |= ((0xFF << 8) | (0x1F << 1));
+>>>  	__raw_writel(tmp, S5P_WAKEUP_MASK);
+>>>  
+>>> -	register_syscore_ops(&exynos_pm_syscore_ops);
+>>>  	suspend_set_ops(&exynos_suspend_ops);
+>>>  }
+>>>
+>>
+>> Please consider this patch for next fixes pull request. Without it
+>> suspend/resume is broken for Exynos4 and probably other SoCs. This patch
+>> just restores the sequence from before the patch moving things to PM
+>> notifier, so I don't think it should need any special treatment.
+> 
+> Your patch fixes the regression and is a step in the good direction but it
+> seems that it needs a bit more work:
+> 
+> Your patch adds to cpuidle AFTR code path restoring of exynos_core_save and
+> exynos5_sys_save registers without saving them first (restoring is done
+> through exynos_pm_resume() which is used by both suspend and cpuidle while
+> saving is done through exynos_pm_prepare() which is used only by suspend). 
 
-I understand this is not a simple case here, and this is why I left
-RGB mode config in the HLCDC node in the first place.
+That's right, unfortunately. Interestingly enough AFTR worked fine on
+Exynos4210 with this patch, but still this needs to be fixed.
 
-Anyway, I agree that this rgb mode should not be defined in the hlcdc
-node but rather in the slave device. I said slave device and not panel
-device here because the device connected to the RGB connector is not
-necessarily an LCD panel (i.e. atmel is connecting a raw RGB to HDMI
-bridge on the RGB connector). And given that I definitely think an
-interface bus architecture is better: this way we could configure RGB
-mode no matter what kind of device is connected on this bus and we
-could keep slave devices interface-agnostic.
+Now, in fact, I recall that Chander had some objections to this patch as
+well and we decided that he will send another patch to replace mine [1],
+but I haven't heard from him since that.
 
-This being said, I guess modeling interface (or connector) types as
-busses is not that simple.
+Chander, do you have any progress with this? Keep in mind that we need
+this as an rc fix and we already have rc5, so not much time left. If you
+don't have time to work on this I can take care of this, proceeding as
+we discussed in [1].
 
-I really want to help here, so let me know what I can do.
+[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29085/focus=33975
 
-Just a side note: you are saying that RGB mode is a panel property, and
-this is not entirely true (it might depends on board design) :-). In
-some HW designs, LSB bits of the RGB connector are either connected to
-ground or to the first available MSB bit. This way you can use an LCD
-panel supporting RGB888 mode with an display controller supporting lower
-modes (RGB555 or RGB666).
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Tomasz
