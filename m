@@ -1,49 +1,34 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 15 Jul 2014 17:20:26 +0200
-Subject: [PATCH v3 10/15] drivers: clk: st: Add quadfs reset handling
+Date: Tue, 15 Jul 2014 17:20:31 +0200
+Subject: [PATCH v3 15/15] drivers: clk: st: Use round to closest divider flag
 In-Reply-To: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1405437631-23623-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1405437631-23623-11-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1405437631-23623-16-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the support of quadfs reset handling.
+This patch uses CLK_DIVIDER_ROUND_CLOSEST flag to specify
+the divider has to round to closest div.
 
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 Acked-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/clk/st/clkgen-fsyn.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/clk/st/clkgen-mux.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index b925580..4cd10b2 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -70,12 +70,14 @@ struct clkgen_quadfs_data {
- 	bool powerup_polarity;
- 	bool standby_polarity;
- 	bool nsdiv_present;
-+	bool nrst_present;
- 	struct clkgen_field ndiv;
- 	struct clkgen_field ref_bw;
- 	struct clkgen_field nreset;
- 	struct clkgen_field npda;
- 	struct clkgen_field lock_status;
+diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+index 9bdedc8..79dc40b 100644
+--- a/drivers/clk/st/clkgen-mux.c
++++ b/drivers/clk/st/clkgen-mux.c
+@@ -774,7 +774,8 @@ void __init st_of_clkgen_vcc_setup(struct device_node *np)
+ 		div->reg = reg + VCC_DIV_OFFSET;
+ 		div->shift = 2 * i;
+ 		div->width = 2;
+-		div->flags = CLK_DIVIDER_POWER_OF_TWO;
++		div->flags = CLK_DIVIDER_POWER_OF_TWO |
++			CLK_DIVIDER_ROUND_CLOSEST;
  
-+	struct clkgen_field nrst[QUADFS_MAX_CHAN];
- 	struct clkgen_field nsb[QUADFS_MAX_CHAN];
- 	struct clkgen_field en[QUADFS_MAX_CHAN];
- 	struct clkgen_field mdiv[QUADFS_MAX_CHAN];
-@@ -615,6 +617,9 @@ static int quadfs_fsynth_enable(struct clk_hw *hw)
- 
- 	CLKGEN_WRITE(fs, nsb[fs->chan], !fs->data->standby_polarity);
- 
-+	if (fs->data->nrst_present)
-+		CLKGEN_WRITE(fs, nrst[fs->chan], 0);
-+
- 	if (fs->lock)
- 		spin_unlock_irqrestore(fs->lock, flags);
- 
+ 		mux->reg = reg + VCC_MUX_OFFSET;
+ 		mux->shift = 2 * i;
 -- 
 1.9.1
