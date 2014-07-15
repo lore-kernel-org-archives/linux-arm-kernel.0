@@ -1,55 +1,82 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Jul 2014 13:49:07 +0200
-Subject: [PATCH] arm64/efi: efistub: jump to 'stext' directly, not through
- the header
-In-Reply-To: <20140715113138.GZ26465@leverpostej>
-References: <1405415402-3427-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140715095704.GV26465@leverpostej>
- <CAKv+Gu_PUJVXbDqp5Y3jdVouWhSqPVzaOi_6bpFM6BaLVrwvTQ@mail.gmail.com>
- <20140715113138.GZ26465@leverpostej>
-Message-ID: <CAKv+Gu_1vYA+akR4_fAeTd+p22kt-EfcJHu+9sVBBToUnSO8_Q@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 15 Jul 2014 13:55:25 +0200
+Subject: [PATCH v5 4/8] ARM: shmobile: r7s72100: Add MTU2 device to DT
+In-Reply-To: <20140715114741.GB25333@verge.net.au>
+References: <1404911564-17380-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1404911564-17380-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140715114741.GB25333@verge.net.au>
+Message-ID: <4380270.nzol65dDjU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 July 2014 13:31, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
->> >> index 619b1dd7bcde..6ef541731d9e 100644
->> >> --- a/arch/arm64/kernel/efi-entry.S
->> >> +++ b/arch/arm64/kernel/efi-entry.S
->> >> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
->> >>        */
->> >>       mov     x20, x0         // DTB address
->> >>       ldr     x0, [sp, #16]   // relocated _text address
->> >> -     mov     x21, x0
->> >> +     add     x21, x0, #:lo12:stext_offset
->> >
->> > I think we can drop the :lo12: here, which will allow us to have a
->> > warning if stext_offset is unexpectedly large (I believe this will
->> > currently silently mask bits were that to happen?).
->> >
->>
->> There is no alternative lo12 relocation that errors out when the value
->> does not fit, so it would have to use a literal instead.
->
-> Ah, that's a shame. What happens when the value doesn't fit if the
-> linker / assembler don't error out?
->
+Hi Simon,
 
-Obviously, it will jump into the wrong place if stext ever gets pushed
-beyond a 4k boundary, which is not that likely (current value is
-0x160, we may want to up it to 0x200 at some point if we need to
-increase the PE/COFF section alignment, which some versions of the
-(poor) PE/COFF documentation say should be 0x200 at the minimum)
+On Tuesday 15 July 2014 20:47:41 Simon Horman wrote:
+> On Wed, Jul 09, 2014 at 03:12:40PM +0200, Laurent Pinchart wrote:
+> > Add the MTU2 counter to the r7s72100 device tree and make it disabled by
+> > default.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
+> > b/arch/arm/boot/dts/r7s72100.dtsi index bdee225..c902b0b 100644
+> > --- a/arch/arm/boot/dts/r7s72100.dtsi
+> > +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> > @@ -229,6 +229,16 @@
+> >  		status = "disabled";
+> >  	};
+> > 
+> > +	mtu2: timer at fcff0000 {
+> > +		compatible = "renesas,mtu2";
+> > +		reg = <0xfcff0000 0x400>;
+> > +		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-names = "tgi0a";
+> > +		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+> > +		clock-names = "fck";
+> > +		status = "disabled";
+> > +	};
+> > +
+> >  	scif0: serial at e8007000 {
+> >  		compatible = "renesas,scif-r7s72100", "renesas,scif";
+> >  		reg = <0xe8007000 64>;
+> 
+> I believe that I claimed to have tested this in the past but that
+> my testing was by booting a config to userspace that as it happens
+> did not require to timer to get that far.
+> 
+> I now believe there is a minor error: the interrupt number should be
+> (139 - 32 =) 107 rather than 139.
+> 
+> This allows a system with this and the related genmai patch applied
+> on top of renesas-next-v3.16-rc3-20140715 to boot to uerspace
+> when compiled with shmobile_defconfig (+ an initrd).
+> Without the irq number change the boot gets stuck in
+> ip_auto_config (which presumably sleeps).
+> 
+> Laurent, should I squash the following in and queue-up the result?
 
-However, doing ldr x21, =stext_offset works fine as well
+Please do, and sorry for the mistake.
 
-> That sounds like a toolchain bug if they're silently doing the wrong
-> thing.
->
-
-Meh, don't think so, really. You get what you pay for, and :lo12: just
-isn't supposed to care. (It's mainly used with adrp to get a +/- 4gb
-PC relative reach)
+> diff --git a/arch/arm/boot/dts/r7s72100.dtsi
+> b/arch/arm/boot/dts/r7s72100.dtsi index c902b0b..1d28d01 100644
+> --- a/arch/arm/boot/dts/r7s72100.dtsi
+> +++ b/arch/arm/boot/dts/r7s72100.dtsi
+> @@ -232,7 +232,7 @@
+>  	mtu2: timer at fcff0000 {
+>  		compatible = "renesas,mtu2";
+>  		reg = <0xfcff0000 0x400>;
+> -		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "tgi0a";
+>  		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+>  		clock-names = "fck";
 
 -- 
-Ard.
+Regards,
+
+Laurent Pinchart
