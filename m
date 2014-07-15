@@ -1,444 +1,111 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 15 Jul 2014 16:26:40 +0800
-Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <53C4D872.9060707@pengutronix.de>
-References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
- <1405338041-19945-2-git-send-email-b29396@freescale.com>
- <53C3C97A.7080102@pengutronix.de>
- <20140715033324.GC21584@shlinux1.ap.freescale.net>
- <53C4D872.9060707@pengutronix.de>
-Message-ID: <20140715082637.GA2601@shlinux1.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Jul 2014 10:39:57 +0200
+Subject: PATCH] video: fix up versatile CLCD helper move
+Message-ID: <9561883.zqovrcBa4A@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 09:29:54AM +0200, Marc Kleine-Budde wrote:
-> On 07/15/2014 05:33 AM, Dong Aisheng wrote:
-> > On Mon, Jul 14, 2014 at 02:13:46PM +0200, Marc Kleine-Budde wrote:
-> >> On 07/14/2014 01:40 PM, Dong Aisheng wrote:
-> >>> The patch adds the basic CAN TX/RX function support for Bosch M_CAN controller.
-> >>> For TX, only one dedicated tx buffer is used for sending data.
-> >>> For RX, RXFIFO 0 is used for receiving data to avoid overflow.
-> >>> Rx FIFO 1 and Rx Buffers are not used currently, as well as Tx Event FIFO.
-> >>>
-> >>> Due to the message ram can be shared by multi m_can instances
-> >>> and the fifo element is configurable which is SoC dependant,
-> >>> the design is to parse the message ram related configuration data from device
-> >>> tree rather than hardcode define it in driver which can make the message
-> >>> ram sharing fully transparent to M_CAN controller driver,
-> >>> then we can gain better driver maintainability and future features upgrade.
-> >>>
-> >>> M_CAN also supports CANFD protocol features like data payload up to 64 bytes
-> >>> and bitrate switch at runtime, however, this patch still does not add the
-> >>> support for these features.
-> >>>
-> >>> Cc: Wolfgang Grandegger <wg@grandegger.com>
-> >>> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> >>> Cc: Mark Rutland <mark.rutland@arm.com>
-> >>> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
-> >>> Cc: Varka Bhadram <varkabhadram@gmail.com>
-> >>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> >>
-> >> [...]
-> >>
-> >>> +static inline u32 m_can_fifo_read(const struct m_can_priv *priv,
-> >>> +				  u32 fgi, unsigned int offset)
-> >>> +{
-> >>> +	return readl(priv->mram_base + priv->mcfg[MRAM_RXF0].off +
-> >>> +				fgi * RXF0_ELEMENT_SIZE + offset);
-> >>> +}
-> >>
-> >> Can you add a similar function for fifo_write, please?
-> > 
-> > Unlike fifo_read, we only use one tx buffer for tx function,
-> > fpi, correspding to fgi, is always 0.
-> > So i planned to add it later when adding using multi tx buffers before.
-> > If you like it, i could add it now.
-> > It could be:
-> > +static inline void m_can_fifo_write(const struct m_can_priv *priv,
-> > +                                 u32 fpi, unsigned int offset, u32 val)
-> > +{
-> > +       return writel(val, priv->mram_base + priv->mcfg[MRAM_TXB].off +
-> > +                               fpi * TXB_ELEMENT_SIZE + offset);
-> > +}
-> > +
-> 
-> Yes, looks good.
-> 
-> >  static inline void m_can_config_endisable(const struct m_can_priv *priv,
-> >                                           bool enable)
-> >  {
-> > @@ -973,12 +980,10 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
-> >         }
-> > 
-> >         /* message ram configuration */
-> > -       fifo_addr = priv->mram_base + priv->mcfg[MRAM_TXB].off;
-> > -       writel(id | flags, fifo_addr);
-> > -       writel(cf->can_dlc << 16, fifo_addr + 0x4);
-> > -       writel(*(u32 *)(cf->data + 0), fifo_addr + 0x8);
-> > -       writel(*(u32 *)(cf->data + 4), fifo_addr + 0xc);
-> > -
-> > +       m_can_fifo_write(priv, 0, 0x0, id | flags);
-> > +       m_can_fifo_write(priv, 0, 0x4, cf->can_dlc << 16);
-> > +       m_can_fifo_write(priv, 0, 0x8, *(u32 *)(cf->data + 0));
-> > +       m_can_fifo_write(priv, 0, 0xc, *(u32 *)(cf->data + 4));
-> >         can_put_echo_skb(skb, dev, 0);
-> > 
-> >         /* enable first TX buffer to start transfer  */
-> > 
-> > The '0' parameter may cause a bit misleading now, do you think it's ok?
-> 
-> Yes.
-> 
-> >>> +
-> >>> +static inline void m_can_config_endisable(const struct m_can_priv *priv,
-> >>> +					  bool enable)
-> >>> +{
-> >>> +	u32 cccr = m_can_read(priv, M_CAN_CCCR);
-> >>> +	u32 timeout = 10;
-> >>> +	u32 val = 0;
-> >>> +
-> >>> +	if (enable) {
-> >>> +		/* enable m_can configuration */
-> >>> +		m_can_write(priv, M_CAN_CCCR, cccr | CCCR_INIT);
-> >>> +		/* CCCR.CCE can only be set/reset while CCCR.INIT = '1' */
-> >>> +		m_can_write(priv, M_CAN_CCCR, cccr | CCCR_INIT | CCCR_CCE);
-> >>> +	} else {
-> >>> +		m_can_write(priv, M_CAN_CCCR, cccr & ~(CCCR_INIT | CCCR_CCE));
-> >>> +	}
-> >>> +
-> >>> +	/* there's a delay for module initialization */
-> >>> +	if (enable)
-> >>> +		val = CCCR_INIT | CCCR_CCE;
-> >>> +
-> >>> +	while ((m_can_read(priv, M_CAN_CCCR) & (CCCR_INIT | CCCR_CCE))
-> >>> +				!= val) {
-> >>> +		if (timeout == 0) {
-> >>> +			netdev_warn(priv->dev, "Failed to init module\n");
-> >>> +			return;
-> >>> +		}
-> >>> +		timeout--;
-> >>> +		udelay(1);
-> >>> +	}
-> >>> +}
-> >>> +
-> >>> +static inline void m_can_enable_all_interrupts(const struct m_can_priv *priv)
-> >>> +{
-> >>> +	m_can_write(priv, M_CAN_ILE, ILE_EINT0 | ILE_EINT1);
-> >>> +}
-> >>> +
-> >>> +static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
-> >>> +{
-> >>> +	m_can_write(priv, M_CAN_ILE, 0x0);
-> >>> +}
-> >>> +
-> >>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
-> >>> +			    u32 rxfs)
-> >>> +{
-> >>> +	struct m_can_priv *priv = netdev_priv(dev);
-> >>> +	u32 flags, fgi;
-> >>> +
-> >>> +	/* calculate the fifo get index for where to read data */
-> >>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
-> >>> +	flags = m_can_fifo_read(priv, fgi, 0x0);
-> >>                                            ^^^
-> >>
-> >> Can you introduce an enum for the offsets, please adjust the signature
-> >> of m_can_fifo_read() accordingly.
-> >>
-> > 
-> > I wonder enum may not be suitable.
-> > The Rx Buffer and FIFO Element is as follows:
-> >    31 24 23 16 15 8 7 0
-> > R0 ESI XTD RTR ID[28:0]
-> 
-> M_CAN_FIFO_ID
-> 
-> > R1 ANMF FIDX[6:0] res EDL BRS DLC[3:0] RXTS[15:0]
-> 
-> M_CAN_FIFO_DLC
-> 
-> > R2 DB3[7:0] DB2[7:0] DB1[7:0] DB0[7:0]
-> > R3 DB7[7:0] DB6[7:0] DB5[7:0] DB4[7:0]
-> 
-> M_CAN_FIFO_DATA0
-> M_CAN_FIFO_DATA1
-> 
+commit 11c32d7b6274cb0f ("video: move Versatile CLCD helpers")
+moved files out of the plat-versatile directory but in the process
+got a few of the dependencies wrong:
 
-You mean as follows?
-enum m_can_fifo {
-        M_CAN_FIFO_ID = 0,
-        M_CAN_FIFO_DLC,
-        M_CAN_FIFO_DATA0,
-        M_CAN_FIFO_DATA1,
-};
+- If CONFIG_FB is not set, the file no longer gets built, resulting
+  in a link error
+- If CONFIG_FB or CONFIG_FB_ARMCLCD are disabled, we also get a
+  Kconfig warning for incorrect dependencies due to the symbol
+  being 'select'ed from the platform Kconfig.
+- When the file is not built, we also get a link error for missing
+  symbols.
 
-static inline u32 m_can_fifo_read(const struct m_can_priv *priv,
-                                  u32 fgi, enum m_can_fifo fifo)
-{
-        return readl(priv->mram_base + priv->mcfg[MRAM_RXF0].off +
-                     fgi * RXF0_ELEMENT_SIZE + fifo * 0x4);
-}
+This patch should fix all three, by removing the 'select' statements,
+changing the Kconfig description of the symbol to be enabled in
+exactly the right configurations, and adding inline stub functions
+for the case when the framebuffer driver is disabled.
 
-id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The problem is when adding long frames support, it becomes:
-enum m_can_fifo {
-        M_CAN_FIFO_ID = 0,
-        M_CAN_FIFO_DLC,
-        M_CAN_FIFO_DATA0,
-        M_CAN_FIFO_DATA1,
-        ....
-        M_CAN_FIFO_DATA15,
-};
-
-But it's useless because we may not use enum to read fifo data anymore.
-It's not suitable to read fifo one by one:
-m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA0);
-m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA1);
-..
-m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA15);
-
-
-Instead, we may read data according to real dlc value within a for loop like:
-#define M_CAN_FIFO(n)   (n * 0x4)
-id = m_can_fifo_read(priv, fgi, M_CAN_FIFO(0));
-dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO(1));
-for (i = 0; dlc > 0; dlc -= 0x4, i++) {
-        ....
-        data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO(i + 2));
-}
-
-So i'm not sure define that enum now is really needed.
-
-> > ... ... ... ... ...
-> > Rn DBm[7:0] DBm-1[7:0] DBm-2[7:0] DBm-3[7:0]
-> > Maybe #define a macro for it is better, like:
-> > #define RX_BUFFER_Rn(n)	(n * 0x4)
-> > #define TX_BUFFER_Tn(n)	(n * 0x4)
-> > #define TXE_BUFFER_En(n)(n * 0x4)
-> > But i'm not sure if it's worthy to do that now.
-> > I also planed to update it later when adding canfd format support before.
-> 
-> IMHO, there's no need for {RX,TX}_BUFER_Rn() yet.
-> 
-> >>> +	if (flags & RX_BUF_XTD)
-> >>> +		cf->can_id = (flags & CAN_EFF_MASK) | CAN_EFF_FLAG;
-> >>> +	else
-> >>> +		cf->can_id = (flags >> 18) & CAN_SFF_MASK;
-> >>> +
-> >>> +	if (flags & RX_BUF_RTR) {
-> >>> +		cf->can_id |= CAN_RTR_FLAG;
-> >>> +	} else {
-> >>> +		flags = m_can_fifo_read(priv, fgi, 0x4);
-> >>> +		cf->can_dlc = get_can_dlc((flags >> 16) & 0x0F);
-> >>> +		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi, 0x8);
-> >>> +		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi, 0xC);
-> >>> +	}
-> >>> +
-> >>> +	/* acknowledge rx fifo 0 */
-> >>> +	m_can_write(priv, M_CAN_RXF0A, fgi);
-> >>> +}
-> >>> +
-> >>> +static int m_can_do_rx_poll(struct net_device *dev, int quota)
-> >>> +{
-> >>> +	struct m_can_priv *priv = netdev_priv(dev);
-> >>> +	struct net_device_stats *stats = &dev->stats;
-> >>> +	struct sk_buff *skb;
-> >>> +	struct can_frame *frame;
-> >>> +	u32 pkts = 0;
-> >>> +	u32 rxfs;
-> >>> +
-> >>> +	rxfs = m_can_read(priv, M_CAN_RXF0S);
-> >>> +	if (!(rxfs & RXFS_FFL_MASK)) {
-> >>> +		netdev_dbg(dev, "no messages in fifo0\n");
-> >>> +		return 0;
-> >>> +	}
-> >>> +
-> >>> +	while ((rxfs & RXFS_FFL_MASK) && (quota > 0)) {
-> >>> +		if (rxfs & RXFS_RFL)
-> >>> +			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
-> >>> +
-> >>> +		skb = alloc_can_skb(dev, &frame);
-> >>> +		if (!skb) {
-> >>> +			stats->rx_dropped++;
-> >>> +			return 0;
-> >>
-> >> return pkts;
-> >>  - or -
-> >> goto out;
-> >>
-> > 
-> > Good catch. Will update it.
-> > 
-> >>> +		}
-> >>> +
-> >>> +		m_can_read_fifo(dev, frame, rxfs);
-> >>> +
-> >>> +		stats->rx_packets++;
-> >>> +		stats->rx_bytes += frame->can_dlc;
-> >>> +
-> >>> +		netif_receive_skb(skb);
-> >>> +
-> >>> +		quota--;
-> >>> +		pkts++;
-> >>> +		rxfs = m_can_read(priv, M_CAN_RXF0S);
-> >>> +	};
-> >>> +
-> >>
-> >> out:
-> >>> +	if (pkts)
-> >>> +		can_led_event(dev, CAN_LED_EVENT_RX);
-> >>> +
-> >>> +	return pkts;
-> >>> +}
-> >>> +
-> >>
-> >> [...]
-> >>
-> >>> +static int m_can_handle_lec_err(struct net_device *dev,
-> >>> +				enum m_can_lec_type lec_type)
-> >>> +{
-> >>> +	struct m_can_priv *priv = netdev_priv(dev);
-> >>> +	struct net_device_stats *stats = &dev->stats;
-> >>> +	struct can_frame *cf;
-> >>> +	struct sk_buff *skb;
-> >>> +
-> >>> +	/* early exit if no lec update */
-> >>> +	if (lec_type == LEC_UNUSED)
-> >>> +		return 0;
-> >>
-> >> I think this is not needed, as checked by the only caller.
-> > 
-> > You mean move it to caller as follows?
-> >         /* handle lec errors on the bus */
-> >         if ((psr & LEC_UNUSED) && ((psr & LEC_UNUSED)!= LEC_UNUSED) &&
-> 
-> yes - or something like this:
-> 
-> static inline bool is_lec(u32 psr)
-> {
-> 	u32 psr &= LEC_UNUSED
-> 
-> 	return psr && (psr != LEC_UNUSED)
-> }
-> 
-> 	if ((priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING) &&
-> 		is_lec(psr)) {
-> 	}
-> 
-
-
-Looks fine.
-Maybe is_lec_err(u32 psr) better? :-)
-
-Regards
-Dong Aisheng
-
-> >                 (priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING))
-> >                 work_done += m_can_handle_lec_err(dev,
-> >                                 psr & LEC_UNUSED);
-> > It seems not look good.
-> > 
-> > How about keep it here and move the later one to caller like:
-> >         /* handle lec errors on the bus */
-> >         if ((psr & LEC_UNUSED) &&
-> >                 (priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING))
-> >                 work_done += m_can_handle_lec_err(dev,
-> >                                 psr & LEC_UNUSED);
-> > 
-> >>> +
-> >>> +	if (!(priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING))
-> >>> +		return 0;
-> >>
-> >> Can you move this to the caller, too?
-> >>
-> >>> +
-> >>> +	priv->can.can_stats.bus_error++;
-> >>> +	stats->rx_errors++;
-> >>> +
-> >>> +	/* propagate the error condition to the CAN stack */
-> >>> +	skb = alloc_can_err_skb(dev, &cf);
-> >>> +	if (unlikely(!skb))
-> >>> +		return 0;
-> >>> +
-> >>> +	/* check for 'last error code' which tells us the
-> >>> +	 * type of the last error to occur on the CAN bus
-> >>> +	 */
-> >>> +	cf->can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR;
-> >>> +	cf->data[2] |= CAN_ERR_PROT_UNSPEC;
-> >>> +
-> >>> +	switch (lec_type) {
-> >>> +	case LEC_STUFF_ERROR:
-> >>> +		netdev_dbg(dev, "stuff error\n");
-> >>> +		cf->data[2] |= CAN_ERR_PROT_STUFF;
-> >>> +		break;
-> >>> +	case LEC_FORM_ERROR:
-> >>> +		netdev_dbg(dev, "form error\n");
-> >>> +		cf->data[2] |= CAN_ERR_PROT_FORM;
-> >>> +		break;
-> >>> +	case LEC_ACK_ERROR:
-> >>> +		netdev_dbg(dev, "ack error\n");
-> >>> +		cf->data[3] |= (CAN_ERR_PROT_LOC_ACK |
-> >>> +				CAN_ERR_PROT_LOC_ACK_DEL);
-> >>> +		break;
-> >>> +	case LEC_BIT1_ERROR:
-> >>> +		netdev_dbg(dev, "bit1 error\n");
-> >>> +		cf->data[2] |= CAN_ERR_PROT_BIT1;
-> >>> +		break;
-> >>> +	case LEC_BIT0_ERROR:
-> >>> +		netdev_dbg(dev, "bit0 error\n");
-> >>> +		cf->data[2] |= CAN_ERR_PROT_BIT0;
-> >>> +		break;
-> >>> +	case LEC_CRC_ERROR:
-> >>> +		netdev_dbg(dev, "CRC error\n");
-> >>> +		cf->data[3] |= (CAN_ERR_PROT_LOC_CRC_SEQ |
-> >>> +				CAN_ERR_PROT_LOC_CRC_DEL);
-> >>> +		break;
-> >>> +	default:
-> >>> +		break;
-> >>> +	}
-> >>> +
-> >>> +	stats->rx_packets++;
-> >>> +	stats->rx_bytes += cf->can_dlc;
-> >>> +	netif_receive_skb(skb);
-> >>> +
-> >>> +	return 1;
-> >>> +}
-> >>> +
-> >>
-> >> [...]
-> >>
-> >>> +static void m_can_handle_other_err(struct net_device *dev, u32 irqstatus)
-> >>> +{
-> >>> +	if (irqstatus & IR_WDI)
-> >>> +		netdev_err(dev, "Message RAM Watchdog event due to missing READY\n");
-> >>> +	if (irqstatus & IR_BEU)
-> >>> +		netdev_err(dev, "Error Logging Overflow\n");
-> >>> +	if (irqstatus & IR_BEU)
-> >>> +		netdev_err(dev, "Bit Error Uncorrected\n");
-> >>> +	if (irqstatus & IR_BEC)
-> >>> +		netdev_err(dev, "Bit Error Corrected\n");
-> >>> +	if (irqstatus & IR_TOO)
-> >>> +		netdev_err(dev, "Timeout reached\n");
-> >>> +	if (irqstatus & IR_MRAF)
-> >>> +		netdev_err(dev, "Message RAM access failure occurred\n");
-> >>> +}
-> >>
-> >> Have you ever seen these error messages? Better rate limit these, though.
-> >>
-> > 
-> > Normally we will not see those errors.
-> > It just for telling the user if something errors happened.
-> > Still not sure about the rate.
-> > Could it be improved later when we meet the real issue?
-> 
-> Meh, there is not netdev_ratelimited_LEVEL(), okay, keep it this way.
-> 
-> Marc
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index fceb014c54a1..76e0d6752bd8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -336,7 +336,6 @@ config ARCH_VERSATILE
+ 	select HAVE_MACH_CLKDEV
+ 	select ICST
+ 	select PLAT_VERSATILE
+-	select PLAT_VERSATILE_CLCD
+ 	select PLAT_VERSATILE_CLOCK
+ 	select VERSATILE_FPGA_IRQ
+ 	help
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index 3b02ba4e7094..4b7649d59bf6 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -9,7 +9,6 @@ config ARCH_REALVIEW
+ 	select GPIO_PL061 if GPIOLIB
+ 	select ICST
+ 	select PLAT_VERSATILE
+-	select PLAT_VERSATILE_CLCD
+ 	help
+ 	  This enables support for ARM Ltd RealView boards.
+ 
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index d8b9330f896a..e9166dfc4756 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -13,7 +13,6 @@ menuconfig ARCH_VEXPRESS
+ 	select ICST
+ 	select NO_IOPORT_MAP
+ 	select PLAT_VERSATILE
+-	select PLAT_VERSATILE_CLCD
+ 	select POWER_RESET
+ 	select POWER_RESET_VEXPRESS
+ 	select POWER_SUPPLY
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index e2dd9b493580..a16efe729988 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -292,10 +292,8 @@ config FB_ARMCLCD
+ 
+ # Helper logic selected only by the ARM Versatile platform family.
+ config PLAT_VERSATILE_CLCD
+-	depends on FB_ARMCLCD
+-	depends on (PLAT_VERSATILE || ARCH_INTEGRATOR)
+-	default y
+-	bool
++	def_bool ARCH_VERSATILE || ARCH_REALVIEW || ARCH_VEXPRESS
++	depends on FB_ARMCLCD && FB=y
+ 
+ config FB_ACORN
+ 	bool "Acorn VIDC support"
+diff --git a/include/linux/platform_data/video-clcd-versatile.h b/include/linux/platform_data/video-clcd-versatile.h
+index 6bb6a1d2019b..09ccf182af4d 100644
+--- a/include/linux/platform_data/video-clcd-versatile.h
++++ b/include/linux/platform_data/video-clcd-versatile.h
+@@ -1,9 +1,27 @@
+ #ifndef PLAT_CLCD_H
+ #define PLAT_CLCD_H
+ 
++#ifdef CONFIG_PLAT_VERSATILE_CLCD
+ struct clcd_panel *versatile_clcd_get_panel(const char *);
+ int versatile_clcd_setup_dma(struct clcd_fb *, unsigned long);
+ int versatile_clcd_mmap_dma(struct clcd_fb *, struct vm_area_struct *);
+ void versatile_clcd_remove_dma(struct clcd_fb *);
++#else
++static inline struct clcd_panel *versatile_clcd_get_panel(const char *s)
++{
++	return NULL;
++}
++static inline int versatile_clcd_setup_dma(struct clcd_fb *fb, unsigned long framesize)
++{
++	return -ENODEV;
++}
++static inline int versatile_clcd_mmap_dma(struct clcd_fb *fb, struct vm_area_struct *vm)
++{
++	return -ENODEV;
++}
++static inline void versatile_clcd_remove_dma(struct clcd_fb *fb)
++{
++}
++#endif
+ 
+ #endif
