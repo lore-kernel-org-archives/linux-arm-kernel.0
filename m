@@ -1,40 +1,96 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Jul 2014 11:39:38 +0100
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
- <4657735.1VKsbQGuH6@wuerfel>
- <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
-Message-ID: <20140715103938.GJ6800@sirena.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 15 Jul 2014 12:43:02 +0200
+Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
+ atmel-hlcdc-dc driver
+In-Reply-To: <20140715103718.GB6616@ulmo>
+References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417324.PxofUz16v0@avalon> <20140715103718.GB6616@ulmo>
+Message-ID: <1645765.yCSTbHcZMC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 04:36:20PM +0900, Alexandre Courbot wrote:
+Hi Thierry,
 
-> Direction and initial value, on the other hand, are clearly properties
-> that ought to be set by the driver itself. Thus my expectation here
-> would be that the driver sets the GPIO direction and initial value as
-> soon as it gets it using gpiod_direction_output(). In other words,
+On Tuesday 15 July 2014 12:37:19 Thierry Reding wrote:
+> On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
+> > On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
+> >> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
+> >>> On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
+> >>>> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs
+> >>>> (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family) provides a
+> >>>> display controller device.
+> >>>> 
+> >>>> The HLCDC block provides a single RGB output port, and only supports
+> >>>> LCD panels connection to LCD panels for now.
+> >>>> 
+> >>>> The atmel,panel property link the HLCDC RGB output with the LCD
+> >>>> panel connected on this port (note that the HLCDC RGB connector
+> >>>> implementation makes use of the DRM panel framework).
+> >>>> 
+> >>>> Connection to other external devices (DRM bridges) might be added
+> >>>> later by mean of a new atmel,xxx (atmel,bridge) property.
+> >>>> 
+> >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >>>> ---
+> >>>> 
+> >>>>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++
+> >>>>  1 file changed, 59 insertions(+)
+> >>>>  create mode 100644
+> >>>>  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+> > 
+> > [snip]
+> > 
+> >>>> + - atmel,panel: Should contain a phandle with 2 parameters.
+> >>>> +   The first cell is a phandle to a DRM panel device
+> >>>> +   The second cell encodes the RGB mode, which can take the
+> >>>> following values:
+> >>>> +   * 0: RGB444
+> >>>> +   * 1: RGB565
+> >>>> +   * 2: RGB666
+> >>>> +   * 3: RGB888
+> >>> 
+> >>> These are properties of the panel and should be obtained from the
+> >>> panel directly rather than an additional cell in this specifier.
+> >> 
+> >> Okay.
+> >> What's the preferred way of doing this ?
+> >> What about defining an rgb-mode property in the panel node.
+> > 
+> > You could do that, but it won't help you much, as the HLCDC driver must
+> > not parse properties from the panel node. You should instead extend the
+> > drm_panel API with a function to retrieve panel properties. The HLCDC
+> > driver will then query the panel driver at runtime for the interface
+> > type. The panel driver will get the information from hardcoded data in
+> > the driver, from DT or possibly in some cases by querying the panel
+> > hardware directly.
+> 
+> My preference for this would be that we either add this to some existing
+> structure (struct drm_display_info seems like a good candidate) or if
+> the number of parameters grows out of hands, then maybe even introduce a
+> new type of device that's specific for the interface. DRM panels are an
+> abstraction for panels, that is, interface-agnostic, and if we start
+> exposing interface specific parameters things will start to become very
+> unwieldy.
 
-Well, it's a bit of a mix really - from a hardware point of view they
-normally are actually often fixed.
+I agree with the goal of keeping drm_panel interface-agnostic. However, one 
+way or another, interface parameters will need to be communicated between the 
+panel driver and the controller driver. My preference, if we need to extend 
+the number and/or scope of parameters beyond what drm_display_info could 
+reasonably contain, would be to implement a new drm_panel operation to 
+query/configure interface parameters, using a structure that contains the 
+interface type and a union of type-specific structures. This would keep the 
+API generic in the sense of not requiring explicit knowledge of all interfaces 
+in the drivers, while offering the flexibility we need with a way to easily 
+detect the interface type at runtime and react on unknown/unsupported types.
 
-> there is no replacement for gpio_request_one() with the gpiod
-> interface. Is there any use-case that cannot be covered by calling
-> gpiod_direction_output() right after gpiod_get()? AFAICT this is what
-> gpio_request_one() was doing anyway.
+-- 
+Regards,
 
-Right, the original goal was to provide a better interface for
-requesting a GPIO - it saves a lot of error handling code throughout the
-kernel and avoids the possibility of bugs due to users forgetting to
-mark the directio for the GPIO.  Having a direct replacement also makes
-conversions to gpiod easier.
+Laurent Pinchart
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/ceaf2154/attachment.sig>
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/d4d38661/attachment.sig>
