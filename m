@@ -1,49 +1,46 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 15 Jul 2014 15:49:44 +0100
-Subject: [PATCH] efi/arm64: efistub: don't abort if base of DRAM is
- occupied
-In-Reply-To: <1405434206.25580.31.camel@deneb.redhat.com>
-References: <1405351521-12010-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405363248.25580.12.camel@deneb.redhat.com>
- <20140715100221.GU4179@bivouac.eciton.net>
- <1405429860.25580.25.camel@deneb.redhat.com>
- <20140715135418.GV4179@bivouac.eciton.net>
- <1405434206.25580.31.camel@deneb.redhat.com>
-Message-ID: <20140715144944.GW4179@bivouac.eciton.net>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 15 Jul 2014 09:50:56 -0500
+Subject: [PATCH v5 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+In-Reply-To: <1403030008-20675-1-git-send-email-galak@codeaurora.org>
+References: <1403030008-20675-1-git-send-email-galak@codeaurora.org>
+Message-ID: <3ABB6878-6EED-452A-BE5F-4240EA237BF7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 10:23:26AM -0400, Mark Salter wrote:
-> On Tue, 2014-07-15 at 14:54 +0100, Leif Lindholm wrote:
-> > On Tue, Jul 15, 2014 at 09:11:00AM -0400, Mark Salter wrote:
-> > > On Tue, 2014-07-15 at 11:02 +0100, Leif Lindholm wrote:
-> > > > > @@ -273,6 +282,10 @@ static void __init free_boot_services(void)
-> > > > >                       continue;
-> > > > >               }
-> > > > >  
-> > > > > +             /* Don't free anything below kernel */
-> > > > > +             if (md->phys_addr < PHYS_OFFSET)
-> > > > > +                     continue;
-> > > > > +
-> > > > 
-> > > > Is the spin table area really allocated as BOOT_SERVICES_*?
-> > > 
-> > > No. It is EFI_RESERVED_TYPE. But if UEFI is allowed below the kernel,
-> > > then there could be BS code/data memory which we'd want to ignore.
-> > 
-> > Well, if it is boot service code/data - then there is no need for us
-> > to keep it around after ExitBootServices().
+
+On Jun 17, 2014, at 1:33 PM, Kumar Gala <galak@codeaurora.org> wrote:
+
+> Add a PHY driver for uses with AHCI based SATA controller driver on the
+> IPQ806x family of SoCs.
 > 
-> One would think, but EFI has proven to be less than strictly compliant
-> in that regard in the past. I'm inclined to keep the boot services
-> around until after SetVirtualAddressMap just in case.
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+> v5:
+> * Fix copy/paste error when killing qcom_ipq806x_sata_delay_us
+> 
+> v4:
+> * removed qcom_ipq806x_sata_delay_us as it was only used one
+> 
+> v3:
+> * Added Kconfig HAS_IOMEM dep
+> * re-ordered probe function so phy_provider_register is last
+> 
+> v2:
+> * dropped unused dev pointer in struct qcom_ipq806x_sata_phy
+> * remove unnecessary reg initializaiton
+> * Removed unneeded error message
+> * Added remove function to disable the clock
+> 
+> drivers/phy/Kconfig                 |   7 ++
+> drivers/phy/Makefile                |   1 +
+> drivers/phy/phy-qcom-ipq806x-sata.c | 206 ++++++++++++++++++++++++++++++++++++
+> 3 files changed, 214 insertions(+)
+> create mode 100644 drivers/phy/phy-qcom-ipq806x-sata.c
 
-But the function you add this clause to will still throw away all boot
-services code/data regions - just with this modification it skips
-those that happen to lie lower in the address space than the kernel.
+any update?
 
-(And I do agree with Mark R here - let's not work around bugs that
-don't exist yet.)
+- k
 
-/
-    Leif
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
