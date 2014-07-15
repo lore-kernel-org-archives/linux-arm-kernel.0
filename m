@@ -1,20 +1,38 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 15 Jul 2014 14:53:42 +0900
-Subject: [RFC/PATCH RESEND -next 10/21] mm: slab: share virt_to_cache()
- between slab and slub
-In-Reply-To: <1404905415-9046-11-git-send-email-a.ryabinin@samsung.com>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-11-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20140715055342.GH11317@js1304-P5Q-DELUXE>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 15 Jul 2014 11:22:40 +0530
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C4BDFB.70707@codeaurora.org>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+ <53C0A12A.2060204@codeaurora.org>
+ <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
+ <53C42AA8.8010107@codeaurora.org>
+ <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
+ <53C4BDFB.70707@codeaurora.org>
+Message-ID: <CAKohpo=y4KiTrTxvacyN7cbuaOJBXa-hyg+kmyV7V-0nCRZkkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 03:30:04PM +0400, Andrey Ryabinin wrote:
-> This patch shares virt_to_cache() between slab and slub and
-> it used in cache_from_obj() now.
-> Later virt_to_cache() will be kernel address sanitizer also.
+On 15 July 2014 11:06, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Btw, I tried to take a stab at removing any assumption in cpufreq code about
+> policy->cpu being ONLINE. There are 160 instances of those of with 23 are in
+> cpufreq.c
+>
+> So, even if we are sure cpufreq.c is fine, it's 137 other uses spread across
+> all the other files. I definitely don't want to try and fix those as part of
+> this patch. Way too risky and hard to get the test coverage it would need.
+> Even some of the acpi cpufreq drivers seem to be making this assumption.
 
-I think that this patch won't be needed.
-See comment in 15/21.
+Hmm, yeah that would be an issue. So this is what you should do now:
+- Left policy->cpu as it is, i.e. updated only when policy->cpu goes down.
+- Just make sure sysfs nodes are untouched when any cpu goes down
 
-Thanks.
+> Btw, I think v3 is done. I did some testing and it was fine. But made some
+> minor changes. Will test tomorrow to make sure I didn't break anything with
+> the minor changes and then send them out.
+
+Ok, just comply to the above comments.
