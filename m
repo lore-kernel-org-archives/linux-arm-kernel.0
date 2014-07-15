@@ -1,54 +1,81 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Jul 2014 23:59:28 -0700
-Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <53C4A8F5.2000302@ti.com>
-References: <53BD0C43.1090002@ti.com> <20140709100914.GL28884@atomide.com>
- <53BD1AF8.2060609@ti.com> <20140709105055.GP28884@atomide.com>
- <53BD1FC3.6050500@ti.com> <20140709110051.GQ28884@atomide.com>
- <53BD2249.2080808@ti.com> <53C3ED02.7020206@ti.com>
- <20140714162324.GF20068@atomide.com> <53C4A8F5.2000302@ti.com>
-Message-ID: <20140715065928.GK20068@atomide.com>
+From: srivatsa@MIT.EDU (Srivatsa S. Bhat)
+Date: Tue, 15 Jul 2014 12:28:54 +0530
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C4BDFB.70707@codeaurora.org>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+ <53C0A12A.2060204@codeaurora.org>
+ <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
+ <53C42AA8.8010107@codeaurora.org>
+ <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
+ <53C4BDFB.70707@codeaurora.org>
+Message-ID: <53C4D12E.3040807@mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [140714 21:09]:
-> On Monday 14 July 2014 09:53 PM, Tony Lindgren wrote:
-> > * Lokesh Vutla <lokeshvutla@ti.com> [140714 07:47]:
-> >>
-> >> In my experiments I observed that when RTC regulator is switched
-> >> off and switched on, there is an abort while accessing RTC registers.
-> > 
-> > Right, then you know you have the right regulator :)
+On 07/15/2014 11:06 AM, Saravana Kannan wrote:
+> On 07/14/2014 09:35 PM, Viresh Kumar wrote:
+>> On 15 July 2014 00:38, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>> Yeah, it definitely crashes if policy->cpu if an offline cpu. Because
+>>> the
+>>> mutex would be uninitialized if it's stopped after boot or it would
+>>> never
+>>> have been initialized (depending on how you fix policy->cpu at boot).
+>>>
+>>> Look at this snippet on the actual tree and it should be pretty evident.
+>>
+>> Yeah, I missed it. So the problem is we initialize timer_mutex's for
+>> policy->cpus. So we need to do that just for policy->cpu and also we
+>> don't
+>> need a per-cpu timer_mutex anymore.
+>>
+> 
+> Btw, I tried to take a stab at removing any assumption in cpufreq code
+> about policy->cpu being ONLINE.
+
+Wait, allowing an offline CPU to be the policy->cpu (i.e., the CPU which is
+considered as the master of the policy/group) is just absurd. If there is
+no leader, there is no army. We should NOT sacrifice sane semantics for the
+sake of simplifying the code.
+
+> There are 160 instances of those of with
+> 23 are in cpufreq.c
 >
-> Once we switch it off it is expected, but then if it is *switched on*
-> it is expected that we should be able to access registers. Here there
-> is an abort accessing these registers. 
 
-Most likely you need to also reconfigure the registers or
-re-enable the clock or reset it at the interconnect too.
+And that explains why. It is just *natural* to assume that the CPUs governed
+by a policy are online. Especially so for the CPU which is supposed to be
+the policy leader. Let us please not change that - it will become
+counter-intuitive if we do so. [ The other reason is that physical hotplug
+is also possible on some systems... in that case your code might make a CPU
+which is not even present (but possible) as the policy->cpu.. and great 'fun'
+will ensue after that ;-( ]
 
-> >> After discussing with hardware team, it is confirmed that this
-> >> LDO9 regulator powering RTC cannot be turned off when
-> >> SoC is active and expected to be always on.
-> > 
-> > Hmm but sounds like you already proved it can be idled? So
-> > the regulator really should be managed by the driver?
->
-> Actually I adapted the driver to support a power regulator.
-> Then I observed that if rtc is loaded as  a module there is
-> an abort(  which is happening because the regulator is disabled
-> once and re-enabled). So when we checked with the hardware team,
-> they confirmed that ldo9 should not be disabled. 
+The goal of this patchset should be to just de-couple the sysfs files/ownership
+from the policy->cpu to an extent where it doesn't matter who owns those
+files, and probably make it easier to do CPU hotplug without having to
+destroy and recreate the files on every hotplug operation.
 
-Hmm so how is it enabled initially then?
+This is exactly why the _implementation_ matters in this particular case -
+if we can't achieve the simplification by keeping sane semantics, then we
+shouldn't do the simplification!
 
-To me it sounds like very standard stuff to reinitialize
-a driver for any omap device when waking from suspend or
-returning from off-idle. If the RTC device cannot be reset,
-idled and re-initialized properly, there's something wrong
-with the RTC driver, clocks, regulators, or hwmod data for
-that device.
+That said, I think we should keep trying - we haven't exhausted all ideas
+yet :-)
 
 Regards,
+Srivatsa S. Bhat
 
-Tony
+> So, even if we are sure cpufreq.c is fine, it's 137 other uses spread
+> across all the other files. I definitely don't want to try and fix those
+> as part of this patch. Way too risky and hard to get the test coverage
+> it would need. Even some of the acpi cpufreq drivers seem to be making
+> this assumption.
+> 
+> Btw, I think v3 is done. I did some testing and it was fine. But made
+> some minor changes. Will test tomorrow to make sure I didn't break
+> anything with the minor changes and then send them out.
+> 
