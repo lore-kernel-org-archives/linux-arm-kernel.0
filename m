@@ -1,67 +1,60 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Tue, 15 Jul 2014 22:55:41 +0530
-Subject: [PATCH] ARM: config: update multi_v7_defconfig
-In-Reply-To: <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
-References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
- <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
-Message-ID: <CAHfPSqBuVWSCdJCv7xJ8UEpiq_GRiiL=OX6-u1KtZ-3jpRNTYw@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 15 Jul 2014 10:28:52 -0700
+Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
+In-Reply-To: <20140714140526.GK2197@dragon>
+References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+ <20140714070341.GC2197@dragon>
+ <CA+sos7_quvZo6j9rFPvgCdYsEx6RoUNPUyvxE74K4vaNWDkGyg@mail.gmail.com>
+ <20140714140526.GK2197@dragon>
+Message-ID: <CAJ+vNU071i=fb5r-mq_GXz_r41N1XyafCeGEiuayhbwVmQ5jAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug
-
-On 15 July 2014 21:29, Doug Anderson <dianders@chromium.org> wrote:
-> Naveen,
->
-> On Tue, Jul 15, 2014 at 1:02 AM, Naveen Krishna Chatradhi
-> <ch.naveen@samsung.com> wrote:
->> Enabled S3C24XX I2C driver and MAX77686 PMIC MFD and Voltage
->> regulator drivers used on Exynos5250 based Snow board.
+On Mon, Jul 14, 2014 at 7:05 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Mon, Jul 14, 2014 at 02:56:06PM +0200, Beno?t Th?baudeau wrote:
+>> > So the question comes down to, for an output GPIO, whether the value in
+>> > GPIO_DR register is always identical to what we see on the pad.  If yes,
+>> > your patch makes sense to me.  Otherwise, we have to set SION bit to
+>> > read the value of an output GPIO from GPIO_PSR.
 >>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> ---
->> By enabling the symbols to compile S3C24XX I2C driver, MAX77686 PMIC
->> under MFD and REGULATOR.
+>> Both are not always the same. They should be the same only for sane
+>> hardware. GPIO_DR indicates the level that the output pad tries to
+>> drive, while GPIO_PSR indicates the level sensed on the pad. Thus,
+>> they may differ if there is an external level conflict on the pin.
+>> This difference may be useful in order to test if the board is
+>> behaving as expected or if there is anything going wrong, which is
+>> typically useful for board prototyping.
 >>
->> http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
->> The warnings by cpufreq on Snow board are fixed.
->>
->> Booted and verified on  on Exynos5420 based Snow board
->>
->>  arch/arm/configs/multi_v7_defconfig |    3 +++
->>  1 file changed, 3 insertions(+)
+>> The software "knows" what it has set on the output pad, so having a
+>> get accessor for GPIO_PSR is more useful than for GPIO_DR, and it
+>> better fits the actual meaning of this function. GPIO_DR would
+>> correspond to the non-existing gpio_get_set_value() function.
 >
-> Is there a reason not to add more of the max77686 configs?
-
-I was trying to address the warnings posted @
-http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
-
+> Thanks for the input, Beno?t.  That's helpful.
 >
-> +CONFIG_RTC_DRV_MAX77686=y
-> +CONFIG_COMMON_CLK_MAX77686=y
->
-> I also seems like it would be nice to reconcile this with Sacin's
-> latest patch.  For starters I notice that you're missing:
->   CONFIG_EXYNOS5420_MCPM=y
+> Shawn
 
-Right
->
-> I'll leave it up to you to look for other things that might be
-> missing.  If some of the things in exynos5_defconfig can't go into the
-> multi-config, please explain.
+Great - thanks for the clarification everyone. I will not submit such
+a patch and instead work this from the pinmux perspective setting SION
+on GPIO outputs.
 
-Will try to bring the symbols from Sachin's patch for exynos_defconfig
-to multi_v7_defconfig.
+That said, can anyone shed light on the subject of what is 'proper'
+for GPIO pinmux in the bootloader vs the kernel device-tree? I see
+that among the various imx6qdl*.dtsi files, some boards configure
+MX6QDL_PAD_GPIO* as 0x80000000 (no config, keeping power-on or
+bootloader settings) instead of manually configuring them. Perhaps
+there is some rule of thumb that should be followed?
 
->
-> -Doug
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The boards I maintain have several GPIO's that fall under the categories:
+ a) go to a connector for off-board use as GPIO
+ b) used for a chip enable that no driver may use (like an i2c buffer
+for expanding/isolating i2c to an off-board connector for example)
+ c) user leds (which 'are' configured for use by the gpio-led driver)
+ d) USB hub reset (which the bootloader configures and de-asserts)
+ e) probably a few more less-used cases (see
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi#n348
+for a good example)
 
+Thanks,
 
-
--- 
-Regards,
-(: Naveen :)
+Tim
