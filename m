@@ -1,96 +1,158 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 15 Jul 2014 12:43:02 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140715103718.GB6616@ulmo>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417324.PxofUz16v0@avalon> <20140715103718.GB6616@ulmo>
-Message-ID: <1645765.yCSTbHcZMC@avalon>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 15 Jul 2014 18:40:06 +0800
+Subject: [PATCH v4 2/2] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <53C4F2B5.7050704@pengutronix.de>
+References: <1405338041-19945-1-git-send-email-b29396@freescale.com>
+ <1405338041-19945-2-git-send-email-b29396@freescale.com>
+ <53C3C97A.7080102@pengutronix.de>
+ <20140715033324.GC21584@shlinux1.ap.freescale.net>
+ <53C4D872.9060707@pengutronix.de>
+ <20140715082637.GA2601@shlinux1.ap.freescale.net>
+ <53C4EA68.5090606@pengutronix.de>
+ <20140715090719.GA3374@shlinux1.ap.freescale.net>
+ <53C4F2B5.7050704@pengutronix.de>
+Message-ID: <20140715104005.GA3837@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On Tuesday 15 July 2014 12:37:19 Thierry Reding wrote:
-> On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
-> > On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
-> >> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
-> >>> On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
-> >>>> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs
-> >>>> (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family) provides a
-> >>>> display controller device.
-> >>>> 
-> >>>> The HLCDC block provides a single RGB output port, and only supports
-> >>>> LCD panels connection to LCD panels for now.
-> >>>> 
-> >>>> The atmel,panel property link the HLCDC RGB output with the LCD
-> >>>> panel connected on this port (note that the HLCDC RGB connector
-> >>>> implementation makes use of the DRM panel framework).
-> >>>> 
-> >>>> Connection to other external devices (DRM bridges) might be added
-> >>>> later by mean of a new atmel,xxx (atmel,bridge) property.
-> >>>> 
-> >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> >>>> ---
-> >>>> 
-> >>>>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 +++++++++++
-> >>>>  1 file changed, 59 insertions(+)
-> >>>>  create mode 100644
-> >>>>  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+On Tue, Jul 15, 2014 at 11:21:57AM +0200, Marc Kleine-Budde wrote:
+> On 07/15/2014 11:07 AM, Dong Aisheng wrote:
+> > On Tue, Jul 15, 2014 at 10:46:32AM +0200, Marc Kleine-Budde wrote:
+> >> On 07/15/2014 10:26 AM, Dong Aisheng wrote:
+> >>>>>>> +static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> >>>>>>> +			    u32 rxfs)
+> >>>>>>> +{
+> >>>>>>> +	struct m_can_priv *priv = netdev_priv(dev);
+> >>>>>>> +	u32 flags, fgi;
+> >>>>>>> +
+> >>>>>>> +	/* calculate the fifo get index for where to read data */
+> >>>>>>> +	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> >>>>>>> +	flags = m_can_fifo_read(priv, fgi, 0x0);
+> >>>>>>                                            ^^^
+> >>>>>>
+> >>>>>> Can you introduce an enum for the offsets, please adjust the signature
+> >>>>>> of m_can_fifo_read() accordingly.
+> >>>>>>
+> >>>>>
+> >>>>> I wonder enum may not be suitable.
+> >>>>> The Rx Buffer and FIFO Element is as follows:
+> >>>>>    31 24 23 16 15 8 7 0
+> >>>>> R0 ESI XTD RTR ID[28:0]
+> >>>>
+> >>>> M_CAN_FIFO_ID
+> >>>>
+> >>>>> R1 ANMF FIDX[6:0] res EDL BRS DLC[3:0] RXTS[15:0]
+> >>>>
+> >>>> M_CAN_FIFO_DLC
+> >>>>
+> >>>>> R2 DB3[7:0] DB2[7:0] DB1[7:0] DB0[7:0]
+> >>>>> R3 DB7[7:0] DB6[7:0] DB5[7:0] DB4[7:0]
+> >>>>
+> >>>> M_CAN_FIFO_DATA0
+> >>>> M_CAN_FIFO_DATA1
+> >>>>
+> >>>
+> >>> You mean as follows?
+> >>> enum m_can_fifo {
+> >>>         M_CAN_FIFO_ID = 0,
+> >>>         M_CAN_FIFO_DLC,
+> >> = 0x4,
+> >>>         M_CAN_FIFO_DATA0,
+> >> = 0x8,
+> >>>         M_CAN_FIFO_DATA1,
+> >> = 0xc,
+> >>> };
+> >>>
+> >>> static inline u32 m_can_fifo_read(const struct m_can_priv *priv,
+> >>>                                   u32 fgi, enum m_can_fifo fifo)
+> >>> {
+> >>>         return readl(priv->mram_base + priv->mcfg[MRAM_RXF0].off +
+> >>>                      fgi * RXF0_ELEMENT_SIZE + fifo * 0x4);
+> >>> }
+> >>
+> >> without the * 0x4
+> >>
+> >>> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+> >>>
+> >>> The problem is when adding long frames support, it becomes:
+> >>> enum m_can_fifo {
+> >>>         M_CAN_FIFO_ID = 0,
+> >>>         M_CAN_FIFO_DLC,
+> >>>         M_CAN_FIFO_DATA0,
+> >>>         M_CAN_FIFO_DATA1,
+> >>>         ....
+> >>>         M_CAN_FIFO_DATA15,
+> >>> };
+> >>
+> >> #define M_CAN_FIFO_DATA(n)
+> >> 	(enum m_can_fifo)(M_CAN_FIFO_DATA_0 + (n) << 2)
+> >>
 > > 
-> > [snip]
+> > This is a bit strange using and we may still have to define other M_CAN_FIFO_DATAx
+> > to avoid the enum value exceeds the defined range.
+> > enum m_can_fifo {
+> >         M_CAN_FIFO_ID = 0,
+> >         M_CAN_FIFO_DLC = 0x4,
+> >         M_CAN_FIFO_DATA0 = 0x8,
+> >         M_CAN_FIFO_DATA1 = 0xc,
+> > 	....
+> >         M_CAN_FIFO_DATA15 = 0xc,
+> > };
 > > 
-> >>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> >>>> +   The first cell is a phandle to a DRM panel device
-> >>>> +   The second cell encodes the RGB mode, which can take the
-> >>>> following values:
-> >>>> +   * 0: RGB444
-> >>>> +   * 1: RGB565
-> >>>> +   * 2: RGB666
-> >>>> +   * 3: RGB888
-> >>> 
-> >>> These are properties of the panel and should be obtained from the
-> >>> panel directly rather than an additional cell in this specifier.
-> >> 
-> >> Okay.
-> >> What's the preferred way of doing this ?
-> >> What about defining an rgb-mode property in the panel node.
+> > However, actually we will not use them at all after introducing M_CAN_FIFO_DATA(n).
+> > If that, why we still need define them in enum?
 > > 
-> > You could do that, but it won't help you much, as the HLCDC driver must
-> > not parse properties from the panel node. You should instead extend the
-> > drm_panel API with a function to retrieve panel properties. The HLCDC
-> > driver will then query the panel driver at runtime for the interface
-> > type. The panel driver will get the information from hardcoded data in
-> > the driver, from DT or possibly in some cases by querying the panel
-> > hardware directly.
+> > Comparing to this way, why not simply just do as follows:
+> > #define M_CAN_FIFO_ID		0x0
+> > #define M_CAN_FIFO_DLC		0x4
+> > #define M_CAN_FIFO_DATA(n)	(0x8 + (n) << 2)
+> > 
+> > What do you think?
 > 
-> My preference for this would be that we either add this to some existing
-> structure (struct drm_display_info seems like a good candidate) or if
-> the number of parameters grows out of hands, then maybe even introduce a
-> new type of device that's specific for the interface. DRM panels are an
-> abstraction for panels, that is, interface-agnostic, and if we start
-> exposing interface specific parameters things will start to become very
-> unwieldy.
+> Looks good.
+> 
+> > 
+> >>> But it's useless because we may not use enum to read fifo data anymore.
+> >>> It's not suitable to read fifo one by one:
+> >>> m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA0);
+> >>> m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA1);
+> >>> ..
+> >>> m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA15);
+> >>>
+> >>>
+> >>> Instead, we may read data according to real dlc value within a for loop like:
+> >>> #define M_CAN_FIFO(n)   (n * 0x4)
+> >>> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO(0));
+> >>> dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO(1));
+> >>> for (i = 0; dlc > 0; dlc -= 0x4, i++) {
+> >>>         ....
+> >>>         data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO(i + 2));
+> >>> }
+> >>
+> >> id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+> >> dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> >> for (i = 0; i <= dlc; i++)
+> >> 	data[i] = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i));
+> > 
+> > Does it work?
+> > The dlc is in bytes while m_can_fifo_read is read in words.
+> 
+> Doh! probably not :) But should work with something like this:
+> 
+> int len = DIV_ROUND_UP(dlc, 4);
+> 
 
-I agree with the goal of keeping drm_panel interface-agnostic. However, one 
-way or another, interface parameters will need to be communicated between the 
-panel driver and the controller driver. My preference, if we need to extend 
-the number and/or scope of parameters beyond what drm_display_info could 
-reasonably contain, would be to implement a new drm_panel operation to 
-query/configure interface parameters, using a structure that contains the 
-interface type and a union of type-specific structures. This would keep the 
-API generic in the sense of not requiring explicit knowledge of all interfaces 
-in the drivers, while offering the flexibility we need with a way to easily 
-detect the interface type at runtime and react on unknown/unsupported types.
+Good point!
+Will try this when adding canfd format support.
 
--- 
-Regards,
+Regards
+Dong Aisheng
 
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/d4d38661/attachment.sig>
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
