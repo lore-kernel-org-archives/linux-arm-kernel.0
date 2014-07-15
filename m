@@ -1,63 +1,79 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Jul 2014 01:00:46 +0200
-Subject: [PATCH 2/6] ARM: rockchip: add debug uart used by rk3288
-In-Reply-To: <1471578.ILeMmG2DL6@diego>
-References: <1471578.ILeMmG2DL6@diego>
-Message-ID: <2866950.oXmKFGy9mh@diego>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Jul 2014 15:59:41 -0700
+Subject: [PATCH 1/2] clk: qcom: pll: Add support for configuring SR PLLs
+In-Reply-To: <1405465182-925-1-git-send-email-sboyd@codeaurora.org>
+References: <1405465182-925-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1405465182-925-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uarts on rk3288 are still compatible with the dw_8250, but located
-at a different position and need DEBUG_UART_8250_WORD enabled.
+Some SR type PLLs need to be configured for a certain rate when
+linux boots. Add support for these types of PLLs so that we can
+program PLL15's rate on APQ8064.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/Kconfig.debug | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/clk/qcom/clk-pll.c | 15 ++++++++++++---
+ drivers/clk/qcom/clk-pll.h |  2 ++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 8f90595..f68def0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -613,6 +613,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Rockchip based platforms.
+diff --git a/drivers/clk/qcom/clk-pll.c b/drivers/clk/qcom/clk-pll.c
+index 0f927c538613..9db03d3b1657 100644
+--- a/drivers/clk/qcom/clk-pll.c
++++ b/drivers/clk/qcom/clk-pll.c
+@@ -166,7 +166,7 @@ const struct clk_ops clk_pll_vote_ops = {
+ EXPORT_SYMBOL_GPL(clk_pll_vote_ops);
  
-+	config DEBUG_RK32_UART2
-+		bool "Kernel low-level debugging messages via Rockchip RK32 UART2"
-+		depends on ARCH_ROCKCHIP
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Rockchip RK32xx based platforms.
+ static void
+-clk_pll_set_fsm_mode(struct clk_pll *pll, struct regmap *regmap)
++clk_pll_set_fsm_mode(struct clk_pll *pll, struct regmap *regmap, u8 lock_count)
+ {
+ 	u32 val;
+ 	u32 mask;
+@@ -175,7 +175,7 @@ clk_pll_set_fsm_mode(struct clk_pll *pll, struct regmap *regmap)
+ 	regmap_update_bits(regmap, pll->mode_reg, PLL_VOTE_FSM_RESET, 0);
+ 
+ 	/* Program bias count and lock count */
+-	val = 1 << PLL_BIAS_COUNT_SHIFT;
++	val = 1 << PLL_BIAS_COUNT_SHIFT | lock_count << PLL_LOCK_COUNT_SHIFT;
+ 	mask = PLL_BIAS_COUNT_MASK << PLL_BIAS_COUNT_SHIFT;
+ 	mask |= PLL_LOCK_COUNT_MASK << PLL_LOCK_COUNT_SHIFT;
+ 	regmap_update_bits(regmap, pll->mode_reg, mask, val);
+@@ -212,11 +212,20 @@ static void clk_pll_configure(struct clk_pll *pll, struct regmap *regmap,
+ 	regmap_update_bits(regmap, pll->config_reg, mask, val);
+ }
+ 
++void clk_pll_configure_sr(struct clk_pll *pll, struct regmap *regmap,
++		const struct pll_config *config, bool fsm_mode)
++{
++	clk_pll_configure(pll, regmap, config);
++	if (fsm_mode)
++		clk_pll_set_fsm_mode(pll, regmap, 8);
++}
++EXPORT_SYMBOL_GPL(clk_pll_configure_sr);
 +
- 	config DEBUG_S3C_UART0
- 		depends on PLAT_SAMSUNG
- 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
-@@ -1096,6 +1104,7 @@ config DEBUG_UART_PHYS
- 	default 0xf991e000 if DEBUG_QCOM_UARTDM
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfe800000 if ARCH_IOP32X
-+	default 0xff690000 if DEBUG_RK32_UART2
- 	default 0xffc02000 if DEBUG_SOCFPGA_UART
- 	default 0xffd82340 if ARCH_IOP13XX
- 	default 0xfff36000 if DEBUG_HIGHBANK_UART
-@@ -1152,6 +1161,7 @@ config DEBUG_UART_VIRT
- 	default 0xfec02000 if DEBUG_SOCFPGA_UART
- 	default 0xfec12000 if DEBUG_MVEBU_UART || DEBUG_MVEBU_UART_ALTERNATE
- 	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
-+	default 0xfec90000 if DEBUG_RK32_UART2
- 	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
- 	default 0xfed0d000 if DEBUG_DAVINCI_DA8XX_UART2
- 	default 0xfed12000 if ARCH_KIRKWOOD
-@@ -1186,7 +1196,7 @@ config DEBUG_UART_8250_WORD
- 		ARCH_KEYSTONE || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
--		DEBUG_BCM_KONA_UART
-+		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
+ void clk_pll_configure_sr_hpm_lp(struct clk_pll *pll, struct regmap *regmap,
+ 		const struct pll_config *config, bool fsm_mode)
+ {
+ 	clk_pll_configure(pll, regmap, config);
+ 	if (fsm_mode)
+-		clk_pll_set_fsm_mode(pll, regmap);
++		clk_pll_set_fsm_mode(pll, regmap, 0);
+ }
+ EXPORT_SYMBOL_GPL(clk_pll_configure_sr_hpm_lp);
+diff --git a/drivers/clk/qcom/clk-pll.h b/drivers/clk/qcom/clk-pll.h
+index 0775a99ca768..3003e9962472 100644
+--- a/drivers/clk/qcom/clk-pll.h
++++ b/drivers/clk/qcom/clk-pll.h
+@@ -60,6 +60,8 @@ struct pll_config {
+ 	u32 aux_output_mask;
+ };
  
- config DEBUG_UART_8250_FLOW_CONTROL
- 	bool "Enable flow control for 8250 UART"
++void clk_pll_configure_sr(struct clk_pll *pll, struct regmap *regmap,
++		const struct pll_config *config, bool fsm_mode);
+ void clk_pll_configure_sr_hpm_lp(struct clk_pll *pll, struct regmap *regmap,
+ 		const struct pll_config *config, bool fsm_mode);
+ 
 -- 
-1.9.0
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
