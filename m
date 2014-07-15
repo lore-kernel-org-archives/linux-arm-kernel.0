@@ -1,72 +1,95 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Tue, 15 Jul 2014 13:39:15 +0530
-Subject: [PATCH] ARM: config: update multi_v7_defconfig
-In-Reply-To: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
-References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAHfPSqCphGLYiiby4zrqvydUALo2+JdHx5CT-RuryapeQisvaw@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 15 Jul 2014 17:18:52 +0900
+Subject: [RFC/PATCH RESEND -next 14/21] mm: slub: kasan: disable kasan
+ when touching unaccessible memory
+In-Reply-To: <53C4DA54.3010502@samsung.com>
+References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
+ <1404905415-9046-15-git-send-email-a.ryabinin@samsung.com>
+ <20140715060405.GI11317@js1304-P5Q-DELUXE>
+ <53C4DA54.3010502@samsung.com>
+Message-ID: <20140715081852.GL11317@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello All,
+On Tue, Jul 15, 2014 at 11:37:56AM +0400, Andrey Ryabinin wrote:
+> On 07/15/14 10:04, Joonsoo Kim wrote:
+> > On Wed, Jul 09, 2014 at 03:30:08PM +0400, Andrey Ryabinin wrote:
+> >> Some code in slub could validly touch memory marked by kasan as unaccessible.
+> >> Even though slub.c doesn't instrumented, functions called in it are instrumented,
+> >> so to avoid false positive reports such places are protected by
+> >> kasan_disable_local()/kasan_enable_local() calls.
+> >>
+> >> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> >> ---
+> >>  mm/slub.c | 21 +++++++++++++++++++--
+> >>  1 file changed, 19 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/mm/slub.c b/mm/slub.c
+> >> index 6ddedf9..c8dbea7 100644
+> >> --- a/mm/slub.c
+> >> +++ b/mm/slub.c
+> >> @@ -560,8 +560,10 @@ static void print_tracking(struct kmem_cache *s, void *object)
+> >>  	if (!(s->flags & SLAB_STORE_USER))
+> >>  		return;
+> >>  
+> >> +	kasan_disable_local();
+> >>  	print_track("Allocated", get_track(s, object, TRACK_ALLOC));
+> >>  	print_track("Freed", get_track(s, object, TRACK_FREE));
+> >> +	kasan_enable_local();
+> > 
+> > I don't think that this is needed since print_track() doesn't call
+> > external function with object pointer. print_track() call pr_err(), but,
+> > before calling, it retrieve t->addrs[i] so memory access only occurs
+> > in slub.c.
+> > 
+> Agree.
+> 
+> >>  }
+> >>  
+> >>  static void print_page_info(struct page *page)
+> >> @@ -604,6 +606,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+> >>  	unsigned int off;	/* Offset of last byte */
+> >>  	u8 *addr = page_address(page);
+> >>  
+> >> +	kasan_disable_local();
+> >> +
+> >>  	print_tracking(s, p);
+> >>  
+> >>  	print_page_info(page);
+> >> @@ -632,6 +636,8 @@ static void print_trailer(struct kmem_cache *s, struct page *page, u8 *p)
+> >>  		/* Beginning of the filler is the free pointer */
+> >>  		print_section("Padding ", p + off, s->size - off);
+> >>  
+> >> +	kasan_enable_local();
+> >> +
+> >>  	dump_stack();
+> >>  }
+> > 
+> > And, I recommend that you put this hook on right place.
+> > At a glance, the problematic function is print_section() which have
+> > external function call, print_hex_dump(), with object pointer.
+> > If you disable kasan in print_section, all the below thing won't be
+> > needed, I guess.
+> > 
+> 
+> Nope, at least memchr_inv() call in slab_pad_check will be a problem.
+> 
+> I think putting disable/enable only where we strictly need them might be a problem for future maintenance of slub.
+> If someone is going to add a new function call somewhere, he must ensure that it this call won't be a problem
+> for kasan.
 
-On 15 July 2014 13:32, Naveen Krishna Chatradhi <ch.naveen@samsung.com> wrote:
-> Enabled S3C24XX I2C driver and MAX77686 PMIC MFD and Voltage
-> regulator drivers used on Exynos5250 based Snow board.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
-> By enabling the symbols to compile S3C24XX I2C driver, MAX77686 PMIC
-> under MFD and REGULATOR.
->
-> http://arm-soc.lixom.net/bootlogs/next/next-20140711/snow-multi_v7_defconfig.html
-> The warnings by cpufreq on Snow board are fixed.
->
-> Booted and verified on  on Exynos5420 based Snow board
+I don't agree with this.
 
-* Exynos5250 based Snow board.
+If someone is going to add a slab_pad_check() in other places in
+slub.c, we should disable/enable kasan there, too. This looks same
+maintenance problem to me. Putting disable/enable only where we
+strictly need at least ensures that we don't need to care when using
+slub internal functions.
 
->
->  arch/arm/configs/multi_v7_defconfig |    3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 5348364..1aaf91d 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -193,6 +193,7 @@ CONFIG_I2C_CADENCE=y
->  CONFIG_I2C_DESIGNWARE_PLATFORM=y
->  CONFIG_I2C_EXYNOS5=y
->  CONFIG_I2C_MV64XXX=y
-> +CONFIG_I2C_S3C2410=y
->  CONFIG_I2C_SIRF=y
->  CONFIG_I2C_TEGRA=y
->  CONFIG_SPI=y
-> @@ -231,6 +232,7 @@ CONFIG_MFD_AS3722=y
->  CONFIG_MFD_BCM590XX=y
->  CONFIG_MFD_CROS_EC=y
->  CONFIG_MFD_CROS_EC_SPI=y
-> +CONFIG_MFD_MAX77686=y
->  CONFIG_MFD_MAX8907=y
->  CONFIG_MFD_SEC_CORE=y
->  CONFIG_MFD_PALMAS=y
-> @@ -243,6 +245,7 @@ CONFIG_REGULATOR_AS3722=y
->  CONFIG_REGULATOR_BCM590XX=y
->  CONFIG_REGULATOR_GPIO=y
->  CONFIG_REGULATOR_MAX8907=y
-> +CONFIG_REGULATOR_MAX77686=y
->  CONFIG_REGULATOR_PALMAS=y
->  CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_REGULATOR_S5M8767=y
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+And, if memchr_inv() is problem, I think that you also need to add hook
+into validate_slab_cache().
 
+validate_slab_cache() -> validate_slab_slab() -> validate_slab() ->
+check_object() -> check_bytes_and_report() -> memchr_inv()
 
-
--- 
-Shine bright,
-(: Nav :)
+Thanks.
