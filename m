@@ -1,33 +1,77 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Tue, 15 Jul 2014 09:33:21 +0530
-Subject: [PATCH 1/3 v6] spi: s3c64xx: fix broken "cs_gpios" usage in the
- driver
-In-Reply-To: <20140714191533.GH6800@sirena.org.uk>
-References: <1405316506-27855-1-git-send-email-ch.naveen@samsung.com>
- <1405316506-27855-2-git-send-email-ch.naveen@samsung.com>
- <20140714172524.GH6800@sirena.org.uk>
- <CAHfPSqAzab931yurSs+3zj=uoFj93FuAdd24AQKm1fZm07Nq8Q@mail.gmail.com>
- <20140714191533.GH6800@sirena.org.uk>
-Message-ID: <CAHfPSqAgCbfL2nkrfSYNJZitT-nGw7+5fpR9FMaabmwVJM6jUQ@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 15 Jul 2014 09:37:17 +0530
+Subject: [PATCH V2 2/2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <20140714162324.GF20068@atomide.com>
+References: <1404894932-26677-3-git-send-email-lokeshvutla@ti.com>
+ <20140709091232.GJ28884@atomide.com> <53BD0C43.1090002@ti.com>
+ <20140709100914.GL28884@atomide.com> <53BD1AF8.2060609@ti.com>
+ <20140709105055.GP28884@atomide.com> <53BD1FC3.6050500@ti.com>
+ <20140709110051.GQ28884@atomide.com> <53BD2249.2080808@ti.com>
+ <53C3ED02.7020206@ti.com> <20140714162324.GF20068@atomide.com>
+Message-ID: <53C4A8F5.2000302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hi Tony,
+On Monday 14 July 2014 09:53 PM, Tony Lindgren wrote:
+> * Lokesh Vutla <lokeshvutla@ti.com> [140714 07:47]:
+>> Hi Tony,
+>> On Wednesday 09 July 2014 04:36 PM, Keerthy wrote:
+>>> On Wednesday 09 July 2014 04:30 PM, Tony Lindgren wrote:
+>>>> * Keerthy <a0393675@ti.com> [140709 03:59]:
+>>>>> On Wednesday 09 July 2014 04:20 PM, Tony Lindgren wrote:
+>>>>>> * Keerthy <a0393675@ti.com> [140709 03:39]:
+>>>>>>> On Wednesday 09 July 2014 03:39 PM, Tony Lindgren wrote:
+>>>>>>>> * Keerthy <a0393675@ti.com> [140709 02:36]:
+>>>>>>>>> On Wednesday 09 July 2014 02:42 PM, Tony Lindgren wrote:
+>>>>>>>>>> * Lokesh Vutla <lokeshvutla@ti.com> [140709 01:37]:
+>>>>>>>>>>> --- a/arch/arm/boot/dts/dra7-evm.dts
+>>>>>>>>>>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+>>>>>>>>>>> @@ -249,6 +249,7 @@
+>>>>>>>>>>>                       regulator-min-microvolt = <1050000>;
+>>>>>>>>>>>                       regulator-max-microvolt = <1050000>;
+>>>>>>>>>>>                       regulator-boot-on;
+>>>>>>>>>>> +                    regulator-always-on;
+>>>>>>>>>>>                   };
+>>>>>>>>>> Is this regulator really always on?
+>>>>>>>>> This feeds on to RTC which is a free running clock. So i guess always on is
+>>>>>>>>> justified no?
+>>>>>>>> Well the dts entries should describe the hardware. If the
+>>>>>>>> regulator can be enabled and disabled, we should not claim it's
+>>>>>>>> always on.
+>>>>>>>  From the PMIC perspective every regulator can be enabled and
+>>>>>>> disabled. From a Board perspective there are some which need
+>>>>>>> to be always on. For Ex: SMPS123 which feeds on to the MPU.
+>>>>>> Right, and we already have regulator-boot-on for those. Or are
+>>>>>> you seeing some issue with that?
+>>>>> regulator-boot-on describes that at boot a particular regulator is on.
+>>>>> It does not guarantee that it will be on for the rest of the time. The
+>>>>> regulator framework can go ahead and disable it if no one has requested
+>>>>> for it. In case of RTC we do not want that to happen.
+>>>> That's a bug in the RTC driver then. The driver should request a
+>>>> regulator if it's specified.
+>>
+>> In my experiments I observed that when RTC regulator is switched
+>> off and switched on, there is an abort while accessing RTC registers.
+> 
+> Right, then you know you have the right regulator :)
+Once we switch it off it is expected, but then if it is *switched on* it is expected that we should be able to access
+registers. Here there is an abort accessing these registers. 
+> 
+>> After discussing with hardware team, it is confirmed that this
+>> LDO9 regulator powering RTC cannot be turned off when
+>> SoC is active and expected to be always on.
+> 
+> Hmm but sounds like you already proved it can be idled? So
+> the regulator really should be managed by the driver?
+Actually I adapted the driver to support a power regulator. Then I observed that if rtc is loaded as  a module
+there is an abort(  which is happening because the regulator is disabled once and re-enabled). So when we checked
+with the hardware team, they confirmed that ldo9 should not be disabled. 
 
-On 15 July 2014 00:45, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jul 15, 2014 at 12:31:32AM +0530, Naveen Krishna Ch wrote:
->
->> in this case spi-s3c64xx.c will continue to ignore the generic SPI "cs-gpios"
->> implementation.
->
->> I'm willing to implement any suggestion to fix this issue.
->
-> The problem isn't what you're trying to do, the problem is verifying
-> that it has been done correctly - making sure that everything has been
-> accounted for in the change itself.
-
-Understand your concern. I will try to get it tested on as many platforms.
-
--- 
-Thanks for your review.
-(: Naveen :)
+Thanks and regards,
+Lokesh
+> 
+> Regards,
+> 
+> Tony
+> 
