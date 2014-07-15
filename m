@@ -1,102 +1,74 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 15 Jul 2014 19:49:28 +0200
-Subject: [PATCH 2/3] spi: s3c64xx: validate s3c64xx_spi_csinfo before using
-In-Reply-To: <1405426860-18404-3-git-send-email-ch.naveen@samsung.com>
-References: <1405426860-18404-1-git-send-email-ch.naveen@samsung.com>
- <1405426860-18404-3-git-send-email-ch.naveen@samsung.com>
-Message-ID: <53C569A8.1000103@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 15 Jul 2014 12:56:47 -0500
+Subject: [RFC/PATCH 0/5] Add Video Processing Front End Support
+Message-ID: <1405447012-5340-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naveen,
+Hi all,
 
-Please see my comments inline.
+the following patches add suport for AM43xx's Video Processing
+Front End (VPFE). Full documentation is available at [1] chapter 14.
 
-On 15.07.2014 14:20, Naveen Krishna Chatradhi wrote:
-> This patch validates the cs->line (Chip select gpio) and
-> struct s3c64xx_spi_csinfo *cs object for both DT and NON-DT
-> platforms before using in .setup().
-> 
-> Also, check gpio_is_valid(spi->cs_gpio) in cleanup() before
-> freeing up.
+This driver has been tested with linux-next from yesterday, plus my
+(already queued) am437x starter kit patches, plus these patches, plus
+the sensor driver which, saddly enough, we're not allowed to release :-(
 
-Missing reason of the change.
+This driver has almost full v4l2-compliance with only 2 failures (I'll
+take hints on how to properly fix them) as below:
 
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/spi/spi-s3c64xx.c |   15 ++++-----------
->  1 file changed, 4 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 72bfba6..8971076 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -773,12 +773,6 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
->  	/* The CS line is asserted/deasserted by the gpio pin */
->  	cs->line = spi->cs_gpio;
->  
-> -	if (!gpio_is_valid(cs->line)) {
-> -		dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
-> -		kfree(cs);
-> -		return ERR_PTR(-EINVAL);
-> -	}
-> -
->  	data_np = of_get_child_by_name(slave_np, "controller-data");
->  	if (!data_np) {
->  		dev_err(&spi->dev, "child node 'controller-data' not found\n");
-> @@ -805,15 +799,14 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
->  	int err;
->  
->  	sdd = spi_master_get_devdata(spi->master);
-> -	if (!cs && spi->dev.of_node) {
-> +	if (spi->dev.of_node)
+		fail: v4l2-compliance.cpp(419): !doioctl(node2,
+			VIDIOC_S_PRIORITY, &prio)
+	test VIDIOC_G/S_PRIORITY: FAIL
 
-This check is equivalent, i.e. cs will always be NULL whenever
-spi->dev.of_node is not.
+		fail: v4l2-test-formats.cpp(319): pixelformat !=
+				V4L2_PIX_FMT_JPEG && colorspace ==
+				V4L2_COLORSPACE_JPEG
+		fail: v4l2-test-formats.cpp(418):
+				testColorspace(pix.pixelformat, pix.colorspace)
+	test VIDIOC_G_FMT: FAIL
 
->  		cs = s3c64xx_get_slave_ctrldata(spi);
-> -		spi->controller_data = cs;
-> -	}
->  
-> -	if (IS_ERR_OR_NULL(cs)) {
-> +	if (IS_ERR_OR_NULL(cs) || !gpio_is_valid(cs->line)) {
+I have also tested with gst-launch using fbdevsink and I can see my
+ugly mug just fine.
 
-I'm not sure this is correct. It will error out even if hardware chip
-select is used.
+Please give this a thorough review and let me know of any problems
+which need to be sorted out and I'll try to help out as time allows.
 
-Otherwise you need to free cs here if wrong GPIO was the cause of
-entering this block, so if this extra check is to stay, I'd suggest
-splitting this into two separate if blocks.
+cheers
 
->  		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
->  		return -ENODEV;
->  	}
-> +	spi->controller_data = cs;
+[1] http://www.ti.com/lit/pdf/spruhl7
 
-I'm not sure what's the point of moving this assignment here.
+Benoit Parrot (4):
+  Media: platform: Add ti-vpfe driver for AM437x device
+  arm: omap: hwmod: add hwmod entries for AM437x VPFE
+  arm: boot: dts: am4372: add vpfe DTS entries
+  arm: dts: am43x-epos: Add VPFE DTS entries
 
->  
->  	if (!spi_get_ctldata(spi)) {
->  		/* Request gpio only if cs line is asserted by gpio pins */
-> @@ -898,7 +891,7 @@ static void s3c64xx_spi_cleanup(struct spi_device *spi)
->  	struct s3c64xx_spi_driver_data *sdd;
->  
->  	sdd = spi_master_get_devdata(spi->master);
-> -	if (spi->cs_gpio) {
-> +	if (gpio_is_valid(spi->cs_gpio)) {
->  		gpio_free(spi->cs_gpio);
->  		if (spi->dev.of_node)
->  			kfree(cs);
+Darren Etheridge (1):
+  ARM: dts: am437x-sk-evm: add vpfe support and ov2659 sensor
 
-I believe this is completely wrong. cs is allocated even if GPIO chip
-select is not used, so the only thing that should be done conditionally
-is gpio_free().
+ arch/arm/boot/dts/am4372.dtsi                     |   16 +
+ arch/arm/boot/dts/am437x-sk-evm.dts               |   63 +
+ arch/arm/boot/dts/am43x-epos-evm.dts              |   54 +
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c        |   56 +
+ arch/arm/mach-omap2/prcm43xx.h                    |    3 +-
+ drivers/media/platform/Kconfig                    |    1 +
+ drivers/media/platform/Makefile                   |    2 +
+ drivers/media/platform/ti-vpfe/Kconfig            |   12 +
+ drivers/media/platform/ti-vpfe/Makefile           |    2 +
+ drivers/media/platform/ti-vpfe/am437x_isif.c      | 1053 +++++++++
+ drivers/media/platform/ti-vpfe/am437x_isif.h      |  355 +++
+ drivers/media/platform/ti-vpfe/am437x_isif_regs.h |  144 ++
+ drivers/media/platform/ti-vpfe/vpfe_capture.c     | 2478 +++++++++++++++++++++
+ drivers/media/platform/ti-vpfe/vpfe_capture.h     |  263 +++
+ 14 files changed, 4501 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/media/platform/ti-vpfe/Kconfig
+ create mode 100644 drivers/media/platform/ti-vpfe/Makefile
+ create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif.c
+ create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif.h
+ create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif_regs.h
+ create mode 100644 drivers/media/platform/ti-vpfe/vpfe_capture.c
+ create mode 100644 drivers/media/platform/ti-vpfe/vpfe_capture.h
 
-In general, I liked previous version of this series much more, as it was
-doing what it should as opposed to this one.
-
-Best regards,
-Tomasz
+-- 
+2.0.0.390.gcb682f8
