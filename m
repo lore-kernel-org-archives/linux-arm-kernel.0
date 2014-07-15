@@ -1,127 +1,280 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 15 Jul 2014 16:24:15 +0200
-Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
-In-Reply-To: <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
-References: <cover.1405428166.git.stefan@agner.ch>
- <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
-Message-ID: <53C5398F.2000005@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 15 Jul 2014 16:24:47 +0200
+Subject: [PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
+In-Reply-To: <53C51B57.9040404@samsung.com>
+References: <53C51B57.9040404@samsung.com>
+Message-ID: <1405434287-22710-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2014 02:56 PM, Stefan Agner wrote:
-> Extend FlexCAN driver to support Vybrid. Vybrids variant of the IP
-> has ECC support which is controlled through the memory error
-> control register (MECR). There is also an errata which leads to
-> false positive error detections (ID e5295). This patch disables
-> the memory error detection completely.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/net/can/flexcan.c | 73 +++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 64 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-> index 89745aa..1c31a5d 100644
-> --- a/drivers/net/can/flexcan.c
-> +++ b/drivers/net/can/flexcan.c
-> @@ -92,6 +92,27 @@
->  #define FLEXCAN_CTRL_ERR_ALL \
->  	(FLEXCAN_CTRL_ERR_BUS | FLEXCAN_CTRL_ERR_STATE)
->  
-> +/* FLEXCAN control register 2 (CTRL2) bits */
-> +#define FLEXCAN_CRL2_ECRWRE		BIT(29)
-> +#define FLEXCAN_CRL2_WRMFRZ		BIT(28)
-> +#define FLEXCAN_CRL2_RFFN(x)		(((x) & 0x0f) << 24)
-> +#define FLEXCAN_CRL2_TASD(x)		(((x) & 0x1f) << 19)
-> +#define FLEXCAN_CRL2_MRP		BIT(18)
-> +#define FLEXCAN_CRL2_RRS		BIT(17)
-> +#define FLEXCAN_CRL2_EACEN		BIT(16)
-> +
-> +/* FLEXCAN memory error control register (MECR) bits */
-> +#define FLEXCAN_MECR_ECRWRDIS		BIT(31)
-> +#define FLEXCAN_MECR_HANCEI_MSK		BIT(19)
-> +#define FLEXCAN_MECR_FANCEI_MSK		BIT(18)
-> +#define FLEXCAN_MECR_CEI_MSK		BIT(16)
-> +#define FLEXCAN_MECR_HAERRIE		BIT(15)
-> +#define FLEXCAN_MECR_FAERRIE		BIT(14)
-> +#define FLEXCAN_MECR_EXTERRIE		BIT(13)
-> +#define FLEXCAN_MECR_RERRDIS		BIT(9)
-> +#define FLEXCAN_MECR_ECCDIS		BIT(8)
-> +#define FLEXCAN_MECR_NCEFAFRZ		BIT(7)
-> +
->  /* FLEXCAN error and status register (ESR) bits */
->  #define FLEXCAN_ESR_TWRN_INT		BIT(17)
->  #define FLEXCAN_ESR_RWRN_INT		BIT(16)
-> @@ -150,18 +171,20 @@
->   * FLEXCAN hardware feature flags
->   *
->   * Below is some version info we got:
-> - *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT
-> - *                                Filter?   connected?
-> - *   MX25  FlexCAN2  03.00.00.00     no         no
-> - *   MX28  FlexCAN2  03.00.04.00    yes        yes
-> - *   MX35  FlexCAN2  03.00.00.00     no         no
-> - *   MX53  FlexCAN2  03.00.00.00    yes         no
-> - *   MX6s  FlexCAN3  10.00.12.00    yes        yes
-> + *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT  Memory err
-> + *                                Filter?   connected?  detection
-> + *   MX25  FlexCAN2  03.00.00.00     no         no         no
-> + *   MX28  FlexCAN2  03.00.04.00    yes        yes         no
-> + *   MX35  FlexCAN2  03.00.00.00     no         no         no
-> + *   MX53  FlexCAN2  03.00.00.00    yes         no         no
-> + *   MX6s  FlexCAN3  10.00.12.00    yes        yes         no
-> + *   VF610 FlexCAN3  ?               no         no        yes
-                                        ^^         ^^
+Due to recent consolidation of Exynos suspend and cpuidle code, some
+parts of suspend and resume sequences are executed two times, once from
+exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+breaks suspend, at least on Exynos4-based boards. In addition, simple
+core power down from a cpuidle driver could, in case of CPU 0 could
+result in calling functions that are specific to suspend and deeper idle
+states.
 
-Can you check the datasheet if the flexcan core has a "Glitch Filter
-Width Register (FLEXCANx_GFWR)"
+This patch fixes the issue by moving those operations outside the CPU PM
+notifier into suspend and AFTR code paths. This leads to a bit of code
+duplication, but allows additional code simplification, so in the end
+more code is removed than added.
 
-Can you check if the core generates a warning interrupt with the current
-setup, if you don't switch on bus error reporting? This means internally
-the [TR]WRN_INT is connected and works as specified.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/pm.c        | 164 ++++++++++++++++++---------------------
+ drivers/cpuidle/cpuidle-exynos.c |  25 +-----
+ 2 files changed, 80 insertions(+), 109 deletions(-)
 
->   *
->   * Some SOCs do not have the RX_WARN & TX_WARN interrupt line connected.
->   */
->  #define FLEXCAN_HAS_V10_FEATURES	BIT(1) /* For core version >= 10 */
->  #define FLEXCAN_HAS_BROKEN_ERR_STATE	BIT(2) /* [TR]WRN_INT not connected */
-> +#define FLEXCAN_HAS_MECR_FEATURES	BIT(3) /* Memory error detection */
->  
->  /* Structure of the message buffer */
->  struct flexcan_mb {
-> @@ -192,8 +215,11 @@ struct flexcan_regs {
->  	u32 crcr;		/* 0x44 */
->  	u32 rxfgmask;		/* 0x48 */
->  	u32 rxfir;		/* 0x4c */
-> -	u32 _reserved3[12];
-> +	u32 _reserved3[12];	/* 0x50 */
->  	struct flexcan_mb cantxfg[64];
-> +	u32 _reserved4[408];
-> +	u32 mecr;		/* 0xae0 */
-> +	u32 erriar;		/* 0xae4 */
->  };
->  
->  struct flexcan_devtype_data {
-> @@ -223,6 +249,9 @@ static struct flexcan_devtype_data fsl_imx28_devtype_data;
->  static struct flexcan_devtype_data fsl_imx6q_devtype_data = {
->  	.features = FLEXCAN_HAS_V10_FEATURES,
->  };
-> +static struct flexcan_devtype_data fsl_vf610_devtype_data = {
-> +	.features = FLEXCAN_HAS_V10_FEATURES | FLEXCAN_HAS_MECR_FEATURES,
-> +};
-
-Marc
-
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 202ca73..e3b04b4 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -176,26 +176,6 @@ int exynos_cluster_power_state(int cluster)
+ #define S5P_CHECK_AFTR  0xFCBA0D10
+ #define S5P_CHECK_SLEEP 0x00000BAD
+ 
+-/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+-static void exynos_set_wakeupmask(long mask)
+-{
+-	__raw_writel(mask, S5P_WAKEUP_MASK);
+-}
+-
+-static void exynos_cpu_set_boot_vector(long flags)
+-{
+-	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
+-	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
+-}
+-
+-void exynos_enter_aftr(void)
+-{
+-	exynos_set_wakeupmask(0x0000ff3e);
+-	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
+-	/* Set value of power down register for aftr mode */
+-	exynos_sys_powerdown_conf(SYS_AFTR);
+-}
+-
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+ 
+@@ -235,6 +215,82 @@ static void exynos_cpu_restore_register(void)
+ 		      : "cc");
+ }
+ 
++static void exynos_pm_central_suspend(void)
++{
++	unsigned long tmp;
++
++	/* Setting Central Sequence Register for power down mode */
++	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
++	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++}
++
++static int exynos_pm_central_resume(void)
++{
++	unsigned long tmp;
++
++	/*
++	 * If PMU failed while entering sleep mode, WFI will be
++	 * ignored by PMU and then exiting cpu_do_idle().
++	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
++	 * in this situation.
++	 */
++	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
++		tmp |= S5P_CENTRAL_LOWPWR_CFG;
++		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++		/* clear the wakeup state register */
++		__raw_writel(0x0, S5P_WAKEUP_STAT);
++		/* No need to perform below restore code */
++		return -1;
++	}
++
++	return 0;
++}
++
++/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
++static void exynos_set_wakeupmask(long mask)
++{
++	__raw_writel(mask, S5P_WAKEUP_MASK);
++}
++
++static void exynos_cpu_set_boot_vector(long flags)
++{
++	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
++	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
++}
++
++static int exynos_aftr_finisher(unsigned long flags)
++{
++	exynos_set_wakeupmask(0x0000ff3e);
++	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
++	/* Set value of power down register for aftr mode */
++	exynos_sys_powerdown_conf(SYS_AFTR);
++	cpu_do_idle();
++
++	return 0;
++}
++
++void exynos_enter_aftr(void)
++{
++	cpu_pm_enter();
++
++	exynos_pm_central_suspend();
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
++		exynos_cpu_save_register();
++
++	cpu_suspend(0, exynos_aftr_finisher);
++
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9) {
++		scu_enable(S5P_VA_SCU);
++		exynos_cpu_restore_register();
++	}
++
++	exynos_pm_central_resume();
++
++	cpu_pm_exit();
++}
++
+ static int exynos_cpu_suspend(unsigned long arg)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+@@ -279,16 +335,6 @@ static void exynos_pm_prepare(void)
+ 	__raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+ }
+ 
+-static void exynos_pm_central_suspend(void)
+-{
+-	unsigned long tmp;
+-
+-	/* Setting Central Sequence Register for power down mode */
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+-	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-}
+-
+ static int exynos_pm_suspend(void)
+ {
+ 	unsigned long tmp;
+@@ -306,29 +352,6 @@ static int exynos_pm_suspend(void)
+ 	return 0;
+ }
+ 
+-static int exynos_pm_central_resume(void)
+-{
+-	unsigned long tmp;
+-
+-	/*
+-	 * If PMU failed while entering sleep mode, WFI will be
+-	 * ignored by PMU and then exiting cpu_do_idle().
+-	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
+-	 * in this situation.
+-	 */
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+-		tmp |= S5P_CENTRAL_LOWPWR_CFG;
+-		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-		/* clear the wakeup state register */
+-		__raw_writel(0x0, S5P_WAKEUP_STAT);
+-		/* No need to perform below restore code */
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+ static void exynos_pm_resume(void)
+ {
+ 	if (exynos_pm_central_resume())
+@@ -431,45 +454,10 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+ 	.valid		= suspend_valid_only_mem,
+ };
+ 
+-static int exynos_cpu_pm_notifier(struct notifier_block *self,
+-				  unsigned long cmd, void *v)
+-{
+-	int cpu = smp_processor_id();
+-
+-	switch (cmd) {
+-	case CPU_PM_ENTER:
+-		if (cpu == 0) {
+-			exynos_pm_central_suspend();
+-			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+-				exynos_cpu_save_register();
+-		}
+-		break;
+-
+-	case CPU_PM_EXIT:
+-		if (cpu == 0) {
+-			if (read_cpuid_part_number() ==
+-					ARM_CPU_PART_CORTEX_A9) {
+-				scu_enable(S5P_VA_SCU);
+-				exynos_cpu_restore_register();
+-			}
+-			exynos_pm_central_resume();
+-		}
+-		break;
+-	}
+-
+-	return NOTIFY_OK;
+-}
+-
+-static struct notifier_block exynos_cpu_pm_notifier_block = {
+-	.notifier_call = exynos_cpu_pm_notifier,
+-};
+-
+ void __init exynos_pm_init(void)
+ {
+ 	u32 tmp;
+ 
+-	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
+-
+ 	/* Platform-specific GIC callback */
+ 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+ 
+diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+index 7c01512..ba9b34b 100644
+--- a/drivers/cpuidle/cpuidle-exynos.c
++++ b/drivers/cpuidle/cpuidle-exynos.c
+@@ -20,25 +20,6 @@
+ 
+ static void (*exynos_enter_aftr)(void);
+ 
+-static int idle_finisher(unsigned long flags)
+-{
+-	exynos_enter_aftr();
+-	cpu_do_idle();
+-
+-	return 1;
+-}
+-
+-static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index)
+-{
+-	cpu_pm_enter();
+-	cpu_suspend(0, idle_finisher);
+-	cpu_pm_exit();
+-
+-	return index;
+-}
+-
+ static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+@@ -51,8 +32,10 @@ static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 
+ 	if (new_index == 0)
+ 		return arm_cpuidle_simple_enter(dev, drv, new_index);
+-	else
+-		return exynos_enter_core0_aftr(dev, drv, new_index);
++
++	exynos_enter_aftr();
++
++	return new_index;
+ }
+ 
+ static struct cpuidle_driver exynos_idle_driver = {
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140715/c91045cb/attachment.sig>
+1.9.3
