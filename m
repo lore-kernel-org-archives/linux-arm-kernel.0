@@ -1,96 +1,259 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 15 Jul 2014 12:32:36 -0700
-Subject: [PATCH 7/7] x86_64,
- entry: Use split-phase syscall_trace_enter for 64-bit syscalls
+Date: Tue, 15 Jul 2014 12:32:31 -0700
+Subject: [PATCH 2/7] seccomp: Refactor the filter callback and the API
 In-Reply-To: <cover.1405452484.git.luto@amacapital.net>
 References: <cover.1405452484.git.luto@amacapital.net>
-Message-ID: <5cb038436f48107f7b855ce2431bb6d63d3e9294.1405452484.git.luto@amacapital.net>
+Message-ID: <4f153feea35430104d6d1a7c83805fccbffdf089.1405452484.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On KVM on my box, this reduces the overhead from an always-accept
-seccomp filter from ~130ns to ~17ns.  Most of that comes from
-avoiding IRET on every syscall when seccomp is enabled.
+The reason I did this is to add a seccomp API that will be usable
+for an x86 fast path.  The x86 entry code needs to use a rather
+expensive slow path for a syscall that might be visible to things
+like ptrace.  By splitting seccomp into two phases, we can check
+whether we need the slow path and then use the fast path in if the
+filter allows the syscall or just returns some errno.
 
-In extremely approximate hacked-up benchmarking, just bypassing IRET
-saves about 80ns, so there's another 43ns of savings here from
-simplifying the seccomp path.
+As a side effect, I think the new code is much easier to understand
+than the old code.
 
-The diffstat is also rather nice :)
+This has one user-visible effect: the audit record written for
+SECCOMP_RET_TRACE is now a simple indication that SECCOMP_RET_TRACE
+happened.  It used to depend in a complicated way on what the tracer
+did.  I couldn't make much sense of it.
 
 Signed-off-by: Andy Lutomirski <luto@amacapital.net>
 ---
- arch/x86/kernel/entry_64.S | 40 ++++++++++++++++------------------------
- 1 file changed, 16 insertions(+), 24 deletions(-)
+ include/linux/seccomp.h |   6 ++
+ kernel/seccomp.c        | 180 +++++++++++++++++++++++++++++++-----------------
+ 2 files changed, 123 insertions(+), 63 deletions(-)
 
-diff --git a/arch/x86/kernel/entry_64.S b/arch/x86/kernel/entry_64.S
-index 432c190..13e0c1d 100644
---- a/arch/x86/kernel/entry_64.S
-+++ b/arch/x86/kernel/entry_64.S
-@@ -479,22 +479,6 @@ sysret_signal:
- 
- #ifdef CONFIG_AUDITSYSCALL
- 	/*
--	 * Fast path for syscall audit without full syscall trace.
--	 * We just call __audit_syscall_entry() directly, and then
--	 * jump back to the normal fast path.
--	 */
--auditsys:
--	movq %r10,%r9			/* 6th arg: 4th syscall arg */
--	movq %rdx,%r8			/* 5th arg: 3rd syscall arg */
--	movq %rsi,%rcx			/* 4th arg: 2nd syscall arg */
--	movq %rdi,%rdx			/* 3rd arg: 1st syscall arg */
--	movq %rax,%rsi			/* 2nd arg: syscall number */
--	movl $AUDIT_ARCH_X86_64,%edi	/* 1st arg: audit arch */
--	call __audit_syscall_entry
--	LOAD_ARGS 0		/* reload call-clobbered registers */
--	jmp system_call_fastpath
--
--	/*
- 	 * Return fast path for syscall audit.  Call __audit_syscall_exit()
- 	 * directly and then jump back to the fast path with TIF_SYSCALL_AUDIT
- 	 * masked off.
-@@ -511,17 +495,25 @@ sysret_audit:
- 
- 	/* Do syscall tracing */
- tracesys:
--#ifdef CONFIG_AUDITSYSCALL
--	testl $(_TIF_WORK_SYSCALL_ENTRY & ~_TIF_SYSCALL_AUDIT),TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET)
--	jz auditsys
--#endif
-+	leaq -REST_SKIP(%rsp), %rdi
-+	movq $AUDIT_ARCH_X86_64, %rsi
-+	call syscall_trace_enter_phase1
-+	test %rax, %rax
-+	jnz tracesys_phase2		/* if needed, run the slow path */
-+	LOAD_ARGS 0			/* else restore clobbered regs */
-+	jmp system_call_fastpath	/*      and return to the fast path */
+diff --git a/include/linux/seccomp.h b/include/linux/seccomp.h
+index 6e655a6..8345fdc 100644
+--- a/include/linux/seccomp.h
++++ b/include/linux/seccomp.h
+@@ -33,6 +33,12 @@ static inline int secure_computing(void)
+ 		return  __secure_computing();
+ 	return 0;
+ }
 +
-+tracesys_phase2:
- 	SAVE_REST
- 	FIXUP_TOP_OF_STACK %rdi
--	movq %rsp,%rdi
--	call syscall_trace_enter
-+	movq %rsp, %rdi
-+	movq $AUDIT_ARCH_X86_64, %rsi
-+	movq %rax,%rdx
-+	call syscall_trace_enter_phase2
++#define SECCOMP_PHASE1_OK	0
++#define SECCOMP_PHASE1_SKIP	1
 +
- 	/*
- 	 * Reload arg registers from stack in case ptrace changed them.
--	 * We don't reload %rax because syscall_trace_enter() returned
-+	 * We don't reload %rax because syscall_trace_entry_phase2() returned
- 	 * the value it wants us to use in the table lookup.
- 	 */
- 	LOAD_ARGS ARGOFFSET, 1
-@@ -532,7 +524,7 @@ tracesys:
- 	andl $__SYSCALL_MASK,%eax
- 	cmpl $__NR_syscall_max,%eax
++extern u32 seccomp_phase1(void);
++int seccomp_phase2(u32 phase1_result);
+ #else
+ extern void secure_computing_strict(int this_syscall);
  #endif
--	ja   int_ret_from_sys_call	/* RAX(%rsp) set to -ENOSYS above */
-+	ja   int_ret_from_sys_call	/* RAX(%rsp) is already set */
- 	movq %r10,%rcx	/* fixup for C */
- 	call *sys_call_table(,%rax,8)
- 	movq %rax,RAX-ARGOFFSET(%rsp)
+diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+index 15ee9d6..d737445 100644
+--- a/kernel/seccomp.c
++++ b/kernel/seccomp.c
+@@ -19,8 +19,6 @@
+ #include <linux/sched.h>
+ #include <linux/seccomp.h>
+ 
+-/* #define SECCOMP_DEBUG 1 */
+-
+ #ifdef CONFIG_HAVE_ARCH_SECCOMP_FILTER
+ #include <asm/syscall.h>
+ #endif
+@@ -417,79 +415,135 @@ void secure_computing_strict(int this_syscall)
+ #else
+ int __secure_computing(void)
+ {
++	u32 phase1_result = seccomp_phase1();
++
++	if (likely(phase1_result == SECCOMP_PHASE1_OK))
++		return 0;
++	else if (likely(phase1_result == SECCOMP_PHASE1_SKIP))
++		return -1;
++	else
++		return seccomp_phase2(phase1_result);
++}
++
++#ifdef CONFIG_SECCOMP_FILTER
++static u32 __seccomp_phase1_filter(int this_syscall, struct pt_regs *regs)
++{
++	u32 filter_ret = seccomp_run_filters();
++	int data = filter_ret & SECCOMP_RET_DATA;
++	u32 action = filter_ret & SECCOMP_RET_ACTION;
++
++	switch (action) {
++	case SECCOMP_RET_ERRNO:
++		/* Set the low-order 16-bits as a errno. */
++		syscall_set_return_value(current, regs,
++					 -data, 0);
++		goto skip;
++
++	case SECCOMP_RET_TRAP:
++		/* Show the handler the original registers. */
++		syscall_rollback(current, regs);
++		/* Let the filter pass back 16 bits of data. */
++		seccomp_send_sigsys(this_syscall, data);
++		goto skip;
++
++	case SECCOMP_RET_TRACE:
++		return filter_ret;  /* Save the rest for phase 2. */
++
++	case SECCOMP_RET_ALLOW:
++		return SECCOMP_PHASE1_OK;
++
++	case SECCOMP_RET_KILL:
++	default:
++		audit_seccomp(this_syscall, SIGSYS, action);
++		do_exit(SIGSYS);
++	}
++
++	unreachable();
++
++skip:
++	audit_seccomp(this_syscall, 0, action);
++	return SECCOMP_PHASE1_SKIP;
++}
++#endif
++
++/**
++ * seccomp_phase1() - run fast path seccomp checks on the current syscall
++ *
++ * This only reads pt_regs via the syscall_xyz helpers.  The only change
++ * it will make to pt_regs is via syscall_set_return_value, and it will
++ * only do that if it returns SECCOMP_PHASE1_SKIP.
++ *
++ * It may also call do_exit or force a signal; these actions must be
++ * safe.
++ *
++ * If it returns SECCOMP_PHASE1_OK, the syscall passes checks and should
++ * be processed normally.
++ *
++ * If it returns SECCOMP_PHASE1_SKIP, then the syscall should not be
++ * invoked.  In this case, seccomp_phase1 will have set the return value
++ * using syscall_set_return_value.
++ *
++ * If it returns anything else, then the return value should be passed
++ * to seccomp_phase2 from a context in which ptrace hooks are safe.
++ */
++u32 seccomp_phase1(void)
++{
+ 	int mode = current->seccomp.mode;
+ 	struct pt_regs *regs = task_pt_regs(current);
+ 	int this_syscall = syscall_get_nr(current, regs);
+-	int exit_sig = 0;
+-	u32 ret;
+ 
+ 	switch (mode) {
+ 	case SECCOMP_MODE_STRICT:
+-		__secure_computing_strict(this_syscall);
+-		return 0;
++		__secure_computing_strict(this_syscall);  /* may call do_exit */
++		return SECCOMP_PHASE1_OK;
+ #ifdef CONFIG_SECCOMP_FILTER
+-	case SECCOMP_MODE_FILTER: {
+-		int data;
+-		ret = seccomp_run_filters();
+-		data = ret & SECCOMP_RET_DATA;
+-		ret &= SECCOMP_RET_ACTION;
+-		switch (ret) {
+-		case SECCOMP_RET_ERRNO:
+-			/* Set the low-order 16-bits as a errno. */
+-			syscall_set_return_value(current, regs,
+-						 -data, 0);
+-			goto skip;
+-		case SECCOMP_RET_TRAP:
+-			/* Show the handler the original registers. */
+-			syscall_rollback(current, regs);
+-			/* Let the filter pass back 16 bits of data. */
+-			seccomp_send_sigsys(this_syscall, data);
+-			goto skip;
+-		case SECCOMP_RET_TRACE:
+-			/* Skip these calls if there is no tracer. */
+-			if (!ptrace_event_enabled(current, PTRACE_EVENT_SECCOMP)) {
+-				syscall_set_return_value(current, regs,
+-							 -ENOSYS, 0);
+-				goto skip;
+-			}
+-			/* Allow the BPF to provide the event message */
+-			ptrace_event(PTRACE_EVENT_SECCOMP, data);
+-			/*
+-			 * The delivery of a fatal signal during event
+-			 * notification may silently skip tracer notification.
+-			 * Terminating the task now avoids executing a system
+-			 * call that may not be intended.
+-			 */
+-			if (fatal_signal_pending(current))
+-				break;
+-			if (syscall_get_nr(current, regs) < 0)
+-				goto skip;  /* Explicit request to skip. */
+-
+-			return 0;
+-		case SECCOMP_RET_ALLOW:
+-			return 0;
+-		case SECCOMP_RET_KILL:
+-		default:
+-			break;
+-		}
+-		exit_sig = SIGSYS;
+-		break;
+-	}
++	case SECCOMP_MODE_FILTER:
++		return __seccomp_phase1_filter(this_syscall, regs);
+ #endif
+ 	default:
+ 		BUG();
+ 	}
++}
+ 
+-#ifdef SECCOMP_DEBUG
+-	dump_stack();
+-#endif
+-	audit_seccomp(this_syscall, exit_sig, ret);
+-	do_exit(exit_sig);
+-#ifdef CONFIG_SECCOMP_FILTER
+-skip:
+-	audit_seccomp(this_syscall, exit_sig, ret);
+-	return -1;
+-#endif
++/**
++ * seccomp_phase2() - finish slow path seccomp work for the current syscall
++ * @phase1_result: The return value from seccomp_phase1()
++ *
++ * This must be called from a context in which ptrace hooks can be used.
++ *
++ * Returns 0 if the syscall should be processed or -1 to skip the syscall.
++ */
++int seccomp_phase2(u32 phase1_result)
++{
++	struct pt_regs *regs = task_pt_regs(current);
++	u32 action = phase1_result & SECCOMP_RET_ACTION;
++	int data = phase1_result & SECCOMP_RET_DATA;
++
++	BUG_ON(action != SECCOMP_RET_TRACE);
++
++	audit_seccomp(syscall_get_nr(current, regs), 0, action);
++
++	/* Skip these calls if there is no tracer. */
++	if (!ptrace_event_enabled(current, PTRACE_EVENT_SECCOMP)) {
++		syscall_set_return_value(current, regs,
++					 -ENOSYS, 0);
++		return -1;
++	}
++
++	/* Allow the BPF to provide the event message */
++	ptrace_event(PTRACE_EVENT_SECCOMP, data);
++	/*
++	 * The delivery of a fatal signal during event
++	 * notification may silently skip tracer notification.
++	 * Terminating the task now avoids executing a system
++	 * call that may not be intended.
++	 */
++	if (fatal_signal_pending(current))
++		do_exit(SIGSYS);
++	if (syscall_get_nr(current, regs) < 0)
++		return -1;  /* Explicit request to skip. */
++
++	return 0;
+ }
+ #endif /* CONFIG_HAVE_ARCH_SECCOMP_FILTER */
+ 
 -- 
 1.9.3
