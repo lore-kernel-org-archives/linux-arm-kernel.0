@@ -1,68 +1,44 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Tue, 15 Jul 2014 10:08:35 +0400
-Subject: [RFC/PATCH RESEND -next 20/21] fs: dcache: manually unpoison
- dname after allocation to shut up kasan's reports
-In-Reply-To: <20140715061219.GK11317@js1304-P5Q-DELUXE>
-References: <1404905415-9046-1-git-send-email-a.ryabinin@samsung.com>
- <1404905415-9046-21-git-send-email-a.ryabinin@samsung.com>
- <20140715061219.GK11317@js1304-P5Q-DELUXE>
-Message-ID: <CACT4Y+ZdVN_gUKQr9Gz+nKv4M3zJHL1F0C4Awc4rg9xi3bVyiw@mail.gmail.com>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Mon, 14 Jul 2014 23:24:58 -0700
+Subject: [PATCH RFCv3 00/14] arm64: eBPF JIT compiler
+Message-ID: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 10:12 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
-> On Wed, Jul 09, 2014 at 03:30:14PM +0400, Andrey Ryabinin wrote:
->> We need to manually unpoison rounded up allocation size for dname
->> to avoid kasan's reports in __d_lookup_rcu.
->> __d_lookup_rcu may validly read a little beyound allocated size.
->
-> If it read a little beyond allocated size, IMHO, it is better to
-> allocate correct size.
->
-> kmalloc(name->len + 1, GFP_KERNEL); -->
-> kmalloc(roundup(name->len + 1, sizeof(unsigned long ), GFP_KERNEL);
->
-> Isn't it?
+This series implements eBPF JIT compiler for arm64.
+See [14/14] for change log.
 
+Patches [1-13/14] implement code generation functions.
+Patch [14/14] implements the actual eBPF JIT compiler.
 
-I absolutely agree!
+Zi Shen Lim (14):
+  arm64: introduce aarch64_insn_gen_comp_branch_imm()
+  arm64: introduce aarch64_insn_gen_branch_reg()
+  arm64: introduce aarch64_insn_gen_cond_branch_imm()
+  arm64: introduce aarch64_insn_gen_load_store_reg()
+  arm64: introduce aarch64_insn_gen_load_store_pair()
+  arm64: introduce aarch64_insn_gen_add_sub_imm()
+  arm64: introduce aarch64_insn_gen_bitfield()
+  arm64: introduce aarch64_insn_gen_movewide()
+  arm64: introduce aarch64_insn_gen_add_sub_shifted_reg()
+  arm64: introduce aarch64_insn_gen_data1()
+  arm64: introduce aarch64_insn_gen_data2()
+  arm64: introduce aarch64_insn_gen_data3()
+  arm64: introduce aarch64_insn_gen_logical_shifted_reg()
+  arm64: eBPF JIT compiler
 
+ Documentation/networking/filter.txt |   2 +-
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/Makefile                 |   1 +
+ arch/arm64/include/asm/insn.h       | 249 +++++++++++++
+ arch/arm64/kernel/insn.c            | 644 +++++++++++++++++++++++++++++++++-
+ arch/arm64/net/Makefile             |   4 +
+ arch/arm64/net/bpf_jit.h            | 169 +++++++++
+ arch/arm64/net/bpf_jit_comp.c       | 677 ++++++++++++++++++++++++++++++++++++
+ 8 files changed, 1739 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/net/Makefile
+ create mode 100644 arch/arm64/net/bpf_jit.h
+ create mode 100644 arch/arm64/net/bpf_jit_comp.c
 
-> Thanks.
->
->>
->> Reported-by: Dmitry Vyukov <dvyukov@google.com>
->> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
->> ---
->>  fs/dcache.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/fs/dcache.c b/fs/dcache.c
->> index b7e8b20..dff64f2 100644
->> --- a/fs/dcache.c
->> +++ b/fs/dcache.c
->> @@ -38,6 +38,7 @@
->>  #include <linux/prefetch.h>
->>  #include <linux/ratelimit.h>
->>  #include <linux/list_lru.h>
->> +#include <linux/kasan.h>
->>  #include "internal.h"
->>  #include "mount.h"
->>
->> @@ -1412,6 +1413,8 @@ struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
->>                       kmem_cache_free(dentry_cache, dentry);
->>                       return NULL;
->>               }
->> +             unpoison_shadow(dname,
->> +                             roundup(name->len + 1, sizeof(unsigned long)));
->>       } else  {
->>               dname = dentry->d_iname;
->>       }
->> --
->> 1.8.5.5
->>
->> --
->> To unsubscribe, send a message with 'unsubscribe linux-mm' in
->> the body to majordomo at kvack.org.  For more info on Linux MM,
->> see: http://www.linux-mm.org/ .
->> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+-- 
+1.9.1
