@@ -1,43 +1,34 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 15 Jul 2014 20:10:43 -0700
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 15 Jul 2014 20:33:42 -0700
 Subject: [PATCH] PM / devfreq: Allocate memory using the right data type
-Message-ID: <1405480243-25915-1-git-send-email-skannan@codeaurora.org>
+In-Reply-To: <1405480243-25915-1-git-send-email-skannan@codeaurora.org>
+References: <1405480243-25915-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <20140716033342.GA31052@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Tatiraju <sumant@codeaurora.org>
+On Tue, Jul 15, 2014 at 08:10:43PM -0700, Saravana Kannan wrote:
+> From: Suman Tatiraju <sumant@codeaurora.org>
+> 
+> Long and int have different sizes on a 64-bit machine. Allocate
+> memory for the time_in_state table using the right data type.
+> 
+> Change-Id: I335277674018c0ea759aa0996309d52578ea1fd5
 
-Long and int have different sizes on a 64-bit machine. Allocate
-memory for the time_in_state table using the right data type.
+Please don't put this crud in patches you submit upstream.  It means
+nothing to us.
 
-Change-Id: I335277674018c0ea759aa0996309d52578ea1fd5
-Signed-off-by: Suman Tatiraju <sumant@codeaurora.org>
-Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
----
- drivers/devfreq/devfreq.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+> Signed-off-by: Suman Tatiraju <sumant@codeaurora.org>
+> Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>  drivers/devfreq/devfreq.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index 65eed38..349e28ea 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -483,9 +483,10 @@ struct devfreq *devfreq_add_device(struct device *dev,
- 						devfreq->profile->max_state *
- 						devfreq->profile->max_state,
- 						GFP_KERNEL);
--	devfreq->time_in_state = devm_kzalloc(dev, sizeof(unsigned int) *
--						devfreq->profile->max_state,
--						GFP_KERNEL);
-+	devfreq->time_in_state = devm_kzalloc(dev,
-+					sizeof(*(devfreq->time_in_state)) *
-+					devfreq->profile->max_state,
-+					GFP_KERNEL);
- 	devfreq->last_stat_updated = jiffies;
- 
- 	dev_set_name(&devfreq->dev, "%s", dev_name(dev));
--- 
-1.8.2.1
+<formletter>
 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+This is not the correct way to submit patches for inclusion in the
+stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+for how to do this properly.
+
+</formletter>
