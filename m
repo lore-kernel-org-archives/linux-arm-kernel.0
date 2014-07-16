@@ -1,57 +1,42 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 16 Jul 2014 11:47:47 +0200
-Subject: [PATCH v3 05/12] phy: add the Berlin USB PHY driver
-In-Reply-To: <53C646DA.3020002@gmail.com>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-6-git-send-email-antoine.tenart@free-electrons.com>
- <53C64389.3050705@gmail.com> <20140716092541.GC28151@kwain>
- <53C646DA.3020002@gmail.com>
-Message-ID: <20140716094747.GD28151@kwain>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Jul 2014 10:48:41 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
+ <4657735.1VKsbQGuH6@wuerfel>
+ <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
+ <53C4DF0D.8010208@metafoo.de>
+ <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+ <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
+ <20140716071237.GA7978@ulmo>
+ <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+Message-ID: <20140716094841.GK17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 03:03:14PM +0530, Varka Bhadram wrote:
-> On 07/16/2014 02:55 PM, Antoine T?nart wrote:
-> >Hi Varka,
-> >
-> >On Wed, Jul 16, 2014 at 02:49:05PM +0530, Varka Bhadram wrote:
-> >>On 07/16/2014 01:55 PM, Antoine T?nart wrote:
-> >>>+static const struct of_device_id phy_berlin_sata_of_match[] = {
-> >>>+	{
-> >>>+		.compatible = "marvell,berlin2-usb-phy",
-> >>>+		.data = &phy_berlin_pll_dividers[0],
-> >>>+	},
-> >>>+	{
-> >>>+		.compatible = "marvell,berlin2cd-usb-phy",
-> >>>+		.data = &phy_berlin_pll_dividers[1],
-> >>>+	},
-> >>>+	{ },
-> >>>+};
-> >>>+MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
-> >>>+
-> >>It looks good if we move this after probe().. So that we can see of_match_table directly...
-> >We use the of match table in the probe, when calling of_match_device().
-> >
-> >>>+static int phy_berlin_usb_probe(struct platform_device *pdev)
-> >>>+{
-> >>>+	const struct of_device_id *match =
-> >>>+		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
-> 
-> We are updating of_match_table in platform_driver struct.
+On Wed, Jul 16, 2014 at 04:28:33PM +0900, Alexandre Courbot wrote:
+> On Wed, Jul 16, 2014 at 4:12 PM, Thierry Reding
 
-Yes. This is not the same thing. of_match_device() allows to get a
-pointer to the of_device_id that matched, to retrieve its data.
+> > Then again, maybe rather than add a new set of functions we should bite
+> > the bullet and change gpiod_get() (and variants) to take an additional
+> > flags parameter. There aren't all that many users yet (I count 26
+> > outside of drivers/gpio), so maybe now would still be a good time to do
+> > that.
 
-> 
-> Every driver follows the concept of giving the of_device_ids
-> above the platform_driver declaration...
+> That sounds reasonable indeed. And preferable to getting an aneurysm
+> after trying to spell devm_gpiod_get_index_optional_with_flags().
 
-Lots of drivers using of_match_device() declare their of_device_id
-structure before the probe.
+> This also makes the most sense since most GPIO users will want to set
+> a direction and value right after obtaining one. So if there is no
+> objection I will probably start refactoring gpiod_get() this week.
 
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yes, please!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/9ef242e2/attachment-0001.sig>
