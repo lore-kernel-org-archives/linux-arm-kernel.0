@@ -1,35 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Jul 2014 11:21:23 +0100
-Subject: [PATCH v3] ARM: save/restore Cortex-A9 CP15 registers on
- suspend/resume
-In-Reply-To: <20140716064249.GA2612@dragon>
-References: <1404974856-25846-1-git-send-email-shawn.guo@freescale.com>
- <alpine.DEB.2.10.1407101704540.2893@Yrabib> <20140714051905.GA2197@dragon>
- <20140716064249.GA2612@dragon>
-Message-ID: <20140716102123.GP21766@n2100.arm.linux.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 16 Jul 2014 12:24:28 +0200
+Subject: [PATCH 18/19] ARM: SAMSUNG: Remove remaining legacy code
+In-Reply-To: <1404496099-26708-19-git-send-email-t.figa@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-19-git-send-email-t.figa@samsung.com>
+Message-ID: <1405506268.4408.28.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 02:42:50PM +0800, Shawn Guo wrote:
-> On Mon, Jul 14, 2014 at 01:19:06PM +0800, Shawn Guo wrote:
-> > If no one has objection to the patch, I'm going to put it into patch
-> > tracker soon.
+On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
+> After refactoring suspend/resume, which was last part with dependencies
+> on legacy code, all Kconfig symbols related to Samsung ATAGS support can
+> be deselected and more unused code removed. This includes most of s5p-*
+> code as well, as s5pv210 was their last user.
 > 
-> Submitted as 8103/1.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
 
-Thanks.  In some ways, I'd like more people to test this before
-applying it, especially as we're at -rc5, but I know full well that
-posting messages to mailing lists won't attract the amount of testing
-that this needs.
+And I noticed another issue as this patch showed up in linux-next (this
+should be the last issue for this series).
 
-We also know that this will cause breeakage for non-secure platforms,
-and we will need people running those platforms to update their
-resume code.
+> [...]
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index f8185b5..1091b0a 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+>[...]
+> @@ -64,31 +51,6 @@ config SAMSUNG_ATAGS
+>  
+>  if SAMSUNG_ATAGS
+>  
+> -# options for IRQ support
+> -
+> -config S5P_IRQ
+> -	def_bool ARCH_S5PV210
+> -	help
+> -	  Support common interrupt part for ARCH_S5P SoCs
+> -
+> -config S5P_EXT_INT
+> -	bool
+> -	help
+> -	  Use the external interrupts (other than GPIO interrupts.)
+> -
+> -config S5P_GPIO_INT
+> -	bool
+> -	help
+> -	  Common code for the GPIO interrupts (other than external interrupts.)
+> -
+> -# options for gpio configuration support
+> -
+> -config S5P_GPIO_DRVSTR
+> -	bool
+> -	help
+> -	  Internal configuration to get and set correct GPIO driver strength
+> -	  helper
+> -
 
-The only way which seems to work is to apply it for the next merge
-window, and wait until platform people are forced into testing it
-when it eventually appears in their trees.
+This one is used (as a macro) in drivers/gpio/gpio-samsung.c. Is a patch
+that touches that macro queued somewhere?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+>  config SAMSUNG_GPIO_EXTRA
+>  	int "Number of additional GPIO pins"
+>  	default 128 if SAMSUNG_GPIO_EXTRA128
+
+Thanks,
+
+
+Paul Bolle
