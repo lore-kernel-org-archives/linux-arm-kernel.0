@@ -1,46 +1,102 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Wed, 16 Jul 2014 15:03:14 +0530
-Subject: [PATCH v3 05/12] phy: add the Berlin USB PHY driver
-In-Reply-To: <20140716092541.GC28151@kwain>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-6-git-send-email-antoine.tenart@free-electrons.com>
- <53C64389.3050705@gmail.com> <20140716092541.GC28151@kwain>
-Message-ID: <53C646DA.3020002@gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 16 Jul 2014 17:30:49 +0800
+Subject: [PATCH v5 1/2] can: m_can: add device tree binding documentation
+Message-ID: <1405503050-16796-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 02:55 PM, Antoine T?nart wrote:
-> Hi Varka,
->
-> On Wed, Jul 16, 2014 at 02:49:05PM +0530, Varka Bhadram wrote:
->> On 07/16/2014 01:55 PM, Antoine T?nart wrote:
->>> +static const struct of_device_id phy_berlin_sata_of_match[] = {
->>> +	{
->>> +		.compatible = "marvell,berlin2-usb-phy",
->>> +		.data = &phy_berlin_pll_dividers[0],
->>> +	},
->>> +	{
->>> +		.compatible = "marvell,berlin2cd-usb-phy",
->>> +		.data = &phy_berlin_pll_dividers[1],
->>> +	},
->>> +	{ },
->>> +};
->>> +MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
->>> +
->> It looks good if we move this after probe().. So that we can see of_match_table directly...
-> We use the of match table in the probe, when calling of_match_device().
->
->>> +static int phy_berlin_usb_probe(struct platform_device *pdev)
->>> +{
->>> +	const struct of_device_id *match =
->>> +		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
+add M_CAN device tree binding documentation
 
-We are updating of_match_table in platform_driver struct.
+Cc: Wolfgang Grandegger <wg@grandegger.com>
+Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+Cc: Varka Bhadram <varkabhadram@gmail.com>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+Changes since v4:
+- change the name of board dtsi to board dts which is more common
 
-Every driver follows the concept of giving the of_device_ids
-above the platform_driver declaration...
+Changes since v3:
+- change mram-cfg property name to bosch,mram-cfg
+- indent change
+---
+ .../devicetree/bindings/net/can/m_can.txt          |   67 ++++++++++++++++++++
+ 1 files changed, 67 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
 
-> Here.
->
-> Antoine
->
+diff --git a/Documentation/devicetree/bindings/net/can/m_can.txt b/Documentation/devicetree/bindings/net/can/m_can.txt
+new file mode 100644
+index 0000000..9e33177
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/can/m_can.txt
+@@ -0,0 +1,67 @@
++Bosch MCAN controller Device Tree Bindings
++-------------------------------------------------
++
++Required properties:
++- compatible		: Should be "bosch,m_can" for M_CAN controllers
++- reg			: physical base address and size of the M_CAN
++			  registers map and Message RAM
++- reg-names		: Should be "m_can" and "message_ram"
++- interrupts		: Should be the interrupt number of M_CAN interrupt
++			  line 0 and line 1, could be same if sharing
++			  the same interrupt.
++- interrupt-names	: Should contain "int0" and "int1"
++- clocks		: Clocks used by controller, should be host clock
++			  and CAN clock.
++- clock-names		: Should contain "hclk" and "cclk"
++- pinctrl-<n>		: Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
++- pinctrl-names 	: Names corresponding to the numbered pinctrl states
++- bosch,mram-cfg	: Message RAM configuration data.
++			  Multiple M_CAN instances can share the same Message
++			  RAM and each element(e.g Rx FIFO or Tx Buffer and etc)
++			  number in Message RAM is also configurable,
++			  so this property is telling driver how the shared or
++			  private Message RAM are used by this M_CAN controller.
++
++			  The format should be as follows:
++			  <offset sidf_elems xidf_elems rxf0_elems rxf1_elems
++			   rxb_elems txe_elems txb_elems>
++			  The 'offset' is an address offset of the Message RAM
++			  where the following elements start from. This is
++			  usually set to 0x0 if you're using a private Message
++			  RAM. The remain cells are used to specify how many
++			  elements are used for each FIFO/Buffer.
++
++			  M_CAN includes the following elements according to user manual:
++			  11-bit Filter	0-128 elements / 0-128 words
++			  29-bit Filter	0-64 elements / 0-128 words
++			  Rx FIFO 0	0-64 elements / 0-1152 words
++			  Rx FIFO 1	0-64 elements / 0-1152 words
++			  Rx Buffers	0-64 elements / 0-1152 words
++			  Tx Event FIFO	0-32 elements / 0-64 words
++			  Tx Buffers	0-32 elements / 0-576 words
++
++			  Please refer to 2.4.1 Message RAM Configuration in
++			  Bosch M_CAN user manual for details.
++
++Example:
++SoC dtsi:
++m_can1: can at 020e8000 {
++	compatible = "bosch,m_can";
++	reg = <0x020e8000 0x4000>, <0x02298000 0x4000>;
++	reg-names = "m_can", "message_ram";
++	interrupts = <0 114 0x04>,
++		     <0 114 0x04>;
++	interrupt-names = "int0", "int1";
++	clocks = <&clks IMX6SX_CLK_CANFD>,
++		 <&clks IMX6SX_CLK_CANFD>;
++	clock-names = "hclk", "cclk";
++	bosch,mram-cfg = <0x0 0 0 32 0 0 0 1>;
++	status = "disabled";
++};
++
++Board dts:
++&m_can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_m_can1>;
++	status = "enabled";
++};
+-- 
+1.7.8
