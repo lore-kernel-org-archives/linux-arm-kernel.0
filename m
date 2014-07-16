@@ -1,38 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 16 Jul 2014 11:14:01 +0530
-Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C4D12E.3040807@mit.edu>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
- <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
- <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
- <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
- <53C0A12A.2060204@codeaurora.org>
- <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
- <53C42AA8.8010107@codeaurora.org>
- <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
- <53C4BDFB.70707@codeaurora.org> <53C4D12E.3040807@mit.edu>
-Message-ID: <CAKohpon8zDP3hVFMQV4CO2zOkb-AwnDws8xW=H8Hm4=gW=8FGQ@mail.gmail.com>
+From: andy.green@linaro.org (Andy Green)
+Date: Wed, 16 Jul 2014 13:52:15 +0800
+Subject: [PATCH 1/8] ARM: Add platform support for Fujitsu MB86S7X SoCs
+In-Reply-To: <CAL_JsqKvwxjEDZPVwL646PhPKr7oemBzxr6cZ+X=uJQ2u_XZ8g@mail.gmail.com>
+References: <1405232911-4569-1-git-send-email-mollie.wu@linaro.org>
+ <CAL_JsqKvwxjEDZPVwL646PhPKr7oemBzxr6cZ+X=uJQ2u_XZ8g@mail.gmail.com>
+Message-ID: <CAAfg0W5vRKamkpz0mJhVWg0Y_bnVG==TWhPEmziqFdkm1irJ5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 July 2014 12:28, Srivatsa S. Bhat <srivatsa@mit.edu> wrote:
-> Wait, allowing an offline CPU to be the policy->cpu (i.e., the CPU which is
-> considered as the master of the policy/group) is just absurd.
+On 15 July 2014 23:11, Rob Herring <robherring2@gmail.com> wrote:
 
-Yeah, that was as Absurd as I am :)
+>> +               interrupts = <0 324 4>,
+>> +                            <0 325 4>;
+>> +               clocks = <&clk_alw_6_8>;
+>> +       };
+>
+> No arch timer?
 
-> The goal of this patchset should be to just de-couple the sysfs files/ownership
-> from the policy->cpu to an extent where it doesn't matter who owns those
-> files, and probably make it easier to do CPU hotplug without having to
-> destroy and recreate the files on every hotplug operation.
+As Jassi said he'll solve the rest of the issues you found, but about
+the arch / localtimers... mb86s70 is a sort of initial demonstrator
+for the new technologies in this series for Fujitsu.  As such it has
+some errata and one of them is the localtimers are not workable, the
+clocksource has to be provided instead by sp804.  If we define the
+localtimers, the kernel will prefer them and we will fail to boot due
+to the hardware errata.  So, they should not be defined for this
+particular SoC.
 
-I went to that Absurd idea because we thought we can skip playing with
-the sysfs nodes on suspend/hotplug.
+Later variants fix this errata like mb86s73 (also introduced in this
+patch series) and the Device Tree for that has the arch localtimers as
+you would expect.
 
-And if policy->cpu keeps changing with hotplug, we *may* have to keep
-sysfs stuff moving as well. One way to avoid that is by using something
-like: policy->sysfs_cpu, but wasn't sure if that's the right path to follow.
-
-Lets see what Saravana's new patchset has for us :)
+-Andy
