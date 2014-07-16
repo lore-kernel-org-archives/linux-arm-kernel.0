@@ -1,241 +1,115 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Jul 2014 20:09:50 +0100
-Subject: [PATCH v7 09/11] arm64: Remove asm/pgtable-*level-hwdef.h files
+Date: Wed, 16 Jul 2014 20:09:51 +0100
+Subject: [PATCH v7 10/11] arm64: Clean up the initial page table creation in
+ head.S
 In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
 References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1405537792-23666-10-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1405537792-23666-11-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macros in these files can easily be computed based on PAGE_SHIFT and
-VA_BITS, so just remove them and add the corresponding macros to
-asm/pgtable-hwdef.h
+This patch adds a create_table_entry macro which is used to populate pgd
+and pud entries, also reducing the number of arguments for
+create_pgd_entry.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/pgtable-2level-hwdef.h | 43 -----------------------
- arch/arm64/include/asm/pgtable-3level-hwdef.h | 50 ---------------------------
- arch/arm64/include/asm/pgtable-4level-hwdef.h | 50 ---------------------------
- arch/arm64/include/asm/pgtable-hwdef.h        | 42 ++++++++++++++++++----
- 4 files changed, 36 insertions(+), 149 deletions(-)
- delete mode 100644 arch/arm64/include/asm/pgtable-2level-hwdef.h
- delete mode 100644 arch/arm64/include/asm/pgtable-3level-hwdef.h
- delete mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
+ arch/arm64/kernel/head.S | 59 ++++++++++++++++++++++--------------------------
+ 1 file changed, 27 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-2level-hwdef.h b/arch/arm64/include/asm/pgtable-2level-hwdef.h
-deleted file mode 100644
-index 2593b490c56a..000000000000
---- a/arch/arm64/include/asm/pgtable-2level-hwdef.h
-+++ /dev/null
-@@ -1,43 +0,0 @@
--/*
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#ifndef __ASM_PGTABLE_2LEVEL_HWDEF_H
--#define __ASM_PGTABLE_2LEVEL_HWDEF_H
--
--/*
-- * With LPAE and 64KB pages, there are 2 levels of page tables. Each level has
-- * 8192 entries of 8 bytes each, occupying a 64KB page. Levels 0 and 1 are not
-- * used. The 2nd level table (PGD for Linux) can cover a range of 4TB, each
-- * entry representing 512MB. The user and kernel address spaces are limited to
-- * 4TB in the 64KB page configuration.
-- */
--#define PTRS_PER_PTE		8192
--#define PTRS_PER_PGD		8192
--
--/*
-- * PGDIR_SHIFT determines the size a top-level page table entry can map.
-- */
--#define PGDIR_SHIFT		29
--#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
--
--/*
-- * section address mask and size definitions.
-- */
--#define SECTION_SHIFT		29
--#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
--
--#endif
-diff --git a/arch/arm64/include/asm/pgtable-3level-hwdef.h b/arch/arm64/include/asm/pgtable-3level-hwdef.h
-deleted file mode 100644
-index 3dbf941d7767..000000000000
---- a/arch/arm64/include/asm/pgtable-3level-hwdef.h
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#ifndef __ASM_PGTABLE_3LEVEL_HWDEF_H
--#define __ASM_PGTABLE_3LEVEL_HWDEF_H
--
--/*
-- * With LPAE and 4KB pages, there are 3 levels of page tables. Each level has
-- * 512 entries of 8 bytes each, occupying a 4K page. The first level table
-- * covers a range of 512GB, each entry representing 1GB. The user and kernel
-- * address spaces are limited to 512GB each.
-- */
--#define PTRS_PER_PTE		512
--#define PTRS_PER_PMD		512
--#define PTRS_PER_PGD		512
--
--/*
-- * PGDIR_SHIFT determines the size a top-level page table entry can map.
-- */
--#define PGDIR_SHIFT		30
--#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
--
--/*
-- * PMD_SHIFT determines the size a middle-level page table entry can map.
-- */
--#define PMD_SHIFT		21
--#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
--#define PMD_MASK		(~(PMD_SIZE-1))
--
--/*
-- * section address mask and size definitions.
-- */
--#define SECTION_SHIFT		21
--#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
--
--#endif
-diff --git a/arch/arm64/include/asm/pgtable-4level-hwdef.h b/arch/arm64/include/asm/pgtable-4level-hwdef.h
-deleted file mode 100644
-index 0ec84e2274a3..000000000000
---- a/arch/arm64/include/asm/pgtable-4level-hwdef.h
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#ifndef __ASM_PGTABLE_4LEVEL_HWDEF_H
--#define __ASM_PGTABLE_4LEVEL_HWDEF_H
--
--#define PTRS_PER_PTE		512
--#define PTRS_PER_PMD		512
--#define PTRS_PER_PUD		512
--#define PTRS_PER_PGD		512
--
--/*
-- * PGDIR_SHIFT determines the size a top-level page table entry can map.
-- */
--#define PGDIR_SHIFT		39
--#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
--
--/*
-- * PUD_SHIFT determines the size the second level page table entry can map.
-- */
--#define PUD_SHIFT		30
--#define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
--#define PUD_MASK		(~(PUD_SIZE-1))
--
--/*
-- * PMD_SHIFT determines the size the third level page table entry can map.
-- */
--#define PMD_SHIFT		21
--#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
--#define PMD_MASK		(~(PMD_SIZE-1))
--
--/*
-- * section address mask and size definitions.
-- */
--#define SECTION_SHIFT		21
--#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
--
--#endif
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index d453e8bfef06..88174e0bfafe 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -16,15 +16,45 @@
- #ifndef __ASM_PGTABLE_HWDEF_H
- #define __ASM_PGTABLE_HWDEF_H
- 
--#if CONFIG_ARM64_PGTABLE_LEVELS == 2
--#include <asm/pgtable-2level-hwdef.h>
--#elif CONFIG_ARM64_PGTABLE_LEVELS == 3
--#include <asm/pgtable-3level-hwdef.h>
--#else
--#include <asm/pgtable-4level-hwdef.h>
-+#define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
-+
-+/*
-+ * PMD_SHIFT determines the size a level 2 page table entry can map.
-+ */
-+#if CONFIG_ARM64_PGTABLE_LEVELS > 2
-+#define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
-+#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
-+#define PMD_MASK		(~(PMD_SIZE-1))
-+#define PTRS_PER_PMD		PTRS_PER_PTE
-+#endif
-+
-+/*
-+ * PUD_SHIFT determines the size a level 1 page table entry can map.
-+ */
-+#if CONFIG_ARM64_PGTABLE_LEVELS > 3
-+#define PUD_SHIFT		((PAGE_SHIFT - 3) * 3 + 3)
-+#define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
-+#define PUD_MASK		(~(PUD_SIZE-1))
-+#define PTRS_PER_PUD		PTRS_PER_PTE
- #endif
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 019f81d9f1d5..a6db505411bc 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -476,43 +476,38 @@ ENDPROC(__calc_phys_offset)
+ 	.quad	PAGE_OFFSET
  
  /*
-+ * PGDIR_SHIFT determines the size a top-level page table entry can map
-+ * (depending on the configuration, this level can be 0, 1 or 2).
-+ */
-+#define PGDIR_SHIFT		((PAGE_SHIFT - 3) * CONFIG_ARM64_PGTABLE_LEVELS + 3)
-+#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
-+#define PGDIR_MASK		(~(PGDIR_SIZE-1))
-+#define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
-+
-+/*
-+ * Section address mask and size definitions.
-+ */
-+#define SECTION_SHIFT		PMD_SHIFT
-+#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
-+#define SECTION_MASK		(~(SECTION_SIZE-1))
-+
-+/*
-  * Hardware page table definitions.
+- * Macro to populate the PUD for the corresponding block entry in the next
+- * level (tbl) for the given virtual address in case of 4 levels.
++ * Macro to create a table entry to the next page.
   *
-  * Level 1 descriptor (PUD).
+- * Preserves:	pgd, virt
+- * Corrupts:	tbl, tmp1, tmp2
+- * Returns:	pud
++ *	tbl:	page table address
++ *	virt:	virtual address
++ *	shift:	#imm page table shift
++ *	ptrs:	#imm pointers per table page
++ *
++ * Preserves:	virt
++ * Corrupts:	tmp1, tmp2
++ * Returns:	tbl -> next level table page address
+  */
+-	.macro	create_pud_entry, pgd, tbl, virt, pud, tmp1, tmp2
+-#if CONFIG_ARM64_PGTABLE_LEVELS == 4
+-	add	\tbl, \tbl, #PAGE_SIZE		// bump tbl 1 page up.
+-						// to make room for pud
+-	add	\pud, \pgd, #PAGE_SIZE		// pgd points to pud which
+-						// follows pgd
+-	lsr	\tmp1, \virt, #PUD_SHIFT
+-	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
+-	orr	\tmp2, \tbl, #3			// PUD entry table type
+-	str	\tmp2, [\pud, \tmp1, lsl #3]
+-#else
+-	mov	\pud, \tbl
+-#endif
++	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
++	lsr	\tmp1, \virt, #\shift
++	and	\tmp1, \tmp1, #\ptrs - 1	// table index
++	add	\tmp2, \tbl, #PAGE_SIZE
++	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
++	str	\tmp2, [\tbl, \tmp1, lsl #3]
++	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
+ 	.endm
+ 
+ /*
+  * Macro to populate the PGD (and possibily PUD) for the corresponding
+  * block entry in the next level (tbl) for the given virtual address.
+  *
+- * Preserves:	pgd, virt
+- * Corrupts:	tmp1, tmp2, tmp3
+- * Returns:	tbl -> page where block mappings can be placed
+- *	(changed to make room for pud with 4 levels, preserved otherwise)
++ * Preserves:	tbl, next, virt
++ * Corrupts:	tmp1, tmp2
+  */
+-	.macro	create_pgd_entry, pgd, tbl, virt, tmp1, tmp2, tmp3
+-	create_pud_entry \pgd, \tbl, \virt, \tmp3, \tmp1, \tmp2
+-	lsr	\tmp1, \virt, #PGDIR_SHIFT
+-	and	\tmp1, \tmp1, #PTRS_PER_PGD - 1	// PGD index
+-	orr	\tmp2, \tmp3, #3		// PGD entry table type
+-	str	\tmp2, [\pgd, \tmp1, lsl #3]
++	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
++	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
++#if CONFIG_ARM64_PGTABLE_LEVELS == 4
++	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
++#endif
+ 	.endm
+ 
+ /*
+@@ -573,10 +568,10 @@ __create_page_tables:
+ 	/*
+ 	 * Create the identity mapping.
+ 	 */
+-	add	x0, x25, #PAGE_SIZE		// section table address
++	mov	x0, x25				// idmap_pg_dir
+ 	ldr	x3, =KERNEL_START
+ 	add	x3, x3, x28			// __pa(KERNEL_START)
+-	create_pgd_entry x25, x0, x3, x1, x5, x6
++	create_pgd_entry x0, x3, x5, x6
+ 	ldr	x6, =KERNEL_END
+ 	mov	x5, x3				// __pa(KERNEL_START)
+ 	add	x6, x6, x28			// __pa(KERNEL_END)
+@@ -585,9 +580,9 @@ __create_page_tables:
+ 	/*
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
+ 	 */
+-	add	x0, x26, #PAGE_SIZE		// section table address
++	mov	x0, x26				// swapper_pg_dir
+ 	mov	x5, #PAGE_OFFSET
+-	create_pgd_entry x26, x0, x5, x1, x3, x6
++	create_pgd_entry x0, x5, x3, x6
+ 	ldr	x6, =KERNEL_END
+ 	mov	x3, x24				// phys offset
+ 	create_block_map x0, x7, x3, x5, x6
