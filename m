@@ -1,168 +1,174 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 13:01:23 +0200
-Subject: [PATCH v3 2/3] ARM: Use include/asm-generic/io.h
-In-Reply-To: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
-References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1405508484-18303-2-git-send-email-thierry.reding@gmail.com>
+Date: Wed, 16 Jul 2014 13:09:28 +0200
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <53C63CBA.20809@codethink.co.uk>
+References: <20140714183624.GV6800@sirena.org.uk> <4657735.1VKsbQGuH6@wuerfel>
+ <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
+ <53C4DF0D.8010208@metafoo.de>
+ <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+ <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
+ <20140716071237.GA7978@ulmo>
+ <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+ <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
+Message-ID: <20140716110927.GK7978@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Wed, Jul 16, 2014 at 09:50:02AM +0100, Rob Jones wrote:
+> 
+> 
+> On 16/07/14 08:51, Thierry Reding wrote:
+> >On Wed, Jul 16, 2014 at 04:28:33PM +0900, Alexandre Courbot wrote:
+> >>On Wed, Jul 16, 2014 at 4:12 PM, Thierry Reding
+> >><thierry.reding@gmail.com> wrote:
+> >>>On Wed, Jul 16, 2014 at 12:00:45PM +0900, Alexandre Courbot wrote:
+> >>>>On Tue, Jul 15, 2014 at 6:14 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> >>>>>On Tue, Jul 15, 2014 at 4:58 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> >>>>>>On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
+> >>>>>>>
+> >>>>>>>On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>>>>>>>
+> >>>>>>>>On Monday 14 July 2014 19:36:24 Mark Brown wrote:
+> >>>>>>>>>
+> >>>>>>>>>On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
+> >>>>>>>>>>
+> >>>>>>>>>>On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
+> >>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>>>>Yes. But now that you say it the gpiod_direction_output() call is
+> >>>>>>>>>>>missing
+> >>>>>>>>>>>from this patch.
+> >>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>>>I'm lost now. The GPIO_ACTIVE_HIGH I added comes from
+> >>>>>>>>>>Documentation/gpio/board.txt
+> >>>>>>>>>>and as Linus Walleij explained to me the other day, the lookup is
+> >>>>>>>>>>supposed
+> >>>>>>>>>>to replace devm_gpio_request_one(), which in turn replaced both the
+> >>>>>>>>>>gpio_request and the gpio_direction_output(). Do I need to put the
+> >>>>>>>>>>gpiod_direction_output() back or is there another interface for that
+> >>>>>>>>>>when
+> >>>>>>>>>>registering the board gpios?
+> >>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>>Indeed.  If you *do* need an explicit _output() then that sounds to me
+> >>>>>>>>>like we either need a gpiod_get_one() or an extension to the table,
+> >>>>>>>>>looking at the code it seems like this is indeed the case.  We can set
+> >>>>>>>>>if the GPIO is active high/low, or open source/drain but there's no flag
+> >>>>>>>>>for the initial state.
+> >>>>>>>>
+> >>>>>>>>
+> >>>>>>>>(adding Alexandre and the gpio list)
+> >>>>>>>>
+> >>>>>>>>GPIO people: any guidance on how a board file should set a gpio to
+> >>>>>>>>output/default-high in a GPIO_LOOKUP() table to replace a
+> >>>>>>>>devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
+> >>>>>>>>Do we need to add an interface extension to do this, e.g. passing
+> >>>>>>>>GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
+> >>>>>>>
+> >>>>>>>
+> >>>>>>>The way I see it, GPIO mappings (whether they are done using the
+> >>>>>>>lookup tables, DT, or ACPI) should only care about details that are
+> >>>>>>>relevant to the device layout and that should be abstracted to the
+> >>>>>>>driver (e.g. whether the GPIO is active low or open drain) so drivers
+> >>>>>>>do not need to check X conditions every time they want to drive the
+> >>>>>>>GPIO.
+> >>>>>>>
+> >>>>>>>Direction and initial value, on the other hand, are clearly properties
+> >>>>>>>that ought to be set by the driver itself. Thus my expectation here
+> >>>>>>>would be that the driver sets the GPIO direction and initial value as
+> >>>>>>>soon as it gets it using gpiod_direction_output(). In other words,
+> >>>>>>>there is no replacement for gpio_request_one() with the gpiod
+> >>>>>>>interface. Is there any use-case that cannot be covered by calling
+> >>>>>>>gpiod_direction_output() right after gpiod_get()? AFAICT this is what
+> >>>>>>>gpio_request_one() was doing anyway.
+> >>>>>>
+> >>>>>>
+> >>>>>>I agree with you that this is something that should be done in the driver
+> >>>>>>and not in the lookup table. I think that it is still a good idea to have a
+> >>>>>>replacement for gpio_request_one with the new GPIO descriptor API. A large
+> >>>>>>share of the drivers want to call either gpio_direction_input() or
+> >>>>>>gpio_direction_output() right after requesting the GPIO. Combining both the
+> >>>>>>requesting and the configuration of the GPIO into one function call makes
+> >>>>>>the code a bit shorter and also simplifies the error handling. Even more so
+> >>>>>>if e.g. the GPIO is optional. This was one of the main reasons why
+> >>>>>>gpio_request_one was introduced, see the commit[1] that added it.
+> >>>>>
+> >>>>>I am not opposed to it as a convenience function. Note that since the
+> >>>>>open-source and open-drain flags are already handled by the lookup
+> >>>>>table, the only flags it should handle are those related to direction,
+> >>>>>value, and (maybe) sysfs export.
+> >>>>
+> >>>>Problem is, too much convenience functions seems to ultimately kill convenience.
+> >>>>
+> >>>>The canonical way to request a GPIO is by providing a (device,
+> >>>>function, index) triplet to gpiod_get_index(). Since most functions
+> >>>>only need one GPIO, we have gpiod_get(device, function) which is
+> >>>>basically an alias to gpiod_get_index(device, function, 0) (note to
+> >>>>self: we should probably inline it).
+> >>>>
+> >>>>On top of these comes another set of convenience functions,
+> >>>>gpiod_get_optional() and gpiod_get_index_optional(), which return NULL
+> >>>>instead of -ENOENT if the requested GPIO mapping does not exist. This
+> >>>>is useful for the common case where a driver can work without a GPIO.
+> >>>>
+> >>>>Of course these functions all have devm counterparts, so we currently
+> >>>>have 8 (devm_)gpiod_get(_index)(_optional) functions.
+> >>>>
+> >>>>If we are to add functions with an init flags parameter, we will end
+> >>>>with 16 functions. That starts to be a bit too much to my taste, and
+> >>>>maybe that's where GPIO consumers should sacrifice some convenience to
+> >>>>preserve a comprehensible GPIO API.
+> >>>>
+> >>>>There might be other ways to work around this though. For instance, we
+> >>>>could replace the _optional functions by a GPIOF_OPTIONAL flag to be
+> >>>>passed to a more generic function that would also accept direction and
+> >>>>init value flags. Actually I am not seeing any user of the _optional
+> >>>>variant in -next, so maybe we should just do this. Thierry, since you
+> >>>>introduced the _optional functions, can we get your thoughts about
+> >>>>this?
+> >>>
+> >>>I personally prefer explicit naming of the functions rather than putting
+> >>>a bunch of flags into some parameter. If you're overly concerned about
+> >>>the amount of convenience functions, perhaps the _index variants can be
+> >>>left out for gpiod_get_one(). I'd argue that if drivers want to deal
+> >>>with that level of detail anyway, they may just as well add the index
+> >>>explicitly when calling the function.
+> >>>
+> >>>While we're at it, gpiod_get_one() doesn't sound like a very good name.
+> >>>All other variants only request "one" as well. Perhaps something like
+> >>>gpiod_get_with_flags() would be a better name.
+> >>>
+> >>>Then again, maybe rather than add a new set of functions we should bite
+> >>>the bullet and change gpiod_get() (and variants) to take an additional
+> >>>flags parameter. There aren't all that many users yet (I count 26
+> >>>outside of drivers/gpio), so maybe now would still be a good time to do
+> >>>that.
+> >>
+> >>That sounds reasonable indeed. And preferable to getting an aneurysm
+> >>after trying to spell devm_gpiod_get_index_optional_with_flags().
+> >>
+> >>This also makes the most sense since most GPIO users will want to set
+> >>a direction and value right after obtaining one. So if there is no
+> >>objection I will probably start refactoring gpiod_get() this week.
+> >
+> >Sounds good to me.
+> >
+> 
+> In light of this, should I hold off starting on devm_gpiod_get_array()
+> as discussed on here last week?
 
-Include the generic I/O header file so that duplicate implementations
-can be removed. This will also help to establish consistency across more
-architectures regarding which accessors they support.
+I'll let Alex or Linus answer this, since I wasn't involved in the
+devm_gpiod_get_array() discussions. It's probably going to be tricky to
+pass around an array of everything, but I suspect you've already got a
+solution to that.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes in v3:
-- override io{read,write}{16,32}be() since the generic ones don't have
-  the required memory barriers
-
- arch/arm/include/asm/io.h     | 53 +++++++++++++------------------------------
- arch/arm/include/asm/memory.h |  2 ++
- 2 files changed, 18 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index a78562f21aab..72d87e788cfd 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -69,6 +69,7 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
-  * writeback addressing modes as these incur a significant performance
-  * overhead (the address generation must be emulated in software).
-  */
-+#define __raw_writew __raw_writew
- static inline void __raw_writew(u16 val, volatile void __iomem *addr)
- {
- 	asm volatile("strh %1, %0"
-@@ -76,6 +77,7 @@ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
- 		     : "r" (val));
- }
- 
-+#define __raw_readw __raw_readw
- static inline u16 __raw_readw(const volatile void __iomem *addr)
- {
- 	u16 val;
-@@ -86,6 +88,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
- }
- #endif
- 
-+#define __raw_writeb __raw_writeb
- static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
- {
- 	asm volatile("strb %1, %0"
-@@ -93,6 +96,7 @@ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
- 		     : "r" (val));
- }
- 
-+#define __raw_writel __raw_writel
- static inline void __raw_writel(u32 val, volatile void __iomem *addr)
- {
- 	asm volatile("str %1, %0"
-@@ -100,6 +104,7 @@ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
- 		     : "r" (val));
- }
- 
-+#define __raw_readb __raw_readb
- static inline u8 __raw_readb(const volatile void __iomem *addr)
- {
- 	u8 val;
-@@ -109,6 +114,7 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+#define __raw_readl __raw_readl
- static inline u32 __raw_readl(const volatile void __iomem *addr)
- {
- 	u32 val;
-@@ -267,20 +273,6 @@ extern void pci_iounmap_io(unsigned int offset);
- #define insl(p,d,l)		__raw_readsl(__io(p),d,l)
- #endif
- 
--#define outb_p(val,port)	outb((val),(port))
--#define outw_p(val,port)	outw((val),(port))
--#define outl_p(val,port)	outl((val),(port))
--#define inb_p(port)		inb((port))
--#define inw_p(port)		inw((port))
--#define inl_p(port)		inl((port))
--
--#define outsb_p(port,from,len)	outsb(port,from,len)
--#define outsw_p(port,from,len)	outsw(port,from,len)
--#define outsl_p(port,from,len)	outsl(port,from,len)
--#define insb_p(port,to,len)	insb(port,to,len)
--#define insw_p(port,to,len)	insw(port,to,len)
--#define insl_p(port,to,len)	insl(port,to,len)
--
- /*
-  * String version of IO memory access ops:
-  */
-@@ -347,39 +339,26 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define iounmap				__arm_iounmap
- 
- /*
-- * io{read,write}{8,16,32} macros
-+ * io{read,write}{16,32}be() macros
-  */
--#ifndef ioread8
--#define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
--#define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })
--#define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
--
--#define ioread16be(p)	({ unsigned int __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
--#define ioread32be(p)	({ unsigned int __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
--
--#define iowrite8(v,p)	({ __iowmb(); __raw_writeb(v, p); })
--#define iowrite16(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_le16(v), p); })
--#define iowrite32(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_le32(v), p); })
-+#define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
-+#define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
- 
--#define iowrite16be(v,p) ({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
--#define iowrite32be(v,p) ({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
--
--#define ioread8_rep(p,d,c)	__raw_readsb(p,d,c)
--#define ioread16_rep(p,d,c)	__raw_readsw(p,d,c)
--#define ioread32_rep(p,d,c)	__raw_readsl(p,d,c)
--
--#define iowrite8_rep(p,s,c)	__raw_writesb(p,s,c)
--#define iowrite16_rep(p,s,c)	__raw_writesw(p,s,c)
--#define iowrite32_rep(p,s,c)	__raw_writesl(p,s,c)
-+#define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
-+#define iowrite32be(v,p)	({ __iowmb(); __raw_writew((__force __u32)cpu_to_be32(v), p); })
- 
-+#define ioport_map ioport_map
- extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
-+#define ioport_unmap ioport_unmap
- extern void ioport_unmap(void __iomem *addr);
--#endif
- 
- struct pci_dev;
- 
-+#define pci_iounmap pci_iounmap
- extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
- 
-+#include <asm-generic/io.h>
-+
- /*
-  * can the hardware map this into one segment or not, given no other
-  * constraints.
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 2b751464d6ff..35ae6eaf33b2 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -278,11 +278,13 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
-  * translation for translating DMA addresses.  Use the driver
-  * DMA support - see dma-mapping.h.
-  */
-+#define virt_to_phys virt_to_phys
- static inline phys_addr_t virt_to_phys(const volatile void *x)
- {
- 	return __virt_to_phys((unsigned long)(x));
- }
- 
-+#define phys_to_virt phys_to_virt
- static inline void *phys_to_virt(phys_addr_t x)
- {
- 	return (void *)__phys_to_virt(x);
--- 
-2.0.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/8f862613/attachment.sig>
