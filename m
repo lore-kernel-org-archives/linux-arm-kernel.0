@@ -1,61 +1,235 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Jul 2014 22:22:56 +0200
-Subject: [PATCH 4/6] ARM: rockchip: enable support for RK3288 SoCs
-In-Reply-To: <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
-References: <1471578.ILeMmG2DL6@diego> <4355781.cnmcVo5AVu@diego>
- <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
-Message-ID: <2681748.x2jAk95I37@diego>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 16 Jul 2014 13:21:35 -0700
+Subject: [PATCH 5/7] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <bd4e2efb7cd97f2bf9d4f1e2065f16c9091d799a.1405452484.git.luto@amacapital.net>
+References: <cover.1405452484.git.luto@amacapital.net>
+ <bd4e2efb7cd97f2bf9d4f1e2065f16c9091d799a.1405452484.git.luto@amacapital.net>
+Message-ID: <CAGXu5jJornzMJjyPXVZB_eYi-FRet=bXcJWJDa1vnB_oU9ZA_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 16. Juli 2014, 12:57:21 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Tue, Jul 15, 2014 at 4:01 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Enable HAVE_ARM_ARCH_TIMER and add a rockchip,rk3288 compatible.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  arch/arm/mach-rockchip/Kconfig    | 1 +
-> >  arch/arm/mach-rockchip/rockchip.c | 1 +
-> >  2 files changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-rockchip/Kconfig
-> > b/arch/arm/mach-rockchip/Kconfig index e4564c2..d168669 100644
-> > --- a/arch/arm/mach-rockchip/Kconfig
-> > +++ b/arch/arm/mach-rockchip/Kconfig
-> > @@ -6,6 +6,7 @@ config ARCH_ROCKCHIP
-> > 
-> >         select ARCH_REQUIRE_GPIOLIB
-> >         select ARM_GIC
-> >         select CACHE_L2X0
-> > 
-> > +       select HAVE_ARM_ARCH_TIMER
-> 
-> Do we want to think about allowing someone to enable the A9-based
-> Rockchip SoCs separately than the A12-based ones?  I know it doesn't
-> hurt to have the arch timer code present on A9 SoCs (it will figure
-> things out at runtime), but people trying to build an A9-based system
-> might not want the extra code?
-> 
-> Anyway, I don't feel strongly about it, so:
+On Tue, Jul 15, 2014 at 12:32 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> This splits syscall_trace_enter into syscall_trace_enter_phase1 and
+> syscall_trace_enter_phase2.  Only phase 2 has full pt_regs, and only
+> phase 2 is permitted to modify any of pt_regs except for orig_ax.
+>
+> The intent is that phase 1 can be called from the syscall fast path.
+>
+> Signed-off-by: Andy Lutomirski <luto@amacapital.net>
+> ---
+>  arch/x86/include/asm/ptrace.h |   5 ++
+>  arch/x86/kernel/ptrace.c      | 139 ++++++++++++++++++++++++++++++++++++------
+>  2 files changed, 125 insertions(+), 19 deletions(-)
+>
+> diff --git a/arch/x86/include/asm/ptrace.h b/arch/x86/include/asm/ptrace.h
+> index 14fd6fd..dcbfb49 100644
+> --- a/arch/x86/include/asm/ptrace.h
+> +++ b/arch/x86/include/asm/ptrace.h
+> @@ -75,6 +75,11 @@ convert_ip_to_linear(struct task_struct *child, struct pt_regs *regs);
+>  extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+>                          int error_code, int si_code);
+>
+> +
+> +extern unsigned long syscall_trace_enter_phase1(struct pt_regs *, u32 arch);
+> +extern long syscall_trace_enter_phase2(struct pt_regs *, u32 arch,
+> +                                      unsigned long phase1_result);
+> +
+>  extern long syscall_trace_enter(struct pt_regs *);
+>  extern void syscall_trace_leave(struct pt_regs *);
+>
+> diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
+> index 39296d2..8e05418 100644
+> --- a/arch/x86/kernel/ptrace.c
+> +++ b/arch/x86/kernel/ptrace.c
+> @@ -1441,13 +1441,111 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+>         force_sig_info(SIGTRAP, &info, tsk);
+>  }
+>
+> +static void do_audit_syscall_entry(struct pt_regs *regs, u32 arch)
+> +{
+> +       if (arch == AUDIT_ARCH_X86_64) {
+> +               audit_syscall_entry(arch, regs->orig_ax, regs->di,
+> +                                   regs->si, regs->dx, regs->r10);
+> +       } else {
+> +               audit_syscall_entry(arch, regs->orig_ax, regs->bx,
+> +                                   regs->cx, regs->dx, regs->si);
+> +       }
+> +}
+> +
+>  /*
+> - * We must return the syscall number to actually look up in the table.
+> - * This can be -1L to skip running any syscall at all.
+> + * We can return 0 to resume the syscall or anything else to go to phase
+> + * 2.  If we resume the syscall, we need to put something appropriate in
+> + * regs->orig_ax.
+> + *
+> + * NB: We don't have full pt_regs here, but regs->orig_ax and regs->ax
+> + * are fully functional.
+> + *
+> + * For phase 2's benefit, our return value is:
+> + * 0: resume the syscall
+> + * 1: go to phase 2; no seccomp phase 2 needed
+> + * 2: go to phase 2; pass return value to seccomp
+>   */
+> -long syscall_trace_enter(struct pt_regs *regs)
+> +unsigned long syscall_trace_enter_phase1(struct pt_regs *regs, u32 arch)
+> +{
+> +       unsigned long ret = 0;
+> +       u32 work;
+> +
+> +       BUG_ON(regs != task_pt_regs(current));
+> +
+> +       work = ACCESS_ONCE(current_thread_info()->flags) &
+> +               _TIF_WORK_SYSCALL_ENTRY;
+> +
+> +#ifdef CONFIG_SECCOMP
+> +       /*
+> +        * Do seccomp first -- it should minimize exposure of other
+> +        * code, and keeping seccomp fast is probably more valuable
+> +        * than the rest of this.
+> +        */
+> +       if (work & _TIF_SECCOMP) {
+> +               struct seccomp_data sd;
+> +
+> +               sd.arch = arch;
+> +               sd.nr = regs->orig_ax;
+> +               sd.instruction_pointer = regs->ip;
+> +               if (arch == AUDIT_ARCH_X86_64) {
+> +                       sd.args[0] = regs->di;
+> +                       sd.args[1] = regs->si;
+> +                       sd.args[2] = regs->dx;
+> +                       sd.args[3] = regs->r10;
+> +                       sd.args[4] = regs->r8;
+> +                       sd.args[5] = regs->r9;
+> +               } else {
+> +                       sd.args[0] = regs->bx;
+> +                       sd.args[1] = regs->cx;
+> +                       sd.args[2] = regs->dx;
+> +                       sd.args[3] = regs->si;
+> +                       sd.args[4] = regs->di;
+> +                       sd.args[5] = regs->bp;
+> +               }
+> +
+> +               BUILD_BUG_ON(SECCOMP_PHASE1_OK != 0);
+> +               BUILD_BUG_ON(SECCOMP_PHASE1_SKIP != 1);
+> +
+> +               ret = seccomp_phase1(&sd);
+> +               if (ret == SECCOMP_PHASE1_SKIP) {
+> +                       regs->orig_ax = -ENOSYS;
 
-I've also thought about this previously. Personally I would want to wait with 
-introducing more complexity here until someone comes along with a use case.
-Simply because we're talking about 7kb (stripped) for the arch-timer and 
-machines with >1GB of memory.
-So I'm not adverse to it, but I guess it will make more sense when more soc-
-specific code lands - suspend stuff for example.
+Before, seccomp didn't touch orig_ax on a skip. I don't see any
+problem with this, and it's probably more clear this way, but are you
+sure there aren't unexpected side-effects from this?
+
+-Kees
+
+> +                       ret = 0;
+> +               } else if (ret != SECCOMP_PHASE1_OK) {
+> +                       return ret;  /* Go directly to phase 2 */
+> +               }
+> +
+> +               work &= ~_TIF_SECCOMP;
+> +       }
+> +#endif
+> +
+> +       /* Do our best to finish without phase 2. */
+> +       if (work == 0)
+> +               return ret;  /* seccomp only (ret == 0 here) */
+> +
+> +#ifdef CONFIG_AUDITSYSCALL
+> +       if (work == _TIF_SYSCALL_AUDIT) {
+> +               /*
+> +                * If there is no more work to be done except auditing,
+> +                * then audit in phase 1.  Phase 2 always audits, so, if
+> +                * we audit here, then we can't go on to phase 2.
+> +                */
+> +               do_audit_syscall_entry(regs, arch);
+> +               return 0;
+> +       }
+> +#endif
+> +
+> +       return 1;  /* Something is enabled that we can't handle in phase 1 */
+> +}
+> +
+> +/* Returns the syscall nr to run (which should match regs->orig_ax). */
+> +long syscall_trace_enter_phase2(struct pt_regs *regs, u32 arch,
+> +                               unsigned long phase1_result)
+>  {
+>         long ret = 0;
+> +       u32 work = ACCESS_ONCE(current_thread_info()->flags) &
+> +               _TIF_WORK_SYSCALL_ENTRY;
+> +
+> +       BUG_ON(regs != task_pt_regs(current));
+>
+>         user_exit();
+>
+> @@ -1458,17 +1556,20 @@ long syscall_trace_enter(struct pt_regs *regs)
+>          * do_debug() and we need to set it again to restore the user
+>          * state.  If we entered on the slow path, TF was already set.
+>          */
+> -       if (test_thread_flag(TIF_SINGLESTEP))
+> +       if (work & _TIF_SINGLESTEP)
+>                 regs->flags |= X86_EFLAGS_TF;
+>
+> -       /* do the secure computing check first */
+> -       if (secure_computing()) {
+> +       /*
+> +        * Call seccomp_phase2 before running the other hooks so that
+> +        * they can see any changes made by a seccomp tracer.
+> +        */
+> +       if (phase1_result > 1 && seccomp_phase2(phase1_result)) {
+>                 /* seccomp failures shouldn't expose any additional code. */
+>                 ret = -1L;
+>                 goto out;
+>         }
+>
+> -       if (unlikely(test_thread_flag(TIF_SYSCALL_EMU)))
+> +       if (unlikely(work & _TIF_SYSCALL_EMU))
+>                 ret = -1L;
+>
+>         if ((ret || test_thread_flag(TIF_SYSCALL_TRACE)) &&
+> @@ -1478,23 +1579,23 @@ long syscall_trace_enter(struct pt_regs *regs)
+>         if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+>                 trace_sys_enter(regs, regs->orig_ax);
+>
+> -       if (is_ia32_task())
+> -               audit_syscall_entry(AUDIT_ARCH_I386,
+> -                                   regs->orig_ax,
+> -                                   regs->bx, regs->cx,
+> -                                   regs->dx, regs->si);
+> -#ifdef CONFIG_X86_64
+> -       else
+> -               audit_syscall_entry(AUDIT_ARCH_X86_64,
+> -                                   regs->orig_ax,
+> -                                   regs->di, regs->si,
+> -                                   regs->dx, regs->r10);
+> -#endif
+> +       do_audit_syscall_entry(regs, arch);
+>
+>  out:
+>         return ret ?: regs->orig_ax;
+>  }
+>
+> +long syscall_trace_enter(struct pt_regs *regs)
+> +{
+> +       u32 arch = is_ia32_task() ? AUDIT_ARCH_I386 : AUDIT_ARCH_X86_64;
+> +       unsigned long phase1_result = syscall_trace_enter_phase1(regs, arch);
+> +
+> +       if (phase1_result == 0)
+> +               return regs->orig_ax;
+> +       else
+> +               return syscall_trace_enter_phase2(regs, arch, phase1_result);
+> +}
+> +
+>  void syscall_trace_leave(struct pt_regs *regs)
+>  {
+>         bool step;
+> --
+> 1.9.3
+>
 
 
-But I think we should be able to drop the dw_apb_timer altogether, as it stems 
-from a time before I found the global-timer informations and all A9 SoCs 
-should be able to use this one instead.
 
-
-
-
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
+-- 
+Kees Cook
+Chrome OS Security
