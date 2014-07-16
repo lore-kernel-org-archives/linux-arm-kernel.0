@@ -1,178 +1,46 @@
-From: yj44.cho@samsung.com (YoungJun Cho)
-Date: Wed, 16 Jul 2014 10:28:10 +0900
-Subject: [PATCH RFA] drm: add of_graph endpoint helper to find possible
- CRTCs
-In-Reply-To: <E1X5Iea-0007A2-Rd@rmk-PC.arm.linux.org.uk>
-References: <E1X5Iea-0007A2-Rd@rmk-PC.arm.linux.org.uk>
-Message-ID: <53C5D52A.3020600@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 15 Jul 2014 18:32:25 -0700
+Subject: [GIT PULL] the great <mach/gpio.h> purge
+In-Reply-To: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
+References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
+Message-ID: <CAOesGMg2Qn1B7KmaGnZzT0_RiqAbG7hNUg=a=R0CDjxuP6cBBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Jun 30, 2014 at 1:06 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi ARM SoC guys,
+>
+> please pull in this patch set removing <mach/gpio.h> for good.
+> I guess it could collide with some S5P deletion.
+> If you decide to pull the S5P purge first, tell me so I can rebase.
+>
+> Yours,
+> Linus Walleij
+>
+>
+> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+>
+>   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
+> tags/gpio-h-purge
+>
+> for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
+>
+>   ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
+>
+> ----------------------------------------------------------------
+> This is a purge of all things <mach/gpio.h>, now I never
+> want to see it again.
+>
+> - Remove the need for <mach/gpio.h> from S5P
+> - Kill CONFIG_NEED_MACH_GPIO_H
+> - Kill remnants of ARM_GPIOLIB_COMPLEX
 
-On 07/11/2014 03:01 AM, Russell King wrote:
-> Add a helper to allow encoders to find their possible CRTCs from the
-> OF graph without having to re-implement this functionality.  We add a
-> device_node to drm_crtc which corresponds with the port node in the
-> DT description of the CRTC device.
->
-> We can then scan the DRM device list for CRTCs to find their index,
-> matching the appropriate CRTC using the port device_node, thus building
-> up the possible CRTC mask.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->
-> RFA = request for acks
->
-> - Updated commentry in the drm_of_find_possible_crtcs() comment block to
-> point at the description of the of_graph bindings.
-> - Not updated for drm kerneldoc as I'm unable to build the documentation.
->
->   drivers/gpu/drm/Makefile |  1 +
->   drivers/gpu/drm/drm_of.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++
->   include/drm/drm_crtc.h   |  2 ++
->   include/drm/drm_of.h     | 18 +++++++++++++
->   4 files changed, 88 insertions(+)
->   create mode 100644 drivers/gpu/drm/drm_of.c
->   create mode 100644 include/drm/drm_of.h
->
-> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-> index dd2ba4269740..533d011eab3e 100644
-> --- a/drivers/gpu/drm/Makefile
-> +++ b/drivers/gpu/drm/Makefile
-> @@ -20,6 +20,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
->   drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
->   drm-$(CONFIG_PCI) += ati_pcigart.o
->   drm-$(CONFIG_DRM_PANEL) += drm_panel.o
-> +drm-$(CONFIG_OF) += drm_of.o
->
->   drm-usb-y   := drm_usb.o
->
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> new file mode 100644
-> index 000000000000..16150a00c237
-> --- /dev/null
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -0,0 +1,67 @@
-> +#include <linux/export.h>
-> +#include <linux/list.h>
-> +#include <linux/of_graph.h>
-> +#include <drm/drmP.h>
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_of.h>
-> +
-> +/**
-> + * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
-> + * @dev: DRM device
-> + * @port: port OF node
-> + *
-> + * Given a port OF node, return the possible mask of the corresponding
-> + * CRTC within a device's list of CRTCs.  Returns zero if not found.
-> + */
-> +static uint32_t drm_crtc_port_mask(struct drm_device *dev,
-> +				   struct device_node *port)
-> +{
-> +	unsigned int index = 0;
-> +	struct drm_crtc *tmp;
-> +
-> +	list_for_each_entry(tmp, &dev->mode_config.crtc_list, head) {
-> +		if (tmp->port == port)
-> +			return 1 << index;
-> +
-> +		index++;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * drm_of_find_possible_crtcs - find the possible CRTCs for an encoder port
-> + * @dev: DRM device
-> + * @port: encoder port to scan for endpoints
-> + *
-> + * Scan all endpoints attached to a port, locate their attached CRTCs,
-> + * and generate the DRM mask of CRTCs which may be attached to this
-> + * encoder.
-> + *
-> + * See Documentation/devicetree/bindings/graph.txt for the bindings.
-> + */
-> +uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> +				    struct device_node *port)
-> +{
-> +	struct device_node *remote_port, *ep = NULL;
-> +	uint32_t possible_crtcs = 0;
-> +
-> +	do {
-> +		ep = of_graph_get_next_endpoint(port, ep);
-> +		if (!ep)
-> +			break;
-> +
-> +		remote_port = of_graph_get_remote_port(ep);
-> +		if (!remote_port) {
-> +			of_node_put(ep);
-> +			return 0;
-> +		}
-> +
-> +		possible_crtcs |= drm_crtc_port_mask(dev, remote_port);
-> +
-> +		of_node_put(remote_port);
+Merged. Fixups were trivial since it was just changes against files
+that had been removed.
 
-In my humble opinion, this requires of_node_put(ep),
-because of_graph_get_next_endpoint() doesn't decrement it.
 
-+		of_node_put(ep);
-
-Thank you.
-Best regards YJ
-
-> +	} while (1);
-> +
-> +	return possible_crtcs;
-> +}
-> +EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-> diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-> index 251b75e6bf7a..6a94909f1ca9 100644
-> --- a/include/drm/drm_crtc.h
-> +++ b/include/drm/drm_crtc.h
-> @@ -41,6 +41,7 @@ struct drm_framebuffer;
->   struct drm_object_properties;
->   struct drm_file;
->   struct drm_clip_rect;
-> +struct device_node;
->
->   #define DRM_MODE_OBJECT_CRTC 0xcccccccc
->   #define DRM_MODE_OBJECT_CONNECTOR 0xc0c0c0c0
-> @@ -314,6 +315,7 @@ struct drm_crtc_funcs {
->    */
->   struct drm_crtc {
->   	struct drm_device *dev;
-> +	struct device_node *port;
->   	struct list_head head;
->
->   	/**
-> diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-> new file mode 100644
-> index 000000000000..2441f7112074
-> --- /dev/null
-> +++ b/include/drm/drm_of.h
-> @@ -0,0 +1,18 @@
-> +#ifndef __DRM_OF_H__
-> +#define __DRM_OF_H__
-> +
-> +struct drm_device;
-> +struct device_node;
-> +
-> +#ifdef CONFIG_OF
-> +extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> +					   struct device_node *port);
-> +#else
-> +static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-> +						  struct device_node *port)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
-> +#endif /* __DRM_OF_H__ */
->
+-Olof
