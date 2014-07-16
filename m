@@ -1,59 +1,167 @@
-From: huayi.li@csr.com (Huayi Li)
-Date: Wed, 16 Jul 2014 10:01:53 +0800
-Subject: [PATCH v5 2/4] pwm: sirf: add dt-binding document
-Message-ID: <1405476113-10127-1-git-send-email-huayi.li@csr.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Wed, 16 Jul 2014 07:55:29 +0530
+Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
+In-Reply-To: <53C5BAD6.5030603@samsung.com>
+References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
+ <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
+ <53A12EA3.5010007@samsung.com>
+ <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
+ <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
+ <53BC0F8F.4010106@samsung.com>
+ <CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
+ <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
+ <53C5BAD6.5030603@samsung.com>
+Message-ID: <CAPdUM4N0UyMzvy4vXrVNu0y60=d6J5Zs-hCcD6u1dvCA7Eu-xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dt-binding document for pwm-sirf. here the controller clock
-can't generate PWM signals, so we need seperate clock as signal source.
+Thanks Kukjin,
 
-Signed-off-by: Huayi Li <huayi.li@csr.com>
----
- Documentation/devicetree/bindings/pwm/pwm-sirf.txt | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sirf.txt
+This is not a regression but Display domain in exynos5420 was never
+tested well before posting this patch in mainline. This is causing problems
+in drm probe deferring due to late init of bridge chip. Domain fails to disable
+after few enable/disable iterations during boot. Without this patch DP also
+fails to sync with video stream after resume from suspend. This patch is a
+blocker for above 2 use cases.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-sirf.txt b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
-new file mode 100644
-index 0000000..221e5d9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
-@@ -0,0 +1,29 @@
-+SiRF prima2 & atlas6 PWM drivers
-+
-+Required properties:
-+- compatible: "sirf,prima2-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: should be 2. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clocks: Must contain an entry for each entry in clock-names.
-+  See ../clock/prima2-clock.txt for details.
-+- clock-names: Must include the following entries:
-+  of clock sources to generate PWM signal,
-+  - pwmc: PWM controller clock
-+  - sigsrc0: source clock 0 for PWM
-+  - sigsrc1: source clock 1 for PWM
-+  - sigsrc2: source clock 2 for PWM
-+  - sigsrc3: source clock 3 for PWM
-+  - sigsrc4: source clock 4 for PWM
-+
-+Example:
-+
-+pwm: pwm at b0130000 {
-+	compatible = "sirf,prima2-pwm";
-+	#pwm-cells = <2>;
-+	reg = <0xb0130000 0x10000>;
-+	clocks = <&clks 21>, <&clks 1>, <&clks 2>,
-+	       <&clks 3>, <&clks 0>, <&clks 4>;
-+	clock-names = "pwmc", "sigsrc0", "sigsrc1",
-+		"sigsrc2", "sigsrc3", "sigsrc4";
-+};
--- 
-1.9.3
+Regards,
+Rahul Sharma.
 
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+On 16 July 2014 05:05, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 07/14/14 18:09, Rahul Sharma wrote:
+>>
+>> Hi Kukjin,
+>>
+> Hi Rahul,
+>
+>
+>> Please consider this patch for your branch. This patch is important
+>> for Display for Exynos5 boards.
+>>
+> OK, I will take this for exynos5420 display for 3.17...BTW I'm not sure this
+> is a regression for 3.16 or not...if so, please let me know.
+>
+> Thanks,
+> Kukjin
+>
+>
+>> Regards,
+>> Rahul Sharma.
+>>
+>> On 9 July 2014 17:00, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
+>>>
+>>> Hi Tomasz,
+>>>
+>>> On 8 July 2014 21:04, Tomasz Figa<t.figa@samsung.com>  wrote:
+>>>>
+>>>> Hi Rahul,
+>>>>
+>>>> On 07.07.2014 15:37, Rahul Sharma wrote:
+>>>>>
+>>>>> Hi Andrej, Inki,
+>>>>>
+>>>>> On 18 June 2014 12:06, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
+>>>>>>
+>>>>>> Hi Andrej,
+>>>>>>
+>>>>>> On 18 June 2014 11:46, Andrzej Hajda<a.hajda@samsung.com>  wrote:
+>>>>>>>
+>>>>>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
+>>>>>>>>
+>>>>>>>> Hi All,
+>>>>>>>>
+>>>>>>>> Please review this patch.
+>>>>>>>>
+>>>>>>>> Regards,
+>>>>>>>> Rahul Sharma
+>>>>>>>>
+>>>>>>>> On 9 June 2014 16:58, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
+>>>>>>>>>
+>>>>>>>>> Display domain is removed due to instability issues. Explaining
+>>>>>>>>> the problem below:
+>>>>>>>>>
+>>>>>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
+>>>>>>>>> powers off the unused power domains. This call hits before
+>>>>>>>>> the trigger to deferred probes.
+>>>>>>>>>
+>>>>>>>>> DRM DP Panel defers the probe due to supply get failure. By the
+>>>>>>>>> time, deferred probe is scheduled again, Display Power Domain is
+>>>>>>>>> powered off by pm_genpd_poweroff_unused.
+>>>>>>>>>
+>>>>>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
+>>>>>>>>> callbacks. If display domain is enabled/disabled around register
+>>>>>>>>> accesses, display domain gets unstable and we are getting Power
+>>>>>>>>> Domain Disable fail notification. Increasing the Timeout also
+>>>>>>>>> didn't help.
+>>>>>>>
+>>>>>>>
+>>>>>>> As I understand the problem is that fimd and dp drivers access hw
+>>>>>>> registers without enabling power domain. So the proper solution is to
+>>>>>>> fix these drivers.
+>>>>>>
+>>>>>>
+>>>>>> That is also a problem but I fixed those accesses in my local kernel
+>>>>>> before
+>>>>>> hitting this issue. If we do register accesses in FIMD/DP probe/bind
+>>>>>> we
+>>>>>> observes "Prefetch abort" exception. But here the problem is that 'DP
+>>>>>> domain disable' starts failing if we enable/disable multiple times.
+>>>>>>
+>>>>>>>
+>>>>>>> Btw. there are already patches removing hw access from probe/bind of
+>>>>>>> fimd. I guess removing also hw access from dp probe/bind could be a
+>>>>>>> good
+>>>>>>> solution.
+>>>>>>
+>>>>>>
+>>>>>> Please let me know the links for posted patches. I will test with
+>>>>>> those patches.
+>>>>>
+>>>>>
+>>>>> Is there any update on this? Please share the patches which fixes the
+>>>>> above issue or avoid the above scenario of multiple PM Domain
+>>>>> enable/disable.
+>>>>> I will test them for exynos5 based boards. Otherwise we should get this
+>>>>> change
+>>>>> merged else display will remain broken for exynos5 based boards.
+>>>>
+>>>>
+>>>> Andrzej is on holidays right now, so he won't be able to reply in this
+>>>> thread until he's back. Here are two patches I was able to find on the
+>>>> related MLs that might be fixing the cause of your issues:
+>>>
+>>>
+>>> Ok. thanks for the update.
+>>>
+>>> We should test with Ajay's patches which includes DP probe deferring
+>>> based on availability of bridge chip. +
+>>>
+>>> few patches which cleanup register access in FIMD and DP probe/bind
+>>> OR
+>>> few patches to enable Display power domain and clocks just before the
+>>> register access. As done in https://lkml.org/lkml/2014/7/4/188.
+>>>
+>>> Later solution results into display power domain enable failure in case
+>>> of DRM
+>>> probe defer.
+>>>
+>>> I am just curious if Andrej has some solution for the first approach
+>>> which can
+>>> be tested for defer probe and S2R scenarios.
+>>>
+>>> Regards,
+>>> Rahul Sharma.
+>>>
+>>>>
+>>>> [PATCH] drm/exynos: remove hardware overlays disable from fimd probe
+>>>>
+>>>> (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
+>>>>
+>>>> [PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
+>>>> (https://lkml.org/lkml/2014/7/4/188)
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
