@@ -1,103 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 11:45:11 -0500
-Subject: Function Profiler broken on today's linux-next
-In-Reply-To: <20140716164141.GA3016@saruman.home>
-References: <20140716162328.GJ1365@saruman.home>
- <20140716122921.71b118a9@gandalf.local.home>
- <20140716164141.GA3016@saruman.home>
-Message-ID: <20140716164511.GB3016@saruman.home>
+Date: Wed, 16 Jul 2014 11:46:54 -0500
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <53C6AAE1.7090802@linutronix.de>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
+ <20140716151604.GG1365@saruman.home>
+ <53C6A050.2050409@linutronix.de>
+ <20140716160614.GI1365@saruman.home>
+ <53C6AAE1.7090802@linutronix.de>
+Message-ID: <20140716164654.GC3016@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
-
-On Wed, Jul 16, 2014 at 11:41:41AM -0500, Felipe Balbi wrote:
-> Hi,
+On Wed, Jul 16, 2014 at 06:40:01PM +0200, Sebastian Andrzej Siewior wrote:
+> On 07/16/2014 06:06 PM, Felipe Balbi wrote:
 > 
-> On Wed, Jul 16, 2014 at 12:29:21PM -0400, Steven Rostedt wrote:
-> > On Wed, 16 Jul 2014 11:23:28 -0500
-> > Felipe Balbi <balbi@ti.com> wrote:
+> >>> well, other than in probe and other functions which need to
+> >>> make sure clocks are on, but it seems unnecessary to
+> >>> enable/disable in every function.
+> >> 
+> >> What do you have in mind? Do you plan to let the uart on while
+> >> the minicom is attached but is doing nothing? In that case,
+> >> ->startup() and ->shutdown() should be enough.
 > > 
-> > > Hi folks,
-> > > 
-> > > I was trying to use Kernel Function Profiler to figure out why my
-> > > driver's IRQ handler is taking so much CPU time but to my surprise,
-> > > whenever I try to trace anything, I get a "Unable to handle kernel
-> > > paging request at virtual address XXXX" error.
-> > > 
-> > > Is anybody else seen that or did I screw up my Kernel config ?
-> > 
-> > No, it's probably my fault. The ftrace infrastructure is going through
-> > an overhaul and some dramatic changes are happening. Although it has
-> > passed all my tests, I can't cover everyone's configs and use cases.
-> > 
-> > Please send me your config and the steps you did to enable function
-> > profiling. This is x86 correct? Other archs are already known to be
-> > broken and I'm working on fixing them now.
+> > no the idea was to keep it on for as long as it's transferring 
+> > characters and idle it otherwise, if that can't be done easily,
+> > then I guess your way is the only way.
 > 
-> .config attached. It's actually an ARM platform, I can help out with
-> testing anything you need.
+> But maybe we have to add some additional logic here to keep it up for
+> the transfer. I've been just (maybe over)thinking: If you send 300
+> bytes over DMA via 300 baud it should take 10 seconds. The PM-timeout
+> could hit before the transfer is complete.
 
-for the steps:
+hmm, good point. So we _do_ need a way to get early and only put after
+we know transfer has completed and I was assuming stop_tx() to be that
+hint, but apparently it isn't.
 
-# mount -t debugfs none /debug
-# cd /debug/tracing
-# echo dwc3* > set_graph_function
-# echo dwc3* > set_function_filter
-# echo 1 > function_profile_enabled
-# echo 1 > tracing_on
-# modprobe g_zero # this binds g_zero to dwc3 and a few functions from
-		  # dwc3 are called
+> Same thing with hw-flowcontrol where you could get stalled for a few
+> seconds.
+> However it doesn't seem to be a problem in current omap-serial driver.
 
-KABOOM! (see below)
-
-[   41.135792] Unable to handle kernel paging request at virtual address ed6c9170
-[   41.143375] pgd = ec290000
-[   41.146207] [ed6c9170] *pgd=ad60041e(bad)
-[   41.150420] Internal error: Oops: 8000000d [#1] SMP ARM
-[   41.155898] Modules linked in: g_zero(+) libcomposite configfs matrix_keypad lis3lv02d_i2c lis3lv02d input_polldev
-[   41.166801] CPU: 0 PID: 1710 Comm: modprobe Tainted: G        W      3.16.0-rc5-next-20140715-00031-gb041877 #529
-[   41.177559] task: ec0050c0 ti: ec288000 task.ti: ec288000
-[   41.183217] PC is at 0xed6c9170
-[   41.186507] LR is at 0xec289d44
-[   41.189799] pc : [<ed6c9170>]    lr : [<ec289d44>]    psr: 00000013
-[   41.189799] sp : ec289d1c  ip : ed6c9170  fp : ec289d24
-[   41.201831] r10: 00000000  r9 : bf0288d8  r8 : bf0288b8
-[   41.207303] r7 : bf03a7c4  r6 : ed6c9170  r5 : ed6c9170  r4 : ed465740
-[   41.214139] r3 : ed6c9170  r2 : ed465740  r1 : c04d6bdc  r0 : bf0285c0
-[   41.220977] Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   41.228452] Control: 10c5387d  Table: ac290059  DAC: 00000015
-[   41.234467] Process modprobe (pid: 1710, stack limit = 0xec288248)
-[   41.240937] Stack: (0xec289d1c to 0xec28a000)
-[   41.245510] 9d00:                                                                ec289d28
-[   41.254095] 9d20: c000ecec c04d6be8 ed465740 bf03a7ec ed6c9170 bf03a7c4 ec289d7c ec289d48
-[   41.262661] 9d40: bf028954 bf028594 ec289d74 ec289d58 c0419b9c ed4a9c00 bf03a7ec bf03a7ec
-[   41.271239] 9d60: ed4a9c08 bf0288b8 bf0288d8 00000000 ec289d9c ec289d80 c04fc6fc bf0288e4
-[   41.279817] 9d80: bf03a7ec c0b0ba8c bf03a7ec bf026e40 ec289db4 ec289da0 c04fca70 c04fc6b0
-[   41.288387] 9da0: bf03a7c4 bf03a448 ec289ddc ec289db8 bf026c38 c04fc9fc c0a84060 c0a84060
-[   41.296958] 9dc0: bf03d264 ec288030 00000000 ec2bea40 ec289dec ec289de0 bf03d278 bf026b98
-[   41.305527] 9de0: ec289e84 ec289df0 c0008a54 bf03d270 ed000040 a0000013 ec289e14 ec289e08
-[   41.314090] 9e00: c008cbb4 c008c9d4 ec289e4c ec289e18 c014afa4 c008cbac 0000001d ec2bea40
-[   41.322634] 9e20: f0614000 ec2bea40 00000000 00000000 0000001e ec2bea40 f0614000 00000001
-[   41.331190] 9e40: ec289e6c ec289e50 c0140f38 c014aed8 ec289f48 00000000 bf03a854 ec289f48
-[   41.339739] 9e60: 00000000 bf03a854 00000018 00000000 00000000 bf03a848 ec289f44 ec289e88
-[   41.348286] 9e80: c00c54ec c00089d0 ffff8000 00007fff c00c2854 c015aa78 0001d579 00000000
-[   41.356835] 9ea0: f0614000 ec289f7c ec289f50 000000cc f06299e8 bf03a854 bf03aa44 b6fb27a0
-[   41.365412] 9ec0: ec288008 00000000 00120720 00000000 0b300002 c0a881a4 00000001 00000000
-[   41.373963] 9ee0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[   41.382513] 9f00: 00000000 00000000 00000000 00000000 00000000 00000000 ec289f34 00000000
-[   41.391066] 9f20: 00000005 b6fb27a0 0000017b c000ee04 ec288000 00000000 ec289fa4 ec289f48
-[   41.399635] 9f40: c00c5ad4 c00c3ed0 f0614000 0001d579 f0629218 f0629020 f0630ad8 00000a44
-[   41.408192] 9f60: 00001024 00000000 00000000 00000000 00000032 00000033 00000019 0000001d
-[   41.416747] 9f80: 0000000e 00000000 00000000 b6fb3d10 00000000 70f62c00 00000000 ec289fa8
-[   41.425293] 9fa0: c000eb80 c00c5a68 b6fb3d10 00000000 00000005 b6fb27a0 00000000 b6fb40b8
-[   41.433838] 9fc0: b6fb3d10 00000000 70f62c00 0000017b 00000000 00000000 00000000 b6fbe2d8
-[   41.442401] 9fe0: becaa6d8 becaa6c8 b6fa70a4 b6ee4160 60000010 00000005 00000000 00000000
-[   41.450958] Code: ed4a83c0 ed4a8b40 ed4a8340 00000000 (00000000) 
-[   41.457327] ---[ end trace cb88537fdc8fa202 ]---
-Segmentation fault
-
-cheers
+I don't think current omap-serial driver is a great example.
 
 -- 
 balbi
@@ -107,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/83f39a99/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/7ee27622/attachment.sig>
