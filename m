@@ -1,26 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Jul 2014 08:52:32 -0400
-Subject: [PATCHv3 6/7] ARM: mvebu: update mvebu_v7_defconfig with
- cpufreq support
-In-Reply-To: <1404920715-19834-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404920715-19834-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140716125232.GX13108@titan.lakedaemon.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Jul 2014 14:53:56 +0200
+Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
+In-Reply-To: <1405505072.4408.17.camel@x220>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-12-git-send-email-t.figa@samsung.com>
+ <1405505072.4408.17.camel@x220>
+Message-ID: <53C675E4.4020502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 05:45:14PM +0200, Thomas Petazzoni wrote:
-> Now that the Armada XP supports dynamic CPU frequency scaling, it
-> makes sense to enable the cpufreq subsystem in mvebu_v7_defconfig, as
-> well as the cpufreq-generic driver used on Armada XP.
+On 16.07.2014 12:04, Paul Bolle wrote:
+> On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
+
+[snip]
+
+>> -
+>> -config MACH_AQUILA
+>> -	bool "Aquila"
+>> -	select CPU_S5PV210
+>> -	select S3C_DEV_FB
+>> -	select S3C_DEV_HSMMC
+>> -	select S3C_DEV_HSMMC1
+>> -	select S3C_DEV_HSMMC2
+>> -	select S5PV210_SETUP_FB_24BPP
+>> -	select S5PV210_SETUP_SDHCI
+>> -	select S5PV210_SETUP_USB_PHY
+>> -	select S5P_DEV_FIMC0
+>> -	select S5P_DEV_FIMC1
+>> -	select S5P_DEV_FIMC2
+>> -	select S5P_DEV_ONENAND
+>> -	help
+>> -	  Machine support for the Samsung Aquila target based on S5PC110 SoC
+>> -
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> This symbol is still referenced in sound/soc/samsung/Kconfig.
 
-Applied to mvebu/defconfig
+More code that I missed.
 
-thx,
+I believe that both sound card drivers for Goni and Aquilla could be
+replaced with simple cards in DT, so I'll send a follow-up patch for this.
 
-Jason.
+Most likely the same is the case for SMDK boards, but they don't seem to
+have any active users (see cover letter for more details), which means
+that probably they could be simply dropped from
+sound/soc/samsung/Kconfig in another follow-up patch.
+
+Best regards,
+Tomasz
