@@ -1,174 +1,500 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 13:09:28 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <53C63CBA.20809@codethink.co.uk>
-References: <20140714183624.GV6800@sirena.org.uk> <4657735.1VKsbQGuH6@wuerfel>
- <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
- <53C4DF0D.8010208@metafoo.de>
- <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
- <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
- <20140716071237.GA7978@ulmo>
- <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
- <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
-Message-ID: <20140716110927.GK7978@ulmo>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Jul 2014 13:14:30 +0200
+Subject: [PATCH v3 7/8] ata: Add support for the Tegra124 SATA controller
+In-Reply-To: <1405500863-19696-8-git-send-email-mperttunen@nvidia.com>
+References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
+ <1405500863-19696-8-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53C65E96.9070508@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 09:50:02AM +0100, Rob Jones wrote:
-> 
-> 
-> On 16/07/14 08:51, Thierry Reding wrote:
-> >On Wed, Jul 16, 2014 at 04:28:33PM +0900, Alexandre Courbot wrote:
-> >>On Wed, Jul 16, 2014 at 4:12 PM, Thierry Reding
-> >><thierry.reding@gmail.com> wrote:
-> >>>On Wed, Jul 16, 2014 at 12:00:45PM +0900, Alexandre Courbot wrote:
-> >>>>On Tue, Jul 15, 2014 at 6:14 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> >>>>>On Tue, Jul 15, 2014 at 4:58 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> >>>>>>On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
-> >>>>>>>
-> >>>>>>>On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >>>>>>>>
-> >>>>>>>>On Monday 14 July 2014 19:36:24 Mark Brown wrote:
-> >>>>>>>>>
-> >>>>>>>>>On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
-> >>>>>>>>>>
-> >>>>>>>>>>On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
-> >>>>>>>>>
-> >>>>>>>>>
-> >>>>>>>>>>>Yes. But now that you say it the gpiod_direction_output() call is
-> >>>>>>>>>>>missing
-> >>>>>>>>>>>from this patch.
-> >>>>>>>>>
-> >>>>>>>>>
-> >>>>>>>>>>I'm lost now. The GPIO_ACTIVE_HIGH I added comes from
-> >>>>>>>>>>Documentation/gpio/board.txt
-> >>>>>>>>>>and as Linus Walleij explained to me the other day, the lookup is
-> >>>>>>>>>>supposed
-> >>>>>>>>>>to replace devm_gpio_request_one(), which in turn replaced both the
-> >>>>>>>>>>gpio_request and the gpio_direction_output(). Do I need to put the
-> >>>>>>>>>>gpiod_direction_output() back or is there another interface for that
-> >>>>>>>>>>when
-> >>>>>>>>>>registering the board gpios?
-> >>>>>>>>>
-> >>>>>>>>>
-> >>>>>>>>>Indeed.  If you *do* need an explicit _output() then that sounds to me
-> >>>>>>>>>like we either need a gpiod_get_one() or an extension to the table,
-> >>>>>>>>>looking at the code it seems like this is indeed the case.  We can set
-> >>>>>>>>>if the GPIO is active high/low, or open source/drain but there's no flag
-> >>>>>>>>>for the initial state.
-> >>>>>>>>
-> >>>>>>>>
-> >>>>>>>>(adding Alexandre and the gpio list)
-> >>>>>>>>
-> >>>>>>>>GPIO people: any guidance on how a board file should set a gpio to
-> >>>>>>>>output/default-high in a GPIO_LOOKUP() table to replace a
-> >>>>>>>>devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
-> >>>>>>>>Do we need to add an interface extension to do this, e.g. passing
-> >>>>>>>>GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
-> >>>>>>>
-> >>>>>>>
-> >>>>>>>The way I see it, GPIO mappings (whether they are done using the
-> >>>>>>>lookup tables, DT, or ACPI) should only care about details that are
-> >>>>>>>relevant to the device layout and that should be abstracted to the
-> >>>>>>>driver (e.g. whether the GPIO is active low or open drain) so drivers
-> >>>>>>>do not need to check X conditions every time they want to drive the
-> >>>>>>>GPIO.
-> >>>>>>>
-> >>>>>>>Direction and initial value, on the other hand, are clearly properties
-> >>>>>>>that ought to be set by the driver itself. Thus my expectation here
-> >>>>>>>would be that the driver sets the GPIO direction and initial value as
-> >>>>>>>soon as it gets it using gpiod_direction_output(). In other words,
-> >>>>>>>there is no replacement for gpio_request_one() with the gpiod
-> >>>>>>>interface. Is there any use-case that cannot be covered by calling
-> >>>>>>>gpiod_direction_output() right after gpiod_get()? AFAICT this is what
-> >>>>>>>gpio_request_one() was doing anyway.
-> >>>>>>
-> >>>>>>
-> >>>>>>I agree with you that this is something that should be done in the driver
-> >>>>>>and not in the lookup table. I think that it is still a good idea to have a
-> >>>>>>replacement for gpio_request_one with the new GPIO descriptor API. A large
-> >>>>>>share of the drivers want to call either gpio_direction_input() or
-> >>>>>>gpio_direction_output() right after requesting the GPIO. Combining both the
-> >>>>>>requesting and the configuration of the GPIO into one function call makes
-> >>>>>>the code a bit shorter and also simplifies the error handling. Even more so
-> >>>>>>if e.g. the GPIO is optional. This was one of the main reasons why
-> >>>>>>gpio_request_one was introduced, see the commit[1] that added it.
-> >>>>>
-> >>>>>I am not opposed to it as a convenience function. Note that since the
-> >>>>>open-source and open-drain flags are already handled by the lookup
-> >>>>>table, the only flags it should handle are those related to direction,
-> >>>>>value, and (maybe) sysfs export.
-> >>>>
-> >>>>Problem is, too much convenience functions seems to ultimately kill convenience.
-> >>>>
-> >>>>The canonical way to request a GPIO is by providing a (device,
-> >>>>function, index) triplet to gpiod_get_index(). Since most functions
-> >>>>only need one GPIO, we have gpiod_get(device, function) which is
-> >>>>basically an alias to gpiod_get_index(device, function, 0) (note to
-> >>>>self: we should probably inline it).
-> >>>>
-> >>>>On top of these comes another set of convenience functions,
-> >>>>gpiod_get_optional() and gpiod_get_index_optional(), which return NULL
-> >>>>instead of -ENOENT if the requested GPIO mapping does not exist. This
-> >>>>is useful for the common case where a driver can work without a GPIO.
-> >>>>
-> >>>>Of course these functions all have devm counterparts, so we currently
-> >>>>have 8 (devm_)gpiod_get(_index)(_optional) functions.
-> >>>>
-> >>>>If we are to add functions with an init flags parameter, we will end
-> >>>>with 16 functions. That starts to be a bit too much to my taste, and
-> >>>>maybe that's where GPIO consumers should sacrifice some convenience to
-> >>>>preserve a comprehensible GPIO API.
-> >>>>
-> >>>>There might be other ways to work around this though. For instance, we
-> >>>>could replace the _optional functions by a GPIOF_OPTIONAL flag to be
-> >>>>passed to a more generic function that would also accept direction and
-> >>>>init value flags. Actually I am not seeing any user of the _optional
-> >>>>variant in -next, so maybe we should just do this. Thierry, since you
-> >>>>introduced the _optional functions, can we get your thoughts about
-> >>>>this?
-> >>>
-> >>>I personally prefer explicit naming of the functions rather than putting
-> >>>a bunch of flags into some parameter. If you're overly concerned about
-> >>>the amount of convenience functions, perhaps the _index variants can be
-> >>>left out for gpiod_get_one(). I'd argue that if drivers want to deal
-> >>>with that level of detail anyway, they may just as well add the index
-> >>>explicitly when calling the function.
-> >>>
-> >>>While we're at it, gpiod_get_one() doesn't sound like a very good name.
-> >>>All other variants only request "one" as well. Perhaps something like
-> >>>gpiod_get_with_flags() would be a better name.
-> >>>
-> >>>Then again, maybe rather than add a new set of functions we should bite
-> >>>the bullet and change gpiod_get() (and variants) to take an additional
-> >>>flags parameter. There aren't all that many users yet (I count 26
-> >>>outside of drivers/gpio), so maybe now would still be a good time to do
-> >>>that.
-> >>
-> >>That sounds reasonable indeed. And preferable to getting an aneurysm
-> >>after trying to spell devm_gpiod_get_index_optional_with_flags().
-> >>
-> >>This also makes the most sense since most GPIO users will want to set
-> >>a direction and value right after obtaining one. So if there is no
-> >>objection I will probably start refactoring gpiod_get() this week.
-> >
-> >Sounds good to me.
-> >
-> 
-> In light of this, should I hold off starting on devm_gpiod_get_array()
-> as discussed on here last week?
+Hi,
 
-I'll let Alex or Linus answer this, since I wasn't involved in the
-devm_gpiod_get_array() discussions. It's probably going to be tricky to
-pass around an array of everything, but I suspect you've already got a
-solution to that.
+Thanks for making the changes to use more libahci_platform
+functionality. Overall this looks good, I've a few small remarks
+inline.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/8f862613/attachment.sig>
+On 07/16/2014 10:54 AM, Mikko Perttunen wrote:
+> This adds support for the integrated AHCI-compliant Serial ATA
+> controller present on the NVIDIA Tegra124 system-on-chip.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+> changes since v2:
+> - remove fuse reading: now there is no dependency on the fuse series,
+>   so merging should be easier. always using the zeroth calibration
+>   values works for me anyway. the fuse code should be added back once
+>   fuses have landed, in 3.17-rc1 or 3.18.
+> - put calibration value variables on their own lines.
+> - back to using ahci_platform to manage some resources
+> - code style fixes
+> 
+>  drivers/ata/Kconfig      |   9 ++
+>  drivers/ata/Makefile     |   1 +
+>  drivers/ata/ahci_tegra.c | 406 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 416 insertions(+)
+>  create mode 100644 drivers/ata/ahci_tegra.c
+> 
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index b0d5b5a..e1b9278 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -142,6 +142,15 @@ config AHCI_SUNXI
+>  
+>  	  If unsure, say N.
+>  
+> +config AHCI_TEGRA
+> +	tristate "NVIDIA Tegra124 AHCI SATA support"
+> +	depends on ARCH_TEGRA
+> +	help
+> +	  This option enables support for the NVIDIA Tegra124 SoC's
+> +	  onboard AHCI SATA.
+> +
+> +	  If unsure, say N.
+> +
+>  config AHCI_XGENE
+>  	tristate "APM X-Gene 6.0Gbps AHCI SATA host controller support"
+>  	depends on PHY_XGENE
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 5a02aee..ae41107 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -15,6 +15,7 @@ obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_MVEBU)	+= ahci_mvebu.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
+> +obj-$(CONFIG_AHCI_TEGRA)	+= ahci_tegra.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_XGENE)	+= ahci_xgene.o libahci.o libahci_platform.o
+>  
+>  # SFF w/ custom DMA
+> diff --git a/drivers/ata/ahci_tegra.c b/drivers/ata/ahci_tegra.c
+> new file mode 100644
+> index 0000000..d90d08c
+> --- /dev/null
+> +++ b/drivers/ata/ahci_tegra.c
+> @@ -0,0 +1,406 @@
+> +/*
+> + * drivers/ata/ahci_tegra.c
+> + *
+> + * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+> + *
+> + * Author:
+> + *	Mikko Perttunen <mperttunen@nvidia.com>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/ahci_platform.h>
+> +#include <linux/reset.h>
+> +#include <linux/errno.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/tegra-powergate.h>
+> +#include <linux/regulator/consumer.h>
+> +#include "ahci.h"
+> +
+> +#define SATA_CONFIGURATION_0				0x180
+> +#define SATA_CONFIGURATION_EN_FPCI			BIT(0)
+> +
+> +#define SCFG_OFFSET					0x1000
+> +
+> +#define T_SATA0_CFG_1					0x04
+> +#define T_SATA0_CFG_1_IO_SPACE				BIT(0)
+> +#define T_SATA0_CFG_1_MEMORY_SPACE			BIT(1)
+> +#define T_SATA0_CFG_1_BUS_MASTER			BIT(2)
+> +#define T_SATA0_CFG_1_SERR				BIT(8)
+> +
+> +#define T_SATA0_CFG_9					0x24
+> +#define T_SATA0_CFG_9_BASE_ADDRESS_SHIFT		13
+> +
+> +#define SATA_FPCI_BAR5					0x94
+> +#define SATA_FPCI_BAR5_START_SHIFT			4
+> +
+> +#define SATA_INTR_MASK					0x188
+> +#define SATA_INTR_MASK_IP_INT_MASK			BIT(16)
+> +
+> +#define T_SATA0_AHCI_HBA_CAP_BKDR			0x300
+> +
+> +#define T_SATA0_BKDOOR_CC				0x4a4
+> +
+> +#define T_SATA0_CFG_SATA				0x54c
+> +#define T_SATA0_CFG_SATA_BACKDOOR_PROG_IF_EN		BIT(12)
+> +
+> +#define T_SATA0_CFG_MISC				0x550
+> +
+> +#define T_SATA0_INDEX					0x680
+> +
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN1			0x690
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_MASK		0xff
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_SHIFT		0
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN1_TX_PEAK_MASK		(0xff << 8)
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN1_TX_PEAK_SHIFT	8
+> +
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN2			0x694
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN2_TX_AMP_MASK		0xff
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN2_TX_AMP_SHIFT		0
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN2_TX_PEAK_MASK		(0xff << 12)
+> +#define T_SATA0_CHX_PHY_CTRL1_GEN2_TX_PEAK_SHIFT	12
+> +
+> +#define T_SATA0_CHX_PHY_CTRL2				0x69c
+> +#define T_SATA0_CHX_PHY_CTRL2_CDR_CNTL_GEN1		0x23
+> +
+> +#define T_SATA0_CHX_PHY_CTRL11				0x6d0
+> +#define T_SATA0_CHX_PHY_CTRL11_GEN2_RX_EQ		(0x2800 << 16)
+> +
+> +#define FUSE_SATA_CALIB					0x124
+> +#define FUSE_SATA_CALIB_MASK				0x3
+> +
+> +enum sata_clks {
+> +	AHCI_CLK_SATA		= 0,
+> +	AHCI_CLK_SATA_OOB	= 1,
+> +	AHCI_CLK_CML1		= 2,
+> +	AHCI_CLK_PLL_E		= 3
+> +};
+
+You should mention that having the clocks in this order is mandatory
+in Documentation/devicetree/bindings/ata/tegra-sata.txt / in
+"[PATCH v3 1/8] of: Add NVIDIA Tegra SATA controller binding"
+
+
+> +
+> +struct sata_pad_calibration {
+> +	u8 gen1_tx_amp;
+> +	u8 gen1_tx_peak;
+> +	u8 gen2_tx_amp;
+> +	u8 gen2_tx_peak;
+> +};
+> +
+> +static const struct sata_pad_calibration tegra124_pad_calibration[] = {
+> +	{0x18, 0x04, 0x18, 0x0a},
+> +	{0x0e, 0x04, 0x14, 0x0a},
+> +	{0x0e, 0x07, 0x1a, 0x0e},
+> +	{0x14, 0x0e, 0x1a, 0x0e},
+> +};
+> +
+> +struct tegra_ahci_priv {
+> +	struct platform_device	   *pdev;
+> +	void __iomem		   *sata_regs;
+> +	struct reset_control	   *sata_rst;
+> +	struct reset_control	   *sata_oob_rst;
+> +	struct reset_control	   *sata_cold_rst;
+> +	struct regulator_bulk_data supplies[5];
+> +};
+> +
+> +static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
+> +{
+> +	struct tegra_ahci_priv *tegra = hpriv->plat_data;
+> +	int ret;
+> +
+> +	ret = regulator_bulk_enable(ARRAY_SIZE(tegra->supplies),
+> +				    tegra->supplies);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_SATA,
+> +						hpriv->clks[AHCI_CLK_SATA],
+> +						tegra->sata_rst);
+> +	if (ret)
+> +		goto disable_regulators;
+> +
+> +	reset_control_assert(tegra->sata_oob_rst);
+> +	reset_control_assert(tegra->sata_cold_rst);
+> +
+> +	ret = clk_prepare_enable(hpriv->clks[AHCI_CLK_SATA_OOB]);
+> +	if (ret)
+> +		goto disable_power;
+> +
+> +	ret = clk_prepare_enable(hpriv->clks[AHCI_CLK_CML1]);
+> +	if (ret)
+> +		goto disable_oob;
+> +
+> +	ret = clk_prepare_enable(hpriv->clks[AHCI_CLK_PLL_E]);
+> +	if (ret)
+> +		goto disable_cml1;
+> +
+> +	reset_control_deassert(tegra->sata_cold_rst);
+> +	reset_control_deassert(tegra->sata_oob_rst);
+> +
+> +	ret = phy_power_on(hpriv->phy);
+> +	if (ret)
+> +		goto disable_plle;
+> +
+> +	return 0;
+> +
+> +disable_plle:
+> +	clk_disable_unprepare(hpriv->clks[AHCI_CLK_PLL_E]);
+> +
+> +disable_cml1:
+> +	clk_disable_unprepare(hpriv->clks[AHCI_CLK_CML1]);
+> +
+> +disable_oob:
+> +	clk_disable_unprepare(hpriv->clks[AHCI_CLK_SATA_OOB]);
+> +
+> +disable_power:
+> +	clk_disable_unprepare(hpriv->clks[AHCI_CLK_SATA]);
+> +
+> +	tegra_powergate_power_off(TEGRA_POWERGATE_SATA);
+> +
+> +disable_regulators:
+> +	regulator_bulk_disable(ARRAY_SIZE(tegra->supplies), tegra->supplies);
+> +
+> +	return ret;
+> +}
+> +
+> +static void tegra_ahci_power_off(struct ahci_host_priv *hpriv)
+> +{
+> +	struct tegra_ahci_priv *tegra = hpriv->plat_data;
+> +
+> +	ahci_platform_disable_resources(hpriv);
+
+Disable resources does a phy_exit, unless this is a nop with your
+phy driver, you must re-do the phy_init in tegra_ahci_power_on()
+arguably the phy_init / phy_exit in libahci_platform should be
+moved to hci_platform_get_resources and ahci_platform_put_resources,
+if you decide to go for that please make sure you coordinate with
+other libahci_platform users which use a phy (see the dts files).
+
+> +
+> +	reset_control_assert(tegra->sata_rst);
+> +	reset_control_assert(tegra->sata_oob_rst);
+> +	reset_control_assert(tegra->sata_cold_rst);
+> +
+> +	tegra_powergate_power_off(TEGRA_POWERGATE_SATA);
+> +
+> +	regulator_bulk_disable(ARRAY_SIZE(tegra->supplies), tegra->supplies);
+> +}
+> +
+> +static int tegra_ahci_controller_init(struct ahci_host_priv *hpriv)
+> +{
+> +	struct tegra_ahci_priv *tegra = hpriv->plat_data;
+> +	int ret;
+> +	unsigned int val;
+> +	struct sata_pad_calibration calib;
+> +
+> +	ret = tegra_ahci_power_on(hpriv);
+> +	if (ret) {
+> +		dev_err(&tegra->pdev->dev,
+> +			"failed to power on AHCI controller: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	val = readl(tegra->sata_regs + SATA_CONFIGURATION_0);
+> +	val |= SATA_CONFIGURATION_EN_FPCI;
+> +	writel(val, tegra->sata_regs + SATA_CONFIGURATION_0);
+> +
+> +	/* Pad calibration */
+> +
+> +	/* FIXME Always use calibration 0. Change this to read the calibration
+> +	 * fuse once the fuse driver has landed. */
+> +	val = 0;
+> +
+> +	calib = tegra124_pad_calibration[val & FUSE_SATA_CALIB_MASK];
+> +
+> +	writel(BIT(0), tegra->sata_regs + SCFG_OFFSET + T_SATA0_INDEX);
+> +
+> +	val = readl(tegra->sata_regs +
+> +		SCFG_OFFSET + T_SATA0_CHX_PHY_CTRL1_GEN1);
+> +	val &= ~T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_MASK;
+> +	val &= ~T_SATA0_CHX_PHY_CTRL1_GEN1_TX_PEAK_MASK;
+> +	val |= calib.gen1_tx_amp <<
+> +			T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_SHIFT;
+> +	val |= calib.gen1_tx_peak <<
+> +			T_SATA0_CHX_PHY_CTRL1_GEN1_TX_PEAK_SHIFT;
+> +	writel(val, tegra->sata_regs + SCFG_OFFSET +
+> +		T_SATA0_CHX_PHY_CTRL1_GEN1);
+> +
+> +	val = readl(tegra->sata_regs +
+> +			SCFG_OFFSET + T_SATA0_CHX_PHY_CTRL1_GEN2);
+> +	val &= ~T_SATA0_CHX_PHY_CTRL1_GEN2_TX_AMP_MASK;
+> +	val &= ~T_SATA0_CHX_PHY_CTRL1_GEN2_TX_PEAK_MASK;
+> +	val |= calib.gen2_tx_amp <<
+> +			T_SATA0_CHX_PHY_CTRL1_GEN1_TX_AMP_SHIFT;
+> +	val |= calib.gen2_tx_peak <<
+> +			T_SATA0_CHX_PHY_CTRL1_GEN1_TX_PEAK_SHIFT;
+> +	writel(val, tegra->sata_regs + SCFG_OFFSET +
+> +		T_SATA0_CHX_PHY_CTRL1_GEN2);
+> +
+> +	writel(T_SATA0_CHX_PHY_CTRL11_GEN2_RX_EQ,
+> +		tegra->sata_regs + SCFG_OFFSET + T_SATA0_CHX_PHY_CTRL11);
+> +	writel(T_SATA0_CHX_PHY_CTRL2_CDR_CNTL_GEN1,
+> +		tegra->sata_regs + SCFG_OFFSET + T_SATA0_CHX_PHY_CTRL2);
+> +
+> +	writel(0, tegra->sata_regs + SCFG_OFFSET + T_SATA0_INDEX);
+> +
+> +	/* Program controller device ID */
+> +
+> +	val = readl(tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_SATA);
+> +	val |= T_SATA0_CFG_SATA_BACKDOOR_PROG_IF_EN;
+> +	writel(val, tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_SATA);
+> +
+> +	writel(0x01060100, tegra->sata_regs + SCFG_OFFSET + T_SATA0_BKDOOR_CC);
+> +
+> +	val = readl(tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_SATA);
+> +	val &= ~T_SATA0_CFG_SATA_BACKDOOR_PROG_IF_EN;
+> +	writel(val, tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_SATA);
+> +
+> +	/* Enable IO & memory access, bus master mode */
+> +
+> +	val = readl(tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_1);
+> +	val |= T_SATA0_CFG_1_IO_SPACE | T_SATA0_CFG_1_MEMORY_SPACE |
+> +		T_SATA0_CFG_1_BUS_MASTER | T_SATA0_CFG_1_SERR;
+> +	writel(val, tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_1);
+> +
+> +	/* Program SATA MMIO */
+> +
+> +	writel(0x10000 << SATA_FPCI_BAR5_START_SHIFT,
+> +	       tegra->sata_regs + SATA_FPCI_BAR5);
+> +
+> +	writel(0x08000 << T_SATA0_CFG_9_BASE_ADDRESS_SHIFT,
+> +	       tegra->sata_regs + SCFG_OFFSET + T_SATA0_CFG_9);
+> +
+> +	/* Unmask SATA interrupts */
+> +
+> +	val = readl(tegra->sata_regs + SATA_INTR_MASK);
+> +	val |= SATA_INTR_MASK_IP_INT_MASK;
+> +	writel(val, tegra->sata_regs + SATA_INTR_MASK);
+> +
+> +	return 0;
+> +}
+> +
+> +static void tegra_ahci_controller_deinit(struct ahci_host_priv *hpriv)
+> +{
+> +	tegra_ahci_power_off(hpriv);
+> +}
+> +
+> +static void tegra_ahci_host_stop(struct ata_host *host)
+> +{
+> +	struct ahci_host_priv *hpriv = host->private_data;
+> +
+> +	tegra_ahci_controller_deinit(hpriv);
+> +}
+> +
+> +static struct ata_port_operations ahci_tegra_port_ops = {
+> +	.inherits	= &ahci_ops,
+> +	.host_stop	= tegra_ahci_host_stop,
+> +};
+> +
+> +static const struct ata_port_info ahci_tegra_port_info = {
+> +	.flags		= AHCI_FLAG_COMMON,
+> +	.pio_mask	= ATA_PIO4,
+> +	.udma_mask	= ATA_UDMA6,
+> +	.port_ops	= &ahci_tegra_port_ops,
+> +};
+> +
+> +static const struct of_device_id tegra_ahci_of_match[] = {
+> +	{ .compatible = "nvidia,tegra124-ahci" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, tegra_ahci_of_match);
+> +
+> +static int tegra_ahci_probe(struct platform_device *pdev)
+> +{
+> +	struct ahci_host_priv *hpriv;
+> +	struct tegra_ahci_priv *tegra;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	hpriv = ahci_platform_get_resources(pdev);
+> +	if (IS_ERR(hpriv))
+> +		return PTR_ERR(hpriv);
+> +
+> +	tegra = devm_kzalloc(&pdev->dev, sizeof(*tegra), GFP_KERNEL);
+> +	if (!tegra)
+> +		return -ENOMEM;
+> +
+> +	hpriv->plat_data = tegra;
+> +
+> +	tegra->pdev = pdev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	tegra->sata_regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(tegra->sata_regs))
+> +		return PTR_ERR(tegra->sata_regs);
+> +
+> +	tegra->sata_rst = devm_reset_control_get(&pdev->dev, "sata");
+> +	if (IS_ERR(tegra->sata_rst)) {
+> +		dev_err(&pdev->dev, "Failed to get sata reset\n");
+> +		return PTR_ERR(tegra->sata_rst);
+> +	}
+> +
+> +	tegra->sata_oob_rst = devm_reset_control_get(&pdev->dev, "sata-oob");
+> +	if (IS_ERR(tegra->sata_oob_rst)) {
+> +		dev_err(&pdev->dev, "Failed to get sata-oob reset\n");
+> +		return PTR_ERR(tegra->sata_oob_rst);
+> +	}
+> +
+> +	tegra->sata_cold_rst = devm_reset_control_get(&pdev->dev, "sata-cold");
+> +	if (IS_ERR(tegra->sata_cold_rst)) {
+> +		dev_err(&pdev->dev, "Failed to get sata-cold reset\n");
+> +		return PTR_ERR(tegra->sata_cold_rst);
+> +	}
+> +
+> +	if (!hpriv->clks[AHCI_CLK_PLL_E])
+> +		return -EPROBE_DEFER;
+> +
+> +	tegra->supplies[0].supply = "avdd";
+> +	tegra->supplies[1].supply = "hvdd";
+> +	tegra->supplies[2].supply = "vddio";
+> +	tegra->supplies[3].supply = "target-5v";
+> +	tegra->supplies[4].supply = "target-12v";
+> +
+> +	ret = devm_regulator_bulk_get(&pdev->dev, ARRAY_SIZE(tegra->supplies),
+> +				      tegra->supplies);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Failed to get regulators\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = phy_init(hpriv->phy);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = tegra_ahci_controller_init(hpriv);
+> +	if (ret)
+> +		goto exit_phy;
+> +
+> +	ret = ahci_platform_init_host(pdev, hpriv, &ahci_tegra_port_info,
+> +				      0, 0, 0);
+> +	if (ret)
+> +		goto deinit_controller;
+> +
+> +	return 0;
+> +
+> +deinit_controller:
+> +	tegra_ahci_controller_deinit(hpriv);
+> +
+> +exit_phy:
+> +	phy_exit(hpriv->phy);
+> +
+> +	return ret;
+> +};
+> +
+> +static struct platform_driver tegra_ahci_driver = {
+> +	.probe = tegra_ahci_probe,
+> +	.remove = ata_platform_remove_one,
+> +	.driver = {
+> +		.name = "tegra-ahci",
+> +		.of_match_table = tegra_ahci_of_match,
+> +	},
+> +	/* LP0 suspend support not implemented */
+> +};
+> +module_platform_driver(tegra_ahci_driver);
+> +
+> +MODULE_AUTHOR("Mikko Perttunen <mperttunen@nvidia.com>");
+> +MODULE_DESCRIPTION("Tegra124 AHCI SATA driver");
+> +MODULE_LICENSE("GPL v2");
+> 
+
+Thanks & Regards,
+
+Hans
