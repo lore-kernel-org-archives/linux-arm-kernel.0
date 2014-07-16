@@ -1,60 +1,64 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 16 Jul 2014 13:56:20 -0700
-Subject: [PATCH 2/7] seccomp: Refactor the filter callback and the API
-In-Reply-To: <CAGXu5jK0v=dtPNY4Y2m7D01peeNoBSDq8zowgLu_rjZe41=eUg@mail.gmail.com>
-References: <cover.1405452484.git.luto@amacapital.net>
- <4f153feea35430104d6d1a7c83805fccbffdf089.1405452484.git.luto@amacapital.net>
- <CAGXu5jK0v=dtPNY4Y2m7D01peeNoBSDq8zowgLu_rjZe41=eUg@mail.gmail.com>
-Message-ID: <CALCETrW7UEBTprnJdca0X1Vd-bstyQi1LK9GbfUzdr8FFWze9w@mail.gmail.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Wed, 16 Jul 2014 14:03:56 -0700
+Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu-bqXKoy-G00cWPJES=6A_ofu=cfBOsD0ZriHa4AGxG0A@mail.gmail.com>
+References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405522297.25580.72.camel@deneb.redhat.com>
+ <20140716155345.GB30313@leverpostej>
+ <1405539927.25580.74.camel@deneb.redhat.com>
+ <CAKv+Gu-bqXKoy-G00cWPJES=6A_ofu=cfBOsD0ZriHa4AGxG0A@mail.gmail.com>
+Message-ID: <CAFECyb8j2dg59EST+60Q2WrL6JK9CmGB1HzHxf2iHkTLmRsP5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 1:12 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Jul 15, 2014 at 12:32 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> The reason I did this is to add a seccomp API that will be usable
->> for an x86 fast path.  The x86 entry code needs to use a rather
->> expensive slow path for a syscall that might be visible to things
->> like ptrace.  By splitting seccomp into two phases, we can check
->> whether we need the slow path and then use the fast path in if the
->> filter allows the syscall or just returns some errno.
+On Wed, Jul 16, 2014 at 1:38 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 16 July 2014 21:45, Mark Salter <msalter@redhat.com> wrote:
+>> On Wed, 2014-07-16 at 16:53 +0100, Mark Rutland wrote:
+>>> On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
+>>> > On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
+>>> > > After the EFI stub has done its business, it jumps into the kernel by branching
+>>> > > to offset #0 of the loaded Image, which is where it expects to find the header
+>>> > > containing a 'branch to stext' instruction.
+>>> > >
+>>> > > However, the header is not covered by any PE/COFF section, so the header may
+>>> > > not actually be loaded at the expected offset. So instead, jump to 'stext'
+>>> > > directly, which is at the base of the PE/COFF .text section, by supplying a
+>>> > > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
+>>> > > stext into the Image. Also replace other open coded calculations of the same
+>>> > > value with a reference to 'stext_offset'
+>>> >
+>>> > Have you actually seen a situation where the header isn't there?
+>>> > Isn't the kernel header actually part of the pe/coff file and
+>>> > firmware loads the whole file into RAM?
+>>>
+>>> From my understanding of Ard's earlier comments, this part isn't
+>>> guaranteed per the UEFI spec.
+>>>
+>>> I would rather we weren't relying on implementation details.
+>>>
 >>
->> As a side effect, I think the new code is much easier to understand
->> than the old code.
+>> Could be. I didn't see anything about it in the UEFI spec, but I
+>> probably wasn't exhaustive in my search. In any case, there's at
+>> least one other place broken if the kernel header isn't included
+>> in the loaded image.
+>>
 >
-> I'd agree. The #idefs got a little weirder, but the actual code flow
-> was much easier to read. I wonder if "phase1" and "phase2" should be
-> renamed "pretrace" and "tracing" or something more meaningful? Or
-> "fast" and "slow"?
+> I have not been able to find anything in the PE/COFF documents that
+> tells you what to put in memory areas that are not covered by a
+> section. Expecting the header to be there is indeed relying on an
+> implementation detail, which seems risky.
+> And indeed, if there are any other (non EFI related) uses of header
+> fields in the kernel, it would be good to have a look at those well,
 
-Queue the bikeshedding :)
+I looked through the UEFI spec, and didn't see anything really helpful
+in this regard.  However the "ImageBase" address that is returned
+by the loadedImageProtocol is the address of the header, and this
+address is aligned as specified in the PE/COFF header.  It would
+be strange to specify the alignment of something that is not expected
+to be loaded.
+It's probably worth asking on the edk2 list regarding what the UEFI
+specification requires.
 
-I like "phase1" and "phase2" because it makes it clear that phase1 has
-to come first.  But I'd be amenable to counterarguments.
-
->
->> This has one user-visible effect: the audit record written for
->> SECCOMP_RET_TRACE is now a simple indication that SECCOMP_RET_TRACE
->> happened.  It used to depend in a complicated way on what the tracer
->> did.  I couldn't make much sense of it.
->
-> I think this change is okay. The only way to get the audit record to
-> report SIGSYS before was to have an additional signal come in and kill
-> it while the tracer was working on it. Which is confusing too. I like
-> this way better.
-
-Thanks :)
-
---Andy
-
->
-> -Kees
->
-> --
-> Kees Cook
-> Chrome OS Security
-
-
-
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
+Roy
