@@ -1,79 +1,39 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 16 Jul 2014 18:20:29 +0200
-Subject: [PATCH 2/4] arm64: use generic dma-contiguous.h
-In-Reply-To: <1405525892-60383-3-git-send-email-Zubair.Kakakhel@imgtec.com>
-References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
- <1405525892-60383-3-git-send-email-Zubair.Kakakhel@imgtec.com>
-Message-ID: <xa1td2d5b7hu.fsf@mina86.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 16 Jul 2014 12:29:21 -0400
+Subject: Function Profiler broken on today's linux-next
+In-Reply-To: <20140716162328.GJ1365@saruman.home>
+References: <20140716162328.GJ1365@saruman.home>
+Message-ID: <20140716122921.71b118a9@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16 2014, Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com> wrote:
-> dma-contiguous.h is now in asm-generic. Use that to avoid code
-> repetition in arm64.
->
-> Signed-off-by: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
+On Wed, 16 Jul 2014 11:23:28 -0500
+Felipe Balbi <balbi@ti.com> wrote:
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> Hi folks,
+> 
+> I was trying to use Kernel Function Profiler to figure out why my
+> driver's IRQ handler is taking so much CPU time but to my surprise,
+> whenever I try to trace anything, I get a "Unable to handle kernel
+> paging request at virtual address XXXX" error.
+> 
+> Is anybody else seen that or did I screw up my Kernel config ?
 
-> ---
->  arch/arm64/include/asm/Kbuild           |  1 +
->  arch/arm64/include/asm/dma-contiguous.h | 28 ----------------------------
->  2 files changed, 1 insertion(+), 28 deletions(-)
->  delete mode 100644 arch/arm64/include/asm/dma-contiguous.h
->
-> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-> index 0b3fcf8..92bf7cb 100644
-> --- a/arch/arm64/include/asm/Kbuild
-> +++ b/arch/arm64/include/asm/Kbuild
-> @@ -9,6 +9,7 @@ generic-y += current.h
->  generic-y += delay.h
->  generic-y += div64.h
->  generic-y += dma.h
-> +generic-y += dma-contiguous.h
->  generic-y += emergency-restart.h
->  generic-y += early_ioremap.h
->  generic-y += errno.h
-> diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
-> deleted file mode 100644
-> index 14c4c0c..0000000
-> --- a/arch/arm64/include/asm/dma-contiguous.h
-> +++ /dev/null
-> @@ -1,28 +0,0 @@
-> -/*
-> - * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 and
-> - * only version 2 as published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - */
-> -
-> -#ifndef _ASM_DMA_CONTIGUOUS_H
-> -#define _ASM_DMA_CONTIGUOUS_H
-> -
-> -#ifdef __KERNEL__
-> -#ifdef CONFIG_DMA_CMA
-> -
-> -#include <linux/types.h>
-> -
-> -static inline void
-> -dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
-> -
-> -#endif
-> -#endif
-> -
-> -#endif
-> -- 
-> 1.9.1
->
+No, it's probably my fault. The ftrace infrastructure is going through
+an overhaul and some dramatic changes are happening. Although it has
+passed all my tests, I can't cover everyone's configs and use cases.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+Please send me your config and the steps you did to enable function
+profiling. This is x86 correct? Other archs are already known to be
+broken and I'm working on fixing them now.
+
+-- Steve
+
+
+
+> 
+> cheers
+> 
+> ps: I have tried tracing a few different drivers and they all trigger
+> the same problem.
+> 
