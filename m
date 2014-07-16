@@ -1,38 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Jul 2014 09:08:24 +0900
-Subject: [PATCH 2/2] PCI: rcar: Fix GPL v2 license string typo
-In-Reply-To: <20140715225652.22578.86359.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20140715225503.22578.32174.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20140715225652.22578.86359.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20140716000824.GA25244@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Jul 2014 01:08:48 +0100
+Subject: [PATCH v4 3/3] regulator: qcom-rpm: Regulator driver for the
+ Qualcomm RPM
+In-Reply-To: <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20140716000848.GG17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 04:56:52PM -0600, Bjorn Helgaas wrote:
-> The proper MODULE_LICENSE() string for the GPL v2 is "GPL v2", not "GPLv2".
-> 
-> Based-on-work-by: Thierry Reding <treding@nvidia.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+On Tue, Jul 15, 2014 at 04:00:41PM -0700, Bjorn Andersson wrote:
+> Driver for regulators exposed by the Resource Power Manager (RPM) found
+> in Qualcomm 8660, 8960 and 8064 based devices.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-> ---
->  drivers/pci/host/pcie-rcar.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-> index f7d3de32c9a0..a393cc60b5a3 100644
-> --- a/drivers/pci/host/pcie-rcar.c
-> +++ b/drivers/pci/host/pcie-rcar.c
-> @@ -1003,4 +1003,4 @@ module_platform_driver(rcar_pcie_driver);
->  
->  MODULE_AUTHOR("Phil Edworthy <phil.edworthy@renesas.com>");
->  MODULE_DESCRIPTION("Renesas R-Car PCIe driver");
-> -MODULE_LICENSE("GPLv2");
-> +MODULE_LICENSE("GPL v2");
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I have patch 3/3 here but no cover or other patches - what is the story
+there?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/506747ca/attachment.sig>
