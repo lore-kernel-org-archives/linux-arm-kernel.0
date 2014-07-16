@@ -1,85 +1,222 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Wed, 16 Jul 2014 15:28:09 +0530
-Subject: [PATCH v5 2/2] can: m_can: add Bosch M_CAN controller support
-In-Reply-To: <1405503050-16796-2-git-send-email-b29396@freescale.com>
-References: <1405503050-16796-1-git-send-email-b29396@freescale.com>
- <1405503050-16796-2-git-send-email-b29396@freescale.com>
-Message-ID: <53C64CB1.3050204@gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 16 Jul 2014 12:04:32 +0200
+Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
+In-Reply-To: <1404496099-26708-12-git-send-email-t.figa@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-12-git-send-email-t.figa@samsung.com>
+Message-ID: <1405505072.4408.17.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 03:00 PM, Dong Aisheng wrote:
-> The patch adds the basic CAN TX/RX function support for Bosch M_CAN controller.
-> For TX, only one dedicated tx buffer is used for sending data.
-> For RX, RXFIFO 0 is used for receiving data to avoid overflow.
-> Rx FIFO 1 and Rx Buffers are not used currently, as well as Tx Event FIFO.
->
-> Due to the message ram can be shared by multi m_can instances
-> and the fifo element is configurable which is SoC dependant,
-> the design is to parse the message ram related configuration data from device
-> tree rather than hardcode define it in driver which can make the message
-> ram sharing fully transparent to M_CAN controller driver,
-> then we can gain better driver maintainability and future features upgrade.
->
-> M_CAN also supports CANFD protocol features like data payload up to 64 bytes
-> and bitrate switch at runtime, however, this patch still does not add the
-> support for these features.
->
-> Cc: Wolfgang Grandegger <wg@grandegger.com>
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
-> Cc: Varka Bhadram <varkabhadram@gmail.com>
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
+> Since all in-tree boards have been moved to device tree, we can now drop
+> legacy code and make mach-s5pv210 DT-only. This patch does it.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 > ---
-> changes since v4:
-> some minor changes:
-> - introduce m_can_fifo_write and is_lec_err functin
-> - define macro M_CAN_FIFO_XXX for FIFO
-> - move m_can_of_table before platform_driver
-> - a few indent fix
->
-> Changes since v3:
-> A few minor changes:
-> - use the updated name of bosch,mram-cfg
-> - remove .owner = THIS_MODULE
-> - add a line comment for mram_cfg structure
->
-> Changes since v2:
-> - fix checkpatch warnings
-> - handle CAN_CTRLMODE_BERR_REPORTING properly that disable LEC error
->    interrupts (Bus error) if no CAN_CTRLMODE_BERR_REPORTING.
-> - introduce struct mram_cfg array to store message ram configuration data
->    for each fifo
-> - fix txb offset calculate wrong issue(should not plus mram_off again)
-> - check return for clk_prepare_enable
-> - split doc part into a separate patch
->
-> Changes since v1:
-> Addressed all comments from Mark Rutland, Hartkopp and Marc Kleine-Budde
-> - merge three patches into one
-> - create directory drivers/net/can/m_can
-> - improve binding doc
-> - make sure using valid pointer before netif_receive_skb(skb)
-> - remove debug info a bit
-> - let the stats are updated even if alloc_can_err_skb() fails
-> - other small fixes
-> ---
->   drivers/net/can/Kconfig        |    2 +
->   drivers/net/can/Makefile       |    1 +
->   drivers/net/can/m_can/Kconfig  |    4 +
->   drivers/net/can/m_can/Makefile |    7 +
->   drivers/net/can/m_can/m_can.c  | 1202 ++++++++++++++++++++++++++++++++++++++++
->   5 files changed, 1216 insertions(+), 0 deletions(-)
->   create mode 100644 drivers/net/can/m_can/Kconfig
->   create mode 100644 drivers/net/can/m_can/Makefile
->   create mode 100644 drivers/net/can/m_can/m_can.c
->
->
-This series addressed all of my comments ...Thanks  :-)
 
-Reviewed-by: Varka Bhadram <varkabhadram@gmail.com>
+This patch showed up in next-20140716 too.
 
--- 
-Regards,
-Varka Bhadram.
+>[...]
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index ed492cf..d6d0f92 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -19,181 +19,8 @@ config CPU_S5PV210
+>  	help
+>  	  Enable S5PV210 CPU support
+>  
+> -config S5PV210_SETUP_I2C1
+> -	bool
+> -	help
+> -	  Common setup code for i2c bus 1.
+> -
+> -config S5PV210_SETUP_I2C2
+> -	bool
+> -	help
+> -	  Common setup code for i2c bus 2.
+> -
+> -config S5PV210_SETUP_IDE
+> -	bool
+> -	help
+> -	  Common setup code for S5PV210 IDE GPIO configurations
+> -
+> -config S5PV210_SETUP_FB_24BPP
+> -	bool
+> -	help
+> -          Common setup code for S5PV210 with an 24bpp RGB display helper.
+> -
+> -config S5PV210_SETUP_KEYPAD
+> -	bool
+> -	help
+> -	  Common setup code for keypad.
+> -
+> -config S5PV210_SETUP_SDHCI
+> -        bool
+> -        select S5PV210_SETUP_SDHCI_GPIO
+> -        help
+> -          Internal helper functions for S5PV210 based SDHCI systems
+> -
+> -config S5PV210_SETUP_SDHCI_GPIO
+> -	bool
+> -	help
+> -	  Common setup code for SDHCI gpio.
+> -
+> -config S5PV210_SETUP_FIMC
+> -	bool
+> -	help
+> -	  Common setup code for the camera interfaces.
+> -
+> -config S5PV210_SETUP_SPI
+> -	bool
+> -	help
+> -	  Common setup code for SPI GPIO configurations.
+> -
+> -config S5PV210_SETUP_USB_PHY
+> -	bool
+> -	help
+> -	  Common setup code for USB PHY controller
+> -
+> -menu "S5PC110 Machines"
+> -
+> -config MACH_AQUILA
+> -	bool "Aquila"
+> -	select CPU_S5PV210
+> -	select S3C_DEV_FB
+> -	select S3C_DEV_HSMMC
+> -	select S3C_DEV_HSMMC1
+> -	select S3C_DEV_HSMMC2
+> -	select S5PV210_SETUP_FB_24BPP
+> -	select S5PV210_SETUP_SDHCI
+> -	select S5PV210_SETUP_USB_PHY
+> -	select S5P_DEV_FIMC0
+> -	select S5P_DEV_FIMC1
+> -	select S5P_DEV_FIMC2
+> -	select S5P_DEV_ONENAND
+> -	help
+> -	  Machine support for the Samsung Aquila target based on S5PC110 SoC
+> -
+
+This symbol is still referenced in sound/soc/samsung/Kconfig.
+
+> -config MACH_GONI
+> -	bool "GONI"
+> -	select CPU_S5PV210
+> -	select S3C_DEV_FB
+> -	select S3C_DEV_HSMMC
+> -	select S3C_DEV_HSMMC1
+> -	select S3C_DEV_HSMMC2
+> -	select S3C_DEV_I2C1
+> -	select S3C_DEV_I2C2
+> -	select S3C_DEV_USB_HSOTG
+> -	select S5PV210_SETUP_FB_24BPP
+> -	select S5PV210_SETUP_FIMC
+> -	select S5PV210_SETUP_I2C1
+> -	select S5PV210_SETUP_I2C2
+> -	select S5PV210_SETUP_KEYPAD
+> -	select S5PV210_SETUP_SDHCI
+> -	select S5PV210_SETUP_USB_PHY
+> -	select S5P_DEV_FIMC0
+> -	select S5P_DEV_FIMC1
+> -	select S5P_DEV_FIMC2
+> -	select S5P_DEV_MFC
+> -	select S5P_DEV_ONENAND
+> -	select S5P_DEV_TV
+> -	select S5P_GPIO_INT
+> -	select SAMSUNG_DEV_KEYPAD
+> -	help
+> -	  Machine support for Samsung GONI board
+> -	  S5PC110(MCP) is one of package option of S5PV210
+
+Ditto.
+
+> -config MACH_SMDKC110
+> -	bool "SMDKC110"
+> -	select CPU_S5PV210
+> -	select S3C_DEV_I2C1
+> -	select S3C_DEV_I2C2
+> -	select S3C_DEV_RTC
+> -	select S3C_DEV_WDT
+> -	select S5PV210_SETUP_I2C1
+> -	select S5PV210_SETUP_I2C2
+> -	select S5PV210_SETUP_IDE
+> -	select S5P_DEV_FIMC0
+> -	select S5P_DEV_FIMC1
+> -	select S5P_DEV_FIMC2
+> -	select S5P_DEV_MFC
+> -	select SAMSUNG_DEV_IDE
+> -	help
+> -	  Machine support for Samsung SMDKC110
+> -	  S5PC110(MCP) is one of package option of S5PV210
+
+Ditto.
+
+> -endmenu
+> -
+>  menu "S5PV210 Machines"
+>  
+> -config MACH_SMDKV210
+> -	bool "SMDKV210"
+> -	select CPU_S5PV210
+> -	select S3C_DEV_FB
+> -	select S3C_DEV_HSMMC
+> -	select S3C_DEV_HSMMC1
+> -	select S3C_DEV_HSMMC2
+> -	select S3C_DEV_HSMMC3
+> -	select S3C_DEV_I2C1
+> -	select S3C_DEV_I2C2
+> -	select S3C_DEV_RTC
+> -	select S3C_DEV_USB_HSOTG
+> -	select S3C_DEV_WDT
+> -	select S5PV210_SETUP_FB_24BPP
+> -	select S5PV210_SETUP_I2C1
+> -	select S5PV210_SETUP_I2C2
+> -	select S5PV210_SETUP_IDE
+> -	select S5PV210_SETUP_KEYPAD
+> -	select S5PV210_SETUP_SDHCI
+> -	select S5PV210_SETUP_USB_PHY
+> -	select S5P_DEV_FIMC0
+> -	select S5P_DEV_FIMC1
+> -	select S5P_DEV_FIMC2
+> -	select S5P_DEV_JPEG
+> -	select S5P_DEV_MFC
+> -	select SAMSUNG_DEV_ADC
+> -	select SAMSUNG_DEV_BACKLIGHT
+> -	select SAMSUNG_DEV_IDE
+> -	select SAMSUNG_DEV_KEYPAD
+> -	select SAMSUNG_DEV_PWM
+> -	select SAMSUNG_DEV_TS
+> -	help
+> -	  Machine support for Samsung SMDKV210
+> -
+
+Ditto.
+
+> -config MACH_TORBRECK
+> -	bool "Torbreck"
+> -	select ARCH_SPARSEMEM_ENABLE
+> -	select CPU_S5PV210
+> -	select S3C_DEV_HSMMC
+> -	select S3C_DEV_HSMMC1
+> -	select S3C_DEV_HSMMC2
+> -	select S3C_DEV_HSMMC3
+> -	select S3C_DEV_I2C1
+> -	select S3C_DEV_I2C2
+> -	select S3C_DEV_RTC
+> -	select S3C_DEV_WDT
+> -	select S5PV210_SETUP_I2C1
+> -	select S5PV210_SETUP_I2C2
+> -	select S5PV210_SETUP_SDHCI
+> -	select SAMSUNG_DEV_IDE
+> -	help
+> -	  Machine support for aESOP Torbreck
+> -
+>  config MACH_S5PV210_DT
+>  	bool "Samsung S5PV210/S5PC110 machine using Device Tree"
+>  	select CLKSRC_OF
+
+I assume one or more patches to remove the references to these symbols
+in sound/soc/samsung/Kconfig are pending. Is that correct?
+
+
+Paul Bolle
