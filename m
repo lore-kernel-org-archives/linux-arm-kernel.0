@@ -1,12 +1,12 @@
 From: panpan1.liu@samsung.com (panpan liu)
-Date: Wed, 16 Jul 2014 09:46:34 +0800
+Date: Wed, 16 Jul 2014 09:51:33 +0800
 Subject: [PATCH] s5p-mfc: limit the size of the CPB
-Message-ID: <1405475194-3116-1-git-send-email-panpan1.liu@samsung.com>
+Message-ID: <1405475493-3200-1-git-send-email-panpan1.liu@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The CPB size is limited by the hardware. Add this limit to the s_fmt.
- space required before the open parenthesis '('
+
 Signed-off-by: panpan liu <panpan1.liu@samsung.com>
 ---
  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |    9 ++++++---
