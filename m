@@ -1,86 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 16 Jul 2014 23:13:22 +0200
-Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <1405544636.25580.83.camel@deneb.redhat.com>
-References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405522297.25580.72.camel@deneb.redhat.com>
- <20140716155345.GB30313@leverpostej>
- <1405539927.25580.74.camel@deneb.redhat.com>
- <CAKv+Gu-bqXKoy-G00cWPJES=6A_ofu=cfBOsD0ZriHa4AGxG0A@mail.gmail.com>
- <1405544636.25580.83.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu8kvU8ndeG2vF5HqRhjK+_F=8D52eabHzy++nTHt_pAYQ@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 16 Jul 2014 14:15:44 -0700
+Subject: [PATCH 5/7] x86: Split syscall_trace_enter into two phases
+In-Reply-To: <CAGXu5jJornzMJjyPXVZB_eYi-FRet=bXcJWJDa1vnB_oU9ZA_Q@mail.gmail.com>
+References: <cover.1405452484.git.luto@amacapital.net>
+ <bd4e2efb7cd97f2bf9d4f1e2065f16c9091d799a.1405452484.git.luto@amacapital.net>
+ <CAGXu5jJornzMJjyPXVZB_eYi-FRet=bXcJWJDa1vnB_oU9ZA_Q@mail.gmail.com>
+Message-ID: <CALCETrWuWxZANoKAR=FG55EOHtzvTHmc3euMdtf8yfibtK-QYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 23:03, Mark Salter <msalter@redhat.com> wrote:
-> On Wed, 2014-07-16 at 22:38 +0200, Ard Biesheuvel wrote:
->> On 16 July 2014 21:45, Mark Salter <msalter@redhat.com> wrote:
->> > On Wed, 2014-07-16 at 16:53 +0100, Mark Rutland wrote:
->> >> On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
->> >> > On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
->> >> > > After the EFI stub has done its business, it jumps into the kernel by branching
->> >> > > to offset #0 of the loaded Image, which is where it expects to find the header
->> >> > > containing a 'branch to stext' instruction.
->> >> > >
->> >> > > However, the header is not covered by any PE/COFF section, so the header may
->> >> > > not actually be loaded at the expected offset. So instead, jump to 'stext'
->> >> > > directly, which is at the base of the PE/COFF .text section, by supplying a
->> >> > > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
->> >> > > stext into the Image. Also replace other open coded calculations of the same
->> >> > > value with a reference to 'stext_offset'
->> >> >
->> >> > Have you actually seen a situation where the header isn't there?
->> >> > Isn't the kernel header actually part of the pe/coff file and
->> >> > firmware loads the whole file into RAM?
->> >>
->> >> From my understanding of Ard's earlier comments, this part isn't
->> >> guaranteed per the UEFI spec.
->> >>
->> >> I would rather we weren't relying on implementation details.
->> >>
->> >
->> > Could be. I didn't see anything about it in the UEFI spec, but I
->> > probably wasn't exhaustive in my search. In any case, there's at
->> > least one other place broken if the kernel header isn't included
->> > in the loaded image.
->> >
+On Wed, Jul 16, 2014 at 1:21 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Tue, Jul 15, 2014 at 12:32 PM, Andy Lutomirski <luto@amacapital.net> wrote:
 >>
->> I have not been able to find anything in the PE/COFF documents that
->> tells you what to put in memory areas that are not covered by a
->> section. Expecting the header to be there is indeed relying on an
->> implementation detail, which seems risky.
->> And indeed, if there are any other (non EFI related) uses of header
->> fields in the kernel, it would be good to have a look at those well,
+>> +
+>> +               ret = seccomp_phase1(&sd);
+>> +               if (ret == SECCOMP_PHASE1_SKIP) {
+>> +                       regs->orig_ax = -ENOSYS;
 >
-> I think we need to come up with a loader which does load an image
-> without kernel header so that we can test. Otherwise, we'll probably
-> end up with buggy code anyway. The stub code assumes the the loaded
-> image pointed to by the system table is the whole image. Seems like
-> we'd need to add code to determine if it is whole kernel image or
-> image without initial header. Stub would have to handle both cases.
-> For instance, one case would want image placed at 2MiB+TEXT_OFFSET,
-> other case would want 2MiB+TEXT_OFFSET+sizeof(kernel header).
->
+> Before, seccomp didn't touch orig_ax on a skip. I don't see any
+> problem with this, and it's probably more clear this way, but are you
+> sure there aren't unexpected side-effects from this?
 
-No, this has nothing to do with misaligned data.
+It's necessary to cause the syscall to be skipped -- see syscall_trace_enter.
 
-The PE/COFF .text section does not start at virtual offset #0 but at
-virtual offset 'stext - efi_head'.
-In other words, there is a hole in the virtual image where the header
-is supposed to be.
-So if there is no PE/COFF section describing what data should be put
-at offset #0 by the loader, we can't assume the header is there, even
-if ImageBase does start at #0
+That being said, setting it to -ENOSYS is nonsense and probably
+confused you at least as much as it confused me.  It should be
+regs->orig_ax = -1.
 
-> Am I just missing something here? Your "arm64/efi: efistub: get text
-> offset and image size from the Image header" patch makes no sense if we
-> can't rely on header being there.
->
-
-No, you're right, I reversed my position after doing that work and
-digging into the details. I will drop those patches and proposed this
-one instead.
-
--- 
-Ard.
+--Andy
