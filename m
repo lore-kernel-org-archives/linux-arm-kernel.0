@@ -1,70 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Jul 2014 15:25:50 +0200
-Subject: [PATCH v3] ARM: exynos4: hotplug: Fix CPU idle clock down after
- CPU off
-In-Reply-To: <53C678B5.7080304@samsung.com>
-References: <1405512467-27269-1-git-send-email-k.kozlowski@samsung.com>
- <53C678B5.7080304@samsung.com>
-Message-ID: <1405517150.15590.2.camel@AMDC1943>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Jul 2014 14:27:08 +0100
+Subject: [PATCH] arm64: Move struct stat64 to uapi.
+In-Reply-To: <1405420413.9794.10.camel@kazak.uk.xensource.com>
+References: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
+ <20140715082040.GB24269@arm.com>
+ <1405420413.9794.10.camel@kazak.uk.xensource.com>
+Message-ID: <20140716132708.GP29414@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2014-07-16 at 15:05 +0200, Tomasz Figa wrote:
-> Hi Krzysztof,
+On Tue, Jul 15, 2014 at 11:33:33AM +0100, Ian Campbell wrote:
+> On Tue, 2014-07-15 at 09:20 +0100, Will Deacon wrote:
+> > Hmm, but struct kstat is defined in linux/stat.h so I'm not sure why this is
+> > arm64-specific. linux/fs.h includes that on line 10.
 > 
-> On 16.07.2014 14:07, Krzysztof Kozlowski wrote:
+> That include won't do anything because we already got here via
+> linux/stat.h (6th line of "In file included from" above), so the guard
+> has already been defined. IOW there is a loop in the includes, which
+> starts before kstat is struct defined:
 > 
-> [snip]
+> linux/stat.h -> asm/stat.h -> arm/compat.h -> linux/ptrace.h ->
+> linux_pidnamespace.h -> linux/mm.h -> linux/fs.h
 > 
-> > +#ifdef CONFIG_SMP
-> > +extern void exynos_clear_delayed_reset_assertion(u32 core_id);
-> > +#endif
+> The last link here is added by aufs patches, but all the other arches
+> are ok with this because none of them have asm/stat.h, they only have
+> uapi/asm/stat.h.
 > 
-> Is the ifdef really needed? The only difference it makes if the function
-> is used but not compiled in is that with it the compilation will fail,
-> while without it the kernel won't link.
+> The issue ultimately is down to the asm/stat.h -> asm/compat.h link
+> though I think so an alternative fix could be to switch to a different
+> set of types for the existing definition and ditching asm/compat.h from
+> asm/stat.h. I don't think that's the correct fix though.
 
-Hmmm... I'll take another approach - just merge hotplug.c into
-platsmp.c.
+Perhaps we could split asm/compat.h into asm/compat-types.h containing just
+the type definitions, then asm/compat.h can include that as well as defining
+any functions and macros.
 
-> 
-> > +
-> >  extern void exynos_cpu_resume(void);
-> >  
-> >  extern struct smp_operations exynos_smp_ops;
-> 
-> [snip]
-> 
-> > +/*
-> > + * Clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-> > + * during hot-unplugging CPUx.
-> > + *
-> > + * It won't harm if this is called during first boot of secondary CPU.
-> > + *
-> > + * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION so the CPU idle
-> > + * clock down feature could properly detect global idle state when
-> > + * CPUx is off.
-> > + */
-> > +void exynos_clear_delayed_reset_assertion(u32 core_id)
-> > +{
-> > +	if (soc_is_exynos4()) {
-> > +		unsigned int tmp;
-> > +
-> > +		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-> > +		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-> > +		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-> > +	}
-> > +}
-> 
-> The idea to make this a helper function is quite nice, but maybe it
-> could be extended into exynos_set_delayed_reset_assertion() and disable
-> or enable delayed assertion depending on another argument?
+Then asm/stat.h just needs to include asm/compat-types.h to avoid the
+issue.
 
-Sure, I'll change it.
-
-Best regards,
-Krzysztof
-
+> > Can you help me unconfuse myself, please?
 > 
-> Best regards,
-> Tomasz
+> I hope I've managed to reduce rather than increase the confusion ;-)
+
+I think so, but it hurt :)
+
+Will
