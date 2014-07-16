@@ -1,239 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Jul 2014 17:04:50 +0100
-Subject: [PATCH RFCv3 01/14] arm64: introduce
- aarch64_insn_gen_comp_branch_imm()
-In-Reply-To: <1405405512-4423-2-git-send-email-zlim.lnx@gmail.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <1405405512-4423-2-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20140716160450.GT29414@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 16 Jul 2014 11:06:14 -0500
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <53C6A050.2050409@linutronix.de>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
+ <20140716151604.GG1365@saruman.home>
+ <53C6A050.2050409@linutronix.de>
+Message-ID: <20140716160614.GI1365@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 07:24:59AM +0100, Zi Shen Lim wrote:
-> Introduce function to generate compare & branch (immediate)
-> instructions.
+Hi,
+
+On Wed, Jul 16, 2014 at 05:54:56PM +0200, Sebastian Andrzej Siewior wrote:
+> On 07/16/2014 05:16 PM, Felipe Balbi wrote:
+> > Hi,
 > 
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> ---
->  arch/arm64/include/asm/insn.h | 57 ++++++++++++++++++++++++++++
->  arch/arm64/kernel/insn.c      | 86 ++++++++++++++++++++++++++++++++++++++++---
->  2 files changed, 138 insertions(+), 5 deletions(-)
+> Hi Felipe,
 > 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index dc1f73b..a98c495 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -2,6 +2,8 @@
->   * Copyright (C) 2013 Huawei Ltd.
->   * Author: Jiang Liu <liuj97@gmail.com>
->   *
-> + * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-> + *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
-> @@ -67,9 +69,58 @@ enum aarch64_insn_imm_type {
->  	AARCH64_INSN_IMM_MAX
->  };
->  
-> +enum aarch64_insn_register_type {
-> +	AARCH64_INSN_REGTYPE_RT,
-> +};
-> +
-> +enum aarch64_insn_register {
-> +	AARCH64_INSN_REG_0  = 0,
-> +	AARCH64_INSN_REG_1  = 1,
-> +	AARCH64_INSN_REG_2  = 2,
-> +	AARCH64_INSN_REG_3  = 3,
-> +	AARCH64_INSN_REG_4  = 4,
-> +	AARCH64_INSN_REG_5  = 5,
-> +	AARCH64_INSN_REG_6  = 6,
-> +	AARCH64_INSN_REG_7  = 7,
-> +	AARCH64_INSN_REG_8  = 8,
-> +	AARCH64_INSN_REG_9  = 9,
-> +	AARCH64_INSN_REG_10 = 10,
-> +	AARCH64_INSN_REG_11 = 11,
-> +	AARCH64_INSN_REG_12 = 12,
-> +	AARCH64_INSN_REG_13 = 13,
-> +	AARCH64_INSN_REG_14 = 14,
-> +	AARCH64_INSN_REG_15 = 15,
-> +	AARCH64_INSN_REG_16 = 16,
-> +	AARCH64_INSN_REG_17 = 17,
-> +	AARCH64_INSN_REG_18 = 18,
-> +	AARCH64_INSN_REG_19 = 19,
-> +	AARCH64_INSN_REG_20 = 20,
-> +	AARCH64_INSN_REG_21 = 21,
-> +	AARCH64_INSN_REG_22 = 22,
-> +	AARCH64_INSN_REG_23 = 23,
-> +	AARCH64_INSN_REG_24 = 24,
-> +	AARCH64_INSN_REG_25 = 25,
-> +	AARCH64_INSN_REG_26 = 26,
-> +	AARCH64_INSN_REG_27 = 27,
-> +	AARCH64_INSN_REG_28 = 28,
-> +	AARCH64_INSN_REG_29 = 29,
-> +	AARCH64_INSN_REG_FP = 29, /* Frame pointer */
-> +	AARCH64_INSN_REG_30 = 30,
-> +	AARCH64_INSN_REG_LR = 30, /* Link register */
-> +	AARCH64_INSN_REG_ZR = 31, /* Zero: as source register */
-> +	AARCH64_INSN_REG_SP = 31  /* Stack pointer: as load/store base reg */
+> > On Wed, Jul 16, 2014 at 04:45:02PM +0200, Sebastian Andrzej Siewior
+> > wrote:
+> >> @@ -1280,6 +1285,7 @@ static void serial8250_stop_tx(struct
+> >> uart_port *port) struct uart_8250_port *up = container_of(port,
+> >> struct uart_8250_port, port);
+> >> 
+> >> +	pm_runtime_get_sync(port->dev); __stop_tx(up);
+> >> 
+> >> /* @@ -1289,6 +1295,8 @@ static void serial8250_stop_tx(struct
+> >> uart_port *port) up->acr |= UART_ACR_TXDIS; serial_icr_write(up,
+> >> UART_ACR, up->acr); } +	pm_runtime_mark_last_busy(port->dev); +
+> >> pm_runtime_put_autosuspend(port->dev); }
+> >> 
+> >> static void serial8250_start_tx(struct uart_port *port) @@
+> >> -1296,8 +1304,9 @@ static void serial8250_start_tx(struct
+> >> uart_port *port) struct uart_8250_port *up = container_of(port,
+> >> struct uart_8250_port, port);
+> >> 
+> >> +	pm_runtime_get_sync(port->dev); if (up->dma &&
+> >> !serial8250_tx_dma(up)) { -		return; +		goto out; } else if
+> >> (!(up->ier & UART_IER_THRI)) { up->ier |= UART_IER_THRI; 
+> >> serial_port_out(port, UART_IER, up->ier); @@ -1318,6 +1327,9 @@
+> >> static void serial8250_start_tx(struct uart_port *port) up->acr
+> >> &= ~UART_ACR_TXDIS; serial_icr_write(up, UART_ACR, up->acr); } 
+> >> +out: +	pm_runtime_mark_last_busy(port->dev); +
+> >> pm_runtime_put_autosuspend(port->dev);
+> > 
+> > I wonder if you should get_sync() on start_tx() and only 
+> > put_autosuspend() at stop_tx(). I guess the outcome would be
+> > largely the same, no ?
+> 
+> I just opened minicom on ttyS0 and gave a try. start_tx() was invoked
+> each time I pressed a key (sent a character). I haven't seen stop_tx()
+> even after after I closed minicom. I guess stop_tx() is invoked if you
+> switch half-duplex communication.
 
-Can you just #define AARCH64_INSN_REG(x) instead, then have some magic
-values like ARM64_REG_LR which are defined as the appropriate numbers?
+that's bad, I expected stop to be called also after each character.
 
-> +};
-> +
-> +enum aarch64_insn_variant {
-> +	AARCH64_INSN_VARIANT_32BIT,
-> +	AARCH64_INSN_VARIANT_64BIT
-> +};
-> +
->  enum aarch64_insn_branch_type {
->  	AARCH64_INSN_BRANCH_NOLINK,
->  	AARCH64_INSN_BRANCH_LINK,
-> +	AARCH64_INSN_BRANCH_COMP_ZERO,
-> +	AARCH64_INSN_BRANCH_COMP_NONZERO,
->  };
->  
->  #define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
-> @@ -80,6 +131,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
->  
->  __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
->  __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
-> +__AARCH64_INSN_FUNCS(cbz,	0xFE000000, 0x34000000)
-> +__AARCH64_INSN_FUNCS(cbnz,	0xFE000000, 0x35000000)
->  __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
->  __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
->  __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
-> @@ -97,6 +150,10 @@ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
->  				  u32 insn, u64 imm);
->  u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
->  				enum aarch64_insn_branch_type type);
-> +u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
-> +				     enum aarch64_insn_register reg,
-> +				     enum aarch64_insn_variant variant,
-> +				     enum aarch64_insn_branch_type type);
->  u32 aarch64_insn_gen_hint(enum aarch64_insn_hint_op op);
->  u32 aarch64_insn_gen_nop(void);
->  
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 92f3683..d01bb4e 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -2,6 +2,8 @@
->   * Copyright (C) 2013 Huawei Ltd.
->   * Author: Jiang Liu <liuj97@gmail.com>
->   *
-> + * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-> + *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
-> @@ -264,10 +266,36 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
->  	return insn;
->  }
->  
-> -u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
-> -					  enum aarch64_insn_branch_type type)
-> +static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
-> +					u32 insn,
-> +					enum aarch64_insn_register reg)
-> +{
-> +	int shift;
-> +
-> +	if (reg < AARCH64_INSN_REG_0 || reg > AARCH64_INSN_REG_SP) {
-> +		pr_err("%s: unknown register encoding %d\n", __func__, reg);
-> +		return 0;
-> +	}
-> +
-> +	switch (type) {
-> +	case AARCH64_INSN_REGTYPE_RT:
-> +		shift = 0;
-> +		break;
-> +	default:
-> +		pr_err("%s: unknown register type encoding %d\n", __func__,
-> +		       type);
-> +		return 0;
-> +	}
-> +
-> +	insn &= ~(GENMASK(4, 0) << shift);
-> +	insn |= reg << shift;
-> +
-> +	return insn;
-> +}
-> +
-> +static inline long branch_imm_common(unsigned long pc, unsigned long addr,
-> +				     long range)
->  {
-> -	u32 insn;
->  	long offset;
->  
->  	/*
-> @@ -276,13 +304,24 @@ u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
->  	 */
->  	BUG_ON((pc & 0x3) || (addr & 0x3));
->  
-> +	offset = ((long)addr - (long)pc);
-> +	BUG_ON(offset < -range || offset >= range);
-> +
-> +	return offset;
-> +}
-> +
-> +u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
-> +					  enum aarch64_insn_branch_type type)
-> +{
-> +	u32 insn;
-> +	long offset;
-> +
->  	/*
->  	 * B/BL support [-128M, 128M) offset
->  	 * ARM64 virtual address arrangement guarantees all kernel and module
->  	 * texts are within +/-128M.
->  	 */
-> -	offset = ((long)addr - (long)pc);
-> -	BUG_ON(offset < -SZ_128M || offset >= SZ_128M);
-> +	offset = branch_imm_common(pc, addr, SZ_128M);
->  
->  	if (type == AARCH64_INSN_BRANCH_LINK)
->  		insn = aarch64_insn_get_bl_value();
-> @@ -293,6 +332,43 @@ u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
->  					     offset >> 2);
->  }
->  
-> +u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
-> +				     enum aarch64_insn_register reg,
-> +				     enum aarch64_insn_variant variant,
-> +				     enum aarch64_insn_branch_type type)
-> +{
-> +	u32 insn;
-> +	long offset;
-> +
-> +	offset = branch_imm_common(pc, addr, SZ_1M);
-> +
-> +	switch (type) {
-> +	case AARCH64_INSN_BRANCH_COMP_ZERO:
-> +		insn = aarch64_insn_get_cbz_value();
-> +		break;
-> +	case AARCH64_INSN_BRANCH_COMP_NONZERO:
-> +		insn = aarch64_insn_get_cbnz_value();
-> +		break;
-> +	default:
-> +		BUG_ON(1);
-> +	}
-> +
-> +	switch (variant) {
-> +	case AARCH64_INSN_VARIANT_32BIT:
-> +		break;
-> +	case AARCH64_INSN_VARIANT_64BIT:
-> +		insn |= BIT(31);
+> > well, other than in probe and other functions which need to make
+> > sure clocks are on, but it seems unnecessary to enable/disable in
+> > every function.
+> 
+> What do you have in mind? Do you plan to let the uart on while the
+> minicom is attached but is doing nothing? In that case, ->startup() and
+> ->shutdown() should be enough.
 
-FWIW, that bit (31) is referred to as the `SF' bit in the instruction
-encodings (for Sixty-Four). You could have a #define for that to help people
-match up the bitfield, if you like.
+no the idea was to keep it on for as long as it's transferring
+characters and idle it otherwise, if that can't be done easily, then I
+guess your way is the only way.
 
-> +		break;
-> +	default:
-> +		BUG_ON(1);
+> If you want to put the uart off while the port is open but idle then
+> you should cover the callbacks as they are independent of each other.
+> You could receive three ->set_termios() even without a single
+> ->start_tx(). And as far as I understand the whole situation, you need
+> to make sure the UART is "up" while you touch a single register not
+> only sending characters, right?
 
-Is a BUG_ON justifiable here? Is there not a nicer way to fail?
+right, for those cases, you have to get/put around function entry/exit;
+I was just assuming that we didn't have to do that for each and every
+callback.
 
-Will
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/0107e0c4/attachment-0001.sig>
