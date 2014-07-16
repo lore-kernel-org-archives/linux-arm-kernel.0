@@ -1,34 +1,41 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 16 Jul 2014 15:31:54 -0700
-Subject: [PATCH v2] i2c: s3c2410: resume the I2C controller earlier
-In-Reply-To: <20140716173528.GF2759@katana>
-References: <1403654214-25072-1-git-send-email-dianders@chromium.org>
- <20140716173528.GF2759@katana>
-Message-ID: <CAD=FV=W6OCzXOE9gz9qxGggiVeTHiveg7W-1hnF3_-OKy7RLKQ@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 16 Jul 2014 15:35:27 -0700
+Subject: [PATCH] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <16164926.ZsJxe6UV3e@vostro.rjw.lan>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <16164926.ZsJxe6UV3e@vostro.rjw.lan>
+Message-ID: <53C6FE2F.8080408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram,
-
-On Wed, Jul 16, 2014 at 10:35 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Tue, Jun 24, 2014 at 04:56:54PM -0700, Doug Anderson wrote:
->> From: Vincent Palatin <vpalatin@chromium.org>
+On 07/16/2014 03:02 PM, Rafael J. Wysocki wrote:
+> On Wednesday, July 09, 2014 07:37:30 PM Saravana Kannan wrote:
+>> Preliminary patch. Not tested. Just sending out to give an idea of what I'm
+>> looking to do. Expect a lot more simplification when it's done.
 >>
->> When the wake-up is triggered by the PMIC RTC, the RTC driver is trying
->> to read the PMIC interrupt status over I2C and fails because the I2C
->> controller is not resumed yet.
->> Let's resume the I2C controller earlier in the _noirq phase
->> (as other hardwares are doing), so we can properly get the wake-up
->> condition.
->>
->> Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Benefits:
+>> * A lot more simpler code.
+>> * Less stability issues.
+>> * Suspend/resume time would improve.
+>> * Hotplug time would improve.
+>> * Sysfs file permissions would be maintained.
+>> * More policy settings would be maintained across suspend/resume.
+>> * cpufreq stats would be maintained across hotplug for all CPUs.
 >
-> Applied to for-current (because Tomasz said it fixes issues), thanks! If
-> you think the exynos patch of the same style should also be in current,
-> please let me know...
+> One problem.  The real hotplug (when the CPU actually goes away) depends on
+> offline removing all that stuff for it.  How are you going to address that?
 
-Thanks!  I don't think the exynos one needs to go into for-current.
-for-next is enough.  :)
+policy, sysfs and kobj are just SW state inside cpufreq core. So, that 
+shouldn't really affect what happens in HW when the CPU really is 
+hotplugged. Can you please elaborate what you mean?
 
--Doug
+The only thing that this code assumes is that in real hotplug case too, 
+that the /sys/system/devices/cpuX directory doesn't go away. I don't 
+think it does. Does it?
+
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
