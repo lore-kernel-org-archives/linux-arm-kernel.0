@@ -1,45 +1,42 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 16 Jul 2014 10:26:38 +0200
-Subject: [PATCH 3/6] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <20140710062812.GF28884@atomide.com>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
- <1404928177-26554-4-git-send-email-bigeasy@linutronix.de>
- <20140710062812.GF28884@atomide.com>
-Message-ID: <53C6373E.2010408@linutronix.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Jul 2014 11:27:40 +0300
+Subject: [PATCH 2/6] clk: tegra: make tegra_clocks_apply_init_table
+ arch_initcall
+In-Reply-To: <20140716071932.GB7978@ulmo>
+References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
+ <1405437890-6468-3-git-send-email-pdeschrijver@nvidia.com>
+ <20140716071932.GB7978@ulmo>
+Message-ID: <20140716082740.GK23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2014 08:28 AM, Tony Lindgren wrote:
->> --- a/drivers/tty/serial/8250/8250_core.c
->> +++ b/drivers/tty/serial/8250/8250_core.c
->> @@ -571,7 +573,17 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
->>  			serial_out(p, UART_EFR, 0);
->>  			serial_out(p, UART_LCR, 0);
->>  		}
->> +
->> +		if (!device_may_wakeup(p->port.dev)) {
->> +			if (sleep)
->> +				pm_runtime_forbid(p->port.dev);
->> +			else
->> +				pm_runtime_allow(p->port.dev);
->> +		}
->>  	}
->> +out:
->> +	pm_runtime_mark_last_busy(p->port.dev);
->> +	pm_runtime_put_autosuspend(p->port.dev);
->>  }
+On Wed, Jul 16, 2014 at 09:19:33AM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
-> The device_may_wakeup logic here is wrong as I described in the
-> earlier thread. For runtime PM, the wake-up events should be
-> always enabled. So the device_may_wakeup checks should be only
-> done for suspend and resume.
+> On Tue, Jul 15, 2014 at 06:24:32PM +0300, Peter De Schrijver wrote:
+> [...]
+> > diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+> > index d081732..65cde4e 100644
+> > --- a/drivers/clk/tegra/clk.c
+> > +++ b/drivers/clk/tegra/clk.c
+> > @@ -290,10 +290,13 @@ struct clk ** __init tegra_lookup_dt_id(int clk_id,
+> >  
+> >  tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
+> >  
+> > -void __init tegra_clocks_apply_init_table(void)
+> > +static int __init tegra_clocks_apply_init_table(void)
+> >  {
+> >  	if (!tegra_clk_apply_init_table)
+> > -		return;
+> > +		return 0;
+> 
+> Shouldn't this be an error? Or perhaps WARN()? To make sure this gets
 
-Okay. I dropped it from here.
+An arch_initcall will be called for every ARM platform I think? In case
+this gets called on a non-Tegra platform, tegra_clk_apply_init_table will not
+be set and therefore a silent return 0; seems the most appropriate thing to do
+to me?
 
-> 
-> Regards,
-> 
-> Tony
-> 
+Cheers,
 
-Sebastian
+Peter.
