@@ -1,31 +1,44 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 16 Jul 2014 08:44:32 +0800
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <20140715152437.GF1011@kwain>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <CAGnW=BbA3gLdSv8AKkD_ysnYAaN0KoCdVW+wxWPB9zzGCh9+jQ@mail.gmail.com>
- <20140715152437.GF1011@kwain>
-Message-ID: <20140716004431.GB30419@shlinux1.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Jul 2014 09:53:11 +0900
+Subject: [PATCH 13/19] ARM: s5pv210: move debug-macro.S into the common
+ space
+In-Reply-To: <53C5BF24.9030302@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-14-git-send-email-t.figa@samsung.com>
+ <53C5BF24.9030302@samsung.com>
+Message-ID: <046101cfa090$51757260$f4605720$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 05:24:37PM +0200, Antoine T?nart wrote:
-> Hi,
+Kukjin Kim wrote:
 > 
-> On Thu, Jul 03, 2014 at 08:17:34AM +0530, punnaiah choudary kalluri wrote:
-> > Since its a generic driver, support for configuring the dma_mask using
-> > dma_coerce_mask_and_coherent would be good.
-> > 
+> On 07/05/14 02:48, Tomasz Figa wrote:
+> > Move debug-macro.S from mach/include to include/debug where
+> > all other common debug macros are.
+> >
+> > Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> > ---
+> >   arch/arm/Kconfig.debug                           | 12 +++++--
+> >   arch/arm/include/debug/s5pv210.S                 | 34 ++++++++++++++++++++
+> >   arch/arm/mach-s5pv210/include/mach/debug-macro.S | 41 ------------------------
+> >   3 files changed, 44 insertions(+), 43 deletions(-)
+> >   create mode 100644 arch/arm/include/debug/s5pv210.S
+> >   delete mode 100644 arch/arm/mach-s5pv210/include/mach/debug-macro.S
+
+[...]
+
+> Tomasz,
 > 
-> Should I add a DMA mask dt property? Or just not add this and wait for
-> someone needing it in his case?
+> I couldn't apply this one from this your series because of conflict with
+> others. Can you please respin this one?
 > 
+One more note, since I didn't apply this, there is a build breakage for
+s5pv210_defconfig now...
 
-As a dt property, since most of platforms will use it. For PIO mode, the
-property can be NULL.
+arch/arm/kernel/debug.S:24:33: fatal error: mach/debug-macro.S: No such file or directory
+compilation terminated.
+make[2]: *** [arch/arm/kernel/debug.o] Error 1
+make[1]: *** [arch/arm/kernel] Error 2
+make[1]: *** Waiting for unfinished jobs....
 
--- 
-
-Best Regards,
-Peter Chen
+- Kukjin
