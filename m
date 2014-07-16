@@ -1,55 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 16 Jul 2014 08:43:22 +0200
-Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
-In-Reply-To: <53C5398F.2000005@pengutronix.de>
-References: <cover.1405428166.git.stefan@agner.ch>
- <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
- <53C5398F.2000005@pengutronix.de>
-Message-ID: <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 Jul 2014 14:55:06 +0800
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <20140707135502.GR30239@dragon>
+References: <20140625062243.GD3242@dragon>
+ <CAOMZO5BuOhWo7SCEPFmNRUQBi=5JhDrVv0yvBQM2d_jMyLkbyw@mail.gmail.com>
+ <1403693452.4249.1.camel@weser.hi.pengutronix.de>
+ <20140625125306.GB6917@dragon>
+ <1403772229.4254.4.camel@weser.hi.pengutronix.de>
+ <20140628143712.GA7869@dragon>
+ <1404135864.4305.23.camel@weser.hi.pengutronix.de>
+ <20140701065105.GE14471@dragon>
+ <1404724251.4587.20.camel@weser.hi.pengutronix.de>
+ <20140707135502.GR30239@dragon>
+Message-ID: <20140716065505.GB2612@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-07-15 16:24, schrieb Marc Kleine-Budde:
-<snip>
->> @@ -150,18 +171,20 @@
->>   * FLEXCAN hardware feature flags
->>   *
->>   * Below is some version info we got:
->> - *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT
->> - *                                Filter?   connected?
->> - *   MX25  FlexCAN2  03.00.00.00     no         no
->> - *   MX28  FlexCAN2  03.00.04.00    yes        yes
->> - *   MX35  FlexCAN2  03.00.00.00     no         no
->> - *   MX53  FlexCAN2  03.00.00.00    yes         no
->> - *   MX6s  FlexCAN3  10.00.12.00    yes        yes
->> + *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT  Memory err
->> + *                                Filter?   connected?  detection
->> + *   MX25  FlexCAN2  03.00.00.00     no         no         no
->> + *   MX28  FlexCAN2  03.00.04.00    yes        yes         no
->> + *   MX35  FlexCAN2  03.00.00.00     no         no         no
->> + *   MX53  FlexCAN2  03.00.00.00    yes         no         no
->> + *   MX6s  FlexCAN3  10.00.12.00    yes        yes         no
->> + *   VF610 FlexCAN3  ?               no         no        yes
->                                         ^^         ^^
+On Mon, Jul 07, 2014 at 09:55:03PM +0800, Shawn Guo wrote:
+> On Mon, Jul 07, 2014 at 11:10:51AM +0200, Lucas Stach wrote:
+> > Hi Shawn,
+> > 
+> > Over the weekend I tried to reproduce your problem on a SabreSD board,
+> > but wasn't able to trigger the issue. 3.16-rc3 with PCIe active works
+> > just fine over a suspend and resume cycle for me.
 > 
-> Can you check the datasheet if the flexcan core has a "Glitch Filter
-> Width Register (FLEXCANx_GFWR)"
+> That's strange.  In my setup, PCIe support is enabled in kernel and DT,
+> but I do not have a PCIe device connected to the board.
+> 
+> > 
+> > One possibly relevant difference is that I've booted with NFSroot, while
+> > it seems you are using a SATA connected device. Is this right?
+> 
+> I have a SATA disk connected, but did boot with NFSroot.
+> 
+> > If so,
+> > can you test if it works if you boot from SDcard or the like? This might
+> > be relevant as PCIe and SATA share some clocks.
+> 
+> I tried to disable SATA support completely, but it doesn't help.
 
+Lucas, any news on this?  Or should we just try to use Richard's patch
+to solve the problem?
 
-There is no such register called GFWR/Glitch Filter or similar.
-
-> Can you check if the core generates a warning interrupt with the current
-> setup, if you don't switch on bus error reporting? This means internally
-> the [TR]WRN_INT is connected and works as specified.
-
-Ok, so I disabled TWRNMSK (Bit 11) in the control register and printed
-out the error and status register (ESR1), this is what I get:
-[  191.285295] flexcan_irq, esr=00040080
-[  191.288996] flexcan_irq, ctrl=17092051
-
-Bit 17 (TWRNINT) is not set while TWRNMSK is disabled. Hence [TR]WRN_INT
-is not connected?
-
-
---
-Stefan
+Shawn
