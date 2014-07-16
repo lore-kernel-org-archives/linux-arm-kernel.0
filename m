@@ -1,47 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Jul 2014 14:27:08 +0100
-Subject: [PATCH] arm64: Move struct stat64 to uapi.
-In-Reply-To: <1405420413.9794.10.camel@kazak.uk.xensource.com>
-References: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
- <20140715082040.GB24269@arm.com>
- <1405420413.9794.10.camel@kazak.uk.xensource.com>
-Message-ID: <20140716132708.GP29414@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 16 Jul 2014 09:27:20 -0400
+Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
+In-Reply-To: <20140716151955.377efc5e@free-electrons.com>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140713222223.GH13108@titan.lakedaemon.net>
+ <20140716124522.GV13108@titan.lakedaemon.net>
+ <20140716145905.33105756@free-electrons.com>
+ <20140716131658.GB13108@titan.lakedaemon.net>
+ <20140716151955.377efc5e@free-electrons.com>
+Message-ID: <20140716132720.GC13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 11:33:33AM +0100, Ian Campbell wrote:
-> On Tue, 2014-07-15 at 09:20 +0100, Will Deacon wrote:
-> > Hmm, but struct kstat is defined in linux/stat.h so I'm not sure why this is
-> > arm64-specific. linux/fs.h includes that on line 10.
+On Wed, Jul 16, 2014 at 03:19:55PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> That include won't do anything because we already got here via
-> linux/stat.h (6th line of "In file included from" above), so the guard
-> has already been defined. IOW there is a loop in the includes, which
-> starts before kstat is struct defined:
+> On Wed, 16 Jul 2014 09:16:58 -0400, Jason Cooper wrote:
 > 
-> linux/stat.h -> asm/stat.h -> arm/compat.h -> linux/ptrace.h ->
-> linux_pidnamespace.h -> linux/mm.h -> linux/fs.h
+> > > As explained in the cover letter:
+> > > 
+> > >  * Series rebased on top of mvebu/fixes + mvebu/soc to take into
+> > >    account the conflicts with the changes already merged on the PMSU
+> > >    code.
+> > 
+> > Ok, I've tentatively applied this series to mvebu/soc-cpuidle with a dep
+> > on mvebu/soc and mvebu/fixes.  It'll be in -next tonight.
 > 
-> The last link here is added by aufs patches, but all the other arches
-> are ok with this because none of them have asm/stat.h, they only have
-> uapi/asm/stat.h.
-> 
-> The issue ultimately is down to the asm/stat.h -> asm/compat.h link
-> though I think so an alternative fix could be to switch to a different
-> set of types for the existing definition and ditching asm/compat.h from
-> asm/stat.h. I don't think that's the correct fix though.
+> Great, thanks a lot!
 
-Perhaps we could split asm/compat.h into asm/compat-types.h containing just
-the type definitions, then asm/compat.h can include that as well as defining
-any functions and macros.
+FYI - there's a rather intricate conflict in pmsu.c between cpuidle and
+cpufreq.  I'm currently build-testing my merge.  Once it passes, I'll
+push it up to for-next and I'd appreciate if you could give it a once
+over.  It'll be the HEAD of for-next.
 
-Then asm/stat.h just needs to include asm/compat-types.h to avoid the
-issue.
+thx,
 
-> > Can you help me unconfuse myself, please?
-> 
-> I hope I've managed to reduce rather than increase the confusion ;-)
-
-I think so, but it hurt :)
-
-Will
+Jason.
