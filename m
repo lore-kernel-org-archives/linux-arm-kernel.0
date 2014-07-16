@@ -1,27 +1,79 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 16 Jul 2014 16:25:35 +0000
-Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
-In-Reply-To: <20140716161715.GU29414@arm.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
- <20140716161715.GU29414@arm.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D17274D55@AcuExch.aculab.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Wed, 16 Jul 2014 18:20:29 +0200
+Subject: [PATCH 2/4] arm64: use generic dma-contiguous.h
+In-Reply-To: <1405525892-60383-3-git-send-email-Zubair.Kakakhel@imgtec.com>
+References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
+ <1405525892-60383-3-git-send-email-Zubair.Kakakhel@imgtec.com>
+Message-ID: <xa1td2d5b7hu.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon
-...
-> > +	BUG_ON(imm < 0 || imm > 65535);
-> 
-> Do this check with masking instead?
+On Wed, Jul 16 2014, Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com> wrote:
+> dma-contiguous.h is now in asm-generic. Use that to avoid code
+> repetition in arm64.
+>
+> Signed-off-by: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
 
-The compiler will convert that to a single unsigned comparison.
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-...
-> > +		BUG_ON(shift != 0 && shift != 16 && shift != 32 &&
-> > +		       shift != 48);
+> ---
+>  arch/arm64/include/asm/Kbuild           |  1 +
+>  arch/arm64/include/asm/dma-contiguous.h | 28 ----------------------------
+>  2 files changed, 1 insertion(+), 28 deletions(-)
+>  delete mode 100644 arch/arm64/include/asm/dma-contiguous.h
+>
+> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+> index 0b3fcf8..92bf7cb 100644
+> --- a/arch/arm64/include/asm/Kbuild
+> +++ b/arch/arm64/include/asm/Kbuild
+> @@ -9,6 +9,7 @@ generic-y += current.h
+>  generic-y += delay.h
+>  generic-y += div64.h
+>  generic-y += dma.h
+> +generic-y += dma-contiguous.h
+>  generic-y += emergency-restart.h
+>  generic-y += early_ioremap.h
+>  generic-y += errno.h
+> diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
+> deleted file mode 100644
+> index 14c4c0c..0000000
+> --- a/arch/arm64/include/asm/dma-contiguous.h
+> +++ /dev/null
+> @@ -1,28 +0,0 @@
+> -/*
+> - * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 and
+> - * only version 2 as published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#ifndef _ASM_DMA_CONTIGUOUS_H
+> -#define _ASM_DMA_CONTIGUOUS_H
+> -
+> -#ifdef __KERNEL__
+> -#ifdef CONFIG_DMA_CMA
+> -
+> -#include <linux/types.h>
+> -
+> -static inline void
+> -dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
+> -
+> -#endif
+> -#endif
+> -
+> -#endif
+> -- 
+> 1.9.1
+>
 
-OTOH I don't think it will convert that to:
-		BUG_ON(shift & ~48);
-
-	David
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
