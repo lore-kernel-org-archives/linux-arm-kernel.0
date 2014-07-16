@@ -1,42 +1,44 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 16 Jul 2014 14:45:21 -0700
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C6DFAD.8030109@codeaurora.org>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
- <53C6DFAD.8030109@codeaurora.org>
-Message-ID: <53C6F271.6070707@codeaurora.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 16 Jul 2014 14:50:36 -0700
+Subject: [PATCH v11 05/11] ARM: add seccomp syscall
+In-Reply-To: <1405547442-26641-1-git-send-email-keescook@chromium.org>
+References: <1405547442-26641-1-git-send-email-keescook@chromium.org>
+Message-ID: <1405547442-26641-6-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 01:25 PM, Saravana Kannan wrote:
-> On 07/16/2014 01:24 AM, Viresh Kumar wrote:
->> On 16 July 2014 04:17, Saravana Kannan <skannan@codeaurora.org> wrote:
->>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
->>
->>> @@ -1110,9 +1092,10 @@ static int __cpufreq_add_dev(struct device
->>> *dev, struct subsys_interface *sif)
->>>
->>>   #ifdef CONFIG_SMP
->>>          /* check whether a different CPU already registered this
->>> -        * CPU because it is in the same boat. */
->>> +        * CPU because it is one of the related CPUs. */
->>>          policy = cpufreq_cpu_get(cpu);
->>> -       if (unlikely(policy)) {
->>> +       if (policy) {
->>> +               cpufreq_change_policy_cpus(policy, cpu, true);
->>
->> This is just a waste of time at boot as ... (see below)
->
-> Why? Please explain.
->
+Wires up the new seccomp syscall.
 
-Nevermind. Figured what you meant. I just need to improve the "if" check.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: Oleg Nesterov <oleg@redhat.com>
+---
+ arch/arm/include/uapi/asm/unistd.h |    1 +
+ arch/arm/kernel/calls.S            |    1 +
+ 2 files changed, 2 insertions(+)
 
--Saravana
-
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index ba94446c72d9..e21b4a069701 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -409,6 +409,7 @@
+ #define __NR_sched_setattr		(__NR_SYSCALL_BASE+380)
+ #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
+ #define __NR_renameat2			(__NR_SYSCALL_BASE+382)
++#define __NR_seccomp			(__NR_SYSCALL_BASE+383)
+ 
+ /*
+  * This may need to be greater than __NR_last_syscall+1 in order to
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 8f51bdcdacbb..bea85f97f363 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -392,6 +392,7 @@
+ /* 380 */	CALL(sys_sched_setattr)
+ 		CALL(sys_sched_getattr)
+ 		CALL(sys_renameat2)
++		CALL(sys_seccomp)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
