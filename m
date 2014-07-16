@@ -1,45 +1,151 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 16 Jul 2014 18:39:05 +0200
-Subject: [PATCH 4/4] mips: dma: Add cma support
-In-Reply-To: <1405525892-60383-5-git-send-email-Zubair.Kakakhel@imgtec.com>
-References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
- <1405525892-60383-5-git-send-email-Zubair.Kakakhel@imgtec.com>
-Message-ID: <xa1t7g3db6mu.fsf@mina86.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 16 Jul 2014 12:38:03 -0400
+Subject: [PATCH v5 2/5] PCI: designware: refactor MSI code to work with v3.65
+ dw hardware
+In-Reply-To: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
+References: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1405528686-16539-3-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16 2014, Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com> wrote:
-> Adds cma support to the mips architecture.
->
-> cma uses memblock. However, mips uses bootmem.
+Keystone PCI controller is based on v3.65 version of the DW
+PCI h/w that implements MSI controller registers in application
+space compared to the newer version. This requires updates to
+the DW core API to support the PCI controller driver based on
+this old DW hardware. Add msi_irq_set()/clear() API functions to
+allow Set/Clear MSI IRQ enable bit in the application register.
+Also the old h/w uses MSI_IRQ register in application register
+space to raise MSI IRQ to the RC from EP. Current code uses the
+standard mechanism as per PCI spec. So add another API get_msi_data()
+to get the address of this register so that common code can be
+re-used on old h/w.
 
-Does cma_early_percent_memory work correctly then?
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Acked-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-> bootmem is informed about any regions reserved by memblock
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Grant Likely <grant.likely@linaro.org>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Bjorn Helgaas <bhelgaas@google.com>
+CC: Pratyush Anand <pratyush.anand@st.com>
+CC: Richard Zhu <r65037@freescale.com>
+CC: Kishon Vijay Abraham I <kishon@ti.com>
+CC: Marek Vasut <marex@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Randy Dunlap <rdunlap@infradead.org>
+CC: Grant Likely <grant.likely@linaro.org>
+---
+ drivers/pci/host/pcie-designware.c |   50 ++++++++++++++++++++++++++----------
+ drivers/pci/host/pcie-designware.h |    3 +++
+ 2 files changed, 39 insertions(+), 14 deletions(-)
 
-Alternatively maybe it would make sense to create a new definition of
-dma_contiguous_reserve_area that uses bootmem and choose it based on
-some CONFIG_CMA_USE_BOOTMEM which would be selected by MIPS.
-
-> dma api is modified to use cma reserved memory regions when available
->
-> Tested using cma_test. cma_test is a simple driver that assigns blocks
-> of memory from cma reserved sections.
->
-> Signed-off-by: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
-
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-
-> ---
->  arch/mips/Kconfig            |  1 +
->  arch/mips/include/asm/Kbuild |  1 +
->  arch/mips/kernel/setup.c     |  9 +++++++++
->  arch/mips/mm/dma-default.c   | 37 +++++++++++++++++++++++++------------
->  4 files changed, 36 insertions(+), 12 deletions(-)
->
-
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index d8f3af7..905941c 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -217,27 +217,47 @@ static int find_valid_pos0(struct pcie_port *pp, int msgvec, int pos, int *pos0)
+ 	return 0;
+ }
+ 
++static void dw_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
++{
++	unsigned int res, bit, val;
++
++	res = (irq / 32) * 12;
++	bit = irq % 32;
++	dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++	val &= ~(1 << bit);
++	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++}
++
+ static void clear_irq_range(struct pcie_port *pp, unsigned int irq_base,
+ 			    unsigned int nvec, unsigned int pos)
+ {
+-	unsigned int i, res, bit, val;
++	unsigned int i;
+ 
+ 	for (i = 0; i < nvec; i++) {
+ 		irq_set_msi_desc_off(irq_base, i, NULL);
+ 		clear_bit(pos + i, pp->msi_irq_in_use);
+ 		/* Disable corresponding interrupt on MSI controller */
+-		res = ((pos + i) / 32) * 12;
+-		bit = (pos + i) % 32;
+-		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
+-		val &= ~(1 << bit);
+-		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++		if (pp->ops->msi_clear_irq)
++			pp->ops->msi_clear_irq(pp, pos + i);
++		else
++			dw_pcie_msi_clear_irq(pp, pos + i);
+ 	}
+ }
+ 
++static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
++{
++	unsigned int res, bit, val;
++
++	res = (irq / 32) * 12;
++	bit = irq % 32;
++	dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++	val |= 1 << bit;
++	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++}
++
+ static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+ {
+-	int res, bit, irq, pos0, pos1, i;
+-	u32 val;
++	int irq, pos0, pos1, i;
+ 	struct pcie_port *pp = sys_to_pcie(desc->dev->bus->sysdata);
+ 
+ 	if (!pp) {
+@@ -281,11 +301,10 @@ static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+ 		}
+ 		set_bit(pos0 + i, pp->msi_irq_in_use);
+ 		/*Enable corresponding interrupt in MSI interrupt controller */
+-		res = ((pos0 + i) / 32) * 12;
+-		bit = (pos0 + i) % 32;
+-		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
+-		val |= 1 << bit;
+-		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++		if (pp->ops->msi_set_irq)
++			pp->ops->msi_set_irq(pp, pos0 + i);
++		else
++			dw_pcie_msi_set_irq(pp, pos0 + i);
+ 	}
+ 
+ 	*pos = pos0;
+@@ -353,7 +372,10 @@ static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
+ 	 */
+ 	desc->msi_attrib.multiple = msgvec;
+ 
+-	msg.address_lo = virt_to_phys((void *)pp->msi_data);
++	if (pp->ops->get_msi_data)
++		msg.address_lo = pp->ops->get_msi_data(pp);
++	else
++		msg.address_lo = virt_to_phys((void *)pp->msi_data);
+ 	msg.address_hi = 0x0;
+ 	msg.data = pos;
+ 	write_msi_msg(irq, &msg);
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index 8121901..387f69e 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -67,6 +67,9 @@ struct pcie_host_ops {
+ 			unsigned int devfn, int where, int size, u32 val);
+ 	int (*link_up)(struct pcie_port *pp);
+ 	void (*host_init)(struct pcie_port *pp);
++	void (*msi_set_irq)(struct pcie_port *pp, int irq);
++	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
++	u32 (*get_msi_data)(struct pcie_port *pp);
+ };
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+1.7.9.5
