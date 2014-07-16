@@ -1,205 +1,105 @@
-From: Vincent.Yang@tw.fujitsu.com (Vincent.Yang)
-Date: Wed, 16 Jul 2014 17:35:41 +0800
-Subject: [PATCH 2/8] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <7710458.qT0KZ5qsA6@wuerfel>
-References: <1405232971-4607-1-git-send-email-mollie.wu@linaro.org>
- <7710458.qT0KZ5qsA6@wuerfel>
-Message-ID: <830AC58E49A426478AC39824BC0FA915D8B8FF0609@fmpitwmsex01.fmpi.sea.css.fujitsu.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 16 Jul 2014 11:43:31 +0200
+Subject: [RFC PATCH] arm64/efi: efistub: reuse EFI mapping for Image if it
+ is lower
+In-Reply-To: <20140716092037.GC26951@leverpostej>
+References: <1405443030-4202-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140716092037.GC26951@leverpostej>
+Message-ID: <CAKv+Gu-scAzVqv==qWGr7rJr9V3ZPkbtuC4y6DkDrgqPr1MuXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->On Sunday 13 July 2014 14:29:31 Mollie Wu wrote:
->> +Required properties:
->> +- compatible: "fujitsu,f-sdh30"
->> +- voltage-ranges : This is a list of pairs. In each pair, two cells
->> +  are required. First cell specifies minimum slot voltage (mV), second
->> +  cell specifies maximum slot voltage (mV). In case of supported voltage
->> +  range is discontinuous, several ranges could be specified as a list.
+On 16 July 2014 11:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
+>
+> On Tue, Jul 15, 2014 at 05:50:30PM +0100, Ard Biesheuvel wrote:
+>> The EFI loader may load Image at any available offset. This means Image may
+>> reside very close to or at the base of DRAM, in which case the relocation
+>> done by efi_entry() results in Image being moved up in memory, which is
+>> undesirable (memory below the kernel is currently not usable).
+>
+> Rather than complicating this path I would prefer that we fixed not
+> being able to address memory below stext - TEXT_OFFSET. That would
+> simplify the bootloader's job regardless of UEFI, as any loader can then
+> simply place the kernel at a 2MB-aligned address + TEXT_OFFSET (the
+> kernel would have to not span a 512MB boundary to keep the initial page
+> tables simple, but that's still a weaker requirement than what we
+> currently need).
+>
+> The approach taken in this patch seems sane for the current way the VA
+> space is laid out, but if we're not currently wasting an absurd amount
+> of memory I'd rather we got the VA layout fixed such that we can address
+> memory below the kernel image.
+>
+> How much memory are we seeing wasted as a result of the existing
+> relocation code, and how often?
+>
+
+To be honest, I don't have any data that suggest that this is an actual problem.
+The potential penalty is the size of Image rounded up to 2 megs.
+
+But I agree it would be much more useful if the requirements regarding
+where to locate Image can be relaxed somewhat.
+
+>>       /*
+>> +      * Check whether the original allocation done by the EFI loader is more
+>> +      * favorable (i.e., closer to the base of DRAM) than the new one created
+>> +      * by efi_entry(). If so, reuse the original one.
+>> +      */
+>> +     adr     x3, 0f
+>> +     cmp     x3, x0
+>> +     bgt     1f      // this image is loaded higher, so just proceed normally
 >> +
->> +Optional properties:
->> +- pwr-mux-gpios: This is one optional gpio for controlling a power mux
->> +  which switches between two power supplies. 3.3V is selected when gpio
->> +  is high, and 1.8V is selected when gpio is low. This voltage is used
->> +  for signal level.
+>> +     /*
+>> +      * Jump into the relocated image so we can move the original Image to
+>> +      * a 2 MB boundary + TEXT_OFFSET inside the original mapping without
+>> +      * overwriting ourselves.
+>> +      */
+>> +     sub     x3, x3, x22     // subtract current base offset
+>> +     add     x3, x3, x0      // add base offset of relocated image
+>> +     br      x3              // jump to next line, but in relocated image
 >
->It sounds like what you really want here is a reference to a gpio-regulator
->node and, and to put the details of the voltage switching in there.
-
-Hi Arnd,
-Yes, I'll use a gpio-regulator for it in next version.
-
+> At this point I don't believe the necessary icache maintenance + isb
+> have occurred to make the new image visible to the I-side and to ensure
+> we don't have any stale prefetched instructions in the pipeline. That
+> still seems to happen later. Have I missed something?
 >
->> diff --git a/drivers/mmc/host/sdhci_f_sdh30.c
->b/drivers/mmc/host/sdhci_f_sdh30.c
->> new file mode 100644
->> index 0000000..8d23f2d
->> --- /dev/null
->> +++ b/drivers/mmc/host/sdhci_f_sdh30.c
->> @@ -0,0 +1,380 @@
->> +/*
->> + * linux/drivers/mmc/host/sdhci_f_sdh30.c
->> + *
->> + * Copyright (C) 2013 - 2014 Fujitsu Semiconductor, Ltd
->> + *              Vincent Yang <vincent.yang@tw.fujitsu.com>
->> + * Copyright (C) 2014 Linaro Ltd  Andy Green <andy.green@linaro.org>
->> + *
->> + * This program is free software: you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation, version 2 of the License.
->> + */
+
+No you haven't. The cache maintenance needs to occur here for the
+relocated Image if we intend to execute from it.
+That's what I get for using Foundation model, I guess :-)
+
+Anyway, I don't think this is a big deal, it's just one of the puzzle
+pieces in the wider discussion about PE/COFF loading, relocation, APM
+Mustang etc.
+
+-- 
+Ard.
+
+
 >> +
->> +#include <linux/err.h>
->> +#include <linux/delay.h>
->> +#include <linux/module.h>
->> +#include <linux/mmc/sd.h>
->> +#include <linux/mmc/host.h>
->> +#include <linux/mmc/card.h>
->> +#include <linux/gpio.h>
->> +#include <linux/of_gpio.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pm.h>
->> +#include <linux/pm_runtime.h>
->> +#include <linux/suspend.h>
->> +
->> +#include "sdhci.h"
->> +#include "sdhci-pltfm.h"
->> +#include "../core/core.h"
+>> +0:   mov     x1, x0                  // copy from relocated Image
+>> +     sub     x0, x22, #1             // copy to base of original Image
+>> +     orr     x0, x0, #(SZ_2M - 1)    // .. rounded up to 2 MB
+>> +     ldr     x3, =(TEXT_OFFSET + 1)  // .. plus TEXT_OFFSET
+>> +     add     x0, x0, x3
+>> +     mov     x2, x24                 // copy 'size of Image' bytes
+>> +     bl      memcpy
+>> +     add     x21, x0, x23            // add stext_offset to entry point
+>> +1:
+>> +     /*
+>>        * Flush dcache covering current runtime addresses
+>>        * of kernel text/data. Then flush all of icache.
+>>        */
+>> -     adrp    x1, _text
+>> -     add     x1, x1, #:lo12:_text
+>> -     adrp    x2, _edata
+>> -     add     x2, x2, #:lo12:_edata
+>> -     sub     x1, x2, x1
+>> -
+>> +     mov     x1, x24                 // size of Image
+>>       bl      __flush_dcache_area
+>>       ic      ialluis
 >
->Should this be <linux/mmc/core.h>? A device driver should not be looking
->at the drivers/mmc/core/core.h.
-
-Yes, I'll remove it.
-
->
->> +#define DRIVER_NAME "f_sdh30"
->
->This macro doesn't seem to serve any purpose, it would be easier to
->read if you open-code this.
-
-Yes, I'll do it.
-
->
->> +
->> +void sdhci_f_sdh30_soft_voltage_switch(struct sdhci_host *host)
->> +{
->> +     struct f_sdhost_priv *priv = sdhci_priv(host);
->> +     u32 ctrl = 0;
->> +
->> +     usleep_range(2500, 3000);
->> +     ctrl = sdhci_readl(host, F_SDH30_IO_CONTROL2);
->> +     ctrl |= F_SDH30_CRES_O_DN;
->> +     sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
->> +     ctrl |= F_SDH30_MSEL_O_1_8;
->> +     sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
->> +
->> +     if (gpio_is_valid(priv->gpio_select_1v8)) {
->> +             dev_info(priv->dev, "%s: setting gpio\n", __func__);
->> +             gpio_direction_output(priv->gpio_select_1v8, 0);
->> +     }
->> +
->> +     ctrl &= ~F_SDH30_CRES_O_DN;
->> +     sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
->> +     usleep_range(2500, 3000);
->> +
->> +     if (priv->vendor_hs200) {
->> +             dev_info(priv->dev, "%s: setting hs200\n", __func__);
->> +             ctrl = sdhci_readl(host, F_SDH30_ESD_CONTROL);
->> +             ctrl |= priv->vendor_hs200;
->> +             sdhci_writel(host, ctrl, F_SDH30_ESD_CONTROL);
->> +     }
->> +
->> +     ctrl = sdhci_readl(host, F_SDH30_TUNING_SETTING);
->> +     ctrl |= F_SDH30_CMD_CHK_DIS;
->> +     sdhci_writel(host, ctrl, F_SDH30_TUNING_SETTING);
->> +}
->
->I think this should really use the regulator API.
->
->If the regular is defined properly, this will work without any extra code.
-
-Yes, I'll use a gpio-regulator for it.
-
->
->> +unsigned int sdhci_f_sdh30_get_min_clock(struct sdhci_host *host)
->> +{
->> +     return F_SDH30_MIN_CLOCK;
->> +}
->> +
->> +void sdhci_f_sdh30_reset(struct sdhci_host *host, u8 mask)
->> +{
->> +     struct f_sdhost_priv *priv = sdhci_priv(host);
->> +
->> +     if (gpio_is_valid(priv->gpio_select_1v8))
->> +             gpio_direction_output(priv->gpio_select_1v8, 1);
->> +
->> +     if (sdhci_readw(host, SDHCI_CLOCK_CONTROL) == 0) {
->> +             sdhci_writew(host, 0xBC01, SDHCI_CLOCK_CONTROL);
->> +             mmiowb();
->> +     }
->
->Can you explain the mmiowb call here?
-
-This came from the original 3.0 based driver. It's trying to be a
-write memory barrier. It wants to ensure the clock control change
-actually happened before the following code.
-I'll change it to a regular wmb in next version.
-
->
->> +
->> +     if (!of_property_read_u32(pdev->dev.of_node, "bus-width", &bus_width))
->{
->> +             switch (bus_width) {
->> +             case 8:
->> +                     dev_info(dev, "Applying 8 bit bus width\n");
->> +                     host->mmc->caps |= MMC_CAP_8_BIT_DATA;
->> +                     break;
->> +             case 4:
->> +                     dev_info(dev, "Applying 4 bit bus width\n");
->> +                     host->mmc->caps |= MMC_CAP_4_BIT_DATA;
->> +                     break;
->> +             case 1:
->> +             default:
->> +                     dev_err(dev, "Invalid bus width: %u\n", bus_width);
->> +                     break;
->> +             }
->> +     }
->
->This should probably be done in generic sdhci code somewhere. How about
->adding it to sdhci_get_of_property instead_
-
-I should use generic mmc_of_parse for it. I'll update it in next version.
-
->> +     priv->clk_sd4 = clk_get(&pdev->dev, "sd_sd4clk");
->> +     if (!IS_ERR(priv->clk_sd4)) {
->> +             ret = clk_prepare_enable(priv->clk_sd4);
->> +             if (ret < 0) {
->> +                     dev_err(dev, "Failed to enable sd4 clock: %d\n", ret);
->> +                     goto err_clk1;
->> +             }
->> +     }
->> +     priv->clk_b = clk_get(&pdev->dev, "sd_bclk");
->> +     if (!IS_ERR(priv->clk_b)) {
->> +             ret = clk_prepare_enable(priv->clk_b);
->> +             if (ret < 0) {
->> +                     dev_err(dev, "Failed to enable clk_b clock: %d\n", ret);
->> +                     goto err_clk2;
->> +             }
->> +     }
->
->Please pick clock names that match what some of the other drivers use.
-
-I'll use "iface" and "core" for clock names because they match what used
-in sdhci-msm driver.
-
-Thanks a lot for your review!
-
-Best regards,
-Vincent Yang
-
->
->Ideally some of that should also move to common code.
->
->        Arnd
+> Cheers,
+> Mark.
