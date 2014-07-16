@@ -1,54 +1,112 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 21:51:37 +0200
-Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C6908A.2050200@redhat.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
- <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
- <53C6908A.2050200@redhat.com>
-Message-ID: <20140716195136.GB5212@mithrandir>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 16 Jul 2014 12:56:28 -0700
+Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C65F03.1050609@mit.edu>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>	<1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+ <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
+ <53C65F03.1050609@mit.edu>
+Message-ID: <53C6D8EC.1030609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 04:47:38PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 07/16/2014 03:13 PM, Thierry Reding wrote:
-> > On Wed, Jul 16, 2014 at 01:49:57PM +0200, Hans de Goede wrote:
-> >> Hi,
-> >>
-> >> On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
-> >>> This patch adds device tree binding documentation for the SATA
-> >>> controller found on NVIDIA Tegra SoCs.
-> >>>
-> >>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> >>> ---
-> >>> v4: clarify mandatory clock order
-> >>
-> >> Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
-> >> both look good to me. So these 2 + v3 for the rest of the series are:
-> >>
-> >> Acked-by: Hans de Goede <hdegoede@redhat.com>
-> > 
-> > Like I said in my reply to PATCH v3 7/8, I think this mandatory clock
-> > order is a mistake.
-> 
-> We've plenty of other dt bindings where things need to be specified in
-> a certain order, e.g. registers. So I don't really see what the problem
-> is here.
+On 07/16/2014 04:16 AM, Srivatsa S. Bhat wrote:
+> On 07/16/2014 01:54 PM, Viresh Kumar wrote:
+>> On 16 July 2014 04:17, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+>>
 
-Like I said, the clock-names exists so that drivers can request a clock
-by name. Therefore the order in which they are listed doesn't matter.
-The only thing that matters is that the entries in clocks and
-clock-names match up.
+<SNIP>
 
-With the libahci_platform code we completely annul that convention.
+>>> -static int cpufreq_add_policy_cpu(struct cpufreq_policy *policy,
+>>> -                                 unsigned int cpu, struct device *dev)
+>>> +static int cpufreq_change_policy_cpus(struct cpufreq_policy *policy,
+>>> +                                 unsigned int cpu, bool add)
+>
+> [...]
+>
+>>> -
+>>> -       if (!cpufreq_driver->setpolicy)
+>>> -               strncpy(per_cpu(cpufreq_cpu_governor, cpu),
+>>> -                       policy->governor->name, CPUFREQ_NAME_LEN);
+>>
+>> Where is this gone? There are several instances of code just being
+>> removed, this is the third one. Its really really tough to catch these
+>> in this big of a patch. Believe me.
+>>
+>> You have to break this patch into multiple ones, see this on how to
+>> break even simplest of the changes into multiple patches:
+>> https://lkml.org/lkml/2013/9/6/400
+>>
+>> Its just impossible to catch bugs that you might have introduced here due
+>> to the size of this patch. And its taking a LOT of time for me to review this.
+>> As I have to keep diff in one tab, new cpufreq.c in one and the old cpufreq.c
+>> in one and then compare..
+>>
+>
+> True, this is still a pretty huge chunk. Saravana, at this stage, don't worry
+> about making cpufreq work properly in each and every patch. Just ensure that
+> every patch builds fine; that should be good enough. I hope this will help you
+> in splitting up the patches further.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/3ced75c7/attachment.sig>
+Thanks Srivatsa. This will definitely help split them up into smaller 
+chunks.
+
+> One other thing: your changelog contains what we usually write in a cover-
+> letter - *very* high-level goals of the patch. Ideally, you should explain
+> the subtle details and the non-obvious decisions or trade-offs that you have
+> made at various places in the code. Otherwise it becomes very hard to follow
+> your thought-flow just by looking at the patch. So please split up the patch
+> further and also make the changelogs useful to review the patch :-)
+
+Thanks. Will do.
+
+> The link that Viresh gave above also did a lot of code reorganization in
+> cpufreq, so it should give you a good example of how to proceed.
+>
+> [...]
+>
+>>>                          __cpufreq_add_dev(dev, NULL);
+>>>                          break;
+>>>
+>>>                  case CPU_DOWN_PREPARE:
+>>> -                       __cpufreq_remove_dev_prepare(dev, NULL);
+>>> -                       break;
+>>> -
+>>> -               case CPU_POST_DEAD:
+>>> -                       __cpufreq_remove_dev_finish(dev, NULL);
+>>> -                       break;
+>>> -
+>>> -               case CPU_DOWN_FAILED:
+>>> -                       __cpufreq_add_dev(dev, NULL);
+>>> +                       __cpufreq_remove_dev(dev, NULL);
+>>
+>> @Srivatsa: You might want to have a look at this, remove sequence was
+>> separated for some purpose and I am just not able to concentrate enough
+>> to think of that, just too many cases running in my mind :)
+>>
+>
+> Yeah, we had split it into _remove_dev_prepare() and _remove_dev_finish()
+> to avoid a few potential deadlocks. We wanted to call _remove_dev_prepare()
+> in the DOWN_PREPARE stage and then call _remove_dev_finish() (which waits
+> for the kobject refcount to drop) in the POST_DEAD stage. That is, we wanted
+> to do the kobject cleanup after releasing the hotplug lock, and POST_DEAD stage
+> was well-suited for that.
+>
+> Commit 1aee40ac9c8 (cpufreq: Invoke __cpufreq_remove_dev_finish() after
+> releasing cpu_hotplug.lock) explains this in detail. Saravana, please take a
+> look at that reasoning and ensure that your patch doesn't re-introduce those
+> deadlock possibilities!
+
+But all of that was needed _because_ we were creating and destroying 
+policies and kobjs all the time. We don't do that anymore. So, I don't 
+think any of that applies. We only destroy when the cpufreq driver is 
+unregistered. That's kinda of the point of this patchset.
+
+Thoughts?
+
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
