@@ -1,48 +1,45 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Jul 2014 11:11:22 +0200
-Subject: [PATCH 2/6] ARM: rockchip: add debug uart used by rk3288
-In-Reply-To: <CAD=FV=W3aWeT3RP5_g9r8kV8ToeHfyn57JY-py2zGVW9DF_7RQ@mail.gmail.com>
-References: <1471578.ILeMmG2DL6@diego> <2866950.oXmKFGy9mh@diego>
- <CAD=FV=W3aWeT3RP5_g9r8kV8ToeHfyn57JY-py2zGVW9DF_7RQ@mail.gmail.com>
-Message-ID: <4054962.m70Hhy4CVc@diego>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 16 Jul 2014 11:15:33 +0200
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <42036198.zWkqnus6xa@wuerfel>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
+ <42036198.zWkqnus6xa@wuerfel>
+Message-ID: <20140716091533.GB28151@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 15. Juli 2014, 21:13:10 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Tue, Jul 15, 2014 at 4:00 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > The uarts on rk3288 are still compatible with the dw_8250, but located
-> > at a different position and need DEBUG_UART_8250_WORD enabled.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  arch/arm/Kconfig.debug | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > index 8f90595..f68def0 100644
-> > --- a/arch/arm/Kconfig.debug
-> > +++ b/arch/arm/Kconfig.debug
-> > @@ -613,6 +613,14 @@ choice
-> > 
-> >                   Say Y here if you want kernel low-level debugging
-> >                   support
-> >                   on Rockchip based platforms.
-> > 
-> > +       config DEBUG_RK32_UART2
-> 
-> It's slightly confusing that you didn't rename the old "DEBUG_RK3X_UART2".
+Hi Arnd,
 
-My problem is, to what :-) ... DEBUG_RK30_UART2 ?
-
-RK30xx and RK31xx share these, but I guess at least the description should be 
-adapted.
-
-
+On Wed, Jul 16, 2014 at 10:41:10AM +0200, Arnd Bergmann wrote:
+> On Wednesday 16 July 2014 10:26:01 Antoine T?nart wrote:
+> > +
+> > +       if (priv->dma_mask) {
+> > +               ret = dma_coerce_mask_and_coherent(&pdev->dev, priv->dma_mask);
+> > +               if (ret)
+> > +                       return ret;
+> > +       }
+> > +
+> > 
 > 
-> Other than that:
+> As mentioned in my comment for the binding, this is the wrong way to do it.
+> Russell has in the past converted all drivers that did this manually to 
+> do dma_coerce_mask_and_coherent() so we can spot them more easily, but we
+> should really be doing this better for new drivers.
 > 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
+> Can you describe what the restriction is that you want to put on the dma mask?
+
+Some people wanted the possibility to set the DMA mask as this USB2 CI
+driver does not do specific Berlin operation and can be reused later.
+I don't particularly need to call dma_coerce_mask_and_coherent() in my
+case, as far as I know.
+
+They can maybe give the restrictions they might want to put on the DMA
+mask.
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
