@@ -1,27 +1,42 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 17 Jul 2014 00:02:49 +0200
-Subject: [PATCH] cpufreq: Don't destroy/realloc policy/sysfs on
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 16 Jul 2014 14:45:21 -0700
+Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
  hotplug/suspend
-In-Reply-To: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <16164926.ZsJxe6UV3e@vostro.rjw.lan>
+In-Reply-To: <53C6DFAD.8030109@codeaurora.org>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+ <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
+ <53C6DFAD.8030109@codeaurora.org>
+Message-ID: <53C6F271.6070707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 09, 2014 07:37:30 PM Saravana Kannan wrote:
-> Preliminary patch. Not tested. Just sending out to give an idea of what I'm
-> looking to do. Expect a lot more simplification when it's done.
-> 
-> Benefits:
-> * A lot more simpler code.
-> * Less stability issues.
-> * Suspend/resume time would improve.
-> * Hotplug time would improve.
-> * Sysfs file permissions would be maintained.
-> * More policy settings would be maintained across suspend/resume.
-> * cpufreq stats would be maintained across hotplug for all CPUs.
+On 07/16/2014 01:25 PM, Saravana Kannan wrote:
+> On 07/16/2014 01:24 AM, Viresh Kumar wrote:
+>> On 16 July 2014 04:17, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+>>
+>>> @@ -1110,9 +1092,10 @@ static int __cpufreq_add_dev(struct device
+>>> *dev, struct subsys_interface *sif)
+>>>
+>>>   #ifdef CONFIG_SMP
+>>>          /* check whether a different CPU already registered this
+>>> -        * CPU because it is in the same boat. */
+>>> +        * CPU because it is one of the related CPUs. */
+>>>          policy = cpufreq_cpu_get(cpu);
+>>> -       if (unlikely(policy)) {
+>>> +       if (policy) {
+>>> +               cpufreq_change_policy_cpus(policy, cpu, true);
+>>
+>> This is just a waste of time at boot as ... (see below)
+>
+> Why? Please explain.
+>
 
-One problem.  The real hotplug (when the CPU actually goes away) depends on
-offline removing all that stuff for it.  How are you going to address that?
+Nevermind. Figured what you meant. I just need to improve the "if" check.
 
-Rafael
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
