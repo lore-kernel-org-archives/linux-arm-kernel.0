@@ -1,65 +1,36 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 16 Jul 2014 14:54:42 -0400
-Subject: Function Profiler broken on today's linux-next
-In-Reply-To: <20140716184152.GM3016@saruman.home>
-References: <20140716162328.GJ1365@saruman.home>
- <20140716122921.71b118a9@gandalf.local.home>
- <20140716164141.GA3016@saruman.home>
- <20140716132413.1ede8e1d@gandalf.local.home>
- <20140716182944.GK3016@saruman.home>
- <20140716184152.GM3016@saruman.home>
-Message-ID: <20140716145442.15f25ec3@gandalf.local.home>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 16 Jul 2014 18:57:04 +0000 (UTC)
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <20140716070643.GC3378@breakpoint.cc>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+ <20140709095552.GA25154@breakpoint.cc> <20140709100147.GB25154@breakpoint.cc>
+ <alpine.DEB.2.02.1407152019020.21432@utopia.booyaka.com>
+ <20140716070643.GC3378@breakpoint.cc>
+Message-ID: <alpine.DEB.2.02.1407161854360.23074@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Jul 2014 13:41:52 -0500
-Felipe Balbi <balbi@ti.com> wrote:
+On Wed, 16 Jul 2014, Sebastian Andrzej Siewior wrote:
 
-> Hi,
+> On 2014-07-15 20:21:21 [+0000], Paul Walmsley wrote:
 > 
-> On Wed, Jul 16, 2014 at 01:29:44PM -0500, Felipe Balbi wrote:
-> > On Wed, Jul 16, 2014 at 01:24:13PM -0400, Steven Rostedt wrote:
-> > > On Wed, 16 Jul 2014 11:41:42 -0500
-> > > Felipe Balbi <balbi@ti.com> wrote:
+> > > Acked-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 > > > 
-> > > 
-> > > > .config attached. It's actually an ARM platform, I can help out with
-> > > > testing anything you need.
-> > > 
-> > > In that case, can you see if it works under my repo?
-> > > 
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
-> > > branch: ftrace/core
+> > > This is basically what Tony hasked me to do: No IRQ numbers & iomem.
 > > 
-> > works fine, thanks. FWIW
-> > 
-> > Tested-by: Felipe Balbi <balbi@ti.com>
+> > Sorry - I'm a bit confused - Sebastian, did you test this one?  If so, is 
+> > it okay to add a Tested-by from you?
 > 
-> Actually it seems like it's not counting time properly if I run my test
-> multiple times in a row:
-> 
-> # /root/testusb -t 1 -c 100000 -s 2048 -a
-> # head -3 trace_stat/function0
->   Function                         Hit    Time                Avg           s^2
->   --------                         ---    ----                ---           ---
->   thread_interrupt               174876    166120839 us     949.935 us  3048498 us
-> 
-> # /root/testusb -t 1 -c 100000 -s 2048 -a
-> # head -3 trace_stat/function0
->   Function                           Hit       Time                    Avg          s^2
->   --------                           ---       ----                    ---          ---
->   dwc3_thread_interrupt            286796    967267300 us         4190545199 us     3241109 us 
-> 
-> # /root/testusb -t 1 -c 100000 -s 2048 -a
-> # head -3 trace_stat/function0
->   Function                              Hit      Time                 Avg               s^2
->     --------                            ---       ----                 ---              ---
->   dwc3_thread_interrupt               401346    642632072 us       1601.192 us     1194316 us 
-> 
-> and so on...
-> 
+> Tested-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 
-Did it use to work? In other words, is this a regression, or just some
-another bug?
+Thanks Sebastian.
 
--- Steve
+Mugunthan, next step would be for you to get a Reviewed-by: by someone who 
+has access to the (non-public) DRA7xx TRM, and can review for SoC 
+integration.  Since Rajendra is no longer at TI, the right person is 
+probably Tony.
+
+Then this patch should be mergeable.
+
+
+- Paul
