@@ -1,38 +1,51 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 16 Jul 2014 14:57:20 -0700
-Subject: [PATCH 5/7] x86: Split syscall_trace_enter into two phases
-In-Reply-To: <CALCETrWuWxZANoKAR=FG55EOHtzvTHmc3euMdtf8yfibtK-QYw@mail.gmail.com>
-References: <cover.1405452484.git.luto@amacapital.net>
- <bd4e2efb7cd97f2bf9d4f1e2065f16c9091d799a.1405452484.git.luto@amacapital.net>
- <CAGXu5jJornzMJjyPXVZB_eYi-FRet=bXcJWJDa1vnB_oU9ZA_Q@mail.gmail.com>
- <CALCETrWuWxZANoKAR=FG55EOHtzvTHmc3euMdtf8yfibtK-QYw@mail.gmail.com>
-Message-ID: <CAGXu5jLcbWDJiLbpejJTERbV2CkCk2dVZ7jwq7Xw_jYUicBFjQ@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 17 Jul 2014 00:18:38 +0200
+Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
+In-Reply-To: <20140713222223.GH13108@titan.lakedaemon.net>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140713222223.GH13108@titan.lakedaemon.net>
+Message-ID: <2328587.KMSy5tvnCr@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 2:15 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Wed, Jul 16, 2014 at 1:21 PM, Kees Cook <keescook@chromium.org> wrote:
->> On Tue, Jul 15, 2014 at 12:32 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->>>
->>> +
->>> +               ret = seccomp_phase1(&sd);
->>> +               if (ret == SECCOMP_PHASE1_SKIP) {
->>> +                       regs->orig_ax = -ENOSYS;
->>
->> Before, seccomp didn't touch orig_ax on a skip. I don't see any
->> problem with this, and it's probably more clear this way, but are you
->> sure there aren't unexpected side-effects from this?
->
-> It's necessary to cause the syscall to be skipped -- see syscall_trace_enter.
->
-> That being said, setting it to -ENOSYS is nonsense and probably
-> confused you at least as much as it confused me.  It should be
-> regs->orig_ax = -1.
+On Sunday, July 13, 2014 06:22:23 PM Jason Cooper wrote:
+> Rafael, Daniel,
+> 
+> On Wed, Jul 09, 2014 at 03:40:04PM +0200, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > Here comes the second version of the cpuidle support for Armada 370
+> > and Armada 38x. This series has been tested on the following
+> > configurations:
+> > 
+> >  * Armada XP, LE and BE, to verify that the existing, SMP, cpuidle and
+> >    CPU hotplug functionalities are still working.
+> > 
+> >  * Armada 375, Z1 and A0, LE and BE, to verify that the existing SMP
+> >    functionality is still working (SMP support on Armada 375 Z1 is
+> >    affected by this series).
+> > 
+> >  * Armada 370, LE and BE, to verify that the newly introduced cpuidle
+> >    functionality is working fine.
+> > 
+> >  * Armada 38x, LE and BE, to verify that the existing SMP
+> >    functionality, and the newly introduced cpuidle functionality is
+> >    working fine.
+> > 
+> > We are hoping to see this patch series merged for 3.17.
+> > 
+> > Most patches are touching only arch/arm/mach-mvebu/ code so they
+> > should be handled by the mvebu maintainers. However, patches 11-14 are
+> > touching the mvebu cpuidle driver, with a possible issue on patch 11,
+> > which touches both the cpuidle driver and the mach-mvebu code in order
+> > to rename the driver without breaking functionality (if needed, we can
+> > decide to split the commits, it would break functionality temporarly,
+> > but not buildability).
+> 
+> Would one or both of you mind Acking this series so we can keep it
+> together?
 
-Yes, I think that would be better.
+While I don't see anything obviously wrong in it, I'd like Daniel to look
+at them too from the ARM perspective.
 
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Rafael
