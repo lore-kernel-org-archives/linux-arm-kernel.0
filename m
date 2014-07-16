@@ -1,88 +1,71 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 16 Jul 2014 11:18:14 +0300
-Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
- gpio block
-In-Reply-To: <CAJAp7OjU=FFdGKHPqovz+qrEhDCZ3E=uOSAOFbgYyLE01C9cPg@mail.gmail.com>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
- <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
- <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
- <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
- <53C095EA.90000@codeaurora.org> <1405346335.13503.25.camel@iivanov-dev>
- <53C449A3.2010404@codeaurora.org> <1405406114.13503.40.camel@iivanov-dev>
- <CAJAp7OjU=FFdGKHPqovz+qrEhDCZ3E=uOSAOFbgYyLE01C9cPg@mail.gmail.com>
-Message-ID: <1405498694.31919.20.camel@iivanov-dev>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 16 Jul 2014 13:51:40 +0530
+Subject: [PATCH v4 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
+In-Reply-To: <CAODwPW_h2EBKtA+XwEvjCtS=FrcdHOjybwALGugd-ccQ-_vMWw@mail.gmail.com>
+References: <CAODwPW_h2EBKtA+XwEvjCtS=FrcdHOjybwALGugd-ccQ-_vMWw@mail.gmail.com>
+Message-ID: <1405498900-13473-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-07-15 at 17:23 -0700, Bjorn Andersson wrote:
-> On Mon, Jul 14, 2014 at 11:35 PM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
-> > On Mon, 2014-07-14 at 14:20 -0700, Stephen Boyd wrote:
-> [..]
-> >> Isn't this document only for the gpios? I think you're talking about the
-> >> MPPs, which also exist on these generation of pmics. We should probably
-> >> avoid mixing the two (gpios and mpps) in one binding because they're
-> >> really different hardware.
-> >
-> > I don't know. For me "gpio" looks like function of the pin hardware.
-> >
-> >>
-> >> >  So I will like
-> >> > to keep "function" property for selecting one of the above functions.
-> >> > Choosing between "normal", "paired"... options in QPNP pinctrl driver
-> >> > is supported trough passing values, defined in DT header file, to
-> >> > "output-high" property. Please don't kill me :-).
-> >>
-> >> Overloading output-high to choose the MPP mode doesn't seem to follow
-> >> the generic pinconfig binding. Does output-high even take a value? Why
-> >> can't we use the function property?
-> >
-> > No, no.  using value of the output-high|low" is just to select
-> > "normal", "paired"... thing. Function selection is via "function"
-> > property. Currently QPNP support following functions "gpio", "mpp-ain",
-> > "mpp-aout", "mpp-cs".
-> >
-> 
-> Hi Ivan,
-> 
-> From your comment I presume that you don't have access to the
-> documentation for these blocks.
-> 
-> The pmic sports two types of pins; gpios and mpps (multi-purpose-pin).
-> These are different hardware blocks; i.e. not a configuration thing.
+The host controller by itself may sometimes need to handle PHY
+and/or calibrate some of the PHY settings to get full support out
+of the PHY controller. The PHY core provides a calibration
+funtionality now to do so.
+Therefore, facilitate getting the two possible PHYs, viz.
+USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3).
 
-I am looking on GPIO's hardware blocks as stripped down MPP's.
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
 
-> 
-> The gpios can be input, output or both and they can be configured as
-> gpio, paired, function 1 or function 2 (+ some test modes). So here it
-> makes sense to have the functions "gpio", "paired" and the valid
-> function combinations.
+Changes from v3:
+ - Modified error message as per review comments from Julius.
 
-I believe that MPP's also support these 'functions'.
+ drivers/usb/host/xhci-plat.c |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-> 
-> The mpps can be input, output or both; in either digital or analog
-> mode. Or they can be a current sink. When configured as analog input
-> you select which adc the pin should be routed to. Here it makes sense
-> to have the functions "digital", "analog" and "current-sink" I think.
-
-My understanding is that MPP's are supporting everything which GPIO's
-does, plus analog functionality. 
-
-I don't want at the end MPP's functions to be something like:
-
-analog-normal, analog-paired, analog-function-1, analog-function-2, 
-digital-normal, digital-paired...
-
-So better to leave normal/paired stuff as separate parameter (qcom,pair).
-
-Plain GPIO hardware will just support 'gpio' function, while MPP's
-will have 'gpio', 'analog-in', 'analog-out', 'current-sink' 
-
-I am fine to split driver to two drivers (GPIO and MPP), which will
-make code a little more clean, but I am pretty sure there will be
-lot of duplication.
-
-Regards,
-Ivan
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 1a0cf9f..b1c0364 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/phy/phy.h>
+ #include <linux/slab.h>
+ #include <linux/usb/xhci_pdriver.h>
+ 
+@@ -180,6 +181,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 			goto put_hcd;
+ 	}
+ 
++	/* Get possile USB 2.0 type PHY (UTMI+) available with xhci */
++	hcd->gen_phy = devm_phy_get(&pdev->dev, "usb2-phy");
++	if (IS_ERR(hcd->gen_phy)) {
++		ret = PTR_ERR(hcd->gen_phy);
++		if (ret != -ENOSYS && ret != -ENODEV)
++			dev_warn(&pdev->dev,
++				 "Error retrieving usb2 phy: %d\n", ret);
++	}
++
+ 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (ret)
+ 		goto disable_clk;
+@@ -209,6 +219,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
++	/* Get possile USB 3.0 type PHY (PIPE3) available with xhci */
++	xhci->shared_hcd->gen_phy = devm_phy_get(&pdev->dev, "usb3-phy");
++	if (IS_ERR(xhci->shared_hcd->gen_phy)) {
++		ret = PTR_ERR(xhci->shared_hcd->gen_phy);
++		if (ret != -ENOSYS && ret != -ENODEV)
++			dev_warn(&pdev->dev,
++				 "Error retrieving usb3 phy: %d\n", ret);
++	}
++
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+ 		goto put_usb3_hcd;
+-- 
+1.7.10.4
