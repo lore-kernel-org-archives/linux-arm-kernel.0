@@ -1,39 +1,96 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 16 Jul 2014 16:05:27 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.17
-In-Reply-To: <53C5D69A.2090407@samsung.com>
-References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
- <53C4D874.2040206@samsung.com> <53C54246.2040002@gmail.com>
- <53C5D69A.2090407@samsung.com>
-Message-ID: <1405544727.6107.0.camel@linux-builds1>
+Date: Wed, 16 Jul 2014 16:06:09 -0500
+Subject: [PATCHv5 3/5] ARM: dts: socfpga: unuse the slot-node and
+ deprecated the supports-highspeed for dw-mmc
+In-Reply-To: <1405050587-5577-4-git-send-email-jh80.chung@samsung.com>
+References: <1405050587-5577-1-git-send-email-jh80.chung@samsung.com>
+ <1405050587-5577-4-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1405544769.6107.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-07-16 at 10:34 +0900, Jaehoon Chung wrote:
-> CC'd Chris/Ulf.
+On Fri, 2014-07-11 at 12:49 +0900, Jaehoon Chung wrote:
+> dw-mmc controller can support multiple slots.
+> But, there are no use-cases anywhere. So we don't need to support the
+> slot-node for dw-mmc controller.
+> And "supports-highspeed" property in dw-mmc is deprecated.
+> "supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
 > 
-> If you are ok, this patch will apply mmc tree.(3.16-rc5)
-> To prevent conflict, we want to get your opinion.
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Reviewed-by: Tushar Behera <trblinux@gmail.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+> ---
+>  arch/arm/boot/dts/socfpga_arria5.dtsi   |    9 +++------
+>  arch/arm/boot/dts/socfpga_cyclone5.dtsi |    9 +++------
+>  arch/arm/boot/dts/socfpga_vt.dts        |    9 +++------
+>  3 files changed, 9 insertions(+), 18 deletions(-)
 > 
+> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> index 12d1c2c..468fc4c 100644
+> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> @@ -29,13 +29,10 @@
+>  
+>  		dwmmc0 at ff704000 {
+>  			num-slots = <1>;
+> -			supports-highspeed;
+>  			broken-cd;
+> -
+> -			slot at 0 {
+> -				reg = <0>;
+> -				bus-width = <4>;
+> -			};
+> +			bus-width = <4>;
+> +			cap-mmc-highspeed;
+> +			cap-sd-highspeed;
+>  		};
+>  
+>  		sysmgr at ffd08000 {
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> index bf51182..1ee03c4 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> @@ -30,13 +30,10 @@
+>  
+>  		dwmmc0 at ff704000 {
+>  			num-slots = <1>;
+> -			supports-highspeed;
+>  			broken-cd;
+> -
+> -			slot at 0 {
+> -				reg = <0>;
+> -				bus-width = <4>;
+> -			};
+> +			bus-width = <4>;
+> +			cap-mmc-highspeed;
+> +			cap-sd-highspeed;
+>  		};
+>  
+>  		ethernet at ff702000 {
+> diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+> index 09792b4..f9345e0 100644
+> --- a/arch/arm/boot/dts/socfpga_vt.dts
+> +++ b/arch/arm/boot/dts/socfpga_vt.dts
+> @@ -43,13 +43,10 @@
+>  
+>  		dwmmc0 at ff704000 {
+>  			num-slots = <1>;
+> -			supports-highspeed;
+>  			broken-cd;
+> -
+> -			slot at 0 {
+> -				reg = <0>;
+> -				bus-width = <4>;
+> -			};
+> +			bus-width = <4>;
+> +			cap-mmc-highspeed;
+> +			cap-sd-highspeed;
+>  		};
+>  
+>  		ethernet at ff700000 {
 
-Oh okay...The patch looks fine to me.
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
 
+Thanks,
 Dinh
-> Best Regards,
-> Jaehoon Chung
-> 
-> On 07/16/2014 12:01 AM, Dinh Nguyen wrote:
-> > Hi Jaehoon,
-> > 
-> > On 07/15/2014 02:29 AM, Jaehoon Chung wrote:
-> >> Hi Dinh.
-> >>
-> >> Could you check this patch?
-> >> https://patchwork.kernel.org/patch/4529891/
-> >>
-> > 
-> > Sorry that I missed this. I just applied it. Will test and send out an updated pull-request.
-> > 
-> > Dinh
-> > 
-> 
