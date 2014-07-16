@@ -1,24 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Jul 2014 01:08:48 +0100
-Subject: [PATCH v4 3/3] regulator: qcom-rpm: Regulator driver for the
- Qualcomm RPM
-In-Reply-To: <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140716000848.GG17528@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 Jul 2014 09:18:30 +0900
+Subject: [PATCH] ARM: shmobile: genmai: remove defconfig
+In-Reply-To: <11732654.rv4KHsfgRD@avalon>
+References: <1405409364-23378-1-git-send-email-horms+renesas@verge.net.au>
+ <20140715122350.GD25333@verge.net.au>
+ <20140715130458.GI25333@verge.net.au> <11732654.rv4KHsfgRD@avalon>
+Message-ID: <20140716001829.GC25244@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 04:00:41PM -0700, Bjorn Andersson wrote:
-> Driver for regulators exposed by the Resource Power Manager (RPM) found
-> in Qualcomm 8660, 8960 and 8064 based devices.
+On Wed, Jul 16, 2014 at 01:01:46AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Tuesday 15 July 2014 22:04:59 Simon Horman wrote:
+> > On Tue, Jul 15, 2014 at 09:23:50PM +0900, Simon Horman wrote:
+> > > On Tue, Jul 15, 2014 at 01:58:21PM +0200, Laurent Pinchart wrote:
+> > > > Hi Simon,
+> > > > 
+> > > > Thank you for the patch.
+> > > > 
+> > > > On Tuesday 15 July 2014 16:29:24 Simon Horman wrote:
+> > > > > The genmai board code is scheduled for removal and once
+> > > > > that occurs the defconfig will be of no use. Remove it.
+> > > > > 
+> > > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > 
+> > > > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > > 
+> > > > Now that the MTU2 boot issue has been solved (thank you for tracking it
+> > > > down), am I correct to assume that all timer patches, the genmai board
+> > > > file removal series and this patch will make it to v3.17 ?
+> > > 
+> > > Yes, that is my plan.
+> > > 
+> > > I hope to have them queued up this evening.
+> > 
+> > Please take a look at renesas-next-v3.16-rc3-20140715v2 and let me know if
+> > anything is missing.
+> 
+> Everything seems to be in order. Thank you.
 
-I have patch 3/3 here but no cover or other patches - what is the story
-there?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/506747ca/attachment.sig>
+Great thanks.
