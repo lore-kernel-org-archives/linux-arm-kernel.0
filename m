@@ -1,50 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 16 Jul 2014 22:38:47 +0200
-Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <1405539927.25580.74.camel@deneb.redhat.com>
-References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405522297.25580.72.camel@deneb.redhat.com>
- <20140716155345.GB30313@leverpostej>
- <1405539927.25580.74.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu-bqXKoy-G00cWPJES=6A_ofu=cfBOsD0ZriHa4AGxG0A@mail.gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 16 Jul 2014 16:05:27 -0500
+Subject: [GIT PULL] SOCFPGA DTS updates for 3.17
+In-Reply-To: <53C5D69A.2090407@samsung.com>
+References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
+ <53C4D874.2040206@samsung.com> <53C54246.2040002@gmail.com>
+ <53C5D69A.2090407@samsung.com>
+Message-ID: <1405544727.6107.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 21:45, Mark Salter <msalter@redhat.com> wrote:
-> On Wed, 2014-07-16 at 16:53 +0100, Mark Rutland wrote:
->> On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
->> > On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
->> > > After the EFI stub has done its business, it jumps into the kernel by branching
->> > > to offset #0 of the loaded Image, which is where it expects to find the header
->> > > containing a 'branch to stext' instruction.
->> > >
->> > > However, the header is not covered by any PE/COFF section, so the header may
->> > > not actually be loaded at the expected offset. So instead, jump to 'stext'
->> > > directly, which is at the base of the PE/COFF .text section, by supplying a
->> > > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
->> > > stext into the Image. Also replace other open coded calculations of the same
->> > > value with a reference to 'stext_offset'
->> >
->> > Have you actually seen a situation where the header isn't there?
->> > Isn't the kernel header actually part of the pe/coff file and
->> > firmware loads the whole file into RAM?
->>
->> From my understanding of Ard's earlier comments, this part isn't
->> guaranteed per the UEFI spec.
->>
->> I would rather we weren't relying on implementation details.
->>
->
-> Could be. I didn't see anything about it in the UEFI spec, but I
-> probably wasn't exhaustive in my search. In any case, there's at
-> least one other place broken if the kernel header isn't included
-> in the loaded image.
->
+On Wed, 2014-07-16 at 10:34 +0900, Jaehoon Chung wrote:
+> CC'd Chris/Ulf.
+> 
+> If you are ok, this patch will apply mmc tree.(3.16-rc5)
+> To prevent conflict, we want to get your opinion.
+> 
 
-I have not been able to find anything in the PE/COFF documents that
-tells you what to put in memory areas that are not covered by a
-section. Expecting the header to be there is indeed relying on an
-implementation detail, which seems risky.
-And indeed, if there are any other (non EFI related) uses of header
-fields in the kernel, it would be good to have a look at those well,
+Oh okay...The patch looks fine to me.
+
+Dinh
+> Best Regards,
+> Jaehoon Chung
+> 
+> On 07/16/2014 12:01 AM, Dinh Nguyen wrote:
+> > Hi Jaehoon,
+> > 
+> > On 07/15/2014 02:29 AM, Jaehoon Chung wrote:
+> >> Hi Dinh.
+> >>
+> >> Could you check this patch?
+> >> https://patchwork.kernel.org/patch/4529891/
+> >>
+> > 
+> > Sorry that I missed this. I just applied it. Will test and send out an updated pull-request.
+> > 
+> > Dinh
+> > 
+> 
