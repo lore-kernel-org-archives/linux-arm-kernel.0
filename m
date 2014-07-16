@@ -1,32 +1,54 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 16 Jul 2014 11:54:21 +0300
-Subject: [PATCH v3 6/8] ata: ahci_platform: Increase AHCI_MAX_CLKS to 4
-In-Reply-To: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
-References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1405500863-19696-7-git-send-email-mperttunen@nvidia.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 16 Jul 2014 10:59:24 +0200
+Subject: [PATCH v3 08/12] Documentation: bindings: add doc for the USB2
+ ChipIdea USB driver
+In-Reply-To: <23972141.94aiK9jz66@wuerfel>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1405499166-6726-9-git-send-email-antoine.tenart@free-electrons.com>
+ <23972141.94aiK9jz66@wuerfel>
+Message-ID: <20140716085924.GA28151@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra124 SATA controller requires 4 clocks. Increase this constant
-to be able to use them all.
+Hi Arnd,
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
----
- drivers/ata/ahci.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Wed, Jul 16, 2014 at 10:39:36AM +0200, Arnd Bergmann wrote:
+> On Wednesday 16 July 2014 10:26:02 Antoine T?nart wrote:
+> > +
+> > +Required properties:
+> > +- compatible: should be "chipidea,usb2"
+> > +- reg: base address and length of the registers
+> > +- interrupts: interrupt for the USB controller
+> > +
+> > +Optional properties:
+> > +- clocks: reference to the USB clock
+> > +- usb-phy: reference to the USB PHY
+> 
+> I think the phy reference should use the standard phy binding, using
+> "phys" property to refer to a node that has a "#phy-cells" property.
+> 
+> It seems the code gets this right, but just the documentation is wrong.
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 5513296..2ed84e1 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -53,7 +53,7 @@
- 
- enum {
- 	AHCI_MAX_PORTS		= 32,
--	AHCI_MAX_CLKS		= 3,
-+	AHCI_MAX_CLKS		= 4,
- 	AHCI_MAX_SG		= 168, /* hardware max is 64K */
- 	AHCI_DMA_BOUNDARY	= 0xffffffff,
- 	AHCI_MAX_CMDS		= 32,
+I moved this PHY driver from usb/phy/ to phy/ and forgot to update this
+property. I'll fix it.
+
+> 
+> > +- vbus-supply: reference to the VBUS regulator
+> > +- dma-mask: DMA bit mask
+> 
+> No. Do not use "dma-mask" as a property, that is a pure Linux specific
+> concept. The DT way to express this is to use the 'dma-ranges' property
+> in the device's parent to describe any bus-related restrictions, and
+> for the driver to ask for a mask that matches what the hardware is
+> capable of (which may be smaller or larger than what the bus supports).
+
+Ok. I'll answer in the CI driver's thread.
+
+Thanks!
+
+Antoine
+
 -- 
-1.8.1.5
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
