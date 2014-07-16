@@ -1,30 +1,54 @@
 From: huayi.li@csr.com (Huayi Li)
-Date: Wed, 16 Jul 2014 09:55:14 +0800
-Subject: [PATCH v5 4/4] ARM: prima2_defconfig: enable PWM and sirf PWM driver
-In-Reply-To: <1405475714-10006-1-git-send-email-huayi.li@csr.com>
-References: <1405475714-10006-1-git-send-email-huayi.li@csr.com>
-Message-ID: <1405475714-10006-5-git-send-email-huayi.li@csr.com>
+Date: Wed, 16 Jul 2014 10:01:53 +0800
+Subject: [PATCH v5 2/4] pwm: sirf: add dt-binding document
+Message-ID: <1405476113-10127-1-git-send-email-huayi.li@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds dt-binding document for pwm-sirf. here the controller clock
+can't generate PWM signals, so we need seperate clock as signal source.
+
 Signed-off-by: Huayi Li <huayi.li@csr.com>
 ---
- arch/arm/configs/prima2_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/pwm/pwm-sirf.txt | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sirf.txt
 
-diff --git a/arch/arm/configs/prima2_defconfig b/arch/arm/configs/prima2_defconfig
-index 23591db..303204a 100644
---- a/arch/arm/configs/prima2_defconfig
-+++ b/arch/arm/configs/prima2_defconfig
-@@ -50,6 +50,8 @@ CONFIG_DMADEVICES_DEBUG=y
- CONFIG_DMADEVICES_VDEBUG=y
- CONFIG_SIRF_DMA=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_SIRF=y
- CONFIG_EXT2_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-sirf.txt b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
+new file mode 100644
+index 0000000..221e5d9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
+@@ -0,0 +1,29 @@
++SiRF prima2 & atlas6 PWM drivers
++
++Required properties:
++- compatible: "sirf,prima2-pwm"
++- reg: physical base address and length of the controller's registers
++- #pwm-cells: should be 2. See pwm.txt in this directory for a description of
++  the cells format.
++- clocks: Must contain an entry for each entry in clock-names.
++  See ../clock/prima2-clock.txt for details.
++- clock-names: Must include the following entries:
++  of clock sources to generate PWM signal,
++  - pwmc: PWM controller clock
++  - sigsrc0: source clock 0 for PWM
++  - sigsrc1: source clock 1 for PWM
++  - sigsrc2: source clock 2 for PWM
++  - sigsrc3: source clock 3 for PWM
++  - sigsrc4: source clock 4 for PWM
++
++Example:
++
++pwm: pwm at b0130000 {
++	compatible = "sirf,prima2-pwm";
++	#pwm-cells = <2>;
++	reg = <0xb0130000 0x10000>;
++	clocks = <&clks 21>, <&clks 1>, <&clks 2>,
++	       <&clks 3>, <&clks 0>, <&clks 4>;
++	clock-names = "pwmc", "sigsrc0", "sigsrc1",
++		"sigsrc2", "sigsrc3", "sigsrc4";
++};
 -- 
 1.9.3
 
