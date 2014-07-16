@@ -1,99 +1,67 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 16 Jul 2014 21:20:38 +0530
-Subject: [PATCH 0/4] spi: s3c64xx: fix DT binding breakage
-In-Reply-To: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAHfPSqB7BHx49WmFJ-1gyXYMPOyfapnMEGnwPiYOpap=295Vjg@mail.gmail.com>
+From: Zubair.Kakakhel@imgtec.com (Zubair Lutfullah Kakakhel)
+Date: Wed, 16 Jul 2014 16:51:30 +0100
+Subject: [PATCH 2/4] arm64: use generic dma-contiguous.h
+In-Reply-To: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
+References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
+Message-ID: <1405525892-60383-3-git-send-email-Zubair.Kakakhel@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Javier,
+dma-contiguous.h is now in asm-generic. Use that to avoid code
+repetition in arm64.
 
-On 16 July 2014 20:49, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Mark,
->
-> The s3c64xx SPI driver DT binding is currently broken. Commit
-> 3146bee ("spi: s3c64xx: Added provision for dedicated cs pin")
-> added a new "cs-gpio" property and made it a requirement in
-> order to make the driver behave in the same way that it used to.
->
-> The motivation of the offending commit was to allow boards that
-> want to use the native chip select (instead of a GPIO) to work
-> with the s3c64xx SPI driver. Something that was not possible
-> before since the driver made it mandatory to specify a GPIO.
->
-> Unfortunately the commit also changed the driver defaults since
-> now besides specifying a GPIO, it makes mandatory to also specify
-> that a GPIO is used while the default used to be the opposite.
->
-> That mean that old FDT are not working anymore after 3146bee
-> so DT backward compatibility was not ensured by that commit.
->
-> This is a follow-up series from a previous one posted by Naveen
-> Krishna [0] which attempts to solve the issue.
->
-> The feedback from Naveen's series was that the patches did not
-> provide a clear explanation about the rationale and goal of both
-> the series as a whole and the individual changes [1].
->
-> So I tried to take Navee's series and rework them to provide
-> an easier to understand patch series.
->
-> The series is composed of the following patches:
->
-> Javier Martinez Canillas (1):
->   Revert "spi: s3c64xx: Added provision for dedicated cs pin"
->
-> Naveen Krishna Chatradhi (3):
->   spi: s3c64xx: use the generic SPI "cs-gpios" property
->   spi: samsung: Update binding documentation
->   ARM: DTS: fix the chip select gpios definition in the SPI nodes
+Signed-off-by: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
+---
+ arch/arm64/include/asm/Kbuild           |  1 +
+ arch/arm64/include/asm/dma-contiguous.h | 28 ----------------------------
+ 2 files changed, 1 insertion(+), 28 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/dma-contiguous.h
 
-I should have mentioned what was the issue being fixed. Your
-explanation is very clear. I'm working on getting the terminology correct.
-
-Thank you.
-
->
->  .../devicetree/bindings/spi/spi-samsung.txt        |  8 ++--
->  arch/arm/boot/dts/exynos4210-smdkv310.dts          |  2 +-
->  arch/arm/boot/dts/exynos4412-trats2.dts            |  2 +-
->  arch/arm/boot/dts/exynos5250-smdk5250.dts          |  2 +-
->  drivers/spi/spi-s3c64xx.c                          | 54 ++++++++++------------
->  5 files changed, 30 insertions(+), 38 deletions(-)
->
-> Patch 01/04 reverts the offending commit since it not only broke
-> the DT binding but also introduced a confusing "cs-gpio" property
-> while the driver already used a property with the same name.
->
-> Patch 02/04 fixes the DT binding for good by using the SPI core
-> "cs-gpios" property to specify the chip select GPIO instead of
-> using a custom property only used by this driver. This change
-> breaks backward compatibility but this has been broken for more
-> than a year and nobody complained so I think it's safe to change
-> it again in favor of using standard DT binding properties.
->
-> A benefit of Patch 02/04 is that it allows DT and legacy boards
-> that need to use the built-in CS instead of a GPIO to work with
-> the driver which was the original motivation of the broken commit.
->
-> Patch 03/04 updates the driver binding documentation accordingly
-> and patch 04/04 updates all the DTS board files in mainline.
->
-> Best regards,
-> Javier
->
-> [0]: http://www.spinics.net/lists/linux-samsung-soc/msg34163.html
-> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg34309.html
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 0b3fcf8..92bf7cb 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -9,6 +9,7 @@ generic-y += current.h
+ generic-y += delay.h
+ generic-y += div64.h
+ generic-y += dma.h
++generic-y += dma-contiguous.h
+ generic-y += emergency-restart.h
+ generic-y += early_ioremap.h
+ generic-y += errno.h
+diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
+deleted file mode 100644
+index 14c4c0c..0000000
+--- a/arch/arm64/include/asm/dma-contiguous.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef _ASM_DMA_CONTIGUOUS_H
+-#define _ASM_DMA_CONTIGUOUS_H
+-
+-#ifdef __KERNEL__
+-#ifdef CONFIG_DMA_CMA
+-
+-#include <linux/types.h>
+-
+-static inline void
+-dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
+-
+-#endif
+-#endif
+-
+-#endif
 -- 
-Shine bright,
-(: Nav :)
+1.9.1
