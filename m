@@ -1,115 +1,160 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Jul 2014 20:09:44 +0100
-Subject: [PATCH v7 03/11] arm64: Do not initialise the fixmap page tables in
- head.S
+Date: Wed, 16 Jul 2014 20:09:47 +0100
+Subject: [PATCH v7 06/11] arm64: Add 4 levels of page tables definition with
+ 4KB pages
 In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
 References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1405537792-23666-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1405537792-23666-7-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early_ioremap_init() function already handles fixmap pte
-initialisation, so upgrade this to cover all of pud/pmd/pte and remove
-one page from swapper_pg_dir.
+From: Jungseok Lee <jays.lee@samsung.com>
 
+This patch adds hardware definition and types for 4 levels of
+translation tables with 4KB pages.
+
+Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/page.h |  8 ++++----
- arch/arm64/kernel/head.S      |  7 -------
- arch/arm64/mm/ioremap.c       | 26 ++++++++++++++++++--------
- 3 files changed, 22 insertions(+), 19 deletions(-)
+ arch/arm64/include/asm/pgtable-4level-hwdef.h | 50 +++++++++++++++++++
+ arch/arm64/include/asm/pgtable-4level-types.h | 71 +++++++++++++++++++++++++++
+ 2 files changed, 121 insertions(+)
+ create mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
+ create mode 100644 arch/arm64/include/asm/pgtable-4level-types.h
 
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index a6331e6a92b5..d3515bce4077 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -33,11 +33,11 @@
- 
- /*
-  * The idmap and swapper page tables need some space reserved in the kernel
-- * image. The idmap only requires a pgd and a next level table to (section) map
-- * the kernel, while the swapper also maps the FDT and requires an additional
-- * table to map an early UART. See __create_page_tables for more information.
-+ * image. Both require a pgd and a next level table to (section) map the
-+ * kernel. The the swapper also maaps the FDT (see __create_page_tables for
-+ * more information).
-  */
--#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-+#define SWAPPER_DIR_SIZE	(2 * PAGE_SIZE)
- #define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
- 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 69dafe9621fd..fa3b7fb8a77a 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -583,13 +583,6 @@ __create_page_tables:
- 	create_block_map x0, x7, x3, x5, x6
- 1:
- 	/*
--	 * Create the pgd entry for the fixed mappings.
--	 */
--	ldr	x5, =FIXADDR_TOP		// Fixed mapping virtual address
--	add	x0, x26, #2 * PAGE_SIZE		// section table address
--	create_pgd_entry x26, x0, x5, x6, x7
--
--	/*
- 	 * Since the page tables have been populated with non-cacheable
- 	 * accesses (MMU disabled), invalidate the idmap and swapper page
- 	 * tables again to remove any speculatively loaded cache lines.
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 7ec328392ae0..69000efa015e 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -103,19 +103,25 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- }
- EXPORT_SYMBOL(ioremap_cache);
- 
--#ifndef CONFIG_ARM64_64K_PAGES
- static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-+#ifndef CONFIG_ARM64_64K_PAGES
-+static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
- #endif
- 
--static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-+static inline pud_t * __init early_ioremap_pud(unsigned long addr)
- {
- 	pgd_t *pgd;
--	pud_t *pud;
- 
- 	pgd = pgd_offset_k(addr);
- 	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
- 
--	pud = pud_offset(pgd, addr);
-+	return pud_offset(pgd, addr);
-+}
+diff --git a/arch/arm64/include/asm/pgtable-4level-hwdef.h b/arch/arm64/include/asm/pgtable-4level-hwdef.h
+new file mode 100644
+index 000000000000..0ec84e2274a3
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-4level-hwdef.h
+@@ -0,0 +1,50 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_4LEVEL_HWDEF_H
++#define __ASM_PGTABLE_4LEVEL_HWDEF_H
 +
-+static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-+{
-+	pud_t *pud = early_ioremap_pud(addr);
++#define PTRS_PER_PTE		512
++#define PTRS_PER_PMD		512
++#define PTRS_PER_PUD		512
++#define PTRS_PER_PGD		512
 +
- 	BUG_ON(pud_none(*pud) || pud_bad(*pud));
- 
- 	return pmd_offset(pud, addr);
-@@ -132,13 +138,17 @@ static inline pte_t * __init early_ioremap_pte(unsigned long addr)
- 
- void __init early_ioremap_init(void)
- {
-+	pgd_t *pgd;
-+	pud_t *pud;
- 	pmd_t *pmd;
-+	unsigned long addr = fix_to_virt(FIX_BTMAP_BEGIN);
- 
--	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
--#ifndef CONFIG_ARM64_64K_PAGES
--	/* need to populate pmd for 4k pagesize only */
-+	pgd = pgd_offset_k(addr);
-+	pud = pud_offset(pgd, addr);
-+	pud_populate(&init_mm, pud, bm_pmd);
-+	pmd = pmd_offset(pud, addr);
- 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
--#endif
++/*
++ * PGDIR_SHIFT determines the size a top-level page table entry can map.
++ */
++#define PGDIR_SHIFT		39
++#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
++#define PGDIR_MASK		(~(PGDIR_SIZE-1))
 +
- 	/*
- 	 * The boot-ioremap range spans multiple pmds, for which
- 	 * we are not prepared:
++/*
++ * PUD_SHIFT determines the size the second level page table entry can map.
++ */
++#define PUD_SHIFT		30
++#define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
++#define PUD_MASK		(~(PUD_SIZE-1))
++
++/*
++ * PMD_SHIFT determines the size the third level page table entry can map.
++ */
++#define PMD_SHIFT		21
++#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
++#define PMD_MASK		(~(PMD_SIZE-1))
++
++/*
++ * section address mask and size definitions.
++ */
++#define SECTION_SHIFT		21
++#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
++#define SECTION_MASK		(~(SECTION_SIZE-1))
++
++#endif
+diff --git a/arch/arm64/include/asm/pgtable-4level-types.h b/arch/arm64/include/asm/pgtable-4level-types.h
+new file mode 100644
+index 000000000000..7ad8dd257ea1
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-4level-types.h
+@@ -0,0 +1,71 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_4LEVEL_TYPES_H
++#define __ASM_PGTABLE_4LEVEL_TYPES_H
++
++#include <asm/types.h>
++
++typedef u64 pteval_t;
++typedef u64 pmdval_t;
++typedef u64 pudval_t;
++typedef u64 pgdval_t;
++
++#undef STRICT_MM_TYPECHECKS
++
++#ifdef STRICT_MM_TYPECHECKS
++
++/*
++ * These are used to make use of C type-checking..
++ */
++typedef struct { pteval_t pte; } pte_t;
++typedef struct { pmdval_t pmd; } pmd_t;
++typedef struct { pudval_t pud; } pud_t;
++typedef struct { pgdval_t pgd; } pgd_t;
++typedef struct { pteval_t pgprot; } pgprot_t;
++
++#define pte_val(x)	((x).pte)
++#define pmd_val(x)	((x).pmd)
++#define pud_val(x)	((x).pud)
++#define pgd_val(x)	((x).pgd)
++#define pgprot_val(x)	((x).pgprot)
++
++#define __pte(x)	((pte_t) { (x) } )
++#define __pmd(x)	((pmd_t) { (x) } )
++#define __pud(x)	((pud_t) { (x) } )
++#define __pgd(x)	((pgd_t) { (x) } )
++#define __pgprot(x)	((pgprot_t) { (x) } )
++
++#else	/* !STRICT_MM_TYPECHECKS */
++
++typedef pteval_t pte_t;
++typedef pmdval_t pmd_t;
++typedef pudval_t pud_t;
++typedef pgdval_t pgd_t;
++typedef pteval_t pgprot_t;
++
++#define pte_val(x)	(x)
++#define pmd_val(x)	(x)
++#define pud_val(x)	(x)
++#define pgd_val(x)	(x)
++#define pgprot_val(x)	(x)
++
++#define __pte(x)	(x)
++#define __pmd(x)	(x)
++#define __pud(x)	(x)
++#define __pgd(x)	(x)
++#define __pgprot(x)	(x)
++
++#endif /* STRICT_MM_TYPECHECKS */
++
++#endif /* __ASM_PGTABLE_4LEVEL_TYPES_H */
