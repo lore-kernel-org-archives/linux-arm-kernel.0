@@ -1,41 +1,19 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 17 Jul 2014 01:12:46 +0200
-Subject: [PATCH] ARM: at91/dt: fix usb0 clocks definition in sam9n12 dtsi
-In-Reply-To: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140716231245.GA12493@piout.net>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 16 Jul 2014 16:14:10 -0700
+Subject: [PATCH v7 03/11] arm64: Do not initialise the fixmap page
+ tables in head.S
+In-Reply-To: <1405537792-23666-4-git-send-email-catalin.marinas@arm.com>
+References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
+ <1405537792-23666-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1405552450.7262.28.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/2014 at 08:39:27 +0200, Boris Brezillon wrote :
-> udphs_clk (USB Device Controller clock) is referenced instead of
-> uhphs_clk (USB Host Controller clock).
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Wed, 2014-07-16 at 20:09 +0100, Catalin Marinas wrote:
+> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
 
-> ---
->  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 2877959..b84bac5 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -925,7 +925,7 @@
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00500000 0x00100000>;
->  			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-> -			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
-> +			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
->  				 <&uhpck>;
->  			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
->  			status = "disabled";
-> -- 
-> 1.8.3.2
-> 
+> + * image. Both require a pgd and a next level table to (section) map the
+> + * kernel. The the swapper also maaps the FDT (see __create_page_tables for
+                                  ^^^^^ maps
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Geoff
