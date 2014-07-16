@@ -1,65 +1,145 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 15 Jul 2014 17:23:51 -0700
-Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
- gpio block
-In-Reply-To: <1405406114.13503.40.camel@iivanov-dev>
-References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
- <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
- <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
- <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
- <53C095EA.90000@codeaurora.org>
- <1405346335.13503.25.camel@iivanov-dev>
- <53C449A3.2010404@codeaurora.org>
- <1405406114.13503.40.camel@iivanov-dev>
-Message-ID: <CAJAp7OjU=FFdGKHPqovz+qrEhDCZ3E=uOSAOFbgYyLE01C9cPg@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 15 Jul 2014 17:28:40 -0700
+Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+Message-ID: <53C5C738.5040705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 11:35 PM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
-> On Mon, 2014-07-14 at 14:20 -0700, Stephen Boyd wrote:
-[..]
->> Isn't this document only for the gpios? I think you're talking about the
->> MPPs, which also exist on these generation of pmics. We should probably
->> avoid mixing the two (gpios and mpps) in one binding because they're
->> really different hardware.
+One preemptive comment.
+
+On 07/15/2014 03:47 PM, Saravana Kannan wrote:
+> The CPUfreq core moves the cpufreq policy ownership between CPUs when CPUs
+> within a cluster (CPUs sharing same policy) go ONLINE/OFFLINE. When moving
+> policy ownership between CPUs, it also moves the cpufreq sysfs directory
+> between CPUs and also fixes up the symlinks of the other CPUs in the
+> cluster.
 >
-> I don't know. For me "gpio" looks like function of the pin hardware.
+> Also, when all the CPUs in a cluster go OFFLINE, all the sysfs nodes and
+> directories are deleted, the kobject is released and the policy is freed.
+> And when the first CPU in a cluster comes up, the policy is reallocated and
+> initialized, kobject is acquired, the sysfs nodes are created or symlinked,
+> etc.
 >
->>
->> >  So I will like
->> > to keep "function" property for selecting one of the above functions.
->> > Choosing between "normal", "paired"... options in QPNP pinctrl driver
->> > is supported trough passing values, defined in DT header file, to
->> > "output-high" property. Please don't kill me :-).
->>
->> Overloading output-high to choose the MPP mode doesn't seem to follow
->> the generic pinconfig binding. Does output-high even take a value? Why
->> can't we use the function property?
+> All these steps end up creating unnecessarily complicated code and locking.
+> There's no real benefit to adding/removing/moving the sysfs nodes and the
+> policy between CPUs. Other per CPU sysfs directories like power and cpuidle
+> are left alone during hotplug. So there's some precedence to what this
+> patch is trying to do.
 >
-> No, no.  using value of the output-high|low" is just to select
-> "normal", "paired"... thing. Function selection is via "function"
-> property. Currently QPNP support following functions "gpio", "mpp-ain",
-> "mpp-aout", "mpp-cs".
+> This patch simplifies a lot of the code and locking by removing the
+> adding/removing/moving of policy/sysfs/kobj and just leaves the cpufreq
+> directory and policy in place irrespective of whether the CPUs are
+> ONLINE/OFFLINE.
+>
+> Leaving the policy, sysfs and kobject in place also brings these additional
+> benefits:
+> * Faster suspend/resume
+> * Faster hotplug
+> * Sysfs file permissions maintained across hotplug
+> * Policy settings and governor tunables maintained across hotplug
+> * Cpufreq stats would be maintained across hotplug for all CPUs and can be
+>    queried even after CPU goes OFFLINE
+>
+> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>   drivers/cpufreq/cpufreq.c | 388 +++++++++++++---------------------------------
+>   1 file changed, 107 insertions(+), 281 deletions(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> index 62259d2..a0a2ec2 100644
+> --- a/drivers/cpufreq/cpufreq.c
+> +++ b/drivers/cpufreq/cpufreq.c
+
+<SNIP>
+
+> @@ -961,60 +967,58 @@ static void cpufreq_init_policy(struct cpufreq_policy *policy)
+>   }
+>
+>   #ifdef CONFIG_HOTPLUG_CPU
+> -static int cpufreq_add_policy_cpu(struct cpufreq_policy *policy,
+> -				  unsigned int cpu, struct device *dev)
+> +static int cpufreq_change_policy_cpus(struct cpufreq_policy *policy,
+> +				  unsigned int cpu, bool add)
+>   {
+>   	int ret = 0;
+> -	unsigned long flags;
+> +	unsigned int cpus, pcpu;
+>
+> -	if (has_target()) {
+> +	down_write(&policy->rwsem);
+> +
+> +	cpus = !cpumask_empty(policy->cpus);
+> +	if (has_target() && cpus) {
+>   		ret = __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
+>   		if (ret) {
+>   			pr_err("%s: Failed to stop governor\n", __func__);
+> -			return ret;
+> +			goto unlock;
+>   		}
+>   	}
 >
 
-Hi Ivan,
+<SNIP>
 
->From your comment I presume that you don't have access to the
-documentation for these blocks.
+> +	if (add)
+> +		cpumask_set_cpu(cpu, policy->cpus);
+> +	else
+> +		cpumask_clear_cpu(cpu, policy->cpus);
+>
+> -	up_write(&policy->rwsem);
+> +	pcpu = cpumask_first(policy->cpus);
+> +	if (pcpu < nr_cpu_ids && policy->cpu != pcpu) {
+> +		policy->last_cpu = policy->cpu;
+> +		policy->cpu = pcpu;
+> +		blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
+> +					CPUFREQ_UPDATE_POLICY_CPU, policy);
+> +	}
+>
+> -	if (has_target()) {
+> +	cpus = !cpumask_empty(policy->cpus);
+> +	if (has_target() && cpus) {
+>   		ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
+>   		if (!ret)
+>   			ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
+>
+>   		if (ret) {
+>   			pr_err("%s: Failed to start governor\n", __func__);
+> -			return ret;
+> +			goto unlock;
+>   		}
+>   	}
+>
 
-The pmic sports two types of pins; gpios and mpps (multi-purpose-pin).
-These are different hardware blocks; i.e. not a configuration thing.
+<SNIP>
 
-The gpios can be input, output or both and they can be configured as
-gpio, paired, function 1 or function 2 (+ some test modes). So here it
-makes sense to have the functions "gpio", "paired" and the valid
-function combinations.
+> +	if (!cpus && cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
+> +		cpufreq_driver->stop_cpu(policy);
+> +	}
+>
 
-The mpps can be input, output or both; in either digital or analog
-mode. Or they can be a current sink. When configured as analog input
-you select which adc the pin should be routed to. Here it makes sense
-to have the functions "digital", "analog" and "current-sink" I think.
+Viresh, I tried your suggestion (and my initial thought too) to combine 
+this as an if/else with the previous if. But the indentation got nasty 
+and made it hard to read. I'm sure the compiler will optimize it. So, I 
+would prefer to leave it this way.
 
-Regards,
-Bjorn
+
+> -	policy->governor = NULL;
+> +unlock:
+> +	up_write(&policy->rwsem);
+>
+> -	return policy;
+> +	return ret;
+>   }
+> +#endif
+>
+
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
