@@ -1,33 +1,13 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Jul 2014 16:43:55 +0200
-Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
- code
-In-Reply-To: <1405521324.4408.44.camel@x220>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-5-git-send-email-t.figa@samsung.com>
- <1405502840.4408.2.camel@x220> <53C67386.5070401@samsung.com>
- <1405520767.4408.39.camel@x220> <1405521324.4408.44.camel@x220>
-Message-ID: <53C68FAB.9070102@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 16 Jul 2014 16:44:58 +0200
+Subject: [PATCH v4] 8250-core based serial driver for OMAP
+Message-ID: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.07.2014 16:35, Paul Bolle wrote:
-> On Wed, 2014-07-16 at 16:26 +0200, Paul Bolle wrote:
->> On Wed, 2014-07-16 at 14:43 +0200, Tomasz Figa wrote:
->>> That's right. Apparently I missed them. I guess that's not critical,
->>> though, and could be done in separate patch, right?
->>
->> This is not critical at all, so that's fine with me. 
-> 
-> Actually, that's only correct if the solution here is to just remove the
-> (currently) dead code hidden behind CONFIG_SAMSUNG_CLOCK. But if the
-> solution requires something less trivial, that might be quite wrong.
-> 
-> So please disregard my comment!
+I converted most of the omap-serial over to the 8250-core based code where it
+once was forked from. I dropped the rs485 support for now.
+The runtime-pm does not crash any machines because none of them shutdown the
+IP core and/or enter deep idle where it would metter.
 
-The code between those ifdefs is no longer used, because all Samsung
-platforms use the Common Clock Framework after this series. So I believe
-we can safely remove this dead code.
-
-Best regards,
-Tomasz
+Sebastian
