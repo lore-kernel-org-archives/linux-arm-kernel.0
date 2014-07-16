@@ -1,65 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Jul 2014 09:40:32 -0500
-Subject: [GIT PULL] Mediatek basic support for v3.17
-In-Reply-To: <CABuKBe+pF4jxSqot5KhOfzvnyK1d3PmfsMuL2HJ9jbUPFaYCOg@mail.gmail.com>
-References: <CABuKBe+h0Et5_+o4_i-Eu7EQ8Xka7YFoKmO=U0B7NnVQBdQ8FA@mail.gmail.com>
- <20140715135913.GA18571@kroah.com> <14060966.Jhk08lR3XI@wuerfel>
- <CABuKBe+pF4jxSqot5KhOfzvnyK1d3PmfsMuL2HJ9jbUPFaYCOg@mail.gmail.com>
-Message-ID: <CAL_JsqK-jJ-yCyMm=DXx=T9xjHQa3ZNefEco+fEi4ju_LO_Vtg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Jul 2014 16:43:55 +0200
+Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
+ code
+In-Reply-To: <1405521324.4408.44.camel@x220>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-5-git-send-email-t.figa@samsung.com>
+ <1405502840.4408.2.camel@x220> <53C67386.5070401@samsung.com>
+ <1405520767.4408.39.camel@x220> <1405521324.4408.44.camel@x220>
+Message-ID: <53C68FAB.9070102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 8:47 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> 2014-07-15 17:17 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->> On Tuesday 15 July 2014 06:59:13 Greg KH wrote:
->>> On Tue, Jul 15, 2014 at 01:11:42PM +0200, Matthias Brugger wrote:
->>> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
->>> >
->>> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
->>> >
->>> > are available in the git repository at:
->>> >
->>> >   https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-basic-support
->>>
->>> As these are only 7 patches, why do a git pull?  And I know I can't take
->>> pull requests from github, I'm not sure what the rules are for the ARM
->>> SoC developers either...
->>>
->>> Just send patches, it's easier that way.
+On 16.07.2014 16:35, Paul Bolle wrote:
+> On Wed, 2014-07-16 at 16:26 +0200, Paul Bolle wrote:
+>> On Wed, 2014-07-16 at 14:43 +0200, Tomasz Figa wrote:
+>>> That's right. Apparently I missed them. I guess that's not critical,
+>>> though, and could be done in separate patch, right?
 >>
->> We generally prefer pull requests, but patches also work for us.
->>
->> However, one note about the text in the pull request: Matthias,
->> please always try to be explicit about who you want to pull or
->> merge things when you are ready and list in the pull request the
->> other maintainers that have agreed to merging it (or whether they
->> have not sent an Ack yet, which is even more important).
->
-> Ok, thank you for the advice. I will do so in the next pull request.
->
->>
->> In this case, the clocksource driver needs an Ack from the clocksource
->> maintainers, and the drivers/of/address.c changes need an Ack from the
->> OF maintainers. I assume you have those, but I'd have to first look
->> at the patches to be sure.
->>
->>         arnd
->
-> For the drivers/of/address.c patch I used to have an Ack [1] from
-> Grant Likely who told me to merge it through arm-soc. But I deleted
-> the Ack after changing the patch because of some comments from Russel
-> King [2].
-> So at the moment I don't have any Ack anymore.
->
-> I have an Ack for the clocksource driver from Thomas [0]. Daniel
-> wanted to merge it through his branch, but because of the changes in
-> the OF patch he never did.
->
-> So I suppose I have to get some comments from the OF maintainer about
-> the patch, before we can go on with the pull request.
+>> This is not critical at all, so that's fine with me. 
+> 
+> Actually, that's only correct if the solution here is to just remove the
+> (currently) dead code hidden behind CONFIG_SAMSUNG_CLOCK. But if the
+> solution requires something less trivial, that might be quite wrong.
+> 
+> So please disregard my comment!
 
-I've now acked the patch in question. If there's no other change to
-the pull req, there's no reason to respin the branch to add the ack.
+The code between those ifdefs is no longer used, because all Samsung
+platforms use the Common Clock Framework after this series. So I believe
+we can safely remove this dead code.
 
-Rob
+Best regards,
+Tomasz
