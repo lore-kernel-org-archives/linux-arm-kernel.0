@@ -1,45 +1,91 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 Jul 2014 14:55:06 +0800
-Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
-In-Reply-To: <20140707135502.GR30239@dragon>
-References: <20140625062243.GD3242@dragon>
- <CAOMZO5BuOhWo7SCEPFmNRUQBi=5JhDrVv0yvBQM2d_jMyLkbyw@mail.gmail.com>
- <1403693452.4249.1.camel@weser.hi.pengutronix.de>
- <20140625125306.GB6917@dragon>
- <1403772229.4254.4.camel@weser.hi.pengutronix.de>
- <20140628143712.GA7869@dragon>
- <1404135864.4305.23.camel@weser.hi.pengutronix.de>
- <20140701065105.GE14471@dragon>
- <1404724251.4587.20.camel@weser.hi.pengutronix.de>
- <20140707135502.GR30239@dragon>
-Message-ID: <20140716065505.GB2612@dragon>
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Wed, 16 Jul 2014 12:31:33 +0530
+Subject: [PATCH v4 3/3] regulator: qcom-rpm: Regulator driver for the
+ Qualcomm RPM
+In-Reply-To: <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CAMf-jSn2YHF7ihRpXMfkPWYt8pNCj4o395OGha3BHD3K3mUv9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 07, 2014 at 09:55:03PM +0800, Shawn Guo wrote:
-> On Mon, Jul 07, 2014 at 11:10:51AM +0200, Lucas Stach wrote:
-> > Hi Shawn,
-> > 
-> > Over the weekend I tried to reproduce your problem on a SabreSD board,
-> > but wasn't able to trigger the issue. 3.16-rc3 with PCIe active works
-> > just fine over a suspend and resume cycle for me.
-> 
-> That's strange.  In my setup, PCIe support is enabled in kernel and DT,
-> but I do not have a PCIe device connected to the board.
-> 
-> > 
-> > One possibly relevant difference is that I've booted with NFSroot, while
-> > it seems you are using a SATA connected device. Is this right?
-> 
-> I have a SATA disk connected, but did boot with NFSroot.
-> 
-> > If so,
-> > can you test if it works if you boot from SDcard or the like? This might
-> > be relevant as PCIe and SATA share some clocks.
-> 
-> I tried to disable SATA support completely, but it doesn't help.
+Hi Bjorn,
 
-Lucas, any news on this?  Or should we just try to use Richard's patch
-to solve the problem?
+On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> Driver for regulators exposed by the Resource Power Manager (RPM) found
+> in Qualcomm 8660, 8960 and 8064 based devices.
+>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+>  drivers/regulator/Kconfig              |  12 +
+>  drivers/regulator/Makefile             |   1 +
+>  drivers/regulator/qcom_rpm-regulator.c | 787 +++++++++++++++++++++++++++++++++
+>  3 files changed, 800 insertions(+)
+.
+.
+[snip]
+.
+.
+> + * Physically available PMIC regulator voltage ranges
+> + */
+> +static const struct regulator_linear_range pldo_ranges[] = {
+> +       REGULATOR_LINEAR_RANGE( 750000,   0,  59, 12500),
 
-Shawn
+ERROR: space prohibited after that open parenthesis '('
+
+> +       REGULATOR_LINEAR_RANGE(1500000,  60, 123, 25000),
+> +       REGULATOR_LINEAR_RANGE(3100000, 124, 160, 50000),
+> +};
+> +
+> +static const struct regulator_linear_range nldo_ranges[] = {
+> +       REGULATOR_LINEAR_RANGE( 750000,   0,  63, 12500),
+
+Ditto.
+
+> +};
+> +
+> +static const struct regulator_linear_range nldo1200_ranges[] = {
+> +       REGULATOR_LINEAR_RANGE( 375000,   0,  59,  6250),
+> +       REGULATOR_LINEAR_RANGE( 750000,  60, 123, 12500),
+
+Ditto
+
+> +};
+> +
+> +static const struct regulator_linear_range smps_ranges[] = {
+> +       REGULATOR_LINEAR_RANGE( 375000,   0,  29, 12500),
+> +       REGULATOR_LINEAR_RANGE( 750000,  30,  89, 12500),
+> +       REGULATOR_LINEAR_RANGE(1500000,  90, 153, 25000),
+> +};
+> +
+> +static const struct regulator_linear_range ftsmps_ranges[] = {
+> +       REGULATOR_LINEAR_RANGE( 350000,   0,   6, 50000),
+> +       REGULATOR_LINEAR_RANGE( 700000,   7,  63, 12500),
+> +       REGULATOR_LINEAR_RANGE(1500000,  64, 100, 50000),
+> +};
+
+Ditto
+
+> +
+> +static const struct regulator_linear_range ncp_ranges[] = {
+> +       REGULATOR_LINEAR_RANGE(1500000,   0,  31, 50000),
+
+[snip]
+
+> +MODULE_DESCRIPTION("Qualcomm RPM regulator driver");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 1.8.2.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+Thanks and Regards
+Pramod
