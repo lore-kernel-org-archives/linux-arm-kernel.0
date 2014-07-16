@@ -1,24 +1,135 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 16 Jul 2014 16:26:07 +0200
-Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
- code
-In-Reply-To: <53C67386.5070401@samsung.com>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-5-git-send-email-t.figa@samsung.com>
- <1405502840.4408.2.camel@x220> <53C67386.5070401@samsung.com>
-Message-ID: <1405520767.4408.39.camel@x220>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 Jul 2014 09:26:30 -0500
+Subject: [PATCH v10 1/7] of: Provide function to request and map memory
+In-Reply-To: <1404745988-32558-2-git-send-email-matthias.bgg@gmail.com>
+References: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
+ <1404745988-32558-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAL_Jsq+MJJA9OeKqM+dmYJdBRuuOcA-=4Ax3w8AqEhc8yOjeUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-07-16 at 14:43 +0200, Tomasz Figa wrote:
-> On 16.07.2014 11:27, Paul Bolle wrote:
-> > There are three further references to CONFIG_SAMSUNG_CLOCK in this file.
-> > Those should be removed too, shouldn't they?
-> 
-> That's right. Apparently I missed them. I guess that's not critical,
-> though, and could be done in separate patch, right?
+On Mon, Jul 7, 2014 at 10:13 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> A call to of_iomap does not request the memory region.
+> This patch adds the function of_io_request_and_map which requests
+> the memory region before mapping it.
+>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+> Suggested-by: Rob Herring <robh@kernel.org>
 
-This is not critical at all, so that's fine with me. 
+Acked-by: Rob Herring <robh@kernel.org>
 
-
-Paul Bolle
+> ---
+>  drivers/of/address.c       |   36 ++++++++++++++++++++++++++++++++++++
+>  include/linux/io.h         |    2 ++
+>  include/linux/of_address.h |   11 +++++++++++
+>  lib/devres.c               |    2 --
+>  4 files changed, 49 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 5edfcb0..e371825 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -702,6 +702,42 @@ void __iomem *of_iomap(struct device_node *np, int index)
+>  }
+>  EXPORT_SYMBOL(of_iomap);
+>
+> +/*
+> + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
+> + *                        for a given device_node
+> + * @device:    the device whose io range will be mapped
+> + * @index:     index of the io range
+> + * @name:      name of the resource
+> + *
+> + * Returns a pointer to the requested and mapped memory or an ERR_PTR() encoded
+> + * error code on failure. Usage example:
+> + *
+> + *     base = of_io_request_and_map(node, 0, "foo");
+> + *     if (IS_ERR(base))
+> + *             return PTR_ERR(base);
+> + */
+> +void __iomem *of_io_request_and_map(struct device_node *np, int index,
+> +                                       char *name)
+> +{
+> +       struct resource res;
+> +       void __iomem *mem;
+> +
+> +       if (of_address_to_resource(np, index, &res))
+> +               return IOMEM_ERR_PTR(-EINVAL);
+> +
+> +       if (!request_mem_region(res.start, resource_size(&res), name))
+> +               return IOMEM_ERR_PTR(-EBUSY);
+> +
+> +       mem = ioremap(res.start, resource_size(&res));
+> +       if (!mem) {
+> +               release_mem_region(res.start, resource_size(&res));
+> +               return IOMEM_ERR_PTR(-ENOMEM);
+> +       }
+> +
+> +       return mem;
+> +}
+> +EXPORT_SYMBOL(of_io_request_and_map);
+> +
+>  /**
+>   * of_dma_get_range - Get DMA range info
+>   * @np:                device node to get DMA range info
+> diff --git a/include/linux/io.h b/include/linux/io.h
+> index b76e6e5..d5fc9b8 100644
+> --- a/include/linux/io.h
+> +++ b/include/linux/io.h
+> @@ -58,6 +58,8 @@ static inline void devm_ioport_unmap(struct device *dev, void __iomem *addr)
+>  }
+>  #endif
+>
+> +#define IOMEM_ERR_PTR(err) (__force void __iomem *)ERR_PTR(err)
+> +
+>  void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
+>                             unsigned long size);
+>  void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index c13b878..fb7b722 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -109,7 +109,12 @@ static inline bool of_dma_is_coherent(struct device_node *np)
+>  extern int of_address_to_resource(struct device_node *dev, int index,
+>                                   struct resource *r);
+>  void __iomem *of_iomap(struct device_node *node, int index);
+> +void __iomem *of_io_request_and_map(struct device_node *device,
+> +                                       int index, char *name);
+>  #else
+> +
+> +#include <linux/io.h>
+> +
+>  static inline int of_address_to_resource(struct device_node *dev, int index,
+>                                          struct resource *r)
+>  {
+> @@ -120,6 +125,12 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+>  {
+>         return NULL;
+>  }
+> +
+> +static inline void __iomem *of_io_request_and_map(struct device_node *device,
+> +                                       int index, char *name)
+> +{
+> +       return IOMEM_ERR_PTR(-EINVAL);
+> +}
+>  #endif
+>
+>  #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
+> diff --git a/lib/devres.c b/lib/devres.c
+> index f562bf6..bb63248 100644
+> --- a/lib/devres.c
+> +++ b/lib/devres.c
+> @@ -86,8 +86,6 @@ void devm_iounmap(struct device *dev, void __iomem *addr)
+>  }
+>  EXPORT_SYMBOL(devm_iounmap);
+>
+> -#define IOMEM_ERR_PTR(err) (__force void __iomem *)ERR_PTR(err)
+> -
+>  /**
+>   * devm_ioremap_resource() - check, request region, and ioremap resource
+>   * @dev: generic device to handle the resource for
+> --
+> 1.7.9.5
+>
