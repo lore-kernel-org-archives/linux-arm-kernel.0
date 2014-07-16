@@ -1,133 +1,172 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Jul 2014 23:22:21 +0200
-Subject: [PATCH 6/6] ARM: dts: add rk3288 evaluation board
-In-Reply-To: <CAD=FV=Vo-J2cmyUZfD6KUdvw=5iaCgANsSvaSKfuJRWz1DCCeg@mail.gmail.com>
-References: <1471578.ILeMmG2DL6@diego> <2186895.xqgxh7zegl@diego>
- <CAD=FV=Vo-J2cmyUZfD6KUdvw=5iaCgANsSvaSKfuJRWz1DCCeg@mail.gmail.com>
-Message-ID: <2347101.iYfkQC2joc@diego>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 16 Jul 2014 14:23:25 -0700
+Subject: [PATCH v10 0/11] seccomp: add thread sync ability
+In-Reply-To: <CALCETrX48nuR6wqEV4Nu47BF4Z3XFvBpYer_fzwaqJdi0fpdKw@mail.gmail.com>
+References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
+ <20140711164931.GA18473@redhat.com>
+ <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
+ <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
+ <CAGXu5j+r-CpJiXipCT=j09+ZfJjF9jTc3kuZFAH3ZxgUEvktTA@mail.gmail.com>
+ <CALCETrX48nuR6wqEV4Nu47BF4Z3XFvBpYer_fzwaqJdi0fpdKw@mail.gmail.com>
+Message-ID: <CAGXu5jKMwiAxeCVZVPS72XWCd2KhiR-uc4VFKT0mvD9s-cTO_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 16. Juli 2014, 13:02:53 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Tue, Jul 15, 2014 at 4:02 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> > b/arch/arm/boot/dts/rk3288-evb-rk808.dts new file mode 100644
-> > index 0000000..c168cb2
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> > @@ -0,0 +1,19 @@
-> > +/*
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "rk3288-evb.dtsi"
-> > +
-> > +/ {
-> > +       compatible = "rockchip,rk3288-evb-rk808", "rockchip,rk3288";
-> > +
-> 
-> nit: remove extra blank line?
-> 
-> > +};
-> > diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
-> > b/arch/arm/boot/dts/rk3288-evb.dtsi new file mode 100644
-> > index 0000000..ff642d4
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> > @@ -0,0 +1,77 @@
-> > +/*
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include "rk3288.dtsi"
-> > +
-> > +/ {
-> > +       aliases {
-> > +               serial0 = &uart0;
-> > +               serial1 = &uart1;
-> > +               serial2 = &uart2;
-> > +               serial3 = &uart3;
-> > +               serial4 = &uart4;
-> 
-> Can the aliases go in the main dtsi?
-> 
-> > +       };
-> > +
-> > +       memory {
-> > +               reg = <0x0 0x80000000>;
-> > +       };
-> > +
-> > +       soc {
-> > +               gpio-keys {
-> > +                       compatible = "gpio-keys";
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +                       autorepeat;
-> 
-> I would have expected pinctrl for gpio0-5 to make sure pulls are
-> enabled / disabled as appropriate.
-> 
-> > +
-> > +                       button at 0 {
-> > +                               gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-> > +                               linux,code = <116>;
-> > +                               label = "GPIO Key Power";
-> > +                               linux,input-type = <1>;
-> > +                               gpio-key,wakeup = <1>;
-> > +                               debounce-interval = <100>;
-> > +                       };
-> > +               };
-> > +
-> > +               i2c0: i2c at ff650000 {
-> > +                       pinctrl-names = "default";
-> > +                       pinctrl-0 = <&i2c0_xfer>;
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               watchdog at ff800000 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               serial at ff180000 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               serial at ff190000 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               uart2: serial at ff690000 {
-> > +                       pinctrl-names = "default";
-> > +                       pinctrl-0 = <&uart2_xfer>;
-> 
-> Why is this pinctrl here?
+On Wed, Jul 16, 2014 at 12:45 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Wed, Jul 16, 2014 at 10:54 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Mon, Jul 14, 2014 at 12:04 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>>> On Fri, Jul 11, 2014 at 10:55 AM, Kees Cook <keescook@chromium.org> wrote:
+>>>> On Fri, Jul 11, 2014 at 9:49 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>>>>> On 07/10, Kees Cook wrote:
+>>>>>>
+>>>>>> This adds the ability for threads to request seccomp filter
+>>>>>> synchronization across their thread group (at filter attach time).
+>>>>>> For example, for Chrome to make sure graphic driver threads are fully
+>>>>>> confined after seccomp filters have been attached.
+>>>>>>
+>>>>>> To support this, locking on seccomp changes via thread-group-shared
+>>>>>> sighand lock is introduced, along with refactoring of no_new_privs. Races
+>>>>>> with thread creation are handled via delayed duplication of the seccomp
+>>>>>> task struct field and cred_guard_mutex.
+>>>>>>
+>>>>>> This includes a new syscall (instead of adding a new prctl option),
+>>>>>> as suggested by Andy Lutomirski and Michael Kerrisk.
+>>>>>
+>>>>> I do not not see any problems in this version,
+>>>>
+>>>> Awesome! Thank you for all the reviews. :) If Andy and Michael are
+>>>> happy with this too, I think this is in good shape. \o/
+>>>
+>>> I think I'm happy with it.  Is it in git somewhere for easy perusal?
+>>> I have a cold, so my reviewing ability is a bit off, but I want to
+>>> take a look at the final version, and git is a little easier than
+>>> email for this.
+>>
+>> Hi Andy,
+>>
+>> Have you had a chance to look v10 over? I'd like to send a v11 with
+>> Oleg's Reviewed-by added (at James Morris's request). Should I add one
+>> from you as well?
+>
+> Trivial nits (take them or leave them):
+>
+> seccomp_check_mode confused me.  Maybe seccomp_may_assign_mode would
+> be a better name.
 
-The other uarts also have rts/cts pins available, but optional it seems. So my 
-idea was to let the boards decide which pins to use, instead of setting it in 
-the soc-dtsi.
+Good idea; I was unhappy with this name too. Done for v11.
 
-Other opinions? :-)
+> In the writer locking changelog, should "(which is unique to the
+> thread group)" be "(which is shared by all threads in the thread
+> group)"?
 
+Done.
 
-> 
-> > +                       status = "okay";
-> > +               };
+> This bit:
+>
+>     /*
+>      * Explicitly enable no_new_privs here in case it got set
+>      * between the task_struct being duplicated and holding the
+>      * sighand lock. The seccomp state and nnp must be in sync.
+>      */
+>     if (task_no_new_privs(current))
+>         task_set_no_new_privs(p);
+>
+> should arguably move the very end of task duplication -- someone will
+> want it for some other purpose some day.
+
+That certainly seems plausible, but for the moment, I want to keep nnp
+near seccomp, since that's where we have a race.
+
+> This bit:
+>
+>     /* If we have a seccomp mode, enable the thread flag. */
+>     if (p->seccomp.mode != SECCOMP_MODE_DISABLED)
+>         set_tsk_thread_flag(p, TIF_SECCOMP);
+>
+> is not quite obvious to me -- it's not obvious why it's needed.  If
+> it's to eliminate a race, can you explain the race in the comment?  If
+> it's just paranoia, a WARN_ON or BUG_ON might be worthwhile.
+
+I've expanded the comment; it's the same issue as nnp: seccomp could
+have changed, so if we gained a mode, we need to set the flag too.
+
+> SECCOMP_FILTER_FLAG_MASK seems backwards to me.  Maybe rename it to
+> SECCOMP_FILTER_ALLOWED_FLAGS and invert it?
+
+Excellent point. Other kernel users of the _MASK name aren't inverted. Fixed.
+
+> is_ancestor: calling the first parameter "candidate" is just a tiny
+> bit odd -- it's the child that's up for consideration.  (This is
+> barely even worth the time it took me to type it.)
+
+Switch argument and comment to "parent".
+
+> Less trivial nits:
+>
+> Can you change:
+>
+> fp = kzalloc(fp_size, GFP_KERNEL|__GFP_NOWARN);
+>
+> to
+>
+> fp = kcalloc(fprog->len, sizeof(struct sock_filter), GFP_KERNEL|__GFP_NOWARN);
+>
+> somewhere in this series (w/ a changelog comment that it's not
+> exploitable to avoid scaring people).
+
+Done, though I used a BUG_ON since the compiler will optimize it out
+(since it's an impossible state to be in).
+
+> In seccomp_prepare_user_filter, would it make sense to return -EINVAL
+> if !user_filter?  That will make it slightly more pleasant to
+> implement TSYNC-without-change if anyone ever wants it.  (This isn't
+> really necessary -- it's just slightly more polite.)
+
+I can't do this since EFAULT is already used to detect seccomp
+capabilities from userspace.
+
+> Once James picks this up, I'll rebase my series on top of it.  I think
+> they'll conflict slightly.
+
+It's not bad. I tripped over sd -> sd_local and the related sd vs &sd
+in the SK_RUN_FILTER call, but otherwise it was pretty trivial.
+
+> Feel free to add my Reviewed-by to the whole series except the ARM and
+> MIPS patches.
+
+Thanks!
+
+> And some thoughts:
+>
+> Your changelog comment for the seccomp syscall suggests that you're
+> thinking about extending the tracer interface.  I'd suggest a rather
+> different design: add a concept of a seccomp monitor associated with a
+> particular filter and an action SECCOMP_RET_MONITOR.
+> SECCOMP_RET_MONITOR will tell the monitor what syscall was attempted
+> and will wait for further instructions.  The monitor can then ask for
+> zero or more syscalls to be issued on behalf of the waiting process
+> and then resume it.  Each of those additional syscalls will be further
+> filtered through all seccomp filters outside of the one that returned
+> SECCOMP_RET_MONITOR.
+>
+> This would avoid all of the nastiness inherent in using ptrace and
+> would nest much more nicely.  And it could be far faster.
+>
+> If you decide to do something to ARM along the lines of what I'm doing
+> to x86, you may want to fix this:
+>
+>     /*
+>      * Make sure that any changes to mode from another thread have
+>      * been seen after TIF_SECCOMP was seen.
+>      */
+>     rmb();
+>
+> It should have essentially no effect on x86, though.
+
+Noted, thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
