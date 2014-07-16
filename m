@@ -1,68 +1,69 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 16 Jul 2014 12:19:37 -0700
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpomt34NcMH=H5L_fhf-6R6p27_h=aCNcpT6T12u35d=Z+w@mail.gmail.com>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <53C5C738.5040705@codeaurora.org>
- <CAKohpomt34NcMH=H5L_fhf-6R6p27_h=aCNcpT6T12u35d=Z+w@mail.gmail.com>
-Message-ID: <53C6D049.7000705@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 Jul 2014 12:31:00 -0700
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <7497427.LQy8pJts8f@wuerfel>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
+ <7497427.LQy8pJts8f@wuerfel>
+Message-ID: <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 01:30 AM, Viresh Kumar wrote:
-> On 16 July 2014 05:58, Saravana Kannan <skannan@codeaurora.org> wrote:
->>> +       if (!cpus && cpufreq_driver->stop_cpu &&
->>> cpufreq_driver->setpolicy) {
->>> +               cpufreq_driver->stop_cpu(policy);
->>> +       }
->>>
+[ Gee, I had completely missed this thread because nobody bothered to
+cc me. Seems to be standard procedure on 64-bit these days. :( ]
+
+
+On Mon, Jun 30, 2014 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
+>> > > pmc.c implements various routines to access the power management
+>> > > controller, some of which is needed by suspend/resume, some of it is
+>> > > needed by SMP. powergate.c implements a subset of the PMC that needs to
+>> > > be exported to drivers to enable power partitions on the SoC. I'm not
+>> > > aware of subsystems that deal with this kind of driver.
+>> > >
+>> > Please see above.
 >>
->> Viresh, I tried your suggestion (and my initial thought too) to combine this
->> as an if/else with the previous if. But the indentation got nasty and made
->> it hard to read. I'm sure the compiler will optimize it. So, I would prefer
->> to leave it this way.
+>> Like I said, I don't see what business suspend/resume related code has
+>> in drivers/power. What we're talking about here really is functionality
+>> very specific to Tegra. Also some of that code needs to be run at very
+>> early points in the boot process, so we can't reasonably turn it into a
+>> proper driver anyway.
 >
-> Okay, I gave that comment again :)
+> I believe the powergate.c stuff can be changed into pm_domain code, but
+> we don't have a good subsystem with generic DT bindings yet, so that
+> may need some more groundwork first. drivers/power or a subdirectory
+> of that may end up being the right place though.
 >
-> Try this:
+>> Also, the real win we get from moving code out into drivers/ is if we
+>> can provide a common framework for them. I don't see how we can possibly
+>> do that for this code since there simply isn't enough commonality
+>> between SoCs. At the same time we now have a situation where both 32-bit
+>> and 64-bit variants of some SoCs share some of the same hardware at the
+>> very low level and since we don't have mach-* directories for 64-bit ARM
+>> and shouldn't be duplicating code either, we need to find a new home for
+>> this type of code. drivers/soc seemed to fit perfectly well.
 >
-> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> index f72b2b7..092a0ba 100644
-> --- a/drivers/cpufreq/cpufreq.c
-> +++ b/drivers/cpufreq/cpufreq.c
-> @@ -991,8 +991,10 @@ static int cpufreq_change_policy_cpus(struct
-> cpufreq_policy *policy,
->                                          CPUFREQ_UPDATE_POLICY_CPU, policy);
->          }
+> For the low-level stuff yes, but I agree with Santosh there needs to be
+> some more work trying to split out individual high-level drivers.
 >
-> -       cpus = !cpumask_empty(policy->cpus);
-> -       if (has_target() && cpus) {
-> +       if (!cpumask_empty(policy->cpus)) {
-> +               if (!has_target())
-> +                       goto unlock;
-> +
->                  ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
->                  if (!ret)
->                          ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
-> @@ -1001,9 +1003,7 @@ static int cpufreq_change_policy_cpus(struct
-> cpufreq_policy *policy,
->                          pr_err("%s: Failed to start governor\n", __func__);
->                          goto unlock;
->                  }
-> -       }
-> -
-> -       if (!cpus && cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
-> +       } else if (cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
->                  cpufreq_driver->stop_cpu(policy);
->          }
->
+> There are two common patterns for the interface between the low-level
+> register access and the more high-level stuff:  you can either use
+> a "syscon" driver that just exports a struct regmap and that gets referenced
+> from other drivers using a phandle in their device nodes, or you have
+> a driver in drivers/soc that exports a somewhat higher-level interface
+> and comes with its own header file that gets included by other drivers.
+> At the moment, the syscon/regmap variant can only be used once device
+> drivers are loaded, but there is some broad agreement that it should
+> be changed to allow calling syscon_regmap_lookup_by_phandle() at
+> early boot using just DT accessors.
 
-Not bad :) I'll take it.
+I'd strongly prefer to NOT tie this into DT and keep it as in-kernel
+implementation until we know more what a common subsystem might look
+like, if any.
 
--Saravana
+If we keep it only in the kernel, then we're free to change it as
+needed. If we tie it into DT/syscon, then we get stick with
+stable-only ABIs from day one. That doesn't seem like a good idea.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+
+-Olof
