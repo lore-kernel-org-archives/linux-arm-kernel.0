@@ -1,65 +1,32 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 13:41:52 -0500
-Subject: Function Profiler broken on today's linux-next
-In-Reply-To: <20140716182944.GK3016@saruman.home>
-References: <20140716162328.GJ1365@saruman.home>
- <20140716122921.71b118a9@gandalf.local.home>
- <20140716164141.GA3016@saruman.home>
- <20140716132413.1ede8e1d@gandalf.local.home>
- <20140716182944.GK3016@saruman.home>
-Message-ID: <20140716184152.GM3016@saruman.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jul 2014 19:45:17 +0100
+Subject: Regarding module size change in ARM kernel
+In-Reply-To: <CAKuQT6xdcsQM6a4PXO40SvbqSdccJ7bkS6Arz0yqU9RRpcoVQA@mail.gmail.com>
+References: <CAKuQT6xdcsQM6a4PXO40SvbqSdccJ7bkS6Arz0yqU9RRpcoVQA@mail.gmail.com>
+Message-ID: <20140716184517.GR21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jul 16, 2014 at 01:29:44PM -0500, Felipe Balbi wrote:
-> On Wed, Jul 16, 2014 at 01:24:13PM -0400, Steven Rostedt wrote:
-> > On Wed, 16 Jul 2014 11:41:42 -0500
-> > Felipe Balbi <balbi@ti.com> wrote:
-> > 
-> > 
-> > > .config attached. It's actually an ARM platform, I can help out with
-> > > testing anything you need.
-> > 
-> > In that case, can you see if it works under my repo?
-> > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
-> > branch: ftrace/core
+On Wed, Jul 16, 2014 at 05:51:16PM +0100, Venkateswar Rao Goli wrote:
+> Hi there,
 > 
-> works fine, thanks. FWIW
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
+> I'm running out of module size memory i.e, 14MB  ( CONFIG_HIGHMEM is
+> enabled in config ) .
 
-Actually it seems like it's not counting time properly if I run my test
-multiple times in a row:
+Quite simply, don't have such big modules.  Really.  If you're filling
+14MB you're doing something very wrong.
 
-# /root/testusb -t 1 -c 100000 -s 2048 -a
-# head -3 trace_stat/function0
-  Function                         Hit    Time                Avg           s^2
-  --------                         ---    ----                ---           ---
-  thread_interrupt               174876    166120839 us     949.935 us  3048498 us
+> I've tried to increase by changing as below,
+> could you please let us know if it would cause any regressions in any
+> of the application or scenario ?
 
-# /root/testusb -t 1 -c 100000 -s 2048 -a
-# head -3 trace_stat/function0
-  Function                           Hit       Time                    Avg          s^2
-  --------                           ---       ----                    ---          ---
-  dwc3_thread_interrupt            286796    967267300 us         4190545199 us     3241109 us 
+You're increasing the chances that the module text won't be able to reach
+the kernel text, and so relocations will fail.  18MB should work fine
+provided your kernel is no larger than 14MB.
 
-# /root/testusb -t 1 -c 100000 -s 2048 -a
-# head -3 trace_stat/function0
-  Function                              Hit      Time                 Avg               s^2
-    --------                            ---       ----                 ---              ---
-  dwc3_thread_interrupt               401346    642632072 us       1601.192 us     1194316 us 
-
-and so on...
+But seriously, do something about your huge modules.  Filling 14MB is
+just insane.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/abd4abb6/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
