@@ -1,63 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 09:46:28 -0500
-Subject: [PATCH v4 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
-In-Reply-To: <1405498900-13473-1-git-send-email-gautam.vivek@samsung.com>
-References: <CAODwPW_h2EBKtA+XwEvjCtS=FrcdHOjybwALGugd-ccQ-_vMWw@mail.gmail.com>
- <1405498900-13473-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <20140716144628.GC1365@saruman.home>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Jul 2014 16:47:38 +0200
+Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <20140716131306.GB23384@ulmo>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
+ <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
+Message-ID: <53C6908A.2050200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 01:51:40PM +0530, Vivek Gautam wrote:
-> The host controller by itself may sometimes need to handle PHY
-> and/or calibrate some of the PHY settings to get full support out
-> of the PHY controller. The PHY core provides a calibration
-> funtionality now to do so.
-> Therefore, facilitate getting the two possible PHYs, viz.
-> USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3).
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
-> 
-> Changes from v3:
->  - Modified error message as per review comments from Julius.
-> 
->  drivers/usb/host/xhci-plat.c |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 1a0cf9f..b1c0364 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
-> +#include <linux/phy/phy.h>
->  #include <linux/slab.h>
->  #include <linux/usb/xhci_pdriver.h>
->  
-> @@ -180,6 +181,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  			goto put_hcd;
->  	}
->  
-> +	/* Get possile USB 2.0 type PHY (UTMI+) available with xhci */
-> +	hcd->gen_phy = devm_phy_get(&pdev->dev, "usb2-phy");
-> +	if (IS_ERR(hcd->gen_phy)) {
-> +		ret = PTR_ERR(hcd->gen_phy);
-> +		if (ret != -ENOSYS && ret != -ENODEV)
-> +			dev_warn(&pdev->dev,
-> +				 "Error retrieving usb2 phy: %d\n", ret);
-> +	}
+Hi,
 
-should you treat -EPROBE_DEFER differently here ?
+On 07/16/2014 03:13 PM, Thierry Reding wrote:
+> On Wed, Jul 16, 2014 at 01:49:57PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
+>>> This patch adds device tree binding documentation for the SATA
+>>> controller found on NVIDIA Tegra SoCs.
+>>>
+>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>>> ---
+>>> v4: clarify mandatory clock order
+>>
+>> Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
+>> both look good to me. So these 2 + v3 for the rest of the series are:
+>>
+>> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Like I said in my reply to PATCH v3 7/8, I think this mandatory clock
+> order is a mistake.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/cf016ad7/attachment.sig>
+We've plenty of other dt bindings where things need to be specified in
+a certain order, e.g. registers. So I don't really see what the problem
+is here.
+
+Regards,
+
+Hans
