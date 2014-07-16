@@ -1,40 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Jul 2014 09:10:08 -0400
-Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
-In-Reply-To: <20140716145905.33105756@free-electrons.com>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140713222223.GH13108@titan.lakedaemon.net>
- <20140716124522.GV13108@titan.lakedaemon.net>
- <20140716145905.33105756@free-electrons.com>
-Message-ID: <20140716131008.GA13108@titan.lakedaemon.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 16 Jul 2014 15:13:06 +0200
+Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <53C666E5.6030009@redhat.com>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
+ <53C666E5.6030009@redhat.com>
+Message-ID: <20140716131306.GB23384@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 02:59:05PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Wed, Jul 16, 2014 at 01:49:57PM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> On Wed, 16 Jul 2014 08:45:22 -0400, Jason Cooper wrote:
-> 
-> > Ok, so I applied patch #10 to mvebu/dt, and #17 to mvebu/defconfig.  I
-> > was then going to apply the rest into a tentative topic branch
-> > (mvebu/soc-cpuidle), but it failed when based on v3.16-rc1, and it
-> > failed when based on mvebu/soc.
+> On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
+> > This patch adds device tree binding documentation for the SATA
+> > controller found on NVIDIA Tegra SoCs.
 > > 
-> > Could you please outline the deps so I can get this into -next?  We're
-> > really cutting the deadline close for v3.17, and I'd like to already
-> > have some time in -next if/when cpuidle Ack's it going through the mvebu
-> > tree.
+> > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> > ---
+> > v4: clarify mandatory clock order
 > 
-> As explained in the cover letter:
+> Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
+> both look good to me. So these 2 + v3 for the rest of the series are:
+> 
+> Acked-by: Hans de Goede <hdegoede@redhat.com>
 
-Gah!  I missed that it was listed in the changes.  Thanks!
+Like I said in my reply to PATCH v3 7/8, I think this mandatory clock
+order is a mistake.
 
->  * Series rebased on top of mvebu/fixes + mvebu/soc to take into
->    account the conflicts with the changes already merged on the PMSU
->    code.
-
-Yup, I missed the dep on mvebu/fixes.
-
-thx,
-
-Jason.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/fd3924d9/attachment.sig>
