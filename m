@@ -1,87 +1,48 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 21:47:42 +0200
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
- <7497427.LQy8pJts8f@wuerfel>
- <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
-Message-ID: <20140716194740.GA5212@mithrandir>
+Date: Wed, 16 Jul 2014 21:51:37 +0200
+Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <53C6908A.2050200@redhat.com>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
+ <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
+ <53C6908A.2050200@redhat.com>
+Message-ID: <20140716195136.GB5212@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 12:31:00PM -0700, Olof Johansson wrote:
-> [ Gee, I had completely missed this thread because nobody bothered to
-> cc me. Seems to be standard procedure on 64-bit these days. :( ]
+On Wed, Jul 16, 2014 at 04:47:38PM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> 
-> On Mon, Jun 30, 2014 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
-> >> > > pmc.c implements various routines to access the power management
-> >> > > controller, some of which is needed by suspend/resume, some of it is
-> >> > > needed by SMP. powergate.c implements a subset of the PMC that needs to
-> >> > > be exported to drivers to enable power partitions on the SoC. I'm not
-> >> > > aware of subsystems that deal with this kind of driver.
-> >> > >
-> >> > Please see above.
+> On 07/16/2014 03:13 PM, Thierry Reding wrote:
+> > On Wed, Jul 16, 2014 at 01:49:57PM +0200, Hans de Goede wrote:
+> >> Hi,
 > >>
-> >> Like I said, I don't see what business suspend/resume related code has
-> >> in drivers/power. What we're talking about here really is functionality
-> >> very specific to Tegra. Also some of that code needs to be run at very
-> >> early points in the boot process, so we can't reasonably turn it into a
-> >> proper driver anyway.
-> >
-> > I believe the powergate.c stuff can be changed into pm_domain code, but
-> > we don't have a good subsystem with generic DT bindings yet, so that
-> > may need some more groundwork first. drivers/power or a subdirectory
-> > of that may end up being the right place though.
-> >
-> >> Also, the real win we get from moving code out into drivers/ is if we
-> >> can provide a common framework for them. I don't see how we can possibly
-> >> do that for this code since there simply isn't enough commonality
-> >> between SoCs. At the same time we now have a situation where both 32-bit
-> >> and 64-bit variants of some SoCs share some of the same hardware at the
-> >> very low level and since we don't have mach-* directories for 64-bit ARM
-> >> and shouldn't be duplicating code either, we need to find a new home for
-> >> this type of code. drivers/soc seemed to fit perfectly well.
-> >
-> > For the low-level stuff yes, but I agree with Santosh there needs to be
-> > some more work trying to split out individual high-level drivers.
-> >
-> > There are two common patterns for the interface between the low-level
-> > register access and the more high-level stuff:  you can either use
-> > a "syscon" driver that just exports a struct regmap and that gets referenced
-> > from other drivers using a phandle in their device nodes, or you have
-> > a driver in drivers/soc that exports a somewhat higher-level interface
-> > and comes with its own header file that gets included by other drivers.
-> > At the moment, the syscon/regmap variant can only be used once device
-> > drivers are loaded, but there is some broad agreement that it should
-> > be changed to allow calling syscon_regmap_lookup_by_phandle() at
-> > early boot using just DT accessors.
+> >> On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
+> >>> This patch adds device tree binding documentation for the SATA
+> >>> controller found on NVIDIA Tegra SoCs.
+> >>>
+> >>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> >>> ---
+> >>> v4: clarify mandatory clock order
+> >>
+> >> Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
+> >> both look good to me. So these 2 + v3 for the rest of the series are:
+> >>
+> >> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> > 
+> > Like I said in my reply to PATCH v3 7/8, I think this mandatory clock
+> > order is a mistake.
 > 
-> I'd strongly prefer to NOT tie this into DT and keep it as in-kernel
-> implementation until we know more what a common subsystem might look
-> like, if any.
-> 
-> If we keep it only in the kernel, then we're free to change it as
-> needed. If we tie it into DT/syscon, then we get stick with
-> stable-only ABIs from day one. That doesn't seem like a good idea.
+> We've plenty of other dt bindings where things need to be specified in
+> a certain order, e.g. registers. So I don't really see what the problem
+> is here.
 
-There are two sides to keeping to an in-kernel API too: it may seem like
-we're free to change this at will and aren't subject to a stable ABI.
-However that's not entirely accurate.
+Like I said, the clock-names exists so that drivers can request a clock
+by name. Therefore the order in which they are listed doesn't matter.
+The only thing that matters is that the entries in clocks and
+clock-names match up.
 
-Assume we don't put any information about a feature into DT but use an
-in-kernel API only. Once we've come up with a good way to represent that
-in DT and have a generic framework that we can use, we'll most likely
-still need to keep around the old API in the kernel to make sure the
-kernel still works with a DT that doesn't have nodes and/or properties
-for the new binding.
-
-So the question arises: at that point is it really worth using a DT
-binding? Since we already have an API that works, why bother coming up
-with a new one? Especially if we can't get rid of the one we already
-have anyway?
+With the libahci_platform code we completely annul that convention.
 
 Thierry
 -------------- next part --------------
@@ -90,4 +51,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/89883d14/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/3ced75c7/attachment.sig>
