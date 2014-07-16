@@ -1,37 +1,35 @@
-From: Zubair.Kakakhel@imgtec.com (Zubair Lutfullah Kakakhel)
-Date: Wed, 16 Jul 2014 16:51:29 +0100
-Subject: [PATCH 1/4] asm-generic: Add dma-contiguous.h
-In-Reply-To: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
-References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
-Message-ID: <1405525892-60383-2-git-send-email-Zubair.Kakakhel@imgtec.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 16 Jul 2014 16:53:45 +0100
+Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <1405522297.25580.72.camel@deneb.redhat.com>
+References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405522297.25580.72.camel@deneb.redhat.com>
+Message-ID: <20140716155345.GB30313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header is used by arm64 and x86 individually.
+On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
+> On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
+> > After the EFI stub has done its business, it jumps into the kernel by branching
+> > to offset #0 of the loaded Image, which is where it expects to find the header
+> > containing a 'branch to stext' instruction.
+> > 
+> > However, the header is not covered by any PE/COFF section, so the header may
+> > not actually be loaded at the expected offset. So instead, jump to 'stext'
+> > directly, which is at the base of the PE/COFF .text section, by supplying a
+> > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
+> > stext into the Image. Also replace other open coded calculations of the same
+> > value with a reference to 'stext_offset'
+> 
+> Have you actually seen a situation where the header isn't there?
+> Isn't the kernel header actually part of the pe/coff file and
+> firmware loads the whole file into RAM?
 
-Adding to asm-generic to avoid further code repetition while adding cma
-to mips.
+>From my understanding of Ard's earlier comments, this part isn't
+guaranteed per the UEFI spec.
 
-Signed-off-by: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
----
- include/asm-generic/dma-contiguous.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
- create mode 100644 include/asm-generic/dma-contiguous.h
+I would rather we weren't relying on implementation details.
 
-diff --git a/include/asm-generic/dma-contiguous.h b/include/asm-generic/dma-contiguous.h
-new file mode 100644
-index 0000000..292c571
---- /dev/null
-+++ b/include/asm-generic/dma-contiguous.h
-@@ -0,0 +1,9 @@
-+#ifndef _ASM_GENERIC_DMA_CONTIGUOUS_H
-+#define _ASM_GENERIC_DMA_CONTIGUOUS_H
-+
-+#include <linux/types.h>
-+
-+static inline void
-+dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
-+
-+#endif
--- 
-1.9.1
+Thanks,
+Mark.
