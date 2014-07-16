@@ -1,33 +1,35 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 16 Jul 2014 18:16:54 +0800
-Subject: [PATCH v2 1/3] mtd: atmel_nand: add NFC status error check
-In-Reply-To: <53C64EA2.3050703@atmel.com>
-References: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
- <53C64EA2.3050703@atmel.com>
-Message-ID: <53C65116.2040508@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Jul 2014 11:21:23 +0100
+Subject: [PATCH v3] ARM: save/restore Cortex-A9 CP15 registers on
+ suspend/resume
+In-Reply-To: <20140716064249.GA2612@dragon>
+References: <1404974856-25846-1-git-send-email-shawn.guo@freescale.com>
+ <alpine.DEB.2.10.1407101704540.2893@Yrabib> <20140714051905.GA2197@dragon>
+ <20140716064249.GA2612@dragon>
+Message-ID: <20140716102123.GP21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/16/2014 6:06 PM, Josh Wu wrote:
-> On 6/10/2014 5:50 PM, Josh Wu wrote:
->> Add a new function to read the NFC status. Meantime, this function will
->> theck if there is any errors in NFC.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->
-> Tested-by: Matthieu Crapet <Matthieu.Crapet@ingenico.com>
->
+On Wed, Jul 16, 2014 at 02:42:50PM +0800, Shawn Guo wrote:
+> On Mon, Jul 14, 2014 at 01:19:06PM +0800, Shawn Guo wrote:
+> > If no one has objection to the patch, I'm going to put it into patch
+> > tracker soon.
+> 
+> Submitted as 8103/1.
 
-Sorry, I forgot to mention this Tested-by tag is for these patch series.
+Thanks.  In some ways, I'd like more people to test this before
+applying it, especially as we're at -rc5, but I know full well that
+posting messages to mailing lists won't attract the amount of testing
+that this needs.
 
-Best Regards,
-Josh Wu
+We also know that this will cause breeakage for non-secure platforms,
+and we will need people running those platforms to update their
+resume code.
 
-> I add a Tested-by tag from Matthieu Crapet.
-> He didn't reply this email thread directly. His test-by tag is in 
-> email:http://lists.infradead.org/pipermail/linux-mtd/2014-June/054443.html 
->
->
-> Best Regards,
-> Josh Wu
->
+The only way which seems to work is to apply it for the next merge
+window, and wait until platform people are forced into testing it
+when it eventually appears in their trees.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
