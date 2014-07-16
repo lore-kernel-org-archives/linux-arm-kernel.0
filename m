@@ -1,36 +1,41 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 16 Jul 2014 16:04:21 -0700
-Subject: Kexec on arm64
-In-Reply-To: <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
-References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
- <1405443898.22585.7.camel@smoke>
- <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
-Message-ID: <1405551861.7262.26.camel@smoke>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 17 Jul 2014 01:12:46 +0200
+Subject: [PATCH] ARM: at91/dt: fix usb0 clocks definition in sam9n12 dtsi
+In-Reply-To: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140716231245.GA12493@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Feng,
+On 14/07/2014 at 08:39:27 +0200, Boris Brezillon wrote :
+> udphs_clk (USB Device Controller clock) is referenced instead of
+> uhphs_clk (USB Host Controller clock).
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-On Wed, 2014-07-16 at 10:57 -0700, Feng Kan wrote:
-> Just following up on the conversation. The cpu return address of 0 should work
-> in your case. Since thats the _start of the bootloader, it will run
-> some core init
-> code and then put the core back in wfe. 
+> ---
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 2877959..b84bac5 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -925,7 +925,7 @@
+>  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>  			reg = <0x00500000 0x00100000>;
+>  			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+> -			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
+> +			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
+>  				 <&uhpck>;
+>  			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+>  			status = "disabled";
+> -- 
+> 1.8.3.2
+> 
 
-OK, I fixed up my code so that zero is valid cpu return address.  Arun,
-could you try my latest I pushed out today?
-
-> However, I think this
-> functionality should
-> be pushed back into the kernel side to provide some small page of spin
-> code rather
-> than depend on the bootloader. 
-
-This method was already discussed in another thread [1] and decided
-against.  With this we would need to set that spin code memory as
-reserved from kernel use, and so each boot stage would leak some memory.
-A system would eventually run out of memory over kexec's.
-
-[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/323440
-
--Geoff
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
