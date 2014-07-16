@@ -1,74 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 16 Jul 2014 13:49:57 +0200
-Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53C666E5.6030009@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Jul 2014 13:56:44 +0200
+Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
+In-Reply-To: <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
+Message-ID: <201407161356.44693.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
-> This patch adds device tree binding documentation for the SATA
-> controller found on NVIDIA Tegra SoCs.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
-> v4: clarify mandatory clock order
-
-Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
-both look good to me. So these 2 + v3 for the rest of the series are:
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
-
-
-
-> 
->  .../devicetree/bindings/ata/tegra-sata.txt         | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
-> new file mode 100644
-> index 0000000..de2f775
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
-> @@ -0,0 +1,31 @@
-> +Tegra124 SoC SATA AHCI controller
+On Friday 11 July 2014, Thierry Reding wrote:
+> +/*
+> + * PMC
+> + */
+> +enum tegra_suspend_mode {
+> +       TEGRA_SUSPEND_NONE = 0,
+> +       TEGRA_SUSPEND_LP2, /* CPU voltage off */
+> +       TEGRA_SUSPEND_LP1, /* CPU voltage off, DRAM self-refresh */
+> +       TEGRA_SUSPEND_LP0, /* CPU + core voltage off, DRAM self-refresh */
+> +       TEGRA_MAX_SUSPEND_MODE,
+> +};
 > +
-> +Required properties :
-> +- compatible : "nvidia,tegra124-ahci".
-> +- reg : Should contain 2 entries:
-> +  - AHCI register set (SATA BAR5)
-> +  - SATA register set
-> +- interrupts : Defines the interrupt used by SATA
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names : Must include the following entries in the same
-> +  order as listed here:
-> +  - sata
-> +  - sata-oob
-> +  - cml1
-> +  - pll_e
-> +- resets : Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names : Must include the following entries:
-> +  - sata
-> +  - sata-oob
-> +  - sata-cold
-> +- phys : Must contain an entry for each entry in phy-names.
-> +  See ../phy/phy-bindings.txt for details.
-> +- phy-names : Must include the following entries:
-> +  - sata-phy : XUSB PADCTL SATA PHY
-> +- hvdd-supply : Defines the SATA HVDD regulator
-> +- vddio-supply : Defines the SATA VDDIO regulator
-> +- avdd-supply : Defines the SATA AVDD regulator
-> +- target-5v-supply : Defines the SATA 5V power regulator
-> +- target-12v-supply : Defines the SATA 12V power regulator
-> 
+> +#ifdef CONFIG_PM_SLEEP
+> +enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
+> +void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
+> +void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode);
+> +
+> +bool tegra_pmc_cpu_is_powered(int cpuid);
+> +int tegra_pmc_cpu_power_on(int cpuid);
+> +int tegra_pmc_cpu_remove_clamping(int cpuid);
+> +
+> +void tegra_pmc_restart(enum reboot_mode mode, const char *cmd);
+> +#endif
+> +
+> +/*
+
+This part is causing multiple build failures in the randconfig tests.
+You can avoid them by removing the #ifdef.
+
+On a more general note, why are you adding this stuff into a global
+header file in the first place? All users are in the same directory
+in which the functions are defined.
+
+	Arnd
