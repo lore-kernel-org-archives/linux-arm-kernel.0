@@ -1,177 +1,83 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Jul 2014 14:07:47 +0200
-Subject: [PATCH v3] ARM: exynos4: hotplug: Fix CPU idle clock down after CPU
- off
-Message-ID: <1405512467-27269-1-git-send-email-k.kozlowski@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 16 Jul 2014 14:11:57 +0200
+Subject: [PATCH 6/6] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140711064151.GJ28884@atomide.com>
+References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
+ <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
+ <20140710070948.GH28884@atomide.com> <53BEB5AF.7010604@linutronix.de>
+ <20140711064151.GJ28884@atomide.com>
+Message-ID: <53C66C0D.5060501@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos4 USE_DELAYED_RESET_ASSERTION must be set in
-ARM_COREx_OPTION register during CPU power down. This is the proper way
-of powering down CPU on Exynos4.
+On 07/11/2014 08:41 AM, Tony Lindgren wrote:
+>> I tried this with am335x-evm, dra7-evm and beaglebone (omap5-uevm and
+>> am335x-evmsk didn't want to boot a kernel and omap4-blaze didn't even
+>> want to show MLO/U-boot) with the same result.
+> 
+> None of these SoCs support off-idle with mainline kernel so testing
+> with those is not enough :) Best to use some omap3 based device for
+> testing this.
+> 
+> So far I have verified that beagleboard xm, n900, and omap3730-evm
+> all hit off-idle with v3.16-rc4.
 
-Additionally on Exynos4212 without this the CPU clock down feature won't
-work after powering down some CPU and the online CPUs will work at full
-frequency chosen by CPUfreq governor.
+Unfortunately I don't have access to any of those devices.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> I had network up and configured. Was that okay? I also tried
+>> "ifconfig eth0 down; sleep 10; ifconfig eth0 up" to see if it works.
+> 
+> That's fine for GPMC connected devices, devices with Ethernet on
+> EHCI won't idle properly AFAIK.
 
----
-Changes since v2:
-1. Add missing disable of the "use delayed reset assertion" feature
-   when starting secondary CPU (suggested by Tomasz Figa).
+am33xx has proper ethernet (cpsw IP core on SoC and not something
+behind USB).
 
-Changes since v1:
-1. Use delayed reset assertion on all Exynos4 family and all cores, not
-   only on core 1 of Exynos4212.
-2. Rebase on Tomasz Figa's patch:
-   ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
-   http://www.spinics.net/lists/linux-samsung-soc/msg31604.html
-   Tomasz's patch is currently applied to Kukjin's v3.16-samsung-fixes-4
----
- arch/arm/mach-exynos/common.h   |  4 ++++
- arch/arm/mach-exynos/hotplug.c  | 21 +++++++++++++++++++--
- arch/arm/mach-exynos/platsmp.c  | 24 ++++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h |  3 +++
- 4 files changed, 50 insertions(+), 2 deletions(-)
+>> That core_pwrdm shows only up on dra7. However with both drivers (mine
+>> and the current omap serial) the UART went down after three secs (as
+>> expected) and didn't accept any characters while writing on the
+>> console. If I wrote something on it via network (like echo a >
+>> /dev/ttyO0) it came back and was working as long as I kept it busy. The
+>> thing is that RX does not wake it up. Any idea?
+> 
+> If the RX pin does not wake it up, you need to configure the
+> pinctrl-single entry for it, and configure that pin as a wake-up
+> interrupt. See the interrupts-extended entry in omap3-beagle-xm.dts.
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 1ee91763fa7c..2e08fa793aff 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -137,6 +137,10 @@ extern void __init exynos_pm_init(void);
- static inline void exynos_pm_init(void) {}
- #endif
- 
-+#ifdef CONFIG_SMP
-+extern void exynos_clear_delayed_reset_assertion(u32 core_id);
-+#endif
-+
- extern void exynos_cpu_resume(void);
- 
- extern struct smp_operations exynos_smp_ops;
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 920a4baa53cd..c58aa0f161bf 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -22,7 +22,7 @@
- #include "common.h"
- #include "regs-pmu.h"
- 
--static inline void cpu_leave_lowpower(void)
-+static inline void cpu_leave_lowpower(u32 core_id)
- {
- 	unsigned int v;
- 
-@@ -36,6 +36,8 @@ static inline void cpu_leave_lowpower(void)
- 	  : "=&r" (v)
- 	  : "Ir" (CR_C), "Ir" (0x40)
- 	  : "cc");
-+
-+	exynos_clear_delayed_reset_assertion(core_id);
- }
- 
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-@@ -47,6 +49,19 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 
- 		/* Turn the CPU off on next WFI instruction. */
- 		exynos_cpu_power_down(core_id);
-+		if (soc_is_exynos4()) {
-+			unsigned int tmp;
-+
-+			/*
-+			 * Exynos 4 SoCs require setting
-+			 * USE_DELAYED_RESET_ASSERTION so the CPU idle
-+			 * clock down feature could properly detect
-+			 * global idle state when CPUx is off.
-+			 */
-+			tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-+			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-+			__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-+		}
- 
- 		wfi();
- 
-@@ -76,6 +91,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- void __ref exynos_cpu_die(unsigned int cpu)
- {
- 	int spurious = 0;
-+	u32 mpidr = cpu_logical_map(cpu);
-+	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
- 
- 	v7_exit_coherency_flush(louis);
- 
-@@ -85,7 +102,7 @@ void __ref exynos_cpu_die(unsigned int cpu)
- 	 * bring this CPU back into the world of cache
- 	 * coherency, and then restore interrupts
- 	 */
--	cpu_leave_lowpower();
-+	cpu_leave_lowpower(core_id);
- 
- 	if (spurious)
- 		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 50b9aad5e27b..9ce0567fbe87 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -32,6 +32,27 @@
- 
- extern void exynos4_secondary_startup(void);
- 
-+/*
-+ * Clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-+ * during hot-unplugging CPUx.
-+ *
-+ * It won't harm if this is called during first boot of secondary CPU.
-+ *
-+ * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION so the CPU idle
-+ * clock down feature could properly detect global idle state when
-+ * CPUx is off.
-+ */
-+void exynos_clear_delayed_reset_assertion(u32 core_id)
-+{
-+	if (soc_is_exynos4()) {
-+		unsigned int tmp;
-+
-+		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-+		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-+		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-+	}
-+}
-+
- static inline void __iomem *cpu_boot_reg_base(void)
- {
- 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-@@ -170,6 +191,9 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		udelay(10);
- 	}
- 
-+	/* No harm if this is called during first boot of secondary CPU */
-+	exynos_clear_delayed_reset_assertion(core_id);
-+
- 	/*
- 	 * now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 1d13b08708f0..59bd92112842 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -25,6 +25,7 @@
- 
- #define S5P_USE_STANDBY_WFI0			(1 << 16)
- #define S5P_USE_STANDBY_WFE0			(1 << 24)
-+#define S5P_USE_DELAYED_RESET_ASSERTION		BIT(12)
- 
- #define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
- #define EXYNOS5440_SWRESET			S5P_PMUREG(0x00C4)
-@@ -111,6 +112,8 @@
- 			(EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
- #define EXYNOS_ARM_CORE_STATUS(_nr)		\
- 			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
-+#define EXYNOS_ARM_CORE_OPTION(_nr)		\
-+			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x8)
- 
- #define EXYNOS_ARM_COMMON_CONFIGURATION		S5P_PMUREG(0x2500)
- #define EXYNOS_COMMON_CONFIGURATION(_nr)	\
--- 
-1.9.1
+This does not help. Checking the manual, there is not something like
+PIN_OFF_WAKEUPENABLE for am33xx. There is just INPUT/OUTPUT, pull
+up/down + enabled/disabled and the mux_mode. For the interrupt, the HW
+referenced as omap3_pmx_core touches some bits in the pinmux register
+which do not exists on am33xx.
+
+So I have nothing on HW around that could test wakeup scenario.
+
+>> Also, while it was I checked the core_pwrdm and I had ON:1 and OFF:0.
+>> So something is not right.
+>> Since Dra7 has some things missing I tried it on am335x with the same
+>> behavior. Should it work here?
+> 
+> Yes only omap3 currently has the pieces needed for off-idle in the
+> mainline kernel.
+>  
+
+Good to know.
+
+>> puh. So after staring a while at your backtrace I realized that
+>> shutdown & startup callbacks are not overwritten properly. Well, thanks
+>> for that. Anyway, even serial8250_do_startup() has
+>> pm_runtime_get_sync() before first register access so I have no idea
+>> where this is coming from.
+> 
+> Maybe because the console is enabled for that port?
+
+Maybe. But I would expect to explode around the console code. Anyway I
+fixed it up and prepare next batch.
+
+> 
+> Regards,
+> 
+> Tony
+
+
+Sebastian
