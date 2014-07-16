@@ -1,66 +1,76 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 10:16:04 -0500
-Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140716151604.GG1365@saruman.home>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 16 Jul 2014 17:19:06 +0200
+Subject: [PATCH 0/4] spi: s3c64xx: fix DT binding breakage
+Message-ID: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Mark,
 
-On Wed, Jul 16, 2014 at 04:45:02PM +0200, Sebastian Andrzej Siewior wrote:
-> @@ -1280,6 +1285,7 @@ static void serial8250_stop_tx(struct uart_port *port)
->  	struct uart_8250_port *up =
->  		container_of(port, struct uart_8250_port, port);
->  
-> +	pm_runtime_get_sync(port->dev);
->  	__stop_tx(up);
->  
->  	/*
-> @@ -1289,6 +1295,8 @@ static void serial8250_stop_tx(struct uart_port *port)
->  		up->acr |= UART_ACR_TXDIS;
->  		serial_icr_write(up, UART_ACR, up->acr);
->  	}
-> +	pm_runtime_mark_last_busy(port->dev);
-> +	pm_runtime_put_autosuspend(port->dev);
->  }
->  
->  static void serial8250_start_tx(struct uart_port *port)
-> @@ -1296,8 +1304,9 @@ static void serial8250_start_tx(struct uart_port *port)
->  	struct uart_8250_port *up =
->  		container_of(port, struct uart_8250_port, port);
->  
-> +	pm_runtime_get_sync(port->dev);
->  	if (up->dma && !serial8250_tx_dma(up)) {
-> -		return;
-> +		goto out;
->  	} else if (!(up->ier & UART_IER_THRI)) {
->  		up->ier |= UART_IER_THRI;
->  		serial_port_out(port, UART_IER, up->ier);
-> @@ -1318,6 +1327,9 @@ static void serial8250_start_tx(struct uart_port *port)
->  		up->acr &= ~UART_ACR_TXDIS;
->  		serial_icr_write(up, UART_ACR, up->acr);
->  	}
-> +out:
-> +	pm_runtime_mark_last_busy(port->dev);
-> +	pm_runtime_put_autosuspend(port->dev);
+The s3c64xx SPI driver DT binding is currently broken. Commit
+3146bee ("spi: s3c64xx: Added provision for dedicated cs pin")
+added a new "cs-gpio" property and made it a requirement in
+order to make the driver behave in the same way that it used to.
 
-I wonder if you should get_sync() on start_tx() and only
-put_autosuspend() at stop_tx(). I guess the outcome would be largely the
-same, no ?
+The motivation of the offending commit was to allow boards that
+want to use the native chip select (instead of a GPIO) to work
+with the s3c64xx SPI driver. Something that was not possible
+before since the driver made it mandatory to specify a GPIO.
 
-well, other than in probe and other functions which need to make sure
-clocks are on, but it seems unnecessary to enable/disable in every
-function.
+Unfortunately the commit also changed the driver defaults since
+now besides specifying a GPIO, it makes mandatory to also specify
+that a GPIO is used while the default used to be the opposite.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/1ce5636b/attachment.sig>
+That mean that old FDT are not working anymore after 3146bee
+so DT backward compatibility was not ensured by that commit.
+
+This is a follow-up series from a previous one posted by Naveen
+Krishna [0] which attempts to solve the issue.
+
+The feedback from Naveen's series was that the patches did not
+provide a clear explanation about the rationale and goal of both
+the series as a whole and the individual changes [1].
+
+So I tried to take Navee's series and rework them to provide
+an easier to understand patch series.
+
+The series is composed of the following patches:
+
+Javier Martinez Canillas (1):
+  Revert "spi: s3c64xx: Added provision for dedicated cs pin"
+
+Naveen Krishna Chatradhi (3):
+  spi: s3c64xx: use the generic SPI "cs-gpios" property
+  spi: samsung: Update binding documentation
+  ARM: DTS: fix the chip select gpios definition in the SPI nodes
+
+ .../devicetree/bindings/spi/spi-samsung.txt        |  8 ++--
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |  2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts            |  2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |  2 +-
+ drivers/spi/spi-s3c64xx.c                          | 54 ++++++++++------------
+ 5 files changed, 30 insertions(+), 38 deletions(-)
+
+Patch 01/04 reverts the offending commit since it not only broke
+the DT binding but also introduced a confusing "cs-gpio" property
+while the driver already used a property with the same name.
+
+Patch 02/04 fixes the DT binding for good by using the SPI core
+"cs-gpios" property to specify the chip select GPIO instead of
+using a custom property only used by this driver. This change
+breaks backward compatibility but this has been broken for more
+than a year and nobody complained so I think it's safe to change
+it again in favor of using standard DT binding properties.
+
+A benefit of Patch 02/04 is that it allows DT and legacy boards
+that need to use the built-in CS instead of a GPIO to work with
+the driver which was the original motivation of the broken commit.
+
+Patch 03/04 updates the driver binding documentation accordingly
+and patch 04/04 updates all the DTS board files in mainline.
+
+Best regards,
+Javier
+
+[0]: http://www.spinics.net/lists/linux-samsung-soc/msg34163.html
+[1]: http://www.spinics.net/lists/linux-samsung-soc/msg34309.html
