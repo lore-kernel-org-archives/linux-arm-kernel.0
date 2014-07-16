@@ -1,53 +1,60 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Jul 2014 14:43:50 +0200
-Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
- code
-In-Reply-To: <1405502840.4408.2.camel@x220>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-5-git-send-email-t.figa@samsung.com>
- <1405502840.4408.2.camel@x220>
-Message-ID: <53C67386.5070401@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 16 Jul 2014 08:45:22 -0400
+Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
+In-Reply-To: <20140713222223.GH13108@titan.lakedaemon.net>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140713222223.GH13108@titan.lakedaemon.net>
+Message-ID: <20140716124522.GV13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.07.2014 11:27, Paul Bolle wrote:
-> On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
->> All Samsung platforms are now using the Common Clock Framework and the
->> legacy clock code is being removed, so remove related dead code from
->> samsung-serial driver as well.
->>
->> Reported-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org> (maintainer:SERIAL DRIVERS)
->> Cc: Jiri Slaby <jslaby@suse.cz> (supporter:TTY LAYER)
->> Cc: linux-serial at vger.kernel.org (open list:SERIAL DRIVERS)
->> ---
->>  drivers/tty/serial/samsung.c | 4 ----
->>  1 file changed, 4 deletions(-)
+On Sun, Jul 13, 2014 at 06:22:23PM -0400, Jason Cooper wrote:
+> Rafael, Daniel,
 > 
-> This just entered linux-next (see next-20140716).
+> On Wed, Jul 09, 2014 at 03:40:04PM +0200, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > Here comes the second version of the cpuidle support for Armada 370
+> > and Armada 38x. This series has been tested on the following
+> > configurations:
+> > 
+> >  * Armada XP, LE and BE, to verify that the existing, SMP, cpuidle and
+> >    CPU hotplug functionalities are still working.
+> > 
+> >  * Armada 375, Z1 and A0, LE and BE, to verify that the existing SMP
+> >    functionality is still working (SMP support on Armada 375 Z1 is
+> >    affected by this series).
+> > 
+> >  * Armada 370, LE and BE, to verify that the newly introduced cpuidle
+> >    functionality is working fine.
+> > 
+> >  * Armada 38x, LE and BE, to verify that the existing SMP
+> >    functionality, and the newly introduced cpuidle functionality is
+> >    working fine.
+> > 
+> > We are hoping to see this patch series merged for 3.17.
+> > 
+> > Most patches are touching only arch/arm/mach-mvebu/ code so they
+> > should be handled by the mvebu maintainers. However, patches 11-14 are
+> > touching the mvebu cpuidle driver, with a possible issue on patch 11,
+> > which touches both the cpuidle driver and the mach-mvebu code in order
+> > to rename the driver without breaking functionality (if needed, we can
+> > decide to split the commits, it would break functionality temporarly,
+> > but not buildability).
 > 
->> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
->> index 36c7747..cae8ebd 100644
->> --- a/drivers/tty/serial/samsung.c
->> +++ b/drivers/tty/serial/samsung.c
->> @@ -47,10 +47,6 @@
->>  
->>  #include <asm/irq.h>
->>  
->> -#ifdef CONFIG_SAMSUNG_CLOCK
->> -#include <plat/clock.h>
->> -#endif
->> -
->>  #include "samsung.h"
->>  
->>  #if	defined(CONFIG_SERIAL_SAMSUNG_DEBUG) &&	\
-> 
-> There are three further references to CONFIG_SAMSUNG_CLOCK in this file.
-> Those should be removed too, shouldn't they?
+> Would one or both of you mind Acking this series so we can keep it
+> together?
 
-That's right. Apparently I missed them. I guess that's not critical,
-though, and could be done in separate patch, right?
+Ok, so I applied patch #10 to mvebu/dt, and #17 to mvebu/defconfig.  I
+was then going to apply the rest into a tentative topic branch
+(mvebu/soc-cpuidle), but it failed when based on v3.16-rc1, and it
+failed when based on mvebu/soc.
 
-Best regards,
-Tomasz
+Could you please outline the deps so I can get this into -next?  We're
+really cutting the deadline close for v3.17, and I'd like to already
+have some time in -next if/when cpuidle Ack's it going through the mvebu
+tree.
+
+thx,
+
+Jason.
