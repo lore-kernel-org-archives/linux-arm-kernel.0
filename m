@@ -1,36 +1,57 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 16 Jul 2014 10:27:59 +0200
-Subject: [PATCH 4/4] ARM: dts: imx6qdl: Enable CODA960 VPU
-In-Reply-To: <20140618151229.GR8860@dragon>
-References: <1402679641-868-1-git-send-email-p.zabel@pengutronix.de>
- <1402679641-868-4-git-send-email-p.zabel@pengutronix.de>
- <20140618151229.GR8860@dragon>
-Message-ID: <1405499279.3622.4.camel@paszta.hi.pengutronix.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 16 Jul 2014 14:00:00 +0530
+Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C5C738.5040705@codeaurora.org>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+ <53C5C738.5040705@codeaurora.org>
+Message-ID: <CAKohpomt34NcMH=H5L_fhf-6R6p27_h=aCNcpT6T12u35d=Z+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 18.06.2014, 23:12 +0800 schrieb Shawn Guo:
-> On Fri, Jun 13, 2014 at 07:14:01PM +0200, Philipp Zabel wrote:
-> > This patch adds links to the on-chip SRAM and reset controller nodes
-> > and switches the interrupts. Make the BIT processor interrupt, which exists on
-> > all variants, the first one. The JPEG unit interrupt, which does not exist on
-> > i.MX27 and i.MX5 thus is an optional second interrupt.
-> > Use different compatible strings for i.MX6Q/D and i.MX6S/DL, as they have to
-> > load separate firmware images for some reason.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> The whole series looks good to me.
-> 
-> Rob,
-> 
-> Do you want to apply the first patch through DT tree, or may I have your
-> ACK to take the whole series via IMX tree?
+On 16 July 2014 05:58, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> +       if (!cpus && cpufreq_driver->stop_cpu &&
+>> cpufreq_driver->setpolicy) {
+>> +               cpufreq_driver->stop_cpu(policy);
+>> +       }
+>>
+>
+> Viresh, I tried your suggestion (and my initial thought too) to combine this
+> as an if/else with the previous if. But the indentation got nasty and made
+> it hard to read. I'm sure the compiler will optimize it. So, I would prefer
+> to leave it this way.
 
-Hi,
+Okay, I gave that comment again :)
 
-are there any reservations about these patches being merged through
-Shawn's IMX tree?
+Try this:
 
-regards
-Philipp
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index f72b2b7..092a0ba 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -991,8 +991,10 @@ static int cpufreq_change_policy_cpus(struct
+cpufreq_policy *policy,
+                                        CPUFREQ_UPDATE_POLICY_CPU, policy);
+        }
+
+-       cpus = !cpumask_empty(policy->cpus);
+-       if (has_target() && cpus) {
++       if (!cpumask_empty(policy->cpus)) {
++               if (!has_target())
++                       goto unlock;
++
+                ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
+                if (!ret)
+                        ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
+@@ -1001,9 +1003,7 @@ static int cpufreq_change_policy_cpus(struct
+cpufreq_policy *policy,
+                        pr_err("%s: Failed to start governor\n", __func__);
+                        goto unlock;
+                }
+-       }
+-
+-       if (!cpus && cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
++       } else if (cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
+                cpufreq_driver->stop_cpu(policy);
+        }
