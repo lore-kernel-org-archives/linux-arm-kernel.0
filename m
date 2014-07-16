@@ -1,81 +1,48 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 16 Jul 2014 11:25:41 +0200
-Subject: [PATCH v3 05/12] phy: add the Berlin USB PHY driver
-In-Reply-To: <53C64389.3050705@gmail.com>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-6-git-send-email-antoine.tenart@free-electrons.com>
- <53C64389.3050705@gmail.com>
-Message-ID: <20140716092541.GC28151@kwain>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 16 Jul 2014 11:27:20 +0200
+Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
+ code
+In-Reply-To: <1404496099-26708-5-git-send-email-t.figa@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1405502840.4408.2.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Varka,
-
-On Wed, Jul 16, 2014 at 02:49:05PM +0530, Varka Bhadram wrote:
-> On 07/16/2014 01:55 PM, Antoine T?nart wrote:
-> >+static const struct of_device_id phy_berlin_sata_of_match[] = {
-> >+	{
-> >+		.compatible = "marvell,berlin2-usb-phy",
-> >+		.data = &phy_berlin_pll_dividers[0],
-> >+	},
-> >+	{
-> >+		.compatible = "marvell,berlin2cd-usb-phy",
-> >+		.data = &phy_berlin_pll_dividers[1],
-> >+	},
-> >+	{ },
-> >+};
-> >+MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
-> >+
+On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
+> All Samsung platforms are now using the Common Clock Framework and the
+> legacy clock code is being removed, so remove related dead code from
+> samsung-serial driver as well.
 > 
-> It looks good if we move this after probe().. So that we can see of_match_table directly...
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org> (maintainer:SERIAL DRIVERS)
+> Cc: Jiri Slaby <jslaby@suse.cz> (supporter:TTY LAYER)
+> Cc: linux-serial at vger.kernel.org (open list:SERIAL DRIVERS)
+> ---
+>  drivers/tty/serial/samsung.c | 4 ----
+>  1 file changed, 4 deletions(-)
 
-We use the of match table in the probe, when calling of_match_device().
+This just entered linux-next (see next-20140716).
 
-> >+static int phy_berlin_usb_probe(struct platform_device *pdev)
-> >+{
-> >+	const struct of_device_id *match =
-> >+		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
+> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> index 36c7747..cae8ebd 100644
+> --- a/drivers/tty/serial/samsung.c
+> +++ b/drivers/tty/serial/samsung.c
+> @@ -47,10 +47,6 @@
+>  
+>  #include <asm/irq.h>
+>  
+> -#ifdef CONFIG_SAMSUNG_CLOCK
+> -#include <plat/clock.h>
+> -#endif
+> -
+>  #include "samsung.h"
+>  
+>  #if	defined(CONFIG_SERIAL_SAMSUNG_DEBUG) &&	\
 
-Here.
+There are three further references to CONFIG_SAMSUNG_CLOCK in this file.
+Those should be removed too, shouldn't they?
 
-Antoine
 
-> >+	struct phy_berlin_usb_priv *priv;
-> >+	struct resource *res;
-> >+	struct phy_provider *phy_provider;
-> >+
-> >+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> >+	if (!priv)
-> >+		return -ENOMEM;
-> >+
-> >+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >+	priv->base = devm_ioremap_resource(&pdev->dev, res);
-> >+	if (IS_ERR(priv->base))
-> >+		return PTR_ERR(priv->base);
-> >+
-> >+	priv->rst_ctrl = devm_reset_control_get(&pdev->dev, NULL);
-> >+	if (IS_ERR(priv->rst_ctrl))
-> >+		return PTR_ERR(priv->rst_ctrl);
-> >+
-> >+	priv->pll_divider = *((u32 *)match->data);
-> >+
-> >+	priv->phy = devm_phy_create(&pdev->dev, &phy_berlin_usb_ops, NULL);
-> >+	if (IS_ERR(priv->phy)) {
-> >+		dev_err(&pdev->dev, "failed to create PHY\n");
-> >+		return PTR_ERR(priv->phy);
-> >+	}
-> >+
-> >+	platform_set_drvdata(pdev, priv);
-> >+
-> >+	phy_provider =
-> >+		devm_of_phy_provider_register(&pdev->dev, of_phy_simple_xlate);
-> >+	if (IS_ERR(phy_provider))
-> >+		return PTR_ERR(phy_provider);
-> >+
-> >+	return 0;
-> >+}
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Paul  Bolle
