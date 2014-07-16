@@ -1,45 +1,46 @@
-From: srivatsa@MIT.EDU (Srivatsa S. Bhat)
-Date: Wed, 16 Jul 2014 13:19:39 +0530
-Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpon8zDP3hVFMQV4CO2zOkb-AwnDws8xW=H8Hm4=gW=8FGQ@mail.gmail.com>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>	<1405052287-4744-1-git-send-email-skannan@codeaurora.org>	<CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>	<2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>	<CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>	<53C0A12A.2060204@codeaurora.org>	<CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>	<53C42AA8.8010107@codeaurora.org>	<CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>	<53C4BDFB.70707@codeaurora.org>	<53C4D12E.3040807@mit.edu>
- <CAKohpon8zDP3hVFMQV4CO2zOkb-AwnDws8xW=H8Hm4=gW=8FGQ@mail.gmail.com>
-Message-ID: <53C62E93.8010307@mit.edu>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 16 Jul 2014 10:01:34 +0200
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <20140715225252.GD17528@sirena.org.uk>
+References: <CAL1qeaFF0ZpUFovxTuLXrBPRg2Lbf-754Z=ztD5HFZPbfnDsAw@mail.gmail.com>
+ <53C01558.3090607@nvidia.com>
+ <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+ <53C01D17.2050906@nvidia.com> <20140714083854.GO2081@ulmo>
+ <20140714091233.GC6800@sirena.org.uk> <20140714092434.GA9755@ulmo>
+ <20140714102203.GD6800@sirena.org.uk> <53C58DCB.90502@nvidia.com>
+ <20140715225252.GD17528@sirena.org.uk>
+Message-ID: <20140716080133.GI7978@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 11:14 AM, Viresh Kumar wrote:
-> On 15 July 2014 12:28, Srivatsa S. Bhat <srivatsa@mit.edu> wrote:
->> Wait, allowing an offline CPU to be the policy->cpu (i.e., the CPU which is
->> considered as the master of the policy/group) is just absurd.
+On Tue, Jul 15, 2014 at 11:52:52PM +0100, Mark Brown wrote:
+> On Tue, Jul 15, 2014 at 11:23:39PM +0300, Tuomas Tynkkynen wrote:
 > 
-> Yeah, that was as Absurd as I am :)
+> > That sounds indeed useful for this case. How'd the following interface
+> > sound for the register offset / selector-to-register-value conversion?
+> > The I2C address would be a bit trickier to get as it would touch the
+> > regmap stuff as well, but perhaps it would be a good idea to have a
+> > phandle to the I2C device itself, and then parse the reg field for
+> > the address.
 > 
+> This looks fine, can you submit properly please?  For the I2C address
+> why not just have an interface to get the regmap and then provide a way
+> to get the underlying device back from the regmap?
 
-I have had my own share of silly ideas over the years; so don't worry, we are
-all in the same boat ;-)
+Is it mandatory for regulators to use regmap? Also I'm not sure how this
+will work with MFDs, since the device may not be the actual bus device,
+but rather a child of the MFD (and what we want access to is the MFD).
+Perhaps for regmaps that would work in most cases since MFDs seem to
+aften share the regmap with their children. However, the code in
+regulator_register() at least indicates that even then it's possible to
+have a regmap in children that's different from the top-level MFD.
 
->> The goal of this patchset should be to just de-couple the sysfs files/ownership
->> from the policy->cpu to an extent where it doesn't matter who owns those
->> files, and probably make it easier to do CPU hotplug without having to
->> destroy and recreate the files on every hotplug operation.
-> 
-> I went to that Absurd idea because we thought we can skip playing with
-> the sysfs nodes on suspend/hotplug.
-> 
-> And if policy->cpu keeps changing with hotplug, we *may* have to keep
-> sysfs stuff moving as well. One way to avoid that is by using something
-> like: policy->sysfs_cpu, but wasn't sure if that's the right path to follow.
->
-
-Hmm, I understand.. Even I don't have any suggestions as of now, since I
-haven't spent enough time thinking of alternatives yet.
-
-> Lets see what Saravana's new patchset has for us :)
-> 
-
-Yep :-)
-
-Regards,
-Srivatsa S. Bhat
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/e822c172/attachment.sig>
