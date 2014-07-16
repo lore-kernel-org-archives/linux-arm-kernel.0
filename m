@@ -1,109 +1,93 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Wed, 16 Jul 2014 15:36:09 +0530
-Subject: [PATCH v4 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <1405465241-28684-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1405465241-28684-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAMf-jS=tkBYQ7mXp71F2_rPo6DE3e4C=sFHqg3Q26a08m6NxJQ@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 16 Jul 2014 18:06:26 +0800
+Subject: [PATCH v2 1/3] mtd: atmel_nand: add NFC status error check
+In-Reply-To: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
+References: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <53C64EA2.3050703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-RPM breaks on IFC6410 without entry for 'qcom.ipc' node. Please find
-my observations below.
-
-On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
-> 8960 and 8064 based devices. The binding currently describes the rpm
-> itself and the regulator subnodes.
+On 6/10/2014 5:50 PM, Josh Wu wrote:
+> Add a new function to read the NFC status. Meantime, this function will
+> theck if there is any errors in NFC.
 >
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+
+Tested-by: Matthieu Crapet <Matthieu.Crapet@ingenico.com>
+
+I add a Tested-by tag from Matthieu Crapet.
+He didn't reply this email thread directly. His test-by tag is in 
+email:http://lists.infradead.org/pipermail/linux-mtd/2014-June/054443.html
+
+Best Regards,
+Josh Wu
+
 > ---
->  .../devicetree/bindings/soc/qcom/qcom,rpm.txt      | 263 +++++++++++++++++++++
->  include/dt-bindings/soc/qcom,rpm.h                 | 142 +++++++++++
->  2 files changed, 405 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
->  create mode 100644 include/dt-bindings/soc/qcom,rpm.h
+>   drivers/mtd/nand/atmel_nand.c     |   24 +++++++++++++++++++++++-
+>   drivers/mtd/nand/atmel_nand_nfc.h |    4 ++++
+>   2 files changed, 27 insertions(+), 1 deletion(-)
 >
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
-> new file mode 100644
-> index 0000000..ac98ffc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
-> @@ -0,0 +1,263 @@
-> +Qualcomm Resource Power Manager (RPM)
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index ec97ccb..25d9921 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1572,6 +1572,25 @@ static int atmel_hw_nand_init_params(struct platform_device *pdev,
+>   	return 0;
+>   }
+>   
+> +static inline u32 nfc_read_status(struct atmel_nand_host *host)
+> +{
+> +	u32 err_flags = NFC_SR_DTOE | NFC_SR_UNDEF | NFC_SR_AWB | NFC_SR_ASE;
+> +	u32 nfc_status = nfc_readl(host->nfc->hsmc_regs, SR);
 > +
-.
-[snip]
-.
-
-> +- #size-cells:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: must be 0
+> +	if (unlikely(nfc_status & err_flags)) {
+> +		if (nfc_status & NFC_SR_DTOE)
+> +			dev_err(host->dev, "NFC: Waiting Nand R/B Timeout Error\n");
+> +		else if (nfc_status & NFC_SR_UNDEF)
+> +			dev_err(host->dev, "NFC: Access Undefined Area Error\n");
+> +		else if (nfc_status & NFC_SR_AWB)
+> +			dev_err(host->dev, "NFC: Access memory While NFC is busy\n");
+> +		else if (nfc_status & NFC_SR_ASE)
+> +			dev_err(host->dev, "NFC: Access memory Size Error\n");
+> +	}
 > +
-> +- qcom,ipc:
-> +       Usage: required
-> +       Value type: <prop-encoded-array>
-> +       Definition: three entries specifying:
-> +                   - phandle to a syscon node representing the apcs registers
-> +                   - u32 representing offset to the register within the syscon
-> +                   - u32 representing the ipc bit within the register
-
-Was testing your patch on IFC6410 and looks like its breaking because
-this node support not being in IFC DTs. I was using the earlier
-versions of these patches and things were working. Please let me know
-the changes needed in IFC6410 DT for qcom,ipc.
-
+> +	return nfc_status;
+> +}
 > +
+>   /* SMC interrupt service routine */
+>   static irqreturn_t hsmc_interrupt(int irq, void *dev_id)
+>   {
+> @@ -1579,7 +1598,7 @@ static irqreturn_t hsmc_interrupt(int irq, void *dev_id)
+>   	u32 status, mask, pending;
+>   	irqreturn_t ret = IRQ_HANDLED;
+>   
+> -	status = nfc_readl(host->nfc->hsmc_regs, SR);
+> +	status = nfc_read_status(host);
+>   	mask = nfc_readl(host->nfc->hsmc_regs, IMR);
+>   	pending = status & mask;
+>   
+> @@ -2210,6 +2229,9 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>   		}
+>   	}
+>   
+> +	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
+> +	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
 > +
-> += SUBDEVICES
-> +
-
-.
-[snip]
-.
-
-> +       Definition: resource as defined in <dt-bindings/soc/qcom/qcom,rpm.h>
-> +
-> +
-> += EXAMPLE
-> +
-> +       #include <dt-bindings/soc/qcom,rpm.h>
-> +
-> +       rpm at 108000 {
-> +               compatible = "qcom,rpm-msm8960";
-> +               reg = <0x108000 0x1000>;
-> +               qcom,ipc = <&apcs 0x8 2>;
-
-Tried adding this but there is no reference to 'apcs' registers itself
-in any dts.
-
-Without these changes rpm breaks hence not able to test SATA which needs rpm.
-
-> +
-> +               interrupts = <0 19 0>, <0 21 0>, <0 22 0>;
-> +               interrupt-names = "ack", "err", "wakeup";
-> +
-.
-[snip]
-.
-> +
-> +#endif
-> --
-> 1.8.2.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-
-
--- 
-Thanks and Regards
-Pramod
+>   	nfc->is_initialized = true;
+>   	dev_info(&pdev->dev, "NFC is probed.\n");
+>   	return 0;
+> diff --git a/drivers/mtd/nand/atmel_nand_nfc.h b/drivers/mtd/nand/atmel_nand_nfc.h
+> index 4efd117..85b8ca6 100644
+> --- a/drivers/mtd/nand/atmel_nand_nfc.h
+> +++ b/drivers/mtd/nand/atmel_nand_nfc.h
+> @@ -37,6 +37,10 @@
+>   #define ATMEL_HSMC_NFC_SR	0x08		/* NFC Status Register */
+>   #define		NFC_SR_XFR_DONE		(1 << 16)
+>   #define		NFC_SR_CMD_DONE		(1 << 17)
+> +#define		NFC_SR_DTOE		(1 << 20)
+> +#define		NFC_SR_UNDEF		(1 << 21)
+> +#define		NFC_SR_AWB		(1 << 22)
+> +#define		NFC_SR_ASE		(1 << 23)
+>   #define		NFC_SR_RB_EDGE		(1 << 24)
+>   
+>   #define ATMEL_HSMC_NFC_IER	0x0c
