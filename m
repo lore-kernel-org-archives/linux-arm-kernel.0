@@ -1,43 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 16 Jul 2014 10:03:21 +0100
-Subject: [PATCH 1/6] dt-bindings: arm: add arm,cortex-a12 cpu compatible
- property
-In-Reply-To: <20140716005616.GB26207@quad.lixom.net>
-References: <1471578.ILeMmG2DL6@diego> <2686681.eHDb2kq8iP@diego>
- <20140716005616.GB26207@quad.lixom.net>
-Message-ID: <20140716090321.GB26951@leverpostej>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Jul 2014 11:11:22 +0200
+Subject: [PATCH 2/6] ARM: rockchip: add debug uart used by rk3288
+In-Reply-To: <CAD=FV=W3aWeT3RP5_g9r8kV8ToeHfyn57JY-py2zGVW9DF_7RQ@mail.gmail.com>
+References: <1471578.ILeMmG2DL6@diego> <2866950.oXmKFGy9mh@diego>
+ <CAD=FV=W3aWeT3RP5_g9r8kV8ToeHfyn57JY-py2zGVW9DF_7RQ@mail.gmail.com>
+Message-ID: <4054962.m70Hhy4CVc@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 01:56:16AM +0100, Olof Johansson wrote:
-> On Wed, Jul 16, 2014 at 12:59:33AM +0200, Heiko St?bner wrote:
-> > This is necessary for the new RK3288 soc.
+Am Dienstag, 15. Juli 2014, 21:13:10 schrieb Doug Anderson:
+> Heiko,
+> 
+> On Tue, Jul 15, 2014 at 4:00 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > The uarts on rk3288 are still compatible with the dw_8250, but located
+> > at a different position and need DEBUG_UART_8250_WORD enabled.
 > > 
 > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > > ---
-> >  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
-> >  1 file changed, 1 insertion(+)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> > index 1fe72a0..620a1a8 100644
-> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> > @@ -152,6 +152,7 @@ nodes to be present and contain the properties described below.
-> >  			    "arm,cortex-a7"
-> >  			    "arm,cortex-a8"
-> >  			    "arm,cortex-a9"
-> > +			    "arm,cortex-a12"
-> >  			    "arm,cortex-a15"
-> >  			    "arm,cortex-a53"
+> >  arch/arm/Kconfig.debug | 12 +++++++++++-
+> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> > index 8f90595..f68def0 100644
+> > --- a/arch/arm/Kconfig.debug
+> > +++ b/arch/arm/Kconfig.debug
+> > @@ -613,6 +613,14 @@ choice
+> > 
+> >                   Say Y here if you want kernel low-level debugging
+> >                   support
+> >                   on Rockchip based platforms.
+> > 
+> > +       config DEBUG_RK32_UART2
 > 
-> You might as well add -a17 while you're at it, since it's an announced part
-> from ARM.
+> It's slightly confusing that you didn't rename the old "DEBUG_RK3X_UART2".
 
-Yes please!
+My problem is, to what :-) ... DEBUG_RK30_UART2 ?
 
-For said patch with both strings:
+RK30xx and RK31xx share these, but I guess at least the description should be 
+adapted.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Thanks,
-Mark.
+> 
+> Other than that:
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
