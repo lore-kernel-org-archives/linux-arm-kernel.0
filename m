@@ -1,48 +1,76 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 16 Jul 2014 11:27:20 +0200
-Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
- code
-In-Reply-To: <1404496099-26708-5-git-send-email-t.figa@samsung.com>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-5-git-send-email-t.figa@samsung.com>
-Message-ID: <1405502840.4408.2.camel@x220>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Wed, 16 Jul 2014 14:56:43 +0530
+Subject: [PATCH v3 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
+ <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53C64553.9010704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
-> All Samsung platforms are now using the Common Clock Framework and the
-> legacy clock code is being removed, so remove related dead code from
-> samsung-serial driver as well.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org> (maintainer:SERIAL DRIVERS)
-> Cc: Jiri Slaby <jslaby@suse.cz> (supporter:TTY LAYER)
-> Cc: linux-serial at vger.kernel.org (open list:SERIAL DRIVERS)
+On 07/16/2014 02:24 PM, Mikko Perttunen wrote:
+> This patch adds device tree binding documentation for the SATA
+> controller found on NVIDIA Tegra SoCs.
+>
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > ---
->  drivers/tty/serial/samsung.c | 4 ----
->  1 file changed, 4 deletions(-)
+>   .../devicetree/bindings/ata/tegra-sata.txt         | 30 ++++++++++++++++++++++
+>   1 file changed, 30 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
+>
+> diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+> new file mode 100644
+> index 0000000..946f207
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+> @@ -0,0 +1,30 @@
+> +Tegra124 SoC SATA AHCI controller
+> +
+> +Required properties :
+> +- compatible : "nvidia,tegra124-ahci".
+> +- reg : Should contain 2 entries:
+> +  - AHCI register set (SATA BAR5)
+> +  - SATA register set
+> +- interrupts : Defines the interrupt used by SATA
+> +- clocks : Must contain an entry for each entry in clock-names.
+> +  See ../clocks/clock-bindings.txt for details.
+> +- clock-names : Must include the following entries:
+> +  - sata
+> +  - sata-oob
+> +  - cml1
+> +  - pll_e
 
-This just entered linux-next (see next-20140716).
+It would be more readable if it like this...
 
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index 36c7747..cae8ebd 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -47,10 +47,6 @@
->  
->  #include <asm/irq.h>
->  
-> -#ifdef CONFIG_SAMSUNG_CLOCK
-> -#include <plat/clock.h>
-> -#endif
-> -
->  #include "samsung.h"
->  
->  #if	defined(CONFIG_SERIAL_SAMSUNG_DEBUG) &&	\
+Required properties :
+- compatible	: "nvidia,tegra124-ahci".
+- reg		: Should contain 2 entries:
+		  - AHCI register set (SATA BAR5)
+		  - SATA register set
+- interrupts	: Defines the interrupt used by SATA
+- clocks	: Must contain an entry for each entry in clock-names.
+		  See ../clocks/clock-bindings.txt for details.
+....
 
-There are three further references to CONFIG_SAMSUNG_CLOCK in this file.
-Those should be removed too, shouldn't they?
+> +- resets : Must contain an entry for each entry in reset-names.
+> +  See ../reset/reset.txt for details.
+> +- reset-names : Must include the following entries:
+> +  - sata
+> +  - sata-oob
+> +  - sata-cold
+> +- phys : Must contain an entry for each entry in phy-names.
+> +  See ../phy/phy-bindings.txt for details.
+> +- phy-names : Must include the following entries:
+> +  - sata-phy : XUSB PADCTL SATA PHY
+> +- hvdd-supply : Defines the SATA HVDD regulator
+> +- vddio-supply : Defines the SATA VDDIO regulator
+> +- avdd-supply : Defines the SATA AVDD regulator
+> +- target-5v-supply : Defines the SATA 5V power regulator
+> +- target-12v-supply : Defines the SATA 12V power regulator
+
+Same....
 
 
-Paul  Bolle
+-- 
+Regards,
+Varka Bhadram.
