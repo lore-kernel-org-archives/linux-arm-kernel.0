@@ -1,55 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Jul 2014 17:47:41 +0200
-Subject: [PATCH 2/8] cpufreq: add driver for Armada XP
-In-Reply-To: <CAKohpok6-_7aQ1RxSJKLo1idc777LHWLVM=tjtTLOzZjeAUpjw@mail.gmail.com>
-References: <1404467103-29644-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404467103-29644-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAKohponuvPd1kWDdB66kxd8TxxYqQ219jCq2D2RGhMHAuZTSWA@mail.gmail.com>
- <20140716160256.7e8dbccf@free-electrons.com>
- <CAKohpomaYfuq0CR5xsf73obTbXsxdBtHToLsNWcW2NQcCd5LUw@mail.gmail.com>
- <20140716172811.2289a64c@free-electrons.com>
- <CAKohpok6-_7aQ1RxSJKLo1idc777LHWLVM=tjtTLOzZjeAUpjw@mail.gmail.com>
-Message-ID: <20140716174741.0399e9f8@free-electrons.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed, 16 Jul 2014 16:50:10 +0100
+Subject: [PATCH] arm64: Move struct stat64 to uapi.
+In-Reply-To: <20140716132708.GP29414@arm.com>
+References: <1405409946-1790-1-git-send-email-ijc@hellion.org.uk>
+ <20140715082040.GB24269@arm.com>
+ <1405420413.9794.10.camel@kazak.uk.xensource.com>
+ <20140716132708.GP29414@arm.com>
+Message-ID: <1405525810.1087.43.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Viresh Kumar,
-
-On Wed, 16 Jul 2014 21:02:29 +0530, Viresh Kumar wrote:
-
-> > Would be good to have this soon, since the 3.17 merge window is
-> > approaching. You asked me to use this cpufreq-generic driver instead of
-> > a custom cpufreq driver, and I did the work to do that. So now I clearly
-> > hope that cpufreq-generic will be merged in 3.17.
+On Wed, 2014-07-16 at 14:27 +0100, Will Deacon wrote:
+> On Tue, Jul 15, 2014 at 11:33:33AM +0100, Ian Campbell wrote:
+> > On Tue, 2014-07-15 at 09:20 +0100, Will Deacon wrote:
+> > > Hmm, but struct kstat is defined in linux/stat.h so I'm not sure why this is
+> > > arm64-specific. linux/fs.h includes that on line 10.
+> > 
+> > That include won't do anything because we already got here via
+> > linux/stat.h (6th line of "In file included from" above), so the guard
+> > has already been defined. IOW there is a loop in the includes, which
+> > starts before kstat is struct defined:
+> > 
+> > linux/stat.h -> asm/stat.h -> arm/compat.h -> linux/ptrace.h ->
+> > linux_pidnamespace.h -> linux/mm.h -> linux/fs.h
+> > 
+> > The last link here is added by aufs patches, but all the other arches
+> > are ok with this because none of them have asm/stat.h, they only have
+> > uapi/asm/stat.h.
+> > 
+> > The issue ultimately is down to the asm/stat.h -> asm/compat.h link
+> > though I think so an alternative fix could be to switch to a different
+> > set of types for the existing definition and ditching asm/compat.h from
+> > asm/stat.h. I don't think that's the correct fix though.
 > 
-> Yeah, I have already pinged Rafael few days back on this. He came back
-> from holidays last week and this is what he told me:
+> Perhaps we could split asm/compat.h into asm/compat-types.h containing just
+> the type definitions, then asm/compat.h can include that as well as defining
+> any functions and macros.
 > 
-> Jul 11 19:58:34 <vireshk> rafael, when are you going to pick stuff for 3.17?
-> Jul 11 19:59:11 <rafael> vireshk: next week i suppose
+> Then asm/stat.h just needs to include asm/compat-types.h to avoid the
+> issue.
 
-Ok.
+I think that looks like it will work. I'll give it a go.
 
-> Do you depend on this patch btw?
+> > > Can you help me unconfuse myself, please?
+> > 
+> > I hope I've managed to reduce rather than increase the confusion ;-)
 > 
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg675398.html
-> 
-> Actually there had been some objections to comparing clocks this way and
-> we *might* hold this off, unless the bindings are finalized. Will get all other
-> patches merged though.
+> I think so, but it hurt :)
 
-I'm not sure to fully understand what this patch is doing, but I
-believe I depend on it. My system has one clock for each CPU, and
-therefore each CPU has a separately controllable frequency. See
-http://git.infradead.org/linux-mvebu.git/blob/3843607838cc5436d02a6771e661969a54c2fee0:/arch/arm/boot/dts/armada-xp-mv78460.dtsi#l30
-for the Device Tree part describing the CPUs. So the existing
-cpufreq-cpu0 (as of 3.16) doesn't work because it assumes there is one
-single clock controlling the frequency.
+:)
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ian.
