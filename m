@@ -1,58 +1,40 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Jul 2014 15:05:57 +0200
-Subject: [PATCH v3] ARM: exynos4: hotplug: Fix CPU idle clock down after
- CPU off
-In-Reply-To: <1405512467-27269-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405512467-27269-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <53C678B5.7080304@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 16 Jul 2014 09:10:08 -0400
+Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
+In-Reply-To: <20140716145905.33105756@free-electrons.com>
+References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140713222223.GH13108@titan.lakedaemon.net>
+ <20140716124522.GV13108@titan.lakedaemon.net>
+ <20140716145905.33105756@free-electrons.com>
+Message-ID: <20140716131008.GA13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Wed, Jul 16, 2014 at 02:59:05PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Wed, 16 Jul 2014 08:45:22 -0400, Jason Cooper wrote:
+> 
+> > Ok, so I applied patch #10 to mvebu/dt, and #17 to mvebu/defconfig.  I
+> > was then going to apply the rest into a tentative topic branch
+> > (mvebu/soc-cpuidle), but it failed when based on v3.16-rc1, and it
+> > failed when based on mvebu/soc.
+> > 
+> > Could you please outline the deps so I can get this into -next?  We're
+> > really cutting the deadline close for v3.17, and I'd like to already
+> > have some time in -next if/when cpuidle Ack's it going through the mvebu
+> > tree.
+> 
+> As explained in the cover letter:
 
-On 16.07.2014 14:07, Krzysztof Kozlowski wrote:
+Gah!  I missed that it was listed in the changes.  Thanks!
 
-[snip]
+>  * Series rebased on top of mvebu/fixes + mvebu/soc to take into
+>    account the conflicts with the changes already merged on the PMSU
+>    code.
 
-> +#ifdef CONFIG_SMP
-> +extern void exynos_clear_delayed_reset_assertion(u32 core_id);
-> +#endif
+Yup, I missed the dep on mvebu/fixes.
 
-Is the ifdef really needed? The only difference it makes if the function
-is used but not compiled in is that with it the compilation will fail,
-while without it the kernel won't link.
+thx,
 
-> +
->  extern void exynos_cpu_resume(void);
->  
->  extern struct smp_operations exynos_smp_ops;
-
-[snip]
-
-> +/*
-> + * Clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-> + * during hot-unplugging CPUx.
-> + *
-> + * It won't harm if this is called during first boot of secondary CPU.
-> + *
-> + * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION so the CPU idle
-> + * clock down feature could properly detect global idle state when
-> + * CPUx is off.
-> + */
-> +void exynos_clear_delayed_reset_assertion(u32 core_id)
-> +{
-> +	if (soc_is_exynos4()) {
-> +		unsigned int tmp;
-> +
-> +		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-> +		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-> +		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-> +	}
-> +}
-
-The idea to make this a helper function is quite nice, but maybe it
-could be extended into exynos_set_delayed_reset_assertion() and disable
-or enable delayed assertion depending on another argument?
-
-Best regards,
-Tomasz
+Jason.
