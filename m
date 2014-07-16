@@ -1,115 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Jul 2014 20:09:51 +0100
-Subject: [PATCH v7 10/11] arm64: Clean up the initial page table creation in
- head.S
-In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1405537792-23666-11-git-send-email-catalin.marinas@arm.com>
+From: benoit.thebaudeau.dev@gmail.com (=?UTF-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Wed, 16 Jul 2014 21:14:23 +0200
+Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
+In-Reply-To: <20140716060152.GM2197@dragon>
+References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
+ <20140714070341.GC2197@dragon>
+ <CA+sos7_quvZo6j9rFPvgCdYsEx6RoUNPUyvxE74K4vaNWDkGyg@mail.gmail.com>
+ <20140714140526.GK2197@dragon>
+ <CAJ+vNU071i=fb5r-mq_GXz_r41N1XyafCeGEiuayhbwVmQ5jAQ@mail.gmail.com>
+ <20140716060152.GM2197@dragon>
+Message-ID: <CA+sos7_nHFZ6pC87CVxviuQTxTQd0-Go4zdbPrek7CWqQyWiAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a create_table_entry macro which is used to populate pgd
-and pud entries, also reducing the number of arguments for
-create_pgd_entry.
+On Wed, Jul 16, 2014 at 8:01 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Tue, Jul 15, 2014 at 10:28:52AM -0700, Tim Harvey wrote:
+>> On Mon, Jul 14, 2014 at 7:05 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+>> > On Mon, Jul 14, 2014 at 02:56:06PM +0200, Beno?t Th?baudeau wrote:
+>> >> > So the question comes down to, for an output GPIO, whether the value in
+>> >> > GPIO_DR register is always identical to what we see on the pad.  If yes,
+>> >> > your patch makes sense to me.  Otherwise, we have to set SION bit to
+>> >> > read the value of an output GPIO from GPIO_PSR.
+>> >>
+>> >> Both are not always the same. They should be the same only for sane
+>> >> hardware. GPIO_DR indicates the level that the output pad tries to
+>> >> drive, while GPIO_PSR indicates the level sensed on the pad. Thus,
+>> >> they may differ if there is an external level conflict on the pin.
+>> >> This difference may be useful in order to test if the board is
+>> >> behaving as expected or if there is anything going wrong, which is
+>> >> typically useful for board prototyping.
+>> >>
+>> >> The software "knows" what it has set on the output pad, so having a
+>> >> get accessor for GPIO_PSR is more useful than for GPIO_DR, and it
+>> >> better fits the actual meaning of this function. GPIO_DR would
+>> >> correspond to the non-existing gpio_get_set_value() function.
+>> >
+>> > Thanks for the input, Beno?t.  That's helpful.
+>> >
+>> > Shawn
+>>
+>> Great - thanks for the clarification everyone. I will not submit such
+>> a patch and instead work this from the pinmux perspective setting SION
+>> on GPIO outputs.
+>>
+>> That said, can anyone shed light on the subject of what is 'proper'
+>> for GPIO pinmux in the bootloader vs the kernel device-tree? I see
+>> that among the various imx6qdl*.dtsi files, some boards configure
+>> MX6QDL_PAD_GPIO* as 0x80000000 (no config, keeping power-on or
+>> bootloader settings) instead of manually configuring them. Perhaps
+>> there is some rule of thumb that should be followed?
+>
+> Although there are quite some cases where 0x80000000 is being used, we
+> should really configure it properly to avoid the dependency on
+> bootloader or reset value.
+>
+> Instead of specifying SION setup in the config cell case by case, I
+> think we can do that directly in pin function ID for all cases where
+> GPIO mode is selected.  I just sent a patch to do that.  Please take
+> a look to see if it works for you.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/kernel/head.S | 59 ++++++++++++++++++++++--------------------------
- 1 file changed, 27 insertions(+), 32 deletions(-)
+I don't find this patch on the ML.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 019f81d9f1d5..a6db505411bc 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -476,43 +476,38 @@ ENDPROC(__calc_phys_offset)
- 	.quad	PAGE_OFFSET
- 
- /*
-- * Macro to populate the PUD for the corresponding block entry in the next
-- * level (tbl) for the given virtual address in case of 4 levels.
-+ * Macro to create a table entry to the next page.
-  *
-- * Preserves:	pgd, virt
-- * Corrupts:	tbl, tmp1, tmp2
-- * Returns:	pud
-+ *	tbl:	page table address
-+ *	virt:	virtual address
-+ *	shift:	#imm page table shift
-+ *	ptrs:	#imm pointers per table page
-+ *
-+ * Preserves:	virt
-+ * Corrupts:	tmp1, tmp2
-+ * Returns:	tbl -> next level table page address
-  */
--	.macro	create_pud_entry, pgd, tbl, virt, pud, tmp1, tmp2
--#if CONFIG_ARM64_PGTABLE_LEVELS == 4
--	add	\tbl, \tbl, #PAGE_SIZE		// bump tbl 1 page up.
--						// to make room for pud
--	add	\pud, \pgd, #PAGE_SIZE		// pgd points to pud which
--						// follows pgd
--	lsr	\tmp1, \virt, #PUD_SHIFT
--	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
--	orr	\tmp2, \tbl, #3			// PUD entry table type
--	str	\tmp2, [\pud, \tmp1, lsl #3]
--#else
--	mov	\pud, \tbl
--#endif
-+	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
-+	lsr	\tmp1, \virt, #\shift
-+	and	\tmp1, \tmp1, #\ptrs - 1	// table index
-+	add	\tmp2, \tbl, #PAGE_SIZE
-+	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
-+	str	\tmp2, [\tbl, \tmp1, lsl #3]
-+	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
- 	.endm
- 
- /*
-  * Macro to populate the PGD (and possibily PUD) for the corresponding
-  * block entry in the next level (tbl) for the given virtual address.
-  *
-- * Preserves:	pgd, virt
-- * Corrupts:	tmp1, tmp2, tmp3
-- * Returns:	tbl -> page where block mappings can be placed
-- *	(changed to make room for pud with 4 levels, preserved otherwise)
-+ * Preserves:	tbl, next, virt
-+ * Corrupts:	tmp1, tmp2
-  */
--	.macro	create_pgd_entry, pgd, tbl, virt, tmp1, tmp2, tmp3
--	create_pud_entry \pgd, \tbl, \virt, \tmp3, \tmp1, \tmp2
--	lsr	\tmp1, \virt, #PGDIR_SHIFT
--	and	\tmp1, \tmp1, #PTRS_PER_PGD - 1	// PGD index
--	orr	\tmp2, \tmp3, #3		// PGD entry table type
--	str	\tmp2, [\pgd, \tmp1, lsl #3]
-+	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
-+	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
-+#if CONFIG_ARM64_PGTABLE_LEVELS == 4
-+	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
-+#endif
- 	.endm
- 
- /*
-@@ -573,10 +568,10 @@ __create_page_tables:
- 	/*
- 	 * Create the identity mapping.
- 	 */
--	add	x0, x25, #PAGE_SIZE		// section table address
-+	mov	x0, x25				// idmap_pg_dir
- 	ldr	x3, =KERNEL_START
- 	add	x3, x3, x28			// __pa(KERNEL_START)
--	create_pgd_entry x25, x0, x3, x1, x5, x6
-+	create_pgd_entry x0, x3, x5, x6
- 	ldr	x6, =KERNEL_END
- 	mov	x5, x3				// __pa(KERNEL_START)
- 	add	x6, x6, x28			// __pa(KERNEL_END)
-@@ -585,9 +580,9 @@ __create_page_tables:
- 	/*
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
--	add	x0, x26, #PAGE_SIZE		// section table address
-+	mov	x0, x26				// swapper_pg_dir
- 	mov	x5, #PAGE_OFFSET
--	create_pgd_entry x26, x0, x5, x1, x3, x6
-+	create_pgd_entry x0, x5, x3, x6
- 	ldr	x6, =KERNEL_END
- 	mov	x3, x24				// phys offset
- 	create_block_map x0, x7, x3, x5, x6
+Note that enabling SION for all pads in GPIO mode will have some
+impact on the power consumption. That's why SION is designed to be
+used on a per-pad basis, only when an output GPIO needs to be sensed.
+
+Beno?t
