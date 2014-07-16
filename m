@@ -1,38 +1,82 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 13:29:44 -0500
-Subject: Function Profiler broken on today's linux-next
-In-Reply-To: <20140716132413.1ede8e1d@gandalf.local.home>
-References: <20140716162328.GJ1365@saruman.home>
- <20140716122921.71b118a9@gandalf.local.home>
- <20140716164141.GA3016@saruman.home>
- <20140716132413.1ede8e1d@gandalf.local.home>
-Message-ID: <20140716182944.GK3016@saruman.home>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 16 Jul 2014 20:39:08 +0200
+Subject: [PATCH v1] ARM: rockchip: Add cpu hotplug support
+Message-ID: <53C6C6CC.2050508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 01:24:13PM -0400, Steven Rostedt wrote:
-> On Wed, 16 Jul 2014 11:41:42 -0500
-> Felipe Balbi <balbi@ti.com> wrote:
-> 
-> 
-> > .config attached. It's actually an ARM platform, I can help out with
-> > testing anything you need.
-> 
-> In that case, can you see if it works under my repo?
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
-> branch: ftrace/core
+Hi all,
 
-works fine, thanks. FWIW
+This patch adds support for cpu hotplug for rockchip SoCs. You can now 
+use kexec with rockchip compatible devices.
+That's my first patch to the kernel, so perhaps that there are missing 
+things (I am sorry if this is the case).
 
-Tested-by: Felipe Balbi <balbi@ti.com>
 
--- 
-balbi
+Regards,
+Romain
+
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/d77a7223/attachment-0001.sig>
+>From 6727523766e3711ab58b2276d2e60bee0f7b7ba8 Mon Sep 17 00:00:00 2001
+From: Romain Perier <romain.perier@gmail.com>
+Date: Tue, 15 Jul 2014 19:38:05 +0000
+Subject: [PATCH] Add cpu hotplug support
+
+---
+ arch/arm/mach-rockchip/platsmp.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+index 910835d..7cdcf5f 100644
+--- a/arch/arm/mach-rockchip/platsmp.c
++++ b/arch/arm/mach-rockchip/platsmp.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_address.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
+ #include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
+ #include <asm/mach/map.h>
+@@ -178,8 +179,38 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+ 		pmu_set_power_domain(0 + i, false);
+ }
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++static DECLARE_COMPLETION(cpu_died);
++
++static int rockchip_cpu_kill(unsigned int cpu)
++{
++	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(1000))) {
++		pr_err("CPU%d: didn't die correctly\n", cpu);
++		return 0;
++	}
++	pmu_set_power_domain(0 + cpu, false);
++	return 1;
++}
++
++
++static void rockchip_cpu_die(unsigned int cpu)
++{
++	complete(&cpu_died);
++	flush_cache_louis();
++
++	v7_exit_coherency_flush(louis);
++
++	while(1)
++		cpu_do_idle();
++}
++#endif
++
+ static struct smp_operations rockchip_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
+-	.smp_boot_secondary	= rockchip_boot_secondary,
++	.smp_boot_secondary	= rockchip_boot_secondary
++#ifdef CONFIG_HOTPLUG_CPU
++	, .cpu_kill		= rockchip_cpu_kill,
++	.cpu_die		= rockchip_cpu_die
++#endif
+ };
+ CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+-- 
+1.9.1
