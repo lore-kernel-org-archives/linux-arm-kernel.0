@@ -1,41 +1,36 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 16 Jul 2014 15:35:27 -0700
-Subject: [PATCH] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <16164926.ZsJxe6UV3e@vostro.rjw.lan>
-References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
- <16164926.ZsJxe6UV3e@vostro.rjw.lan>
-Message-ID: <53C6FE2F.8080408@codeaurora.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 16 Jul 2014 16:04:21 -0700
+Subject: Kexec on arm64
+In-Reply-To: <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+References: <CAFdej006OSyhgDcJ2iZdbjt+PtysN=i_+9Dr4GTmr=+t5yg4Kw@mail.gmail.com>
+ <1405443898.22585.7.camel@smoke>
+ <CAL85gmC9LLcN_uxMY1bM5kLx=N7rZGdGO3bmGHeUVo=Rqgk8uw@mail.gmail.com>
+Message-ID: <1405551861.7262.26.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 03:02 PM, Rafael J. Wysocki wrote:
-> On Wednesday, July 09, 2014 07:37:30 PM Saravana Kannan wrote:
->> Preliminary patch. Not tested. Just sending out to give an idea of what I'm
->> looking to do. Expect a lot more simplification when it's done.
->>
->> Benefits:
->> * A lot more simpler code.
->> * Less stability issues.
->> * Suspend/resume time would improve.
->> * Hotplug time would improve.
->> * Sysfs file permissions would be maintained.
->> * More policy settings would be maintained across suspend/resume.
->> * cpufreq stats would be maintained across hotplug for all CPUs.
->
-> One problem.  The real hotplug (when the CPU actually goes away) depends on
-> offline removing all that stuff for it.  How are you going to address that?
+Hi Feng,
 
-policy, sysfs and kobj are just SW state inside cpufreq core. So, that 
-shouldn't really affect what happens in HW when the CPU really is 
-hotplugged. Can you please elaborate what you mean?
+On Wed, 2014-07-16 at 10:57 -0700, Feng Kan wrote:
+> Just following up on the conversation. The cpu return address of 0 should work
+> in your case. Since thats the _start of the bootloader, it will run
+> some core init
+> code and then put the core back in wfe. 
 
-The only thing that this code assumes is that in real hotplug case too, 
-that the /sys/system/devices/cpuX directory doesn't go away. I don't 
-think it does. Does it?
+OK, I fixed up my code so that zero is valid cpu return address.  Arun,
+could you try my latest I pushed out today?
 
--Saravana
+> However, I think this
+> functionality should
+> be pushed back into the kernel side to provide some small page of spin
+> code rather
+> than depend on the bootloader. 
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+This method was already discussed in another thread [1] and decided
+against.  With this we would need to set that spin code memory as
+reserved from kernel use, and so each boot stage would leak some memory.
+A system would eventually run out of memory over kexec's.
+
+[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/323440
+
+-Geoff
