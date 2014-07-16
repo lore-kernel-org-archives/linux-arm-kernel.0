@@ -1,50 +1,47 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Jul 2014 12:48:48 +0200
-Subject: [RESEND PATCH v2] ARM: exynos4: hotplug: Fix CPU idle clock down
- after CPU off
-In-Reply-To: <1405499003-9975-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405499003-9975-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <53C65890.8000500@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Jul 2014 12:00:12 +0100
+Subject: [PATCH 01/13] clk: tegra: Add binding for the Tegra124 DFLL
+ clocksource
+In-Reply-To: <20140716080133.GI7978@ulmo>
+References: <53C01558.3090607@nvidia.com>
+ <CAL1qeaHETQ7kSGNjPiwi_9WNMtr9qZp0KwjZCCxY29+_N4AcuA@mail.gmail.com>
+ <53C01D17.2050906@nvidia.com> <20140714083854.GO2081@ulmo>
+ <20140714091233.GC6800@sirena.org.uk> <20140714092434.GA9755@ulmo>
+ <20140714102203.GD6800@sirena.org.uk> <53C58DCB.90502@nvidia.com>
+ <20140715225252.GD17528@sirena.org.uk> <20140716080133.GI7978@ulmo>
+Message-ID: <20140716110012.GL17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Wed, Jul 16, 2014 at 10:01:34AM +0200, Thierry Reding wrote:
+> On Tue, Jul 15, 2014 at 11:52:52PM +0100, Mark Brown wrote:
 
-Please see my comment below.
+> > This looks fine, can you submit properly please?  For the I2C address
+> > why not just have an interface to get the regmap and then provide a way
+> > to get the underlying device back from the regmap?
 
-On 16.07.2014 10:23, Krzysztof Kozlowski wrote:
-> On Exynos4 USE_DELAYED_RESET_ASSERTION must be set in
-> ARM_COREx_OPTION register during CPU power down. This is the proper way
-> of powering down CPU on Exynos4.
-> 
-> Additionally on Exynos4212 without this the CPU clock down feature won't
-> work after powering down some CPU and the online CPUs will work at full
-> frequency chosen by CPUfreq governor.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Is it mandatory for regulators to use regmap? Also I'm not sure how this
 
-[snip]
+No, but this is for a limited subset of devices that the hardware knows
+how to write to directly which means that they're restricted to things
+that can be supported with regmap (or already know how to interact with
+the hardware and don't need this interface at all).  The proposed patch
+already relies on regmap - it's passing back the information the regmap
+helpers use.
 
-> @@ -36,6 +36,14 @@ static inline void cpu_leave_lowpower(void)
->  	  : "=&r" (v)
->  	  : "Ir" (CR_C), "Ir" (0x40)
->  	  : "cc");
-> +
-> +	if (soc_is_exynos4()) {
-> +		unsigned int tmp;
-> +
-> +		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-> +		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-> +		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-> +	}
+> will work with MFDs, since the device may not be the actual bus device,
+> but rather a child of the MFD (and what we want access to is the MFD).
 
-This code is executed only if the CPU doesn't manage to power off before
-already receiving a wake-up event. Otherwise the context is lost after
-wfi(), as the core power is being cut down.
+> Perhaps for regmaps that would work in most cases since MFDs seem to
+> aften share the regmap with their children. However, the code in
+> regulator_register() at least indicates that even then it's possible to
+> have a regmap in children that's different from the top-level MFD.
 
-The normal wake-up path goes through platsmp's exynos_boot_secondary()
-and I believe that setting of S5P_USE_DELAYED_RESET_ASSERTION should be
-taken care there as well.
-
-Best regards,
-Tomasz
+Right, drivers can say exactly which regmap to use.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/68871552/attachment.sig>
