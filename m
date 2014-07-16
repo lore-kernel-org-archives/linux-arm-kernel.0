@@ -1,110 +1,75 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 16 Jul 2014 16:45:00 +0200
-Subject: [PATCH 2/5] tty: serial: 8250 core: allow to overwrite & export
- serial8250_startup()
+Date: Wed, 16 Jul 2014 16:45:01 +0200
+Subject: [PATCH 3/5] tty: serial: 8250 core: allow to set ->throttle /
+ ->unthrottle callbacks
 In-Reply-To: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
 References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1405521903-5877-3-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1405521903-5877-4-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP version of the 8250 can actually use 1:1 serial8250_startup().
-However it needs to be extended by a wakeup irq which should to be
-requested & enabled at ->startup() time and disabled at ->shutdown() time.
+The omap uart provides support for HW assisted flow control. What is
+missing is the support to throttle / unthrottle callbacks which are used
+by the omap-serial driver at the moment.
+This patch adds the callbacks. It should be safe to add them since they
+are only invovked from the serial_core (uart_throttle()) if the feature
+flags are set.
 
-v2?v3: properly copy callbacks
-v1?v2: add shutdown callback
-
-Acked-by: Alan Cox <alan@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250_core.c | 26 ++++++++++++++++++++++++--
- include/linux/serial_8250.h         |  2 ++
+ drivers/tty/serial/8250/8250_core.c | 14 ++++++++++++++
  include/linux/serial_core.h         |  2 ++
- 3 files changed, 28 insertions(+), 2 deletions(-)
+ 2 files changed, 16 insertions(+)
 
 diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 5a6af19..bd0e1897 100644
+index bd0e1897..714f954 100644
 --- a/drivers/tty/serial/8250/8250_core.c
 +++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1939,7 +1939,7 @@ static void serial8250_put_poll_char(struct uart_port *port,
- 
- #endif /* CONFIG_CONSOLE_POLL */
- 
--static int serial8250_startup(struct uart_port *port)
-+int serial8250_do_startup(struct uart_port *port)
- {
- 	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
-@@ -2191,8 +2191,17 @@ static int serial8250_startup(struct uart_port *port)
- 
- 	return 0;
+@@ -1320,6 +1320,16 @@ static void serial8250_start_tx(struct uart_port *port)
+ 	}
  }
-+EXPORT_SYMBOL_GPL(serial8250_do_startup);
  
--static void serial8250_shutdown(struct uart_port *port)
-+static int serial8250_startup(struct uart_port *port)
++static void serial8250_throttle(struct uart_port *port)
 +{
-+	if (port->startup)
-+		return port->startup(port);
-+	else
-+		return serial8250_do_startup(port);
++	port->throttle(port);
 +}
 +
-+void serial8250_do_shutdown(struct uart_port *port)
++static void serial8250_unthrottle(struct uart_port *port)
++{
++	port->unthrottle(port);
++}
++
+ static void serial8250_stop_rx(struct uart_port *port)
  {
  	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
-@@ -2243,6 +2252,15 @@ static void serial8250_shutdown(struct uart_port *port)
- 	if (port->irq)
- 		serial_unlink_irq_chain(up);
- }
-+EXPORT_SYMBOL_GPL(serial8250_do_shutdown);
-+
-+static void serial8250_shutdown(struct uart_port *port)
-+{
-+	if (port->shutdown)
-+		port->shutdown(port);
-+	else
-+		serial8250_do_shutdown(port);
-+}
+@@ -2752,6 +2762,8 @@ static struct uart_ops serial8250_pops = {
+ 	.get_mctrl	= serial8250_get_mctrl,
+ 	.stop_tx	= serial8250_stop_tx,
+ 	.start_tx	= serial8250_start_tx,
++	.throttle	= serial8250_throttle,
++	.unthrottle	= serial8250_unthrottle,
+ 	.stop_rx	= serial8250_stop_rx,
+ 	.enable_ms	= serial8250_enable_ms,
+ 	.break_ctl	= serial8250_break_ctl,
+@@ -3300,6 +3312,8 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
+ 		uart->port.fifosize	= up->port.fifosize;
+ 		uart->tx_loadsz		= up->tx_loadsz;
+ 		uart->capabilities	= up->capabilities;
++		uart->port.throttle	= up->port.throttle;
++		uart->port.unthrottle	= up->port.unthrottle;
  
- static unsigned int serial8250_get_divisor(struct uart_port *port, unsigned int baud)
- {
-@@ -3304,6 +3322,10 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
- 		/*  Possibly override set_termios call */
- 		if (up->port.set_termios)
- 			uart->port.set_termios = up->port.set_termios;
-+		if (up->port.startup)
-+			uart->port.startup = up->port.startup;
-+		if (up->port.shutdown)
-+			uart->port.shutdown = up->port.shutdown;
- 		if (up->port.pm)
- 			uart->port.pm = up->port.pm;
- 		if (up->port.handle_break)
-diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
-index af47a8a..0ec21ec 100644
---- a/include/linux/serial_8250.h
-+++ b/include/linux/serial_8250.h
-@@ -114,6 +114,8 @@ extern void serial8250_early_out(struct uart_port *port, int offset, int value);
- extern int setup_early_serial8250_console(char *cmdline);
- extern void serial8250_do_set_termios(struct uart_port *port,
- 		struct ktermios *termios, struct ktermios *old);
-+extern int serial8250_do_startup(struct uart_port *port);
-+extern void serial8250_do_shutdown(struct uart_port *port);
- extern void serial8250_do_pm(struct uart_port *port, unsigned int state,
- 			     unsigned int oldstate);
- extern int fsl8250_handle_irq(struct uart_port *port);
+ 		/* Take tx_loadsz from fifosize if it wasn't set separately */
+ 		if (uart->port.fifosize && !uart->tx_loadsz)
 diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 5bbb809..6f20ff0 100644
+index 6f20ff0..c380af2 100644
 --- a/include/linux/serial_core.h
 +++ b/include/linux/serial_core.h
-@@ -122,6 +122,8 @@ struct uart_port {
- 	void			(*set_termios)(struct uart_port *,
- 				               struct ktermios *new,
+@@ -124,6 +124,8 @@ struct uart_port {
  				               struct ktermios *old);
-+	int			(*startup)(struct uart_port *port);
-+	void			(*shutdown)(struct uart_port *port);
+ 	int			(*startup)(struct uart_port *port);
+ 	void			(*shutdown)(struct uart_port *port);
++	void			(*throttle)(struct uart_port *port);
++	void			(*unthrottle)(struct uart_port *port);
  	int			(*handle_irq)(struct uart_port *);
  	void			(*pm)(struct uart_port *, unsigned int state,
  				      unsigned int old);
