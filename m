@@ -1,81 +1,52 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 16 Jul 2014 14:42:50 +0300
-Subject: [PATCH v3 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C64553.9010704@gmail.com>
-References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
- <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <53C64553.9010704@gmail.com>
-Message-ID: <53C6653A.7040107@nvidia.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 16 Jul 2014 08:45:58 -0300
+Subject: [PATCH 1/5] [RFC-HACK] pinctrl-single: init by postcore_initcall()
+In-Reply-To: <20140522233154.GE29577@atomide.com>
+References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
+ <1400799986-20043-2-git-send-email-chf.fritz@googlemail.com>
+ <20140522233154.GE29577@atomide.com>
+Message-ID: <20140716114558.GA1842@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for you comment. I decided to keep the format as is for now, 
-however, to keep a consistent style between all binding files describing 
-Tegra hardware.
+On 22 May 04:31 PM, Tony Lindgren wrote:
+> * Christoph Fritz <chf.fritz@googlemail.com> [140522 16:07]:
+> > --- a/drivers/pinctrl/pinctrl-single.c
+> > +++ b/drivers/pinctrl/pinctrl-single.c
+> > @@ -2069,7 +2069,22 @@ static struct platform_driver pcs_driver = {
+> >  #endif
+> >  };
+> >  
+> > +#ifdef CONFIG_USE_OF
+> > +static int __init pcs_driver_drv_init(void)
+> > +{
+> > +       return platform_driver_register(&pcs_driver);
+> > +}
+> > +postcore_initcall(pcs_driver_drv_init);
+> > +
+> > +static void __exit pcs_driver_drv_exit(void)
+> > +{
+> > +       platform_driver_unregister(&pcs_driver);
+> > +}
+> > +module_exit(pcs_driver_drv_exit);
+> > +#else
+> >  module_platform_driver(pcs_driver);
+> > +#endif
+> > +
+> 
+> I would prefer to initialize all the drivers with module_init
+> and and if necessary, selected frameworks with subsys_initcall. 
+> 
+> In drivers/Makefile we do have painctrl before gpio, so this
+> too could be just module_init once the other drivers are fixed.
+> 
 
-Mikko
+I've been using patches that change gpio and i2c initialization to module_init
+for some time now. However, I still see some non-DT boards using the GPIO API
+in early functions such as .init_machine.
 
-On 16/07/14 12:26, Varka Bhadram wrote:
-> On 07/16/2014 02:24 PM, Mikko Perttunen wrote:
->> This patch adds device tree binding documentation for the SATA
->> controller found on NVIDIA Tegra SoCs.
->>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->>    .../devicetree/bindings/ata/tegra-sata.txt         | 30 ++++++++++++++++++++++
->>    1 file changed, 30 insertions(+)
->>    create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
->>
->> diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
->> new file mode 100644
->> index 0000000..946f207
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
->> @@ -0,0 +1,30 @@
->> +Tegra124 SoC SATA AHCI controller
->> +
->> +Required properties :
->> +- compatible : "nvidia,tegra124-ahci".
->> +- reg : Should contain 2 entries:
->> +  - AHCI register set (SATA BAR5)
->> +  - SATA register set
->> +- interrupts : Defines the interrupt used by SATA
->> +- clocks : Must contain an entry for each entry in clock-names.
->> +  See ../clocks/clock-bindings.txt for details.
->> +- clock-names : Must include the following entries:
->> +  - sata
->> +  - sata-oob
->> +  - cml1
->> +  - pll_e
->
-> It would be more readable if it like this...
->
-> Required properties :
-> - compatible	: "nvidia,tegra124-ahci".
-> - reg		: Should contain 2 entries:
-> 		  - AHCI register set (SATA BAR5)
-> 		  - SATA register set
-> - interrupts	: Defines the interrupt used by SATA
-> - clocks	: Must contain an entry for each entry in clock-names.
-> 		  See ../clocks/clock-bindings.txt for details.
-> ....
->
->> +- resets : Must contain an entry for each entry in reset-names.
->> +  See ../reset/reset.txt for details.
->> +- reset-names : Must include the following entries:
->> +  - sata
->> +  - sata-oob
->> +  - sata-cold
->> +- phys : Must contain an entry for each entry in phy-names.
->> +  See ../phy/phy-bindings.txt for details.
->> +- phy-names : Must include the following entries:
->> +  - sata-phy : XUSB PADCTL SATA PHY
->> +- hvdd-supply : Defines the SATA HVDD regulator
->> +- vddio-supply : Defines the SATA VDDIO regulator
->> +- avdd-supply : Defines the SATA AVDD regulator
->> +- target-5v-supply : Defines the SATA 5V power regulator
->> +- target-12v-supply : Defines the SATA 12V power regulator
->
-> Same....
->
->
+Only when these boards get converted and the legacy support is dropped, we'll
+be able to move all the drivers to module_init.
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
