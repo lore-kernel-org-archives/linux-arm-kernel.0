@@ -1,69 +1,72 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 16 Jul 2014 15:47:20 +0200
-Subject: [GIT PULL] Mediatek basic support for v3.17
-In-Reply-To: <14060966.Jhk08lR3XI@wuerfel>
-References: <CABuKBe+h0Et5_+o4_i-Eu7EQ8Xka7YFoKmO=U0B7NnVQBdQ8FA@mail.gmail.com>
- <20140715135913.GA18571@kroah.com> <14060966.Jhk08lR3XI@wuerfel>
-Message-ID: <CABuKBe+pF4jxSqot5KhOfzvnyK1d3PmfsMuL2HJ9jbUPFaYCOg@mail.gmail.com>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Wed, 16 Jul 2014 15:59:44 +0200
+Subject: [PATCH] s5p-mfc: limit the size of the CPB
+In-Reply-To: <1405475493-3200-1-git-send-email-panpan1.liu@samsung.com>
+References: <1405475493-3200-1-git-send-email-panpan1.liu@samsung.com>
+Message-ID: <095901cfa0fe$334215a0$99c640e0$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-15 17:17 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 15 July 2014 06:59:13 Greg KH wrote:
->> On Tue, Jul 15, 2014 at 01:11:42PM +0200, Matthias Brugger wrote:
->> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
->> >
->> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
->> >
->> > are available in the git repository at:
->> >
->> >   https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-basic-support
->>
->> As these are only 7 patches, why do a git pull?  And I know I can't take
->> pull requests from github, I'm not sure what the rules are for the ARM
->> SoC developers either...
->>
->> Just send patches, it's easier that way.
->
-> We generally prefer pull requests, but patches also work for us.
->
-> However, one note about the text in the pull request: Matthias,
-> please always try to be explicit about who you want to pull or
-> merge things when you are ready and list in the pull request the
-> other maintainers that have agreed to merging it (or whether they
-> have not sent an Ack yet, which is even more important).
+Hi Panpan,
 
-Ok, thank you for the advice. I will do so in the next pull request.
+I merged your patch to my tree. However, next time please base the patch
+on the newest branch from Mauro. Please mind the whitespaces, I had to
+manually correct them. Also, please add version number to the [PATCH] part
+of subject e.g. [PATCH v10].
 
->
-> In this case, the clocksource driver needs an Ack from the clocksource
-> maintainers, and the drivers/of/address.c changes need an Ack from the
-> OF maintainers. I assume you have those, but I'd have to first look
-> at the patches to be sure.
->
->         arnd
-
-For the drivers/of/address.c patch I used to have an Ack [1] from
-Grant Likely who told me to merge it through arm-soc. But I deleted
-the Ack after changing the patch because of some comments from Russel
-King [2].
-So at the moment I don't have any Ack anymore.
-
-I have an Ack for the clocksource driver from Thomas [0]. Daniel
-wanted to merge it through his branch, but because of the changes in
-the OF patch he never did.
-
-So I suppose I have to get some comments from the OF maintainer about
-the patch, before we can go on with the pull request.
-
-Sorry for the noise.
-
-Matthias
-
-[0] http://thread.gmane.org/gmane.linux.documentation/24562/focus=24665
-[1] http://thread.gmane.org/gmane.linux.documentation/24447/focus=331382
-[2] https://lkml.org/lkml/2014/6/20/676
-
-
+Best wishes,
 -- 
-motzblog.wordpress.com
+Kamil Debski
+Samsung R&D Institute Poland
+
+
+> -----Original Message-----
+> From: panpan liu [mailto:panpan1.liu at samsung.com]
+> Sent: Wednesday, July 16, 2014 3:52 AM
+> To: kyungmin.park at samsung.com; k.debski at samsung.com;
+> jtp.park at samsung.com; mchehab at redhat.com
+> Cc: linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Subject: [PATCH] s5p-mfc: limit the size of the CPB
+> 
+> The CPB size is limited by the hardware. Add this limit to the s_fmt.
+> 
+> Signed-off-by: panpan liu <panpan1.liu@samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c |    9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index 0bae907..0621ed8 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -413,6 +413,7 @@ static int vidioc_s_fmt(struct file *file, void
+> *priv, struct v4l2_format *f)
+>  	int ret = 0;
+>  	struct s5p_mfc_fmt *fmt;
+>  	struct v4l2_pix_format_mplane *pix_mp;
+> +	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
+> 
+>  	mfc_debug_enter();
+>  	ret = vidioc_try_fmt(file, priv, f);
+> @@ -466,11 +467,13 @@ static int vidioc_s_fmt(struct file *file, void
+> *priv, struct v4l2_format *f)
+>  	mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+>  	pix_mp->height = 0;
+>  	pix_mp->width = 0;
+> -	if (pix_mp->plane_fmt[0].sizeimage)
+> -		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+> -	else
+> +	if (pix_mp->plane_fmt[0].sizeimage == 0)
+>  		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size =
+>
+DEF_CPB_SIZE;
+> +	else if (pix_mp->plane_fmt[0].sizeimage > buf_size->cpb)
+> +		ctx->dec_src_buf_size = buf_size->cpb;
+> +	else
+> +		ctx->dec_src_buf_size = pix_mp->plane_fmt[0].sizeimage;
+>  	pix_mp->plane_fmt[0].bytesperline = 0;
+>  	ctx->state = MFCINST_INIT;
+>  out:
+> --
+> 1.7.9.5
