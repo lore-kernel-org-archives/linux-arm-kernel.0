@@ -1,36 +1,65 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Jul 2014 09:20:40 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0: Remove spurious 0x from SCIFB clock
- name
-Message-ID: <1405470040-8328-1-git-send-email-horms+renesas@verge.net.au>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 15 Jul 2014 17:23:51 -0700
+Subject: [PATCH 2/3] pinctrl: Device tree bindings for Qualcomm pm8xxx
+ gpio block
+In-Reply-To: <1405406114.13503.40.camel@iivanov-dev>
+References: <1404782785-1824-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1404782785-1824-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <CACRpkdZ2hekBGe1-9GV-amqi50heghWhXJ9raW7P_Nif_Ci88g@mail.gmail.com>
+ <CAJAp7OghZoTXutxw7hAsq1XA_wAhOXDNFO0tz8u9ceQ1fD9W1w@mail.gmail.com>
+ <CACRpkdai=q3nmPk5OWQWn_UMdXmqcbFXJ90rxREBG9k6gdy88Q@mail.gmail.com>
+ <53C095EA.90000@codeaurora.org>
+ <1405346335.13503.25.camel@iivanov-dev>
+ <53C449A3.2010404@codeaurora.org>
+ <1405406114.13503.40.camel@iivanov-dev>
+Message-ID: <CAJAp7OjU=FFdGKHPqovz+qrEhDCZ3E=uOSAOFbgYyLE01C9cPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
-clock support for DT"). This  patch removes it.
+On Mon, Jul 14, 2014 at 11:35 PM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+> On Mon, 2014-07-14 at 14:20 -0700, Stephen Boyd wrote:
+[..]
+>> Isn't this document only for the gpios? I think you're talking about the
+>> MPPs, which also exist on these generation of pmics. We should probably
+>> avoid mixing the two (gpios and mpps) in one binding because they're
+>> really different hardware.
+>
+> I don't know. For me "gpio" looks like function of the pin hardware.
+>
+>>
+>> >  So I will like
+>> > to keep "function" property for selecting one of the above functions.
+>> > Choosing between "normal", "paired"... options in QPNP pinctrl driver
+>> > is supported trough passing values, defined in DT header file, to
+>> > "output-high" property. Please don't kill me :-).
+>>
+>> Overloading output-high to choose the MPP mode doesn't seem to follow
+>> the generic pinconfig binding. Does output-high even take a value? Why
+>> can't we use the function property?
+>
+> No, no.  using value of the output-high|low" is just to select
+> "normal", "paired"... thing. Function selection is via "function"
+> property. Currently QPNP support following functions "gpio", "mpp-ain",
+> "mpp-aout", "mpp-cs".
+>
 
-This change should not have any run-time affect at this time as
-the clock in question is used by a SCIF device that is not enabled by
-default.
+Hi Ivan,
 
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>From your comment I presume that you don't have access to the
+documentation for these blocks.
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index d8c4048..02a6f45 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
--	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-+	CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
--- 
-2.0.0
+The pmic sports two types of pins; gpios and mpps (multi-purpose-pin).
+These are different hardware blocks; i.e. not a configuration thing.
+
+The gpios can be input, output or both and they can be configured as
+gpio, paired, function 1 or function 2 (+ some test modes). So here it
+makes sense to have the functions "gpio", "paired" and the valid
+function combinations.
+
+The mpps can be input, output or both; in either digital or analog
+mode. Or they can be a current sink. When configured as analog input
+you select which adc the pin should be routed to. Here it makes sense
+to have the functions "digital", "analog" and "current-sink" I think.
+
+Regards,
+Bjorn
