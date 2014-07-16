@@ -1,69 +1,202 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 16 Jul 2014 12:31:00 -0700
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <7497427.LQy8pJts8f@wuerfel>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
- <7497427.LQy8pJts8f@wuerfel>
-Message-ID: <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 16 Jul 2014 12:34:22 -0700
+Subject: [PATCH v3 2/2] cpufreq: Simplify and fix mutual exclusion with
+ hotplug
+In-Reply-To: <CAKohpomuo-=fox=1rNZOgvy+COyWYexcP2J9NRFJqmTK6MLOjA@mail.gmail.com>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1405464473-3916-3-git-send-email-skannan@codeaurora.org>
+ <CAKohpomuo-=fox=1rNZOgvy+COyWYexcP2J9NRFJqmTK6MLOjA@mail.gmail.com>
+Message-ID: <53C6D3BE.5070505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Gee, I had completely missed this thread because nobody bothered to
-cc me. Seems to be standard procedure on 64-bit these days. :( ]
+On 07/16/2014 01:48 AM, Viresh Kumar wrote:
+> On 16 July 2014 04:17, Saravana Kannan <skannan@codeaurora.org> wrote:
+>
+> Again, just too many things in a single patch. That's not acceptable.
+> Few of these might be bug fixes, which must go in before any other updates.
+> And so it must have been added as first patch.
+>
+> Even the other stuff you are trying to fix (by checking policy->cpus) should go
+> before 1/2, otherwise 1/2 will actually break things inbetween, i.e. show values
+> even when no CPUs of a cluster are online.
+
+Well, it's no worse that what it does today. The existing code actually 
+causes a crash when you try to show while hotplugging a CPU. I'm keeping 
+the 1/2 as small as possible. You clearly want to smaller, so I don't 
+want to add this to that.
+
+Also, the current add/remove path is complicated with many cases. So, 
+I'm not comfortable saying I'm sure policy->cpus check would be 
+sufficient. I'm willing to throw out this change if you think this is 
+still wrong when it comes after 1/2.
+
+>> Since we no longer alloc and destroy/freeze policy and sysfs nodes during
+>> hotplug and suspend, we don't need to lock sysfs with hotplug. We can
+>> achieve the same effect by checking if policy->cpus is empty.
+>
+> Are you talking about the changes in store()?
+
+Yes.
+
+>
+>> Hotplug mutual exclusion was only done for sysfs writes. But reads need the
+>> same protection too.  So, this patch adds that too.
+>
+> How? How is checking for policy->cpus enough?
+
+Because when all the CPUs in a policy are hotplugged off, the 
+policy->cpus would be empty? So, it's functionally the same without 
+having to get hotplug lock. This way, CPUs of other policies could be 
+hotplugged while your are show/store on one policy.
+
+But I'm sure you already understood this. So, not sure what you are 
+really asking.
+
+>
+>> Also, cpufreq driver (un)register can race with hotplug since CPU online
+>> state can change between adding/removing the currently online devices and
+>> registering/unregistering for hotplug notifiers. So, fix that by
+>> registering for hotplug notifiers first before adding devices and
+>> unregistering from hotplug notifiers first before removing devices.
+>
+> Couldn't get it, tell us an example race and what will go wrong due to it.
+> Also this should have had a separate patch for itself.
+
+I assumed we go a lot of down_write()s and that would cause a 
+down_read_trylock() to fail. But we really do that only for cpufreq 
+driver register/unregister. So, my previous statement is not really a 
+very useful/common.
+
+But I do hate that we do "trylock". It always makes one wonder if it 
+will silently fail (since we return NULL, which is same as policy with 
+"offline" policy). Technically, we could do down_read(), but lockdep is 
+throwing warnings when it's really not an issue (doing down read twice). 
+So, I'm guessing all these trylocks are just to keep lockdep happy?
 
 
-On Mon, Jun 30, 2014 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
->> > > pmc.c implements various routines to access the power management
->> > > controller, some of which is needed by suspend/resume, some of it is
->> > > needed by SMP. powergate.c implements a subset of the PMC that needs to
->> > > be exported to drivers to enable power partitions on the SoC. I'm not
->> > > aware of subsystems that deal with this kind of driver.
->> > >
->> > Please see above.
+>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>> ---
+>>   drivers/cpufreq/cpufreq.c | 44 ++++++++++++++++++++------------------------
+>>   1 file changed, 20 insertions(+), 24 deletions(-)
 >>
->> Like I said, I don't see what business suspend/resume related code has
->> in drivers/power. What we're talking about here really is functionality
->> very specific to Tegra. Also some of that code needs to be run at very
->> early points in the boot process, so we can't reasonably turn it into a
->> proper driver anyway.
+>> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+>> index a0a2ec2..f72b2b7 100644
+>> --- a/drivers/cpufreq/cpufreq.c
+>> +++ b/drivers/cpufreq/cpufreq.c
+>> @@ -748,17 +748,18 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
+>>   {
+>>          struct cpufreq_policy *policy = to_policy(kobj);
+>>          struct freq_attr *fattr = to_attr(attr);
+>> -       ssize_t ret;
+>> +       ssize_t ret = -EINVAL;
+>>
+>>          if (!down_read_trylock(&cpufreq_rwsem))
+>> -               return -EINVAL;
+>> -
+>> +               return ret;
+>>          down_read(&policy->rwsem);
+>>
+>> -       if (fattr->show)
+>> -               ret = fattr->show(policy, buf);
+>> -       else
+>> -               ret = -EIO;
+>> +       if (!cpumask_empty(policy->cpus)) {
+>> +               if (fattr->show)
+>> +                       ret = fattr->show(policy, buf);
+>> +               else
+>> +                       ret = -EIO;
+>> +       }
 >
-> I believe the powergate.c stuff can be changed into pm_domain code, but
-> we don't have a good subsystem with generic DT bindings yet, so that
-> may need some more groundwork first. drivers/power or a subdirectory
-> of that may end up being the right place though.
+> Makes sense upto this point.
 >
->> Also, the real win we get from moving code out into drivers/ is if we
->> can provide a common framework for them. I don't see how we can possibly
->> do that for this code since there simply isn't enough commonality
->> between SoCs. At the same time we now have a situation where both 32-bit
->> and 64-bit variants of some SoCs share some of the same hardware at the
->> very low level and since we don't have mach-* directories for 64-bit ARM
->> and shouldn't be duplicating code either, we need to find a new home for
->> this type of code. drivers/soc seemed to fit perfectly well.
+>>          up_read(&policy->rwsem);
+>>          up_read(&cpufreq_rwsem);
+>> @@ -773,26 +774,19 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
+>>          struct freq_attr *fattr = to_attr(attr);
+>>          ssize_t ret = -EINVAL;
+>>
+>> -       get_online_cpus();
+>> -
+>> -       if (!cpu_online(policy->cpu))
+>> -               goto unlock;
+>> -
 >
-> For the low-level stuff yes, but I agree with Santosh there needs to be
-> some more work trying to split out individual high-level drivers.
+> @Srivatsa: what do you say?
 >
-> There are two common patterns for the interface between the low-level
-> register access and the more high-level stuff:  you can either use
-> a "syscon" driver that just exports a struct regmap and that gets referenced
-> from other drivers using a phandle in their device nodes, or you have
-> a driver in drivers/soc that exports a somewhat higher-level interface
-> and comes with its own header file that gets included by other drivers.
-> At the moment, the syscon/regmap variant can only be used once device
-> drivers are loaded, but there is some broad agreement that it should
-> be changed to allow calling syscon_regmap_lookup_by_phandle() at
-> early boot using just DT accessors.
+>>          if (!down_read_trylock(&cpufreq_rwsem))
+>> -               goto unlock;
+>> -
+>> +               return ret;
+>>          down_write(&policy->rwsem);
+>>
+>> -       if (fattr->store)
+>> -               ret = fattr->store(policy, buf, count);
+>> -       else
+>> -               ret = -EIO;
+>> +       if (!cpumask_empty(policy->cpus)) {
+>> +               if (fattr->store)
+>> +                       ret = fattr->store(policy, buf, count);
+>> +               else
+>> +                       ret = -EIO;
+>> +       }
+>>
+>>          up_write(&policy->rwsem);
+>> -
+>>          up_read(&cpufreq_rwsem);
+>> -unlock:
+>> -       put_online_cpus();
+>>
+>>          return ret;
+>>   }
+>> @@ -2270,6 +2264,8 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
+>>                  }
+>>          }
+>>
+>> +       register_hotcpu_notifier(&cpufreq_cpu_notifier);
+>> +
+>>          ret = subsys_interface_register(&cpufreq_interface);
+>>          if (ret)
+>>                  goto err_boost_unreg;
+>> @@ -2293,13 +2289,13 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
+>>                  }
+>>          }
+>>
+>> -       register_hotcpu_notifier(&cpufreq_cpu_notifier);
+>>          pr_debug("driver %s up and running\n", driver_data->name);
+>>
+>>          return 0;
+>>   err_if_unreg:
+>>          subsys_interface_unregister(&cpufreq_interface);
+>>   err_boost_unreg:
+>> +       unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
+>>          if (cpufreq_boost_supported())
+>>                  cpufreq_sysfs_remove_file(&boost.attr);
+>>   err_null_driver:
+>> @@ -2327,12 +2323,12 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
+>>
+>>          pr_debug("unregistering driver %s\n", driver->name);
+>>
+>> +       unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
+>> +
+>>          subsys_interface_unregister(&cpufreq_interface);
+>>          if (cpufreq_boost_supported())
+>>                  cpufreq_sysfs_remove_file(&boost.attr);
+>>
+>> -       unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
+>> -
+>>          down_write(&cpufreq_rwsem);
+>>          write_lock_irqsave(&cpufreq_driver_lock, flags);
+>
+> Normally the order of register/unregister should be just opposite.
+> Isn't that true here? Yeah, it was broken earlier as well...
 
-I'd strongly prefer to NOT tie this into DT and keep it as in-kernel
-implementation until we know more what a common subsystem might look
-like, if any.
+Generally agreed, but as explained in the commit text, we need to keep 
+it this way to avoid races with hotplug/unregister.
 
-If we keep it only in the kernel, then we're free to change it as
-needed. If we tie it into DT/syscon, then we get stick with
-stable-only ABIs from day one. That doesn't seem like a good idea.
+-Saravana
 
-
--Olof
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
