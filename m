@@ -1,262 +1,241 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Jul 2014 20:09:52 +0100
-Subject: [PATCH v7 11/11] arm64: Determine the vmalloc/vmemmap space at build
- time based on VA_BITS
+Date: Wed, 16 Jul 2014 20:09:50 +0100
+Subject: [PATCH v7 09/11] arm64: Remove asm/pgtable-*level-hwdef.h files
 In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
 References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1405537792-23666-12-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1405537792-23666-10-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than guessing what the maximum vmmemap space should be, this
-patch allows the calculation based on the VA_BITS and sizeof(struct
-page). The vmalloc space extends to the beginning of the vmemmap space.
-
-Since the virtual kernel memory layout now depends on the build
-configuration, this patch removes the detailed description in
-Documentation/arm64/memory.txt in favour of information printed during
-kernel booting.
+The macros in these files can easily be computed based on PAGE_SHIFT and
+VA_BITS, so just remove them and add the corresponding macros to
+asm/pgtable-hwdef.h
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- Documentation/arm64/memory.txt   | 98 ++++++----------------------------------
- arch/arm64/include/asm/pgtable.h | 13 ++++--
- arch/arm64/mm/init.c             | 22 ++++++---
- 3 files changed, 38 insertions(+), 95 deletions(-)
+ arch/arm64/include/asm/pgtable-2level-hwdef.h | 43 -----------------------
+ arch/arm64/include/asm/pgtable-3level-hwdef.h | 50 ---------------------------
+ arch/arm64/include/asm/pgtable-4level-hwdef.h | 50 ---------------------------
+ arch/arm64/include/asm/pgtable-hwdef.h        | 42 ++++++++++++++++++----
+ 4 files changed, 36 insertions(+), 149 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/pgtable-2level-hwdef.h
+ delete mode 100644 arch/arm64/include/asm/pgtable-3level-hwdef.h
+ delete mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 4c720d698e8e..8845d0847a66 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -2,19 +2,18 @@
- 		     ==============================
+diff --git a/arch/arm64/include/asm/pgtable-2level-hwdef.h b/arch/arm64/include/asm/pgtable-2level-hwdef.h
+deleted file mode 100644
+index 2593b490c56a..000000000000
+--- a/arch/arm64/include/asm/pgtable-2level-hwdef.h
++++ /dev/null
+@@ -1,43 +0,0 @@
+-/*
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_PGTABLE_2LEVEL_HWDEF_H
+-#define __ASM_PGTABLE_2LEVEL_HWDEF_H
+-
+-/*
+- * With LPAE and 64KB pages, there are 2 levels of page tables. Each level has
+- * 8192 entries of 8 bytes each, occupying a 64KB page. Levels 0 and 1 are not
+- * used. The 2nd level table (PGD for Linux) can cover a range of 4TB, each
+- * entry representing 512MB. The user and kernel address spaces are limited to
+- * 4TB in the 64KB page configuration.
+- */
+-#define PTRS_PER_PTE		8192
+-#define PTRS_PER_PGD		8192
+-
+-/*
+- * PGDIR_SHIFT determines the size a top-level page table entry can map.
+- */
+-#define PGDIR_SHIFT		29
+-#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
+-
+-/*
+- * section address mask and size definitions.
+- */
+-#define SECTION_SHIFT		29
+-#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
+-
+-#endif
+diff --git a/arch/arm64/include/asm/pgtable-3level-hwdef.h b/arch/arm64/include/asm/pgtable-3level-hwdef.h
+deleted file mode 100644
+index 3dbf941d7767..000000000000
+--- a/arch/arm64/include/asm/pgtable-3level-hwdef.h
++++ /dev/null
+@@ -1,50 +0,0 @@
+-/*
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_PGTABLE_3LEVEL_HWDEF_H
+-#define __ASM_PGTABLE_3LEVEL_HWDEF_H
+-
+-/*
+- * With LPAE and 4KB pages, there are 3 levels of page tables. Each level has
+- * 512 entries of 8 bytes each, occupying a 4K page. The first level table
+- * covers a range of 512GB, each entry representing 1GB. The user and kernel
+- * address spaces are limited to 512GB each.
+- */
+-#define PTRS_PER_PTE		512
+-#define PTRS_PER_PMD		512
+-#define PTRS_PER_PGD		512
+-
+-/*
+- * PGDIR_SHIFT determines the size a top-level page table entry can map.
+- */
+-#define PGDIR_SHIFT		30
+-#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
+-
+-/*
+- * PMD_SHIFT determines the size a middle-level page table entry can map.
+- */
+-#define PMD_SHIFT		21
+-#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
+-#define PMD_MASK		(~(PMD_SIZE-1))
+-
+-/*
+- * section address mask and size definitions.
+- */
+-#define SECTION_SHIFT		21
+-#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
+-
+-#endif
+diff --git a/arch/arm64/include/asm/pgtable-4level-hwdef.h b/arch/arm64/include/asm/pgtable-4level-hwdef.h
+deleted file mode 100644
+index 0ec84e2274a3..000000000000
+--- a/arch/arm64/include/asm/pgtable-4level-hwdef.h
++++ /dev/null
+@@ -1,50 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_PGTABLE_4LEVEL_HWDEF_H
+-#define __ASM_PGTABLE_4LEVEL_HWDEF_H
+-
+-#define PTRS_PER_PTE		512
+-#define PTRS_PER_PMD		512
+-#define PTRS_PER_PUD		512
+-#define PTRS_PER_PGD		512
+-
+-/*
+- * PGDIR_SHIFT determines the size a top-level page table entry can map.
+- */
+-#define PGDIR_SHIFT		39
+-#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
+-
+-/*
+- * PUD_SHIFT determines the size the second level page table entry can map.
+- */
+-#define PUD_SHIFT		30
+-#define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
+-#define PUD_MASK		(~(PUD_SIZE-1))
+-
+-/*
+- * PMD_SHIFT determines the size the third level page table entry can map.
+- */
+-#define PMD_SHIFT		21
+-#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
+-#define PMD_MASK		(~(PMD_SIZE-1))
+-
+-/*
+- * section address mask and size definitions.
+- */
+-#define SECTION_SHIFT		21
+-#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
+-
+-#endif
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index d453e8bfef06..88174e0bfafe 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -16,15 +16,45 @@
+ #ifndef __ASM_PGTABLE_HWDEF_H
+ #define __ASM_PGTABLE_HWDEF_H
  
- Author: Catalin Marinas <catalin.marinas@arm.com>
--Date  : 20 February 2012
- 
- This document describes the virtual memory layout used by the AArch64
- Linux kernel. The architecture allows up to 4 levels of translation
- tables with a 4KB page size and up to 3 levels with a 64KB page size.
- 
--AArch64 Linux uses either 3 levels or 4 levels of translation tables with
--the 4KB page configuration, allowing 39-bit (512GB) or 48-bit (256TB)
--virtual addresses, respectively, for both user and kernel. With 64KB
--pages, only 2 levels of translation tables, allowing 42-bit (4TB)
-+AArch64 Linux uses either 3 levels or 4 levels of translation tables
-+with the 4KB page configuration, allowing 39-bit (512GB) or 48-bit
-+(256TB) virtual addresses, respectively, for both user and kernel. With
-+64KB pages, only 2 levels of translation tables, allowing 42-bit (4TB)
- virtual address, are used but the memory layout is the same.
- 
--User addresses have bits 63:39 set to 0 while the kernel addresses have
-+User addresses have bits 63:48 set to 0 while the kernel addresses have
- the same bits set to 1. TTBRx selection is given by bit 63 of the
- virtual address. The swapper_pg_dir contains only kernel (global)
- mappings while the user pgd contains only user (non-global) mappings.
-@@ -27,26 +26,7 @@ AArch64 Linux memory layout with 4KB pages + 3 levels:
- Start			End			Size		Use
- -----------------------------------------------------------------------
- 0000000000000000	0000007fffffffff	 512GB		user
--
--ffffff8000000000	ffffffbbfffeffff	~240GB		vmalloc
--
--ffffffbbffff0000	ffffffbbffffffff	  64KB		[guard page]
--
--ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
--
--ffffffbe00000000	ffffffbffbbfffff	  ~8GB		[guard, future vmmemap]
--
--ffffffbffa000000	ffffffbffaffffff	  16MB		PCI I/O space
--
--ffffffbffb000000	ffffffbffbbfffff	  12MB		[guard]
--
--ffffffbffbc00000	ffffffbffbdfffff	   2MB		fixed mappings
--
--ffffffbffbe00000	ffffffbffbffffff	   2MB		[guard]
--
--ffffffbffc000000	ffffffbfffffffff	  64MB		modules
--
--ffffffc000000000	ffffffffffffffff	 256GB		kernel logical memory map
-+ffffff8000000000	ffffffffffffffff	 512GB		kernel
- 
- 
- AArch64 Linux memory layout with 4KB pages + 4 levels:
-@@ -54,26 +34,7 @@ AArch64 Linux memory layout with 4KB pages + 4 levels:
- Start			End			Size		Use
- -----------------------------------------------------------------------
- 0000000000000000	0000ffffffffffff	 256TB		user
--
--ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
--
--ffff7bffffff0000	ffff7bffffffffff	  64KB		[guard page]
--
--ffff7c0000000000	ffff7dffffffffff	   2TB		vmemmap
--
--ffff7e0000000000	ffff7ffffbbfffff	  ~2TB		[guard, future vmmemap]
--
--ffff7ffffa000000	ffff7ffffaffffff	  16MB		PCI I/O space
--
--ffff7ffffb000000	ffff7ffffbbfffff	  12MB		[guard]
--
--ffff7ffffbc00000	ffff7ffffbdfffff	   2MB		fixed mappings
--
--ffff7ffffbe00000	ffff7ffffbffffff	   2MB		[guard]
--
--ffff7ffffc000000	ffff7fffffffffff	  64MB		modules
--
--ffff800000000000	ffffffffffffffff	 128TB		kernel logical memory map
-+ffff000000000000	ffffffffffffffff	 256TB		kernel
- 
- 
- AArch64 Linux memory layout with 64KB pages + 2 levels:
-@@ -81,44 +42,14 @@ AArch64 Linux memory layout with 64KB pages + 2 levels:
- Start			End			Size		Use
- -----------------------------------------------------------------------
- 0000000000000000	000003ffffffffff	   4TB		user
-+fffffc0000000000	ffffffffffffffff	   4TB		kernel
- 
--fffffc0000000000	fffffdfbfffeffff	  ~2TB		vmalloc
--
--fffffdfbffff0000	fffffdfbffffffff	  64KB		[guard page]
- 
--fffffdfc00000000	fffffdfdffffffff	   8GB		vmemmap
-+For details of the virtual kernel memory layout please see the kernel
-+booting log.
- 
--fffffdfe00000000	fffffdfffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--fffffdfffa000000	fffffdfffaffffff	  16MB		PCI I/O space
--
--fffffdfffb000000	fffffdfffbbfffff	  12MB		[guard]
--
--fffffdfffbc00000	fffffdfffbdfffff	   2MB		fixed mappings
--
--fffffdfffbe00000	fffffdfffbffffff	   2MB		[guard]
--
--fffffdfffc000000	fffffdffffffffff	  64MB		modules
--
--fffffe0000000000	ffffffffffffffff	   2TB		kernel logical memory map
--
--
--Translation table lookup with 4KB pages + 3 levels:
--
--+--------+--------+--------+--------+--------+--------+--------+--------+
--|63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
--+--------+--------+--------+--------+--------+--------+--------+--------+
-- |                 |         |         |         |         |
-- |                 |         |         |         |         v
-- |                 |         |         |         |   [11:0]  in-page offset
-- |                 |         |         |         +-> [20:12] L3 index
-- |                 |         |         +-----------> [29:21] L2 index
-- |                 |         +---------------------> [38:30] L1 index
-- |                 +-------------------------------> [47:39] L0 index (not used)
-- +-------------------------------------------------> [63] TTBR0/1
--
--
--Translation table lookup with 4KB pages + 4 levels:
-+Translation table lookup with 4KB pages:
- 
- +--------+--------+--------+--------+--------+--------+--------+--------+
- |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
-@@ -133,7 +64,7 @@ Translation table lookup with 4KB pages + 4 levels:
-  +-------------------------------------------------> [63] TTBR0/1
- 
- 
--Translation table lookup with 64KB pages + 2 levels:
-+Translation table lookup with 64KB pages:
- 
- +--------+--------+--------+--------+--------+--------+--------+--------+
- |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
-@@ -142,10 +73,11 @@ Translation table lookup with 64KB pages + 2 levels:
-  |                 |    |               |              v
-  |                 |    |               |            [15:0]  in-page offset
-  |                 |    |               +----------> [28:16] L3 index
-- |                 |    +--------------------------> [41:29] L2 index (only 38:29 used)
-- |                 +-------------------------------> [47:42] L1 index (not used)
-+ |                 |    +--------------------------> [41:29] L2 index
-+ |                 +-------------------------------> [47:42] L1 index
-  +-------------------------------------------------> [63] TTBR0/1
- 
+-#if CONFIG_ARM64_PGTABLE_LEVELS == 2
+-#include <asm/pgtable-2level-hwdef.h>
+-#elif CONFIG_ARM64_PGTABLE_LEVELS == 3
+-#include <asm/pgtable-3level-hwdef.h>
+-#else
+-#include <asm/pgtable-4level-hwdef.h>
++#define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
 +
- When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
- offset from the kernel VA (top 24bits of the kernel VA set to zero):
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 9f862e6e9286..ec82789d03c3 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -33,13 +33,16 @@
++/*
++ * PMD_SHIFT determines the size a level 2 page table entry can map.
++ */
++#if CONFIG_ARM64_PGTABLE_LEVELS > 2
++#define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
++#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
++#define PMD_MASK		(~(PMD_SIZE-1))
++#define PTRS_PER_PMD		PTRS_PER_PTE
++#endif
++
++/*
++ * PUD_SHIFT determines the size a level 1 page table entry can map.
++ */
++#if CONFIG_ARM64_PGTABLE_LEVELS > 3
++#define PUD_SHIFT		((PAGE_SHIFT - 3) * 3 + 3)
++#define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
++#define PUD_MASK		(~(PUD_SIZE-1))
++#define PTRS_PER_PUD		PTRS_PER_PTE
+ #endif
  
  /*
-  * VMALLOC and SPARSEMEM_VMEMMAP ranges.
-+ *
-+ * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
-+ *	(rounded up to PUD_SIZE).
-+ * VMALLOC_START: beginning of the kernel VA space
-+ * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
-+ *	fixed mappings and modules
-  */
-+#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
- #define VMALLOC_START		(UL(0xffffffffffffffff) << VA_BITS)
--#if CONFIG_ARM64_PGTABLE_LEVELS != 4
--#define VMALLOC_END		(PAGE_OFFSET - UL(0x400000000) - SZ_64K)
--#else
--#define VMALLOC_END		(PAGE_OFFSET - UL(0x40000000000) - SZ_64K)
--#endif
-+#define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
- 
- #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 7f68804814a1..0b32504e280f 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -33,6 +33,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/dma-contiguous.h>
- 
-+#include <asm/fixmap.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
- #include <asm/sizes.h>
-@@ -256,26 +257,33 @@ void __init mem_init(void)
- 
- #define MLK(b, t) b, t, ((t) - (b)) >> 10
- #define MLM(b, t) b, t, ((t) - (b)) >> 20
-+#define MLG(b, t) b, t, ((t) - (b)) >> 30
- #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
- 
- 	pr_notice("Virtual kernel memory layout:\n"
--		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld MB)\n"
-+		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
--		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld MB)\n"
-+		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
-+		  "              0x%16lx - 0x%16lx   (%6ld MB actual)\n"
- #endif
-+		  "    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n"
-+		  "    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n"
- 		  "    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n"
- 		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "      .init : 0x%p" " - 0x%p" "   (%6ld kB)\n"
--		  "      .text : 0x%p" " - 0x%p" "   (%6ld kB)\n"
--		  "      .data : 0x%p" " - 0x%p" "   (%6ld kB)\n",
--		  MLM(VMALLOC_START, VMALLOC_END),
-+		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-+		  MLG(VMALLOC_START, VMALLOC_END),
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
-+		  MLG((unsigned long)vmemmap,
-+		      (unsigned long)vmemmap + VMEMMAP_SIZE),
- 		  MLM((unsigned long)virt_to_page(PAGE_OFFSET),
- 		      (unsigned long)virt_to_page(high_memory)),
- #endif
-+		  MLM((unsigned long)PCI_IOBASE, (unsigned long)PCI_IOBASE + SZ_16M),
-+		  MLK(FIXADDR_START, FIXADDR_TOP),
- 		  MLM(MODULES_VADDR, MODULES_END),
- 		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
--
- 		  MLK_ROUNDUP(__init_begin, __init_end),
- 		  MLK_ROUNDUP(_text, _etext),
- 		  MLK_ROUNDUP(_sdata, _edata));
++ * PGDIR_SHIFT determines the size a top-level page table entry can map
++ * (depending on the configuration, this level can be 0, 1 or 2).
++ */
++#define PGDIR_SHIFT		((PAGE_SHIFT - 3) * CONFIG_ARM64_PGTABLE_LEVELS + 3)
++#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
++#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++#define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
++
++/*
++ * Section address mask and size definitions.
++ */
++#define SECTION_SHIFT		PMD_SHIFT
++#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
++#define SECTION_MASK		(~(SECTION_SIZE-1))
++
++/*
+  * Hardware page table definitions.
+  *
+  * Level 1 descriptor (PUD).
