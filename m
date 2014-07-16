@@ -1,63 +1,118 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 09:32:01 +0200
-Subject: [PATCH 4/6] clk: tegra: add nvidia,tegra132-ccplex-clk binding
-In-Reply-To: <1405437890-6468-5-git-send-email-pdeschrijver@nvidia.com>
+Date: Wed, 16 Jul 2014 09:44:10 +0200
+Subject: [PATCH 5/6] clk: tegra: Add support for Tegra132 CAR clocks
+In-Reply-To: <1405437890-6468-6-git-send-email-pdeschrijver@nvidia.com>
 References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20140716073200.GE7978@ulmo>
+ <1405437890-6468-6-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20140716074410.GF7978@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 06:24:34PM +0300, Peter De Schrijver wrote:
-> Tegra132 has a few new clocks for the CPU complex (ccplex).
+On Tue, Jul 15, 2014 at 06:24:35PM +0300, Peter De Schrijver wrote:
+> Tegra132 CAR supports almost the same clocks as Tegra124 CAR. This patch
+> deals with the small differences.
+> 
+> --
+> I'm not entirely sure why the soc_therm clock needs to be enabled on Tegra132,
+> but turning it off results in a system hang. I presume this might be because
+> of fastboot initializing soc_therm.
 > 
 > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > ---
->  .../bindings/clock/nvidia,tegra132-ccplex-clk.txt  |   27 ++++++++++++++++++++
->  include/dt-bindings/clock/tegra132-ccplex.h        |   12 +++++++++
->  2 files changed, 39 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt
->  create mode 100644 include/dt-bindings/clock/tegra132-ccplex.h
+>  drivers/clk/tegra/clk-tegra124.c |   32 ++++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt
-> new file mode 100644
-> index 0000000..1441e36
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra132-ccplex-clk.txt
-> @@ -0,0 +1,27 @@
-> +NVIDIA Tegra132 ccplex clocks
+> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> index 80efe51..b857aab 100644
+> --- a/drivers/clk/tegra/clk-tegra124.c
+> +++ b/drivers/clk/tegra/clk-tegra124.c
+> @@ -1369,6 +1369,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+>  	{TEGRA124_CLK_XUSB_HS_SRC, TEGRA124_CLK_PLL_U_60M, 60000000, 0},
+>  	{TEGRA124_CLK_XUSB_FALCON_SRC, TEGRA124_CLK_PLL_RE_OUT, 224000000, 0},
+>  	{TEGRA124_CLK_XUSB_HOST_SRC, TEGRA124_CLK_PLL_RE_OUT, 112000000, 0},
+> +	{TEGRA124_CLK_SOC_THERM, TEGRA124_CLK_PLL_P, 51000000, 0},
+>  	/* This MUST be the last entry. */
+>  	{TEGRA124_CLK_CLK_MAX, TEGRA124_CLK_CLK_MAX, 0, 0},
+>  };
+> @@ -1378,9 +1379,25 @@ static void __init tegra124_clock_apply_init_table(void)
+>  	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
+>  }
+>  
+> +enum {
+> +	TEGRA124_CLK,
+> +	TEGRA132_CLK,
+> +};
 
-Perhaps: "NVIDIA Tegra132 CPU complex (ccplex) clocks". Otherwise this
-file doesn't expand the ccplex abbreviation at all and it may not be
-obvious to everyone.
+I'd prefer this to be something like:
 
-> +This binding uses the common clock binding:
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+	struct tegra_car_soc {
+		bool has_ccplex_clk;
+	};
 
-clock-bindings.txt is in the same directory as this file, so a slightly
-better wording would be:
+	static const struct tegra_car_soc tegra124_car_soc = {
+		.has_ccplex_clk = false,
+	};
 
-	This binding uses the common clock binding as described in the
-	clock-bindings.txt file in this directory.
+	static const struct tegra_car_soc tegra132_car_soc = {
+		.has_ccplex_clk = true,
+	};
 
-Note that these absolute paths may not remain the same when the device
-tree bindings are moved out of the kernel tree.
+> +static const struct of_device_id tegra_clock_of_match[] = {
+> +	{ .compatible = "nvidia,tegra124-car", .data = (void *)TEGRA124_CLK },
 
-> +The Tegra132 ccplex clock module on Tegra132 is the HW module responsible
-> +for the ccplex related clocks.
+	                                       .data = &tegra124_car_soc,
 
-The end repeats the beginning of this sentence, so its information
-content is rather low. Maybe the last part of this sentence could be:
-"... responsible for the CPU and related clocks".
+> +	{ .compatible = "nvidia,tegra132-car", .data = (void *)TEGRA132_CLK },
 
-> diff --git a/include/dt-bindings/clock/tegra132-ccplex.h b/include/dt-bindings/clock/tegra132-ccplex.h
-[...]
-> +#define TEGRA132_CCPLEX_CCLK_G 1
-> +#define TEGRA132_PLL_X 2
-> +#define TEGRA132_CCPLEX_CLK_MAX 3
+	                                       .data = &tegra132_car_soc,
 
-Maybe these should use TEGRA132_CLK_ as prefix for consistency with the
-CAR binding?
+>  static void __init tegra124_clock_init(struct device_node *np)
+>  {
+>  	struct device_node *node;
+> +	const struct of_device_id *match;
+
+	const struct tegra_car_soc *soc;
+
+> +	uintptr_t id;
+
+> +	match = of_match_node(tegra_clock_of_match, np);
+> +	id = (uintptr_t)match->data;
+
+	soc = match->data;
+
+>  
+>  	clk_base = of_iomap(np, 0);
+>  	if (!clk_base) {
+> @@ -1416,6 +1433,20 @@ static void __init tegra124_clock_init(struct device_node *np)
+>  	tegra_audio_clk_init(clk_base, pmc_base, tegra124_clks, &pll_a_params);
+>  	tegra_pmc_clk_init(pmc_base, tegra124_clks);
+>  
+> +	if (id == TEGRA132_CLK) {
+
+	if (soc->has_ccplex_clk) {
+
+That's somewhat more explicit and avoids a lot of ugly casting.
+
+> +		int i;
+> +
+> +		tegra124_clks[tegra_clk_cclk_g].present = false;
+> +		tegra124_clks[tegra_clk_cclk_lp].present = false;
+> +		tegra124_clks[tegra_clk_pll_x].present = false;
+> +		tegra124_clks[tegra_clk_pll_x_out0].present = false;
+> +
+> +		/* Tegra132 requires the soc_therm clock to be always on */
+> +		for (i = 0; i < ARRAY_SIZE(init_table); i++) {
+> +			if (init_table[i].clk_id == TEGRA124_CLK_SOC_THERM)
+> +				init_table[i].state = 1;
+
+I wonder if we could do this someplace else. If we could, then we'd have
+the opportunity to make the init_table const.
+
+> +		}
+> +	}
+>  	tegra_super_clk_gen4_init(clk_base, pmc_base, tegra124_clks,
+
+Could use a blank line after the closing } above.
 
 Thierry
 -------------- next part --------------
@@ -66,4 +121,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/141aa548/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/56a1c076/attachment.sig>
