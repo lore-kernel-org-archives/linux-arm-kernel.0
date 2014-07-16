@@ -1,42 +1,66 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 16 Jul 2014 11:27:40 +0300
-Subject: [PATCH 2/6] clk: tegra: make tegra_clocks_apply_init_table
- arch_initcall
-In-Reply-To: <20140716071932.GB7978@ulmo>
-References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-3-git-send-email-pdeschrijver@nvidia.com>
- <20140716071932.GB7978@ulmo>
-Message-ID: <20140716082740.GK23218@tbergstrom-lnx.Nvidia.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Wed, 16 Jul 2014 10:27:45 +0200
+Subject: BUG: i.MX6-FEC: broken TCP tx checksumming
+Message-ID: <CAOpc7mFpW=ZDdF3g-MK4TaNje5KBWimUwUgxoebg-wmb+OQ8zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 09:19:33AM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Tue, Jul 15, 2014 at 06:24:32PM +0300, Peter De Schrijver wrote:
-> [...]
-> > diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-> > index d081732..65cde4e 100644
-> > --- a/drivers/clk/tegra/clk.c
-> > +++ b/drivers/clk/tegra/clk.c
-> > @@ -290,10 +290,13 @@ struct clk ** __init tegra_lookup_dt_id(int clk_id,
-> >  
-> >  tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
-> >  
-> > -void __init tegra_clocks_apply_init_table(void)
-> > +static int __init tegra_clocks_apply_init_table(void)
-> >  {
-> >  	if (!tegra_clk_apply_init_table)
-> > -		return;
-> > +		return 0;
-> 
-> Shouldn't this be an error? Or perhaps WARN()? To make sure this gets
+Hi,
 
-An arch_initcall will be called for every ARM platform I think? In case
-this gets called on a non-Tegra platform, tegra_clk_apply_init_table will not
-be set and therefore a silent return 0; seems the most appropriate thing to do
-to me?
+on my target I use the i:MX6 FEC with kernel 3.16-rc5. Very quickly I
+was able to "ping", but TCP (e.g. ssh) didn't work.
 
-Cheers,
+I first suspected autonegotiation, because "mii-tool eth0" shows
+(wrongly) eth0: negotiated "1000baseT-HD flow-control, link ok".
+Despite my switch not a gigabit one ...  Then I found out that
+"ethtool eth0" worked better, it displayed "Speed: 100Mb/s", "Duplex:
+Full". And with ping working, it couldn't be gigabit-ethernet against
+a non-gigabit switch anyway ...
 
-Peter.
+I then looked at linux-next and applied the FEC related patches from
+it. To no avail.
+
+Finally I made started wireshark (on the desktop). And Wireshark said:
+
+  Header checksum: 0x0000 [incorrect, should be 0xe65e (may be caused
+by "IP checksum offload"?)]
+
+So I tried "ethtool -K eth0 tx off" (on the i.MX6 board) and suddenly
+ssh worked.
+
+
+
+
+I think it is unrelated, but together with rc-5 patches I'm using this
+linux-next patches:
+
+net: fec: iMX6 FEC does not support half-duplex gigabit
+net: fec: fix ethtool set_pauseparam duplex bug
+net: fec: fix interrupt handling races
+net: fec: use netif_tx_disable() rather than netif_stop_queue()
+net: fec: remove checking for NULL phy_dev in fec_enet_close()
+net: fec: ensure that a disconnected phy isn't configured
+net: fec: stop the phy before shutting down the MAC
+net: fec: remove useless fep->opened
+net: fec: make rx skb handling more robust
+net: fec: clean up transmit descriptor setup
+net: fec: ensure fec_enet_free_buffers() properly cleans the rings
+net: fec: fix missing kmalloc() failure check in fec_enet_alloc_buffers()
+net: fec: improve safety of suspend/resume/transmit timeout paths
+net: fec: ensure fec_enet_close() copes with resume failure
+net: fec: only restart or stop the device if it is present and running
+net: fec: move calls to quiesce/resume packet processing out of fec_restart()
+net: fec: remove inappropriate calls around fec_restart()
+net: fec: quiesce packet processing before stopping device in fec_suspend()
+net: fec: quiesce packet processing before stopping device in fec_set_features()
+net: fec: quiesce packet processing before changing features
+net: fec: quiesce packet processing when taking link down in
+fec_enet_adjust_link()
+net: fec: clean up duplex mode handling
+net: fec: better implementation of iMX6 ERR006358 quirk
+net: fec: replace delayed work with standard work
+net: fec: clear receive interrupts before processing a packet
+net: fec: reorder ethtool ops to match order in struct declaration
+net: fec: add support for dumping transmit ring on timeout
+net: fec: remove useless status check in tx reap path
+net: fec: consolidate hwtstamp implementation
