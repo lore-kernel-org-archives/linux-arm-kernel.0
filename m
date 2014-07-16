@@ -1,32 +1,55 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 16 Jul 2014 18:33:42 +0200
-Subject: [PATCH 0/4] spi: s3c64xx: fix DT binding breakage
-In-Reply-To: <20140716160249.GS17528@sirena.org.uk>
-References: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
- <20140716160249.GS17528@sirena.org.uk>
-Message-ID: <53C6A966.10409@collabora.co.uk>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 16 Jul 2014 12:38:06 -0400
+Subject: [PATCH v5 5/5] PCI: keystone: Update maintainer information
+In-Reply-To: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
+References: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1405528686-16539-6-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 06:02 PM, Mark Brown wrote:
-> On Wed, Jul 16, 2014 at 05:19:06PM +0200, Javier Martinez Canillas wrote:
-> 
-> *sigh*  Yesterday Naveen submitted another, different, patch series also
-> attempting to improve things which I'm not seeing any reference to here.
-> Please coordinate with Naveen about what you are doing.
-> 
+Update the MAINTAINERS file for the keystone PCIe driver
 
-Yes, I answered Naveen on his latest series and told him that I thought his v6
-was better and also that the commit messages where still not clearly explaining
-the motivation for the changes [0].
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-So after that I asked him in private if he wouldn't mind if I try to rework his
-series to make it easier to understand and he agreed on that. I should had
-mentioned it the cover later, sorry about that.
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Grant Likely <grant.likely@linaro.org>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mohit Kumar <mohit.kumar@st.com>
+CC: Jingoo Han <jg1.han@samsung.com>
+CC: Bjorn Helgaas <bhelgaas@google.com>
+CC: Pratyush Anand <pratyush.anand@st.com>
+CC: Richard Zhu <r65037@freescale.com>
+CC: Kishon Vijay Abraham I <kishon@ti.com>
+CC: Marek Vasut <marex@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Randy Dunlap <rdunlap@infradead.org>
+CC: Grant Likely <grant.likely@linaro.org>
+---
+ MAINTAINERS |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Please take a look to this series instead of the latest that was posted by Naveen.
-
-Thanks a lot and best regards,
-Javier
-
-[0]: https://www.mail-archive.com/devicetree at vger.kernel.org/msg34860.html
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e31c874..8158f82 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6807,6 +6807,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/pci/host/*imx6*
+ 
++PCI DRIVER FOR keystone
++M:	Murali Karicheri <m-karicheri2@ti.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	drivers/pci/host/*keystone*
++
+ PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
+ M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ M:	Jason Cooper <jason@lakedaemon.net>
+-- 
+1.7.9.5
