@@ -1,41 +1,51 @@
 From: Zubair.Kakakhel@imgtec.com (Zubair Lutfullah Kakakhel)
-Date: Wed, 16 Jul 2014 16:51:28 +0100
-Subject: [PATCH 0/4] mips: Add cma support to mips
-Message-ID: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
+Date: Wed, 16 Jul 2014 16:51:31 +0100
+Subject: [PATCH 3/4] x86: use generic dma-contiguous.h
+In-Reply-To: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
+References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
+Message-ID: <1405525892-60383-4-git-send-email-Zubair.Kakakhel@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we have 4 patches that add cma support to mips.
+dma-contiguous.h is now in asm-generic. Use that to avoid code
+repetition in x86.
 
-Patch 1 adds dma-contiguous.h to asm-generic
-Patch 2 and 3 make arm64 and x86 use dma-contiguous from asm-generic
-Patch 4 adds cma to mips.
-
-I'd like to request ralf to take these set of 4 patches via his tree.
-
-acks from asm-generic, arm64 and x86 welcome.
-
-patches based on linux-next b997a07604562f1a54cc531fe1cf7447f0ed6078
-
-Zubair Lutfullah Kakakhel (4):
-  asm-generic: Add dma-contiguous.h
-  arm64: use generic dma-contiguous.h
-  x86: use generic dma-contiguous.h
-  mips: dma: Add cma support
-
- arch/arm64/include/asm/Kbuild           |  1 +
- arch/arm64/include/asm/dma-contiguous.h | 28 -------------------------
- arch/mips/Kconfig                       |  1 +
- arch/mips/include/asm/Kbuild            |  1 +
- arch/mips/kernel/setup.c                |  9 ++++++++
- arch/mips/mm/dma-default.c              | 37 ++++++++++++++++++++++-----------
- arch/x86/include/asm/Kbuild             |  1 +
- arch/x86/include/asm/dma-contiguous.h   | 12 -----------
- include/asm-generic/dma-contiguous.h    |  9 ++++++++
- 9 files changed, 47 insertions(+), 52 deletions(-)
- delete mode 100644 arch/arm64/include/asm/dma-contiguous.h
+Signed-off-by: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
+---
+ arch/x86/include/asm/Kbuild           |  1 +
+ arch/x86/include/asm/dma-contiguous.h | 12 ------------
+ 2 files changed, 1 insertion(+), 12 deletions(-)
  delete mode 100644 arch/x86/include/asm/dma-contiguous.h
- create mode 100644 include/asm-generic/dma-contiguous.h
 
+diff --git a/arch/x86/include/asm/Kbuild b/arch/x86/include/asm/Kbuild
+index 3bf000f..d55a210 100644
+--- a/arch/x86/include/asm/Kbuild
++++ b/arch/x86/include/asm/Kbuild
+@@ -6,6 +6,7 @@ genhdr-y += unistd_x32.h
+ 
+ generic-y += clkdev.h
+ generic-y += cputime.h
++generic-y += dma-contiguous.h
+ generic-y += early_ioremap.h
+ generic-y += mcs_spinlock.h
+ generic-y += scatterlist.h
+diff --git a/arch/x86/include/asm/dma-contiguous.h b/arch/x86/include/asm/dma-contiguous.h
+deleted file mode 100644
+index b4b38ba..0000000
+--- a/arch/x86/include/asm/dma-contiguous.h
++++ /dev/null
+@@ -1,12 +0,0 @@
+-#ifndef ASMX86_DMA_CONTIGUOUS_H
+-#define ASMX86_DMA_CONTIGUOUS_H
+-
+-#ifdef __KERNEL__
+-
+-#include <linux/types.h>
+-
+-static inline void
+-dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
+-
+-#endif
+-#endif
 -- 
 1.9.1
