@@ -1,106 +1,120 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 15 Jul 2014 21:44:20 -0500
-Subject: [PATCH v4 02/11] memory: emif: Move EMIF register defines to
- include/linux/
-In-Reply-To: <20140715063830.GI20068@atomide.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-3-git-send-email-d-gerlach@ti.com>
- <20140714111222.GB20068@atomide.com> <53C41696.6020004@ti.com>
- <20140715063830.GI20068@atomide.com>
-Message-ID: <53C5E704.5030605@ti.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 16 Jul 2014 12:00:45 +0900
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
+ <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
+ <4657735.1VKsbQGuH6@wuerfel>
+ <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
+ <53C4DF0D.8010208@metafoo.de>
+ <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+Message-ID: <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On 07/15/2014 01:38 AM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [140714 10:44]:
->> On 07/14/2014 06:12 AM, Tony Lindgren wrote:
->>> * Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
->>>> OMAP4 and AM33XX share the same EMIF controller IP. Although there
->>>> are significant differences in the IP integration due to which
->>>> AM33XX can't reuse the EMIF driver DVFS similar to OMAP4,
->>>> it can definitely benefit by reusing the EMIF related macros
->>>> defined in drivers/memory/emif.h.
->>>>
->>>> In the current OMAP PM framework the PM code resides under
->>>> arch/arm/mach-omap2/. To enable reuse of the register defines move
->>>> the register defines in the emif header file to include/linux so that
->>>> both the EMIF driver and the AM33XX PM code can benefit.
->>>>
->>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>> Reviewed-by: Russ Dill <russ.dill@ti.com>
->>>> Acked-by: Santosh Shililmar <santosh.shilimkar@ti.com>
->>>> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>> ---
->>>> v3->v4:
->>>> patch unchanged from original:
->>>> 	http://www.spinics.net/lists/linux-omap/msg95314.html
->>>>
->>>>   drivers/memory/emif.h   | 543 +---------------------------------------------
->>>>   include/linux/ti_emif.h | 558 ++++++++++++++++++++++++++++++++++++++++++++++++
+On Tue, Jul 15, 2014 at 6:14 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Tue, Jul 15, 2014 at 4:58 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>> On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
 >>>
->>> So far we've seen that exposing hardware registers like this
->>> will lead into various drivers misusing them. I think a better
->>> solution is to implement few targeted functions that allow
->>> sharing code between the platform idle code and memory driver.
+>>> On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>
+>>>> On Monday 14 July 2014 19:36:24 Mark Brown wrote:
+>>>>>
+>>>>> On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
+>>>>>>
+>>>>>> On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
+>>>>>
+>>>>>
+>>>>>>> Yes. But now that you say it the gpiod_direction_output() call is
+>>>>>>> missing
+>>>>>>> from this patch.
+>>>>>
+>>>>>
+>>>>>> I'm lost now. The GPIO_ACTIVE_HIGH I added comes from
+>>>>>> Documentation/gpio/board.txt
+>>>>>> and as Linus Walleij explained to me the other day, the lookup is
+>>>>>> supposed
+>>>>>> to replace devm_gpio_request_one(), which in turn replaced both the
+>>>>>> gpio_request and the gpio_direction_output(). Do I need to put the
+>>>>>> gpiod_direction_output() back or is there another interface for that
+>>>>>> when
+>>>>>> registering the board gpios?
+>>>>>
+>>>>>
+>>>>> Indeed.  If you *do* need an explicit _output() then that sounds to me
+>>>>> like we either need a gpiod_get_one() or an extension to the table,
+>>>>> looking at the code it seems like this is indeed the case.  We can set
+>>>>> if the GPIO is active high/low, or open source/drain but there's no flag
+>>>>> for the initial state.
+>>>>
+>>>>
+>>>> (adding Alexandre and the gpio list)
+>>>>
+>>>> GPIO people: any guidance on how a board file should set a gpio to
+>>>> output/default-high in a GPIO_LOOKUP() table to replace a
+>>>> devm_gpio_request_one() call in a device driver with devm_gpiod_get()?
+>>>> Do we need to add an interface extension to do this, e.g. passing
+>>>> GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
 >>>
->>> Maybe you can have the shared functions in in something like
->>> drivers/memory/ti-emif.c that's always built in? The idle
->>> code won't need any of that early on.
+>>>
+>>> The way I see it, GPIO mappings (whether they are done using the
+>>> lookup tables, DT, or ACPI) should only care about details that are
+>>> relevant to the device layout and that should be abstracted to the
+>>> driver (e.g. whether the GPIO is active low or open drain) so drivers
+>>> do not need to check X conditions every time they want to drive the
+>>> GPIO.
+>>>
+>>> Direction and initial value, on the other hand, are clearly properties
+>>> that ought to be set by the driver itself. Thus my expectation here
+>>> would be that the driver sets the GPIO direction and initial value as
+>>> soon as it gets it using gpiod_direction_output(). In other words,
+>>> there is no replacement for gpio_request_one() with the gpiod
+>>> interface. Is there any use-case that cannot be covered by calling
+>>> gpiod_direction_output() right after gpiod_get()? AFAICT this is what
+>>> gpio_request_one() was doing anyway.
 >>
->> Well the reason it was done this way was to utilize all of the addresses of
->> EMIF register in the ASM sleep code to do relative addressing from the EMIF
->> base address. The ASM sleep code (patch 9) needs to save and restore emif
->> context and set and unset self refresh in emif. The issues will come from
->> the ASM being copied to and running from SRAM without the ability to access
->> code in DDR (because we are shutting the EMIF off), so we would need to copy
->> these functions as well and have to worry about any issues we introduce by
->> relocating c code. Is it worth the added maintenance burden?
+>>
+>> I agree with you that this is something that should be done in the driver
+>> and not in the lookup table. I think that it is still a good idea to have a
+>> replacement for gpio_request_one with the new GPIO descriptor API. A large
+>> share of the drivers want to call either gpio_direction_input() or
+>> gpio_direction_output() right after requesting the GPIO. Combining both the
+>> requesting and the configuration of the GPIO into one function call makes
+>> the code a bit shorter and also simplifies the error handling. Even more so
+>> if e.g. the GPIO is optional. This was one of the main reasons why
+>> gpio_request_one was introduced, see the commit[1] that added it.
 >
-> Ah right it needs to run in SRAM. There were some relocatable
-> c code patches posted a while back, so it might be worth
-> revisiting that.
->
-> I think it can also be done with assembly with something like
-> this:
->
-> 1. Make am335x idle code depends on TI_EMIF && WKUP_M3_RPROC
->
-> 2. Add the memory save and restore assembly functions into
->     drivers/memory/ti-emif-sram.S
->
-> 3. Allocate the SRAM preferrably with drivers/misc/sram.c
->     instead of the legacy mach-omap2/sram.c
->
+> I am not opposed to it as a convenience function. Note that since the
+> open-source and open-drain flags are already handled by the lookup
+> table, the only flags it should handle are those related to direction,
+> value, and (maybe) sysfs export.
 
-This I can do, I will just need to make a change somewhere to make generic sram 
-driver provide sram allocations marked for exec.
+Problem is, too much convenience functions seems to ultimately kill convenience.
 
-> 4. Map the idle assembly code and EMIF save and restore
->     functions into SRAM
->
-> 5. Call the EMIF save and restore functions from the idle
->     assembly code at the SRAM locations and pass the save and
->     restore area in a register
->
-> So basically we need to figure out a generic way to do driver
-> hooks in the PM idle code even very late and early in the
-> assembly code so we can keep most of the code in drivers.
-> Eventually also the idle assembly code should be in the drivers
-> too..
+The canonical way to request a GPIO is by providing a (device,
+function, index) triplet to gpiod_get_index(). Since most functions
+only need one GPIO, we have gpiod_get(device, function) which is
+basically an alias to gpiod_get_index(device, function, 0) (note to
+self: we should probably inline it).
 
-I did not consider this earlier but the cpuidle code will use the same path in 
-the assembly code. The cpuidle configures the suspend path to make the emif 
-actions optional (save and restore with shut off, and self refresh), so a 
-generic solution probably isn't possible here as we (will) need a certain level 
-of granularity of control over the emif actions, and that will be difficult to 
-maintain while keeping the pm functionality out of the EMIF code.
+On top of these comes another set of convenience functions,
+gpiod_get_optional() and gpiod_get_index_optional(), which return NULL
+instead of -ENOENT if the requested GPIO mapping does not exist. This
+is useful for the common case where a driver can work without a GPIO.
 
-Regards,
-Dave
+Of course these functions all have devm counterparts, so we currently
+have 8 (devm_)gpiod_get(_index)(_optional) functions.
 
->
-> Regards,
->
-> Tony
->
+If we are to add functions with an init flags parameter, we will end
+with 16 functions. That starts to be a bit too much to my taste, and
+maybe that's where GPIO consumers should sacrifice some convenience to
+preserve a comprehensible GPIO API.
+
+There might be other ways to work around this though. For instance, we
+could replace the _optional functions by a GPIOF_OPTIONAL flag to be
+passed to a more generic function that would also accept direction and
+init value flags. Actually I am not seeing any user of the _optional
+variant in -next, so maybe we should just do this. Thierry, since you
+introduced the _optional functions, can we get your thoughts about
+this?
