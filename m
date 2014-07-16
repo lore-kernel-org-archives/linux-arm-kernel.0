@@ -1,30 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 11:23:28 -0500
-Subject: Function Profiler broken on today's linux-next
-Message-ID: <20140716162328.GJ1365@saruman.home>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 16 Jul 2014 16:25:35 +0000
+Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
+In-Reply-To: <20140716161715.GU29414@arm.com>
+References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
+ <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
+ <20140716161715.GU29414@arm.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D17274D55@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+From: Will Deacon
+...
+> > +	BUG_ON(imm < 0 || imm > 65535);
+> 
+> Do this check with masking instead?
 
-I was trying to use Kernel Function Profiler to figure out why my
-driver's IRQ handler is taking so much CPU time but to my surprise,
-whenever I try to trace anything, I get a "Unable to handle kernel
-paging request at virtual address XXXX" error.
+The compiler will convert that to a single unsigned comparison.
 
-Is anybody else seen that or did I screw up my Kernel config ?
+...
+> > +		BUG_ON(shift != 0 && shift != 16 && shift != 32 &&
+> > +		       shift != 48);
 
-cheers
+OTOH I don't think it will convert that to:
+		BUG_ON(shift & ~48);
 
-ps: I have tried tracing a few different drivers and they all trigger
-the same problem.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/a9927012/attachment.sig>
+	David
