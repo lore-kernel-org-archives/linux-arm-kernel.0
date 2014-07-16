@@ -1,33 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Jul 2014 17:21:47 +0100
-Subject: [PATCH RFCv3 00/14] arm64: eBPF JIT compiler
-In-Reply-To: <20140716104153.GL29414@arm.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <20140716104153.GL29414@arm.com>
-Message-ID: <20140716162146.GV29414@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 16 Jul 2014 11:23:28 -0500
+Subject: Function Profiler broken on today's linux-next
+Message-ID: <20140716162328.GJ1365@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 11:41:53AM +0100, Will Deacon wrote:
-> On Tue, Jul 15, 2014 at 07:24:58AM +0100, Zi Shen Lim wrote:
-> > This series implements eBPF JIT compiler for arm64.
-> > See [14/14] for change log.
-> > 
-> > Patches [1-13/14] implement code generation functions.
-> 
-> Nice work, I'll take a look. Thanks!
+Hi folks,
 
-... and it all looks pretty damn good to me. I gave you a few in-line
-comments but, rather than repeat myself for each patch, my main two gripes
-were:
+I was trying to use Kernel Function Profiler to figure out why my
+driver's IRQ handler is taking so much CPU time but to my surprise,
+whenever I try to trace anything, I get a "Unable to handle kernel
+paging request at virtual address XXXX" error.
 
-  - The use of BUG_ON all over the place
+Is anybody else seen that or did I screw up my Kernel config ?
 
-  - Explicit limit checks which could be done with masks
+cheers
 
-If you address those, this stuff looks pretty much ready to go from my
-perspective. Do you have a branch somewhere I can play with please?
+ps: I have tried tracing a few different drivers and they all trigger
+the same problem.
 
-Cheers,
-
-Will
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/a9927012/attachment.sig>
