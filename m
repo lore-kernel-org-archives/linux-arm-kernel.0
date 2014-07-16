@@ -1,39 +1,40 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 16 Jul 2014 12:42:46 -0700
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpokLzMbzr4kdL6wCL7MZgnVe0CQhbJHKL5wWeETH1YwEOg@mail.gmail.com>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <53C68C54.3010900@gmail.com>
- <CAKohpokLzMbzr4kdL6wCL7MZgnVe0CQhbJHKL5wWeETH1YwEOg@mail.gmail.com>
-Message-ID: <53C6D5B6.808@codeaurora.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 16 Jul 2014 15:45:27 -0400
+Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <20140716155345.GB30313@leverpostej>
+References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1405522297.25580.72.camel@deneb.redhat.com>
+ <20140716155345.GB30313@leverpostej>
+Message-ID: <1405539927.25580.74.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 08:28 AM, Viresh Kumar wrote:
-> On 16 July 2014 19:59, Dirk Brandewie <dirk.brandewie@gmail.com> wrote:
->> stop_cpu() only needs to be called during __cpufreq_remove_dev_prepare() no
->> where else.
->
-> Oh, thanks for reminding us..
->
-> Look at this Saravana:
-> 367dc4a cpufreq: Add stop CPU callback to cpufreq_driver interface
->
+On Wed, 2014-07-16 at 16:53 +0100, Mark Rutland wrote:
+> On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
+> > On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
+> > > After the EFI stub has done its business, it jumps into the kernel by branching
+> > > to offset #0 of the loaded Image, which is where it expects to find the header
+> > > containing a 'branch to stext' instruction.
+> > > 
+> > > However, the header is not covered by any PE/COFF section, so the header may
+> > > not actually be loaded at the expected offset. So instead, jump to 'stext'
+> > > directly, which is at the base of the PE/COFF .text section, by supplying a
+> > > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
+> > > stext into the Image. Also replace other open coded calculations of the same
+> > > value with a reference to 'stext_offset'
+> > 
+> > Have you actually seen a situation where the header isn't there?
+> > Isn't the kernel header actually part of the pe/coff file and
+> > firmware loads the whole file into RAM?
+> 
+> From my understanding of Ard's earlier comments, this part isn't
+> guaranteed per the UEFI spec.
+> 
+> I would rather we weren't relying on implementation details.
+> 
 
-I'll only get called at the same time as it is called today. 
-__cpufreq_remove_dev_prepare is now renamed to __cpufreq_remove_dev. And 
-this function is called from there.
-
-The only time stop does get called is when __cpufreq_remove_dev is 
-called on the last CPU of a policy. So, functionally it's identical.
-
-Btw, I already added logs to all cpufreq driver ops and checked the 
-calls come in the same order with and without my changes.
-
--Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Could be. I didn't see anything about it in the UEFI spec, but I
+probably wasn't exhaustive in my search. In any case, there's at
+least one other place broken if the kernel header isn't included
+in the loaded image.
