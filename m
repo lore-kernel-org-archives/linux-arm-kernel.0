@@ -1,145 +1,55 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 15 Jul 2014 17:28:40 -0700
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
-Message-ID: <53C5C738.5040705@codeaurora.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 16 Jul 2014 08:32:45 +0800
+Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
+In-Reply-To: <20140715152230.GE1011@kwain>
+References: <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140627032506.GA18039@shlinux1.ap.freescale.net>
+ <20140630133313.GA11880@kwain>
+ <20140701002112.GA26146@shlinux1.ap.freescale.net>
+ <53B27789.3090509@gmail.com>
+ <20140701083007.GB26146@shlinux1.ap.freescale.net>
+ <20140701104254.GD3427@piout.net> <53B2D151.60404@cogentembedded.com>
+ <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140715152230.GE1011@kwain>
+Message-ID: <20140716003244.GA30419@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One preemptive comment.
+On Tue, Jul 15, 2014 at 05:22:30PM +0200, Antoine T?nart wrote:
+> Hi guys,
+> 
+> On Wed, Jul 02, 2014 at 01:10:00AM +0000, Peter Chen wrote:
+> > > On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
+> > > 
+> > > >>>>> Well, there is nothing specific about the Berlin CI. Some
+> > > >>>>> subsystems use the 'generic' keyword in these cases. Do you see a
+> > > >>>>> particular reason I should use some Berlin related compatible here?
+> > > 
+> > > >>>> Not must, one suggestion is: can you change the compatible string
+> > > >>>> to "chipidea-usb-generic"?
+> > > 
+> > > >>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
+> > > >>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
+> > > >>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
+> > > 
+> > > >> The recommended format for compatible string is:
+> > > >> "manufacturer,model", I agree with "chipidea,ci13xxx", thanks.
+> > > 
+> > > > I think we should probably avoid using wildcards in the compatible
+> > > > string.
+> > > 
+> > >     I'm sure wildcards shouldn't be allowed there. :-)
+> > 
+> > Then, what's your guys recommend, how about "chipidea,usb2-generic"?
+> 
+> So what do you think? "chipidea,ci13", "chipidea,usb2-generic" or
+> something else?
+> 
 
-On 07/15/2014 03:47 PM, Saravana Kannan wrote:
-> The CPUfreq core moves the cpufreq policy ownership between CPUs when CPUs
-> within a cluster (CPUs sharing same policy) go ONLINE/OFFLINE. When moving
-> policy ownership between CPUs, it also moves the cpufreq sysfs directory
-> between CPUs and also fixes up the symlinks of the other CPUs in the
-> cluster.
->
-> Also, when all the CPUs in a cluster go OFFLINE, all the sysfs nodes and
-> directories are deleted, the kobject is released and the policy is freed.
-> And when the first CPU in a cluster comes up, the policy is reallocated and
-> initialized, kobject is acquired, the sysfs nodes are created or symlinked,
-> etc.
->
-> All these steps end up creating unnecessarily complicated code and locking.
-> There's no real benefit to adding/removing/moving the sysfs nodes and the
-> policy between CPUs. Other per CPU sysfs directories like power and cpuidle
-> are left alone during hotplug. So there's some precedence to what this
-> patch is trying to do.
->
-> This patch simplifies a lot of the code and locking by removing the
-> adding/removing/moving of policy/sysfs/kobj and just leaves the cpufreq
-> directory and policy in place irrespective of whether the CPUs are
-> ONLINE/OFFLINE.
->
-> Leaving the policy, sysfs and kobject in place also brings these additional
-> benefits:
-> * Faster suspend/resume
-> * Faster hotplug
-> * Sysfs file permissions maintained across hotplug
-> * Policy settings and governor tunables maintained across hotplug
-> * Cpufreq stats would be maintained across hotplug for all CPUs and can be
->    queried even after CPU goes OFFLINE
->
-> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->   drivers/cpufreq/cpufreq.c | 388 +++++++++++++---------------------------------
->   1 file changed, 107 insertions(+), 281 deletions(-)
->
-> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> index 62259d2..a0a2ec2 100644
-> --- a/drivers/cpufreq/cpufreq.c
-> +++ b/drivers/cpufreq/cpufreq.c
-
-<SNIP>
-
-> @@ -961,60 +967,58 @@ static void cpufreq_init_policy(struct cpufreq_policy *policy)
->   }
->
->   #ifdef CONFIG_HOTPLUG_CPU
-> -static int cpufreq_add_policy_cpu(struct cpufreq_policy *policy,
-> -				  unsigned int cpu, struct device *dev)
-> +static int cpufreq_change_policy_cpus(struct cpufreq_policy *policy,
-> +				  unsigned int cpu, bool add)
->   {
->   	int ret = 0;
-> -	unsigned long flags;
-> +	unsigned int cpus, pcpu;
->
-> -	if (has_target()) {
-> +	down_write(&policy->rwsem);
-> +
-> +	cpus = !cpumask_empty(policy->cpus);
-> +	if (has_target() && cpus) {
->   		ret = __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
->   		if (ret) {
->   			pr_err("%s: Failed to stop governor\n", __func__);
-> -			return ret;
-> +			goto unlock;
->   		}
->   	}
->
-
-<SNIP>
-
-> +	if (add)
-> +		cpumask_set_cpu(cpu, policy->cpus);
-> +	else
-> +		cpumask_clear_cpu(cpu, policy->cpus);
->
-> -	up_write(&policy->rwsem);
-> +	pcpu = cpumask_first(policy->cpus);
-> +	if (pcpu < nr_cpu_ids && policy->cpu != pcpu) {
-> +		policy->last_cpu = policy->cpu;
-> +		policy->cpu = pcpu;
-> +		blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
-> +					CPUFREQ_UPDATE_POLICY_CPU, policy);
-> +	}
->
-> -	if (has_target()) {
-> +	cpus = !cpumask_empty(policy->cpus);
-> +	if (has_target() && cpus) {
->   		ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
->   		if (!ret)
->   			ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
->
->   		if (ret) {
->   			pr_err("%s: Failed to start governor\n", __func__);
-> -			return ret;
-> +			goto unlock;
->   		}
->   	}
->
-
-<SNIP>
-
-> +	if (!cpus && cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
-> +		cpufreq_driver->stop_cpu(policy);
-> +	}
->
-
-Viresh, I tried your suggestion (and my initial thought too) to combine 
-this as an if/else with the previous if. But the indentation got nasty 
-and made it hard to read. I'm sure the compiler will optimize it. So, I 
-would prefer to leave it this way.
-
-
-> -	policy->governor = NULL;
-> +unlock:
-> +	up_write(&policy->rwsem);
->
-> -	return policy;
-> +	return ret;
->   }
-> +#endif
->
-
--Saravana
+Do you agree to use "chipidea,usb2", And add ci13xxx at
+MODULE_DESCRIPTION?
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+
+Best Regards,
+Peter Chen
