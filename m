@@ -1,53 +1,29 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 16 Jul 2014 08:32:45 +0800
+Date: Wed, 16 Jul 2014 08:44:32 +0800
 Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <20140715152230.GE1011@kwain>
-References: <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140627032506.GA18039@shlinux1.ap.freescale.net>
- <20140630133313.GA11880@kwain>
- <20140701002112.GA26146@shlinux1.ap.freescale.net>
- <53B27789.3090509@gmail.com>
- <20140701083007.GB26146@shlinux1.ap.freescale.net>
- <20140701104254.GD3427@piout.net> <53B2D151.60404@cogentembedded.com>
- <1d01427f91084d67bf63721e2267e160@BL2PR03MB226.namprd03.prod.outlook.com>
- <20140715152230.GE1011@kwain>
-Message-ID: <20140716003244.GA30419@shlinux1.ap.freescale.net>
+In-Reply-To: <20140715152437.GF1011@kwain>
+References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
+ <CAGnW=BbA3gLdSv8AKkD_ysnYAaN0KoCdVW+wxWPB9zzGCh9+jQ@mail.gmail.com>
+ <20140715152437.GF1011@kwain>
+Message-ID: <20140716004431.GB30419@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 05:22:30PM +0200, Antoine T?nart wrote:
-> Hi guys,
+On Tue, Jul 15, 2014 at 05:24:37PM +0200, Antoine T?nart wrote:
+> Hi,
 > 
-> On Wed, Jul 02, 2014 at 01:10:00AM +0000, Peter Chen wrote:
-> > > On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
-> > > 
-> > > >>>>> Well, there is nothing specific about the Berlin CI. Some
-> > > >>>>> subsystems use the 'generic' keyword in these cases. Do you see a
-> > > >>>>> particular reason I should use some Berlin related compatible here?
-> > > 
-> > > >>>> Not must, one suggestion is: can you change the compatible string
-> > > >>>> to "chipidea-usb-generic"?
-> > > 
-> > > >>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
-> > > >>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
-> > > >>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
-> > > 
-> > > >> The recommended format for compatible string is:
-> > > >> "manufacturer,model", I agree with "chipidea,ci13xxx", thanks.
-> > > 
-> > > > I think we should probably avoid using wildcards in the compatible
-> > > > string.
-> > > 
-> > >     I'm sure wildcards shouldn't be allowed there. :-)
+> On Thu, Jul 03, 2014 at 08:17:34AM +0530, punnaiah choudary kalluri wrote:
+> > Since its a generic driver, support for configuring the dma_mask using
+> > dma_coerce_mask_and_coherent would be good.
 > > 
-> > Then, what's your guys recommend, how about "chipidea,usb2-generic"?
 > 
-> So what do you think? "chipidea,ci13", "chipidea,usb2-generic" or
-> something else?
+> Should I add a DMA mask dt property? Or just not add this and wait for
+> someone needing it in his case?
 > 
 
-Do you agree to use "chipidea,usb2", And add ci13xxx at
-MODULE_DESCRIPTION?
+As a dt property, since most of platforms will use it. For PIO mode, the
+property can be NULL.
 
 -- 
 
