@@ -1,52 +1,33 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 16 Jul 2014 15:20:40 -0700
-Subject: [PATCH v4 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <CAMf-jS=tkBYQ7mXp71F2_rPo6DE3e4C=sFHqg3Q26a08m6NxJQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Jul 2014 23:28:29 +0100
+Subject: [PATCH v4 3/3] regulator: qcom-rpm: Regulator driver for the
+ Qualcomm RPM
+In-Reply-To: <CAJAp7Oj1R-EkJoSdLEa6SBLbzE_N1MjsystQ9Z+x4L_SjU=56w@mail.gmail.com>
 References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1405465241-28684-2-git-send-email-bjorn.andersson@sonymobile.com>
- <CAMf-jS=tkBYQ7mXp71F2_rPo6DE3e4C=sFHqg3Q26a08m6NxJQ@mail.gmail.com>
-Message-ID: <CAJAp7OggtuxPSc0yXzMCs10aQ2R6E+m4Bu8sdLJopvrZ3+5Rmg@mail.gmail.com>
+ <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAMf-jSn2YHF7ihRpXMfkPWYt8pNCj4o395OGha3BHD3K3mUv9g@mail.gmail.com>
+ <CAJAp7Oj1R-EkJoSdLEa6SBLbzE_N1MjsystQ9Z+x4L_SjU=56w@mail.gmail.com>
+Message-ID: <20140716222829.GO17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 3:06 AM, pramod gurav
-<pramod.gurav.etc@gmail.com> wrote:
-> Hi Bjorn,
->
-> RPM breaks on IFC6410 without entry for 'qcom.ipc' node. Please find
-> my observations below.
->
-> On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
-> <bjorn.andersson@sonymobile.com> wrote:
-[...]
->> +       rpm at 108000 {
->> +               compatible = "qcom,rpm-msm8960";
->> +               reg = <0x108000 0x1000>;
->> +               qcom,ipc = <&apcs 0x8 2>;
->
-> Tried adding this but there is no reference to 'apcs' registers itself
-> in any dts.
->
-> Without these changes rpm breaks hence not able to test SATA which needs rpm.
->
+On Wed, Jul 16, 2014 at 03:17:13PM -0700, Bjorn Andersson wrote:
+> On Wed, Jul 16, 2014 at 12:01 AM, pramod gurav
+> > On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
+> > <bjorn.andersson@sonymobile.com> wrote:
 
-Hi Pramod,
+> >> +static const struct regulator_linear_range pldo_ranges[] = {
+> >> +       REGULATOR_LINEAR_RANGE( 750000,   0,  59, 12500),
 
-Unfortunately the ipc bits resides in a block that needs to be
-accesses by various device drivers so I had to extract the access; so
-you now need to reference it via a syscon handle and offset instead -
-as described above.
+> > ERROR: space prohibited after that open parenthesis '('
 
-The apcs node I used for testing this with looks like this:
+> I prefer the nicely aligned columns over checkpatch correctness here.
 
-apcs: syscon at 2011000 {
-    compatible = "syscon";
-    reg = <0x2011000 0x1000>;
-};
-
-Enable CONFIG_MFD_SYSCON and put the dt snippet somewhere under soc
-and you should be good.
-
-Regards,
-Bjorn
+Me too.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/93638325/attachment.sig>
