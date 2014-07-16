@@ -1,93 +1,93 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 16 Jul 2014 18:06:26 +0800
-Subject: [PATCH v2 1/3] mtd: atmel_nand: add NFC status error check
-In-Reply-To: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
-References: <1402393811-24578-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <53C64EA2.3050703@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Jul 2014 12:10:07 +0200
+Subject: [PATCH 2/8] mmc: sdhci: host: add new f_sdh30
+In-Reply-To: <830AC58E49A426478AC39824BC0FA915D8B8FF0609@fmpitwmsex01.fmpi.sea.css.fujitsu.com>
+References: <1405232971-4607-1-git-send-email-mollie.wu@linaro.org>
+ <7710458.qT0KZ5qsA6@wuerfel>
+ <830AC58E49A426478AC39824BC0FA915D8B8FF0609@fmpitwmsex01.fmpi.sea.css.fujitsu.com>
+Message-ID: <5526913.sJ4RMkanr6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/10/2014 5:50 PM, Josh Wu wrote:
-> Add a new function to read the NFC status. Meantime, this function will
-> theck if there is any errors in NFC.
->
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+On Wednesday 16 July 2014 17:35:41 Vincent. Yang wrote:
 
-Tested-by: Matthieu Crapet <Matthieu.Crapet@ingenico.com>
+> >
+> >> +unsigned int sdhci_f_sdh30_get_min_clock(struct sdhci_host *host)
+> >> +{
+> >> +     return F_SDH30_MIN_CLOCK;
+> >> +}
+> >> +
+> >> +void sdhci_f_sdh30_reset(struct sdhci_host *host, u8 mask)
+> >> +{
+> >> +     struct f_sdhost_priv *priv = sdhci_priv(host);
+> >> +
+> >> +     if (gpio_is_valid(priv->gpio_select_1v8))
+> >> +             gpio_direction_output(priv->gpio_select_1v8, 1);
+> >> +
+> >> +     if (sdhci_readw(host, SDHCI_CLOCK_CONTROL) == 0) {
+> >> +             sdhci_writew(host, 0xBC01, SDHCI_CLOCK_CONTROL);
+> >> +             mmiowb();
+> >> +     }
+> >
+> >Can you explain the mmiowb call here?
+> 
+> This came from the original 3.0 based driver. It's trying to be a
+> write memory barrier. It wants to ensure the clock control change
+> actually happened before the following code.
+> I'll change it to a regular wmb in next version.
 
-I add a Tested-by tag from Matthieu Crapet.
-He didn't reply this email thread directly. His test-by tag is in 
-email:http://lists.infradead.org/pipermail/linux-mtd/2014-June/054443.html
+Note that with 'readw'/writew', you shouldn't need any extra barriers.
+If sdhci_writew() is readw_relaxed(), wmb() is the correct barrier.
 
-Best Regards,
-Josh Wu
+> >> +
+> >> +     if (!of_property_read_u32(pdev->dev.of_node, "bus-width", &bus_width))
+> >{
+> >> +             switch (bus_width) {
+> >> +             case 8:
+> >> +                     dev_info(dev, "Applying 8 bit bus width\n");
+> >> +                     host->mmc->caps |= MMC_CAP_8_BIT_DATA;
+> >> +                     break;
+> >> +             case 4:
+> >> +                     dev_info(dev, "Applying 4 bit bus width\n");
+> >> +                     host->mmc->caps |= MMC_CAP_4_BIT_DATA;
+> >> +                     break;
+> >> +             case 1:
+> >> +             default:
+> >> +                     dev_err(dev, "Invalid bus width: %u\n", bus_width);
+> >> +                     break;
+> >> +             }
+> >> +     }
+> >
+> >This should probably be done in generic sdhci code somewhere. How about
+> >adding it to sdhci_get_of_property instead_
+> 
+> I should use generic mmc_of_parse for it. I'll update it in next version.
 
-> ---
->   drivers/mtd/nand/atmel_nand.c     |   24 +++++++++++++++++++++++-
->   drivers/mtd/nand/atmel_nand_nfc.h |    4 ++++
->   2 files changed, 27 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index ec97ccb..25d9921 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -1572,6 +1572,25 @@ static int atmel_hw_nand_init_params(struct platform_device *pdev,
->   	return 0;
->   }
->   
-> +static inline u32 nfc_read_status(struct atmel_nand_host *host)
-> +{
-> +	u32 err_flags = NFC_SR_DTOE | NFC_SR_UNDEF | NFC_SR_AWB | NFC_SR_ASE;
-> +	u32 nfc_status = nfc_readl(host->nfc->hsmc_regs, SR);
-> +
-> +	if (unlikely(nfc_status & err_flags)) {
-> +		if (nfc_status & NFC_SR_DTOE)
-> +			dev_err(host->dev, "NFC: Waiting Nand R/B Timeout Error\n");
-> +		else if (nfc_status & NFC_SR_UNDEF)
-> +			dev_err(host->dev, "NFC: Access Undefined Area Error\n");
-> +		else if (nfc_status & NFC_SR_AWB)
-> +			dev_err(host->dev, "NFC: Access memory While NFC is busy\n");
-> +		else if (nfc_status & NFC_SR_ASE)
-> +			dev_err(host->dev, "NFC: Access memory Size Error\n");
-> +	}
-> +
-> +	return nfc_status;
-> +}
-> +
->   /* SMC interrupt service routine */
->   static irqreturn_t hsmc_interrupt(int irq, void *dev_id)
->   {
-> @@ -1579,7 +1598,7 @@ static irqreturn_t hsmc_interrupt(int irq, void *dev_id)
->   	u32 status, mask, pending;
->   	irqreturn_t ret = IRQ_HANDLED;
->   
-> -	status = nfc_readl(host->nfc->hsmc_regs, SR);
-> +	status = nfc_read_status(host);
->   	mask = nfc_readl(host->nfc->hsmc_regs, IMR);
->   	pending = status & mask;
->   
-> @@ -2210,6 +2229,9 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->   		}
->   	}
->   
-> +	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
-> +	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
-> +
->   	nfc->is_initialized = true;
->   	dev_info(&pdev->dev, "NFC is probed.\n");
->   	return 0;
-> diff --git a/drivers/mtd/nand/atmel_nand_nfc.h b/drivers/mtd/nand/atmel_nand_nfc.h
-> index 4efd117..85b8ca6 100644
-> --- a/drivers/mtd/nand/atmel_nand_nfc.h
-> +++ b/drivers/mtd/nand/atmel_nand_nfc.h
-> @@ -37,6 +37,10 @@
->   #define ATMEL_HSMC_NFC_SR	0x08		/* NFC Status Register */
->   #define		NFC_SR_XFR_DONE		(1 << 16)
->   #define		NFC_SR_CMD_DONE		(1 << 17)
-> +#define		NFC_SR_DTOE		(1 << 20)
-> +#define		NFC_SR_UNDEF		(1 << 21)
-> +#define		NFC_SR_AWB		(1 << 22)
-> +#define		NFC_SR_ASE		(1 << 23)
->   #define		NFC_SR_RB_EDGE		(1 << 24)
->   
->   #define ATMEL_HSMC_NFC_IER	0x0c
+Ah right, I thought we had this in common code already but couldn't find
+it. Using mmc_of_parse() is definitely the correct solution here.
+
+> >> +     priv->clk_sd4 = clk_get(&pdev->dev, "sd_sd4clk");
+> >> +     if (!IS_ERR(priv->clk_sd4)) {
+> >> +             ret = clk_prepare_enable(priv->clk_sd4);
+> >> +             if (ret < 0) {
+> >> +                     dev_err(dev, "Failed to enable sd4 clock: %d\n", ret);
+> >> +                     goto err_clk1;
+> >> +             }
+> >> +     }
+> >> +     priv->clk_b = clk_get(&pdev->dev, "sd_bclk");
+> >> +     if (!IS_ERR(priv->clk_b)) {
+> >> +             ret = clk_prepare_enable(priv->clk_b);
+> >> +             if (ret < 0) {
+> >> +                     dev_err(dev, "Failed to enable clk_b clock: %d\n", ret);
+> >> +                     goto err_clk2;
+> >> +             }
+> >> +     }
+> >
+> >Please pick clock names that match what some of the other drivers use.
+> 
+> I'll use "iface" and "core" for clock names because they match what used
+> in sdhci-msm driver.
+
+Ok, makes sense.
+
+	Arnd
