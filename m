@@ -1,41 +1,26 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 17 Jul 2014 01:32:21 +0200
-Subject: [PATCH v2 0/3] Clean up ACPI core to prepare for running ACPI on
- ARM64
-In-Reply-To: <1404898746-6685-1-git-send-email-hanjun.guo@linaro.org>
-References: <1404898746-6685-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <2351210.nfpIXXiZXh@vostro.rjw.lan>
+From: tony.luck@gmail.com (Tony Luck)
+Date: Wed, 16 Jul 2014 16:20:00 -0700
+Subject: [PATCH 2/2] ia64: Remove Linux/x86 domain support
+In-Reply-To: <1405263538-27589-3-git-send-email-richard@nod.at>
+References: <1405263538-27589-1-git-send-email-richard@nod.at>
+ <1405263538-27589-3-git-send-email-richard@nod.at>
+Message-ID: <CA+8MBbKA5UppTjLP6JYAeLMAyeUPBfF73j91xDCfoF_Vewy5=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 09, 2014 05:39:03 PM Hanjun Guo wrote:
-> This patch set have no function change for x86 and ia64 and
-> just do some clean up to prepare for running ACPI on ARM64.
-> 
-> This patch set is splited out from the patch set [1]
-> "[PATCH v4 00/13] Enable ACPI on ARM64 in Kconfig" and hope it
-> can be merged first before ARM64 ACPI core patches.
-> 
-> [1]: https://lkml.org/lkml/2014/6/26/627
-> 
-> update from v1:
-> 1. Drop "Make EC debugfs depend on X86 || IA64 in Kconfig";
-> 2. Rename ACPI_SCAN_BIOS_NOT_EFI to ACPI_LEGACY_TABLES_LOOKUP
->    suggested by Rafael;
-> 3. Rename ARCH_HAS_ACPI_PDC to ARCH_MIGHT_HAVE_ACPI_PDC suggested by Rafael;
-> 4. Remove the help for ARCH_MIGHT_HAVE_ACPI_PDC because it can't be selected;
-> 5. Rename acpi_arch_is_smp() to acpi_has_cpu_in_madt() to be more
->    explicit and easy understanding.
-> 
-> Graeme Gregory (2):
->   ACPI: ARM64 does not have a BIOS add config for BIOS table scan.
->   ACPI: Don't use acpi_lapic in ACPI core code
-> 
-> Hanjun Guo (1):
->   ACPI / processor: Introduce ARCH_HAS_ACPI_PDC
+On Sun, Jul 13, 2014 at 7:58 AM, Richard Weinberger <richard@nod.at> wrote:
 
-Are there any objections against this series from the x86 and ia64 maintainers?
+Did you read the comment?
 
-If not, I'll take it for 3.17.
+> -/*
+> - * Even when CONFIG_IA32_SUPPORT is not enabled it is
+> - * useful to have the Linux/x86 domain registered to
+> - * avoid an attempted module load when emulators call
+> - * personality(PER_LINUX32). This saves several milliseconds
+> - * on each such call.
+> - */
 
-Rafael
+I don't know if there are still people using ia32el to run x86 binaries
+on ia64 ... but if there are, they may be sad at the extra delays.
+
+-Tony
