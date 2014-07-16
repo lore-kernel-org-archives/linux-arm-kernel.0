@@ -1,144 +1,93 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 16 Jul 2014 12:45:58 -0700
-Subject: [PATCH v10 0/11] seccomp: add thread sync ability
-In-Reply-To: <CAGXu5j+r-CpJiXipCT=j09+ZfJjF9jTc3kuZFAH3ZxgUEvktTA@mail.gmail.com>
-References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
- <20140711164931.GA18473@redhat.com>
- <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
- <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
- <CAGXu5j+r-CpJiXipCT=j09+ZfJjF9jTc3kuZFAH3ZxgUEvktTA@mail.gmail.com>
-Message-ID: <CALCETrX48nuR6wqEV4Nu47BF4Z3XFvBpYer_fzwaqJdi0fpdKw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 16 Jul 2014 21:47:42 +0200
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
+ <7497427.LQy8pJts8f@wuerfel>
+ <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
+Message-ID: <20140716194740.GA5212@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-C
+On Wed, Jul 16, 2014 at 12:31:00PM -0700, Olof Johansson wrote:
+> [ Gee, I had completely missed this thread because nobody bothered to
+> cc me. Seems to be standard procedure on 64-bit these days. :( ]
+> 
+> 
+> On Mon, Jun 30, 2014 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
+> >> > > pmc.c implements various routines to access the power management
+> >> > > controller, some of which is needed by suspend/resume, some of it is
+> >> > > needed by SMP. powergate.c implements a subset of the PMC that needs to
+> >> > > be exported to drivers to enable power partitions on the SoC. I'm not
+> >> > > aware of subsystems that deal with this kind of driver.
+> >> > >
+> >> > Please see above.
+> >>
+> >> Like I said, I don't see what business suspend/resume related code has
+> >> in drivers/power. What we're talking about here really is functionality
+> >> very specific to Tegra. Also some of that code needs to be run at very
+> >> early points in the boot process, so we can't reasonably turn it into a
+> >> proper driver anyway.
+> >
+> > I believe the powergate.c stuff can be changed into pm_domain code, but
+> > we don't have a good subsystem with generic DT bindings yet, so that
+> > may need some more groundwork first. drivers/power or a subdirectory
+> > of that may end up being the right place though.
+> >
+> >> Also, the real win we get from moving code out into drivers/ is if we
+> >> can provide a common framework for them. I don't see how we can possibly
+> >> do that for this code since there simply isn't enough commonality
+> >> between SoCs. At the same time we now have a situation where both 32-bit
+> >> and 64-bit variants of some SoCs share some of the same hardware at the
+> >> very low level and since we don't have mach-* directories for 64-bit ARM
+> >> and shouldn't be duplicating code either, we need to find a new home for
+> >> this type of code. drivers/soc seemed to fit perfectly well.
+> >
+> > For the low-level stuff yes, but I agree with Santosh there needs to be
+> > some more work trying to split out individual high-level drivers.
+> >
+> > There are two common patterns for the interface between the low-level
+> > register access and the more high-level stuff:  you can either use
+> > a "syscon" driver that just exports a struct regmap and that gets referenced
+> > from other drivers using a phandle in their device nodes, or you have
+> > a driver in drivers/soc that exports a somewhat higher-level interface
+> > and comes with its own header file that gets included by other drivers.
+> > At the moment, the syscon/regmap variant can only be used once device
+> > drivers are loaded, but there is some broad agreement that it should
+> > be changed to allow calling syscon_regmap_lookup_by_phandle() at
+> > early boot using just DT accessors.
+> 
+> I'd strongly prefer to NOT tie this into DT and keep it as in-kernel
+> implementation until we know more what a common subsystem might look
+> like, if any.
+> 
+> If we keep it only in the kernel, then we're free to change it as
+> needed. If we tie it into DT/syscon, then we get stick with
+> stable-only ABIs from day one. That doesn't seem like a good idea.
 
-On Wed, Jul 16, 2014 at 10:54 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Jul 14, 2014 at 12:04 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> On Fri, Jul 11, 2014 at 10:55 AM, Kees Cook <keescook@chromium.org> wrote:
->>> On Fri, Jul 11, 2014 at 9:49 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->>>> On 07/10, Kees Cook wrote:
->>>>>
->>>>> This adds the ability for threads to request seccomp filter
->>>>> synchronization across their thread group (at filter attach time).
->>>>> For example, for Chrome to make sure graphic driver threads are fully
->>>>> confined after seccomp filters have been attached.
->>>>>
->>>>> To support this, locking on seccomp changes via thread-group-shared
->>>>> sighand lock is introduced, along with refactoring of no_new_privs. Races
->>>>> with thread creation are handled via delayed duplication of the seccomp
->>>>> task struct field and cred_guard_mutex.
->>>>>
->>>>> This includes a new syscall (instead of adding a new prctl option),
->>>>> as suggested by Andy Lutomirski and Michael Kerrisk.
->>>>
->>>> I do not not see any problems in this version,
->>>
->>> Awesome! Thank you for all the reviews. :) If Andy and Michael are
->>> happy with this too, I think this is in good shape. \o/
->>
->> I think I'm happy with it.  Is it in git somewhere for easy perusal?
->> I have a cold, so my reviewing ability is a bit off, but I want to
->> take a look at the final version, and git is a little easier than
->> email for this.
->
-> Hi Andy,
->
-> Have you had a chance to look v10 over? I'd like to send a v11 with
-> Oleg's Reviewed-by added (at James Morris's request). Should I add one
-> from you as well?
+There are two sides to keeping to an in-kernel API too: it may seem like
+we're free to change this at will and aren't subject to a stable ABI.
+However that's not entirely accurate.
 
-Trivial nits (take them or leave them):
+Assume we don't put any information about a feature into DT but use an
+in-kernel API only. Once we've come up with a good way to represent that
+in DT and have a generic framework that we can use, we'll most likely
+still need to keep around the old API in the kernel to make sure the
+kernel still works with a DT that doesn't have nodes and/or properties
+for the new binding.
 
-seccomp_check_mode confused me.  Maybe seccomp_may_assign_mode would
-be a better name.
+So the question arises: at that point is it really worth using a DT
+binding? Since we already have an API that works, why bother coming up
+with a new one? Especially if we can't get rid of the one we already
+have anyway?
 
-In the writer locking changelog, should "(which is unique to the
-thread group)" be "(which is shared by all threads in the thread
-group)"?
-
-This bit:
-
-    /*
-     * Explicitly enable no_new_privs here in case it got set
-     * between the task_struct being duplicated and holding the
-     * sighand lock. The seccomp state and nnp must be in sync.
-     */
-    if (task_no_new_privs(current))
-        task_set_no_new_privs(p);
-
-should arguably move the very end of task duplication -- someone will
-want it for some other purpose some day.
-
-This bit:
-
-    /* If we have a seccomp mode, enable the thread flag. */
-    if (p->seccomp.mode != SECCOMP_MODE_DISABLED)
-        set_tsk_thread_flag(p, TIF_SECCOMP);
-
-is not quite obvious to me -- it's not obvious why it's needed.  If
-it's to eliminate a race, can you explain the race in the comment?  If
-it's just paranoia, a WARN_ON or BUG_ON might be worthwhile.
-
-SECCOMP_FILTER_FLAG_MASK seems backwards to me.  Maybe rename it to
-SECCOMP_FILTER_ALLOWED_FLAGS and invert it?
-
-is_ancestor: calling the first parameter "candidate" is just a tiny
-bit odd -- it's the child that's up for consideration.  (This is
-barely even worth the time it took me to type it.)
-
-Less trivial nits:
-
-Can you change:
-
-fp = kzalloc(fp_size, GFP_KERNEL|__GFP_NOWARN);
-
-to
-
-fp = kcalloc(fprog->len, sizeof(struct sock_filter), GFP_KERNEL|__GFP_NOWARN);
-
-somewhere in this series (w/ a changelog comment that it's not
-exploitable to avoid scaring people).
-
-In seccomp_prepare_user_filter, would it make sense to return -EINVAL
-if !user_filter?  That will make it slightly more pleasant to
-implement TSYNC-without-change if anyone ever wants it.  (This isn't
-really necessary -- it's just slightly more polite.)
-
-
-Once James picks this up, I'll rebase my series on top of it.  I think
-they'll conflict slightly.
-
-Feel free to add my Reviewed-by to the whole series except the ARM and
-MIPS patches.
-
-
-And some thoughts:
-
-Your changelog comment for the seccomp syscall suggests that you're
-thinking about extending the tracer interface.  I'd suggest a rather
-different design: add a concept of a seccomp monitor associated with a
-particular filter and an action SECCOMP_RET_MONITOR.
-SECCOMP_RET_MONITOR will tell the monitor what syscall was attempted
-and will wait for further instructions.  The monitor can then ask for
-zero or more syscalls to be issued on behalf of the waiting process
-and then resume it.  Each of those additional syscalls will be further
-filtered through all seccomp filters outside of the one that returned
-SECCOMP_RET_MONITOR.
-
-This would avoid all of the nastiness inherent in using ptrace and
-would nest much more nicely.  And it could be far faster.
-
-If you decide to do something to ARM along the lines of what I'm doing
-to x86, you may want to fix this:
-
-    /*
-     * Make sure that any changes to mode from another thread have
-     * been seen after TIF_SECCOMP was seen.
-     */
-    rmb();
-
-It should have essentially no effect on x86, though.
-
-
---Andy
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/89883d14/attachment.sig>
