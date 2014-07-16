@@ -1,55 +1,52 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed, 16 Jul 2014 15:18:23 -0700
-Subject: [PATCH RFCv3 00/14] arm64: eBPF JIT compiler
-In-Reply-To: <20140716162146.GV29414@arm.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <20140716104153.GL29414@arm.com> <20140716162146.GV29414@arm.com>
-Message-ID: <20140716221823.GA3378@gup76>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 16 Jul 2014 15:20:40 -0700
+Subject: [PATCH v4 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <CAMf-jS=tkBYQ7mXp71F2_rPo6DE3e4C=sFHqg3Q26a08m6NxJQ@mail.gmail.com>
+References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1405465241-28684-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAMf-jS=tkBYQ7mXp71F2_rPo6DE3e4C=sFHqg3Q26a08m6NxJQ@mail.gmail.com>
+Message-ID: <CAJAp7OggtuxPSc0yXzMCs10aQ2R6E+m4Bu8sdLJopvrZ3+5Rmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 05:21:47PM +0100, Will Deacon wrote:
-> On Wed, Jul 16, 2014 at 11:41:53AM +0100, Will Deacon wrote:
-> > On Tue, Jul 15, 2014 at 07:24:58AM +0100, Zi Shen Lim wrote:
-> > > This series implements eBPF JIT compiler for arm64.
-> > > See [14/14] for change log.
-> > > 
-> > > Patches [1-13/14] implement code generation functions.
-> > 
-> > Nice work, I'll take a look. Thanks!
-> 
-> ... and it all looks pretty damn good to me. I gave you a few in-line
+On Wed, Jul 16, 2014 at 3:06 AM, pramod gurav
+<pramod.gurav.etc@gmail.com> wrote:
+> Hi Bjorn,
+>
+> RPM breaks on IFC6410 without entry for 'qcom.ipc' node. Please find
+> my observations below.
+>
+> On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
+> <bjorn.andersson@sonymobile.com> wrote:
+[...]
+>> +       rpm at 108000 {
+>> +               compatible = "qcom,rpm-msm8960";
+>> +               reg = <0x108000 0x1000>;
+>> +               qcom,ipc = <&apcs 0x8 2>;
+>
+> Tried adding this but there is no reference to 'apcs' registers itself
+> in any dts.
+>
+> Without these changes rpm breaks hence not able to test SATA which needs rpm.
+>
 
-Thanks :)
+Hi Pramod,
 
-> comments but, rather than repeat myself for each patch, my main two gripes
-> were:
-> 
->   - The use of BUG_ON all over the place
+Unfortunately the ipc bits resides in a block that needs to be
+accesses by various device drivers so I had to extract the access; so
+you now need to reference it via a syscon handle and offset instead -
+as described above.
 
-I responded to your comment about BUG_ON in [1/14].
+The apcs node I used for testing this with looks like this:
 
-> 
->   - Explicit limit checks which could be done with masks
+apcs: syscon at 2011000 {
+    compatible = "syscon";
+    reg = <0x2011000 0x1000>;
+};
 
-I responded to your comment about this in [8/14]. I can go ahead and
-make changes throughout if you prefer.
+Enable CONFIG_MFD_SYSCON and put the dt snippet somewhere under soc
+and you should be good.
 
-> 
-> If you address those, this stuff looks pretty much ready to go from my
-> perspective. Do you have a branch somewhere I can play with please?
-
-Just pushed it to:
-
-	https://github.com/zlim/linux.git arm64/bpf
-
-which is the same as this RFCv3 series, i.e. I haven't rebased it on
-latest net-next.
-
-Thanks so much for your time and attention!
-Let me know how it goes for you.
-
-I can post this series (dropping RFC) once we finalized the above.
-
-Cheers,
-z
+Regards,
+Bjorn
