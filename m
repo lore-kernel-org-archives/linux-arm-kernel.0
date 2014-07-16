@@ -1,75 +1,49 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 16 Jul 2014 10:26:05 +0200
-Subject: [PATCH v3 11/12] ARM: dts: berlin: add BG2CD nodes for USB support
+Date: Wed, 16 Jul 2014 10:26:02 +0200
+Subject: [PATCH v3 08/12] Documentation: bindings: add doc for the USB2
+ ChipIdea USB driver
 In-Reply-To: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1405499166-6726-12-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1405499166-6726-9-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Document the USB2 ChipIdea driver (ci13xxx) bindings.
 
-Adds nodes describing the Marvell Berlin BG2CD USB PHY and USB. The BG2CD
-SoC has 2 USB ChipIdea controllers, with usb0 host-only and usb1 dual-role
-capable.
-
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ .../devicetree/bindings/usb/ci-hdrc-usb2.txt       | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 68f7032b4686..5c6950531327 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -66,6 +66,22 @@
- 			clocks = <&chip CLKID_TWD>;
- 		};
- 
-+		usb_phy0: usb-phy at b74000 {
-+			compatible = "marvell,berlin2cd-usb-phy";
-+			reg = <0xb74000 0x128>;
-+			#phy-cells = <0>;
-+			resets = <&chip 0x178 23>;
-+			status = "disabled";
-+		};
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+new file mode 100644
+index 000000000000..fb3157183e6a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+@@ -0,0 +1,23 @@
++* USB2 ChipIdea USB controller for ci13xxx
 +
-+		usb_phy1: usb-phy at b78000 {
-+			compatible = "marvell,berlin2cd-usb-phy";
-+			reg = <0xb78000 0x128>;
-+			#phy-cells = <0>;
-+			resets = <&chip 0x178 24>;
-+			status = "disabled";
-+		};
++Required properties:
++- compatible: should be "chipidea,usb2"
++- reg: base address and length of the registers
++- interrupts: interrupt for the USB controller
 +
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -242,6 +258,24 @@
- 			};
- 		};
- 
-+		usb0: usb at ed0000 {
-+			compatible = "chipidea,usb2";
-+			reg = <0xed0000 0x200>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_USB0>;
-+			usb-phy = <&usb_phy0>;
-+			status = "disabled";
-+		};
++Optional properties:
++- clocks: reference to the USB clock
++- usb-phy: reference to the USB PHY
++- vbus-supply: reference to the VBUS regulator
++- dma-mask: DMA bit mask
 +
-+		usb1: usb at ee0000 {
-+			compatible = "chipidea,usb2";
-+			reg = <0xee0000 0x200>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_USB1>;
-+			usb-phy = <&usb_phy1>;
-+			status = "disabled";
-+		};
++Example:
 +
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++	usb at f7ed0000 {
++		compatible = "chipidea,usb2";
++		reg = <0xf7ed0000 0x10000>;
++		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&chip CLKID_USB0>;
++		usb-phy = <&usb_phy0>;
++		vbus-supply = <&reg_usb0_vbus>;
++	};
 -- 
 1.9.1
