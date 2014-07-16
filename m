@@ -1,51 +1,78 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 17 Jul 2014 00:18:38 +0200
-Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
-In-Reply-To: <20140713222223.GH13108@titan.lakedaemon.net>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140713222223.GH13108@titan.lakedaemon.net>
-Message-ID: <2328587.KMSy5tvnCr@vostro.rjw.lan>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Wed, 16 Jul 2014 15:04:22 -0700
+Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
+In-Reply-To: <20140716161715.GU29414@arm.com>
+References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
+ <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
+ <20140716161715.GU29414@arm.com>
+Message-ID: <20140716220422.GB18109@gup76>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 13, 2014 06:22:23 PM Jason Cooper wrote:
-> Rafael, Daniel,
+On Wed, Jul 16, 2014 at 05:17:15PM +0100, Will Deacon wrote:
+> On Tue, Jul 15, 2014 at 07:25:06AM +0100, Zi Shen Lim wrote:
+> > Introduce function to generate move wide (immediate) instructions.
 > 
-> On Wed, Jul 09, 2014 at 03:40:04PM +0200, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > Here comes the second version of the cpuidle support for Armada 370
-> > and Armada 38x. This series has been tested on the following
-> > configurations:
-> > 
-> >  * Armada XP, LE and BE, to verify that the existing, SMP, cpuidle and
-> >    CPU hotplug functionalities are still working.
-> > 
-> >  * Armada 375, Z1 and A0, LE and BE, to verify that the existing SMP
-> >    functionality is still working (SMP support on Armada 375 Z1 is
-> >    affected by this series).
-> > 
-> >  * Armada 370, LE and BE, to verify that the newly introduced cpuidle
-> >    functionality is working fine.
-> > 
-> >  * Armada 38x, LE and BE, to verify that the existing SMP
-> >    functionality, and the newly introduced cpuidle functionality is
-> >    working fine.
-> > 
-> > We are hoping to see this patch series merged for 3.17.
-> > 
-> > Most patches are touching only arch/arm/mach-mvebu/ code so they
-> > should be handled by the mvebu maintainers. However, patches 11-14 are
-> > touching the mvebu cpuidle driver, with a possible issue on patch 11,
-> > which touches both the cpuidle driver and the mach-mvebu code in order
-> > to rename the driver without breaking functionality (if needed, we can
-> > decide to split the commits, it would break functionality temporarly,
-> > but not buildability).
+> [...]
 > 
-> Would one or both of you mind Acking this series so we can keep it
-> together?
+> > +u32 aarch64_insn_gen_movewide(enum aarch64_insn_register dst,
+> > +			      int imm, int shift,
+> > +			      enum aarch64_insn_variant variant,
+> > +			      enum aarch64_insn_movewide_type type)
+> > +{
+> > +	u32 insn;
+> > +
+> > +	switch (type) {
+> > +	case AARCH64_INSN_MOVEWIDE_ZERO:
+> > +		insn = aarch64_insn_get_movz_value();
+> > +		break;
+> > +	case AARCH64_INSN_MOVEWIDE_KEEP:
+> > +		insn = aarch64_insn_get_movk_value();
+> > +		break;
+> > +	case AARCH64_INSN_MOVEWIDE_INVERSE:
+> > +		insn = aarch64_insn_get_movn_value();
+> > +		break;
+> > +	default:
+> > +		BUG_ON(1);
+> > +	}
+> > +
+> > +	BUG_ON(imm < 0 || imm > 65535);
+> 
+> Do this check with masking instead?
 
-While I don't see anything obviously wrong in it, I'd like Daniel to look
-at them too from the ARM perspective.
+Ok, if you prefer, I can change it to:
 
-Rafael
+	BUG_ON(imm & ~GENMASK(15, 0));
+
+> 
+> > +
+> > +	switch (variant) {
+> > +	case AARCH64_INSN_VARIANT_32BIT:
+> > +		BUG_ON(shift != 0 && shift != 16);
+> > +		break;
+> > +	case AARCH64_INSN_VARIANT_64BIT:
+> > +		insn |= BIT(31);
+> > +		BUG_ON(shift != 0 && shift != 16 && shift != 32 &&
+> > +		       shift != 48);
+> 
+> Would be neater as a nested switch, perhaps? If you reorder the
+> outer-switch, you could probably fall-through too and combine the shift
+> checks.
+
+Not sure I picture what you had in mind... I couldn't come up with a
+neater version with the properties you described.
+
+The alternative I had was using masks instead of integer values, but
+one could argue that while neater, it could also be harder to read:
+
+	switch (variant) {
+	case AARCH64_INSN_VARIANT_32BIT:
+		BUG_ON(shift & ~BIT(4));
+		break;
+	case AARCH64_INSN_VARIANT_64BIT:
+		insn |= BIT(31);
+		BUG_ON(shift & ~GENMASK(5, 4));
+	...
+
+> 
+> Will
