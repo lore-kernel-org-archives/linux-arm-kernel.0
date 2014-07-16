@@ -1,74 +1,26 @@
-From: hrhaan@gmail.com (Harro Haan)
-Date: Wed, 16 Jul 2014 19:21:40 +0200
-Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
-In-Reply-To: <53C6761A.9090002@linaro.org>
-References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
- <CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>
- <53C4F745.3070701@linaro.org> <201407152045.06517.marex@denx.de>
- <53C6761A.9090002@linaro.org>
-Message-ID: <CAB5oZtCWe2Z4PqUaMBzmO-W_UH3Hau4U8Yw+9ca71wTUksWs8w@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 16 Jul 2014 13:24:13 -0400
+Subject: Function Profiler broken on today's linux-next
+In-Reply-To: <20140716164141.GA3016@saruman.home>
+References: <20140716162328.GJ1365@saruman.home>
+ <20140716122921.71b118a9@gandalf.local.home>
+ <20140716164141.GA3016@saruman.home>
+Message-ID: <20140716132413.1ede8e1d@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 14:54, Daniel Thompson <daniel.thompson@linaro.org> wrote:
-> On 15/07/14 19:45, Marek Vasut wrote:
->>>> I can reduce the number of occurrences (not prevent it) by adding the
->>>> following hack to irq-gic.c
->>>> @@ -297,10 +309,12 @@ static asmlinkage void __exception_irq_entry
->>>> gic_handle_irq(struct pt_regs *regs
->>>>
->>>>   u32 irqstat, irqnr;
->>>>   struct gic_chip_data *gic = &gic_data[0];
->>>>   void __iomem *cpu_base = gic_data_cpu_base(gic);
->>>>
->>>>   do {
->>>>
->>>> + while(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_PENDING_SET)
->>>> & (1 << 30))
->>>> +   printk(KERN_ERR "TEMP: gic_handle_irq: wait for FIQ exception\n");
->>>>
->>>>   irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
->>>>   irqnr = irqstat & ~0x1c00;
->>>
->>> I've made a more complete attempt to fix this. Could you test the
->>> following? (and be prepared to fuzz the line numbers)
->>
->> There's also another workaround, look at [1], but it's really a perverse hack
->> thus far (blush). What I did there is I got hinted that an L1 page table can
->> have this NS bit set. If this bit is set for a mapping, all accesses to memory
->> area via that mapping will be non-secure. And then, in turn, by doing a non-
->> secure read of the INTACK register, it will not ever happen that the FIQ number
->> will pop up in the INTACK. I only do a non-secure read of the INTACK register,
->> all other registers of the GICv1 are read via regular secure-mode accesses.
->
-> I'll be looking into this approach.
->
-> It is technically a better approach than mine since it prevents the IRQ
-> handler from ever reading a group 0 interrupt from INTACK.
+On Wed, 16 Jul 2014 11:41:42 -0500
+Felipe Balbi <balbi@ti.com> wrote:
 
-Agree, preventing the problem is better than fixing it afterwards.
 
->
-> Unfortunately the tentacles of this workaround reach pretty deep in the
-> memory management code (rather than being concentrated in the GIC
-> driver) but the improved runtime behaviour might be worth it.
+> .config attached. It's actually an ARM platform, I can help out with
+> testing anything you need.
 
-I did some worst case measurements on the SabreSD while running:
-$ while true; do hackbench 20; done &
+In that case, can you see if it works under my repo?
 
-Use banked non-secure GIC_CPU_INTACK register for regular interrupts
-(patches by Marek):
-The FIQ handler reads the TWD_TIMER_COUNTER 2570 ticks (which is x
-1000 / 498 = 5161 nsec) after FIQ interrupt ID30 is generated.
-The average is around 497 ticks.
-The minimum is around 34 ticks.
+git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
+branch: ftrace/core
 
-Use re-trigger approach by putting it back to pending state (latest
-patch by Daniel):
-The FIQ handler reads the TWD_TIMER_COUNTER 2678 ticks (which is x
-1000 / 498 = 5378 nsec) after FIQ interrupt ID30 is generated.
-The average is around 563 ticks (note: almost everything is normal path)
-The minimum is around 34 ticks (note: this is the normal path, not the
-re-trigger path)
+Thanks,
 
-So the results are quite similar.
+-- Steve
