@@ -1,80 +1,116 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Jul 2014 00:07:09 -0700
-Subject: [PATCHv2 06/10] ARM: DRA7: hwmod_data: Add mailbox hwmod data
-In-Reply-To: <53C55D68.8050308@ti.com>
-References: <1405115083-52977-1-git-send-email-s-anna@ti.com>
- <1405115083-52977-7-git-send-email-s-anna@ti.com>
- <20140715133013.GA2605@atomide.com> <53C55D68.8050308@ti.com>
-Message-ID: <20140716070708.GC2605@atomide.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 16 Jul 2014 12:39:28 +0530
+Subject: [PATCH 4/8] clk: Add clock driver for mb86s7x
+In-Reply-To: <4408359.eoFHS4QiM2@wuerfel>
+References: <1405233052-4688-1-git-send-email-mollie.wu@linaro.org>
+ <4408359.eoFHS4QiM2@wuerfel>
+Message-ID: <CAJe_ZheP4G_yg0LDXgztpyHZSSjJ5sjYj1F8g7ZW-dkr1E5xeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [140715 09:59]:
-> Hi Tony,
-> 
-> On 07/15/2014 08:30 AM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [140711 14:47]:
-> >> Add the hwmod data for the 13 instances of the system mailbox
-> >> IP in DRA7 SoC. The patch is needed for performing a soft-reset
-> >> while configuring the respective mailbox instance, otherwise is
-> >> a non-essential change for functionality. The modules are smart
-> >> idled on reset, and the IP module mode is hardware controlled.
-> >>
-> >> Cc: Rajendra Nayak <rnayak@ti.com>
-> >> Cc: Paul Walmsley <paul@pwsan.com>
-> >> Signed-off-by: Suman Anna <s-anna@ti.com>
-> >> ---
-> >>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 305 ++++++++++++++++++++++++++++++
-> >>  1 file changed, 305 insertions(+)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> >> index 20b4398..e35f5b1 100644
-> >> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> >> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> >> @@ -939,6 +939,194 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
-> >>  };
-> >>  
-> >>  /*
-> >> + * 'mailbox' class
-> >> + *
-> >> + */
-> >> +
-> >> +static struct omap_hwmod_class_sysconfig dra7xx_mailbox_sysc = {
-> >> +	.rev_offs	= 0x0000,
-> >> +	.sysc_offs	= 0x0010,
-> >> +	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-> >> +			   SYSC_HAS_SOFTRESET),
-> >> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-> >> +	.sysc_fields	= &omap_hwmod_sysc_type2,
-> >> +};
-> >> +
-> >> +static struct omap_hwmod_class dra7xx_mailbox_hwmod_class = {
-> >> +	.name	= "mailbox",
-> >> +	.sysc	= &dra7xx_mailbox_sysc,
-> >> +};
-> > 
-> > Hmm I'm seeing just the following MAILBOX_SYSCONFIG in at least
-> > am57xx TRM:
-> > 
-> > 31:4	RESERVED
-> > 3:2	SIDLEMODE	0 = force-idle 1 = no-idle, 2 = smart-idle, 3 = reserved
-> > 1	RESERVED
-> > 0	SOFTRESET
-> > 
-> > So it seems that SYSC_HAS_RESET_STATUS above is wrong? Can you guys
-> > please check.
-> 
-> The same SOFTRESET bit is used for both triggering the softreset and
-> reading the reset done status. Once you write a 1 to trigger a reset,
-> the bit will be cleared once the reset is done. This is no different
-> from OMAP4. The logic in _wait_softreset_complete in omap_hwmod.c was
-> already designed to work with this properly.
+On 14 July 2014 19:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 13 July 2014 14:30:52 Mollie Wu wrote:
+>
+>> ---
+>>  .../bindings/clock/fujitsu,mb86s7x_clk.txt         |  32 ++
+>>  drivers/clk/Makefile                               |   1 +
+>>  drivers/clk/clk-mb86s7x.c                          | 352 +++++++++++++++++++++
+>>  3 files changed, 385 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+>>  create mode 100644 drivers/clk/clk-mb86s7x.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+>> new file mode 100644
+>> index 0000000..4a17d79
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s7x_clk.txt
+>> @@ -0,0 +1,32 @@
+>> +Fujitsu CRG11 clock driver bindings
+>> +-----------------------------------
+>> +
+>> +Required properties :
+>> +- compatible : Shall contain "fujitsu,mb86s7x_clk"
+>
+> No wildcards in compatible strings please.
+>
+OK
 
-Oh OK, I guess I got it confused with SYSS_HAS_RESET_STATUS. Paul,
-want to ack this one if no other issues? I can then set this series
-into a branch against -rc1 that we can all merge in as needed as
-it seems that the driver changes may need this branch as a base too.
+>> +- #clock-cells : Shall be 0
+>> +- cntrlr : 0->ALW, 1->DDR3, 2->MAIN, 3->CA15, 4->HDMI, 5->DPHY
+>> +- domain : [0, 15]
+>> +- port : [0,7] -> Gateable Clock Ports.  [8]->UngatedCLK
+>
+> It would be good to be a bit more verbose here.
+>
+That is how the clock controller is on this soc. The UngatedCLK is the
+source of 8 gateable clock ports as well as having its own output
+port. The PLLs and divisors are internally programmed by the remote
+master.
 
-Regards,
+>> +
+>> +struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
+>> +{
+>> +     struct clk_init_data init;
+>> +     struct cl_clk *clc;
+>> +
+>> +     clc = kzalloc(sizeof(*clc), GFP_KERNEL);
+>> +     if (!clc) {
+>> +             pr_err("could not allocate cl_clk\n");
+>> +             return ERR_PTR(-ENOMEM);
+>> +     }
+>> +
+>> +     clc->hw.init = &init;
+>> +     clc->cluster = topology_physical_package_id(cpu_dev->id);
+>> +
+>> +     init.name = dev_name(cpu_dev);
+>> +     init.ops = &clk_clc_ops;
+>> +     init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
+>> +     init.num_parents = 0;
+>> +
+>> +     return devm_clk_register(cpu_dev, &clc->hw);
+>> +}
+>> +
+>> +static int mb86s7x_clclk_of_init(void)
+>> +{
+>> +     int cpu;
+>> +     struct clk *clk;
+>> +
+>> +     for_each_possible_cpu(cpu) {
+>> +             struct device *cpu_dev = get_cpu_device(cpu);
+>> +
+>> +             if (!cpu_dev) {
+>> +                     pr_err("failed to get cpu%d device\n", cpu);
+>> +                     continue;
+>> +             }
+>> +
+>> +             clk = mb86s7x_clclk_register(cpu_dev);
+>> +             if (IS_ERR(clk)) {
+>> +                     pr_err("failed to register cpu%d clock\n", cpu);
+>> +                     continue;
+>> +             }
+>> +             if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
+>> +                     pr_err("failed to register cpu%d clock lookup\n", cpu);
+>> +                     continue;
+>> +             }
+>> +             pr_debug("registered clk for %s\n", dev_name(cpu_dev));
+>> +     }
+>> +
+>> +     platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
+>> +
+>> +     return 0;
+>> +}
+>> +module_init(mb86s7x_clclk_of_init);
+>>
+>
+> This looks weird: why don't you probe the clocks from DT like normal?
+>
+We need to register clocks for each cpu populated, which is only after
+all clock providers are probed by CLK_OF_DECLARE()
 
-Tony
+> Why do you register a platform device here? Are you trying to hide the fact that
+> the cpufreq stuff still doesn't use proper DT probing?
+>
+Yup, the generic  bL cpufreq driver doesn't probe by DT.
+
+thanks
+-jassi
