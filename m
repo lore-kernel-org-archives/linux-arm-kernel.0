@@ -1,167 +1,106 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 16 Jul 2014 07:55:29 +0530
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <53C5BAD6.5030603@samsung.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
- <53A12EA3.5010007@samsung.com>
- <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
- <CAPdUM4MToVJC5KRS1DUDmYEdUx2PGBE0G1v7p-SGgqpw7SPOhw@mail.gmail.com>
- <53BC0F8F.4010106@samsung.com>
- <CAPdUM4NGXDz-bX=qqzC7LXRE5fCapdHGZeUZ29Xov=P7VZykgg@mail.gmail.com>
- <CAPdUM4P7sijj_-fa_Opuo73ugAW7coUDZ+UnSp_tnjkHacJFVw@mail.gmail.com>
- <53C5BAD6.5030603@samsung.com>
-Message-ID: <CAPdUM4N0UyMzvy4vXrVNu0y60=d6J5Zs-hCcD6u1dvCA7Eu-xg@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 15 Jul 2014 21:44:20 -0500
+Subject: [PATCH v4 02/11] memory: emif: Move EMIF register defines to
+ include/linux/
+In-Reply-To: <20140715063830.GI20068@atomide.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <1405047349-15101-3-git-send-email-d-gerlach@ti.com>
+ <20140714111222.GB20068@atomide.com> <53C41696.6020004@ti.com>
+ <20140715063830.GI20068@atomide.com>
+Message-ID: <53C5E704.5030605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Kukjin,
+Tony,
+On 07/15/2014 01:38 AM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [140714 10:44]:
+>> On 07/14/2014 06:12 AM, Tony Lindgren wrote:
+>>> * Dave Gerlach <d-gerlach@ti.com> [140710 19:59]:
+>>>> OMAP4 and AM33XX share the same EMIF controller IP. Although there
+>>>> are significant differences in the IP integration due to which
+>>>> AM33XX can't reuse the EMIF driver DVFS similar to OMAP4,
+>>>> it can definitely benefit by reusing the EMIF related macros
+>>>> defined in drivers/memory/emif.h.
+>>>>
+>>>> In the current OMAP PM framework the PM code resides under
+>>>> arch/arm/mach-omap2/. To enable reuse of the register defines move
+>>>> the register defines in the emif header file to include/linux so that
+>>>> both the EMIF driver and the AM33XX PM code can benefit.
+>>>>
+>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>>> Reviewed-by: Russ Dill <russ.dill@ti.com>
+>>>> Acked-by: Santosh Shililmar <santosh.shilimkar@ti.com>
+>>>> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>> ---
+>>>> v3->v4:
+>>>> patch unchanged from original:
+>>>> 	http://www.spinics.net/lists/linux-omap/msg95314.html
+>>>>
+>>>>   drivers/memory/emif.h   | 543 +---------------------------------------------
+>>>>   include/linux/ti_emif.h | 558 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>
+>>> So far we've seen that exposing hardware registers like this
+>>> will lead into various drivers misusing them. I think a better
+>>> solution is to implement few targeted functions that allow
+>>> sharing code between the platform idle code and memory driver.
+>>>
+>>> Maybe you can have the shared functions in in something like
+>>> drivers/memory/ti-emif.c that's always built in? The idle
+>>> code won't need any of that early on.
+>>
+>> Well the reason it was done this way was to utilize all of the addresses of
+>> EMIF register in the ASM sleep code to do relative addressing from the EMIF
+>> base address. The ASM sleep code (patch 9) needs to save and restore emif
+>> context and set and unset self refresh in emif. The issues will come from
+>> the ASM being copied to and running from SRAM without the ability to access
+>> code in DDR (because we are shutting the EMIF off), so we would need to copy
+>> these functions as well and have to worry about any issues we introduce by
+>> relocating c code. Is it worth the added maintenance burden?
+>
+> Ah right it needs to run in SRAM. There were some relocatable
+> c code patches posted a while back, so it might be worth
+> revisiting that.
+>
+> I think it can also be done with assembly with something like
+> this:
+>
+> 1. Make am335x idle code depends on TI_EMIF && WKUP_M3_RPROC
+>
+> 2. Add the memory save and restore assembly functions into
+>     drivers/memory/ti-emif-sram.S
+>
+> 3. Allocate the SRAM preferrably with drivers/misc/sram.c
+>     instead of the legacy mach-omap2/sram.c
+>
 
-This is not a regression but Display domain in exynos5420 was never
-tested well before posting this patch in mainline. This is causing problems
-in drm probe deferring due to late init of bridge chip. Domain fails to disable
-after few enable/disable iterations during boot. Without this patch DP also
-fails to sync with video stream after resume from suspend. This patch is a
-blocker for above 2 use cases.
+This I can do, I will just need to make a change somewhere to make generic sram 
+driver provide sram allocations marked for exec.
+
+> 4. Map the idle assembly code and EMIF save and restore
+>     functions into SRAM
+>
+> 5. Call the EMIF save and restore functions from the idle
+>     assembly code at the SRAM locations and pass the save and
+>     restore area in a register
+>
+> So basically we need to figure out a generic way to do driver
+> hooks in the PM idle code even very late and early in the
+> assembly code so we can keep most of the code in drivers.
+> Eventually also the idle assembly code should be in the drivers
+> too..
+
+I did not consider this earlier but the cpuidle code will use the same path in 
+the assembly code. The cpuidle configures the suspend path to make the emif 
+actions optional (save and restore with shut off, and self refresh), so a 
+generic solution probably isn't possible here as we (will) need a certain level 
+of granularity of control over the emif actions, and that will be difficult to 
+maintain while keeping the pm functionality out of the EMIF code.
 
 Regards,
-Rahul Sharma.
+Dave
 
-On 16 July 2014 05:05, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 07/14/14 18:09, Rahul Sharma wrote:
->>
->> Hi Kukjin,
->>
-> Hi Rahul,
 >
+> Regards,
 >
->> Please consider this patch for your branch. This patch is important
->> for Display for Exynos5 boards.
->>
-> OK, I will take this for exynos5420 display for 3.17...BTW I'm not sure this
-> is a regression for 3.16 or not...if so, please let me know.
+> Tony
 >
-> Thanks,
-> Kukjin
->
->
->> Regards,
->> Rahul Sharma.
->>
->> On 9 July 2014 17:00, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
->>>
->>> Hi Tomasz,
->>>
->>> On 8 July 2014 21:04, Tomasz Figa<t.figa@samsung.com>  wrote:
->>>>
->>>> Hi Rahul,
->>>>
->>>> On 07.07.2014 15:37, Rahul Sharma wrote:
->>>>>
->>>>> Hi Andrej, Inki,
->>>>>
->>>>> On 18 June 2014 12:06, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
->>>>>>
->>>>>> Hi Andrej,
->>>>>>
->>>>>> On 18 June 2014 11:46, Andrzej Hajda<a.hajda@samsung.com>  wrote:
->>>>>>>
->>>>>>> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
->>>>>>>>
->>>>>>>> Hi All,
->>>>>>>>
->>>>>>>> Please review this patch.
->>>>>>>>
->>>>>>>> Regards,
->>>>>>>> Rahul Sharma
->>>>>>>>
->>>>>>>> On 9 June 2014 16:58, Rahul Sharma<rahul.sharma@samsung.com>  wrote:
->>>>>>>>>
->>>>>>>>> Display domain is removed due to instability issues. Explaining
->>>>>>>>> the problem below:
->>>>>>>>>
->>>>>>>>> exynos_init_late triggers the pm_genpd_poweroff_unused which
->>>>>>>>> powers off the unused power domains. This call hits before
->>>>>>>>> the trigger to deferred probes.
->>>>>>>>>
->>>>>>>>> DRM DP Panel defers the probe due to supply get failure. By the
->>>>>>>>> time, deferred probe is scheduled again, Display Power Domain is
->>>>>>>>> powered off by pm_genpd_poweroff_unused.
->>>>>>>>>
->>>>>>>>> FIMD and DP drivers are accessing registers during Probe and Bind
->>>>>>>>> callbacks. If display domain is enabled/disabled around register
->>>>>>>>> accesses, display domain gets unstable and we are getting Power
->>>>>>>>> Domain Disable fail notification. Increasing the Timeout also
->>>>>>>>> didn't help.
->>>>>>>
->>>>>>>
->>>>>>> As I understand the problem is that fimd and dp drivers access hw
->>>>>>> registers without enabling power domain. So the proper solution is to
->>>>>>> fix these drivers.
->>>>>>
->>>>>>
->>>>>> That is also a problem but I fixed those accesses in my local kernel
->>>>>> before
->>>>>> hitting this issue. If we do register accesses in FIMD/DP probe/bind
->>>>>> we
->>>>>> observes "Prefetch abort" exception. But here the problem is that 'DP
->>>>>> domain disable' starts failing if we enable/disable multiple times.
->>>>>>
->>>>>>>
->>>>>>> Btw. there are already patches removing hw access from probe/bind of
->>>>>>> fimd. I guess removing also hw access from dp probe/bind could be a
->>>>>>> good
->>>>>>> solution.
->>>>>>
->>>>>>
->>>>>> Please let me know the links for posted patches. I will test with
->>>>>> those patches.
->>>>>
->>>>>
->>>>> Is there any update on this? Please share the patches which fixes the
->>>>> above issue or avoid the above scenario of multiple PM Domain
->>>>> enable/disable.
->>>>> I will test them for exynos5 based boards. Otherwise we should get this
->>>>> change
->>>>> merged else display will remain broken for exynos5 based boards.
->>>>
->>>>
->>>> Andrzej is on holidays right now, so he won't be able to reply in this
->>>> thread until he's back. Here are two patches I was able to find on the
->>>> related MLs that might be fixing the cause of your issues:
->>>
->>>
->>> Ok. thanks for the update.
->>>
->>> We should test with Ajay's patches which includes DP probe deferring
->>> based on availability of bridge chip. +
->>>
->>> few patches which cleanup register access in FIMD and DP probe/bind
->>> OR
->>> few patches to enable Display power domain and clocks just before the
->>> register access. As done in https://lkml.org/lkml/2014/7/4/188.
->>>
->>> Later solution results into display power domain enable failure in case
->>> of DRM
->>> probe defer.
->>>
->>> I am just curious if Andrej has some solution for the first approach
->>> which can
->>> be tested for defer probe and S2R scenarios.
->>>
->>> Regards,
->>> Rahul Sharma.
->>>
->>>>
->>>> [PATCH] drm/exynos: remove hardware overlays disable from fimd probe
->>>>
->>>> (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31629.html)
->>>>
->>>> [PATCH] drm/exynos: fimd: Keep power enabled during fimd_bind
->>>> (https://lkml.org/lkml/2014/7/4/188)
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
