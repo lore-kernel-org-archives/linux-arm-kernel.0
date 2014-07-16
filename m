@@ -1,59 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Jul 2014 05:36:42 -0700
-Subject: [PATCH 1/5] [RFC-HACK] pinctrl-single: init by postcore_initcall()
-In-Reply-To: <20140716114558.GA1842@arch.cereza>
-References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
- <1400799986-20043-2-git-send-email-chf.fritz@googlemail.com>
- <20140522233154.GE29577@atomide.com>
- <20140716114558.GA1842@arch.cereza>
-Message-ID: <20140716123641.GB18374@atomide.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Jul 2014 14:43:50 +0200
+Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
+ code
+In-Reply-To: <1405502840.4408.2.camel@x220>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-5-git-send-email-t.figa@samsung.com>
+ <1405502840.4408.2.camel@x220>
+Message-ID: <53C67386.5070401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> [140716 04:48]:
-> On 22 May 04:31 PM, Tony Lindgren wrote:
-> > * Christoph Fritz <chf.fritz@googlemail.com> [140522 16:07]:
-> > > --- a/drivers/pinctrl/pinctrl-single.c
-> > > +++ b/drivers/pinctrl/pinctrl-single.c
-> > > @@ -2069,7 +2069,22 @@ static struct platform_driver pcs_driver = {
-> > >  #endif
-> > >  };
-> > >  
-> > > +#ifdef CONFIG_USE_OF
-> > > +static int __init pcs_driver_drv_init(void)
-> > > +{
-> > > +       return platform_driver_register(&pcs_driver);
-> > > +}
-> > > +postcore_initcall(pcs_driver_drv_init);
-> > > +
-> > > +static void __exit pcs_driver_drv_exit(void)
-> > > +{
-> > > +       platform_driver_unregister(&pcs_driver);
-> > > +}
-> > > +module_exit(pcs_driver_drv_exit);
-> > > +#else
-> > >  module_platform_driver(pcs_driver);
-> > > +#endif
-> > > +
-> > 
-> > I would prefer to initialize all the drivers with module_init
-> > and and if necessary, selected frameworks with subsys_initcall. 
-> > 
-> > In drivers/Makefile we do have painctrl before gpio, so this
-> > too could be just module_init once the other drivers are fixed.
-> > 
+On 16.07.2014 11:27, Paul Bolle wrote:
+> On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
+>> All Samsung platforms are now using the Common Clock Framework and the
+>> legacy clock code is being removed, so remove related dead code from
+>> samsung-serial driver as well.
+>>
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org> (maintainer:SERIAL DRIVERS)
+>> Cc: Jiri Slaby <jslaby@suse.cz> (supporter:TTY LAYER)
+>> Cc: linux-serial at vger.kernel.org (open list:SERIAL DRIVERS)
+>> ---
+>>  drivers/tty/serial/samsung.c | 4 ----
+>>  1 file changed, 4 deletions(-)
 > 
-> I've been using patches that change gpio and i2c initialization to module_init
-> for some time now. However, I still see some non-DT boards using the GPIO API
-> in early functions such as .init_machine.
+> This just entered linux-next (see next-20140716).
 > 
-> Only when these boards get converted and the legacy support is dropped, we'll
-> be able to move all the drivers to module_init.
+>> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+>> index 36c7747..cae8ebd 100644
+>> --- a/drivers/tty/serial/samsung.c
+>> +++ b/drivers/tty/serial/samsung.c
+>> @@ -47,10 +47,6 @@
+>>  
+>>  #include <asm/irq.h>
+>>  
+>> -#ifdef CONFIG_SAMSUNG_CLOCK
+>> -#include <plat/clock.h>
+>> -#endif
+>> -
+>>  #include "samsung.h"
+>>  
+>>  #if	defined(CONFIG_SERIAL_SAMSUNG_DEBUG) &&	\
+> 
+> There are three further references to CONFIG_SAMSUNG_CLOCK in this file.
+> Those should be removed too, shouldn't they?
 
-Hmm yeah tons of dependencies to dropping the legacy booting.. But to not
-have that dependency maybe we can convert those .init_machine functions
-easily to late_initcall.
+That's right. Apparently I missed them. I guess that's not critical,
+though, and could be done in separate patch, right?
 
-Regards,
-
-Tony
+Best regards,
+Tomasz
