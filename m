@@ -1,31 +1,27 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 16 Jul 2014 14:27:38 -0700
-Subject: [PATCH v10 0/11] seccomp: add thread sync ability
-In-Reply-To: <CAGXu5jKMwiAxeCVZVPS72XWCd2KhiR-uc4VFKT0mvD9s-cTO_Q@mail.gmail.com>
-References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
- <20140711164931.GA18473@redhat.com>
- <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
- <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
- <CAGXu5j+r-CpJiXipCT=j09+ZfJjF9jTc3kuZFAH3ZxgUEvktTA@mail.gmail.com>
- <CALCETrX48nuR6wqEV4Nu47BF4Z3XFvBpYer_fzwaqJdi0fpdKw@mail.gmail.com>
- <CAGXu5jKMwiAxeCVZVPS72XWCd2KhiR-uc4VFKT0mvD9s-cTO_Q@mail.gmail.com>
-Message-ID: <CALCETrUXRszBEhB7aOu6nXtCj09zofY_b_5BUNbJk-EFefA6fw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 17 Jul 2014 00:02:49 +0200
+Subject: [PATCH] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <16164926.ZsJxe6UV3e@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 2:23 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Jul 16, 2014 at 12:45 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> In seccomp_prepare_user_filter, would it make sense to return -EINVAL
->> if !user_filter?  That will make it slightly more pleasant to
->> implement TSYNC-without-change if anyone ever wants it.  (This isn't
->> really necessary -- it's just slightly more polite.)
->
-> I can't do this since EFAULT is already used to detect seccomp
-> capabilities from userspace.
+On Wednesday, July 09, 2014 07:37:30 PM Saravana Kannan wrote:
+> Preliminary patch. Not tested. Just sending out to give an idea of what I'm
+> looking to do. Expect a lot more simplification when it's done.
+> 
+> Benefits:
+> * A lot more simpler code.
+> * Less stability issues.
+> * Suspend/resume time would improve.
+> * Hotplug time would improve.
+> * Sysfs file permissions would be maintained.
+> * More policy settings would be maintained across suspend/resume.
+> * cpufreq stats would be maintained across hotplug for all CPUs.
 
-Aha.  In that case, can you (separately) send a prctl.2 manpage patch
-documenting that?  Also, I'm pretty sure you can get away with doing
-this for seccomp(2) -- EINVAL and ENOSYS are easily distinguishable,
-but the current behavior is IMO also fine if documented.
+One problem.  The real hotplug (when the CPU actually goes away) depends on
+offline removing all that stuff for it.  How are you going to address that?
 
---Andy
+Rafael
