@@ -1,38 +1,60 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 09:20:52 +0200
-Subject: [PATCH 1/6] clk: tegra: don't abort clk init on error
-In-Reply-To: <1405437890-6468-2-git-send-email-pdeschrijver@nvidia.com>
+Date: Wed, 16 Jul 2014 09:25:40 +0200
+Subject: [PATCH 3/6] clk: tegra: Update binding doc Tegra132
+In-Reply-To: <1405437890-6468-4-git-send-email-pdeschrijver@nvidia.com>
 References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20140716072051.GC7978@ulmo>
+ <1405437890-6468-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20140716072539.GD7978@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 06:24:31PM +0300, Peter De Schrijver wrote:
-> Just continue initializing clocks if there's an error on one of them. This
-> is useful if there's a mistake in the inittable, because the system could
-> hang if clk_disable_unused() disables some of the critical clocks in this
-> table.
+On Tue, Jul 15, 2014 at 06:24:33PM +0300, Peter De Schrijver wrote:
+> Tegra132 has almost the same clock structure than Tegra124. This patch
+> documents the missing clock IDs.
 > 
 > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > ---
->  drivers/clk/tegra/clk.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  .../bindings/clock/nvidia,tegra124-car.txt         |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-> index c0a7d77..d081732 100644
-> --- a/drivers/clk/tegra/clk.c
-> +++ b/drivers/clk/tegra/clk.c
-> @@ -207,7 +207,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
->  	for (; tbl->clk_id < clk_max; tbl++) {
->  		clk = clks[tbl->clk_id];
->  		if (IS_ERR_OR_NULL(clk))
-> -			return;
-> +			continue;
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
+> index ded5d62..28129a9 100644
+> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
+> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
+> @@ -1,4 +1,4 @@
+> -NVIDIA Tegra124 Clock And Reset Controller
+> +NVIDIA Tegra124 and Tegra132 Clock And Reset Controller
+>  
+>  This binding uses the common clock binding:
+>  Documentation/devicetree/bindings/clock/clock-bindings.txt
+> @@ -7,14 +7,16 @@ The CAR (Clock And Reset) Controller on Tegra is the HW module responsible
+>  for muxing and gating Tegra's clocks, and setting their rates.
+>  
+>  Required properties :
+> -- compatible : Should be "nvidia,tegra124-car"
+> +- compatible : Should be "nvidia,tegra124-car" or "nvidia,tegra132-car"
+>  - reg : Should contain CAR registers location and length
+>  - clocks : Should contain phandle and clock specifiers for two clocks:
+>    the 32 KHz "32k_in", and the board-specific oscillator "osc".
+>  - #clock-cells : Should be 1.
+>    In clock consumers, this cell represents the clock ID exposed by the
+>    CAR. The assignments may be found in header file
+> -  <dt-bindings/clock/tegra124-car.h>.
+> +  <dt-bindings/clock/tegra124-car.h>. The following clocks do not exist
+> +  in the nvidia,tegra132-car binding: TEGRA124_CLK_CCLK_G,
+> +  TEGRA124_CLK_CCLK_LP, TEGRA124_CLK_PLL_X and TEGRA124_CLK_PLL_X_OUT0.
 
-Perhaps rather than silently ignoring, should this at least print out an
-error? I'd even go as far as make it a full-blown WARN to make sure
-people notice and this gets fixed early.
+Perhaps it would be useful to split up the common clocks and the
+Tegra124-only clocks into separate header files and then provide
+tegra132-car.h which includes only the ones in common with Tegra124.
+
+In other words: tegra124-car-common.h would have all except the ones
+above, then tegra124-car.h includes tegra124-car-common.h and defines
+those that are Tegra124-only (the ones you listed above) and
+tegra132-car.h can include tegra124-car-common.h.
+
+That's somewhat extreme, but it has the benefit of giving us compile-
+time checks as to whether the correct clocks are being used.
 
 Thierry
 -------------- next part --------------
@@ -41,4 +63,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/e19dc78a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/99b77a25/attachment.sig>
