@@ -1,54 +1,82 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 16 Jul 2014 10:59:24 +0200
-Subject: [PATCH v3 08/12] Documentation: bindings: add doc for the USB2
- ChipIdea USB driver
-In-Reply-To: <23972141.94aiK9jz66@wuerfel>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-9-git-send-email-antoine.tenart@free-electrons.com>
- <23972141.94aiK9jz66@wuerfel>
-Message-ID: <20140716085924.GA28151@kwain>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 16 Jul 2014 14:33:03 +0530
+Subject: [GIT PULL] ARM: SPEAr13xx PCIe updates for v3.17
+Message-ID: <CAKohpo=T3taZx8e39tenCRBNxCUr=7H2xG7Ng=e+YQXuuY9u8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Olof/Arnd,
 
-On Wed, Jul 16, 2014 at 10:39:36AM +0200, Arnd Bergmann wrote:
-> On Wednesday 16 July 2014 10:26:02 Antoine T?nart wrote:
-> > +
-> > +Required properties:
-> > +- compatible: should be "chipidea,usb2"
-> > +- reg: base address and length of the registers
-> > +- interrupts: interrupt for the USB controller
-> > +
-> > +Optional properties:
-> > +- clocks: reference to the USB clock
-> > +- usb-phy: reference to the USB PHY
-> 
-> I think the phy reference should use the standard phy binding, using
-> "phys" property to refer to a node that has a "#phy-cells" property.
-> 
-> It seems the code gets this right, but just the documentation is wrong.
+This is another attempt to merge SPEAr PCIe updates after olof
+pointed out *enough* issues with initial PULL request:
 
-I moved this PHY driver from usb/phy/ to phy/ and forgot to update this
-property. I'll fix it.
+https://lkml.org/lkml/2014/7/9/641
 
-> 
-> > +- vbus-supply: reference to the VBUS regulator
-> > +- dma-mask: DMA bit mask
-> 
-> No. Do not use "dma-mask" as a property, that is a pure Linux specific
-> concept. The DT way to express this is to use the 'dma-ranges' property
-> in the device's parent to describe any bus-related restrictions, and
-> for the driver to ask for a mask that matches what the hardware is
-> capable of (which may be smaller or larger than what the bus supports).
+Last version was sent here: http://patchwork.ozlabs.org/patch/368479/
+and all the nits pointed out by Kishon & Bjorn are fixed in this pull
+request.
 
-Ok. I'll answer in the CI driver's thread.
+Apart from ARM specific changes, this updates drivers/{pci|phy}. Bjorn
+advised to get complete series via arm-soc tree earlier:
 
-Thanks!
+http://www.spinics.net/lists/linux-pci/msg30271.html
 
-Antoine
+Please let me know if I couldn't get it right this time.
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+--
+viresh
+
+---------x---------------x---------------
+
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git
+spear/pcie-support-v10
+
+for you to fetch changes up to f6e670a3b62d23722d04e801244a068755a45b7a:
+
+  ARM: SPEAr13xx: Update defconfigs (2014-07-14 11:04:44 +0530)
+
+----------------------------------------------------------------
+Mohit Kumar (1):
+      ARM: SPEAr13xx: Update defconfigs
+
+Pratyush Anand (5):
+      PCI: spear: Add PCIe driver for ST Microelectronics SPEAr13xx
+      phy: Add drivers for PCIe and SATA phy on SPEAr13xx
+      ARM: SPEAr13xx: Fix static mapping table
+      ARM: SPEAr13xx: Add bindings and dt node for misc block
+      ARM: SPEAr13xx: Add pcie and miphy DT nodes
+
+ .../devicetree/bindings/arm/spear-misc.txt         |   9 +
+ .../devicetree/bindings/pci/spear13xx-pcie.txt     |  14 +
+ .../devicetree/bindings/phy/st-spear-miphy.txt     |  15 +
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/spear1310-evb.dts                |   4 +
+ arch/arm/boot/dts/spear1310.dtsi                   |  93 ++++-
+ arch/arm/boot/dts/spear1340-evb.dts                |   4 +
+ arch/arm/boot/dts/spear1340.dtsi                   |  30 +-
+ arch/arm/boot/dts/spear13xx.dtsi                   |   9 +-
+ arch/arm/configs/spear13xx_defconfig               |  16 +
+ arch/arm/mach-spear/Kconfig                        |   4 +
+ arch/arm/mach-spear/include/mach/spear.h           |   4 +-
+ arch/arm/mach-spear/spear1340.c                    | 125 +------
+ arch/arm/mach-spear/spear13xx.c                    |   2 +-
+ drivers/pci/host/Kconfig                           |   8 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-spear13xx.c                  | 405 +++++++++++++++++++++
+ drivers/phy/Kconfig                                |  12 +
+ drivers/phy/Makefile                               |   2 +
+ drivers/phy/phy-spear1310-miphy.c                  | 274 ++++++++++++++
+ drivers/phy/phy-spear1340-miphy.c                  | 307 ++++++++++++++++
+ 21 files changed, 1211 insertions(+), 133 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/st-spear-miphy.txt
+ create mode 100644 drivers/pci/host/pcie-spear13xx.c
+ create mode 100644 drivers/phy/phy-spear1310-miphy.c
+ create mode 100644 drivers/phy/phy-spear1340-miphy.c
