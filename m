@@ -1,33 +1,255 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Jul 2014 16:20:16 +0200
-Subject: [PATCH 2/3] ARM: EXYNOS: Remove unneeded __ref annotation for cpu_die
- function
-In-Reply-To: <1405520417-15027-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405520417-15027-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1405520417-15027-2-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 16 Jul 2014 16:20:15 +0200
+Subject: [PATCH 1/3] ARM: EXYNOS: Move code from hotplug.c to platsmp.c
+Message-ID: <1405520417-15027-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __ref annotation for exynos_cpu_die() is not needed because the
-function does not reference any __init/__exit symbol or call.
+Cleanup a little the SMP/hotplug code for Exynos by:
+1. Moving completely all functions from hotplug.c into the platsmp.c;
+2. Deleting the hotplug.c file.
+
+After recent cleanups (e.g. 75ad2ab28f0f "ARM: EXYNOS: use
+v7_exit_coherency_flush macro for cache disabling") there was only CPU
+power down related code in hotplug.c file. Keeping this file does not
+give any benefits.
+
+The commit only moves code around with one additional observable change:
+the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
+CFLAGS are not necessary any more.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/mach-exynos/platsmp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-exynos/Makefile  |  3 --
+ arch/arm/mach-exynos/common.h  |  2 -
+ arch/arm/mach-exynos/hotplug.c | 92 ------------------------------------------
+ arch/arm/mach-exynos/platsmp.c | 74 +++++++++++++++++++++++++++++++++
+ 4 files changed, 74 insertions(+), 97 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/hotplug.c
 
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 788f26d21141..0095de99d703 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -21,9 +21,6 @@ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+ 
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ 
+-obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+-CFLAGS_hotplug.o		+= -march=armv7-a
+-
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+ 
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 1ee91763fa7c..907349d20c25 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -141,8 +141,6 @@ extern void exynos_cpu_resume(void);
+ 
+ extern struct smp_operations exynos_smp_ops;
+ 
+-extern void exynos_cpu_die(unsigned int cpu);
+-
+ /* PMU(Power Management Unit) support */
+ 
+ #define PMU_TABLE_END	NULL
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+deleted file mode 100644
+index 920a4baa53cd..000000000000
+--- a/arch/arm/mach-exynos/hotplug.c
++++ /dev/null
+@@ -1,92 +0,0 @@
+-/* linux arch/arm/mach-exynos4/hotplug.c
+- *
+- *  Cloned from linux/arch/arm/mach-realview/hotplug.c
+- *
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/smp.h>
+-#include <linux/io.h>
+-
+-#include <asm/cacheflush.h>
+-#include <asm/cp15.h>
+-#include <asm/smp_plat.h>
+-
+-#include "common.h"
+-#include "regs-pmu.h"
+-
+-static inline void cpu_leave_lowpower(void)
+-{
+-	unsigned int v;
+-
+-	asm volatile(
+-	"mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	orr	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	orr	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	  : "=&r" (v)
+-	  : "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
+-}
+-
+-static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+-{
+-	u32 mpidr = cpu_logical_map(cpu);
+-	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+-
+-	for (;;) {
+-
+-		/* Turn the CPU off on next WFI instruction. */
+-		exynos_cpu_power_down(core_id);
+-
+-		wfi();
+-
+-		if (pen_release == core_id) {
+-			/*
+-			 * OK, proper wakeup, we're done
+-			 */
+-			break;
+-		}
+-
+-		/*
+-		 * Getting here, means that we have come out of WFI without
+-		 * having been woken up - this shouldn't happen
+-		 *
+-		 * Just note it happening - when we're woken, we can report
+-		 * its occurrence.
+-		 */
+-		(*spurious)++;
+-	}
+-}
+-
+-/*
+- * platform-specific code to shutdown a CPU
+- *
+- * Called with IRQs disabled
+- */
+-void __ref exynos_cpu_die(unsigned int cpu)
+-{
+-	int spurious = 0;
+-
+-	v7_exit_coherency_flush(louis);
+-
+-	platform_do_lowpower(cpu, &spurious);
+-
+-	/*
+-	 * bring this CPU back into the world of cache
+-	 * coherency, and then restore interrupts
+-	 */
+-	cpu_leave_lowpower();
+-
+-	if (spurious)
+-		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+-}
 diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index b0679b6d5161..6a0de7591f73 100644
+index 50b9aad5e27b..b0679b6d5161 100644
 --- a/arch/arm/mach-exynos/platsmp.c
 +++ b/arch/arm/mach-exynos/platsmp.c
-@@ -306,7 +306,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
-  *
-  * Called with IRQs disabled
-  */
--static void __ref exynos_cpu_die(unsigned int cpu)
-+static void exynos_cpu_die(unsigned int cpu)
- {
- 	int spurious = 0;
+@@ -23,6 +23,7 @@
+ #include <linux/of_address.h>
  
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ #include <asm/firmware.h>
+@@ -32,6 +33,54 @@
+ 
+ extern void exynos4_secondary_startup(void);
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"mrc	p15, 0, %0, c1, c0, 0\n"
++	"	orr	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	orr	%0, %0, %2\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	  : "=&r" (v)
++	  : "Ir" (CR_C), "Ir" (0x40)
++	  : "cc");
++}
++
++static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
++{
++	u32 mpidr = cpu_logical_map(cpu);
++	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++
++	for (;;) {
++
++		/* Turn the CPU off on next WFI instruction. */
++		exynos_cpu_power_down(core_id);
++
++		wfi();
++
++		if (pen_release == core_id) {
++			/*
++			 * OK, proper wakeup, we're done
++			 */
++			break;
++		}
++
++		/*
++		 * Getting here, means that we have come out of WFI without
++		 * having been woken up - this shouldn't happen
++		 *
++		 * Just note it happening - when we're woken, we can report
++		 * its occurrence.
++		 */
++		(*spurious)++;
++	}
++}
++#endif /* CONFIG_HOTPLUG_CPU */
++
+ static inline void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+@@ -251,6 +300,31 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ }
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++static void __ref exynos_cpu_die(unsigned int cpu)
++{
++	int spurious = 0;
++
++	v7_exit_coherency_flush(louis);
++
++	platform_do_lowpower(cpu, &spurious);
++
++	/*
++	 * bring this CPU back into the world of cache
++	 * coherency, and then restore interrupts
++	 */
++	cpu_leave_lowpower();
++
++	if (spurious)
++		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
++}
++#endif /* CONFIG_HOTPLUG_CPU */
++
+ struct smp_operations exynos_smp_ops __initdata = {
+ 	.smp_init_cpus		= exynos_smp_init_cpus,
+ 	.smp_prepare_cpus	= exynos_smp_prepare_cpus,
 -- 
 1.9.1
