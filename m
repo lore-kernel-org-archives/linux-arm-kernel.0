@@ -1,79 +1,38 @@
-From: srivatsa@MIT.EDU (Srivatsa S. Bhat)
-Date: Wed, 16 Jul 2014 23:34:41 +0530
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpomKF_TvpPZzEwocOK33RKnLWLtE2cPK6hk7YuhTVaNg2g@mail.gmail.com>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>	<1405464473-3916-2-git-send-email-skannan@codeaurora.org>	<CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>	<53C65F03.1050609@mit.edu>
- <CAKohpomKF_TvpPZzEwocOK33RKnLWLtE2cPK6hk7YuhTVaNg2g@mail.gmail.com>
-Message-ID: <53C6BEB9.6090503@mit.edu>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 16 Jul 2014 13:29:44 -0500
+Subject: Function Profiler broken on today's linux-next
+In-Reply-To: <20140716132413.1ede8e1d@gandalf.local.home>
+References: <20140716162328.GJ1365@saruman.home>
+ <20140716122921.71b118a9@gandalf.local.home>
+ <20140716164141.GA3016@saruman.home>
+ <20140716132413.1ede8e1d@gandalf.local.home>
+Message-ID: <20140716182944.GK3016@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 06:43 PM, Viresh Kumar wrote:
-> On 16 July 2014 16:46, Srivatsa S. Bhat <srivatsa@mit.edu> wrote:
->> Short answer: If the sysfs directory has already been created by cpufreq,
->> then yes, it will remain as it is. However, if the online operation failed
->> before that, then cpufreq won't know about that CPU at all, and no file will
->> be created.
->>
->> Long answer:
->> The existing cpufreq code does all its work (including creating the sysfs
->> directories etc) at the CPU_ONLINE stage. This stage is not expected to fail
->> (in fact even the core CPU hotplug code in kernel/cpu.c doesn't care for
->> error returns at this point). So if a CPU fails to come up in earlier stages
->> itself (such as CPU_UP_PREPARE), then cpufreq won't even hear about that CPU,
->> and hence no sysfs files will be created/linked. However, if the CPU bringup
->> operation fails during the CPU_ONLINE stage after the cpufreq's notifier has
->> been invoked, then we do nothing about it and the cpufreq sysfs files will
->> remain.
+On Wed, Jul 16, 2014 at 01:24:13PM -0400, Steven Rostedt wrote:
+> On Wed, 16 Jul 2014 11:41:42 -0500
+> Felipe Balbi <balbi@ti.com> wrote:
 > 
-> In short, the problem I mentioned before this para is genuine. And setting
-> policy->cpu to the first cpu of a mask is indeed a bad idea.
 > 
->>> Also, how does suspend/resume work without CONFIG_HOTPLUG_CPU ?
->>> What's the sequence of events?
->>>
->>
->> Well, CONFIG_SUSPEND doesn't have an explicit dependency on HOTPLUG_CPU, but
->> SMP systems usually use CONFIG_PM_SLEEP_SMP, which sets CONFIG_HOTPLUG_CPU.
+> > .config attached. It's actually an ARM platform, I can help out with
+> > testing anything you need.
 > 
-> I read usually as *optional*
+> In that case, can you see if it works under my repo?
 > 
->> (I guess the reason why CONFIG_SUSPEND doesn't depend on HOTPLUG_CPU is
->> because suspend is possible even on uniprocessor systems and hence the
->> Kconfig dependency wasn't really justified).
-> 
-> Again the same question, how do we suspend when HOTPLUG is disabled?
-> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
+> branch: ftrace/core
 
->From what I understand, if you disable HOTPLUG_CPU and enable CONFIG_SUSPEND
-and try suspend/resume on an SMP system, the disable_nonboot_cpus() call will
-return silently without doing anything. Thus, suspend will fail silently and
-the system might have trouble resuming.
+works fine, thanks. FWIW
 
-But surprisingly we have never had such bug reports so far! Most probably this
-is because PM_SLEEP_SMP has a default of y (which in turn selects HOTPLUG_CPU):
+Tested-by: Felipe Balbi <balbi@ti.com>
 
-config PM_SLEEP_SMP
-        def_bool y
-        depends on SMP
-        depends on ARCH_SUSPEND_POSSIBLE || ARCH_HIBERNATION_POSSIBLE
-        depends on PM_SLEEP
-        select HOTPLUG_CPU
-
-So I guess nobody really tried turning this off on SMP systems and then trying
-suspend. Then I started looking at the git history and wondered where this
-Kconfig dependency between SUSPEND and SMP<->HOTPLUG_CPU got messed up. But
-instead I found that the initial commit itself didn't get the dependency right.
-
-Commit 296699de6bdc (Introduce CONFIG_SUSPEND for suspend-to-Ram and standby)
-introduced all the Kconfig options, and it indeed mentions this in the
-changelog: "Make HOTPLUG_CPU be selected automatically if SUSPEND or
-HIBERNATION has been chosen and the kernel is intended for SMP systems". But
-unfortunately, the code didn't get it right because it made CONFIG_SUSPEND
-depend on SUSPEND_SMP_POSSIBLE instead of SUSPEND_SMP.
-
-In other words, we have had this incorrect dependency all the time!
-
-Regards,
-Srivatsa S. Bhat
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/d77a7223/attachment-0001.sig>
