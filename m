@@ -1,37 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 Jul 2014 14:42:50 +0800
-Subject: [PATCH v3] ARM: save/restore Cortex-A9 CP15 registers on
- suspend/resume
-In-Reply-To: <20140714051905.GA2197@dragon>
-References: <1404974856-25846-1-git-send-email-shawn.guo@freescale.com>
- <alpine.DEB.2.10.1407101704540.2893@Yrabib> <20140714051905.GA2197@dragon>
-Message-ID: <20140716064249.GA2612@dragon>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 16 Jul 2014 08:43:22 +0200
+Subject: [PATCH v3 4/4] can: flexcan: add vf610 support for FlexCAN
+In-Reply-To: <53C5398F.2000005@pengutronix.de>
+References: <cover.1405428166.git.stefan@agner.ch>
+ <ff2ea1726b13dc2ffa3519ce9244f3633cf1420d.1405428166.git.stefan@agner.ch>
+ <53C5398F.2000005@pengutronix.de>
+Message-ID: <1b8a8ca03b4a160027a79b722f697e25@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 01:19:06PM +0800, Shawn Guo wrote:
-> On Thu, Jul 10, 2014 at 05:05:23PM +0200, Nicolas Pitre wrote:
-> > On Thu, 10 Jul 2014, Shawn Guo wrote:
-> > 
-> > > The CP15 diagnostic register holds ARM errata bits on Cortex-A9, so it
-> > > needs to be saved/restored on suspend/resume.  Otherwise, the
-> > > effectiveness of errata workaround gets lost together with diagnostic
-> > > register bit across suspend/resume cycle.  And the CP15 power control
-> > > register of Cortex-A9 shares the same problem.
-> > > 
-> > > The patch adds a couple of Cortex-A9 specific suspend/resume functions
-> > > to save/restore these two Cortex-A9 CP15 registers across the
-> > > suspend/resume cycle.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org
+Am 2014-07-15 16:24, schrieb Marc Kleine-Budde:
+<snip>
+>> @@ -150,18 +171,20 @@
+>>   * FLEXCAN hardware feature flags
+>>   *
+>>   * Below is some version info we got:
+>> - *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT
+>> - *                                Filter?   connected?
+>> - *   MX25  FlexCAN2  03.00.00.00     no         no
+>> - *   MX28  FlexCAN2  03.00.04.00    yes        yes
+>> - *   MX35  FlexCAN2  03.00.00.00     no         no
+>> - *   MX53  FlexCAN2  03.00.00.00    yes         no
+>> - *   MX6s  FlexCAN3  10.00.12.00    yes        yes
+>> + *    SOC   Version   IP-Version  Glitch-  [TR]WRN_INT  Memory err
+>> + *                                Filter?   connected?  detection
+>> + *   MX25  FlexCAN2  03.00.00.00     no         no         no
+>> + *   MX28  FlexCAN2  03.00.04.00    yes        yes         no
+>> + *   MX35  FlexCAN2  03.00.00.00     no         no         no
+>> + *   MX53  FlexCAN2  03.00.00.00    yes         no         no
+>> + *   MX6s  FlexCAN3  10.00.12.00    yes        yes         no
+>> + *   VF610 FlexCAN3  ?               no         no        yes
+>                                         ^^         ^^
 > 
-> Thanks, Nico.
-> 
-> If no one has objection to the patch, I'm going to put it into patch
-> tracker soon.
+> Can you check the datasheet if the flexcan core has a "Glitch Filter
+> Width Register (FLEXCANx_GFWR)"
 
-Submitted as 8103/1.
 
-Shawn
+There is no such register called GFWR/Glitch Filter or similar.
+
+> Can you check if the core generates a warning interrupt with the current
+> setup, if you don't switch on bus error reporting? This means internally
+> the [TR]WRN_INT is connected and works as specified.
+
+Ok, so I disabled TWRNMSK (Bit 11) in the control register and printed
+out the error and status register (ESR1), this is what I get:
+[  191.285295] flexcan_irq, esr=00040080
+[  191.288996] flexcan_irq, ctrl=17092051
+
+Bit 17 (TWRNINT) is not set while TWRNMSK is disabled. Hence [TR]WRN_INT
+is not connected?
+
+
+--
+Stefan
