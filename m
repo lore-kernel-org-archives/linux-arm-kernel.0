@@ -1,39 +1,32 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 16 Jul 2014 12:29:21 -0400
-Subject: Function Profiler broken on today's linux-next
-In-Reply-To: <20140716162328.GJ1365@saruman.home>
-References: <20140716162328.GJ1365@saruman.home>
-Message-ID: <20140716122921.71b118a9@gandalf.local.home>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 16 Jul 2014 18:33:42 +0200
+Subject: [PATCH 0/4] spi: s3c64xx: fix DT binding breakage
+In-Reply-To: <20140716160249.GS17528@sirena.org.uk>
+References: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
+ <20140716160249.GS17528@sirena.org.uk>
+Message-ID: <53C6A966.10409@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Jul 2014 11:23:28 -0500
-Felipe Balbi <balbi@ti.com> wrote:
-
-> Hi folks,
+On 07/16/2014 06:02 PM, Mark Brown wrote:
+> On Wed, Jul 16, 2014 at 05:19:06PM +0200, Javier Martinez Canillas wrote:
 > 
-> I was trying to use Kernel Function Profiler to figure out why my
-> driver's IRQ handler is taking so much CPU time but to my surprise,
-> whenever I try to trace anything, I get a "Unable to handle kernel
-> paging request at virtual address XXXX" error.
+> *sigh*  Yesterday Naveen submitted another, different, patch series also
+> attempting to improve things which I'm not seeing any reference to here.
+> Please coordinate with Naveen about what you are doing.
 > 
-> Is anybody else seen that or did I screw up my Kernel config ?
 
-No, it's probably my fault. The ftrace infrastructure is going through
-an overhaul and some dramatic changes are happening. Although it has
-passed all my tests, I can't cover everyone's configs and use cases.
+Yes, I answered Naveen on his latest series and told him that I thought his v6
+was better and also that the commit messages where still not clearly explaining
+the motivation for the changes [0].
 
-Please send me your config and the steps you did to enable function
-profiling. This is x86 correct? Other archs are already known to be
-broken and I'm working on fixing them now.
+So after that I asked him in private if he wouldn't mind if I try to rework his
+series to make it easier to understand and he agreed on that. I should had
+mentioned it the cover later, sorry about that.
 
--- Steve
+Please take a look to this series instead of the latest that was posted by Naveen.
 
+Thanks a lot and best regards,
+Javier
 
-
-> 
-> cheers
-> 
-> ps: I have tried tracing a few different drivers and they all trigger
-> the same problem.
-> 
+[0]: https://www.mail-archive.com/devicetree at vger.kernel.org/msg34860.html
