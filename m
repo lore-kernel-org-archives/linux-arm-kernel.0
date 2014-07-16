@@ -1,47 +1,51 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Jul 2014 10:15:02 +0530
-Subject: [PATCH v2] arm: dra7xx: Add hwmod data for pcie1 and pcie2
- subsystems
-In-Reply-To: <alpine.DEB.2.02.1407152013310.21432@utopia.booyaka.com>
-References: <1403719366-9656-3-git-send-email-kishon@ti.com>
- <1404896567-32204-1-git-send-email-kishon@ti.com> <53BD2136.9030009@ti.com>
- <53C3B251.8000209@ti.com>
- <alpine.DEB.2.02.1407152013310.21432@utopia.booyaka.com>
-Message-ID: <53C6034E.5000105@ti.com>
+Date: Wed, 16 Jul 2014 10:16:20 +0530
+Subject: [RESEND PATCH 0/8] arm: dts: dra7: Add PCIe data and PCIe PHY data
+In-Reply-To: <20140715071859.GL20068@atomide.com>
+References: <1405334543-25509-1-git-send-email-kishon@ti.com>
+ <20140715071859.GL20068@atomide.com>
+Message-ID: <53C6039C.8000208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Wednesday 16 July 2014 01:43 AM, Paul Walmsley wrote:
-> On Mon, 14 Jul 2014, Kishon Vijay Abraham I wrote:
-> 
->> On Wednesday 09 July 2014 04:32 PM, Rajendra Nayak wrote:
->>> On Wednesday 09 July 2014 02:32 PM, Kishon Vijay Abraham I wrote:
->>>> Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
->>>>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>> Changes from v1:
->>>> * changed the clock domain to "pcie_clkdm"
->>>> * Added PCIe as a slave port for l3_main.
->>>
->>> Looks good to me,
->>> Reviewed-by: Rajendra Nayak <rnayak@ti.com>
+On Tuesday 15 July 2014 12:48 PM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [140714 03:44]:
+>> [1] is split into separate series in order for individual subsystem
+>> Maintainers to pick up the patches. This series handles the PCIe
+>> dt data for DRA7.
 >>
->> Paul,
+>> This series has better commit logs than the previous one modified as
+>> suggested by Tero.
 >>
->> Can you pick this one?
+>> [1] -> https://lkml.org/lkml/2014/5/29/258
+>>
+>> Keerthy (2):
+>>   ARM: dts: dra7xx-clocks: Add divider table to optfclk_pciephy_div
+>>     clock
+>>   ARM: dts: dra7xx-clocks: Change the parent of apll_pcie_in_clk_mux to
+>>     dpll_pcie_ref_m2ldo_ck
+>>
+>> Kishon Vijay Abraham I (6):
+>>   ARM: dts: dra7xx-clocks: Add missing 32KHz clocks used for PHY
+>>   ARM: dts: dra7xx-clocks: rename pcie clocks to accommodate second PHY
+>>     instance
+>>   ARM: dts: dra7xx-clocks: Add missing clocks for second PCIe PHY
+>>     instance
+>>   ARM: dts: dra7: Add dt data for PCIe PHY control module
+>>   ARM: dts: dra7: Add dt data for PCIe PHY
+>>   ARM: dts: dra7: Add dt data for PCIe controller
+>>
+>>  arch/arm/boot/dts/dra7.dtsi          |  127 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/dra7xx-clocks.dtsi |   39 ++++++++++-
+>>  2 files changed, 163 insertions(+), 3 deletions(-)
 > 
-> Yep, queued for 3.17.
+> Applying this series into omap-for-v3.17/dt thanks.
 
 Thanks :-)
 
 -Kishon
 > 
-> - Paul
+> Tony
 > 
