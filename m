@@ -1,124 +1,96 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 09:44:10 +0200
-Subject: [PATCH 5/6] clk: tegra: Add support for Tegra132 CAR clocks
-In-Reply-To: <1405437890-6468-6-git-send-email-pdeschrijver@nvidia.com>
-References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
- <1405437890-6468-6-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20140716074410.GF7978@ulmo>
+From: srivatsa@MIT.EDU (Srivatsa S. Bhat)
+Date: Wed, 16 Jul 2014 13:14:40 +0530
+Subject: [PATCH v2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <03e76981eb3d84e8397a39616ac0cfa1.squirrel@www.codeaurora.org>
+References: <1404959850-11617-1-git-send-email-skannan@codeaurora.org>
+ <1405052287-4744-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponB9feyh50p+dL5hyU1ffHAzHU59G-sYCrCm1AbHQe9hw@mail.gmail.com>
+ <2f549e6e4871ccf2a94dd4c8872c7a0b.squirrel@www.codeaurora.org>
+ <CAKohpokhmj1OkCRj=X+Q7eYiun8fsqD2dpEt66VKYnqo3dENVA@mail.gmail.com>
+ <53C0A12A.2060204@codeaurora.org>
+ <CAKohpon9en_VnSx+CVydPsWBHtArvmazn0hrodrRJt9jgOa0-g@mail.gmail.com>
+ <53C42AA8.8010107@codeaurora.org>
+ <CAKohpomkqbHZo9KrJMSwsEKGt6+Ac2Fg2X0+S7ZAo=OzhAc45g@mail.gmail.com>
+ <53C4BDFB.70707@codeaurora.org> <53C4D12E.3040807@mit.edu>
+ <03e76981eb3d84e8397a39616ac0cfa1.squirrel@www.codeaurora.org>
+Message-ID: <53C62D68.6080608@mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 06:24:35PM +0300, Peter De Schrijver wrote:
-> Tegra132 CAR supports almost the same clocks as Tegra124 CAR. This patch
-> deals with the small differences.
+On 07/15/2014 11:05 PM, skannan at codeaurora.org wrote:
 > 
-> --
-> I'm not entirely sure why the soc_therm clock needs to be enabled on Tegra132,
-> but turning it off results in a system hang. I presume this might be because
-> of fastboot initializing soc_therm.
+> Srivatsa S. Bhat wrote:
+>> On 07/15/2014 11:06 AM, Saravana Kannan wrote:
+>>> On 07/14/2014 09:35 PM, Viresh Kumar wrote:
+>>>> On 15 July 2014 00:38, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>>>> Yeah, it definitely crashes if policy->cpu if an offline cpu. Because
+>>>>> the
+>>>>> mutex would be uninitialized if it's stopped after boot or it would
+>>>>> never
+>>>>> have been initialized (depending on how you fix policy->cpu at boot).
+>>>>>
+>>>>> Look at this snippet on the actual tree and it should be pretty
+>>>>> evident.
+>>>>
+>>>> Yeah, I missed it. So the problem is we initialize timer_mutex's for
+>>>> policy->cpus. So we need to do that just for policy->cpu and also we
+>>>> don't
+>>>> need a per-cpu timer_mutex anymore.
+>>>>
+>>>
+>>> Btw, I tried to take a stab at removing any assumption in cpufreq code
+>>> about policy->cpu being ONLINE.
+>>
+>> Wait, allowing an offline CPU to be the policy->cpu (i.e., the CPU which
+>> is
+>> considered as the master of the policy/group) is just absurd. If there is
+>> no leader, there is no army. We should NOT sacrifice sane semantics for
+>> the
+>> sake of simplifying the code.
+>>
+>>> There are 160 instances of those of with
+>>> 23 are in cpufreq.c
+>>>
+>>
+>> And that explains why. It is just *natural* to assume that the CPUs
+>> governed
+>> by a policy are online. Especially so for the CPU which is supposed to be
+>> the policy leader. Let us please not change that - it will become
+>> counter-intuitive if we do so. [ The other reason is that physical hotplug
+>> is also possible on some systems... in that case your code might make a
+>> CPU
+>> which is not even present (but possible) as the policy->cpu.. and great
+>> 'fun'
+>> will ensue after that ;-( ]
+>>
+>> The goal of this patchset should be to just de-couple the sysfs
+>> files/ownership
+>> from the policy->cpu to an extent where it doesn't matter who owns those
+>> files, and probably make it easier to do CPU hotplug without having to
+>> destroy and recreate the files on every hotplug operation.
+>>
+>> This is exactly why the _implementation_ matters in this particular case -
+>> if we can't achieve the simplification by keeping sane semantics, then we
+>> shouldn't do the simplification!
+>>
+>> That said, I think we should keep trying - we haven't exhausted all ideas
+>> yet :-)
+>>
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
->  drivers/clk/tegra/clk-tegra124.c |   32 ++++++++++++++++++++++++++++++++
->  1 files changed, 32 insertions(+), 0 deletions(-)
+> I don't think we disagree. To summarize this topic: I tried to keep the
+> policy->cpu an actual online CPU so as to not break existing semantics in
+> this patch. Viresh asked "why not fix it at boot?". My response was to
+> keep it an online CPU and give it a shot in a separate patch if we really
+> want that. It's too risky to do that in this patch and also not a
+> mandatory change for this patch.
 > 
-> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-> index 80efe51..b857aab 100644
-> --- a/drivers/clk/tegra/clk-tegra124.c
-> +++ b/drivers/clk/tegra/clk-tegra124.c
-> @@ -1369,6 +1369,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
->  	{TEGRA124_CLK_XUSB_HS_SRC, TEGRA124_CLK_PLL_U_60M, 60000000, 0},
->  	{TEGRA124_CLK_XUSB_FALCON_SRC, TEGRA124_CLK_PLL_RE_OUT, 224000000, 0},
->  	{TEGRA124_CLK_XUSB_HOST_SRC, TEGRA124_CLK_PLL_RE_OUT, 112000000, 0},
-> +	{TEGRA124_CLK_SOC_THERM, TEGRA124_CLK_PLL_P, 51000000, 0},
->  	/* This MUST be the last entry. */
->  	{TEGRA124_CLK_CLK_MAX, TEGRA124_CLK_CLK_MAX, 0, 0},
->  };
-> @@ -1378,9 +1379,25 @@ static void __init tegra124_clock_apply_init_table(void)
->  	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
->  }
->  
-> +enum {
-> +	TEGRA124_CLK,
-> +	TEGRA132_CLK,
-> +};
+> I think we can work out the details on the need to fixing policy->cpu at
+> boot and whether there's even a need for policy->cpu (when we already have
+> policy->cpus) in a separate thread after the dust settles on this one?
+>
 
-I'd prefer this to be something like:
+Sure, that sounds good!
 
-	struct tegra_car_soc {
-		bool has_ccplex_clk;
-	};
-
-	static const struct tegra_car_soc tegra124_car_soc = {
-		.has_ccplex_clk = false,
-	};
-
-	static const struct tegra_car_soc tegra132_car_soc = {
-		.has_ccplex_clk = true,
-	};
-
-> +static const struct of_device_id tegra_clock_of_match[] = {
-> +	{ .compatible = "nvidia,tegra124-car", .data = (void *)TEGRA124_CLK },
-
-	                                       .data = &tegra124_car_soc,
-
-> +	{ .compatible = "nvidia,tegra132-car", .data = (void *)TEGRA132_CLK },
-
-	                                       .data = &tegra132_car_soc,
-
->  static void __init tegra124_clock_init(struct device_node *np)
->  {
->  	struct device_node *node;
-> +	const struct of_device_id *match;
-
-	const struct tegra_car_soc *soc;
-
-> +	uintptr_t id;
-
-> +	match = of_match_node(tegra_clock_of_match, np);
-> +	id = (uintptr_t)match->data;
-
-	soc = match->data;
-
->  
->  	clk_base = of_iomap(np, 0);
->  	if (!clk_base) {
-> @@ -1416,6 +1433,20 @@ static void __init tegra124_clock_init(struct device_node *np)
->  	tegra_audio_clk_init(clk_base, pmc_base, tegra124_clks, &pll_a_params);
->  	tegra_pmc_clk_init(pmc_base, tegra124_clks);
->  
-> +	if (id == TEGRA132_CLK) {
-
-	if (soc->has_ccplex_clk) {
-
-That's somewhat more explicit and avoids a lot of ugly casting.
-
-> +		int i;
-> +
-> +		tegra124_clks[tegra_clk_cclk_g].present = false;
-> +		tegra124_clks[tegra_clk_cclk_lp].present = false;
-> +		tegra124_clks[tegra_clk_pll_x].present = false;
-> +		tegra124_clks[tegra_clk_pll_x_out0].present = false;
-> +
-> +		/* Tegra132 requires the soc_therm clock to be always on */
-> +		for (i = 0; i < ARRAY_SIZE(init_table); i++) {
-> +			if (init_table[i].clk_id == TEGRA124_CLK_SOC_THERM)
-> +				init_table[i].state = 1;
-
-I wonder if we could do this someplace else. If we could, then we'd have
-the opportunity to make the init_table const.
-
-> +		}
-> +	}
->  	tegra_super_clk_gen4_init(clk_base, pmc_base, tegra124_clks,
-
-Could use a blank line after the closing } above.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/56a1c076/attachment.sig>
+Regards,
+Srivatsa S. Bhat
