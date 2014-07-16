@@ -1,34 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 15 Jul 2014 20:33:42 -0700
-Subject: [PATCH] PM / devfreq: Allocate memory using the right data type
-In-Reply-To: <1405480243-25915-1-git-send-email-skannan@codeaurora.org>
-References: <1405480243-25915-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20140716033342.GA31052@kroah.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 15 Jul 2014 21:13:10 -0700
+Subject: [PATCH 2/6] ARM: rockchip: add debug uart used by rk3288
+In-Reply-To: <2866950.oXmKFGy9mh@diego>
+References: <1471578.ILeMmG2DL6@diego>
+	<2866950.oXmKFGy9mh@diego>
+Message-ID: <CAD=FV=W3aWeT3RP5_g9r8kV8ToeHfyn57JY-py2zGVW9DF_7RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 08:10:43PM -0700, Saravana Kannan wrote:
-> From: Suman Tatiraju <sumant@codeaurora.org>
-> 
-> Long and int have different sizes on a 64-bit machine. Allocate
-> memory for the time_in_state table using the right data type.
-> 
-> Change-Id: I335277674018c0ea759aa0996309d52578ea1fd5
+Heiko,
 
-Please don't put this crud in patches you submit upstream.  It means
-nothing to us.
-
-> Signed-off-by: Suman Tatiraju <sumant@codeaurora.org>
-> Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+On Tue, Jul 15, 2014 at 4:00 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> The uarts on rk3288 are still compatible with the dw_8250, but located
+> at a different position and need DEBUG_UART_8250_WORD enabled.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  drivers/devfreq/devfreq.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>  arch/arm/Kconfig.debug | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 8f90595..f68def0 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -613,6 +613,14 @@ choice
+>                   Say Y here if you want kernel low-level debugging support
+>                   on Rockchip based platforms.
+>
+> +       config DEBUG_RK32_UART2
 
-<formletter>
+It's slightly confusing that you didn't rename the old "DEBUG_RK3X_UART2".
 
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-for how to do this properly.
+Other than that:
 
-</formletter>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
