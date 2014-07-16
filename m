@@ -1,42 +1,45 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 16 Jul 2014 10:26:00 +0200
-Subject: [PATCH v3 06/12] Documentation: bindings: add doc for the Berlin USB
- PHY
-In-Reply-To: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1405499166-6726-7-git-send-email-antoine.tenart@free-electrons.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 16 Jul 2014 10:26:38 +0200
+Subject: [PATCH 3/6] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140710062812.GF28884@atomide.com>
+References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
+ <1404928177-26554-4-git-send-email-bigeasy@linutronix.de>
+ <20140710062812.GF28884@atomide.com>
+Message-ID: <53C6373E.2010408@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the bindings of the Marvell Berlin USB PHY driver.
+On 07/10/2014 08:28 AM, Tony Lindgren wrote:
+>> --- a/drivers/tty/serial/8250/8250_core.c
+>> +++ b/drivers/tty/serial/8250/8250_core.c
+>> @@ -571,7 +573,17 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
+>>  			serial_out(p, UART_EFR, 0);
+>>  			serial_out(p, UART_LCR, 0);
+>>  		}
+>> +
+>> +		if (!device_may_wakeup(p->port.dev)) {
+>> +			if (sleep)
+>> +				pm_runtime_forbid(p->port.dev);
+>> +			else
+>> +				pm_runtime_allow(p->port.dev);
+>> +		}
+>>  	}
+>> +out:
+>> +	pm_runtime_mark_last_busy(p->port.dev);
+>> +	pm_runtime_put_autosuspend(p->port.dev);
+>>  }
+> 
+> The device_may_wakeup logic here is wrong as I described in the
+> earlier thread. For runtime PM, the wake-up events should be
+> always enabled. So the device_may_wakeup checks should be only
+> done for suspend and resume.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- Documentation/devicetree/bindings/phy/berlin-usb-phy.txt | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+Okay. I dropped it from here.
 
-diff --git a/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
-new file mode 100644
-index 000000000000..be33780f668e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
-@@ -0,0 +1,16 @@
-+* Marvell Berlin USB PHY
-+
-+Required properties:
-+- compatible: "marvell,berlin2-usb-phy" or "marvell,berlin2cd-usb-phy"
-+- reg: base address and length of the registers
-+- #phys-cells: should be 0
-+- resets: reference to the reset controller
-+
-+Example:
-+
-+	usb-phy at f774000 {
-+		compatible = "marvell,berlin2-usb-phy";
-+		reg = <0xf774000 0x128>;
-+		#phy-cells = <0>;
-+		resets = <&chip 0x104 14>;
-+	};
--- 
-1.9.1
+> 
+> Regards,
+> 
+> Tony
+> 
+
+Sebastian
