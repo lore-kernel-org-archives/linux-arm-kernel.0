@@ -1,202 +1,88 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 16 Jul 2014 12:34:22 -0700
-Subject: [PATCH v3 2/2] cpufreq: Simplify and fix mutual exclusion with
- hotplug
-In-Reply-To: <CAKohpomuo-=fox=1rNZOgvy+COyWYexcP2J9NRFJqmTK6MLOjA@mail.gmail.com>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-3-git-send-email-skannan@codeaurora.org>
- <CAKohpomuo-=fox=1rNZOgvy+COyWYexcP2J9NRFJqmTK6MLOjA@mail.gmail.com>
-Message-ID: <53C6D3BE.5070505@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 16 Jul 2014 12:34:56 -0700
+Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
+In-Reply-To: <20140716185715.GA4843@mithrandir>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <17053542.QUGvfkeRmc@wuerfel> <20140716151427.GA22027@ulmo>
+ <6322144.IB6iKDb6TK@wuerfel> <20140716185715.GA4843@mithrandir>
+Message-ID: <CAOesGMi=UrLS3OuFb9SAaf9dPBojYrqp4VE0YhGiX1hkLvYanw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 01:48 AM, Viresh Kumar wrote:
-> On 16 July 2014 04:17, Saravana Kannan <skannan@codeaurora.org> wrote:
->
-> Again, just too many things in a single patch. That's not acceptable.
-> Few of these might be bug fixes, which must go in before any other updates.
-> And so it must have been added as first patch.
->
-> Even the other stuff you are trying to fix (by checking policy->cpus) should go
-> before 1/2, otherwise 1/2 will actually break things inbetween, i.e. show values
-> even when no CPUs of a cluster are online.
-
-Well, it's no worse that what it does today. The existing code actually 
-causes a crash when you try to show while hotplugging a CPU. I'm keeping 
-the 1/2 as small as possible. You clearly want to smaller, so I don't 
-want to add this to that.
-
-Also, the current add/remove path is complicated with many cases. So, 
-I'm not comfortable saying I'm sure policy->cpus check would be 
-sufficient. I'm willing to throw out this change if you think this is 
-still wrong when it comes after 1/2.
-
->> Since we no longer alloc and destroy/freeze policy and sysfs nodes during
->> hotplug and suspend, we don't need to lock sysfs with hotplug. We can
->> achieve the same effect by checking if policy->cpus is empty.
->
-> Are you talking about the changes in store()?
-
-Yes.
-
->
->> Hotplug mutual exclusion was only done for sysfs writes. But reads need the
->> same protection too.  So, this patch adds that too.
->
-> How? How is checking for policy->cpus enough?
-
-Because when all the CPUs in a policy are hotplugged off, the 
-policy->cpus would be empty? So, it's functionally the same without 
-having to get hotplug lock. This way, CPUs of other policies could be 
-hotplugged while your are show/store on one policy.
-
-But I'm sure you already understood this. So, not sure what you are 
-really asking.
-
->
->> Also, cpufreq driver (un)register can race with hotplug since CPU online
->> state can change between adding/removing the currently online devices and
->> registering/unregistering for hotplug notifiers. So, fix that by
->> registering for hotplug notifiers first before adding devices and
->> unregistering from hotplug notifiers first before removing devices.
->
-> Couldn't get it, tell us an example race and what will go wrong due to it.
-> Also this should have had a separate patch for itself.
-
-I assumed we go a lot of down_write()s and that would cause a 
-down_read_trylock() to fail. But we really do that only for cpufreq 
-driver register/unregister. So, my previous statement is not really a 
-very useful/common.
-
-But I do hate that we do "trylock". It always makes one wonder if it 
-will silently fail (since we return NULL, which is same as policy with 
-"offline" policy). Technically, we could do down_read(), but lockdep is 
-throwing warnings when it's really not an issue (doing down read twice). 
-So, I'm guessing all these trylocks are just to keep lockdep happy?
-
-
->
->> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->> ---
->>   drivers/cpufreq/cpufreq.c | 44 ++++++++++++++++++++------------------------
->>   1 file changed, 20 insertions(+), 24 deletions(-)
+On Wed, Jul 16, 2014 at 11:57 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Jul 16, 2014 at 05:22:03PM +0200, Arnd Bergmann wrote:
+>> On Wednesday 16 July 2014 17:14:29 Thierry Reding wrote:
+>> > >
+>> > > Ok, I'll have a look. I think when this becomes a separate driver, it
+>> > > should also have its own header file, so maybe you can in the meantime
+>> > > make it a local header file in mach-tegra until we have found a good
+>> > > place for it.
+>> >
+>> > Why do you think it should be a separate header? We already have a
+>> > couple in include/linux and I'm not sure it's useful to add even more.
+>> > If anything I would've thought it made sense to move the content of the
+>> > other headers into tegra-soc.h.
 >>
->> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
->> index a0a2ec2..f72b2b7 100644
->> --- a/drivers/cpufreq/cpufreq.c
->> +++ b/drivers/cpufreq/cpufreq.c
->> @@ -748,17 +748,18 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
->>   {
->>          struct cpufreq_policy *policy = to_policy(kobj);
->>          struct freq_attr *fattr = to_attr(attr);
->> -       ssize_t ret;
->> +       ssize_t ret = -EINVAL;
->>
->>          if (!down_read_trylock(&cpufreq_rwsem))
->> -               return -EINVAL;
->> -
->> +               return ret;
->>          down_read(&policy->rwsem);
->>
->> -       if (fattr->show)
->> -               ret = fattr->show(policy, buf);
->> -       else
->> -               ret = -EIO;
->> +       if (!cpumask_empty(policy->cpus)) {
->> +               if (fattr->show)
->> +                       ret = fattr->show(policy, buf);
->> +               else
->> +                       ret = -EIO;
->> +       }
+>> I very much dislike the idea of having a per-vendor header file that
+>> everything gets crammed into. We should try to have proper subsystems
+>> and generic interfaces for these wherever possible.
 >
-> Makes sense upto this point.
+> I completely agree. However spreading the SoC-specific functions across
+> multiple header files isn't going to help. If we keep all the per-vendor
+> APIs in one file it makes it easier to see what could still be moved off
+> into a separate subsystem.
 >
->>          up_read(&policy->rwsem);
->>          up_read(&cpufreq_rwsem);
->> @@ -773,26 +774,19 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
->>          struct freq_attr *fattr = to_attr(attr);
->>          ssize_t ret = -EINVAL;
->>
->> -       get_online_cpus();
->> -
->> -       if (!cpu_online(policy->cpu))
->> -               goto unlock;
->> -
+> Now for PMC specifically, we've investigated converting the powergate
+> API to power domains. I don't think it will be possible to make that
+> work. The issue is that there's a defined sequence that needs to be
+> respected to make sure the device is powered up properly. That sequence
+> involves the primary clock and reset of the device. It's been proposed
+> to make these clocks available to the PMC driver so that it can control
+> them, but then we can't make sure that clocks are really off if they
+> need to be, since we have two drivers accessing them. The only way I see
+> to make that work reliably is by moving complete control of the
+> powergate into drivers so that they can make sure clocks and resets are
+> in the correct states.
 >
-> @Srivatsa: what do you say?
+> The PMC driver also provides access to I/O rails and specifically a deep
+> power down state. Some modules are in deep power down state by default,
+> so they need to be brought out of that state. I suppose this would be
+> easier to turn into a generic framework because there aren't any cross-
+> dependencies like for powergates, but I'm not aware of any other SoC
+> having a similar feature (or implementation thereof in the kernel). And
+> adding a subsystem just for the sake of it if only one implementation is
+> available isn't a good idea in my opinion because it will be naturally
+> designed to work best (and therefore maybe only) for the one instance.
 >
->>          if (!down_read_trylock(&cpufreq_rwsem))
->> -               goto unlock;
->> -
->> +               return ret;
->>          down_write(&policy->rwsem);
->>
->> -       if (fattr->store)
->> -               ret = fattr->store(policy, buf, count);
->> -       else
->> -               ret = -EIO;
->> +       if (!cpumask_empty(policy->cpus)) {
->> +               if (fattr->store)
->> +                       ret = fattr->store(policy, buf, count);
->> +               else
->> +                       ret = -EIO;
->> +       }
->>
->>          up_write(&policy->rwsem);
->> -
->>          up_read(&cpufreq_rwsem);
->> -unlock:
->> -       put_online_cpus();
->>
->>          return ret;
->>   }
->> @@ -2270,6 +2264,8 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
->>                  }
->>          }
->>
->> +       register_hotcpu_notifier(&cpufreq_cpu_notifier);
->> +
->>          ret = subsys_interface_register(&cpufreq_interface);
->>          if (ret)
->>                  goto err_boost_unreg;
->> @@ -2293,13 +2289,13 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
->>                  }
->>          }
->>
->> -       register_hotcpu_notifier(&cpufreq_cpu_notifier);
->>          pr_debug("driver %s up and running\n", driver_data->name);
->>
->>          return 0;
->>   err_if_unreg:
->>          subsys_interface_unregister(&cpufreq_interface);
->>   err_boost_unreg:
->> +       unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
->>          if (cpufreq_boost_supported())
->>                  cpufreq_sysfs_remove_file(&boost.attr);
->>   err_null_driver:
->> @@ -2327,12 +2323,12 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
->>
->>          pr_debug("unregistering driver %s\n", driver->name);
->>
->> +       unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
->> +
->>          subsys_interface_unregister(&cpufreq_interface);
->>          if (cpufreq_boost_supported())
->>                  cpufreq_sysfs_remove_file(&boost.attr);
->>
->> -       unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
->> -
->>          down_write(&cpufreq_rwsem);
->>          write_lock_irqsave(&cpufreq_driver_lock, flags);
+> This issue is a fundamental one and there are bound to be other SoCs
+> that have similarly unique blocks for which it's impractical to add a
+> framework. I suspect the primary reason why we haven't run into it this
+> frequently is because a lot of it is still hidden in arch/arm/mach-*.
 >
-> Normally the order of register/unregister should be just opposite.
-> Isn't that true here? Yeah, it was broken earlier as well...
+> I'm open to suggestions of course, but the best option I currently see
+> is to collect these custom APIs in a central place so that we can easily
+> compare various SoCs for commonalities as time goes by and factor them
+> out into subsystems where appropriate.
+>
+> For the same reason I think it's valid to put this type of code into
+> drivers/soc. That way we have one subdirectory to look through for
+> potential unification rather than various ones sprinkled across arch
+> directories. It makes little sense in my opinion to move this code to
+> drivers/power if there's no common framework anyway.
 
-Generally agreed, but as explained in the commit text, we need to keep 
-it this way to avoid races with hotplug/unregister.
+I agree. We can move them out and make them common them later if needed.
 
--Saravana
+We're sometimes trying too hard to find proper homes for various new
+drivers, which means that we're proliferating the kernel with a lot of
+new driver directories that have only one or two drivers in them.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I'd rather collect stuff in drivers/soc, and move it out as needed
+later. Especially since we merge drivers/soc through one merge path
+(arm-soc) and can keep an eye on it, while the
+scatter-drivers-everywhere approach merges through various
+maintainers.
+
+
+
+-Olof
