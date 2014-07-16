@@ -1,50 +1,50 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 16 Jul 2014 18:40:54 +0800
-Subject: [PATCH v5 1/2] can: m_can: add device tree binding documentation
-In-Reply-To: <53C64E51.9050606@pengutronix.de>
-References: <1405503050-16796-1-git-send-email-b29396@freescale.com>
- <53C64E51.9050606@pengutronix.de>
-Message-ID: <20140716104054.GB20184@shlinux1.ap.freescale.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Jul 2014 12:48:48 +0200
+Subject: [RESEND PATCH v2] ARM: exynos4: hotplug: Fix CPU idle clock down
+ after CPU off
+In-Reply-To: <1405499003-9975-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405499003-9975-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <53C65890.8000500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 12:05:05PM +0200, Marc Kleine-Budde wrote:
-> On 07/16/2014 11:30 AM, Dong Aisheng wrote:
-> > add M_CAN device tree binding documentation
-> > 
-> > Cc: Wolfgang Grandegger <wg@grandegger.com>
-> > Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Oliver Hartkopp <socketcan@hartkopp.net>
-> > Cc: Varka Bhadram <varkabhadram@gmail.com>
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > ---
-> > Changes since v4:
-> > - change the name of board dtsi to board dts which is more common
-> > 
-> > Changes since v3:
-> > - change mram-cfg property name to bosch,mram-cfg
-> > - indent change
-> > ---
-> >  .../devicetree/bindings/net/can/m_can.txt          |   67 ++++++++++++++++++++
-> >  1 files changed, 67 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/net/can/m_can.txt
-> 
-> I'll apply this series once we've got an Ack for the DT folks.
-> 
+Hi Krzysztof,
 
-Okay, thanks!
+Please see my comment below.
 
-Copy Grant, Rob and Mark in case they have comments.
-
-Regards
-Dong Aisheng
-
-> Marc
+On 16.07.2014 10:23, Krzysztof Kozlowski wrote:
+> On Exynos4 USE_DELAYED_RESET_ASSERTION must be set in
+> ARM_COREx_OPTION register during CPU power down. This is the proper way
+> of powering down CPU on Exynos4.
 > 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> Additionally on Exynos4212 without this the CPU clock down feature won't
+> work after powering down some CPU and the online CPUs will work at full
+> frequency chosen by CPUfreq governor.
 > 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+[snip]
+
+> @@ -36,6 +36,14 @@ static inline void cpu_leave_lowpower(void)
+>  	  : "=&r" (v)
+>  	  : "Ir" (CR_C), "Ir" (0x40)
+>  	  : "cc");
+> +
+> +	if (soc_is_exynos4()) {
+> +		unsigned int tmp;
+> +
+> +		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
+> +		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
+> +		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
+> +	}
+
+This code is executed only if the CPU doesn't manage to power off before
+already receiving a wake-up event. Otherwise the context is lost after
+wfi(), as the core power is being cut down.
+
+The normal wake-up path goes through platsmp's exynos_boot_secondary()
+and I believe that setting of S5P_USE_DELAYED_RESET_ASSERTION should be
+taken care there as well.
+
+Best regards,
+Tomasz
