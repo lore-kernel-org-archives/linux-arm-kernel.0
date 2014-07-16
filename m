@@ -1,45 +1,77 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 16 Jul 2014 11:15:33 +0200
-Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <42036198.zWkqnus6xa@wuerfel>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Wed, 16 Jul 2014 14:49:05 +0530
+Subject: [PATCH v3 05/12] phy: add the Berlin USB PHY driver
+In-Reply-To: <1405499166-6726-6-git-send-email-antoine.tenart@free-electrons.com>
 References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405499166-6726-8-git-send-email-antoine.tenart@free-electrons.com>
- <42036198.zWkqnus6xa@wuerfel>
-Message-ID: <20140716091533.GB28151@kwain>
+ <1405499166-6726-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <53C64389.3050705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 07/16/2014 01:55 PM, Antoine T?nart wrote:
+> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+> +	{
+> +		.compatible = "marvell,berlin2-usb-phy",
+> +		.data = &phy_berlin_pll_dividers[0],
+> +	},
+> +	{
+> +		.compatible = "marvell,berlin2cd-usb-phy",
+> +		.data = &phy_berlin_pll_dividers[1],
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
+> +
 
-On Wed, Jul 16, 2014 at 10:41:10AM +0200, Arnd Bergmann wrote:
-> On Wednesday 16 July 2014 10:26:01 Antoine T?nart wrote:
-> > +
-> > +       if (priv->dma_mask) {
-> > +               ret = dma_coerce_mask_and_coherent(&pdev->dev, priv->dma_mask);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > 
-> 
-> As mentioned in my comment for the binding, this is the wrong way to do it.
-> Russell has in the past converted all drivers that did this manually to 
-> do dma_coerce_mask_and_coherent() so we can spot them more easily, but we
-> should really be doing this better for new drivers.
-> 
-> Can you describe what the restriction is that you want to put on the dma mask?
+It looks good if we move this after probe().. So that we can see of_match_table directly...
 
-Some people wanted the possibility to set the DMA mask as this USB2 CI
-driver does not do specific Berlin operation and can be reused later.
-I don't particularly need to call dma_coerce_mask_and_coherent() in my
-case, as far as I know.
+> +static int phy_berlin_usb_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *match =
+> +		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
+> +	struct phy_berlin_usb_priv *priv;
+> +	struct resource *res;
+> +	struct phy_provider *phy_provider;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	priv->rst_ctrl = devm_reset_control_get(&pdev->dev, NULL);
+> +	if (IS_ERR(priv->rst_ctrl))
+> +		return PTR_ERR(priv->rst_ctrl);
+> +
+> +	priv->pll_divider = *((u32 *)match->data);
+> +
+> +	priv->phy = devm_phy_create(&pdev->dev, &phy_berlin_usb_ops, NULL);
+> +	if (IS_ERR(priv->phy)) {
+> +		dev_err(&pdev->dev, "failed to create PHY\n");
+> +		return PTR_ERR(priv->phy);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	phy_provider =
+> +		devm_of_phy_provider_register(&pdev->dev, of_phy_simple_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver phy_berlin_usb_driver = {
+> +	.probe	= phy_berlin_usb_probe,
+> +	.driver	= {
+> +		.name		= "phy-berlin-usb",
+> +		.owner		= THIS_MODULE,
 
-They can maybe give the restrictions they might want to put on the DMA
-mask.
-
-Antoine
+No need to update owner field.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+Varka Bhadram.
