@@ -1,32 +1,36 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Jul 2014 15:00:51 +0200
-Subject: [PATCH 18/19] ARM: SAMSUNG: Remove remaining legacy code
-In-Reply-To: <1405506268.4408.28.camel@x220>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-19-git-send-email-t.figa@samsung.com>
- <1405506268.4408.28.camel@x220>
-Message-ID: <53C67783.4090407@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 16 Jul 2014 09:02:51 -0400
+Subject: [PATCHv3 1/7] ARM: mvebu: ensure CPU clocks are enabled
+In-Reply-To: <1404920715-19834-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1404920715-19834-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1404920715-19834-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140716130251.GZ13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.07.2014 12:24, Paul Bolle wrote:
-> On Fri, 2014-07-04 at 19:48 +0200, Tomasz Figa wrote:
-
-[snip]
-
->> -config S5P_GPIO_DRVSTR
->> -	bool
->> -	help
->> -	  Internal configuration to get and set correct GPIO driver strength
->> -	  helper
->> -
+On Wed, Jul 09, 2014 at 05:45:09PM +0200, Thomas Petazzoni wrote:
+> In the Armada XP SMP support code, we are reading the clock frequency
+> of the booting CPU, and use that to assign the same frequency to the
+> other CPUs, and we do this while the clocks are disabled.
 > 
-> This one is used (as a macro) in drivers/gpio/gpio-samsung.c. Is a patch
-> that touches that macro queued somewhere?
+> However, the CPU clocks are in fact never prepared/enabled, and to
+> support cpufreq, we now have two code paths to change the frequency of
+> the CPU clocks in the CPU clock driver: one when the clock is enabled
+> (dynamic frequency scaling), one when the clock is disabled (adjusting
+> the CPU frequency before starting the CPU). In order for this to work,
+> the CPU clocks now have to be prepared and enabled after the initial
+> synchronization of the clock frequencies is done, so that all future
+> rate changes of the CPU clocks will trigger a dynamic frequency
+> scaling transition.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/platsmp.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-The code you mention should be removed as well as it's no longer needed.
-Will include in a follow-up series. Thanks for reporting this and
-remaining missed parts.
+Tentatively applied patches 1-3, and 5 to mvebu/soc-cpufreq to get some
+coverage in -next.
 
-Best regards,
-Tomasz
+thx,
+
+Jason.
