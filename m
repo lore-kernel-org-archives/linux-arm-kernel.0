@@ -1,46 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 Jul 2014 18:32:25 -0700
-Subject: [GIT PULL] the great <mach/gpio.h> purge
-In-Reply-To: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
-References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
-Message-ID: <CAOesGMg2Qn1B7KmaGnZzT0_RiqAbG7hNUg=a=R0CDjxuP6cBBw@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 16 Jul 2014 10:34:18 +0900
+Subject: [GIT PULL] SOCFPGA DTS updates for 3.17
+In-Reply-To: <53C54246.2040002@gmail.com>
+References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
+ <53C4D874.2040206@samsung.com> <53C54246.2040002@gmail.com>
+Message-ID: <53C5D69A.2090407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 1:06 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi ARM SoC guys,
->
-> please pull in this patch set removing <mach/gpio.h> for good.
-> I guess it could collide with some S5P deletion.
-> If you decide to pull the S5P purge first, tell me so I can rebase.
->
-> Yours,
-> Linus Walleij
->
->
-> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
->
->   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
-> tags/gpio-h-purge
->
-> for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
->
->   ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
->
-> ----------------------------------------------------------------
-> This is a purge of all things <mach/gpio.h>, now I never
-> want to see it again.
->
-> - Remove the need for <mach/gpio.h> from S5P
-> - Kill CONFIG_NEED_MACH_GPIO_H
-> - Kill remnants of ARM_GPIOLIB_COMPLEX
+CC'd Chris/Ulf.
 
-Merged. Fixups were trivial since it was just changes against files
-that had been removed.
+If you are ok, this patch will apply mmc tree.(3.16-rc5)
+To prevent conflict, we want to get your opinion.
 
+Best Regards,
+Jaehoon Chung
 
--Olof
+On 07/16/2014 12:01 AM, Dinh Nguyen wrote:
+> Hi Jaehoon,
+> 
+> On 07/15/2014 02:29 AM, Jaehoon Chung wrote:
+>> Hi Dinh.
+>>
+>> Could you check this patch?
+>> https://patchwork.kernel.org/patch/4529891/
+>>
+> 
+> Sorry that I missed this. I just applied it. Will test and send out an updated pull-request.
+> 
+> Dinh
+> 
