@@ -1,36 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Jul 2014 22:23:40 +0100
-Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
-In-Reply-To: <53C525A2.8080609@kpanic.de>
-References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
- <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
- <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
- <20140714181338.GR6800@sirena.org.uk> <53C525A2.8080609@kpanic.de>
-Message-ID: <20140716212340.GZ17528@sirena.org.uk>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 16 Jul 2014 14:27:38 -0700
+Subject: [PATCH v10 0/11] seccomp: add thread sync ability
+In-Reply-To: <CAGXu5jKMwiAxeCVZVPS72XWCd2KhiR-uc4VFKT0mvD9s-cTO_Q@mail.gmail.com>
+References: <1405017631-27346-1-git-send-email-keescook@chromium.org>
+ <20140711164931.GA18473@redhat.com>
+ <CAGXu5jK-x0=Rr7kX2a=b4Z8ueA77uwmhNZZAayG8cwmNOKa8Ug@mail.gmail.com>
+ <CALCETrVXgA9a2f7VwnCYW4_XB+JAPRSR8xsuH_ZYbA82=ZozRw@mail.gmail.com>
+ <CAGXu5j+r-CpJiXipCT=j09+ZfJjF9jTc3kuZFAH3ZxgUEvktTA@mail.gmail.com>
+ <CALCETrX48nuR6wqEV4Nu47BF4Z3XFvBpYer_fzwaqJdi0fpdKw@mail.gmail.com>
+ <CAGXu5jKMwiAxeCVZVPS72XWCd2KhiR-uc4VFKT0mvD9s-cTO_Q@mail.gmail.com>
+Message-ID: <CALCETrUXRszBEhB7aOu6nXtCj09zofY_b_5BUNbJk-EFefA6fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 02:59:14PM +0200, Stefan Assmann wrote:
+On Wed, Jul 16, 2014 at 2:23 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Jul 16, 2014 at 12:45 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> In seccomp_prepare_user_filter, would it make sense to return -EINVAL
+>> if !user_filter?  That will make it slightly more pleasant to
+>> implement TSYNC-without-change if anyone ever wants it.  (This isn't
+>> really necessary -- it's just slightly more polite.)
+>
+> I can't do this since EFAULT is already used to detect seccomp
+> capabilities from userspace.
 
-> Looking at this more closely it seems to me that it's a regulator thing
-> after all. In the end it all boils down to a single register write.
-> twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x41, 0x8e);
-> This is a write to the CLK32KG_CFG_STATE [1] register to power on the
-> device.
+Aha.  In that case, can you (separately) send a prctl.2 manpage patch
+documenting that?  Also, I'm pretty sure you can get away with doing
+this for seccomp(2) -- EINVAL and ENOSYS are easily distinguishable,
+but the current behavior is IMO also fine if documented.
 
-The register description happening to mention power doesn't mean it's
-not functionally an enable for a clock.
-
-> I tried moving that to omap4xxx_dt_clk_init() but that won't work
-> because the twl core structures aren't initialized yet.
-
-> Any suggestions?
-
-Why not just add this to (or create a new) clock driver for the chip?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/8e470177/attachment.sig>
+--Andy
