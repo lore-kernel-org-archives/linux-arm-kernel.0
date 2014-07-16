@@ -1,132 +1,84 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 16 Jul 2014 15:20:59 +0200
-Subject: [RESEND PATCH v3 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20140716150522.4a5d7280@bbrezillon>
-References: <1404751384-5077-1-git-send-email-boris.brezillon@free-electrons.com>
- <1484511.NijXCAc7Hx@avalon> <20140716150522.4a5d7280@bbrezillon>
-Message-ID: <2090402.0lsU1s2UzH@avalon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 16 Jul 2014 15:22:41 +0200
+Subject: [PATCH 12/12] ARM: tegra: Convert PMC to a driver
+In-Reply-To: <201407161356.44693.arnd@arndb.de>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <1405080971-7609-13-git-send-email-thierry.reding@gmail.com>
+ <201407161356.44693.arnd@arndb.de>
+Message-ID: <20140716132240.GC23384@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Wednesday 16 July 2014 15:05:22 Boris BREZILLON wrote:
-> On Tue, 15 Jul 2014 13:07:58 +0200 Laurent Pinchart wrote:
-> > On Tuesday 15 July 2014 12:52:54 Thierry Reding wrote:
-> >> On Tue, Jul 15, 2014 at 12:43:02PM +0200, Laurent Pinchart wrote:
-> >>> On Tuesday 15 July 2014 12:37:19 Thierry Reding wrote:
-> >>>> On Tue, Jul 15, 2014 at 12:20:02PM +0200, Laurent Pinchart wrote:
-> >>>>> On Tuesday 15 July 2014 12:06:19 Boris BREZILLON wrote:
-> >>>>>> On Mon, 14 Jul 2014 12:05:43 +0200 Thierry Reding wrote:
-> >>>>>>> On Mon, Jul 07, 2014 at 06:42:59PM +0200, Boris BREZILLON wrote:
-> >>>>>>>> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs
-> >>>>>>>> (i.e. at91sam9n12, at91sam9x5 family or sama5d3 family) provides
-> >>>>>>>> a display controller device.
-> >>>>>>>> 
-> >>>>>>>> The HLCDC block provides a single RGB output port, and only
-> >>>>>>>> supports LCD panels connection to LCD panels for now.
-> >>>>>>>> 
-> >>>>>>>> The atmel,panel property link the HLCDC RGB output with the LCD
-> >>>>>>>> panel connected on this port (note that the HLCDC RGB connector
-> >>>>>>>> implementation makes use of the DRM panel framework).
-> >>>>>>>> 
-> >>>>>>>> Connection to other external devices (DRM bridges) might be added
-> >>>>>>>> later by mean of a new atmel,xxx (atmel,bridge) property.
-> >>>>>>>> 
-> >>>>>>>> Signed-off-by: Boris BREZILLON
-> >>>>>>>> <boris.brezillon@free-electrons.com>
-> >>>>>>>> ---
-> >>>>>>>> 
-> >>>>>>>>  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 59 ++++++++
-> >>>>>>>>  1 file changed, 59 insertions(+)
-> >>>>>>>>  create mode 100644
-> >>>>>>>>  Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> >>>>> 
-> >>>>> [snip]
-> >>>>> 
-> >>>>>>>> + - atmel,panel: Should contain a phandle with 2 parameters.
-> >>>>>>>> +   The first cell is a phandle to a DRM panel device
-> >>>>>>>> +   The second cell encodes the RGB mode, which can take the
-> >>>>>>>> following values:
-> >>>>>>>> +   * 0: RGB444
-> >>>>>>>> +   * 1: RGB565
-> >>>>>>>> +   * 2: RGB666
-> >>>>>>>> +   * 3: RGB888
-> >>>>>>> 
-> >>>>>>> These are properties of the panel and should be obtained from the
-> >>>>>>> panel directly rather than an additional cell in this specifier.
-> >>>>>> 
-> >>>>>> Okay.
-> >>>>>> What's the preferred way of doing this ?
-> >>>>>> What about defining an rgb-mode property in the panel node.
-> >>>>> 
-> >>>>> You could do that, but it won't help you much, as the HLCDC driver
-> >>>>> must not parse properties from the panel node. You should instead
-> >>>>> extend the drm_panel API with a function to retrieve panel
-> >>>>> properties. The HLCDC driver will then query the panel driver at
-> >>>>> runtime for the interface type. The panel driver will get the
-> >>>>> information from hardcoded data in the driver, from DT or possibly
-> >>>>> in some cases by querying the panel hardware directly.
-> >>>> 
-> >>>> My preference for this would be that we either add this to some
-> >>>> existing structure (struct drm_display_info seems like a good
-> >>>> candidate) or if the number of parameters grows out of hands, then
-> >>>> maybe even introduce a new type of device that's specific for the
-> >>>> interface. DRM panels are an abstraction for panels, that is,
-> >>>> interface-agnostic, and if we start exposing interface specific
-> >>>> parameters things will start to become very unwieldy.
-> >>> 
-> >>> I agree with the goal of keeping drm_panel interface-agnostic.
-> >>> However, one way or another, interface parameters will need to be
-> >>> communicated between the panel driver and the controller driver. My
-> >>> preference, if we need to extend the number and/or scope of parameters
-> >>> beyond what drm_display_info could reasonably contain, would be to
-> >>> implement a new drm_panel operation to query/configure interface
-> >>> parameters, using a structure that contains the interface type and a
-> >>> union of type-specific structures. This would keep the API generic in
-> >>> the sense of not requiring explicit knowledge of all interfaces in the
-> >>> drivers, while offering the flexibility we need with a way to easily
-> >>> detect the interface type at runtime and react on unknown/unsupported
-> >>> types.
-> >> 
-> >> That's exactly what I was hoping could be avoided. If instead we modeled
-> >> the interface type as a bus, we could for example have an lvds_bus along
-> >> with an lvds_device and then use that as the natural place to store
-> >> these properties. Much like we do for DSI.
-> > 
-> > And I believe that's what we should avoid ;-) First of all, let's not
-> > forget that Linux models control busses, not data busses. DSI is a
-> > special case as it combines the control and data busses, but in the
-> > general case the same implementation isn't possible. An LVDS panel
-> > controlled through I2C needs to be an I2C device sitting on an I2C bus.
-> > 
-> > Then, I believe it would make all drivers simpler if we had a single
-> > object type to deal with, with proper abstractions for bus types. A
-> > drm_panel that can model panels regardless of the data bus type, with one
-> > operation that conveys bus-specific information, makes storing the objects
-> > and communicating with them simpler than having to deal with different
-> > kind of devices.
->
-> Could you detail a bit what you mean by "single object type" ?
+On Wed, Jul 16, 2014 at 01:56:44PM +0200, Arnd Bergmann wrote:
+> On Friday 11 July 2014, Thierry Reding wrote:
+> > +/*
+> > + * PMC
+> > + */
+> > +enum tegra_suspend_mode {
+> > +       TEGRA_SUSPEND_NONE = 0,
+> > +       TEGRA_SUSPEND_LP2, /* CPU voltage off */
+> > +       TEGRA_SUSPEND_LP1, /* CPU voltage off, DRAM self-refresh */
+> > +       TEGRA_SUSPEND_LP0, /* CPU + core voltage off, DRAM self-refresh */
+> > +       TEGRA_MAX_SUSPEND_MODE,
+> > +};
+> > +
+> > +#ifdef CONFIG_PM_SLEEP
+> > +enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
+> > +void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
+> > +void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode);
+> > +
+> > +bool tegra_pmc_cpu_is_powered(int cpuid);
+> > +int tegra_pmc_cpu_power_on(int cpuid);
+> > +int tegra_pmc_cpu_remove_clamping(int cpuid);
+> > +
+> > +void tegra_pmc_restart(enum reboot_mode mode, const char *cmd);
+> > +#endif
+> > +
+> > +/*
 > 
-> Is this about making a common abstraction class (by mean of
-> drm_xxx and drm_xxx_funcs) that could represent any display device
-> (drm_bridge, drm_panel, ...) ?
+> This part is causing multiple build failures in the randconfig tests.
+> You can avoid them by removing the #ifdef.
 
-Exactly :-) This is similar to what exists in V4L, with a v4l2_subdev object 
-able to model any kind of IP core or external chip.
+How is this causing build failures? I only see them used wherever
+CONFIG_PM_SLEEP is defined.
 
-I don't think we will get there in one go, but I'd like to start by merging 
-drm_encoder and drm_bridge on the kernel side. Both objects model the same 
-hardware, a drm_encoder on one board could be a drm_bridge on another one. 
->From a userspace point of view drm_encoder won't go away, and we can't chain 
-multiple encoders, so the change would be internal to the kernel only.
+Although I guess tegra-pmc.c could cause sparse warnings since it
+implements these functions regardless of CONFIG_PM_SLEEP, which probably
+is the bug that should be fixed.
 
-Then, as a next step, I believe using the same object to model panels would be 
-a good idea, but there's no consensus on that.
+Do you have a randconfig that I can use to reproduce this and come up
+with a fix?
 
--- 
-Regards,
+> On a more general note, why are you adding this stuff into a global
+> header file in the first place? All users are in the same directory
+> in which the functions are defined.
 
-Laurent Pinchart
+That's mostly preparatory work. We'll need to move tegra-pmc.c out of
+arch/arm/mach-tegra at some point. I've proposed two patches already to
+do that, one move the driver to drivers/soc/tegra and was massively
+NAK'ed (I'm still not sure I agree) and people requested that this be
+moved into drivers/power. I then posted a 2 patch series to move power
+supply drivers into a subdirectory (drivers/power/supply) so that
+drivers in drivers/power didn't have to depend on CONFIG_POWER_SUPPLY
+for no good reason.
+
+The latter series didn't receive any comments whatsoever in over a week,
+so in order to keep things moving forward I respun the PMC patch to do
+the conversion without moving the code out of arch/arm/mach-tegra yet.
+That way moving the driver out of arch/arm/mach-tegra will be a simple
+matter of moving and the rework will already be done. You were Cc'ed on
+the second series, so if you want to take a look (and maybe help get
+things moving) the patches are called:
+
+	[PATCH 0/2] Restructure driver/power and add Tegra PMC driver
+	[PATCH 1/2] power: Move power-supply drivers to subdirectory
+	[PATCH 2/2] ARM: tegra: Convert PMC to a driver
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/3836f4bb/attachment.sig>
