@@ -1,66 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Jul 2014 10:58:50 +0100
-Subject: BUG: i.MX6-FEC: broken TCP tx checksumming
-In-Reply-To: <CAOpc7mFpW=ZDdF3g-MK4TaNje5KBWimUwUgxoebg-wmb+OQ8zA@mail.gmail.com>
-References: <CAOpc7mFpW=ZDdF3g-MK4TaNje5KBWimUwUgxoebg-wmb+OQ8zA@mail.gmail.com>
-Message-ID: <20140716095850.GO21766@n2100.arm.linux.org.uk>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Wed, 16 Jul 2014 15:28:09 +0530
+Subject: [PATCH v5 2/2] can: m_can: add Bosch M_CAN controller support
+In-Reply-To: <1405503050-16796-2-git-send-email-b29396@freescale.com>
+References: <1405503050-16796-1-git-send-email-b29396@freescale.com>
+ <1405503050-16796-2-git-send-email-b29396@freescale.com>
+Message-ID: <53C64CB1.3050204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 10:27:45AM +0200, Holger Schurig wrote:
-> on my target I use the i:MX6 FEC with kernel 3.16-rc5. Very quickly I
-> was able to "ping", but TCP (e.g. ssh) didn't work.
-> 
-> I first suspected autonegotiation, because "mii-tool eth0" shows
-> (wrongly) eth0: negotiated "1000baseT-HD flow-control, link ok".
-> Despite my switch not a gigabit one ...
+On 07/16/2014 03:00 PM, Dong Aisheng wrote:
+> The patch adds the basic CAN TX/RX function support for Bosch M_CAN controller.
+> For TX, only one dedicated tx buffer is used for sending data.
+> For RX, RXFIFO 0 is used for receiving data to avoid overflow.
+> Rx FIFO 1 and Rx Buffers are not used currently, as well as Tx Event FIFO.
+>
+> Due to the message ram can be shared by multi m_can instances
+> and the fifo element is configurable which is SoC dependant,
+> the design is to parse the message ram related configuration data from device
+> tree rather than hardcode define it in driver which can make the message
+> ram sharing fully transparent to M_CAN controller driver,
+> then we can gain better driver maintainability and future features upgrade.
+>
+> M_CAN also supports CANFD protocol features like data payload up to 64 bytes
+> and bitrate switch at runtime, however, this patch still does not add the
+> support for these features.
+>
+> Cc: Wolfgang Grandegger <wg@grandegger.com>
+> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+> Cc: Varka Bhadram <varkabhadram@gmail.com>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+> changes since v4:
+> some minor changes:
+> - introduce m_can_fifo_write and is_lec_err functin
+> - define macro M_CAN_FIFO_XXX for FIFO
+> - move m_can_of_table before platform_driver
+> - a few indent fix
+>
+> Changes since v3:
+> A few minor changes:
+> - use the updated name of bosch,mram-cfg
+> - remove .owner = THIS_MODULE
+> - add a line comment for mram_cfg structure
+>
+> Changes since v2:
+> - fix checkpatch warnings
+> - handle CAN_CTRLMODE_BERR_REPORTING properly that disable LEC error
+>    interrupts (Bus error) if no CAN_CTRLMODE_BERR_REPORTING.
+> - introduce struct mram_cfg array to store message ram configuration data
+>    for each fifo
+> - fix txb offset calculate wrong issue(should not plus mram_off again)
+> - check return for clk_prepare_enable
+> - split doc part into a separate patch
+>
+> Changes since v1:
+> Addressed all comments from Mark Rutland, Hartkopp and Marc Kleine-Budde
+> - merge three patches into one
+> - create directory drivers/net/can/m_can
+> - improve binding doc
+> - make sure using valid pointer before netif_receive_skb(skb)
+> - remove debug info a bit
+> - let the stats are updated even if alloc_can_err_skb() fails
+> - other small fixes
+> ---
+>   drivers/net/can/Kconfig        |    2 +
+>   drivers/net/can/Makefile       |    1 +
+>   drivers/net/can/m_can/Kconfig  |    4 +
+>   drivers/net/can/m_can/Makefile |    7 +
+>   drivers/net/can/m_can/m_can.c  | 1202 ++++++++++++++++++++++++++++++++++++++++
+>   5 files changed, 1216 insertions(+), 0 deletions(-)
+>   create mode 100644 drivers/net/can/m_can/Kconfig
+>   create mode 100644 drivers/net/can/m_can/Makefile
+>   create mode 100644 drivers/net/can/m_can/m_can.c
+>
+>
+This series addressed all of my comments ...Thanks  :-)
 
-That's rather weird - that line is printed by the generic phy layer,
-so it suggests a bug in either the generic phy support, or the phy
-driver itself.  It shouldn't report HD mode for gigabit with my patch
-series applied - the FEC hardware doesn't support HD at gigabit speeds.
-
-> Then I found out that
-> "ethtool eth0" worked better, it displayed "Speed: 100Mb/s", "Duplex:
-> Full". And with ping working, it couldn't be gigabit-ethernet against
-> a non-gigabit switch anyway ...
-
-That's again read via the generic phy layer, and that suggests that
-the phy finally reported the correct speed... again, I wonder if
-something in the phy layer is buggy.  I've never seen this behaviour
-here with Atheros AR8035.
-
-> I then looked at linux-next and applied the FEC related patches from
-> it. To no avail.
-
-In some ways, no change is good.
-
-> Finally I made started wireshark (on the desktop). And Wireshark said:
-> 
->   Header checksum: 0x0000 [incorrect, should be 0xe65e (may be caused
-> by "IP checksum offload"?)]
-> 
-> So I tried "ethtool -K eth0 tx off" (on the i.MX6 board) and suddenly
-> ssh worked.
-
-That sounds like the hardware IP header checksumming isn't working.  Is
-there anything specific to your setup?  VLAN maybe?
-
-Which gcc version are you using?
-
-It could be that the hardware isn't seeing the update for cbd_esc before
-cbd_sc.  To test that out, can you try putting a wmb() before the writes
-to bdp->cbd_sc in:
-
-fec_enet_txq_submit_frag_skb
-fec_enet_txq_submit_skb
-fec_enet_txq_put_data_tso
-fec_enet_txq_put_hdr_tso
-
-to ensure that the previous transmit descriptor updates are pushed out
-before the descriptor is handed over to the hardware.  That's a little
-heavy-weight, but let's use the sledge hammer first...
+Reviewed-by: Varka Bhadram <varkabhadram@gmail.com>
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Varka Bhadram.
