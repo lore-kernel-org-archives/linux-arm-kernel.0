@@ -1,39 +1,108 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 16 Jul 2014 21:02:29 +0530
-Subject: [PATCH 2/8] cpufreq: add driver for Armada XP
-In-Reply-To: <20140716172811.2289a64c@free-electrons.com>
-References: <1404467103-29644-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1404467103-29644-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAKohponuvPd1kWDdB66kxd8TxxYqQ219jCq2D2RGhMHAuZTSWA@mail.gmail.com>
- <20140716160256.7e8dbccf@free-electrons.com>
- <CAKohpomaYfuq0CR5xsf73obTbXsxdBtHToLsNWcW2NQcCd5LUw@mail.gmail.com>
- <20140716172811.2289a64c@free-electrons.com>
-Message-ID: <CAKohpok6-_7aQ1RxSJKLo1idc777LHWLVM=tjtTLOzZjeAUpjw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 16 Jul 2014 16:32:42 +0100
+Subject: [PATCHv4 0/5] arm64: handle heterogeneous system register values
+Message-ID: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 20:58, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> I guess you meant 3.17, right?
+Currently the arm64 kernel assumes CPUs are homogeneous, which is a source of
+several potential problems as this is not always true. This series is an
+attempt to ameliorate the situation. The first posting [1] was titled as
+"arm64: extend/fix /proc/cpuinfo + runtime sanity checks", but with the
+addition of the I-cache policy fix this title was either going to become
+unwieldy or misleading.
 
-Yeah, sorry.
+The major addition is a couple of hooks to log system register values, and
+sanity checking of our assumptions regarding the underlying hardware. If these
+are violated it is made very clear to the user that things may be broken.
 
-> Would be good to have this soon, since the 3.17 merge window is
-> approaching. You asked me to use this cpufreq-generic driver instead of
-> a custom cpufreq driver, and I did the work to do that. So now I clearly
-> hope that cpufreq-generic will be merged in 3.17.
+Due to rework between v2 an 3 I've dropped Acks from some patches. A once-over
+from those who have reviewed this before would be much appreciated.
 
-Yeah, I have already pinged Rafael few days back on this. He came back
-from holidays last week and this is what he told me:
+Due to some off-list comments I've restored the printing of features per-cpu
+(which was also my initial preference). While this is still based on the global
+hwcaps, this will be correct where the sanity checks don't fail. Hopefully
+no-one is insane enough to build CPUs with different instruction set support
+anyhow.
 
-Jul 11 19:58:34 <vireshk> rafael, when are you going to pick stuff for 3.17?
-Jul 11 19:59:11 <rafael> vireshk: next week i suppose
+I'd like to see at least patches 1-4 go in shortly as they've been stable for a
+while now, have received no major complaints, and will be of use immediately
+for those involved in CPU bringup. I understand people might not like patch 5,
+but that shouldn't delay the rest of the series.
 
+Since v3 [5]:
+* Minor cleanups suggested by Will.
+* Print hwcaps per-cpu again.
+* Clean up other issues in /proc/cpuinfo.
+* Move the cpuinfo patch to the end.
+Since v2 [4]:
+* Print the hwcaps once in /proc/cpinfo, per Ard's comments.
+* Apply fixupps per Will's comments.
+* Sanity check additional registers: dczid id_aa64{isar,mmfr,pfr}1.
+* We care about GICv3 support reporting, don't mask it out.
+* Set TAINT_CPU_OUT_OF_SPEC upon sanity check failure.
+* Store boot CPU values separately.
+* Separate value stashing into new patch.
+* Rebased the branch to v3.16-rc2.
+Since v1 [1]:
+* Add fix for differing I-cache policies
+* Make read_cpuid_part_number and read_cpu_implementor return extracted fields.
 
-Do you depend on this patch btw?
+This series adds infrastructure to record various system registers upon the
+booting of each CPU into a new per-CPU struct cpuinfo_arm64. This data can then
+be used to solve various problems:
 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg675398.html
+* On arm64 /proc/cpuinfo only contains information regarding the current CPU
+  (i.e. that which issued the read), due to use of read_cpuid_id() within
+  c_show. This isn't fantastic as it doesn't match arm and x86 (which print
+  information per-cpu), and on big.LITTLE AArch64 systems it will mean we can't
+  discover what CPU implementations we have. Using the newly recorded
+  information, we can print correct information per-CPU in /proc/cpuinfo.
 
-Actually there had been some objections to comparing clocks this way and
-we *might* hold this off, unless the bindings are finalized. Will get all other
-patches merged though.
+* Level 1 instruction cache policy can differ across CPU micro-architectures in
+  big.LITTLE configurations, which can lead to a subset of cores reporting
+  aliasing I-caches in CTR_EL0.L1Ip. If any CPUs in the system have VIPT or
+  AIVIVT I-caches, the appropriate maintenance must be performed even from those
+  CPUs whose caches are non-aliasing. We can use the newly recorded information
+  to detect when this is the case.
+
+* Sometimes CPUs are erroneously configured differently by firmware such that a
+  feature is only enabled on a subset of CPUs. Even in the presence of
+  big.LITTLE systems we do not generally expect this, and such problems can be
+  difficult to detect. To enable early detection of mismatched capabilities in
+  SMP systems, we can use the newly recorded information to compare CPUs
+  feature-wise and identify potential issues.
+
+The series is based on v3.16-rc2, and can be found in my
+arm64/heterogeneous-sysreg branch [2,3]. It should cleanly rebase to later
+release candidates.
+
+Cheers,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255389.html
+[2] http://linux-arm.org/git?p=linux-mr.git;a=shortlog;h=refs/heads/arm64/heterogeneous-sysreg
+[3] git://linux-arm.org/linux-mr.git arm64/heterogeneous-sysreg
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264387.html
+[5] lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266973.html
+
+Mark Rutland (5):
+  arm64: add MIDR_EL1 field accessors
+  arm64: cpuinfo: record cpu system register values
+  arm64: cachetype: report weakest cache policy
+  arm64: add runtime system sanity checks
+  arm64: cpuinfo: print info for all CPUs
+
+ arch/arm64/include/asm/cachetype.h |  16 ++--
+ arch/arm64/include/asm/cpu.h       |  59 ++++++++++++
+ arch/arm64/include/asm/cputype.h   |  33 +++++--
+ arch/arm64/kernel/Makefile         |   3 +-
+ arch/arm64/kernel/cpuinfo.c        | 192 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c          |  46 ++++-----
+ arch/arm64/kernel/smp.c            |   6 ++
+ 7 files changed, 316 insertions(+), 39 deletions(-)
+ create mode 100644 arch/arm64/include/asm/cpu.h
+ create mode 100644 arch/arm64/kernel/cpuinfo.c
+
+-- 
+1.9.1
