@@ -1,57 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 16 Jul 2014 14:00:00 +0530
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C5C738.5040705@codeaurora.org>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <53C5C738.5040705@codeaurora.org>
-Message-ID: <CAKohpomt34NcMH=H5L_fhf-6R6p27_h=aCNcpT6T12u35d=Z+w@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Jul 2014 11:30:42 +0300
+Subject: [PATCH 6/6] clk: tegra: Add Tegra132 ccplex clocks
+In-Reply-To: <53C591B1.4080302@nvidia.com>
+References: <1405437890-6468-1-git-send-email-pdeschrijver@nvidia.com>
+ <1405437890-6468-7-git-send-email-pdeschrijver@nvidia.com>
+ <53C5908C.5000009@nvidia.com> <53C591B1.4080302@nvidia.com>
+Message-ID: <20140716083042.GL23218@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 05:58, Saravana Kannan <skannan@codeaurora.org> wrote:
->> +       if (!cpus && cpufreq_driver->stop_cpu &&
->> cpufreq_driver->setpolicy) {
->> +               cpufreq_driver->stop_cpu(policy);
->> +       }
->>
->
-> Viresh, I tried your suggestion (and my initial thought too) to combine this
-> as an if/else with the previous if. But the indentation got nasty and made
-> it hard to read. I'm sure the compiler will optimize it. So, I would prefer
-> to leave it this way.
+On Tue, Jul 15, 2014 at 10:40:17PM +0200, Rhyland Klein wrote:
+> On 7/15/2014 4:35 PM, Rhyland Klein wrote:
+> > On 7/15/2014 11:24 AM, Peter De Schrijver wrote:
+> >> Add support for the ccplex clocks in Tegra132.
+> >>
+> >> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> >> ---
+> >>  drivers/clk/tegra/Makefile |    2 ++
+> >>  1 files changed, 2 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+> >> index f7dfb72..4231865 100644
+> >> --- a/drivers/clk/tegra/Makefile
+> >> +++ b/drivers/clk/tegra/Makefile
+> >> @@ -15,3 +15,5 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
+> >>  obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
+> >>  obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
+> >>  obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
+> >> +obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.c
+> >> +obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra132-ccplex.c
+> 
+> Also, shouldn't both these be .o not .c ?
+> 
+> -rhyland
 
-Okay, I gave that comment again :)
+Yes, obviously :)
 
-Try this:
+Cheers,
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index f72b2b7..092a0ba 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -991,8 +991,10 @@ static int cpufreq_change_policy_cpus(struct
-cpufreq_policy *policy,
-                                        CPUFREQ_UPDATE_POLICY_CPU, policy);
-        }
-
--       cpus = !cpumask_empty(policy->cpus);
--       if (has_target() && cpus) {
-+       if (!cpumask_empty(policy->cpus)) {
-+               if (!has_target())
-+                       goto unlock;
-+
-                ret = __cpufreq_governor(policy, CPUFREQ_GOV_START);
-                if (!ret)
-                        ret = __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
-@@ -1001,9 +1003,7 @@ static int cpufreq_change_policy_cpus(struct
-cpufreq_policy *policy,
-                        pr_err("%s: Failed to start governor\n", __func__);
-                        goto unlock;
-                }
--       }
--
--       if (!cpus && cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
-+       } else if (cpufreq_driver->stop_cpu && cpufreq_driver->setpolicy) {
-                cpufreq_driver->stop_cpu(policy);
-        }
+Peter.
