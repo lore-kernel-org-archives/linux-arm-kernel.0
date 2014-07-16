@@ -1,48 +1,81 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Jul 2014 13:42:18 +0200
-Subject: [PATCH v3 7/8] ata: Add support for the Tegra124 SATA controller
-In-Reply-To: <53C65E96.9070508@redhat.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 16 Jul 2014 14:42:50 +0300
+Subject: [PATCH v3 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <53C64553.9010704@gmail.com>
 References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
- <1405500863-19696-8-git-send-email-mperttunen@nvidia.com>
- <53C65E96.9070508@redhat.com>
-Message-ID: <20140716114217.GA18977@ulmo>
+ <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <53C64553.9010704@gmail.com>
+Message-ID: <53C6653A.7040107@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 01:14:30PM +0200, Hans de Goede wrote:
-> On 07/16/2014 10:54 AM, Mikko Perttunen wrote:
-[...]
-> > +enum sata_clks {
-> > +	AHCI_CLK_SATA		= 0,
-> > +	AHCI_CLK_SATA_OOB	= 1,
-> > +	AHCI_CLK_CML1		= 2,
-> > +	AHCI_CLK_PLL_E		= 3
-> > +};
-> 
-> You should mention that having the clocks in this order is mandatory
-> in Documentation/devicetree/bindings/ata/tegra-sata.txt / in
-> "[PATCH v3 1/8] of: Add NVIDIA Tegra SATA controller binding"
+Thanks for you comment. I decided to keep the format as is for now, 
+however, to keep a consistent style between all binding files describing 
+Tegra hardware.
 
-This is precisely why I said that using a library for resources is a bad
-idea. Why on earth would we want to mandate a specific order? The clock
-bindings specifically have the clock-names so that the order in which
-the clocks are listed in the clocks property doesn't matter. Now because
-of these library helpers we can no longer do that, but instead need to
-fix the order.
+Mikko
 
-So we're now in a position where a Linux-specific driver, worse
-actually, a Linux helper library dictates what the device tree binding
-must look like. This obviously conflicts with what device tree people
-have been recommending for years.
-
-What this also means is that since the DT bindings are ABI, the libahci
-platform library code effectively becomes an ABI too.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/e4e58de7/attachment.sig>
+On 16/07/14 12:26, Varka Bhadram wrote:
+> On 07/16/2014 02:24 PM, Mikko Perttunen wrote:
+>> This patch adds device tree binding documentation for the SATA
+>> controller found on NVIDIA Tegra SoCs.
+>>
+>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>> ---
+>>    .../devicetree/bindings/ata/tegra-sata.txt         | 30 ++++++++++++++++++++++
+>>    1 file changed, 30 insertions(+)
+>>    create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+>> new file mode 100644
+>> index 0000000..946f207
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+>> @@ -0,0 +1,30 @@
+>> +Tegra124 SoC SATA AHCI controller
+>> +
+>> +Required properties :
+>> +- compatible : "nvidia,tegra124-ahci".
+>> +- reg : Should contain 2 entries:
+>> +  - AHCI register set (SATA BAR5)
+>> +  - SATA register set
+>> +- interrupts : Defines the interrupt used by SATA
+>> +- clocks : Must contain an entry for each entry in clock-names.
+>> +  See ../clocks/clock-bindings.txt for details.
+>> +- clock-names : Must include the following entries:
+>> +  - sata
+>> +  - sata-oob
+>> +  - cml1
+>> +  - pll_e
+>
+> It would be more readable if it like this...
+>
+> Required properties :
+> - compatible	: "nvidia,tegra124-ahci".
+> - reg		: Should contain 2 entries:
+> 		  - AHCI register set (SATA BAR5)
+> 		  - SATA register set
+> - interrupts	: Defines the interrupt used by SATA
+> - clocks	: Must contain an entry for each entry in clock-names.
+> 		  See ../clocks/clock-bindings.txt for details.
+> ....
+>
+>> +- resets : Must contain an entry for each entry in reset-names.
+>> +  See ../reset/reset.txt for details.
+>> +- reset-names : Must include the following entries:
+>> +  - sata
+>> +  - sata-oob
+>> +  - sata-cold
+>> +- phys : Must contain an entry for each entry in phy-names.
+>> +  See ../phy/phy-bindings.txt for details.
+>> +- phy-names : Must include the following entries:
+>> +  - sata-phy : XUSB PADCTL SATA PHY
+>> +- hvdd-supply : Defines the SATA HVDD regulator
+>> +- vddio-supply : Defines the SATA VDDIO regulator
+>> +- avdd-supply : Defines the SATA AVDD regulator
+>> +- target-5v-supply : Defines the SATA 5V power regulator
+>> +- target-12v-supply : Defines the SATA 12V power regulator
+>
+> Same....
+>
+>
