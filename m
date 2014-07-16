@@ -1,91 +1,28 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Wed, 16 Jul 2014 12:31:33 +0530
-Subject: [PATCH v4 3/3] regulator: qcom-rpm: Regulator driver for the
- Qualcomm RPM
-In-Reply-To: <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1405465241-28684-4-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAMf-jSn2YHF7ihRpXMfkPWYt8pNCj4o395OGha3BHD3K3mUv9g@mail.gmail.com>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Wed, 16 Jul 2014 09:06:43 +0200
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <alpine.DEB.2.02.1407152019020.21432@utopia.booyaka.com>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+ <20140709095552.GA25154@breakpoint.cc>
+ <20140709100147.GB25154@breakpoint.cc>
+ <alpine.DEB.2.02.1407152019020.21432@utopia.booyaka.com>
+Message-ID: <20140716070643.GC3378@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 2014-07-15 20:21:21 [+0000], Paul Walmsley wrote:
+> Hi Sebastian,
+Hi Paul,
 
-On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> Driver for regulators exposed by the Resource Power Manager (RPM) found
-> in Qualcomm 8660, 8960 and 8064 based devices.
->
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  drivers/regulator/Kconfig              |  12 +
->  drivers/regulator/Makefile             |   1 +
->  drivers/regulator/qcom_rpm-regulator.c | 787 +++++++++++++++++++++++++++++++++
->  3 files changed, 800 insertions(+)
-.
-.
-[snip]
-.
-.
-> + * Physically available PMIC regulator voltage ranges
-> + */
-> +static const struct regulator_linear_range pldo_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE( 750000,   0,  59, 12500),
+> > Acked-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
+> > 
+> > This is basically what Tony hasked me to do: No IRQ numbers & iomem.
+> 
+> Sorry - I'm a bit confused - Sebastian, did you test this one?  If so, is 
+> it okay to add a Tested-by from you?
 
-ERROR: space prohibited after that open parenthesis '('
+Tested-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 
-> +       REGULATOR_LINEAR_RANGE(1500000,  60, 123, 25000),
-> +       REGULATOR_LINEAR_RANGE(3100000, 124, 160, 50000),
-> +};
-> +
-> +static const struct regulator_linear_range nldo_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE( 750000,   0,  63, 12500),
+> - Paul
 
-Ditto.
-
-> +};
-> +
-> +static const struct regulator_linear_range nldo1200_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE( 375000,   0,  59,  6250),
-> +       REGULATOR_LINEAR_RANGE( 750000,  60, 123, 12500),
-
-Ditto
-
-> +};
-> +
-> +static const struct regulator_linear_range smps_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE( 375000,   0,  29, 12500),
-> +       REGULATOR_LINEAR_RANGE( 750000,  30,  89, 12500),
-> +       REGULATOR_LINEAR_RANGE(1500000,  90, 153, 25000),
-> +};
-> +
-> +static const struct regulator_linear_range ftsmps_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE( 350000,   0,   6, 50000),
-> +       REGULATOR_LINEAR_RANGE( 700000,   7,  63, 12500),
-> +       REGULATOR_LINEAR_RANGE(1500000,  64, 100, 50000),
-> +};
-
-Ditto
-
-> +
-> +static const struct regulator_linear_range ncp_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE(1500000,   0,  31, 50000),
-
-[snip]
-
-> +MODULE_DESCRIPTION("Qualcomm RPM regulator driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.8.2.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-
-
--- 
-Thanks and Regards
-Pramod
+Sebastian
