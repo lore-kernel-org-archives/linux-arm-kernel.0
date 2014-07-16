@@ -1,77 +1,70 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 16 Jul 2014 16:45:01 +0200
-Subject: [PATCH 3/5] tty: serial: 8250 core: allow to set ->throttle /
- ->unthrottle callbacks
+Date: Wed, 16 Jul 2014 16:44:59 +0200
+Subject: [PATCH 1/5] tty: serial: 8250 core: provide a function to export
+ uart_8250_port
 In-Reply-To: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
 References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1405521903-5877-4-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1405521903-5877-2-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap uart provides support for HW assisted flow control. What is
-missing is the support to throttle / unthrottle callbacks which are used
-by the omap-serial driver at the moment.
-This patch adds the callbacks. It should be safe to add them since they
-are only invovked from the serial_core (uart_throttle()) if the feature
-flags are set.
+There is no access to access a struct uart_8250_port for a specific
+line. This is only required outside of the 8250/uart callbacks like for
+devices' suspend & remove callbacks. For those the 8250-core provides
+wrapper like serial8250_unregister_port() which passes the struct
+to the proper function based on the line argument.
 
+For runtime suspend I need access to this struct not only to make
+serial_out() work but also to properly restore up->ier and up->mcr.
+
+Acked-by: Alan Cox <alan@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250_core.c | 14 ++++++++++++++
- include/linux/serial_core.h         |  2 ++
- 2 files changed, 16 insertions(+)
+ drivers/tty/serial/8250/8250.h      |  2 ++
+ drivers/tty/serial/8250/8250_core.c | 18 ++++++++++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index bd0e1897..714f954 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1320,6 +1320,16 @@ static void serial8250_start_tx(struct uart_port *port)
- 	}
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index 1ebf853..34c3cd1 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -110,6 +110,8 @@ static inline void serial_dl_write(struct uart_8250_port *up, int value)
+ 	up->dl_write(up, value);
  }
  
-+static void serial8250_throttle(struct uart_port *port)
-+{
-+	port->throttle(port);
-+}
++struct uart_8250_port *serial8250_get_port(int line);
 +
-+static void serial8250_unthrottle(struct uart_port *port)
-+{
-+	port->unthrottle(port);
-+}
-+
- static void serial8250_stop_rx(struct uart_port *port)
- {
- 	struct uart_8250_port *up =
-@@ -2752,6 +2762,8 @@ static struct uart_ops serial8250_pops = {
- 	.get_mctrl	= serial8250_get_mctrl,
- 	.stop_tx	= serial8250_stop_tx,
- 	.start_tx	= serial8250_start_tx,
-+	.throttle	= serial8250_throttle,
-+	.unthrottle	= serial8250_unthrottle,
- 	.stop_rx	= serial8250_stop_rx,
- 	.enable_ms	= serial8250_enable_ms,
- 	.break_ctl	= serial8250_break_ctl,
-@@ -3300,6 +3312,8 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
- 		uart->port.fifosize	= up->port.fifosize;
- 		uart->tx_loadsz		= up->tx_loadsz;
- 		uart->capabilities	= up->capabilities;
-+		uart->port.throttle	= up->port.throttle;
-+		uart->port.unthrottle	= up->port.unthrottle;
+ #if defined(__alpha__) && !defined(CONFIG_PCI)
+ /*
+  * Digital did something really horribly wrong with the OUT1 and OUT2
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 7a91c6d..5a6af19 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -2755,6 +2755,24 @@ static struct uart_ops serial8250_pops = {
  
- 		/* Take tx_loadsz from fifosize if it wasn't set separately */
- 		if (uart->port.fifosize && !uart->tx_loadsz)
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 6f20ff0..c380af2 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -124,6 +124,8 @@ struct uart_port {
- 				               struct ktermios *old);
- 	int			(*startup)(struct uart_port *port);
- 	void			(*shutdown)(struct uart_port *port);
-+	void			(*throttle)(struct uart_port *port);
-+	void			(*unthrottle)(struct uart_port *port);
- 	int			(*handle_irq)(struct uart_port *);
- 	void			(*pm)(struct uart_port *, unsigned int state,
- 				      unsigned int old);
+ static struct uart_8250_port serial8250_ports[UART_NR];
+ 
++/**
++ * serial8250_get_port - retrieve struct uart_8250_port
++ * @line: serial line number
++ *
++ * This function retrieves struct uart_8250_port for the specific line.
++ * This struct *must* *not* be used to perform a 8250 or serial core operation
++ * which is not accessible otherwise. Its only purpose is to make the struct
++ * accessible to the runtime-pm callbacks for context suspend/restore.
++ * The lock assumption made here is none because runtime-pm suspend/resume
++ * callbacks should not be invoked if there is any operation performed on the
++ * port.
++ */
++struct uart_8250_port *serial8250_get_port(int line)
++{
++	return &serial8250_ports[line];
++}
++EXPORT_SYMBOL_GPL(serial8250_get_port);
++
+ static void (*serial8250_isa_config)(int port, struct uart_port *up,
+ 	unsigned short *capabilities);
+ 
 -- 
 2.0.1
