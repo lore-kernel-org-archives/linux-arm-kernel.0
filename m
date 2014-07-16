@@ -1,83 +1,66 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 16 Jul 2014 14:11:57 +0200
-Subject: [PATCH 6/6] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <20140711064151.GJ28884@atomide.com>
-References: <1404928177-26554-1-git-send-email-bigeasy@linutronix.de>
- <1404928177-26554-7-git-send-email-bigeasy@linutronix.de>
- <20140710070948.GH28884@atomide.com> <53BEB5AF.7010604@linutronix.de>
- <20140711064151.GJ28884@atomide.com>
-Message-ID: <53C66C0D.5060501@linutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Jul 2014 14:12:46 +0200
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <cd73d8a384cc4040a0bbc6afc1f3063d@DM2PR0301MB0783.namprd03.prod.outlook.com>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5615007.cNNjmu3rBK@wuerfel>
+ <cd73d8a384cc4040a0bbc6afc1f3063d@DM2PR0301MB0783.namprd03.prod.outlook.com>
+Message-ID: <22032517.gk8PRUMaIU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 08:41 AM, Tony Lindgren wrote:
->> I tried this with am335x-evm, dra7-evm and beaglebone (omap5-uevm and
->> am335x-evmsk didn't want to boot a kernel and omap4-blaze didn't even
->> want to show MLO/U-boot) with the same result.
+On Wednesday 16 July 2014 11:58:14 Peter Chen wrote:
+> > >
+> > > Some people wanted the possibility to set the DMA mask as this USB2 CI
+> > > driver does not do specific Berlin operation and can be reused later.
+> > > I don't particularly need to call dma_coerce_mask_and_coherent() in my
+> > > case, as far as I know.
+> > 
+> > Ok, just remove the call then and rely on the default mask.
+> > 
+> > > They can maybe give the restrictions they might want to put on the DMA
+> > > mask.
+> > 
+> > If the restriction is from the bus, it should get handled automatically
+> > by the device probe as long as the correct dma-ranges property is there
+> > (though we have a small bug there at the moment). If there is a variation
+> > of ci13xxx that can't do 32-bit DMA, that should use a different
+> > compatible string and pass a fixed mask into dma_set_mask_and_coherent()
+> > based on the device.
+> > 
 > 
-> None of these SoCs support off-idle with mainline kernel so testing
-> with those is not enough :) Best to use some omap3 based device for
-> testing this.
+> Correct me if my below understanding is wrong please.
 > 
-> So far I have verified that beagleboard xm, n900, and omap3730-evm
-> all hit off-idle with v3.16-rc4.
-
-Unfortunately I don't have access to any of those devices.
-
->> I had network up and configured. Was that okay? I also tried
->> "ifconfig eth0 down; sleep 10; ifconfig eth0 up" to see if it works.
+> For three chipidea users:
+> user_a: don't need dma mask
+> user_b: dma mask value is dma_mask_b
+> user_c: dma mask value is dma_mask_c
 > 
-> That's fine for GPMC connected devices, devices with Ethernet on
-> EHCI won't idle properly AFAIK.
+> We don't need to call dma_coerce_mask_and_coherent() at generic chipidea
+> glue driver, and set dma-ranges as dma_mask_b at user_b's dts, and set
+> dma-ranges as dma_mask_c at user_c's dts.
 
-am33xx has proper ethernet (cpsw IP core on SoC and not something
-behind USB).
+The dma-ranges property doesn't just encode a dma-mask for a device, but
+rather how the children of a bus see the memory address space of the parent.
 
->> That core_pwrdm shows only up on dra7. However with both drivers (mine
->> and the current omap serial) the UART went down after three secs (as
->> expected) and didn't accept any characters while writing on the
->> console. If I wrote something on it via network (like echo a >
->> /dev/ttyO0) it came back and was working as long as I kept it busy. The
->> thing is that RX does not wake it up. Any idea?
-> 
-> If the RX pin does not wake it up, you need to configure the
-> pinctrl-single entry for it, and configure that pin as a wake-up
-> interrupt. See the interrupts-extended entry in omap3-beagle-xm.dts.
+For traditional reasons we default to assuming that a 32-bit dma_mask
+is correct, but there may be multiple reasons why this is not true:
 
-This does not help. Checking the manual, there is not something like
-PIN_OFF_WAKEUPENABLE for am33xx. There is just INPUT/OUTPUT, pull
-up/down + enabled/disabled and the mux_mode. For the interrupt, the HW
-referenced as omap3_pmx_core touches some bits in the pinmux register
-which do not exists on am33xx.
+- you have a device connected to a bus that is smaller than 32-bit wide
+  (and that would have a dma-ranges property describing that)
+- you have a device that has fewer than 32 address lines but is connected
+  to a 32-bit upstream bus (hence the dma-ranges describe all 32 bit,
+  but the driver must set a smaller mask)
+- you have a 64-bit capable device connected to a 32-bit bus: the driver
+  will ask for a 64-bit mask, but the dma_set_mask() call refuses this
+  because of the bus capabilities.
+- you have a 64-bit capable device on a 64-bit capable bus, and the
+  dma_set_mask call should succeed.
 
-So I have nothing on HW around that could test wakeup scenario.
+The mask is definitely never "user" specific, but is a combination of
+the device you have and the bus it is connected to.
 
->> Also, while it was I checked the core_pwrdm and I had ON:1 and OFF:0.
->> So something is not right.
->> Since Dra7 has some things missing I tried it on am335x with the same
->> behavior. Should it work here?
-> 
-> Yes only omap3 currently has the pieces needed for off-idle in the
-> mainline kernel.
->  
+Things get more complicated when you add in IOMMUs to this, but I'm
+skipping this for the sake of limiting the confusion.
 
-Good to know.
-
->> puh. So after staring a while at your backtrace I realized that
->> shutdown & startup callbacks are not overwritten properly. Well, thanks
->> for that. Anyway, even serial8250_do_startup() has
->> pm_runtime_get_sync() before first register access so I have no idea
->> where this is coming from.
-> 
-> Maybe because the console is enabled for that port?
-
-Maybe. But I would expect to explode around the console code. Anyway I
-fixed it up and prepare next batch.
-
-> 
-> Regards,
-> 
-> Tony
-
-
-Sebastian
+	Arnd
