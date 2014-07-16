@@ -1,58 +1,32 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Jul 2014 20:09:42 +0100
-Subject: [PATCH v7 01/11] arm64: Use pr_* instead of printk
+Date: Wed, 16 Jul 2014 20:09:43 +0100
+Subject: [PATCH v7 02/11] arm64: Remove duplicate (SWAPPER|IDMAP)_DIR_SIZE
+ definitions
 In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
 References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1405537792-23666-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1405537792-23666-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jungseok Lee <jays.lee@samsung.com>
+Just keep the asm/page.h definition as this is included in vmlinux.lds.S
+as well.
 
-This patch fixed the following checkpatch complaint as using pr_*
-instead of printk.
-
-WARNING: printk() should include KERN_ facility level
-
-Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/traps.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c43cfa9b8304..506f7814e305 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -156,7 +156,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		frame.pc = thread_saved_pc(tsk);
- 	}
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index e0ccceb317d9..d7455fa83bc7 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -383,9 +383,6 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
  
--	printk("Call trace:\n");
-+	pr_emerg("Call trace:\n");
- 	while (1) {
- 		unsigned long where = frame.pc;
- 		int ret;
-@@ -331,17 +331,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 
- void __pte_error(const char *file, int line, unsigned long val)
- {
--	printk("%s:%d: bad pte %016lx.\n", file, line, val);
-+	pr_crit("%s:%d: bad pte %016lx.\n", file, line, val);
- }
- 
- void __pmd_error(const char *file, int line, unsigned long val)
- {
--	printk("%s:%d: bad pmd %016lx.\n", file, line, val);
-+	pr_crit("%s:%d: bad pmd %016lx.\n", file, line, val);
- }
- 
- void __pgd_error(const char *file, int line, unsigned long val)
- {
--	printk("%s:%d: bad pgd %016lx.\n", file, line, val);
-+	pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
- }
- 
- void __init trap_init(void)
+-#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
+-
+ /*
+  * Encode and decode a swap entry:
+  *	bits 0-1:	present (must be zero)
