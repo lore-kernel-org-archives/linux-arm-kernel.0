@@ -1,44 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Jul 2014 15:28:38 +0200
-Subject: [PATCHv2 00/17] cpuidle for Marvell Armada 370 and 38x
-In-Reply-To: <20140716132720.GC13108@titan.lakedaemon.net>
-References: <1404913221-17343-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140713222223.GH13108@titan.lakedaemon.net>
- <20140716124522.GV13108@titan.lakedaemon.net>
- <20140716145905.33105756@free-electrons.com>
- <20140716131658.GB13108@titan.lakedaemon.net>
- <20140716151955.377efc5e@free-electrons.com>
- <20140716132720.GC13108@titan.lakedaemon.net>
-Message-ID: <20140716152838.3a469cdb@free-electrons.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 16 Jul 2014 10:30:01 -0300
+Subject: [PATCH 1/5] [RFC-HACK] pinctrl-single: init by postcore_initcall()
+In-Reply-To: <20140716123641.GB18374@atomide.com>
+References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
+ <1400799986-20043-2-git-send-email-chf.fritz@googlemail.com>
+ <20140522233154.GE29577@atomide.com>
+ <20140716114558.GA1842@arch.cereza>
+ <20140716123641.GB18374@atomide.com>
+Message-ID: <20140716133001.GA4033@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Wed, 16 Jul 2014 09:27:20 -0400, Jason Cooper wrote:
-
-> > > Ok, I've tentatively applied this series to mvebu/soc-cpuidle with a dep
-> > > on mvebu/soc and mvebu/fixes.  It'll be in -next tonight.
+On 16 Jul 05:36 AM, Tony Lindgren wrote:
+> * Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> [140716 04:48]:
+> > On 22 May 04:31 PM, Tony Lindgren wrote:
+> > > * Christoph Fritz <chf.fritz@googlemail.com> [140522 16:07]:
+> > > > --- a/drivers/pinctrl/pinctrl-single.c
+> > > > +++ b/drivers/pinctrl/pinctrl-single.c
+> > > > @@ -2069,7 +2069,22 @@ static struct platform_driver pcs_driver = {
+> > > >  #endif
+> > > >  };
+> > > >  
+> > > > +#ifdef CONFIG_USE_OF
+> > > > +static int __init pcs_driver_drv_init(void)
+> > > > +{
+> > > > +       return platform_driver_register(&pcs_driver);
+> > > > +}
+> > > > +postcore_initcall(pcs_driver_drv_init);
+> > > > +
+> > > > +static void __exit pcs_driver_drv_exit(void)
+> > > > +{
+> > > > +       platform_driver_unregister(&pcs_driver);
+> > > > +}
+> > > > +module_exit(pcs_driver_drv_exit);
+> > > > +#else
+> > > >  module_platform_driver(pcs_driver);
+> > > > +#endif
+> > > > +
+> > > 
+> > > I would prefer to initialize all the drivers with module_init
+> > > and and if necessary, selected frameworks with subsys_initcall. 
+> > > 
+> > > In drivers/Makefile we do have painctrl before gpio, so this
+> > > too could be just module_init once the other drivers are fixed.
+> > > 
 > > 
-> > Great, thanks a lot!
+> > I've been using patches that change gpio and i2c initialization to module_init
+> > for some time now. However, I still see some non-DT boards using the GPIO API
+> > in early functions such as .init_machine.
+> > 
+> > Only when these boards get converted and the legacy support is dropped, we'll
+> > be able to move all the drivers to module_init.
 > 
-> FYI - there's a rather intricate conflict in pmsu.c between cpuidle and
-> cpufreq.
+> Hmm yeah tons of dependencies to dropping the legacy booting.. But to not
+> have that dependency maybe we can convert those .init_machine functions
+> easily to late_initcall.
+> 
 
-Yeah, doesn't surprise me. All those power management features are very
-inter-related.
-
->  I'm currently build-testing my merge.  Once it passes, I'll
-> push it up to for-next and I'd appreciate if you could give it a once
-> over.  It'll be the HEAD of for-next.
-
-Sure, I'll have a look, I'll even try to run test for-next on the
-platforms.
-
-Thanks a lot!
-
-Thomas
+Could be. I can drop a few patches and then wait for Acks from the maintainers.
+Although I'm not really sure this is worth the pain.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
