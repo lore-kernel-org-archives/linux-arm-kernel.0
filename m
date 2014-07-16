@@ -1,80 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Jul 2014 13:57:32 -0500
-Subject: Function Profiler broken on today's linux-next
-In-Reply-To: <20140716145442.15f25ec3@gandalf.local.home>
-References: <20140716162328.GJ1365@saruman.home>
- <20140716122921.71b118a9@gandalf.local.home>
- <20140716164141.GA3016@saruman.home>
- <20140716132413.1ede8e1d@gandalf.local.home>
- <20140716182944.GK3016@saruman.home>
- <20140716184152.GM3016@saruman.home>
- <20140716145442.15f25ec3@gandalf.local.home>
-Message-ID: <20140716185732.GN3016@saruman.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Jul 2014 20:09:41 +0100
+Subject: [PATCH v7 00/11] arm64: Support 4 levels of translation tables
+Message-ID: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 02:54:42PM -0400, Steven Rostedt wrote:
-> On Wed, 16 Jul 2014 13:41:52 -0500
-> Felipe Balbi <balbi@ti.com> wrote:
-> 
-> > Hi,
-> > 
-> > On Wed, Jul 16, 2014 at 01:29:44PM -0500, Felipe Balbi wrote:
-> > > On Wed, Jul 16, 2014 at 01:24:13PM -0400, Steven Rostedt wrote:
-> > > > On Wed, 16 Jul 2014 11:41:42 -0500
-> > > > Felipe Balbi <balbi@ti.com> wrote:
-> > > > 
-> > > > 
-> > > > > .config attached. It's actually an ARM platform, I can help out with
-> > > > > testing anything you need.
-> > > > 
-> > > > In that case, can you see if it works under my repo?
-> > > > 
-> > > > git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
-> > > > branch: ftrace/core
-> > > 
-> > > works fine, thanks. FWIW
-> > > 
-> > > Tested-by: Felipe Balbi <balbi@ti.com>
-> > 
-> > Actually it seems like it's not counting time properly if I run my test
-> > multiple times in a row:
-> > 
-> > # /root/testusb -t 1 -c 100000 -s 2048 -a
-> > # head -3 trace_stat/function0
-> >   Function                         Hit    Time                Avg           s^2
-> >   --------                         ---    ----                ---           ---
-> >   thread_interrupt               174876    166120839 us     949.935 us  3048498 us
-> > 
-> > # /root/testusb -t 1 -c 100000 -s 2048 -a
-> > # head -3 trace_stat/function0
-> >   Function                           Hit       Time                    Avg          s^2
-> >   --------                           ---       ----                    ---          ---
-> >   dwc3_thread_interrupt            286796    967267300 us         4190545199 us     3241109 us 
-> > 
-> > # /root/testusb -t 1 -c 100000 -s 2048 -a
-> > # head -3 trace_stat/function0
-> >   Function                              Hit      Time                 Avg               s^2
-> >     --------                            ---       ----                 ---              ---
-> >   dwc3_thread_interrupt               401346    642632072 us       1601.192 us     1194316 us 
-> > 
-> > and so on...
-> > 
-> 
-> Did it use to work? In other words, is this a regression, or just some
-> another bug?
+Hi,
 
-It used to work at least on v3.12... It seems like it's not always
-either. After I rebooted, then it took a little effort to trigger it
-again. But if I just run my test in a loop, eventually it'll start
-miscalculating.
+I've taken over Jungseok's 4-level page table series here:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140716/f2f7c8b2/attachment.sig>
+https://lkml.kernel.org/g/000001cf6dc6$03ded0c0$0b9c7240$@samsung.com
+
+I kept the same series numbering, so this is normally version 7. Changes
+since v6:
+
+- Additional fixes for duplicate (SWAPPER|IDMAP)_DIR_SIZE definitions
+- Removed the fixmap pmd from swapper_pg_dir populated in head.S
+- Several clean-ups in Jungseok's patches (annotated above my
+  signed-off-by line)
+- Removal of the pgtable-*level-hwdef.h files
+- Converting levels config options to int ARM64_PGTABLE_LEVELS
+
+Important change: I dropped the KVM support for 4 levels temporarily. I
+plan to revive them but didn't have for v7.
+
+You can also access the branch here:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64 pgtable-4levels
+
+The branch is on top of the arm64 for-next/core branch.
+
+Thanks.
+
+
+Catalin Marinas (6):
+  arm64: Remove duplicate (SWAPPER|IDMAP)_DIR_SIZE definitions
+  arm64: Do not initialise the fixmap page tables in head.S
+  arm64: Convert bool ARM64_x_LEVELS to int ARM64_PGTABLE_LEVELS
+  arm64: Remove asm/pgtable-*level-hwdef.h files
+  arm64: Clean up the initial page table creation in head.S
+  arm64: Determine the vmalloc/vmemmap space at build time based on
+    VA_BITS
+
+Jungseok Lee (5):
+  arm64: Use pr_* instead of printk
+  arm64: Introduce VA_BITS and translation level options
+  arm64: Add a description on 48-bit address space with 4KB pages
+  arm64: Add 4 levels of page tables definition with 4KB pages
+  arm64: mm: Implement 4 levels of translation tables
+
+ Documentation/arm64/memory.txt                | 67 ++++++++-----------------
+ arch/arm64/Kconfig                            | 51 ++++++++++++++++++-
+ arch/arm64/include/asm/memory.h               |  6 +--
+ arch/arm64/include/asm/page.h                 | 17 +++++--
+ arch/arm64/include/asm/pgalloc.h              | 24 ++++++++-
+ arch/arm64/include/asm/pgtable-2level-hwdef.h | 43 ----------------
+ arch/arm64/include/asm/pgtable-3level-hwdef.h | 50 -------------------
+ arch/arm64/include/asm/pgtable-4level-types.h | 71 +++++++++++++++++++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h        | 42 ++++++++++++++--
+ arch/arm64/include/asm/pgtable.h              | 56 ++++++++++++++++++---
+ arch/arm64/include/asm/tlb.h                  | 11 ++++-
+ arch/arm64/kernel/head.S                      | 52 +++++++++++++-------
+ arch/arm64/kernel/traps.c                     | 13 +++--
+ arch/arm64/mm/fault.c                         |  1 +
+ arch/arm64/mm/init.c                          | 22 ++++++---
+ arch/arm64/mm/ioremap.c                       | 30 ++++++++---
+ arch/arm64/mm/mmu.c                           | 14 ++++--
+ 17 files changed, 363 insertions(+), 207 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/pgtable-2level-hwdef.h
+ delete mode 100644 arch/arm64/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm64/include/asm/pgtable-4level-types.h
