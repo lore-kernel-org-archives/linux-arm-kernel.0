@@ -1,35 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 16 Jul 2014 16:53:45 +0100
-Subject: [PATCH v2] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <1405522297.25580.72.camel@deneb.redhat.com>
-References: <1405421886-11692-1-git-send-email-ard.biesheuvel@linaro.org>
- <1405522297.25580.72.camel@deneb.redhat.com>
-Message-ID: <20140716155345.GB30313@leverpostej>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 16 Jul 2014 17:54:56 +0200
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140716151604.GG1365@saruman.home>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
+ <20140716151604.GG1365@saruman.home>
+Message-ID: <53C6A050.2050409@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 03:51:37PM +0100, Mark Salter wrote:
-> On Tue, 2014-07-15 at 12:58 +0200, Ard Biesheuvel wrote:
-> > After the EFI stub has done its business, it jumps into the kernel by branching
-> > to offset #0 of the loaded Image, which is where it expects to find the header
-> > containing a 'branch to stext' instruction.
-> > 
-> > However, the header is not covered by any PE/COFF section, so the header may
-> > not actually be loaded at the expected offset. So instead, jump to 'stext'
-> > directly, which is at the base of the PE/COFF .text section, by supplying a
-> > symbol 'stext_offset' to efi-entry.o which contains the relative offset of
-> > stext into the Image. Also replace other open coded calculations of the same
-> > value with a reference to 'stext_offset'
+On 07/16/2014 05:16 PM, Felipe Balbi wrote:
+> Hi,
+
+Hi Felipe,
+
+> On Wed, Jul 16, 2014 at 04:45:02PM +0200, Sebastian Andrzej Siewior
+> wrote:
+>> @@ -1280,6 +1285,7 @@ static void serial8250_stop_tx(struct
+>> uart_port *port) struct uart_8250_port *up = container_of(port,
+>> struct uart_8250_port, port);
+>> 
+>> +	pm_runtime_get_sync(port->dev); __stop_tx(up);
+>> 
+>> /* @@ -1289,6 +1295,8 @@ static void serial8250_stop_tx(struct
+>> uart_port *port) up->acr |= UART_ACR_TXDIS; serial_icr_write(up,
+>> UART_ACR, up->acr); } +	pm_runtime_mark_last_busy(port->dev); +
+>> pm_runtime_put_autosuspend(port->dev); }
+>> 
+>> static void serial8250_start_tx(struct uart_port *port) @@
+>> -1296,8 +1304,9 @@ static void serial8250_start_tx(struct
+>> uart_port *port) struct uart_8250_port *up = container_of(port,
+>> struct uart_8250_port, port);
+>> 
+>> +	pm_runtime_get_sync(port->dev); if (up->dma &&
+>> !serial8250_tx_dma(up)) { -		return; +		goto out; } else if
+>> (!(up->ier & UART_IER_THRI)) { up->ier |= UART_IER_THRI; 
+>> serial_port_out(port, UART_IER, up->ier); @@ -1318,6 +1327,9 @@
+>> static void serial8250_start_tx(struct uart_port *port) up->acr
+>> &= ~UART_ACR_TXDIS; serial_icr_write(up, UART_ACR, up->acr); } 
+>> +out: +	pm_runtime_mark_last_busy(port->dev); +
+>> pm_runtime_put_autosuspend(port->dev);
 > 
-> Have you actually seen a situation where the header isn't there?
-> Isn't the kernel header actually part of the pe/coff file and
-> firmware loads the whole file into RAM?
+> I wonder if you should get_sync() on start_tx() and only 
+> put_autosuspend() at stop_tx(). I guess the outcome would be
+> largely the same, no ?
 
->From my understanding of Ard's earlier comments, this part isn't
-guaranteed per the UEFI spec.
+I just opened minicom on ttyS0 and gave a try. start_tx() was invoked
+each time I pressed a key (sent a character). I haven't seen stop_tx()
+even after after I closed minicom. I guess stop_tx() is invoked if you
+switch half-duplex communication.
 
-I would rather we weren't relying on implementation details.
+> well, other than in probe and other functions which need to make
+> sure clocks are on, but it seems unnecessary to enable/disable in
+> every function.
 
-Thanks,
-Mark.
+What do you have in mind? Do you plan to let the uart on while the
+minicom is attached but is doing nothing? In that case, ->startup() and
+->shutdown() should be enough.
+If you want to put the uart off while the port is open but idle then
+you should cover the callbacks as they are independent of each other.
+You could receive three ->set_termios() even without a single
+->start_tx(). And as far as I understand the whole situation, you need
+to make sure the UART is "up" while you touch a single register not
+only sending characters, right?
+
+Sebastian
