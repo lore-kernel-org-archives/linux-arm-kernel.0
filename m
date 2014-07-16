@@ -1,57 +1,41 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 16 Jul 2014 12:56:58 -0700
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <CAKohpomKF_TvpPZzEwocOK33RKnLWLtE2cPK6hk7YuhTVaNg2g@mail.gmail.com>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
- <53C65F03.1050609@mit.edu>
- <CAKohpomKF_TvpPZzEwocOK33RKnLWLtE2cPK6hk7YuhTVaNg2g@mail.gmail.com>
-Message-ID: <53C6D90A.1000402@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 16 Jul 2014 12:57:21 -0700
+Subject: [PATCH 4/6] ARM: rockchip: enable support for RK3288 SoCs
+In-Reply-To: <4355781.cnmcVo5AVu@diego>
+References: <1471578.ILeMmG2DL6@diego>
+	<4355781.cnmcVo5AVu@diego>
+Message-ID: <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 06:13 AM, Viresh Kumar wrote:
-> On 16 July 2014 16:46, Srivatsa S. Bhat <srivatsa@mit.edu> wrote:
->> Short answer: If the sysfs directory has already been created by cpufreq,
->> then yes, it will remain as it is. However, if the online operation failed
->> before that, then cpufreq won't know about that CPU at all, and no file will
->> be created.
->>
->> Long answer:
->> The existing cpufreq code does all its work (including creating the sysfs
->> directories etc) at the CPU_ONLINE stage. This stage is not expected to fail
->> (in fact even the core CPU hotplug code in kernel/cpu.c doesn't care for
->> error returns at this point). So if a CPU fails to come up in earlier stages
->> itself (such as CPU_UP_PREPARE), then cpufreq won't even hear about that CPU,
->> and hence no sysfs files will be created/linked. However, if the CPU bringup
->> operation fails during the CPU_ONLINE stage after the cpufreq's notifier has
->> been invoked, then we do nothing about it and the cpufreq sysfs files will
->> remain.
+Heiko,
+
+On Tue, Jul 15, 2014 at 4:01 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Enable HAVE_ARM_ARCH_TIMER and add a rockchip,rk3288 compatible.
 >
-> In short, the problem I mentioned before this para is genuine. And setting
-> policy->cpu to the first cpu of a mask is indeed a bad idea.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/mach-rockchip/Kconfig    | 1 +
+>  arch/arm/mach-rockchip/rockchip.c | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+> index e4564c2..d168669 100644
+> --- a/arch/arm/mach-rockchip/Kconfig
+> +++ b/arch/arm/mach-rockchip/Kconfig
+> @@ -6,6 +6,7 @@ config ARCH_ROCKCHIP
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_GIC
+>         select CACHE_L2X0
+> +       select HAVE_ARM_ARCH_TIMER
 
-No it's not. All the cpu*/ directories for all possible CPUs will be 
-there whether a CPU is online/offline. Which is why I also weed out 
-impossible CPUs, but you said the driver shouldn't be passing impossible 
-CPUs anyway. I'm just picking one directory to put the real cpufreq 
-directory under. So, the code as-is is definitely not broken.
+Do we want to think about allowing someone to enable the A9-based
+Rockchip SoCs separately than the A12-based ones?  I know it doesn't
+hurt to have the arch timer code present on A9 SoCs (it will figure
+things out at runtime), but people trying to build an A9-based system
+might not want the extra code?
 
-Sure, I can pick the first cpu that comes online to decide where to put 
-the real sysfs cpufreq directory, but then I have to keep track of that 
-in a separate field when it's time to remove it when the cpufreq driver 
-is unregistered. It's yet another pointless thing to keep track. And no, 
-we shouldn't be moving sysfs directory to stay with only an online 
-directory. That's the thing this patch is trying to simplify.
+Anyway, I don't feel strongly about it, so:
 
-So, I think using the first cpu in related CPUs will always work. If 
-there's any disagreement, I think it's purely a personal preference over 
-adding another field vs calling cpumask_first()
-
--Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
