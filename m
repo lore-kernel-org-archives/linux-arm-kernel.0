@@ -1,60 +1,59 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Jul 2014 13:19:10 +0200
-Subject: [RESEND PATCH v2] ARM: exynos4: hotplug: Fix CPU idle clock down
- after CPU off
-In-Reply-To: <53C65890.8000500@samsung.com>
-References: <1405499003-9975-1-git-send-email-k.kozlowski@samsung.com>
- <53C65890.8000500@samsung.com>
-Message-ID: <1405509550.7368.0.camel@AMDC1943>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 16 Jul 2014 14:40:14 +0300
+Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds device tree binding documentation for the SATA
+controller found on NVIDIA Tegra SoCs.
 
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+v4: clarify mandatory clock order
 
+ .../devicetree/bindings/ata/tegra-sata.txt         | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
 
-On ?ro, 2014-07-16 at 12:48 +0200, Tomasz Figa wrote:
-> Hi Krzysztof,
-> 
-> Please see my comment below.
-> 
-> On 16.07.2014 10:23, Krzysztof Kozlowski wrote:
-> > On Exynos4 USE_DELAYED_RESET_ASSERTION must be set in
-> > ARM_COREx_OPTION register during CPU power down. This is the proper way
-> > of powering down CPU on Exynos4.
-> > 
-> > Additionally on Exynos4212 without this the CPU clock down feature won't
-> > work after powering down some CPU and the online CPUs will work at full
-> > frequency chosen by CPUfreq governor.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> [snip]
-> 
-> > @@ -36,6 +36,14 @@ static inline void cpu_leave_lowpower(void)
-> >  	  : "=&r" (v)
-> >  	  : "Ir" (CR_C), "Ir" (0x40)
-> >  	  : "cc");
-> > +
-> > +	if (soc_is_exynos4()) {
-> > +		unsigned int tmp;
-> > +
-> > +		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-> > +		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-> > +		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-> > +	}
-> 
-> This code is executed only if the CPU doesn't manage to power off before
-> already receiving a wake-up event. Otherwise the context is lost after
-> wfi(), as the core power is being cut down.
-> 
-> The normal wake-up path goes through platsmp's exynos_boot_secondary()
-> and I believe that setting of S5P_USE_DELAYED_RESET_ASSERTION should be
-> taken care there as well.
-
-You're right. Thanks for pointing this, I'll fix it.
-
-Best regards,
-Krzysztof
-> 
-> Best regards,
-> Tomasz
+diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+new file mode 100644
+index 0000000..de2f775
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+@@ -0,0 +1,31 @@
++Tegra124 SoC SATA AHCI controller
++
++Required properties :
++- compatible : "nvidia,tegra124-ahci".
++- reg : Should contain 2 entries:
++  - AHCI register set (SATA BAR5)
++  - SATA register set
++- interrupts : Defines the interrupt used by SATA
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries in the same
++  order as listed here:
++  - sata
++  - sata-oob
++  - cml1
++  - pll_e
++- resets : Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names : Must include the following entries:
++  - sata
++  - sata-oob
++  - sata-cold
++- phys : Must contain an entry for each entry in phy-names.
++  See ../phy/phy-bindings.txt for details.
++- phy-names : Must include the following entries:
++  - sata-phy : XUSB PADCTL SATA PHY
++- hvdd-supply : Defines the SATA HVDD regulator
++- vddio-supply : Defines the SATA VDDIO regulator
++- avdd-supply : Defines the SATA AVDD regulator
++- target-5v-supply : Defines the SATA 5V power regulator
++- target-12v-supply : Defines the SATA 12V power regulator
+-- 
+1.8.1.5
