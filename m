@@ -1,76 +1,62 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 16 Jul 2014 17:19:06 +0200
-Subject: [PATCH 0/4] spi: s3c64xx: fix DT binding breakage
-Message-ID: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 16 Jul 2014 17:19:09 +0200
+Subject: [PATCH 3/4] spi: samsung: Update binding documentation
+In-Reply-To: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1405523950-2231-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+From: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 
-The s3c64xx SPI driver DT binding is currently broken. Commit
-3146bee ("spi: s3c64xx: Added provision for dedicated cs pin")
-added a new "cs-gpio" property and made it a requirement in
-order to make the driver behave in the same way that it used to.
+Samsung SPI driver now uses the generic SPI "cs-gpios"
+binding so update the documentation accordingly.
 
-The motivation of the offending commit was to allow boards that
-want to use the native chip select (instead of a GPIO) to work
-with the s3c64xx SPI driver. Something that was not possible
-before since the driver made it mandatory to specify a GPIO.
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+[javier.martinez at collabora.co.uk: split changes and improve commit message]
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ Documentation/devicetree/bindings/spi/spi-samsung.txt | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-Unfortunately the commit also changed the driver defaults since
-now besides specifying a GPIO, it makes mandatory to also specify
-that a GPIO is used while the default used to be the opposite.
-
-That mean that old FDT are not working anymore after 3146bee
-so DT backward compatibility was not ensured by that commit.
-
-This is a follow-up series from a previous one posted by Naveen
-Krishna [0] which attempts to solve the issue.
-
-The feedback from Naveen's series was that the patches did not
-provide a clear explanation about the rationale and goal of both
-the series as a whole and the individual changes [1].
-
-So I tried to take Navee's series and rework them to provide
-an easier to understand patch series.
-
-The series is composed of the following patches:
-
-Javier Martinez Canillas (1):
-  Revert "spi: s3c64xx: Added provision for dedicated cs pin"
-
-Naveen Krishna Chatradhi (3):
-  spi: s3c64xx: use the generic SPI "cs-gpios" property
-  spi: samsung: Update binding documentation
-  ARM: DTS: fix the chip select gpios definition in the SPI nodes
-
- .../devicetree/bindings/spi/spi-samsung.txt        |  8 ++--
- arch/arm/boot/dts/exynos4210-smdkv310.dts          |  2 +-
- arch/arm/boot/dts/exynos4412-trats2.dts            |  2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |  2 +-
- drivers/spi/spi-s3c64xx.c                          | 54 ++++++++++------------
- 5 files changed, 30 insertions(+), 38 deletions(-)
-
-Patch 01/04 reverts the offending commit since it not only broke
-the DT binding but also introduced a confusing "cs-gpio" property
-while the driver already used a property with the same name.
-
-Patch 02/04 fixes the DT binding for good by using the SPI core
-"cs-gpios" property to specify the chip select GPIO instead of
-using a custom property only used by this driver. This change
-breaks backward compatibility but this has been broken for more
-than a year and nobody complained so I think it's safe to change
-it again in favor of using standard DT binding properties.
-
-A benefit of Patch 02/04 is that it allows DT and legacy boards
-that need to use the built-in CS instead of a GPIO to work with
-the driver which was the original motivation of the broken commit.
-
-Patch 03/04 updates the driver binding documentation accordingly
-and patch 04/04 updates all the DTS board files in mainline.
-
-Best regards,
-Javier
-
-[0]: http://www.spinics.net/lists/linux-samsung-soc/msg34163.html
-[1]: http://www.spinics.net/lists/linux-samsung-soc/msg34309.html
+diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+index 7f2d88d..1e8a857 100644
+--- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
++++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+@@ -38,15 +38,13 @@ Optional Board Specific Properties:
+ - num-cs: Specifies the number of chip select lines supported. If
+   not specified, the default number of chip select lines is set to 1.
+ 
++- cs-gpios: should specify GPIOs used for chipselects (see spi-bus.txt)
++
+ SPI Controller specific data in SPI slave nodes:
+ 
+ - The spi slave nodes should provide the following information which is required
+   by the spi controller.
+ 
+-  - cs-gpio: A gpio specifier that specifies the gpio line used as
+-    the slave select line by the spi controller. The format of the gpio
+-    specifier depends on the gpio controller.
+-
+   - samsung,spi-feedback-delay: The sampling phase shift to be applied on the
+     miso line (to account for any lag in the miso line). The following are the
+     valid values.
+@@ -84,6 +82,7 @@ Example:
+ 		#size-cells = <0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi0_bus>;
++		cs-gpios = <&gpa2 5 0>;
+ 
+ 		w25q80bw at 0 {
+ 			#address-cells = <1>;
+@@ -93,7 +92,6 @@ Example:
+ 			spi-max-frequency = <10000>;
+ 
+ 			controller-data {
+-				cs-gpio = <&gpa2 5 1 0 3>;
+ 				samsung,spi-feedback-delay = <0>;
+ 			};
+ 
+-- 
+2.0.0.rc2
