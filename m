@@ -1,125 +1,152 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 16 Jul 2014 16:32:45 +0100
-Subject: [PATCHv4 3/5] arm64: cachetype: report weakest cache policy
+Date: Wed, 16 Jul 2014 16:32:46 +0100
+Subject: [PATCHv4 4/5] arm64: add runtime system sanity checks
 In-Reply-To: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
 References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1405524767-30220-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1405524767-30220-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In big.LITTLE systems, the I-cache policy may differ across CPUs, and
-thus we must always meet the most stringent maintenance requirements of
-any I-cache in the system when performing maintenance to ensure
-correctness. Unfortunately this requirement is not met as we always look
-at the current CPU's cache type register to determine the maintenance
-requirements.
+Unexpected variation in certain system register values across CPUs is an
+indicator of potential problems with a system. The kernel expects CPUs
+to be mostly identical in terms of supported features, even in systems
+with heterogeneous CPUs, with uniform instruction set support being
+critical for the correct operation of userspace.
 
-This patch causes the I-cache policy of all CPUs to be taken into
-account for icache_is_aliasing and icache_is_aivivt. If any I-cache in
-the system is aliasing or AIVIVT, the respective function will return
-true. At boot each CPU may set flags to identify that at least one
-I-cache in the system is aliasing and/or AIVIVT.
+To help detect issues early where hardware violates the expectations of
+the kernel, this patch adds simple runtime sanity checks on important ID
+registers in the bring up path of each CPU.
 
-The now unused and potentially misleading icache_policy function is
-removed.
+Where CPUs are fundamentally mismatched, set TAINT_CPU_OUT_OF_SPEC.
+Given that the kernel assumes CPUs are identical feature wise, let's not
+pretend that we expect such configurations to work. Supporting such
+configurations would require massive rework, and hopefully they will
+never exist.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/cachetype.h | 16 ++++++++++------
- arch/arm64/kernel/cpuinfo.c        | 26 ++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/cpuinfo.c | 93 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index 4b23e75..7a2e076 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -30,10 +30,14 @@
- 
- #ifndef __ASSEMBLY__
- 
--static inline u32 icache_policy(void)
--{
--	return (read_cpuid_cachetype() >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK;
--}
-+#include <linux/bitops.h>
-+
-+#define CTR_L1IP(ctr)	(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
-+
-+#define ICACHEF_ALIASING	BIT(0)
-+#define ICACHEF_AIVIVT		BIT(1)
-+
-+extern unsigned long __icache_flags;
- 
- /*
-  * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
-@@ -41,12 +45,12 @@ static inline u32 icache_policy(void)
-  */
- static inline int icache_is_aliasing(void)
- {
--	return icache_policy() != ICACHE_POLICY_PIPT;
-+	return test_bit(ICACHEF_ALIASING, &__icache_flags);
- }
- 
- static inline int icache_is_aivivt(void)
- {
--	return icache_policy() == ICACHE_POLICY_AIVIVT;
-+	return test_bit(ICACHEF_AIVIVT, &__icache_flags);
- }
- 
- static inline u32 cache_type_cwg(void)
 diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 1f350fe..3ce99fc 100644
+index 3ce99fc..f82f7d1 100644
 --- a/arch/arm64/kernel/cpuinfo.c
 +++ b/arch/arm64/kernel/cpuinfo.c
-@@ -19,7 +19,9 @@
- #include <asm/cpu.h>
- #include <asm/cputype.h>
+@@ -21,6 +21,7 @@
  
-+#include <linux/bitops.h>
+ #include <linux/bitops.h>
  #include <linux/init.h>
-+#include <linux/printk.h>
++#include <linux/kernel.h>
+ #include <linux/printk.h>
  #include <linux/smp.h>
  
- /*
-@@ -30,6 +32,28 @@
- DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
- static struct cpuinfo_arm64 boot_cpu_data;
+@@ -54,6 +55,97 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	pr_info("Detected %s I-cache on CPU%d", icache_policy_str[l1ip], cpu);
+ }
  
-+static char *icache_policy_str[] = {
-+	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
-+	[ICACHE_POLICY_AIVIVT] = "AIVIVT",
-+	[ICACHE_POLICY_VIPT] = "VIPT",
-+	[ICACHE_POLICY_PIPT] = "PIPT",
-+};
++static int check_reg_mask(char *name, u64 mask, u64 boot, u64 cur, int cpu)
++{
++	if ((boot & mask) == (cur & mask))
++		return 0;
 +
-+unsigned long __icache_flags;
++	pr_warn("SANITY CHECK: Unexpected variation in %s. Boot CPU: %#016lx, CPU%d: %#016lx\n",
++		name, (unsigned long)boot, cpu, (unsigned long)cur);
 +
-+static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
++	return 1;
++}
++
++#define CHECK_MASK(field, mask, boot, cur, cpu) \
++	check_reg_mask(#field, mask, (boot)->reg_ ## field, (cur)->reg_ ## field, cpu)
++
++#define CHECK(field, boot, cur, cpu) \
++	CHECK_MASK(field, ~0ULL, boot, cur, cpu)
++
++/*
++ * Verify that CPUs don't have unexpected differences that will cause problems.
++ */
++static void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
 +{
 +	unsigned int cpu = smp_processor_id();
-+	u32 l1ip = CTR_L1IP(info->reg_ctr);
++	struct cpuinfo_arm64 *boot = &boot_cpu_data;
++	unsigned int diff = 0;
 +
-+	if (l1ip != ICACHE_POLICY_PIPT)
-+		set_bit(ICACHEF_ALIASING, &__icache_flags);
-+	if (l1ip == ICACHE_POLICY_AIVIVT);
-+		set_bit(ICACHEF_AIVIVT, &__icache_flags);
++	/*
++	 * The kernel can handle differing I-cache policies, but otherwise
++	 * caches should look identical. Userspace JITs will make use of
++	 * *minLine.
++	 */
++	diff |= CHECK_MASK(ctr, 0xffff3fff, boot, cur, cpu);
 +
-+	pr_info("Detected %s I-cache on CPU%d", icache_policy_str[l1ip], cpu);
++	/*
++	 * Userspace may perform DC ZVA instructions. Mismatched block sizes
++	 * could result in too much or too little memory being zeroed if a
++	 * process is preempted and migrated between CPUs.
++	 */
++	diff |= CHECK(dczid, boot, cur, cpu);
++
++	/* If different, timekeeping will be broken (especially with KVM) */
++	diff |= CHECK(cntfrq, boot, cur, cpu);
++
++	/*
++	 * Even in big.LITTLE, processors should be identical instruction-set
++	 * wise.
++	 */
++	diff |= CHECK(id_aa64isar0, boot, cur, cpu);
++	diff |= CHECK(id_aa64isar1, boot, cur, cpu);
++
++	/*
++	 * Differing PARange support is fine as long as all peripherals and
++	 * memory are mapped within the minimum PARange of all CPUs.
++	 * Linux should not care about secure memory.
++	 * ID_AA64MMFR1 is currently RES0.
++	 */
++	diff |= CHECK_MASK(id_aa64mmfr0, 0xffffffffffff0ff0, boot, cur, cpu);
++	diff |= CHECK(id_aa64mmfr1, boot, cur, cpu);
++
++	/*
++	 * EL3 is not our concern.
++	 * ID_AA64PFR1 is currently RES0.
++	 */
++	diff |= CHECK_MASK(id_aa64pfr0, 0xffffffffffff0fff, boot, cur, cpu);
++	diff |= CHECK(id_aa64pfr1, boot, cur, cpu);
++
++	/*
++	 * If we have AArch32, we care about 32-bit features for compat. These
++	 * registers should be RES0 otherwise.
++	 */
++	diff |= CHECK(id_isar0, boot, cur, cpu);
++	diff |= CHECK(id_isar1, boot, cur, cpu);
++	diff |= CHECK(id_isar2, boot, cur, cpu);
++	diff |= CHECK(id_isar3, boot, cur, cpu);
++	diff |= CHECK(id_isar4, boot, cur, cpu);
++	diff |= CHECK(id_isar5, boot, cur, cpu);
++	diff |= CHECK(id_mmfr0, boot, cur, cpu);
++	diff |= CHECK(id_mmfr1, boot, cur, cpu);
++	diff |= CHECK(id_mmfr2, boot, cur, cpu);
++	diff |= CHECK(id_mmfr3, boot, cur, cpu);
++	diff |= CHECK(id_pfr0, boot, cur, cpu);
++	diff |= CHECK(id_pfr1, boot, cur, cpu);
++
++	/*
++	 * Mismatched CPU features are a recipe for disaster. Don't even
++	 * pretend to support them.
++	 */
++	WARN_TAINT_ONCE(diff, TAINT_CPU_OUT_OF_SPEC,
++			"Unsupported CPU feature variation.");
 +}
 +
  static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
  {
  	info->reg_cntfrq = arch_timer_get_cntfrq();
-@@ -56,6 +80,8 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	info->reg_id_mmfr3 = read_cpuid(ID_MMFR3_EL1);
- 	info->reg_id_pfr0 = read_cpuid(ID_PFR0_EL1);
- 	info->reg_id_pfr1 = read_cpuid(ID_PFR1_EL1);
-+
-+	cpuinfo_detect_icache_policy(info);
+@@ -88,6 +180,7 @@ void cpuinfo_store_cpu(void)
+ {
+ 	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
+ 	__cpuinfo_store_cpu(info);
++	cpuinfo_sanity_check(info);
  }
  
- void cpuinfo_store_cpu(void)
+ void __init cpuinfo_store_boot_cpu(void)
 -- 
 1.9.1
