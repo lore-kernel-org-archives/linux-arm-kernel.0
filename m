@@ -1,34 +1,32 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 16 Jul 2014 11:54:23 +0300
-Subject: [PATCH v3 8/8] ARM: tegra: Add options for Tegra AHCI support to
- tegra_defconfig
+Date: Wed, 16 Jul 2014 11:54:21 +0300
+Subject: [PATCH v3 6/8] ata: ahci_platform: Increase AHCI_MAX_CLKS to 4
 In-Reply-To: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
 References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1405500863-19696-9-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1405500863-19696-7-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds ATA, SATA_AHCI and AHCI_TEGRA support to tegra_defconfig
-so that the SATA support will be automatically enabled.
+The Tegra124 SATA controller requires 4 clocks. Increase this constant
+to be able to use them all.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- arch/arm/configs/tegra_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/ata/ahci.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 285c433..2b8be48 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -102,6 +102,9 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI=y
-+CONFIG_AHCI_TEGRA=y
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
- CONFIG_IGB=y
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 5513296..2ed84e1 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -53,7 +53,7 @@
+ 
+ enum {
+ 	AHCI_MAX_PORTS		= 32,
+-	AHCI_MAX_CLKS		= 3,
++	AHCI_MAX_CLKS		= 4,
+ 	AHCI_MAX_SG		= 168, /* hardware max is 64K */
+ 	AHCI_DMA_BOUNDARY	= 0xffffffff,
+ 	AHCI_MAX_CMDS		= 32,
 -- 
 1.8.1.5
