@@ -1,100 +1,54 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 17 Jul 2014 16:30:26 +0800
-Subject: [GIT PULL] AT91 reset and ramc rework, Cleanups
-In-Reply-To: <20140717082227.GA31917@lukather>
-References: <20140717082227.GA31917@lukather>
-Message-ID: <941246CE-BE2C-443E-A7DD-BD9748606876@jcrosoft.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 17 Jul 2014 10:45:12 +0200
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140717083342.GS21766@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+ <20140717102425.34fe0181@free-electrons.com>
+ <20140717083342.GS21766@n2100.arm.linux.org.uk>
+Message-ID: <20140717104512.5d134904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+Russell,
 
-I?ve not finish to review it as I?m travelling so wait in it
+On Thu, 17 Jul 2014 09:33:42 +0100, Russell King - ARM Linux wrote:
 
-On Jul 17, 2014, at 4:22 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > So wouldn't it be possible to keep the early
+> > assembly code as it is today, and then later, in C code, once we have
+> > identified the platform on which we're running, modify the page tables
+> > to switch to the appropriate page attributes (write allocate cache
+> > policy, shareable attribute, etc.) ?
+> 
+> No - the problem is that we're running from the page table in question
+> with global mappings, and we need to switch all these mappings, including
+> the ones we're currently using to execute from.
+> 
+> We can't even create a new page table and switch to it because the
+> mappings in question are global mappings.
+> 
+> The only way to do that safely from an architectural point of view would
+> be to turn the MMU off, and drop back to assembly code to change the
+> page tables, and re-enable the MMU.  For something as obscure as Marvell's
+> coherency stuff, that's not something I want to see in core code.
 
-> Hi Nicolas,
-> 
-> Here is the last pull request with the various cleanups possibles now
-> that we have the poweroff and reset drivers in place.
-> 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit cb17ad293f38b5b409739c15cbba9e628c6c8786:
-> 
->  Merge branches 'at91/drivers-for-3.17' and 'at91/dt-for-3.17' into at91/cleanup-for-3.17 (2014-07-15 14:57:14 +0200)
-> 
-> are available in the git repository at:
-> 
->  git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/at91-cleanup-for-3.17
-> 
-> for you to fetch changes up to d732c88dceda47599f80132d7e885232dd189bac:
-> 
->  ARM: at91: Remove rstc and shdwc headers (2014-07-15 14:58:39 +0200)
-> 
-> ----------------------------------------------------------------
-> AT91 poweroff and reset cleanup
-> 
-> Remove the reset and poweroff code from mach-at91, and convert the various
-> users of the former code to the newly introduced mechanisms
-> 
-> This branch also merges the two first branches in order to preserve
-> bisectability.
-> 
-> ----------------------------------------------------------------
-> Maxime Ripard (12):
->      ARM: at91: setup: Switch to pr_fmt
->      ARM: at91: Rework ramc mapping code
->      ARM: at91: Remove the old-style reset probing
->      ARM: at91/soc: Introduce register_devices callback
->      ARM: at91: Probe the reset driver
->      ARM: at91: Call at91_register_devices in the board files
->      ARM: at91: Remove reset code from the machine code
->      ARM: at91: Register the poweroff driver
->      ARM: at91: Remove poweroff code
->      ARM: at91/pm: Remove show_reset_status function
->      ARM: at91: Remove rstc and shdwnc global base addresses
->      ARM: at91: Remove rstc and shdwc headers
-> 
-> .../devicetree/bindings/arm/atmel-at91.txt         |   7 --
-> arch/arm/mach-at91/Kconfig                         |   8 --
-> arch/arm/mach-at91/Makefile                        |   2 -
-> arch/arm/mach-at91/at91_rstc.h                     |  53 ----------
-> arch/arm/mach-at91/at91_shdwc.h                    |  50 ---------
-> arch/arm/mach-at91/at91sam9260.c                   |  45 +++++++-
-> arch/arm/mach-at91/at91sam9261.c                   |  45 +++++++-
-> arch/arm/mach-at91/at91sam9263.c                   |  45 +++++++-
-> arch/arm/mach-at91/at91sam9_alt_reset.S            |  40 --------
-> arch/arm/mach-at91/at91sam9g45.c                   |  49 ++++++++-
-> arch/arm/mach-at91/at91sam9g45_reset.S             |  45 --------
-> arch/arm/mach-at91/at91sam9rl.c                    |  45 +++++++-
-> arch/arm/mach-at91/board-afeb-9260v1.c             |   2 +
-> arch/arm/mach-at91/board-cam60.c                   |   2 +
-> arch/arm/mach-at91/board-cpu9krea.c                |   2 +
-> arch/arm/mach-at91/board-flexibity.c               |   2 +
-> arch/arm/mach-at91/board-sam9-l9260.c              |   2 +
-> arch/arm/mach-at91/board-sam9260ek.c               |   3 +-
-> arch/arm/mach-at91/board-sam9261ek.c               |   3 +-
-> arch/arm/mach-at91/board-sam9263ek.c               |   3 +-
-> arch/arm/mach-at91/board-sam9m10g45ek.c            |   3 +-
-> arch/arm/mach-at91/board-sam9rlek.c                |   3 +-
-> arch/arm/mach-at91/board-snapper9260.c             |   2 +
-> arch/arm/mach-at91/generic.h                       |  10 +-
-> arch/arm/mach-at91/pm.c                            |  72 -------------
-> arch/arm/mach-at91/setup.c                         | 113 +++++++--------------
-> arch/arm/mach-at91/soc.h                           |   1 +
-> 27 files changed, 269 insertions(+), 388 deletions(-)
-> delete mode 100644 arch/arm/mach-at91/at91_rstc.h
-> delete mode 100644 arch/arm/mach-at91/at91_shdwc.h
-> delete mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
-> delete mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+That's indeed tricky. But then, if we don't find solutions to support
+in mainline the features of those SoCs, why are we asking all those SoC
+vendors to push their code mainline?
+
+As far as I can see, the conclusion of this discussion seems to be that
+there is no solution that looks acceptable to you to support the
+hardware I/O coherency functionality in mainline. I am trying hard to
+get Marvell to stop using their evil vendor tree as much as possible,
+but the message we're sending here is basically exactly the opposite:
+we're telling them that there's no way to properly support hardware
+I/O coherency in mainline and that the only solution for them is to keep
+their evil vendor tree. Is this really what we want?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
