@@ -1,22 +1,143 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 17 Jul 2014 11:18:22 +0200
-Subject: ARM: mvebu: ARCH_HAS_CPUFREQ
-Message-ID: <1405588702.4808.6.camel@x220>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 10:19:31 +0100
+Subject: [PATCH RFCv3 01/14] arm64: introduce
+ aarch64_insn_gen_comp_branch_imm()
+In-Reply-To: <20140716211931.GA18109@gup76>
+References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
+ <1405405512-4423-2-git-send-email-zlim.lnx@gmail.com>
+ <20140716160450.GT29414@arm.com> <20140716211931.GA18109@gup76>
+Message-ID: <20140717091931.GC21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas, Jason,
+On Wed, Jul 16, 2014 at 10:19:31PM +0100, Zi Shen Lim wrote:
+> On Wed, Jul 16, 2014 at 05:04:50PM +0100, Will Deacon wrote:
+> > On Tue, Jul 15, 2014 at 07:24:59AM +0100, Zi Shen Lim wrote:
+> [...]
+> > > +enum aarch64_insn_register {
+> > > +	AARCH64_INSN_REG_0  = 0,
+> > > +	AARCH64_INSN_REG_1  = 1,
+> > > +	AARCH64_INSN_REG_2  = 2,
+> > > +	AARCH64_INSN_REG_3  = 3,
+> > > +	AARCH64_INSN_REG_4  = 4,
+> > > +	AARCH64_INSN_REG_5  = 5,
+> > > +	AARCH64_INSN_REG_6  = 6,
+> > > +	AARCH64_INSN_REG_7  = 7,
+> > > +	AARCH64_INSN_REG_8  = 8,
+> > > +	AARCH64_INSN_REG_9  = 9,
+> > > +	AARCH64_INSN_REG_10 = 10,
+> > > +	AARCH64_INSN_REG_11 = 11,
+> > > +	AARCH64_INSN_REG_12 = 12,
+> > > +	AARCH64_INSN_REG_13 = 13,
+> > > +	AARCH64_INSN_REG_14 = 14,
+> > > +	AARCH64_INSN_REG_15 = 15,
+> > > +	AARCH64_INSN_REG_16 = 16,
+> > > +	AARCH64_INSN_REG_17 = 17,
+> > > +	AARCH64_INSN_REG_18 = 18,
+> > > +	AARCH64_INSN_REG_19 = 19,
+> > > +	AARCH64_INSN_REG_20 = 20,
+> > > +	AARCH64_INSN_REG_21 = 21,
+> > > +	AARCH64_INSN_REG_22 = 22,
+> > > +	AARCH64_INSN_REG_23 = 23,
+> > > +	AARCH64_INSN_REG_24 = 24,
+> > > +	AARCH64_INSN_REG_25 = 25,
+> > > +	AARCH64_INSN_REG_26 = 26,
+> > > +	AARCH64_INSN_REG_27 = 27,
+> > > +	AARCH64_INSN_REG_28 = 28,
+> > > +	AARCH64_INSN_REG_29 = 29,
+> > > +	AARCH64_INSN_REG_FP = 29, /* Frame pointer */
+> > > +	AARCH64_INSN_REG_30 = 30,
+> > > +	AARCH64_INSN_REG_LR = 30, /* Link register */
+> > > +	AARCH64_INSN_REG_ZR = 31, /* Zero: as source register */
+> > > +	AARCH64_INSN_REG_SP = 31  /* Stack pointer: as load/store base reg */
+> > 
+> > Can you just #define AARCH64_INSN_REG(x) instead, then have some magic
+> > values like ARM64_REG_LR which are defined as the appropriate numbers?
+> 
+> I actually had something like what you mentioned in the beginning, but
+> decided to go with the above - thinking that it's clearer to present
+> the complete set of valid register definitions.
+> 
+> The #define can still be added for convenience, though I think it's also a
+> potential source of errors - it's much easier to typo something like
+> AARCH64_INSN_REG(32) and not get caught.
 
-0) Linux-next includes your commit a02829b0485e ("ARM: mvebu: allow
-enabling of cpufreq on Armada XP") as of today (next-20140717).
+Fair enough, that's a good enough reason to leave it like it is.
 
-1) That commit only adds
-    select ARCH_HAS_CPUFREQ
+> [...]
+> > > +	switch (variant) {
+> > > +	case AARCH64_INSN_VARIANT_32BIT:
+> > > +		break;
+> > > +	case AARCH64_INSN_VARIANT_64BIT:
+> > > +		insn |= BIT(31);
+> > 
+> > FWIW, that bit (31) is referred to as the `SF' bit in the instruction
+> > encodings (for Sixty-Four). You could have a #define for that to help people
+> > match up the bitfield, if you like.
+> 
+> Something like this?
+> 
+> 	#define AARCH64_INSN_SF_BIT  BIT(31)
+> 
+> 	...
+> 
+> 	case AARCH64_INSN_VARIANT_64BIT:
+> 		insn |= AARCH64_INSN_SF_BIT;
+> 
+> In the case of bitfield instruction, there's also an "N" bit.
+> So something like this?
+> 
+> 	#define AARCH64_INSN_N_BIT  BIT(22)
+> 
+> 	...
+> 
+> 	case AARCH64_INSN_VARIANT_64BIT:
+> 		insn |= AARCH64_INSN_SF_BIT | AARCH64_INSN_N_BIT;
 
-to a Kconfig entry. But ARCH_HAS_CPUFREQ was dropped in v3.16-rc2, see
-commit 19682f72f5db ("ARM: Remove ARCH_HAS_CPUFREQ config option").
-While I don't know what you want to achieve here, selecting
-ARCH_HAS_CPUFREQ certainly won't help you.
+Looks good.
 
+> > 
+> > > +		break;
+> > > +	default:
+> > > +		BUG_ON(1);
+> > 
+> > Is a BUG_ON justifiable here? Is there not a nicer way to fail?
+> 
+> In general, it'd be nice if we returned something like -EINVAL and
+> have all callers handle failures. Today all code gen functions return
+> the u32 instruction and there's no error handling by callers.
+> I think following the precedence (aarch64_insn_gen_branch_imm())
+> of failing with BUG_ON is a reasonable tradeoff.
 
-Paul Bolle
+Well, I don't necessarily agree with that BUG_ON, either :)
+I take it eBPF doesn't have a `trap' instruction or similar? Otherwise, we
+could generate that and avoid having to propagate errors directly to the
+caller.
+
+> In this case here, when we hit the default (failure) case, that means
+> there's a serious error of attempting to use an unsupported
+> variant. I think we're better off failing hard here than trying to
+> arbitrarily "fallback" on a default choice.
+
+It might be a serious error for BPF, but a BUG_ON brings down the entire
+machine, which I think is unfortunate.
+
+> 
+> One potential option instead of switch (variant) is:
+> 
+> 	if (variant == AARCH64_INSN_VARIANT_64BIT)
+> 		/* do something */
+> 	else
+> 		/* do something else */
+> 
+> which would be quite reasonable to do as we only have VARIANT_{32,64}BIT
+> today.
+> 
+> However, consider the case where we add VARIANT_128BIT or other flavors
+> in the future. The if/else option (basically defaulting to VARIANT_32BIT)
+> would then make much less sense.
+
+I don't think we need to worry about hypothetical extensions to the
+instruction set at this stage.
+
+Will
