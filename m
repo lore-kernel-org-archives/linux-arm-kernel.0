@@ -1,82 +1,75 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 17 Jul 2014 14:35:02 +0200
-Subject: [PATCH] [RFC] [media] omap3isp: try to fix dependencies
-In-Reply-To: <46586956.hxqoJOmDbk@wuerfel>
-References: <46586956.hxqoJOmDbk@wuerfel>
-Message-ID: <2725974.cX7okUBUol@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 13:35:33 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+ <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+ <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
+ <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
+Message-ID: <20140717123533.GJ21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-Sorry for the late reply.
-
-On Friday 13 June 2014 14:02:01 Arnd Bergmann wrote:
-> commit 2a0a5472af5c ("omap3isp: Use the ARM DMA IOMMU-aware operations")
-> brought the omap3isp driver closer to using standard APIs, but also
-> introduced two problems:
+On Thu, Jul 17, 2014 at 12:12:48PM +0100, Peter Maydell wrote:
+> On 17 July 2014 11:54, Will Deacon <will.deacon@arm.com> wrote:
+> > I don't really see the benefits of pretending that /proc/cpuinfo is remotely
+> > portable between architectures.
 > 
-> a) it selects a particular IOMMU driver for no good reason. This just
->    causes hard to track dependency chains, in my case breaking an
->    experimental patch set that tries to reenable !MMU support on ARM
->    multiplatform kernels. Since the driver doesn't have a dependency
->    on the actual IOMMU implementation (other than sitting on the same
->    SoC), this changes the 'select OMAP_IOMMU' to a generic 'depends on
->    IOMMU_API' that reflects the actual usage.
+> I'm not suggesting it's portable. I'm suggesting that you need
+> a good reason to push backwards against a design decision
+> made on other architectures. In particular, given that ARM is
+> in general *more* likely to be heterogenous than x86 (given
+> the existence of big.LITTLE), it seems baffling to try to move
+> in a direction that denies the possibility of further heterogeneity
+> in future.
 
-That sounds good to me.
+We're not denying the possibility of heterogeneity, we're trying to expose a
+consistent view of the system to userspace. Differences between cores should
+be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
+passed off to userspace.
 
-> b) The driver incorrectly calls into low-level helpers designed to
->    be used by the IOMMU implementation:
->    arm_iommu_{create,attach,release}_mapping.
-
-I agree with you, and that's my plan, but I haven't been able to fix the 
-problem yet. It's somewhere on my (too big) to-do list.
-
-Please note that, while the problem hasn't been introduced by commit 
-2a0a5472af5c, the driver was in an even worse shape before that, as it called 
-in the OMAP IOMMU driver directly.
-
->    I'm not fixing this here, but adding a FIXME and a dependency on
->    ARM_DMA_USE_IOMMU. I believe the correct solution is to move the calls
->    into the omap iommu driver that currently doesn't have them, and change
->    the isp driver to call generic functions.
-
-OMAP_IOMMU doesn't select ARM_DMA_USE_IOMMU :-/ That should be fixed first, 
-otherwise the OMAP3 ISP driver won't be available at all.
-
-> In addition, this also adds the missing 'select VIDEOBUF2_DMA_CONTIG'
-> that is needed since fbac1400bd1 ("[media] omap3isp: Move to videobuf2")
-
-That's already fixed in my tree, so I'll skip that part.
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> ----
+> > So the real question is: do we want to allow Linux to support features that
+> > exist only on a subset of cores in the system? The current thinking is that
+> > we truncate the advertised features to the common system subset, which means
+> > it will be the same on all cores, by definition. That allows hardware guys
+> > to build crazy systems that we can at least use, without imparting a world
+> > of pain onto software that needs to run on them.
 > 
-> Hi Laurent,
-> 
-> Could you have a look at this? It's possible I'm missing something
-> important here, but this is what I currently need to get randconfig
-> builds to use the omap3isp driver.
-> 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index 8108c69..15bf61b 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -94,8 +94,9 @@ config VIDEO_M32R_AR_M64278
->  config VIDEO_OMAP3
->  	tristate "OMAP 3 Camera support"
->  	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3
-> -	select ARM_DMA_USE_IOMMU
-> -	select OMAP_IOMMU
-> +	depends on ARM_DMA_USE_IOMMU # FIXME: use iommu API instead of low-level
-> ARM calls +	depends on IOMMU_API
-> +	select VIDEOBUF2_DMA_CONTIG
->  	---help---
->  	  Driver for an OMAP 3 camera controller.
+> I've already made one suggestion (non-pervasive crypto).
+> You could also envisage "feature bits" that effectively mean
+> "things will be faster on this core" even if they still work on
+> other cores too.
 
--- 
-Regards,
+I don't believe that knowledge belongs in userspace. If you wanted to
+support crypto on such a system, then you advertise it as a system feature
+and migrate those tasks to the cores that support the instructions (in a
+similar manner to migrating the FPU on architecture that can share one).
+However, I'd prefer to start from a point where we *don't*' support such
+systems and actively dissuage people from building them.
 
-Laurent Pinchart
+> > I also think that we're backed into a corner regardless. We've seen how
+> > people ignore hwcaps (e.g. SWP), so they're likely to parse the caps for
+> > CPU0 and use that as an indication of the system capabilities.
+> 
+> Certainly userspace *can* do the wrong thing. That doesn't
+> necessarily mean that the kernel should only ever provide the
+> API equivalent of safety scissors...
+
+Userspace *will* do the wrong thing and it *will* turn the feature into
+useless baggage that we have to carry.
+
+> > Note that the features list *isn't* just the features supported by the CPU.
+> > It also takes into account the set of features supported by the kernel (e.g.
+> > we don't advertise VFP on ARMv7 if VFP context switching isn't enabled).
+> 
+> This is an argument for also advertising the lowest-common-denominator
+> feature bits. (Do you want to argue for a single "features:" line
+> plus per-core "extra-features:" lines?)
+
+That's what Ard brought up and I think it makes more sense that printing the
+same features line for each core. However, I question its usefulness and
+think it's ripe for misuse.
+
+Will
