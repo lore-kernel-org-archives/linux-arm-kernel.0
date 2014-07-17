@@ -1,79 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Jul 2014 08:59:26 +0900
-Subject: [PATCH 2/3] ARM: shmobile: r7s72100: genmai: Remove legacy board file
+Date: Fri, 18 Jul 2014 08:59:27 +0900
+Subject: [PATCH 3/3] ARM: shmobile: r7s72100: Remove legacy board support
 In-Reply-To: <cover.1405641497.git.horms+renesas@verge.net.au>
 References: <cover.1405641497.git.horms+renesas@verge.net.au>
-Message-ID: <efcbac6c2b2d5cc218f96a7d7673842c01bf8929.1405641497.git.horms+renesas@verge.net.au>
+Message-ID: <53b04e7fb3b28517ff86a7ac9fcff86101fe6d5a.1405641497.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The genmai board now boots using DT and multiplatform kernel with the
-same feature set as the legacy board. Remove the legacy board file and
-the board Kconfig option.
+There's no legacy board anymore, genmai now boots with multiplatform
+support only. Remove the leftovers.
+
+Makefile.boot portion pointed out by Paul Bolle.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Wolfram Sang <wsa@sang-engineering.com>
+Cc: Paul Bolle <pebolle@tiscali.nl>
+[horms+renesas at verge.net.au: squashed in patch containing
+ Makefile.boot change]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig        |   9 --
- arch/arm/mach-shmobile/Makefile       |   1 -
- arch/arm/mach-shmobile/board-genmai.c | 174 ----------------------------------
- 3 files changed, 184 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/board-genmai.c
+ arch/arm/mach-shmobile/Kconfig          |   8 --
+ arch/arm/mach-shmobile/Makefile         |   1 -
+ arch/arm/mach-shmobile/Makefile.boot    |   1 -
+ arch/arm/mach-shmobile/clock-r7s72100.c | 231 --------------------------------
+ arch/arm/mach-shmobile/r7s72100.h       |   6 -
+ arch/arm/mach-shmobile/setup-r7s72100.c |   2 -
+ 6 files changed, 249 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/clock-r7s72100.c
+ delete mode 100644 arch/arm/mach-shmobile/r7s72100.h
 
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 4508643..85f55e8 100644
+index 85f55e8..384221d 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -43,10 +43,6 @@ config ARCH_R8A7791
+@@ -146,14 +146,6 @@ config ARCH_R8A7791
+ 	select SYS_SUPPORTS_SH_CMT
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
  
+-config ARCH_R7S72100
+-	bool "RZ/A1H (R7S72100)"
+-	select ARCH_WANT_OPTIONAL_GPIOLIB
+-	select ARM_GIC
+-	select CPU_V7
+-	select SH_CLK_CPG
+-	select SYS_SUPPORTS_SH_MTU2
+-
  comment "Renesas ARM SoCs Board Type"
  
--config MACH_GENMAI
--	bool "Genmai board"
--	depends on ARCH_R7S72100
--
- config MACH_KOELSCH
- 	bool "Koelsch board"
- 	depends on ARCH_R8A7791
-@@ -233,11 +229,6 @@ config MACH_BOCKW_REFERENCE
- 
- 	   This is intended to aid developers
- 
--config MACH_GENMAI
--	bool "Genmai board"
--	depends on ARCH_R7S72100
--	select USE_OF
--
- config MACH_MARZEN
- 	bool "MARZEN board"
- 	depends on ARCH_R8A7779
+ config MACH_APE6EVM
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 18b05a8..411e236 100644
+index 411e236..dc9446f 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -71,7 +71,6 @@ obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
- obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
- obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
--obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+@@ -31,7 +31,6 @@ obj-$(CONFIG_ARCH_R8A7778)	+= clock-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= clock-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= clock-r8a7790.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= clock-r8a7791.o
+-obj-$(CONFIG_ARCH_R7S72100)	+= clock-r7s72100.o
+ endif
+ 
+ # CPU reset vector handling objects
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index ebf97d4..a23e155 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -6,7 +6,6 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+-loadaddr-$(CONFIG_MACH_GENMAI) += 0x08008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
 deleted file mode 100644
-index b5dee53..0000000
---- a/arch/arm/mach-shmobile/board-genmai.c
+index 3eb2ec4..0000000
+--- a/arch/arm/mach-shmobile/clock-r7s72100.c
 +++ /dev/null
-@@ -1,174 +0,0 @@
+@@ -1,231 +0,0 @@
 -/*
-- * Genmai board support
+- * r7a72100 clock framework support
 - *
-- * Copyright (C) 2013-2014  Renesas Solutions Corp.
-- * Copyright (C) 2013  Magnus Damm
-- * Copyright (C) 2014  Cogent Embedded, Inc.
+- * Copyright (C) 2013  Renesas Solutions Corp.
+- * Copyright (C) 2012  Phil Edworthy
+- * Copyright (C) 2011  Magnus Damm
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -83,164 +95,250 @@ index b5dee53..0000000
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 - */
--
+-#include <linux/init.h>
 -#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/serial_sci.h>
--#include <linux/sh_eth.h>
--#include <linux/sh_timer.h>
--#include <linux/spi/rspi.h>
--#include <linux/spi/spi.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
+-#include <linux/io.h>
+-#include <linux/sh_clk.h>
+-#include <linux/clkdev.h>
 -
 -#include "common.h"
--#include "irqs.h"
 -#include "r7s72100.h"
 -
--/* Ether */
--static const struct sh_eth_plat_data ether_pdata __initconst = {
--	.phy			= 0x00, /* PD60610 */
--	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
--	.phy_interface		= PHY_INTERFACE_MODE_MII,
--	.no_ether_link		= 1
+-/* Frequency Control Registers */
+-#define FRQCR		0xfcfe0010
+-#define FRQCR2		0xfcfe0014
+-/* Standby Control Registers */
+-#define STBCR3		0xfcfe0420
+-#define STBCR4		0xfcfe0424
+-#define STBCR7		0xfcfe0430
+-#define STBCR9		0xfcfe0438
+-#define STBCR10		0xfcfe043c
+-
+-#define PLL_RATE 30
+-
+-static struct clk_mapping cpg_mapping = {
+-	.phys	= 0xfcfe0000,
+-	.len	= 0x1000,
 -};
 -
--static const struct resource ether_resources[] __initconst = {
--	DEFINE_RES_MEM(0xe8203000, 0x800),
--	DEFINE_RES_MEM(0xe8204800, 0x200),
--	DEFINE_RES_IRQ(gic_iid(359)),
+-/* Fixed 32 KHz root clock for RTC */
+-static struct clk r_clk = {
+-	.rate           = 32768,
 -};
 -
--static const struct platform_device_info ether_info __initconst = {
--	.parent		= &platform_bus,
--	.name		= "r7s72100-ether",
--	.id		= -1,
--	.res		= ether_resources,
--	.num_res	= ARRAY_SIZE(ether_resources),
--	.data		= &ether_pdata,
--	.size_data	= sizeof(ether_pdata),
--	.dma_mask	= DMA_BIT_MASK(32),
+-/*
+- * Default rate for the root input clock, reset this with clk_set_rate()
+- * from the platform code.
+- */
+-static struct clk extal_clk = {
+-	.rate		= 13330000,
+-	.mapping	= &cpg_mapping,
 -};
 -
--/* RSPI */
--#define RSPI_RESOURCE(idx, baseaddr, irq)				\
--static const struct resource rspi##idx##_resources[] __initconst = {	\
--	DEFINE_RES_MEM(baseaddr, 0x24),					\
--	DEFINE_RES_IRQ_NAMED(irq, "error"),				\
--	DEFINE_RES_IRQ_NAMED(irq + 1, "rx"),				\
--	DEFINE_RES_IRQ_NAMED(irq + 2, "tx"),				\
--}
--
--RSPI_RESOURCE(0, 0xe800c800, gic_iid(270));
--RSPI_RESOURCE(1, 0xe800d000, gic_iid(273));
--RSPI_RESOURCE(2, 0xe800d800, gic_iid(276));
--RSPI_RESOURCE(3, 0xe800e000, gic_iid(279));
--RSPI_RESOURCE(4, 0xe800e800, gic_iid(282));
--
--static const struct rspi_plat_data rspi_pdata __initconst = {
--	.num_chipselect	= 1,
--};
--
--#define r7s72100_register_rspi(idx)					   \
--	platform_device_register_resndata(&platform_bus, "rspi-rz", idx,   \
--					rspi##idx##_resources,		   \
--					ARRAY_SIZE(rspi##idx##_resources), \
--					&rspi_pdata, sizeof(rspi_pdata))
--
--static const struct spi_board_info spi_info[] __initconst = {
--	{
--		.modalias               = "wm8978",
--		.max_speed_hz           = 5000000,
--		.bus_num                = 4,
--		.chip_select            = 0,
--	},
--};
--
--/* SCIF */
--#define R7S72100_SCIF(index, baseaddr, irq)				\
--static const struct plat_sci_port scif##index##_platform_data = {	\
--	.type		= PORT_SCIF,					\
--	.regtype	= SCIx_SH2_SCIF_FIFODATA_REGTYPE,		\
--	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
--	.scscr		= SCSCR_RIE | SCSCR_TIE | SCSCR_RE | SCSCR_TE |	\
--			  SCSCR_REIE,					\
--};									\
--									\
--static struct resource scif##index##_resources[] = {			\
--	DEFINE_RES_MEM(baseaddr, 0x100),				\
--	DEFINE_RES_IRQ(irq + 1),					\
--	DEFINE_RES_IRQ(irq + 2),					\
--	DEFINE_RES_IRQ(irq + 3),					\
--	DEFINE_RES_IRQ(irq),						\
--}									\
--
--R7S72100_SCIF(0, 0xe8007000, gic_iid(221));
--R7S72100_SCIF(1, 0xe8007800, gic_iid(225));
--R7S72100_SCIF(2, 0xe8008000, gic_iid(229));
--R7S72100_SCIF(3, 0xe8008800, gic_iid(233));
--R7S72100_SCIF(4, 0xe8009000, gic_iid(237));
--R7S72100_SCIF(5, 0xe8009800, gic_iid(241));
--R7S72100_SCIF(6, 0xe800a000, gic_iid(245));
--R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
--
--#define r7s72100_register_scif(index)					       \
--	platform_device_register_resndata(&platform_bus, "sh-sci", index,      \
--					  scif##index##_resources,	       \
--					  ARRAY_SIZE(scif##index##_resources), \
--					  &scif##index##_platform_data,	       \
--					  sizeof(scif##index##_platform_data))
--
--static struct resource mtu2_resources[] __initdata = {
--	DEFINE_RES_MEM(0xfcff0000, 0x400),
--	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
--};
--
--#define r7s72100_register_mtu2()					\
--	platform_device_register_resndata(&platform_bus, "sh-mtu2",	\
--					  -1, mtu2_resources,		\
--					  ARRAY_SIZE(mtu2_resources),	\
--					  NULL, 0)
--
--static void __init genmai_add_standard_devices(void)
+-static unsigned long pll_recalc(struct clk *clk)
 -{
--	r7s72100_clock_init();
--	r7s72100_register_mtu2();
--
--	platform_device_register_full(&ether_info);
--
--	r7s72100_register_rspi(0);
--	r7s72100_register_rspi(1);
--	r7s72100_register_rspi(2);
--	r7s72100_register_rspi(3);
--	r7s72100_register_rspi(4);
--	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
--
--	r7s72100_register_scif(0);
--	r7s72100_register_scif(1);
--	r7s72100_register_scif(2);
--	r7s72100_register_scif(3);
--	r7s72100_register_scif(4);
--	r7s72100_register_scif(5);
--	r7s72100_register_scif(6);
--	r7s72100_register_scif(7);
+-	return clk->parent->rate * PLL_RATE;
 -}
 -
--static const char * const genmai_boards_compat_dt[] __initconst = {
--	"renesas,genmai",
--	NULL,
+-static struct sh_clk_ops pll_clk_ops = {
+-	.recalc		= pll_recalc,
 -};
 -
--DT_MACHINE_START(GENMAI_DT, "genmai")
--	.init_early	= shmobile_init_delay,
--	.init_machine	= genmai_add_standard_devices,
--	.dt_compat	= genmai_boards_compat_dt,
--MACHINE_END
+-static struct clk pll_clk = {
+-	.ops		= &pll_clk_ops,
+-	.parent		= &extal_clk,
+-	.flags		= CLK_ENABLE_ON_INIT,
+-};
+-
+-static unsigned long bus_recalc(struct clk *clk)
+-{
+-	return clk->parent->rate / 3;
+-}
+-
+-static struct sh_clk_ops bus_clk_ops = {
+-	.recalc		= bus_recalc,
+-};
+-
+-static struct clk bus_clk = {
+-	.ops		= &bus_clk_ops,
+-	.parent		= &pll_clk,
+-	.flags		= CLK_ENABLE_ON_INIT,
+-};
+-
+-static unsigned long peripheral0_recalc(struct clk *clk)
+-{
+-	return clk->parent->rate / 12;
+-}
+-
+-static struct sh_clk_ops peripheral0_clk_ops = {
+-	.recalc		= peripheral0_recalc,
+-};
+-
+-static struct clk peripheral0_clk = {
+-	.ops		= &peripheral0_clk_ops,
+-	.parent		= &pll_clk,
+-	.flags		= CLK_ENABLE_ON_INIT,
+-};
+-
+-static unsigned long peripheral1_recalc(struct clk *clk)
+-{
+-	return clk->parent->rate / 6;
+-}
+-
+-static struct sh_clk_ops peripheral1_clk_ops = {
+-	.recalc		= peripheral1_recalc,
+-};
+-
+-static struct clk peripheral1_clk = {
+-	.ops		= &peripheral1_clk_ops,
+-	.parent		= &pll_clk,
+-	.flags		= CLK_ENABLE_ON_INIT,
+-};
+-
+-struct clk *main_clks[] = {
+-	&r_clk,
+-	&extal_clk,
+-	&pll_clk,
+-	&bus_clk,
+-	&peripheral0_clk,
+-	&peripheral1_clk,
+-};
+-
+-static int div2[] = { 1, 3, 0, 3 }; /* 1, 2/3, reserve, 1/3 */
+-static int multipliers[] = { 1, 2, 1, 1 };
+-
+-static struct clk_div_mult_table div4_div_mult_table = {
+-	.divisors = div2,
+-	.nr_divisors = ARRAY_SIZE(div2),
+-	.multipliers = multipliers,
+-	.nr_multipliers = ARRAY_SIZE(multipliers),
+-};
+-
+-static struct clk_div4_table div4_table = {
+-	.div_mult_table = &div4_div_mult_table,
+-};
+-
+-enum { DIV4_I,
+-	DIV4_NR };
+-
+-#define DIV4(_reg, _bit, _mask, _flags) \
+-	SH_CLK_DIV4(&pll_clk, _reg, _bit, _mask, _flags)
+-
+-/* The mask field specifies the div2 entries that are valid */
+-struct clk div4_clks[DIV4_NR] = {
+-	[DIV4_I]  = DIV4(FRQCR, 8, 0xB, CLK_ENABLE_REG_16BIT
+-					| CLK_ENABLE_ON_INIT),
+-};
+-
+-enum {
+-	MSTP107, MSTP106, MSTP105, MSTP104, MSTP103,
+-	MSTP97, MSTP96, MSTP95, MSTP94,
+-	MSTP74,
+-	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
+-	MSTP33,	MSTP_NR
+-};
+-
+-static struct clk mstp_clks[MSTP_NR] = {
+-	[MSTP107] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 7, 0), /* RSPI0 */
+-	[MSTP106] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 6, 0), /* RSPI1 */
+-	[MSTP105] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 5, 0), /* RSPI2 */
+-	[MSTP104] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 4, 0), /* RSPI3 */
+-	[MSTP103] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 3, 0), /* RSPI4 */
+-	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
+-	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
+-	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
+-	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
+-	[MSTP74] = SH_CLK_MSTP8(&peripheral1_clk, STBCR7, 4, 0), /* Ether */
+-	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
+-	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
+-	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
+-	[MSTP44] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 4, 0), /* SCIF3 */
+-	[MSTP43] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 3, 0), /* SCIF4 */
+-	[MSTP42] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 2, 0), /* SCIF5 */
+-	[MSTP41] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 1, 0), /* SCIF6 */
+-	[MSTP40] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 0, 0), /* SCIF7 */
+-	[MSTP33] = SH_CLK_MSTP8(&peripheral0_clk, STBCR3, 3, 0), /* MTU2 */
+-};
+-
+-static struct clk_lookup lookups[] = {
+-	/* main clocks */
+-	CLKDEV_CON_ID("rclk", &r_clk),
+-	CLKDEV_CON_ID("extal", &extal_clk),
+-	CLKDEV_CON_ID("pll_clk", &pll_clk),
+-	CLKDEV_CON_ID("peripheral_clk", &peripheral1_clk),
+-
+-	/* DIV4 clocks */
+-	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
+-
+-	/* MSTP clocks */
+-	CLKDEV_DEV_ID("rspi-rz.0", &mstp_clks[MSTP107]),
+-	CLKDEV_DEV_ID("rspi-rz.1", &mstp_clks[MSTP106]),
+-	CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
+-	CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
+-	CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
+-	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+-
+-	/* ICK */
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.0", &mstp_clks[MSTP47]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.1", &mstp_clks[MSTP46]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.2", &mstp_clks[MSTP45]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.3", &mstp_clks[MSTP44]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.4", &mstp_clks[MSTP43]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
+-	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
+-	CLKDEV_ICK_ID("fck", "sh-mtu2", &mstp_clks[MSTP33]),
+-};
+-
+-void __init r7s72100_clock_init(void)
+-{
+-	int k, ret = 0;
+-
+-	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+-		ret = clk_register(main_clks[k]);
+-
+-	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-
+-	if (!ret)
+-		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+-
+-	if (!ret)
+-		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
+-
+-	if (!ret)
+-		shmobile_clk_init();
+-	else
+-		panic("failed to setup rza1 clocks\n");
+-}
+diff --git a/arch/arm/mach-shmobile/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
+deleted file mode 100644
+index 321ae4e..0000000
+--- a/arch/arm/mach-shmobile/r7s72100.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef __ASM_R7S72100_H__
+-#define __ASM_R7S72100_H__
+-
+-void r7s72100_clock_init(void);
+-
+-#endif /* __ASM_R7S72100_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index d898cef..111437d 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -24,7 +24,6 @@
+ 
+ #include "common.h"
+ 
+-#ifdef CONFIG_USE_OF
+ static const char *r7s72100_boards_compat_dt[] __initdata = {
+ 	"renesas,r7s72100",
+ 	NULL,
+@@ -34,4 +33,3 @@ DT_MACHINE_START(R7S72100_DT, "Generic R7S72100 (Flattened Device Tree)")
+ 	.init_early	= shmobile_init_delay,
+ 	.dt_compat	= r7s72100_boards_compat_dt,
+ MACHINE_END
+-#endif /* CONFIG_USE_OF */
 -- 
 2.0.1
