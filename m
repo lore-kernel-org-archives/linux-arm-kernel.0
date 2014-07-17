@@ -1,143 +1,57 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 17 Jul 2014 11:08:34 -0700
-Subject: [PATCH v12 07/11] sched: move no_new_privs into new atomic flags
-In-Reply-To: <1405620518-18495-1-git-send-email-keescook@chromium.org>
-References: <1405620518-18495-1-git-send-email-keescook@chromium.org>
-Message-ID: <1405620518-18495-8-git-send-email-keescook@chromium.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 17 Jul 2014 11:17:03 -0700
+Subject: [PATCH v4 2/3] soc: qcom-rpm: Driver for the Qualcomm RPM
+In-Reply-To: <CAMf-jSnPpo39cXLbM9cefUr37J=hnEHqfJSetORxMnjsdoANdw@mail.gmail.com>
+References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1405465241-28684-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAMf-jSnPpo39cXLbM9cefUr37J=hnEHqfJSetORxMnjsdoANdw@mail.gmail.com>
+Message-ID: <CAJAp7OjPPoZYk4QyT4CzB5ncpzYos_f0ZNFk4kWEKBGvzVvOmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since seccomp transitions between threads requires updates to the
-no_new_privs flag to be atomic, the flag must be part of an atomic flag
-set. This moves the nnp flag into a separate task field, and introduces
-accessors.
+On Thu, Jul 17, 2014 at 10:33 AM, pramod gurav
+<pramod.gurav.etc@gmail.com> wrote:
+> Hi Bjorn,
+>
+> On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
+> <bjorn.andersson@sonymobile.com> wrote:
+>> Driver for the Resource Power Manager (RPM) found in Qualcomm 8660, 8960
+>> and 8064 based devices. The driver exposes resources that child drivers
+>> can operate on; to implementing regulator, clock and bus frequency
+>> drivers.
+>>
+>
+> [snip]
+>
+>> +       }
+>> +
+>> +       ret = irq_set_irq_wake(irq_ack, 1);
+>
+> This calls fails and throws error on my ifc6410 with 3.16-rc5.
+> Does this driver depend on pincntrl. Looks like the DT support for
+> pincntrl driver is missing in apq8064 dts in mainline.
+> Is that right?
+>
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: Oleg Nesterov <oleg@redhat.com>
-Reviewed-by: Andy Lutomirski <luto@amacapital.net>
----
- fs/exec.c                  |    4 ++--
- include/linux/sched.h      |   18 +++++++++++++++---
- kernel/seccomp.c           |    2 +-
- kernel/sys.c               |    4 ++--
- security/apparmor/domain.c |    4 ++--
- 5 files changed, 22 insertions(+), 10 deletions(-)
+This is a gic interrupt, to it's unrelated to pinctrl.
 
-diff --git a/fs/exec.c b/fs/exec.c
-index a3d33fe592d6..0f5c272410f6 100644
---- a/fs/exec.c
-+++ b/fs/exec.c
-@@ -1234,7 +1234,7 @@ static void check_unsafe_exec(struct linux_binprm *bprm)
- 	 * This isn't strictly necessary, but it makes it harder for LSMs to
- 	 * mess up.
- 	 */
--	if (current->no_new_privs)
-+	if (task_no_new_privs(current))
- 		bprm->unsafe |= LSM_UNSAFE_NO_NEW_PRIVS;
- 
- 	t = p;
-@@ -1272,7 +1272,7 @@ int prepare_binprm(struct linux_binprm *bprm)
- 	bprm->cred->egid = current_egid();
- 
- 	if (!(bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID) &&
--	    !current->no_new_privs &&
-+	    !task_no_new_privs(current) &&
- 	    kuid_has_mapping(bprm->cred->user_ns, inode->i_uid) &&
- 	    kgid_has_mapping(bprm->cred->user_ns, inode->i_gid)) {
- 		/* Set-uid? */
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 0376b054a0d0..45cec6b70eaf 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -1307,13 +1307,12 @@ struct task_struct {
- 				 * execve */
- 	unsigned in_iowait:1;
- 
--	/* task may not gain privileges */
--	unsigned no_new_privs:1;
--
- 	/* Revert to default priority/policy when forking */
- 	unsigned sched_reset_on_fork:1;
- 	unsigned sched_contributes_to_load:1;
- 
-+	unsigned long atomic_flags; /* Flags needing atomic access. */
-+
- 	pid_t pid;
- 	pid_t tgid;
- 
-@@ -1967,6 +1966,19 @@ static inline void memalloc_noio_restore(unsigned int flags)
- 	current->flags = (current->flags & ~PF_MEMALLOC_NOIO) | flags;
- }
- 
-+/* Per-process atomic flags. */
-+#define PFA_NO_NEW_PRIVS 0x00000001	/* May not gain new privileges. */
-+
-+static inline bool task_no_new_privs(struct task_struct *p)
-+{
-+	return test_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
-+}
-+
-+static inline void task_set_no_new_privs(struct task_struct *p)
-+{
-+	set_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
-+}
-+
- /*
-  * task->jobctl flags
-  */
-diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index f0652578af75..d2596136b0d1 100644
---- a/kernel/seccomp.c
-+++ b/kernel/seccomp.c
-@@ -241,7 +241,7 @@ static long seccomp_attach_filter(struct sock_fprog *fprog)
- 	 * This avoids scenarios where unprivileged tasks can affect the
- 	 * behavior of privileged children.
- 	 */
--	if (!current->no_new_privs &&
-+	if (!task_no_new_privs(current) &&
- 	    security_capable_noaudit(current_cred(), current_user_ns(),
- 				     CAP_SYS_ADMIN) != 0)
- 		return -EACCES;
-diff --git a/kernel/sys.c b/kernel/sys.c
-index 66a751ebf9d9..ce8129192a26 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -1990,12 +1990,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
- 		if (arg2 != 1 || arg3 || arg4 || arg5)
- 			return -EINVAL;
- 
--		current->no_new_privs = 1;
-+		task_set_no_new_privs(current);
- 		break;
- 	case PR_GET_NO_NEW_PRIVS:
- 		if (arg2 || arg3 || arg4 || arg5)
- 			return -EINVAL;
--		return current->no_new_privs ? 1 : 0;
-+		return task_no_new_privs(current) ? 1 : 0;
- 	case PR_GET_THP_DISABLE:
- 		if (arg2 || arg3 || arg4 || arg5)
- 			return -EINVAL;
-diff --git a/security/apparmor/domain.c b/security/apparmor/domain.c
-index 452567d3a08e..d97cba3e3849 100644
---- a/security/apparmor/domain.c
-+++ b/security/apparmor/domain.c
-@@ -621,7 +621,7 @@ int aa_change_hat(const char *hats[], int count, u64 token, bool permtest)
- 	 * There is no exception for unconfined as change_hat is not
- 	 * available.
- 	 */
--	if (current->no_new_privs)
-+	if (task_no_new_privs(current))
- 		return -EPERM;
- 
- 	/* released below */
-@@ -776,7 +776,7 @@ int aa_change_profile(const char *ns_name, const char *hname, bool onexec,
- 	 * no_new_privs is set because this aways results in a reduction
- 	 * of permissions.
- 	 */
--	if (current->no_new_privs && !unconfined(profile)) {
-+	if (task_no_new_privs(current) && !unconfined(profile)) {
- 		put_cred(cred);
- 		return -EPERM;
- 	}
--- 
-1.7.9.5
+What happens is that you end up in gic_set_wake() checking for the
+architecture specific implementation of irq_set_wake; on modern
+Qualcomm platforms waking the system up from sleep seems to be handled
+in it's entirety by the "Modem Power Manager" (or "MSM Power Manager")
+- in short MPM.
+
+So once we introduce a driver for the mpm hardware this should
+register these functions with the gic and we should get those marked
+as wakeup sources.
+
+It can be argued that this should be an error instead of just a
+"warning", but for systems where this fails; i.e. systems without the
+mpm driver we will not be able to go to sleep anyways, so if this call
+fails we shouldn't expect to ever be woken up again.
+
+
+So please ignore this warning for now; we will get there at some point.
+
+Regards,
+Bjorn
