@@ -1,76 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Jul 2014 18:13:33 +0100
-Subject: [RFC PATCH] usb: dwc3: core: allow vendor drivers to check probe
- status
-Message-ID: <1405617213-27360-1-git-send-email-lee.jones@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 18:15:50 +0100
+Subject: [PATCH] ARM: DMA: ensure that old section mappings are flushed
+ from the TLB
+In-Reply-To: <E1X7nlB-0000EN-7e@rmk-PC.arm.linux.org.uk>
+References: <E1X7nlB-0000EN-7e@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140717171550.GA4844@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides mechanism for subordinate devices to check
-whether the DWC3 core probed successfully or otherwise.  Useful
-if PHYs are required to configure controllers, but aren't yet
-available.  The DWC3 core driver will defer probe if PHYs are
-unavailable, however subordinate DWC3 drivers currently do not
-have any visibility or means to check status - until now.
+On Thu, Jul 17, 2014 at 04:38:17PM +0100, Russell King wrote:
+> When setting up the CMA region, we must ensure that the old section
+> mappings are flushed from the TLB before replacing them with page
+> tables, otherwise we can suffer from mismatched aliases if the CPU
+> speculatively prefetches from these mappings at an inopportune time.
+> 
+> A mismatched alias can occur when the TLB contains a section mapping,
+> but a subsequent prefetch causes it to load a page table mapping,
+> resulting in the possibility of the TLB containing two matching
+> mappings for the same virtual address region.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Another way to do this would be to *_phy_get*(), but if every
-driver did this it would create a high level of code
-duplication.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/usb/dwc3/core.c | 12 ++++++++++++
- drivers/usb/dwc3/core.h |  1 +
- 2 files changed, 13 insertions(+)
+Will
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index eb69eb9..171ca52 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -47,6 +47,14 @@
- 
- /* -------------------------------------------------------------------------- */
- 
-+static bool is_enabled = false;
-+
-+int dwc3_is_enabled(void)
-+{
-+	return is_enabled;
-+}
-+EXPORT_SYMBOL(dwc3_is_enabled);
-+
- void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
- {
- 	u32 reg;
-@@ -757,6 +765,8 @@ static int dwc3_probe(struct platform_device *pdev)
- 
- 	pm_runtime_allow(dev);
- 
-+	is_enabled = true;
-+
- 	return 0;
- 
- err3:
-@@ -786,6 +796,8 @@ static int dwc3_remove(struct platform_device *pdev)
- {
- 	struct dwc3	*dwc = platform_get_drvdata(pdev);
- 
-+	is_enabled = false;
-+
- 	usb_phy_set_suspend(dwc->usb2_phy, 1);
- 	usb_phy_set_suspend(dwc->usb3_phy, 1);
- 	phy_power_off(dwc->usb2_generic_phy);
-diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
-index 57332e3..94dee86 100644
---- a/drivers/usb/dwc3/core.h
-+++ b/drivers/usb/dwc3/core.h
-@@ -906,6 +906,7 @@ struct dwc3_gadget_ep_cmd_params {
- /* prototypes */
- void dwc3_set_mode(struct dwc3 *dwc, u32 mode);
- int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc);
-+int dwc3_is_enabled(void);
- 
- #if IS_ENABLED(CONFIG_USB_DWC3_HOST) || IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
- int dwc3_host_init(struct dwc3 *dwc);
--- 
-1.8.3.2
+> ---
+>  arch/arm/mm/dma-mapping.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 4c88935654ca..1f88db06b133 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -461,12 +461,21 @@ void __init dma_contiguous_remap(void)
+>  		map.type = MT_MEMORY_DMA_READY;
+>  
+>  		/*
+> -		 * Clear previous low-memory mapping
+> +		 * Clear previous low-memory mapping to ensure that the
+> +		 * TLB does not see any conflicting entries, then flush
+> +		 * the TLB of the old entries before creating new mappings.
+> +		 *
+> +		 * This ensures that any speculatively loaded TLB entries
+> +		 * (even though they may be rare) can not cause any problems,
+> +		 * and ensures that this code is architecturally compliant.
+>  		 */
+>  		for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
+>  		     addr += PMD_SIZE)
+>  			pmd_clear(pmd_off_k(addr));
+>  
+> +		flush_tlb_kernel_range(__phys_to_virt(start),
+> +				       __phys_to_virt(end));
+> +
+>  		iotable_init(&map, 1);
+>  	}
+>  }
+> -- 
+> 1.8.3.1
+> 
+> 
