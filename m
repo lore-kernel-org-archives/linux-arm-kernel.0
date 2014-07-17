@@ -1,52 +1,50 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 17 Jul 2014 16:38:17 +0100
-Subject: [PATCH] ARM: DMA: ensure that old section mappings are flushed from
- the TLB
-Message-ID: <E1X7nlB-0000EN-7e@rmk-PC.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 17 Jul 2014 17:40:50 +0200
+Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
+ read from DT
+In-Reply-To: <20140717153236.GS13108@titan.lakedaemon.net>
+References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
+ <20140717153236.GS13108@titan.lakedaemon.net>
+Message-ID: <53C7EE82.6040803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When setting up the CMA region, we must ensure that the old section
-mappings are flushed from the TLB before replacing them with page
-tables, otherwise we can suffer from mismatched aliases if the CPU
-speculatively prefetches from these mappings at an inopportune time.
+Hi Jason,
 
-A mismatched alias can occur when the TLB contains a section mapping,
-but a subsequent prefetch causes it to load a page table mapping,
-resulting in the possibility of the TLB containing two matching
-mappings for the same virtual address region.
+On 17.07.2014 17:32, Jason Cooper wrote:
+> On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
+>> Certain GIC implementation, namely those found on earlier, single
+>> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
+>> which means that the driver needs to use different offset for each CPU.
+>>
+>> Currently the driver calculates the offset by multiplying value returned
+>> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
+>> CPU topology is not specified in DT and aforementioned function returns
+>> core ID alone. However when DT contains CPU topology, the function
+>> changes to return cluster ID as well, which is non-zero on mentioned
+>> SoCs and so breaks the calculation in GIC driver.
+>>
+>> This patch fixes this by masking out cluster ID in CPU offset
+>> calculation so that only core ID is considered. Multi-cluster Exynos
+>> SoCs already have banked GIC implementations, so this simple fix should
+>> be enough.
+>>
+>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> ---
+>>  drivers/irqchip/irq-gic.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> iiuc, this was introduced by:
+> 
+>   db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
+> 
+> and so should be for v3.3 and up, correct?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/dma-mapping.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+Could be, although there was and still is no topology data specified in
+DT for affected Exynos SoCs. The need for it showed up just recently, so
+I'm not sure this is a regression to fix in older kernels.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 4c88935654ca..1f88db06b133 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -461,12 +461,21 @@ void __init dma_contiguous_remap(void)
- 		map.type = MT_MEMORY_DMA_READY;
- 
- 		/*
--		 * Clear previous low-memory mapping
-+		 * Clear previous low-memory mapping to ensure that the
-+		 * TLB does not see any conflicting entries, then flush
-+		 * the TLB of the old entries before creating new mappings.
-+		 *
-+		 * This ensures that any speculatively loaded TLB entries
-+		 * (even though they may be rare) can not cause any problems,
-+		 * and ensures that this code is architecturally compliant.
- 		 */
- 		for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
- 		     addr += PMD_SIZE)
- 			pmd_clear(pmd_off_k(addr));
- 
-+		flush_tlb_kernel_range(__phys_to_virt(start),
-+				       __phys_to_virt(end));
-+
- 		iotable_init(&map, 1);
- 	}
- }
--- 
-1.8.3.1
+Best regards,
+Tomasz
