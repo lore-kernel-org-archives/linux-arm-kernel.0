@@ -1,41 +1,54 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Thu, 17 Jul 2014 10:22:12 +0200
-Subject: BUG: i.MX6-FEC: broken TCP tx checksumming
-In-Reply-To: <20140716183904.GQ21766@n2100.arm.linux.org.uk>
-References: <CAOpc7mFpW=ZDdF3g-MK4TaNje5KBWimUwUgxoebg-wmb+OQ8zA@mail.gmail.com>
- <20140716095850.GO21766@n2100.arm.linux.org.uk>
- <CAOpc7mGrZXbr-cytzSHLUjgoYz88ZFeuv2g0kJ2kzOnbF7Uz5g@mail.gmail.com>
- <20140716183904.GQ21766@n2100.arm.linux.org.uk>
-Message-ID: <CAOpc7mHZZz-mxEKuoyoWtz7a=X=gDdQ7TVCDCZFYcR0+DYFSeg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 17 Jul 2014 10:24:25 +0200
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+Message-ID: <20140717102425.34fe0181@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's good that you didn't invest too much time, because I found the
-real culprit.
+Russell,
 
-I wanted to trigger the "clock from phy" code path in
-imx6q_1588_init() (arch/arm/mach-imx/mach-imx6q.c). This is done in
-weird way: the code checks the 3rd clock in the DTS somehow.
+Jumping back to this topic.
 
-So I removed the 3rd clock in my dts, e.g. making it:
+On Wed, 2 Jul 2014 17:41:47 +0100, Russell King - ARM Linux wrote:
 
-&fec {
-    status = "okay";
-    pinctrl-names = "default";
-    pinctrl-0 = <&pinctrl_fec>;
-    phy-mode = "rmii";
-    phy-reset-gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
-    clocks = <&clks 117>, <&clks 117>;
-    clock-names = "ipg", "ahb";
-};
+> The most important first step in that is working out how, in the early
+> assembly code, we can identify these Armada SoCs.  That's a task I
+> can't undertake because I know next to nothing about the SoCs you're
+> dealing with.  Yes, I know that Marvell released a TRM a short while
+> back, which is great, but not everyone has time to go around reading
+> every TRM which every silicon vendor releases into the public domain.
+> 
+> If it /is/ possible to detect the Armada SoCs in the early assembly,
+> then we can start to solve this.
 
-And as soon as I make that, the TCP checksumming doesn't work. When I
-remove that manual-clock-assignment it (so that the default get's
-active), tcp checksumming works. That I told you it works with wmb()
-was in error, because I changed several things at once (grave
-debugging error....  shame on me!).
+Instead of having the absolute requirement to detect the Armada SoC in
+the early assembly code, wouldn't it be possible to re-adjust the page
+tables afterwards?
 
-Now if the TCP checksumming code in the chip depends the ptp clock,
-then no code part should check if it is set to something else. So I
-guess imx6q_1588_init() is actualy buggy by checking for dtsclock[2]
-!= ptp_clk.
+If I understand correctly, we are already changing the page tables
+anyway, to switch certain pages to be mapped uncached, to do DMA
+coherent allocations, no? So wouldn't it be possible to keep the early
+assembly code as it is today, and then later, in C code, once we have
+identified the platform on which we're running, modify the page tables
+to switch to the appropriate page attributes (write allocate cache
+policy, shareable attribute, etc.) ?
+
+Remember that this special page attribute configuration is only needed
+to provide hardware I/O coherency, i.e when we start doing DMA
+transfers. It is therefore possible to do the change of the page
+attributes in for example ->init_early(), which happens before any DMA
+transfer has taken place.
+
+What would be the complexity of achieving this? Would there be a way to
+handle the TTBR register value as well?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
