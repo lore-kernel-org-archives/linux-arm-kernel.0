@@ -1,44 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Jul 2014 14:12:24 +0100
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <6510599.Qoc205T3v7@wuerfel>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140717102425.34fe0181@free-electrons.com>
- <20140717083342.GS21766@n2100.arm.linux.org.uk> <6510599.Qoc205T3v7@wuerfel>
-Message-ID: <20140717131224.GW21766@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Jul 2014 09:13:20 -0400
+Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <20140717131320.GM13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 02:39:42PM +0200, Arnd Bergmann wrote:
-> On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
-> > No - the problem is that we're running from the page table in question
-> > with global mappings, and we need to switch all these mappings, including
-> > the ones we're currently using to execute from.
-> > 
-> > We can't even create a new page table and switch to it because the
-> > mappings in question are global mappings.
-> > 
-> > The only way to do that safely from an architectural point of view would
-> > be to turn the MMU off, and drop back to assembly code to change the
-> > page tables, and re-enable the MMU.  For something as obscure as Marvell's
-> > coherency stuff, that's not something I want to see in core code.
+On Wed, Jul 09, 2014 at 06:05:03PM -0500, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> Is this different from what we do in the LPAE version of
-> early_paging_init()? That code already adjusts all the page
-> table entries on a per-platform setting and should be very
-> easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
-> and possibly able to extend for traditional (non-LPAE)
-> page tables without a lot of duplication.
+> ARM GICv2m specification extends GICv2 to support MSI(-X) with
+> a new set of register frames. This patch introduces support for
+> the non-secure GICv2m register frame.
+> 
+> The driver currently matchs "arm,gic-400-plus" in device tree binding,
+> which implements GICv2m.
+> 
+> The "msi-controller" keyword in ARM GIC devicetree binding is used to indentify
+> GIC driver that it should enable MSI(-X) support, The region of GICv2m MSI
+> register frame is specified using the register frame index 4 in the device tree.
+> MSI support is optional.
+> 
+> Each GIC maintains an "msi_chip" structure. To discover the msi_chip,
+> PCI host driver can do the following:
+> 
+>     struct device_node *gic_node = of_irq_find_parent(pdev->dev.of_node);
+>     pcie_bus->msi_chip = of_pci_find_msi_chip_by_node(gic_node);
+> 
+> Cc: Mark Rutland <Mark.Rutland@arm.com>
+> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
+> Cc: Will Deacon <Will.Deacon@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  Documentation/devicetree/bindings/arm/gic.txt |  20 +-
+>  arch/arm64/Kconfig                            |   1 +
+>  drivers/irqchip/Kconfig                       |   7 +
+>  drivers/irqchip/Makefile                      |   1 +
+>  drivers/irqchip/irq-gic-v2m.c                 | 251 ++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-v2m.h                 |  13 ++
+>  drivers/irqchip/irq-gic.c                     |  23 ++-
+>  drivers/irqchip/irq-gic.h                     |  31 +++-
+>  8 files changed, 334 insertions(+), 13 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-gic-v2m.c
+>  create mode 100644 drivers/irqchip/irq-gic-v2m.h
 
-I'm going to have to profess no knowledge of how the LPAE stuff works.
-LPAE is something I can't run, and something that I was not involved
-in its creation.  Therefore, I know very little about it and zero
-experience thereof.
+Applied to irqchip/gic with some minor typos fixed in the commit
+message.
 
->From a glance over that function, I think that is unsafe for all the
-reasons I've stated.  However, I'll pass this over to Will Deacon
-to comment further on.
+thx,
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Jason.
