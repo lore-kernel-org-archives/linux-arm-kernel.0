@@ -1,58 +1,50 @@
-From: pramod.gurav.etc@gmail.com (pramod gurav)
-Date: Thu, 17 Jul 2014 16:18:02 +0530
-Subject: [PATCH 1/3] mfd: qpnp-spmi: add support for Qualcomm QPNP PMICs
-In-Reply-To: <1404834869-23049-2-git-send-email-svarbanov@mm-sol.com>
-References: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
- <1404834869-23049-2-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <CAMf-jSk5+c1QYfKfjqmstB60bM3adK5tgAYwmPKhOi6cSeM_WA@mail.gmail.com>
+From: marcus.shawcroft@arm.com (Marcus Shawcroft)
+Date: Thu, 17 Jul 2014 11:46:24 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+ <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+Message-ID: <53C7A980.8050601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Mark Brown
-Hi Josh/Stanimir,
-
-
-On Tue, Jul 8, 2014 at 9:24 PM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
-> From: Josh Cartwright <joshc@codeaurora.org>
+On 17/07/14 11:39, Peter Maydell wrote:
+> On 16 July 2014 16:57, Will Deacon <will.deacon@arm.com> wrote:
+>> I don't have hugely strong opinions about this, but I don't see why it's
+>> useful to print exactly the same line out `n' times; once for each CPU. We
+>> only pass one set of hwcaps to ELF executables via auxv, so why do we need
+>> to duplicate things here?
 >
-> The Qualcomm QPNP PMIC chips are components used with the
-> Snapdragon 800 series SoC family.  This driver exists
-.
-[SNIP]
-.
-> +config MFD_QPNP_SPMI
-> +       tristate "Qualcomm QPNP SPMI PMIC"
-> +       depends on ARCH_QCOM || COMPILE_TEST
-> +       depends on OF
-> +       select MFD_CORE
-> +       select REGMAP_SPMI
-REGMAP_SPMI use SPMI functions.
-
-https://patchwork.kernel.org/patch/4566591/
-
-> +       help
-> +         This enables support for the Qualcomm QPNP SPMI PMICs.
-> +         These PMICs are currently used with the Snapdragon 800 series of
-> +         SoCs.  Note, that this will only be useful paired with descriptions
-.
-[snip]
-.
-> +
-> +MODULE_DESCRIPTION("QPNP PMIC SPMI driver");
-> +MODULE_ALIAS("platform:" KBUILD_MODNAME);
-> +MODULE_AUTHOR("The Linux Foundation");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.7.0.4
+> I think there are a couple of lines of argument here:
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> (1) Precedent from other architectures. Both 32-bit ARM and
+> x86 have the feature-info be per-core; we should do the same
+> for 64-bit ARM unless there's a really strong reason not to.
 
+Agreed.
 
+> (2) Making this be not-per-CPU backs us into a corner. If we
+> have the feature flags per-core, and it turns out that they're
+> never ever different between cores even on heterogenous
+> CPUs, there's no problem. If we have the feature flags be
+> listed only once, and then in future we do want to support
+> some minor form of heterogeny between cores, then we're
+> stuck with a compatibility break because the format doesn't
+> let us express that. (Perhaps there might be a big.LITTLE
+> system where only the big cores had the crypto extensions,
+> to pick a random possibility where the kernel doesn't need to
+> care but userspace could take advantage by restricting itself
+> to running on only the big cores). I think this makes the
+> choice pretty straightforward, since there's basically no
+> benefit to having only a single features line.
 
--- 
-Thanks and Regards
-Pramod
+Agreed.
+
+This patch is in itself an ABI break for anyone consuming /proc/cpuinfo. 
+  Making this be not-per-cpu just sets us up for another ABI break in 
+the future, not ideal.
+
+Cheers
+/Marcus
