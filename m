@@ -1,68 +1,125 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 17 Jul 2014 10:52:50 -0700
-Subject: [PATCH v11 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <CAGXu5j+dFZdnnK8f-HRrUs2vLeyhWyHh_AY-OynDcp-Ye+dy7Q@mail.gmail.com>
-References: <1405547442-26641-1-git-send-email-keescook@chromium.org>
- <1405547442-26641-12-git-send-email-keescook@chromium.org>
- <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
- <CAGXu5j+dFZdnnK8f-HRrUs2vLeyhWyHh_AY-OynDcp-Ye+dy7Q@mail.gmail.com>
-Message-ID: <CAGXu5jJy0pW9X8YMhnfChtBO55EZKW6J7-+svKMBYP7WGM4PaA@mail.gmail.com>
+Date: Thu, 17 Jul 2014 11:08:33 -0700
+Subject: [PATCH v12 06/11] MIPS: add seccomp syscall
+In-Reply-To: <1405620518-18495-1-git-send-email-keescook@chromium.org>
+References: <1405620518-18495-1-git-send-email-keescook@chromium.org>
+Message-ID: <1405620518-18495-7-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 8:45 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Thu, Jul 17, 2014 at 8:04 AM, David Drysdale <drysdale@google.com> wrote:
->> On Wed, Jul 16, 2014 at 10:50 PM, Kees Cook <keescook@chromium.org> wrote:
->>> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
->>> index 9065d2c79c56..2125b83ccfd4 100644
->>> +/**
->>> + * seccomp_can_sync_threads: checks if all threads can be synchronized
->>> + *
->>> + * Expects sighand and cred_guard_mutex locks to be held.
->>> + *
->>> + * Returns 0 on success, -ve on error, or the pid of a thread which was
->>> + * either not in the correct seccomp mode or it did not have an ancestral
->>> + * seccomp filter.
->>> + */
->>> +static inline pid_t seccomp_can_sync_threads(void)
->>> +{
->>> +       struct task_struct *thread, *caller;
->>> +
->>> +       BUG_ON(!mutex_is_locked(&current->signal->cred_guard_mutex));
->>> +       BUG_ON(!spin_is_locked(&current->sighand->siglock));
->>> +
->>> +       if (current->seccomp.mode != SECCOMP_MODE_FILTER)
->>> +               return -EACCES;
->>
->> Quick question -- is it possible to apply the first filter and also synchronize
->> it across threads in the same operation?  If so, does this arm also need to
->> cope with seccomp.mode being SECCOMP_MODE_DISABLED?
->>
->> [seccomp_set_mode_filter() looks to call this via seccomp_attach_filter()
->> before it does seccomp_assign_mode()]
->
-> I don't entirely understand what you're asking. The threads gain the
-> filter and the mode before the current thread may gain the mode (if
-> it's the first time this has been called). Due to all the locks,
-> though, this isn't a problem. Is there a situation you see where there
-> might be a problem?
+Wires up the new seccomp syscall.
 
-Just to follow up for posterity on lkml: the problem was that mode was
-being set in "current" _after_ sync, so the mode check in can_sync
-would fail if "current" was not yet in filter mode. (i.e. the first
-attached filter could not have the TSYNC flag.) This check was
-redundant with the attach_filter entry point checks, and protected
-nothing, so it has been removed and a new test added to the seccomp
-regression test suite. :)
+Signed-off-by: Kees Cook <keescook@chromium.org>
+Reviewed-by: Oleg Nesterov <oleg@redhat.com>
+---
+ arch/mips/include/uapi/asm/unistd.h |   15 +++++++++------
+ arch/mips/kernel/scall32-o32.S      |    1 +
+ arch/mips/kernel/scall64-64.S       |    1 +
+ arch/mips/kernel/scall64-n32.S      |    1 +
+ arch/mips/kernel/scall64-o32.S      |    1 +
+ 5 files changed, 13 insertions(+), 6 deletions(-)
 
-I sent it as a new patch on top of v11, instead of respinning
-everything as v12. If that's not preferred, I can send v12 with this
-fix incorporated.
-
-Thanks!
-
--Kees
-
+diff --git a/arch/mips/include/uapi/asm/unistd.h b/arch/mips/include/uapi/asm/unistd.h
+index 5805414777e0..9bc13eaf9d67 100644
+--- a/arch/mips/include/uapi/asm/unistd.h
++++ b/arch/mips/include/uapi/asm/unistd.h
+@@ -372,16 +372,17 @@
+ #define __NR_sched_setattr		(__NR_Linux + 349)
+ #define __NR_sched_getattr		(__NR_Linux + 350)
+ #define __NR_renameat2			(__NR_Linux + 351)
++#define __NR_seccomp			(__NR_Linux + 352)
+ 
+ /*
+  * Offset of the last Linux o32 flavoured syscall
+  */
+-#define __NR_Linux_syscalls		351
++#define __NR_Linux_syscalls		352
+ 
+ #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
+ 
+ #define __NR_O32_Linux			4000
+-#define __NR_O32_Linux_syscalls		351
++#define __NR_O32_Linux_syscalls		352
+ 
+ #if _MIPS_SIM == _MIPS_SIM_ABI64
+ 
+@@ -701,16 +702,17 @@
+ #define __NR_sched_setattr		(__NR_Linux + 309)
+ #define __NR_sched_getattr		(__NR_Linux + 310)
+ #define __NR_renameat2			(__NR_Linux + 311)
++#define __NR_seccomp			(__NR_Linux + 312)
+ 
+ /*
+  * Offset of the last Linux 64-bit flavoured syscall
+  */
+-#define __NR_Linux_syscalls		311
++#define __NR_Linux_syscalls		312
+ 
+ #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
+ 
+ #define __NR_64_Linux			5000
+-#define __NR_64_Linux_syscalls		311
++#define __NR_64_Linux_syscalls		312
+ 
+ #if _MIPS_SIM == _MIPS_SIM_NABI32
+ 
+@@ -1034,15 +1036,16 @@
+ #define __NR_sched_setattr		(__NR_Linux + 313)
+ #define __NR_sched_getattr		(__NR_Linux + 314)
+ #define __NR_renameat2			(__NR_Linux + 315)
++#define __NR_seccomp			(__NR_Linux + 316)
+ 
+ /*
+  * Offset of the last N32 flavoured syscall
+  */
+-#define __NR_Linux_syscalls		315
++#define __NR_Linux_syscalls		316
+ 
+ #endif /* _MIPS_SIM == _MIPS_SIM_NABI32 */
+ 
+ #define __NR_N32_Linux			6000
+-#define __NR_N32_Linux_syscalls		315
++#define __NR_N32_Linux_syscalls		316
+ 
+ #endif /* _UAPI_ASM_UNISTD_H */
+diff --git a/arch/mips/kernel/scall32-o32.S b/arch/mips/kernel/scall32-o32.S
+index 3245474f19d5..ab02d14f1b5c 100644
+--- a/arch/mips/kernel/scall32-o32.S
++++ b/arch/mips/kernel/scall32-o32.S
+@@ -578,3 +578,4 @@ EXPORT(sys_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr		/* 4350 */
+ 	PTR	sys_renameat2
++	PTR	sys_seccomp
+diff --git a/arch/mips/kernel/scall64-64.S b/arch/mips/kernel/scall64-64.S
+index be2fedd4ae33..010dccf128ec 100644
+--- a/arch/mips/kernel/scall64-64.S
++++ b/arch/mips/kernel/scall64-64.S
+@@ -431,4 +431,5 @@ EXPORT(sys_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr		/* 5310 */
+ 	PTR	sys_renameat2
++	PTR	sys_seccomp
+ 	.size	sys_call_table,.-sys_call_table
+diff --git a/arch/mips/kernel/scall64-n32.S b/arch/mips/kernel/scall64-n32.S
+index c1dbcda4b816..c3b3b6525df5 100644
+--- a/arch/mips/kernel/scall64-n32.S
++++ b/arch/mips/kernel/scall64-n32.S
+@@ -424,4 +424,5 @@ EXPORT(sysn32_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr
+ 	PTR	sys_renameat2			/* 6315 */
++	PTR	sys_seccomp
+ 	.size	sysn32_call_table,.-sysn32_call_table
+diff --git a/arch/mips/kernel/scall64-o32.S b/arch/mips/kernel/scall64-o32.S
+index f1343ccd7ed7..bb1550b1f501 100644
+--- a/arch/mips/kernel/scall64-o32.S
++++ b/arch/mips/kernel/scall64-o32.S
+@@ -557,4 +557,5 @@ EXPORT(sys32_call_table)
+ 	PTR	sys_sched_setattr
+ 	PTR	sys_sched_getattr		/* 4350 */
+ 	PTR	sys_renameat2
++	PTR	sys_seccomp
+ 	.size	sys32_call_table,.-sys32_call_table
 -- 
-Kees Cook
-Chrome OS Security
+1.7.9.5
