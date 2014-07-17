@@ -1,71 +1,97 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Jul 2014 11:08:40 +0200
-Subject: [PATCH 00/14] clk: sunxi: Improve MMC clocks support
-Message-ID: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 17 Jul 2014 11:08:54 +0200
+Subject: [PATCH 14/14] clk: sunxi: Remove custom phase function
+In-Reply-To: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1405588134-2396-15-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Now that we don't have any user left for our custom phase function, we can
+safely remove this hack from the code.
 
-Here is an attempt at improving the MMC clock support in the Allwinner
-SoCs.
-
-Until now, the MMC clocks were having a custom phase function that was
-directly setting an obscure value in the right register, because we
-were not really having any idea of what these values were.
-
-Now that we have more informations, we can introduce a common function
-call to get and set the phase of a particular clock, and use this in
-both our provider and our client.
-
-Another issue we had so far on the A13 was that, out of reset, the
-PLL6 driving the MMC was running too high to be working. We can solve
-that by adding two new properties in the DT to setup the rate
-constraints we might have on a clock.
-
-Thanks,
-Maxime
-
-Maxime Ripard (13):
-  clk: Introduce new frequency boundaries properties
-  clk: sunxi: factors: Implement clock min and max frequencies
-  ARM: sunxi: sun5i: Enforce max frequency on PLL6
-  clk: Add a function to retrieve phase
-  clk: sunxi: factors: Invert the probing logic
-  clk: sunxi: Introduce mbus compatible
-  ARM: sunxi: dt: Switch to the new mbus compatible
-  clk: sunxi: Move mod0 clock to a file of its own
-  clk: sunxi: Move mbus to mod0 file
-  ARM: sunxi: dt: Add sample and output mmc clocks
-  clk: sunxi: mod0: Introduce MMC proper phase handling
-  mmc: sunxi: Convert MMC driver to the standard clock phase API
-  clk: sunxi: Remove custom phase function
-
-Mike Turquette (1):
-  clk: introduce clk_set_phase function & callback
-
- .../devicetree/bindings/clock/clock-bindings.txt   |   2 +
- Documentation/devicetree/bindings/clock/sunxi.txt  |   3 +
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |   8 +-
- arch/arm/boot/dts/sun4i-a10.dtsi                   | 104 +++++++-
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |  81 +++++-
- arch/arm/boot/dts/sun5i-a13.dtsi                   |  83 +++++-
- arch/arm/boot/dts/sun6i-a31.dtsi                   | 104 +++++++-
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 106 +++++++-
- drivers/clk/clk.c                                  |  95 ++++++-
- drivers/clk/sunxi/Makefile                         |   1 +
- drivers/clk/sunxi/clk-factors.c                    | 129 +++++++++-
- drivers/clk/sunxi/clk-factors.h                    |  18 +-
- drivers/clk/sunxi/clk-mod0.c                       | 283 +++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                      | 189 +-------------
- drivers/mmc/host/sunxi-mmc.c                       |  72 ++++--
- include/linux/clk-private.h                        |   1 +
- include/linux/clk-provider.h                       |  10 +
- include/linux/clk.h                                |  29 +++
- include/linux/clk/sunxi.h                          |  22 --
- 19 files changed, 1050 insertions(+), 290 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-mod0.c
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 37 -------------------------------------
+ include/linux/clk/sunxi.h     | 22 ----------------------
+ 2 files changed, 59 deletions(-)
  delete mode 100644 include/linux/clk/sunxi.h
 
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 46f21392a061..85061f76d793 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -361,43 +361,6 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
+ }
+ 
+ /**
+- * clk_sunxi_mmc_phase_control() - configures MMC clock phase control
+- */
+-
+-void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output)
+-{
+-	#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
+-	#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
+-
+-	struct clk_hw *hw = __clk_get_hw(clk);
+-	struct clk_composite *composite = to_clk_composite(hw);
+-	struct clk_hw *rate_hw = composite->rate_hw;
+-	struct clk_factors *factors = to_clk_factors(rate_hw);
+-	unsigned long flags = 0;
+-	u32 reg;
+-
+-	if (factors->lock)
+-		spin_lock_irqsave(factors->lock, flags);
+-
+-	reg = readl(factors->reg);
+-
+-	/* set sample clock phase control */
+-	reg &= ~(0x7 << 20);
+-	reg |= ((sample & 0x7) << 20);
+-
+-	/* set output clock phase control */
+-	reg &= ~(0x7 << 8);
+-	reg |= ((output & 0x7) << 8);
+-
+-	writel(reg, factors->reg);
+-
+-	if (factors->lock)
+-		spin_unlock_irqrestore(factors->lock, flags);
+-}
+-EXPORT_SYMBOL(clk_sunxi_mmc_phase_control);
+-
+-
+-/**
+  * sunxi_factors_clk_setup() - Setup function for factor clocks
+  */
+ 
+diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
+deleted file mode 100644
+index aed28c4451d9..000000000000
+--- a/include/linux/clk/sunxi.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Copyright 2013 - Hans de Goede <hdegoede@redhat.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef __LINUX_CLK_SUNXI_H_
+-#define __LINUX_CLK_SUNXI_H_
+-
+-#include <linux/clk.h>
+-
+-void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output);
+-
+-#endif
 -- 
 2.0.1
