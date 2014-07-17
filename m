@@ -1,44 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 09:12:40 -0400
-Subject: [PATCH 2/4 V3] irqchip: gic: Restructuring ARM GIC code
-In-Reply-To: <1404947104-21345-3-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-3-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140717131240.GL13108@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Jul 2014 14:12:24 +0100
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <6510599.Qoc205T3v7@wuerfel>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140717102425.34fe0181@free-electrons.com>
+ <20140717083342.GS21766@n2100.arm.linux.org.uk> <6510599.Qoc205T3v7@wuerfel>
+Message-ID: <20140717131224.GW21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 06:05:02PM -0500, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Thu, Jul 17, 2014 at 02:39:42PM +0200, Arnd Bergmann wrote:
+> On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
+> > No - the problem is that we're running from the page table in question
+> > with global mappings, and we need to switch all these mappings, including
+> > the ones we're currently using to execute from.
+> > 
+> > We can't even create a new page table and switch to it because the
+> > mappings in question are global mappings.
+> > 
+> > The only way to do that safely from an architectural point of view would
+> > be to turn the MMU off, and drop back to assembly code to change the
+> > page tables, and re-enable the MMU.  For something as obscure as Marvell's
+> > coherency stuff, that's not something I want to see in core code.
 > 
-> This patch restructures the code to prepare for future MSI support.
-> It moves the declaration of structures and functions into the header file,
-> and omit the static prefix.
-> 
-> Since we are planing to have different irq_chip for GICv2m, the patch adds
-> irq_chip pointer in the gic_chip_data which is initialized during probing phase.
-> 
-> This should not have any functional changes.
-> 
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->  drivers/irqchip/irq-gic.c | 65 +++++++++++++++++++++--------------------------
->  drivers/irqchip/irq-gic.h | 52 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 81 insertions(+), 36 deletions(-)
->  create mode 100644 drivers/irqchip/irq-gic.h
+> Is this different from what we do in the LPAE version of
+> early_paging_init()? That code already adjusts all the page
+> table entries on a per-platform setting and should be very
+> easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
+> and possibly able to extend for traditional (non-LPAE)
+> page tables without a lot of duplication.
 
-Applied to irqchip/gic.  With a dependency on irqchip/urgent for
+I'm going to have to profess no knowledge of how the LPAE stuff works.
+LPAE is something I can't run, and something that I was not involved
+in its creation.  Therefore, I know very little about it and zero
+experience thereof.
 
-  144cb08864ed irqchip: gic: Add binding probe for ARM GIC400
+>From a glance over that function, I think that is unsafe for all the
+reasons I've stated.  However, I'll pass this over to Will Deacon
+to comment further on.
 
-As a result, I had to hand-jam the last hunk for irq-gic.c.  Please
-double-check my work.
-
-thx,
-
-Jason.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
