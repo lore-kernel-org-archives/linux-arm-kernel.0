@@ -1,41 +1,44 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 17 Jul 2014 09:51:33 +0000
-Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
-In-Reply-To: <20140717094101.GD21153@arm.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
- <20140716161715.GU29414@arm.com> <20140716220422.GB18109@gup76>
- <20140717094101.GD21153@arm.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1727697D@AcuExch.aculab.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 17 Jul 2014 11:50:20 +0200
+Subject: [PATCH v2 00/14] AT91: PIT: Cleanups and move to
+ drivers/clocksource
+In-Reply-To: <20140710075105.GA27469@lukather>
+References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140710075105.GA27469@lukather>
+Message-ID: <20140717095020.GB20328@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon
-...
-> > > > +	BUG_ON(imm < 0 || imm > 65535);
-> > >
-> > > Do this check with masking instead?
-> >
-> > Ok, if you prefer, I can change it to:
-> >
-> > 	BUG_ON(imm & ~GENMASK(15, 0));
+On Thu, Jul 10, 2014 at 09:51:05AM +0200, Maxime Ripard wrote:
+> Hi Daniel,
+> 
+> On Tue, Jul 01, 2014 at 11:33:13AM +0200, Maxime Ripard wrote:
+> > Hi everyone,
+> > 
+> > This series cleans up the PIT driver in order for it to not depend on
+> > anything in mach-at91 anymore, and in the end move it out of
+> > mach-at91.
+> > 
+> > Along the way, these patches also do a bit of cleanup.
+> > 
+> > This has been tested on a G45-EK without DT and an Xplained with DT.
+> > 
+> 
+> Even though most of this patches are not clocksource related, it would
+> be great if we could at least get an acked-by on the last patch that
+> moves the driver to drivers/clocksource, since it pretty much becomes
+> your burden :)
 
-Gah - then anyone reading the code has to look up another define.
-There isn't a prize for the most complicated method of defining
-a constant that can never change.
+Ping?
 
-> Sure, that or use a named constant for the upper-bound (SZ_64K - 1).
-
-There is nothing wrong with the original code.
-Maybe use 0xffff for those people (are there any) that don't know
-their powers of two.
-
-These are strong constants, they aren't going to be changed to any
-other value, and it is unlikely that anyone will want to search for
-their uses.
-
-I presume that SZ_64K is defined somewhere to 0x10000u.
-But IMHO using it (instead of the literal) doesn't make code
-any more readable.
-
-	David
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/c9ad4e89/attachment.sig>
