@@ -1,37 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Jul 2014 12:26:42 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-Message-ID: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Jul 2014 13:34:38 +0200
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <20140717111912.GA16025@shlinux1.ap.freescale.net>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5456516.0fVZeXjF8k@wuerfel>
+ <20140717111912.GA16025@shlinux1.ap.freescale.net>
+Message-ID: <14435027.UvktXyQjy4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Thursday 17 July 2014 19:19:15 Peter Chen wrote:
+> 
+> Currently, we are designing a generic driver, we don't know what's the
+> hardware architecture, we are trying to find a solution how to set
+> dma mask for all possible devices which will use this driver, Antoine's
+> this patch is trying to cover this feature.
+> 
+> For example, 
+> 
+> Marvell Berlin doesn't need to set dma mask specific.
+> http://marc.info/?l=linux-arm-kernel&m=140205228507045&w=2
+> http://www.spinics.net/lists/linux-usb/msg110598.html
+> 
+> Xilinx zynq needs to set dma mask as 0xFFFFFFF0
+> http://marc.info/?l=linux-usb&m=140384129921706&w=2
+> 
+> FSL i.mx needs to set dma mask as DMA_BIT_MASK(32)
+> https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/tree/drivers/usb/chipidea/ci_hdrc_imx.c?h=usb-next
 
-Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-interface) removed the arch parameter from __audit_syscall_entry() and
-updated the only current user in mainline but this breaks the ARMv8 audit
-code that has been added in -next. Fix this by making the equivalent
-update to ARMv8.
+Ok, I see now. I think we can safely drop it completely then:
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/kernel/ptrace.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+- Berlin was only recently added and doesn't need to set the
+  mask because the common code handles it just fine now.
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 70526cfda056..310842e3d477 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		trace_sys_enter(regs, regs->syscallno);
- 
--	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
--		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-+	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-+			    regs->regs[2], regs->regs[3]);
- 
- 	return regs->syscallno;
- }
--- 
-2.0.1
+- i.mx was added earlier, at a time where it was still necessary
+
+- zynq just made a mistake, 0xFFFFFFF0 was never a valid mask
+  and just happened to work by accident.
+
+In summary, the 32-bit default mask will work on all of them,
+and we need no special code or DT properties for it.
+
+	Arnd
