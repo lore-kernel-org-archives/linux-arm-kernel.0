@@ -1,47 +1,64 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 09:18:54 -0400
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Jul 2014 14:31:08 +0100
+Subject: [PATCH] irqchip: gic: Add binding probe for ARM GIC400
+In-Reply-To: <2621565.f5eISveXXJ@diego>
 References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140717131854.GN13108@titan.lakedaemon.net>
+ <1404947104-21345-2-git-send-email-suravee.suthikulpanit@amd.com>
+ <2932284.F1eaAf8ArJ@diego> <2621565.f5eISveXXJ@diego>
+Message-ID: <20140717133108.GL30313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
+On Mon, Jul 14, 2014 at 11:03:03PM +0100, Heiko St?bner wrote:
 > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> This patch set introduces support for MSI(-X) in GICv2m specification,
-> which is implemented in some variation of GIC400.
+> Commit 3ab72f9156bb "dt-bindings: add GIC-400 binding" added the
+> "arm,gic-400" compatible string, but the corresponding IRQCHIP_DECLARE
+> was never added to the gic driver.
 > 
-> This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
-> (https://lkml.org/lkml/2014/3/14/320).
+> Therefore add the missing irqchip declaration for it.
 > 
-> Changes in V3:
->     * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
->       (per Jason Cooper request)
->     * Misc fix/clean up per Mark Rutland comments
->     * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
->     * Patch 4 is new to the series:
->         * Add ARM64-specific version arch_setup_msi_irqs() to allow support
->           for Multiple MSI.
->         * Add support for Multiple MSI for GICv2m.
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> Suravee Suthikulpanit (4):
->   irqchip: gic: Add binding probe for ARM GIC400
->   irqchip: gic: Restructuring ARM GIC code
->   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
->   irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
+> Removed additional empty line and adapted commit message to mark it
+> as fixing an issue.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> As I really need this, I took the liberty of adapting the patch accordingly
+> to make it apply on top of the current irqchip/for-next (or urgent) and
+> explicitly state the fixed issue. Hope that is ok
 
-Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
-irqchip/gic with irqchip/urgent merged in.  To facilitate
-testing/merging, I've prepared an unsigned tag for you on the
-irqchip/gic branch:
+While this is a fix that we should have, I'm not certain I see why this
+is urgent. A dt can already have:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/deps-irqchip-gic-3.17-2
+	compatible = "arm,gic-400", "arm,cortex-a15-gic";
 
-Unless you tell me I broke something horribly, this tag and irqchip/gic
-up to that point are stable.
+Which will work _today_, before this patch. If we need to treat the A15
+GIC string differently, we'll have to ensure we support the GIC 400
+string first.
 
-thx,
+Thanks,
+Mark.
 
-Jason.
+> 
+>  drivers/irqchip/irq-gic.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 9d26643..6ff28b4 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1020,6 +1020,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>  	gic_cnt++;
+>  	return 0;
+>  }
+> +IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
+>  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
+>  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+>  IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+> -- 
+> 1.9.0
+> 
+> 
+> 
+> 
