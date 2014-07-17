@@ -1,44 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Jul 2014 12:41:23 +0200
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <20140717101723.GR17528@sirena.org.uk>
-References: <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
- <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
- <20140716071237.GA7978@ulmo>
- <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
- <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
- <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
- <20140717074444.GB18640@ulmo>
- <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
- <20140717101723.GR17528@sirena.org.uk>
-Message-ID: <20140717104121.GF17877@ulmo>
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Thu, 17 Jul 2014 16:18:02 +0530
+Subject: [PATCH 1/3] mfd: qpnp-spmi: add support for Qualcomm QPNP PMICs
+In-Reply-To: <1404834869-23049-2-git-send-email-svarbanov@mm-sol.com>
+References: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
+ <1404834869-23049-2-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <CAMf-jSk5+c1QYfKfjqmstB60bM3adK5tgAYwmPKhOi6cSeM_WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 11:17:23AM +0100, Mark Brown wrote:
-> On Thu, Jul 17, 2014 at 05:55:36PM +0900, Alexandre Courbot wrote:
-> 
-> > Right. It may very well be that a single flag specifier (as opposed to
-> > an array) will be enough for this case. If you need to request some
-> > GPIOs as input and some other as output then they are clearly
-> > different functions and requesting them together would be an abuse of
-> > the API.
-> 
-> Not so sure about that - what about requesting GPIOs for a bidirectional
-> bus?  Thinking about SPI bitbanging here.
++Mark Brown
+Hi Josh/Stanimir,
 
-Wouldn't you want to use a different means that the gpiod_array_*() API
-to handle those cases? gpiod_array_*() is probably most useful to handle
-bulk operations on a set of GPIOs that do essentially the same thing. If
-you get and then need to index into that array to handle them all
-differently then you don't gain very much.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/7c167e5d/attachment-0001.sig>
+On Tue, Jul 8, 2014 at 9:24 PM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+> From: Josh Cartwright <joshc@codeaurora.org>
+>
+> The Qualcomm QPNP PMIC chips are components used with the
+> Snapdragon 800 series SoC family.  This driver exists
+.
+[SNIP]
+.
+> +config MFD_QPNP_SPMI
+> +       tristate "Qualcomm QPNP SPMI PMIC"
+> +       depends on ARCH_QCOM || COMPILE_TEST
+> +       depends on OF
+> +       select MFD_CORE
+> +       select REGMAP_SPMI
+REGMAP_SPMI use SPMI functions.
+
+https://patchwork.kernel.org/patch/4566591/
+
+> +       help
+> +         This enables support for the Qualcomm QPNP SPMI PMICs.
+> +         These PMICs are currently used with the Snapdragon 800 series of
+> +         SoCs.  Note, that this will only be useful paired with descriptions
+.
+[snip]
+.
+> +
+> +MODULE_DESCRIPTION("QPNP PMIC SPMI driver");
+> +MODULE_ALIAS("platform:" KBUILD_MODNAME);
+> +MODULE_AUTHOR("The Linux Foundation");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+Thanks and Regards
+Pramod
