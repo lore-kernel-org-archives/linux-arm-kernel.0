@@ -1,16 +1,16 @@
 From: dmurphy@ti.com (Dan Murphy)
-Date: Thu, 17 Jul 2014 11:45:28 -0500
-Subject: [v3 PATCH 3/6] ARM: dts: am33xx: Add prcm_resets node
+Date: Thu, 17 Jul 2014 11:45:30 -0500
+Subject: [v3 PATCH 5/6] ARM: dts: dra7: Add prm_resets node
 In-Reply-To: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
 References: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1405615531-15649-3-git-send-email-dmurphy@ti.com>
+Message-ID: <1405615531-15649-5-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the prcm_resets node to the prcm parent node.
+Add the prcm_resets node to the prm parent node.
 
-Add the am33xx_resets file to define the
-am33xx reset lines that are handled by this reset
+Add the draxx_resets file to define the
+dra7xx reset lines that are handled by this reset
 framework.
 
 Signed-off-by: Dan Murphy <dmurphy@ti.com>
@@ -18,19 +18,41 @@ Signed-off-by: Dan Murphy <dmurphy@ti.com>
 
 v3 - No changes
 
- arch/arm/boot/dts/am33xx-resets.dtsi |   42 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi        |    7 ++++++
- 2 files changed, 49 insertions(+)
- create mode 100644 arch/arm/boot/dts/am33xx-resets.dtsi
+ arch/arm/boot/dts/dra7.dtsi          |    7 +++
+ arch/arm/boot/dts/dra7xx-resets.dtsi |   82 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/dra7xx-resets.dtsi
 
-diff --git a/arch/arm/boot/dts/am33xx-resets.dtsi b/arch/arm/boot/dts/am33xx-resets.dtsi
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 8012763..f3a8819 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -93,6 +93,12 @@
+ 
+ 			prm_clockdomains: clockdomains {
+ 			};
++
++			prm_resets: resets {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				#reset-cells = <1>;
++			};
+ 		};
+ 
+ 		cm_core_aon: cm_core_aon at 4a005000 {
+@@ -998,3 +1004,4 @@
+ };
+ 
+ /include/ "dra7xx-clocks.dtsi"
++/include/ "dra7xx-resets.dtsi"
+diff --git a/arch/arm/boot/dts/dra7xx-resets.dtsi b/arch/arm/boot/dts/dra7xx-resets.dtsi
 new file mode 100644
-index 0000000..9260626
+index 0000000..4c4966d
 --- /dev/null
-+++ b/arch/arm/boot/dts/am33xx-resets.dtsi
-@@ -0,0 +1,42 @@
++++ b/arch/arm/boot/dts/dra7xx-resets.dtsi
+@@ -0,0 +1,82 @@
 +/*
-+ * Device Tree Source for AM33XX reset data
++ * Device Tree Source for DRA7XX reset data
 + *
 + * Copyright (C) 2014 Texas Instruments, Inc.
 + *
@@ -39,30 +61,70 @@ index 0000000..9260626
 + * published by the Free Software Foundation.
 + */
 +
-+&prcm_resets {
-+	gfx_rstctrl {
-+		reg = <0x1104>,
-+			  <0x1114>;
++&prm_resets {
++	dsp_rstctrl {
++		reg = <0x410>,
++			  <0x414>;
 +
-+		gfx_reset: gfx_reset {
++		dsp_reset: dsp_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++
++		dsp_mmu_reset: dsp_mmu_reset {
++			control-bit = <0x02>;
++			status-bit = <0x02>;
++		};
++	};
++
++	ipu_rstctrl {
++		reg = <0x510>,
++			  <0x514>;
++
++		ipu_cpu0_reset: ipu_cpu0_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++
++		ipu_cpu1_reset: ipu_cpu1_reset {
++			control-bit = <0x02>;
++			status-bit = <0x02>;
++		};
++
++		ipu_mmu_reset: ipu_mmu_reset {
++			control-bit = <0x04>;
++			status-bit = <0x04>;
++		};
++	};
++
++	iva_rstctrl {
++		reg = <0xf10>,
++			  <0xf14>;
++
++		iva_reset: iva_reset {
 +			control-bit = <0x01>;
 +			status-bit = <0x01>;
 +		};
 +	};
 +
-+	per_rstctrl {
-+		reg = <0xD00>,
-+			  <0xD0C>;
++	pcie_rstctrl {
++		reg = <0x1310>,
++			  <0x1314>;
 +
-+		iva_reset: iva_reset {
-+			control-bit = <0x04>;
-+			status-bit = <0x10>;
++		pcie1_reset: pcie1_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++
++		pcie2_reset: pcie2_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
 +		};
 +	};
 +
 +	device_rstctrl {
-+		reg = <0xf00>,
-+			  <0xf08>;
++		reg = <0x1D00>,
++			  <0x1D04>;
 +
 +		device_reset: device_reset {
 +			control-bit = <0x01>;
@@ -71,27 +133,5 @@ index 0000000..9260626
 +	};
 +
 +};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 4a4e02d..5cdc8f0 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -117,6 +117,12 @@
- 
- 			prcm_clockdomains: clockdomains {
- 			};
-+
-+			prcm_resets: resets {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#reset-cells = <1>;
-+			};
- 		};
- 
- 		scrm: scrm at 44e10000 {
-@@ -834,3 +840,4 @@
- };
- 
- /include/ "am33xx-clocks.dtsi"
-+/include/ "am33xx-resets.dtsi"
 -- 
 1.7.9.5
