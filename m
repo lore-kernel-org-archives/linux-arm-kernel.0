@@ -1,77 +1,64 @@
-From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
-Date: Thu, 17 Jul 2014 06:30:24 -0400 (EDT)
-Subject: [Patch v7 2/3] usb: phy: Add Qualcomm DWC3 HS/SS PHY drivers
-In-Reply-To: <CA+neC=McWS8=iSi2XShJyvc85Aw4PSmF-osNpVgJv42d9or1WQ@mail.gmail.com>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-3-git-send-email-agross@codeaurora.org>
- <CA+neC=McWS8=iSi2XShJyvc85Aw4PSmF-osNpVgJv42d9or1WQ@mail.gmail.com>
-Message-ID: <1405593024.423213197@apps.rackspace.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Jul 2014 11:30:34 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <20140716155747.GR29414@arm.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+Message-ID: <20140717103034.GD18203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 30, 2014 at 9:33 PM, Andy Gross <agross@codeaurora.org> wrote: 
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+On Wed, Jul 16, 2014 at 04:57:47PM +0100, Will Deacon wrote:
+> On Wed, Jul 16, 2014 at 04:32:47PM +0100, Mark Rutland wrote:
+> > The features are printed per-cpu to match the format used by other
+> > architectures, and are derived from the (globally uniform) hwcaps. In
+> > cases where this may report incorrect information, rework is required
+> > elsewhere to function with varying instruction set support, and the
+> > sanity checks should provide us with some advance notice (warnings and
+> > TAINT_CPU_OUT_OF_SPEC). If we're lucky, such systems will never exist.
 > 
-> These drivers handles control and configuration of the HS
-> and SS USB PHY transceivers. They are part of the driver
-.
-[snip]
-.
-> +#include <linux/usb/phy.h>
-> +
-> +/**
-> + *  USB QSCRATCH Hardware registers
-> + */
-
-unused define, can you please remove it
-
-> +#define QSCRATCH_CTRL_REG              (0x04)
-> +#define QSCRATCH_GENERAL_CFG           (0x08)
-> +#define PHY_CTRL_REG                   (0x10)
-> +#define PARAMETER_OVERRIDE_X_REG       (0x14)
-
-ditto
-
-> +#define CHARGING_DET_CTRL_REG          (0x18)
-
-ditto
-
-> +#define CHARGING_DET_OUTPUT_REG                (0x1c)
-
-ditto
-
-> +#define ALT_INTERRUPT_EN_REG           (0x20)
-
-ditto
-
-> +#define PHY_IRQ_STAT_REG               (0x24)
-
-ditto
-
-> +#define CGCTL_REG                      (0x28)
-> +
-> +#define PHY_3P3_VOL_MIN                        3050000 /* uV */
-> +#define PHY_3P3_VOL_MAX                        3300000 /* uV */
-> +#define PHY_3P3_HPM_LOAD               16000   /* uA */
-> +
-.
-[snip]
-.
-> +MODULE_ALIAS("platform:qcom-dwc3-ssphy");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("DesignWare USB3 QCOM SSPHY driver");
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> [...]
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+> > -	for_each_online_cpu(i) {
+> >  		/*
+> >  		 * glibc reads /proc/cpuinfo to determine the number of
+> >  		 * online processors, looking for lines beginning with
+> >  		 * "processor".  Give glibc what it expects.
+> >  		 */
+> >  #ifdef CONFIG_SMP
+> > -		seq_printf(m, "processor\t: %d\n", i);
+> > +		seq_printf(m, "processor\t: %d\n", c);
+> >  #endif
+> > +		seq_printf(m, "implementer\t: 0x%02x\n",
+> > +			   MIDR_IMPLEMENTOR(midr));
+> > +		seq_printf(m, "variant\t\t: 0x%x\n", MIDR_VARIANT(midr));
+> > +		seq_printf(m, "partnum\t\t: 0x%03x\n", MIDR_PARTNUM(midr));
+> > +		seq_printf(m, "revision\t: 0x%x\n", MIDR_REVISION(midr));
+> > +
+> > +		/* dump out the processor features */
+> > +		seq_puts(m, "features\t: ");
+> > +		for (i = 0; hwcap_str[i]; i++)
+> > +			if (elf_hwcap & (1 << i))
+> > +				seq_printf(m, "%s ", hwcap_str[i]);
+> 
+> I don't have hugely strong opinions about this, but I don't see why it's
+> useful to print exactly the same line out `n' times; once for each CPU. We
+> only pass one set of hwcaps to ELF executables via auxv, so why do we need
+> to duplicate things here?
+> 
+> Put another way, we're really treating the hwcaps as a system property
+> rather than a per-cpu property, so I think we should handle them as such.
 
-Regards,
-Kiran Padwal
+I agree. An argument would be that we expose per-cpu hwcap in
+/proc/cpuinfo so that whoever (human) looks at this can get an idea of
+what features are missing on some CPUs. The elf_hwcap exported to user
+via envp should only contain the common subset.
+
+But my worry is that code will start reading /proc/cpuinfo and make the
+wrong assumptions on heterogeneous systems, so I agree with Will's
+proposal of only printing the (common) CPU features once as a system
+property made available by the kernel.
+
+-- 
+Catalin
