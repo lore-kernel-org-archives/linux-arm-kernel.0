@@ -1,46 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Jul 2014 10:07:58 +0100
-Subject: [PATCH] arm64: Refactor compat.h into compat-types.h
-In-Reply-To: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
-References: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
-Message-ID: <20140717090758.GB21153@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 17 Jul 2014 11:08:43 +0200
+Subject: [PATCH 03/14] ARM: sunxi: sun5i: Enforce max frequency on PLL6
+In-Reply-To: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1405588134-2396-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 07:45:38AM +0100, Ian Campbell wrote:
-> This reduces the complexity of the includes needed for linux/stat.h and removes
-> some possibilities for causing include loops.
-> 
-> One such issue was exposed by the Debian kernel's application of the aufs
-> patches which led to:
-> 
-> In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
->                  from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
->                  from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
->                  from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
->                  from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
->                  from /?PKGBUILDDIR?/include/linux/stat.h:5,
->                  from /?PKGBUILDDIR?/include/linux/module.h:10,
->                  from /?PKGBUILDDIR?/init/main.c:15:
-> /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
->   int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
->                                                                 ^
-> /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-> 
-> This is due to an extra fs.h include added to mm.h leading to a loop in the
-> includes. Splitting out the type defintions from compat.h into compat-types.h
-> allows asm/stat.h to only include the types header and avoids the loop.
-> 
-> Full logs in http://buildd.debian-ports.org/status/fetch.php?pkg=linux&arch=arm64&ver=3.14.12-1&stamp=1405234443
-> 
-> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: debian-kernel at lists.debian.org
+PLL6 out of reset is running at 2.4GHz, which is outside of its operating
+boundaries.
 
-Looks good to me, but I note Arnd's prior comment about mm.h including fs.h
-being a bug. If that's true, then this patch isn't needed at all and aufs
-should be fixed instead.
+Enforce its maximum frequency as set in the datasheet to make sure we stays
+within these bounds.
 
-Will
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a13.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index bf86e65dd167..de89edc5e5b3 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -97,6 +97,7 @@
+ 			reg = <0x01c20028 0x4>;
+ 			clocks = <&osc24M>;
+ 			clock-output-names = "pll6_sata", "pll6_other", "pll6";
++			clock-max-frequency = <1200000000>;
+ 		};
+ 
+ 		/* dummy is 200M */
+-- 
+2.0.1
