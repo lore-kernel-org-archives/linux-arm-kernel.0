@@ -1,68 +1,56 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Jul 2014 11:04:21 -0500
-Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <53C7E7BE.7030403@linutronix.de>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
- <20140717145430.GF10459@saruman.home>
- <53C7E7BE.7030403@linutronix.de>
-Message-ID: <20140717160421.GJ10459@saruman.home>
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Thu, 17 Jul 2014 21:34:37 +0530
+Subject: [PATCH v4 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <CAJAp7OggtuxPSc0yXzMCs10aQ2R6E+m4Bu8sdLJopvrZ3+5Rmg@mail.gmail.com>
+References: <1405465241-28684-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1405465241-28684-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAMf-jS=tkBYQ7mXp71F2_rPo6DE3e4C=sFHqg3Q26a08m6NxJQ@mail.gmail.com>
+ <CAJAp7OggtuxPSc0yXzMCs10aQ2R6E+m4Bu8sdLJopvrZ3+5Rmg@mail.gmail.com>
+Message-ID: <CAMf-jSkvC4P8-06XbmMH2i0xHvaYwH_VbfG6Ypp3F+ct5ZxM+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 05:11:58PM +0200, Sebastian Andrzej Siewior wrote:
-> On 07/17/2014 04:54 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Wed, Jul 16, 2014 at 04:45:03PM +0200, Sebastian Andrzej Siewior wrote:
-> >> +static int omap_8250_startup(struct uart_port *port)
-> >> +{
-> >> +	struct uart_8250_port *up =
-> >> +		container_of(port, struct uart_8250_port, port);
-> >> +	struct omap8250_priv *priv = port->private_data;
-> >> +
-> >> +	int ret;
-> >> +
-> >> +	if (priv->wakeirq) {
-> >> +		ret = request_irq(priv->wakeirq, omap_wake_irq,
-> >> +				port->irqflags, "wakeup irq", port);
-> >> +		if (ret)
-> >> +			return ret;
-> >> +		disable_irq(priv->wakeirq);
-> >> +	}
-> >> +
-> >> +	ret = serial8250_do_startup(port);
-> >> +	if (ret)
-> >> +		goto err;
-> >> +
-> >> +	pm_runtime_get_sync(port->dev);
-> > 
-> > should this pm_runtime_get_sync() be placed above
-> > serial8250_do_startup() call ?
-> 
-> I don't think it matters since serial8250_do_startup() has its own
-> pm_runtime_get_sync().
+On Thu, Jul 17, 2014 at 3:50 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
+>> On Wed, Jul 16, 2014 at 4:30 AM, Bjorn Andersson
+>> <bjorn.andersson@sonymobile.com> wrote:
+> [...]
+>>> +       rpm at 108000 {
+>>> +               compatible = "qcom,rpm-msm8960";
+>>> +               reg = <0x108000 0x1000>;
+>>> +               qcom,ipc = <&apcs 0x8 2>;
+>>
+>> Tried adding this but there is no reference to 'apcs' registers itself
+>> in any dts.
+>>
+>> Without these changes rpm breaks hence not able to test SATA which needs rpm.
+>>
+>
+> Hi Pramod,
+>
+> Unfortunately the ipc bits resides in a block that needs to be
+> accesses by various device drivers so I had to extract the access; so
+> you now need to reference it via a syscon handle and offset instead -
+> as described above.
+>
+> The apcs node I used for testing this with looks like this:
+>
+> apcs: syscon at 2011000 {
+>     compatible = "syscon";
+>     reg = <0x2011000 0x1000>;
+> };
+>
+> Enable CONFIG_MFD_SYSCON and put the dt snippet somewhere under soc
+> and you should be good.
+>
 
-oh right, saw that now.
+Thanks Bjorn. Did this and seen things working (sata atleast).
 
-> ->startup(), ->shutdown() are called via omap callbacks so we could
-> spare in the 8250-core if we do it in the omap code before invoking the
-> function. The same goes for serial8250_set_termios() which is not used
-> by omap but has those runtime-pm stuff, too.
-> It would be wrong if someone would use the serial8250_do_startup()
-> without his own runtime-pm get but it is omap only which does this
-> things.
-> So it is not used by anyone else (right now) and if you want to keep it
-> to a minimum I could remove them from those places.
+> Regards,
+> Bjorn
 
-I don't think it matters as long as the calls are balanced.
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/fe4ab5fe/attachment.sig>
+Thanks and Regards
+Pramod
