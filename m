@@ -1,25 +1,54 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 17 Jul 2014 12:02:36 +0200
-Subject: [PATCH 1/2 v2] i2c: exynos5: remove an unnecessary read of
- FIFO_STATUS register
-In-Reply-To: <1403759698-15624-1-git-send-email-ch.naveen@samsung.com>
-References: <1403759698-15624-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140717100235.GB2740@katana>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 17 Jul 2014 12:06:20 +0200
+Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140717081232.GH18374@atomide.com>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
+ <20140717070859.GD18374@atomide.com> <20140717074219.GA29193@linutronix.de>
+ <20140717081232.GH18374@atomide.com>
+Message-ID: <53C7A01C.50107@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 10:44:57AM +0530, Naveen Krishna Chatradhi wrote:
-> This patch removes an extra read of FIFO_STATUS register in the interrrupt
-> service routine. Which is read again before the actual use.
+On 07/17/2014 10:12 AM, Tony Lindgren wrote:
+> Hmm it could be that it works for a while because the clocks are on
+> from the bootloader and pm_runtime calls won't do anything. This
+> could happen if the interconnect data based on the ti,hwmods entry
+> is not getting matched to the new driver. This gets initialized when
+> the device entry gets created in omap_device_build_from_dt().
 > 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Or maybe something now affects the clock aliases? It seems that we
+> are still missing the clocks entries in the .dtsi files, see the
+> mappings with $ git grep uart drivers/clk/ti/
 
-Applied to for-next, thanks!
+I've been looking for something completely different while I noticed
+this:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/469f1137/attachment.sig>
+in drivers/tty/serial/omap-serial.c
+| static struct platform_driver serial_omap_driver = {
+|         .driver         = {
+|                 .name   = DRIVER_NAME,
+|         },
+| };
+|
+
+and DRIVER_NAME should come from include/linux/platform_data/serial-omap.h
+Looking further, I've found arch/arm/mach-omap2/serial.c:
+| void __init omap_serial_init_port(struct omap_board_data *bdata,
+|                         struct omap_uart_port_info *info)
+| {
+|         char *name
+?
+|	name = DRIVER_NAME;
+?
+|	pdev = omap_device_build(name, uart->num, oh, pdata, pdata_size);
+?
+|
+
+Would this explain it?
+
+> Regards,
+> 
+> Tony
+
+Sebastian
