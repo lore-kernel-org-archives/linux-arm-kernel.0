@@ -1,592 +1,109 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 17 Jul 2014 07:45:38 +0100
-Subject: [PATCH] arm64: Refactor compat.h into compat-types.h
-Message-ID: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 17 Jul 2014 08:51:15 +0200
+Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <20140716195136.GB5212@mithrandir>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
+ <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
+ <53C6908A.2050200@redhat.com> <20140716195136.GB5212@mithrandir>
+Message-ID: <53C77263.7050903@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reduces the complexity of the includes needed for linux/stat.h and removes
-some possibilities for causing include loops.
+Hi,
 
-One such issue was exposed by the Debian kernel's application of the aufs
-patches which led to:
+On 07/16/2014 09:51 PM, Thierry Reding wrote:
+> On Wed, Jul 16, 2014 at 04:47:38PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 07/16/2014 03:13 PM, Thierry Reding wrote:
+>>> On Wed, Jul 16, 2014 at 01:49:57PM +0200, Hans de Goede wrote:
+>>>> Hi,
+>>>>
+>>>> On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
+>>>>> This patch adds device tree binding documentation for the SATA
+>>>>> controller found on NVIDIA Tegra SoCs.
+>>>>>
+>>>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>>>>> ---
+>>>>> v4: clarify mandatory clock order
+>>>>
+>>>> Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
+>>>> both look good to me. So these 2 + v3 for the rest of the series are:
+>>>>
+>>>> Acked-by: Hans de Goede <hdegoede@redhat.com>
+>>>
+>>> Like I said in my reply to PATCH v3 7/8, I think this mandatory clock
+>>> order is a mistake.
+>>
+>> We've plenty of other dt bindings where things need to be specified in
+>> a certain order, e.g. registers. So I don't really see what the problem
+>> is here.
+> 
+> Like I said, the clock-names exists so that drivers can request a clock
+> by name. Therefore the order in which they are listed doesn't matter.
+> The only thing that matters is that the entries in clocks and
+> clock-names match up.
 
-In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
-                 from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
-                 from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
-                 from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
-                 from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
-                 from /?PKGBUILDDIR?/include/linux/stat.h:5,
-                 from /?PKGBUILDDIR?/include/linux/module.h:10,
-                 from /?PKGBUILDDIR?/init/main.c:15:
-/?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
-  int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
-                                                                ^
-/?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+Ok so I've been think about this, and about the unbalance I've noticed
+between tegra_ahci_power_on which does everything DIY and tegra_ahci_power_off
+which uses ahci_platform_disable_resources() in v3 and later.
 
-This is due to an extra fs.h include added to mm.h leading to a loop in the
-includes. Splitting out the type defintions from compat.h into compat-types.h
-allows asm/stat.h to only include the types header and avoids the loop.
+Really only the "sata" clock needs special handling, so I think the following
+solution is best:
 
-Full logs in http://buildd.debian-ports.org/status/fetch.php?pkg=linux&arch=arm64&ver=3.14.12-1&stamp=1405234443
+1) Drop the clock ordering requirement and the clk enum
 
-Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: debian-kernel at lists.debian.org
----
-This is effectively v2 of "arm64: Move struct stat64 to uapi"
----
- arch/arm64/include/asm/compat-types.h | 262 ++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/compat.h       | 238 +-----------------------------
- arch/arm64/include/asm/stat.h         |   2 +-
- 3 files changed, 264 insertions(+), 238 deletions(-)
- create mode 100644 arch/arm64/include/asm/compat-types.h
+2) Make ahci_tegra.c do a devm_clk_get(dev, "sata"), so that it gets its
+own handle to the sata-clk (store this in tegra_ahci_priv). no need to
+get all the other clks which need no special handling
 
-diff --git a/arch/arm64/include/asm/compat-types.h b/arch/arm64/include/asm/compat-types.h
-new file mode 100644
-index 0000000..18e55ef
---- /dev/null
-+++ b/arch/arm64/include/asm/compat-types.h
-@@ -0,0 +1,262 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_COMPAT_TYPES_H
-+#define __ASM_COMPAT_TYPES_H
-+#ifdef __KERNEL__
-+#ifdef CONFIG_COMPAT
-+
-+#include <linux/types.h>
-+
-+typedef u32		compat_size_t;
-+typedef s32		compat_ssize_t;
-+typedef s32		compat_time_t;
-+typedef s32		compat_clock_t;
-+typedef s32		compat_pid_t;
-+typedef u32		__compat_uid_t;
-+typedef u32		__compat_gid_t;
-+typedef u16		__compat_uid16_t;
-+typedef u16		__compat_gid16_t;
-+typedef u32		__compat_uid32_t;
-+typedef u32		__compat_gid32_t;
-+typedef u16		compat_mode_t;
-+typedef u32		compat_ino_t;
-+typedef u32		compat_dev_t;
-+typedef s32		compat_off_t;
-+typedef s64		compat_loff_t;
-+typedef s32		compat_nlink_t;
-+typedef u16		compat_ipc_pid_t;
-+typedef s32		compat_daddr_t;
-+typedef u32		compat_caddr_t;
-+typedef __kernel_fsid_t	compat_fsid_t;
-+typedef s32		compat_key_t;
-+typedef s32		compat_timer_t;
-+
-+typedef s16		compat_short_t;
-+typedef s32		compat_int_t;
-+typedef s32		compat_long_t;
-+typedef s64		compat_s64;
-+typedef u16		compat_ushort_t;
-+typedef u32		compat_uint_t;
-+typedef u32		compat_ulong_t;
-+typedef u64		compat_u64;
-+typedef u32		compat_uptr_t;
-+
-+struct compat_timespec {
-+	compat_time_t	tv_sec;
-+	s32		tv_nsec;
-+};
-+
-+struct compat_timeval {
-+	compat_time_t	tv_sec;
-+	s32		tv_usec;
-+};
-+
-+struct compat_stat {
-+#ifdef __AARCH64EB__
-+	short		st_dev;
-+	short		__pad1;
-+#else
-+	compat_dev_t	st_dev;
-+#endif
-+	compat_ino_t	st_ino;
-+	compat_mode_t	st_mode;
-+	compat_ushort_t	st_nlink;
-+	__compat_uid16_t	st_uid;
-+	__compat_gid16_t	st_gid;
-+#ifdef __AARCH64EB__
-+	short		st_rdev;
-+	short		__pad2;
-+#else
-+	compat_dev_t	st_rdev;
-+#endif
-+	compat_off_t	st_size;
-+	compat_off_t	st_blksize;
-+	compat_off_t	st_blocks;
-+	compat_time_t	st_atime;
-+	compat_ulong_t	st_atime_nsec;
-+	compat_time_t	st_mtime;
-+	compat_ulong_t	st_mtime_nsec;
-+	compat_time_t	st_ctime;
-+	compat_ulong_t	st_ctime_nsec;
-+	compat_ulong_t	__unused4[2];
-+};
-+
-+struct compat_flock {
-+	short		l_type;
-+	short		l_whence;
-+	compat_off_t	l_start;
-+	compat_off_t	l_len;
-+	compat_pid_t	l_pid;
-+};
-+
-+#define F_GETLK64	12	/*  using 'struct flock64' */
-+#define F_SETLK64	13
-+#define F_SETLKW64	14
-+
-+struct compat_flock64 {
-+	short		l_type;
-+	short		l_whence;
-+	compat_loff_t	l_start;
-+	compat_loff_t	l_len;
-+	compat_pid_t	l_pid;
-+};
-+
-+struct compat_statfs {
-+	int		f_type;
-+	int		f_bsize;
-+	int		f_blocks;
-+	int		f_bfree;
-+	int		f_bavail;
-+	int		f_files;
-+	int		f_ffree;
-+	compat_fsid_t	f_fsid;
-+	int		f_namelen;	/* SunOS ignores this field. */
-+	int		f_frsize;
-+	int		f_flags;
-+	int		f_spare[4];
-+};
-+
-+#define COMPAT_RLIM_INFINITY		0xffffffff
-+
-+typedef u32		compat_old_sigset_t;
-+
-+#define _COMPAT_NSIG		64
-+#define _COMPAT_NSIG_BPW	32
-+
-+typedef u32		compat_sigset_word;
-+
-+typedef union compat_sigval {
-+	compat_int_t	sival_int;
-+	compat_uptr_t	sival_ptr;
-+} compat_sigval_t;
-+
-+typedef struct compat_siginfo {
-+	int si_signo;
-+	int si_errno;
-+	int si_code;
-+
-+	union {
-+		/* The padding is the same size as AArch64. */
-+		int _pad[128/sizeof(int) - 3];
-+
-+		/* kill() */
-+		struct {
-+			compat_pid_t _pid;	/* sender's pid */
-+			__compat_uid32_t _uid;	/* sender's uid */
-+		} _kill;
-+
-+		/* POSIX.1b timers */
-+		struct {
-+			compat_timer_t _tid;	/* timer id */
-+			int _overrun;		/* overrun count */
-+			compat_sigval_t _sigval;	/* same as below */
-+			int _sys_private;       /* not to be passed to user */
-+		} _timer;
-+
-+		/* POSIX.1b signals */
-+		struct {
-+			compat_pid_t _pid;	/* sender's pid */
-+			__compat_uid32_t _uid;	/* sender's uid */
-+			compat_sigval_t _sigval;
-+		} _rt;
-+
-+		/* SIGCHLD */
-+		struct {
-+			compat_pid_t _pid;	/* which child */
-+			__compat_uid32_t _uid;	/* sender's uid */
-+			int _status;		/* exit code */
-+			compat_clock_t _utime;
-+			compat_clock_t _stime;
-+		} _sigchld;
-+
-+		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
-+		struct {
-+			compat_uptr_t _addr; /* faulting insn/memory ref. */
-+			short _addr_lsb; /* LSB of the reported address */
-+		} _sigfault;
-+
-+		/* SIGPOLL */
-+		struct {
-+			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
-+			int _fd;
-+		} _sigpoll;
-+	} _sifields;
-+} compat_siginfo_t;
-+
-+#define COMPAT_OFF_T_MAX	0x7fffffff
-+#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
-+
-+struct compat_ipc64_perm {
-+	compat_key_t key;
-+	__compat_uid32_t uid;
-+	__compat_gid32_t gid;
-+	__compat_uid32_t cuid;
-+	__compat_gid32_t cgid;
-+	unsigned short mode;
-+	unsigned short __pad1;
-+	unsigned short seq;
-+	unsigned short __pad2;
-+	compat_ulong_t unused1;
-+	compat_ulong_t unused2;
-+};
-+
-+struct compat_semid64_ds {
-+	struct compat_ipc64_perm sem_perm;
-+	compat_time_t  sem_otime;
-+	compat_ulong_t __unused1;
-+	compat_time_t  sem_ctime;
-+	compat_ulong_t __unused2;
-+	compat_ulong_t sem_nsems;
-+	compat_ulong_t __unused3;
-+	compat_ulong_t __unused4;
-+};
-+
-+struct compat_msqid64_ds {
-+	struct compat_ipc64_perm msg_perm;
-+	compat_time_t  msg_stime;
-+	compat_ulong_t __unused1;
-+	compat_time_t  msg_rtime;
-+	compat_ulong_t __unused2;
-+	compat_time_t  msg_ctime;
-+	compat_ulong_t __unused3;
-+	compat_ulong_t msg_cbytes;
-+	compat_ulong_t msg_qnum;
-+	compat_ulong_t msg_qbytes;
-+	compat_pid_t   msg_lspid;
-+	compat_pid_t   msg_lrpid;
-+	compat_ulong_t __unused4;
-+	compat_ulong_t __unused5;
-+};
-+
-+struct compat_shmid64_ds {
-+	struct compat_ipc64_perm shm_perm;
-+	compat_size_t  shm_segsz;
-+	compat_time_t  shm_atime;
-+	compat_ulong_t __unused1;
-+	compat_time_t  shm_dtime;
-+	compat_ulong_t __unused2;
-+	compat_time_t  shm_ctime;
-+	compat_ulong_t __unused3;
-+	compat_pid_t   shm_cpid;
-+	compat_pid_t   shm_lpid;
-+	compat_ulong_t shm_nattch;
-+	compat_ulong_t __unused4;
-+	compat_ulong_t __unused5;
-+};
-+
-+#endif /* CONFIG_COMPAT */
-+#endif /* __KERNEL__ */
-+#endif /* __ASM_COMPAT_TYPES_H */
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 253e33b..c10c791 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -24,6 +24,7 @@
- #include <linux/types.h>
- #include <linux/sched.h>
- #include <linux/ptrace.h>
-+#include <asm/compat-types.h>
- 
- #define COMPAT_USER_HZ		100
- #ifdef __AARCH64EB__
-@@ -32,185 +33,6 @@
- #define COMPAT_UTS_MACHINE	"armv8l\0\0"
- #endif
- 
--typedef u32		compat_size_t;
--typedef s32		compat_ssize_t;
--typedef s32		compat_time_t;
--typedef s32		compat_clock_t;
--typedef s32		compat_pid_t;
--typedef u32		__compat_uid_t;
--typedef u32		__compat_gid_t;
--typedef u16		__compat_uid16_t;
--typedef u16		__compat_gid16_t;
--typedef u32		__compat_uid32_t;
--typedef u32		__compat_gid32_t;
--typedef u16		compat_mode_t;
--typedef u32		compat_ino_t;
--typedef u32		compat_dev_t;
--typedef s32		compat_off_t;
--typedef s64		compat_loff_t;
--typedef s32		compat_nlink_t;
--typedef u16		compat_ipc_pid_t;
--typedef s32		compat_daddr_t;
--typedef u32		compat_caddr_t;
--typedef __kernel_fsid_t	compat_fsid_t;
--typedef s32		compat_key_t;
--typedef s32		compat_timer_t;
--
--typedef s16		compat_short_t;
--typedef s32		compat_int_t;
--typedef s32		compat_long_t;
--typedef s64		compat_s64;
--typedef u16		compat_ushort_t;
--typedef u32		compat_uint_t;
--typedef u32		compat_ulong_t;
--typedef u64		compat_u64;
--typedef u32		compat_uptr_t;
--
--struct compat_timespec {
--	compat_time_t	tv_sec;
--	s32		tv_nsec;
--};
--
--struct compat_timeval {
--	compat_time_t	tv_sec;
--	s32		tv_usec;
--};
--
--struct compat_stat {
--#ifdef __AARCH64EB__
--	short		st_dev;
--	short		__pad1;
--#else
--	compat_dev_t	st_dev;
--#endif
--	compat_ino_t	st_ino;
--	compat_mode_t	st_mode;
--	compat_ushort_t	st_nlink;
--	__compat_uid16_t	st_uid;
--	__compat_gid16_t	st_gid;
--#ifdef __AARCH64EB__
--	short		st_rdev;
--	short		__pad2;
--#else
--	compat_dev_t	st_rdev;
--#endif
--	compat_off_t	st_size;
--	compat_off_t	st_blksize;
--	compat_off_t	st_blocks;
--	compat_time_t	st_atime;
--	compat_ulong_t	st_atime_nsec;
--	compat_time_t	st_mtime;
--	compat_ulong_t	st_mtime_nsec;
--	compat_time_t	st_ctime;
--	compat_ulong_t	st_ctime_nsec;
--	compat_ulong_t	__unused4[2];
--};
--
--struct compat_flock {
--	short		l_type;
--	short		l_whence;
--	compat_off_t	l_start;
--	compat_off_t	l_len;
--	compat_pid_t	l_pid;
--};
--
--#define F_GETLK64	12	/*  using 'struct flock64' */
--#define F_SETLK64	13
--#define F_SETLKW64	14
--
--struct compat_flock64 {
--	short		l_type;
--	short		l_whence;
--	compat_loff_t	l_start;
--	compat_loff_t	l_len;
--	compat_pid_t	l_pid;
--};
--
--struct compat_statfs {
--	int		f_type;
--	int		f_bsize;
--	int		f_blocks;
--	int		f_bfree;
--	int		f_bavail;
--	int		f_files;
--	int		f_ffree;
--	compat_fsid_t	f_fsid;
--	int		f_namelen;	/* SunOS ignores this field. */
--	int		f_frsize;
--	int		f_flags;
--	int		f_spare[4];
--};
--
--#define COMPAT_RLIM_INFINITY		0xffffffff
--
--typedef u32		compat_old_sigset_t;
--
--#define _COMPAT_NSIG		64
--#define _COMPAT_NSIG_BPW	32
--
--typedef u32		compat_sigset_word;
--
--typedef union compat_sigval {
--	compat_int_t	sival_int;
--	compat_uptr_t	sival_ptr;
--} compat_sigval_t;
--
--typedef struct compat_siginfo {
--	int si_signo;
--	int si_errno;
--	int si_code;
--
--	union {
--		/* The padding is the same size as AArch64. */
--		int _pad[128/sizeof(int) - 3];
--
--		/* kill() */
--		struct {
--			compat_pid_t _pid;	/* sender's pid */
--			__compat_uid32_t _uid;	/* sender's uid */
--		} _kill;
--
--		/* POSIX.1b timers */
--		struct {
--			compat_timer_t _tid;	/* timer id */
--			int _overrun;		/* overrun count */
--			compat_sigval_t _sigval;	/* same as below */
--			int _sys_private;       /* not to be passed to user */
--		} _timer;
--
--		/* POSIX.1b signals */
--		struct {
--			compat_pid_t _pid;	/* sender's pid */
--			__compat_uid32_t _uid;	/* sender's uid */
--			compat_sigval_t _sigval;
--		} _rt;
--
--		/* SIGCHLD */
--		struct {
--			compat_pid_t _pid;	/* which child */
--			__compat_uid32_t _uid;	/* sender's uid */
--			int _status;		/* exit code */
--			compat_clock_t _utime;
--			compat_clock_t _stime;
--		} _sigchld;
--
--		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
--		struct {
--			compat_uptr_t _addr; /* faulting insn/memory ref. */
--			short _addr_lsb; /* LSB of the reported address */
--		} _sigfault;
--
--		/* SIGPOLL */
--		struct {
--			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
--			int _fd;
--		} _sigpoll;
--	} _sifields;
--} compat_siginfo_t;
--
--#define COMPAT_OFF_T_MAX	0x7fffffff
--#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
--
- /*
-  * A pointer passed in from user mode. This should not
-  * be used for syscall parameters, just declare them
-@@ -235,64 +57,6 @@ static inline void __user *arch_compat_alloc_user_space(long len)
- 	return (void __user *)compat_user_stack_pointer() - len;
- }
- 
--struct compat_ipc64_perm {
--	compat_key_t key;
--	__compat_uid32_t uid;
--	__compat_gid32_t gid;
--	__compat_uid32_t cuid;
--	__compat_gid32_t cgid;
--	unsigned short mode;
--	unsigned short __pad1;
--	unsigned short seq;
--	unsigned short __pad2;
--	compat_ulong_t unused1;
--	compat_ulong_t unused2;
--};
--
--struct compat_semid64_ds {
--	struct compat_ipc64_perm sem_perm;
--	compat_time_t  sem_otime;
--	compat_ulong_t __unused1;
--	compat_time_t  sem_ctime;
--	compat_ulong_t __unused2;
--	compat_ulong_t sem_nsems;
--	compat_ulong_t __unused3;
--	compat_ulong_t __unused4;
--};
--
--struct compat_msqid64_ds {
--	struct compat_ipc64_perm msg_perm;
--	compat_time_t  msg_stime;
--	compat_ulong_t __unused1;
--	compat_time_t  msg_rtime;
--	compat_ulong_t __unused2;
--	compat_time_t  msg_ctime;
--	compat_ulong_t __unused3;
--	compat_ulong_t msg_cbytes;
--	compat_ulong_t msg_qnum;
--	compat_ulong_t msg_qbytes;
--	compat_pid_t   msg_lspid;
--	compat_pid_t   msg_lrpid;
--	compat_ulong_t __unused4;
--	compat_ulong_t __unused5;
--};
--
--struct compat_shmid64_ds {
--	struct compat_ipc64_perm shm_perm;
--	compat_size_t  shm_segsz;
--	compat_time_t  shm_atime;
--	compat_ulong_t __unused1;
--	compat_time_t  shm_dtime;
--	compat_ulong_t __unused2;
--	compat_time_t  shm_ctime;
--	compat_ulong_t __unused3;
--	compat_pid_t   shm_cpid;
--	compat_pid_t   shm_lpid;
--	compat_ulong_t shm_nattch;
--	compat_ulong_t __unused4;
--	compat_ulong_t __unused5;
--};
--
- static inline int is_compat_task(void)
- {
- 	return test_thread_flag(TIF_32BIT);
-diff --git a/arch/arm64/include/asm/stat.h b/arch/arm64/include/asm/stat.h
-index 15e3559..d96a5c6 100644
---- a/arch/arm64/include/asm/stat.h
-+++ b/arch/arm64/include/asm/stat.h
-@@ -20,7 +20,7 @@
- 
- #ifdef CONFIG_COMPAT
- 
--#include <asm/compat.h>
-+#include <asm/compat-types.h>
- 
- /*
-  * struct stat64 is needed for compat tasks only. Its definition is different
--- 
-2.0.1
+3) Start using ahci_platform_enable_resources() in tegra_ahci_power_on,
+so it would look something like this:
+
+static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
+{
+	struct tegra_ahci_priv *tegra = hpriv->plat_data;
+	int ret;
+
+	ret = regulator_bulk_enable(ARRAY_SIZE(tegra->supplies),
+				    tegra->supplies);
+	if (ret)
+		return ret;
+
+	ret = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_SATA,
+						tegra->sata_clk,
+						tegra->sata_rst);
+	if (ret)
+		goto disable_regulators;
+
+	reset_control_deassert(tegra->sata_cold_rst);
+	reset_control_deassert(tegra->sata_oob_rst);
+
+	ret = ahci_platform_enable_resources(hpriv);
+	if (ret)
+		goto powergate_sequence_power_off;
+
+	return 0;
+...
+
+This will make tegra_ahci_power_on and tegra_ahci_power_off symmetrical
+which is something I always like to see in functions like this.
+
+I realize that this changes the reset-deassert vs clock enabling ordering,
+if this is an issue please add reset support to libahci-platform.c I believe
+that is something which we will need to do soonish anyways (reset controllers
+are popping up everywhere in newer SoCs).
+
+This will nicely reduce the amount of code and also greatly simplify the error
+return path of tegra_ahci_power_on.
+
+This means that the sata_clk will get enabled twice, but that is harmless
+as long as we disable it twice too. This means that we need to add an
+extra disable to tegra_ahci_power_off because tegra_powergate_power_off
+seems to not do this (unlike power-on, which is rather unsymmetrical
+it would be nice to fix this).
+
+Regards,
+
+Hans
