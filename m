@@ -1,48 +1,45 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 17 Jul 2014 19:43:36 +0800
-Subject: [PATCH v2 1/2] usb: ci_hdrc_imx: Return -EINVAL for missing
- USB PHY
-In-Reply-To: <1405081775-21508-1-git-send-email-mpa@pengutronix.de>
-References: <1405081775-21508-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140717114335.GB16025@shlinux1.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Jul 2014 12:59:38 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140717115937.GF18203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 11, 2014 at 02:29:34PM +0200, Markus Pargmann wrote:
-> -ENODEV is interpreted by the generic driver probing function as a
-> non-matching driver. This leads to a missing probe failure message.
+On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> Also a missing USB PHY is more of an invalid configuration of the usb
-> driver because it is necessary.
+> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> interface) removed the arch parameter from __audit_syscall_entry() and
+> updated the only current user in mainline but this breaks the ARMv8 audit
+> code that has been added in -next. Fix this by making the equivalent
+> update to ARMv8.
 > 
-> This patch returns -EINVAL if devm_usb_get_phy_by_phandle() returned -ENODEV.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 > ---
->  drivers/usb/chipidea/ci_hdrc_imx.c | 3 +++
->  1 file changed, 3 insertions(+)
+>  arch/arm64/kernel/ptrace.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-> index 2e58f8dfd311..65444b02bd68 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-> @@ -133,6 +133,9 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
->  	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
->  	if (IS_ERR(data->phy)) {
->  		ret = PTR_ERR(data->phy);
-> +		/* Return -EINVAL if no usbphy is available */
-> +		if (ret == -ENODEV)
-> +			ret = -EINVAL;
->  		goto err_clk;
->  	}
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 70526cfda056..310842e3d477 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>  		trace_sys_enter(regs, regs->syscallno);
 >  
-> -- 
-> 2.0.0
-> 
+> -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
+> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
+> +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
+> +			    regs->regs[2], regs->regs[3]);
+>  
+>  	return regs->syscallno;
+>  }
 
-Applied, thanks.
+Thanks. This will have to be applied after 3.17-rc1 since commit
+3efe33f5d2 does not seem to be in mainline yet (nor the arm64 audit
+patches).
 
 -- 
-
-Best Regards,
-Peter Chen
+Catalin
