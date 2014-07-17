@@ -1,52 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Jul 2014 11:49:09 +0100
-Subject: [PATCH v7 02/11] arm64: Remove duplicate
- (SWAPPER|IDMAP)_DIR_SIZE definitions
-In-Reply-To: <1405537792-23666-3-git-send-email-catalin.marinas@arm.com>
-References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
- <1405537792-23666-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20140717104909.GI30313@leverpostej>
+From: pramod.gurav.etc@gmail.com (pramod gurav)
+Date: Thu, 17 Jul 2014 16:21:33 +0530
+Subject: [PATCH 1/3] mfd: qpnp-spmi: add support for Qualcomm QPNP PMICs
+In-Reply-To: <CAMf-jSk5+c1QYfKfjqmstB60bM3adK5tgAYwmPKhOi6cSeM_WA@mail.gmail.com>
+References: <1404834869-23049-1-git-send-email-svarbanov@mm-sol.com>
+ <1404834869-23049-2-git-send-email-svarbanov@mm-sol.com>
+ <CAMf-jSk5+c1QYfKfjqmstB60bM3adK5tgAYwmPKhOi6cSeM_WA@mail.gmail.com>
+Message-ID: <CAMf-jSkxEmCeKDfw+=+QwgLHz7wYdWJB9qk1bi1gzP7Qpw-6jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 08:09:43PM +0100, Catalin Marinas wrote:
-> Just keep the asm/page.h definition as this is included in vmlinux.lds.S
-> as well.
+On Thu, Jul 17, 2014 at 4:18 PM, pramod gurav
+<pramod.gurav.etc@gmail.com> wrote:
+> +Mark Brown
+> Hi Josh/Stanimir,
+>
+>
+> On Tue, Jul 8, 2014 at 9:24 PM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+>> From: Josh Cartwright <joshc@codeaurora.org>
+>>
+>> The Qualcomm QPNP PMIC chips are components used with the
+>> Snapdragon 800 series SoC family.  This driver exists
+> .
+> [SNIP]
+> .
+>> +config MFD_QPNP_SPMI
+>> +       tristate "Qualcomm QPNP SPMI PMIC"
+>> +       depends on ARCH_QCOM || COMPILE_TEST
+>> +       depends on OF
+>> +       select MFD_CORE
+>> +       select REGMAP_SPMI
+> REGMAP_SPMI use SPMI functions.
+>
+> https://patchwork.kernel.org/patch/4566591/
 
-My bad, I should've spotted that when I moved idmap and swapper next to
-the BSS. Thanks for cleaning this up.
+Sorry for incomplete comment as I sent the mail by mistake.
+In above patchwork discussion Mark Brown suggested "driver using
+REGMAP_SPMI should depend on SPMI and select REGMAP_SPMI, assuming
+SPMI is a user-selectable Kconfig symbol."
 
-I guess we got lucky with nothing including both pgtable.h and page.h? I
-don't recall seeing any duplicate definition warnings.
+>> +       help
+>> +         This enables support for the Qualcomm QPNP SPMI PMICs.
+>> +         These PMICs are currently used with the Snapdragon 800 series of
+>> +         SoCs.  Note, that this will only be useful paired with descriptions
+> .
+>
+> --
+> Thanks and Regards
+> Pramod
 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Thanks,
-Mark.
-
-> ---
->  arch/arm64/include/asm/pgtable.h | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index e0ccceb317d9..d7455fa83bc7 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -383,9 +383,6 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
->  extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
->  extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
->  
-> -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-> -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
-> -
->  /*
->   * Encode and decode a swap entry:
->   *	bits 0-1:	present (must be zero)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Thanks and Regards
+Pramod
