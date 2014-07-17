@@ -1,125 +1,42 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 17 Jul 2014 16:58:17 +0200
-Subject: [PATCH v2 1/5] i2c: Don't start transfers when suspended
-In-Reply-To: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-Message-ID: <CABYn4swJ5NHyUd5+zCK6jhHex4v9DCMe5Qo-BZqxjPf90JfusQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Jul 2014 15:58:38 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <20140717145002.GW17528@sirena.org.uk>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+ <20140717115937.GF18203@arm.com>
+ <20140717145002.GW17528@sirena.org.uk>
+Message-ID: <20140717145838.GJ18203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I want to add the remark that I can't help further on the patch series
-in the next month about. So this is free to be taken/ignored/modified
-without any approval by my side.
+On Thu, Jul 17, 2014 at 03:50:02PM +0100, Mark Brown wrote:
+> On Thu, Jul 17, 2014 at 12:59:38PM +0100, Catalin Marinas wrote:
+> > On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+> 
+> > > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> > > interface) removed the arch parameter from __audit_syscall_entry() and
+> 
+> > Thanks. This will have to be applied after 3.17-rc1 since commit
+> > 3efe33f5d2 does not seem to be in mainline yet (nor the arm64 audit
+> > patches).
+> 
+> That's not great and is kind of missing the point of -next - the core
+> idea is to find these inter-tree dependencies, ensure things work when
+> they're merged together and avoid things like massive bisection breaks.
+> Leaving things also causes problems for anyone trying to do integration
+> testing on -next.
+> 
+> What would be better would be if we could get the two trees synced up,
+> in this case something like picking the audit change up in the ARMv8
+> tree (or vice versa) seems like it'd be quick and easy since it looks
+> like neither tree uses topic branches.
 
-Have fun coding,
+It's not ideal indeed but applying this patch on my tree would break it.
+So we need a common base where the audit API is changed, guaranteed not
+to be rebased so that I can merge it in the arm64 for-next/core branch.
 
- Bastian
+Do you know which tree commit 3efe33f5d2 is in? I assume some tip
+branch?
 
-
-2014-07-17 16:48 GMT+02:00 Bastian Hecht <hechtb@gmail.com>:
-> i2c transfer requests come in very uncontrolled, like from interrupt routines.
-> We might be suspended when this happens. To avoid i2c timeouts caused by
-> powered down busses we check for suspension.
->
-> Several bus drivers handle this problem on their own. We can clean things up
-> by moving the protection mechanism into the core.
->
-> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
-> ---
-> changelog v2:
->
-> - commit message extended.
-> - initialization added for adap->suspended
-> - swapped branch for increased performance
->
->
->  drivers/i2c/i2c-core.c | 25 ++++++++++++++++++++++++-
->  include/linux/i2c.h    |  1 +
->  2 files changed, 25 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 7c7f4b8..b15dc20 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -343,6 +343,13 @@ static int i2c_legacy_resume(struct device *dev)
->  static int i2c_device_pm_suspend(struct device *dev)
->  {
->         const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-> +       struct i2c_adapter *adap = i2c_verify_adapter(dev);
-> +
-> +       if (adap) {
-> +               i2c_lock_adapter(adap);
-> +               adap->suspended = true;
-> +               i2c_unlock_adapter(adap);
-> +       }
->
->         if (pm)
->                 return pm_generic_suspend(dev);
-> @@ -353,6 +360,13 @@ static int i2c_device_pm_suspend(struct device *dev)
->  static int i2c_device_pm_resume(struct device *dev)
->  {
->         const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-> +       struct i2c_adapter *adap = i2c_verify_adapter(dev);
-> +
-> +       if (adap) {
-> +               i2c_lock_adapter(adap);
-> +               adap->suspended = false;
-> +               i2c_unlock_adapter(adap);
-> +       }
->
->         if (pm)
->                 return pm_generic_resume(dev);
-> @@ -1243,6 +1257,7 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
->         dev_set_name(&adap->dev, "i2c-%d", adap->nr);
->         adap->dev.bus = &i2c_bus_type;
->         adap->dev.type = &i2c_adapter_type;
-> +       adap->suspended = false;
->         res = device_register(&adap->dev);
->         if (res)
->                 goto out_list;
-> @@ -1819,7 +1834,10 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->                         i2c_lock_adapter(adap);
->                 }
->
-> -               ret = __i2c_transfer(adap, msgs, num);
-> +               if (!adap->suspended)
-> +                       ret = __i2c_transfer(adap, msgs, num);
-> +               else
-> +                       ret = -EIO;
->                 i2c_unlock_adapter(adap);
->
->                 return ret;
-> @@ -2577,6 +2595,10 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
->
->         if (adapter->algo->smbus_xfer) {
->                 i2c_lock_adapter(adapter);
-> +               if (adapter->suspended) {
-> +                       res = -EIO;
-> +                       goto unlock;
-> +               }
->
->                 /* Retry automatically on arbitration loss */
->                 orig_jiffies = jiffies;
-> @@ -2590,6 +2612,7 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
->                                        orig_jiffies + adapter->timeout))
->                                 break;
->                 }
-> +unlock:
->                 i2c_unlock_adapter(adapter);
->
->                 if (res != -EOPNOTSUPP || !adapter->algo->master_xfer)
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index b556e0a..af08c75 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -434,6 +434,7 @@ struct i2c_adapter {
->         int timeout;                    /* in jiffies */
->         int retries;
->         struct device dev;              /* the adapter device */
-> +       unsigned int suspended:1;
->
->         int nr;
->         char name[48];
-> --
-> 1.9.1
->
+-- 
+Catalin
