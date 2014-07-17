@@ -1,49 +1,44 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 17 Jul 2014 17:59:22 +0300
-Subject: [PATCH 1/3] ARM: dts: keystone: add mdio devices entries
-In-Reply-To: <1405609087-9128-1-git-send-email-grygorii.strashko@ti.com>
-References: <1404911660-10047-2-git-send-email-grygorii.strashko@ti.com>
- <1405609087-9128-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <53C7E4CA.2090903@ti.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Thu, 17 Jul 2014 09:13:37 -0500
+Subject: [PATCH] irqchip: gic: Add binding probe for ARM GIC400
+In-Reply-To: <20140717124804.GI13108@titan.lakedaemon.net>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-2-git-send-email-suravee.suthikulpanit@amd.com>
+ <2932284.F1eaAf8ArJ@diego> <2621565.f5eISveXXJ@diego>
+ <20140717124804.GI13108@titan.lakedaemon.net>
+Message-ID: <53C7DA11.2000105@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-On 07/17/2014 05:58 PM, Grygorii Strashko wrote:
-> The Keystone 2 has MDIO HW block which are compatible
-> to Davinci SoCs:
-> See "Gigabit Ethernet (GbE) Switch Subsystem"
->    See http://www.ti.com/lit/ug/sprugv9d/sprugv9d.pdf
+On 7/17/2014 7:48 AM, Jason Cooper wrote:
+> On Tue, Jul 15, 2014 at 12:03:03AM +0200, Heiko St?bner wrote:
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> Commit 3ab72f9156bb "dt-bindings: add GIC-400 binding" added the
+>> "arm,gic-400" compatible string, but the corresponding IRQCHIP_DECLARE
+>> was never added to the gic driver.
+>>
+>> Therefore add the missing irqchip declaration for it.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> Removed additional empty line and adapted commit message to mark it
+>> as fixing an issue.
+>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>> As I really need this, I took the liberty of adapting the patch accordingly
+>> to make it apply on top of the current irqchip/for-next (or urgent) and
+>> explicitly state the fixed issue. Hope that is ok
+>>
+>>   drivers/irqchip/irq-gic.c | 1 +
+>>   1 file changed, 1 insertion(+)
 >
-> Hence, add corresponding DT entry for Keystone 2.
+> Applied to irqchip/urgent with Will's Ack and Cc'd to stable for v3.14+
+>
+> thx,
+>
+> Jason.
+>
+Thank you,
 
-This is updated version of patch (missed v2 in subj).
-
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->   arch/arm/boot/dts/keystone.dtsi |   11 +++++++++++
->   1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-> index c1414cb..9e31fe7 100644
-> --- a/arch/arm/boot/dts/keystone.dtsi
-> +++ b/arch/arm/boot/dts/keystone.dtsi
-> @@ -266,5 +266,16 @@
->   			ranges = <0 0 0x30000000 0x10000000
->   				  1 0 0x21000A00 0x00000100>;
->   		};
-> +
-> +		mdio: mdio at 02090300 {
-> +			compatible	= "ti,keystone_mdio", "ti,davinci_mdio";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg		= <0x02090300 0x100>;
-> +			status = "disabled";
-> +			clocks = <&clkpa>;
-> +			clock-names = "fck";
-> +			bus_freq	= <2500000>;
-> +		};
->   	};
->   };
->
+Suravee
