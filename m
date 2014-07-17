@@ -1,33 +1,94 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 17 Jul 2014 21:33:35 +0200
-Subject: [PATCH 1/4] Revert "spi: s3c64xx: Added provision for dedicated
- cs pin"
-In-Reply-To: <20140717184656.GB17528@sirena.org.uk>
-References: <1405523950-2231-1-git-send-email-javier.martinez@collabora.co.uk>
- <1405523950-2231-2-git-send-email-javier.martinez@collabora.co.uk>
- <20140717184656.GB17528@sirena.org.uk>
-Message-ID: <53C8250F.6070006@collabora.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 17 Jul 2014 21:46:14 +0200
+Subject: [PATCH v11 0/2] Add support for the Allwinner A31 DMA Controller
+Message-ID: <1405626376-471-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hi,
 
-On 07/17/2014 08:46 PM, Mark Brown wrote:
-> On Wed, Jul 16, 2014 at 05:19:07PM +0200, Javier Martinez Canillas wrote:
->> This reverts commit 3146beec21b64f4551fcf0ac148381d54dc41b1b.
-> 
-> For the benefit of those who haven't memorized the SHA1s of every commit
-> that's "spi: s3c64xx: Added provision for dedicated cs pin" - please
-> include the human readable format whenever you reference a SHA1.
-> 
+This patchset adds support for the DMA controller found in the
+Allwinner A31 and A23 SoCs.
 
-Ok, I'll take into account for the next time.
+This has been tested using the newly introduced SPI driver on an A31
+EVK. Support for DMA-driven SPI transfers will be the subject of
+another patch serie.
 
-> I've applied this.
-> 
+This has been around for around 5 monthes now, and didn't get any
+review but nitpicks for three versions, so I feel like it could be
+merged quite quickly.
 
-Thanks a lot for your help and sorry for all the inconveniences that this series
-caused to you.
+Thanks,
+Maxime
 
-Best regards,
-Javier
+Changes from v10:
+  - Added in 
+
+Changes from v9:
+  - Rebased on top of 3.16-rc1
+  - Fixed the whitespace error in the documentation
+
+Changes from v8:
+  - Drop the select on DMA_OF
+  - Depend on COMPILE_TEST to get more build tests coverage
+
+Changes from v7:
+  - select DMA_OF, since we're only relying on DT
+  - Properly kill the tasklet as suggested in
+    https://lwn.net/Articles/588457/
+  - Split up the dt bindings documentation into a separate patch
+
+Changes from v6:
+  - Dropped the merged patches and the clock patches that are pretty
+    orthogonal to this driver
+
+Changes from v5:
+  - Rebased on top of 3.15-rc1
+
+Changes from v4:
+  - Removed the packed attribute on the LLI
+  - Switched to using a NULL device pointer in clk_get on PLL6 and
+    AHB1 mux to make explicit that we are getting global clocks
+  - Switched from spin_lock_irqsave to spin_lock in the interrupt
+    handler
+  - Various nitpicks from Andy Shevchenko:
+    + Switched to using %p printk formats for pointers
+    + Inverted some tests to lose a level of indentation
+    + Dropped ifdef DEBUG protecting calls to dev_dbg
+
+Changes from v3:
+  - A few other comments made by Andy Shevchenko were fixed:
+    + Used references in %pa* printk formats
+    + Used is_slave_direction in prep_slave_sg to make sure we were
+      actually called for something, and to avoid making assumptions
+      that we were actually called with the expected directions
+    + A few others minor fixes: s/pr_err/dev_err/, etc.
+
+Changes from v2:
+  - Removed the clk_put calls in the clock protection functions
+  - Splitted out the sunxi machines into several files
+  - Moved the clock protection code into these new machine files
+  - Moved the PLL6 reparenting to the DMA driver
+  - Addressed various comments from Andy Shevchenko: switched to using
+    devm_kcalloc, used correct printk formats for physical and DMA
+    addresses, etc.
+
+Changes from v1:
+  - Removed the clk_put call in the clocks protecting patches
+  - Minor fixes here and there as suggested by Andy Shevchenko: switch
+    to dmam_pool_create, switch to dev_dbg instead of pr_debug, etc.
+
+Maxime Ripard (2):
+  Documentation: dt: Add Allwinner A31 DMA controller bindings
+  dmaengine: sun6i: Add driver for the Allwinner A31 DMA controller
+
+ .../devicetree/bindings/dma/sun6i-dma.txt          |   45 +
+ drivers/dma/Kconfig                                |    8 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/sun6i-dma.c                            | 1059 ++++++++++++++++++++
+ 4 files changed, 1113 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
+ create mode 100644 drivers/dma/sun6i-dma.c
+
+-- 
+2.0.1
