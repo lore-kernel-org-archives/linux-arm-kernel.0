@@ -1,52 +1,64 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 17 Jul 2014 08:45:52 -0700
-Subject: [PATCH v11 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
-References: <1405547442-26641-1-git-send-email-keescook@chromium.org>
- <1405547442-26641-12-git-send-email-keescook@chromium.org>
- <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
-Message-ID: <CAGXu5j+dFZdnnK8f-HRrUs2vLeyhWyHh_AY-OynDcp-Ye+dy7Q@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Jul 2014 11:51:05 -0400
+Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
+ read from DT
+In-Reply-To: <53C7EE82.6040803@samsung.com>
+References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
+ <20140717153236.GS13108@titan.lakedaemon.net>
+ <53C7EE82.6040803@samsung.com>
+Message-ID: <20140717155105.GT13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 8:04 AM, David Drysdale <drysdale@google.com> wrote:
-> On Wed, Jul 16, 2014 at 10:50 PM, Kees Cook <keescook@chromium.org> wrote:
->> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
->> index 9065d2c79c56..2125b83ccfd4 100644
->> +/**
->> + * seccomp_can_sync_threads: checks if all threads can be synchronized
->> + *
->> + * Expects sighand and cred_guard_mutex locks to be held.
->> + *
->> + * Returns 0 on success, -ve on error, or the pid of a thread which was
->> + * either not in the correct seccomp mode or it did not have an ancestral
->> + * seccomp filter.
->> + */
->> +static inline pid_t seccomp_can_sync_threads(void)
->> +{
->> +       struct task_struct *thread, *caller;
->> +
->> +       BUG_ON(!mutex_is_locked(&current->signal->cred_guard_mutex));
->> +       BUG_ON(!spin_is_locked(&current->sighand->siglock));
->> +
->> +       if (current->seccomp.mode != SECCOMP_MODE_FILTER)
->> +               return -EACCES;
->
-> Quick question -- is it possible to apply the first filter and also synchronize
-> it across threads in the same operation?  If so, does this arm also need to
-> cope with seccomp.mode being SECCOMP_MODE_DISABLED?
->
-> [seccomp_set_mode_filter() looks to call this via seccomp_attach_filter()
-> before it does seccomp_assign_mode()]
+On Thu, Jul 17, 2014 at 05:40:50PM +0200, Tomasz Figa wrote:
+> Hi Jason,
+> 
+> On 17.07.2014 17:32, Jason Cooper wrote:
+> > On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
+> >> Certain GIC implementation, namely those found on earlier, single
+> >> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
+> >> which means that the driver needs to use different offset for each CPU.
+> >>
+> >> Currently the driver calculates the offset by multiplying value returned
+> >> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
+> >> CPU topology is not specified in DT and aforementioned function returns
+> >> core ID alone. However when DT contains CPU topology, the function
+> >> changes to return cluster ID as well, which is non-zero on mentioned
+> >> SoCs and so breaks the calculation in GIC driver.
+> >>
+> >> This patch fixes this by masking out cluster ID in CPU offset
+> >> calculation so that only core ID is considered. Multi-cluster Exynos
+> >> SoCs already have banked GIC implementations, so this simple fix should
+> >> be enough.
+> >>
+> >> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> >> ---
+> >>  drivers/irqchip/irq-gic.c | 5 ++++-
+> >>  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > iiuc, this was introduced by:
+> > 
+> >   db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
+> > 
+> > and so should be for v3.3 and up, correct?
+> 
+> Could be, although there was and still is no topology data specified in
+> DT for affected Exynos SoCs. The need for it showed up just recently, so
+> I'm not sure this is a regression to fix in older kernels.
 
-I don't entirely understand what you're asking. The threads gain the
-filter and the mode before the current thread may gain the mode (if
-it's the first time this has been called). Due to all the locks,
-though, this isn't a problem. Is there a situation you see where there
-might be a problem?
+In my "the kernel and the dtb aren't tied together" quest, these are the
+kinds of things I like to see fixed in stable kernels.
 
--Kees
+If a user needs to update a dtb, say to fix a bug, it's reasonable to
+use the newest one for a given board.  After all, any new nodes won't
+change anything, since the driver in the kernel won't match the node.
 
--- 
-Kees Cook
-Chrome OS Security
+However, in this case, without this fix, a user upgrading to the newest
+dtb would get a broken system.  So, this fix should be backported to
+prevent the breakage.  Or, have I missed something in my analysis?
+
+thx,
+
+Jason.
