@@ -1,69 +1,41 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Thu, 17 Jul 2014 17:11:50 +0000
-Subject: [PATCH] ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
-Message-ID: <1405617110-1136-1-git-send-email-romain.perier@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Jul 2014 18:10:58 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+ <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+ <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
+ <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
+ <20140717123533.GJ21153@arm.com>
+ <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
+Message-ID: <20140717171058.GM18203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds ability to shutdown all CPUs except the first one
-(since it might be special for a lot of platforms).
-It is now possible to use kexec which requires such a feature.
+On Thu, Jul 17, 2014 at 02:55:37PM +0100, Peter Maydell wrote:
+> On 17 July 2014 13:35, Will Deacon <will.deacon@arm.com> wrote:
+> > We're not denying the possibility of heterogeneity, we're trying to expose a
+> > consistent view of the system to userspace. Differences between cores should
+> > be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
+> > passed off to userspace.
+> 
+> On that basis, why report anything at all about invididual cores?
+> Just have /proc/cpuinfo report "number of processors: 4" and
+> no per-CPU information at all...
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- arch/arm/mach-rockchip/platsmp.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+We lost a lot of time on this already (given the internal threads). So
+my proposal is to go ahead with Mark's patch with per-CPU features. They
+currently just include the same elf_hwcap multiple times. If we ever
+need to present different features, the conditions would be:
 
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 910835d..7c1299a 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -21,6 +21,7 @@
- #include <linux/of_address.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/cp15.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_plat.h>
- #include <asm/mach/map.h>
-@@ -178,8 +179,38 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
- 		pmu_set_power_domain(0 + i, false);
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static DECLARE_COMPLETION(cpu_died);
-+
-+static int rockchip_cpu_kill(unsigned int cpu)
-+{
-+	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(1000))) {
-+		pr_err("CPU%d: didn't die correctly\n", cpu);
-+		return 0;
-+	}
-+	pmu_set_power_domain(0 + cpu, false);
-+	return 1;
-+}
-+
-+
-+static void rockchip_cpu_die(unsigned int cpu)
-+{
-+	complete(&cpu_died);
-+	flush_cache_louis();
-+
-+	v7_exit_coherency_flush(louis);
-+
-+	while(1)
-+		cpu_do_idle();
-+}
-+#endif
-+
- static struct smp_operations rockchip_smp_ops __initdata = {
- 	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
- 	.smp_boot_secondary	= rockchip_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= rockchip_cpu_kill,
-+	.cpu_die		= rockchip_cpu_die,
-+#endif
- };
- CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+1. Never report more than elf_hwcap
+2. elf_hwcap can only include non-symmetric features *if* Linux gets a
+   way to transparently handle migration or emulation
+
+It basically means that Linux would not rely on the user space to make
+informed decisions on where to run a thread and avoid SIGILL.
+
 -- 
-1.9.1
+Catalin
