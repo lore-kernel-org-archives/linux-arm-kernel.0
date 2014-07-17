@@ -1,182 +1,400 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 17 Jul 2014 11:54:12 +0530
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C6DFAD.8030109@codeaurora.org>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
- <53C6DFAD.8030109@codeaurora.org>
-Message-ID: <CAKohpom5BQU+-wkohQYD4sdh4D0gZf0hmHgajPF1hDvxX4NBmw@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 17 Jul 2014 11:55:44 +0530
+Subject: [PATCH 7/8] mailbox: f_mhu: add driver for Fujitsu MHU controller
+In-Reply-To: <53C6B83D.80602@arm.com>
+References: <1405233128-4799-1-git-send-email-mollie.wu@linaro.org>
+ <53C6B83D.80602@arm.com>
+Message-ID: <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2014 01:55, Saravana Kannan <skannan@codeaurora.org> wrote:
-> On 07/16/2014 01:24 AM, Viresh Kumar wrote:
->> Also, its not the duty of this routine to find which one is the policy cpu
->> as
->> that is done by __cpufreq_add_dev(). And so in case we need to make
->> first cpu of a mask as policy->cpu, it should be done in
->> __cpufreq_add_dev()
->> and not here. This one should just follow the orders :)
+On 16 July 2014 23:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi Mollie,
 >
 >
-> This is a new function. And that split up might have made sense earlier. But
-> not so much anymore since I'm sharing a lot of code between
-> __cpufreq_add_dev() and __cpufreq_remove_dev(). There's not reason to stick
-> with the previous split of up work if it doesn't apply well anymore.
->
-> Please give this a second thought. Maybe it'll make more sense after I split
-> this up into smaller patches.
-
-Don't worry I am all open to good suggestions :)
-
-So, this is why I see your idea of first cpu in related_cpus is good:
-- cpufreq_dev_symlink() is called while adding/removing links now
-- And we must know which CPU owns kobj in the first place, as there
-is no symlink there.
-- To be guaranteed about that, first-cpu logic makes sense and I can see
-why you did it this way.
-- If we want to do it myway, i.e. using policy->cpu there is a problem.
-policy->cpu may change and we have to keep another field like:
-policy->sysfs_cpu to track sysfs master. That's bad..
-
-This is what you wanted to hear, isn't it ? :)
-
-But, as usual I have few concerns:
-- As we talked in another thread consider this scenario:
-- Dual cluster system, 4 CPUs per cluster. Cluser0: cpu0-3, Cluster1: 4-7.
-- CPU 4 failed to come online on boot, but it is still the first cpu of
-related_cpus. It can still come online later on if we fix things somehow.
-- We CAN'T guarantee that first CPU of related_cpus will have a sysfs
-directory for itself, as it may have failed to comeup in the first place..
-- What can we do now? Go to next CPU? Maybe yes, but then we *have*
-to track policy->sysfs_cpu. Isn't it?
-
-If that's the case, lets track sysfs_cpu and lets make it equal to policy->cpu
-instead of the first-cpu logic :)
-
-I know you don't like me much by now :) Just kidding.
-
->> Keep this please, it might be useful while debugging.
->
->
-> Reluctant ok. We don't add/remove these files anymore in a common scenario.
-> So, it's not going to be very helpful. I'll also have to do a add ? Add :
-> Remove blurb for the print.
-
-May still be useful :). For example:
-- In IKS (In kernel switcher: which you may use for you b.L implementation), we
-can turn IKS on/off at runtime and the only way it works is by
-unregistering/registering
-cpufreq driver. And this will be useful there. Also we might want to know what
-went wrong while porting a cpufreq driver for a platform initially.
-
->>> +       dev = get_cpu_device(cpumask_first(policy->related_cpus));
->>> +       if (!dev)
->>> +               return -EINVAL;
+> On 13/07/14 07:32, Mollie Wu wrote:
 >>
->>
->> Again, deciding which cpu is policy->cpu here is wrong. Just follow
->> orders of __cpufreq_add_dev().
->
-> But that's not what I'm doing here?
-
-Yeah, I misread that earlier. So take my comment for sysfs-cpu here :)
-
->> Also pcpu can't be < nr_cpu_ids, right?
->
-> This is for the case when all CPUs in a cluster have been taken down. We
-> don't want to send the notifier at that point. When the mask is empty, the
-> function returns a value >= nr_cpu_ids to indicate an error.
-
-I see, probably you can use cpumask_weight() earlier in the code and
-reuse it here instead of checking for cpumask_first() to find if we need to do
-something. Confusing ? Look at this routine again in your code and you will
-come to know what I refer to. :)
-
->>> @@ -1053,10 +1057,8 @@ static void cpufreq_policy_put_kobj(struct
->>> cpufreq_policy *policy)
->>>          blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
->>>                          CPUFREQ_REMOVE_POLICY, policy);
->>>
->>> -       down_read(&policy->rwsem);
->>>          kobj = &policy->kobj;
->>>          cmp = &policy->kobj_unregister;
->>> -       up_read(&policy->rwsem);
->>
->>
->> Why? And also, these are unrelated changes and must be added as separate
->> commits.
+>> Add driver for the proprietary Mailbox controller (f_mhu) in MB86S7x.
 >
 >
-> This is because we call this with policy rwsem read lock held and lockdep
-> throws a warning. So, it's related to this patch.
-
-I fail to see that in the final code, Can you please enlighten me with line
-numbers please?
-
->>> @@ -1110,9 +1092,10 @@ static int __cpufreq_add_dev(struct device *dev,
->>> +       if (policy) {
->>> +               cpufreq_change_policy_cpus(policy, cpu, true);
->>
->>
->> This is just a waste of time at boot as ... (see below)
+> And it looks like this is not Fujitsu proprietary MHU, it's exactly same IP
+> on JUNO(ARM64 development platform from ARM [1]). I was not sure it's
+> standard
+> IP used on other SoCs too, I too wrote similar driver :(.
 >
-> Why? Please explain.
+Same here :)
 
-As I said, see below :)
-
->>>          /* related cpus should atleast have policy->cpus */
->>>          cpumask_or(policy->related_cpus, policy->related_cpus,
->>> policy->cpus);
->>
->>
->> policy->cpus is already updated here.
-
---------------- HERE -------------------------
-
->>> -       if (!recover_policy) {
->>> -               policy->user_policy.min = policy->min;
->>> -               policy->user_policy.max = policy->max;
->>> -       }
->>
->> Where did these go? There weren't there for fun.
+> Can you please confirm this by reading Peripheral ID(PID: 0xFD0, 0xFE0 -
+> 0xFEC) and Component ID(COMPID: 0xFF0 - 0xFFC). Are they
 >
-> We are keeping the policy intact. So, why would this be needed anymore?
+> PID  - 0x04 0x98 0xB0 0x1B 0x00
+> COMPID - 0x0D 0xF0 0x05 0xB1
+>
+> If so we have do s/f_mhu/arm_mhu/g :)
+>
+Yup, we have to.
 
-This code would execute on !recover_policy, i.e. when we aren't recovering
-policy. Also at boot.. I forgot exact details, please try 'git blame' ..
+>
+>> It has three channels - LowPri-NonSecure, HighPri-NonSecure and Secure.
+>> The MB86S7x communicates over the HighPri-NonSecure channel.
+>>
+>> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+>> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
+>> Signed-off-by: Mollie Wu <mollie.wu@linaro.org>
+>> ---
+>>   drivers/mailbox/Kconfig  |   7 ++
+>>   drivers/mailbox/Makefile |   2 +
+>>   drivers/mailbox/f_mhu.c  | 227
+>> +++++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 236 insertions(+)
+>>   create mode 100644 drivers/mailbox/f_mhu.c
+>>
+>> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+>> index c8b5c13..681aac2 100644
+>> --- a/drivers/mailbox/Kconfig
+>> +++ b/drivers/mailbox/Kconfig
+>> @@ -6,6 +6,13 @@ menuconfig MAILBOX
+>>           signals. Say Y if your platform supports hardware mailboxes.
+>>
+>>   if MAILBOX
+>> +
+>> +config MBOX_F_MHU
+>> +       bool
+>
+>
+> On Juno, there's nothing that prevents me from compiling this as module.
+>
+On S7x, even built-in is not early enough for our purposes. But yes,
+now that we have company it should be made tristate.
 
-> Will do. With Srivatsa point about just making sure every patch compiles, it
-> should be easy to break it up. But to answer your original question, it's
-> again not needed to save/restore since we don't destroy it.
+>> +       depends on ARCH_MB86S7X
+>
+>
+> Definitely not a requirement
+>
+It was, until we found each other ;)
 
-Again, check why it was required with git bisect.
+>
+>> +       help
+>> +         Say Y here if you want to use the F_MHU IPCM support.
+>> +
+>
+>
+> Also it needs some description.
+>
+OK
 
 
+>> +#define INTR_STAT_OFS  0x0
+>> +#define INTR_SET_OFS   0x8
+>> +#define INTR_CLR_OFS   0x10
+>> +
+>> +#define MHU_SCFG       0x400
+>> +
+>
+>
+> Remove this.(secure access only register)
+>
+See later.
 
-Okay, another thing which I just figured out. You changed something really
-really important.
+>
+>> +struct mhu_link {
+>> +       unsigned irq;
+>> +       spinlock_t lock; /* channel regs */
+>> +       void __iomem *tx_reg;
+>> +       void __iomem *rx_reg;
+>> +};
+>> +
+>> +struct f_mhu {
+>> +       void __iomem *base;
+>> +       struct clk *clk;
+>> +       struct mhu_link mlink[3];
+>> +       struct mbox_chan chan[3];
+>> +       struct mbox_controller mbox;
+>> +};
+>> +
+>> +static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+>> +{
+>> +       struct mbox_chan *chan = (struct mbox_chan *)p;
+>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>
+>
+> You don't need explicit cast from void pointers
+>
+Yup
 
-We don't call ->init()/exit() anymore on suspend/resume or when we move
-all CPUs out. I am quite sure this will break platforms, and actually those
-which Rafael care about most :)
+>
+>> +       u32 val;
+>> +
+>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>
+>
+> Please remove all these debug prints.
+>
+These are as good as absent unless DEBUG is defined.
 
-Again. I still feel this patch was a lot over-engineered. I agree that there
-are things which we want to solve, but the first thing to solve is not moving
-sysfs nodes. Which can be solved with very basic changes.
+>
+>> +       /* See NOTE_RX_DONE */
+>> +       val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
+>> +       mbox_chan_received_data(chan, (void *)val);
+>> +
+>> +       /*
+>> +        * It is agreed with the remote firmware that the receiver
+>> +        * will clear the STAT register indicating it is ready to
+>> +        * receive next data - NOTE_RX_DONE
+>> +        */
+>
+> This note could be added as how this mailbox works in general and
+> it's not just Rx right ? Even Tx done is based on this logic.
+> Basically the logic is valid on both directions.
+>
+Yes that is a protocol level agreement. Different f/w may behave differently.
 
-Get that right first and send patches for that. Nothing else.
 
-You can send out improvements later once we have your really really
-important fix in.
+>
+>> +       writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
+>> +
+>> +       return IRQ_HANDLED;
+>> +}
+>> +
+>> +static bool mhu_last_tx_done(struct mbox_chan *chan)
+>> +{
+>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>> +       unsigned long flags;
+>> +       u32 val;
+>> +
+>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>> +       spin_lock_irqsave(&mlink->lock, flags);
+>
+>
+> Why do we need this extra locks here ? mailbox core maintains
+> per channel lock and uses it for at-least send_data IIRC. And this
+> function is just reading status do we really need the lock ?
+>
+> I must be missing something here else  IMO we can get rid of this
+> extra locks in here.
+>
+Yeah, probably unnecessary.
 
-Otherwise, you will just make it tougher for this patchset to get merged.
+>> +       /* See NOTE_RX_DONE */
+>> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+>> +       spin_unlock_irqrestore(&mlink->lock, flags);
+>> +
+>> +       return (val == 0);
+>> +}
+>> +
+>> +static int mhu_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>> +       unsigned long flags;
+>> +
+>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>> +       if (!mhu_last_tx_done(chan)) {
+>> +               pr_err("%s:%d Shouldn't have seen the day!\n",
+>> +                      __func__, __LINE__);
+>> +               return -EBUSY;
+>> +       }
+>> +
+>> +       spin_lock_irqsave(&mlink->lock, flags);
+>> +       writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
+>> +       spin_unlock_irqrestore(&mlink->lock, flags);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int mhu_startup(struct mbox_chan *chan)
+>> +{
+>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>> +       unsigned long flags;
+>> +       u32 val;
+>> +       int ret;
+>> +
+>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>> +       spin_lock_irqsave(&mlink->lock, flags);
+>> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+>> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
+>> +       spin_unlock_irqrestore(&mlink->lock, flags);
+>> +
+>> +       ret = request_irq(mlink->irq, mhu_rx_interrupt,
+>> +                         IRQF_SHARED, "mhu_link", chan);
+>
+>
+> Just a thought: Can this be threaded_irq instead ?
+> Can move request_irq to probe instead esp. if threaded_irq ?
+> That provides some flexibility to client's rx_callback.
+>
+This is controller driver, and can not know which client want
+rx_callback in hard-irq context and which in thread_fn context.
+Otherwise, request_irq() does evaluate to request_threaded_irq(), if
+thats what you mean.
+ There might be use-cases like (diagnostic or other) data transfer
+over mailbox where we don't wanna increase latency, so we have to
+provide a rx_callback in hard-irq context.
 
-Look at this (I don't have a link yet, but you are cc'd):
-[PATCH V1 Resend 0/4] CPUFreq: Bug fixes & cleanups
+>
+>> +       if (unlikely(ret)) {
+>> +               pr_err("Unable to aquire IRQ\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static void mhu_shutdown(struct mbox_chan *chan)
+>> +{
+>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>> +
+>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>> +       free_irq(mlink->irq, chan);
+>> +}
+>> +
+>> +static struct mbox_chan_ops mhu_ops = {
+>> +       .send_data = mhu_send_data,
+>> +       .startup = mhu_startup,
+>> +       .shutdown = mhu_shutdown,
+>> +       .last_tx_done = mhu_last_tx_done,
+>> +};
+>> +
+>> +static int f_mhu_probe(struct platform_device *pdev)
+>> +{
+>> +       int i, err;
+>> +       struct f_mhu *mhu;
+>> +       struct resource *res;
+>> +       int mhu_reg[3] = {0x0, 0x20, 0x200};
+>
+>
+> Probably this gets simplified when you remove secure channel access ?
+>
+we don't remove secure channel :)
 
-A perfect example of how to get the fix in first and then improvements.
+>
+>> +
+>> +       /* Allocate memory for device */
+>> +       mhu = kzalloc(sizeof(*mhu), GFP_KERNEL);
+>> +       if (!mhu) {
+>> +               dev_err(&pdev->dev, "failed to allocate memory.\n");
+>> +               return -EBUSY;
+>> +       }
+>> +
+>> +       mhu->clk = clk_get(&pdev->dev, "clk");
+>> +       if (unlikely(IS_ERR(mhu->clk))) {
+>> +               dev_err(&pdev->dev, "unable to init clock\n");
+>
+>
+> Don't bail out if there's no clock specified in DT. Clock might not
+> be a hard requirement.
+>
+Hmm.. OK.
 
-Everybody have to follow these, even Maintainers.
+>
+>> +               kfree(mhu);
+>> +               return -EINVAL;
+>> +       }
+>> +       clk_prepare_enable(mhu->clk);
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       mhu->base = ioremap(res->start, resource_size(res));
+>> +       if (!mhu->base) {
+>> +               dev_err(&pdev->dev, "ioremap failed.\n");
+>> +               kfree(mhu);
+>> +               return -EBUSY;
+>> +       }
+>> +
+>> +       /* Let UnTrustedOS's access violations don't bother us */
+>> +       writel_relaxed(0, mhu->base + MHU_SCFG);
+>> +
+>
+>
+> Please don't do this. It can't work in non-secure mode. The firmware running
+> with secure access needs to configure this appropriately.
+>
+ok.. pls see below.
+
+> I might be missing to see, is there a binding document for this mhu ?
+>
+Yeah we need one.
+
+>
+>> +       for (i = 0; i < 3; i++) {
+>> +               mhu->chan[i].con_priv = &mhu->mlink[i];
+>> +               spin_lock_init(&mhu->mlink[i].lock);
+>> +               res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+>> +               mhu->mlink[i].irq = res->start;
+>> +               mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
+>> +               mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
+>> +       }
+>> +
+>> +       mhu->mbox.dev = &pdev->dev;
+>> +       mhu->mbox.chans = &mhu->chan[0];
+>> +       mhu->mbox.num_chans = 3;
+>
+>
+> Change this to 2, we shouldn't expose secular channel here as Linux can't
+> access that anyway.
+>
+On the contrary, I think the device driver code should be able to
+manage every resource - secure or non-secure. If we remove secure
+channel option, what do we do on some other platform that needs it?
+And Linux may not always run in non-secure mode.
+ So here we populate all channels and let the clients knows which
+channel to use via platform specific details - DT. Please note the
+driver doesn't touch any secure resource if client doesn't ask it to
+(except SCFG for now, which I think should have some S vs NS DT
+binding).
+
+>
+>> +       mhu->mbox.ops = &mhu_ops;
+>> +       mhu->mbox.txdone_irq = false;
+>> +       mhu->mbox.txdone_poll = true;
+>> +       mhu->mbox.txpoll_period = 10;
+>> +
+>> +       platform_set_drvdata(pdev, mhu);
+>> +
+>> +       err = mbox_controller_register(&mhu->mbox);
+>> +       if (err) {
+>> +               dev_err(&pdev->dev, "Failed to register mailboxes %d\n",
+>> err);
+>> +               iounmap(mhu->base);
+>> +               kfree(mhu);
+>> +       } else {
+>> +               dev_info(&pdev->dev, "Fujitsu MHU Mailbox registered\n");
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>
+>
+> Also to be module you need add remove.
+>
+Yup, OK.
+
+>
+>> +static const struct of_device_id f_mhu_dt_ids[] = {
+>> +       { .compatible = "fujitsu,mhu" },
+>> +       { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, f_mhu_dt_ids);
+>> +
+>> +static struct platform_driver f_mhu_driver = {
+>> +       .driver         = {
+>> +               .name   = "f_mhu",
+>> +               .owner = THIS_MODULE,
+>> +               .of_match_table = f_mhu_dt_ids,
+>> +       },
+>> +       .probe          = f_mhu_probe,
+>> +};
+>> +
+>> +static int __init f_mhu_init(void)
+>> +{
+>> +       return platform_driver_register(&f_mhu_driver);
+>> +}
+>> +module_init(f_mhu_init);
+>
+>
+> This can be module_platform_driver instead.
+>
+OK
+
+Thanks
+-Jassi
