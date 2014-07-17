@@ -1,50 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 Jul 2014 14:31:48 +0200
-Subject: [PATCH 0/4] mips: Add cma support to mips
-In-Reply-To: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
-References: <1405525892-60383-1-git-send-email-Zubair.Kakakhel@imgtec.com>
-Message-ID: <53C7C234.4030903@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 17 Jul 2014 14:35:02 +0200
+Subject: [PATCH] [RFC] [media] omap3isp: try to fix dependencies
+In-Reply-To: <46586956.hxqoJOmDbk@wuerfel>
+References: <46586956.hxqoJOmDbk@wuerfel>
+Message-ID: <2725974.cX7okUBUol@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd,
 
-On 2014-07-16 17:51, Zubair Lutfullah Kakakhel wrote:
-> Here we have 4 patches that add cma support to mips.
->
-> Patch 1 adds dma-contiguous.h to asm-generic
-> Patch 2 and 3 make arm64 and x86 use dma-contiguous from asm-generic
-> Patch 4 adds cma to mips.
->
-> I'd like to request ralf to take these set of 4 patches via his tree.
->
-> acks from asm-generic, arm64 and x86 welcome.
->
-> patches based on linux-next b997a07604562f1a54cc531fe1cf7447f0ed6078
+Sorry for the late reply.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Friday 13 June 2014 14:02:01 Arnd Bergmann wrote:
+> commit 2a0a5472af5c ("omap3isp: Use the ARM DMA IOMMU-aware operations")
+> brought the omap3isp driver closer to using standard APIs, but also
+> introduced two problems:
+> 
+> a) it selects a particular IOMMU driver for no good reason. This just
+>    causes hard to track dependency chains, in my case breaking an
+>    experimental patch set that tries to reenable !MMU support on ARM
+>    multiplatform kernels. Since the driver doesn't have a dependency
+>    on the actual IOMMU implementation (other than sitting on the same
+>    SoC), this changes the 'select OMAP_IOMMU' to a generic 'depends on
+>    IOMMU_API' that reflects the actual usage.
 
-> Zubair Lutfullah Kakakhel (4):
->    asm-generic: Add dma-contiguous.h
->    arm64: use generic dma-contiguous.h
->    x86: use generic dma-contiguous.h
->    mips: dma: Add cma support
+That sounds good to me.
+
+> b) The driver incorrectly calls into low-level helpers designed to
+>    be used by the IOMMU implementation:
+>    arm_iommu_{create,attach,release}_mapping.
+
+I agree with you, and that's my plan, but I haven't been able to fix the 
+problem yet. It's somewhere on my (too big) to-do list.
+
+Please note that, while the problem hasn't been introduced by commit 
+2a0a5472af5c, the driver was in an even worse shape before that, as it called 
+in the OMAP IOMMU driver directly.
+
+>    I'm not fixing this here, but adding a FIXME and a dependency on
+>    ARM_DMA_USE_IOMMU. I believe the correct solution is to move the calls
+>    into the omap iommu driver that currently doesn't have them, and change
+>    the isp driver to call generic functions.
+
+OMAP_IOMMU doesn't select ARM_DMA_USE_IOMMU :-/ That should be fixed first, 
+otherwise the OMAP3 ISP driver won't be available at all.
+
+> In addition, this also adds the missing 'select VIDEOBUF2_DMA_CONTIG'
+> that is needed since fbac1400bd1 ("[media] omap3isp: Move to videobuf2")
+
+That's already fixed in my tree, so I'll skip that part.
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 >
->   arch/arm64/include/asm/Kbuild           |  1 +
->   arch/arm64/include/asm/dma-contiguous.h | 28 -------------------------
->   arch/mips/Kconfig                       |  1 +
->   arch/mips/include/asm/Kbuild            |  1 +
->   arch/mips/kernel/setup.c                |  9 ++++++++
->   arch/mips/mm/dma-default.c              | 37 ++++++++++++++++++++++-----------
->   arch/x86/include/asm/Kbuild             |  1 +
->   arch/x86/include/asm/dma-contiguous.h   | 12 -----------
->   include/asm-generic/dma-contiguous.h    |  9 ++++++++
->   9 files changed, 47 insertions(+), 52 deletions(-)
->   delete mode 100644 arch/arm64/include/asm/dma-contiguous.h
->   delete mode 100644 arch/x86/include/asm/dma-contiguous.h
->   create mode 100644 include/asm-generic/dma-contiguous.h
+> ----
+> 
+> Hi Laurent,
+> 
+> Could you have a look at this? It's possible I'm missing something
+> important here, but this is what I currently need to get randconfig
+> builds to use the omap3isp driver.
+> 
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index 8108c69..15bf61b 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -94,8 +94,9 @@ config VIDEO_M32R_AR_M64278
+>  config VIDEO_OMAP3
+>  	tristate "OMAP 3 Camera support"
+>  	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3
+> -	select ARM_DMA_USE_IOMMU
+> -	select OMAP_IOMMU
+> +	depends on ARM_DMA_USE_IOMMU # FIXME: use iommu API instead of low-level
+> ARM calls +	depends on IOMMU_API
+> +	select VIDEOBUF2_DMA_CONTIG
+>  	---help---
+>  	  Driver for an OMAP 3 camera controller.
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Regards,
+
+Laurent Pinchart
