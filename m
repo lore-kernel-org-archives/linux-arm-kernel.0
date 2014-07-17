@@ -1,33 +1,61 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Thu, 17 Jul 2014 09:47:05 +0200
-Subject: [PATCH 2/2] ia64: Remove Linux/x86 domain support
-In-Reply-To: <CA+8MBbKA5UppTjLP6JYAeLMAyeUPBfF73j91xDCfoF_Vewy5=A@mail.gmail.com>
-References: <1405263538-27589-1-git-send-email-richard@nod.at>	<1405263538-27589-3-git-send-email-richard@nod.at>
- <CA+8MBbKA5UppTjLP6JYAeLMAyeUPBfF73j91xDCfoF_Vewy5=A@mail.gmail.com>
-Message-ID: <53C77F79.2010508@nod.at>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Jul 2014 00:49:48 -0700
+Subject: [Re-send PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
+In-Reply-To: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+References: <1404825399-10330-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20140717074948.GF18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.07.2014 01:20, schrieb Tony Luck:
-> On Sun, Jul 13, 2014 at 7:58 AM, Richard Weinberger <richard@nod.at> wrote:
+* Mugunthan V N <mugunthanvnm@ti.com> [140708 06:18]:
+> Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
 > 
-> Did you read the comment?
-
-Sure, please see my comment below.
-
->> -/*
->> - * Even when CONFIG_IA32_SUPPORT is not enabled it is
->> - * useful to have the Linux/x86 domain registered to
->> - * avoid an attempted module load when emulators call
->> - * personality(PER_LINUX32). This saves several milliseconds
->> - * on each such call.
->> - */
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> ---
 > 
-> I don't know if there are still people using ia32el to run x86 binaries
-> on ia64 ... but if there are, they may be sad at the extra delays.
+> This patch was already send twice on 2013-10-18 and 2014-05-13. Adding
+> more people in Cc to review the patch.
+> 
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 65 +++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 20b4398..45b5113 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -273,6 +273,56 @@ static struct omap_hwmod dra7xx_ctrl_module_wkup_hwmod = {
+>  };
+>  
+>  /*
+> + * 'gmac' class
+> + * cpsw/gmac sub system
+> + */
+> +static struct omap_hwmod_class_sysconfig dra7xx_gmac_sysc = {
+> +	.rev_offs	= 0x0,
+> +	.sysc_offs	= 0x8,
+> +	.syss_offs	= 0x4,
+> +	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
+> +			   SYSS_HAS_RESET_STATUS),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | MSTANDBY_FORCE |
+> +			   MSTANDBY_NO),
+> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+> +};
 
-As written in 0/, the plan is to get rid of exec domains at all.
-Therefore personality(PER_LINUX32) would no longer try to request a module.
+We seem to have this layout WR_SOFT_RESET and WR_CONTROL in the TRM:
 
-Thanks,
-//richard
+WR_SOFT_RESET
+[0]     SOFT_RESET
+
+WR_CONTROL
+[3:2]   MMR_STDBYMODE   0 = force-idle, 1 = no-standby
+[1:0]   MMR_IDLEMODE    0 = force-idle, 1 = no-idle
+
+And so it seems to match what am33xx also has for am33xx_cpgmac_sysc
+and am33xx TRM for 14.5.9 CONTROL register. So as far as I'm concerned:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
