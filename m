@@ -1,49 +1,70 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Jul 2014 16:42:26 +0200
-Subject: [PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
-In-Reply-To: <53C53A1A.6060701@samsung.com>
-References: <53C51B57.9040404@samsung.com>
- <1405434287-22710-1-git-send-email-t.figa@samsung.com>
- <53C53A1A.6060701@samsung.com>
-Message-ID: <53C7E0D2.1050307@samsung.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Thu, 17 Jul 2014 09:48:29 -0500
+Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+In-Reply-To: <20140717135534.GM30313@leverpostej>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140717131854.GN13108@titan.lakedaemon.net>
+ <20140717135534.GM30313@leverpostej>
+Message-ID: <53C7E23D.1050900@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On 15.07.2014 16:26, Tomasz Figa wrote:
-> Forgot to CC Daniel and linux-pm. Sorry for the noise.
-> 
-> On 15.07.2014 16:24, Tomasz Figa wrote:
->> Due to recent consolidation of Exynos suspend and cpuidle code, some
->> parts of suspend and resume sequences are executed two times, once from
->> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
->> breaks suspend, at least on Exynos4-based boards. In addition, simple
->> core power down from a cpuidle driver could, in case of CPU 0 could
->> result in calling functions that are specific to suspend and deeper idle
->> states.
+On 7/17/2014 8:55 AM, Mark Rutland wrote:
+> Hi Jason,
+>
+> On Thu, Jul 17, 2014 at 02:18:54PM +0100, Jason Cooper wrote:
+>> On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
+>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>
+>>> This patch set introduces support for MSI(-X) in GICv2m specification,
+>>> which is implemented in some variation of GIC400.
+>>>
+>>> This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
+>>> (https://lkml.org/lkml/2014/3/14/320).
+>>>
+>>> Changes in V3:
+>>>      * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
+>>>        (per Jason Cooper request)
+>>>      * Misc fix/clean up per Mark Rutland comments
+>>>      * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
+>>>      * Patch 4 is new to the series:
+>>>          * Add ARM64-specific version arch_setup_msi_irqs() to allow support
+>>>            for Multiple MSI.
+>>>          * Add support for Multiple MSI for GICv2m.
+>>>
+>>> Suravee Suthikulpanit (4):
+>>>    irqchip: gic: Add binding probe for ARM GIC400
+>>>    irqchip: gic: Restructuring ARM GIC code
+>>>    irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+>>>    irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
 >>
->> This patch fixes the issue by moving those operations outside the CPU PM
->> notifier into suspend and AFTR code paths. This leads to a bit of code
->> duplication, but allows additional code simplification, so in the end
->> more code is removed than added.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pm.c        | 164 ++++++++++++++++++---------------------
->>  drivers/cpuidle/cpuidle-exynos.c |  25 +-----
->>  2 files changed, 80 insertions(+), 109 deletions(-)
->>
+>> Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
+>> irqchip/gic with irqchip/urgent merged in.  To facilitate
+>> testing/merging, I've prepared an unsigned tag for you on the
+>> irqchip/gic branch:
+>
+> I'm a little concerned that this is all going through for v3.17 without
+> a {Reviewed,Acked}-by from Marc or anyone working with GIC{,v2m}.
 
-Please consider this patch for next pull request with rc fixes. It
-replaces following patches posted in this thread:
+> While his comments on v1 have been addressed, he has not had a chance to
+> acknowledge the solutions. I appreciate Marc's holiday is unfortunately
+> timed.
+>
+> I also have an open concern with the binding with regard to the
+> orthogonality of GICV GICH and the MSI registers.
 
-[PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
-[PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
+The MSI part is normally enabled from the optional "msi-controller" 
+keyword. It should not really matter which compatible ID it uses.
 
-and also similar patch by Chander:
+Ooops. I noticed that was accidentally dropped the check for 
+"msi-controller" in the gicv2m_of_init() function.  I'll send a follow 
+up patch to fix this.
 
-[PATCH 2/2] cpuidle: Exynos: fix cpuidle for all states
+> Suravee, do you need this urgently for v3.17? I was under the impression
+> that we wouldn't have full PCIe support by then.
+>
 
-Best regards,
-Tomasz
+PCI is the dependency for this patch to function.  So, it should be 
+aligned with upstreaming of PCI patches.
+
+Suravee
