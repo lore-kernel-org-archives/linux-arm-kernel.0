@@ -1,162 +1,55 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 17 Jul 2014 19:17:35 +0300
-Subject: [PATCH v2 4/4] mfd: pm8921: rename pm8921-core driver
-In-Reply-To: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
-References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <1405613855-27572-5-git-send-email-svarbanov@mm-sol.com>
+From: rgb@redhat.com (Richard Guy Briggs)
+Date: Thu, 17 Jul 2014 12:26:51 -0400
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140717162651.GP8594@madcap2.tricolour.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm8921-core driver presently supports pm8921 and pm8058
-Qualcomm PMICs.  To avoid confusion with new generation PMICs
-(like pm8941) rename the pm8921-core driver to more
-appropriate name pm8xxx-ssbi, which reflects better that
-those chips use SSBI interface.
+On 14/07/17, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> interface) removed the arch parameter from __audit_syscall_entry() and
+> updated the only current user in mainline but this breaks the ARMv8 audit
+> code that has been added in -next. Fix this by making the equivalent
+> update to ARMv8.
+> 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 
-Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
----
- drivers/mfd/Kconfig                          |   14 +++++-----
- drivers/mfd/Makefile                         |    2 +-
- drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} |   38 +++++++++++++-------------
- 3 files changed, 27 insertions(+), 27 deletions(-)
- rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
+Signed-off-by: Richard Guy Briggs <rgb@redhat.com>
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 122e2d9..884bc32 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -507,8 +507,8 @@ config UCB1400_CORE
- config MFD_PM8XXX
- 	tristate
- 
--config MFD_PM8921_CORE
--	tristate "Qualcomm PM8921 PMIC chip"
-+config MFD_PM8XXX_SSBI
-+	tristate "Qualcomm PM8XXX SSBI PMICs"
- 	depends on (ARM || HEXAGON)
- 	select IRQ_DOMAIN
- 	select MFD_CORE
-@@ -516,13 +516,13 @@ config MFD_PM8921_CORE
- 	select REGMAP
- 	help
- 	  If you say yes to this option, support will be included for the
--	  built-in PM8921 PMIC chip.
-+	  built-in PM8921 and PM8058 PMIC chips.
- 
--	  This is required if your board has a PM8921 and uses its features,
--	  such as: MPPs, GPIOs, regulators, interrupts, and PWM.
-+	  This is required if your board has a PM8921 or PM8058 and uses
-+	  its features, such as: MPPs, GPIOs, regulators, interrupts, and PWM.
- 
--	  Say M here if you want to include support for PM8921 chip as a module.
--	  This will build a module called "pm8921-core".
-+	  Say M here if you want to include support for PM8921 or PM8058 chip
-+	  as a module. This will build a module called "pm8xxx-ssbi".
- 
- config MFD_PM8XXX_SPMI
- 	tristate "Qualcomm PM8XXX SPMI PMICs"
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 93d82cc..d332085 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -152,7 +152,7 @@ obj-$(CONFIG_MFD_SI476X_CORE)	+= si476x-core.o
- 
- obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
- obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o omap-usb-tll.o
--obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
-+obj-$(CONFIG_MFD_PM8XXX_SSBI) 	+= pm8xxx-ssbi.o ssbi.o
- obj-$(CONFIG_MFD_PM8XXX_SPMI)	+= pm8xxx-spmi.o
- obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
- obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
-diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8xxx-ssbi.c
-similarity index 92%
-rename from drivers/mfd/pm8921-core.c
-rename to drivers/mfd/pm8xxx-ssbi.c
-index 9595138..102d7fb 100644
---- a/drivers/mfd/pm8921-core.c
-+++ b/drivers/mfd/pm8xxx-ssbi.c
-@@ -277,14 +277,14 @@ static const struct regmap_config ssbi_regmap_config = {
- 	.reg_write = ssbi_reg_write
- };
- 
--static const struct of_device_id pm8921_id_table[] = {
-+static const struct of_device_id pm8xxx_id_table[] = {
- 	{ .compatible = "qcom,pm8058", },
- 	{ .compatible = "qcom,pm8921", },
- 	{ }
- };
--MODULE_DEVICE_TABLE(of, pm8921_id_table);
-+MODULE_DEVICE_TABLE(of, pm8xxx_id_table);
- 
--static int pm8921_probe(struct platform_device *pdev)
-+static int pm8xxx_probe(struct platform_device *pdev)
- {
- 	struct regmap *regmap;
- 	int irq, rc;
-@@ -354,18 +354,18 @@ static int pm8921_probe(struct platform_device *pdev)
- 	return rc;
- }
- 
--static int pm8921_remove_child(struct device *dev, void *unused)
-+static int pm8xxx_remove_child(struct device *dev, void *unused)
- {
- 	platform_device_unregister(to_platform_device(dev));
- 	return 0;
- }
- 
--static int pm8921_remove(struct platform_device *pdev)
-+static int pm8xxx_remove(struct platform_device *pdev)
- {
- 	int irq = platform_get_irq(pdev, 0);
- 	struct pm_irq_chip *chip = platform_get_drvdata(pdev);
- 
--	device_for_each_child(&pdev->dev, NULL, pm8921_remove_child);
-+	device_for_each_child(&pdev->dev, NULL, pm8xxx_remove_child);
- 	irq_set_chained_handler(irq, NULL);
- 	irq_set_handler_data(irq, NULL);
- 	irq_domain_remove(chip->irqdomain);
-@@ -373,29 +373,29 @@ static int pm8921_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct platform_driver pm8921_driver = {
--	.probe		= pm8921_probe,
--	.remove		= pm8921_remove,
-+static struct platform_driver pm8xxx_driver = {
-+	.probe		= pm8xxx_probe,
-+	.remove		= pm8xxx_remove,
- 	.driver		= {
--		.name	= "pm8921-core",
-+		.name	= "pm8xxx-ssbi",
- 		.owner	= THIS_MODULE,
--		.of_match_table = pm8921_id_table,
-+		.of_match_table = pm8xxx_id_table,
- 	},
- };
- 
--static int __init pm8921_init(void)
-+static int __init pm8xxx_init(void)
- {
--	return platform_driver_register(&pm8921_driver);
-+	return platform_driver_register(&pm8xxx_driver);
- }
--subsys_initcall(pm8921_init);
-+subsys_initcall(pm8xxx_init);
- 
--static void __exit pm8921_exit(void)
-+static void __exit pm8xxx_exit(void)
- {
--	platform_driver_unregister(&pm8921_driver);
-+	platform_driver_unregister(&pm8xxx_driver);
- }
--module_exit(pm8921_exit);
-+module_exit(pm8xxx_exit);
- 
- MODULE_LICENSE("GPL v2");
--MODULE_DESCRIPTION("PMIC 8921 core driver");
-+MODULE_DESCRIPTION("PMIC PM8XXX SSBI driver");
- MODULE_VERSION("1.0");
--MODULE_ALIAS("platform:pm8921-core");
-+MODULE_ALIAS("platform:pm8xxx-ssbi");
--- 
-1.7.0.4
+I'm not sure the best way to propagate this patch, but it will be
+necessary.
+
+> ---
+>  arch/arm64/kernel/ptrace.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 70526cfda056..310842e3d477 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>  		trace_sys_enter(regs, regs->syscallno);
+>  
+> -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
+> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
+> +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
+> +			    regs->regs[2], regs->regs[3]);
+>  
+>  	return regs->syscallno;
+>  }
+> -- 
+> 2.0.1
+> 
+
+- RGB
+
+--
+Richard Guy Briggs <rbriggs@redhat.com>
+Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+Remote, Ottawa, Canada
+Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
