@@ -1,101 +1,75 @@
-From: maggie.mae.roxas@gmail.com (Maggie Mae Roxas)
-Date: Wed, 16 Jul 2014 22:37:47 -0700
-Subject: Issue found in Armada 370: "No buffer space available" error
- during continuous ping
-In-Reply-To: <20140715124333.GF12333@1wt.eu>
-References: <CAB8gEUs3Z8OzOMBVqP1yN8zV1E67mGQTaxKKCw=GRuAVxJ4nGQ@mail.gmail.com>
- <CAB8gEUv52mjpAuYRKhv8_VuAwt9Uog5eD2jn45gnyqcd+cXv8g@mail.gmail.com>
- <20140708102142.0f7fe796@free-electrons.com>
- <CAB8gEUvEQdRT3Xarq_z6-KCr3T9xZ7wHvW9Termw8MAg_d-gQA@mail.gmail.com>
- <20140715142431.4eccbcd6@free-electrons.com>
- <20140715124333.GF12333@1wt.eu>
-Message-ID: <CAB8gEUt08QVpgW0fs18tNnCkCw36SD6hxgL8O6p6+oOtX0-yJQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 17 Jul 2014 11:21:25 +0530
+Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <53C6D90A.1000402@codeaurora.org>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+ <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
+ <53C65F03.1050609@mit.edu>
+ <CAKohpomKF_TvpPZzEwocOK33RKnLWLtE2cPK6hk7YuhTVaNg2g@mail.gmail.com>
+ <53C6D90A.1000402@codeaurora.org>
+Message-ID: <CAKohponX1Wkk0ZOpV6C4i5pQr35b=zMN0L7mjfHVZDwq_A4ocw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Willy,
-Good day.
+On 17 July 2014 01:26, Saravana Kannan <skannan@codeaurora.org> wrote:
+> No it's not. All the cpu*/ directories for all possible CPUs will be there
+> whether a CPU is online/offline. Which is why I also weed out impossible
+> CPUs, but you said the driver shouldn't be passing impossible CPUs anyway.
+> I'm just picking one directory to put the real cpufreq directory under. So,
+> the code as-is is definitely not broken.
 
-First of all, thanks again for looking further into this.
+I may be wrong, and that's why I checked it with Srivatsa. He is quite familiar
+with hotplug code.
 
-> Maggie, do you know if it is possible that for any reason your board
-would not deliver an IRQ on Tx completion ? That could explain things.
-I'm sorrry but I'm not really sure how to check this - all I know is
-that the difference in the working and not-working setup (both
-software and hardware) is the mvneta.c.
+Let me show the example again, its a bit tricky.
 
-> You can easily test reverting commit 4f3a4f701b just in case. If that's
-the case, then the next step will be to figure out how it is possible
-that IRQs are disabled!
-I'll try this one, specifcally this combination:
-- use 3.13.9 mvneta.c
-- apply cd71e246c16b30e3f396a85943d5f596202737ba
-- revert 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922
+I agree with you that sysfs nodes for CPUs stay as is with offline events, but
+we aren't talking about that here. On boot when we are trying to bring CPUs
+online, some of them may fail to come. And in that case, as confirmed by
+Srivatsa, there are no sysfs directories. This doesn't happen normally and
+is a very corner case.
 
-I will update you the results within today until latest tomorrow.
+Still think we are wrong?
 
-Thank you for your support as usual!
+> Sure, I can pick the first cpu that comes online to decide where to put the
+> real sysfs cpufreq directory, but then I have to keep track of that in a
+> separate field when it's time to remove it when the cpufreq driver is
+> unregistered.
 
-Regards,
-Maggie Roxas
+It works this way right now and I don't think we maintain any separate field
+here. Subsys-interface takes care of the order in which CPUs are added/
+removed. And we don't have to handle that here. Just fix policy->cpu
+at first cpufreq_add_dev().
 
-On Tue, Jul 15, 2014 at 5:43 AM, Willy Tarreau <w@1wt.eu> wrote:
-> Hi Thomas,
->
-> On Tue, Jul 15, 2014 at 02:24:31PM +0200, Thomas Petazzoni wrote:
->> Dear Maggie Mae Roxas,
->>
->> On Tue, 8 Jul 2014 23:35:36 -0700, Maggie Mae Roxas wrote:
->>
->> > As much as we'd like to switch to the latest v3.14.x, we need to stay
->> > at kernel v3.13.9 as that is a hard requirement of our customer (I
->> > think it's because it's the base platform for Ubuntu 14.04 FS which
->> > we'll use).
->> >
->> > So I applied your patch in our v3.13.9 as suggested:
->> > http://kernel.opensuse.org/cgit/kernel/patch/?id=cd71e246c16b30e3f396a85943d5f596202737ba
->> >
->> > Unfortunately, issue still exists after we applied it.
->> >
->> > > Basically, between 3.13.5 and 3.13.9, I introduced two patches to the
->> > network driver:
->> >
->> > Given this, we tried to replace mvneta.c of our v3.13.9 and replace it
->> > with v3.13.5's mvneta.c.
->> > Issue does not exist when we did that - but of course, we surely will
->> > miss something, so we wanted to confirm this further with you.
->> > It seems like applying cd71e246c16b30e3f396a85943d5f596202737ba in
->> > v3.13.9 is not sufficient enough..?
->> > Possibly there are v3.13.5 and v3.13.9 diff (see attached) needed
->> > apart from just cd71e246c16b30e3f396a85943d5f596202737ba?
->>
->> Hum, there are indeed more commits than I thought between 3.13.5 and
->> 3.13.9 :
->>
->> 396b229b683fdc08d8705883860ec5a1b810546a net: mvneta: fix usage as a module on RGMII configurations
->> ea64e1f33d9d627da5d38da035e5d7443276e84e net: mvneta: rename MVNETA_GMAC2_PSC_ENABLE to MVNETA_GMAC2_PCS_ENABLE
->> 4f3a4f701b59a3e4b5c8503ac3d905c0a326f922 net: mvneta: replace Tx timer with a real interrupt
->> 0ce58acf529bacd25dbe01298ff51a5c4d59a4f4 net: mvneta: add missing bit descriptions for interrupt masks and causes
->> 8c2c9b1efcc4b04b4625d0613b9e74ef17016dea net: mvneta: do not schedule in mvneta_tx_timeout
->> 92817335465090aecfde6caef9bab6923f209664 net: mvneta: use per_cpu stats to fix an SMP lock up
->> fbfbed33a5effba7dc6f33e3ed598f9bd31b0cdf net: mvneta: increase the 64-bit rx/tx stats out of the hot path
->>
->> Willy: many of the patches in this list are yours. The patch "net:
->> mvneta: fix usage as a module on RGMII configurations" is known to
->> break SGMII configurations, but even after reverting it, Maggie Mae
->> reports that mvneta in 3.13.9 doesn't work, but mvneta works on 3.13.5.
->> Do you see any missing patch on the TX rework that you did and that was
->> included betweeen 3.13.5 and 3.13.9 ?
->
-> No, everything seems to be there. Additionally, my local development branch
-> was actually based on the commits above as it was rebased on v3.13.9.
->
-> Maggie, do you know if it is possible that for any reason your board
-> would not deliver an IRQ on Tx completion ? That could explain things.
-> You can easily test reverting commit 4f3a4f701b just in case. If that's
-> the case, then the next step will be to figure out how it is possible
-> that IRQs are disabled!
->
-> Regards,
-> Willy
->
+> And no, we
+> shouldn't be moving sysfs directory to stay with only an online directory.
+> That's the thing this patch is trying to simplify.
+
+Ahh, I really missed it in reviews. So, that's why you are looking at first
+cpu of related_cpus.. Hmm, so it is quite possible that we would end up
+in a case where policy->cpu wouldn't have sysfs directory created for it.
+
+Not sure if that might cause some hickups.
+
+@Srivatsa: ??
+
+> So, I think using the first cpu in related CPUs will always work. If there's
+> any disagreement, I think it's purely a personal preference over adding
+> another field vs calling cpumask_first()
+
+That's what the problem with this patch was, just too big to miss important
+things :)
+
+I now understood why you had these extra cpumask_first() calls.
+
+But having said that, I still don't see a need to change the current behavior.
+The important point is kobject and links are added just once, no movement.
+And so, I would still like to add it to policy->cpu, i.e. the cpu which comes
+first. And this happens only once while we register a driver, so no side
+effects probably.
+
+Not every platform is going through hotplug/suspend/resume and keeping
+policy->cpu and sysfs node aligned atleast for them might not be that bad.
+Though it will work for any cpu.
