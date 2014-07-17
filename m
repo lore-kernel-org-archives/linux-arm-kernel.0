@@ -1,45 +1,48 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Jul 2014 12:59:38 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <1405596402-23844-1-git-send-email-broonie@kernel.org>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140717115937.GF18203@arm.com>
+Date: Thu, 17 Jul 2014 13:01:22 +0100
+Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic
+ {read,write}s*()
+In-Reply-To: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140717120122.GG18203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
+On Wed, Jul 16, 2014 at 12:01:22PM +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> interface) removed the arch parameter from __audit_syscall_entry() and
-> updated the only current user in mainline but this breaks the ARMv8 audit
-> code that has been added in -next. Fix this by making the equivalent
-> update to ARMv8.
+> Currently driver writers need to use io{read,write}{8,16,32}_rep() when
+> accessing FIFO registers portably. This is bad for two reasons: it is
+> inconsistent with how other registers are accessed using the standard
+> {read,write}{b,w,l}() functions, which can lead to confusion. On some
+> architectures the io{read,write}*() functions also need to perform some
+> extra checks to determine whether an address is memory-mapped or refers
+> to I/O space. Drivers which can be expected to never use I/O can safely
+> use the {read,write}s{b,w,l,q}(), just like they use their non-string
+> variants and there's no need for these extra checks.
 > 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/kernel/ptrace.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> This patch implements generic versions of readsb(), readsw(), readsl(),
+> readsq(), writesb(), writesw(), writesl() and writesq(). Variants of
+> these string functions for I/O accesses (ins*() and outs*() as well as
+> ioread*_rep() and iowrite*_rep()) are now implemented in terms of the
+> new functions.
 > 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 70526cfda056..310842e3d477 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->  		trace_sys_enter(regs, regs->syscallno);
->  
-> -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-> +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-> +			    regs->regs[2], regs->regs[3]);
->  
->  	return regs->syscallno;
->  }
+> Going forward, {read,write}{,s}{b,w,l,q}() should be used consistently
+> by drivers for devices that will only ever be memory-mapped and hence
+> don't need to access I/O space, whereas io{read,write}{8,16,32}_rep()
+> should be used by drivers for devices that can be either memory-mapped
+> or I/O-mapped.
+> 
+> While at it, also make sure that any of the functions provided as
+> fallback for architectures that don't override them can't be overridden
+> subsequently.
+> 
+> This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+> tested on Microblaze, s390, SPARC and Xtensa. For ARC, Blackfin, Metag,
+> OpenRISC, Score and Unicore32 which also use asm-generic/io.h I couldn't
+> find or build a cross-compiler that would run on my system. But by code
+> inspection they shouldn't break with this patch.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-Thanks. This will have to be applied after 3.17-rc1 since commit
-3efe33f5d2 does not seem to be in mainline yet (nor the arm64 audit
-patches).
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
