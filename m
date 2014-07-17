@@ -1,78 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 08:35:50 -0400
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <20140708124653.GX23978@titan.lakedaemon.net>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140708053434.GH28931@quad.lixom.net>
- <20140708115727.GR23978@titan.lakedaemon.net>
- <20140708121252.GK21766@n2100.arm.linux.org.uk>
- <20140708124653.GX23978@titan.lakedaemon.net>
-Message-ID: <20140717123550.GH13108@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Jul 2014 14:39:42 +0200
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140717083342.GS21766@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140717102425.34fe0181@free-electrons.com>
+ <20140717083342.GS21766@n2100.arm.linux.org.uk>
+Message-ID: <6510599.Qoc205T3v7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Tue, Jul 08, 2014 at 08:46:53AM -0400, Jason Cooper wrote:
-> On Tue, Jul 08, 2014 at 01:12:52PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jul 08, 2014 at 07:57:27AM -0400, Jason Cooper wrote:
-> > > Can you offer any suggestions as to how you would like this resolved?  I
-> > > thought when I voiced my opinion as above, and Russell didn't reply,
-> > > there was implied acknowledgement...
-> > 
-> > I didn't reply probably because I didn't see the message and/or I'm busy
-> > with other stuff.
+On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
+> On Thu, Jul 17, 2014 at 10:24:25AM +0200, Thomas Petazzoni wrote:
+> > If I understand correctly, we are already changing the page tables
+> > anyway, to switch certain pages to be mapped uncached, to do DMA
+> > coherent allocations, no?
 > 
-> Fair enough.
-
-This is the second time I've asked you for a technical reason not to
-merge these DTS patches, only to be met with silence, again.
-
-> > I know that Sebastian asked Rabeeh on IRC yesterday whether the flash
-> > chip type could be used to detect the difference between the two, but
-> > has not yet received an answer.
+> I've no idea, I never looked at that code.  I hope that Marek has
+> considered the requirements of the architecture when creating that
+> code...
 > 
-> Ok.
+> > So wouldn't it be possible to keep the early
+> > assembly code as it is today, and then later, in C code, once we have
+> > identified the platform on which we're running, modify the page tables
+> > to switch to the appropriate page attributes (write allocate cache
+> > policy, shareable attribute, etc.) ?
 > 
-> > As the two DT descriptions are mutually incompatible, there isn't much
-> > choice.  And (afaik) there's no choice of updating the boot loader to
-> > a version which can deal with DT - yes it may be u-boot, but I've no
-> > idea if modern u-boot works on it, and I really would not like to try.
+> No - the problem is that we're running from the page table in question
+> with global mappings, and we need to switch all these mappings, including
+> the ones we're currently using to execute from.
 > 
-> Right, what I'm arguing for (since trimmed), is *not* bootloader
-> upgrades.  I think Sebastian's changes are ok because:
+> We can't even create a new page table and switch to it because the
+> mappings in question are global mappings.
 > 
->  - Most users have production boxes (Sebastian's patches provide their
->    sane default)
-> 
->  - Most users of mainline or distro kernels are appending the dtb, so
->    swapping out a dtb, while not ideal, isn't earth-shattering.
-> 
-> The *only* failure condition I can see is what you already highlighted,
-> people who don't know they have an engineering sample.  Sebastian's
-> patches work for most people, and on the odd chance of the failure, the
-> user simply appends the other dtb and reboots.
-> 
-> Once we hear back from Rabeeh, at a minimum, we'll add a comment to the
-> dts file for distro maintainers and users to find.  If possible, we'll
-> add a hook in arch code to read from SPI and adjust the dtb accordingly.
+> The only way to do that safely from an architectural point of view would
+> be to turn the MMU off, and drop back to assembly code to change the
+> page tables, and re-enable the MMU.  For something as obscure as Marvell's
+> coherency stuff, that's not something I want to see in core code.
 
-Either of these solutions will be follow-on patches.  There's no need to
-hold up this pull request over this information.
+Is this different from what we do in the LPAE version of
+early_paging_init()? That code already adjusts all the page
+table entries on a per-platform setting and should be very
+easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
+and possibly able to extend for traditional (non-LPAE)
+page tables without a lot of duplication.
 
-> In either case, comment or code, the dts files changed in this series
-> are correct and won't change.
+At the moment it only handles a platform-specific undetectable
+PHYS_OFFSET for mach-keystone, which to me sounds equally
+hacky as the platform-specific undetectable pmdprot value
+for mvebu.
 
-I still stand by this.
+Is there anything I'm missing why one works and the other doesn't?
 
-> I'm sorry to be dense, Russell, but what am I missing from your
-> objection?
-
-Olof, Arnd, please merge this request.  I can re-send if you need.
-
-We have more changes pending in mvebu/dt on top of this, and we're
-getting very close to the cutoff for the merge window.
-
-thx,
-
-Jason.
+	Arnd
