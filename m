@@ -1,43 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 11:32:36 -0400
-Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
- read from DT
-In-Reply-To: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
-References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
-Message-ID: <20140717153236.GS13108@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Jul 2014 16:34:01 +0100
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <10673994.kkICTRHJxL@wuerfel>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140717131224.GW21766@n2100.arm.linux.org.uk>
+ <20140717142720.GM21153@arm.com> <10673994.kkICTRHJxL@wuerfel>
+Message-ID: <20140717153401.GX21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
-> Certain GIC implementation, namely those found on earlier, single
-> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
-> which means that the driver needs to use different offset for each CPU.
+On Thu, Jul 17, 2014 at 04:40:21PM +0200, Arnd Bergmann wrote:
+> On Thursday 17 July 2014 15:27:20 Will Deacon wrote:
+> > Just an FYI, but I've had to check internally to clarify the behaviour
+> > around TLB conflict aborts. We're changing live page tables here, but the
+> > *only* thing to differ is the output address, which I would hope is ok but
+> > need to check to be sure.
 > 
-> Currently the driver calculates the offset by multiplying value returned
-> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
-> CPU topology is not specified in DT and aforementioned function returns
-> core ID alone. However when DT contains CPU topology, the function
-> changes to return cluster ID as well, which is non-zero on mentioned
-> SoCs and so breaks the calculation in GIC driver.
+> The two cases are slightly different:
 > 
-> This patch fixes this by masking out cluster ID in CPU offset
-> calculation so that only core ID is considered. Multi-cluster Exynos
-> SoCs already have banked GIC implementations, so this simple fix should
-> be enough.
-> 
-> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  drivers/irqchip/irq-gic.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+> - The existing keystone code changes the output address but not the flags
+> - The hypothetical mvebu code needs to change the flags but not the address.
 
-iiuc, this was introduced by:
+Don't base too much confidence in the keystone code:
 
-  db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
+        map_start = init_mm.start_code;
+        map_end   = init_mm.brk;
 
-and so should be for v3.3 and up, correct?
+        phys = __pa(map_start) & PMD_MASK;
+        do {
+...
+                phys += PMD_SIZE;
+        } while (phys < map_end);
 
-thx,
+Consider what happens when map_end is not PMD aligned - it misses the
+PMD covering the end of the kernel BSS, which will be quite a common
+case.  Obviously something that needs fixing...
 
-Jason.
+-- 
+FTTC broadband for 0.8mile line: currently@9.5Mbps down 400kbps up
+according to speedtest.net.
