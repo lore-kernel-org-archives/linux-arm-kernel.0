@@ -1,145 +1,51 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 17 Jul 2014 09:17:59 -0700
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <20140703150401.GE20104@cbox>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
- <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
- <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
- <20140611070352.GC24286@lvm> <53A0EE60.6030508@samsung.com>
- <20140703150401.GE20104@cbox>
-Message-ID: <53C7F737.40307@samsung.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 17 Jul 2014 19:17:31 +0300
+Subject: [PATCH v2 0/4] Support for Qualcomm QPNP PMIC's
+Message-ID: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-   Just back from holiday - a short plan to resume work.
+Hello everyone,
 
-- move VM tlb flush and kvm log functions to generic, per Paolo's
-comments use Kconfig approach
-- update other architectures make sure they compile
-- Keep it ARMv7 for now
+Here is the continuation of patch sets sent recently about Qualcomm
+QPNP SPMI PMICs.
 
-Get maintainers to test the branch.
+The previous version of the patch set can be found at [1].
 
-In parallel add dirty log support to ARMv8, to test I would
-add a QEMU monitor function to validate general operation.
+Changes since v1:
+ - removed completely custom *of* parser
+ - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
+ - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
 
-Your thoughts?
+Removing of the custom *of* parser leads to that that the *reg* devicetree
+property cannot exist and therefore cannot be parsed to get PMIC peripheral
+resources. I took this step aside because no one from mfd drivers does this
+parsing. This will lead to inconvenience in the peripheral drivers to define
+internally the SPMI base addresses depending on the compatible property
+i.e. PMIC version. 
 
-Thanks,
-  Mario
+Comments are welcome!
 
-On 07/03/2014 08:04 AM, Christoffer Dall wrote:
-> On Tue, Jun 17, 2014 at 06:41:52PM -0700, Mario Smarduch wrote:
->> On 06/11/2014 12:03 AM, Christoffer Dall wrote:
->>
->>>>
->>>> There is also the issue of kvm_flush_remote_tlbs(), that's also weak,
->>>> the generic one is using IPIs. Since it's only used in mmu.c maybe make 
->>>> this one static.
->>>>
->>> So I don't see a lot of use of weak symbols in kvm_main.c (actually on
->>> kvmarm/next I don't see any), but we do want to share code when more
->>> than one architecture implements something in the exact same way, like
->>> it seems x86 and ARM is doing here for this particular function.
->>>
->>> I think the KVM scheme is usually to check for some define, like:
->>>
->>> #ifdef KVM_ARCH_HAVE_GET_DIRTY_LOG
->>> 	ret = kvm_arch_get_dirty_log(...);
->>> #else
->>> 	ret = kvm_get_dirty_log(...);
->>> #endif
->>>
->>> but Paolo may have a more informed oppinion of how to deal with these.
->>>
->>> Thanks,
->>> -Christoffer
->>>
->>
->>  
->> One approach I'm trying looking at the code in kvm_main().
->> This approach applies more to selecting features as opposed to
->> selecting generic vs architecture specific functions.
->>
->> 1.-------------------------------------------------
->>  - add to 'virt/kvm/Kconfig'
->> config HAVE_KVM_ARCH_TLB_FLUSH_ALL
->>        bool
->>
->> config HAVE_KVM_ARCH_DIRTY_LOG
->>        bool
->> 2.--------------------------------------------------
->> For ARM and later ARM64 add to 'arch/arm[64]/kvm/Kconfig'
->> config KVM
->>         bool "Kernel-based Virtual Machine (KVM) support"
->> ...
->> select HAVE_KVM_ARCH_TLB_FLUSH_ALL
->> ..
->>
->> Not for HAVE_KVM_ARCH_DIRTY_LOG given it's shared with x86,
->> but would need to do it for every other architecture that
->> does not share it (except initially for arm64 since it
->> will use the variant that returns -EINVAL until feature
->> is supported)
->>
->> 3------------------------------------------------------
->> In kvm_main.c would have something like
->>
->> void kvm_flush_remote_tlbs(struct kvm *kvm)
->> {
->> #ifdef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
->>         kvm_arch_flush_remote_tlbs(kvm);
->> #else
->>         long dirty_count = kvm->tlbs_dirty;
->>
->>         smp_mb();
->>         if (make_all_cpus_request(kvm, KVM_REQ_TLB_FLUSH))
->>                 ++kvm->stat.remote_tlb_flush;
->>         cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
->> #endif
->> }
->>
->> Then add void kvm_flush_remote_tlbs(struct kvm *kvm) definition
->> to arm kvm_host.h. Define the function in this case mmu.c
->>
->> For the dirty log function
->> int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
->>                                                 struct kvm_dirty_log *log)
->> {
->> #ifdef CONFIG_HAVE_KVM_ARCH_DIRTY_LOG
->>         kvm_arch_vm_ioctl_get_dirty_log(kvm, log);
->> #else
->>         int r;
->>         struct kvm_memory_slot *memslot;
->>         unsigned long n, i;
->>         unsigned long *dirty_bitmap;
->>         unsigned long *dirty_bitmap_buffer;
->>         bool is_dirty = false;
->> 	...
->>
->> But then you have to go into every architecture and define the
->> kvm_arch_vm_...() variant.
->>
->> Is this the right way to go? Or is there a simpler way?
->>
-> Hmmm, I'm really not an expert in the 'established procedures' for what
-> to put in config files etc., but here's my basic take:
-> 
-> a) you wouldn't put a config option in Kconfig unless it's comething
-> that's actually configurable or some generic feature/subsystem that
-> should only be enabled if hardware has certain capabilities or other
-> config options enabled.
-> 
-> b) this seems entirely an implementation issue and not depending on
-> anything users should select.
-> 
-> c) therefore, I think it's either a question of always having an
-> arch-specific implementation that you probe for its return value or you
-> have some sort of define in the header files for the
-> arch/X/include/asm/kvm_host.h to control what you need.
-> 
-> -Christoffer
-> 
+regards,
+Stan
+
+[1] https://lkml.org/lkml/2014/7/8/428
+
+Josh Cartwright (1):
+  mfd: pm8xxx-spmi: add support for Qualcomm SPMI PMICs
+
+Stanimir Varbanov (3):
+  mfd: pm8xxx-spmi: document DT bindings for Qualcomm SPMI PMICs
+  ARM: DT: qcom: add pm8941 and pm8841 device nodes
+  mfd: pm8921: rename pm8921-core driver
+
+ .../devicetree/bindings/mfd/qcom,pm8xxx-spmi.txt   |   49 +++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |   37 ++++++++++++
+ drivers/mfd/Kconfig                                |   30 +++++++--
+ drivers/mfd/Makefile                               |    3 +-
+ drivers/mfd/pm8xxx-spmi.c                          |   63 ++++++++++++++++++++
+ drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c}       |   38 ++++++------
+ 6 files changed, 193 insertions(+), 27 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx-spmi.txt
+ create mode 100644 drivers/mfd/pm8xxx-spmi.c
+ rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
