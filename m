@@ -1,44 +1,66 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 16 Jul 2014 17:28:35 -0700
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <6c999c0fee0b406db597e74837980081@BLUPR03MB136.namprd03.prod.outlook.com>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <20140626031247.GN2224@dragon>
- <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
- <20140626054937.GB7859@dragon>
- <CAJ+vNU0DNCT5pcvnptNBo-tPTVOH1HnrCwy7uCZt33dfyq8U-g@mail.gmail.com>
- <6c999c0fee0b406db597e74837980081@BLUPR03MB136.namprd03.prod.outlook.com>
-Message-ID: <CAJ+vNU2_AOYm8=L-w4QKDT-sWq-pennOyPE0eN-sYzUgzAMCSw@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 17 Jul 2014 09:40:28 +0900
+Subject: [PATCH 1/8] ARM: shmobile: r8a7790: Add CMT devices to DT
+In-Reply-To: <cover.1405556312.git.horms+renesas@verge.net.au>
+References: <cover.1405556312.git.horms+renesas@verge.net.au>
+Message-ID: <99ecea23cc4209549a8e5c3efd0f123a2b8f8138.1405556312.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 3:06 AM, Hong-Xing.Zhu at freescale.com
-<Hong-Xing.Zhu@freescale.com> wrote:
-> [Richard] I did the tests refer to this use-case, enable imx6 pcie on both u-boot and kernel,
-> and I encounter the system hang too.
->
-> Here are the latest updates and some clues from my side:
-> - About 200us delay is required after the ltssm_en is set to be '1' at my side.
-> Otherwise, system would be hang when driver access the pcie_phy_debug_r1 to check
-> the link is up or not.
->
-> - After that, system hang when rc trying to access the cfg space of ep device,
-> Although the pcie link had been setup and I don't have know the root cause yet.
->
-> - The kernel can boot up successfully, when I mask the cfg read/write call-back in pcie-designware.c
-> Driver for debug purpose.
->
-> Note:
-> The sequence of the pcie initialization should be adjusted refer to the newly
->  discovered bug(pcie link maybe rarely random down after the system warm-reset).
-> * Ref_ssp_en(bit16 of gpr1 register) should be set after the pcie others clks are enable.
-> Enable pcie related clks --> delay for about ~10us waiting for the clks stable-->set ref_ssp_en(bit16 of gpr1 register).
->
-> Debug is still on-going.
->
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Any update on this? Are you or others at Freescale actively working on this?
+Add the CMT0 and CMT1 counters to the r8a7790 device tree and make them
+disabled by default.
 
-Regards,
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Tim
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index d9ddecb..7218bff 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -206,6 +206,38 @@
+ 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
++	cmt0: timer at ffca0000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xffca0000 0 0x1004>;
++		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
++		clock-names = "fck";
++
++		renesas,channels-mask = <0x60>;
++
++		status = "disabled";
++	};
++
++	cmt1: timer at e6130000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xe6130000 0 0x1004>;
++		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 122 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 123 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 124 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7790_CLK_CMT1>;
++		clock-names = "fck";
++
++		renesas,channels-mask = <0xff>;
++
++		status = "disabled";
++	};
++
+ 	irqc0: interrupt-controller at e61c0000 {
+ 		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
+ 		#interrupt-cells = <2>;
+-- 
+2.0.0
