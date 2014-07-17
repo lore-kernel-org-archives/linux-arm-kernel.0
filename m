@@ -1,28 +1,42 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 17 Jul 2014 13:28:25 -0500
-Subject: [Patch v7 2/3] usb: phy: Add Qualcomm DWC3 HS/SS PHY drivers
-In-Reply-To: <1405593024.423213197@apps.rackspace.com>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-3-git-send-email-agross@codeaurora.org>
- <CA+neC=McWS8=iSi2XShJyvc85Aw4PSmF-osNpVgJv42d9or1WQ@mail.gmail.com>
- <1405593024.423213197@apps.rackspace.com>
-Message-ID: <20140717182825.GA17951@qualcomm.com>
+Date: Thu, 17 Jul 2014 13:31:10 -0500
+Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flags
+In-Reply-To: <20140714163616.GA4387@intel.com>
+References: <1401482990-26486-1-git-send-email-agross@codeaurora.org>
+ <20140714163616.GA4387@intel.com>
+Message-ID: <20140717183110.GB17951@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 06:30:24AM -0400, kiran.padwal at smartplayin.com wrote:
-> Hi,
-> 
-> On Mon, Jun 30, 2014 at 9:33 PM, Andy Gross <agross@codeaurora.org> wrote: 
-> > From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+On Mon, Jul 14, 2014 at 10:06:16PM +0530, Vinod Koul wrote:
+> On Fri, May 30, 2014 at 03:49:50PM -0500, Andy Gross wrote:
+> > This patch adds support for end of transaction (EOT) and notify when done (NWD)
+> > hardware descriptor flags.
 > > 
-> > These drivers handles control and configuration of the HS
-> > and SS USB PHY transceivers. They are part of the driver
-> .
-> [snip]
-> .
+> > The EOT flag requests that the peripheral assert an end of transaction interrupt
+> > when that descriptor is complete.  It also results in special signaling protocol
+> > that is used between the attached peripheral and the core using the DMA
+> > controller.  Clients will specify DMA_PREP_INTERRUPT to enable this flag.
+> > 
+> > The NWD flag requests that the peripheral wait until the data has been fully
+> > processed by the peripheral before moving on to the next descriptor.  Clients
+> > will specify DMA_PREP_FENCE to enable this flag.
+> 
+> I am going to apply this, but pls send a follow up patch to add comments on the
+> flags and their behaviour. I think it is required!
 
-I'll remove all the unused/unnecessary defines in the next version.
+Will do.
+
+<snip>
+
+> >  #define DESC_FLAG_EOT BIT(14)
+> >  #define DESC_FLAG_EOB BIT(13)
+> > +#define DESC_FLAG_NWD BIT(12)
+> explaining behvaiour will help..
+
+In the followup, I'll put in a lengthy description of the INT/EOT/NWD and how
+they are used in the signaling to/from the attached peripheral.
+
 
 Thanks!
 
