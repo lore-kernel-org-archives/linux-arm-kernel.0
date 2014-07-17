@@ -1,38 +1,101 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Jul 2014 18:38:58 +0200
-Subject: [PATCH v3 3/7] ARM: l2c: Get outer cache .write_sec callback from
- mach_desc only if not NULL
+Date: Thu, 17 Jul 2014 18:38:59 +0200
+Subject: [PATCH v3 4/7] ARM: l2c: Add support for overriding prefetch settings
 In-Reply-To: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
 References: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1405615142-21426-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1405615142-21426-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain platforms (i.e. Exynos) might need to set .write_sec callback
-from firmware initialization which is happenning in .init_early callback
-of machine descriptor. However current code will overwrite the pointer
-with whatever is present in machine descriptor, even though it can be
-already set earlier. This patch fixes this by making the assignment
-conditional, depending on whether current .write_sec callback is NULL.
+Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+settings configured in registers leading to crashes if L2C is enabled
+without overriding them. This patch introduces bindings to enable
+prefetch settings to be specified from DT and necessary support in the
+driver.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/kernel/irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/l2cc.txt | 10 +++++++
+ arch/arm/mm/cache-l2x0.c                       | 39 ++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 2c42576..e7383b9 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -125,7 +125,8 @@ void __init init_IRQ(void)
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index af527ee..3443d2d 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -47,6 +47,16 @@ Optional properties:
+ - cache-id-part: cache id part number to be used if it is not present
+   on hardware
+ - wt-override: If present then L2 is forced to Write through mode
++- arm,double-linefill : Override double linefill enable setting. Enable if
++  non-zero, disable if zero.
++- arm,double-linefill-incr : Override double linefill on INCR read. Enable
++  if non-zero, disable if zero.
++- arm,double-linefill-wrap : Override double linefill on WRAP read. Enable
++  if non-zero, disable if zero.
++- arm,prefetch-drop : Override prefetch drop enable setting. Enable if non-zero,
++  disable if zero.
++- arm,prefetch-offset : Override prefetch offset value. Valid values are
++  0-7, 15, 23, and 31.
  
- 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
- 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
--		outer_cache.write_sec = machine_desc->l2c_write_sec;
-+		if (!outer_cache.write_sec)
-+			outer_cache.write_sec = machine_desc->l2c_write_sec;
- 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
- 				   machine_desc->l2c_aux_mask);
- 		if (ret)
+ Example:
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 21a625a0..6274803 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1055,6 +1055,8 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 	u32 data[3] = { 0, 0, 0 };
+ 	u32 tag[3] = { 0, 0, 0 };
+ 	u32 filter[2] = { 0, 0 };
++	u32 prefetch;
++	u32 val;
+ 
+ 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+ 	if (tag[0] && tag[1] && tag[2])
+@@ -1079,6 +1081,43 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		l2x0_saved_regs.filter_start = (filter[0] & ~(SZ_1M - 1))
+ 					| L310_ADDR_FILTER_EN;
+ 	}
++
++	prefetch = l2x0_saved_regs.prefetch_ctrl;
++
++	if (!of_property_read_u32(np, "arm,double-linefill", &val)) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
++	}
++
++	if (!of_property_read_u32(np, "arm,double-linefill-incr", &val)) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++	}
++
++	if (!of_property_read_u32(np, "arm,double-linefill-wrap", &val)) {
++		if (!val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
++	}
++
++	if (!of_property_read_u32(np, "arm,prefetch-drop", &val)) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_PREFETCH_DROP;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_PREFETCH_DROP;
++	}
++
++	if (!of_property_read_u32(np, "arm,prefetch-offset", &val)) {
++		prefetch &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
++		prefetch |= val & L310_PREFETCH_CTRL_OFFSET_MASK;
++	}
++
++	l2x0_saved_regs.prefetch_ctrl = prefetch;
+ }
+ 
+ static const struct l2c_init_data of_l2c310_data __initconst = {
 -- 
 1.9.3
