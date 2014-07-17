@@ -1,102 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Jul 2014 17:10:10 +0100
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <53C7F40A.800@ti.com>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <10673994.kkICTRHJxL@wuerfel> <20140717153401.GX21766@n2100.arm.linux.org.uk>
- <5105942.b7kcvNdlC8@wuerfel> <53C7F40A.800@ti.com>
-Message-ID: <20140717161010.GY21766@n2100.arm.linux.org.uk>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 17 Jul 2014 09:17:59 -0700
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <20140703150401.GE20104@cbox>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
+ <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
+ <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
+ <20140611070352.GC24286@lvm> <53A0EE60.6030508@samsung.com>
+ <20140703150401.GE20104@cbox>
+Message-ID: <53C7F737.40307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:04:26PM -0400, Santosh Shilimkar wrote:
-> Thanks for spotting it RMK. Will have a loot at it.
+Hi Christoffer,
+   Just back from holiday - a short plan to resume work.
 
-I already have this for it - which includes a lot more comments on the
-code (some in anticipation of the reply from the architecture people.)
-The first hunk alone should fix the spotted problem.
+- move VM tlb flush and kvm log functions to generic, per Paolo's
+comments use Kconfig approach
+- update other architectures make sure they compile
+- Keep it ARMv7 for now
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index ab14b79b03f0..917aabd6b2dc 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1406,8 +1406,8 @@ void __init early_paging_init(const struct machine_desc *mdesc,
- 		return;
- 
- 	/* remap kernel code and data */
--	map_start = init_mm.start_code;
--	map_end   = init_mm.brk;
-+	map_start = init_mm.start_code & PMD_MASK;
-+	map_end   = ALIGN(init_mm.brk, PMD_SIZE);
- 
- 	/* get a handle on things... */
- 	pgd0 = pgd_offset_k(0);
-@@ -1434,23 +1434,60 @@ void __init early_paging_init(const struct machine_desc *mdesc,
- 	dsb(ishst);
- 	isb();
- 
--	/* remap level 1 table */
-+	/*
-+	 * WARNING: This code is not architecturally compliant: we modify
-+	 * the mappings in-place, indeed while they are in use by this
-+	 * very same code.
-+	 *
-+	 * Even modifying the mappings in a separate page table does
-+	 * not resolve this.
-+	 *
-+	 * The architecture strongly recommends that when a mapping is
-+	 * changed, that it is changed by first going via an invalid
-+	 * mapping and back to the new mapping.  This is to ensure
-+	 * that no TLB conflicts (caused by the TLB having more than
-+	 * one TLB entry match a translation) can occur.
-+	 */
-+
-+	/*
-+	 * Remap level 1 table.  This changes the physical addresses
-+	 * used to refer to the level 2 page tables to the high
-+	 * physical address alias, leaving everything else the same.
-+	 */
- 	for (i = 0; i < PTRS_PER_PGD; pud0++, i++) {
- 		set_pud(pud0,
- 			__pud(__pa(pmd0) | PMD_TYPE_TABLE | L_PGD_SWAPPER));
- 		pmd0 += PTRS_PER_PMD;
- 	}
- 
--	/* remap pmds for kernel mapping */
--	phys = __pa(map_start) & PMD_MASK;
-+	/*
-+	 * Remap the level 2 table, pointing the mappings at the high
-+	 * physical address alias of these pages.
-+	 */
-+	phys = __pa(map_start);
- 	do {
- 		*pmdk++ = __pmd(phys | pmdprot);
- 		phys += PMD_SIZE;
- 	} while (phys < map_end);
- 
-+	/*
-+	 * Ensure that the above updates are flushed out of the cache.
-+	 * This is not strictly correct; on a system where the caches
-+	 * are coherent with each other, but the MMU page table walks
-+	 * may not be coherent, flush_cache_all() may be a no-op, and
-+	 * this will fail.
-+	 */
- 	flush_cache_all();
-+
-+	/*
-+	 * Re-write the TTBR values to point them at the high physical
-+	 * alias of the page tables.  We expect __va() will work on
-+	 * cpu_get_pgd(), which returns the value of TTBR0.
-+	 */
- 	cpu_switch_mm(pgd0, &init_mm);
- 	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
-+
-+	/* Finally flush any stale TLB values. */
- 	local_flush_bp_all();
- 	local_flush_tlb_all();
- }
+Get maintainers to test the branch.
 
+In parallel add dirty log support to ARMv8, to test I would
+add a QEMU monitor function to validate general operation.
 
--- 
-FTTC broadband for 0.8mile line: currently@9.5Mbps down 400kbps up
-according to speedtest.net.
+Your thoughts?
+
+Thanks,
+  Mario
+
+On 07/03/2014 08:04 AM, Christoffer Dall wrote:
+> On Tue, Jun 17, 2014 at 06:41:52PM -0700, Mario Smarduch wrote:
+>> On 06/11/2014 12:03 AM, Christoffer Dall wrote:
+>>
+>>>>
+>>>> There is also the issue of kvm_flush_remote_tlbs(), that's also weak,
+>>>> the generic one is using IPIs. Since it's only used in mmu.c maybe make 
+>>>> this one static.
+>>>>
+>>> So I don't see a lot of use of weak symbols in kvm_main.c (actually on
+>>> kvmarm/next I don't see any), but we do want to share code when more
+>>> than one architecture implements something in the exact same way, like
+>>> it seems x86 and ARM is doing here for this particular function.
+>>>
+>>> I think the KVM scheme is usually to check for some define, like:
+>>>
+>>> #ifdef KVM_ARCH_HAVE_GET_DIRTY_LOG
+>>> 	ret = kvm_arch_get_dirty_log(...);
+>>> #else
+>>> 	ret = kvm_get_dirty_log(...);
+>>> #endif
+>>>
+>>> but Paolo may have a more informed oppinion of how to deal with these.
+>>>
+>>> Thanks,
+>>> -Christoffer
+>>>
+>>
+>>  
+>> One approach I'm trying looking at the code in kvm_main().
+>> This approach applies more to selecting features as opposed to
+>> selecting generic vs architecture specific functions.
+>>
+>> 1.-------------------------------------------------
+>>  - add to 'virt/kvm/Kconfig'
+>> config HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>>        bool
+>>
+>> config HAVE_KVM_ARCH_DIRTY_LOG
+>>        bool
+>> 2.--------------------------------------------------
+>> For ARM and later ARM64 add to 'arch/arm[64]/kvm/Kconfig'
+>> config KVM
+>>         bool "Kernel-based Virtual Machine (KVM) support"
+>> ...
+>> select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>> ..
+>>
+>> Not for HAVE_KVM_ARCH_DIRTY_LOG given it's shared with x86,
+>> but would need to do it for every other architecture that
+>> does not share it (except initially for arm64 since it
+>> will use the variant that returns -EINVAL until feature
+>> is supported)
+>>
+>> 3------------------------------------------------------
+>> In kvm_main.c would have something like
+>>
+>> void kvm_flush_remote_tlbs(struct kvm *kvm)
+>> {
+>> #ifdef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>>         kvm_arch_flush_remote_tlbs(kvm);
+>> #else
+>>         long dirty_count = kvm->tlbs_dirty;
+>>
+>>         smp_mb();
+>>         if (make_all_cpus_request(kvm, KVM_REQ_TLB_FLUSH))
+>>                 ++kvm->stat.remote_tlb_flush;
+>>         cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
+>> #endif
+>> }
+>>
+>> Then add void kvm_flush_remote_tlbs(struct kvm *kvm) definition
+>> to arm kvm_host.h. Define the function in this case mmu.c
+>>
+>> For the dirty log function
+>> int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
+>>                                                 struct kvm_dirty_log *log)
+>> {
+>> #ifdef CONFIG_HAVE_KVM_ARCH_DIRTY_LOG
+>>         kvm_arch_vm_ioctl_get_dirty_log(kvm, log);
+>> #else
+>>         int r;
+>>         struct kvm_memory_slot *memslot;
+>>         unsigned long n, i;
+>>         unsigned long *dirty_bitmap;
+>>         unsigned long *dirty_bitmap_buffer;
+>>         bool is_dirty = false;
+>> 	...
+>>
+>> But then you have to go into every architecture and define the
+>> kvm_arch_vm_...() variant.
+>>
+>> Is this the right way to go? Or is there a simpler way?
+>>
+> Hmmm, I'm really not an expert in the 'established procedures' for what
+> to put in config files etc., but here's my basic take:
+> 
+> a) you wouldn't put a config option in Kconfig unless it's comething
+> that's actually configurable or some generic feature/subsystem that
+> should only be enabled if hardware has certain capabilities or other
+> config options enabled.
+> 
+> b) this seems entirely an implementation issue and not depending on
+> anything users should select.
+> 
+> c) therefore, I think it's either a question of always having an
+> arch-specific implementation that you probe for its return value or you
+> have some sort of define in the header files for the
+> arch/X/include/asm/kvm_host.h to control what you need.
+> 
+> -Christoffer
+> 
