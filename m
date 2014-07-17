@@ -1,232 +1,83 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 17 Jul 2014 13:28:00 +0900
-Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
- registration
-In-Reply-To: <53C63CBA.20809@codethink.co.uk>
-References: <1405086308-1461192-1-git-send-email-arnd@arndb.de>
- <16507628.c6raaN50oI@wuerfel> <20140714183624.GV6800@sirena.org.uk>
- <4657735.1VKsbQGuH6@wuerfel>
- <CAAVeFu+Z2xzUy6pGWu3H4MXdkBq39-USHbwNU9ih6AvvxPyu5A@mail.gmail.com>
- <53C4DF0D.8010208@metafoo.de>
- <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
- <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
- <20140716071237.GA7978@ulmo>
- <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
- <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
-Message-ID: <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 17 Jul 2014 10:56:50 +0530
+Subject: [PATCH] PM / OPP: cpufreq: Avoid sleeping while atomic
+In-Reply-To: <1405553740-5067-1-git-send-email-sboyd@codeaurora.org>
+References: <1405553740-5067-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAKohpond9aNvX+x--G7AADkRhAu1iZ5mFW8pDvAXJ6yp_CCH_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 5:50 PM, Rob Jones <rob.jones@codethink.co.uk> wrote:
+On 17 July 2014 05:05, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> We allocate the cpufreq table after calling rcu_read_lock(),
+> which disables preemption. This causes scheduling while atomic
+> warnings. Use GFP_ATOMIC instead of GFP_KERNEL and update for
+> kcalloc while we're here.
+
+I am surprised to see that this isn't reported by anybody since the time
+it came into existence? Some special config option required to observe
+this?
+
+> BUG: sleeping function called from invalid context at mm/slub.c:1246
+> in_atomic(): 0, irqs_disabled(): 0, pid: 80, name: modprobe
+> 5 locks held by modprobe/80:
+>  #0:  (&dev->mutex){......}, at: [<c050d484>] __driver_attach+0x48/0x98
+>  #1:  (&dev->mutex){......}, at: [<c050d494>] __driver_attach+0x58/0x98
+>  #2:  (subsys mutex#5){+.+.+.}, at: [<c050c114>] subsys_interface_register+0x38/0xc8
+>  #3:  (cpufreq_rwsem){.+.+.+}, at: [<c05a9c8c>] __cpufreq_add_dev.isra.22+0x84/0x92c
+>  #4:  (rcu_read_lock){......}, at: [<c05ab24c>] dev_pm_opp_init_cpufreq_table+0x18/0x10c
+> Preemption disabled at:[<  (null)>]   (null)
 >
+> CPU: 2 PID: 80 Comm: modprobe Not tainted 3.16.0-rc3-next-20140701-00035-g286857f216aa-dirty #217
+> [<c0214da8>] (unwind_backtrace) from [<c02123f8>] (show_stack+0x10/0x14)
+> [<c02123f8>] (show_stack) from [<c070141c>] (dump_stack+0x70/0xbc)
+> [<c070141c>] (dump_stack) from [<c02f4cb0>] (__kmalloc+0x124/0x250)
+> [<c02f4cb0>] (__kmalloc) from [<c05ab270>] (dev_pm_opp_init_cpufreq_table+0x3c/0x10c)
+> [<c05ab270>] (dev_pm_opp_init_cpufreq_table) from [<bf000508>] (cpufreq_init+0x48/0x378 [cpufreq_generic])
+> [<bf000508>] (cpufreq_init [cpufreq_generic]) from [<c05a9e08>] (__cpufreq_add_dev.isra.22+0x200/0x92c)
+> [<c05a9e08>] (__cpufreq_add_dev.isra.22) from [<c050c160>] (subsys_interface_register+0x84/0xc8)
+> [<c050c160>] (subsys_interface_register) from [<c05a9494>] (cpufreq_register_driver+0x108/0x2d8)
+> [<c05a9494>] (cpufreq_register_driver) from [<bf000888>] (generic_cpufreq_probe+0x50/0x74 [cpufreq_generic])
+> [<bf000888>] (generic_cpufreq_probe [cpufreq_generic]) from [<c050e994>] (platform_drv_probe+0x18/0x48)
+> [<c050e994>] (platform_drv_probe) from [<c050d1f4>] (driver_probe_device+0x128/0x370)
+> [<c050d1f4>] (driver_probe_device) from [<c050d4d0>] (__driver_attach+0x94/0x98)
+> [<c050d4d0>] (__driver_attach) from [<c050b778>] (bus_for_each_dev+0x54/0x88)
+> [<c050b778>] (bus_for_each_dev) from [<c050c894>] (bus_add_driver+0xe8/0x204)
+> [<c050c894>] (bus_add_driver) from [<c050dd48>] (driver_register+0x78/0xf4)
+> [<c050dd48>] (driver_register) from [<c0208870>] (do_one_initcall+0xac/0x1d8)
+> [<c0208870>] (do_one_initcall) from [<c028b6b4>] (load_module+0x190c/0x21e8)
+> [<c028b6b4>] (load_module) from [<c028c034>] (SyS_init_module+0xa4/0x110)
+> [<c028c034>] (SyS_init_module) from [<c020f0c0>] (ret_fast_syscall+0x0/0x48)
 >
-> On 16/07/14 08:51, Thierry Reding wrote:
->>
->> On Wed, Jul 16, 2014 at 04:28:33PM +0900, Alexandre Courbot wrote:
->>>
->>> On Wed, Jul 16, 2014 at 4:12 PM, Thierry Reding
->>> <thierry.reding@gmail.com> wrote:
->>>>
->>>> On Wed, Jul 16, 2014 at 12:00:45PM +0900, Alexandre Courbot wrote:
->>>>>
->>>>> On Tue, Jul 15, 2014 at 6:14 PM, Alexandre Courbot <gnurou@gmail.com>
->>>>> wrote:
->>>>>>
->>>>>> On Tue, Jul 15, 2014 at 4:58 PM, Lars-Peter Clausen <lars@metafoo.de>
->>>>>> wrote:
->>>>>>>
->>>>>>> On 07/15/2014 09:36 AM, Alexandre Courbot wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> On Tue, Jul 15, 2014 at 4:19 PM, Arnd Bergmann <arnd@arndb.de>
->>>>>>>> wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> On Monday 14 July 2014 19:36:24 Mark Brown wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> On Mon, Jul 14, 2014 at 08:23:55PM +0200, Arnd Bergmann wrote:
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> On Monday 14 July 2014 18:18:12 Lars-Peter Clausen wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>>> Yes. But now that you say it the gpiod_direction_output() call
->>>>>>>>>>>> is
->>>>>>>>>>>> missing
->>>>>>>>>>>> from this patch.
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>> I'm lost now. The GPIO_ACTIVE_HIGH I added comes from
->>>>>>>>>>> Documentation/gpio/board.txt
->>>>>>>>>>> and as Linus Walleij explained to me the other day, the lookup is
->>>>>>>>>>> supposed
->>>>>>>>>>> to replace devm_gpio_request_one(), which in turn replaced both
->>>>>>>>>>> the
->>>>>>>>>>> gpio_request and the gpio_direction_output(). Do I need to put
->>>>>>>>>>> the
->>>>>>>>>>> gpiod_direction_output() back or is there another interface for
->>>>>>>>>>> that
->>>>>>>>>>> when
->>>>>>>>>>> registering the board gpios?
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Indeed.  If you *do* need an explicit _output() then that sounds
->>>>>>>>>> to me
->>>>>>>>>> like we either need a gpiod_get_one() or an extension to the
->>>>>>>>>> table,
->>>>>>>>>> looking at the code it seems like this is indeed the case.  We can
->>>>>>>>>> set
->>>>>>>>>> if the GPIO is active high/low, or open source/drain but there's
->>>>>>>>>> no flag
->>>>>>>>>> for the initial state.
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> (adding Alexandre and the gpio list)
->>>>>>>>>
->>>>>>>>> GPIO people: any guidance on how a board file should set a gpio to
->>>>>>>>> output/default-high in a GPIO_LOOKUP() table to replace a
->>>>>>>>> devm_gpio_request_one() call in a device driver with
->>>>>>>>> devm_gpiod_get()?
->>>>>>>>> Do we need to add an interface extension to do this, e.g. passing
->>>>>>>>> GPIOF_OUT_INIT_HIGH as the flags rather than GPIO_ACTIVE_HIGH?
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> The way I see it, GPIO mappings (whether they are done using the
->>>>>>>> lookup tables, DT, or ACPI) should only care about details that are
->>>>>>>> relevant to the device layout and that should be abstracted to the
->>>>>>>> driver (e.g. whether the GPIO is active low or open drain) so
->>>>>>>> drivers
->>>>>>>> do not need to check X conditions every time they want to drive the
->>>>>>>> GPIO.
->>>>>>>>
->>>>>>>> Direction and initial value, on the other hand, are clearly
->>>>>>>> properties
->>>>>>>> that ought to be set by the driver itself. Thus my expectation here
->>>>>>>> would be that the driver sets the GPIO direction and initial value
->>>>>>>> as
->>>>>>>> soon as it gets it using gpiod_direction_output(). In other words,
->>>>>>>> there is no replacement for gpio_request_one() with the gpiod
->>>>>>>> interface. Is there any use-case that cannot be covered by calling
->>>>>>>> gpiod_direction_output() right after gpiod_get()? AFAICT this is
->>>>>>>> what
->>>>>>>> gpio_request_one() was doing anyway.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> I agree with you that this is something that should be done in the
->>>>>>> driver
->>>>>>> and not in the lookup table. I think that it is still a good idea to
->>>>>>> have a
->>>>>>> replacement for gpio_request_one with the new GPIO descriptor API. A
->>>>>>> large
->>>>>>> share of the drivers want to call either gpio_direction_input() or
->>>>>>> gpio_direction_output() right after requesting the GPIO. Combining
->>>>>>> both the
->>>>>>> requesting and the configuration of the GPIO into one function call
->>>>>>> makes
->>>>>>> the code a bit shorter and also simplifies the error handling. Even
->>>>>>> more so
->>>>>>> if e.g. the GPIO is optional. This was one of the main reasons why
->>>>>>> gpio_request_one was introduced, see the commit[1] that added it.
->>>>>>
->>>>>>
->>>>>> I am not opposed to it as a convenience function. Note that since the
->>>>>> open-source and open-drain flags are already handled by the lookup
->>>>>> table, the only flags it should handle are those related to direction,
->>>>>> value, and (maybe) sysfs export.
->>>>>
->>>>>
->>>>> Problem is, too much convenience functions seems to ultimately kill
->>>>> convenience.
->>>>>
->>>>> The canonical way to request a GPIO is by providing a (device,
->>>>> function, index) triplet to gpiod_get_index(). Since most functions
->>>>> only need one GPIO, we have gpiod_get(device, function) which is
->>>>> basically an alias to gpiod_get_index(device, function, 0) (note to
->>>>> self: we should probably inline it).
->>>>>
->>>>> On top of these comes another set of convenience functions,
->>>>> gpiod_get_optional() and gpiod_get_index_optional(), which return NULL
->>>>> instead of -ENOENT if the requested GPIO mapping does not exist. This
->>>>> is useful for the common case where a driver can work without a GPIO.
->>>>>
->>>>> Of course these functions all have devm counterparts, so we currently
->>>>> have 8 (devm_)gpiod_get(_index)(_optional) functions.
->>>>>
->>>>> If we are to add functions with an init flags parameter, we will end
->>>>> with 16 functions. That starts to be a bit too much to my taste, and
->>>>> maybe that's where GPIO consumers should sacrifice some convenience to
->>>>> preserve a comprehensible GPIO API.
->>>>>
->>>>> There might be other ways to work around this though. For instance, we
->>>>> could replace the _optional functions by a GPIOF_OPTIONAL flag to be
->>>>> passed to a more generic function that would also accept direction and
->>>>> init value flags. Actually I am not seeing any user of the _optional
->>>>> variant in -next, so maybe we should just do this. Thierry, since you
->>>>> introduced the _optional functions, can we get your thoughts about
->>>>> this?
->>>>
->>>>
->>>> I personally prefer explicit naming of the functions rather than putting
->>>> a bunch of flags into some parameter. If you're overly concerned about
->>>> the amount of convenience functions, perhaps the _index variants can be
->>>> left out for gpiod_get_one(). I'd argue that if drivers want to deal
->>>> with that level of detail anyway, they may just as well add the index
->>>> explicitly when calling the function.
->>>>
->>>> While we're at it, gpiod_get_one() doesn't sound like a very good name.
->>>> All other variants only request "one" as well. Perhaps something like
->>>> gpiod_get_with_flags() would be a better name.
->>>>
->>>> Then again, maybe rather than add a new set of functions we should bite
->>>> the bullet and change gpiod_get() (and variants) to take an additional
->>>> flags parameter. There aren't all that many users yet (I count 26
->>>> outside of drivers/gpio), so maybe now would still be a good time to do
->>>> that.
->>>
->>>
->>> That sounds reasonable indeed. And preferable to getting an aneurysm
->>> after trying to spell devm_gpiod_get_index_optional_with_flags().
->>>
->>> This also makes the most sense since most GPIO users will want to set
->>> a direction and value right after obtaining one. So if there is no
->>> objection I will probably start refactoring gpiod_get() this week.
->>
->>
->> Sounds good to me.
->>
+> Fixes: a0dd7b79657b "PM / OPP: Move cpufreq specific OPP functions out of generic OPP library"
+
+That looks to be wrong. This commit just moved things around and I can still
+see rcu_read_lock() before this commit.
+
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 >
-> In light of this, should I hold off starting on devm_gpiod_get_array()
-> as discussed on here last week?
+> It would be nice to not do atomic allocations, but I guess the table could
+> change size?
 
-These are two independant issues, and adapting the get_array() patch
-to a refactored gpiod_get() should be trivial.
+Yep. Number of OPPs can vary over time on a running machine.
 
-But while we are at it (and sorry for going further off-topic), I also
-think that gpiod_get_array() should not follow the same calling
-convention as gpio_request_array() by taking an array of whatever
-gpiod_get() would require. Instead, I think it should be redefined to
-mean "get all the GPIOs for a given function". For instance, say that
-in the DT you have
+>  drivers/cpufreq/cpufreq_opp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+> index c0c6f4a4eccf..f7a32d2326c6 100644
+> --- a/drivers/cpufreq/cpufreq_opp.c
+> +++ b/drivers/cpufreq/cpufreq_opp.c
+> @@ -60,7 +60,7 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>                 goto out;
+>         }
+>
+> -       freq_table = kzalloc(sizeof(*freq_table) * (max_opps + 1), GFP_KERNEL);
+> +       freq_table = kcalloc(sizeof(*freq_table), (max_opps + 1), GFP_ATOMIC);
 
-foo-gpios = <&gpio 0 GPIO_ACTIVE_HIGH &gpio 1 GPIO_ACTIVE_HIGH &gpio 2
-GPIO_ACTIVE_HIGH>;
+I am not really sure if there would be any consequences of this, but overall it
+looks fine.
 
-Then gpiod_get_array(dev, "foo", &num) should return descriptors to
-these 3 GPIOs and assign "3" to num. The same thing can be done with
-the platform lookup tables.
-
-Actually it would be even better if this API could be designed to
-interact nicely with the multiple GPIO setting patch by Rojhalat:
-http://www.spinics.net/lists/linux-gpio/msg00827.html
-
-gpiod_get_array() would thus allocate and return an array of GPIO
-descriptors suitable to be used immediatly with gpiod_set_array(). And
-bam, a nice full-circle API for handling multiple GPIOs. My
-expectations have risen all of a sudden. ;)
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
