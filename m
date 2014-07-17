@@ -1,50 +1,88 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Jul 2014 17:40:50 +0200
-Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
- read from DT
-In-Reply-To: <20140717153236.GS13108@titan.lakedaemon.net>
-References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
- <20140717153236.GS13108@titan.lakedaemon.net>
-Message-ID: <53C7EE82.6040803@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 17 Jul 2014 17:43:00 +0200
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <53C7EC6F.6060902@hurleysoftware.com>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
+ <20140716151604.GG1365@saruman.home>
+ <53C6A050.2050409@linutronix.de>
+ <20140716160614.GI1365@saruman.home>
+ <53C7EC6F.6060902@hurleysoftware.com>
+Message-ID: <20140717154300.GA16623@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+* Peter Hurley | 2014-07-17 11:31:59 [-0400]:
 
-On 17.07.2014 17:32, Jason Cooper wrote:
-> On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
->> Certain GIC implementation, namely those found on earlier, single
->> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
->> which means that the driver needs to use different offset for each CPU.
+>On 07/16/2014 12:06 PM, Felipe Balbi wrote:
+>>On Wed, Jul 16, 2014 at 05:54:56PM +0200, Sebastian Andrzej Siewior wrote:
+>>>On 07/16/2014 05:16 PM, Felipe Balbi wrote:
+>
+>>>>I wonder if you should get_sync() on start_tx() and only
+>>>>put_autosuspend() at stop_tx(). I guess the outcome would be
+>>>>largely the same, no ?
+>>>
+>>>I just opened minicom on ttyS0 and gave a try. start_tx() was invoked
+>>>each time I pressed a key (sent a character). I haven't seen stop_tx()
+>>>even after after I closed minicom. I guess stop_tx() is invoked if you
+>>>switch half-duplex communication.
 >>
->> Currently the driver calculates the offset by multiplying value returned
->> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
->> CPU topology is not specified in DT and aforementioned function returns
->> core ID alone. However when DT contains CPU topology, the function
->> changes to return cluster ID as well, which is non-zero on mentioned
->> SoCs and so breaks the calculation in GIC driver.
->>
->> This patch fixes this by masking out cluster ID in CPU offset
->> calculation so that only core ID is considered. Multi-cluster Exynos
->> SoCs already have banked GIC implementations, so this simple fix should
->> be enough.
->>
->> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> ---
->>  drivers/irqchip/irq-gic.c | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> iiuc, this was introduced by:
-> 
->   db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
-> 
-> and so should be for v3.3 and up, correct?
+>>that's bad, I expected stop to be called also after each character.
+>
+>The 8250 core auto-stops tx when the tx ring buffer is empty (except
+>in the case of dma, where stopping tx isn't necessary).
 
-Could be, although there was and still is no topology data specified in
-DT for affected Exynos SoCs. The need for it showed up just recently, so
-I'm not sure this is a regression to fix in older kernels.
+This is correct. So this is what I have now for the non-dma case:
 
-Best regards,
-Tomasz
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 2e4a93b..480a1c0 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -1283,6 +1283,9 @@ static inline void __stop_tx(struct uart_8250_port *p)
+ 	if (p->ier & UART_IER_THRI) {
+ 		p->ier &= ~UART_IER_THRI;
+ 		serial_out(p, UART_IER, p->ier);
++
++		pm_runtime_mark_last_busy(p->port.dev);
++		pm_runtime_put_autosuspend(p->port.dev);
+ 	}
+ }
+ 
+@@ -1310,12 +1313,12 @@ static void serial8250_start_tx(struct uart_port *port)
+ 	struct uart_8250_port *up =
+ 		container_of(port, struct uart_8250_port, port);
+ 
+-	pm_runtime_get_sync(port->dev);
+ 	if (up->dma && !serial8250_tx_dma(up)) {
+ 		goto out;
+ 	} else if (!(up->ier & UART_IER_THRI)) {
+ 		up->ier |= UART_IER_THRI;
++		pm_runtime_get_sync(port->dev);
+ 		serial_port_out(port, UART_IER, up->ier);
+ 
+ 		if (up->bugs & UART_BUG_TXEN) {
+ 			unsigned char lsr;
+@@ -1500,9 +1503,10 @@ void serial8250_tx_chars(struct uart_8250_port *up)
+ 		uart_write_wakeup(port);
+ 
+ 	DEBUG_INTR("THRE...");
+-
++#if 0
+ 	if (uart_circ_empty(xmit))
+ 		__stop_tx(up);
++#endif
+ }
+ EXPORT_SYMBOL_GPL(serial8250_tx_chars);
+ 
+
+and now I need to come up with something that is not if (port != omap)
+for that #if 0 block. The code disables the TX FIFO empty interrupt once
+the transfer is complete. I want to call __stop_tx() once the tx fifo is
+empty.
+Felipe, Would a check for dev->power.use_autosuspend be the right thing
+to do?
+
+>Regards,
+>Peter Hurley
+
+Sebastian
