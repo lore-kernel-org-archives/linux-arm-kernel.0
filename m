@@ -1,34 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 Jul 2014 10:41:04 +0800
-Subject: gpio-mxc gpio get always returns 0 for outputs for IMX6
-In-Reply-To: <CA+sos7_nHFZ6pC87CVxviuQTxTQd0-Go4zdbPrek7CWqQyWiAg@mail.gmail.com>
-References: <CAJ+vNU3w9Oi+dErmy9x8g6ps=eLHLNLO-w7=gn_8JtY4Kab6JQ@mail.gmail.com>
- <20140714070341.GC2197@dragon>
- <CA+sos7_quvZo6j9rFPvgCdYsEx6RoUNPUyvxE74K4vaNWDkGyg@mail.gmail.com>
- <20140714140526.GK2197@dragon>
- <CAJ+vNU071i=fb5r-mq_GXz_r41N1XyafCeGEiuayhbwVmQ5jAQ@mail.gmail.com>
- <20140716060152.GM2197@dragon>
- <CA+sos7_nHFZ6pC87CVxviuQTxTQd0-Go4zdbPrek7CWqQyWiAg@mail.gmail.com>
-Message-ID: <20140717024103.GP2197@dragon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 17 Jul 2014 11:18:06 +0800
+Subject: [PATCH v2 1/3] ACPI: ARM64 does not have a BIOS add config for
+ BIOS table scan.
+In-Reply-To: <53C70F78.40206@zytor.com>
+References: <1404898746-6685-1-git-send-email-hanjun.guo@linaro.org>
+ <1404898746-6685-2-git-send-email-hanjun.guo@linaro.org>
+ <53C70CCC.2080109@zytor.com>
+ <3908561D78D1C84285E8C5FCA982C28F3285FB3C@ORSMSX114.amr.corp.intel.com>
+ <53C70F78.40206@zytor.com>
+Message-ID: <53C7406E.40902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 09:14:23PM +0200, Beno?t Th?baudeau wrote:
-> > Instead of specifying SION setup in the config cell case by case, I
-> > think we can do that directly in pin function ID for all cases where
-> > GPIO mode is selected.  I just sent a patch to do that.  Please take
-> > a look to see if it works for you.
+On 2014-7-17 7:49, H. Peter Anvin wrote:
+> On 07/16/2014 04:46 PM, Luck, Tony wrote:
+>>> +	select ACPI_LEGACY_TABLES_LOOKUP if ACPI
+>>
+>>> This shouldn't actually be set on IA64, should it?  IA64 doesn't have
+>>> BIOS, either, it has EFI/UEFI, like ARM64...
+
+Yes, I agree with you, thanks for pointing this out. if I remember
+correctly, the EFI standard was introduced when IA64 came out.
+
+>>
+>> Which ACPI tables are in the "LEGACY" category affected by this option?
+>>
 > 
-> I don't find this patch on the ML.
-
-The patch is too big to hit the list.
-
+> That's not what this is about... it is about how you find the root pointer.
 > 
-> Note that enabling SION for all pads in GPIO mode will have some
-> impact on the power consumption. That's why SION is designed to be
-> used on a per-pad basis, only when an output GPIO needs to be sensed.
+> On a BIOS system it is found by scanning low memory.  On an EFI system
+> it is found by querying EFI for a specific UUID.
 
-Okay, in that case, we will have to leave the configuration option to
-board DTS author.
+Thanks for the explanation.
 
-Shawn
+Tony, if it is ok with you, I will modify the patch and will not select
+ACPI_LEGACY_TABLES_LOOKUP on IA64, I'm waiting for your final confirmation.
+
+Thanks
+Hanjun
