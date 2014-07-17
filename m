@@ -1,38 +1,90 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 Jul 2014 11:36:07 +0200
-Subject: [PATCH] CMA: generalize CMA reserved area management functionality
- (fixup)
-In-Reply-To: <53C78ED7.7030002@samsung.com>
-References: <53C78ED7.7030002@samsung.com>
-Message-ID: <1405589767-17513-1-git-send-email-m.szyprowski@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 10:41:02 +0100
+Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
+In-Reply-To: <20140716220422.GB18109@gup76>
+References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
+ <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
+ <20140716161715.GU29414@arm.com> <20140716220422.GB18109@gup76>
+Message-ID: <20140717094101.GD21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MAX_CMA_AREAS is used by other subsystems (i.e. arch/arm/mm/dma-mapping.c),
-so we need to provide correct definition even if CMA is disabled.
-This patch fixes this issue.
+On Wed, Jul 16, 2014 at 11:04:22PM +0100, Zi Shen Lim wrote:
+> On Wed, Jul 16, 2014 at 05:17:15PM +0100, Will Deacon wrote:
+> > On Tue, Jul 15, 2014 at 07:25:06AM +0100, Zi Shen Lim wrote:
+> > > Introduce function to generate move wide (immediate) instructions.
+> > 
+> > [...]
+> > 
+> > > +u32 aarch64_insn_gen_movewide(enum aarch64_insn_register dst,
+> > > +			      int imm, int shift,
+> > > +			      enum aarch64_insn_variant variant,
+> > > +			      enum aarch64_insn_movewide_type type)
+> > > +{
+> > > +	u32 insn;
+> > > +
+> > > +	switch (type) {
+> > > +	case AARCH64_INSN_MOVEWIDE_ZERO:
+> > > +		insn = aarch64_insn_get_movz_value();
+> > > +		break;
+> > > +	case AARCH64_INSN_MOVEWIDE_KEEP:
+> > > +		insn = aarch64_insn_get_movk_value();
+> > > +		break;
+> > > +	case AARCH64_INSN_MOVEWIDE_INVERSE:
+> > > +		insn = aarch64_insn_get_movn_value();
+> > > +		break;
+> > > +	default:
+> > > +		BUG_ON(1);
+> > > +	}
+> > > +
+> > > +	BUG_ON(imm < 0 || imm > 65535);
+> > 
+> > Do this check with masking instead?
+> 
+> Ok, if you prefer, I can change it to:
+> 
+> 	BUG_ON(imm & ~GENMASK(15, 0));
 
-Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- include/linux/cma.h | 4 ++++
- 1 file changed, 4 insertions(+)
+Sure, that or use a named constant for the upper-bound (SZ_64K - 1).
 
-diff --git a/include/linux/cma.h b/include/linux/cma.h
-index 9a18a2b1934c..c077635cad76 100644
---- a/include/linux/cma.h
-+++ b/include/linux/cma.h
-@@ -5,7 +5,11 @@
-  * There is always at least global CMA area and a few optional
-  * areas configured in kernel .config.
-  */
-+#ifdef CONFIG_CMA
- #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
-+#else
-+#define MAX_CMA_AREAS	(0)
-+#endif
- 
- struct cma;
- 
--- 
-1.9.2
+> > > +	switch (variant) {
+> > > +	case AARCH64_INSN_VARIANT_32BIT:
+> > > +		BUG_ON(shift != 0 && shift != 16);
+> > > +		break;
+> > > +	case AARCH64_INSN_VARIANT_64BIT:
+> > > +		insn |= BIT(31);
+> > > +		BUG_ON(shift != 0 && shift != 16 && shift != 32 &&
+> > > +		       shift != 48);
+> > 
+> > Would be neater as a nested switch, perhaps? If you reorder the
+> > outer-switch, you could probably fall-through too and combine the shift
+> > checks.
+> 
+> Not sure I picture what you had in mind... I couldn't come up with a
+> neater version with the properties you described.
+> 
+> The alternative I had was using masks instead of integer values, but
+> one could argue that while neater, it could also be harder to read:
+> 
+> 	switch (variant) {
+> 	case AARCH64_INSN_VARIANT_32BIT:
+> 		BUG_ON(shift & ~BIT(4));
+> 		break;
+> 	case AARCH64_INSN_VARIANT_64BIT:
+> 		insn |= BIT(31);
+> 		BUG_ON(shift & ~GENMASK(5, 4));
+> 	...
+
+I was thinking of using nested switches, but that doesn't fall out like I
+hoped. How about:
+
+	switch (variant) {
+	case AARCH64_INSN_VARIANT_64BIT:
+		BUG_ON(shift != 32 && shift != 48);
+	case AARCH64_INSN_VARIANT_32BIT:
+		BUG_ON(shift != 0 && shift != 16);
+	};
+
+?
+
+Will
