@@ -1,88 +1,52 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 17 Jul 2014 17:43:00 +0200
-Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <53C7EC6F.6060902@hurleysoftware.com>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
- <20140716151604.GG1365@saruman.home>
- <53C6A050.2050409@linutronix.de>
- <20140716160614.GI1365@saruman.home>
- <53C7EC6F.6060902@hurleysoftware.com>
-Message-ID: <20140717154300.GA16623@linutronix.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 17 Jul 2014 08:45:52 -0700
+Subject: [PATCH v11 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
+References: <1405547442-26641-1-git-send-email-keescook@chromium.org>
+ <1405547442-26641-12-git-send-email-keescook@chromium.org>
+ <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
+Message-ID: <CAGXu5j+dFZdnnK8f-HRrUs2vLeyhWyHh_AY-OynDcp-Ye+dy7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Hurley | 2014-07-17 11:31:59 [-0400]:
-
->On 07/16/2014 12:06 PM, Felipe Balbi wrote:
->>On Wed, Jul 16, 2014 at 05:54:56PM +0200, Sebastian Andrzej Siewior wrote:
->>>On 07/16/2014 05:16 PM, Felipe Balbi wrote:
+On Thu, Jul 17, 2014 at 8:04 AM, David Drysdale <drysdale@google.com> wrote:
+> On Wed, Jul 16, 2014 at 10:50 PM, Kees Cook <keescook@chromium.org> wrote:
+>> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+>> index 9065d2c79c56..2125b83ccfd4 100644
+>> +/**
+>> + * seccomp_can_sync_threads: checks if all threads can be synchronized
+>> + *
+>> + * Expects sighand and cred_guard_mutex locks to be held.
+>> + *
+>> + * Returns 0 on success, -ve on error, or the pid of a thread which was
+>> + * either not in the correct seccomp mode or it did not have an ancestral
+>> + * seccomp filter.
+>> + */
+>> +static inline pid_t seccomp_can_sync_threads(void)
+>> +{
+>> +       struct task_struct *thread, *caller;
+>> +
+>> +       BUG_ON(!mutex_is_locked(&current->signal->cred_guard_mutex));
+>> +       BUG_ON(!spin_is_locked(&current->sighand->siglock));
+>> +
+>> +       if (current->seccomp.mode != SECCOMP_MODE_FILTER)
+>> +               return -EACCES;
 >
->>>>I wonder if you should get_sync() on start_tx() and only
->>>>put_autosuspend() at stop_tx(). I guess the outcome would be
->>>>largely the same, no ?
->>>
->>>I just opened minicom on ttyS0 and gave a try. start_tx() was invoked
->>>each time I pressed a key (sent a character). I haven't seen stop_tx()
->>>even after after I closed minicom. I guess stop_tx() is invoked if you
->>>switch half-duplex communication.
->>
->>that's bad, I expected stop to be called also after each character.
+> Quick question -- is it possible to apply the first filter and also synchronize
+> it across threads in the same operation?  If so, does this arm also need to
+> cope with seccomp.mode being SECCOMP_MODE_DISABLED?
 >
->The 8250 core auto-stops tx when the tx ring buffer is empty (except
->in the case of dma, where stopping tx isn't necessary).
+> [seccomp_set_mode_filter() looks to call this via seccomp_attach_filter()
+> before it does seccomp_assign_mode()]
 
-This is correct. So this is what I have now for the non-dma case:
+I don't entirely understand what you're asking. The threads gain the
+filter and the mode before the current thread may gain the mode (if
+it's the first time this has been called). Due to all the locks,
+though, this isn't a problem. Is there a situation you see where there
+might be a problem?
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 2e4a93b..480a1c0 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1283,6 +1283,9 @@ static inline void __stop_tx(struct uart_8250_port *p)
- 	if (p->ier & UART_IER_THRI) {
- 		p->ier &= ~UART_IER_THRI;
- 		serial_out(p, UART_IER, p->ier);
-+
-+		pm_runtime_mark_last_busy(p->port.dev);
-+		pm_runtime_put_autosuspend(p->port.dev);
- 	}
- }
- 
-@@ -1310,12 +1313,12 @@ static void serial8250_start_tx(struct uart_port *port)
- 	struct uart_8250_port *up =
- 		container_of(port, struct uart_8250_port, port);
- 
--	pm_runtime_get_sync(port->dev);
- 	if (up->dma && !serial8250_tx_dma(up)) {
- 		goto out;
- 	} else if (!(up->ier & UART_IER_THRI)) {
- 		up->ier |= UART_IER_THRI;
-+		pm_runtime_get_sync(port->dev);
- 		serial_port_out(port, UART_IER, up->ier);
- 
- 		if (up->bugs & UART_BUG_TXEN) {
- 			unsigned char lsr;
-@@ -1500,9 +1503,10 @@ void serial8250_tx_chars(struct uart_8250_port *up)
- 		uart_write_wakeup(port);
- 
- 	DEBUG_INTR("THRE...");
--
-+#if 0
- 	if (uart_circ_empty(xmit))
- 		__stop_tx(up);
-+#endif
- }
- EXPORT_SYMBOL_GPL(serial8250_tx_chars);
- 
+-Kees
 
-and now I need to come up with something that is not if (port != omap)
-for that #if 0 block. The code disables the TX FIFO empty interrupt once
-the transfer is complete. I want to call __stop_tx() once the tx fifo is
-empty.
-Felipe, Would a check for dev->power.use_autosuspend be the right thing
-to do?
-
->Regards,
->Peter Hurley
-
-Sebastian
+-- 
+Kees Cook
+Chrome OS Security
