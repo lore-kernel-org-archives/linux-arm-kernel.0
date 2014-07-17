@@ -1,216 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Jul 2014 09:39:58 +0200
-Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C77263.7050903@redhat.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
- <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
- <53C6908A.2050200@redhat.com> <20140716195136.GB5212@mithrandir>
- <53C77263.7050903@redhat.com>
-Message-ID: <20140717073956.GA18640@ulmo>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 17 Jul 2014 09:42:19 +0200
+Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140717070859.GD18374@atomide.com>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
+ <20140717070859.GD18374@atomide.com>
+Message-ID: <20140717074219.GA29193@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 08:51:15AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 07/16/2014 09:51 PM, Thierry Reding wrote:
-> > On Wed, Jul 16, 2014 at 04:47:38PM +0200, Hans de Goede wrote:
-> >> Hi,
-> >>
-> >> On 07/16/2014 03:13 PM, Thierry Reding wrote:
-> >>> On Wed, Jul 16, 2014 at 01:49:57PM +0200, Hans de Goede wrote:
-> >>>> Hi,
-> >>>>
-> >>>> On 07/16/2014 01:40 PM, Mikko Perttunen wrote:
-> >>>>> This patch adds device tree binding documentation for the SATA
-> >>>>> controller found on NVIDIA Tegra SoCs.
-> >>>>>
-> >>>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> >>>>> ---
-> >>>>> v4: clarify mandatory clock order
-> >>>>
-> >>>> Thanks this and the new v4 of "ata: Add support for the Tegra124 SATA controller"
-> >>>> both look good to me. So these 2 + v3 for the rest of the series are:
-> >>>>
-> >>>> Acked-by: Hans de Goede <hdegoede@redhat.com>
-> >>>
-> >>> Like I said in my reply to PATCH v3 7/8, I think this mandatory clock
-> >>> order is a mistake.
-> >>
-> >> We've plenty of other dt bindings where things need to be specified in
-> >> a certain order, e.g. registers. So I don't really see what the problem
-> >> is here.
-> > 
-> > Like I said, the clock-names exists so that drivers can request a clock
-> > by name. Therefore the order in which they are listed doesn't matter.
-> > The only thing that matters is that the entries in clocks and
-> > clock-names match up.
-> 
-> Ok so I've been think about this, and about the unbalance I've noticed
-> between tegra_ahci_power_on which does everything DIY and tegra_ahci_power_off
-> which uses ahci_platform_disable_resources() in v3 and later.
-> 
-> Really only the "sata" clock needs special handling, so I think the following
-> solution is best:
-> 
-> 1) Drop the clock ordering requirement and the clk enum
-> 
-> 2) Make ahci_tegra.c do a devm_clk_get(dev, "sata"), so that it gets its
-> own handle to the sata-clk (store this in tegra_ahci_priv). no need to
-> get all the other clks which need no special handling
-> 
-> 3) Start using ahci_platform_enable_resources() in tegra_ahci_power_on,
-> so it would look something like this:
-> 
-> static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
-> {
-> 	struct tegra_ahci_priv *tegra = hpriv->plat_data;
-> 	int ret;
-> 
-> 	ret = regulator_bulk_enable(ARRAY_SIZE(tegra->supplies),
-> 				    tegra->supplies);
-> 	if (ret)
-> 		return ret;
-> 
-> 	ret = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_SATA,
-> 						tegra->sata_clk,
-> 						tegra->sata_rst);
-> 	if (ret)
-> 		goto disable_regulators;
-> 
-> 	reset_control_deassert(tegra->sata_cold_rst);
-> 	reset_control_deassert(tegra->sata_oob_rst);
-> 
-> 	ret = ahci_platform_enable_resources(hpriv);
-> 	if (ret)
-> 		goto powergate_sequence_power_off;
-> 
-> 	return 0;
-> ...
-> 
-> This will make tegra_ahci_power_on and tegra_ahci_power_off symmetrical
-> which is something I always like to see in functions like this.
-> 
-> I realize that this changes the reset-deassert vs clock enabling ordering,
-> if this is an issue please add reset support to libahci-platform.c I believe
-> that is something which we will need to do soonish anyways (reset controllers
-> are popping up everywhere in newer SoCs).
+* Tony Lindgren | 2014-07-17 00:09:00 [-0700]:
 
-I think we could safely move the reset deassert after the call to
-ahci_platform_enable_resources().
+>Seems to boot a bit further now with output from serial console
+>initially, then I'm getting the following error again that's probably
+>related to clocks not enabled when the registers are accessed:
 
-> This will nicely reduce the amount of code and also greatly simplify the error
-> return path of tegra_ahci_power_on.
+It is (mostly) the same thing as before. We have additionally 
+omap_8250_startup() in the backtrace but it is the same thing.
+So you  say I miss a clock? Looking through serial8250_do_startup() I see:
+- pm_runtime_get_sync(port->dev); which should get the clocks up
+- serial8250_clear_fifos() which does a write at address + 8. Seems to 
+  work. 
+- serial_port_in(port, UART_LSR); does a read at address + 0x14, seems 
+  to work.
+- serial_port_in(port, UART_RX); does a read at address + 0. This is 
+  probably the bad one.
 
-Agreed, htat sounds like it could work.
+Now comparing with omap-serial I noticed that I do a 32bit access
+instead a 16bit.
+Could you please try the following hack:
 
-> This means that the sata_clk will get enabled twice, but that is harmless
-> as long as we disable it twice too. This means that we need to add an
-> extra disable to tegra_ahci_power_off because tegra_powergate_power_off
-> seems to not do this (unlike power-on, which is rather unsymmetrical
-> it would be nice to fix this).
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 2e4a93b..94af5a3 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -420,13 +420,13 @@ static void mem_serial_out(struct uart_port *p, int offset, int value)
+ static void mem32_serial_out(struct uart_port *p, int offset, int value)
+ {
+ 	offset = offset << p->regshift;
+-	writel(value, p->membase + offset);
++	writew(value, p->membase + offset);
+ }
+ 
+ static unsigned int mem32_serial_in(struct uart_port *p, int offset)
+ {
+ 	offset = offset << p->regshift;
+-	return readl(p->membase + offset);
++	return readw(p->membase + offset);
+ }
+ 
+ static unsigned int io_serial_in(struct uart_port *p, int offset)
 
-We've never had a need for it because the exact power down sequence
-isn't nearly as important. But I guess we could add a new function
-tegra_powergate_sequence_power_down() that takes care of disabling the
-clock and asserting the reset.
 
-One other thing that I've been thinking about is whether it would make
-sense to make the ahci_platform library use a list of clock names that
-it should request. This would better mirror the clock bindings
-convention and allow drivers (such as the Tegra one) to take ownership
-of clocks that need special handling while at the same time leaving it
-to the helpers to do the bulk of the work.
+besides that, I don't see what could be different.
 
-One way I can think of to handle this would be by adding a struct
-ahci_platform_resources * parameter to ahci_platform_get_resources(),
-sowewhat like this:
+>Regards,
+>
+>Tony
 
-	struct ahci_platform_resources {
-		const char *const *clocks;
-		unsigned int num_clocks;
-
-		const char *const *resets;
-		unsigned int num_resets;
-	};
-
-	struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
-							   const struct ahci_platform_resources *res)
-	{
-		...
-
-		for (i = 0; i < res->num_clocks; i++) {
-			clk = clk_get(&pdev->dev, res->clocks[i]);
-			...
-		}
-
-		...
-
-		for (i = 0; i < res->num_resets; i++) {
-			rst = reset_control_get(&pdev->dev, res->resets[i]);
-			...
-		}
-
-		...
-	}
-
-And I guess the same could be done for regulators (and even phys). The
-Tegra driver for instance could then do this:
-
-	static const char *const tegra_ahci_clocks[] = {
-		"sata-oob", "cml1", pll_e",
-	};
-
-	static const char *const tegra_ahci_resets[] = {
-		"sata-oob", "sata-cold",
-	};
-
-	static const struct ahci_platform_resources tegra_ahci_resources = {
-		.num_clocks = ARRAY_SIZE(tegra_ahci_clocks),
-		.clocks = tegra_ahci_clocks,
-		.num_resets = ARRAY_SIZE(tegra_ahci_resets),
-		.resets = tegra_ahci_resets,
-	};
-
-	...
-
-	struct tegra_ahci {
-		struct ahci_host_priv *host;
-		struct reset_control *rst;
-		struct clk *clk;
-		...
-	};
-
-	...
-
-	static int tegra_ahci_probe(struct platform_device *pdev)
-	{
-		struct tegra_ahci *ahci;
-
-		...
-
-		ahci = devm_kzalloc(&pdev->dev, sizeof(*ahci), GFP_KERNEL);
-		if (!ahci)
-			return -ENOMEM;
-
-		ahci->host = ahci_platform_get_resources(pdev, &tegra_ahci_resources);
-		if (IS_ERR(ahci->host)) {
-			...
-		}
-
-		...
-
-		platform_set_drvdata(pdev, ahci);
-	}
-
-Does that sound reasonable?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/ef155e96/attachment.sig>
+Sebastian
