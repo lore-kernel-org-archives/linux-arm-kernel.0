@@ -1,36 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Jul 2014 11:18:41 +0100
-Subject: [PATCH 0/6] ARM: rockchip: add initial support for rk3288
-In-Reply-To: <1471578.ILeMmG2DL6@diego>
-References: <1471578.ILeMmG2DL6@diego>
-Message-ID: <20140717101841.GF21153@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Jul 2014 11:16:37 +0100
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140717083342.GS21766@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+ <20140717102425.34fe0181@free-electrons.com>
+ <20140717083342.GS21766@n2100.arm.linux.org.uk>
+Message-ID: <20140717101637.GT21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 11:58:00PM +0100, Heiko St?bner wrote:
-> This series adds the initial support for Rockchip rk3288 socs including
-> debug uart and devicetree files for the rk3288 evaluation board and
-> enables these boards to boot into an initramfs.
+On Thu, Jul 17, 2014 at 09:33:42AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 17, 2014 at 10:24:25AM +0200, Thomas Petazzoni wrote:
+> > If I understand correctly, we are already changing the page tables
+> > anyway, to switch certain pages to be mapped uncached, to do DMA
+> > coherent allocations, no?
 > 
-> The series depends on an updated bootloader, which must start the timer
-> supplying the architected timer, which we will hopefully get in the next
-> days. It also depends on the patch
->     "irqchip: gic: Add binding probe for ARM GIC400"
-> which will hopefully make it into the irqchip tree shortly.
-> 
-> 
-> Heiko Stuebner (6):
->   dt-bindings: arm: add arm,cortex-a12 cpu compatible property
->   ARM: rockchip: add debug uart used by rk3288
->   ARM: Kconfig: set default gpio number for rockchip SoCs
->   ARM: rockchip: enable support for RK3288 SoCs
->   ARM: dts: rockchip: add core rk3288 dtsi
->   ARM: dts: add rk3288 evaluation board
+> I've no idea, I never looked at that code.  I hope that Marek has
+> considered the requirements of the architecture when creating that
+> code...
 
-For the series:
+On this, it appears that (confirmed by Will) the DMA code is indeed buggy
+in that it doesn't take account of the possibility of mismatched aliases.
 
-  Tested-by: Will Deacon <will.deacon@arm.com>
+This was raised before in this thread:
 
-Cheers Heiko!
+http://archive.arm.linux.org.uk/lurker/thread/20120922.052207.ff853126.en.html
 
-Will
+but it was claimed that because it's done very early, it's safe.  That's
+not really good enough - what the code relies upon is the hope that the
+CPU will not speculatively prefetch from the area being modified.  While
+that's unlikely, it's not impossible - and when if it were to happen
+mid-update, then we could end up with the TLB containing both a section
+mapping _and_ a page mapping.
+
+I suspect that the only reason we haven't seen issues is that we haven't
+had seen such aggressive speculation yet.
+
+The code in principle is doing the right thing by clearing the section
+mappings first.  What has been forgotten is that if speculative prefetches
+have already happened, the TLB may well be populated, and so it needs a
+TLB flush immediately after clearing the section mappings with pmd_clear().
+
+Will Deacon agrees with me on this... so, CMA is buggy in this respect.
+
+The reason this can't be done for coherency becomes obvious - in order to
+make this change, we would need to clear the section mapping, flush it
+from the TLB, and then create the new section mapping.  If the section
+mapping we're modifying in that way happens to be the one which maps the
+code performing that update, or the one which contains the page table,
+than kaboom...
+
+That's why I said that the only alternative is to turn the MMU off.
+There are really only two choices here: either detect the platform early
+in assembly where we can avoid this issue completely, or turn the MMU
+off, update the page tables from assembly code, and then turn the MMU
+back on and resume executing C code.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
