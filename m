@@ -1,61 +1,49 @@
-From: drysdale@google.com (David Drysdale)
-Date: Thu, 17 Jul 2014 16:04:56 +0100
-Subject: [PATCH v11 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <1405547442-26641-12-git-send-email-keescook@chromium.org>
-References: <1405547442-26641-1-git-send-email-keescook@chromium.org>
- <1405547442-26641-12-git-send-email-keescook@chromium.org>
-Message-ID: <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 17 Jul 2014 11:04:51 -0400
+Subject: [PATCH v5 3/5] PCI: designware: enhance dw_pcie_host_init() to
+ support v3.65 DW hardware
+In-Reply-To: <20140717033638.GI12278@pratyush-vbox>
+References: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
+ <1405528686-16539-4-git-send-email-m-karicheri2@ti.com>
+ <20140717033638.GI12278@pratyush-vbox>
+Message-ID: <53C7E613.3080102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 10:50 PM, Kees Cook <keescook@chromium.org> wrote:
-> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-> index 9065d2c79c56..2125b83ccfd4 100644
-> +/**
-> + * seccomp_can_sync_threads: checks if all threads can be synchronized
-> + *
-> + * Expects sighand and cred_guard_mutex locks to be held.
-> + *
-> + * Returns 0 on success, -ve on error, or the pid of a thread which was
-> + * either not in the correct seccomp mode or it did not have an ancestral
-> + * seccomp filter.
-> + */
-> +static inline pid_t seccomp_can_sync_threads(void)
-> +{
-> +       struct task_struct *thread, *caller;
-> +
-> +       BUG_ON(!mutex_is_locked(&current->signal->cred_guard_mutex));
-> +       BUG_ON(!spin_is_locked(&current->sighand->siglock));
-> +
-> +       if (current->seccomp.mode != SECCOMP_MODE_FILTER)
-> +               return -EACCES;
+On 07/16/2014 11:36 PM, Pratyush Anand wrote:
+> On Thu, Jul 17, 2014 at 12:38:04AM +0800, Murali Karicheri wrote:
+>> keystone PCI controller is based on v3.65 designware hardware. This
+>> version differs from newer versions of the hardware in few functional
+>> areas discussed below that makes it necessary to change dw_pcie_host_init()
+>> to support v3.65 based PCI controller.
+>>
+>>   1. No support for ATU port. So any ATU specific resource handling code
+>>      is to be bypassed for v3.65 h/w.
+>>   2. MSI controller uses Application space to implement MSI and 32 MSI
+>>      interrupts are multiplexed over 8 IRQs to the host. Hence the code
+>>      to process MSI IRQ needs to be different. This patch allows platform
+>>      driver to provide its own irq_domain_ops ptr to irq_domain_add_linear()
+>>      through an API callback from the designware core driver.
+>>   3. MSI interrupt generation requires EP to write to the RC's application
+>>      register. So enhance the driver to allow setup of inbound access to
+>>      MSI irq register as a post scan bus API callback.
+>>
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+> Looks almost ok to me.
+>
+> Reviewed-by: Pratyush Anand<pratyush.anand@st.com>
+>
+>>   int __init dw_pcie_host_init(struct pcie_port *pp)
+>>   {
+>>   	struct device_node *np = pp->dev->of_node;
+>> -	struct of_pci_range range;
+>>   	struct of_pci_range_parser parser;
+>> +	struct of_pci_range range;
+> You may avoid moving the above line.
+Thought the variables are to be sorted. I can fix this when I resend it 
+today with your reviewed by and Mohit's Ack.
 
-Quick question -- is it possible to apply the first filter and also synchronize
-it across threads in the same operation?  If so, does this arm also need to
-cope with seccomp.mode being SECCOMP_MODE_DISABLED?
+Regards,
 
-[seccomp_set_mode_filter() looks to call this via seccomp_attach_filter()
-before it does seccomp_assign_mode()]
-
-> +
-> +       /* Validate all threads being eligible for synchronization. */
-> +       caller = current;
-> +       for_each_thread(caller, thread) {
-> +               pid_t failed;
-> +
-> +               if (thread->seccomp.mode == SECCOMP_MODE_DISABLED ||
-> +                   (thread->seccomp.mode == SECCOMP_MODE_FILTER &&
-> +                    is_ancestor(thread->seccomp.filter,
-> +                                caller->seccomp.filter)))
-> +                       continue;
-> +
-> +               /* Return the first thread that cannot be synchronized. */
-> +               failed = task_pid_vnr(thread);
-> +               /* If the pid cannot be resolved, then return -ESRCH */
-> +               if (unlikely(WARN_ON(failed == 0)))
-> +                       failed = -ESRCH;
-> +               return failed;
-> +       }
-> +
-> +       return 0;
-> +}
+Murali
+> ~Pratyush
