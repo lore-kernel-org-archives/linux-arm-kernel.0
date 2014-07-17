@@ -1,51 +1,45 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 08:51:31 -0400
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <53C3FE7D.3090805@amd.com>
+Date: Thu, 17 Jul 2014 08:53:09 -0400
+Subject: [PATCH 4/4 V3] irqchip: gicv2m: Add support for multiple MSI
+ for ARM64 GICv2m
+In-Reply-To: <1404947104-21345-5-git-send-email-suravee.suthikulpanit@amd.com>
 References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140713231431.GM13108@titan.lakedaemon.net>
- <53C3FE7D.3090805@amd.com>
-Message-ID: <20140717125131.GJ13108@titan.lakedaemon.net>
+ <1404947104-21345-5-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <20140717125309.GK13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 10:59:57AM -0500, Suravee Suthikulanit wrote:
-> On 7/13/2014 6:14 PM, Jason Cooper wrote:
-> >Suravee,
-> >
-> >On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
-> >>From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >>
-> >>This patch set introduces support for MSI(-X) in GICv2m specification,
-> >>which is implemented in some variation of GIC400.
-> >>
-> >>This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
-> >>(https://lkml.org/lkml/2014/3/14/320).
-> >
-> >Grrr.  I mis-spoke against your v1 of this series.  There are more
-> >changes to irq-gic.c than I originally thought in this series.
+Suravee,
+
+On Wed, Jul 09, 2014 at 06:05:04PM -0500, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> I am not quite sure what your are referring to.
+> This patch extend GICv2m MSI to support multiple MSI in ARM64.
 > 
-
-No problem, it was an old comment.  If you weren't depending on it then it
-doesn't matter. ;-)
-
-> >Additionally, we have a lot of other significant changes to that driver
-> >as well this cycle.  It would be really helpful if I could take patches
-> >1-3 through irqchip/gic.  I can Ack #4 with the Subject change, and the
-> >branch it lands in can depend on irqchip/gic, no problem there.
+> This requires the common arch_setup_msi_irqs() to be overwriten
+> with ARM64 version which does not return 1 for PCI_CAP_ID_MSI and
+> nvec > 1.
 > 
-> Patch 1-3 should be able to go through the irqchip/gic along with
-> the gicv3 from Marc, which I have rebased this patch against.
+> Cc: Mark Rutland <Mark.Rutland@arm.com>
+> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
+> Cc: Will Deacon <Will.Deacon@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  arch/arm64/include/asm/msi.h  | 15 ++++++++
+>  arch/arm64/kernel/Makefile    |  1 +
+>  arch/arm64/kernel/msi.c       | 57 ++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-v2m.c | 80 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 153 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/msi.h
+>  create mode 100644 arch/arm64/kernel/msi.c
 
-Perfect!
+With the Subject line nit fixed ("irqchip: gic-v2m: ..."),
 
-> Patch 4 is arch64 architectural changes.  Therefore, it might need
-> to be going through a different branch. Marc/Mark/Will/Catalin, do
-> you have any suggestions on which branch this should go to?
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Yep, I'll Ack it for arm64 to take, conflicts should be minimal.
+Please route as you see fit.
 
 thx,
 
