@@ -1,38 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 17 Jul 2014 11:32:45 +0200
-Subject: ARM: mvebu: ARCH_HAS_CPUFREQ
-In-Reply-To: <1405588702.4808.6.camel@x220>
-References: <1405588702.4808.6.camel@x220>
-Message-ID: <20140717113245.121277bb@free-electrons.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 17 Jul 2014 11:36:07 +0200
+Subject: [PATCH] CMA: generalize CMA reserved area management functionality
+ (fixup)
+In-Reply-To: <53C78ED7.7030002@samsung.com>
+References: <53C78ED7.7030002@samsung.com>
+Message-ID: <1405589767-17513-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Paul Bolle,
+MAX_CMA_AREAS is used by other subsystems (i.e. arch/arm/mm/dma-mapping.c),
+so we need to provide correct definition even if CMA is disabled.
+This patch fixes this issue.
 
-On Thu, 17 Jul 2014 11:18:22 +0200, Paul Bolle wrote:
+Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ include/linux/cma.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> 0) Linux-next includes your commit a02829b0485e ("ARM: mvebu: allow
-> enabling of cpufreq on Armada XP") as of today (next-20140717).
-> 
-> 1) That commit only adds
->     select ARCH_HAS_CPUFREQ
-> 
-> to a Kconfig entry. But ARCH_HAS_CPUFREQ was dropped in v3.16-rc2, see
-> commit 19682f72f5db ("ARM: Remove ARCH_HAS_CPUFREQ config option").
-> While I don't know what you want to achieve here, selecting
-> ARCH_HAS_CPUFREQ certainly won't help you.
-
-Thanks for the notification. The issue is that the cpufreq branch I've
-sent to Jason is based on 3.16-rc1, which does not have 19682f72f5db.
-
-Jason, I believe you could simply drop the patch a02829b0485e, since
-all it does is selecting this ARCH_HAS_CPUFREQ option which no longer
-exists.
-
-Thanks,
-
-Thomas
+diff --git a/include/linux/cma.h b/include/linux/cma.h
+index 9a18a2b1934c..c077635cad76 100644
+--- a/include/linux/cma.h
++++ b/include/linux/cma.h
+@@ -5,7 +5,11 @@
+  * There is always at least global CMA area and a few optional
+  * areas configured in kernel .config.
+  */
++#ifdef CONFIG_CMA
+ #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
++#else
++#define MAX_CMA_AREAS	(0)
++#endif
+ 
+ struct cma;
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.2
