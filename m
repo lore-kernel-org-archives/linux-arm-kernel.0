@@ -1,144 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 17 Jul 2014 11:31:13 +0100
-Subject: [PATCH 7/8] mailbox: f_mhu: add driver for Fujitsu MHU controller
-In-Reply-To: <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
-References: <1405233128-4799-1-git-send-email-mollie.wu@linaro.org>	<53C6B83D.80602@arm.com>
- <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
-Message-ID: <53C7A5F1.30209@arm.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Thu, 17 Jul 2014 15:47:14 +0545
+Subject: [PATCH 0/3] Adds PMU and S2R support for exynos5800
+In-Reply-To: <1404905147-30319-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1404905147-30319-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CAGm_ybirYq5iLS-hY8G6W-mMh2pW4ZoieuGn5iBT-X4fbBEboA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/07/14 07:25, Jassi Brar wrote:
-> On 16 July 2014 23:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Mollie,
->>
->>
->> On 13/07/14 07:32, Mollie Wu wrote:
->>>
->>> Add driver for the proprietary Mailbox controller (f_mhu) in MB86S7x.
-
-[...]
-
->>
->>> +       u32 val;
->>> +
->>> +       pr_debug("%s:%d\n", __func__, __LINE__);
->>
->>
->> Please remove all these debug prints.
->>
-> These are as good as absent unless DEBUG is defined.
+On Wed, Jul 9, 2014 at 5:10 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> Rebased on
+> 1] Kukjin Kim's tree, for-next branch
+> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+> 2] My 5420 PMU Series :
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33675.html
 >
-
-Yes, but with mailbox framework, the controller driver(esp. this one)is
-almost like a shim layer. Instead of each driver adding these debugs,
-IMO it would be good to have these in the framework.
-
->>
->>> +       /* See NOTE_RX_DONE */
->>> +       val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
->>> +       mbox_chan_received_data(chan, (void *)val);
->>> +
->>> +       /*
->>> +        * It is agreed with the remote firmware that the receiver
->>> +        * will clear the STAT register indicating it is ready to
->>> +        * receive next data - NOTE_RX_DONE
->>> +        */
->>
->> This note could be added as how this mailbox works in general and
->> it's not just Rx right ? Even Tx done is based on this logic.
->> Basically the logic is valid on both directions.
->>
-> Yes that is a protocol level agreement. Different f/w may behave differently.
+> Tested on Exynos5800 based chromebook (peach-pi board) with help of
+>  1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html (modified to support 5800)
+>  2] http://www.spinics.net/lists/linux-samsung-soc/msg32923.html
 >
-
-Ok, I am not sure if that's entirely true because the MHU spec says it 
-drives
-the signal using a 32-bit register, with all 32 bits logically ORed 
-together.
-Usually only Rx signals are wired to interrupts and Tx needs to be polled
-but that's entirely implementation choice I believe.
-
-More over if it's protocol level agreement it should not belong here :)
-
->>> +static int mhu_startup(struct mbox_chan *chan)
->>> +{
->>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->>> +       unsigned long flags;
->>> +       u32 val;
->>> +       int ret;
->>> +
->>> +       pr_debug("%s:%d\n", __func__, __LINE__);
->>> +       spin_lock_irqsave(&mlink->lock, flags);
->>> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->>> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
->>> +       spin_unlock_irqrestore(&mlink->lock, flags);
->>> +
->>> +       ret = request_irq(mlink->irq, mhu_rx_interrupt,
->>> +                         IRQF_SHARED, "mhu_link", chan);
->>
->>
->> Just a thought: Can this be threaded_irq instead ?
->> Can move request_irq to probe instead esp. if threaded_irq ?
->> That provides some flexibility to client's rx_callback.
->>
-> This is controller driver, and can not know which client want
-> rx_callback in hard-irq context and which in thread_fn context.
-> Otherwise, request_irq() does evaluate to request_threaded_irq(), if
-> thats what you mean.
-
-Agreed but on contrary since MHU involves external firmware(running
-on different processor) which might have it's own latency, I prefer
-threaded over hard irq. And yes request_irq does evaluate to
-request_threaded_irq but with thread_fn = NULL which is not what I want.
-
->   There might be use-cases like (diagnostic or other) data transfer
-> over mailbox where we don't wanna increase latency, so we have to
-> provide a rx_callback in hard-irq context.
+> Below are steps followed to test S2R:
+>         1. make multi_v7_defconfig
+>         2  enable MCPM for 5420
+>         3. enable S3C RTC
+>         4. pass "no_console_suspend" in bootargs
+>         5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
 >
-
-OK
-
->>
->>> +       for (i = 0; i < 3; i++) {
->>> +               mhu->chan[i].con_priv = &mhu->mlink[i];
->>> +               spin_lock_init(&mhu->mlink[i].lock);
->>> +               res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
->>> +               mhu->mlink[i].irq = res->start;
->>> +               mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
->>> +               mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
->>> +       }
->>> +
->>> +       mhu->mbox.dev = &pdev->dev;
->>> +       mhu->mbox.chans = &mhu->chan[0];
->>> +       mhu->mbox.num_chans = 3;
->>
->>
->> Change this to 2, we shouldn't expose secular channel here as Linux can't
->> access that anyway.
->>
-> On the contrary, I think the device driver code should be able to
-> manage every resource - secure or non-secure. If we remove secure
-> channel option, what do we do on some other platform that needs it?
-> And Linux may not always run in non-secure mode.
-
-In general secure accesses are avoided these days in Linux as we have no
-way to identify it. I agree there are few place where we do access.
-Even though I don't like you have secure channel access in Linux, you
-have valid reasons. In case you decide to support it, there is some
-restrictions in bit 31, though RAZ/WI you need to notify that to protocol
-if it tries to access it ?
-
->   So here we populate all channels and let the clients knows which
-> channel to use via platform specific details - DT. Please note the
-> driver doesn't touch any secure resource if client doesn't ask it to
-> (except SCFG for now, which I think should have some S vs NS DT
-> binding).
+> Vikas Sajjan (3):
+>   arm: dts: Add pmu node for exynos5800 SoC
+>   arm: exynos: Add exynos5800-pmu compatible entry
+>   arm: exynos: Add PMU and S2R support for exynos5800 SoC
 >
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>  arch/arm/boot/dts/exynos5800.dtsi                  |    4 ++++
+>  arch/arm/mach-exynos/exynos.c                      |    1 +
+>  arch/arm/mach-exynos/pm.c                          |    3 +++
+>  arch/arm/mach-exynos/pmu.c                         |   22 ++++++++++++++++++++
+>  arch/arm/mach-exynos/regs-pmu.h                    |    3 ++-
+>  6 files changed, 33 insertions(+), 1 deletion(-)
 
-Not sure of this though. We need feedback from DT maintainers.
 
-Regards,
-Sudeep
+any comments on this series..
+
+
+>
+> --
+> 1.7.9.5
+>
