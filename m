@@ -1,50 +1,68 @@
-From: ast@plumgrid.com (Alexei Starovoitov)
-Date: Thu, 17 Jul 2014 08:59:10 -0700
-Subject: [PATCH RFCv3 01/14] arm64: introduce
- aarch64_insn_gen_comp_branch_imm()
-In-Reply-To: <20140717091931.GC21153@arm.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <1405405512-4423-2-git-send-email-zlim.lnx@gmail.com>
- <20140716160450.GT29414@arm.com> <20140716211931.GA18109@gup76>
- <20140717091931.GC21153@arm.com>
-Message-ID: <CAMEtUux1NRqz-Bqi_H8kJe8x9u+1Q12Sg4a-92cE6OsePEBLxg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 17 Jul 2014 17:58:33 +0200
+Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
+ read from DT
+In-Reply-To: <20140717155105.GT13108@titan.lakedaemon.net>
+References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
+ <20140717153236.GS13108@titan.lakedaemon.net> <53C7EE82.6040803@samsung.com>
+ <20140717155105.GT13108@titan.lakedaemon.net>
+Message-ID: <53C7F2A9.1080508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 2:19 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jul 16, 2014 at 10:19:31PM +0100, Zi Shen Lim wrote:
->> >
->> > Is a BUG_ON justifiable here? Is there not a nicer way to fail?
+On 17.07.2014 17:51, Jason Cooper wrote:
+> On Thu, Jul 17, 2014 at 05:40:50PM +0200, Tomasz Figa wrote:
+>> Hi Jason,
 >>
->> In general, it'd be nice if we returned something like -EINVAL and
->> have all callers handle failures. Today all code gen functions return
->> the u32 instruction and there's no error handling by callers.
->> I think following the precedence (aarch64_insn_gen_branch_imm())
->> of failing with BUG_ON is a reasonable tradeoff.
->
-> Well, I don't necessarily agree with that BUG_ON, either :)
-> I take it eBPF doesn't have a `trap' instruction or similar? Otherwise, we
-> could generate that and avoid having to propagate errors directly to the
-> caller.
->
->> In this case here, when we hit the default (failure) case, that means
->> there's a serious error of attempting to use an unsupported
->> variant. I think we're better off failing hard here than trying to
->> arbitrarily "fallback" on a default choice.
->
-> It might be a serious error for BPF, but a BUG_ON brings down the entire
-> machine, which I think is unfortunate.
+>> On 17.07.2014 17:32, Jason Cooper wrote:
+>>> On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
+>>>> Certain GIC implementation, namely those found on earlier, single
+>>>> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
+>>>> which means that the driver needs to use different offset for each CPU.
+>>>>
+>>>> Currently the driver calculates the offset by multiplying value returned
+>>>> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
+>>>> CPU topology is not specified in DT and aforementioned function returns
+>>>> core ID alone. However when DT contains CPU topology, the function
+>>>> changes to return cluster ID as well, which is non-zero on mentioned
+>>>> SoCs and so breaks the calculation in GIC driver.
+>>>>
+>>>> This patch fixes this by masking out cluster ID in CPU offset
+>>>> calculation so that only core ID is considered. Multi-cluster Exynos
+>>>> SoCs already have banked GIC implementations, so this simple fix should
+>>>> be enough.
+>>>>
+>>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-gic.c | 5 ++++-
+>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>
+>>> iiuc, this was introduced by:
+>>>
+>>>   db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
+>>>
+>>> and so should be for v3.3 and up, correct?
+>>
+>> Could be, although there was and still is no topology data specified in
+>> DT for affected Exynos SoCs. The need for it showed up just recently, so
+>> I'm not sure this is a regression to fix in older kernels.
+> 
+> In my "the kernel and the dtb aren't tied together" quest, these are the
+> kinds of things I like to see fixed in stable kernels.
+> 
+> If a user needs to update a dtb, say to fix a bug, it's reasonable to
+> use the newest one for a given board.  After all, any new nodes won't
+> change anything, since the driver in the kernel won't match the node.
+> 
+> However, in this case, without this fix, a user upgrading to the newest
+> dtb would get a broken system.  So, this fix should be backported to
+> prevent the breakage.  Or, have I missed something in my analysis?
 
-There is some misunderstanding here. Here BUG_ON will trigger
-only on actual bug in JIT implementation, it cannot be triggered by user.
-eBPF program is verified before it reaches JIT, so all instructions are
-valid and input to JIT is proper. Two instruction are not yet
-implemented in this JIT and they trigger pr_.._once().
-So I don't see any issue with this usage of BUG_ON
-imo living with silent bugs in JIT is more dangerous.
+This is correct when looking only at this issue. However I suspect such
+move would cause a breakage anyway, because DT stuff isn't that stable
+on Exynos side. I don't mind if this patch hits stable, though.
 
-For the same reason there is no 'trap' instruction in eBPF.
-Static verifier checks that program is valid. If there was a 'trap'
-insn the program would be rejected. Like programs with
-'div by zero' are rejected. There is normal 'bpf_exit' insn to
-return from the program.
+Best regards,
+Tomasz
