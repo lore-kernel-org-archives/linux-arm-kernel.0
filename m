@@ -1,42 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Jul 2014 11:20:45 +0100
-Subject: [PATCH 4/6] ARM: rockchip: enable support for RK3288 SoCs
-In-Reply-To: <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
-References: <1471578.ILeMmG2DL6@diego> <4355781.cnmcVo5AVu@diego>
- <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
-Message-ID: <20140717102045.GG21153@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Jul 2014 12:21:56 +0200
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <93903d5fdf85427bb8a418894540c122@BN1PR0301MB0772.namprd03.prod.outlook.com>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <22032517.gk8PRUMaIU@wuerfel>
+ <93903d5fdf85427bb8a418894540c122@BN1PR0301MB0772.namprd03.prod.outlook.com>
+Message-ID: <5456516.0fVZeXjF8k@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 08:57:21PM +0100, Doug Anderson wrote:
-> Heiko,
+On Thursday 17 July 2014 01:20:54 Peter Chen wrote:
+> Thanks, arnd.
 > 
-> On Tue, Jul 15, 2014 at 4:01 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Enable HAVE_ARM_ARCH_TIMER and add a rockchip,rk3288 compatible.
-> >
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  arch/arm/mach-rockchip/Kconfig    | 1 +
-> >  arch/arm/mach-rockchip/rockchip.c | 1 +
-> >  2 files changed, 2 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-> > index e4564c2..d168669 100644
-> > --- a/arch/arm/mach-rockchip/Kconfig
-> > +++ b/arch/arm/mach-rockchip/Kconfig
-> > @@ -6,6 +6,7 @@ config ARCH_ROCKCHIP
-> >         select ARCH_REQUIRE_GPIOLIB
-> >         select ARM_GIC
-> >         select CACHE_L2X0
-> > +       select HAVE_ARM_ARCH_TIMER
+> For chipidea generic glue layer case, if there are three devices who use this
+> driver, and all devices have 32-bit bus, some devices have less 32 address lines.
+> For example:
 > 
-> Do we want to think about allowing someone to enable the A9-based
-> Rockchip SoCs separately than the A12-based ones?  I know it doesn't
-> hurt to have the arch timer code present on A9 SoCs (it will figure
-> things out at runtime), but people trying to build an A9-based system
-> might not want the extra code?
+> - the device_a doesn't need to use dma_mask
+> - the device_b needs dma_mask as 0xfffffffff
+> - the device_c needs dma_mask as 0xfffffff0, assume it has only 28 address lines
 
-More likely, people using the A12-based system won't want the CACHE_L2X0
-code (which adds an outer_cache.sync check to wmb()).
+This makes no sense. You always need a dma mask, so the first case doesn't exist,
+and the second one is the default.
 
-Will
+In the third case, I assume you mean 0x0fffffff, which is a 28-bit mask.
+
+> My questions are:
+> - Can we not set dma_mask at driver, and only set dma-ranges at dts for device_b
+> and device_c as a solution to cover this different dma mask use case?
+
+try to understand my earlier reply. What is the problem with device_b?
+Is that a limitation of the bus it is connected to, or the version of the
+chipidea hardware?
+
+> - If we can't use this solution, would you suggest one?
+
+It depends on what the requirement of the hardware is, as I explained
+now for three times.
+
+> - If we can use this solution, for device_b and device_c, how can we write dma-ranges?
+> I can't find any arm platforms use it, only some powerpc platform use it.
+> According to the definition from Power_ePAPR_APPROVED_v1.1.pdf, it is
+> dma-ranges = <child-bus-address, parent-bus-address, length>
+> but I find the powerpc has different way for using dma-ranges. 
+
+It's now handled by of_dma_configure() in drivers/of/platform.c for all
+architectures.
+
+	Arnd
