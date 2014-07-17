@@ -1,62 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Jul 2014 18:15:50 +0100
-Subject: [PATCH] ARM: DMA: ensure that old section mappings are flushed
- from the TLB
-In-Reply-To: <E1X7nlB-0000EN-7e@rmk-PC.arm.linux.org.uk>
-References: <E1X7nlB-0000EN-7e@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140717171550.GA4844@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jul 2014 12:20:45 -0500
+Subject: [RFC PATCH] usb: dwc3: core: allow vendor drivers to check probe
+ status
+In-Reply-To: <1405617213-27360-1-git-send-email-lee.jones@linaro.org>
+References: <1405617213-27360-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140717172045.GM10459@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 04:38:17PM +0100, Russell King wrote:
-> When setting up the CMA region, we must ensure that the old section
-> mappings are flushed from the TLB before replacing them with page
-> tables, otherwise we can suffer from mismatched aliases if the CPU
-> speculatively prefetches from these mappings at an inopportune time.
+Hi,
+
+On Thu, Jul 17, 2014 at 06:13:33PM +0100, Lee Jones wrote:
+> This patch provides mechanism for subordinate devices to check
+> whether the DWC3 core probed successfully or otherwise.  Useful
+> if PHYs are required to configure controllers, but aren't yet
+> available.  The DWC3 core driver will defer probe if PHYs are
+> unavailable, however subordinate DWC3 drivers currently do not
+> have any visibility or means to check status - until now.
+
+what's a subordinate DWC3 driver ?
+
+> Another way to do this would be to *_phy_get*(), but if every
+> driver did this it would create a high level of code
+> duplication.
 > 
-> A mismatched alias can occur when the TLB contains a section mapping,
-> but a subsequent prefetch causes it to load a page table mapping,
-> resulting in the possibility of the TLB containing two matching
-> mappings for the same virtual address region.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/mm/dma-mapping.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
+>  drivers/usb/dwc3/core.c | 12 ++++++++++++
+>  drivers/usb/dwc3/core.h |  1 +
+>  2 files changed, 13 insertions(+)
 > 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 4c88935654ca..1f88db06b133 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -461,12 +461,21 @@ void __init dma_contiguous_remap(void)
->  		map.type = MT_MEMORY_DMA_READY;
+> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> index eb69eb9..171ca52 100644
+> --- a/drivers/usb/dwc3/core.c
+> +++ b/drivers/usb/dwc3/core.c
+> @@ -47,6 +47,14 @@
 >  
->  		/*
-> -		 * Clear previous low-memory mapping
-> +		 * Clear previous low-memory mapping to ensure that the
-> +		 * TLB does not see any conflicting entries, then flush
-> +		 * the TLB of the old entries before creating new mappings.
-> +		 *
-> +		 * This ensures that any speculatively loaded TLB entries
-> +		 * (even though they may be rare) can not cause any problems,
-> +		 * and ensures that this code is architecturally compliant.
->  		 */
->  		for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
->  		     addr += PMD_SIZE)
->  			pmd_clear(pmd_off_k(addr));
+>  /* -------------------------------------------------------------------------- */
 >  
-> +		flush_tlb_kernel_range(__phys_to_virt(start),
-> +				       __phys_to_virt(end));
+> +static bool is_enabled = false;
 > +
->  		iotable_init(&map, 1);
->  	}
->  }
-> -- 
-> 1.8.3.1
-> 
-> 
+> +int dwc3_is_enabled(void)
+> +{
+> +	return is_enabled;
+> +}
+> +EXPORT_SYMBOL(dwc3_is_enabled);
+
+no, no, no, no. Let me try that again, hello no! You _do_ realise there
+are systems with more than one dwc3 instance, right ? And this is the
+most fragile possible way of doing this.
+
+You never explained what's a dwc3 subordinate driver, you don't show any
+example of how this would be used and why/where does the PHY need to
+poke into DWC3. Why isn't probe defer enough for you ? Which platform
+are you working on ? what is the problem that you're trying to solve ?
+
+>From this patch, all I can is NAK this patch with no mercy, sorry.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/7fe3e7f3/attachment.sig>
