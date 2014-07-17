@@ -1,64 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 11:51:05 -0400
-Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
- read from DT
-In-Reply-To: <53C7EE82.6040803@samsung.com>
-References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
- <20140717153236.GS13108@titan.lakedaemon.net>
- <53C7EE82.6040803@samsung.com>
-Message-ID: <20140717155105.GT13108@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Jul 2014 17:53:54 +0200
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140717153401.GX21766@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <10673994.kkICTRHJxL@wuerfel> <20140717153401.GX21766@n2100.arm.linux.org.uk>
+Message-ID: <5105942.b7kcvNdlC8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 05:40:50PM +0200, Tomasz Figa wrote:
-> Hi Jason,
+On Thursday 17 July 2014 16:34:01 Russell King - ARM Linux wrote:
+> On Thu, Jul 17, 2014 at 04:40:21PM +0200, Arnd Bergmann wrote:
+> > On Thursday 17 July 2014 15:27:20 Will Deacon wrote:
+> > > Just an FYI, but I've had to check internally to clarify the behaviour
+> > > around TLB conflict aborts. We're changing live page tables here, but the
+> > > *only* thing to differ is the output address, which I would hope is ok but
+> > > need to check to be sure.
+> > 
+> > The two cases are slightly different:
+> > 
+> > - The existing keystone code changes the output address but not the flags
+> > - The hypothetical mvebu code needs to change the flags but not the address.
 > 
-> On 17.07.2014 17:32, Jason Cooper wrote:
-> > On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
-> >> Certain GIC implementation, namely those found on earlier, single
-> >> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
-> >> which means that the driver needs to use different offset for each CPU.
-> >>
-> >> Currently the driver calculates the offset by multiplying value returned
-> >> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
-> >> CPU topology is not specified in DT and aforementioned function returns
-> >> core ID alone. However when DT contains CPU topology, the function
-> >> changes to return cluster ID as well, which is non-zero on mentioned
-> >> SoCs and so breaks the calculation in GIC driver.
-> >>
-> >> This patch fixes this by masking out cluster ID in CPU offset
-> >> calculation so that only core ID is considered. Multi-cluster Exynos
-> >> SoCs already have banked GIC implementations, so this simple fix should
-> >> be enough.
-> >>
-> >> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> >> ---
-> >>  drivers/irqchip/irq-gic.c | 5 ++++-
-> >>  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > iiuc, this was introduced by:
-> > 
-> >   db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
-> > 
-> > and so should be for v3.3 and up, correct?
+> Don't base too much confidence in the keystone code:
+
+What I meant was that verifying the correctness of one of the two above
+with the architecture team doesn't mean that the other one is okay too.
+
+>         map_start = init_mm.start_code;
+>         map_end   = init_mm.brk;
 > 
-> Could be, although there was and still is no topology data specified in
-> DT for affected Exynos SoCs. The need for it showed up just recently, so
-> I'm not sure this is a regression to fix in older kernels.
+>         phys = __pa(map_start) & PMD_MASK;
+>         do {
+> ...
+>                 phys += PMD_SIZE;
+>         } while (phys < map_end);
+> 
+> Consider what happens when map_end is not PMD aligned - it misses the
+> PMD covering the end of the kernel BSS, which will be quite a common
+> case.  Obviously something that needs fixing...
 
-In my "the kernel and the dtb aren't tied together" quest, these are the
-kinds of things I like to see fixed in stable kernels.
+Ouch.
 
-If a user needs to update a dtb, say to fix a bug, it's reasonable to
-use the newest one for a given board.  After all, any new nodes won't
-change anything, since the driver in the kernel won't match the node.
-
-However, in this case, without this fix, a user upgrading to the newest
-dtb would get a broken system.  So, this fix should be backported to
-prevent the breakage.  Or, have I missed something in my analysis?
-
-thx,
-
-Jason.
+	Arnd
