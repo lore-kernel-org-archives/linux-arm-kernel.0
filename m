@@ -1,48 +1,59 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Jul 2014 12:31:56 +0200
-Subject: [PATCH v2 00/14] AT91: PIT: Cleanups and move to
- drivers/clocksource
-In-Reply-To: <20140717095020.GB20328@lukather>
-References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140710075105.GA27469@lukather> <20140717095020.GB20328@lukather>
-Message-ID: <53C7A61C.7030704@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 17 Jul 2014 11:39:10 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <20140716155747.GR29414@arm.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+Message-ID: <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2014 11:50 AM, Maxime Ripard wrote:
-> On Thu, Jul 10, 2014 at 09:51:05AM +0200, Maxime Ripard wrote:
->> Hi Daniel,
->>
->> On Tue, Jul 01, 2014 at 11:33:13AM +0200, Maxime Ripard wrote:
->>> Hi everyone,
->>>
->>> This series cleans up the PIT driver in order for it to not depend on
->>> anything in mach-at91 anymore, and in the end move it out of
->>> mach-at91.
->>>
->>> Along the way, these patches also do a bit of cleanup.
->>>
->>> This has been tested on a G45-EK without DT and an Xplained with DT.
->>>
->>
->> Even though most of this patches are not clocksource related, it would
->> be great if we could at least get an acked-by on the last patch that
->> moves the driver to drivers/clocksource, since it pretty much becomes
->> your burden :)
->
-> Ping?
+On 16 July 2014 16:57, Will Deacon <will.deacon@arm.com> wrote:
+> I don't have hugely strong opinions about this, but I don't see why it's
+> useful to print exactly the same line out `n' times; once for each CPU. We
+> only pass one set of hwcaps to ELF executables via auxv, so why do we need
+> to duplicate things here?
 
-Hi,
+I think there are a couple of lines of argument here:
 
-I am in vacation right now. I will review the patches in the next two days.
+(1) Precedent from other architectures. Both 32-bit ARM and
+x86 have the feature-info be per-core; we should do the same
+for 64-bit ARM unless there's a really strong reason not to.
 
-Thanks
-   -- Daniel
+(2) Making this be not-per-CPU backs us into a corner. If we
+have the feature flags per-core, and it turns out that they're
+never ever different between cores even on heterogenous
+CPUs, there's no problem. If we have the feature flags be
+listed only once, and then in future we do want to support
+some minor form of heterogeny between cores, then we're
+stuck with a compatibility break because the format doesn't
+let us express that. (Perhaps there might be a big.LITTLE
+system where only the big cores had the crypto extensions,
+to pick a random possibility where the kernel doesn't need to
+care but userspace could take advantage by restricting itself
+to running on only the big cores). I think this makes the
+choice pretty straightforward, since there's basically no
+benefit to having only a single features line.
 
+(3) CPU features really are per-core, so collapsing them
+down into a single line is not consistent with the line this
+series otherwise takes of "we just report the information
+the hardware provides without interpretation" (in particular
+the refusal to provide nice human readable CPU names).
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> Put another way, we're really treating the hwcaps as a system property
+> rather than a per-cpu property, so I think we should handle them as such.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+This is an implementation detail of the kernel, so you shouldn't
+be gratuitously exposing it to userspace if you can easily
+avoid doing so, as here. (The ELF HWCAP ABI obviously
+does assume homogeny and would need fixing in a future
+more heterogenous world.)
+
+If you wanted you could print a single "lowest common
+denominator features" line in addition to the per-CPU
+features information.
+
+thanks
+-- PMM
