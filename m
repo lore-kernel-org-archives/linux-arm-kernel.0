@@ -1,70 +1,81 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Thu, 17 Jul 2014 09:48:29 -0500
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <20140717135534.GM30313@leverpostej>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140717131854.GN13108@titan.lakedaemon.net>
- <20140717135534.GM30313@leverpostej>
-Message-ID: <53C7E23D.1050900@amd.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Thu, 17 Jul 2014 16:48:37 +0200
+Subject: [PATCH v2 2/5] i2c: eg20t: Remove suspension check
+In-Reply-To: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
+References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
+Message-ID: <1405608520-5644-2-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/17/2014 8:55 AM, Mark Rutland wrote:
-> Hi Jason,
->
-> On Thu, Jul 17, 2014 at 02:18:54PM +0100, Jason Cooper wrote:
->> On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
->>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>
->>> This patch set introduces support for MSI(-X) in GICv2m specification,
->>> which is implemented in some variation of GIC400.
->>>
->>> This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
->>> (https://lkml.org/lkml/2014/3/14/320).
->>>
->>> Changes in V3:
->>>      * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
->>>        (per Jason Cooper request)
->>>      * Misc fix/clean up per Mark Rutland comments
->>>      * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
->>>      * Patch 4 is new to the series:
->>>          * Add ARM64-specific version arch_setup_msi_irqs() to allow support
->>>            for Multiple MSI.
->>>          * Add support for Multiple MSI for GICv2m.
->>>
->>> Suravee Suthikulpanit (4):
->>>    irqchip: gic: Add binding probe for ARM GIC400
->>>    irqchip: gic: Restructuring ARM GIC code
->>>    irqchip: gic: Add supports for ARM GICv2m MSI(-X)
->>>    irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
->>
->> Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
->> irqchip/gic with irqchip/urgent merged in.  To facilitate
->> testing/merging, I've prepared an unsigned tag for you on the
->> irqchip/gic branch:
->
-> I'm a little concerned that this is all going through for v3.17 without
-> a {Reviewed,Acked}-by from Marc or anyone working with GIC{,v2m}.
+We now take care of suspension in the i2c core code. So we can remove this
+check here.
 
-> While his comments on v1 have been addressed, he has not had a chance to
-> acknowledge the solutions. I appreciate Marc's holiday is unfortunately
-> timed.
->
-> I also have an open concern with the binding with regard to the
-> orthogonality of GICV GICH and the MSI registers.
+Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+---
+same as v1
 
-The MSI part is normally enabled from the optional "msi-controller" 
-keyword. It should not really matter which compatible ID it uses.
+ drivers/i2c/busses/i2c-eg20t.c | 15 ---------------
+ 1 file changed, 15 deletions(-)
 
-Ooops. I noticed that was accidentally dropped the check for 
-"msi-controller" in the gicv2m_of_init() function.  I'll send a follow 
-up patch to fix this.
-
-> Suravee, do you need this urgently for v3.17? I was under the impression
-> that we wouldn't have full PCIe support by then.
->
-
-PCI is the dependency for this patch to function.  So, it should be 
-aligned with upstreaming of PCI patches.
-
-Suravee
+diff --git a/drivers/i2c/busses/i2c-eg20t.c b/drivers/i2c/busses/i2c-eg20t.c
+index a44ea13..aae0413 100644
+--- a/drivers/i2c/busses/i2c-eg20t.c
++++ b/drivers/i2c/busses/i2c-eg20t.c
+@@ -162,15 +162,12 @@ struct i2c_algo_pch_data {
+  * struct adapter_info - This structure holds the adapter information for the
+ 			 PCH i2c controller
+  * @pch_data:		stores a list of i2c_algo_pch_data
+- * @pch_i2c_suspended:	specifies whether the system is suspended or not
+- *			perhaps with more lines and words.
+  * @ch_num:		specifies the number of i2c instance
+  *
+  * pch_data has as many elements as maximum I2C channels
+  */
+ struct adapter_info {
+ 	struct i2c_algo_pch_data pch_data[PCH_I2C_MAX_DEV];
+-	bool pch_i2c_suspended;
+ 	int ch_num;
+ };
+ 
+@@ -677,13 +674,6 @@ static s32 pch_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 	if (ret)
+ 		return ret;
+ 
+-	if (adap->p_adapter_info->pch_i2c_suspended) {
+-		mutex_unlock(&pch_mutex);
+-		return -EBUSY;
+-	}
+-
+-	pch_dbg(adap, "adap->p_adapter_info->pch_i2c_suspended is %d\n",
+-		adap->p_adapter_info->pch_i2c_suspended);
+ 	/* transfer not completed */
+ 	adap->pch_i2c_xfer_in_progress = true;
+ 
+@@ -786,7 +776,6 @@ static int pch_i2c_probe(struct pci_dev *pdev,
+ 
+ 	for (i = 0; i < adap_info->ch_num; i++) {
+ 		pch_adap = &adap_info->pch_data[i].pch_adapter;
+-		adap_info->pch_i2c_suspended = false;
+ 
+ 		adap_info->pch_data[i].p_adapter_info = adap_info;
+ 
+@@ -862,8 +851,6 @@ static int pch_i2c_suspend(struct pci_dev *pdev, pm_message_t state)
+ 	struct adapter_info *adap_info = pci_get_drvdata(pdev);
+ 	void __iomem *p = adap_info->pch_data[0].pch_base_address;
+ 
+-	adap_info->pch_i2c_suspended = true;
+-
+ 	for (i = 0; i < adap_info->ch_num; i++) {
+ 		while ((adap_info->pch_data[i].pch_i2c_xfer_in_progress)) {
+ 			/* Wait until all channel transfers are completed */
+@@ -912,8 +899,6 @@ static int pch_i2c_resume(struct pci_dev *pdev)
+ 	for (i = 0; i < adap_info->ch_num; i++)
+ 		pch_i2c_init(&adap_info->pch_data[i]);
+ 
+-	adap_info->pch_i2c_suspended = false;
+-
+ 	return 0;
+ }
+ #else
+-- 
+1.9.1
