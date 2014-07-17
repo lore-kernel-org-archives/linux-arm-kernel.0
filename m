@@ -1,75 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Jul 2014 13:35:33 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
- <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
- <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
-Message-ID: <20140717123533.GJ21153@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Jul 2014 08:35:50 -0400
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <20140708124653.GX23978@titan.lakedaemon.net>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140708053434.GH28931@quad.lixom.net>
+ <20140708115727.GR23978@titan.lakedaemon.net>
+ <20140708121252.GK21766@n2100.arm.linux.org.uk>
+ <20140708124653.GX23978@titan.lakedaemon.net>
+Message-ID: <20140717123550.GH13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:12:48PM +0100, Peter Maydell wrote:
-> On 17 July 2014 11:54, Will Deacon <will.deacon@arm.com> wrote:
-> > I don't really see the benefits of pretending that /proc/cpuinfo is remotely
-> > portable between architectures.
+Russell,
+
+On Tue, Jul 08, 2014 at 08:46:53AM -0400, Jason Cooper wrote:
+> On Tue, Jul 08, 2014 at 01:12:52PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Jul 08, 2014 at 07:57:27AM -0400, Jason Cooper wrote:
+> > > Can you offer any suggestions as to how you would like this resolved?  I
+> > > thought when I voiced my opinion as above, and Russell didn't reply,
+> > > there was implied acknowledgement...
+> > 
+> > I didn't reply probably because I didn't see the message and/or I'm busy
+> > with other stuff.
 > 
-> I'm not suggesting it's portable. I'm suggesting that you need
-> a good reason to push backwards against a design decision
-> made on other architectures. In particular, given that ARM is
-> in general *more* likely to be heterogenous than x86 (given
-> the existence of big.LITTLE), it seems baffling to try to move
-> in a direction that denies the possibility of further heterogeneity
-> in future.
+> Fair enough.
 
-We're not denying the possibility of heterogeneity, we're trying to expose a
-consistent view of the system to userspace. Differences between cores should
-be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
-passed off to userspace.
+This is the second time I've asked you for a technical reason not to
+merge these DTS patches, only to be met with silence, again.
 
-> > So the real question is: do we want to allow Linux to support features that
-> > exist only on a subset of cores in the system? The current thinking is that
-> > we truncate the advertised features to the common system subset, which means
-> > it will be the same on all cores, by definition. That allows hardware guys
-> > to build crazy systems that we can at least use, without imparting a world
-> > of pain onto software that needs to run on them.
+> > I know that Sebastian asked Rabeeh on IRC yesterday whether the flash
+> > chip type could be used to detect the difference between the two, but
+> > has not yet received an answer.
 > 
-> I've already made one suggestion (non-pervasive crypto).
-> You could also envisage "feature bits" that effectively mean
-> "things will be faster on this core" even if they still work on
-> other cores too.
-
-I don't believe that knowledge belongs in userspace. If you wanted to
-support crypto on such a system, then you advertise it as a system feature
-and migrate those tasks to the cores that support the instructions (in a
-similar manner to migrating the FPU on architecture that can share one).
-However, I'd prefer to start from a point where we *don't*' support such
-systems and actively dissuage people from building them.
-
-> > I also think that we're backed into a corner regardless. We've seen how
-> > people ignore hwcaps (e.g. SWP), so they're likely to parse the caps for
-> > CPU0 and use that as an indication of the system capabilities.
+> Ok.
 > 
-> Certainly userspace *can* do the wrong thing. That doesn't
-> necessarily mean that the kernel should only ever provide the
-> API equivalent of safety scissors...
-
-Userspace *will* do the wrong thing and it *will* turn the feature into
-useless baggage that we have to carry.
-
-> > Note that the features list *isn't* just the features supported by the CPU.
-> > It also takes into account the set of features supported by the kernel (e.g.
-> > we don't advertise VFP on ARMv7 if VFP context switching isn't enabled).
+> > As the two DT descriptions are mutually incompatible, there isn't much
+> > choice.  And (afaik) there's no choice of updating the boot loader to
+> > a version which can deal with DT - yes it may be u-boot, but I've no
+> > idea if modern u-boot works on it, and I really would not like to try.
 > 
-> This is an argument for also advertising the lowest-common-denominator
-> feature bits. (Do you want to argue for a single "features:" line
-> plus per-core "extra-features:" lines?)
+> Right, what I'm arguing for (since trimmed), is *not* bootloader
+> upgrades.  I think Sebastian's changes are ok because:
+> 
+>  - Most users have production boxes (Sebastian's patches provide their
+>    sane default)
+> 
+>  - Most users of mainline or distro kernels are appending the dtb, so
+>    swapping out a dtb, while not ideal, isn't earth-shattering.
+> 
+> The *only* failure condition I can see is what you already highlighted,
+> people who don't know they have an engineering sample.  Sebastian's
+> patches work for most people, and on the odd chance of the failure, the
+> user simply appends the other dtb and reboots.
+> 
+> Once we hear back from Rabeeh, at a minimum, we'll add a comment to the
+> dts file for distro maintainers and users to find.  If possible, we'll
+> add a hook in arch code to read from SPI and adjust the dtb accordingly.
 
-That's what Ard brought up and I think it makes more sense that printing the
-same features line for each core. However, I question its usefulness and
-think it's ripe for misuse.
+Either of these solutions will be follow-on patches.  There's no need to
+hold up this pull request over this information.
 
-Will
+> In either case, comment or code, the dts files changed in this series
+> are correct and won't change.
+
+I still stand by this.
+
+> I'm sorry to be dense, Russell, but what am I missing from your
+> objection?
+
+Olof, Arnd, please merge this request.  I can re-send if you need.
+
+We have more changes pending in mvebu/dt on top of this, and we're
+getting very close to the cutoff for the merge window.
+
+thx,
+
+Jason.
