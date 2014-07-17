@@ -1,211 +1,80 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Thu, 17 Jul 2014 18:45:00 -0300
-Subject: [PATCH v2 1/8] dma: sun4i: Add support for the DMA engine on
- sun[457]i SoCs
-In-Reply-To: <20140717205639.GH20328@lukather>
-References: <1404619518-7592-1-git-send-email-emilio@elopez.com.ar>
- <1404619518-7592-2-git-send-email-emilio@elopez.com.ar>
- <20140717205639.GH20328@lukather>
-Message-ID: <53C843DC.8090808@elopez.com.ar>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 17 Jul 2014 15:06:15 -0700
+Subject: [PATCH] CMA: generalize CMA reserved area management
+ functionality (fixup)
+In-Reply-To: <1405589767-17513-1-git-send-email-m.szyprowski@samsung.com>
+References: <53C78ED7.7030002@samsung.com>
+ <1405589767-17513-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140717150615.32c48786b6bdbc880bdc5ed4@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Thu, 17 Jul 2014 11:36:07 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-El 17/07/14 17:56, Maxime Ripard escribi?:
-> On Sun, Jul 06, 2014 at 01:05:08AM -0300, Emilio L?pez wrote:
->> This patch adds support for the DMA engine present on Allwinner A10,
->> A13, A10S and A20 SoCs. This engine has two kinds of channels: normal
->> and dedicated. The main difference is in the mode of operation;
->> while a single normal channel may be operating at any given time,
->> dedicated channels may operate simultaneously provided there is no
->> overlap of source or destination.
->>
->> Hardware documentation can be found on A10 User Manual (section 12), A13
->> User Manual (section 14) and A20 User Manual (section 1.12)
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
->>(...)
->>
->> +config SUN4I_DMA
->> +	tristate "Allwinner A10/A10S/A13/A20 DMA support"
->
-> I'm not that fond of having an exhaustive list here. If some other SoC
-> we didn't thought of or get a new SoC that uses this controller, this
-> list won't be exhaustive anymore, which is even worse.
->
-> Just mention the A10.
+> MAX_CMA_AREAS is used by other subsystems (i.e. arch/arm/mm/dma-mapping.c),
+> so we need to provide correct definition even if CMA is disabled.
+> This patch fixes this issue.
+> 
+> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  include/linux/cma.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index 9a18a2b1934c..c077635cad76 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -5,7 +5,11 @@
+>   * There is always at least global CMA area and a few optional
+>   * areas configured in kernel .config.
+>   */
+> +#ifdef CONFIG_CMA
+>  #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
+> +#else
+> +#define MAX_CMA_AREAS	(0)
+> +#endif
+>  
+>  struct cma;
 
-Ok
+Joonsoo already fixed this up, a bit differently:
+http://ozlabs.org/~akpm/mmots/broken-out/cma-generalize-cma-reserved-area-management-functionality-fix.patch
 
->> +	depends on (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || (COMPILE_TEST && OF && ARM))
->
-> This pretty much defeats the purpose of COMPILE_TEST
+Which approach makes more sense?
 
-QCOM_BAM_DMA does it that way; it's better to get some coverage than 
-none I guess?
 
->
->> +	select DMA_ENGINE
->> +	select DMA_OF
->> +	select DMA_VIRTUAL_CHANNELS
->
-> I guess you could default to y for the SoCs where it's relevant.
 
-Sounds good.
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Subject: CMA: fix ARM build failure related to MAX_CMA_AREAS definition
 
->
->> +	help
->> +	  Enable support for the DMA controller present in the sun4i,
->> +	  sun5i and sun7i Allwinner ARM SoCs.
->> +
-(...)
->> +
->> +/** Normal DMA register values **/
->> +
->> +/* Normal DMA source/destination data request type values */
->> +#define NDMA_DRQ_TYPE_SDRAM			0x16
->> +#define NDMA_DRQ_TYPE_LIMIT			(0x1F + 1)
->
-> Hmmm, I'm unsure what this is about... What is it supposed to do, and
-> how is it different from BIT(5) ?
+If CMA is disabled, CONFIG_CMA_AREAS isn't defined so compile error
+happens. To fix it, define MAX_CMA_AREAS if CONFIG_CMA_AREAS
+isn't defined.
 
-if (val < NDMA_DRQ_TYPE_LIMIT)
-	/* valid value */
-else
-	/* invalid value */
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
 
-0x1F is the last valid value
+ include/linux/cma.h |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-(...)
->> +
->> +static void set_pchan_interrupt(struct sun4i_dma_dev *priv,
->> +				struct sun4i_dma_pchan *pchan,
->> +				int half, int end)
->> +{
->> +	u32 reg = readl_relaxed(priv->base + DMA_IRQ_ENABLE_REG);
->> +	int pchan_number = pchan - priv->pchans;
->> +
->> +	if (half)
->> +		reg |= BIT(pchan_number * 2);
->> +	else
->> +		reg &= ~BIT(pchan_number * 2);
->> +
->> +	if (end)
->> +		reg |= BIT(pchan_number * 2 + 1);
->> +	else
->> +		reg &= ~BIT(pchan_number * 2 + 1);
->> +
->> +	writel_relaxed(reg, priv->base + DMA_IRQ_ENABLE_REG);
->
-> I don't see any interrupts here.
-
-Hm?
-
-> Is this suppose to be called with a
-> lock taken? If so, it should be mentionned in some comment.
-
-Good point, this should probably take a lock, I'll get it fixed.
-
-(...)
->> +{
->> +	struct sun4i_dma_contract *contract = to_sun4i_dma_contract(vd);
->> +	struct sun4i_dma_promise *promise;
->> +
->> +	/* Free all the demands and completed demands */
->> +	list_for_each_entry(promise, &contract->demands, list) {
->> +		kfree(promise);
->> +	}
->> +
->> +	list_for_each_entry(promise, &contract->completed_demands, list) {
->> +		kfree(promise);
->> +	}
->>
->
-> Those brackets are useless.
-
-Indeed, dropped.
-
->> +	for_each_sg(sgl, sg, sg_len, i) {
->> +		/* Figure out addresses */
->> +		if (dir == DMA_MEM_TO_DEV) {
->> +			srcaddr = sg_dma_address(sg);
->> +			dstaddr = sconfig->dst_addr;
->> +		} else {
->> +			srcaddr = sconfig->src_addr;
->> +			dstaddr = sg_dma_address(sg);
->> +		}
->> +
->> +		/* TODO: should this be configurable? */
->> +		para = DDMA_MAGIC_SPI_PARAMETERS;
->
-> What is it? Is it supposed to change from one client device to
-> another?
-
-These are the magic DMA engine timings that keep SPI going. I haven't 
-seen any interface on DMAEngine to configure timings, and so far they 
-seem to work for everything we support, so I've kept them here. I don't 
-know if other devices need different timings because, as usual, we only 
-have the "para" bitfield meanings, but no comment on what the values 
-should be when doing a certain operation :|
-
->> +
->> +		/* And make a suitable promise */
->> +		if (vchan->is_dedicated)
->> +			promise = generate_ddma_promise(chan, srcaddr, dstaddr,
->> +							sg_dma_len(sg), sconfig);
->> +		else
->> +			promise = generate_ndma_promise(chan, srcaddr, dstaddr,
->> +							sg_dma_len(sg), sconfig);
->> +
->> +		if (!promise)
->> +			return NULL; /* TODO */
->
-> TODO what?
-
-/* TODO: properly kfree the promises generated in the loop */
-
-(...)
->> +static enum dma_status sun4i_dma_tx_status(struct dma_chan *chan,
->> +					   dma_cookie_t cookie,
->> +					   struct dma_tx_state *state)
->> +{
->> +	struct sun4i_dma_vchan *vchan = to_sun4i_dma_vchan(chan);
->> +	struct sun4i_dma_pchan *pchan = vchan->pchan;
->> +	struct sun4i_dma_contract *contract;
->> +	struct sun4i_dma_promise *promise;
->> +	struct virt_dma_desc *vd;
->> +	unsigned long flags;
->> +	enum dma_status ret;
->> +	size_t bytes = 0;
->> +
->> +	ret = dma_cookie_status(chan, cookie, state);
->> +	if (ret == DMA_COMPLETE)
->> +		return ret;
->> +
->> +	spin_lock_irqsave(&vchan->vc.lock, flags);
->> +	vd = vchan_find_desc(&vchan->vc, cookie);
->> +	if (!vd) /* TODO */
->
-> TODO what?
->
-
-/* TODO: remove the TODO */
-
->> +		goto exit;
->> +	contract = to_sun4i_dma_contract(vd);
->> +
->> +	list_for_each_entry(promise, &contract->demands, list) {
->> +		bytes += promise->len;
->> +	}
->
-> Useless brackets
-
-Dropped
-
-Thanks for taking the time to review this!
-
-Cheers,
-
-Emilio
+diff -puN include/linux/cma.h~cma-generalize-cma-reserved-area-management-functionality-fix include/linux/cma.h
+--- a/include/linux/cma.h~cma-generalize-cma-reserved-area-management-functionality-fix
++++ a/include/linux/cma.h
+@@ -5,8 +5,14 @@
+  * There is always at least global CMA area and a few optional
+  * areas configured in kernel .config.
+  */
++#ifdef CONFIG_CMA_AREAS
+ #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
+ 
++#else
++#define MAX_CMA_AREAS	(0)
++
++#endif
++
+ struct cma;
+ 
+ extern phys_addr_t cma_get_base(struct cma *cma);
+_
