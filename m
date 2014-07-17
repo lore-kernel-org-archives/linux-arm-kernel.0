@@ -1,50 +1,52 @@
-From: marcus.shawcroft@arm.com (Marcus Shawcroft)
-Date: Thu, 17 Jul 2014 11:46:24 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
-Message-ID: <53C7A980.8050601@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Jul 2014 11:49:09 +0100
+Subject: [PATCH v7 02/11] arm64: Remove duplicate
+ (SWAPPER|IDMAP)_DIR_SIZE definitions
+In-Reply-To: <1405537792-23666-3-git-send-email-catalin.marinas@arm.com>
+References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
+ <1405537792-23666-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20140717104909.GI30313@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/14 11:39, Peter Maydell wrote:
-> On 16 July 2014 16:57, Will Deacon <will.deacon@arm.com> wrote:
->> I don't have hugely strong opinions about this, but I don't see why it's
->> useful to print exactly the same line out `n' times; once for each CPU. We
->> only pass one set of hwcaps to ELF executables via auxv, so why do we need
->> to duplicate things here?
->
-> I think there are a couple of lines of argument here:
->
-> (1) Precedent from other architectures. Both 32-bit ARM and
-> x86 have the feature-info be per-core; we should do the same
-> for 64-bit ARM unless there's a really strong reason not to.
+On Wed, Jul 16, 2014 at 08:09:43PM +0100, Catalin Marinas wrote:
+> Just keep the asm/page.h definition as this is included in vmlinux.lds.S
+> as well.
 
-Agreed.
+My bad, I should've spotted that when I moved idmap and swapper next to
+the BSS. Thanks for cleaning this up.
 
-> (2) Making this be not-per-CPU backs us into a corner. If we
-> have the feature flags per-core, and it turns out that they're
-> never ever different between cores even on heterogenous
-> CPUs, there's no problem. If we have the feature flags be
-> listed only once, and then in future we do want to support
-> some minor form of heterogeny between cores, then we're
-> stuck with a compatibility break because the format doesn't
-> let us express that. (Perhaps there might be a big.LITTLE
-> system where only the big cores had the crypto extensions,
-> to pick a random possibility where the kernel doesn't need to
-> care but userspace could take advantage by restricting itself
-> to running on only the big cores). I think this makes the
-> choice pretty straightforward, since there's basically no
-> benefit to having only a single features line.
+I guess we got lucky with nothing including both pgtable.h and page.h? I
+don't recall seeing any duplicate definition warnings.
 
-Agreed.
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-This patch is in itself an ABI break for anyone consuming /proc/cpuinfo. 
-  Making this be not-per-cpu just sets us up for another ABI break in 
-the future, not ideal.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Cheers
-/Marcus
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/include/asm/pgtable.h | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index e0ccceb317d9..d7455fa83bc7 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -383,9 +383,6 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+>  extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+>  extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+>  
+> -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
+> -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
+> -
+>  /*
+>   * Encode and decode a swap entry:
+>   *	bits 0-1:	present (must be zero)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
