@@ -1,34 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 17 Jul 2014 10:23:10 +0200
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <20140717065148.GT11056@pengutronix.de>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <20140717065148.GT11056@pengutronix.de>
-Message-ID: <201407171023.10908.marex@denx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Jul 2014 09:33:42 +0100
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140717102425.34fe0181@free-electrons.com>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140702164147.GQ32514@n2100.arm.linux.org.uk>
+ <20140717102425.34fe0181@free-electrons.com>
+Message-ID: <20140717083342.GS21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 17, 2014 at 08:51:48 AM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Tue, Jun 24, 2014 at 04:18:27PM -0300, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > When the mx6 PCI conctroller is initialized in the bootloader we see a
-> > kernel hang inside imx6_add_pcie_port().
-> > 
-> > Adding a 30ms delay allows the kernel to boot.
-> 
-> Just my thought on how to debug that: I'd try to bisect the pci init
-> routine in the boot loader. I.e. first only do the first half of the
-> initialisation in U-Boot. Depending on Linux being able to boot or not
-> initialize more or less on the next run.
-> 
-> Maybe there is a single register write that makes Linux fail?!
+On Thu, Jul 17, 2014 at 10:24:25AM +0200, Thomas Petazzoni wrote:
+> If I understand correctly, we are already changing the page tables
+> anyway, to switch certain pages to be mapped uncached, to do DMA
+> coherent allocations, no?
 
-I am still hell-bent on thinking that the missing PCIe block reset is what makes 
-the Linux fail. Missing block reset is always a problem. Or do we now have a 
-mean to reset the PCIe block and it's PHY from software?
+I've no idea, I never looked at that code.  I hope that Marek has
+considered the requirements of the architecture when creating that
+code...
 
-Best regards,
-Marek Vasut
+> So wouldn't it be possible to keep the early
+> assembly code as it is today, and then later, in C code, once we have
+> identified the platform on which we're running, modify the page tables
+> to switch to the appropriate page attributes (write allocate cache
+> policy, shareable attribute, etc.) ?
+
+No - the problem is that we're running from the page table in question
+with global mappings, and we need to switch all these mappings, including
+the ones we're currently using to execute from.
+
+We can't even create a new page table and switch to it because the
+mappings in question are global mappings.
+
+The only way to do that safely from an architectural point of view would
+be to turn the MMU off, and drop back to assembly code to change the
+page tables, and re-enable the MMU.  For something as obscure as Marvell's
+coherency stuff, that's not something I want to see in core code.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
