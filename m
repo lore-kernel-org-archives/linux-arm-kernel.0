@@ -1,27 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Jul 2014 10:31:50 +0100
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
- <7497427.LQy8pJts8f@wuerfel>
- <CAOesGMjgNZ0hvWy0p1fh36gOMfBVd-uJSf=AWUsr9GdrrErtyw@mail.gmail.com>
-Message-ID: <20140717093149.GB3180@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 17 Jul 2014 11:32:45 +0200
+Subject: ARM: mvebu: ARCH_HAS_CPUFREQ
+In-Reply-To: <1405588702.4808.6.camel@x220>
+References: <1405588702.4808.6.camel@x220>
+Message-ID: <20140717113245.121277bb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 08:31:00PM +0100, Olof Johansson wrote:
-> [ Gee, I had completely missed this thread because nobody bothered to
-> cc me. Seems to be standard procedure on 64-bit these days. :( ]
+Dear Paul Bolle,
 
-Just to clarify this point, as per prior agreement I'm expecting the
-arm-soc guys to help reviewing/merging arm64-soc as well, even though
-there are no arch/arm64/{mach,plat}-* directories. That means that
-arm-soc folks should also be cc'ed on such patches.
+On Thu, 17 Jul 2014 11:18:22 +0200, Paul Bolle wrote:
 
-However, the "ARM SUB-ARCHITECTURES" MAINTAINERS entry does not mention
-arm at kernel.org (neither Olof nor Arnd). Was this not meant as an arm-soc
-email alias?
+> 0) Linux-next includes your commit a02829b0485e ("ARM: mvebu: allow
+> enabling of cpufreq on Armada XP") as of today (next-20140717).
+> 
+> 1) That commit only adds
+>     select ARCH_HAS_CPUFREQ
+> 
+> to a Kconfig entry. But ARCH_HAS_CPUFREQ was dropped in v3.16-rc2, see
+> commit 19682f72f5db ("ARM: Remove ARCH_HAS_CPUFREQ config option").
+> While I don't know what you want to achieve here, selecting
+> ARCH_HAS_CPUFREQ certainly won't help you.
 
+Thanks for the notification. The issue is that the cpufreq branch I've
+sent to Jason is based on 3.16-rc1, which does not have 19682f72f5db.
+
+Jason, I believe you could simply drop the patch a02829b0485e, since
+all it does is selecting this ARCH_HAS_CPUFREQ option which no longer
+exists.
+
+Thanks,
+
+Thomas
 -- 
-Catalin
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
