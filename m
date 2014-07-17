@@ -1,88 +1,38 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 17 Jul 2014 13:43:32 +0100
-Subject: [RFC/PATCH 0/5] Add Video Processing Front End Support
-In-Reply-To: <1405447012-5340-1-git-send-email-balbi@ti.com>
-References: <1405447012-5340-1-git-send-email-balbi@ti.com>
-Message-ID: <CA+V-a8sZF-M1Me0ZpVAkCGChQYYNcCopdW50fLZwPQ1uCLgx4Q@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Jul 2014 08:48:04 -0400
+Subject: [PATCH] irqchip: gic: Add binding probe for ARM GIC400
+In-Reply-To: <2621565.f5eISveXXJ@diego>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1404947104-21345-2-git-send-email-suravee.suthikulpanit@amd.com>
+ <2932284.F1eaAf8ArJ@diego> <2621565.f5eISveXXJ@diego>
+Message-ID: <20140717124804.GI13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 6:56 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi all,
->
-> the following patches add suport for AM43xx's Video Processing
-> Front End (VPFE). Full documentation is available at [1] chapter 14.
->
-> This driver has been tested with linux-next from yesterday, plus my
-> (already queued) am437x starter kit patches, plus these patches, plus
-> the sensor driver which, saddly enough, we're not allowed to release :-(
->
-> This driver has almost full v4l2-compliance with only 2 failures (I'll
-> take hints on how to properly fix them) as below:
->
->                 fail: v4l2-compliance.cpp(419): !doioctl(node2,
->                         VIDIOC_S_PRIORITY, &prio)
->         test VIDIOC_G/S_PRIORITY: FAIL
->
->                 fail: v4l2-test-formats.cpp(319): pixelformat !=
->                                 V4L2_PIX_FMT_JPEG && colorspace ==
->                                 V4L2_COLORSPACE_JPEG
->                 fail: v4l2-test-formats.cpp(418):
->                                 testColorspace(pix.pixelformat, pix.colorspace)
->         test VIDIOC_G_FMT: FAIL
->
-> I have also tested with gst-launch using fbdevsink and I can see my
-> ugly mug just fine.
->
-> Please give this a thorough review and let me know of any problems
-> which need to be sorted out and I'll try to help out as time allows.
->
-> cheers
->
-> [1] http://www.ti.com/lit/pdf/spruhl7
->
-> Benoit Parrot (4):
->   Media: platform: Add ti-vpfe driver for AM437x device
->   arm: omap: hwmod: add hwmod entries for AM437x VPFE
->   arm: boot: dts: am4372: add vpfe DTS entries
->   arm: dts: am43x-epos: Add VPFE DTS entries
->
-> Darren Etheridge (1):
->   ARM: dts: am437x-sk-evm: add vpfe support and ov2659 sensor
->
->  arch/arm/boot/dts/am4372.dtsi                     |   16 +
->  arch/arm/boot/dts/am437x-sk-evm.dts               |   63 +
->  arch/arm/boot/dts/am43x-epos-evm.dts              |   54 +
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c        |   56 +
->  arch/arm/mach-omap2/prcm43xx.h                    |    3 +-
->  drivers/media/platform/Kconfig                    |    1 +
->  drivers/media/platform/Makefile                   |    2 +
->  drivers/media/platform/ti-vpfe/Kconfig            |   12 +
->  drivers/media/platform/ti-vpfe/Makefile           |    2 +
->  drivers/media/platform/ti-vpfe/am437x_isif.c      | 1053 +++++++++
->  drivers/media/platform/ti-vpfe/am437x_isif.h      |  355 +++
->  drivers/media/platform/ti-vpfe/am437x_isif_regs.h |  144 ++
->  drivers/media/platform/ti-vpfe/vpfe_capture.c     | 2478 +++++++++++++++++++++
->  drivers/media/platform/ti-vpfe/vpfe_capture.h     |  263 +++
->  14 files changed, 4501 insertions(+), 1 deletion(-)
+On Tue, Jul 15, 2014 at 12:03:03AM +0200, Heiko St?bner wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> 
+> Commit 3ab72f9156bb "dt-bindings: add GIC-400 binding" added the
+> "arm,gic-400" compatible string, but the corresponding IRQCHIP_DECLARE
+> was never added to the gic driver.
+> 
+> Therefore add the missing irqchip declaration for it.
+> 
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> 
+> Removed additional empty line and adapted commit message to mark it
+> as fixing an issue.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> As I really need this, I took the liberty of adapting the patch accordingly
+> to make it apply on top of the current irqchip/for-next (or urgent) and
+> explicitly state the fixed issue. Hope that is ok
+> 
+>  drivers/irqchip/irq-gic.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Missing documentation for DT ?
+Applied to irqchip/urgent with Will's Ack and Cc'd to stable for v3.14+
 
-Thanks,
---Prabhakar Lad
+thx,
 
->  create mode 100644 drivers/media/platform/ti-vpfe/Kconfig
->  create mode 100644 drivers/media/platform/ti-vpfe/Makefile
->  create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif.c
->  create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif.h
->  create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif_regs.h
->  create mode 100644 drivers/media/platform/ti-vpfe/vpfe_capture.c
->  create mode 100644 drivers/media/platform/ti-vpfe/vpfe_capture.h
->
-> --
-> 2.0.0.390.gcb682f8
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Jason.
