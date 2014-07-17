@@ -1,27 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Jul 2014 23:14:36 +0100
-Subject: [PATCH] ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
-In-Reply-To: <1405617110-1136-1-git-send-email-romain.perier@gmail.com>
-References: <1405617110-1136-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <20140717221436.GZ21766@n2100.arm.linux.org.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 18 Jul 2014 00:31:48 +0200
+Subject: [PATCH] ARM: config: update multi_v7_defconfig
+In-Reply-To: <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
+References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
+ <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
+Message-ID: <CABxcv==+cwoXA=WM3E7Zb62T0Epgqg_oH3UNU0vEe2DDPiCYPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 05:11:50PM +0000, Romain Perier wrote:
-> +static DECLARE_COMPLETION(cpu_died);
-> +
-> +static int rockchip_cpu_kill(unsigned int cpu)
-> +{
-> +	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(1000))) {
-> +		pr_err("CPU%d: didn't die correctly\n", cpu);
-> +		return 0;
-> +	}
+Hello,
 
-Please explain the point of this cpu_died thing.
+On Tue, Jul 15, 2014 at 5:59 PM, Doug Anderson <dianders@chromium.org> wrote:
+>
+> Is there a reason not to add more of the max77686 configs?
+>
+> +CONFIG_RTC_DRV_MAX77686=y
+> +CONFIG_COMMON_CLK_MAX77686=y
 
-I think you should read arch/arm/kernel/smp.c, searching for cpu_died
-in there.
+AFAIK for the multi-platform defconfig we should try to build as a
+module as many config options as possible to keep the kernel binary
+size to a minimum.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+In the case of the MAX77686, the mfd, regulator and clock drivers use
+subsys_initcall() instead of module_init() but I wonder which of these
+really need to be initialized at subsys init call time and which one
+can just be built as a module. The only MAX77686 driver that uses
+module_platform_driver() so it's initialized at device initcall time
+is the rtc-max77686 driver which ironically is the only MAX77686
+driver that doesn't define a MODULE_DEVICE_TABLE() so the module won't
+be autoloaded.
+
+Best regards,
+Javier
