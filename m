@@ -1,49 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 17 Jul 2014 12:04:26 -0400
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <5105942.b7kcvNdlC8@wuerfel>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <10673994.kkICTRHJxL@wuerfel> <20140717153401.GX21766@n2100.arm.linux.org.uk>
- <5105942.b7kcvNdlC8@wuerfel>
-Message-ID: <53C7F40A.800@ti.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 17 Jul 2014 18:06:59 +0200
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140717160206.GI10459@saruman.home>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
+ <20140716151604.GG1365@saruman.home> <53C6A050.2050409@linutronix.de>
+ <20140716160614.GI1365@saruman.home> <53C7EC6F.6060902@hurleysoftware.com>
+ <20140717154300.GA16623@linutronix.de> <20140717160206.GI10459@saruman.home>
+Message-ID: <53C7F4A3.5080508@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 July 2014 11:53 AM, Arnd Bergmann wrote:
-> On Thursday 17 July 2014 16:34:01 Russell King - ARM Linux wrote:
->> On Thu, Jul 17, 2014 at 04:40:21PM +0200, Arnd Bergmann wrote:
->>> On Thursday 17 July 2014 15:27:20 Will Deacon wrote:
->>>> Just an FYI, but I've had to check internally to clarify the behaviour
->>>> around TLB conflict aborts. We're changing live page tables here, but the
->>>> *only* thing to differ is the output address, which I would hope is ok but
->>>> need to check to be sure.
->>>
->>> The two cases are slightly different:
->>>
->>> - The existing keystone code changes the output address but not the flags
->>> - The hypothetical mvebu code needs to change the flags but not the address.
->>
->> Don't base too much confidence in the keystone code:
+On 07/17/2014 06:02 PM, Felipe Balbi wrote:
+>> diff --git a/drivers/tty/serial/8250/8250_core.c
+>> b/drivers/tty/serial/8250/8250_core.c index 2e4a93b..480a1c0
+>> 100644 --- a/drivers/tty/serial/8250/8250_core.c +++
+>> b/drivers/tty/serial/8250/8250_core.c @@ -1283,6 +1283,9 @@
+>> static inline void __stop_tx(struct uart_8250_port *p) if (p->ier
+>> & UART_IER_THRI) { p->ier &= ~UART_IER_THRI; serial_out(p,
+>> UART_IER, p->ier); + +		pm_runtime_mark_last_busy(p->port.dev); +
+>> pm_runtime_put_autosuspend(p->port.dev); } }
+>> 
+>> @@ -1310,12 +1313,12 @@ static void serial8250_start_tx(struct
+>> uart_port *port) struct uart_8250_port *up = container_of(port,
+>> struct uart_8250_port, port);
+>> 
+>> -	pm_runtime_get_sync(port->dev); if (up->dma &&
+>> !serial8250_tx_dma(up)) { goto out; } else if (!(up->ier &
+>> UART_IER_THRI)) { up->ier |= UART_IER_THRI; +
+>> pm_runtime_get_sync(port->dev); serial_port_out(port, UART_IER,
+>> up->ier);
+>> 
+>> if (up->bugs & UART_BUG_TXEN) { unsigned char lsr;
 > 
-> What I meant was that verifying the correctness of one of the two above
-> with the architecture team doesn't mean that the other one is okay too.
+> this looks better. So we get on start_tx() and put on stop_tx().
 > 
->>         map_start = init_mm.start_code;
->>         map_end   = init_mm.brk;
->>
->>         phys = __pa(map_start) & PMD_MASK;
->>         do {
->> ...
->>                 phys += PMD_SIZE;
->>         } while (phys < map_end);
->>
->> Consider what happens when map_end is not PMD aligned - it misses the
->> PMD covering the end of the kernel BSS, which will be quite a common
->> case.  Obviously something that needs fixing...
+>> @@ -1500,9 +1503,10 @@ void serial8250_tx_chars(struct
+>> uart_8250_port *up) uart_write_wakeup(port);
+>> 
+>> DEBUG_INTR("THRE..."); - +#if 0 if (uart_circ_empty(xmit)) 
+>> __stop_tx(up); +#endif } EXPORT_SYMBOL_GPL(serial8250_tx_chars);
 > 
-> Ouch.
-> 
-Thanks for spotting it RMK. Will have a loot at it.
+> is it so that start_tx() gets called one and stop_tx() might be
+> called N times ? That looks unbalanced to me. If the calls are
+> balanced, then you shouldn't need to care because pm_runtime will
+> handle reference counting for you, right?
 
-regards,
-Santosh
+No, this is okay. If you look, it checks for "up->ier &
+UART_IER_THRI". On the second invocation it will see that this bit is
+already set and therefore won't call get_sync() for the second time.
+That bit is removed in the _stop_tx() path.
+
+>> and now I need to come up with something that is not if (port !=
+>> omap) for that #if 0 block. The code disables the TX FIFO empty
+>> interrupt once the transfer is complete. I want to call
+>> __stop_tx() once the tx fifo is empty. Felipe, Would a check for
+>> dev->power.use_autosuspend be the right thing to do?
+> 
+> probably not, as that's internal to the pm_runtime code. But I
+> wonder if start/stop tx calls are balanced, if they are then we're
+> good. Unless I'm missing something else.
+
+Do you have other ideas? It doesn't look like this is exported at all.
+If we call _stop_tx() right away, then we have 64 bytes in the TX fifo
+in the worst case. They should be gone "soon" but the HW-flow control
+may delay it (in theory for a long time)).
+
+Sebastian
