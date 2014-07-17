@@ -1,70 +1,46 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Thu, 17 Jul 2014 12:18:11 +0800
-Subject: [PATCH v5 3/5] PCI: designware: enhance dw_pcie_host_init() to
- support v3.65 DW hardware
-In-Reply-To: <20140717033638.GI12278@pratyush-vbox>
-References: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
- <1405528686-16539-4-git-send-email-m-karicheri2@ti.com>
- <20140717033638.GI12278@pratyush-vbox>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB661A47A2A83BB@EAPEX1MAIL1.st.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Thu, 17 Jul 2014 09:51:21 +0530
+Subject: [PATCH 0/4 v2] hwmon: ntc_thermistor: prepose vendor prefix change
+In-Reply-To: <53AAD8C8.3080506@roeck-us.net>
+References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
+ <02b501cf9064$34f16b80$9ed44280$@samsung.com> <53AAD8C8.3080506@roeck-us.net>
+Message-ID: <CAHfPSqCGf2d6xXDGr974+4ipNsYx3-fOLT+u2OGN=c9FVPEkZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Kukjin,
+
+On 25 June 2014 19:42, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 06/25/2014 03:57 AM, Kukjin Kim wrote:
+>>
+>> Naveen Krishna Chatradhi wrote:
+>>>
+>>>
+>> + Jean Delvare, Guenter Roeck
+>>
+>> I'm adding maintainers for drivers/hwmon/ntc* but I'm not sure.
+>>
+>> Hi,
+>>
+>> This series looks good to me. I will take 3/4 and 4/4 for exynos DT
+>> changes once
+>> hwmon/ntc maintainer pick the others.
+>>
+>
+> I applied both patches. Currently going through my test cycle.
+> I'll send them to Linus Thursday or Friday.
+
+I see the 1/4 and 2/4 merged in togreg branch of
+http://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git
+
+Can you pull the 3/4 and 4/4 patches.
+
+>
+> Guenter
+>
 
 
-> -----Original Message-----
-> From: Pratyush ANAND
-> Sent: Thursday, July 17, 2014 9:07 AM
-> To: Murali Karicheri
-> Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Santosh Shilimkar; Russell King; Grant Likely; Rob
-> Herring; Mohit KUMAR DCG; Jingoo Han; Bjorn Helgaas; Richard Zhu; Kishon
-> Vijay Abraham I; Marek Vasut; Arnd Bergmann; Pawel Moll; Mark Rutland;
-> Ian Campbell; Kumar Gala; Randy Dunlap
-> Subject: Re: [PATCH v5 3/5] PCI: designware: enhance dw_pcie_host_init()
-> to support v3.65 DW hardware
-> 
-> On Thu, Jul 17, 2014 at 12:38:04AM +0800, Murali Karicheri wrote:
-> > keystone PCI controller is based on v3.65 designware hardware. This
-> > version differs from newer versions of the hardware in few functional
-> > areas discussed below that makes it necessary to change
-> > dw_pcie_host_init() to support v3.65 based PCI controller.
-> >
-> >  1. No support for ATU port. So any ATU specific resource handling code
-> >     is to be bypassed for v3.65 h/w.
-> >  2. MSI controller uses Application space to implement MSI and 32 MSI
-> >     interrupts are multiplexed over 8 IRQs to the host. Hence the code
-> >     to process MSI IRQ needs to be different. This patch allows platform
-> >     driver to provide its own irq_domain_ops ptr to irq_domain_add_linear()
-> >     through an API callback from the designware core driver.
-> >  3. MSI interrupt generation requires EP to write to the RC's application
-> >     register. So enhance the driver to allow setup of inbound access to
-> >     MSI irq register as a post scan bus API callback.
-> >
-> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> 
-> Looks almost ok to me.
-> 
-> Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
-> 
 
-- Now looks fine to me.
-
-Acked-by: Mohit KUMAR <mohit.kumar@st.com>
-
-Jingoo,
-After Murali's patches,  dw code can be used by  older Synopsys controller based driver too.
-Pls have a look at the series if you have any further comment.
-
-Thanks
-Mohit
-
-> >  int __init dw_pcie_host_init(struct pcie_port *pp)  {
-> >  	struct device_node *np = pp->dev->of_node;
-> > -	struct of_pci_range range;
-> >  	struct of_pci_range_parser parser;
-> > +	struct of_pci_range range;
-> 
-> You may avoid moving the above line.
-> 
-> ~Pratyush
+-- 
+Regards,
+(: Naveen :)
