@@ -1,54 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Jul 2014 16:40:21 +0200
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <20140717142720.GM21153@arm.com>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140717131224.GW21766@n2100.arm.linux.org.uk>
- <20140717142720.GM21153@arm.com>
-Message-ID: <10673994.kkICTRHJxL@wuerfel>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 17 Jul 2014 16:42:26 +0200
+Subject: [PATCH v3] ARM: EXYNOS: Fix suspend/resume sequences
+In-Reply-To: <53C53A1A.6060701@samsung.com>
+References: <53C51B57.9040404@samsung.com>
+ <1405434287-22710-1-git-send-email-t.figa@samsung.com>
+ <53C53A1A.6060701@samsung.com>
+Message-ID: <53C7E0D2.1050307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 July 2014 15:27:20 Will Deacon wrote:
-> On Thu, Jul 17, 2014 at 02:12:24PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jul 17, 2014 at 02:39:42PM +0200, Arnd Bergmann wrote:
-> > > On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
-> > > > No - the problem is that we're running from the page table in question
-> > > > with global mappings, and we need to switch all these mappings, including
-> > > > the ones we're currently using to execute from.
-> > > > 
-> > > > We can't even create a new page table and switch to it because the
-> > > > mappings in question are global mappings.
-> > > > 
-> > > > The only way to do that safely from an architectural point of view would
-> > > > be to turn the MMU off, and drop back to assembly code to change the
-> > > > page tables, and re-enable the MMU.  For something as obscure as Marvell's
-> > > > coherency stuff, that's not something I want to see in core code.
-> > > 
-> > > Is this different from what we do in the LPAE version of
-> > > early_paging_init()? That code already adjusts all the page
-> > > table entries on a per-platform setting and should be very
-> > > easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
-> > > and possibly able to extend for traditional (non-LPAE)
-> > > page tables without a lot of duplication.
-> > 
-> > I'm going to have to profess no knowledge of how the LPAE stuff works.
-> > LPAE is something I can't run, and something that I was not involved
-> > in its creation.  Therefore, I know very little about it and zero
-> > experience thereof.
-> > 
-> > From a glance over that function, I think that is unsafe for all the
-> > reasons I've stated.  However, I'll pass this over to Will Deacon
-> > to comment further on.
+Hi Kukjin,
+
+On 15.07.2014 16:26, Tomasz Figa wrote:
+> Forgot to CC Daniel and linux-pm. Sorry for the noise.
 > 
-> Just an FYI, but I've had to check internally to clarify the behaviour
-> around TLB conflict aborts. We're changing live page tables here, but the
-> *only* thing to differ is the output address, which I would hope is ok but
-> need to check to be sure.
+> On 15.07.2014 16:24, Tomasz Figa wrote:
+>> Due to recent consolidation of Exynos suspend and cpuidle code, some
+>> parts of suspend and resume sequences are executed two times, once from
+>> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+>> breaks suspend, at least on Exynos4-based boards. In addition, simple
+>> core power down from a cpuidle driver could, in case of CPU 0 could
+>> result in calling functions that are specific to suspend and deeper idle
+>> states.
+>>
+>> This patch fixes the issue by moving those operations outside the CPU PM
+>> notifier into suspend and AFTR code paths. This leads to a bit of code
+>> duplication, but allows additional code simplification, so in the end
+>> more code is removed than added.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/pm.c        | 164 ++++++++++++++++++---------------------
+>>  drivers/cpuidle/cpuidle-exynos.c |  25 +-----
+>>  2 files changed, 80 insertions(+), 109 deletions(-)
+>>
 
-The two cases are slightly different:
+Please consider this patch for next pull request with rc fixes. It
+replaces following patches posted in this thread:
 
-- The existing keystone code changes the output address but not the flags
-- The hypothetical mvebu code needs to change the flags but not the address.
+[PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
+[PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
 
-	Arnd
+and also similar patch by Chander:
+
+[PATCH 2/2] cpuidle: Exynos: fix cpuidle for all states
+
+Best regards,
+Tomasz
