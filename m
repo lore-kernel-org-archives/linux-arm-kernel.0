@@ -1,44 +1,71 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 17 Jul 2014 17:58:07 +0300
-Subject: [PATCH 1/3] ARM: dts: keystone: add mdio devices entries
-In-Reply-To: <1404911660-10047-2-git-send-email-grygorii.strashko@ti.com>
-References: <1404911660-10047-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1405609087-9128-1-git-send-email-grygorii.strashko@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Jul 2014 10:12:35 -0400
+Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+In-Reply-To: <20140717135534.GM30313@leverpostej>
+References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140717131854.GN13108@titan.lakedaemon.net>
+ <20140717135534.GM30313@leverpostej>
+Message-ID: <20140717141235.GR13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone 2 has MDIO HW block which are compatible
-to Davinci SoCs:
-See "Gigabit Ethernet (GbE) Switch Subsystem"
-  See http://www.ti.com/lit/ug/sprugv9d/sprugv9d.pdf
+On Thu, Jul 17, 2014 at 02:55:34PM +0100, Mark Rutland wrote:
+> Hi Jason,
+> 
+> On Thu, Jul 17, 2014 at 02:18:54PM +0100, Jason Cooper wrote:
+> > On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
+> > > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> > > 
+> > > This patch set introduces support for MSI(-X) in GICv2m specification,
+> > > which is implemented in some variation of GIC400.
+> > > 
+> > > This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
+> > > (https://lkml.org/lkml/2014/3/14/320).
+> > > 
+> > > Changes in V3:
+> > >     * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
+> > >       (per Jason Cooper request)
+> > >     * Misc fix/clean up per Mark Rutland comments
+> > >     * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
+> > >     * Patch 4 is new to the series:
+> > >         * Add ARM64-specific version arch_setup_msi_irqs() to allow support
+> > >           for Multiple MSI.
+> > >         * Add support for Multiple MSI for GICv2m.
+> > > 
+> > > Suravee Suthikulpanit (4):
+> > >   irqchip: gic: Add binding probe for ARM GIC400
+> > >   irqchip: gic: Restructuring ARM GIC code
+> > >   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+> > >   irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
+> > 
+> > Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
+> > irqchip/gic with irqchip/urgent merged in.  To facilitate
+> > testing/merging, I've prepared an unsigned tag for you on the
+> > irqchip/gic branch:
+> 
+> I'm a little concerned that this is all going through for v3.17 without
+> a {Reviewed,Acked}-by from Marc or anyone working with GIC{,v2m}.
 
-Hence, add corresponding DT entry for Keystone 2.
+Well, that's why it's not in irqchip/core yet. ;-)  It can be undone if
+needed.
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/keystone.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+> While his comments on v1 have been addressed, he has not had a chance to
+> acknowledge the solutions. I appreciate Marc's holiday is unfortunately
+> timed.
+> 
+> I also have an open concern with the binding with regard to the
+> orthogonality of GICV GICH and the MSI registers.
+> 
+> Suravee, do you need this urgently for v3.17? I was under the impression
+> that we wouldn't have full PCIe support by then.
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index c1414cb..9e31fe7 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -266,5 +266,16 @@
- 			ranges = <0 0 0x30000000 0x10000000
- 				  1 0 0x21000A00 0x00000100>;
- 		};
-+
-+		mdio: mdio at 02090300 {
-+			compatible	= "ti,keystone_mdio", "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg		= <0x02090300 0x100>;
-+			status = "disabled";
-+			clocks = <&clkpa>;
-+			clock-names = "fck";
-+			bus_freq	= <2500000>;
-+		};
- 	};
- };
--- 
-1.7.9.5
+If Suravee is ok with it, I can drop them for now and he can resend for
+v3.18.  Since we've worked out a way to merge it all in one window, I
+don't think it would hurt anything to wait.
+
+I'll leave these in irqchip/for-next until I hear from Suravee, then
+I'll drop the lot till we hear from Marc and look at the timing.
+
+thx,
+
+Jason.
