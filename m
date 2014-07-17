@@ -1,58 +1,88 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 17 Jul 2014 18:52:35 +0200
-Subject: [PATCH v2 5/5] i2c: tegra: Remove suspension check
-In-Reply-To: <20140717145958.GA32534@ulmo>
+Date: Thu, 17 Jul 2014 18:54:10 +0200
+Subject: [PATCH v3 3/5] i2c: exynos5: Remove suspension check
+In-Reply-To: <1405608520-5644-3-git-send-email-hechtb@gmail.com>
 References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
- <1405608520-5644-5-git-send-email-hechtb@gmail.com>
- <20140717145958.GA32534@ulmo>
-Message-ID: <CABYn4swY5yRe=eGzCYo0uJtmjn05Ut4oDWupPjmU9bXbuU6+Pw@mail.gmail.com>
+ <1405608520-5644-3-git-send-email-hechtb@gmail.com>
+Message-ID: <CABYn4swJfYhTbXA0zYG4Mncm2xSGjL8CQPyeEB_piQWE+wUyTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-17 16:59 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> On Thu, Jul 17, 2014 at 04:48:40PM +0200, Bastian Hecht wrote:
-> [...]
->>  #ifdef CONFIG_PM_SLEEP
->> -static int tegra_i2c_suspend(struct device *dev)
->> -{
->> -     struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
->> -
->> -     i2c_lock_adapter(&i2c_dev->adapter);
->> -     i2c_dev->is_suspended = true;
->> -     i2c_unlock_adapter(&i2c_dev->adapter);
->> -
->> -     return 0;
->> -}
->> -
->>  static int tegra_i2c_resume(struct device *dev)
->>  {
->>       struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
->> @@ -842,14 +827,12 @@ static int tegra_i2c_resume(struct device *dev)
->>               return ret;
->>       }
->>
->> -     i2c_dev->is_suspended = false;
->> -
->>       i2c_unlock_adapter(&i2c_dev->adapter);
->>
->>       return 0;
->>  }
->>
->> -static SIMPLE_DEV_PM_OPS(tegra_i2c_pm, tegra_i2c_suspend, tegra_i2c_resume);
->> +static SIMPLE_DEV_PM_OPS(tegra_i2c_pm, tegra_i2c_resume);
+2014-07-17 16:48 GMT+02:00 Bastian Hecht <hechtb@gmail.com>:
+> We now take care of suspension in the i2c core code. So we can remove this
+> check here.
 >
-> Shouldn't this be:
+> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+> ---
+> same as v1
 >
->         static SIMPLE_DEV_OPS(tegra_i2c_pm, NULL, tegra_i2c_resume);
+>  drivers/i2c/busses/i2c-exynos5.c | 20 +-------------------
+>  1 file changed, 1 insertion(+), 19 deletions(-)
 >
-> instead?
+> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+> index 63d2292..a80cf28 100644
+> --- a/drivers/i2c/busses/i2c-exynos5.c
+> +++ b/drivers/i2c/busses/i2c-exynos5.c
+> @@ -145,7 +145,6 @@
+>
+>  struct exynos5_i2c {
+>         struct i2c_adapter      adap;
+> -       unsigned int            suspended:1;
+>
+>         struct i2c_msg          *msg;
+>         struct completion       msg_complete;
+> @@ -610,11 +609,6 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+>         struct exynos5_i2c *i2c = adap->algo_data;
+>         int i = 0, ret = 0, stop = 0;
+>
+> -       if (i2c->suspended) {
+> -               dev_err(i2c->dev, "HS-I2C is not initialized.\n");
+> -               return -EIO;
+> -       }
+> -
+>         clk_prepare_enable(i2c->clk);
+>
+>         for (i = 0; i < num; i++, msgs++) {
+> @@ -757,16 +751,6 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
+>  }
+>
+>  #ifdef CONFIG_PM_SLEEP
+> -static int exynos5_i2c_suspend_noirq(struct device *dev)
+> -{
+> -       struct platform_device *pdev = to_platform_device(dev);
+> -       struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
+> -
+> -       i2c->suspended = 1;
+> -
+> -       return 0;
+> -}
+> -
+>  static int exynos5_i2c_resume_noirq(struct device *dev)
+>  {
+>         struct platform_device *pdev = to_platform_device(dev);
+> @@ -783,14 +767,12 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+>
+>         exynos5_i2c_init(i2c);
+>         clk_disable_unprepare(i2c->clk);
+> -       i2c->suspended = 0;
+>
+>         return 0;
+>  }
+>  #endif
+>
+> -static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, exynos5_i2c_suspend_noirq,
+> -                        exynos5_i2c_resume_noirq);
+> +static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, exynos5_i2c_resume_noirq);
 
-Oh yes thanks. I made the same mistake in [PATCH 3/5] too.
+This should be
 
-Thanks,
++static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, NULL,
+exynos5_i2c_resume_noirq);
 
- Bastian
+And this is v2, not v3.
 
-
-
-> Thierry
+>  static struct platform_driver exynos5_i2c_driver = {
+>         .probe          = exynos5_i2c_probe,
+> --
+> 1.9.1
+>
