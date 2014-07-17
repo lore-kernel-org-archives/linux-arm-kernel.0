@@ -1,5 +1,5 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 17 Jul 2014 13:09:00 +0200
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 17 Jul 2014 12:12:48 +0100
 Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
 In-Reply-To: <20140717105415.GI21153@arm.com>
 References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
@@ -7,66 +7,49 @@ References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
  <20140716155747.GR29414@arm.com>
  <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
  <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
-Message-ID: <7A8C9348-D1B3-401C-B667-175AEEFF684A@linaro.org>
+Message-ID: <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On 17 jul. 2014, at 12:54, Will Deacon <will.deacon@arm.com> wrote:
-> 
->> On Thu, Jul 17, 2014 at 11:46:24AM +0100, Marcus Shawcroft wrote:
->>> On 17/07/14 11:39, Peter Maydell wrote:
->>>> On 16 July 2014 16:57, Will Deacon <will.deacon@arm.com> wrote:
->>>> I don't have hugely strong opinions about this, but I don't see why it's
->>>> useful to print exactly the same line out `n' times; once for each CPU. We
->>>> only pass one set of hwcaps to ELF executables via auxv, so why do we need
->>>> to duplicate things here?
->>> 
->>> I think there are a couple of lines of argument here:
->>> 
->>> (1) Precedent from other architectures. Both 32-bit ARM and
->>> x86 have the feature-info be per-core; we should do the same
->>> for 64-bit ARM unless there's a really strong reason not to.
->> 
->> Agreed.
-> 
+On 17 July 2014 11:54, Will Deacon <will.deacon@arm.com> wrote:
 > I don't really see the benefits of pretending that /proc/cpuinfo is remotely
 > portable between architectures.
-> 
->>> (2) Making this be not-per-CPU backs us into a corner. If we
->>> have the feature flags per-core, and it turns out that they're
->>> never ever different between cores even on heterogenous
->>> CPUs, there's no problem. If we have the feature flags be
->>> listed only once, and then in future we do want to support
->>> some minor form of heterogeny between cores, then we're
->>> stuck with a compatibility break because the format doesn't
->>> let us express that. (Perhaps there might be a big.LITTLE
->>> system where only the big cores had the crypto extensions,
->>> to pick a random possibility where the kernel doesn't need to
->>> care but userspace could take advantage by restricting itself
->>> to running on only the big cores). I think this makes the
->>> choice pretty straightforward, since there's basically no
->>> benefit to having only a single features line.
->> 
->> Agreed.
-> 
+
+I'm not suggesting it's portable. I'm suggesting that you need
+a good reason to push backwards against a design decision
+made on other architectures. In particular, given that ARM is
+in general *more* likely to be heterogenous than x86 (given
+the existence of big.LITTLE), it seems baffling to try to move
+in a direction that denies the possibility of further heterogeneity
+in future.
+
 > So the real question is: do we want to allow Linux to support features that
 > exist only on a subset of cores in the system? The current thinking is that
 > we truncate the advertised features to the common system subset, which means
 > it will be the same on all cores, by definition. That allows hardware guys
 > to build crazy systems that we can at least use, without imparting a world
 > of pain onto software that needs to run on them.
-> 
+
+I've already made one suggestion (non-pervasive crypto).
+You could also envisage "feature bits" that effectively mean
+"things will be faster on this core" even if they still work on
+other cores too.
+
 > I also think that we're backed into a corner regardless. We've seen how
 > people ignore hwcaps (e.g. SWP), so they're likely to parse the caps for
 > CPU0 and use that as an indication of the system capabilities.
-> 
+
+Certainly userspace *can* do the wrong thing. That doesn't
+necessarily mean that the kernel should only ever provide the
+API equivalent of safety scissors...
+
 > Note that the features list *isn't* just the features supported by the CPU.
 > It also takes into account the set of features supported by the kernel (e.g.
 > we don't advertise VFP on ARMv7 if VFP context switching isn't enabled).
 
-So obviously, we shouldn't use hwcaps derived from cpu #0 to report cpu capabilities for all cpus. Why can't we have a single hwcaps line, and then a capabilties line for each cpu containing the 'raw' capability flags read straight from the cpu in question?
+This is an argument for also advertising the lowest-common-denominator
+feature bits. (Do you want to argue for a single "features:" line
+plus per-core "extra-features:" lines?)
 
--- 
-Ard.
+thanks
+-- PMM
