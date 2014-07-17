@@ -1,94 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Jul 2014 11:17:52 +0100
-Subject: [PATCH v1] ARM: rockchip: Add cpu hotplug support
-In-Reply-To: <53C6C6CC.2050508@gmail.com>
-References: <53C6C6CC.2050508@gmail.com>
-Message-ID: <20140717101752.GH30313@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 11:18:41 +0100
+Subject: [PATCH 0/6] ARM: rockchip: add initial support for rk3288
+In-Reply-To: <1471578.ILeMmG2DL6@diego>
+References: <1471578.ILeMmG2DL6@diego>
+Message-ID: <20140717101841.GF21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 07:39:08PM +0100, Romain Perier wrote:
-> Hi all,
+On Tue, Jul 15, 2014 at 11:58:00PM +0100, Heiko St?bner wrote:
+> This series adds the initial support for Rockchip rk3288 socs including
+> debug uart and devicetree files for the rk3288 evaluation board and
+> enables these boards to boot into an initramfs.
 > 
-> This patch adds support for cpu hotplug for rockchip SoCs. You can now 
-> use kexec with rockchip compatible devices.
-> That's my first patch to the kernel, so perhaps that there are missing 
-> things (I am sorry if this is the case).
+> The series depends on an updated bootloader, which must start the timer
+> supplying the architected timer, which we will hopefully get in the next
+> days. It also depends on the patch
+>     "irqchip: gic: Add binding probe for ARM GIC400"
+> which will hopefully make it into the irqchip tree shortly.
 > 
 > 
-> Regards,
-> Romain
-> 
-> From 6727523766e3711ab58b2276d2e60bee0f7b7ba8 Mon Sep 17 00:00:00 2001
-> From: Romain Perier <romain.perier@gmail.com>
-> Date: Tue, 15 Jul 2014 19:38:05 +0000
-> Subject: [PATCH] Add cpu hotplug support
+> Heiko Stuebner (6):
+>   dt-bindings: arm: add arm,cortex-a12 cpu compatible property
+>   ARM: rockchip: add debug uart used by rk3288
+>   ARM: Kconfig: set default gpio number for rockchip SoCs
+>   ARM: rockchip: enable support for RK3288 SoCs
+>   ARM: dts: rockchip: add core rk3288 dtsi
+>   ARM: dts: add rk3288 evaluation board
 
-This needs a message and sign-off. Please read
-Documentation/SubmittingPatches.
+For the series:
 
-Use scripts/get_maintainer.pl to find out who to Cc.
+  Tested-by: Will Deacon <will.deacon@arm.com>
 
-> 
-> ---
->  arch/arm/mach-rockchip/platsmp.c | 33 ++++++++++++++++++++++++++++++++-
->  1 file changed, 32 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index 910835d..7cdcf5f 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of_address.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
->  #include <asm/smp_scu.h>
->  #include <asm/smp_plat.h>
->  #include <asm/mach/map.h>
-> @@ -178,8 +179,38 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->  		pmu_set_power_domain(0 + i, false);
->  }
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static DECLARE_COMPLETION(cpu_died);
-> +
-> +static int rockchip_cpu_kill(unsigned int cpu)
-> +{
-> +	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(1000))) {
-> +		pr_err("CPU%d: didn't die correctly\n", cpu);
-> +		return 0;
-> +	}
-> +	pmu_set_power_domain(0 + cpu, false);
-> +	return 1;
-> +}
-> +
-> +
-> +static void rockchip_cpu_die(unsigned int cpu)
-> +{
-> +	complete(&cpu_died);
-> +	flush_cache_louis();
-> +
-> +	v7_exit_coherency_flush(louis);
+Cheers Heiko!
 
-Two flushes?
-
-> +
-> +	while(1)
-> +		cpu_do_idle();
-> +}
-> +#endif
-> +
->  static struct smp_operations rockchip_smp_ops __initdata = {
->  	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
-> -	.smp_boot_secondary	= rockchip_boot_secondary,
-> +	.smp_boot_secondary	= rockchip_boot_secondary
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	, .cpu_kill		= rockchip_cpu_kill,
-> +	.cpu_die		= rockchip_cpu_die
-
-Just put commas on the end of all lines. It's perfectly valid to have a
-trailing comma even when there are no other fields.
-
-Thanks,
-Mark.
+Will
