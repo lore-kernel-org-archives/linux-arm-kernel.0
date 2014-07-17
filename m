@@ -1,68 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Jul 2014 17:58:33 +0200
-Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
- read from DT
-In-Reply-To: <20140717155105.GT13108@titan.lakedaemon.net>
-References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
- <20140717153236.GS13108@titan.lakedaemon.net> <53C7EE82.6040803@samsung.com>
- <20140717155105.GT13108@titan.lakedaemon.net>
-Message-ID: <53C7F2A9.1080508@samsung.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 17 Jul 2014 09:00:46 -0700
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <53B6D66B.9070608@redhat.com>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
+ <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
+ <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
+ <20140611070352.GC24286@lvm> <53A0EE60.6030508@samsung.com>
+ <20140703150401.GE20104@cbox> <53B6D66B.9070608@redhat.com>
+Message-ID: <53C7F32E.2030307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.07.2014 17:51, Jason Cooper wrote:
-> On Thu, Jul 17, 2014 at 05:40:50PM +0200, Tomasz Figa wrote:
->> Hi Jason,
+On 07/04/2014 09:29 AM, Paolo Bonzini wrote:
+> Il 03/07/2014 17:04, Christoffer Dall ha scritto:
+>> Hmmm, I'm really not an expert in the 'established procedures' for what
+>> to put in config files etc., but here's my basic take:
 >>
->> On 17.07.2014 17:32, Jason Cooper wrote:
->>> On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
->>>> Certain GIC implementation, namely those found on earlier, single
->>>> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
->>>> which means that the driver needs to use different offset for each CPU.
->>>>
->>>> Currently the driver calculates the offset by multiplying value returned
->>>> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
->>>> CPU topology is not specified in DT and aforementioned function returns
->>>> core ID alone. However when DT contains CPU topology, the function
->>>> changes to return cluster ID as well, which is non-zero on mentioned
->>>> SoCs and so breaks the calculation in GIC driver.
->>>>
->>>> This patch fixes this by masking out cluster ID in CPU offset
->>>> calculation so that only core ID is considered. Multi-cluster Exynos
->>>> SoCs already have banked GIC implementations, so this simple fix should
->>>> be enough.
->>>>
->>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->>>> ---
->>>>  drivers/irqchip/irq-gic.c | 5 ++++-
->>>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>
->>> iiuc, this was introduced by:
->>>
->>>   db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
->>>
->>> and so should be for v3.3 and up, correct?
+>> a) you wouldn't put a config option in Kconfig unless it's comething
+>> that's actually configurable or some generic feature/subsystem that
+>> should only be enabled if hardware has certain capabilities or other
+>> config options enabled.
 >>
->> Could be, although there was and still is no topology data specified in
->> DT for affected Exynos SoCs. The need for it showed up just recently, so
->> I'm not sure this is a regression to fix in older kernels.
+>> b) this seems entirely an implementation issue and not depending on
+>> anything users should select.
 > 
-> In my "the kernel and the dtb aren't tied together" quest, these are the
-> kinds of things I like to see fixed in stable kernels.
+> Actually I think Mario's idea is just fine.  Non-user-accessible Kconfig
+> symbols are used a lot to invoke an #ifdef elsewhere in the code;
+> compare this with his proposal is a bit different but not too much.
 > 
-> If a user needs to update a dtb, say to fix a bug, it's reasonable to
-> use the newest one for a given board.  After all, any new nodes won't
-> change anything, since the driver in the kernel won't match the node.
+> Sometimes #defines are used, sometimes Kconfig symbols, but the idea is
+> the same.
 > 
-> However, in this case, without this fix, a user upgrading to the newest
-> dtb would get a broken system.  So, this fix should be backported to
-> prevent the breakage.  Or, have I missed something in my analysis?
+> Paolo
 
-This is correct when looking only at this issue. However I suspect such
-move would cause a breakage anyway, because DT stuff isn't that stable
-on Exynos side. I don't mind if this patch hits stable, though.
+Hi Paolo,
+  thanks for your feedback. I forgot to add that I tried define 
+ARCH_HAVE_... approach but checkpatch rejected it and insisted
+on Kconfig.
 
-Best regards,
-Tomasz
+Thanks,
+- Mario
