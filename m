@@ -1,77 +1,37 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 17 Jul 2014 16:48:40 +0200
-Subject: [PATCH v2 5/5] i2c: tegra: Remove suspension check
-In-Reply-To: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-Message-ID: <1405608520-5644-5-git-send-email-hechtb@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 Jul 2014 15:50:02 +0100
+Subject: [PATCH] arm64: audit: Fix build for audit changes
+In-Reply-To: <20140717115937.GF18203@arm.com>
+References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
+ <20140717115937.GF18203@arm.com>
+Message-ID: <20140717145002.GW17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now take care of suspension in the i2c core code. So we can remove this
-check here.
+On Thu, Jul 17, 2014 at 12:59:38PM +0100, Catalin Marinas wrote:
+> On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
 
-Signed-off-by: Bastian Hecht <hechtb@gmail.com>
----
-same as v1
+> > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
+> > interface) removed the arch parameter from __audit_syscall_entry() and
 
- drivers/i2c/busses/i2c-tegra.c | 19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+> Thanks. This will have to be applied after 3.17-rc1 since commit
+> 3efe33f5d2 does not seem to be in mainline yet (nor the arm64 audit
+> patches).
 
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index f1bb2fc..c279d85 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -172,7 +172,6 @@ struct tegra_i2c_dev {
- 	size_t msg_buf_remaining;
- 	int msg_read;
- 	u32 bus_clk_rate;
--	bool is_suspended;
- };
- 
- static void dvc_writel(struct tegra_i2c_dev *i2c_dev, u32 val, unsigned long reg)
-@@ -628,9 +627,6 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
- 	int i;
- 	int ret = 0;
- 
--	if (i2c_dev->is_suspended)
--		return -EBUSY;
--
- 	ret = tegra_i2c_clock_enable(i2c_dev);
- 	if (ret < 0) {
- 		dev_err(i2c_dev->dev, "Clock enable failed %d\n", ret);
-@@ -817,17 +813,6 @@ static int tegra_i2c_remove(struct platform_device *pdev)
- }
- 
- #ifdef CONFIG_PM_SLEEP
--static int tegra_i2c_suspend(struct device *dev)
--{
--	struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
--
--	i2c_lock_adapter(&i2c_dev->adapter);
--	i2c_dev->is_suspended = true;
--	i2c_unlock_adapter(&i2c_dev->adapter);
--
--	return 0;
--}
--
- static int tegra_i2c_resume(struct device *dev)
- {
- 	struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
-@@ -842,14 +827,12 @@ static int tegra_i2c_resume(struct device *dev)
- 		return ret;
- 	}
- 
--	i2c_dev->is_suspended = false;
--
- 	i2c_unlock_adapter(&i2c_dev->adapter);
- 
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(tegra_i2c_pm, tegra_i2c_suspend, tegra_i2c_resume);
-+static SIMPLE_DEV_PM_OPS(tegra_i2c_pm, tegra_i2c_resume);
- #define TEGRA_I2C_PM	(&tegra_i2c_pm)
- #else
- #define TEGRA_I2C_PM	NULL
--- 
-1.9.1
+That's not great and is kind of missing the point of -next - the core
+idea is to find these inter-tree dependencies, ensure things work when
+they're merged together and avoid things like massive bisection breaks.
+Leaving things also causes problems for anyone trying to do integration
+testing on -next.
+
+What would be better would be if we could get the two trees synced up,
+in this case something like picking the audit change up in the ARMv8
+tree (or vice versa) seems like it'd be quick and easy since it looks
+like neither tree uses topic branches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/eb7fde8e/attachment-0001.sig>
