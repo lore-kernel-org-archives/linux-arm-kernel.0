@@ -1,36 +1,70 @@
-From: behanw@converseincode.com (Behan Webster)
-Date: Wed, 16 Jul 2014 21:17:43 -0700
-Subject: [PATCH 0/6] LLVMLinux: Patches to enable the kernel to be compiled
- with clang/LLVM
-In-Reply-To: <alpine.LFD.2.11.1407130508580.3647@knanqh.ubzr>
-References: <1404850576-2006-1-git-send-email-behanw@converseincode.com>
- <alpine.LFD.2.11.1407130508580.3647@knanqh.ubzr>
-Message-ID: <53C74E67.9050401@converseincode.com>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Thu, 17 Jul 2014 12:18:11 +0800
+Subject: [PATCH v5 3/5] PCI: designware: enhance dw_pcie_host_init() to
+ support v3.65 DW hardware
+In-Reply-To: <20140717033638.GI12278@pratyush-vbox>
+References: <1405528686-16539-1-git-send-email-m-karicheri2@ti.com>
+ <1405528686-16539-4-git-send-email-m-karicheri2@ti.com>
+ <20140717033638.GI12278@pratyush-vbox>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB661A47A2A83BB@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/14 02:10, Nicolas Pitre wrote:
-> On Tue, 8 Jul 2014, behanw at converseincode.com wrote:
->
->> From: Behan Webster <behanw@converseincode.com>
->>
->> The LLVMLinux project aims to fully build the Linux kernel using both gcc and
->> clang (the C front end for the LLVM compiler infrastructure project).
->>
->> Clang only supports global named registers for non-allocatable registers like
->> the stack pointer. By centralizing the definition of current_stack_pointer, the
->> use of named registers for ARM remains largely unchanged while working for both
->> gcc and clang.
-> You verified that the compiled code is identical on gcc?
-Yes. Identical.
 
->    If so:
->
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-Thanks,
 
-Behan
+> -----Original Message-----
+> From: Pratyush ANAND
+> Sent: Thursday, July 17, 2014 9:07 AM
+> To: Murali Karicheri
+> Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Santosh Shilimkar; Russell King; Grant Likely; Rob
+> Herring; Mohit KUMAR DCG; Jingoo Han; Bjorn Helgaas; Richard Zhu; Kishon
+> Vijay Abraham I; Marek Vasut; Arnd Bergmann; Pawel Moll; Mark Rutland;
+> Ian Campbell; Kumar Gala; Randy Dunlap
+> Subject: Re: [PATCH v5 3/5] PCI: designware: enhance dw_pcie_host_init()
+> to support v3.65 DW hardware
+> 
+> On Thu, Jul 17, 2014 at 12:38:04AM +0800, Murali Karicheri wrote:
+> > keystone PCI controller is based on v3.65 designware hardware. This
+> > version differs from newer versions of the hardware in few functional
+> > areas discussed below that makes it necessary to change
+> > dw_pcie_host_init() to support v3.65 based PCI controller.
+> >
+> >  1. No support for ATU port. So any ATU specific resource handling code
+> >     is to be bypassed for v3.65 h/w.
+> >  2. MSI controller uses Application space to implement MSI and 32 MSI
+> >     interrupts are multiplexed over 8 IRQs to the host. Hence the code
+> >     to process MSI IRQ needs to be different. This patch allows platform
+> >     driver to provide its own irq_domain_ops ptr to irq_domain_add_linear()
+> >     through an API callback from the designware core driver.
+> >  3. MSI interrupt generation requires EP to write to the RC's application
+> >     register. So enhance the driver to allow setup of inbound access to
+> >     MSI irq register as a post scan bus API callback.
+> >
+> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> Looks almost ok to me.
+> 
+> Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
+> 
 
--- 
-Behan Webster
-behanw at converseincode.com
+- Now looks fine to me.
+
+Acked-by: Mohit KUMAR <mohit.kumar@st.com>
+
+Jingoo,
+After Murali's patches,  dw code can be used by  older Synopsys controller based driver too.
+Pls have a look at the series if you have any further comment.
+
+Thanks
+Mohit
+
+> >  int __init dw_pcie_host_init(struct pcie_port *pp)  {
+> >  	struct device_node *np = pp->dev->of_node;
+> > -	struct of_pci_range range;
+> >  	struct of_pci_range_parser parser;
+> > +	struct of_pci_range range;
+> 
+> You may avoid moving the above line.
+> 
+> ~Pratyush
