@@ -1,78 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Jul 2014 19:12:45 +0200
-Subject: [PATCH 1/8] ARM: Add platform support for Fujitsu MB86S7X SoCs
-In-Reply-To: <CAJe_ZhdM88x883DqxerW-JWpVeiFR9yA7s_=gpPZ7w1qPDJR=A@mail.gmail.com>
-References: <1405232911-4569-1-git-send-email-mollie.wu@linaro.org>
- <13950816.fBdtyDiPqD@wuerfel>
- <CAJe_ZhdM88x883DqxerW-JWpVeiFR9yA7s_=gpPZ7w1qPDJR=A@mail.gmail.com>
-Message-ID: <13232839.EhWsHsNIV6@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 17 Jul 2014 18:13:33 +0100
+Subject: [RFC PATCH] usb: dwc3: core: allow vendor drivers to check probe
+ status
+Message-ID: <1405617213-27360-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 July 2014 22:24:43 Jassi Brar wrote:
-> On 17 July 2014 19:18, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 17 July 2014 19:02:53 Jassi Brar wrote:
+This patch provides mechanism for subordinate devices to check
+whether the DWC3 core probed successfully or otherwise.  Useful
+if PHYs are required to configure controllers, but aren't yet
+available.  The DWC3 core driver will defer probe if PHYs are
+unavailable, however subordinate DWC3 drivers currently do not
+have any visibility or means to check status - until now.
 
-> >> From a few hundred micro-sec for CPU reset, to potentially tens of
-> >> milli-sec for some I2C transaction ... yes we do have for I2C over
-> >> mailbox! ;)
-> >>
-> >> Probably bailing out of the loop and returning -ETIMEOUT to the
-> >> caller, before a WARN(), is the simplest way to die.
-> >
-> > If you can have multiple miliseconds here, I think the code should
-> > be changed to run in non-atomic context and use msleep(1) or
-> > usleep_range() as a back-off. Is that possible?
-> >
-> I don't think we could sleep there but that should be ok because the
-> code is used only when we don't have mailbox framework ready i.e, in
-> very early boot before timers are ready and also as late as during
-> reboot/poweroff. Also I realize long delays like those for I2C would
-> never use this code - they would always have mailbox usable during
-> their lifetime.
+Another way to do this would be to *_phy_get*(), but if every
+driver did this it would create a high level of code
+duplication.
 
-Ok, just add a comment then, and a warning if things take too long.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/usb/dwc3/core.c | 12 ++++++++++++
+ drivers/usb/dwc3/core.h |  1 +
+ 2 files changed, 13 insertions(+)
 
-> >> >> >> +struct mb86s7x_peri_clk {
-> >> >> >> +     u32 payload_size;
-> >> >> >> +     u32 cntrlr;
-> >> >> >> +     u32 domain;
-> >> >> >> +     u32 port;
-> >> >> >> +     u32 en;
-> >> >> >> +     u64 freqency;
-> >> >> >> +} __packed;
-> >> >> >
-> >> >> > Just mark the last member by itself __packed. I assume you didn't
-> >> >> > actually mean to change the alignment of the data structure to one
-> >> >> > byte, but just want to say that the last one is misaligned.
-> >> >> >
-> >> >> This and others, are data packets that are passed between local and
-> >> >> remote via SharedMemory. __packed is only meant to specify that these
-> >> >> data structures have no holes in them.
-> >> >
-> >> > That would be '__packed __attribute__((aligned(4)))'. A struct of 'u32'
-> >> > already has no padding on any architecture that is supported by Linux.
-> >> > The only reason you need the packing here is because the u64 member is
-> >> > unaligned. Note that marking the entire structure as packed means that
-> >> > accesses are no longer atomic because the compiler may prefer to do them
-> >> > one byte at a time, which can break the protocol on the shared memory
-> >> > area.
-> >> >
-> >> We are not worried about the atomic access because the side sending
-> >> the data doesn't touch it until the other side indicates it has
-> >> consumed it.
-> >
-> > It's still wrong though ;-)
-> >
-> The remote f/w expects data to be contiguous and we can't assume how
-> it reads the packet. So our firstmost priority is to have no holes in
-> the region... like, say, USB descriptors.
-
-The structures being contiguous is guaranteed by the ELF ABI, unless
-you have unaligned members.
-
-You can be explicit about it, but then you should also provide a
-new minimum alignment (e.g. 4 bytes) for the structure to avoid
-having the compiler turn everything into bytewise accesses.
-
-	Arnd
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index eb69eb9..171ca52 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -47,6 +47,14 @@
+ 
+ /* -------------------------------------------------------------------------- */
+ 
++static bool is_enabled = false;
++
++int dwc3_is_enabled(void)
++{
++	return is_enabled;
++}
++EXPORT_SYMBOL(dwc3_is_enabled);
++
+ void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
+ {
+ 	u32 reg;
+@@ -757,6 +765,8 @@ static int dwc3_probe(struct platform_device *pdev)
+ 
+ 	pm_runtime_allow(dev);
+ 
++	is_enabled = true;
++
+ 	return 0;
+ 
+ err3:
+@@ -786,6 +796,8 @@ static int dwc3_remove(struct platform_device *pdev)
+ {
+ 	struct dwc3	*dwc = platform_get_drvdata(pdev);
+ 
++	is_enabled = false;
++
+ 	usb_phy_set_suspend(dwc->usb2_phy, 1);
+ 	usb_phy_set_suspend(dwc->usb3_phy, 1);
+ 	phy_power_off(dwc->usb2_generic_phy);
+diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+index 57332e3..94dee86 100644
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -906,6 +906,7 @@ struct dwc3_gadget_ep_cmd_params {
+ /* prototypes */
+ void dwc3_set_mode(struct dwc3 *dwc, u32 mode);
+ int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc);
++int dwc3_is_enabled(void);
+ 
+ #if IS_ENABLED(CONFIG_USB_DWC3_HOST) || IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
+ int dwc3_host_init(struct dwc3 *dwc);
+-- 
+1.8.3.2
