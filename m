@@ -1,55 +1,66 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 17 Jul 2014 12:12:48 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140717105415.GI21153@arm.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
- <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
-Message-ID: <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 17 Jul 2014 19:19:15 +0800
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <5456516.0fVZeXjF8k@wuerfel>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <22032517.gk8PRUMaIU@wuerfel>
+ <93903d5fdf85427bb8a418894540c122@BN1PR0301MB0772.namprd03.prod.outlook.com>
+ <5456516.0fVZeXjF8k@wuerfel>
+Message-ID: <20140717111912.GA16025@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2014 11:54, Will Deacon <will.deacon@arm.com> wrote:
-> I don't really see the benefits of pretending that /proc/cpuinfo is remotely
-> portable between architectures.
+On Thu, Jul 17, 2014 at 12:21:56PM +0200, Arnd Bergmann wrote:
+> On Thursday 17 July 2014 01:20:54 Peter Chen wrote:
+> > Thanks, arnd.
+> > 
+> > For chipidea generic glue layer case, if there are three devices who use this
+> > driver, and all devices have 32-bit bus, some devices have less 32 address lines.
+> > For example:
+> > 
+> > - the device_a doesn't need to use dma_mask
+> > - the device_b needs dma_mask as 0xfffffffff
+> > - the device_c needs dma_mask as 0xfffffff0, assume it has only 28 address lines
+> 
+> This makes no sense. You always need a dma mask, so the first case doesn't exist,
+> and the second one is the default.
+> 
+> In the third case, I assume you mean 0x0fffffff, which is a 28-bit mask.
+> 
+> > My questions are:
+> > - Can we not set dma_mask at driver, and only set dma-ranges at dts for device_b
+> > and device_c as a solution to cover this different dma mask use case?
+> 
+> try to understand my earlier reply. What is the problem with device_b?
+> Is that a limitation of the bus it is connected to, or the version of the
+> chipidea hardware?
+> 
+> > - If we can't use this solution, would you suggest one?
+> 
+> It depends on what the requirement of the hardware is, as I explained
+> now for three times.
+> 
 
-I'm not suggesting it's portable. I'm suggesting that you need
-a good reason to push backwards against a design decision
-made on other architectures. In particular, given that ARM is
-in general *more* likely to be heterogenous than x86 (given
-the existence of big.LITTLE), it seems baffling to try to move
-in a direction that denies the possibility of further heterogeneity
-in future.
+Thanks, Arnd.
 
-> So the real question is: do we want to allow Linux to support features that
-> exist only on a subset of cores in the system? The current thinking is that
-> we truncate the advertised features to the common system subset, which means
-> it will be the same on all cores, by definition. That allows hardware guys
-> to build crazy systems that we can at least use, without imparting a world
-> of pain onto software that needs to run on them.
+Currently, we are designing a generic driver, we don't know what's the
+hardware architecture, we are trying to find a solution how to set
+dma mask for all possible devices which will use this driver, Antoine's
+this patch is trying to cover this feature.
 
-I've already made one suggestion (non-pervasive crypto).
-You could also envisage "feature bits" that effectively mean
-"things will be faster on this core" even if they still work on
-other cores too.
+For example, 
 
-> I also think that we're backed into a corner regardless. We've seen how
-> people ignore hwcaps (e.g. SWP), so they're likely to parse the caps for
-> CPU0 and use that as an indication of the system capabilities.
+Marvell Berlin doesn't need to set dma mask specific.
+http://marc.info/?l=linux-arm-kernel&m=140205228507045&w=2
+http://www.spinics.net/lists/linux-usb/msg110598.html
 
-Certainly userspace *can* do the wrong thing. That doesn't
-necessarily mean that the kernel should only ever provide the
-API equivalent of safety scissors...
+Xilinx zynq needs to set dma mask as 0xFFFFFFF0
+http://marc.info/?l=linux-usb&m=140384129921706&w=2
 
-> Note that the features list *isn't* just the features supported by the CPU.
-> It also takes into account the set of features supported by the kernel (e.g.
-> we don't advertise VFP on ARMv7 if VFP context switching isn't enabled).
+FSL i.mx needs to set dma mask as DMA_BIT_MASK(32)
+https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/tree/drivers/usb/chipidea/ci_hdrc_imx.c?h=usb-next
 
-This is an argument for also advertising the lowest-common-denominator
-feature bits. (Do you want to argue for a single "features:" line
-plus per-core "extra-features:" lines?)
+-- 
 
-thanks
--- PMM
+Best Regards,
+Peter Chen
