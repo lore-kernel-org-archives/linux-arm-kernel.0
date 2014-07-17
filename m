@@ -1,35 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Jul 2014 08:55:49 +0900
-Subject: [PATCH 2/2] ARM: shmobile: defconfig: Remove MACH_GENMAI
-In-Reply-To: <cover.1405640905.git.horms+renesas@verge.net.au>
-References: <cover.1405640905.git.horms+renesas@verge.net.au>
-Message-ID: <92db2b7af591d3c3212183a34856b4cb190b6999.1405640905.git.horms+renesas@verge.net.au>
+Date: Fri, 18 Jul 2014 08:59:25 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Cleanups Updates for v3.17
+Message-ID: <cover.1405641497.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The CONFIG_MACH_GENMAI is scheduled for removal so remove it from
-shmobile_defconfig.
+Please consider these Renesas ARM based SoC Boards Cleanups updates for v3.17.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-[horms+renesas at verge.net.au: revised changelog for updated commit order]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+This pull request is based on a merge of:
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 6bc85a5..3b13614 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -14,7 +14,6 @@ CONFIG_ARCH_R7S72100=y
- CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
- CONFIG_ARCH_R8A7791=y
--CONFIG_MACH_GENMAI=y
- CONFIG_MACH_KOELSCH=y
- CONFIG_MACH_LAGER=y
- CONFIG_MACH_MARZEN=y
--- 
-2.0.1
+* "Fourth Round of Renesas ARM Based SoC Defconfig Updates for v3.17",
+  tagged as renesas-defconfig4-for-v3.17,
+  which I have sent a pull request for.
+
+  The reason for this dependency is to avoid attempts to use
+  genmai_defconfig after the board code it relies on has been removed.
+
+* "Renesas ARM Based SoC DT Timers Updates for v3.17",
+  tagged as renesas-dt-timers-for-v3.17,
+  which I have sent a pull request for.
+
+
+The following changes since commit b34fd6184cf689db8570d89c66b9ab9742c3e813:
+
+  Merge branch 'defconfig-for-v3.17' into cleanup-boards-for-v3.17.base (2014-07-17 00:03:15 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boards-for-v3.17
+
+for you to fetch changes up to 53b04e7fb3b28517ff86a7ac9fcff86101fe6d5a:
+
+  ARM: shmobile: r7s72100: Remove legacy board support (2014-07-17 00:14:44 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Boards Cleanups for v3.17
+
+Remove Genmai board code
+
+----------------------------------------------------------------
+Laurent Pinchart (3):
+      ARM: shmobile: r7s72100: genmai: Remove reference board file
+      ARM: shmobile: r7s72100: genmai: Remove legacy board file
+      ARM: shmobile: r7s72100: Remove legacy board support
+
+ arch/arm/mach-shmobile/Kconfig                  |  17 --
+ arch/arm/mach-shmobile/Makefile                 |   3 -
+ arch/arm/mach-shmobile/Makefile.boot            |   1 -
+ arch/arm/mach-shmobile/board-genmai-reference.c |  35 ----
+ arch/arm/mach-shmobile/board-genmai.c           | 174 ------------------
+ arch/arm/mach-shmobile/clock-r7s72100.c         | 231 ------------------------
+ arch/arm/mach-shmobile/r7s72100.h               |   6 -
+ arch/arm/mach-shmobile/setup-r7s72100.c         |   2 -
+ 8 files changed, 469 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/board-genmai-reference.c
+ delete mode 100644 arch/arm/mach-shmobile/board-genmai.c
+ delete mode 100644 arch/arm/mach-shmobile/clock-r7s72100.c
+ delete mode 100644 arch/arm/mach-shmobile/r7s72100.h
