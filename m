@@ -1,47 +1,39 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 18 Jul 2014 00:49:36 +0200
-Subject: [PATCH] ARM: config: update multi_v7_defconfig
-In-Reply-To: <20140717224413.GA21766@n2100.arm.linux.org.uk>
-References: <1405411346-12471-1-git-send-email-ch.naveen@samsung.com>
- <CAD=FV=UFknqF_Mt7ArytFq4KdDsGDa+JR2KZzX9Xn+if-_Vw4g@mail.gmail.com>
- <CABxcv==+cwoXA=WM3E7Zb62T0Epgqg_oH3UNU0vEe2DDPiCYPA@mail.gmail.com>
- <20140717224413.GA21766@n2100.arm.linux.org.uk>
-Message-ID: <CABxcv=kWnJX_ggPZ61QMt8z6DXMPf2TTPmo7eF-+H5m+==fciA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 17 Jul 2014 16:10:22 -0700
+Subject: [PATCH v2 0/4] Support for Qualcomm QPNP PMIC's
+In-Reply-To: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
+References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <53C857DE.7030507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On 07/17/14 09:17, Stanimir Varbanov wrote:
+> Hello everyone,
+>
+> Here is the continuation of patch sets sent recently about Qualcomm
+> QPNP SPMI PMICs.
+>
+> The previous version of the patch set can be found at [1].
+>
+> Changes since v1:
+>  - removed completely custom *of* parser
+>  - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
+>  - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
+>
+> Removing of the custom *of* parser leads to that that the *reg* devicetree
+> property cannot exist and therefore cannot be parsed to get PMIC peripheral
+> resources. I took this step aside because no one from mfd drivers does this
+> parsing. This will lead to inconvenience in the peripheral drivers to define
+> internally the SPMI base addresses depending on the compatible property
+> i.e. PMIC version. 
 
-On Fri, Jul 18, 2014 at 12:44 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jul 18, 2014 at 12:31:48AM +0200, Javier Martinez Canillas wrote:
->> In the case of the MAX77686, the mfd, regulator and clock drivers use
->> subsys_initcall() instead of module_init() but I wonder which of these
->> really need to be initialized at subsys init call time and which one
->> can just be built as a module.
->
-> I think you're making a frequently made mistake concerning module
-> initialisation.
->
-> Having code initialised by subsys_initcall() (or indeed any other level)
-> does not preclude it being a module:
->
-> #ifndef MODULE
-> ...
-> #define subsys_initcall(fn)             __define_initcall(fn, 4)
-> ...
-> #else /* MODULE */
-> ...
-> #define subsys_initcall(fn)             module_init(fn)
-> ...
-> #endif
->
-> So, subsys_initcall() automagically becomes module_init() when built
-> as a module.  There's no need to change anything here.
->
+We should teach the of platform layer to translate reg properties up
+until the point that they can't be translated anymore. If they can't be
+translated all the way back to cpu addresses we can make the resource
+have IORESOURCE_REG instead of IORESOURCE_MEM and then said pmic
+platform drivers can use platform_get_resource() with IORESOURCE_REG
+instead of IORESOURCE_MEM to get the addresses.
 
-I was indeed confused, I should had looked at include/linux/init.h
-before. Thanks a lot for the clarification.
-
-Best regards,
-Javier
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
