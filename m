@@ -1,34 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Jul 2014 11:15:41 +0100
-Subject: [PATCH v7 00/11] arm64: Support 4 levels of translation tables
-In-Reply-To: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-References: <1405537792-23666-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20140717101540.GE21153@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 Jul 2014 11:17:23 +0100
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
+References: <53C4DF0D.8010208@metafoo.de>
+ <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+ <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
+ <20140716071237.GA7978@ulmo>
+ <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+ <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
+ <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
+ <20140717074444.GB18640@ulmo>
+ <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
+Message-ID: <20140717101723.GR17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 08:09:41PM +0100, Catalin Marinas wrote:
-> Hi,
-> 
-> I've taken over Jungseok's 4-level page table series here:
-> 
-> https://lkml.kernel.org/g/000001cf6dc6$03ded0c0$0b9c7240$@samsung.com
-> 
-> I kept the same series numbering, so this is normally version 7. Changes
-> since v6:
-> 
-> - Additional fixes for duplicate (SWAPPER|IDMAP)_DIR_SIZE definitions
-> - Removed the fixmap pmd from swapper_pg_dir populated in head.S
-> - Several clean-ups in Jungseok's patches (annotated above my
->   signed-off-by line)
-> - Removal of the pgtable-*level-hwdef.h files
-> - Converting levels config options to int ARM64_PGTABLE_LEVELS
-> 
-> Important change: I dropped the KVM support for 4 levels temporarily. I
-> plan to revive them but didn't have for v7.
+On Thu, Jul 17, 2014 at 05:55:36PM +0900, Alexandre Courbot wrote:
 
-While you're looking at KVM, can you check if this breaks the SMMU driver
-too, please? We re-use the CPU page-table functions in there and, whilst it
-does have PUD code, a quick eyeball/test wouldn't hurt.
+> Right. It may very well be that a single flag specifier (as opposed to
+> an array) will be enough for this case. If you need to request some
+> GPIOs as input and some other as output then they are clearly
+> different functions and requesting them together would be an abuse of
+> the API.
 
-Will
+Not so sure about that - what about requesting GPIOs for a bidirectional
+bus?  Thinking about SPI bitbanging here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/d8637095/attachment-0001.sig>
