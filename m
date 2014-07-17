@@ -1,41 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Jul 2014 09:33:42 +0100
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <20140717102425.34fe0181@free-electrons.com>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140702164147.GQ32514@n2100.arm.linux.org.uk>
- <20140717102425.34fe0181@free-electrons.com>
-Message-ID: <20140717083342.GS21766@n2100.arm.linux.org.uk>
+From: sassmann@kpanic.de (Stefan Assmann)
+Date: Thu, 17 Jul 2014 10:36:48 +0200
+Subject: [PATCH RFC 2/2] regulator: twl: Re-add clk32kg to get wifi working
+In-Reply-To: <20140716212340.GZ17528@sirena.org.uk>
+References: <1405338655-18415-1-git-send-email-sassmann@kpanic.de>
+ <1405338655-18415-3-git-send-email-sassmann@kpanic.de>
+ <20140714120051.GF6800@sirena.org.uk> <53C3C77F.7080208@kpanic.de>
+ <20140714181338.GR6800@sirena.org.uk> <53C525A2.8080609@kpanic.de>
+ <20140716212340.GZ17528@sirena.org.uk>
+Message-ID: <53C78B20.6010602@kpanic.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 10:24:25AM +0200, Thomas Petazzoni wrote:
-> If I understand correctly, we are already changing the page tables
-> anyway, to switch certain pages to be mapped uncached, to do DMA
-> coherent allocations, no?
+On 16.07.2014 23:23, Mark Brown wrote:
+> On Tue, Jul 15, 2014 at 02:59:14PM +0200, Stefan Assmann wrote:
+>
+>> Looking at this more closely it seems to me that it's a regulator thing
+>> after all. In the end it all boils down to a single register write.
+>> twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x41, 0x8e);
+>> This is a write to the CLK32KG_CFG_STATE [1] register to power on the
+>> device.
+>
+> The register description happening to mention power doesn't mean it's
+> not functionally an enable for a clock.
+>
+>> I tried moving that to omap4xxx_dt_clk_init() but that won't work
+>> because the twl core structures aren't initialized yet.
+>
+>> Any suggestions?
+>
+> Why not just add this to (or create a new) clock driver for the chip?
+>
 
-I've no idea, I never looked at that code.  I hope that Marek has
-considered the requirements of the architecture when creating that
-code...
+Problem is that twl_i2c_write_u8() calls twl_get_regmap() to get the
+regmap. This requires struct twl_priv to be populated which does not
+happen until twl_probe has run. That hasn't happened at the point when
+omap4xxx_dt_clk_init() gets called.
+Is there a way to defer a clock driver until twl_probe() has run?
 
-> So wouldn't it be possible to keep the early
-> assembly code as it is today, and then later, in C code, once we have
-> identified the platform on which we're running, modify the page tables
-> to switch to the appropriate page attributes (write allocate cache
-> policy, shareable attribute, etc.) ?
-
-No - the problem is that we're running from the page table in question
-with global mappings, and we need to switch all these mappings, including
-the ones we're currently using to execute from.
-
-We can't even create a new page table and switch to it because the
-mappings in question are global mappings.
-
-The only way to do that safely from an architectural point of view would
-be to turn the MMU off, and drop back to assembly code to change the
-page tables, and re-enable the MMU.  For something as obscure as Marvell's
-coherency stuff, that's not something I want to see in core code.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+   Stefan
