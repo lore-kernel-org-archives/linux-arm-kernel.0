@@ -1,83 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 17 Jul 2014 16:27:33 -0700
-Subject: [PATCH] PM / OPP: cpufreq: Avoid sleeping while atomic
-In-Reply-To: <CAKohpond9aNvX+x--G7AADkRhAu1iZ5mFW8pDvAXJ6yp_CCH_A@mail.gmail.com>
-References: <1405553740-5067-1-git-send-email-sboyd@codeaurora.org>
- <CAKohpond9aNvX+x--G7AADkRhAu1iZ5mFW8pDvAXJ6yp_CCH_A@mail.gmail.com>
-Message-ID: <53C85BE5.6030901@codeaurora.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 18 Jul 2014 08:55:47 +0900
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Defconfig Updates
+ for v3.17
+Message-ID: <cover.1405640905.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/14 22:26, Viresh Kumar wrote:
-> On 17 July 2014 05:05, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> We allocate the cpufreq table after calling rcu_read_lock(),
->> which disables preemption. This causes scheduling while atomic
->> warnings. Use GFP_ATOMIC instead of GFP_KERNEL and update for
->> kcalloc while we're here.
-> I am surprised to see that this isn't reported by anybody since the time
-> it came into existence? Some special config option required to observe
-> this?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-First you need to enable sleeping while atomic checking, but in reality,
-I assume nobody has tried inserting a cpufreq driver as a module. The
-might_sleep() code has a check to see if the system_state is
-SYSTEM_RUNNING. If it isn't running then there isn't a warning and
-might_sleep() doesn't flag any problem. I wonder if that is actually the
-right thing to do though? Perhaps the intention of that code is to skip
-warning early on in the boot path when the scheduler isn't up and
-running yet. But once the scheduler is running (which is fairly early
-nowadays) I would think we want might_sleep() to trigger warnings. Maybe
-that check in might_sleep() needs to be updated to check for "scheduler
-running" instead of "system running"?
+Please consider these fourth round of Renesas ARM based SoC defconfig
+updates for v3.17.
 
->
->> BUG: sleeping function called from invalid context at mm/slub.c:1246
->> in_atomic(): 0, irqs_disabled(): 0, pid: 80, name: modprobe
->> 5 locks held by modprobe/80:
->>  #0:  (&dev->mutex){......}, at: [<c050d484>] __driver_attach+0x48/0x98
->>  #1:  (&dev->mutex){......}, at: [<c050d494>] __driver_attach+0x58/0x98
->>  #2:  (subsys mutex#5){+.+.+.}, at: [<c050c114>] subsys_interface_register+0x38/0xc8
->>  #3:  (cpufreq_rwsem){.+.+.+}, at: [<c05a9c8c>] __cpufreq_add_dev.isra.22+0x84/0x92c
->>  #4:  (rcu_read_lock){......}, at: [<c05ab24c>] dev_pm_opp_init_cpufreq_table+0x18/0x10c
->> Preemption disabled at:[<  (null)>]   (null)
->>
->> CPU: 2 PID: 80 Comm: modprobe Not tainted 3.16.0-rc3-next-20140701-00035-g286857f216aa-dirty #217
->> [<c0214da8>] (unwind_backtrace) from [<c02123f8>] (show_stack+0x10/0x14)
->> [<c02123f8>] (show_stack) from [<c070141c>] (dump_stack+0x70/0xbc)
->> [<c070141c>] (dump_stack) from [<c02f4cb0>] (__kmalloc+0x124/0x250)
->> [<c02f4cb0>] (__kmalloc) from [<c05ab270>] (dev_pm_opp_init_cpufreq_table+0x3c/0x10c)
->> [<c05ab270>] (dev_pm_opp_init_cpufreq_table) from [<bf000508>] (cpufreq_init+0x48/0x378 [cpufreq_generic])
->> [<bf000508>] (cpufreq_init [cpufreq_generic]) from [<c05a9e08>] (__cpufreq_add_dev.isra.22+0x200/0x92c)
->> [<c05a9e08>] (__cpufreq_add_dev.isra.22) from [<c050c160>] (subsys_interface_register+0x84/0xc8)
->> [<c050c160>] (subsys_interface_register) from [<c05a9494>] (cpufreq_register_driver+0x108/0x2d8)
->> [<c05a9494>] (cpufreq_register_driver) from [<bf000888>] (generic_cpufreq_probe+0x50/0x74 [cpufreq_generic])
->> [<bf000888>] (generic_cpufreq_probe [cpufreq_generic]) from [<c050e994>] (platform_drv_probe+0x18/0x48)
->> [<c050e994>] (platform_drv_probe) from [<c050d1f4>] (driver_probe_device+0x128/0x370)
->> [<c050d1f4>] (driver_probe_device) from [<c050d4d0>] (__driver_attach+0x94/0x98)
->> [<c050d4d0>] (__driver_attach) from [<c050b778>] (bus_for_each_dev+0x54/0x88)
->> [<c050b778>] (bus_for_each_dev) from [<c050c894>] (bus_add_driver+0xe8/0x204)
->> [<c050c894>] (bus_add_driver) from [<c050dd48>] (driver_register+0x78/0xf4)
->> [<c050dd48>] (driver_register) from [<c0208870>] (do_one_initcall+0xac/0x1d8)
->> [<c0208870>] (do_one_initcall) from [<c028b6b4>] (load_module+0x190c/0x21e8)
->> [<c028b6b4>] (load_module) from [<c028c034>] (SyS_init_module+0xa4/0x110)
->> [<c028c034>] (SyS_init_module) from [<c020f0c0>] (ret_fast_syscall+0x0/0x48)
->>
->> Fixes: a0dd7b79657b "PM / OPP: Move cpufreq specific OPP functions out of generic OPP library"
-> That looks to be wrong. This commit just moved things around and I can still
-> see rcu_read_lock() before this commit.
->
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig3-for-v3.17,
+which you have merged into renesas/defconfig3.
 
-Right. It seems that we moved to RCU in commit
-0f5c890e9b9754d9aa5bf6ae2fc00cae65780d23 so the real Fixes line should be:
+I will follow-up with a pull request that removes
+the Genmai board code.
 
-Fixes: 0f5c890e9b97 "PM / OPP: Remove cpufreq wrapper dependency on
-internal data organization"
 
-One way to avoid this problem is to put things back the way they were
-before that change. Is there any real benefit to having this code live
-in drivers/cpufreq/ instead of just under some config option in
-drivers/base/power/opp.c?
+The following changes since commit 8cbf869a0a278c4d39e50daa4f4101b394a72a93:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+  ARM: shmobile: Enable R-Car Gen 2 PCIe in shmobile_defconfig (2014-07-09 10:44:12 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig4-for-v3.17
+
+for you to fetch changes up to 92db2b7af591d3c3212183a34856b4cb190b6999:
+
+  ARM: shmobile: defconfig: Remove MACH_GENMAI (2014-07-17 00:02:34 +0900)
+
+----------------------------------------------------------------
+Fourth Round of Renesas ARM Based SoC Defconfig Updates for v3.17
+
+The genmai board code is going away so remove:
+* The genmai defconfig
+* MACH_GENMAI from shmobile defconfig
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: shmobile: defconfig: Remove MACH_GENMAI
+
+Simon Horman (1):
+      ARM: shmobile: genmai: remove defconfig
+
+ arch/arm/configs/genmai_defconfig   | 122 ------------------------------------
+ arch/arm/configs/shmobile_defconfig |   1 -
+ 2 files changed, 123 deletions(-)
+ delete mode 100644 arch/arm/configs/genmai_defconfig
