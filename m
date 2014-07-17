@@ -1,66 +1,96 @@
 From: dmurphy@ti.com (Dan Murphy)
-Date: Thu, 17 Jul 2014 11:45:31 -0500
-Subject: [v3 PATCH 6/6] ARM: dts: omap5: Add prm_resets node
+Date: Thu, 17 Jul 2014 11:45:27 -0500
+Subject: [v3 PATCH 2/6] dt: TI: Describe the ti reset DT entries
 In-Reply-To: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
 References: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1405615531-15649-6-git-send-email-dmurphy@ti.com>
+Message-ID: <1405615531-15649-2-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the prm_resets node to the prm parent node.
-
-Add the omap54xx_resets file to define the
-omap5 reset lines that are handled by this reset
-framework.
+Describe the TI reset DT entries for TI SoC's.
 
 Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
 
-v3 - No changes
+v3 - Changed Headline no other changes
 
- arch/arm/boot/dts/omap5.dtsi           |    7 ++++
- arch/arm/boot/dts/omap54xx-resets.dtsi |   66 ++++++++++++++++++++++++++++++++
- 2 files changed, 73 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap54xx-resets.dtsi
+ .../devicetree/bindings/reset/ti,reset.txt         |  103 ++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/ti,reset.txt
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index a4ed549..97bfef5 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -139,6 +139,12 @@
- 
- 			prm_clockdomains: clockdomains {
- 			};
+diff --git a/Documentation/devicetree/bindings/reset/ti,reset.txt b/Documentation/devicetree/bindings/reset/ti,reset.txt
+new file mode 100644
+index 0000000..9d5c29c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/ti,reset.txt
+@@ -0,0 +1,103 @@
++Texas Instruments Reset Controller
++======================================
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Specifying the reset entries for the IP module
++==============================================
++Parent module:
++This is the module node that contains the reset registers and bits.
++
++example:
++			prcm_resets: resets {
++				compatible = "ti,dra7-resets";
++				#reset-cells = <1>;
++			};
++
++Required parent properties:
++- compatible : Should be one of,
++		"ti,omap4-prm" for OMAP4 PRM instances
++		"ti,omap5-prm" for OMAP5 PRM instances
++		"ti,dra7-prm" for DRA7xx PRM instances
++		"ti,am4-prcm" for AM43xx PRCM instances
++		"ti,am3-prcm" for AM33xx PRCM instances
++
++Required child reset property:
++- compatible : Should be
++		"resets" for All TI SoCs
++
++example:
++		prm: prm at 4ae06000 {
++			compatible = "ti,omap5-prm";
++			reg = <0x4ae06000 0x3000>;
 +
 +			prm_resets: resets {
 +				#address-cells = <1>;
 +				#size-cells = <1>;
 +				#reset-cells = <1>;
 +			};
- 		};
- 
- 		cm_core_aon: cm_core_aon at 4a004000 {
-@@ -989,3 +995,4 @@
- };
- 
- /include/ "omap54xx-clocks.dtsi"
-+/include/ "omap54xx-resets.dtsi"
-diff --git a/arch/arm/boot/dts/omap54xx-resets.dtsi b/arch/arm/boot/dts/omap54xx-resets.dtsi
-new file mode 100644
-index 0000000..cba6f52
---- /dev/null
-+++ b/arch/arm/boot/dts/omap54xx-resets.dtsi
-@@ -0,0 +1,66 @@
-+/*
-+ * Device Tree Source for OMAP5 reset data
-+ *
-+ * Copyright (C) 2014 Texas Instruments, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++		};
 +
++
++Reset node declaration
++==============================================
++The reset node is declared in a parent child relationship.  The main parent
++is the PRCM module which contains the base address.  The first child within
++the reset parent declares the target modules reset name.  This is followed by
++the control and status offsets.
++
++Within the first reset child node is a secondary child node which declares the
++reset signal of interest.  Under this node the control and status bits
++are declared.  These bits declare the bit mask for the target reset.
++
++
++Required properties:
++reg - This is the register offset from the PRCM parent.
++	This must be declared as:
++
++	reg = <control register offset>,
++		  <status register offset>;
++
++control-bit - This is the bit within the register which controls the reset
++	of the target module.  This is declared as a bit mask for the register.
++status-bit - This is the bit within the register which contains the status of
++	the reset of the target module.
++	This is declared as a bit mask for the register.
++
++example:
 +&prm_resets {
 +	dsp_rstctrl {
 +		reg = <0x1c00>,
@@ -70,52 +100,32 @@ index 0000000..cba6f52
 +			control-bit = <0x01>;
 +			status-bit = <0x01>;
 +		};
-+
-+		dsp_mmu_reset: dsp_mmu_reset {
-+			control-bit = <0x02>;
-+			status-bit = <0x02>;
-+		};
-+	};
-+
-+	ipu_rstctrl {
-+		reg = <0x910>,
-+			  <0x914>;
-+
-+		ipu_cpu0_reset: ipu_cpu0_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+
-+		ipu_cpu1_reset: ipu_cpu1_reset {
-+			control-bit = <0x02>;
-+			status-bit = <0x02>;
-+		};
-+
-+		ipu_mmu_reset: ipu_mmu_reset {
-+			control-bit = <0x04>;
-+			status-bit = <0x04>;
-+		};
-+	};
-+
-+	iva_rstctrl {
-+		reg = <0x1210>,
-+			  <0x1214>;
-+
-+		iva_reset: iva_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+	};
-+
-+	device_rstctrl {
-+		reg = <0x1c00>,
-+			  <0x1c04>;
-+
-+		device_reset: device_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
 +	};
 +};
++
++
++
++Client Node Declaration
++==============================================
++This is the consumer of the parent node to declare what resets this
++particular module is interested in.
++
++example:
++	src: src at 55082000 {
++		    resets = <&reset_src phandle>;
++			reset-names = "<reset_name>";
++	};
++
++Required Properties:
++reset_src - This is the parent DT entry for the reset controller
++phandle - This is the phandle of the specific reset to be used by the clien
++	driver.
++reset-names - This is the reset name of module that the device driver
++	needs to be able to reset.  This value must correspond to a value within
++	the reset controller array.
++
++example:
++resets = <&prm_resets &dsp_mmu_reset>;
++reset-names = "dsp_mmu_reset";
 -- 
 1.7.9.5
