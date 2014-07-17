@@ -1,55 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 17 Jul 2014 12:20:14 +0200
-Subject: [PATCH] arm: clk-imx6q: parent lvds_sel input from upstream clock
- gates
-Message-ID: <1405592414-19550-1-git-send-email-l.stach@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 11:20:45 +0100
+Subject: [PATCH 4/6] ARM: rockchip: enable support for RK3288 SoCs
+In-Reply-To: <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
+References: <1471578.ILeMmG2DL6@diego> <4355781.cnmcVo5AVu@diego>
+ <CAD=FV=Vp2GqwEsLt5n5176ZRvDgNLSYFSUC6G+7pV6cuATuFTw@mail.gmail.com>
+Message-ID: <20140717102045.GG21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 reference manual doesn't make a clear distinction
-between the fixed clock divider and the enable gate for the
-pcie and sata reference clocks. This lead to the lvds mux
-inputs in the imx6q clk driver to be parented from the
-ref clock (which is the divider) instead of the actual gate,
-which in turn prevents the upstream clock to actually be
-enabled when lvds clk out is active.
+On Wed, Jul 16, 2014 at 08:57:21PM +0100, Doug Anderson wrote:
+> Heiko,
+> 
+> On Tue, Jul 15, 2014 at 4:01 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Enable HAVE_ARM_ARCH_TIMER and add a rockchip,rk3288 compatible.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  arch/arm/mach-rockchip/Kconfig    | 1 +
+> >  arch/arm/mach-rockchip/rockchip.c | 1 +
+> >  2 files changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+> > index e4564c2..d168669 100644
+> > --- a/arch/arm/mach-rockchip/Kconfig
+> > +++ b/arch/arm/mach-rockchip/Kconfig
+> > @@ -6,6 +6,7 @@ config ARCH_ROCKCHIP
+> >         select ARCH_REQUIRE_GPIOLIB
+> >         select ARM_GIC
+> >         select CACHE_L2X0
+> > +       select HAVE_ARM_ARCH_TIMER
+> 
+> Do we want to think about allowing someone to enable the A9-based
+> Rockchip SoCs separately than the A12-based ones?  I know it doesn't
+> hurt to have the arch timer code present on A9 SoCs (it will figure
+> things out at runtime), but people trying to build an A9-based system
+> might not want the extra code?
 
-This fixes a hard machine hang regression in kernel 3.16 for
-boards where only pcie is active but no sata, as with this
-kernel version the imx6-pcie driver is no longer enabling
-the upstream clock directly but only lvds clk out.
+More likely, people using the A12-based system won't want the CACHE_L2X0
+code (which adds an outer_cache.sync check to wmb()).
 
-Reported-by: Arne Ruhnau <arne.ruhnau@target-sg.com>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-Tested-by: Arne Ruhnau <arne.ruhnau@target-sg.com>
----
-Shawn, this is an urgent fix for 3.16. Can you please
-Ack it so arm-soc people can take this directly?
----
- arch/arm/mach-imx/clk-imx6q.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 8e795dea02ec..8556c787e59c 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -70,7 +70,7 @@ static const char *cko_sels[] = { "cko1", "cko2", };
- static const char *lvds_sels[] = {
- 	"dummy", "dummy", "dummy", "dummy", "dummy", "dummy",
- 	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
--	"pcie_ref", "sata_ref",
-+	"pcie_ref_125m", "sata_ref_100m",
- };
- 
- enum mx6q_clks {
-@@ -491,7 +491,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 
- 	/* All existing boards with PCIe use LVDS1 */
- 	if (IS_ENABLED(CONFIG_PCI_IMX6))
--		clk_set_parent(clk[lvds1_sel], clk[sata_ref]);
-+		clk_set_parent(clk[lvds1_sel], clk[sata_ref_100m]);
- 
- 	/* Set initial power mode */
- 	imx6q_set_lpm(WAIT_CLOCKED);
--- 
-2.0.1
+Will
