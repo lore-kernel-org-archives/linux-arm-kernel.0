@@ -1,46 +1,34 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 17 Jul 2014 13:31:10 -0500
-Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flags
-In-Reply-To: <20140714163616.GA4387@intel.com>
-References: <1401482990-26486-1-git-send-email-agross@codeaurora.org>
- <20140714163616.GA4387@intel.com>
-Message-ID: <20140717183110.GB17951@qualcomm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Jul 2014 20:42:37 +0200
+Subject: [PATCH v2] i2c: efm32: correct namespacing of location property
+In-Reply-To: <20140717134000.GK2740@katana>
+References: <1405066940-12919-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1405068614-14279-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140717134000.GK2740@katana>
+Message-ID: <20140717184237.GX11056@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 10:06:16PM +0530, Vinod Koul wrote:
-> On Fri, May 30, 2014 at 03:49:50PM -0500, Andy Gross wrote:
-> > This patch adds support for end of transaction (EOT) and notify when done (NWD)
-> > hardware descriptor flags.
+On Thu, Jul 17, 2014 at 03:40:00PM +0200, Wolfram Sang wrote:
+> On Fri, Jul 11, 2014 at 10:50:14AM +0200, Uwe Kleine-K?nig wrote:
+> > Olof Johansson pointed out that usually the company name is picked as
+> > namespace prefix to specific properties. So expect "energymicro,location"
+> > but fall back to the previously introduced name "efm32,location".
 > > 
-> > The EOT flag requests that the peripheral assert an end of transaction interrupt
-> > when that descriptor is complete.  It also results in special signaling protocol
-> > that is used between the attached peripheral and the core using the DMA
-> > controller.  Clients will specify DMA_PREP_INTERRUPT to enable this flag.
-> > 
-> > The NWD flag requests that the peripheral wait until the data has been fully
-> > processed by the peripheral before moving on to the next descriptor.  Clients
-> > will specify DMA_PREP_FENCE to enable this flag.
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> I am going to apply this, but pls send a follow up patch to add comments on the
-> flags and their behaviour. I think it is required!
+> Applied to for-next, thanks! If you think this is better suited in
+> for-current, let me know.
+I'm not in a hurry. If you take it it's fine for me.
 
-Will do.
+(BTW, I'm not sure i fI understand your branch naming. for-next means
+"targeting the next merge window" and for-current means "targeting the
+next release"? So for-next currently means 3.17-rc1?)
 
-<snip>
-
-> >  #define DESC_FLAG_EOT BIT(14)
-> >  #define DESC_FLAG_EOB BIT(13)
-> > +#define DESC_FLAG_NWD BIT(12)
-> explaining behvaiour will help..
-
-In the followup, I'll put in a lengthy description of the INT/EOT/NWD and how
-they are used in the signaling to/from the attached peripheral.
-
-
-Thanks!
+Thanks
+Uwe
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
