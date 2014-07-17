@@ -1,38 +1,51 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 09:34:49 -0400
-Subject: [PATCH v4 0/7] ARM: at91: move aic driver to drivers/irqchips
-In-Reply-To: <1405012462-766-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405012462-766-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140717133449.GP13108@titan.lakedaemon.net>
+Date: Thu, 17 Jul 2014 09:39:51 -0400
+Subject: [PATCH 0/3] irqchip: atmel-aic: Add irq RTC fixups
+In-Reply-To: <1405016741-2407-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1405016741-2407-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140717133951.GQ13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 10, 2014 at 07:14:15PM +0200, Boris BREZILLON wrote:
+On Thu, Jul 10, 2014 at 08:25:38PM +0200, Boris BREZILLON wrote:
 > Hello,
 > 
-> This series moves the AIC driver to the irqchip directory and make use of
-> the generic chip framework whenever possible.
+> This patch series introduce the notion of irq fixups for atmel SoCs.
 > 
-> This driver only support DT boards (all legacy board files should be soon
-> replaced by their DT versions).
+> In most at91 SoCs the first interrupt line is shared by several IPs, and
+> some of these HW blocks might be in an unknown state when booting the
+> Linux kernel.
+> Hence these IPs might generate spurious interrupts if they've not masked
+> their irqs and the shared irq line is requested by another peripheral.
 > 
-> Since the last version AIC and AIC5 code have been split and common
-> functions have been moved to irq-atmel-aic-common.c.
-> I know there is not much code in this file and it could have been
-> duplicated in AIC and AIC5 drivers, but I'm planning to add more common
-> stuff soon (AIC irq fixups previously done in
-> arch/arm/mach-at91/sysirq_mask.c).
+> These fixups were previously done in arch/arm/mach-at91/sysirq_mask.c
+> but as we're trying to use standard implementation (IRQCHIP_DECLARE and
+> automatic call of irqchip_init within arch/arm/kernel/irq.c) we need to
+> do those fixups in the irqchip driver.
 > 
-> Jason, if everybody is fine with this version could you share a topic
-> branch  containing patch 1 to 3 with Nicolas ?
+> This series only fix RTC irqs, but other HW blocks (RTT, PMC, ...) will
+> be added later on.
+> 
+> This series depends on this one [1].
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271413.html
+> 
+> Boris BREZILLON (3):
+>   irqchip: atmel-aic: Add irq fixup infrastructure
+>   irqchip: atmel-aic: Implement RTC irq fixup
+>   irqchip: atmel-aic: Define irq fixups for atmel SoCs
+> 
+>  drivers/irqchip/irq-atmel-aic-common.c | 47 ++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-atmel-aic-common.h |  4 +++
+>  drivers/irqchip/irq-atmel-aic.c        | 15 +++++++++++
+>  drivers/irqchip/irq-atmel-aic5.c       | 12 +++++++++
+>  4 files changed, 78 insertions(+)
 
-I've now applied patches 1-3 to irqchip/atmel-aic.  You can find the
-branch here:
-
-  git://git.infradead.org/users/jcooper/linux.git irqchip/atmel-aic
-
-It will be merged into -next today, and I'll merge it into irqchip/core
-after a few days.
+Whole series applied on top of irqchip/atmel-aic.
 
 thx,
 
