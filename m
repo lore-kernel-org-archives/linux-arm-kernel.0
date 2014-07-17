@@ -1,55 +1,454 @@
-From: rgb@redhat.com (Richard Guy Briggs)
-Date: Thu, 17 Jul 2014 12:26:51 -0400
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <1405596402-23844-1-git-send-email-broonie@kernel.org>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140717162651.GP8594@madcap2.tricolour.ca>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 17 Jul 2014 18:38:56 +0200
+Subject: [PATCH v3 1/7] ARM: l2c: Refactor the driver to use commit-like
+ interface
+In-Reply-To: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
+References: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1405615142-21426-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/17, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> interface) removed the arch parameter from __audit_syscall_entry() and
-> updated the only current user in mainline but this breaks the ARMv8 audit
-> code that has been added in -next. Fix this by making the equivalent
-> update to ARMv8.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+Certain implementations of secure hypervisors (namely the one found on
+Samsung Exynos-based boards) do not provide access to individual L2C
+registers. This makes the .write_sec()-based interface insufficient and
+provoking ugly hacks.
 
-Signed-off-by: Richard Guy Briggs <rgb@redhat.com>
+This patch is first step to make the driver not rely on availability of
+writes to individual registers. This is achieved by refactoring the
+driver to use a commit-like operation scheme: all register values are
+prepared first and stored in an instance of l2x0_regs struct and then a
+single callback is responsible to flush those values to the hardware.
 
-I'm not sure the best way to propagate this patch, but it will be
-necessary.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mm/cache-l2x0.c | 201 ++++++++++++++++++++++++++---------------------
+ 1 file changed, 110 insertions(+), 91 deletions(-)
 
-> ---
->  arch/arm64/kernel/ptrace.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 70526cfda056..310842e3d477 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1115,8 +1115,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->  		trace_sys_enter(regs, regs->syscallno);
->  
-> -	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-> +	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-> +			    regs->regs[2], regs->regs[3]);
->  
->  	return regs->syscallno;
->  }
-> -- 
-> 2.0.1
-> 
-
-- RGB
-
---
-Richard Guy Briggs <rbriggs@redhat.com>
-Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
-Remote, Ottawa, Canada
-Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 5f2c988..385c047 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -40,12 +40,14 @@ struct l2c_init_data {
+ 	void (*enable)(void __iomem *, u32, unsigned);
+ 	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
+ 	void (*save)(void __iomem *);
++	void (*configure)(void __iomem *);
+ 	struct outer_cache_fns outer_cache;
+ };
+ 
+ #define CACHE_LINE_SIZE		32
+ 
+ static void __iomem *l2x0_base;
++static const struct l2c_init_data *l2x0_data;
+ static DEFINE_RAW_SPINLOCK(l2x0_lock);
+ static u32 l2x0_way_mask;	/* Bitmask of active ways */
+ static u32 l2x0_size;
+@@ -105,6 +107,14 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
+ 	}
+ }
+ 
++static void l2c_configure(void __iomem *base)
++{
++	if (l2x0_data->configure)
++		l2x0_data->configure(base);
++
++	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
++}
++
+ /*
+  * Enable the L2 cache controller.  This function must only be
+  * called when the cache controller is known to be disabled.
+@@ -113,7 +123,12 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ {
+ 	unsigned long flags;
+ 
+-	l2c_write_sec(aux, base, L2X0_AUX_CTRL);
++	/* Do not touch the controller if already enabled. */
++	if (readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)
++		return;
++
++	l2x0_saved_regs.aux_ctrl = aux;
++	l2c_configure(base);
+ 
+ 	l2c_unlock(base, num_lock);
+ 
+@@ -207,6 +222,12 @@ static void l2c_save(void __iomem *base)
+ 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ }
+ 
++static void l2c_resume(void)
++{
++	l2x0_data->enable(l2x0_base, l2x0_saved_regs.aux_ctrl,
++				l2x0_data->num_lock);
++}
++
+ /*
+  * L2C-210 specific code.
+  *
+@@ -287,14 +308,6 @@ static void l2c210_sync(void)
+ 	__l2c210_cache_sync(l2x0_base);
+ }
+ 
+-static void l2c210_resume(void)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN))
+-		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 1);
+-}
+-
+ static const struct l2c_init_data l2c210_data __initconst = {
+ 	.type = "L2C-210",
+ 	.way_size_0 = SZ_8K,
+@@ -308,7 +321,7 @@ static const struct l2c_init_data l2c210_data __initconst = {
+ 		.flush_all = l2c210_flush_all,
+ 		.disable = l2c_disable,
+ 		.sync = l2c210_sync,
+-		.resume = l2c210_resume,
++		.resume = l2c_resume,
+ 	},
+ };
+ 
+@@ -465,7 +478,7 @@ static const struct l2c_init_data l2c220_data = {
+ 		.flush_all = l2c220_flush_all,
+ 		.disable = l2c_disable,
+ 		.sync = l2c220_sync,
+-		.resume = l2c210_resume,
++		.resume = l2c_resume,
+ 	},
+ };
+ 
+@@ -614,39 +627,29 @@ static void __init l2c310_save(void __iomem *base)
+ 							L310_POWER_CTRL);
+ }
+ 
+-static void l2c310_resume(void)
++static void l2c310_configure(void __iomem *base)
+ {
+-	void __iomem *base = l2x0_base;
++	unsigned revision;
+ 
+-	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+-		unsigned revision;
+-
+-		/* restore pl310 setup */
+-		writel_relaxed(l2x0_saved_regs.tag_latency,
+-			       base + L310_TAG_LATENCY_CTRL);
+-		writel_relaxed(l2x0_saved_regs.data_latency,
+-			       base + L310_DATA_LATENCY_CTRL);
+-		writel_relaxed(l2x0_saved_regs.filter_end,
+-			       base + L310_ADDR_FILTER_END);
+-		writel_relaxed(l2x0_saved_regs.filter_start,
+-			       base + L310_ADDR_FILTER_START);
+-
+-		revision = readl_relaxed(base + L2X0_CACHE_ID) &
+-				L2X0_CACHE_ID_RTL_MASK;
+-
+-		if (revision >= L310_CACHE_ID_RTL_R2P0)
+-			l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
+-				      L310_PREFETCH_CTRL);
+-		if (revision >= L310_CACHE_ID_RTL_R3P0)
+-			l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
+-				      L310_POWER_CTRL);
+-
+-		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
+-
+-		/* Re-enable full-line-of-zeros for Cortex-A9 */
+-		if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
+-			set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+-	}
++	/* restore pl310 setup */
++	writel_relaxed(l2x0_saved_regs.tag_latency,
++		       base + L310_TAG_LATENCY_CTRL);
++	writel_relaxed(l2x0_saved_regs.data_latency,
++		       base + L310_DATA_LATENCY_CTRL);
++	writel_relaxed(l2x0_saved_regs.filter_end,
++		       base + L310_ADDR_FILTER_END);
++	writel_relaxed(l2x0_saved_regs.filter_start,
++		       base + L310_ADDR_FILTER_START);
++
++	revision = readl_relaxed(base + L2X0_CACHE_ID) &
++				 L2X0_CACHE_ID_RTL_MASK;
++
++	if (revision >= L310_CACHE_ID_RTL_R2P0)
++		l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
++			      L310_PREFETCH_CTRL);
++	if (revision >= L310_CACHE_ID_RTL_R3P0)
++		l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
++			      L310_POWER_CTRL);
+ }
+ 
+ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, void *data)
+@@ -698,6 +701,23 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 		aux &= ~(L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP);
+ 	}
+ 
++	/* r3p0 or later has power control register */
++	if (rev >= L310_CACHE_ID_RTL_R3P0)
++		l2x0_saved_regs.pwr_ctrl = L310_DYNAMIC_CLK_GATING_EN |
++						L310_STNDBY_MODE_EN;
++
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
++
++	l2c_enable(base, aux, num_lock);
++
++	/* Read back resulting AUX_CTRL value as it could have been altered. */
++	aux = readl_relaxed(base + L2X0_AUX_CTRL);
++
+ 	if (aux & (L310_AUX_CTRL_DATA_PREFETCH | L310_AUX_CTRL_INSTR_PREFETCH)) {
+ 		u32 prefetch = readl_relaxed(base + L310_PREFETCH_CTRL);
+ 
+@@ -711,23 +731,12 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 	if (rev >= L310_CACHE_ID_RTL_R3P0) {
+ 		u32 power_ctrl;
+ 
+-		l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+-			      base, L310_POWER_CTRL);
+ 		power_ctrl = readl_relaxed(base + L310_POWER_CTRL);
+ 		pr_info("L2C-310 dynamic clock gating %sabled, standby mode %sabled\n",
+ 			power_ctrl & L310_DYNAMIC_CLK_GATING_EN ? "en" : "dis",
+ 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+ 	}
+ 
+-	/*
+-	 * Always enable non-secure access to the lockdown registers -
+-	 * we write to them as part of the L2C enable sequence so they
+-	 * need to be accessible.
+-	 */
+-	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
+-
+-	l2c_enable(base, aux, num_lock);
+-
+ 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
+ 		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+ 		cpu_notifier(l2c310_cpu_enable_flz, 0);
+@@ -759,11 +768,11 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 
+ 	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
+ 	    revision < L310_CACHE_ID_RTL_R3P2) {
+-		u32 val = readl_relaxed(base + L310_PREFETCH_CTRL);
++		u32 val = l2x0_saved_regs.prefetch_ctrl;
+ 		/* I don't think bit23 is required here... but iMX6 does so */
+ 		if (val & (BIT(30) | BIT(23))) {
+ 			val &= ~(BIT(30) | BIT(23));
+-			l2c_write_sec(val, base, L310_PREFETCH_CTRL);
++			l2x0_saved_regs.prefetch_ctrl = val;
+ 			errata[n++] = "752271";
+ 		}
+ 	}
+@@ -799,6 +808,15 @@ static void l2c310_disable(void)
+ 	l2c_disable();
+ }
+ 
++static void l2c310_resume(void)
++{
++	l2c_resume();
++
++	/* Re-enable full-line-of-zeros for Cortex-A9 */
++	if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
++		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++}
++
+ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 	.type = "L2C-310",
+ 	.way_size_0 = SZ_8K,
+@@ -806,6 +824,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 	.enable = l2c310_enable,
+ 	.fixup = l2c310_fixup,
+ 	.save = l2c310_save,
++	.configure = l2c310_configure,
+ 	.outer_cache = {
+ 		.inv_range = l2c210_inv_range,
+ 		.clean_range = l2c210_clean_range,
+@@ -825,6 +844,12 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	u32 aux, old_aux;
+ 
+ 	/*
++	 * Save the pointer globally so that callbacks which do not receive
++	 * context from callers can access the structure.
++	 */
++	l2x0_data = data;
++
++	/*
+ 	 * Sanity check the aux values.  aux_mask is the bits we preserve
+ 	 * from reading the hardware register, and aux_val is the bits we
+ 	 * set.
+@@ -935,6 +960,10 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		break;
+ 	}
+ 
++	/* Read back current (default) hardware configuration */
++	if (data->save)
++		data->save(l2x0_base);
++
+ 	__l2c_init(data, aux_val, aux_mask, cache_id);
+ }
+ 
+@@ -993,7 +1022,7 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
+ 		.flush_all   = l2c210_flush_all,
+ 		.disable     = l2c_disable,
+ 		.sync        = l2c210_sync,
+-		.resume      = l2c210_resume,
++		.resume      = l2c_resume,
+ 	},
+ };
+ 
+@@ -1011,7 +1040,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
+ 		.flush_all   = l2c220_flush_all,
+ 		.disable     = l2c_disable,
+ 		.sync        = l2c220_sync,
+-		.resume      = l2c210_resume,
++		.resume      = l2c_resume,
+ 	},
+ };
+ 
+@@ -1024,28 +1053,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 
+ 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+ 	if (tag[0] && tag[1] && tag[2])
+-		writel_relaxed(
++		l2x0_saved_regs.tag_latency =
+ 			L310_LATENCY_CTRL_RD(tag[0] - 1) |
+ 			L310_LATENCY_CTRL_WR(tag[1] - 1) |
+-			L310_LATENCY_CTRL_SETUP(tag[2] - 1),
+-			l2x0_base + L310_TAG_LATENCY_CTRL);
++			L310_LATENCY_CTRL_SETUP(tag[2] - 1);
+ 
+ 	of_property_read_u32_array(np, "arm,data-latency",
+ 				   data, ARRAY_SIZE(data));
+ 	if (data[0] && data[1] && data[2])
+-		writel_relaxed(
++		l2x0_saved_regs.data_latency =
+ 			L310_LATENCY_CTRL_RD(data[0] - 1) |
+ 			L310_LATENCY_CTRL_WR(data[1] - 1) |
+-			L310_LATENCY_CTRL_SETUP(data[2] - 1),
+-			l2x0_base + L310_DATA_LATENCY_CTRL);
++			L310_LATENCY_CTRL_SETUP(data[2] - 1);
+ 
+ 	of_property_read_u32_array(np, "arm,filter-ranges",
+ 				   filter, ARRAY_SIZE(filter));
+ 	if (filter[1]) {
+-		writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
+-			       l2x0_base + L310_ADDR_FILTER_END);
+-		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
+-			       l2x0_base + L310_ADDR_FILTER_START);
++		l2x0_saved_regs.filter_end =
++					ALIGN(filter[0] + filter[1], SZ_1M);
++		l2x0_saved_regs.filter_start = (filter[0] & ~(SZ_1M - 1))
++					| L310_ADDR_FILTER_EN;
+ 	}
+ }
+ 
+@@ -1057,6 +1084,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ 	.enable = l2c310_enable,
+ 	.fixup = l2c310_fixup,
+ 	.save  = l2c310_save,
++	.configure = l2c310_configure,
+ 	.outer_cache = {
+ 		.inv_range   = l2c210_inv_range,
+ 		.clean_range = l2c210_clean_range,
+@@ -1085,6 +1113,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
+ 	.enable = l2c310_enable,
+ 	.fixup = l2c310_fixup,
+ 	.save  = l2c310_save,
++	.configure = l2c310_configure,
+ 	.outer_cache = {
+ 		.inv_range   = l2c210_inv_range,
+ 		.clean_range = l2c210_clean_range,
+@@ -1199,16 +1228,6 @@ static void aurora_save(void __iomem *base)
+ 	l2x0_saved_regs.aux_ctrl = readl_relaxed(base + L2X0_AUX_CTRL);
+ }
+ 
+-static void aurora_resume(void)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	if (!(readl(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+-		writel_relaxed(l2x0_saved_regs.aux_ctrl, base + L2X0_AUX_CTRL);
+-		writel_relaxed(l2x0_saved_regs.ctrl, base + L2X0_CTRL);
+-	}
+-}
+-
+ /*
+  * For Aurora cache in no outer mode, enable via the CP15 coprocessor
+  * broadcasting of cache commands to L2.
+@@ -1270,7 +1289,7 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
+ 		.flush_all   = l2x0_flush_all,
+ 		.disable     = l2x0_disable,
+ 		.sync        = l2x0_cache_sync,
+-		.resume      = aurora_resume,
++		.resume      = l2c_resume,
+ 	},
+ };
+ 
+@@ -1283,7 +1302,7 @@ static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
+ 	.fixup = aurora_fixup,
+ 	.save  = aurora_save,
+ 	.outer_cache = {
+-		.resume      = aurora_resume,
++		.resume      = l2c_resume,
+ 	},
+ };
+ 
+@@ -1431,6 +1450,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
+ 	.of_parse = l2c310_of_parse,
+ 	.enable = l2c310_enable,
+ 	.save  = l2c310_save,
++	.configure = l2c310_configure,
+ 	.outer_cache = {
+ 		.inv_range   = bcm_inv_range,
+ 		.clean_range = bcm_clean_range,
+@@ -1452,18 +1472,12 @@ static void __init tauros3_save(void __iomem *base)
+ 		readl_relaxed(base + L310_PREFETCH_CTRL);
+ }
+ 
+-static void tauros3_resume(void)
++static void tauros3_configure(void __iomem *base)
+ {
+-	void __iomem *base = l2x0_base;
+-
+-	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+-		writel_relaxed(l2x0_saved_regs.aux2_ctrl,
+-			       base + TAUROS3_AUX2_CTRL);
+-		writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
+-			       base + L310_PREFETCH_CTRL);
+-
+-		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
+-	}
++	writel_relaxed(l2x0_saved_regs.aux2_ctrl,
++		       base + TAUROS3_AUX2_CTRL);
++	writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
++		       base + L310_PREFETCH_CTRL);
+ }
+ 
+ static const struct l2c_init_data of_tauros3_data __initconst = {
+@@ -1472,9 +1486,10 @@ static const struct l2c_init_data of_tauros3_data __initconst = {
+ 	.num_lock = 8,
+ 	.enable = l2c_enable,
+ 	.save  = tauros3_save,
++	.configure = tauros3_configure,
+ 	/* Tauros3 broadcasts L1 cache operations to L2 */
+ 	.outer_cache = {
+-		.resume      = tauros3_resume,
++		.resume      = l2c_resume,
+ 	},
+ };
+ 
+@@ -1530,6 +1545,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	if (!of_property_read_bool(np, "cache-unified"))
+ 		pr_err("L2C: device tree omits to specify unified cache\n");
+ 
++	/* Read back current (default) hardware configuration */
++	if (data->save)
++		data->save(l2x0_base);
++
+ 	/* L2 configuration can only be changed if the cache is disabled */
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN))
+ 		if (data->of_parse)
+-- 
+1.9.3
