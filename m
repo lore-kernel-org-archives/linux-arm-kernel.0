@@ -1,61 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Jul 2014 10:52:09 -0700
-Subject: [GIT PULL 1/3] ARM: tegra: rework PCIe regulators
-In-Reply-To: <20140717142037.GA17494@ulmo>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <20140707003854.GD8469@quad.lixom.net>
- <20140707055211.GA15216@ulmo>
- <CAOesGMjwE=xThuUwmBF02YaQ32_uFogryW5anNoGc8yfkuN_Pg@mail.gmail.com>
- <20140710101527.GC21583@ulmo> <20140717142037.GA17494@ulmo>
-Message-ID: <CAOesGMjdfMDKK5EyA96g3ECxxfJC3W3ZtSpYsijgt+Fp+i3_yg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 17 Jul 2014 10:52:50 -0700
+Subject: [PATCH v11 11/11] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <CAGXu5j+dFZdnnK8f-HRrUs2vLeyhWyHh_AY-OynDcp-Ye+dy7Q@mail.gmail.com>
+References: <1405547442-26641-1-git-send-email-keescook@chromium.org>
+ <1405547442-26641-12-git-send-email-keescook@chromium.org>
+ <CAHse=S_32tmusk4ceY4U6GbNpX4PkX12iPPDZFVZ7qgv-RAooA@mail.gmail.com>
+ <CAGXu5j+dFZdnnK8f-HRrUs2vLeyhWyHh_AY-OynDcp-Ye+dy7Q@mail.gmail.com>
+Message-ID: <CAGXu5jJy0pW9X8YMhnfChtBO55EZKW6J7-+svKMBYP7WGM4PaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 7:20 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Thu, Jul 10, 2014 at 12:15:28PM +0200, Thierry Reding wrote:
->> On Mon, Jul 07, 2014 at 09:45:46PM -0700, Olof Johansson wrote:
-> [...]
->> > If you have to stay compatible, then I suggest you try to fill in
->> > local driver variables with derivatives of the old properties (and
->> > directly from the newer properties where you can). I haven't looked at
->> > the specifics here so I don't know how hard it might be.
->> >
->> > If you are 100% sure that you don't have to stay compatible, then you
->> > can remove the code handling the old bindings. Still, even then I am a
->> > little worried about dependencies (and more importantly conflicts)
->> > between these dtsi changes and others done by tegra platform code for
->> > this release. I suppose that can be resolved by having this as a base
->> > of any DT changes for tegra if needed.
+On Thu, Jul 17, 2014 at 8:45 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Jul 17, 2014 at 8:04 AM, David Drysdale <drysdale@google.com> wrote:
+>> On Wed, Jul 16, 2014 at 10:50 PM, Kees Cook <keescook@chromium.org> wrote:
+>>> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+>>> index 9065d2c79c56..2125b83ccfd4 100644
+>>> +/**
+>>> + * seccomp_can_sync_threads: checks if all threads can be synchronized
+>>> + *
+>>> + * Expects sighand and cred_guard_mutex locks to be held.
+>>> + *
+>>> + * Returns 0 on success, -ve on error, or the pid of a thread which was
+>>> + * either not in the correct seccomp mode or it did not have an ancestral
+>>> + * seccomp filter.
+>>> + */
+>>> +static inline pid_t seccomp_can_sync_threads(void)
+>>> +{
+>>> +       struct task_struct *thread, *caller;
+>>> +
+>>> +       BUG_ON(!mutex_is_locked(&current->signal->cred_guard_mutex));
+>>> +       BUG_ON(!spin_is_locked(&current->sighand->siglock));
+>>> +
+>>> +       if (current->seccomp.mode != SECCOMP_MODE_FILTER)
+>>> +               return -EACCES;
 >>
->> To be honest, I'm very much tempted to just drop this series. Even if
->> that means keeping a totally broken DT binding. But frankly I don't have
->> any energy left to debate DT stability.
+>> Quick question -- is it possible to apply the first filter and also synchronize
+>> it across threads in the same operation?  If so, does this arm also need to
+>> cope with seccomp.mode being SECCOMP_MODE_DISABLED?
+>>
+>> [seccomp_set_mode_filter() looks to call this via seccomp_attach_filter()
+>> before it does seccomp_assign_mode()]
 >
-> So this kept bugging me and I couldn't leave it alone after all. How
-> about if I squash in the attached patch. I've verified that that keeps
-> compatibility with old device trees on TrimSlice and Beaver. I think the
-> remainder of the series could still remain as-is (the top few commits
-> that you said shouldn't be there) if I squash this into
->
->         PCI: tegra: Implement accurate power supply scheme
->
-> That way the binding will be the new one so that people don't get any
-> wrong ideas about taking shortcuts while still preserving compatibility
-> with existing DTBs.
+> I don't entirely understand what you're asking. The threads gain the
+> filter and the mode before the current thread may gain the mode (if
+> it's the first time this has been called). Due to all the locks,
+> though, this isn't a problem. Is there a situation you see where there
+> might be a problem?
 
-Taking a quick look at the patch, it looks sane to me and pretty much
-exactly what I would expect the code to look like w.r.t. handling old
-bindings.
+Just to follow up for posterity on lkml: the problem was that mode was
+being set in "current" _after_ sync, so the mode check in can_sync
+would fail if "current" was not yet in filter mode. (i.e. the first
+attached filter could not have the TSYNC flag.) This check was
+redundant with the attach_filter entry point checks, and protected
+nothing, so it has been removed and a new test added to the seccomp
+regression test suite. :)
 
-> Interestingly, despite my initial disgust for having to keep around old
-> code (it's in fact new code in this case) for compatibility reasons, it
-> ended up making the code look more mature.
+I sent it as a new patch on top of v11, instead of respinning
+everything as v12. If that's not preferred, I can send v12 with this
+fix incorporated.
 
-I'm glad it went that way. It shouldn't be _too_ bad to keep the
-compatibility with old bindings in the code like this in most cases,
-it's mostly a matter of filling in the newer structures like you did
-in this patch.
+Thanks!
 
+-Kees
 
--Olof
+-- 
+Kees Cook
+Chrome OS Security
