@@ -1,59 +1,44 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 17 Jul 2014 11:39:10 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140716155747.GR29414@arm.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
-Message-ID: <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 17 Jul 2014 12:41:23 +0200
+Subject: [alsa-devel] [PATCH 2/4] ASoC: s3c64xx/smartq: use dynamic
+ registration
+In-Reply-To: <20140717101723.GR17528@sirena.org.uk>
+References: <CAAVeFuJRCwSwcEOng2M6s+mWhJT8sUtsh7YGE-hBTGUFWAhtrQ@mail.gmail.com>
+ <CAAVeFuLfgG6W1qK2ATTbq_ydEOjUuM8Wvftm6N1RK3Kz_y1zHg@mail.gmail.com>
+ <20140716071237.GA7978@ulmo>
+ <CAAVeFuJEjMBX+7vsLk5zXV5Moy=WDmWidpVZjQ_=8VD45+QdHg@mail.gmail.com>
+ <20140716075107.GG7978@ulmo> <53C63CBA.20809@codethink.co.uk>
+ <CAAVeFuK55XzwaU+eOWhfUxJ7wEwGqxRCPDZKf+gVeMgeV8ys6g@mail.gmail.com>
+ <20140717074444.GB18640@ulmo>
+ <CAAVeFuJQUA+92jGpgDkyQ+=Qu+okBHzS5aFi7gmdwh+qcFp3fg@mail.gmail.com>
+ <20140717101723.GR17528@sirena.org.uk>
+Message-ID: <20140717104121.GF17877@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 16:57, Will Deacon <will.deacon@arm.com> wrote:
-> I don't have hugely strong opinions about this, but I don't see why it's
-> useful to print exactly the same line out `n' times; once for each CPU. We
-> only pass one set of hwcaps to ELF executables via auxv, so why do we need
-> to duplicate things here?
+On Thu, Jul 17, 2014 at 11:17:23AM +0100, Mark Brown wrote:
+> On Thu, Jul 17, 2014 at 05:55:36PM +0900, Alexandre Courbot wrote:
+> 
+> > Right. It may very well be that a single flag specifier (as opposed to
+> > an array) will be enough for this case. If you need to request some
+> > GPIOs as input and some other as output then they are clearly
+> > different functions and requesting them together would be an abuse of
+> > the API.
+> 
+> Not so sure about that - what about requesting GPIOs for a bidirectional
+> bus?  Thinking about SPI bitbanging here.
 
-I think there are a couple of lines of argument here:
+Wouldn't you want to use a different means that the gpiod_array_*() API
+to handle those cases? gpiod_array_*() is probably most useful to handle
+bulk operations on a set of GPIOs that do essentially the same thing. If
+you get and then need to index into that array to handle them all
+differently then you don't gain very much.
 
-(1) Precedent from other architectures. Both 32-bit ARM and
-x86 have the feature-info be per-core; we should do the same
-for 64-bit ARM unless there's a really strong reason not to.
-
-(2) Making this be not-per-CPU backs us into a corner. If we
-have the feature flags per-core, and it turns out that they're
-never ever different between cores even on heterogenous
-CPUs, there's no problem. If we have the feature flags be
-listed only once, and then in future we do want to support
-some minor form of heterogeny between cores, then we're
-stuck with a compatibility break because the format doesn't
-let us express that. (Perhaps there might be a big.LITTLE
-system where only the big cores had the crypto extensions,
-to pick a random possibility where the kernel doesn't need to
-care but userspace could take advantage by restricting itself
-to running on only the big cores). I think this makes the
-choice pretty straightforward, since there's basically no
-benefit to having only a single features line.
-
-(3) CPU features really are per-core, so collapsing them
-down into a single line is not consistent with the line this
-series otherwise takes of "we just report the information
-the hardware provides without interpretation" (in particular
-the refusal to provide nice human readable CPU names).
-
-> Put another way, we're really treating the hwcaps as a system property
-> rather than a per-cpu property, so I think we should handle them as such.
-
-This is an implementation detail of the kernel, so you shouldn't
-be gratuitously exposing it to userspace if you can easily
-avoid doing so, as here. (The ELF HWCAP ABI obviously
-does assume homogeny and would need fixing in a future
-more heterogenous world.)
-
-If you wanted you could print a single "lowest common
-denominator features" line in addition to the per-CPU
-features information.
-
-thanks
--- PMM
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/7c167e5d/attachment-0001.sig>
