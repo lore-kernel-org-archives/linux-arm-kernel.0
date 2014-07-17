@@ -1,166 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Jul 2014 12:52:45 +0200
-Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C7A433.4070404@redhat.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
- <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
- <53C6908A.2050200@redhat.com> <20140716195136.GB5212@mithrandir>
- <53C77263.7050903@redhat.com> <20140717073956.GA18640@ulmo>
- <53C7A433.4070404@redhat.com>
-Message-ID: <20140717105244.GG17877@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 11:54:15 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <53C7A980.8050601@arm.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+ <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+ <53C7A980.8050601@arm.com>
+Message-ID: <20140717105415.GI21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:23:47PM +0200, Hans de Goede wrote:
-> On 07/17/2014 09:39 AM, Thierry Reding wrote:
-> > On Thu, Jul 17, 2014 at 08:51:15AM +0200, Hans de Goede wrote:
-[...]
-> > > I realize that this changes the reset-deassert vs clock enabling ordering,
-> > > if this is an issue please add reset support to libahci-platform.c I believe
-> > > that is something which we will need to do soonish anyways (reset controllers
-> > > are popping up everywhere in newer SoCs).
-> > 
-> > I think we could safely move the reset deassert after the call to
-> > ahci_platform_enable_resources().
+On Thu, Jul 17, 2014 at 11:46:24AM +0100, Marcus Shawcroft wrote:
+> On 17/07/14 11:39, Peter Maydell wrote:
+> > On 16 July 2014 16:57, Will Deacon <will.deacon@arm.com> wrote:
+> >> I don't have hugely strong opinions about this, but I don't see why it's
+> >> useful to print exactly the same line out `n' times; once for each CPU. We
+> >> only pass one set of hwcaps to ELF executables via auxv, so why do we need
+> >> to duplicate things here?
+> >
+> > I think there are a couple of lines of argument here:
+> >
+> > (1) Precedent from other architectures. Both 32-bit ARM and
+> > x86 have the feature-info be per-core; we should do the same
+> > for 64-bit ARM unless there's a really strong reason not to.
 > 
-> Will the resets not interfere with the phy_init / power_on which is done from
-> ahci_platform_enable_resources().
+> Agreed.
 
-The PHY is a completely different hardware block and I think the only
-requisite is that the regulator be turned on. Resets from SATA don't
-influence it.
+I don't really see the benefits of pretending that /proc/cpuinfo is remotely
+portable between architectures.
 
-> >> This means that the sata_clk will get enabled twice, but that is harmless
-> >> as long as we disable it twice too. This means that we need to add an
-> >> extra disable to tegra_ahci_power_off because tegra_powergate_power_off
-> >> seems to not do this (unlike power-on, which is rather unsymmetrical
-> >> it would be nice to fix this).
-> > 
-> > We've never had a need for it because the exact power down sequence
-> > isn't nearly as important. But I guess we could add a new function
-> > tegra_powergate_sequence_power_down() that takes care of disabling the
-> > clock and asserting the reset.
+> > (2) Making this be not-per-CPU backs us into a corner. If we
+> > have the feature flags per-core, and it turns out that they're
+> > never ever different between cores even on heterogenous
+> > CPUs, there's no problem. If we have the feature flags be
+> > listed only once, and then in future we do want to support
+> > some minor form of heterogeny between cores, then we're
+> > stuck with a compatibility break because the format doesn't
+> > let us express that. (Perhaps there might be a big.LITTLE
+> > system where only the big cores had the crypto extensions,
+> > to pick a random possibility where the kernel doesn't need to
+> > care but userspace could take advantage by restricting itself
+> > to running on only the big cores). I think this makes the
+> > choice pretty straightforward, since there's basically no
+> > benefit to having only a single features line.
 > 
-> Ok, no need to add it for my sake, I was just wondering about the non
-> symmetry of the API.
+> Agreed.
 
-There are discussions on how to make powergates work with PM domains.
-They aren't an ideal fit, but if we manage to make it work the powergate
-API will likely go away anyway.
+So the real question is: do we want to allow Linux to support features that
+exist only on a subset of cores in the system? The current thinking is that
+we truncate the advertised features to the common system subset, which means
+it will be the same on all cores, by definition. That allows hardware guys
+to build crazy systems that we can at least use, without imparting a world
+of pain onto software that needs to run on them.
 
-> > One other thing that I've been thinking about is whether it would make
-> > sense to make the ahci_platform library use a list of clock names that
-> > it should request. This would better mirror the clock bindings
-> > convention and allow drivers (such as the Tegra one) to take ownership
-> > of clocks that need special handling while at the same time leaving it
-> > to the helpers to do the bulk of the work.
-> > 
-> > One way I can think of to handle this would be by adding a struct
-> > ahci_platform_resources * parameter to ahci_platform_get_resources(),
-> > sowewhat like this:
-> > 
-> > 	struct ahci_platform_resources {
-> > 		const char *const *clocks;
-> > 		unsigned int num_clocks;
-> > 
-> > 		const char *const *resets;
-> > 		unsigned int num_resets;
-> > 	};
-> > 
-> > 	struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
-> > 							   const struct ahci_platform_resources *res)
-> > 	{
-> > 		...
-> > 
-> > 		for (i = 0; i < res->num_clocks; i++) {
-> > 			clk = clk_get(&pdev->dev, res->clocks[i]);
-> > 			...
-> > 		}
-> > 
-> > 		...
-> > 
-> > 		for (i = 0; i < res->num_resets; i++) {
-> > 			rst = reset_control_get(&pdev->dev, res->resets[i]);
-> > 			...
-> > 		}
-> > 
-> > 		...
-> > 	}
-> 
-> Interesting, I think this is a quite good idea. I do see some pitfalls though,
-> to answers Mikko's question from his followup :
-> 
-> On 07/17/2014 09:56 AM, Mikko Perttunen wrote:
-> > Also: is there a reason to not use the devm_* variants? I note that the helper code has not been able to prevent any of the ahci_platform drivers from messing up by not calling ahci_platform_put_resources.
-> 
-> The libahci_platform.c code / ahci_platform.c code is also used for
-> devices going way back who may not yet be using the new clk framework,
-> so where we need to use clk_get(dev, NULL); quoting from libahci_platform.c :
-> 
->         for (i = 0; i < AHCI_MAX_CLKS; i++) {
->                 /*
->                  * For now we must use clk_get(dev, NULL) for the first clock,
->                  * because some platforms (da850, spear13xx) are not yet
->                  * converted to use devicetree for clocks.  For new platforms
->                  * this is equivalent to of_clk_get(dev->of_node, 0).
->                  */
->                 if (i == 0)
->                         clk = clk_get(dev, NULL);
->                 else
->                         clk = of_clk_get(dev->of_node, i);
-> 
->                 if (IS_ERR(clk)) {
->                         rc = PTR_ERR(clk);
->                         if (rc == -EPROBE_DEFER)
->                                 goto err_out;
->                         break;
->                 }
->                 hpriv->clks[i] = clk;
->         }
-> 
-> And there is no devm variant of that, nor is there one to get clocks by index.
-> Note that we also need ahci_platform_put_resources for runtime pm support, so
-> that one is going to stay around anyways and thus there is not that much value
-> in fixing this.
-> 
-> So although I like Thierry's idea, if we go this way (which sounds good), we
-> should add support for taking a NULL ahci_platform_resources argument and in
-> that case behave as before, esp. because of the platforms needing the old
-> style clock handling. An advantage of doing this, is that we can simply patch
-> all existing users to pass NULL.
+I also think that we're backed into a corner regardless. We've seen how
+people ignore hwcaps (e.g. SWP), so they're likely to parse the caps for
+CPU0 and use that as an indication of the system capabilities.
 
-Isn't the "legacy" case really just this:
+Note that the features list *isn't* just the features supported by the CPU.
+It also takes into account the set of features supported by the kernel (e.g.
+we don't advertise VFP on ARMv7 if VFP context switching isn't enabled).
 
-	static const char *const legacy_ahci_clocks[] = {
-		NULL
-	};
-
-	static const struct ahci_platform_resources legacy_ahci_resources = {
-		.num_clocks = ARRAY_SIZE(legacy_ahci_clocks),
-		.clocks = legacy_ahci_clocks,
-	};
-
-?
-
-> > 	static const char *const tegra_ahci_clocks[] = {
-> > 		"sata-oob", "cml1", pll_e",
-> > 	};
-> 
-> Note you could also put the "sata" clock here, since then you will
-> know its index, and can use hpriv->clks to access it. Not putting
-> it here has the advantage of not doing the double enable / disable
-> (and the disadvantage of needing to the clk_get yourself).
-
-Right, the intention here was that we wouldn't have it managed by the
-ahci_platform library because it needs special handling anyway. Having
-it in this table would therefore be redundant.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/5b5707fa/attachment.sig>
+Will
