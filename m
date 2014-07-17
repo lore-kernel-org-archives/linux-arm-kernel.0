@@ -1,84 +1,97 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Jul 2014 18:39:00 +0200
-Subject: [PATCH v3 5/7] ARM: EXYNOS: Add .write_sec outer cache callback for
- L2C-310
-In-Reply-To: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
-References: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1405615142-21426-6-git-send-email-t.figa@samsung.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Thu, 17 Jul 2014 11:45:28 -0500
+Subject: [v3 PATCH 3/6] ARM: dts: am33xx: Add prcm_resets node
+In-Reply-To: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
+References: <1405615531-15649-1-git-send-email-dmurphy@ti.com>
+Message-ID: <1405615531-15649-3-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4 SoCs equipped with an L2C-310 cache controller and running under
-secure firmware require certain registers of aforementioned IP to be
-accessed only from secure mode. This means that SMC calls are required
-for certain register writes. To handle this, an implementation of
-.write_sec and .configure callbacks is provided by this patch.
+Add the prcm_resets node to the prcm parent node.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Add the am33xx_resets file to define the
+am33xx reset lines that are handled by this reset
+framework.
+
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
- arch/arm/mach-exynos/firmware.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index f5e626d..554b350 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -17,6 +17,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
- #include <asm/firmware.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/suspend.h>
+v3 - No changes
+
+ arch/arm/boot/dts/am33xx-resets.dtsi |   42 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi        |    7 ++++++
+ 2 files changed, 49 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am33xx-resets.dtsi
+
+diff --git a/arch/arm/boot/dts/am33xx-resets.dtsi b/arch/arm/boot/dts/am33xx-resets.dtsi
+new file mode 100644
+index 0000000..9260626
+--- /dev/null
++++ b/arch/arm/boot/dts/am33xx-resets.dtsi
+@@ -0,0 +1,42 @@
++/*
++ * Device Tree Source for AM33XX reset data
++ *
++ * Copyright (C) 2014 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&prcm_resets {
++	gfx_rstctrl {
++		reg = <0x1104>,
++			  <0x1114>;
++
++		gfx_reset: gfx_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++	};
++
++	per_rstctrl {
++		reg = <0xD00>,
++			  <0xD0C>;
++
++		iva_reset: iva_reset {
++			control-bit = <0x04>;
++			status-bit = <0x10>;
++		};
++	};
++
++	device_rstctrl {
++		reg = <0xf00>,
++			  <0xf08>;
++
++		device_reset: device_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++	};
++
++};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 4a4e02d..5cdc8f0 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -117,6 +117,12 @@
  
- #include <mach/map.h>
-@@ -120,6 +121,31 @@ static const struct firmware_ops exynos_firmware_ops = {
- 	.resume			= exynos_resume,
+ 			prcm_clockdomains: clockdomains {
+ 			};
++
++			prcm_resets: resets {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				#reset-cells = <1>;
++			};
+ 		};
+ 
+ 		scrm: scrm at 44e10000 {
+@@ -834,3 +840,4 @@
  };
  
-+static void exynos_l2_write_sec(unsigned long val, unsigned reg)
-+{
-+	switch (reg) {
-+	case L2X0_CTRL:
-+		if (val & L2X0_CTRL_EN)
-+			exynos_smc(SMC_CMD_L2X0INVALL, 0, 0, 0);
-+		exynos_smc(SMC_CMD_L2X0CTRL, val, 0, 0);
-+		break;
-+
-+	case L2X0_DEBUG_CTRL:
-+		exynos_smc(SMC_CMD_L2X0DEBUG, val, 0, 0);
-+		break;
-+
-+	default:
-+		WARN_ONCE(1, "%s: ignoring write to reg 0x%x\n", __func__, reg);
-+	}
-+}
-+
-+static void exynos_l2_configure(const struct l2x0_regs *regs)
-+{
-+	exynos_smc(SMC_CMD_L2X0SETUP1, regs->tag_latency, regs->data_latency,
-+			regs->prefetch_ctrl);
-+	exynos_smc(SMC_CMD_L2X0SETUP2, regs->pwr_ctrl, regs->aux_ctrl, 0);
-+}
-+
- void __init exynos_firmware_init(void)
- {
- 	struct device_node *nd;
-@@ -139,4 +165,16 @@ void __init exynos_firmware_init(void)
- 	pr_info("Running under secure firmware.\n");
- 
- 	register_firmware_ops(&exynos_firmware_ops);
-+
-+	/*
-+	 * Exynos 4 SoCs (based on Cortex A9 and equipped with L2C-310),
-+	 * running under secure firmware, require certain registers of L2
-+	 * cache controller to be written in secure mode. Here .write_sec
-+	 * callback is provided to perform necessary SMC calls.
-+	 */
-+	if (IS_ENABLED(CONFIG_CACHE_L2X0)
-+	    && read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
-+		outer_cache.write_sec = exynos_l2_write_sec;
-+		outer_cache.configure = exynos_l2_configure;
-+	}
- }
+ /include/ "am33xx-clocks.dtsi"
++/include/ "am33xx-resets.dtsi"
 -- 
-1.9.3
+1.7.9.5
