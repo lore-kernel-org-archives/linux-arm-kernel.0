@@ -1,58 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Jul 2014 14:55:34 +0100
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <20140717131854.GN13108@titan.lakedaemon.net>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140717131854.GN13108@titan.lakedaemon.net>
-Message-ID: <20140717135534.GM30313@leverpostej>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 17 Jul 2014 14:55:37 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <20140717123533.GJ21153@arm.com>
+References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
+ <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
+ <20140716155747.GR29414@arm.com>
+ <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
+ <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
+ <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
+ <20140717123533.GJ21153@arm.com>
+Message-ID: <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On 17 July 2014 13:35, Will Deacon <will.deacon@arm.com> wrote:
+> We're not denying the possibility of heterogeneity, we're trying to expose a
+> consistent view of the system to userspace. Differences between cores should
+> be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
+> passed off to userspace.
 
-On Thu, Jul 17, 2014 at 02:18:54PM +0100, Jason Cooper wrote:
-> On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
-> > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > 
-> > This patch set introduces support for MSI(-X) in GICv2m specification,
-> > which is implemented in some variation of GIC400.
-> > 
-> > This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
-> > (https://lkml.org/lkml/2014/3/14/320).
-> > 
-> > Changes in V3:
-> >     * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
-> >       (per Jason Cooper request)
-> >     * Misc fix/clean up per Mark Rutland comments
-> >     * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
-> >     * Patch 4 is new to the series:
-> >         * Add ARM64-specific version arch_setup_msi_irqs() to allow support
-> >           for Multiple MSI.
-> >         * Add support for Multiple MSI for GICv2m.
-> > 
-> > Suravee Suthikulpanit (4):
-> >   irqchip: gic: Add binding probe for ARM GIC400
-> >   irqchip: gic: Restructuring ARM GIC code
-> >   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-> >   irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
-> 
-> Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
-> irqchip/gic with irqchip/urgent merged in.  To facilitate
-> testing/merging, I've prepared an unsigned tag for you on the
-> irqchip/gic branch:
+On that basis, why report anything at all about invididual cores?
+Just have /proc/cpuinfo report "number of processors: 4" and
+no per-CPU information at all...
 
-I'm a little concerned that this is all going through for v3.17 without
-a {Reviewed,Acked}-by from Marc or anyone working with GIC{,v2m}.
-
-While his comments on v1 have been addressed, he has not had a chance to
-acknowledge the solutions. I appreciate Marc's holiday is unfortunately
-timed.
-
-I also have an open concern with the binding with regard to the
-orthogonality of GICV GICH and the MSI registers.
-
-Suravee, do you need this urgently for v3.17? I was under the impression
-that we wouldn't have full PCIe support by then.
-
-Cheers,
-Mark.
+-- PMM
