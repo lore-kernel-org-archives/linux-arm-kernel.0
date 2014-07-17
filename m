@@ -1,37 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Jul 2014 15:50:02 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <20140717115937.GF18203@arm.com>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
- <20140717115937.GF18203@arm.com>
-Message-ID: <20140717145002.GW17528@sirena.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Jul 2014 09:54:30 -0500
+Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140717145430.GF10459@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:59:38PM +0100, Catalin Marinas wrote:
-> On Thu, Jul 17, 2014 at 12:26:42PM +0100, Mark Brown wrote:
+Hi,
 
-> > Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> > interface) removed the arch parameter from __audit_syscall_entry() and
+On Wed, Jul 16, 2014 at 04:45:03PM +0200, Sebastian Andrzej Siewior wrote:
+> +static int omap_8250_startup(struct uart_port *port)
+> +{
+> +	struct uart_8250_port *up =
+> +		container_of(port, struct uart_8250_port, port);
+> +	struct omap8250_priv *priv = port->private_data;
+> +
+> +	int ret;
+> +
+> +	if (priv->wakeirq) {
+> +		ret = request_irq(priv->wakeirq, omap_wake_irq,
+> +				port->irqflags, "wakeup irq", port);
+> +		if (ret)
+> +			return ret;
+> +		disable_irq(priv->wakeirq);
+> +	}
+> +
+> +	ret = serial8250_do_startup(port);
+> +	if (ret)
+> +		goto err;
+> +
+> +	pm_runtime_get_sync(port->dev);
 
-> Thanks. This will have to be applied after 3.17-rc1 since commit
-> 3efe33f5d2 does not seem to be in mainline yet (nor the arm64 audit
-> patches).
+should this pm_runtime_get_sync() be placed above
+serial8250_do_startup() call ?
 
-That's not great and is kind of missing the point of -next - the core
-idea is to find these inter-tree dependencies, ensure things work when
-they're merged together and avoid things like massive bisection breaks.
-Leaving things also causes problems for anyone trying to do integration
-testing on -next.
-
-What would be better would be if we could get the two trees synced up,
-in this case something like picking the audit change up in the ARMv8
-tree (or vice versa) seems like it'd be quick and easy since it looks
-like neither tree uses topic branches.
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/eb7fde8e/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/86425844/attachment.sig>
