@@ -1,35 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Jul 2014 01:16:05 -0700
-Subject: [PATCH v4 03/11] ARM: OMAP2+: timer: Add suspend-resume
- callbacks for clkevent device
-In-Reply-To: <53C6DDC6.9060705@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-4-git-send-email-d-gerlach@ti.com>
- <20140714111536.GC20068@atomide.com> <53C3EB1F.2010109@ti.com>
- <53C4166F.1050003@ti.com> <20140715064807.GJ20068@atomide.com>
- <53C6DDC6.9060705@ti.com>
-Message-ID: <20140717081605.GI18374@atomide.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Thu, 17 Jul 2014 10:22:12 +0200
+Subject: BUG: i.MX6-FEC: broken TCP tx checksumming
+In-Reply-To: <20140716183904.GQ21766@n2100.arm.linux.org.uk>
+References: <CAOpc7mFpW=ZDdF3g-MK4TaNje5KBWimUwUgxoebg-wmb+OQ8zA@mail.gmail.com>
+ <20140716095850.GO21766@n2100.arm.linux.org.uk>
+ <CAOpc7mGrZXbr-cytzSHLUjgoYz88ZFeuv2g0kJ2kzOnbF7Uz5g@mail.gmail.com>
+ <20140716183904.GQ21766@n2100.arm.linux.org.uk>
+Message-ID: <CAOpc7mHZZz-mxEKuoyoWtz7a=X=gDdQ7TVCDCZFYcR0+DYFSeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140716 13:19]:
-> On 07/15/2014 01:48 AM, Tony Lindgren wrote:
-> > 
-> > It's best to register these kind of functions as platform_data
-> > in pdata-quirks.c auxdata. That way when this moves to live
-> > in drivers/clocksource the driver does not need to know anything
-> > about the interconnect specific registers.
-> 
-> Perhaps I spoke too soon on this, I can't use pdata-quirks right now to pass the
-> idle/unidle functions. The clockevent source is special and reads the dt node
-> itself and then marks it as disabled so nothing else can touch it. No device is
-> created and no auxdata matched. I will gladly fix it up once the driver is ready
-> to move but right now I can't use any existing functionality to do it.
+It's good that you didn't invest too much time, because I found the
+real culprit.
 
-OK. So maybe just initialize the function pointers during init and
-use appropriate naming so the function pointers will stay usable
-later on too once it's a driver.
+I wanted to trigger the "clock from phy" code path in
+imx6q_1588_init() (arch/arm/mach-imx/mach-imx6q.c). This is done in
+weird way: the code checks the 3rd clock in the DTS somehow.
 
-Regards,
+So I removed the 3rd clock in my dts, e.g. making it:
 
-Tony
+&fec {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_fec>;
+    phy-mode = "rmii";
+    phy-reset-gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
+    clocks = <&clks 117>, <&clks 117>;
+    clock-names = "ipg", "ahb";
+};
+
+And as soon as I make that, the TCP checksumming doesn't work. When I
+remove that manual-clock-assignment it (so that the default get's
+active), tcp checksumming works. That I told you it works with wmb()
+was in error, because I changed several things at once (grave
+debugging error....  shame on me!).
+
+Now if the TCP checksumming code in the chip depends the ptp clock,
+then no code part should check if it is set to something else. So I
+guess imx6q_1588_init() is actualy buggy by checking for dtsclock[2]
+!= ptp_clk.
