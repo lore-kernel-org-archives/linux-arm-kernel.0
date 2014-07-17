@@ -1,41 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Jul 2014 18:10:58 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
- <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
- <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
- <20140717123533.GJ21153@arm.com>
- <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
-Message-ID: <20140717171058.GM18203@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Jul 2014 19:12:45 +0200
+Subject: [PATCH 1/8] ARM: Add platform support for Fujitsu MB86S7X SoCs
+In-Reply-To: <CAJe_ZhdM88x883DqxerW-JWpVeiFR9yA7s_=gpPZ7w1qPDJR=A@mail.gmail.com>
+References: <1405232911-4569-1-git-send-email-mollie.wu@linaro.org>
+ <13950816.fBdtyDiPqD@wuerfel>
+ <CAJe_ZhdM88x883DqxerW-JWpVeiFR9yA7s_=gpPZ7w1qPDJR=A@mail.gmail.com>
+Message-ID: <13232839.EhWsHsNIV6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 02:55:37PM +0100, Peter Maydell wrote:
-> On 17 July 2014 13:35, Will Deacon <will.deacon@arm.com> wrote:
-> > We're not denying the possibility of heterogeneity, we're trying to expose a
-> > consistent view of the system to userspace. Differences between cores should
-> > be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
-> > passed off to userspace.
-> 
-> On that basis, why report anything at all about invididual cores?
-> Just have /proc/cpuinfo report "number of processors: 4" and
-> no per-CPU information at all...
+On Thursday 17 July 2014 22:24:43 Jassi Brar wrote:
+> On 17 July 2014 19:18, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 17 July 2014 19:02:53 Jassi Brar wrote:
 
-We lost a lot of time on this already (given the internal threads). So
-my proposal is to go ahead with Mark's patch with per-CPU features. They
-currently just include the same elf_hwcap multiple times. If we ever
-need to present different features, the conditions would be:
+> >> From a few hundred micro-sec for CPU reset, to potentially tens of
+> >> milli-sec for some I2C transaction ... yes we do have for I2C over
+> >> mailbox! ;)
+> >>
+> >> Probably bailing out of the loop and returning -ETIMEOUT to the
+> >> caller, before a WARN(), is the simplest way to die.
+> >
+> > If you can have multiple miliseconds here, I think the code should
+> > be changed to run in non-atomic context and use msleep(1) or
+> > usleep_range() as a back-off. Is that possible?
+> >
+> I don't think we could sleep there but that should be ok because the
+> code is used only when we don't have mailbox framework ready i.e, in
+> very early boot before timers are ready and also as late as during
+> reboot/poweroff. Also I realize long delays like those for I2C would
+> never use this code - they would always have mailbox usable during
+> their lifetime.
 
-1. Never report more than elf_hwcap
-2. elf_hwcap can only include non-symmetric features *if* Linux gets a
-   way to transparently handle migration or emulation
+Ok, just add a comment then, and a warning if things take too long.
 
-It basically means that Linux would not rely on the user space to make
-informed decisions on where to run a thread and avoid SIGILL.
+> >> >> >> +struct mb86s7x_peri_clk {
+> >> >> >> +     u32 payload_size;
+> >> >> >> +     u32 cntrlr;
+> >> >> >> +     u32 domain;
+> >> >> >> +     u32 port;
+> >> >> >> +     u32 en;
+> >> >> >> +     u64 freqency;
+> >> >> >> +} __packed;
+> >> >> >
+> >> >> > Just mark the last member by itself __packed. I assume you didn't
+> >> >> > actually mean to change the alignment of the data structure to one
+> >> >> > byte, but just want to say that the last one is misaligned.
+> >> >> >
+> >> >> This and others, are data packets that are passed between local and
+> >> >> remote via SharedMemory. __packed is only meant to specify that these
+> >> >> data structures have no holes in them.
+> >> >
+> >> > That would be '__packed __attribute__((aligned(4)))'. A struct of 'u32'
+> >> > already has no padding on any architecture that is supported by Linux.
+> >> > The only reason you need the packing here is because the u64 member is
+> >> > unaligned. Note that marking the entire structure as packed means that
+> >> > accesses are no longer atomic because the compiler may prefer to do them
+> >> > one byte at a time, which can break the protocol on the shared memory
+> >> > area.
+> >> >
+> >> We are not worried about the atomic access because the side sending
+> >> the data doesn't touch it until the other side indicates it has
+> >> consumed it.
+> >
+> > It's still wrong though ;-)
+> >
+> The remote f/w expects data to be contiguous and we can't assume how
+> it reads the packet. So our firstmost priority is to have no holes in
+> the region... like, say, USB descriptors.
 
--- 
-Catalin
+The structures being contiguous is guaranteed by the ELF ABI, unless
+you have unaligned members.
+
+You can be explicit about it, but then you should also provide a
+new minimum alignment (e.g. 4 bytes) for the structure to avoid
+having the compiler turn everything into bytewise accesses.
+
+	Arnd
