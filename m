@@ -1,41 +1,97 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 07:41:00 -0400
-Subject: ARM: mvebu: ARCH_HAS_CPUFREQ
-In-Reply-To: <20140717113245.121277bb@free-electrons.com>
-References: <1405588702.4808.6.camel@x220>
- <20140717113245.121277bb@free-electrons.com>
-Message-ID: <20140717114100.GE13108@titan.lakedaemon.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 17 Jul 2014 13:42:45 +0200
+Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <20140717105244.GG17877@ulmo>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
+ <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
+ <53C6908A.2050200@redhat.com> <20140716195136.GB5212@mithrandir>
+ <53C77263.7050903@redhat.com> <20140717073956.GA18640@ulmo>
+ <53C7A433.4070404@redhat.com> <20140717105244.GG17877@ulmo>
+Message-ID: <53C7B6B5.4050602@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 11:32:45AM +0200, Thomas Petazzoni wrote:
-> Dear Paul Bolle,
-> 
-> On Thu, 17 Jul 2014 11:18:22 +0200, Paul Bolle wrote:
-> 
-> > 0) Linux-next includes your commit a02829b0485e ("ARM: mvebu: allow
-> > enabling of cpufreq on Armada XP") as of today (next-20140717).
-> > 
-> > 1) That commit only adds
-> >     select ARCH_HAS_CPUFREQ
-> > 
-> > to a Kconfig entry. But ARCH_HAS_CPUFREQ was dropped in v3.16-rc2, see
-> > commit 19682f72f5db ("ARM: Remove ARCH_HAS_CPUFREQ config option").
-> > While I don't know what you want to achieve here, selecting
-> > ARCH_HAS_CPUFREQ certainly won't help you.
-> 
-> Thanks for the notification. The issue is that the cpufreq branch I've
-> sent to Jason is based on 3.16-rc1, which does not have 19682f72f5db.
-> 
-> Jason, I believe you could simply drop the patch a02829b0485e, since
-> all it does is selecting this ARCH_HAS_CPUFREQ option which no longer
-> exists.
+Hi,
 
-Dropped from mvebu/soc-cpufreq.  mvebu/for-next is updated and build
-testing.  It'll be pushed out in a bit.
+On 07/17/2014 12:52 PM, Thierry Reding wrote:
+> On Thu, Jul 17, 2014 at 12:23:47PM +0200, Hans de Goede wrote:
 
-Thanks for the heads up Paul!
+<snip>
 
-thx,
+>> The libahci_platform.c code / ahci_platform.c code is also used for
+>> devices going way back who may not yet be using the new clk framework,
+>> so where we need to use clk_get(dev, NULL); quoting from libahci_platform.c :
+>>
+>>         for (i = 0; i < AHCI_MAX_CLKS; i++) {
+>>                 /*
+>>                  * For now we must use clk_get(dev, NULL) for the first clock,
+>>                  * because some platforms (da850, spear13xx) are not yet
+>>                  * converted to use devicetree for clocks.  For new platforms
+>>                  * this is equivalent to of_clk_get(dev->of_node, 0).
+>>                  */
+>>                 if (i == 0)
+>>                         clk = clk_get(dev, NULL);
+>>                 else
+>>                         clk = of_clk_get(dev->of_node, i);
+>>
+>>                 if (IS_ERR(clk)) {
+>>                         rc = PTR_ERR(clk);
+>>                         if (rc == -EPROBE_DEFER)
+>>                                 goto err_out;
+>>                         break;
+>>                 }
+>>                 hpriv->clks[i] = clk;
+>>         }
+>>
+>> And there is no devm variant of that, nor is there one to get clocks by index.
+>> Note that we also need ahci_platform_put_resources for runtime pm support, so
+>> that one is going to stay around anyways and thus there is not that much value
+>> in fixing this.
+>>
+>> So although I like Thierry's idea, if we go this way (which sounds good), we
+>> should add support for taking a NULL ahci_platform_resources argument and in
+>> that case behave as before, esp. because of the platforms needing the old
+>> style clock handling. An advantage of doing this, is that we can simply patch
+>> all existing users to pass NULL.
+> 
+> Isn't the "legacy" case really just this:
+> 
+> 	static const char *const legacy_ahci_clocks[] = {
+> 		NULL
+> 	};
+> 
+> 	static const struct ahci_platform_resources legacy_ahci_resources = {
+> 		.num_clocks = ARRAY_SIZE(legacy_ahci_clocks),
+> 		.clocks = legacy_ahci_clocks,
+> 	};
+> 
+> ?
 
-Jason.
+Ah yes that would work for the really legacy ones, as well as less legacy
+(full dts) ones with only one clk, we need to check if there are current
+users which use more then one clk (yes there are which is why MAX_CLKS
+was 3) and fixup those to pass in a correct ahci_platform_resources struct
+then.
+
+The checking + fixing up will be a bit of extra work, but I think the end result
+will be quite nice. so I'm all in favor of this.
+
+>>> 	static const char *const tegra_ahci_clocks[] = {
+>>> 		"sata-oob", "cml1", pll_e",
+>>> 	};
+>>
+>> Note you could also put the "sata" clock here, since then you will
+>> know its index, and can use hpriv->clks to access it. Not putting
+>> it here has the advantage of not doing the double enable / disable
+>> (and the disadvantage of needing to the clk_get yourself).
+> 
+> Right, the intention here was that we wouldn't have it managed by the
+> ahci_platform library because it needs special handling anyway. Having
+> it in this table would therefore be redundant.
+
+Ack.
+
+Regards,
+
+Hans
