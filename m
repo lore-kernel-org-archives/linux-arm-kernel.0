@@ -1,64 +1,144 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Jul 2014 11:30:34 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140716155747.GR29414@arm.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
-Message-ID: <20140717103034.GD18203@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 17 Jul 2014 11:31:13 +0100
+Subject: [PATCH 7/8] mailbox: f_mhu: add driver for Fujitsu MHU controller
+In-Reply-To: <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
+References: <1405233128-4799-1-git-send-email-mollie.wu@linaro.org>	<53C6B83D.80602@arm.com>
+ <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
+Message-ID: <53C7A5F1.30209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 16, 2014 at 04:57:47PM +0100, Will Deacon wrote:
-> On Wed, Jul 16, 2014 at 04:32:47PM +0100, Mark Rutland wrote:
-> > The features are printed per-cpu to match the format used by other
-> > architectures, and are derived from the (globally uniform) hwcaps. In
-> > cases where this may report incorrect information, rework is required
-> > elsewhere to function with varying instruction set support, and the
-> > sanity checks should provide us with some advance notice (warnings and
-> > TAINT_CPU_OUT_OF_SPEC). If we're lucky, such systems will never exist.
-> 
-> [...]
-> 
-> > -	for_each_online_cpu(i) {
-> >  		/*
-> >  		 * glibc reads /proc/cpuinfo to determine the number of
-> >  		 * online processors, looking for lines beginning with
-> >  		 * "processor".  Give glibc what it expects.
-> >  		 */
-> >  #ifdef CONFIG_SMP
-> > -		seq_printf(m, "processor\t: %d\n", i);
-> > +		seq_printf(m, "processor\t: %d\n", c);
-> >  #endif
-> > +		seq_printf(m, "implementer\t: 0x%02x\n",
-> > +			   MIDR_IMPLEMENTOR(midr));
-> > +		seq_printf(m, "variant\t\t: 0x%x\n", MIDR_VARIANT(midr));
-> > +		seq_printf(m, "partnum\t\t: 0x%03x\n", MIDR_PARTNUM(midr));
-> > +		seq_printf(m, "revision\t: 0x%x\n", MIDR_REVISION(midr));
-> > +
-> > +		/* dump out the processor features */
-> > +		seq_puts(m, "features\t: ");
-> > +		for (i = 0; hwcap_str[i]; i++)
-> > +			if (elf_hwcap & (1 << i))
-> > +				seq_printf(m, "%s ", hwcap_str[i]);
-> 
-> I don't have hugely strong opinions about this, but I don't see why it's
-> useful to print exactly the same line out `n' times; once for each CPU. We
-> only pass one set of hwcaps to ELF executables via auxv, so why do we need
-> to duplicate things here?
-> 
-> Put another way, we're really treating the hwcaps as a system property
-> rather than a per-cpu property, so I think we should handle them as such.
 
-I agree. An argument would be that we expose per-cpu hwcap in
-/proc/cpuinfo so that whoever (human) looks at this can get an idea of
-what features are missing on some CPUs. The elf_hwcap exported to user
-via envp should only contain the common subset.
 
-But my worry is that code will start reading /proc/cpuinfo and make the
-wrong assumptions on heterogeneous systems, so I agree with Will's
-proposal of only printing the (common) CPU features once as a system
-property made available by the kernel.
+On 17/07/14 07:25, Jassi Brar wrote:
+> On 16 July 2014 23:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> Hi Mollie,
+>>
+>>
+>> On 13/07/14 07:32, Mollie Wu wrote:
+>>>
+>>> Add driver for the proprietary Mailbox controller (f_mhu) in MB86S7x.
 
--- 
-Catalin
+[...]
+
+>>
+>>> +       u32 val;
+>>> +
+>>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>>
+>>
+>> Please remove all these debug prints.
+>>
+> These are as good as absent unless DEBUG is defined.
+>
+
+Yes, but with mailbox framework, the controller driver(esp. this one)is
+almost like a shim layer. Instead of each driver adding these debugs,
+IMO it would be good to have these in the framework.
+
+>>
+>>> +       /* See NOTE_RX_DONE */
+>>> +       val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
+>>> +       mbox_chan_received_data(chan, (void *)val);
+>>> +
+>>> +       /*
+>>> +        * It is agreed with the remote firmware that the receiver
+>>> +        * will clear the STAT register indicating it is ready to
+>>> +        * receive next data - NOTE_RX_DONE
+>>> +        */
+>>
+>> This note could be added as how this mailbox works in general and
+>> it's not just Rx right ? Even Tx done is based on this logic.
+>> Basically the logic is valid on both directions.
+>>
+> Yes that is a protocol level agreement. Different f/w may behave differently.
+>
+
+Ok, I am not sure if that's entirely true because the MHU spec says it 
+drives
+the signal using a 32-bit register, with all 32 bits logically ORed 
+together.
+Usually only Rx signals are wired to interrupts and Tx needs to be polled
+but that's entirely implementation choice I believe.
+
+More over if it's protocol level agreement it should not belong here :)
+
+>>> +static int mhu_startup(struct mbox_chan *chan)
+>>> +{
+>>> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>>> +       unsigned long flags;
+>>> +       u32 val;
+>>> +       int ret;
+>>> +
+>>> +       pr_debug("%s:%d\n", __func__, __LINE__);
+>>> +       spin_lock_irqsave(&mlink->lock, flags);
+>>> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+>>> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
+>>> +       spin_unlock_irqrestore(&mlink->lock, flags);
+>>> +
+>>> +       ret = request_irq(mlink->irq, mhu_rx_interrupt,
+>>> +                         IRQF_SHARED, "mhu_link", chan);
+>>
+>>
+>> Just a thought: Can this be threaded_irq instead ?
+>> Can move request_irq to probe instead esp. if threaded_irq ?
+>> That provides some flexibility to client's rx_callback.
+>>
+> This is controller driver, and can not know which client want
+> rx_callback in hard-irq context and which in thread_fn context.
+> Otherwise, request_irq() does evaluate to request_threaded_irq(), if
+> thats what you mean.
+
+Agreed but on contrary since MHU involves external firmware(running
+on different processor) which might have it's own latency, I prefer
+threaded over hard irq. And yes request_irq does evaluate to
+request_threaded_irq but with thread_fn = NULL which is not what I want.
+
+>   There might be use-cases like (diagnostic or other) data transfer
+> over mailbox where we don't wanna increase latency, so we have to
+> provide a rx_callback in hard-irq context.
+>
+
+OK
+
+>>
+>>> +       for (i = 0; i < 3; i++) {
+>>> +               mhu->chan[i].con_priv = &mhu->mlink[i];
+>>> +               spin_lock_init(&mhu->mlink[i].lock);
+>>> +               res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+>>> +               mhu->mlink[i].irq = res->start;
+>>> +               mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
+>>> +               mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
+>>> +       }
+>>> +
+>>> +       mhu->mbox.dev = &pdev->dev;
+>>> +       mhu->mbox.chans = &mhu->chan[0];
+>>> +       mhu->mbox.num_chans = 3;
+>>
+>>
+>> Change this to 2, we shouldn't expose secular channel here as Linux can't
+>> access that anyway.
+>>
+> On the contrary, I think the device driver code should be able to
+> manage every resource - secure or non-secure. If we remove secure
+> channel option, what do we do on some other platform that needs it?
+> And Linux may not always run in non-secure mode.
+
+In general secure accesses are avoided these days in Linux as we have no
+way to identify it. I agree there are few place where we do access.
+Even though I don't like you have secure channel access in Linux, you
+have valid reasons. In case you decide to support it, there is some
+restrictions in bit 31, though RAZ/WI you need to notify that to protocol
+if it tries to access it ?
+
+>   So here we populate all channels and let the clients knows which
+> channel to use via platform specific details - DT. Please note the
+> driver doesn't touch any secure resource if client doesn't ask it to
+> (except SCFG for now, which I think should have some S vs NS DT
+> binding).
+>
+
+Not sure of this though. We need feedback from DT maintainers.
+
+Regards,
+Sudeep
