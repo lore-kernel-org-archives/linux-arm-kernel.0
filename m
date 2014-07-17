@@ -1,32 +1,43 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 17 Jul 2014 11:31:59 -0400
-Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <20140716160614.GI1365@saruman.home>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
- <20140716151604.GG1365@saruman.home> <53C6A050.2050409@linutronix.de>
- <20140716160614.GI1365@saruman.home>
-Message-ID: <53C7EC6F.6060902@hurleysoftware.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Jul 2014 11:32:36 -0400
+Subject: [PATCH] irqchip: gic: Fix core ID calculation when topology is
+ read from DT
+In-Reply-To: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
+References: <1405610624-18722-1-git-send-email-t.figa@samsung.com>
+Message-ID: <20140717153236.GS13108@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 12:06 PM, Felipe Balbi wrote:
-> On Wed, Jul 16, 2014 at 05:54:56PM +0200, Sebastian Andrzej Siewior wrote:
->> On 07/16/2014 05:16 PM, Felipe Balbi wrote:
+On Thu, Jul 17, 2014 at 05:23:44PM +0200, Tomasz Figa wrote:
+> Certain GIC implementation, namely those found on earlier, single
+> cluster, Exynos SoCs, have registers mapped without per-CPU banking,
+> which means that the driver needs to use different offset for each CPU.
+> 
+> Currently the driver calculates the offset by multiplying value returned
+> by cpu_logical_map() by CPU offset parsed from DT. This is correct when
+> CPU topology is not specified in DT and aforementioned function returns
+> core ID alone. However when DT contains CPU topology, the function
+> changes to return cluster ID as well, which is non-zero on mentioned
+> SoCs and so breaks the calculation in GIC driver.
+> 
+> This patch fixes this by masking out cluster ID in CPU offset
+> calculation so that only core ID is considered. Multi-cluster Exynos
+> SoCs already have banked GIC implementations, so this simple fix should
+> be enough.
+> 
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 
->>> I wonder if you should get_sync() on start_tx() and only
->>> put_autosuspend() at stop_tx(). I guess the outcome would be
->>> largely the same, no ?
->>
->> I just opened minicom on ttyS0 and gave a try. start_tx() was invoked
->> each time I pressed a key (sent a character). I haven't seen stop_tx()
->> even after after I closed minicom. I guess stop_tx() is invoked if you
->> switch half-duplex communication.
->
-> that's bad, I expected stop to be called also after each character.
+iiuc, this was introduced by:
 
-The 8250 core auto-stops tx when the tx ring buffer is empty (except
-in the case of dma, where stopping tx isn't necessary).
+  db0d4db22a78d ARM: gic: allow GIC to support non-banked setups
 
-Regards,
-Peter Hurley
+and so should be for v3.3 and up, correct?
+
+thx,
+
+Jason.
