@@ -1,38 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Jul 2014 15:21:33 +0100
-Subject: [PATCHv4 0/5] arm64: handle heterogeneous system register values
-In-Reply-To: <20140717110332.GE18203@arm.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <20140717110332.GE18203@arm.com>
-Message-ID: <20140717142133.GO30313@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 15:27:20 +0100
+Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
+In-Reply-To: <20140717131224.GW21766@n2100.arm.linux.org.uk>
+References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140717102425.34fe0181@free-electrons.com>
+ <20140717083342.GS21766@n2100.arm.linux.org.uk>
+ <6510599.Qoc205T3v7@wuerfel>
+ <20140717131224.GW21766@n2100.arm.linux.org.uk>
+Message-ID: <20140717142720.GM21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 12:03:33PM +0100, Catalin Marinas wrote:
-> On Wed, Jul 16, 2014 at 04:32:42PM +0100, Mark Rutland wrote:
-> > Mark Rutland (5):
-> >   arm64: add MIDR_EL1 field accessors
-> >   arm64: cpuinfo: record cpu system register values
-> >   arm64: cachetype: report weakest cache policy
-> >   arm64: add runtime system sanity checks
+On Thu, Jul 17, 2014 at 02:12:24PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 17, 2014 at 02:39:42PM +0200, Arnd Bergmann wrote:
+> > On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
+> > > No - the problem is that we're running from the page table in question
+> > > with global mappings, and we need to switch all these mappings, including
+> > > the ones we're currently using to execute from.
+> > > 
+> > > We can't even create a new page table and switch to it because the
+> > > mappings in question are global mappings.
+> > > 
+> > > The only way to do that safely from an architectural point of view would
+> > > be to turn the MMU off, and drop back to assembly code to change the
+> > > page tables, and re-enable the MMU.  For something as obscure as Marvell's
+> > > coherency stuff, that's not something I want to see in core code.
+> > 
+> > Is this different from what we do in the LPAE version of
+> > early_paging_init()? That code already adjusts all the page
+> > table entries on a per-platform setting and should be very
+> > easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
+> > and possibly able to extend for traditional (non-LPAE)
+> > page tables without a lot of duplication.
 > 
-> For these 4 patches:
+> I'm going to have to profess no knowledge of how the LPAE stuff works.
+> LPAE is something I can't run, and something that I was not involved
+> in its creation.  Therefore, I know very little about it and zero
+> experience thereof.
 > 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> From a glance over that function, I think that is unsafe for all the
+> reasons I've stated.  However, I'll pass this over to Will Deacon
+> to comment further on.
 
-Thanks.
+Just an FYI, but I've had to check internally to clarify the behaviour
+around TLB conflict aborts. We're changing live page tables here, but the
+*only* thing to differ is the output address, which I would hope is ok but
+need to check to be sure.
 
-I take it you'll pick these up directly and apply the tags from you and
-Will?
+The ARM ARM recommends always going via an invalid mapping, but that's not
+always the most practical thing to do.
 
-Or would you prefer I place these in a branch?
-
-> 
-> >   arm64: cpuinfo: print info for all CPUs
-> 
-> This is still up for discussion.
-
-Sure, that's what I had expected. At least it's out in the open.
-
-Cheers,
-Mark.
+Will
