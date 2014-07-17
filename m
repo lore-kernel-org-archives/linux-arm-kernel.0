@@ -1,400 +1,592 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 17 Jul 2014 11:55:44 +0530
-Subject: [PATCH 7/8] mailbox: f_mhu: add driver for Fujitsu MHU controller
-In-Reply-To: <53C6B83D.80602@arm.com>
-References: <1405233128-4799-1-git-send-email-mollie.wu@linaro.org>
- <53C6B83D.80602@arm.com>
-Message-ID: <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 17 Jul 2014 07:45:38 +0100
+Subject: [PATCH] arm64: Refactor compat.h into compat-types.h
+Message-ID: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2014 23:07, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Hi Mollie,
->
->
-> On 13/07/14 07:32, Mollie Wu wrote:
->>
->> Add driver for the proprietary Mailbox controller (f_mhu) in MB86S7x.
->
->
-> And it looks like this is not Fujitsu proprietary MHU, it's exactly same IP
-> on JUNO(ARM64 development platform from ARM [1]). I was not sure it's
-> standard
-> IP used on other SoCs too, I too wrote similar driver :(.
->
-Same here :)
+This reduces the complexity of the includes needed for linux/stat.h and removes
+some possibilities for causing include loops.
 
-> Can you please confirm this by reading Peripheral ID(PID: 0xFD0, 0xFE0 -
-> 0xFEC) and Component ID(COMPID: 0xFF0 - 0xFFC). Are they
->
-> PID  - 0x04 0x98 0xB0 0x1B 0x00
-> COMPID - 0x0D 0xF0 0x05 0xB1
->
-> If so we have do s/f_mhu/arm_mhu/g :)
->
-Yup, we have to.
+One such issue was exposed by the Debian kernel's application of the aufs
+patches which led to:
 
->
->> It has three channels - LowPri-NonSecure, HighPri-NonSecure and Secure.
->> The MB86S7x communicates over the HighPri-NonSecure channel.
->>
->> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
->> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
->> Signed-off-by: Mollie Wu <mollie.wu@linaro.org>
->> ---
->>   drivers/mailbox/Kconfig  |   7 ++
->>   drivers/mailbox/Makefile |   2 +
->>   drivers/mailbox/f_mhu.c  | 227
->> +++++++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 236 insertions(+)
->>   create mode 100644 drivers/mailbox/f_mhu.c
->>
->> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
->> index c8b5c13..681aac2 100644
->> --- a/drivers/mailbox/Kconfig
->> +++ b/drivers/mailbox/Kconfig
->> @@ -6,6 +6,13 @@ menuconfig MAILBOX
->>           signals. Say Y if your platform supports hardware mailboxes.
->>
->>   if MAILBOX
->> +
->> +config MBOX_F_MHU
->> +       bool
->
->
-> On Juno, there's nothing that prevents me from compiling this as module.
->
-On S7x, even built-in is not early enough for our purposes. But yes,
-now that we have company it should be made tristate.
+In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
+                 from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
+                 from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
+                 from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
+                 from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
+                 from /?PKGBUILDDIR?/include/linux/stat.h:5,
+                 from /?PKGBUILDDIR?/include/linux/module.h:10,
+                 from /?PKGBUILDDIR?/init/main.c:15:
+/?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
+  int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+                                                                ^
+/?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
 
->> +       depends on ARCH_MB86S7X
->
->
-> Definitely not a requirement
->
-It was, until we found each other ;)
+This is due to an extra fs.h include added to mm.h leading to a loop in the
+includes. Splitting out the type defintions from compat.h into compat-types.h
+allows asm/stat.h to only include the types header and avoids the loop.
 
->
->> +       help
->> +         Say Y here if you want to use the F_MHU IPCM support.
->> +
->
->
-> Also it needs some description.
->
-OK
+Full logs in http://buildd.debian-ports.org/status/fetch.php?pkg=linux&arch=arm64&ver=3.14.12-1&stamp=1405234443
 
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: debian-kernel at lists.debian.org
+---
+This is effectively v2 of "arm64: Move struct stat64 to uapi"
+---
+ arch/arm64/include/asm/compat-types.h | 262 ++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/compat.h       | 238 +-----------------------------
+ arch/arm64/include/asm/stat.h         |   2 +-
+ 3 files changed, 264 insertions(+), 238 deletions(-)
+ create mode 100644 arch/arm64/include/asm/compat-types.h
 
->> +#define INTR_STAT_OFS  0x0
->> +#define INTR_SET_OFS   0x8
->> +#define INTR_CLR_OFS   0x10
->> +
->> +#define MHU_SCFG       0x400
->> +
->
->
-> Remove this.(secure access only register)
->
-See later.
-
->
->> +struct mhu_link {
->> +       unsigned irq;
->> +       spinlock_t lock; /* channel regs */
->> +       void __iomem *tx_reg;
->> +       void __iomem *rx_reg;
->> +};
->> +
->> +struct f_mhu {
->> +       void __iomem *base;
->> +       struct clk *clk;
->> +       struct mhu_link mlink[3];
->> +       struct mbox_chan chan[3];
->> +       struct mbox_controller mbox;
->> +};
->> +
->> +static irqreturn_t mhu_rx_interrupt(int irq, void *p)
->> +{
->> +       struct mbox_chan *chan = (struct mbox_chan *)p;
->> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->
->
-> You don't need explicit cast from void pointers
->
-Yup
-
->
->> +       u32 val;
->> +
->> +       pr_debug("%s:%d\n", __func__, __LINE__);
->
->
-> Please remove all these debug prints.
->
-These are as good as absent unless DEBUG is defined.
-
->
->> +       /* See NOTE_RX_DONE */
->> +       val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
->> +       mbox_chan_received_data(chan, (void *)val);
->> +
->> +       /*
->> +        * It is agreed with the remote firmware that the receiver
->> +        * will clear the STAT register indicating it is ready to
->> +        * receive next data - NOTE_RX_DONE
->> +        */
->
-> This note could be added as how this mailbox works in general and
-> it's not just Rx right ? Even Tx done is based on this logic.
-> Basically the logic is valid on both directions.
->
-Yes that is a protocol level agreement. Different f/w may behave differently.
-
-
->
->> +       writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
->> +
->> +       return IRQ_HANDLED;
->> +}
->> +
->> +static bool mhu_last_tx_done(struct mbox_chan *chan)
->> +{
->> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->> +       unsigned long flags;
->> +       u32 val;
->> +
->> +       pr_debug("%s:%d\n", __func__, __LINE__);
->> +       spin_lock_irqsave(&mlink->lock, flags);
->
->
-> Why do we need this extra locks here ? mailbox core maintains
-> per channel lock and uses it for at-least send_data IIRC. And this
-> function is just reading status do we really need the lock ?
->
-> I must be missing something here else  IMO we can get rid of this
-> extra locks in here.
->
-Yeah, probably unnecessary.
-
->> +       /* See NOTE_RX_DONE */
->> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->> +       spin_unlock_irqrestore(&mlink->lock, flags);
->> +
->> +       return (val == 0);
->> +}
->> +
->> +static int mhu_send_data(struct mbox_chan *chan, void *data)
->> +{
->> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->> +       unsigned long flags;
->> +
->> +       pr_debug("%s:%d\n", __func__, __LINE__);
->> +       if (!mhu_last_tx_done(chan)) {
->> +               pr_err("%s:%d Shouldn't have seen the day!\n",
->> +                      __func__, __LINE__);
->> +               return -EBUSY;
->> +       }
->> +
->> +       spin_lock_irqsave(&mlink->lock, flags);
->> +       writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
->> +       spin_unlock_irqrestore(&mlink->lock, flags);
->> +
->> +       return 0;
->> +}
->> +
->> +static int mhu_startup(struct mbox_chan *chan)
->> +{
->> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->> +       unsigned long flags;
->> +       u32 val;
->> +       int ret;
->> +
->> +       pr_debug("%s:%d\n", __func__, __LINE__);
->> +       spin_lock_irqsave(&mlink->lock, flags);
->> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
->> +       spin_unlock_irqrestore(&mlink->lock, flags);
->> +
->> +       ret = request_irq(mlink->irq, mhu_rx_interrupt,
->> +                         IRQF_SHARED, "mhu_link", chan);
->
->
-> Just a thought: Can this be threaded_irq instead ?
-> Can move request_irq to probe instead esp. if threaded_irq ?
-> That provides some flexibility to client's rx_callback.
->
-This is controller driver, and can not know which client want
-rx_callback in hard-irq context and which in thread_fn context.
-Otherwise, request_irq() does evaluate to request_threaded_irq(), if
-thats what you mean.
- There might be use-cases like (diagnostic or other) data transfer
-over mailbox where we don't wanna increase latency, so we have to
-provide a rx_callback in hard-irq context.
-
->
->> +       if (unlikely(ret)) {
->> +               pr_err("Unable to aquire IRQ\n");
->> +               return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static void mhu_shutdown(struct mbox_chan *chan)
->> +{
->> +       struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->> +
->> +       pr_debug("%s:%d\n", __func__, __LINE__);
->> +       free_irq(mlink->irq, chan);
->> +}
->> +
->> +static struct mbox_chan_ops mhu_ops = {
->> +       .send_data = mhu_send_data,
->> +       .startup = mhu_startup,
->> +       .shutdown = mhu_shutdown,
->> +       .last_tx_done = mhu_last_tx_done,
->> +};
->> +
->> +static int f_mhu_probe(struct platform_device *pdev)
->> +{
->> +       int i, err;
->> +       struct f_mhu *mhu;
->> +       struct resource *res;
->> +       int mhu_reg[3] = {0x0, 0x20, 0x200};
->
->
-> Probably this gets simplified when you remove secure channel access ?
->
-we don't remove secure channel :)
-
->
->> +
->> +       /* Allocate memory for device */
->> +       mhu = kzalloc(sizeof(*mhu), GFP_KERNEL);
->> +       if (!mhu) {
->> +               dev_err(&pdev->dev, "failed to allocate memory.\n");
->> +               return -EBUSY;
->> +       }
->> +
->> +       mhu->clk = clk_get(&pdev->dev, "clk");
->> +       if (unlikely(IS_ERR(mhu->clk))) {
->> +               dev_err(&pdev->dev, "unable to init clock\n");
->
->
-> Don't bail out if there's no clock specified in DT. Clock might not
-> be a hard requirement.
->
-Hmm.. OK.
-
->
->> +               kfree(mhu);
->> +               return -EINVAL;
->> +       }
->> +       clk_prepare_enable(mhu->clk);
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       mhu->base = ioremap(res->start, resource_size(res));
->> +       if (!mhu->base) {
->> +               dev_err(&pdev->dev, "ioremap failed.\n");
->> +               kfree(mhu);
->> +               return -EBUSY;
->> +       }
->> +
->> +       /* Let UnTrustedOS's access violations don't bother us */
->> +       writel_relaxed(0, mhu->base + MHU_SCFG);
->> +
->
->
-> Please don't do this. It can't work in non-secure mode. The firmware running
-> with secure access needs to configure this appropriately.
->
-ok.. pls see below.
-
-> I might be missing to see, is there a binding document for this mhu ?
->
-Yeah we need one.
-
->
->> +       for (i = 0; i < 3; i++) {
->> +               mhu->chan[i].con_priv = &mhu->mlink[i];
->> +               spin_lock_init(&mhu->mlink[i].lock);
->> +               res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
->> +               mhu->mlink[i].irq = res->start;
->> +               mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
->> +               mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
->> +       }
->> +
->> +       mhu->mbox.dev = &pdev->dev;
->> +       mhu->mbox.chans = &mhu->chan[0];
->> +       mhu->mbox.num_chans = 3;
->
->
-> Change this to 2, we shouldn't expose secular channel here as Linux can't
-> access that anyway.
->
-On the contrary, I think the device driver code should be able to
-manage every resource - secure or non-secure. If we remove secure
-channel option, what do we do on some other platform that needs it?
-And Linux may not always run in non-secure mode.
- So here we populate all channels and let the clients knows which
-channel to use via platform specific details - DT. Please note the
-driver doesn't touch any secure resource if client doesn't ask it to
-(except SCFG for now, which I think should have some S vs NS DT
-binding).
-
->
->> +       mhu->mbox.ops = &mhu_ops;
->> +       mhu->mbox.txdone_irq = false;
->> +       mhu->mbox.txdone_poll = true;
->> +       mhu->mbox.txpoll_period = 10;
->> +
->> +       platform_set_drvdata(pdev, mhu);
->> +
->> +       err = mbox_controller_register(&mhu->mbox);
->> +       if (err) {
->> +               dev_err(&pdev->dev, "Failed to register mailboxes %d\n",
->> err);
->> +               iounmap(mhu->base);
->> +               kfree(mhu);
->> +       } else {
->> +               dev_info(&pdev->dev, "Fujitsu MHU Mailbox registered\n");
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->
->
-> Also to be module you need add remove.
->
-Yup, OK.
-
->
->> +static const struct of_device_id f_mhu_dt_ids[] = {
->> +       { .compatible = "fujitsu,mhu" },
->> +       { /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, f_mhu_dt_ids);
->> +
->> +static struct platform_driver f_mhu_driver = {
->> +       .driver         = {
->> +               .name   = "f_mhu",
->> +               .owner = THIS_MODULE,
->> +               .of_match_table = f_mhu_dt_ids,
->> +       },
->> +       .probe          = f_mhu_probe,
->> +};
->> +
->> +static int __init f_mhu_init(void)
->> +{
->> +       return platform_driver_register(&f_mhu_driver);
->> +}
->> +module_init(f_mhu_init);
->
->
-> This can be module_platform_driver instead.
->
-OK
-
-Thanks
--Jassi
+diff --git a/arch/arm64/include/asm/compat-types.h b/arch/arm64/include/asm/compat-types.h
+new file mode 100644
+index 0000000..18e55ef
+--- /dev/null
++++ b/arch/arm64/include/asm/compat-types.h
+@@ -0,0 +1,262 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_COMPAT_TYPES_H
++#define __ASM_COMPAT_TYPES_H
++#ifdef __KERNEL__
++#ifdef CONFIG_COMPAT
++
++#include <linux/types.h>
++
++typedef u32		compat_size_t;
++typedef s32		compat_ssize_t;
++typedef s32		compat_time_t;
++typedef s32		compat_clock_t;
++typedef s32		compat_pid_t;
++typedef u32		__compat_uid_t;
++typedef u32		__compat_gid_t;
++typedef u16		__compat_uid16_t;
++typedef u16		__compat_gid16_t;
++typedef u32		__compat_uid32_t;
++typedef u32		__compat_gid32_t;
++typedef u16		compat_mode_t;
++typedef u32		compat_ino_t;
++typedef u32		compat_dev_t;
++typedef s32		compat_off_t;
++typedef s64		compat_loff_t;
++typedef s32		compat_nlink_t;
++typedef u16		compat_ipc_pid_t;
++typedef s32		compat_daddr_t;
++typedef u32		compat_caddr_t;
++typedef __kernel_fsid_t	compat_fsid_t;
++typedef s32		compat_key_t;
++typedef s32		compat_timer_t;
++
++typedef s16		compat_short_t;
++typedef s32		compat_int_t;
++typedef s32		compat_long_t;
++typedef s64		compat_s64;
++typedef u16		compat_ushort_t;
++typedef u32		compat_uint_t;
++typedef u32		compat_ulong_t;
++typedef u64		compat_u64;
++typedef u32		compat_uptr_t;
++
++struct compat_timespec {
++	compat_time_t	tv_sec;
++	s32		tv_nsec;
++};
++
++struct compat_timeval {
++	compat_time_t	tv_sec;
++	s32		tv_usec;
++};
++
++struct compat_stat {
++#ifdef __AARCH64EB__
++	short		st_dev;
++	short		__pad1;
++#else
++	compat_dev_t	st_dev;
++#endif
++	compat_ino_t	st_ino;
++	compat_mode_t	st_mode;
++	compat_ushort_t	st_nlink;
++	__compat_uid16_t	st_uid;
++	__compat_gid16_t	st_gid;
++#ifdef __AARCH64EB__
++	short		st_rdev;
++	short		__pad2;
++#else
++	compat_dev_t	st_rdev;
++#endif
++	compat_off_t	st_size;
++	compat_off_t	st_blksize;
++	compat_off_t	st_blocks;
++	compat_time_t	st_atime;
++	compat_ulong_t	st_atime_nsec;
++	compat_time_t	st_mtime;
++	compat_ulong_t	st_mtime_nsec;
++	compat_time_t	st_ctime;
++	compat_ulong_t	st_ctime_nsec;
++	compat_ulong_t	__unused4[2];
++};
++
++struct compat_flock {
++	short		l_type;
++	short		l_whence;
++	compat_off_t	l_start;
++	compat_off_t	l_len;
++	compat_pid_t	l_pid;
++};
++
++#define F_GETLK64	12	/*  using 'struct flock64' */
++#define F_SETLK64	13
++#define F_SETLKW64	14
++
++struct compat_flock64 {
++	short		l_type;
++	short		l_whence;
++	compat_loff_t	l_start;
++	compat_loff_t	l_len;
++	compat_pid_t	l_pid;
++};
++
++struct compat_statfs {
++	int		f_type;
++	int		f_bsize;
++	int		f_blocks;
++	int		f_bfree;
++	int		f_bavail;
++	int		f_files;
++	int		f_ffree;
++	compat_fsid_t	f_fsid;
++	int		f_namelen;	/* SunOS ignores this field. */
++	int		f_frsize;
++	int		f_flags;
++	int		f_spare[4];
++};
++
++#define COMPAT_RLIM_INFINITY		0xffffffff
++
++typedef u32		compat_old_sigset_t;
++
++#define _COMPAT_NSIG		64
++#define _COMPAT_NSIG_BPW	32
++
++typedef u32		compat_sigset_word;
++
++typedef union compat_sigval {
++	compat_int_t	sival_int;
++	compat_uptr_t	sival_ptr;
++} compat_sigval_t;
++
++typedef struct compat_siginfo {
++	int si_signo;
++	int si_errno;
++	int si_code;
++
++	union {
++		/* The padding is the same size as AArch64. */
++		int _pad[128/sizeof(int) - 3];
++
++		/* kill() */
++		struct {
++			compat_pid_t _pid;	/* sender's pid */
++			__compat_uid32_t _uid;	/* sender's uid */
++		} _kill;
++
++		/* POSIX.1b timers */
++		struct {
++			compat_timer_t _tid;	/* timer id */
++			int _overrun;		/* overrun count */
++			compat_sigval_t _sigval;	/* same as below */
++			int _sys_private;       /* not to be passed to user */
++		} _timer;
++
++		/* POSIX.1b signals */
++		struct {
++			compat_pid_t _pid;	/* sender's pid */
++			__compat_uid32_t _uid;	/* sender's uid */
++			compat_sigval_t _sigval;
++		} _rt;
++
++		/* SIGCHLD */
++		struct {
++			compat_pid_t _pid;	/* which child */
++			__compat_uid32_t _uid;	/* sender's uid */
++			int _status;		/* exit code */
++			compat_clock_t _utime;
++			compat_clock_t _stime;
++		} _sigchld;
++
++		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
++		struct {
++			compat_uptr_t _addr; /* faulting insn/memory ref. */
++			short _addr_lsb; /* LSB of the reported address */
++		} _sigfault;
++
++		/* SIGPOLL */
++		struct {
++			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
++			int _fd;
++		} _sigpoll;
++	} _sifields;
++} compat_siginfo_t;
++
++#define COMPAT_OFF_T_MAX	0x7fffffff
++#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
++
++struct compat_ipc64_perm {
++	compat_key_t key;
++	__compat_uid32_t uid;
++	__compat_gid32_t gid;
++	__compat_uid32_t cuid;
++	__compat_gid32_t cgid;
++	unsigned short mode;
++	unsigned short __pad1;
++	unsigned short seq;
++	unsigned short __pad2;
++	compat_ulong_t unused1;
++	compat_ulong_t unused2;
++};
++
++struct compat_semid64_ds {
++	struct compat_ipc64_perm sem_perm;
++	compat_time_t  sem_otime;
++	compat_ulong_t __unused1;
++	compat_time_t  sem_ctime;
++	compat_ulong_t __unused2;
++	compat_ulong_t sem_nsems;
++	compat_ulong_t __unused3;
++	compat_ulong_t __unused4;
++};
++
++struct compat_msqid64_ds {
++	struct compat_ipc64_perm msg_perm;
++	compat_time_t  msg_stime;
++	compat_ulong_t __unused1;
++	compat_time_t  msg_rtime;
++	compat_ulong_t __unused2;
++	compat_time_t  msg_ctime;
++	compat_ulong_t __unused3;
++	compat_ulong_t msg_cbytes;
++	compat_ulong_t msg_qnum;
++	compat_ulong_t msg_qbytes;
++	compat_pid_t   msg_lspid;
++	compat_pid_t   msg_lrpid;
++	compat_ulong_t __unused4;
++	compat_ulong_t __unused5;
++};
++
++struct compat_shmid64_ds {
++	struct compat_ipc64_perm shm_perm;
++	compat_size_t  shm_segsz;
++	compat_time_t  shm_atime;
++	compat_ulong_t __unused1;
++	compat_time_t  shm_dtime;
++	compat_ulong_t __unused2;
++	compat_time_t  shm_ctime;
++	compat_ulong_t __unused3;
++	compat_pid_t   shm_cpid;
++	compat_pid_t   shm_lpid;
++	compat_ulong_t shm_nattch;
++	compat_ulong_t __unused4;
++	compat_ulong_t __unused5;
++};
++
++#endif /* CONFIG_COMPAT */
++#endif /* __KERNEL__ */
++#endif /* __ASM_COMPAT_TYPES_H */
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 253e33b..c10c791 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -24,6 +24,7 @@
+ #include <linux/types.h>
+ #include <linux/sched.h>
+ #include <linux/ptrace.h>
++#include <asm/compat-types.h>
+ 
+ #define COMPAT_USER_HZ		100
+ #ifdef __AARCH64EB__
+@@ -32,185 +33,6 @@
+ #define COMPAT_UTS_MACHINE	"armv8l\0\0"
+ #endif
+ 
+-typedef u32		compat_size_t;
+-typedef s32		compat_ssize_t;
+-typedef s32		compat_time_t;
+-typedef s32		compat_clock_t;
+-typedef s32		compat_pid_t;
+-typedef u32		__compat_uid_t;
+-typedef u32		__compat_gid_t;
+-typedef u16		__compat_uid16_t;
+-typedef u16		__compat_gid16_t;
+-typedef u32		__compat_uid32_t;
+-typedef u32		__compat_gid32_t;
+-typedef u16		compat_mode_t;
+-typedef u32		compat_ino_t;
+-typedef u32		compat_dev_t;
+-typedef s32		compat_off_t;
+-typedef s64		compat_loff_t;
+-typedef s32		compat_nlink_t;
+-typedef u16		compat_ipc_pid_t;
+-typedef s32		compat_daddr_t;
+-typedef u32		compat_caddr_t;
+-typedef __kernel_fsid_t	compat_fsid_t;
+-typedef s32		compat_key_t;
+-typedef s32		compat_timer_t;
+-
+-typedef s16		compat_short_t;
+-typedef s32		compat_int_t;
+-typedef s32		compat_long_t;
+-typedef s64		compat_s64;
+-typedef u16		compat_ushort_t;
+-typedef u32		compat_uint_t;
+-typedef u32		compat_ulong_t;
+-typedef u64		compat_u64;
+-typedef u32		compat_uptr_t;
+-
+-struct compat_timespec {
+-	compat_time_t	tv_sec;
+-	s32		tv_nsec;
+-};
+-
+-struct compat_timeval {
+-	compat_time_t	tv_sec;
+-	s32		tv_usec;
+-};
+-
+-struct compat_stat {
+-#ifdef __AARCH64EB__
+-	short		st_dev;
+-	short		__pad1;
+-#else
+-	compat_dev_t	st_dev;
+-#endif
+-	compat_ino_t	st_ino;
+-	compat_mode_t	st_mode;
+-	compat_ushort_t	st_nlink;
+-	__compat_uid16_t	st_uid;
+-	__compat_gid16_t	st_gid;
+-#ifdef __AARCH64EB__
+-	short		st_rdev;
+-	short		__pad2;
+-#else
+-	compat_dev_t	st_rdev;
+-#endif
+-	compat_off_t	st_size;
+-	compat_off_t	st_blksize;
+-	compat_off_t	st_blocks;
+-	compat_time_t	st_atime;
+-	compat_ulong_t	st_atime_nsec;
+-	compat_time_t	st_mtime;
+-	compat_ulong_t	st_mtime_nsec;
+-	compat_time_t	st_ctime;
+-	compat_ulong_t	st_ctime_nsec;
+-	compat_ulong_t	__unused4[2];
+-};
+-
+-struct compat_flock {
+-	short		l_type;
+-	short		l_whence;
+-	compat_off_t	l_start;
+-	compat_off_t	l_len;
+-	compat_pid_t	l_pid;
+-};
+-
+-#define F_GETLK64	12	/*  using 'struct flock64' */
+-#define F_SETLK64	13
+-#define F_SETLKW64	14
+-
+-struct compat_flock64 {
+-	short		l_type;
+-	short		l_whence;
+-	compat_loff_t	l_start;
+-	compat_loff_t	l_len;
+-	compat_pid_t	l_pid;
+-};
+-
+-struct compat_statfs {
+-	int		f_type;
+-	int		f_bsize;
+-	int		f_blocks;
+-	int		f_bfree;
+-	int		f_bavail;
+-	int		f_files;
+-	int		f_ffree;
+-	compat_fsid_t	f_fsid;
+-	int		f_namelen;	/* SunOS ignores this field. */
+-	int		f_frsize;
+-	int		f_flags;
+-	int		f_spare[4];
+-};
+-
+-#define COMPAT_RLIM_INFINITY		0xffffffff
+-
+-typedef u32		compat_old_sigset_t;
+-
+-#define _COMPAT_NSIG		64
+-#define _COMPAT_NSIG_BPW	32
+-
+-typedef u32		compat_sigset_word;
+-
+-typedef union compat_sigval {
+-	compat_int_t	sival_int;
+-	compat_uptr_t	sival_ptr;
+-} compat_sigval_t;
+-
+-typedef struct compat_siginfo {
+-	int si_signo;
+-	int si_errno;
+-	int si_code;
+-
+-	union {
+-		/* The padding is the same size as AArch64. */
+-		int _pad[128/sizeof(int) - 3];
+-
+-		/* kill() */
+-		struct {
+-			compat_pid_t _pid;	/* sender's pid */
+-			__compat_uid32_t _uid;	/* sender's uid */
+-		} _kill;
+-
+-		/* POSIX.1b timers */
+-		struct {
+-			compat_timer_t _tid;	/* timer id */
+-			int _overrun;		/* overrun count */
+-			compat_sigval_t _sigval;	/* same as below */
+-			int _sys_private;       /* not to be passed to user */
+-		} _timer;
+-
+-		/* POSIX.1b signals */
+-		struct {
+-			compat_pid_t _pid;	/* sender's pid */
+-			__compat_uid32_t _uid;	/* sender's uid */
+-			compat_sigval_t _sigval;
+-		} _rt;
+-
+-		/* SIGCHLD */
+-		struct {
+-			compat_pid_t _pid;	/* which child */
+-			__compat_uid32_t _uid;	/* sender's uid */
+-			int _status;		/* exit code */
+-			compat_clock_t _utime;
+-			compat_clock_t _stime;
+-		} _sigchld;
+-
+-		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
+-		struct {
+-			compat_uptr_t _addr; /* faulting insn/memory ref. */
+-			short _addr_lsb; /* LSB of the reported address */
+-		} _sigfault;
+-
+-		/* SIGPOLL */
+-		struct {
+-			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+-			int _fd;
+-		} _sigpoll;
+-	} _sifields;
+-} compat_siginfo_t;
+-
+-#define COMPAT_OFF_T_MAX	0x7fffffff
+-#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
+-
+ /*
+  * A pointer passed in from user mode. This should not
+  * be used for syscall parameters, just declare them
+@@ -235,64 +57,6 @@ static inline void __user *arch_compat_alloc_user_space(long len)
+ 	return (void __user *)compat_user_stack_pointer() - len;
+ }
+ 
+-struct compat_ipc64_perm {
+-	compat_key_t key;
+-	__compat_uid32_t uid;
+-	__compat_gid32_t gid;
+-	__compat_uid32_t cuid;
+-	__compat_gid32_t cgid;
+-	unsigned short mode;
+-	unsigned short __pad1;
+-	unsigned short seq;
+-	unsigned short __pad2;
+-	compat_ulong_t unused1;
+-	compat_ulong_t unused2;
+-};
+-
+-struct compat_semid64_ds {
+-	struct compat_ipc64_perm sem_perm;
+-	compat_time_t  sem_otime;
+-	compat_ulong_t __unused1;
+-	compat_time_t  sem_ctime;
+-	compat_ulong_t __unused2;
+-	compat_ulong_t sem_nsems;
+-	compat_ulong_t __unused3;
+-	compat_ulong_t __unused4;
+-};
+-
+-struct compat_msqid64_ds {
+-	struct compat_ipc64_perm msg_perm;
+-	compat_time_t  msg_stime;
+-	compat_ulong_t __unused1;
+-	compat_time_t  msg_rtime;
+-	compat_ulong_t __unused2;
+-	compat_time_t  msg_ctime;
+-	compat_ulong_t __unused3;
+-	compat_ulong_t msg_cbytes;
+-	compat_ulong_t msg_qnum;
+-	compat_ulong_t msg_qbytes;
+-	compat_pid_t   msg_lspid;
+-	compat_pid_t   msg_lrpid;
+-	compat_ulong_t __unused4;
+-	compat_ulong_t __unused5;
+-};
+-
+-struct compat_shmid64_ds {
+-	struct compat_ipc64_perm shm_perm;
+-	compat_size_t  shm_segsz;
+-	compat_time_t  shm_atime;
+-	compat_ulong_t __unused1;
+-	compat_time_t  shm_dtime;
+-	compat_ulong_t __unused2;
+-	compat_time_t  shm_ctime;
+-	compat_ulong_t __unused3;
+-	compat_pid_t   shm_cpid;
+-	compat_pid_t   shm_lpid;
+-	compat_ulong_t shm_nattch;
+-	compat_ulong_t __unused4;
+-	compat_ulong_t __unused5;
+-};
+-
+ static inline int is_compat_task(void)
+ {
+ 	return test_thread_flag(TIF_32BIT);
+diff --git a/arch/arm64/include/asm/stat.h b/arch/arm64/include/asm/stat.h
+index 15e3559..d96a5c6 100644
+--- a/arch/arm64/include/asm/stat.h
++++ b/arch/arm64/include/asm/stat.h
+@@ -20,7 +20,7 @@
+ 
+ #ifdef CONFIG_COMPAT
+ 
+-#include <asm/compat.h>
++#include <asm/compat-types.h>
+ 
+ /*
+  * struct stat64 is needed for compat tasks only. Its definition is different
+-- 
+2.0.1
