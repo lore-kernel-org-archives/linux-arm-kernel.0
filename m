@@ -1,56 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Jul 2014 09:13:20 -0400
-Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140717131320.GM13108@titan.lakedaemon.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 17 Jul 2014 15:15:52 +0200
+Subject: [PATCH 1/3] ARM: EXYNOS: Move code from hotplug.c to platsmp.c
+In-Reply-To: <1405520417-15027-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405520417-15027-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <53C7CC88.5040707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 06:05:03PM -0500, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Hi Krzysztof,
+
+On 16.07.2014 16:20, Krzysztof Kozlowski wrote:
+> Cleanup a little the SMP/hotplug code for Exynos by:
+> 1. Moving completely all functions from hotplug.c into the platsmp.c;
+> 2. Deleting the hotplug.c file.
 > 
-> ARM GICv2m specification extends GICv2 to support MSI(-X) with
-> a new set of register frames. This patch introduces support for
-> the non-secure GICv2m register frame.
+> After recent cleanups (e.g. 75ad2ab28f0f "ARM: EXYNOS: use
+> v7_exit_coherency_flush macro for cache disabling") there was only CPU
+> power down related code in hotplug.c file. Keeping this file does not
+> give any benefits.
 > 
-> The driver currently matchs "arm,gic-400-plus" in device tree binding,
-> which implements GICv2m.
+> The commit only moves code around with one additional observable change:
+> the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
+> CFLAGS are not necessary any more.
 > 
-> The "msi-controller" keyword in ARM GIC devicetree binding is used to indentify
-> GIC driver that it should enable MSI(-X) support, The region of GICv2m MSI
-> register frame is specified using the register frame index 4 in the device tree.
-> MSI support is optional.
-> 
-> Each GIC maintains an "msi_chip" structure. To discover the msi_chip,
-> PCI host driver can do the following:
-> 
->     struct device_node *gic_node = of_irq_find_parent(pdev->dev.of_node);
->     pcie_bus->msi_chip = of_pci_find_msi_chip_by_node(gic_node);
-> 
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  Documentation/devicetree/bindings/arm/gic.txt |  20 +-
->  arch/arm64/Kconfig                            |   1 +
->  drivers/irqchip/Kconfig                       |   7 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 251 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v2m.h                 |  13 ++
->  drivers/irqchip/irq-gic.c                     |  23 ++-
->  drivers/irqchip/irq-gic.h                     |  31 +++-
->  8 files changed, 334 insertions(+), 13 deletions(-)
->  create mode 100644 drivers/irqchip/irq-gic-v2m.c
->  create mode 100644 drivers/irqchip/irq-gic-v2m.h
+>  arch/arm/mach-exynos/Makefile  |  3 --
+>  arch/arm/mach-exynos/common.h  |  2 -
+>  arch/arm/mach-exynos/hotplug.c | 92 ------------------------------------------
+>  arch/arm/mach-exynos/platsmp.c | 74 +++++++++++++++++++++++++++++++++
+>  4 files changed, 74 insertions(+), 97 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/hotplug.c
+> 
 
-Applied to irqchip/gic with some minor typos fixed in the commit
-message.
+For this and remaining patches from this series:
 
-thx,
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Jason.
+--
+Best regards,
+Tomasz
