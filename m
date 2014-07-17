@@ -1,88 +1,46 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 17 Jul 2014 10:01:36 +0100
-Subject: [PATCH v8 0/4] arm: KGDB NMI/FIQ support
-In-Reply-To: <CAB5oZtAt0ZWJB1FOmzaFphM2Y566U73=U+HniPLTm9c1suVqNg@mail.gmail.com>
-References: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>	<1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>	<CAB5oZtCk5NwBJF+dBESKGhYabti=EWWtF2jJYK7HdyNHM46nTw@mail.gmail.com>	<53C4F745.3070701@linaro.org>	<CAB5oZtBSZJVqyO8GKdKqh0+3=GDkCyuqrAOQhMRxN0JFBnmZ6w@mail.gmail.com>	<53C54042.2030507@linaro.org>	<CAB5oZtDy=TDz12_6ua_M3g=bQ+zB6cJTH3bUT9oA8snLDRBMTw@mail.gmail.com>	<53C5600C.1080004@linaro.org>
- <CAB5oZtAt0ZWJB1FOmzaFphM2Y566U73=U+HniPLTm9c1suVqNg@mail.gmail.com>
-Message-ID: <53C790F0.7050409@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Jul 2014 10:07:58 +0100
+Subject: [PATCH] arm64: Refactor compat.h into compat-types.h
+In-Reply-To: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
+References: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
+Message-ID: <20140717090758.GB21153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/14 18:15, Harro Haan wrote:
->> Anyhow I've put together a new version of my earlier patch that I think
->> will retrigger all interrupts except SGIs (I'll look at SGIs and
->> compatibility with non-Freescale parts only if this improved approach
->> works).
->>
->> Reported-by: Harro Haan <hrhaan@gmail.com>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> ---
->>  drivers/irqchip/irq-gic.c | 31 ++++++++++++++++++++++++++++++-
->>  1 file changed, 30 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 73ae896..88f92e6 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -303,6 +303,33 @@ static int gic_set_wake(struct irq_data *d,
->> unsigned int on)
->>  #define gic_set_wake   NULL
->>  #endif
->>
->> +/* This is a software emulation of the Aliased Interrupt Acknowledge
->> Register
->> + * (GIC_AIAR) found in GICv2+.
->> + */
->> +static u32 gic_handle_spurious_group_0(struct gic_chip_data *gic, u32
->> irqstat)
->> +{
->> +       u32 irqnr = irqstat & GICC_IAR_INT_ID_MASK;
->> +       void __iomem *dist_base = gic_data_dist_base(gic);
->> +       u32 offset, mask;
->> +
->> +       if (!gic_data_fiq_enable(gic) || irqnr >= 1021)
->> +               return irqnr;
->> +
->> +       offset = irqnr / 32 * 4;
->> +       mask = 1 << (irqnr % 32);
->> +       if (readl_relaxed(dist_base + GIC_DIST_IGROUP + offset) & mask)
->> +               return irqnr;
->> +
->> +       /* this interrupt must be taken as a FIQ so put it back into the
->> +        * pending state and end our own servicing of it.
->> +        */
->> +       writel_relaxed(mask, dist_base + GIC_DIST_PENDING_SET + offset);
->> +       readl_relaxed(dist_base + GIC_DIST_PENDING_SET + offset);
->> +       writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
->> +
->> +       return 1023;
->> +}
->> +
->>  static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->>  {
->>         u32 irqstat, irqnr;
->> @@ -310,8 +337,10 @@ static void __exception_irq_entry
->> gic_handle_irq(struct pt_regs *regs)
->>         void __iomem *cpu_base = gic_data_cpu_base(gic);
->>
->>         do {
->> +               local_fiq_disable();
->>                 irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
->> -               irqnr = irqstat & GICC_IAR_INT_ID_MASK;
->> +               irqnr = gic_handle_spurious_group_0(gic, irqstat);
->> +               local_fiq_enable();
->>
->>                 if (likely(irqnr > 15 && irqnr < 1021)) {
->>                         irqnr = irq_find_mapping(gic->domain, irqnr);
->> --
->> 1.9.3
->>
->>
->>
+On Thu, Jul 17, 2014 at 07:45:38AM +0100, Ian Campbell wrote:
+> This reduces the complexity of the includes needed for linux/stat.h and removes
+> some possibilities for causing include loops.
 > 
-> I just tested the above code. This approach also works as expected for
-> edge sensitive interrupts.
+> One such issue was exposed by the Debian kernel's application of the aufs
+> patches which led to:
+> 
+> In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
+>                  from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
+>                  from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
+>                  from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
+>                  from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
+>                  from /?PKGBUILDDIR?/include/linux/stat.h:5,
+>                  from /?PKGBUILDDIR?/include/linux/module.h:10,
+>                  from /?PKGBUILDDIR?/init/main.c:15:
+> /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
+>   int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+>                                                                 ^
+> /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> 
+> This is due to an extra fs.h include added to mm.h leading to a loop in the
+> includes. Splitting out the type defintions from compat.h into compat-types.h
+> allows asm/stat.h to only include the types header and avoids the loop.
+> 
+> Full logs in http://buildd.debian-ports.org/status/fetch.php?pkg=linux&arch=arm64&ver=3.14.12-1&stamp=1405234443
+> 
+> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: debian-kernel at lists.debian.org
 
-Awesome [and also a personal relief to get it right this time around ;-) ].
+Looks good to me, but I note Arnd's prior comment about mm.h including fs.h
+being a bug. If that's true, then this patch isn't needed at all and aufs
+should be fixed instead.
 
-So we have two completely different confirmed-as-working workarounds!
+Will
