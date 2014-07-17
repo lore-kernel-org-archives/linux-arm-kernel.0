@@ -1,34 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Jul 2014 17:47:22 +0100
-Subject: [PATCH v7 07/11] arm64: mm: Implement 4 levels of translation
- tables
-In-Reply-To: <4A09B481-365B-4BEE-BCC2-FCA24B22CF96@gmail.com>
-References: <2211E520-32A4-435C-9F63-A7EFEE8B677A@gmail.com>
- <4A09B481-365B-4BEE-BCC2-FCA24B22CF96@gmail.com>
-Message-ID: <20140717164722.GK18203@arm.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Thu, 17 Jul 2014 18:52:35 +0200
+Subject: [PATCH v2 5/5] i2c: tegra: Remove suspension check
+In-Reply-To: <20140717145958.GA32534@ulmo>
+References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
+ <1405608520-5644-5-git-send-email-hechtb@gmail.com>
+ <20140717145958.GA32534@ulmo>
+Message-ID: <CABYn4swY5yRe=eGzCYo0uJtmjn05Ut4oDWupPjmU9bXbuU6+Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 04:04:07PM +0100, Jungseok Lee wrote:
-> On Wed, 16 Jul 2014 20:09:48 +0100, Catalin Marinas wrote:
-> 
-> [ ... ]
-> 
-> > diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> > index 69000efa015e..fa324bd5a5c4 100644
-> > --- a/arch/arm64/mm/ioremap.c
-> > +++ b/arch/arm64/mm/ioremap.c
-> > @@ -104,9 +104,12 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
-> > EXPORT_SYMBOL(ioremap_cache);
-> > 
-> > static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-> > -#ifndef CONFIG_ARM64_64K_PAGES
-> > +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
-> 
-> In this patch frame, it causes a compile error since [08/11] patch introduces
-> CONFIG_ARM64_PGTABLE_LEVELS. Please ignore my comment if it does not matter.
+2014-07-17 16:59 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
+> On Thu, Jul 17, 2014 at 04:48:40PM +0200, Bastian Hecht wrote:
+> [...]
+>>  #ifdef CONFIG_PM_SLEEP
+>> -static int tegra_i2c_suspend(struct device *dev)
+>> -{
+>> -     struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+>> -
+>> -     i2c_lock_adapter(&i2c_dev->adapter);
+>> -     i2c_dev->is_suspended = true;
+>> -     i2c_unlock_adapter(&i2c_dev->adapter);
+>> -
+>> -     return 0;
+>> -}
+>> -
+>>  static int tegra_i2c_resume(struct device *dev)
+>>  {
+>>       struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+>> @@ -842,14 +827,12 @@ static int tegra_i2c_resume(struct device *dev)
+>>               return ret;
+>>       }
+>>
+>> -     i2c_dev->is_suspended = false;
+>> -
+>>       i2c_unlock_adapter(&i2c_dev->adapter);
+>>
+>>       return 0;
+>>  }
+>>
+>> -static SIMPLE_DEV_PM_OPS(tegra_i2c_pm, tegra_i2c_suspend, tegra_i2c_resume);
+>> +static SIMPLE_DEV_PM_OPS(tegra_i2c_pm, tegra_i2c_resume);
+>
+> Shouldn't this be:
+>
+>         static SIMPLE_DEV_OPS(tegra_i2c_pm, NULL, tegra_i2c_resume);
+>
+> instead?
 
-It matters, thanks.
+Oh yes thanks. I made the same mistake in [PATCH 3/5] too.
 
--- 
-Catalin
+Thanks,
+
+ Bastian
+
+
+
+> Thierry
