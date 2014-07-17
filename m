@@ -1,54 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Jul 2014 14:39:42 +0200
-Subject: [PATCH 0/3] ARM: mvebu: disable I/O coherency on !SMP
-In-Reply-To: <20140717083342.GS21766@n2100.arm.linux.org.uk>
-References: <1404318070-8503-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140717102425.34fe0181@free-electrons.com>
- <20140717083342.GS21766@n2100.arm.linux.org.uk>
-Message-ID: <6510599.Qoc205T3v7@wuerfel>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 17 Jul 2014 13:43:32 +0100
+Subject: [RFC/PATCH 0/5] Add Video Processing Front End Support
+In-Reply-To: <1405447012-5340-1-git-send-email-balbi@ti.com>
+References: <1405447012-5340-1-git-send-email-balbi@ti.com>
+Message-ID: <CA+V-a8sZF-M1Me0ZpVAkCGChQYYNcCopdW50fLZwPQ1uCLgx4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 July 2014 09:33:42 Russell King - ARM Linux wrote:
-> On Thu, Jul 17, 2014 at 10:24:25AM +0200, Thomas Petazzoni wrote:
-> > If I understand correctly, we are already changing the page tables
-> > anyway, to switch certain pages to be mapped uncached, to do DMA
-> > coherent allocations, no?
-> 
-> I've no idea, I never looked at that code.  I hope that Marek has
-> considered the requirements of the architecture when creating that
-> code...
-> 
-> > So wouldn't it be possible to keep the early
-> > assembly code as it is today, and then later, in C code, once we have
-> > identified the platform on which we're running, modify the page tables
-> > to switch to the appropriate page attributes (write allocate cache
-> > policy, shareable attribute, etc.) ?
-> 
-> No - the problem is that we're running from the page table in question
-> with global mappings, and we need to switch all these mappings, including
-> the ones we're currently using to execute from.
-> 
-> We can't even create a new page table and switch to it because the
-> mappings in question are global mappings.
-> 
-> The only way to do that safely from an architectural point of view would
-> be to turn the MMU off, and drop back to assembly code to change the
-> page tables, and re-enable the MMU.  For something as obscure as Marvell's
-> coherency stuff, that's not something I want to see in core code.
+On Tue, Jul 15, 2014 at 6:56 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi all,
+>
+> the following patches add suport for AM43xx's Video Processing
+> Front End (VPFE). Full documentation is available at [1] chapter 14.
+>
+> This driver has been tested with linux-next from yesterday, plus my
+> (already queued) am437x starter kit patches, plus these patches, plus
+> the sensor driver which, saddly enough, we're not allowed to release :-(
+>
+> This driver has almost full v4l2-compliance with only 2 failures (I'll
+> take hints on how to properly fix them) as below:
+>
+>                 fail: v4l2-compliance.cpp(419): !doioctl(node2,
+>                         VIDIOC_S_PRIORITY, &prio)
+>         test VIDIOC_G/S_PRIORITY: FAIL
+>
+>                 fail: v4l2-test-formats.cpp(319): pixelformat !=
+>                                 V4L2_PIX_FMT_JPEG && colorspace ==
+>                                 V4L2_COLORSPACE_JPEG
+>                 fail: v4l2-test-formats.cpp(418):
+>                                 testColorspace(pix.pixelformat, pix.colorspace)
+>         test VIDIOC_G_FMT: FAIL
+>
+> I have also tested with gst-launch using fbdevsink and I can see my
+> ugly mug just fine.
+>
+> Please give this a thorough review and let me know of any problems
+> which need to be sorted out and I'll try to help out as time allows.
+>
+> cheers
+>
+> [1] http://www.ti.com/lit/pdf/spruhl7
+>
+> Benoit Parrot (4):
+>   Media: platform: Add ti-vpfe driver for AM437x device
+>   arm: omap: hwmod: add hwmod entries for AM437x VPFE
+>   arm: boot: dts: am4372: add vpfe DTS entries
+>   arm: dts: am43x-epos: Add VPFE DTS entries
+>
+> Darren Etheridge (1):
+>   ARM: dts: am437x-sk-evm: add vpfe support and ov2659 sensor
+>
+>  arch/arm/boot/dts/am4372.dtsi                     |   16 +
+>  arch/arm/boot/dts/am437x-sk-evm.dts               |   63 +
+>  arch/arm/boot/dts/am43x-epos-evm.dts              |   54 +
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c        |   56 +
+>  arch/arm/mach-omap2/prcm43xx.h                    |    3 +-
+>  drivers/media/platform/Kconfig                    |    1 +
+>  drivers/media/platform/Makefile                   |    2 +
+>  drivers/media/platform/ti-vpfe/Kconfig            |   12 +
+>  drivers/media/platform/ti-vpfe/Makefile           |    2 +
+>  drivers/media/platform/ti-vpfe/am437x_isif.c      | 1053 +++++++++
+>  drivers/media/platform/ti-vpfe/am437x_isif.h      |  355 +++
+>  drivers/media/platform/ti-vpfe/am437x_isif_regs.h |  144 ++
+>  drivers/media/platform/ti-vpfe/vpfe_capture.c     | 2478 +++++++++++++++++++++
+>  drivers/media/platform/ti-vpfe/vpfe_capture.h     |  263 +++
+>  14 files changed, 4501 insertions(+), 1 deletion(-)
 
-Is this different from what we do in the LPAE version of
-early_paging_init()? That code already adjusts all the page
-table entries on a per-platform setting and should be very
-easy to extend for a modified procinfo->__cpu_mm_mmu_flags,
-and possibly able to extend for traditional (non-LPAE)
-page tables without a lot of duplication.
+Missing documentation for DT ?
 
-At the moment it only handles a platform-specific undetectable
-PHYS_OFFSET for mach-keystone, which to me sounds equally
-hacky as the platform-specific undetectable pmdprot value
-for mvebu.
+Thanks,
+--Prabhakar Lad
 
-Is there anything I'm missing why one works and the other doesn't?
-
-	Arnd
+>  create mode 100644 drivers/media/platform/ti-vpfe/Kconfig
+>  create mode 100644 drivers/media/platform/ti-vpfe/Makefile
+>  create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif.c
+>  create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif.h
+>  create mode 100644 drivers/media/platform/ti-vpfe/am437x_isif_regs.h
+>  create mode 100644 drivers/media/platform/ti-vpfe/vpfe_capture.c
+>  create mode 100644 drivers/media/platform/ti-vpfe/vpfe_capture.h
+>
+> --
+> 2.0.0.390.gcb682f8
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
