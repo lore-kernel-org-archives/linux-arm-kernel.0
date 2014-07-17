@@ -1,42 +1,61 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 17 Jul 2014 13:41:37 -0400
-Subject: [GIT PULL] Keystone DTS update for 3.17
-Message-ID: <1405618897-10350-1-git-send-email-santosh.shilimkar@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 17 Jul 2014 10:52:09 -0700
+Subject: [GIT PULL 1/3] ARM: tegra: rework PCIe regulators
+In-Reply-To: <20140717142037.GA17494@ulmo>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <20140707003854.GD8469@quad.lixom.net>
+ <20140707055211.GA15216@ulmo>
+ <CAOesGMjwE=xThuUwmBF02YaQ32_uFogryW5anNoGc8yfkuN_Pg@mail.gmail.com>
+ <20140710101527.GC21583@ulmo> <20140717142037.GA17494@ulmo>
+Message-ID: <CAOesGMjdfMDKK5EyA96g3ECxxfJC3W3ZtSpYsijgt+Fp+i3_yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arm-soc folks,
+On Thu, Jul 17, 2014 at 7:20 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Thu, Jul 10, 2014 at 12:15:28PM +0200, Thierry Reding wrote:
+>> On Mon, Jul 07, 2014 at 09:45:46PM -0700, Olof Johansson wrote:
+> [...]
+>> > If you have to stay compatible, then I suggest you try to fill in
+>> > local driver variables with derivatives of the old properties (and
+>> > directly from the newer properties where you can). I haven't looked at
+>> > the specifics here so I don't know how hard it might be.
+>> >
+>> > If you are 100% sure that you don't have to stay compatible, then you
+>> > can remove the code handling the old bindings. Still, even then I am a
+>> > little worried about dependencies (and more importantly conflicts)
+>> > between these dtsi changes and others done by tegra platform code for
+>> > this release. I suppose that can be resolved by having this as a base
+>> > of any DT changes for tegra if needed.
+>>
+>> To be honest, I'm very much tempted to just drop this series. Even if
+>> that means keeping a totally broken DT binding. But frankly I don't have
+>> any energy left to debate DT stability.
+>
+> So this kept bugging me and I couldn't leave it alone after all. How
+> about if I squash in the attached patch. I've verified that that keeps
+> compatibility with old device trees on TrimSlice and Beaver. I think the
+> remainder of the series could still remain as-is (the top few commits
+> that you said shouldn't be there) if I squash this into
+>
+>         PCI: tegra: Implement accurate power supply scheme
+>
+> That way the binding will be the new one so that people don't get any
+> wrong ideas about taking shortcuts while still preserving compatibility
+> with existing DTBs.
 
-Please pull below keystone DTS updates for 3.17.
+Taking a quick look at the patch, it looks sane to me and pretty much
+exactly what I would expect the code to look like w.r.t. handling old
+bindings.
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> Interestingly, despite my initial disgust for having to keep around old
+> code (it's in fact new code in this case) for compatibility reasons, it
+> ended up making the code look more mature.
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+I'm glad it went that way. It shouldn't be _too_ bad to keep the
+compatibility with old bindings in the code like this in most cases,
+it's mostly a matter of filling in the newer structures like you did
+in this patch.
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
-
-for you to fetch changes up to 6592f671a4e6ee6308ddd67c2459dd71836770df:
-
-  ARM: dts: keystone-evm: add 1g ethernet phys nodes (2014-07-17 13:29:06 -0400)
-
-----------------------------------------------------------------
-Keystone DTS update for 3.17
- - Ethernet clock tree fix.
- - MDIO device tree node. Respective driver update is already queued.
- - Ethernet phy node. Respective driver update is already queued.
-
-----------------------------------------------------------------
-Grygorii Strashko (3):
-      ARM: dts: keystone: fix netcp's clocks definitions
-      ARM: dts: keystone: add mdio devices entries
-      ARM: dts: keystone-evm: add 1g ethernet phys nodes
-
- arch/arm/boot/dts/k2e-clocks.dtsi      |    2 +-
- arch/arm/boot/dts/k2hk-clocks.dtsi     |    2 +-
- arch/arm/boot/dts/k2hk-evm.dts         |   12 ++++++++++++
- arch/arm/boot/dts/k2l-clocks.dtsi      |    2 +-
- arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
- arch/arm/boot/dts/keystone.dtsi        |   11 +++++++++++
- 6 files changed, 27 insertions(+), 4 deletions(-)
+-Olof
