@@ -1,26 +1,28 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 17 Jul 2014 14:55:37 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140717123533.GJ21153@arm.com>
-References: <1405524767-30220-1-git-send-email-mark.rutland@arm.com>
- <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
- <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
- <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
- <20140717123533.GJ21153@arm.com>
-Message-ID: <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 17 Jul 2014 16:05:30 +0200
+Subject: [PATCH 0/4 v2] hwmon: ntc_thermistor: prepose vendor prefix change
+In-Reply-To: <CAHfPSqCGf2d6xXDGr974+4ipNsYx3-fOLT+u2OGN=c9FVPEkZg@mail.gmail.com>
+References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
+ <02b501cf9064$34f16b80$9ed44280$@samsung.com>
+ <53AAD8C8.3080506@roeck-us.net>
+ <CAHfPSqCGf2d6xXDGr974+4ipNsYx3-fOLT+u2OGN=c9FVPEkZg@mail.gmail.com>
+Message-ID: <CABxcv=mko=1bQ+VnKhPtRbx6Leop+gRNNkiSO-CbvN=JiyWh2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2014 13:35, Will Deacon <will.deacon@arm.com> wrote:
-> We're not denying the possibility of heterogeneity, we're trying to expose a
-> consistent view of the system to userspace. Differences between cores should
-> be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
-> passed off to userspace.
+Hello Naveen,
 
-On that basis, why report anything at all about invididual cores?
-Just have /proc/cpuinfo report "number of processors: 4" and
-no per-CPU information at all...
+On Thu, Jul 17, 2014 at 6:21 AM, Naveen Krishna Ch
+<naveenkrishna.ch@gmail.com> wrote:
+>
+> Can you pull the 3/4 and 4/4 patches.
+>
 
--- PMM
+Patch 4/4 depends on the max77802 support series [0] since the ADC
+uses the max77802 ldo9 regulator as its voltage supply. So that patch
+can't be merged before the series land in mainline.
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/7/14/273
