@@ -1,101 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 17 Jul 2014 13:48:59 +0200
-Subject: [PATCH v4 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C7B6B5.4050602@redhat.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405510814-31928-1-git-send-email-mperttunen@nvidia.com>
- <53C666E5.6030009@redhat.com> <20140716131306.GB23384@ulmo>
- <53C6908A.2050200@redhat.com> <20140716195136.GB5212@mithrandir>
- <53C77263.7050903@redhat.com> <20140717073956.GA18640@ulmo>
- <53C7A433.4070404@redhat.com> <20140717105244.GG17877@ulmo>
- <53C7B6B5.4050602@redhat.com>
-Message-ID: <53C7B82B.5090403@redhat.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 17 Jul 2014 19:43:36 +0800
+Subject: [PATCH v2 1/2] usb: ci_hdrc_imx: Return -EINVAL for missing
+ USB PHY
+In-Reply-To: <1405081775-21508-1-git-send-email-mpa@pengutronix.de>
+References: <1405081775-21508-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140717114335.GB16025@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/17/2014 01:42 PM, Hans de Goede wrote:
-> Hi,
+On Fri, Jul 11, 2014 at 02:29:34PM +0200, Markus Pargmann wrote:
+> -ENODEV is interpreted by the generic driver probing function as a
+> non-matching driver. This leads to a missing probe failure message.
 > 
-> On 07/17/2014 12:52 PM, Thierry Reding wrote:
->> On Thu, Jul 17, 2014 at 12:23:47PM +0200, Hans de Goede wrote:
+> Also a missing USB PHY is more of an invalid configuration of the usb
+> driver because it is necessary.
 > 
-> <snip>
+> This patch returns -EINVAL if devm_usb_get_phy_by_phandle() returned -ENODEV.
 > 
->>> The libahci_platform.c code / ahci_platform.c code is also used for
->>> devices going way back who may not yet be using the new clk framework,
->>> so where we need to use clk_get(dev, NULL); quoting from libahci_platform.c :
->>>
->>>         for (i = 0; i < AHCI_MAX_CLKS; i++) {
->>>                 /*
->>>                  * For now we must use clk_get(dev, NULL) for the first clock,
->>>                  * because some platforms (da850, spear13xx) are not yet
->>>                  * converted to use devicetree for clocks.  For new platforms
->>>                  * this is equivalent to of_clk_get(dev->of_node, 0).
->>>                  */
->>>                 if (i == 0)
->>>                         clk = clk_get(dev, NULL);
->>>                 else
->>>                         clk = of_clk_get(dev->of_node, i);
->>>
->>>                 if (IS_ERR(clk)) {
->>>                         rc = PTR_ERR(clk);
->>>                         if (rc == -EPROBE_DEFER)
->>>                                 goto err_out;
->>>                         break;
->>>                 }
->>>                 hpriv->clks[i] = clk;
->>>         }
->>>
->>> And there is no devm variant of that, nor is there one to get clocks by index.
->>> Note that we also need ahci_platform_put_resources for runtime pm support, so
->>> that one is going to stay around anyways and thus there is not that much value
->>> in fixing this.
->>>
->>> So although I like Thierry's idea, if we go this way (which sounds good), we
->>> should add support for taking a NULL ahci_platform_resources argument and in
->>> that case behave as before, esp. because of the platforms needing the old
->>> style clock handling. An advantage of doing this, is that we can simply patch
->>> all existing users to pass NULL.
->>
->> Isn't the "legacy" case really just this:
->>
->> 	static const char *const legacy_ahci_clocks[] = {
->> 		NULL
->> 	};
->>
->> 	static const struct ahci_platform_resources legacy_ahci_resources = {
->> 		.num_clocks = ARRAY_SIZE(legacy_ahci_clocks),
->> 		.clocks = legacy_ahci_clocks,
->> 	};
->>
->> ?
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/usb/chipidea/ci_hdrc_imx.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Ah yes that would work for the really legacy ones, as well as less legacy
-> (full dts) ones with only one clk, we need to check if there are current
-> users which use more then one clk (yes there are which is why MAX_CLKS
-> was 3) and fixup those to pass in a correct ahci_platform_resources struct
-> then.
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+> index 2e58f8dfd311..65444b02bd68 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> @@ -133,6 +133,9 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+>  	data->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
+>  	if (IS_ERR(data->phy)) {
+>  		ret = PTR_ERR(data->phy);
+> +		/* Return -EINVAL if no usbphy is available */
+> +		if (ret == -ENODEV)
+> +			ret = -EINVAL;
+>  		goto err_clk;
+>  	}
+>  
+> -- 
+> 2.0.0
 > 
-> The checking + fixing up will be a bit of extra work, but I think the end result
-> will be quite nice. so I'm all in favor of this.
 
-Correction, this is not going to work I'm afraid, as not all current dts files
-set clock-names. So we need a fallback to get clks by index for compatibility
-with old dts files.
+Applied, thanks.
 
-At least: arch/arm/boot/dts/sun4i-a10.dtsi and arch/arm/boot/dts/sun7i-a20.dtsi
-are affected. Note in this case the dts file is typically not burned into
-a ROM or some such, so IMHO we could get away with requiring a new dts file.
+-- 
 
-So it might be worthwhile to still do a full check if all affected SoCs and
-see if we can move over to using clock-names for all platforms with
-more then 1 ahci/sata clk.
-
-FWIW I've also just checked imx6q.dts which is the one which has 3 clocks, and
-that one does define clk names.
-
-Regards,
-
-Hans
+Best Regards,
+Peter Chen
