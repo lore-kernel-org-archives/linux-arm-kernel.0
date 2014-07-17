@@ -1,39 +1,88 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Wed, 16 Jul 2014 21:13:19 -0400
-Subject: [PATCH] mach-s3c64xx: Remove all defintions not related to
- regs-clocks
-In-Reply-To: <36350.1405374230@turing-police.cc.vt.edu>
-References: <1405361664-5210-1-git-send-email-xerofoify@gmail.com>
- <36350.1405374230@turing-police.cc.vt.edu>
-Message-ID: <CAPDOMVgOfaf7qHXGSdwpyT4edo_ZjbbnkP7UYNbzkRzudW_f-A@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Thu, 17 Jul 2014 01:20:54 +0000
+Subject: [PATCH v3 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <22032517.gk8PRUMaIU@wuerfel>
+References: <1405499166-6726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5615007.cNNjmu3rBK@wuerfel>
+ <cd73d8a384cc4040a0bbc6afc1f3063d@DM2PR0301MB0783.namprd03.prod.outlook.com>
+ <22032517.gk8PRUMaIU@wuerfel>
+Message-ID: <93903d5fdf85427bb8a418894540c122@BN1PR0301MB0772.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 5:43 PM,  <Valdis.Kletnieks@vt.edu> wrote:
-> On Mon, 14 Jul 2014 14:14:24 -0400, Nicholas Krause said:
->> This patch addresses the fix me message in this file that states to
->> remove all definitions not related to reg-clocks in this header
->> file.
->>
->> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
->> ---
->>  arch/arm/mach-s3c64xx/include/mach/regs-clock.h | 22 +---------------------
->>  1 file changed, 1 insertion(+), 21 deletions(-)
->
->> -#endif /* _PLAT_REGS_CLOCK_H */
->> +/#endif /* _PLAT_REGS_CLOCK_H */
->
-> You're kidding us, right? Given that this was obviously *not* compile
-> tested at all, why should we believe that in fact all those #defines
-> are in fact no longer used?
->
-> Hint: There's a very high chance that somebody stuck that FIXME in there rather
-> than just cleaning it up themselves precisely *because* it was still in use in
-> an inconvenient to fix place in the tree..
->
-I build the arch/arm directory I seem to me hitting a error.
- arch/arm/xen/enlighten.c:17:29: fatal error: asm/system_misc.h: No
-such file or directory
- #include <asm/system_misc.h>
-I am also looking into fixing this issue.
-Cheers Nick
+> > > >
+> > > > Some people wanted the possibility to set the DMA mask as this
+> > > > USB2 CI driver does not do specific Berlin operation and can be
+> reused later.
+> > > > I don't particularly need to call dma_coerce_mask_and_coherent()
+> > > > in my case, as far as I know.
+> > >
+> > > Ok, just remove the call then and rely on the default mask.
+> > >
+> > > > They can maybe give the restrictions they might want to put on the
+> > > > DMA mask.
+> > >
+> > > If the restriction is from the bus, it should get handled
+> > > automatically by the device probe as long as the correct dma-ranges
+> > > property is there (though we have a small bug there at the moment).
+> > > If there is a variation of ci13xxx that can't do 32-bit DMA, that
+> > > should use a different compatible string and pass a fixed mask into
+> > > dma_set_mask_and_coherent() based on the device.
+> > >
+> >
+> > Correct me if my below understanding is wrong please.
+> >
+> > For three chipidea users:
+> > user_a: don't need dma mask
+> > user_b: dma mask value is dma_mask_b
+> > user_c: dma mask value is dma_mask_c
+> >
+> > We don't need to call dma_coerce_mask_and_coherent() at generic
+> > chipidea glue driver, and set dma-ranges as dma_mask_b at user_b's
+> > dts, and set dma-ranges as dma_mask_c at user_c's dts.
+> 
+> The dma-ranges property doesn't just encode a dma-mask for a device, but
+> rather how the children of a bus see the memory address space of the
+> parent.
+> 
+> For traditional reasons we default to assuming that a 32-bit dma_mask is
+> correct, but there may be multiple reasons why this is not true:
+> 
+> - you have a device connected to a bus that is smaller than 32-bit wide
+>   (and that would have a dma-ranges property describing that)
+> - you have a device that has fewer than 32 address lines but is connected
+>   to a 32-bit upstream bus (hence the dma-ranges describe all 32 bit,
+>   but the driver must set a smaller mask)
+> - you have a 64-bit capable device connected to a 32-bit bus: the driver
+>   will ask for a 64-bit mask, but the dma_set_mask() call refuses this
+>   because of the bus capabilities.
+> - you have a 64-bit capable device on a 64-bit capable bus, and the
+>   dma_set_mask call should succeed.
+> 
+> The mask is definitely never "user" specific, but is a combination of the
+> device you have and the bus it is connected to.
+> 
+
+Thanks, arnd.
+
+For chipidea generic glue layer case, if there are three devices who use this
+driver, and all devices have 32-bit bus, some devices have less 32 address lines.
+For example:
+
+- the device_a doesn't need to use dma_mask
+- the device_b needs dma_mask as 0xfffffffff
+- the device_c needs dma_mask as 0xfffffff0, assume it has only 28 address lines
+
+My questions are:
+- Can we not set dma_mask at driver, and only set dma-ranges at dts for device_b
+and device_c as a solution to cover this different dma mask use case?
+
+- If we can't use this solution, would you suggest one?
+
+- If we can use this solution, for device_b and device_c, how can we write dma-ranges?
+I can't find any arm platforms use it, only some powerpc platform use it.
+According to the definition from Power_ePAPR_APPROVED_v1.1.pdf, it is
+dma-ranges = <child-bus-address, parent-bus-address, length>
+but I find the powerpc has different way for using dma-ranges. 
+
+Peter
