@@ -1,35 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Jul 2014 16:01:14 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <20140717145838.GJ18203@arm.com>
-References: <1405596402-23844-1-git-send-email-broonie@kernel.org>
- <20140717115937.GF18203@arm.com>
- <20140717145002.GW17528@sirena.org.uk>
- <20140717145838.GJ18203@arm.com>
-Message-ID: <20140717150114.GX17528@sirena.org.uk>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Fri, 18 Jul 2014 00:04:07 +0900
+Subject: [PATCH v7 07/11] arm64: mm: Implement 4 levels of translation
+ tables
+In-Reply-To: <2211E520-32A4-435C-9F63-A7EFEE8B677A@gmail.com>
+References: <2211E520-32A4-435C-9F63-A7EFEE8B677A@gmail.com>
+Message-ID: <4A09B481-365B-4BEE-BCC2-FCA24B22CF96@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 03:58:38PM +0100, Catalin Marinas wrote:
-> On Thu, Jul 17, 2014 at 03:50:02PM +0100, Mark Brown wrote:
+On Wed, 16 Jul 2014 20:09:48 +0100, Catalin Marinas wrote:
 
-> > What would be better would be if we could get the two trees synced up,
-> > in this case something like picking the audit change up in the ARMv8
-> > tree (or vice versa) seems like it'd be quick and easy since it looks
-> > like neither tree uses topic branches.
+[ ... ]
 
-> It's not ideal indeed but applying this patch on my tree would break it.
-> So we need a common base where the audit API is changed, guaranteed not
-> to be rebased so that I can merge it in the arm64 for-next/core branch.
+> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+> index 69000efa015e..fa324bd5a5c4 100644
+> --- a/arch/arm64/mm/ioremap.c
+> +++ b/arch/arm64/mm/ioremap.c
+> @@ -104,9 +104,12 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+> EXPORT_SYMBOL(ioremap_cache);
+> 
+> static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> -#ifndef CONFIG_ARM64_64K_PAGES
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
 
-> Do you know which tree commit 3efe33f5d2 is in? I assume some tip
-> branch?
+In this patch frame, it causes a compile error since [08/11] patch introduces
+CONFIG_ARM64_PGTABLE_LEVELS. Please ignore my comment if it does not matter.
 
-It's the head commit in Eric's audit tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140717/97456dab/attachment-0001.sig>
+> static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> #endif
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+
+Ditto
+
+- Jungseok Lee
