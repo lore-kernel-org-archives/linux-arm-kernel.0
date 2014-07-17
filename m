@@ -1,87 +1,61 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Jul 2014 18:38:55 +0200
-Subject: [PATCH v3 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
-Message-ID: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
+Date: Thu, 17 Jul 2014 18:38:57 +0200
+Subject: [PATCH v3 2/7] ARM: l2c: Add interface to ask hypervisor to configure
+ L2C
+In-Reply-To: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
+References: <1405615142-21426-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1405615142-21426-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series intends to add support for L2 cache on Exynos4 SoCs on boards
-running under secure firmware, which requires certain initialization steps
-to be done with help of firmware, as selected registers are writable only
-from secure mode.
+Because certain secure hypervisor do not allow writes to individual L2C
+registers, but rather expect set of parameters to be passed as argument
+to secure monitor calls, there is a need to provide an interface for the
+L2C driver to ask the firmware to configure the hardware according to
+specified parameters. This patch adds such.
 
-First four patches extend existing support for secure write in L2C driver
-to account for design of secure firmware running on Exynos. Namely:
- 1) direct read access to certain registers is needed on Exynos, because
-    secure firmware calls set several registers at once,
- 2) not all boards are running secure firmware, so .write_sec callback
-    needs to be installed in Exynos firmware ops initialization code,
- 3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
-    is not allowed and so must use l2c_write_sec as well,
- 4) on certain boards, default value of prefetch register is incorrect
-    and must be overridden at L2C initialization.
-For boards running with firmware that provides access to individual
-L2C registers this series should introduce no functional changes. However
-since the driver is widely used on other platforms I'd like to kindly ask
-any interested people for testing.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/include/asm/outercache.h | 3 +++
+ arch/arm/mm/cache-l2x0.c          | 5 +++++
+ 2 files changed, 8 insertions(+)
 
-Further two patches add impelmentation of .write_sec for Exynos secure
-firmware and necessary DT nodes to enable L2 cache.
-
-Tested on Exynos4210-based Universal C210 and Trats (both without secure
-firmware) and Exynos4412-based TRATS2 and ODROID-U3 boards (both with secure
-firmware).
-
-Depends on:
- - [PATCH] ARM: make it easier to check the CPU part number correctly
-   (http://thread.gmane.org/gmane.linux.ports.arm.kernel/335126
-    already in linux-next)
- - [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
-   (https://lkml.org/lkml/2014/7/17/431)
-
-Changes since v2:
-(https://lkml.org/lkml/2014/6/25/416)
- - refactored L2C driver to use commit-like interface and make it no longer
-   depend on availability of writes to individual registers,
- - moved L2C resume to assembly code, because doing it later makes some
-   systems unstable - this is also needed for deeper cpuidle modes,
- - dropped unnecessary patch hacking around the .write_sec interface,
- - dropped patch making the driver use l2c_write_sec() for LATENCY_CTRL
-   registers as Exynos is no longer affected and I'm not aware of any
-   reports that this is also needed on other platforms (can be applied
-   separately if it turns out to be so),
- - rebased onto next-20140717 tag of linux-next tree.
-
-Changes since v1:
-(https://www.mail-archive.com/linux-omap at vger.kernel.org/msg106323.html)
- - rebased onto for-next branch of linux-samsung tree,
- - changed argument order of outer_cache.write_sec() callback to match
-   l2c_write_sec() function in cache-l2x0.c,
- - added support of overriding of prefetch settings to work around incorrect
-   default settings on certain Exynos4x12-based boards,
- - added call to firmware to invalidate whole L2 cache before setting enable
-   bit in L2C control register (required by Exynos secure firmware).
-
-Tomasz Figa (7):
-  ARM: l2c: Refactor the driver to use commit-like interface
-  ARM: l2c: Add interface to ask hypervisor to configure L2C
-  ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
-    not NULL
-  ARM: l2c: Add support for overriding prefetch settings
-  ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
-  ARM: EXYNOS: Add support for non-secure L2X0 resume
-  ARM: dts: exynos4: Add nodes for L2 cache controller
-
- Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
- arch/arm/boot/dts/exynos4210.dtsi              |   9 +
- arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
- arch/arm/include/asm/outercache.h              |   3 +
- arch/arm/kernel/irq.c                          |   3 +-
- arch/arm/mach-exynos/common.h                  |   1 +
- arch/arm/mach-exynos/firmware.c                |  40 ++++
- arch/arm/mach-exynos/sleep.S                   |  41 +++++
- arch/arm/mm/cache-l2x0.c                       | 245 ++++++++++++++++---------
- 9 files changed, 274 insertions(+), 92 deletions(-)
-
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 891a56b..563b92f 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -23,6 +23,8 @@
+ 
+ #include <linux/types.h>
+ 
++struct l2x0_regs;
++
+ struct outer_cache_fns {
+ 	void (*inv_range)(unsigned long, unsigned long);
+ 	void (*clean_range)(unsigned long, unsigned long);
+@@ -36,6 +38,7 @@ struct outer_cache_fns {
+ 
+ 	/* This is an ARM L2C thing */
+ 	void (*write_sec)(unsigned long, unsigned);
++	void (*configure)(const struct l2x0_regs *);
+ };
+ 
+ extern struct outer_cache_fns outer_cache;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 385c047..21a625a0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -109,6 +109,11 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
+ 
+ static void l2c_configure(void __iomem *base)
+ {
++	if (outer_cache.configure) {
++		outer_cache.configure(&l2x0_saved_regs);
++		return;
++	}
++
+ 	if (l2x0_data->configure)
+ 		l2x0_data->configure(base);
+ 
 -- 
 1.9.3
