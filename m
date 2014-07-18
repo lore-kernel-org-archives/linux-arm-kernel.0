@@ -1,69 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Jul 2014 23:13:35 +0200
-Subject: [GIT PULL] Allwinner clocks additions for 3.17
-Message-ID: <20140718211335.GA29677@lukather>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Fri, 18 Jul 2014 14:18:08 -0700
+Subject: [PATCH v2 0/7] Two-phase seccomp and x86 tracing changes
+Message-ID: <cover.1405717901.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+This is both a cleanup and a speedup.  It reduces overhead due to
+installing a trivial seccomp filter by 87%.  The speedup comes from
+avoiding the full syscall tracing mechanism for filters that don't
+return SECCOMP_RET_TRACE.
 
-Here is the first pull request for the Allwinner clocks changes 
+This series works by splitting the seccomp hooks into two phases.
+The first phase evaluates the filter; it can skip syscalls, allow
+them, kill the calling task, or pass a u32 to the second phase.  The
+second phase requires a full tracing context, and it sends ptrace
+events if necessary.
 
-Unless something major comes up, or we agree quickly on the MMC
-changes I posted yesterday, there shouldn't be any follow up for the
-3.17 relaese cycle.
+Once this is done, I implemented a similar split for the x86 syscall
+entry work.  The C callback is invoked in two phases: the first has
+only a partial frame, and it can request phase 2 processing with a
+full frame.
 
-Thanks!
-Maxime
+Finally, I switch the 64-bit system_call code to use the new split
+entry work.  This is a net deletion of assembly code: it replaces
+all of the audit entry muck.
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+In the process, I fixed some bugs.
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+If this is acceptable, someone can do the same tweak for the
+ia32entry and entry_32 code.
 
-are available in the git repository at:
+This passes all seccomp tests that I know of.  Now that it's properly
+rebased, even the previously expected failures are gone.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-3.17
+Kees, if you like this version, can you create a branch with patches
+1-3?  I think that the rest should go into tip/x86 once everyone's happy
+with it.
 
-for you to fetch changes up to 6c1d66f0da59362cb33ce37d436cd28c77c2b2cb:
+Changes from v1:
+ - Rebased on top of Kees' shiny new seccomp tree (no effect on the x86
+   part).
+ - Improved patch 6 vs patch 7 split (thanks Alexei!)
+ - Fixed bogus -ENOSYS in patch 5 (thanks Kees!)
+ - Improved changelog message in patch 6.
 
-  clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0 support (2014-07-15 08:53:24 +0200)
+Changes from RFC version:
+ - The first three patches are more or less the same
+ - The rest is more or less a rewrite
 
-----------------------------------------------------------------
-Allwinner clocks additions for 3.17
+Andy Lutomirski (7):
+  seccomp,x86,arm,mips,s390: Remove nr parameter from secure_computing
+  seccomp: Refactor the filter callback and the API
+  seccomp: Allow arch code to provide seccomp_data
+  x86,x32,audit: Fix x32's AUDIT_ARCH wrt audit
+  x86: Split syscall_trace_enter into two phases
+  x86_64,entry: Treat regs->ax the same in fastpath and slowpath
+    syscalls
+  x86_64,entry: Use split-phase syscall_trace_enter for 64-bit syscalls
 
-This pull request adds support for the clocks found in the newly supported
-Allwinner A23 clocks.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (9):
-      clk: sunxi: register clock gates with clkdev
-      clk: sunxi: move "ahb_sdram" to protected clock list
-      clk: sunxi: Support factor clocks with N factor starting not from 0
-      clk: sunxi: Add support for table-based divider clocks
-      clk: sunxi: Add A23 clocks support
-      clk: sunxi: Add A23 APB0 divider clock support
-      clk: sunxi: Fix gate indexing for sun6i-a31-apb0-gates
-      clk: sunxi: sun6i-apb0-gates: use bitmaps for valid gate indices
-      clk: sunxi: sun6i-a31-apb0-gates: Add A23 APB0 support
-
- Documentation/devicetree/bindings/clock/sunxi.txt |   7 ++
- drivers/clk/sunxi/Makefile                        |   4 +-
- drivers/clk/sunxi/clk-factors.c                   |   2 +-
- drivers/clk/sunxi/clk-factors.h                   |   1 +
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  76 ++++++++------
- drivers/clk/sunxi/clk-sun8i-apb0.c                |  68 +++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                     | 119 ++++++++++++++++++++--
- 7 files changed, 234 insertions(+), 43 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-sun8i-apb0.c
+ arch/arm/kernel/ptrace.c       |   7 +-
+ arch/mips/kernel/ptrace.c      |   2 +-
+ arch/s390/kernel/ptrace.c      |   2 +-
+ arch/x86/include/asm/calling.h |   6 +-
+ arch/x86/include/asm/ptrace.h  |   5 +
+ arch/x86/kernel/entry_64.S     |  51 ++++-----
+ arch/x86/kernel/ptrace.c       | 146 +++++++++++++++++++-----
+ arch/x86/kernel/vsyscall_64.c  |   2 +-
+ include/linux/seccomp.h        |  25 ++--
+ kernel/seccomp.c               | 252 ++++++++++++++++++++++++++++-------------
+ 10 files changed, 344 insertions(+), 154 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/e46d69b5/attachment.sig>
+1.9.3
