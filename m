@@ -1,51 +1,41 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 17 Jul 2014 20:32:54 -0700
-Subject: [PATCH v3] PM / devfreq: Add possible_frequencies device attribute
-In-Reply-To: <725805840.101171405558256488.JavaMail.weblogic@epmlwas01c>
-References: <725805840.101171405558256488.JavaMail.weblogic@epmlwas01c>
-Message-ID: <53C89566.9020505@codeaurora.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 18 Jul 2014 09:32:06 +0530
+Subject: [PATCH] PM / OPP: cpufreq: Avoid sleeping while atomic
+In-Reply-To: <53C85BE5.6030901@codeaurora.org>
+References: <1405553740-5067-1-git-send-email-sboyd@codeaurora.org>
+ <CAKohpond9aNvX+x--G7AADkRhAu1iZ5mFW8pDvAXJ6yp_CCH_A@mail.gmail.com>
+ <53C85BE5.6030901@codeaurora.org>
+Message-ID: <CAKohpon5787nmLO02=UtSkQZY=p3F_xZ0_E-tu+psME_UoWdHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 05:50 PM, MyungJoo Ham wrote:
-> On Wed, Jul 16, 2014 at 12:01 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
->> Some devices use freq_table instead of OPP. For those devices, the
->> available_frequencies sysfs file shows up empty. So, add a
->> possible_frequencies attribute/syfs file that list all the possible
->> frequencies.
->>
->> For devices that use OPP, the output of this file will match
->> available_frequencies. It may change in the future to show all OPP
->> frequencies -- even the disabled ones.
->>
->> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> 
-> Hi,
-> 
-> 
-> Please add a documentation entry for this new ABI having a little justification and usage included.
+On 18 July 2014 04:57, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> First you need to enable sleeping while atomic checking, but in reality,
+> I assume nobody has tried inserting a cpufreq driver as a module. The
 
-Will do.
+I did for sure, but long back. Over 6 months atleast :)
 
-> 
-> Plus, I am considering to move trans_stat along with this entry to somewhere such as .../stat/*
-> (you don't need to take care of this.)
+> might_sleep() code has a check to see if the system_state is
+> SYSTEM_RUNNING. If it isn't running then there isn't a warning and
+> might_sleep() doesn't flag any problem. I wonder if that is actually the
+> right thing to do though? Perhaps the intention of that code is to skip
+> warning early on in the boot path when the scheduler isn't up and
+> running yet. But once the scheduler is running (which is fairly early
+> nowadays) I would think we want might_sleep() to trigger warnings. Maybe
+> that check in might_sleep() needs to be updated to check for "scheduler
+> running" instead of "system running"?
+> Right. It seems that we moved to RCU in commit
+> 0f5c890e9b9754d9aa5bf6ae2fc00cae65780d23 so the real Fixes line should be:
+>
+> Fixes: 0f5c890e9b97 "PM / OPP: Remove cpufreq wrapper dependency on
+> internal data organization"
 
-Ok.
+Right.
 
-> 
-> Besides, as OPP seems becoming the standard as imagined when devfreq development started,
-> soon, devfreq may require OPP unless the devfreq device has continuous frequencies.
+> One way to avoid this problem is to put things back the way they were
+> before that change. Is there any real benefit to having this code live
+> in drivers/cpufreq/ instead of just under some config option in
+> drivers/base/power/opp.c?
 
-I agree. Only one caveat with OPP is that if a device isn't using OPP to
-do any voltage scaling, then it forces a voltage column with 0s. Also,
-even if we make OPP mandatory, we'll still want trans_stats that
-currently seem to depend on freq_table being populated. I was actually
-planning on sending out more patches later that'll do a lot of stuff
-automatically for devices with OPP. Like creating freq_table, etc.
-
--Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Maybe Nishanth can give more arguments than I can :), but the idea was
+just to keep cpufreq stuff together..
