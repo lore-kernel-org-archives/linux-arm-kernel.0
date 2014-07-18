@@ -1,52 +1,68 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 18 Jul 2014 16:04:18 -0400
-Subject: [PATCH 2/4] ARM: add IPI tracepoints
-In-Reply-To: <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20140718160418.54d11f6a@gandalf.local.home>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 18 Jul 2014 16:15:53 -0400
+Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
+In-Reply-To: <5467203.eMVRoNeSx1@wuerfel>
+References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
+ <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
+ <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
+ <5467203.eMVRoNeSx1@wuerfel>
+Message-ID: <53C98079.4080707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jul 2014 01:18:53 -0400
-Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+On 07/18/2014 03:50 PM, Arnd Bergmann wrote:
+> On Friday 18 July 2014 14:31:39 Rob Herring wrote:
+>>> +
+>>> + Example:
+>>> +       pcie_msi_intc: msi-interrupt-controller {
+>>> +                       interrupt-controller;
+>>> +                       #interrupt-cells =<1>;
+>>> +                       interrupt-parent =<&gic>;
+>>> +                       interrupts =<GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
+>>> +       };
+>>> +
+>>> +pcie_intc: Interrupt controller device node for Legacy irq chip
+>>> +       interrupt-cells: should be set to 1
+>>> +       interrupt-parent: Parent interrupt controller phandle
+>>> +       interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
+>>> +
+>>> + Example:
+>>> +       pcie_intc: legacy-interrupt-controller {
+>>> +               interrupt-controller;
+>>> +               #interrupt-cells =<1>;
+>>> +               interrupt-parent =<&gic>;
+>>> +               interrupts =<GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+>>> +<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+>>> +       };
+>> This seems wrong. Legacy interrupts should be described with
+>> interrupt-map and then PCI child devices have a standard interrupt
+>> specifier.
+>>
+>> I'm not sure about MSIs, but I would think they would have a standard
+>> format too.
+>>
+> IIRC, it's actually the correct way to do this here: the problem is that
+> the PCI IRQs are not directly connected to the GIC, but instead there is
+> a nested irqchip that has each PCI IRQ routed to it and that requires
+> an extra EOI for each interrupt.
+>
+> The interrupt-map in the PCI host points to this special irqchip rather
+> than to the GIC.
+Arnd,
 
-  
-> -#ifdef CONFIG_IRQ_WORK
-> -void arch_irq_work_raise(void)
-> -{
-> -	if (is_smp())
-> -		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
-> -}
-> +static const char *ipi_types[NR_IPI]
-> +#ifdef CONFIG_TRACING
-> +__tracepoint_string
->  #endif
+Thanks. I agree with Arnd and believe there is no issue here
 
-Oh, this is ugly. I should probably add a define when !CONFIG_TRACING
-is set. Something like:
-
-#ifdef CONFIG_TRACING
-...
-#else
-# define __tracepoint_string
-#endif
-
-Such that users of __tracepoint_string don't need to add ugly ifdefs in
-the code.
-
-If you want to add that to ftrace_event.h to this series, I'll ack it.
-
--- Steve
-
-
-> -
-> -static const char *ipi_types[NR_IPI] = {
-> += {
->  #define S(x,s)	[x] = s
->  	S(IPI_WAKEUP, "CPU wakeup interrupts"),
->  	S(IPI_TIMER, "Timer broadcast interrupts"),
-> @@ -473,6 +457,12 @@ static const char *ipi_types[NR_IPI] = {
->  	S(IPI_COMPLETION, "completion interrupts"),
->  };
->  
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
