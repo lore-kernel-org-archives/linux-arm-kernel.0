@@ -1,35 +1,77 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Fri, 18 Jul 2014 08:16:02 +0200
-Subject: [PATCH] ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
-In-Reply-To: <20140717221436.GZ21766@n2100.arm.linux.org.uk>
-References: <1405617110-1136-1-git-send-email-romain.perier@gmail.com>
- <20140717221436.GZ21766@n2100.arm.linux.org.uk>
-Message-ID: <53C8BBA2.7060308@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 17 Jul 2014 23:17:49 -0700
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+In-Reply-To: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+Message-ID: <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-you're probably talking about __cpu_die at 
-http://lxr.free-electrons.com/source/arch/arm/kernel/smp.c#L223 . The 
-problem being that the thread below which executes cpu_die completes the 
-completion before executing smp_ops.cpu_die. So smp_ops.cpu_kill might 
-be executed before smp_ops.cpu_die (in some cases cache coherency would 
-not be turned off). Note that almost all SoCs do the same thing.
-
-
-On 18/07/2014 00:14, Russell King - ARM Linux wrote:
-> On Thu, Jul 17, 2014 at 05:11:50PM +0000, Romain Perier wrote:
->> +static DECLARE_COMPLETION(cpu_died);
->> +
->> +static int rockchip_cpu_kill(unsigned int cpu)
->> +{
->> +	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(1000))) {
->> +		pr_err("CPU%d: didn't die correctly\n", cpu);
->> +		return 0;
->> +	}
-> Please explain the point of this cpu_died thing.
+On Thu, Jul 17, 2014 at 10:35 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Clock lines may or may not be shared among different CPUs on a platform. When
+> clock lines are shared between CPUs, they change DVFS state together.
 >
-> I think you should read arch/arm/kernel/smp.c, searching for cpu_died
-> in there.
+> Possible configurations:
 >
+> 1.) All CPUs share a single clock line.
+> 2.) All CPUs have independent clock lines.
+> 3.) CPUs within a group/cluster share clock line but each group/cluster have a
+>     separate line for itself.
+>
+> There is no generic way available today to detect which CPUs share clock lines
+> and so this is an attempt towards that.
+>
+> Much of the information is present in the commit and so no point duplicating it
+> here.
+>
+> These are obviously not finalized yet and this is an attempt to initiate a
+> discussion around this.
+>
+> Please share your valuable feedback.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> I wasn't sure about the path/name of this file, so please don't blast me on that
+> :)
+>
+>  .../devicetree/bindings/cpufreq/cpu_clocks.txt     | 159 +++++++++++++++++++++
+>  1 file changed, 159 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+>
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+> new file mode 100644
+> index 0000000..30ce9ad
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+> @@ -0,0 +1,159 @@
+> +* Generic CPUFreq clock bindings
+> +
+> +Clock lines may or may not be shared among different CPUs on a platform.
+> +
+> +Possible configurations:
+> +1.) All CPUs share a single clock line
+> +2.) All CPUs have independent clock lines
+> +3.) CPUs within a group/cluster share clock line but each group/cluster have a
+> +    separate line for itself
+> +
+> +Optional Properties:
+> +- clock-master: This declares cpu as clock master. Other CPUs can either define
+> +  "clock-ganged" or "clock-master" property, but shouldn't be missing both.
+> +
+> +- clock-ganged: Should have phandle of a cpu declared as "clock-master".
+
+Why complicate it by using two properties?
+
+If there is no property, then the CPUs are assumed to be controlled
+independently.
+
+if there is a clock-master = <phandle> property, then that points at
+the cpu that is the main one controlling clock for the group.
+
+There's really no need to label the master -- it will be the only one
+with incoming links but nothing outgoing. And a master without slaves
+is an independently controlled cpu so you should be fine in that
+aspect too.
+
+
+-Olof
