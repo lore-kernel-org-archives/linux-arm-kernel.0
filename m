@@ -1,119 +1,37 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Jul 2014 08:31:40 -0400
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <20140718090204.GB25180@leverpostej>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140717131854.GN13108@titan.lakedaemon.net>
- <20140717135534.GM30313@leverpostej>
- <20140717141235.GR13108@titan.lakedaemon.net>
- <20140718090204.GB25180@leverpostej>
-Message-ID: <20140718123140.GD24496@titan.lakedaemon.net>
+Date: Fri, 18 Jul 2014 08:40:38 -0400
+Subject: [RFC Patch V1 21/30] mm, irqchip: Use
+ cpu_to_mem()/numa_mem_id() to support memoryless node
+In-Reply-To: <1405064267-11678-22-git-send-email-jiang.liu@linux.intel.com>
+References: <1405064267-11678-1-git-send-email-jiang.liu@linux.intel.com>
+ <1405064267-11678-22-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20140718124038.GE24496@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 10:02:05AM +0100, Mark Rutland wrote:
-> On Thu, Jul 17, 2014 at 03:12:35PM +0100, Jason Cooper wrote:
-> > On Thu, Jul 17, 2014 at 02:55:34PM +0100, Mark Rutland wrote:
-> > > Hi Jason,
-> > > 
-> > > On Thu, Jul 17, 2014 at 02:18:54PM +0100, Jason Cooper wrote:
-> > > > On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
-> > > > > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > > > > 
-> > > > > This patch set introduces support for MSI(-X) in GICv2m specification,
-> > > > > which is implemented in some variation of GIC400.
-> > > > > 
-> > > > > This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
-> > > > > (https://lkml.org/lkml/2014/3/14/320).
-> > > > > 
-> > > > > Changes in V3:
-> > > > >     * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
-> > > > >       (per Jason Cooper request)
-> > > > >     * Misc fix/clean up per Mark Rutland comments
-> > > > >     * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
-> > > > >     * Patch 4 is new to the series:
-> > > > >         * Add ARM64-specific version arch_setup_msi_irqs() to allow support
-> > > > >           for Multiple MSI.
-> > > > >         * Add support for Multiple MSI for GICv2m.
-> > > > > 
-> > > > > Suravee Suthikulpanit (4):
-> > > > >   irqchip: gic: Add binding probe for ARM GIC400
-> > > > >   irqchip: gic: Restructuring ARM GIC code
-> > > > >   irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-> > > > >   irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
-> > > > 
-> > > > Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
-> > > > irqchip/gic with irqchip/urgent merged in.  To facilitate
-> > > > testing/merging, I've prepared an unsigned tag for you on the
-> > > > irqchip/gic branch:
-> > > 
-> > > I'm a little concerned that this is all going through for v3.17 without
-> > > a {Reviewed,Acked}-by from Marc or anyone working with GIC{,v2m}.
-> > 
-> > Well, that's why it's not in irqchip/core yet. ;-)  It can be undone if
-> > needed.
+On Fri, Jul 11, 2014 at 03:37:38PM +0800, Jiang Liu wrote:
+> When CONFIG_HAVE_MEMORYLESS_NODES is enabled, cpu_to_node()/numa_node_id()
+> may return a node without memory, and later cause system failure/panic
+> when calling kmalloc_node() and friends with returned node id.
+> So use cpu_to_mem()/numa_mem_id() instead to get the nearest node with
+> memory for the/current cpu.
 > 
-> Ah, perhaps I was a litte premature. :)
->  
-> > > While his comments on v1 have been addressed, he has not had a chance to
-> > > acknowledge the solutions. I appreciate Marc's holiday is unfortunately
-> > > timed.
-> > > 
-> > > I also have an open concern with the binding with regard to the
-> > > orthogonality of GICV GICH and the MSI registers.
-> > > 
-> > > Suravee, do you need this urgently for v3.17? I was under the impression
-> > > that we wouldn't have full PCIe support by then.
-> > 
-> > If Suravee is ok with it, I can drop them for now and he can resend for
-> > v3.18.  Since we've worked out a way to merge it all in one window, I
-> > don't think it would hurt anything to wait.
+> If CONFIG_HAVE_MEMORYLESS_NODES is disabled, cpu_to_mem()/numa_mem_id()
+> is the same as cpu_to_node()/numa_node_id().
 > 
-> Ok.
-> 
-> > I'll leave these in irqchip/for-next until I hear from Suravee, then
-> > I'll drop the lot till we hear from Marc and look at the timing.
-> 
-> Keeping it in for-next for testing sounds like a good idea, but until we
-> hear from Marc I wouldn't want to see this queued for mainline. So the
-> above sounds fine to me.
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>  drivers/irqchip/irq-clps711x.c |    2 +-
+>  drivers/irqchip/irq-gic.c      |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 
-Ok, here's what I did:
+Do you have anything depending on this?  Can apply it to irqchip?  If
+you need to keep it with other changes,
 
-[jason at triton] $ git ldo --graph v3.16-rc1^..irqchip/gic-v2m
-* 3e44358c12cc (HEAD, irqchip/gic-v2m) irqchip: gic: Add support for ARM GICv2m MSI(-X)
-* fe7ac63fe539 irqchip: gic: Restructuring ARM GIC code
-*   6bf0be3f077e Merge branch 'irqchip/urgent' into irqchip/gic
-|\  
-| * 144cb08864ed (irqchip/urgent) irqchip: gic: Add binding probe for ARM GIC400
-| * a97e8027b1d2 irqchip: gic: Add support for cortex a7 compatible string
-| * 4f4366033945 (tag: irqchip-urgent-3.16) irqchip: spear_shirq: Fix interrupt offset
-| * 00ac20279174 irqchip: brcmstb-l2: Level-2 interrupts are edge sensitive
-| * b73842b75646 irqchip: armada-370-xp: Mask all interrupts during initialization.
-* | 021f653791ad (tag: deps-irqchip-gic-3.17, irqchip/gic) irqchip: gic-v3: Initial support for GICv3
-* | d51d0af43b30 irqchip: gic: Move some bits of GICv2 to a library-type file
-|/  
-* 7171511eaec5 (tag: v3.16-rc1) Linux 3.16-rc1
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-remote branches removed for clarity.
-
-Basically, I reset irqchip/gic back to tags/deps-irqchip-gic-3.17 (The
-stable tag for GICv3 support), and made the MSI series irqchip/gic-v2m.
-
-I've also removed the dep tag for gic-v2m (tags/dep-irqchip-gic-3.17-2).
-Please consider irqchip/gic-v2m to be completely unstable and drop-able.
-It'll be in -next, but until I hear from Marc, it's not going anywhere.
-
-No commit IDs have changed during this process.  The only problem that
-may occur is if the guys depending on GICv3 pulled the branch *and*
-updated it yesterday.  If they pulled the tag as I provided, then
-they're fine.
-
-Sorry for the confusion, I hope I've made it clear above.
+But please do let me know if I can take it.
 
 thx,
 
 Jason.
-> 
-> Cheers,
-> Mark.
