@@ -1,132 +1,151 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Jul 2014 16:08:40 +0100
-Subject: [PATCH] arm64: Fix barriers used for page table modifications
-Message-ID: <1405696120-22016-1-git-send-email-catalin.marinas@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 18 Jul 2014 11:14:26 -0400
+Subject: [PATCH v6 2/5] PCI: designware: refactor MSI code to work with v3.65
+ dw hardware
+In-Reply-To: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
+References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1405696469-7172-3-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The architecture specification states that both DSB and ISB are required
-between page table modifications and subsequent memory accesses using the
-corresponding virtual address. When TLB invalidation takes place, the
-tlb_flush_* functions already have the necessary barriers. However, there are
-other functions like create_mapping() for which this is not the case.
+Keystone PCI controller is based on v3.65 version of the DW
+PCI h/w that implements MSI controller registers in application
+space compared to the newer version. This requires updates to
+the DW core API to support the PCI controller driver based on
+this old DW hardware. Add msi_irq_set()/clear() API functions to
+allow Set/Clear MSI IRQ enable bit in the application register.
+Also the old h/w uses MSI_IRQ register in application register
+space to raise MSI IRQ to the RC from EP. Current code uses the
+standard mechanism as per PCI spec. So add another API get_msi_data()
+to get the address of this register so that common code can be
+re-used on old h/w.
 
-The patch adds the DSB+ISB instructions in the set_pte() function for
-valid kernel mappings. The invalid pte case is handled by tlb_flush_*
-and the user mappings in general have a corresponding update_mmu_cache()
-call containing a DSB. Even when update_mmu_cache() isn't called, the
-kernel can still cope with an unlikely spurious page fault by
-re-executing the instruction.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
+Acked-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-In addition, the set_pmd, set_pud() functions gain an ISB for
-architecture compliance when block mappings are created.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Leif Lindholm <leif.lindholm@linaro.org>
-Acked-by: Steve Capper <steve.capper@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Grant Likely <grant.likely@linaro.org>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Bjorn Helgaas <bhelgaas@google.com>
+CC: Richard Zhu <r65037@freescale.com>
+CC: Kishon Vijay Abraham I <kishon@ti.com>
+CC: Marek Vasut <marex@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Randy Dunlap <rdunlap@infradead.org>
+CC: Grant Likely <grant.likely@linaro.org>
 ---
+ drivers/pci/host/pcie-designware.c |   50 ++++++++++++++++++++++++++----------
+ drivers/pci/host/pcie-designware.h |    3 +++
+ 2 files changed, 39 insertions(+), 14 deletions(-)
 
-I'll do a similar patch for arch/arm but since there is no failure
-currently, it's not urgent. For arm64 it fails with fixmap mappings on
-some platforms during boot (Leif knows the details).
-
- arch/arm64/include/asm/cacheflush.h | 11 +----------
- arch/arm64/include/asm/pgtable.h    | 13 +++++++++++++
- arch/arm64/include/asm/tlbflush.h   |  5 +++--
- 3 files changed, 17 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index a5176cf32dad..f2defe1c380c 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -138,19 +138,10 @@ static inline void __flush_icache_all(void)
- #define flush_icache_page(vma,page)	do { } while (0)
- 
- /*
-- * flush_cache_vmap() is used when creating mappings (eg, via vmap,
-- * vmalloc, ioremap etc) in kernel space for pages.  On non-VIPT
-- * caches, since the direct-mappings of these pages may contain cached
-- * data, we need to do a full cache flush to ensure that writebacks
-- * don't corrupt data placed into these pages via the new mappings.
-+ * Not required on AArch64 (PIPT or VIPT non-aliasing D-cache).
-  */
- static inline void flush_cache_vmap(unsigned long start, unsigned long end)
- {
--	/*
--	 * set_pte_at() called from vmap_pte_range() does not
--	 * have a DSB after cleaning the cache line.
--	 */
--	dsb(ish);
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index d8f3af7..905941c 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -217,27 +217,47 @@ static int find_valid_pos0(struct pcie_port *pp, int msgvec, int pos, int *pos0)
+ 	return 0;
  }
  
- static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index d7455fa83bc7..627b5080a4cc 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -138,6 +138,8 @@ extern struct page *empty_zero_page;
- 
- #define pte_valid_user(pte) \
- 	((pte_val(pte) & (PTE_VALID | PTE_USER)) == (PTE_VALID | PTE_USER))
-+#define pte_valid_not_user(pte) \
-+	((pte_val(pte) & (PTE_VALID | PTE_USER)) == PTE_VALID)
- 
- static inline pte_t pte_wrprotect(pte_t pte)
- {
-@@ -184,6 +186,15 @@ static inline pte_t pte_mkspecial(pte_t pte)
- static inline void set_pte(pte_t *ptep, pte_t pte)
- {
- 	*ptep = pte;
++static void dw_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
++{
++	unsigned int res, bit, val;
 +
-+	/*
-+	 * Only if the new pte is valid and kernel, otherwise TLB maintenance
-+	 * or update_mmu_cache() have the necessary barriers.
-+	 */
-+	if (pte_valid_not_user(pte)) {
-+		dsb(ishst);
-+		isb();
-+	}
- }
- 
- extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
-@@ -303,6 +314,7 @@ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
++	res = (irq / 32) * 12;
++	bit = irq % 32;
++	dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++	val &= ~(1 << bit);
++	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++}
++
+ static void clear_irq_range(struct pcie_port *pp, unsigned int irq_base,
+ 			    unsigned int nvec, unsigned int pos)
  {
- 	*pmdp = pmd;
- 	dsb(ishst);
-+	isb();
+-	unsigned int i, res, bit, val;
++	unsigned int i;
+ 
+ 	for (i = 0; i < nvec; i++) {
+ 		irq_set_msi_desc_off(irq_base, i, NULL);
+ 		clear_bit(pos + i, pp->msi_irq_in_use);
+ 		/* Disable corresponding interrupt on MSI controller */
+-		res = ((pos + i) / 32) * 12;
+-		bit = (pos + i) % 32;
+-		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
+-		val &= ~(1 << bit);
+-		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++		if (pp->ops->msi_clear_irq)
++			pp->ops->msi_clear_irq(pp, pos + i);
++		else
++			dw_pcie_msi_clear_irq(pp, pos + i);
+ 	}
  }
  
- static inline void pmd_clear(pmd_t *pmdp)
-@@ -333,6 +345,7 @@ static inline void set_pud(pud_t *pudp, pud_t pud)
++static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
++{
++	unsigned int res, bit, val;
++
++	res = (irq / 32) * 12;
++	bit = irq % 32;
++	dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++	val |= 1 << bit;
++	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++}
++
+ static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
  {
- 	*pudp = pud;
- 	dsb(ishst);
-+	isb();
- }
+-	int res, bit, irq, pos0, pos1, i;
+-	u32 val;
++	int irq, pos0, pos1, i;
+ 	struct pcie_port *pp = sys_to_pcie(desc->dev->bus->sysdata);
  
- static inline void pud_clear(pud_t *pudp)
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index b9349c4513ea..3796ea6bb734 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -122,6 +122,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
- 		asm("tlbi vaae1is, %0" : : "r"(addr));
- 	dsb(ish);
-+	isb();
- }
+ 	if (!pp) {
+@@ -281,11 +301,10 @@ static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+ 		}
+ 		set_bit(pos0 + i, pp->msi_irq_in_use);
+ 		/*Enable corresponding interrupt in MSI interrupt controller */
+-		res = ((pos0 + i) / 32) * 12;
+-		bit = (pos0 + i) % 32;
+-		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
+-		val |= 1 << bit;
+-		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++		if (pp->ops->msi_set_irq)
++			pp->ops->msi_set_irq(pp, pos0 + i);
++		else
++			dw_pcie_msi_set_irq(pp, pos0 + i);
+ 	}
  
- /*
-@@ -131,8 +132,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- 				    unsigned long addr, pte_t *ptep)
- {
- 	/*
--	 * set_pte() does not have a DSB, so make sure that the page table
--	 * write is visible.
-+	 * set_pte() does not have a DSB for user mappings, so make sure that
-+	 * the page table write is visible.
+ 	*pos = pos0;
+@@ -353,7 +372,10 @@ static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
  	 */
- 	dsb(ishst);
- }
+ 	desc->msi_attrib.multiple = msgvec;
+ 
+-	msg.address_lo = virt_to_phys((void *)pp->msi_data);
++	if (pp->ops->get_msi_data)
++		msg.address_lo = pp->ops->get_msi_data(pp);
++	else
++		msg.address_lo = virt_to_phys((void *)pp->msi_data);
+ 	msg.address_hi = 0x0;
+ 	msg.data = pos;
+ 	write_msi_msg(irq, &msg);
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index 8121901..387f69e 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -67,6 +67,9 @@ struct pcie_host_ops {
+ 			unsigned int devfn, int where, int size, u32 val);
+ 	int (*link_up)(struct pcie_port *pp);
+ 	void (*host_init)(struct pcie_port *pp);
++	void (*msi_set_irq)(struct pcie_port *pp, int irq);
++	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
++	u32 (*get_msi_data)(struct pcie_port *pp);
+ };
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+-- 
+1.7.9.5
