@@ -1,68 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Jul 2014 09:43:20 +0100
-Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
-In-Reply-To: <CABg9mcv4t_BwcaM0qgLivDBDGEfH0FwfTAR2QjJc4+i=M58cng@mail.gmail.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
- <20140716161715.GU29414@arm.com> <20140716220422.GB18109@gup76>
- <20140717094101.GD21153@arm.com>
- <CABg9mcv4t_BwcaM0qgLivDBDGEfH0FwfTAR2QjJc4+i=M58cng@mail.gmail.com>
-Message-ID: <20140718084320.GB9548@arm.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Fri, 18 Jul 2014 14:15:01 +0530
+Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver through
+ DT
+In-Reply-To: <20140717142019.GA21732@e102568-lin.cambridge.arm.com>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-8-git-send-email-lorenzo.pieralisi@arm.com>
+ <5019714.S4WTdsyrXS@amdc1032>
+ <20140717142019.GA21732@e102568-lin.cambridge.arm.com>
+Message-ID: <CANuQgHEPocfO8wDPDTJUkBNGEfw6FoLEYAJK-zPPA7kd_L-34Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 06:47:22AM +0100, Z Lim wrote:
-> (resending this email in case the first one got caught in your spam
-> filter. sorry.)
-> 
-> On Thu, Jul 17, 2014 at 10:41:02AM +0100, Will Deacon wrote:
-> > On Wed, Jul 16, 2014 at 11:04:22PM +0100, Zi Shen Lim wrote:
-> > > On Wed, Jul 16, 2014 at 05:17:15PM +0100, Will Deacon wrote:
-> > > > On Tue, Jul 15, 2014 at 07:25:06AM +0100, Zi Shen Lim wrote:
-> > > > > Introduce function to generate move wide (immediate) instructions.
-> [...]
-> > > > > +       switch (variant) {
-> > > > > +       case AARCH64_INSN_VARIANT_32BIT:
-> > > > > +               BUG_ON(shift != 0 && shift != 16);
-> > > > > +               break;
-> > > > > +       case AARCH64_INSN_VARIANT_64BIT:
-> > > > > +               insn |= BIT(31);
-> > > > > +               BUG_ON(shift != 0 && shift != 16 && shift != 32 &&
-> > > > > +                      shift != 48);
-> > > >
-> > > > Would be neater as a nested switch, perhaps? If you reorder the
-> > > > outer-switch, you could probably fall-through too and combine the shift
-> > > > checks.
-> > >
-> > > Not sure I picture what you had in mind... I couldn't come up with a
-> > > neater version with the properties you described.
-> > >
-> > > The alternative I had was using masks instead of integer values, but
-> > > one could argue that while neater, it could also be harder to read:
-> > >
-> > >     switch (variant) {
-> > >     case AARCH64_INSN_VARIANT_32BIT:
-> > >             BUG_ON(shift & ~BIT(4));
-> > >             break;
-> > >     case AARCH64_INSN_VARIANT_64BIT:
-> > >             insn |= BIT(31);
-> > >             BUG_ON(shift & ~GENMASK(5, 4));
-> > >     ...
-> >
-> > I was thinking of using nested switches, but that doesn't fall out like I
-> > hoped. How about:
-> >
-> >       switch (variant) {
-> >       case AARCH64_INSN_VARIANT_64BIT:
-> >               BUG_ON(shift != 32 && shift != 48);
-> 
-> Sorry this won't work. For example, on the valid case of shift==0,
-> we'll barf right here - no fallthrough.
-> 
-> Shall we just leave the code as is? :)
+Hi Lorenzo,
 
-Yeah, I'm an idiot ;)
 
-Cheers,
+On 17 July 2014 19:50, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Jun 25, 2014 at 04:23:38PM +0100, Bartlomiej Zolnierkiewicz wrote:
+>>
+>> Hi,
+>>
+>> On Wednesday, June 25, 2014 03:10:20 PM Lorenzo Pieralisi wrote:
+>> > With the introduction of DT based idle states, CPUidle drivers for
+>> > ARM can now initialize idle states data through properties in the device
+>> > tree.
+>> >
+>> > This patch adds code to the Exynos CPUidle driver to dynamically
+>> > initialize idle states data through the updated device tree source
+>> > files.
+>> >
+>> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> > Cc: Tomasz Figa <t.figa@samsung.com>
+>> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> > ---
+>> > Compile tested, I am not sure I patched the right dts files, please check.
+>>
+>> cpuidle-exynos driver is currently working properly in deeper cpuidle
+>> mode (AFTR) on Exynos4210 and Exynos5250 (please also see the following
+>> patch from Tomasz Figa: [1]).  There is ongoing work to AFTR mode work
+>> also on Exynos4x12 and Exynos3250 but it is not complete yet.  Exynos5410
+>> OTOH should probably use the generic big little cpuidle driver (this SoC
+>> is similar to Exynos5420 one for which Chander Kashyap has developed
+>> cpuidle-big_little support [2]).
+>>
+>> Making long story short, I think that your patch should depend on patch
+>> [1] and update only exynos4210.dtsi and exynos5250.dtsi.  Also for your
+>> patch #6 there needs to be some coordination with merging of Chander's
+>> patchset ([2]).
+>>
+>> [1] http://www.spinics.net/lists/arm-kernel/msg341023.html
+>> [2] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg664470.html
+>
+>
+> exynos4210.dtsi does not even have cpu nodes in it. Should I add them or
+> this might trigger regression (ie cpu_logical_map()) ?
 
-Will
+Yes that can cause regression.
+
+>
+> I will post a new version soon, should I just patch 5250 for now ?
+>
+> I would need help to test this patch thanks.
+
+I can test the patch for 5250.
+
+>
+> Lorenzo
+>
+>> >  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
+>> >  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
+>> >  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
+>> >  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
+>> >  drivers/cpuidle/Kconfig.arm                        |  1 +
+>> >  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
+>> >  6 files changed, 93 insertions(+), 12 deletions(-)
+>> >  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
+>>
+>> Best regards,
+>> --
+>> Bartlomiej Zolnierkiewicz
+>> Samsung R&D Institute Poland
+>> Samsung Electronics
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>
+
+
+
+-- 
+with warm regards,
+Chander Kashyap
