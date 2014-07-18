@@ -1,137 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 18 Jul 2014 14:31:39 -0500
-Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
-References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
- <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 19 Jul 2014 04:38:06 +0900
+Subject: [PATCH 13/19] ARM: s5pv210: move debug-macro.S into the common
+ space
+In-Reply-To: <53C5CDCB.2050307@gmail.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-14-git-send-email-t.figa@samsung.com>
+ <53C5BF24.9030302@samsung.com> <046101cfa090$51757260$f4605720$@samsung.com>
+ <53C5CDCB.2050307@gmail.com>
+Message-ID: <53C9779E.7060400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 10:14 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> keystone PCIe controller is based on v3.65 version of the
-> designware h/w. Main differences are
->         1. No ATU support
->         2. Legacy and MSI irq functions are implemented in
->            application register space
->         3. MSI interrupts are multiplexed over 8 IRQ lines to the Host
->            side.
-> All of the Application register space handing code are organized into
-> pci-keystone-dw.c and the functions are called from pci-keystone.c
-> to implement PCI controller driver. Also add necessary DT documentation
-> for the driver.
+On 07/16/14 09:56, Tomasz Figa wrote:
+> On 16.07.2014 02:53, Kukjin Kim wrote:
+>> Kukjin Kim wrote:
+>>>
+>>> On 07/05/14 02:48, Tomasz Figa wrote:
+>>>> Move debug-macro.S from mach/include to include/debug where
+>>>> all other common debug macros are.
+>>>>
+>>>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>>>> ---
+>>>>    arch/arm/Kconfig.debug                           | 12 +++++--
+>>>>    arch/arm/include/debug/s5pv210.S                 | 34 ++++++++++++++++++++
+>>>>    arch/arm/mach-s5pv210/include/mach/debug-macro.S | 41 ------------------------
+>>>>    3 files changed, 44 insertions(+), 43 deletions(-)
+>>>>    create mode 100644 arch/arm/include/debug/s5pv210.S
+>>>>    delete mode 100644 arch/arm/mach-s5pv210/include/mach/debug-macro.S
+>>
+>> [...]
+>>
+>>> Tomasz,
+>>>
+>>> I couldn't apply this one from this your series because of conflict with
+>>> others. Can you please respin this one?
+>>>
+>> One more note, since I didn't apply this, there is a build breakage for
+>> s5pv210_defconfig now...
+>>
+>> arch/arm/kernel/debug.S:24:33: fatal error: mach/debug-macro.S: No such file or directory
+>> compilation terminated.
+>> make[2]: *** [arch/arm/kernel/debug.o] Error 1
+>> make[1]: *** [arch/arm/kernel] Error 2
+>> make[1]: *** Waiting for unfinished jobs....
 >
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Hmm? Are you sure previous patches applied correctly? I have tested this
+> series patch by patch on all affected configs and it built fine back
+> then. Maybe some conflict, I'll see tomorrow.
 >
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Mohit Kumar <mohit.kumar@st.com>
-> CC: Jingoo Han <jg1.han@samsung.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Pratyush Anand <pratyush.anand@st.com>
-> CC: Richard Zhu <r65037@freescale.com>
-> CC: Kishon Vijay Abraham I <kishon@ti.com>
-> CC: Marek Vasut <marex@denx.de>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Pawel Moll <pawel.moll@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
-> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> CC: Kumar Gala <galak@codeaurora.org>
-> CC: Randy Dunlap <rdunlap@infradead.org>
-> CC: Grant Likely <grant.likely@linaro.org>
-> ---
->  .../devicetree/bindings/pci/pci-keystone.txt       |   71 +++
->  drivers/pci/host/Kconfig                           |    5 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pci-keystone-dw.c                 |  516 ++++++++++++++++++++
->  drivers/pci/host/pci-keystone.c                    |  385 +++++++++++++++
->  drivers/pci/host/pci-keystone.h                    |   59 +++
->  6 files changed, 1037 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
->  create mode 100644 drivers/pci/host/pci-keystone-dw.c
->  create mode 100644 drivers/pci/host/pci-keystone.c
->  create mode 100644 drivers/pci/host/pci-keystone.h
->
-> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> new file mode 100644
-> index 0000000..9c96164
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> @@ -0,0 +1,71 @@
-> +TI Keystone PCIe interface
-> +
-> +Keystone PCI host Controller is based on Designware PCI h/w version 3.65.
-> +It shares common functions with PCIE Designware core driver and inherit
-> +common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pci.txt
-> +
-> +Please refer to Documentation/devicetree/bindings/pci/designware-pci.txt
-> +for the details of designware DT bindings. Additional properties are
-> +described here as well propeties that are not applicable.
-> +
-> +Required Properties:-
-> +
-> +compatibility: "ti,keystone-pcie"
-> +reg:   index 1 is the base address and length of DW application registers.
-> +       index 2 is the base address and length of PCI mode configuration
-> +       register.
-> +       index 3 is the base address and length of PCI device ID register.
-> +
-> +pcie_msi_intc : Interrupt controller device node for MSI irq chip
-> +       interrupt-cells: should be set to 1
-> +       interrupt-parent: Parent interrupt controller phandle
-> +       interrupts: GIC interrupt lines connected to PCI MSI interrupt lines
-> +
-> + Example:
-> +       pcie_msi_intc: msi-interrupt-controller {
-> +                       interrupt-controller;
-> +                       #interrupt-cells = <1>;
-> +                       interrupt-parent = <&gic>;
-> +                       interrupts = <GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
-> +       };
-> +
-> +pcie_intc: Interrupt controller device node for Legacy irq chip
-> +       interrupt-cells: should be set to 1
-> +       interrupt-parent: Parent interrupt controller phandle
-> +       interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
-> +
-> + Example:
-> +       pcie_intc: legacy-interrupt-controller {
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
-> +       };
+Tomasz, I've applied this whole series including this again. Can you 
+please check my branch before sending pull-request to arm-soc for 3.17?
 
-This seems wrong. Legacy interrupts should be described with
-interrupt-map and then PCI child devices have a standard interrupt
-specifier.
-
-I'm not sure about MSIs, but I would think they would have a standard
-format too.
-
-> +
-> +Optional properties:-
-> +       phys: phandle to Generic Keystone SerDes phy for PCI
-> +       phy-names: name of the Generic Keystine SerDes phy for PCI
-> +         - If boot loader already does PCI link establishment, then phys and
-> +           phy-names shouldn't be present.
-> +       ti,enable-linktrain - Enable Link training.
-> +         - If boot loader already does PCI link establishment, then this
-> +           shouldn't be present.
-
-Can't you read from the h/w if the link is trained?
-
-Rob
+Thanks,
+Kukjin
