@@ -1,58 +1,82 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 18 Jul 2014 15:00:49 +0100
-Subject: [PATCH 3/7] arm: add strstr to compressed string.c
+Date: Fri, 18 Jul 2014 15:00:47 +0100
+Subject: [PATCH 1/7] arm: break part of __soft_restart out into separate
+ function
 In-Reply-To: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
 References: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1405692053-7514-4-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1405692053-7514-2-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Franz <roy.franz@linaro.org>
+Certain operations can be considered mandatory for any piece of code
+preparing to switch off the MMU. Break this out into separate function
+idmap_prepare().
 
-The shared efi-stub-helper.c functions require a strstr implementation.
-The EFI stub is part of the decompressor, so it does not use the kernel
-strstr() implementation.  This patch adds a strstr() implementation to
-the string.c file for the decompressor, with the implementation copied
-from the arch/x86/boot/string.c file used by the x86 decompressor.
-
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
+Suggested-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/boot/compressed/string.c |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/include/asm/idmap.h |    1 +
+ arch/arm/kernel/process.c    |   12 +-----------
+ arch/arm/mm/idmap.c          |   15 +++++++++++++++
+ 3 files changed, 17 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
-index 36e53ef..5397792 100644
---- a/arch/arm/boot/compressed/string.c
-+++ b/arch/arm/boot/compressed/string.c
-@@ -111,6 +111,27 @@ char *strchr(const char *s, int c)
- 	return (char *)s;
+diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+index bf863ed..2e914a8 100644
+--- a/arch/arm/include/asm/idmap.h
++++ b/arch/arm/include/asm/idmap.h
+@@ -10,5 +10,6 @@
+ extern pgd_t *idmap_pgd;
+ 
+ void setup_mm_for_reboot(void);
++void idmap_prepare(void);
+ 
+ #endif	/* __ASM_IDMAP_H */
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 81ef686..6849e13 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -75,17 +75,7 @@ static void __soft_restart(void *addr)
+ {
+ 	phys_reset_t phys_reset;
+ 
+-	/* Take out a flat memory mapping. */
+-	setup_mm_for_reboot();
+-
+-	/* Clean and invalidate caches */
+-	flush_cache_all();
+-
+-	/* Turn off caching */
+-	cpu_proc_fin();
+-
+-	/* Push out any further dirty data, and ensure cache is empty */
+-	flush_cache_all();
++	idmap_prepare();
+ 
+ 	/* Switch to the identity mapping. */
+ 	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 8e0e52e..5c85779 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -122,3 +122,18 @@ void setup_mm_for_reboot(void)
+ 	local_flush_tlb_all();
+ #endif
  }
- 
-+/**
-+ * strstr - Find the first substring in a %NUL terminated string
-+ * @s1: The string to be searched
-+ * @s2: The string to search for
-+ */
-+char *strstr(const char *s1, const char *s2)
-+{
-+	size_t l1, l2;
 +
-+	l2 = strlen(s2);
-+	if (!l2)
-+		return (char *)s1;
-+	l1 = strlen(s1);
-+	while (l1 >= l2) {
-+		l1--;
-+		if (!memcmp(s1, s2, l2))
-+			return (char *)s1;
-+		s1++;
-+	}
-+	return NULL;
++void idmap_prepare(void)
++{
++	/* Take out a flat memory mapping. */
++	setup_mm_for_reboot();
++
++	/* Clean and invalidate caches */
++	flush_cache_all();
++
++	/* Turn off caching */
++	cpu_proc_fin();
++
++	/* Push out any further dirty data, and ensure cache is empty */
++	flush_cache_all();
 +}
- #undef memset
- 
- void *memset(void *s, int c, size_t count)
 -- 
 1.7.10.4
