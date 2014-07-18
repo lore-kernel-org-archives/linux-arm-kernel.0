@@ -1,69 +1,50 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 19 Jul 2014 01:25:40 +0200
-Subject: [PATCH 13/19] ARM: s5pv210: move debug-macro.S into the common
- space
-In-Reply-To: <53C9779E.7060400@samsung.com>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-14-git-send-email-t.figa@samsung.com>
- <53C5BF24.9030302@samsung.com> <046101cfa090$51757260$f4605720$@samsung.com>
- <53C5CDCB.2050307@gmail.com> <53C9779E.7060400@samsung.com>
-Message-ID: <53C9ACF4.7050002@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 19 Jul 2014 01:51:23 +0200
+Subject: mvebu cpuidle and cpufreq branch handling for v3.17
+In-Reply-To: <20140718230740.GR24496@titan.lakedaemon.net>
+References: <20140718230740.GR24496@titan.lakedaemon.net>
+Message-ID: <4295346.6091tevmKX@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Friday, July 18, 2014 07:07:40 PM Jason Cooper wrote:
+> Arnd, Olof, Kevin,
+> 
+> I have two branches with the remaining mvebu SoC changes for v3.17.
+> They are mvebu/soc-cpuidle and mvebu/soc-cpufreq.  Each branch is
+> slightly problematic because both contain changes to their respective
+> code in drivers/.  To send the driver changes through the appropriate
+> subsystems would be a garish nightmare of branch on branch on branch.
+> Thankfully, the changes are isolated to drivers only mvebu uses, so
+> keeping it all together should cause minimal, if any, conflicts.
+> 
+> I've requested Acks from the appropriate maintainers but as it's summer
+> I'm not confident that we'll receive those Acks in time for the arm-soc
+> cutoff (-rc6 -ish).
+> 
+> As I see it, I could send arm-soc two topic branch pull requests, which
+> arm-soc would keep out separate on the remote chance of an objection.
+> 
+> Or, I could wait for the Acks (the code has already been in -next for
+> several days), merge it into mvebu/soc, and send a, most likely, late
+> pull request for it.
+> 
+> Which would you guys prefer?
+> 
+> The cpuidle branch and ML link:
+> 
+>   git://git.infradead.org/linux-mvebu.git mvebu/soc-cpuidle
+> 
+>   https://lkml.kernel.org/r/1404913221-17343-1-git-send-email-thomas.petazzoni at free-electrons.com
+> 
+> The cpufreq branch and ML link:
+> 
+>   git://git.infradead.org/linux-mvebu.git mvebu/soc-cpufreq
+> 
+>   https://lkml.kernel.org/r/1404920715-19834-1-git-send-email-thomas.petazzoni at free-electrons.com
 
-On 18.07.2014 21:38, Kukjin Kim wrote:
-> On 07/16/14 09:56, Tomasz Figa wrote:
->> On 16.07.2014 02:53, Kukjin Kim wrote:
->>> Kukjin Kim wrote:
->>>>
->>>> On 07/05/14 02:48, Tomasz Figa wrote:
->>>>> Move debug-macro.S from mach/include to include/debug where
->>>>> all other common debug macros are.
->>>>>
->>>>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
->>>>> ---
->>>>>    arch/arm/Kconfig.debug                           | 12 +++++--
->>>>>    arch/arm/include/debug/s5pv210.S                 | 34
->>>>> ++++++++++++++++++++
->>>>>    arch/arm/mach-s5pv210/include/mach/debug-macro.S | 41
->>>>> ------------------------
->>>>>    3 files changed, 44 insertions(+), 43 deletions(-)
->>>>>    create mode 100644 arch/arm/include/debug/s5pv210.S
->>>>>    delete mode 100644 arch/arm/mach-s5pv210/include/mach/debug-macro.S
->>>
->>> [...]
->>>
->>>> Tomasz,
->>>>
->>>> I couldn't apply this one from this your series because of conflict
->>>> with
->>>> others. Can you please respin this one?
->>>>
->>> One more note, since I didn't apply this, there is a build breakage for
->>> s5pv210_defconfig now...
->>>
->>> arch/arm/kernel/debug.S:24:33: fatal error: mach/debug-macro.S: No
->>> such file or directory
->>> compilation terminated.
->>> make[2]: *** [arch/arm/kernel/debug.o] Error 1
->>> make[1]: *** [arch/arm/kernel] Error 2
->>> make[1]: *** Waiting for unfinished jobs....
->>
->> Hmm? Are you sure previous patches applied correctly? I have tested this
->> series patch by patch on all affected configs and it built fine back
->> then. Maybe some conflict, I'll see tomorrow.
->>
-> Tomasz, I've applied this whole series including this again. Can you
-> please check my branch before sending pull-request to arm-soc for 3.17?
+I'm generally OK with the cpufreq/cpuidle changes here in drivers/, but as I
+said in response to the cpuidle series, I'd like someone from the ARM side of
+things to look at those changes too.
 
-Thanks for applying this.
-
-A quick look through the patches didn't reveal any issues.
-s5pv210_defconfig builds fine too. I don't have any s5pv210-based board
-at home, though, so I can't do anything else than compile testing until
-Tuesday.
-
-Best regards,
-Tomasz
+Rafael
