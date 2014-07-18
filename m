@@ -1,111 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Jul 2014 18:05:16 -0400
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
-Message-ID: <20140718220516.GM24496@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 18 Jul 2014 15:09:52 -0700
+Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
+Message-ID: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+During suspend we call sched_clock_poll() to update the epoch and
+accumulated time and reprogram the sched_clock_timer to fire
+before the next wrap-around time. Unfortunately,
+sched_clock_poll() doesn't restart the timer, instead it relies
+on the hrtimer layer to do that and during suspend we aren't
+calling that function from the hrtimer layer. Instead, we're
+reprogramming the expires time while the hrtimer is enqueued,
+which can cause the hrtimer tree to be corrupted. Fix this
+problem by updating the state via update_sched_clock() and
+properly restarting the timer via hrtimer_start().
 
-Yeah, it's just one patch, but it's a beautiful one!  Thanks to the
-efforts of many people over the last couple years, and in particular,
-Andrew Lunn, Kirkwood has been completely converted to DT.
+Fixes: a08ca5d1089d "sched_clock: Use an hrtimer instead of timer"
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-As usual, this is an incremental pull request from tags/mvebu-soc-3.17
-up to tags/mvebu-soc-3.17-2 on the mvebu/soc branch.
+I also wonder if we should be restarting the timer during resume
+instead of suspend given that the resume path modifies the epoch.
+At that point timers can't run because interrupts are disabled and
+we don't really care if the timer fires earlier than it's supposed
+to anyway because it's just there to avoid rollover events, but
+does it seem better to do it that way? I didn't send that version
+because this patch is to fix the code intention, but I'm curious
+if anyone else feels like it should be changed.
 
-Please pull.
+ kernel/time/sched_clock.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-thx,
-
-Jason.
-
-
-The following changes since commit e65714740d65237c40878b63acad6bf921481974:
-
-  ARM: mvebu: Staticize mvebu_cpu_reset_init (2014-06-30 17:41:04 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.17-2
-
-for you to fetch changes up to ba364fc752daeded072a5ef31e43b84cb1f9e5fd:
-
-  ARM: Kirkwood: Remove mach-kirkwood (2014-07-13 22:13:39 +0000)
-
-----------------------------------------------------------------
-mvebu SoC changes for v3.17 (round 2)
-
- - kirkwood
-   - Remove mach-kirkwood/, It's fully supported in mach-mvebu/
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Kirkwood: Remove mach-kirkwood
-
- arch/arm/Kconfig                                  |  18 -
- arch/arm/Kconfig.debug                            |   5 +-
- arch/arm/Makefile                                 |   1 -
- arch/arm/boot/dts/Makefile                        |   5 +-
- arch/arm/mach-kirkwood/Kconfig                    | 111 ----
- arch/arm/mach-kirkwood/Makefile                   |  14 -
- arch/arm/mach-kirkwood/Makefile.boot              |   3 -
- arch/arm/mach-kirkwood/board-dt.c                 | 223 -------
- arch/arm/mach-kirkwood/common.c                   | 746 ----------------------
- arch/arm/mach-kirkwood/common.h                   |  74 ---
- arch/arm/mach-kirkwood/d2net_v2-setup.c           | 231 -------
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  86 ---
- arch/arm/mach-kirkwood/include/mach/entry-macro.S |  34 -
- arch/arm/mach-kirkwood/include/mach/hardware.h    |  14 -
- arch/arm/mach-kirkwood/include/mach/irqs.h        |  65 --
- arch/arm/mach-kirkwood/include/mach/kirkwood.h    | 142 ----
- arch/arm/mach-kirkwood/include/mach/uncompress.h  |  46 --
- arch/arm/mach-kirkwood/irq.c                      |  82 ---
- arch/arm/mach-kirkwood/lacie_v2-common.c          | 114 ----
- arch/arm/mach-kirkwood/lacie_v2-common.h          |  16 -
- arch/arm/mach-kirkwood/mpp.c                      |  43 --
- arch/arm/mach-kirkwood/mpp.h                      | 348 ----------
- arch/arm/mach-kirkwood/netxbig_v2-setup.c         | 422 ------------
- arch/arm/mach-kirkwood/openrd-setup.c             | 255 --------
- arch/arm/mach-kirkwood/pcie.c                     | 296 ---------
- arch/arm/mach-kirkwood/pm.c                       |  76 ---
- arch/arm/mach-kirkwood/pm.h                       |  26 -
- arch/arm/mach-kirkwood/rd88f6192-nas-setup.c      |  89 ---
- arch/arm/mach-kirkwood/rd88f6281-setup.c          | 128 ----
- arch/arm/mach-kirkwood/t5325-setup.c              | 216 -------
- arch/arm/mach-kirkwood/ts219-setup.c              | 142 ----
- arch/arm/mach-kirkwood/ts41x-setup.c              | 186 ------
- arch/arm/mach-kirkwood/tsx1x-common.c             | 113 ----
- arch/arm/mach-kirkwood/tsx1x-common.h             |   7 -
- arch/arm/mm/Kconfig                               |   2 +-
- 35 files changed, 4 insertions(+), 4375 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/Kconfig
- delete mode 100644 arch/arm/mach-kirkwood/Makefile
- delete mode 100644 arch/arm/mach-kirkwood/Makefile.boot
- delete mode 100644 arch/arm/mach-kirkwood/board-dt.c
- delete mode 100644 arch/arm/mach-kirkwood/common.c
- delete mode 100644 arch/arm/mach-kirkwood/common.h
- delete mode 100644 arch/arm/mach-kirkwood/d2net_v2-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/bridge-regs.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/kirkwood.h
- delete mode 100644 arch/arm/mach-kirkwood/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-kirkwood/irq.c
- delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.c
- delete mode 100644 arch/arm/mach-kirkwood/lacie_v2-common.h
- delete mode 100644 arch/arm/mach-kirkwood/mpp.c
- delete mode 100644 arch/arm/mach-kirkwood/mpp.h
- delete mode 100644 arch/arm/mach-kirkwood/netxbig_v2-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/openrd-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/pcie.c
- delete mode 100644 arch/arm/mach-kirkwood/pm.c
- delete mode 100644 arch/arm/mach-kirkwood/pm.h
- delete mode 100644 arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/rd88f6281-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/t5325-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/ts219-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/ts41x-setup.c
- delete mode 100644 arch/arm/mach-kirkwood/tsx1x-common.c
- delete mode 100644 arch/arm/mach-kirkwood/tsx1x-common.h
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index 445106d2c729..9e32ce88e9ee 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -191,7 +191,9 @@ void __init sched_clock_postinit(void)
+ 
+ static int sched_clock_suspend(void)
+ {
+-	sched_clock_poll(&sched_clock_timer);
++	update_sched_clock();
++	/* Restart the timer because we forced an update */
++	hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
+ 	cd.suspended = true;
+ 	return 0;
+ }
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
