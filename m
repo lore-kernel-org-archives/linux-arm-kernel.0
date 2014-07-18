@@ -1,39 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 14:38:29 -0700
-Subject: [GIT PULL] ARM: mvebu: Fixes for v3.16 (round 3)
-In-Reply-To: <20140718213214.GL24496@titan.lakedaemon.net>
-References: <20140718213214.GL24496@titan.lakedaemon.net>
-Message-ID: <CAOesGMgR23UH+-2bdSGFho6RsrAFpKrfF_RHbEs6wh=SOO_mCg@mail.gmail.com>
+Date: Fri, 18 Jul 2014 14:39:30 -0700
+Subject: [GIT PULL] at91: fixes for 3.16 #2
+In-Reply-To: <1405692730-31284-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1405692730-31284-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <CAOesGMgp+Zxc5Brwpa8-zSgWpj+jX3XVO8nC3f=Tw-b=_m0hVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 2:32 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> All,
+On Fri, Jul 18, 2014 at 7:12 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Arnd, Olof, Kevin,
 >
-> Here is hopefully the last round of fixes for mvebu.
+> This is the latest regressions that we found while testing the at91sam9n12 and
+> at91sam9x5 platforms following our move to CCF.
+> I created a pull-request this time because I have 3 patches: there should be
+> no conflict anyway. This tag does not contain the fix that Olof had taken during
+> previous -rc cycle on purpose: this way it won't appear twice in the history.
 >
-> This is an incremental pull request from tags/mvebu-fixes-3.16-2 up to
-> tags/mvebu-fixes-3.16-3 on the mvebu/fixes branch.
+> Thanks, best regards,
 >
-> Please pull.
+> The following changes since commit 971dc9ce106110745f246337f229013589354536:
 >
-> thx,
->
-> Jason.
->
-> The following changes since commit 6509dc74c9f55ffaa558738b96c4da8b98d39571:
->
->   ARM: mvebu: fix cpuidle implementation to work on big-endian systems (2014-06-30 18:15:11 +0000)
+>   ARM: at91/dt: sam9261: remove slow RC osc (2014-06-25 18:00:17 +0200)
 >
 > are available in the git repository at:
 >
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.16-3
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
 >
-> for you to fetch changes up to a728b977429383b3fe92b6e3bff9e69365609e0f:
+> for you to fetch changes up to e0d69e119fc6bf7cc3c9f791478108c1b925bb2e:
 >
->   ARM: mvebu: Fix coherency bus notifiers by using separate notifiers (2014-07-08 13:53:53 +0000)
-
+>   ARM: at91/dt: add missing clocks property to pwm node in sam9x5.dtsi (2014-07-18 15:56:35 +0200)
 
 Merged, thanks.
+
 
 -Olof
