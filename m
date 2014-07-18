@@ -1,64 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Jul 2014 18:24:22 -0400
-Subject: [GIT PULL RESEND] ARM: mvebu: DT changes for v3.17
-Message-ID: <20140718222422.GO24496@titan.lakedaemon.net>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 18 Jul 2014 15:25:09 -0700
+Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
+In-Reply-To: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
+References: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <53C99EC5.2060602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On 07/18/2014 03:09 PM, Stephen Boyd wrote:
+> During suspend we call sched_clock_poll() to update the epoch and
+> accumulated time and reprogram the sched_clock_timer to fire
+> before the next wrap-around time. Unfortunately,
+> sched_clock_poll() doesn't restart the timer, instead it relies
+> on the hrtimer layer to do that and during suspend we aren't
+> calling that function from the hrtimer layer. Instead, we're
+> reprogramming the expires time while the hrtimer is enqueued,
+> which can cause the hrtimer tree to be corrupted. Fix this
+> problem by updating the state via update_sched_clock() and
+> properly restarting the timer via hrtimer_start().
+>
+> Fixes: a08ca5d1089d "sched_clock: Use an hrtimer instead of timer"
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> I also wonder if we should be restarting the timer during resume
+> instead of suspend given that the resume path modifies the epoch.
+> At that point timers can't run because interrupts are disabled and
+> we don't really care if the timer fires earlier than it's supposed
+> to anyway because it's just there to avoid rollover events, but
+> does it seem better to do it that way? I didn't send that version
+> because this patch is to fix the code intention, but I'm curious
+> if anyone else feels like it should be changed.
 
-After discussion with Arnd, this is a resend of my previous pull
-request.
+Yea, starting the timer on suspend seems unintuitive to me.
 
-Please pull.
+Is this something you were hoping to get in for 3.17 or is this a urgent
+3.16 item?
 
-thx,
-
-Jason.
-
-
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.17
-
-for you to fetch changes up to d854fa8a1500bec982ed9cb26b82d96bd5ae8dab:
-
-  ARM: kirkwood: fix net5big regulator gpio assignments (2014-06-21 19:21:13 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.17
-
- - kirkwood
-    - add boards net2big and net5big
-
- - dove
-    - add vendor prefix for SolidRun
-    - split CuBox into it's variants
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Kirkwood: Add DT descriptions for net2big and net5big.
-
-Jason Cooper (1):
-      ARM: kirkwood: fix net5big regulator gpio assignments
-
-Sebastian Hesselbarth (2):
-      dt-binding: add vendor prefix for SolidRun
-      ARM: dts: mvebu: split SolidRun CuBox into variants
-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +
- arch/arm/boot/dts/dove-cubox-es.dts                |  12 ++
- arch/arm/boot/dts/dove-cubox.dts                   |   3 -
- arch/arm/boot/dts/kirkwood-net2big.dts             |  30 ++++
- arch/arm/boot/dts/kirkwood-net5big.dts             |  83 ++++++++++
- arch/arm/boot/dts/kirkwood-netxbig.dtsi            | 180 +++++++++++++++++++++
- 7 files changed, 309 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/dove-cubox-es.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-net2big.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-net5big.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-netxbig.dtsi
+thanks
+-john
