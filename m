@@ -1,35 +1,42 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 19 Jul 2014 01:48:18 +0900
-Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
- to support Exynos3250 ADC
-In-Reply-To: <10264770.8SXiIS8qhq@wuerfel>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <32226622.5gSmvBRKvZ@wuerfel>
- <CAGTfZH3vz9MLN+1fPM22zKE64oMNDgcib3is0nfzZhhLkmdNvw@mail.gmail.com>
- <10264770.8SXiIS8qhq@wuerfel>
-Message-ID: <CAGTfZH1jOEj8D6kJSd=-dgpSiU=sxs5W2TM=-rNtsZb-SkRD9Q@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 18 Jul 2014 19:01:36 +0200
+Subject: [PATCH 0/6] vf610: Add USB support
+Message-ID: <cover.1405702442.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 19, 2014 at 1:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 19 July 2014 01:11:53 Chanwoo Choi wrote:
->>
->>   Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
->>   - 'adc' clock: bus clock for ADC
->>
->>   Exynos3250 has additional 'sclk_adc' clock as following:
->>   - 'sclk_adc' clock: special clock for ADC which provide clock to internal ADC
->
-> The bus clock is often named "apb_pclk", but it's too late to change
-> that now, and it's not clear if the device is actually on APB.
->
-> The problem with "sclk_adc" is that it's very close to the name used
-> in the clock provider, with is CLK_SCLK_TSADC. Please try to avoid
-> the ambiguity here and make it clear that they are not referring
-> to the same thing. "internal" or "special" might be good if you want
-> to avoid "sclk".
+This patchset adds USB support for Vybrid VF610 SoC. It extends the
+clock framework to support the USB PHY cocks, extends the device
+tree files and adds support for the non-core registers in the
+usbmisc_imx driver.
 
-OK, thanks for your feedback.
-I'll try to find proper name.
+This patchset needs the eSDHC length fix available in Shawn's
+for-next branch.
 
-Chanwoo Choi
+The whole patchset proved to be working on a Colibri VF61. The
+first USB controller runs in peripheral mode. I could successfully
+use RNDIS, however with some stability issues: Suddenly the other
+side was not reachable anymore and the interface needed to brought
+down and back up again. I'm still investigating this.
+
+The second USB controller, running in USB host mode, showed no
+issues so far.
+
+Stefan Agner (6):
+  ARM: dts: vf610: add USB PHY and controller
+  ARM: imx: clk-vf610: add USBPHY clocks
+  ARM: dts: vf610: Add usbmisc for non-core registers
+  chipidea: usbmisc_imx: Add USB support for VF610 SoCs
+  usb: phy: mxs: Add VF610 USB PHY support
+  ARM: dts: vf610-colibri: add USB support
+
+ arch/arm/boot/dts/vf610-colibri.dts     | 10 +++++
+ arch/arm/boot/dts/vf610.dtsi            | 55 ++++++++++++++++++++++--
+ arch/arm/mach-imx/clk-vf610.c           | 12 +++++-
+ drivers/usb/chipidea/usbmisc_imx.c      | 76 +++++++++++++++++++++++----------
+ drivers/usb/phy/phy-mxs-usb.c           |  5 +++
+ include/dt-bindings/clock/vf610-clock.h |  5 ++-
+ 6 files changed, 135 insertions(+), 28 deletions(-)
+
+-- 
+2.0.1
