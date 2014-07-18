@@ -1,193 +1,132 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 18 Jul 2014 15:33:08 +0100
-Subject: [PATCH 1/2] arm: use generic fixmap.h
-In-Reply-To: <1404938942.24950.12.camel@deneb.redhat.com>
-References: <1404898792-4201-1-git-send-email-leif.lindholm@linaro.org>
- <1404898792-4201-2-git-send-email-leif.lindholm@linaro.org>
- <1404938942.24950.12.camel@deneb.redhat.com>
-Message-ID: <20140718143308.GA4179@bivouac.eciton.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 18 Jul 2014 16:36:32 +0200
+Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
+Message-ID: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 04:49:02PM -0400, Mark Salter wrote:
-> On Wed, 2014-07-09 at 10:39 +0100, Leif Lindholm wrote:
-> > diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> > index 45aeaac..3c59cdf 100644
-> > --- a/arch/arm/mm/highmem.c
-> > +++ b/arch/arm/mm/highmem.c
-> > @@ -20,16 +20,19 @@
-> >  
-> >  pte_t *fixmap_page_table;
-> >  
-> > +#define __kmap_fix_to_virt(x)	(__fix_to_virt(FIX_KMAP_NR_PTES - 1 - (x)))
-> 
-> FIX_KMAP_END - (x) ?
-> 
-> > +#define __kmap_virt_to_fix(x)	(FIX_KMAP_NR_PTES - 1 - __fix_to_virt(x))
-> 
-> shouldn't this use __virt_to_fix(x)?
+Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
+ARMCLK will be reduced upon entering idle mode (WFI or WFE).
 
-Err, clearly.
-Good thing I managed to mess up the end of the interface that actually
-isn't used anywhere in the kernel(!).
+The feature behaves like very fast cpufreq ondemand governor. In idle
+mode this reduces energy consumption on full frequency chosen by
+cpufreq governor by approximately:
+ - Trats2:  6.5% (153 mA -> 143 mA)
+ - Trats:  33.0% (180 mA -> 120 mA)
+ - Gear1:  27.0% (180 mA -> 130 mA)
 
-Fixed in the below.
+The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
+except it disables clock up feature and on Exynos4412 ARMCLK down is
+enabled for all 4 cores.
 
-/
-    Leif
+Tested on Trats board (Exynos4210), Trats2 board (Exynos4412) and
+Samsung Gear 1 (Exynos4212).
 
->From d0a82cd19000139d32232f415bcf46f476c16561 Mon Sep 17 00:00:00 2001
-From: Mark Salter <msalter@redhat.com>
-Date: Thu, 14 Nov 2013 11:37:32 -0500
-Subject: [PATCH 1/2] arm: use generic fixmap.h
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-ARM is different from other architectures in that fixmap pages are
-indexed with a positive offset from FIXADDR_START. Other architectures
-index with a negative offset from FIXADDR_TOP. In order to use the
-generic fixmap.h definitions, this patch redefines FIXADDR_TOP to be
-inclusive of the useable range. That is, FIXADDR_TOP is the virtual
-address of the topmost fixed page. The newly defined FIXADDR_END is
-the first virtual address past the fixed mappings.
-
-The patch also introduces local helper macros in highmem.c to reverse
-the iteration order of fixmap pages.
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
-[Rebased to 3.16-rc4, reverse kmap fixmap traversal]
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 ---
- arch/arm/include/asm/fixmap.h |   45 ++++++++++++++++++++++++++---------------
- arch/arm/mm/highmem.c         |   13 +++++++-----
- arch/arm/mm/init.c            |    2 +-
- 3 files changed, 38 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 74124b0..8992431 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -1,28 +1,41 @@
- #ifndef _ASM_FIXMAP_H
- #define _ASM_FIXMAP_H
+Changes since v1:
+1. Add PWR_CTRL registers to the list of saved clk registers on
+   Exynos4x12. Suggested by Tomasz Figa.
+2. Disable the clock up feature. (sug. Tomasz Figa)
+3. Use macros for setting clock down ratio. (sug. Tomasz Figa)
+4. Use num_possible_cpus() for exception on Exynos4x12. (sug. Tomasz
+   Figa)
+5. Enable the clock down feature also on Exynos4210 Trats board.
+---
+ drivers/clk/samsung/clk-exynos4.c | 46 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 7f4a473a7ad7..86c7709dc6d6 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -114,11 +114,27 @@
+ #define DIV_CPU1		0x14504
+ #define GATE_SCLK_CPU		0x14800
+ #define GATE_IP_CPU		0x14900
++#define PWR_CTRL1		0x15020
++#define E4X12_PWR_CTRL2		0x15024
+ #define E4X12_DIV_ISP0		0x18300
+ #define E4X12_DIV_ISP1		0x18304
+ #define E4X12_GATE_ISP0		0x18800
+ #define E4X12_GATE_ISP1		0x18804
  
-+#include <asm/pgtable.h>
++/* Below definitions are used for PWR_CTRL settings */
++#define PWR_CTRL1_CORE2_DOWN_RATIO(x)		(((x) & 0x7) << 28)
++#define PWR_CTRL1_CORE1_DOWN_RATIO(x)		(((x) & 0x7) << 16)
++#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
++#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
++#define PWR_CTRL1_USE_CORE3_WFE			(1 << 7)
++#define PWR_CTRL1_USE_CORE2_WFE			(1 << 6)
++#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
++#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
++#define PWR_CTRL1_USE_CORE3_WFI			(1 << 3)
++#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
++#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
++#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
 +
- #define FIXADDR_START		0xffc00000UL
--#define FIXADDR_TOP		0xffe00000UL
--#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
-+#define FIXADDR_END		0xffe00000UL
-+#define FIXADDR_SIZE		(FIXADDR_END - FIXADDR_START)
-+#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+ /* the exynos4 soc type */
+ enum exynos4_soc {
+ 	EXYNOS4210,
+@@ -155,6 +171,7 @@ static unsigned long exynos4210_clk_save[] __initdata = {
+ 	E4210_GATE_IP_LCD1,
+ 	E4210_GATE_IP_PERIR,
+ 	E4210_MPLL_CON0,
++	PWR_CTRL1,
+ };
  
- #define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
+ static unsigned long exynos4x12_clk_save[] __initdata = {
+@@ -164,6 +181,8 @@ static unsigned long exynos4x12_clk_save[] __initdata = {
+ 	E4X12_DIV_ISP,
+ 	E4X12_DIV_CAM1,
+ 	E4X12_MPLL_CON0,
++	PWR_CTRL1,
++	E4X12_PWR_CTRL2,
+ };
  
--#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
--#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
-+enum fixed_addresses {
-+	FIX_KMAP_BEGIN,
-+	FIX_KMAP_END = FIX_KMAP_NR_PTES - 1,
-+	__end_of_fixed_addresses
-+};
+ static unsigned long exynos4_clk_pll_regs[] __initdata = {
+@@ -1164,6 +1183,32 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+ 			VPLL_LOCK, VPLL_CON0, NULL),
+ };
+ 
++static void __init exynos4_core_down_clock(enum exynos4_soc soc)
++{
++	unsigned int tmp;
 +
-+/*
-+ * Temporary boot-time mappings, used by early_ioremap(),
-+ * before ioremap() is functional.
-+ *
-+ * (P)re-using the last pmd of the FIXADDR region, which is used for
-+ * highmem later on, and statically aligned to 1MB.
-+ * Growing down from FIXADDR_TOP
-+ */
-+#define NR_FIX_BTMAPS		32
-+#define FIX_BTMAPS_SLOTS	(PTRS_PER_PTE / NR_FIX_BTMAPS)
-+#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
-+#define FIX_BTMAP_END		FIX_KMAP_BEGIN
-+#define FIX_BTMAP_BEGIN		(FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1)
- 
--extern void __this_fixmap_does_not_exist(void);
-+#define FIXMAP_PAGE_NORMAL (L_PTE_MT_WRITEBACK | L_PTE_YOUNG | L_PTE_PRESENT)
-+#define FIXMAP_PAGE_IO (L_PTE_MT_DEV_NONSHARED | L_PTE_YOUNG | L_PTE_PRESENT)
- 
--static inline unsigned long fix_to_virt(const unsigned int idx)
--{
--	if (idx >= FIX_KMAP_NR_PTES)
--		__this_fixmap_does_not_exist();
--	return __fix_to_virt(idx);
--}
-+extern void __early_set_fixmap(enum fixed_addresses idx,
-+			       phys_addr_t phys, pgprot_t flags);
- 
--static inline unsigned int virt_to_fix(const unsigned long vaddr)
--{
--	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
--	return __virt_to_fix(vaddr);
--}
-+#include <asm-generic/fixmap.h>
- 
- #endif
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 45aeaac..2e5b773 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -20,16 +20,19 @@
- 
- pte_t *fixmap_page_table;
- 
-+#define __kmap_fix_to_virt(x)	(__fix_to_virt(FIX_KMAP_NR_PTES - 1 - (x)))
-+#define __kmap_virt_to_fix(x)	(FIX_KMAP_NR_PTES - 1 - __virt_to_fix(x))
++	/*
++	 * Enable arm clock down (in idle) and set arm divider
++	 * ratios in WFI/WFE state.
++	 */
++	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO(7) | PWR_CTRL1_CORE1_DOWN_RATIO(7) |
++		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
++		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
++		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
++	/* On Exynos4412 enable it also on core 2 and 3 */
++	if (num_possible_cpus() == 4)
++		tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
++		       PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
++	__raw_writel(tmp, reg_base + PWR_CTRL1);
 +
- static inline void set_fixmap_pte(int idx, pte_t pte)
- {
--	unsigned long vaddr = __fix_to_virt(idx);
-+	unsigned long vaddr = __kmap_fix_to_virt(idx);
- 	set_pte_ext(fixmap_page_table + idx, pte, 0);
- 	local_flush_tlb_kernel_page(vaddr);
- }
++	/*
++	 * Disable the clock up feature on Exynos4x12, in case it was
++	 * enabled by bootloader.
++	 */
++	if (exynos4_soc == EXYNOS4X12)
++		__raw_writel(0x0, reg_base + E4X12_PWR_CTRL2);
++}
++
+ /* register exynos4 clocks */
+ static void __init exynos4_clk_init(struct device_node *np,
+ 				    enum exynos4_soc soc)
+@@ -1250,6 +1295,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 	samsung_clk_register_alias(ctx, exynos4_aliases,
+ 			ARRAY_SIZE(exynos4_aliases));
  
- static inline pte_t get_fixmap_pte(unsigned long vaddr)
- {
--	unsigned long idx = __virt_to_fix(vaddr);
-+	unsigned long idx = __kmap_virt_to_fix(vaddr);
- 	return *(fixmap_page_table + idx);
- }
++	exynos4_core_down_clock(soc);
+ 	exynos4_clk_sleep_init();
  
-@@ -78,7 +81,7 @@ void *kmap_atomic(struct page *page)
- 	type = kmap_atomic_idx_push();
- 
- 	idx = type + KM_TYPE_NR * smp_processor_id();
--	vaddr = __fix_to_virt(idx);
-+	vaddr = __kmap_fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 	/*
- 	 * With debugging enabled, kunmap_atomic forces that entry to 0.
-@@ -109,7 +112,7 @@ void __kunmap_atomic(void *kvaddr)
- 		if (cache_is_vivt())
- 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
- #ifdef CONFIG_DEBUG_HIGHMEM
--		BUG_ON(vaddr != __fix_to_virt(idx));
-+		BUG_ON(vaddr != __kmap_fix_to_virt(idx));
- 		set_fixmap_pte(idx, __pte(0));
- #else
- 		(void) idx;  /* to kill a warning */
-@@ -132,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
- 
- 	type = kmap_atomic_idx_push();
- 	idx = type + KM_TYPE_NR * smp_processor_id();
--	vaddr = __fix_to_virt(idx);
-+	vaddr = __kmap_fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
- #endif
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..ad82c05 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -570,7 +570,7 @@ void __init mem_init(void)
- 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
- 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
- #endif
--			MLK(FIXADDR_START, FIXADDR_TOP),
-+			MLK(FIXADDR_START, FIXADDR_END),
- 			MLM(VMALLOC_START, VMALLOC_END),
- 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
- #ifdef CONFIG_HIGHMEM
+ 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
 -- 
-1.7.10.4
+1.9.1
