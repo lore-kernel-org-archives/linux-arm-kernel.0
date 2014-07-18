@@ -1,92 +1,138 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 18 Jul 2014 11:44:58 +0200
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <1405675599.6072.8.camel@weser.hi.pengutronix.de>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <CAJ+vNU0DNCT5pcvnptNBo-tPTVOH1HnrCwy7uCZt33dfyq8U-g@mail.gmail.com>
- <1405675599.6072.8.camel@weser.hi.pengutronix.de>
-Message-ID: <201407181144.58342.marex@denx.de>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Fri, 18 Jul 2014 17:28:31 +0530
+Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
+In-Reply-To: <20140718110718.GC19850@arm.com>
+References: <1403499924-11214-1-git-send-email-msalter@redhat.com>
+ <20140623110937.GB15907@arm.com>
+ <1403529423.755.49.camel@deneb.redhat.com>
+ <20140624141455.GE4489@arm.com>
+ <1403620714.755.69.camel@deneb.redhat.com>
+ <20140718110718.GC19850@arm.com>
+Message-ID: <CALrVBkvWejppnR2+Qwc__LT2d=0bQtEwF325kMSmQ=7BeUBrdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 18, 2014 at 11:26:39 AM, Lucas Stach wrote:
-> Hi Tim,
-> 
-> Am Donnerstag, den 26.06.2014, 17:29 -0700 schrieb Tim Harvey:
-> [...]
-> 
-> > Shawn / Richard,
-> > 
-> > I am also affected by this issue on IMX6 boards that I support. If I
-> > enable PCI in the bootloader I see similar hangs.
-> > 
-> > I have the following hardware configurations on my bench:
-> >   1. IMX6DL + i210 (same PCI setup as Fabio's above, but DL instead of Q)
-> >   2. IMX6Q + ath9k device
-> >   3. IMX6DL + PLX PEX860x PCIe-to-PCIe bridge with various devices
-> > 
-> > behind the bridge, using a clock buffer from IMX6 PCIe clock
-> > 
-> >   4. IMX6Q + PLX PEX860x PCIe-to-PCIe bridge with various devices
-> > 
-> > behind the bridge, using a clock buffer from IMX6 PCIe clock
-> > 
-> >   5. IMX6Q + PLX PEX860x PCIe-to-PCIe bridge with various devices
-> > 
-> > behind the bridge using a clock generator (always on, ignoring the
-> > PCIe clock)
-> > 
-> > For all of the above I have no PCI issues using
-> > 3.14/3.15/3.16-rc2/vendor 3.10.17_1.0.0_ga unless I enable PCI in the
-> > bootloader. When I do so, all of the above configurations hang
-> > somewhere around PCI init/enumeration. The same occurs with the most
-> > recent vendor kernel 3.10.17_1.0.0_ga kernel (works when PCI is
-> > disabled in the bootloader, hangs otherwise).
-> > 
-> > When I apply Fabio's patch above to the 3.16-rc2 kernel I find that
-> > scenarios #4 and #5 above then work, #3 boots but the PLX bridge fails
-> > all config cycles (0xff's), #2 boots but with no PCIe link, and #1
-> > above still hangs. Previously, when I have dug into this particular
-> > 'hang' issue on 3.15 I found that the delay needed to be between
-> > imx6_pcie_probe() requesting and asserting reset_gpio low, and before
-> > setting IOMUX_GPR1:18 to power down the PCIe PHY (note here, that the
-> > PHY is currently enabled in the bootloader when PCI is enabled there).
-> > 
-> > When I apply Fabio's patch above to the most recent vendor kernel
-> > 3.10.17_1.0.0_ga I still hang in all cases.
-> > 
-> > So while I agree there is something horribly wrong with IMX6 PCI
-> > still, I don't think Fabio's patch is the right solution and I don't
-> > have anything better at this point in time. I'm happy to share any
-> > hardware with anyone that can work through this issue.
-> 
-> Can you try if the attached patch makes any difference?
-> 
-> Regards,
-> Lucas
-> ------------------------------>8---------------------------------
-> From 0e2fc443c760290166f6371d50813e6c30a678da Mon Sep 17 00:00:00 2001
-> From: Lucas Stach <l.stach@pengutronix.de>
-> Date: Thu, 17 Jul 2014 18:54:44 +0200
-> Subject: [PATCH] try forcing LTSSM into detect state
-> 
-> ---
->  drivers/pci/host/pci-imx6.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index a568efaa331c..afa450c54aba 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -215,6 +215,8 @@ static int imx6_pcie_assert_core_reset(struct pcie_port
-> *pp) {
->  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-> 
-> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> +			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
->  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->  			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
->  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+Hi Catalin,
 
-Tried this, among many other things, but please let someone else also re-verify 
-this. What I observed is that the LTSSM cannot leave the POLLING phase .
+On 18 July 2014 16:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Jun 24, 2014 at 03:38:34PM +0100, Mark Salter wrote:
+>> On Tue, 2014-06-24 at 15:14 +0100, Catalin Marinas wrote:
+>> > On Mon, Jun 23, 2014 at 02:17:03PM +0100, Mark Salter wrote:
+>> > > On Mon, 2014-06-23 at 12:09 +0100, Catalin Marinas wrote:
+>> > > > My proposal (in the absence of any kind of description) is to still
+>> > > > create a ZONE_DMA if we have DMA memory below 32-bit, otherwise just add
+>> > > > everything (>32-bit) to ZONE_DMA. Basically an extension from your CMA
+>> > > > patch, make dma_phys_limit static in that file and set it to
+>> > > > memblock_end_of_DRAM() if no 32-bit DMA. Re-use it in the
+>> > > > zone_sizes_init() function for ZONE_DMA (maybe with a pr_info for no
+>> > > > 32-bit only DMA zone).
+>> > >
+>> > > There's a performance issue with all memory being in ZONE_DMA. It means
+>> > > all normal allocations will fail on ZONE_NORMAL and then have to fall
+>> > > back to ZONE_DMA. It would be better to put some percentage of memory
+>> > > in ZONE_DMA.
+>> >
+>> > Is the performance penalty real or just theoretical? I haven't run any
+>> > benchmarks myself.
+>>
+>> It is real insofar as you must eat cycles eliminating ZONE_NORMAL from
+>> consideration in the page allocation hot path. How much that really
+>> costs, I don't know. But it seems like it could be easily avoided by
+>> limiting ZONE_DMA size. Is there any reason it needs to be larger than
+>> 4GiB?
+>
+> Basically ZONE_DMA should allow a 32-bit dma mask. When memory starts
+> above 4G, in the absence of an IOMMU, it is likely that 32-bit devices
+> get some offset for the top bits to be able to address the bottom of the
+> memory. The problem is that dma_to_phys() that early in the kernel has
+> no idea about DMA offsets until later (they can be specified in DT per
+> device).
+>
+> The patch belows tries to guess a DMA offset and use the bottom 32-bit
+> of the DRAM as ZONE_DMA.
+>
+> -------8<-----------------------
+>
+> From 133656f8378dbb838ad5f12ea29aa9303d7ca922 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Fri, 18 Jul 2014 11:54:37 +0100
+> Subject: [PATCH] arm64: Create non-empty ZONE_DMA when DRAM starts above 4GB
+>
+> ZONE_DMA is created to allow 32-bit only devices to access memory in the
+> absence of an IOMMU. On systems where the memory starts above 4GB, it is
+> expected that some devices have a DMA offset hardwired to be able to
+> access the bottom of the memory. Linux currently supports DT bindings
+> for the DMA offsets but they are not (easily) available early during
+> boot.
+>
+> This patch tries to guess a DMA offset and assumes that ZONE_DMA
+> corresponds to the 32-bit mask above the start of DRAM.
+>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/mm/init.c | 17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 7f68804814a1..160bbaa4fc78 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -60,6 +60,17 @@ static int __init early_initrd(char *p)
+>  early_param("initrd", early_initrd);
+>  #endif
+>
+> +/*
+> + * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+> + * currently assumes that for memory starting above 4G, 32-bit devices will
+> + * use a DMA offset.
+> + */
+> +static phys_addr_t max_zone_dma_phys(void)
+> +{
+> +       phys_addr_t offset = memblock_start_of_DRAM() & GENMASK_ULL(63, 32);
+> +       return min(offset + (1ULL << 32), memblock_end_of_DRAM());
+> +}
+> +
+>  static void __init zone_sizes_init(unsigned long min, unsigned long max)
+>  {
+>         struct memblock_region *reg;
+> @@ -70,9 +81,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+>
+>         /* 4GB maximum for 32-bit only capable devices */
+>         if (IS_ENABLED(CONFIG_ZONE_DMA)) {
+> -               unsigned long max_dma_phys =
+> -                       (unsigned long)(dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1);
+> -               max_dma = max(min, min(max, max_dma_phys >> PAGE_SHIFT));
+> +               max_dma = PFN_DOWN(max_zone_dma_phys());
+>                 zone_size[ZONE_DMA] = max_dma - min;
+>         }
+>         zone_size[ZONE_NORMAL] = max - max_dma;
+> @@ -142,7 +151,7 @@ void __init arm64_memblock_init(void)
+>
+>         /* 4GB maximum for 32-bit only capable devices */
+>         if (IS_ENABLED(CONFIG_ZONE_DMA))
+> -               dma_phys_limit = dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1;
+> +               dma_phys_limit = max_zone_dma_phys();
+>         dma_contiguous_reserve(dma_phys_limit);
+>
+>         memblock_allow_resize();
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Linux-3.16-rcX is broken on X-Gene Mustang because
+on X-Gene Mustang the DRAM starts at 0x4000000000.
+
+I have tested your patch and the original patch from
+this thread. Both patches fixes the issue for X-Gene
+Mustang and Linux-3.16-rc5 happily boots on X-Gene.
+
+Can you to send your patch as Linux-3.16-rcX fix?
+
+For your patch, you can have:
+Tested-by: Anup Patel <anup.patel@linaro.org>
+
+Thanks,
+Anup
