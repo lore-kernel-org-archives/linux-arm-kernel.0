@@ -1,43 +1,35 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 18 Jul 2014 15:00:50 +0100
-Subject: [PATCH 4/7] arm: Disable stack protection for decompressor/stub
+Date: Fri, 18 Jul 2014 15:00:53 +0100
+Subject: [PATCH 7/7] init: efi: arm: enable (U)EFI runtime services on arm
 In-Reply-To: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
 References: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1405692053-7514-5-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1405692053-7514-8-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Franz <roy.franz@linaro.org>
+Since the efi_set_virtual_address_map call has strict init ordering
+requirements, add an explicit hook in the required place.
 
-The ARM decompressor/EFI stub do not implement the functions
-(__stack_chk_guard_setup, etc) that are required for support of
-stack protection.  The actual enablement of stack protection is
-controlled by heuristics in GCC, which the code added for the EFI
-stub triggers when CONFIG_STACKPROTECTOR is set.  Even with
-CONFIG_STACKPROTECTOR set, the decompressor was never compiled
-with stack protection actually enabled. Adding -fno-stack-protector
-to the decompressor/stub build keeps it building without stack
-protection as it has always been built.
-The x86 decompressor/stub is also built with -fno-stack-protector.
-
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- arch/arm/boot/compressed/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ init/main.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 68c9183..27536b1 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -121,7 +121,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
- KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
+diff --git a/init/main.c b/init/main.c
+index e8ae1fe..744d271 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -996,6 +996,10 @@ static noinline void __init kernel_init_freeable(void)
+ 	smp_prepare_cpus(setup_max_cpus);
  
--ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
-+ccflags-y := -fpic -mno-single-pic-base -fno-builtin -fno-stack-protector -I$(obj)
- asflags-y := -DZIMAGE
+ 	do_pre_smp_initcalls();
++
++	if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
++		efi_enter_virtual_mode();
++
+ 	lockup_detector_init();
  
- # Supply kernel BSS size to the decompressor via a linker symbol.
+ 	smp_init();
 -- 
 1.7.10.4
