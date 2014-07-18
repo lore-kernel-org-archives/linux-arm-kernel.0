@@ -1,58 +1,70 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 18 Jul 2014 09:57:58 -0400
-Subject: [PATCH v10 0/8] ARM: berlin: add AHCI support
-In-Reply-To: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140718135758.GB13012@htj.dyndns.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 18 Jul 2014 15:00:46 +0100
+Subject: [PATCH 0/7] arm: add UEFI support
+Message-ID: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Hans who's now maintaining libahci-platform.)
+This set adds support for UEFI platforms 32-bit ARM platforms,
+consisting of:
+- UEFI stub support
+  Turns the kernel into a UEFI executable, able to launch without a
+  dedicated bootloader.
+- UEFI runtime services
+  Lets the kernel interact with services provided by firmware.
+  (Used by 'efibootmgr' application.)
+- UEFI system descriptions
+  For now, adds the ability to extract information about available
+  RAM from UEFI rather than hard-wired in .dtb or on command line.
 
-On Fri, Jul 18, 2014 at 02:29:59PM +0200, Antoine T?nart wrote:
-> Tejun, Kishon, Sebastian,
-> 
-> I looked into the AHCI framework to see how to map PHYs and ports
-> information. I see two ways of doing this:
->   - We can attach the ahci_port_priv to the ahci_host_priv structure,
->     but that would require quite a lot of changes since the
->     ahci_port_priv is initialized at the very end (in port_start()) and
->     because ahci_port_priv is currently retrieved from the ata_port
->     structure in libahci functions. We do want to parse the dt ports
->     early in the AHCI initialization to be able to generate the right
->     port_map mask. Tests would be needed to ensure nothing is broken.
->   - We can move the PHY handling to where the ports are handled, moving
->     PHYs from ahci_host_priv to ahci_port_priv. This also would require
->     to perform some tests as PHY operations would be moved from
->     libahci_platform to libahci.
+This set depends on:
+- Ard Biesheuvel "efi: efistub: Convert into static library"
+                 About to go into linux-next, aiming for 3.17.
+- Mark Salter    "arm: use generic fixmap.h"
+- Mark Salter    "arm: add early_ioremap support"
 
-I don't get the last part.  Why would it have to be moved from
-libahci_platform to libahci?  Can't we break up the init steps so that
-PHY handling can be put inbetween?  The last time I suggested that,
-Hans seemed to agree.
+The bits shared with arm64 went into 3.16-rc1.
 
-> In both cases we do not have time to do this for the next release, as
-> the request popped up quite late.
-> 
-> So as of now:
->   - Either the series is merged as is and changes to the AHCI framework
->     can be made for 3.18, as it's not particularly linked to this
->     series.
->   - Or you really do not want it. Then that would be great if patches
->     1-2 and 7-8 could be merged so that we do not end up with this big
->     series going for yet another cycle... I think Kishon already took
->     patches 1-2.
+Changes from previous version:
+- Stub and runtime services support now merged (like on arm64) - they
+  are no longer functionally separable.
+- Some fixes and cleanup.
 
-I don't wanna take in code which isn't in the shape that it should be.
-Things like this accumulate to become a large maintenance burden over
-time.  Sure, urgent things can slip in and then later be fixed up but
-who are gonna do that here?  You guys already seem to be under time
-pressure as it is.
+Leif Lindholm (4):
+  arm: break part of __soft_restart out into separate function
+  arm: add new asm macro update_sctlr
+  arm: efi: use strcmp instead of strncmp for fdt parsing
+  init: efi: arm: enable (U)EFI runtime services on arm
 
-If you guys can figure something out with Hans regarding how to
-proceed on this, I'll be happy take the code as is.
+Roy Franz (3):
+  arm: add strstr to compressed string.c
+  arm: Disable stack protection for decompressor/stub
+  arm: add [U]EFI support
 
-Thanks.
+ arch/arm/Kconfig                      |   21 ++
+ arch/arm/boot/compressed/.gitignore   |    2 +
+ arch/arm/boot/compressed/Makefile     |   23 +-
+ arch/arm/boot/compressed/efi-header.S |  117 +++++++++
+ arch/arm/boot/compressed/efi-stub.c   |   92 +++++++
+ arch/arm/boot/compressed/head.S       |   78 +++++-
+ arch/arm/boot/compressed/string.c     |   21 ++
+ arch/arm/include/asm/assembler.h      |   14 ++
+ arch/arm/include/asm/efi.h            |   47 ++++
+ arch/arm/include/asm/idmap.h          |    1 +
+ arch/arm/kernel/Makefile              |    2 +
+ arch/arm/kernel/efi.c                 |  435 +++++++++++++++++++++++++++++++++
+ arch/arm/kernel/efi_phys.S            |   66 +++++
+ arch/arm/kernel/process.c             |   12 +-
+ arch/arm/kernel/setup.c               |    7 +-
+ arch/arm/mm/idmap.c                   |   15 ++
+ drivers/firmware/efi/libstub/fdt.c    |    5 +-
+ init/main.c                           |    4 +
+ 18 files changed, 938 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/boot/compressed/efi-stub.c
+ create mode 100644 arch/arm/include/asm/efi.h
+ create mode 100644 arch/arm/kernel/efi.c
+ create mode 100644 arch/arm/kernel/efi_phys.S
 
 -- 
-tejun
+1.7.10.4
