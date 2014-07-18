@@ -1,35 +1,44 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 18 Jul 2014 14:08:12 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: add DSB and ISB barriers after relocating
- code
-In-Reply-To: <53C95A14.5030300@gmail.com>
-References: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
- <alpine.LFD.2.11.1405222155240.17310@knanqh.ubzr>
- <537EB8F2.3090401@gmail.com>
- <20140602095324.GA3855@e103592.cambridge.arm.com>
- <53C95A14.5030300@gmail.com>
-Message-ID: <alpine.LFD.2.11.1407181407170.3647@knanqh.ubzr>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 18 Jul 2014 11:13:59 -0700
+Subject: [PATCH v12 11/11] seccomp: add thread sync ability
+In-Reply-To: <CALCETrUv3G+C3PTOD1FJGOG8AQCA30hNkUiusCnQDGq6Kt_Feg@mail.gmail.com>
+References: <1405620518-18495-1-git-send-email-keescook@chromium.org>
+ <alpine.LRH.2.11.1407181325200.15709@namei.org>
+ <CALCETrUv3G+C3PTOD1FJGOG8AQCA30hNkUiusCnQDGq6Kt_Feg@mail.gmail.com>
+Message-ID: <CAGXu5jL9wQ4ZJ1kDRx_Y_cyGQEjO_Ugmcc--Q71x32_x1q9ScA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jul 2014, Marc C wrote:
+On Fri, Jul 18, 2014 at 10:17 AM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Thu, Jul 17, 2014 at 8:26 PM, James Morris <jmorris@namei.org> wrote:
+>> On Thu, 17 Jul 2014, Kees Cook wrote:
+>>
+>>> Twelfth time's the charm! :)
+>>
+>> Btw, there doesn't seem to be an official seccomp maintainer.  Kees, would
+>> you like to volunteer for this?  If so, send in a patch for MAINTAINERS,
+>> and set up a git tree for me to pull from.
 
-> Hi Dave,
-> 
-> My apologies for not addressing this prior to submitting my v2 of the patch.
-> 
-> > How is what we're trying to achieve here different from the operation
-> > that needs to be done in between decompressing the kernel and jumping
-> > to it?  Can't we just call cache_clean_flush?
-> >
-> > Except that a possibly-redundant flush of the D-cache will be done,
-> > this should do exactly the right thing.
-> 
-> I agree - I don't see why we can't just perform a cache_clean_flush
-> prior to jumping to the relocated code. It seems like a simpler and less
-> error-prone solution.
+Sure thing, I'll get this set up now. I wonder if I should include the
+glob "arch/*/kernel/ptrace.c" in the MAINTAINERS entry. :P
 
-Agreed.
+> *snicker* :)
+>
+> Kees, if you take on this awesome responsibility, should I send you a
+> rebased version of the fastpath stuff?  If so, I think that the
+> arch-neutral part should go in through your shiny new tree (once it's
+> reviewed to your satisfaction), and I'll ask hpa to pick up the x86
+> part.
 
+Yeah, that sounds perfect.
 
-Nicolas
+> I'd volunteer to be a "R:eviewer", but I don't think that the R tag
+> has made it into MAINTAINERS yet.
+
+I'd love to have you listed. :)
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
