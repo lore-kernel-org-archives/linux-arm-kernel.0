@@ -1,77 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Jul 2014 23:17:49 -0700
-Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
-In-Reply-To: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
-References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
-Message-ID: <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Jul 2014 23:24:56 -0700
+Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <53C7A01C.50107@linutronix.de>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
+ <20140717070859.GD18374@atomide.com>
+ <20140717074219.GA29193@linutronix.de>
+ <20140717081232.GH18374@atomide.com> <53C7A01C.50107@linutronix.de>
+Message-ID: <20140718062456.GJ18374@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 10:35 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Clock lines may or may not be shared among different CPUs on a platform. When
-> clock lines are shared between CPUs, they change DVFS state together.
->
-> Possible configurations:
->
-> 1.) All CPUs share a single clock line.
-> 2.) All CPUs have independent clock lines.
-> 3.) CPUs within a group/cluster share clock line but each group/cluster have a
->     separate line for itself.
->
-> There is no generic way available today to detect which CPUs share clock lines
-> and so this is an attempt towards that.
->
-> Much of the information is present in the commit and so no point duplicating it
-> here.
->
-> These are obviously not finalized yet and this is an attempt to initiate a
-> discussion around this.
->
-> Please share your valuable feedback.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> I wasn't sure about the path/name of this file, so please don't blast me on that
-> :)
->
->  .../devicetree/bindings/cpufreq/cpu_clocks.txt     | 159 +++++++++++++++++++++
->  1 file changed, 159 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
->
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
-> new file mode 100644
-> index 0000000..30ce9ad
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
-> @@ -0,0 +1,159 @@
-> +* Generic CPUFreq clock bindings
-> +
-> +Clock lines may or may not be shared among different CPUs on a platform.
-> +
-> +Possible configurations:
-> +1.) All CPUs share a single clock line
-> +2.) All CPUs have independent clock lines
-> +3.) CPUs within a group/cluster share clock line but each group/cluster have a
-> +    separate line for itself
-> +
-> +Optional Properties:
-> +- clock-master: This declares cpu as clock master. Other CPUs can either define
-> +  "clock-ganged" or "clock-master" property, but shouldn't be missing both.
-> +
-> +- clock-ganged: Should have phandle of a cpu declared as "clock-master".
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140717 03:09]:
+> On 07/17/2014 10:12 AM, Tony Lindgren wrote:
+> > Hmm it could be that it works for a while because the clocks are on
+> > from the bootloader and pm_runtime calls won't do anything. This
+> > could happen if the interconnect data based on the ti,hwmods entry
+> > is not getting matched to the new driver. This gets initialized when
+> > the device entry gets created in omap_device_build_from_dt().
+> > 
+> > Or maybe something now affects the clock aliases? It seems that we
+> > are still missing the clocks entries in the .dtsi files, see the
+> > mappings with $ git grep uart drivers/clk/ti/
+> 
+> I've been looking for something completely different while I noticed
+> this:
+> 
+> in drivers/tty/serial/omap-serial.c
+> | static struct platform_driver serial_omap_driver = {
+> |         .driver         = {
+> |                 .name   = DRIVER_NAME,
+> |         },
+> | };
+> |
+> 
+> and DRIVER_NAME should come from include/linux/platform_data/serial-omap.h
+> Looking further, I've found arch/arm/mach-omap2/serial.c:
+> | void __init omap_serial_init_port(struct omap_board_data *bdata,
+> |                         struct omap_uart_port_info *info)
+> | {
+> |         char *name
+> ?
+> |	name = DRIVER_NAME;
+> ?
+> |	pdev = omap_device_build(name, uart->num, oh, pdata, pdata_size);
+> ?
+> |
+> 
+> Would this explain it?
 
-Why complicate it by using two properties?
+That would explain it for legacy booting, but not for device tree
+based booting. I can try to debug it further on Monday.
 
-If there is no property, then the CPUs are assumed to be controlled
-independently.
+Regards,
 
-if there is a clock-master = <phandle> property, then that points at
-the cpu that is the main one controlling clock for the group.
-
-There's really no need to label the master -- it will be the only one
-with incoming links but nothing outgoing. And a master without slaves
-is an independently controlled cpu so you should be fine in that
-aspect too.
-
-
--Olof
+Tony
