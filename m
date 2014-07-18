@@ -1,51 +1,54 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 18 Jul 2014 11:15:45 +0800
-Subject: [PATCH v2 3/3] [media] atmel-isi: add primary DT support
-In-Reply-To: <2360323.ktzTJnrmOX@avalon>
-References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1403302313290.12008@axis700.grange>
- <53392FC9.9070706@atmel.com> <2360323.ktzTJnrmOX@avalon>
-Message-ID: <53C89161.4080405@atmel.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 17 Jul 2014 20:25:03 -0700
+Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
+ hotplug/suspend
+In-Reply-To: <CAKohpongsNtEVbHL=w1fbw5tEXK=WaMcp1N03ar9Sx_CU=1O-w@mail.gmail.com>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
+ <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
+ <53C65F03.1050609@mit.edu> <53C6D8EC.1030609@codeaurora.org>
+ <CAKohpongsNtEVbHL=w1fbw5tEXK=WaMcp1N03ar9Sx_CU=1O-w@mail.gmail.com>
+Message-ID: <53C8938F.1070706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Laurent
-
-On 7/17/2014 7:00 PM, Laurent Pinchart wrote:
-> Hi Josh,
+On 07/16/2014 10:35 PM, Viresh Kumar wrote:
+> On 17 July 2014 01:26, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> On 07/16/2014 04:16 AM, Srivatsa S. Bhat wrote:
 >
-> What's the status of this patch set ? Do you plan to rebase and resubmit it ?
-
-Thanks for the reminding.
-yes,  I will rebase it and resubmit the new version for this patch set 
-with the data bus width support.
-Thanks.
-
-Best Regards,
-Josh Wu
+>>> That is, we wanted
+>>> to do the kobject cleanup after releasing the hotplug lock, and POST_DEAD
+>>> stage was well-suited for that.
 >
-> On Monday 31 March 2014 17:05:13 Josh Wu wrote:
->> Dear Guennadi
+> I think, this has changed in Saravana's patch, we do it in the PREPARE stage
+> now.
+
+Not really. We much never do it during hotplug. We only do it when the 
+cpufreq driver unregisters.
+
+This should be easier to see in v4, where I'm breaking up the patches 
+into easier diffs.
+
+>>> Commit 1aee40ac9c8 (cpufreq: Invoke __cpufreq_remove_dev_finish() after
+>>> releasing cpu_hotplug.lock) explains this in detail. Saravana, please take
+>>> a
+>>> look at that reasoning and ensure that your patch doesn't re-introduce
+>>> those
+>>> deadlock possibilities!
 >>
->> On 3/31/2014 5:20 AM, Guennadi Liakhovetski wrote:
->>> Hi Josh,
->>>
->>> Please correct me if I'm wrong, but I don't see how this is going to work
->>> without the central part - building asynchronous V4L2 data structures from
->>> the DT, something that your earlier patch
->> Here you mean Bryan Wu not me, right?   ;-)
->> Bryan write the patch "[v2] media: soc-camera: OF cameras" in:
->> https://patchwork.linuxtv.org/patch/22288/.
->> And I saw Ben Dooks already sent out his patch to support soc-camera OF
->> now (https://patchwork.linuxtv.org/patch/23304/) which is simpler than
->> Bryan's.
 >>
->>> "media: soc-camera: OF cameras"
->>> was doing, but which you stopped developing after a discussion with Ben
->>> (added to Cc).
->> And yes, atmel-isi dt patch should not work without above SoC-Camera of
->> support patch.
->> But as the atmel-isi dt binding document and port node can be finalized.
->> So I think this patch is ready for the mainline.
+>> But all of that was needed _because_ we were creating and destroying
+>> policies and kobjs all the time. We don't do that anymore. So, I don't think
+>> any of that applies. We only destroy when the cpufreq driver is
+>> unregistered. That's kinda of the point of this patchset.
 >>
->> BTW: I will test Ben's patch with atmel-isi.
+>> Thoughts?
+>
+> See above.
+>
+
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
