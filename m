@@ -1,96 +1,53 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Fri, 18 Jul 2014 14:15:01 +0530
-Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver through
- DT
-In-Reply-To: <20140717142019.GA21732@e102568-lin.cambridge.arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-8-git-send-email-lorenzo.pieralisi@arm.com>
- <5019714.S4WTdsyrXS@amdc1032>
- <20140717142019.GA21732@e102568-lin.cambridge.arm.com>
-Message-ID: <CANuQgHEPocfO8wDPDTJUkBNGEfw6FoLEYAJK-zPPA7kd_L-34Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Jul 2014 09:48:47 +0100
+Subject: [PATCH v13 6/8] arm: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <1405666386-15095-7-git-send-email-minchan@kernel.org>
+References: <1405666386-15095-1-git-send-email-minchan@kernel.org>
+ <1405666386-15095-7-git-send-email-minchan@kernel.org>
+Message-ID: <20140718084847.GC9548@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Fri, Jul 18, 2014 at 07:53:04AM +0100, Minchan Kim wrote:
+> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+> overwrite of the contents since MADV_FREE syscall is called for
+> THP page.
+> 
+> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+> support.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
+> ---
+>  arch/arm/include/asm/pgtable-3level.h | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 85c60adc8b60..830f84f2d277 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -220,6 +220,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>  #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+>  #endif
+>  
+> +#define pmd_dirty(pmd)		(pmd_val(pmd) & PMD_SECT_DIRTY)
+> +
+>  #define PMD_BIT_FUNC(fn,op) \
+>  static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+>  
+> @@ -228,6 +230,7 @@ PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
+>  PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
+>  PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
+>  PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
+> +PMD_BIT_FUNC(mkclean,   &= ~PMD_SECT_DIRTY);
+>  PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+>  
+>  #define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
 
+Looks fine to me, but again, it would be great if Steve can take a look too.
 
-On 17 July 2014 19:50, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Jun 25, 2014 at 04:23:38PM +0100, Bartlomiej Zolnierkiewicz wrote:
->>
->> Hi,
->>
->> On Wednesday, June 25, 2014 03:10:20 PM Lorenzo Pieralisi wrote:
->> > With the introduction of DT based idle states, CPUidle drivers for
->> > ARM can now initialize idle states data through properties in the device
->> > tree.
->> >
->> > This patch adds code to the Exynos CPUidle driver to dynamically
->> > initialize idle states data through the updated device tree source
->> > files.
->> >
->> > Cc: Kukjin Kim <kgene.kim@samsung.com>
->> > Cc: Tomasz Figa <t.figa@samsung.com>
->> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> > ---
->> > Compile tested, I am not sure I patched the right dts files, please check.
->>
->> cpuidle-exynos driver is currently working properly in deeper cpuidle
->> mode (AFTR) on Exynos4210 and Exynos5250 (please also see the following
->> patch from Tomasz Figa: [1]).  There is ongoing work to AFTR mode work
->> also on Exynos4x12 and Exynos3250 but it is not complete yet.  Exynos5410
->> OTOH should probably use the generic big little cpuidle driver (this SoC
->> is similar to Exynos5420 one for which Chander Kashyap has developed
->> cpuidle-big_little support [2]).
->>
->> Making long story short, I think that your patch should depend on patch
->> [1] and update only exynos4210.dtsi and exynos5250.dtsi.  Also for your
->> patch #6 there needs to be some coordination with merging of Chander's
->> patchset ([2]).
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg341023.html
->> [2] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg664470.html
->
->
-> exynos4210.dtsi does not even have cpu nodes in it. Should I add them or
-> this might trigger regression (ie cpu_logical_map()) ?
-
-Yes that can cause regression.
-
->
-> I will post a new version soon, should I just patch 5250 for now ?
->
-> I would need help to test this patch thanks.
-
-I can test the patch for 5250.
-
->
-> Lorenzo
->
->> >  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
->> >  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
->> >  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
->> >  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
->> >  drivers/cpuidle/Kconfig.arm                        |  1 +
->> >  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
->> >  6 files changed, 93 insertions(+), 12 deletions(-)
->> >  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
->>
->> Best regards,
->> --
->> Bartlomiej Zolnierkiewicz
->> Samsung R&D Institute Poland
->> Samsung Electronics
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->
-
-
-
--- 
-with warm regards,
-Chander Kashyap
+Will
