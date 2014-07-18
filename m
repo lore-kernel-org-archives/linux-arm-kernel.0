@@ -1,128 +1,55 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 18 Jul 2014 18:00:02 +0200
-Subject: [PATCH] ARM: dts: add CPU nodes for Exynos4 SoCs
-Message-ID: <1863399.9O2S91ZvEO@amdc1032>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 18 Jul 2014 11:02:09 -0500
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <53C942F1.2000408@hurleysoftware.com>
+References: <53C6A050.2050409@linutronix.de>
+ <20140716160614.GI1365@saruman.home>
+ <53C7EC6F.6060902@hurleysoftware.com>
+ <20140717154300.GA16623@linutronix.de>
+ <20140717160206.GI10459@saruman.home>
+ <53C7F4A3.5080508@linutronix.de>
+ <20140717161848.GK10459@saruman.home>
+ <53C8DC3E.3020701@linutronix.de>
+ <20140718153116.GN24914@saruman.home>
+ <53C942F1.2000408@hurleysoftware.com>
+Message-ID: <20140718160209.GQ24914@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
-when topology is read from DT") fixed GIC driver to filter cluster ID
-from values returned by cpu_logical_map() for SoCs having registers
-mapped without per-CPU banking making it is possible to add CPU nodes
-for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
-required by future changes adding initialization of cpuidle states in
-Exynos cpuidle driver through DT.
+On Fri, Jul 18, 2014 at 11:53:21AM -0400, Peter Hurley wrote:
+> On 07/18/2014 11:31 AM, Felipe Balbi wrote:
+> >On Fri, Jul 18, 2014 at 10:35:10AM +0200, Sebastian Andrzej Siewior wrote:
+> >>>On 07/17/2014 06:18 PM, Felipe Balbi wrote:
+> >>>
+> >>>>> >>No, this is okay. If you look, it checks for "up->ier &
+> >>>>> >>UART_IER_THRI". On the second invocation it will see that this
+> >>>>> >>bit is already set and therefore won't call get_sync() for the
+> >>>>> >>second time. That bit is removed in the _stop_tx() path.
+> >>>> >
+> >>>> >oh, right. But that's actually unnecessary. Calling
+> >>>> >pm_runtime_get() multiple times will just increment the usage
+> >>>> >counter multiple times, which means you can call __stop_tx()
+> >>>> >multiple times too and everything gets balanced, right ?
+> >>>
+> >>>No. start_tx() will be called multiple times but only the first
+> >>>invocation invoke pm_runtime_get(). Now I noticed that I forgot to
+> >right, but that's unnecessary. You can pm_runtime_get() every time
+> >start_tx() is called. Just make sure to put everytime stop_tx() is
+> >called too.
+> 
+> The interface is asymmetric.
+> 
+> start_tx() may be invoked multiple times for which only 1 interrupt
+> will occur, and thus only invoke __stop_tx() once.
 
-Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
+alright, thanks for the info.
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-Based on next-20140717 branch of linux-next tree +
-- [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
-- [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
-
- arch/arm/boot/dts/exynos4210.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/exynos4212.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/exynos4412.dtsi | 29 +++++++++++++++++++++++++++++
- 3 files changed, 63 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index ee3001f..b99fc83 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -31,6 +31,23 @@
- 		pinctrl2 = &pinctrl_2;
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x900>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x901>;
-+		};
-+	};
-+
- 	sysram at 02020000 {
- 		compatible = "mmio-sram";
- 		reg = <0x02020000 0x20000>;
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 3c00e6e..484a2da 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -22,6 +22,23 @@
- / {
- 	compatible = "samsung,exynos4212", "samsung,exynos4";
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA00>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA01>;
-+		};
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <18>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index c42a3e1..89f4743 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -22,6 +22,35 @@
- / {
- 	compatible = "samsung,exynos4412", "samsung,exynos4";
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA00>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA01>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA02>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA03>;
-+		};
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <20>;
- 	};
 -- 
-1.8.2.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/d89a0b78/attachment.sig>
