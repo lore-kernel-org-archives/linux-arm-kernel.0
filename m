@@ -1,278 +1,63 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Jul 2014 02:21:55 +0200
-Subject: [PATCH v2 7/7] ARM: dts: add rk3288 evaluation board
-In-Reply-To: <4868343.UFgjaXesOn@diego>
-References: <4868343.UFgjaXesOn@diego>
-Message-ID: <2004020.THrDyKm3fa@diego>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 18 Jul 2014 09:44:35 +0900
+Subject: [PATCH v7 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <CAJuA9aiVFFZiN7_xBg6iQEX-LJKLMmHKvPhmdmOduouQzBtQJw@mail.gmail.com>
+References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
+ <CAJuA9ahWbL8v2nS6wuDosn-bi+pga57KUe5wQN14Mot_-RTc6w@mail.gmail.com>
+ <CAJuA9aiVFFZiN7_xBg6iQEX-LJKLMmHKvPhmdmOduouQzBtQJw@mail.gmail.com>
+Message-ID: <53C86DF3.1040303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There exist 2 variants using either the act8846 or rk808 as pmic, while the
-rest of the board stays the same.
+Hi Thomas,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 134 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-evb-rk808.dts   |  18 +++++
- arch/arm/boot/dts/rk3288-evb.dtsi        |  83 +++++++++++++++++++
- 3 files changed, 235 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-evb-act8846.dts
- create mode 100644 arch/arm/boot/dts/rk3288-evb-rk808.dts
- create mode 100644 arch/arm/boot/dts/rk3288-evb.dtsi
+On 07/17/2014 02:58 PM, Thomas Abraham wrote:
+> Hi Mike,
+> 
+> On Tue, Jul 15, 2014 at 9:20 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+>> Hi Tomasz,
+>>
+>> On Mon, Jul 14, 2014 at 7:08 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+>>> Changes since v6:
+>>> - Fixes suggested by Amit Daniel <amit.daniel@samsung.com>.
+>>>
+>>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>>> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+>>> series also enabled cpufreq support for Exynos5420 using arm_big_little cpufreq
+>>> driver.
+>>>
+>>> Thomas Abraham (6):
+>>>   clk: samsung: add infrastructure to register cpu clocks
+>>>   clk: samsung: register exynos5420 apll/kpll configuration data
+>>>   clk: exynos: use cpu-clock provider type to represent arm clock
+>>>   ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
+>>>   ARM: Exynos: switch to using generic cpufreq driver for exynos4210/5250
+>>>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
+>>
+>> In this series, support for Exynos5420 has been included. If there are
+>> any more changes required, could you please let me know.
+> 
+> This patch series migrates exynos cpufreq support to use generic
+> cpufreq drivers. For this, cpu clock blocks are encapsulated into a
+> cpu clock type and cpufreq driver operates the cpu clock type.
+> 
+> We had discussed in the [1] about using coordinated clocks. This
+> series is not using the concept of coordinated clocks but the code in
+> this series can be migrated to use coordinated clocks when it is
+> available.
+> 
+> Is it okay to consider this series for v3.17-rc1. I will update this
+> code to use coordinated clocks when it is available. This series helps
+> with cpufreq support for newer Exynos SoCs such as Exynos5420/3250.
+> 
+> [1] http://www.spinics.net/lists/cpufreq/msg10042.html
+> 
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-new file mode 100644
-index 0000000..7d59ff4
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -0,0 +1,134 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "rk3288-evb.dtsi"
-+
-+/ {
-+	compatible = "rockchip,rk3288-evb-act8846", "rockchip,rk3288";
-+};
-+
-+&i2c0 {
-+	hym8563 at 51 {
-+		compatible = "haoyu,hym8563";
-+		reg = <0x51>;
-+
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hym8563_int>;
-+
-+		#clock-cells = <0>;
-+		clock-output-names = "xin32k";
-+	};
-+
-+	act8846: act8846 at 5a {
-+		compatible = "active-semi,act8846";
-+		reg = <0x5a>;
-+		status = "okay";
-+
-+		regulators {
-+			vcc_ddr: REG1 {
-+				regulator-name = "VCC_DDR";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: REG2 {
-+				regulator-name = "VCC_IO";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_log: REG3 {
-+				regulator-name = "VDD_LOG";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_20: REG4 {
-+				regulator-name = "VCC_20";
-+				regulator-min-microvolt = <2000000>;
-+				regulator-max-microvolt = <2000000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_sd: REG5 {
-+				regulator-name = "VCCIO_SD";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd10_lcd: REG6 {
-+				regulator-name = "VDD10_LCD";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_codec: REG7 {
-+				regulator-name = "VCCA_CODEC";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_tp: REG8 {
-+				regulator-name = "VCCA_TP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_pmu: REG9 {
-+				regulator-name = "VCCIO_PMU";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_10: REG10 {
-+				regulator-name = "VDD_10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_18: REG11 {
-+				regulator-name = "VCC_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc18_lcd: REG12 {
-+				regulator-name = "VCC18_LCD";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	hym8563 {
-+		hym8563_int: hym8563-int {
-+			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-new file mode 100644
-index 0000000..9a88b6c
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "rk3288-evb.dtsi"
-+
-+/ {
-+	compatible = "rockchip,rk3288-evb-rk808", "rockchip,rk3288";
-+};
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-new file mode 100644
-index 0000000..2afd4f2
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -0,0 +1,83 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "rk3288.dtsi"
-+
-+/ {
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+		serial4 = &uart4;
-+	};
-+
-+	memory {
-+		reg = <0x0 0x80000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		button at 0 {
-+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-+			linux,code = <116>;
-+			label = "GPIO Key Power";
-+			linux,input-type = <1>;
-+			gpio-key,wakeup = <1>;
-+			debounce-interval = <100>;
-+		};
-+	};
-+
-+	i2c0: i2c at ff650000 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c0_xfer>;
-+		status = "okay";
-+	};
-+
-+	watchdog at ff800000 {
-+		status = "okay";
-+	};
-+
-+	serial at ff180000 {
-+		status = "okay";
-+	};
-+
-+	serial at ff190000 {
-+		status = "okay";
-+	};
-+
-+	serial at ff690000 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&uart2_xfer>;
-+		status = "okay";
-+	};
-+
-+	serial at ff1b0000 {
-+		status = "okay";
-+	};
-+
-+	serial at ff1c0000 {
-+		status = "okay";
-+	};
-+
-+	pinctrl {
-+		buttons {
-+			pwrbtn: pwrbtn {
-+				rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-+			};
-+		};
-+	};
-+};
--- 
-1.9.0
+I tested this patchset with Exynos3250 cpufreq patchset[1] on Exynos3250 SoC.
+ [1] https://lkml.org/lkml/2014/6/18/126
+
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Best Regards,
+Chanwoo Choi
