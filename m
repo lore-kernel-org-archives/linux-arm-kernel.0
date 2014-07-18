@@ -1,138 +1,26 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Fri, 18 Jul 2014 11:28:19 -0700
-Subject: [PATCH 13/14] arm64: introduce aarch64_insn_gen_logical_shifted_reg()
-In-Reply-To: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
-References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <1405708100-13604-14-git-send-email-zlim.lnx@gmail.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Fri, 18 Jul 2014 11:36:54 -0700
+Subject: [PATCH v3] arm64, ia64, ppc, s390, sh, tile, um, x86,
+ mm: Remove default gate area
+In-Reply-To: <CALCETrXve-=N5yzqDw2YQee4BmC6sb8GYWYJcV2780V38OuJiQ@mail.gmail.com>
+References: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
+ <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
+ <20140718101416.GB1818@arm.com> <53C8F4DF.8020103@nod.at>
+ <CALCETrXve-=N5yzqDw2YQee4BmC6sb8GYWYJcV2780V38OuJiQ@mail.gmail.com>
+Message-ID: <53C96946.4090304@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce function to generate logical (shifted register)
-instructions.
+On 07/18/2014 09:53 AM, Andy Lutomirski wrote:
+> 
+> Splitting this will be annoying: I'd probably have to add a flag asking for
+> the new behavior, update all the arches, then remove the flag.  The chance
+> of screwing up bisectability in the process seems pretty high.  This seems
+> like overkill for a patch that mostly deletes code.
+> 
+> Akpm, can you take this?
+> 
 
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
----
- arch/arm64/include/asm/insn.h | 25 ++++++++++++++++++
- arch/arm64/kernel/insn.c      | 60 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
+I'm fine with it as-is.
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 36e8465..56a9e63 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -206,6 +206,17 @@ enum aarch64_insn_data3_type {
- 	AARCH64_INSN_DATA3_MSUB,
- };
- 
-+enum aarch64_insn_logic_type {
-+	AARCH64_INSN_LOGIC_AND,
-+	AARCH64_INSN_LOGIC_BIC,
-+	AARCH64_INSN_LOGIC_ORR,
-+	AARCH64_INSN_LOGIC_ORN,
-+	AARCH64_INSN_LOGIC_EOR,
-+	AARCH64_INSN_LOGIC_EON,
-+	AARCH64_INSN_LOGIC_AND_SETFLAGS,
-+	AARCH64_INSN_LOGIC_BIC_SETFLAGS
-+};
-+
- #define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
- static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
- { return (code & (mask)) == (val); } \
-@@ -243,6 +254,14 @@ __AARCH64_INSN_FUNCS(rorv,	0x7FE0FC00, 0x1AC02C00)
- __AARCH64_INSN_FUNCS(rev16,	0x7FFFFC00, 0x5AC00400)
- __AARCH64_INSN_FUNCS(rev32,	0x7FFFFC00, 0x5AC00800)
- __AARCH64_INSN_FUNCS(rev64,	0x7FFFFC00, 0x5AC00C00)
-+__AARCH64_INSN_FUNCS(and,	0x7F200000, 0x0A000000)
-+__AARCH64_INSN_FUNCS(bic,	0x7F200000, 0x0A200000)
-+__AARCH64_INSN_FUNCS(orr,	0x7F200000, 0x2A000000)
-+__AARCH64_INSN_FUNCS(orn,	0x7F200000, 0x2A200000)
-+__AARCH64_INSN_FUNCS(eor,	0x7F200000, 0x4A000000)
-+__AARCH64_INSN_FUNCS(eon,	0x7F200000, 0x4A200000)
-+__AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
-+__AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
- __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
- __AARCH64_INSN_FUNCS(cbz,	0xFE000000, 0x34000000)
-@@ -323,6 +342,12 @@ u32 aarch64_insn_gen_data3(enum aarch64_insn_register dst,
- 			   enum aarch64_insn_register reg2,
- 			   enum aarch64_insn_variant variant,
- 			   enum aarch64_insn_data3_type type);
-+u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
-+					 enum aarch64_insn_register src,
-+					 enum aarch64_insn_register reg,
-+					 int shift,
-+					 enum aarch64_insn_variant variant,
-+					 enum aarch64_insn_logic_type type);
- 
- bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
- 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index f73a4bf..0668ee5 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -874,3 +874,63 @@ u32 aarch64_insn_gen_data3(enum aarch64_insn_register dst,
- 	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn,
- 					    reg2);
- }
-+
-+u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
-+					 enum aarch64_insn_register src,
-+					 enum aarch64_insn_register reg,
-+					 int shift,
-+					 enum aarch64_insn_variant variant,
-+					 enum aarch64_insn_logic_type type)
-+{
-+	u32 insn;
-+
-+	switch (type) {
-+	case AARCH64_INSN_LOGIC_AND:
-+		insn = aarch64_insn_get_and_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_BIC:
-+		insn = aarch64_insn_get_bic_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_ORR:
-+		insn = aarch64_insn_get_orr_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_ORN:
-+		insn = aarch64_insn_get_orn_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_EOR:
-+		insn = aarch64_insn_get_eor_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_EON:
-+		insn = aarch64_insn_get_eon_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_AND_SETFLAGS:
-+		insn = aarch64_insn_get_ands_value();
-+		break;
-+	case AARCH64_INSN_LOGIC_BIC_SETFLAGS:
-+		insn = aarch64_insn_get_bics_value();
-+		break;
-+	default:
-+		BUG_ON(1);
-+	}
-+
-+	switch (variant) {
-+	case AARCH64_INSN_VARIANT_32BIT:
-+		BUG_ON(shift & ~(SZ_32 - 1));
-+		break;
-+	case AARCH64_INSN_VARIANT_64BIT:
-+		insn |= AARCH64_INSN_SF_BIT;
-+		BUG_ON(shift & ~(SZ_64 - 1));
-+		break;
-+	default:
-+		BUG_ON(1);
-+	}
-+
-+
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, dst);
-+
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, src);
-+
-+	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, reg);
-+
-+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_6, insn, shift);
-+}
--- 
-1.9.1
+Acked-by: H. Peter Anvin <hpa@linux.intel.com>
