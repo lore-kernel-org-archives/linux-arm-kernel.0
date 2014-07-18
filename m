@@ -1,81 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Jul 2014 10:04:40 +0100
-Subject: [PATCH 0/4 V3] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <53C7E23D.1050900@amd.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140717131854.GN13108@titan.lakedaemon.net>
- <20140717135534.GM30313@leverpostej> <53C7E23D.1050900@amd.com>
-Message-ID: <20140718090439.GC25180@leverpostej>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 18 Jul 2014 14:36:30 +0530
+Subject: [PATCH 7/8] mailbox: f_mhu: add driver for Fujitsu MHU controller
+In-Reply-To: <53C81B3E.2020503@arm.com>
+References: <1405233128-4799-1-git-send-email-mollie.wu@linaro.org>
+ <53C6B83D.80602@arm.com>
+ <CAJe_Zhe_kqmeeu9vF3CZwu3WR=P-nj13Bx+VOBCE7NfGzGPx=g@mail.gmail.com>
+ <53C7A5F1.30209@arm.com>
+ <CAJe_ZhegVczzcRVikt=nWnwU3nGx2G2mNg9nGR3bF4FfHnPeEg@mail.gmail.com>
+ <53C7E71C.8020501@arm.com>
+ <CAJe_ZhcROjhXebJetyJus43jNKoBU60jXXRLwnHwMdPJ7LPq7Q@mail.gmail.com>
+ <53C81B3E.2020503@arm.com>
+Message-ID: <CAJe_Zhfqg6rdrxU8TfN7Xz3wBKcNs1hqz8OsFiUGf=uO=R00mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 03:48:29PM +0100, Suravee Suthikulanit wrote:
-> On 7/17/2014 8:55 AM, Mark Rutland wrote:
-> > Hi Jason,
-> >
-> > On Thu, Jul 17, 2014 at 02:18:54PM +0100, Jason Cooper wrote:
-> >> On Wed, Jul 09, 2014 at 06:05:00PM -0500, suravee.suthikulpanit at amd.com wrote:
-> >>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >>>
-> >>> This patch set introduces support for MSI(-X) in GICv2m specification,
-> >>> which is implemented in some variation of GIC400.
-> >>>
-> >>> This depends on and has been tested with the V7 of"Add support for PCI in AArch64"
-> >>> (https://lkml.org/lkml/2014/3/14/320).
-> >>>
-> >>> Changes in V3:
-> >>>      * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/gic
-> >>>        (per Jason Cooper request)
-> >>>      * Misc fix/clean up per Mark Rutland comments
-> >>>      * Minor Clean up in the driver/irqchip/irq-gic-v2m.c: alloc_msi_irqs()
-> >>>      * Patch 4 is new to the series:
-> >>>          * Add ARM64-specific version arch_setup_msi_irqs() to allow support
-> >>>            for Multiple MSI.
-> >>>          * Add support for Multiple MSI for GICv2m.
-> >>>
-> >>> Suravee Suthikulpanit (4):
-> >>>    irqchip: gic: Add binding probe for ARM GIC400
-> >>>    irqchip: gic: Restructuring ARM GIC code
-> >>>    irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-> >>>    irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
-> >>
-> >> Ok, patch #1 applied to irqchip/urgent.  Patches 2 and 3 applied to
-> >> irqchip/gic with irqchip/urgent merged in.  To facilitate
-> >> testing/merging, I've prepared an unsigned tag for you on the
-> >> irqchip/gic branch:
-> >
-> > I'm a little concerned that this is all going through for v3.17 without
-> > a {Reviewed,Acked}-by from Marc or anyone working with GIC{,v2m}.
-> 
-> > While his comments on v1 have been addressed, he has not had a chance to
-> > acknowledge the solutions. I appreciate Marc's holiday is unfortunately
-> > timed.
-> >
-> > I also have an open concern with the binding with regard to the
-> > orthogonality of GICV GICH and the MSI registers.
-> 
-> The MSI part is normally enabled from the optional "msi-controller" 
-> keyword. It should not really matter which compatible ID it uses.
+On 18 July 2014 00:21, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 17/07/14 18:07, Jassi Brar wrote:
 
-I meant the fact that the MSI registers being described in reg[4],
-rather than how the driver determines MSI support.
+>
+>>> I believe that's what we need here if we want this driver to work
+>>> on both Juno and your platform. Agree ?
+>>>
+>> Does this driver not work for Juno?
+>
+>
+> I have not yet tried yet. For sure secure access will explode.
+>
+OK, I will remove setting up SCFG.
 
-> Ooops. I noticed that was accidentally dropped the check for 
-> "msi-controller" in the gicv2m_of_init() function.  I'll send a follow 
-> up patch to fix this.
+>>>
+>>> No what I meant is unless there is a real need to use hard irq, we
+>>> should prefer threaded one otherwise.
+>>>
+>> And how does controller discern a "real need" from a "soft need" to
+>> use hard irq?
+>> Even if the controller driver pushes data up from a threaded function,
+>> the client can't know the context and can't sleep because the
+>> intermediate API says the rx_callback should be assumed to be atomic.
+>
+> Yes I am not arguing on that, it should assume atomic and not sleep.
+> I am saying we can avoid rx_callback in interrupt context if possible.
+> I will try to look at the protocol implementation tomorrow.
+>
+There is only one way for controller to push data to client... which
+is rx_callback() and it specified to be atomic.
 
-Sure. Whatever happens we should have both the msi-controller property
-and the registers for the MSI block before we enable MSI support.
+>
+>> Again, it maybe more efficient if I see your implementation of the
+>> driver and understand your concerns about mine.
+>>
+>
+> As I said its almost same as this, except I call mbox_chan_received_data
+> in irq thread context. I prefer enabling other interrupts while copying
+> payload data.
+>
+You call mbox_chan_received_data (which does rx_callback) from
+threaded handler. If your client only does atomic stuff in
+rx_callback(), then you pay for nothing. If your client does sleepable
+stuff then, as you agree, that's wrong.
 
-> > Suravee, do you need this urgently for v3.17? I was under the impression
-> > that we wouldn't have full PCIe support by then.
-> >
-> 
-> PCI is the dependency for this patch to function.  So, it should be 
-> aligned with upstreaming of PCI patches.
-
-Ok, so it sounds like this can wait for the moment (but we should
-definitely ensure this gets some testing before then).
-
-Cheers,
-Mark
+cheers
+-jassi
