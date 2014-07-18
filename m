@@ -1,61 +1,40 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 19 Jul 2014 02:02:09 +0900
-Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
- Exynos3250 ADC
-In-Reply-To: <5835825.JtcDoyOP8b@wuerfel>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <6104032.PNRl85V92G@wuerfel>
- <CAGTfZH3cH-QFMbfTWJJfTPTRT-Bij2TW=6CH_Yy-GaZqZvn-Xg@mail.gmail.com>
- <5835825.JtcDoyOP8b@wuerfel>
-Message-ID: <CAGTfZH3mnPJ72wi7aFYoChe_OeuRVsUVo3KGRRLTV5scwPbO4g@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 18 Jul 2014 19:01:41 +0200
+Subject: [PATCH 5/6] usb: phy: mxs: Add VF610 USB PHY support
+In-Reply-To: <cover.1405702442.git.stefan@agner.ch>
+References: <cover.1405702442.git.stefan@agner.ch>
+Message-ID: <af194168fadd80c26f94da740f1e61ce6603225a.1405702442.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 19, 2014 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 19 July 2014 01:23:15 Chanwoo Choi wrote:
->> If don't add new compatible including specific exynos version,
->> I would add new 'adc-needs-sclk' property with existing 'exynos-adc-v2'
->> compatible name.
->>
->>
->> Dear Naveen, Tomasz,
->>
->> If existing exynos-adc driver add just one property for 'sclk_adc'
->> as following, exynos-adc could not include the exynos version
->> in compatible name.
->>
->> I need your opinion about it.
->>
->>                 adc: adc at 126C0000 {
->>                         compatible = "samsung,exynos-adc-v2";
->>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
->>                         interrupts = <0 137 0>;
->>                         clock-names = "adc", "sclk_adc";
->>                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
->> +                        adc-needs-sclk;
->>                         #io-channel-cells = <1>;
->>                         io-channel-ranges;
->>                 }
->
-> How about just making it an optional clock? That would be much
-> easier because then you can simply see if the clock itself is
-> there and use it, or otherwise ignore it.
+This adds support for the USB PHY in Vybrid VF610. We assume that
+the disconnection without VBUS is also needed for Vybrid. For all
+other flags, the presumption of innocence applies.
 
-The v1 of this patchset[1] got the clock of 'sclk_adc'  but if the dt node
-of ADC in dtsi file didn't include 'sclk_adc', print just warning message
-without stopping probe as following:
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/usb/phy/phy-mxs-usb.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
- [1] https://lkml.org/lkml/2014/4/10/710
-
-+       info->sclk = devm_clk_get(&pdev->dev, "sclk_adc");
-+       if (IS_ERR(info->sclk)) {
-+               dev_warn(&pdev->dev, "failed getting sclk clock, err = %ld\n",
-+                                                       PTR_ERR(info->sclk));
-+               info->sclk = NULL;
-+       }
-
-But, Tomasz Figa suggested the method[2] of this patchset(v6).
- [2] https://lkml.org/lkml/2014/4/11/189
-
-Thanks,
-Chanwoo Choi
+diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+index c42bdf0..207946b 100644
+--- a/drivers/usb/phy/phy-mxs-usb.c
++++ b/drivers/usb/phy/phy-mxs-usb.c
+@@ -125,10 +125,15 @@ static const struct mxs_phy_data imx6sl_phy_data = {
+ 		MXS_PHY_NEED_IP_FIX,
+ };
+ 
++static const struct mxs_phy_data vf610_phy_data = {
++	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
++};
++
+ static const struct of_device_id mxs_phy_dt_ids[] = {
+ 	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
+ 	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
+ 	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
++	{ .compatible = "fsl,vf610-usbphy", .data = &vf610_phy_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+-- 
+2.0.1
