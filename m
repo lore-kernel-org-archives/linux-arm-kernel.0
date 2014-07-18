@@ -1,36 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 14:39:30 -0700
-Subject: [GIT PULL] at91: fixes for 3.16 #2
-In-Reply-To: <1405692730-31284-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1405692730-31284-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAOesGMgp+Zxc5Brwpa8-zSgWpj+jX3XVO8nC3f=Tw-b=_m0hVQ@mail.gmail.com>
+Date: Fri, 18 Jul 2014 14:40:25 -0700
+Subject: [GIT PULL] ARM: imx: fixes for 3.16, 2nd take
+In-Reply-To: <20140718080754.GC8537@dragon>
+References: <20140718080754.GC8537@dragon>
+Message-ID: <CAOesGMhEm0TnOQ9uE538w+P9S2NkG0i76UjtjxBa9b8fU+ezZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 7:12 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof, Kevin,
+On Fri, Jul 18, 2014 at 1:07 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
 >
-> This is the latest regressions that we found while testing the at91sam9n12 and
-> at91sam9x5 platforms following our move to CCF.
-> I created a pull-request this time because I have 3 patches: there should be
-> no conflict anyway. This tag does not contain the fix that Olof had taken during
-> previous -rc cycle on purpose: this way it won't appear twice in the history.
->
-> Thanks, best regards,
->
-> The following changes since commit 971dc9ce106110745f246337f229013589354536:
->
->   ARM: at91/dt: sam9261: remove slow RC osc (2014-06-25 18:00:17 +0200)
+>   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
 >
 > are available in the git repository at:
 >
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.16-2
 >
-> for you to fetch changes up to e0d69e119fc6bf7cc3c9f791478108c1b925bb2e:
+> for you to fetch changes up to 03e97220b99b8b691ea5b130b7b4c135c9662792:
 >
->   ARM: at91/dt: add missing clocks property to pwm node in sam9x5.dtsi (2014-07-18 15:56:35 +0200)
+>   ARM: clk-imx6q: parent lvds_sel input from upstream clock gates (2014-07-18 15:57:17 +0800)
+
 
 Merged, thanks.
-
 
 -Olof
