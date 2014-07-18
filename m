@@ -1,87 +1,154 @@
-From: list-09_linux_arm@tqsc.de (Markus Niebel)
-Date: Fri, 18 Jul 2014 13:38:30 +0200
-Subject: [PATCH v2] watchdog: imx2_wdt: add support for WDOG_B signal
- generation
-Message-ID: <1405683510-1303-1-git-send-email-list-09_linux_arm@tqsc.de>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Fri, 18 Jul 2014 16:58:53 +0530
+Subject: [PATCH] cpufreq: tests: Providing cpufreq regression test
+In-Reply-To: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+References: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <CAK5sBcH=L-7=BHNPQUjuoQfQx5QeFmBSdwdow+RXBExgCOP0Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Niebel <Markus.Niebel@tq-group.com>
+Hi Lukasz,
 
-Watchdog unit of i.MX supports output of a signal at
-watchdog shutdown. This feature can be useful to signal an
-external supevisor that a watchdog reset occured.
-Support this feature as an option via devicetree.
+I tested this script on 4210 based Origen board.
+This is the output:
+./cpufreq_freq_test.sh
+CURRENT GOVERNOR: performance
+SET GOVERNOR: performance
+######################################
+TEST AVAILABLE FREQS
+######################################
+FREQ: 1200000 sleep: invalid number '0.1'
+[    5.918347] random: gzip urandom read with 61 bits of entropy available
+         OK
+FREQ: 1000000 sleep: invalid number '0.1'
+         OK
+FREQ: 800000 sleep: invalid number '0.1'
+         OK
+FREQ: 500000 sleep: invalid number '0.1'
+         OK
+FREQ: 200000 sleep: invalid number '0.1'
+         OK
+######################################
+TEST FREQS SWITCHING
+######################################
+REFERENCE FREQ: 1200000
+FREQ: 1200000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+         OK
+FREQ: 1200000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+         OK
+FREQ: 1200000 ----> FREQ: 800000 sleep: invalid number '0.1'
+         OK
+FREQ: 1200000 ----> FREQ: 500000 sleep: invalid number '0.1'
+         OK
+FREQ: 1200000 ----> FREQ: 200000 sleep: invalid number '0.1'
+         OK
+REFERENCE FREQ: 1000000
+FREQ: 1000000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+         OK
+FREQ: 1000000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+         OK
+FREQ: 1000000 ----> FREQ: 800000 sleep: invalid number '0.1'
+         OK
+FREQ: 1000000 ----> FREQ: 500000 sleep: invalid number '0.1'
+         OK
+FREQ: 1000000 ----> FREQ: 200000 sleep: invalid number '0.1'
+         OK
+REFERENCE FREQ: 800000
+FREQ: 800000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+         OK
+FREQ: 800000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+         OK
+FREQ: 800000 ----> FREQ: 800000 sleep: invalid number '0.1'
+         OK
+FREQ: 800000 ----> FREQ: 500000 sleep: invalid number '0.1'
+         OK
+FREQ: 800000 ----> FREQ: 200000 sleep: invalid number '0.1'
+         OK
+REFERENCE FREQ: 500000
+FREQ: 500000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+         OK
+FREQ: 500000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+         OK
+FREQ: 500000 ----> FREQ: 800000 sleep: invalid number '0.1'
+         OK
+FREQ: 500000 ----> FREQ: 500000 sleep: invalid number '0.1'
+         OK
+FREQ: 500000 ----> FREQ: 200000 sleep: invalid number '0.1'
+         OK
+REFERENCE FREQ: 200000
+FREQ: 200000 ----> FREQ: 1200000 sleep: invalid number '0.1'
+         OK
+FREQ: 200000 ----> FREQ: 1000000 sleep: invalid number '0.1'
+         OK
+FREQ: 200000 ----> FREQ: 800000 sleep: invalid number '0.1'
+         OK
+FREQ: 200000 ----> FREQ: 500000 sleep: invalid number '0.1'
+         OK
+FREQ: 200000 ----> FREQ: 200000 sleep: invalid number '0.1'
+         OK
+######################################
+ERRORS: 0
+######################################
 
-Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
----
-History
+Though it says 0 errors, what does the "invalid number..." signify?
 
-v2:
-Fix incorrect sent patch
-- add include of.h
-- fix missing if in probe
 
- .../devicetree/bindings/watchdog/fsl-imx-wdt.txt   |    3 +++
- drivers/watchdog/imx2_wdt.c                        |   11 +++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+On Fri, Jul 18, 2014 at 3:53 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> This commit adds first regression test "cpufreq_freq_test.sh" for the
+> cpufreq subsystem.
+>
+> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> ---
+>  drivers/cpufreq/tests/README               |  23 +++++
+>  drivers/cpufreq/tests/cpufreq_freq_test.sh | 149 +++++++++++++++++++++++++++++
+>  2 files changed, 172 insertions(+)
+>  create mode 100644 drivers/cpufreq/tests/README
+>  create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
+>
+> diff --git a/drivers/cpufreq/tests/README b/drivers/cpufreq/tests/README
+> new file mode 100644
+> index 0000000..66638d2
+> --- /dev/null
+> +++ b/drivers/cpufreq/tests/README
+> @@ -0,0 +1,23 @@
+> +This file contains list of cpufreq's available regression tests with a short
+> +usage description.
+> +
+> +1. cpufreq_freq_test.sh
+> +
+> +Description:
+> +------------
+> +This test is supposed to test if cpufreq attributes exported by sysfs are
 
-diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-index 2144af1..cb759cd 100644
---- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-@@ -5,6 +5,9 @@ Required properties:
- - reg : Should contain WDT registers location and length
- - interrupts : Should contain WDT interrupt
- 
-+Optional properties:
-+- fsl,use-wre: set if watchdog reset out (WDOG_B) signal shall be asserted
-+
- Examples:
- 
- wdt at 73f98000 {
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 9d4874f..bde96db 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -58,6 +58,7 @@ struct imx2_wdt_device {
- 	struct regmap *regmap;
- 	struct timer_list timer;	/* Pings the watchdog when closed */
- 	struct watchdog_device wdog;
-+	unsigned int use_wre:1;		/* enable WRE feature */
- };
- 
- static bool nowayout = WATCHDOG_NOWAYOUT;
-@@ -88,7 +89,10 @@ static inline void imx2_wdt_setup(struct watchdog_device *wdog)
- 	/* Strip the old watchdog Time-Out value */
- 	val &= ~IMX2_WDT_WCR_WT;
- 	/* Generate reset if WDOG times out */
--	val &= ~IMX2_WDT_WCR_WRE;
-+	if (wdev->use_wre)
-+		val |= IMX2_WDT_WCR_WRE;
-+	else
-+		val &= ~IMX2_WDT_WCR_WRE;
- 	/* Keep Watchdog Disabled */
- 	val &= ~IMX2_WDT_WCR_WDE;
- 	/* Set the watchdog's Time-Out value */
-@@ -219,6 +223,9 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		return PTR_ERR(wdev->clk);
- 	}
- 
-+	if (of_property_read_bool(pdev->dev.of_node, "fsl,use-wre"))
-+		wdev->use_wre = 1;
-+
- 	wdog			= &wdev->wdog;
- 	wdog->info		= &imx2_wdt_info;
- 	wdog->ops		= &imx2_wdt_ops;
-@@ -226,7 +233,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	wdog->max_timeout	= IMX2_WDT_MAX_TIME;
- 
- 	clk_prepare_enable(wdev->clk);
--
-+ 
- 	regmap_read(wdev->regmap, IMX2_WDT_WRSR, &val);
- 	wdog->bootstatus = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
- 
+s/test/script would be better
+
+> +exposing a correct values.
+
+s/ exposing a correct values / exposing correct values
+
+> +
+> +It can work with or without boost enabled and helps spotting errors related to
+
+s/ helps spotting / helps in spotting
+
+<snip>
+
+> +
+> +set +x
+> +
+> +COLOUR_RED="\33[31m"
+> +COLOUR_BLUE="\33[34m"
+> +COLOUR_GREEN="\33[32m"
+> +COLOUR_DEFAULT="\33[0m"
+> +
+> +T_PATCH=/sys/devices/system/cpu/cpu0/cpufreq
+
+Shouldn't this be called PATH instead of PATCH?
+
+> +BOOST_PATCH=/sys/devices/system/cpu/cpufreq
+
+ditto and rest of the places in the document.
+
 -- 
-1.7.9.5
+Regards,
+Sachin.
