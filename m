@@ -1,65 +1,35 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 18 Jul 2014 11:53:56 -0500
-Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
-In-Reply-To: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <53C95124.1010902@ti.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 19 Jul 2014 01:48:18 +0900
+Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <10264770.8SXiIS8qhq@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <32226622.5gSmvBRKvZ@wuerfel>
+ <CAGTfZH3vz9MLN+1fPM22zKE64oMNDgcib3is0nfzZhhLkmdNvw@mail.gmail.com>
+ <10264770.8SXiIS8qhq@wuerfel>
+Message-ID: <CAGTfZH1jOEj8D6kJSd=-dgpSiU=sxs5W2TM=-rNtsZb-SkRD9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Sat, Jul 19, 2014 at 1:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 19 July 2014 01:11:53 Chanwoo Choi wrote:
+>>
+>>   Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+>>   - 'adc' clock: bus clock for ADC
+>>
+>>   Exynos3250 has additional 'sclk_adc' clock as following:
+>>   - 'sclk_adc' clock: special clock for ADC which provide clock to internal ADC
+>
+> The bus clock is often named "apb_pclk", but it's too late to change
+> that now, and it's not clear if the device is actually on APB.
+>
+> The problem with "sclk_adc" is that it's very close to the name used
+> in the clock provider, with is CLK_SCLK_TSADC. Please try to avoid
+> the ambiguity here and make it clear that they are not referring
+> to the same thing. "internal" or "special" might be good if you want
+> to avoid "sclk".
 
-On 07/18/2014 05:49 AM, Laurent Pinchart wrote:
-> Hello,
-> 
-> The OMAP3 ISP driver was the only user of the OMAP IOVMM API. Now that is has
-> been ported to the DMA API, remove the unused virtual memory manager.
-> 
-> The removal is split in three patches to ease upstream merge. The first patch
-> removes the omap-iovmm driver, the second patch removes setting of now unused
-> platform data fields from arch code, and the last patch cleans up the platform
-> data structure.
+OK, thanks for your feedback.
+I'll try to find proper name.
 
-Thanks for the revised series, it looks good. I have also tested the
-series on OMAP3, OMAP4 and OMAP5.
-
-For the changes in the entire series,
-Acked-by: Suman Anna <s-anna@ti.com>
-
-regards
-Suman
-
-> 
-> I'd like to get at least the first patch merged in v3.17. To avoid splitting
-> the series across three kernel versions, it would be nice to also merge at
-> least the second patch for v3.17. If there's no risk of conflict everything
-> could be merged in one go through the ARM SoC tree. Otherwise a stable branch
-> with patch 1/3 will be needed to base the arch change on.
-> 
-> Joerg, Tony, how would you like to proceed ?
-> 
-> Changes compared to v1:
-> 
-> - Fix OMAP_IOMMU_DEBUG dependency on OMAP_IOMMU
-> - Remove omap_iommu da_start and da_end fields
-> - Added patches 2/3 and 3/3
-> 
-> Laurent Pinchart (3):
->   iommu/omap: Remove virtual memory manager
->   ARM: omap: Don't set iommu pdata da_start and da_end fields
->   iommu/omap: Remove platform data da_start and da_end fields
-> 
->  arch/arm/mach-omap2/omap-iommu.c           |   2 -
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   4 -
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   4 -
->  drivers/iommu/Kconfig                      |  10 +-
->  drivers/iommu/Makefile                     |   1 -
->  drivers/iommu/omap-iommu-debug.c           | 114 -----
->  drivers/iommu/omap-iommu.c                 |  13 -
->  drivers/iommu/omap-iommu.h                 |   8 +-
->  drivers/iommu/omap-iovmm.c                 | 791 -----------------------------
->  include/linux/omap-iommu.h                 |  37 +-
->  include/linux/platform_data/iommu-omap.h   |   6 -
->  11 files changed, 8 insertions(+), 982 deletions(-)
->  delete mode 100644 drivers/iommu/omap-iovmm.c
-> 
+Chanwoo Choi
