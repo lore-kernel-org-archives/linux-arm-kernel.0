@@ -1,51 +1,65 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 18 Jul 2014 11:50:44 -0500
-Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
-In-Reply-To: <20140718161636.GA18460@arch.cereza>
-References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
- <20140718161636.GA18460@arch.cereza>
-Message-ID: <20140718165044.GA30821@saruman.home>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 18 Jul 2014 11:53:56 -0500
+Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
+In-Reply-To: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <53C95124.1010902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Laurent,
 
-On Fri, Jul 18, 2014 at 01:16:36PM -0300, Ezequiel Garcia wrote:
-> Hi Lothar,
+On 07/18/2014 05:49 AM, Laurent Pinchart wrote:
+> Hello,
 > 
-> On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
-> > The first three patches do some source code cleanup in the files that
-> > are modified in the subsequent patches.
-> > 
+> The OMAP3 ISP driver was the only user of the OMAP IOVMM API. Now that is has
+> been ported to the DMA API, remove the unused virtual memory manager.
 > 
-> I've applied patches 4 and 9 on a recent -next, after fixing a conflict
-> due to patch 3 ("usb: musb_am335x: source cleanup"):
-> 
-> > Patch 4 carries the proper fix reported in commit:
-> >         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
-> > 
-> > Patch 9 reinstates module unloading support for the musb_am335x driver
-> >         which was disabled due to a false failure analysis
-> > 
-> 
-> For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> 
-> Tested on a beaglebone with a mass storage USB device, module load/unload
-> works without issues. The module_get/put in the phy is now preventing the
-> musb_am335x driver unload, which seems to be the real cause of the issue
-> I reported. Thanks for providing a proper fix!
+> The removal is split in three patches to ease upstream merge. The first patch
+> removes the omap-iovmm driver, the second patch removes setting of now unused
+> platform data fields from arch code, and the last patch cleans up the platform
+> data structure.
 
-I don't that's a good fix. The problem is that even after am335x
-removing all its child, someone else tried to release the PHY. That
-ordering is the one that needs to be fixed. Doing a module_get on the
-parent device looks like a hack to me.
+Thanks for the revised series, it looks good. I have also tested the
+series on OMAP3, OMAP4 and OMAP5.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/7dd6352f/attachment.sig>
+For the changes in the entire series,
+Acked-by: Suman Anna <s-anna@ti.com>
+
+regards
+Suman
+
+> 
+> I'd like to get at least the first patch merged in v3.17. To avoid splitting
+> the series across three kernel versions, it would be nice to also merge at
+> least the second patch for v3.17. If there's no risk of conflict everything
+> could be merged in one go through the ARM SoC tree. Otherwise a stable branch
+> with patch 1/3 will be needed to base the arch change on.
+> 
+> Joerg, Tony, how would you like to proceed ?
+> 
+> Changes compared to v1:
+> 
+> - Fix OMAP_IOMMU_DEBUG dependency on OMAP_IOMMU
+> - Remove omap_iommu da_start and da_end fields
+> - Added patches 2/3 and 3/3
+> 
+> Laurent Pinchart (3):
+>   iommu/omap: Remove virtual memory manager
+>   ARM: omap: Don't set iommu pdata da_start and da_end fields
+>   iommu/omap: Remove platform data da_start and da_end fields
+> 
+>  arch/arm/mach-omap2/omap-iommu.c           |   2 -
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   4 -
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   4 -
+>  drivers/iommu/Kconfig                      |  10 +-
+>  drivers/iommu/Makefile                     |   1 -
+>  drivers/iommu/omap-iommu-debug.c           | 114 -----
+>  drivers/iommu/omap-iommu.c                 |  13 -
+>  drivers/iommu/omap-iommu.h                 |   8 +-
+>  drivers/iommu/omap-iovmm.c                 | 791 -----------------------------
+>  include/linux/omap-iommu.h                 |  37 +-
+>  include/linux/platform_data/iommu-omap.h   |   6 -
+>  11 files changed, 8 insertions(+), 982 deletions(-)
+>  delete mode 100644 drivers/iommu/omap-iovmm.c
+> 
