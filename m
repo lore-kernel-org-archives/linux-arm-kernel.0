@@ -1,34 +1,61 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Jul 2014 02:19:21 +0200
-Subject: [PATCH v2 1/7] dt-bindings: arm: add cortex-a12 and cortex-a17 cpu
- compatible properties
+Date: Fri, 18 Jul 2014 02:19:54 +0200
+Subject: [PATCH v2 2/7] ARM: rockchip: clarify usability of DEBUG_RK3X_UART
+ debug_ll options
 In-Reply-To: <4868343.UFgjaXesOn@diego>
 References: <4868343.UFgjaXesOn@diego>
-Message-ID: <1405647289.JhjFpUvHI8@diego>
+Message-ID: <1722917.h37akzFaqW@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As announced parts from ARM they will probably be used in socs shortly.
+The debug uart settings from the DEBUG_RK3X_UART options are usable on
+all Rockchip SoCs from the rk30xx and rk31xx series but not on the
+new rk3288 SoCs. Thus clarify their use to prevent confusion.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/Kconfig.debug | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 1fe72a0..bc6dc17 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -152,7 +152,9 @@ nodes to be present and contain the properties described below.
- 			    "arm,cortex-a7"
- 			    "arm,cortex-a8"
- 			    "arm,cortex-a9"
-+			    "arm,cortex-a12"
- 			    "arm,cortex-a15"
-+			    "arm,cortex-a17"
- 			    "arm,cortex-a53"
- 			    "arm,cortex-a57"
- 			    "arm,cortex-m0"
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..a8dbf5e 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -582,7 +582,7 @@ choice
+ 		  on Rockchip based platforms.
+ 
+ 	config DEBUG_RK3X_UART0
+-		bool "Kernel low-level debugging messages via Rockchip RK3X UART0"
++		bool "Kernel low-level debugging messages via Rockchip RK30/RK31 UART0"
+ 		depends on ARCH_ROCKCHIP
+ 		select DEBUG_UART_8250
+ 		help
+@@ -590,7 +590,7 @@ choice
+ 		  on Rockchip based platforms.
+ 
+ 	config DEBUG_RK3X_UART1
+-		bool "Kernel low-level debugging messages via Rockchip RK3X UART1"
++		bool "Kernel low-level debugging messages via Rockchip RK30/RK31 UART1"
+ 		depends on ARCH_ROCKCHIP
+ 		select DEBUG_UART_8250
+ 		help
+@@ -598,7 +598,7 @@ choice
+ 		  on Rockchip based platforms.
+ 
+ 	config DEBUG_RK3X_UART2
+-		bool "Kernel low-level debugging messages via Rockchip RK3X UART2"
++		bool "Kernel low-level debugging messages via Rockchip RK30/RK31 UART2"
+ 		depends on ARCH_ROCKCHIP
+ 		select DEBUG_UART_8250
+ 		help
+@@ -606,7 +606,7 @@ choice
+ 		  on Rockchip based platforms.
+ 
+ 	config DEBUG_RK3X_UART3
+-		bool "Kernel low-level debugging messages via Rockchip RK3X UART3"
++		bool "Kernel low-level debugging messages via Rockchip RK30/RK31 UART3"
+ 		depends on ARCH_ROCKCHIP
+ 		select DEBUG_UART_8250
+ 		help
 -- 
 1.9.0
