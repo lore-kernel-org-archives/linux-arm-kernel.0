@@ -1,31 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 18 Jul 2014 15:16:37 -0700
-Subject: [PATCH v2 3/7] seccomp: Allow arch code to provide seccomp_data
-In-Reply-To: <ce65e0e8be18ae8fab437899db44ca41c912b506.1405717901.git.luto@amacapital.net>
-References: <cover.1405717901.git.luto@amacapital.net>
- <ce65e0e8be18ae8fab437899db44ca41c912b506.1405717901.git.luto@amacapital.net>
-Message-ID: <CAGXu5jLsnSujJdZmA=nzHw1_K3eYhSiUEnntJ3S2hCZ8DFVYpg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 Jul 2014 15:20:57 -0700
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <4961691.1JRP1YEOt8@wuerfel>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140708124653.GX23978@titan.lakedaemon.net>
+ <20140717123550.GH13108@titan.lakedaemon.net>
+ <4961691.1JRP1YEOt8@wuerfel>
+Message-ID: <20140718222057.GA13234@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 2:18 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> populate_seccomp_data is expensive: it works by inspecting
-> task_pt_regs and various other bits to piece together all the
-> information, and it's does so in multiple partially redundant steps.
->
-> Arch-specific code in the syscall entry path can do much better.
->
-> Admittedly this adds a bit of additional room for error, but the
-> speedup should be worth it.
+On Fri, Jul 18, 2014 at 03:29:53PM +0200, Arnd Bergmann wrote:
+> On Thursday 17 July 2014 08:35:50 Jason Cooper wrote:
+> > Olof, Arnd, please merge this request.  I can re-send if you need.
+> > 
+> > We have more changes pending in mvebu/dt on top of this, and we're
+> > getting very close to the cutoff for the merge window.
+> 
+> Please send both pull requests now so we can look at the whole
+> picture. No need for you to wait for this to be merged before
+> sending the follow-up pull request.
+> 
+> I think we should just merge, there is no nice solution for
+> the technical problem and the approach you have taken looks
+> like the least problematic one to me.
+> 
+> Olof, any further thoughts on this?
 
-I still think we should gain either a note in the
-HAVE_ARCH_SECCOMP_FILTER help text in arch/Kconfig, or possibly a new
-section in Documentation/prctl/seccomp.txt (or similar) on how do
-implement filter support for an architecture, that mentions the
-arch-supplied seccomp_data and how two-phase can be done.
+I have a CuBox, and based on USB id for the UART, it's an ES model.
 
--Kees
+Since the only thing that breaks seems to be SD, I can personally live with
+that just fine even if I have to refer to the non-ES dtb for backwards
+compatibility.
 
--- 
-Kees Cook
-Chrome OS Security
+If this requires more discussion then the obvious solution is to leave out
+these patches and send the superceding DT pull request of a branch that doesn't
+have them. I think we can take this as it is for now though -- I suspect in
+reality the number of affected ES owners should be pretty small?
+
+
+-Olof
