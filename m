@@ -1,57 +1,204 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Jul 2014 22:33:36 -0700
-Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
-In-Reply-To: <53C88A4C.3070304@wwwdotorg.org>
-References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
- <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
- <20140707004417.GE8469@quad.lixom.net>
- <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
- <CAOesGMhoqvqf-dktp-OfUNTPLahPwkyAPiTeDngr4QjH=VfOGA@mail.gmail.com>
- <53C88A4C.3070304@wwwdotorg.org>
-Message-ID: <CAOesGMh+zLV781wzdR5=_Bpzh+XMwJfWL-5XMDP6DwG_Hg80kw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 18 Jul 2014 11:05:55 +0530
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+Message-ID: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 7:45 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 07/08/2014 11:47 AM, Olof Johansson wrote:
->> On Tue, Jul 8, 2014 at 6:43 AM, Peter De Schrijver
->> <pdeschrijver@nvidia.com> wrote:
->>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
->>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
->>>>> This branch moves code related to the Tegra fuses out of arch/arm and
->>>>> into a centralized location which could be shared with ARM64. It also
->>>>> adds support for reading the fuse data through sysfs.
->>>>
->>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
->>>> take this branch.
->>>>
->>>> I saw no indication from searching the mailing list of that either,
->>>> so it wasn't just a missed acked-by.
->>>>
->>>> I wonder if this code should go under drivers/soc/ instead?
->>>
->>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
->>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
->>> and therefore it was moved to drivers/misc/fuse. I think that's the right
->>> place still.
->>
->> I disagree, I think this belongs under drivers/soc. Especially since
->> you're adding dependencies on this misc driver from other parts of the
->> kernel / other drivers.
->>
->> I also don't like seeing init calls form platform code down into
->> drivers/misc like you're adding here. Can you please look at doing
->> that as a regular init call setup?
->
-> I strongly disagree with using init calls for this kind of thing. There
-> are ordering dependencies between the initialization code that can only
-> be sanely managed by explicitly calling functions in a particular order;
-> there's simply no way to manage this using initcalls. This is exactly
-> why the hooks in the ARM machine descriptors exist...
+Clock lines may or may not be shared among different CPUs on a platform. When
+clock lines are shared between CPUs, they change DVFS state together.
 
-Right, but there are non on 64-bit, so you need to solve it for there
-anyway. And once it's solved there, you might as well keep it common
-with 32-bit.
+Possible configurations:
 
+1.) All CPUs share a single clock line.
+2.) All CPUs have independent clock lines.
+3.) CPUs within a group/cluster share clock line but each group/cluster have a
+    separate line for itself.
 
--Olof
+There is no generic way available today to detect which CPUs share clock lines
+and so this is an attempt towards that.
+
+Much of the information is present in the commit and so no point duplicating it
+here.
+
+These are obviously not finalized yet and this is an attempt to initiate a
+discussion around this.
+
+Please share your valuable feedback.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+I wasn't sure about the path/name of this file, so please don't blast me on that
+:)
+
+ .../devicetree/bindings/cpufreq/cpu_clocks.txt     | 159 +++++++++++++++++++++
+ 1 file changed, 159 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+
+diff --git a/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+new file mode 100644
+index 0000000..30ce9ad
+--- /dev/null
++++ b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+@@ -0,0 +1,159 @@
++* Generic CPUFreq clock bindings
++
++Clock lines may or may not be shared among different CPUs on a platform.
++
++Possible configurations:
++1.) All CPUs share a single clock line
++2.) All CPUs have independent clock lines
++3.) CPUs within a group/cluster share clock line but each group/cluster have a
++    separate line for itself
++
++Optional Properties:
++- clock-master: This declares cpu as clock master. Other CPUs can either define
++  "clock-ganged" or "clock-master" property, but shouldn't be missing both.
++
++- clock-ganged: Should have phandle of a cpu declared as "clock-master".
++
++If any cpu node, doesn't have both "clock-master" and "clock-ganged" properties
++defined, it would be assumed that all CPUs on that platform share a single clock
++line. This will help supporting already upstreamed platforms.
++
++
++Examples:
++1.) All CPUs share a single clock line
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	cpu0: cpu at 0 {
++		compatible = "arm,cortex-a15";
++		reg = <0>;
++		next-level-cache = <&L2>;
++		clock-master;
++		operating-points = <
++			/* kHz    uV */
++			792000  1100000
++			396000  950000
++			198000  850000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++	};
++
++	cpu1: cpu at 1 {
++		compatible = "arm,cortex-a15";
++		reg = <1>;
++		next-level-cache = <&L2>;
++		clock-ganged = <&cpu0>;
++	};
++};
++
++OR (clock-master/ganged aren't defined)
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	cpu0: cpu at 0 {
++		compatible = "arm,cortex-a15";
++		reg = <0>;
++		next-level-cache = <&L2>;
++		operating-points = <
++			/* kHz    uV */
++			792000  1100000
++			396000  950000
++			198000  850000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++	};
++
++	cpu1: cpu at 1 {
++		compatible = "arm,cortex-a15";
++		reg = <1>;
++		next-level-cache = <&L2>;
++	};
++};
++
++2.) All CPUs have independent clock lines
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	cpu0: cpu at 0 {
++		compatible = "arm,cortex-a15";
++		reg = <0>;
++		next-level-cache = <&L2>;
++		clock-master;
++		operating-points = <
++			/* kHz    uV */
++			792000  1100000
++			396000  950000
++			198000  850000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++	};
++
++	cpu1: cpu at 1 {
++		compatible = "arm,cortex-a15";
++		reg = <1>;
++		next-level-cache = <&L2>;
++		clock-master;
++		operating-points = <
++			/* kHz    uV */
++			792000  1100000
++			396000  950000
++			198000  850000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++	};
++};
++
++3.) CPUs within a group/cluster share single clock line but each group/cluster
++have a separate line for itself
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	cpu0: cpu at 0 {
++		compatible = "arm,cortex-a15";
++		reg = <0>;
++		next-level-cache = <&L2>;
++		clock-master;
++		operating-points = <
++			/* kHz    uV */
++			792000  1100000
++			396000  950000
++			198000  850000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++	};
++
++	cpu1: cpu at 1 {
++		compatible = "arm,cortex-a15";
++		reg = <1>;
++		next-level-cache = <&L2>;
++		clock-ganged = <&cpu0>;
++	};
++
++	cpu2: cpu at 100 {
++		compatible = "arm,cortex-a7";
++		reg = <100>;
++		next-level-cache = <&L2>;
++		clock-master;
++		operating-points = <
++			/* kHz    uV */
++			792000  950000
++			396000  750000
++			198000  450000
++		>;
++		clock-latency = <61036>; /* two CLK32 periods */
++	};
++
++	cpu3: cpu at 101 {
++		compatible = "arm,cortex-a7";
++		reg = <101>;
++		next-level-cache = <&L2>;
++		clock-ganged = <&cpu2>;
++	};
++};
+-- 
+2.0.0.rc2
