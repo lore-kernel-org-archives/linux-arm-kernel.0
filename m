@@ -1,61 +1,61 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 19 Jul 2014 04:09:31 +0900
-Subject: [PATCH v3] ARM: dts: Add cros_ec to exynos5420-peach-pit and
- exynos5800-peach-pi
-In-Reply-To: <53C8514F.4040606@collabora.co.uk>
-References: <1403627332-4688-1-git-send-email-dianders@chromium.org>
- <53C8514F.4040606@collabora.co.uk>
-Message-ID: <53C970EB.9020006@samsung.com>
+Date: Sat, 19 Jul 2014 04:11:11 +0900
+Subject: [PATCHv2] ARM: dts: Add I2S dt node for Exynos3250
+In-Reply-To: <53C865E3.5030806@samsung.com>
+References: <1404874819-8257-1-git-send-email-cw00.choi@samsung.com>
+ <53C865E3.5030806@samsung.com>
+Message-ID: <53C9714F.1090301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/14 07:42, Javier Martinez Canillas wrote:
-> Hello Kukjin,
->
-Hi,
-
-> On 06/24/2014 06:28 PM, Doug Anderson wrote:
->> This adds cros_ec to exynos5420-peach-pit and exynos5800-peach-pi,
->> including:
->> * The keyboard
->> * The i2c tunnel
->> * The tps65090 under the i2c tunnel
->> * The battery under the i2c tunnel
+On 07/18/14 09:10, Chanwoo Choi wrote:
+> On 07/09/2014 12:00 PM, Chanwoo Choi wrote:
+>> From: Tomasz Figa<t.figa@samsung.com>
 >>
->> To add extra motivation, it should be noted that tps65090 is one of
->> the things needed to get display-related FETs turned on for pit and
->> pi.
+>> This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
+>> (1 channels) IIS-bus for audio interface with DMA-based operation.
 >>
->> Note that this relies on a few outstanding changes:
->> * Needs (spi: s3c64xx: fix broken "cs_gpios" usage in the driver) and
->>    (spi: s3c64xx: for DT platofrms always get the chipselect info from
->>    DT node) to work properly and match the documented bindings.  See
->>    <https://patchwork.kernel.org/patch/4346701/>  and
->>    <https://patchwork.kernel.org/patch/4346711/>
+>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>> Signed-off-by: Inha Song<ideal.song@samsung.com>
+>> Tested-by: Inha Song<ideal.song@samsung.com>
+>> Signed-off-by: Chanwoo Choi<cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
+>> ---
+>> Changes from v1:
+>> - Fix wrong name of property (pinctrl-names)
+>> - Change phanle name (i2s->i2s2)
 >>
->> Signed-off-by: Doug Anderson<dianders@chromium.org>
->> Tested-by: Javier Martinez Canillas<javier.martinez@collabora.co.uk>
->> Tested-by: Tushar Behera<tushar.b@samsung.com>
+>>   arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
+>>   1 file changed, 13 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>> index 3e678fa..77a06df 100644
+>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>> @@ -425,6 +425,19 @@
+>>   			status = "disabled";
+>>   		};
+>>
+>> +		i2s2: i2s at 13970000 {
+>> +			compatible = "samsung,s3c6410-i2s";
+>> +			reg =<0x13970000 0x100>;
+>> +			interrupts =<0 126 0>;
+>> +			clocks =<&cmu CLK_I2S>,<&cmu CLK_SCLK_I2S>;
+>> +			clock-names = "iis", "i2s_opclk0";
+>> +			dmas =<&pdma0 14>,<&pdma0 13>;
+>> +			dma-names = "tx", "rx";
+>> +			pinctrl-0 =<&i2s2_bus>;
+>> +			pinctrl-names = "default";
+>> +			status = "disabled";
+>> +		};
+>> +
+>>   		pwm: pwm at 139D0000 {
+>>   			compatible = "samsung,exynos4210-pwm";
+>>   			reg =<0x139D0000 0x1000>;
 >>
 >
-> Mark Brown as already applied the SPI DT binding fix from Naveen [0] which was
-> the dependency for this patch and he said that will try to send the whole series
-> to Torvalds before the 3.16-rc cycle ends.
+> Ping.
 >
-Thanks for your gentle reminder ;-)
-
-> So I think that it's safe now if you want to pick this patch.
->
-Sure, I've applied.
-
-> Thanks a lot!
->
-Many thanks.
+Applied, thanks.
 
 - Kukjin
-
-> Best regards,
-> Javier
->
-> [0]:
-> https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/commit/?h=for-next&id=306972cedfdedc662dd8e32a6397d0e29f2ac90e
