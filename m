@@ -1,148 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Jul 2014 17:18:03 +0100
-Subject: [PATCH] ARM: dts: add CPU nodes for Exynos4 SoCs
-In-Reply-To: <1863399.9O2S91ZvEO@amdc1032>
-References: <1863399.9O2S91ZvEO@amdc1032>
-Message-ID: <20140718161803.GC16376@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Jul 2014 18:31:40 +0200
+Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <CAGTfZH3vz9MLN+1fPM22zKE64oMNDgcib3is0nfzZhhLkmdNvw@mail.gmail.com>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <32226622.5gSmvBRKvZ@wuerfel>
+ <CAGTfZH3vz9MLN+1fPM22zKE64oMNDgcib3is0nfzZhhLkmdNvw@mail.gmail.com>
+Message-ID: <10264770.8SXiIS8qhq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 05:00:02PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
-> when topology is read from DT") fixed GIC driver to filter cluster ID
-> from values returned by cpu_logical_map() for SoCs having registers
-> mapped without per-CPU banking making it is possible to add CPU nodes
-> for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
-> required by future changes adding initialization of cpuidle states in
-> Exynos cpuidle driver through DT.
+On Saturday 19 July 2014 01:11:53 Chanwoo Choi wrote:
 > 
-> Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
+>   Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+>   - 'adc' clock: bus clock for ADC
 > 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> Based on next-20140717 branch of linux-next tree +
-> - [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
-> - [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
-> 
->  arch/arm/boot/dts/exynos4210.dtsi | 17 +++++++++++++++++
->  arch/arm/boot/dts/exynos4212.dtsi | 17 +++++++++++++++++
->  arch/arm/boot/dts/exynos4412.dtsi | 29 +++++++++++++++++++++++++++++
->  3 files changed, 63 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index ee3001f..b99fc83 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -31,6 +31,23 @@
->  		pinctrl2 = &pinctrl_2;
->  	};
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0x900>;
-> +		};
+>   Exynos3250 has additional 'sclk_adc' clock as following:
+>   - 'sclk_adc' clock: special clock for ADC which provide clock to internal ADC
 
-Please match the unit-address with the reg (e.g. this should be
-cpu at 900).
+The bus clock is often named "apb_pclk", but it's too late to change
+that now, and it's not clear if the device is actually on APB.
 
-Please do this for all the other CPU nodes.
+The problem with "sclk_adc" is that it's very close to the name used
+in the clock provider, with is CLK_SCLK_TSADC. Please try to avoid
+the ambiguity here and make it clear that they are not referring
+to the same thing. "internal" or "special" might be good if you want
+to avoid "sclk".
 
-Thanks,
-Mark.
-
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0x901>;
-> +		};
-> +	};
-> +
->  	sysram at 02020000 {
->  		compatible = "mmio-sram";
->  		reg = <0x02020000 0x20000>;
-> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-> index 3c00e6e..484a2da 100644
-> --- a/arch/arm/boot/dts/exynos4212.dtsi
-> +++ b/arch/arm/boot/dts/exynos4212.dtsi
-> @@ -22,6 +22,23 @@
->  / {
->  	compatible = "samsung,exynos4212", "samsung,exynos4";
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0xA00>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0xA01>;
-> +		};
-> +	};
-> +
->  	combiner: interrupt-controller at 10440000 {
->  		samsung,combiner-nr = <18>;
->  	};
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index c42a3e1..89f4743 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -22,6 +22,35 @@
->  / {
->  	compatible = "samsung,exynos4412", "samsung,exynos4";
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0xA00>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0xA01>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0xA02>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0xA03>;
-> +		};
-> +	};
-> +
->  	combiner: interrupt-controller at 10440000 {
->  		samsung,combiner-nr = <20>;
->  	};
-> -- 
-> 1.8.2.3
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+	Arnd
