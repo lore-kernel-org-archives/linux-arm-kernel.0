@@ -1,223 +1,154 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Fri, 18 Jul 2014 22:37:23 +0900
-Subject: [PATCHv6] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <1405375591-13409-1-git-send-email-sonnyrao@chromium.org>
-References: <53C37029.20600@samsung.com>
- <1405375591-13409-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <003001cfa28d$687f85f0$397e91d0$%jun@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Jul 2014 14:43:43 +0100
+Subject: [PATCHv4 5/5] arm64: Add atomic pool for non-coherent and CMA
+ allocations.
+In-Reply-To: <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
+References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
+ <1404324218-4743-6-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140718134343.GA4608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, July 15, 2014, Sonny Rao wrote:
-> This patch changes the fifo reset code to follow the reset procedure
-> outlined in the documentation of Synopsys Mobile storage host databook.
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+On Wed, Jul 02, 2014 at 07:03:38PM +0100, Laura Abbott wrote:
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 4164c5a..a2487f1 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+[...]
+>  static void *__dma_alloc_coherent(struct device *dev, size_t size,
+>  				  dma_addr_t *dma_handle, gfp_t flags,
+>  				  struct dma_attrs *attrs)
+> @@ -53,7 +103,8 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+>  	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
+>  	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+>  		flags |= GFP_DMA;
+> -	if (IS_ENABLED(CONFIG_DMA_CMA)) {
+> +
+> +	if (!(flags & __GFP_WAIT) && IS_ENABLED(CONFIG_DMA_CMA)) {
+>  		struct page *page;
+>  
+>  		size = PAGE_ALIGN(size);
 
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+I think that's the wrong condition here. You want to use CMA if
+(flags & __GFP_WAIT). CMA does not support atomic allocations so it can
+fall back to swiotlb_alloc_coherent().
 
-Thanks,
-Seungwon Jeon
-
-> ---
-> v2: Add Generic DMA support
->     per the documentation, move interrupt clear before wait
->     make the test for DMA host->use_dma rather than host->using_dma
->     add proper return values (although it appears no caller checks)
-> v3: rename fifo reset function, and change callers
->     use this combined reset function in dw_mci_resume()
->     just one caller left (probe), so get rid of dw_mci_ctrl_all_reset()
->     use DMA reset bit for all systems which use DMA
->     remove extra IDMAC reset in dw_mci_work_routine_card()
->     do CIU clock update in error path, if CIU reset cleared
-> v4: remove comment about FIFO reset in dw_mci_work_routine_card()
->     move down error message when control reset clears but others don't
->      and clarify the error stating that we will still update clocks
->     make flags for all reset bits a macro
-> v5: don't use dw_mci_reset() in dw_mci_resume() and instead match what
->     is done in dw_mci_probe() and don't force inline dw_mci_resume()
-> v6: add newlines to dev_err() messages
-> ---
->  drivers/mmc/host/dw_mmc.c | 86 ++++++++++++++++++++++++++++++++++-------------
->  drivers/mmc/host/dw_mmc.h |  5 +++
->  2 files changed, 68 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 55cd110..0c0aecb 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -111,8 +111,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
->  	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
->  };
-> 
-> -static inline bool dw_mci_fifo_reset(struct dw_mci *host);
-> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
-> +static bool dw_mci_reset(struct dw_mci *host);
-> 
->  #if defined(CONFIG_DEBUG_FS)
->  static int dw_mci_req_show(struct seq_file *s, void *v)
-> @@ -1254,7 +1253,7 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
->  		 * After an error, there may be data lingering
->  		 * in the FIFO
->  		 */
-> -		dw_mci_fifo_reset(host);
-> +		dw_mci_reset(host);
->  	} else {
->  		data->bytes_xfered = data->blocks * data->blksz;
->  		data->error = 0;
-> @@ -1371,7 +1370,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
-> 
->  			/* CMD error in data command */
->  			if (mrq->cmd->error && mrq->data)
-> -				dw_mci_fifo_reset(host);
-> +				dw_mci_reset(host);
-> 
->  			host->cmd = NULL;
->  			host->data = NULL;
-> @@ -1982,14 +1981,8 @@ static void dw_mci_work_routine_card(struct work_struct *work)
->  			}
-> 
->  			/* Power down slot */
-> -			if (present == 0) {
-> -				/* Clear down the FIFO */
-> -				dw_mci_fifo_reset(host);
-> -#ifdef CONFIG_MMC_DW_IDMAC
-> -				dw_mci_idmac_reset(host);
-> -#endif
-> -
-> -			}
-> +			if (present == 0)
-> +				dw_mci_reset(host);
-> 
->  			spin_unlock_bh(&host->lock);
-> 
-> @@ -2323,8 +2316,11 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
->  	return false;
->  }
-> 
-> -static inline bool dw_mci_fifo_reset(struct dw_mci *host)
-> +static bool dw_mci_reset(struct dw_mci *host)
+> @@ -73,50 +124,56 @@ static void __dma_free_coherent(struct device *dev, size_t size,
+>  				void *vaddr, dma_addr_t dma_handle,
+>  				struct dma_attrs *attrs)
 >  {
-> +	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
-> +	bool ret = false;
+> +	bool freed;
+> +	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
 > +
->  	/*
->  	 * Reseting generates a block interrupt, hence setting
->  	 * the scatter-gather pointer to NULL.
-> @@ -2334,15 +2330,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->  		host->sg = NULL;
+>  	if (dev == NULL) {
+>  		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+>  		return;
 >  	}
-> 
-> -	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-> -}
-> +	if (host->use_dma)
-> +		flags |= SDMMC_CTRL_DMA_RESET;
-> 
-> -static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
-> -{
-> -	return dw_mci_ctrl_reset(host,
-> -				 SDMMC_CTRL_FIFO_RESET |
-> -				 SDMMC_CTRL_RESET |
-> -				 SDMMC_CTRL_DMA_RESET);
-> +	if (dw_mci_ctrl_reset(host, flags)) {
-> +		/*
-> +		 * In all cases we clear the RAWINTS register to clear any
-> +		 * interrupts.
-> +		 */
-> +		mci_writel(host, RINTSTS, 0xFFFFFFFF);
-> +
-> +		/* if using dma we wait for dma_req to clear */
-> +		if (host->use_dma) {
-> +			unsigned long timeout = jiffies + msecs_to_jiffies(500);
-> +			u32 status;
-> +			do {
-> +				status = mci_readl(host, STATUS);
-> +				if (!(status & SDMMC_STATUS_DMA_REQ))
-> +					break;
-> +				cpu_relax();
-> +			} while (time_before(jiffies, timeout));
-> +
-> +			if (status & SDMMC_STATUS_DMA_REQ) {
-> +				dev_err(host->dev,
-> +					"%s: Timeout waiting for dma_req to "
-> +					"clear during reset\n", __func__);
-> +				goto ciu_out;
-> +			}
-> +
-> +			/* when using DMA next we reset the fifo again */
-> +			if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
-> +				goto ciu_out;
-> +		}
-> +	} else {
-> +		/* if the controller reset bit did clear, then set clock regs */
-> +		if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET)) {
-> +			dev_err(host->dev, "%s: fifo/dma reset bits didn't "
-> +				"clear but ciu was reset, doing clock update\n",
-> +				__func__);
-> +			goto ciu_out;
-> +		}
-> +	}
-> +
-> +	if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
-> +		/* It is also recommended that we reset and reprogram idmac */
-> +		dw_mci_idmac_reset(host);
-> +
-> +	ret = true;
-> +
-> +ciu_out:
-> +	/* After a CTRL reset we need to have CIU set clock registers  */
-> +	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-> +
-> +	return ret;
+>  
+> -	if (IS_ENABLED(CONFIG_DMA_CMA)) {
+> -		phys_addr_t paddr = dma_to_phys(dev, dma_handle);
+>  
+> -		dma_release_from_contiguous(dev,
+> +	freed = dma_release_from_contiguous(dev,
+>  					phys_to_page(paddr),
+>  					size >> PAGE_SHIFT);
+> -	} else {
+> +	if (!freed)
+>  		swiotlb_free_coherent(dev, size, vaddr, dma_handle);
+> -	}
 >  }
-> 
->  #ifdef CONFIG_OF
-> @@ -2555,7 +2595,7 @@ int dw_mci_probe(struct dw_mci *host)
->  	}
-> 
->  	/* Reset all blocks */
-> -	if (!dw_mci_ctrl_all_reset(host))
-> +	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS))
->  		return -ENODEV;
-> 
->  	host->dma_ops = host->pdata->dma_ops;
-> @@ -2744,7 +2784,7 @@ int dw_mci_resume(struct dw_mci *host)
->  		}
->  	}
-> 
-> -	if (!dw_mci_ctrl_all_reset(host)) {
-> +	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
->  		ret = -ENODEV;
->  		return ret;
->  	}
-> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-> index 6bf24ab..9ab8ccd 100644
-> --- a/drivers/mmc/host/dw_mmc.h
-> +++ b/drivers/mmc/host/dw_mmc.h
-> @@ -129,6 +129,7 @@
->  #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
->  /* Status register defines */
->  #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
-> +#define SDMMC_STATUS_DMA_REQ		BIT(31)
->  /* FIFOTH register defines */
->  #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
->  					 ((r) & 0xFFF) << 16 | \
-> @@ -150,6 +151,10 @@
->  /* Card read threshold */
->  #define SDMMC_SET_RD_THLD(v, x)		(((v) & 0x1FFF) << 16 | (x))
-> 
-> +/* All ctrl reset bits */
-> +#define SDMMC_CTRL_ALL_RESET_FLAGS \
-> +	(SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET | SDMMC_CTRL_DMA_RESET)
+
+Is __dma_free_coherent() ever called in atomic context? If yes, the
+dma_release_from_contiguous() may not like it since it tries to acquire
+a mutex. But since we don't have the gfp flags here, we don't have an
+easy way to know what to call.
+
+So the initial idea of always calling __alloc_from_pool() for both
+coherent/non-coherent cases would work better (but still with a single
+shared pool, see below).
+
+>  static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
+>  				     dma_addr_t *dma_handle, gfp_t flags,
+>  				     struct dma_attrs *attrs)
+>  {
+> -	struct page *page, **map;
+> +	struct page *page;
+>  	void *ptr, *coherent_ptr;
+> -	int order, i;
+>  
+>  	size = PAGE_ALIGN(size);
+> -	order = get_order(size);
 > +
->  /* Register access macros */
->  #define mci_readl(dev, reg)			\
->  	__raw_readl((dev)->regs + SDMMC_##reg)
-> --
-> 2.0.0.526.g5318336
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +	if (!(flags & __GFP_WAIT)) {
+> +		struct page *page = NULL;
+> +		void *addr = __alloc_from_pool(size, &page);
+> +
+> +		if (addr)
+> +			*dma_handle = phys_to_dma(dev, page_to_phys(page));
+> +
+> +		return addr;
+> +
+> +	}
+
+If we do the above for the __dma_alloc_coherent() case, we could use the
+same pool but instead of returning addr it could just return
+page_address(page). The downside of sharing the pool is that you need
+cache flushing for every allocation (which we already do for the
+non-atomic case).
+
+> @@ -332,6 +391,67 @@ static struct notifier_block amba_bus_nb = {
+>  
+>  extern int swiotlb_late_init_with_default_size(size_t default_size);
+>  
+> +static int __init atomic_pool_init(void)
+> +{
+> +	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
+> +	unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
+> +	struct page *page;
+> +	void *addr;
+> +
+> +
+> +	if (dev_get_cma_area(NULL))
+
+Is it worth using this condition for other places where we check
+IS_ENABLED(CONFIG_DMA_CMA) (maybe as a separate patch).
+
+> +		page = dma_alloc_from_contiguous(NULL, nr_pages,
+> +					get_order(atomic_pool_size));
+> +	else
+> +		page = alloc_pages(GFP_KERNEL, get_order(atomic_pool_size));
+
+One problem here is that the atomic pool wouldn't be able to honour
+GFP_DMA (in the latest kernel, CMA is by default in ZONE_DMA). You
+should probably pass GFP_KERNEL|GFP_DMA here. You could also use the
+swiotlb_alloc_coherent() which, with a NULL dev, assumes 32-bit DMA mask
+but it still expects GFP_DMA to be passed.
+
+> +	if (page) {
+> +		int ret;
+> +
+> +		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+> +		if (!atomic_pool)
+> +			goto free_page;
+> +
+> +		addr = dma_common_contiguous_remap(page, atomic_pool_size,
+> +					VM_USERMAP, prot, atomic_pool_init);
+> +
+> +		if (!addr)
+> +			goto destroy_genpool;
+> +
+> +		memset(addr, 0, atomic_pool_size);
+> +		__dma_flush_range(addr, addr + atomic_pool_size);
+
+If you add the flushing in the __dma_alloc_noncoherent(), it won't be
+needed here (of course, more efficient here but it would not work if we
+share the pool).
+
+> +postcore_initcall(atomic_pool_init);
+
+Why not arch_initcall? Or even better, we could have a common DMA init
+function that calls swiotlb_late_init() and atomic_pool_init() (in this
+order if you decide to use swiotlb allocation above).
+
+-- 
+Catalin
