@@ -1,55 +1,36 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 18 Jul 2014 11:14:29 -0400
-Subject: [PATCH v6 5/5] PCI: keystone: Update maintainer information
-In-Reply-To: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
-References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1405696469-7172-6-git-send-email-m-karicheri2@ti.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 19 Jul 2014 00:15:35 +0900
+Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <6917971.QKItNU3coA@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <6485839.CnzmD0SeQj@wuerfel> <53C8F050.6060104@samsung.com>
+ <6917971.QKItNU3coA@wuerfel>
+Message-ID: <CAGTfZH1EHiTpo2Abua=+kDfNoOQx+ydPHU51=+qW8mgCL4Lwvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the MAINTAINERS file for the keystone PCIe driver
+On Fri, Jul 18, 2014 at 8:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 18 July 2014 19:00:48 Chanwoo Choi wrote:
+>> On 07/18/2014 06:47 PM, Arnd Bergmann wrote:
+>> >
+>> > Further, why is it called "sclk_adc" rather than just "sclk"?
+>>
+>> The sclk means 'special clock' in Exynos TRM. Exynos SoC has varisou sclk clocks.
+>> 'sclk_adc' is only used for ADC IP.
+>
+> But that sounds like sclk_adc is the name of the global name
+> of the clock signal coming out of the clock controller.
+>
+> I still think it would be best to name it 'sclk' as the input
+> for the adc. It shouldn't rely on a particular name of the
+> clock controller.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+I think 'sclk' is too common name. 'sclk' don't include specific device name.
+As I know, usual clock name includes the name of IP or includes the
+specific meaning for each IP.
 
-CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mohit Kumar <mohit.kumar@st.com>
-CC: Jingoo Han <jg1.han@samsung.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-CC: Pratyush Anand <pratyush.anand@st.com>
-CC: Richard Zhu <r65037@freescale.com>
-CC: Kishon Vijay Abraham I <kishon@ti.com>
-CC: Marek Vasut <marex@denx.de>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: Randy Dunlap <rdunlap@infradead.org>
-CC: Grant Likely <grant.likely@linaro.org>
----
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
+In my opinion, I think sclk_adc is better than 'sclk'.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e31c874..8158f82 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6807,6 +6807,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	drivers/pci/host/*imx6*
- 
-+PCI DRIVER FOR keystone
-+M:	Murali Karicheri <m-karicheri2@ti.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/pci/host/*keystone*
-+
- PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
- M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- M:	Jason Cooper <jason@lakedaemon.net>
--- 
-1.7.9.5
+Thanks,
+Chanwoo Choi
