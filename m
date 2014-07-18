@@ -1,22 +1,51 @@
-From: jmorris@namei.org (James Morris)
-Date: Fri, 18 Jul 2014 13:26:48 +1000 (EST)
-Subject: [PATCH v12 11/11] seccomp: add thread sync ability
-In-Reply-To: <1405620518-18495-1-git-send-email-keescook@chromium.org>
-References: <1405620518-18495-1-git-send-email-keescook@chromium.org>
-Message-ID: <alpine.LRH.2.11.1407181325200.15709@namei.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 17 Jul 2014 20:32:54 -0700
+Subject: [PATCH v3] PM / devfreq: Add possible_frequencies device attribute
+In-Reply-To: <725805840.101171405558256488.JavaMail.weblogic@epmlwas01c>
+References: <725805840.101171405558256488.JavaMail.weblogic@epmlwas01c>
+Message-ID: <53C89566.9020505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jul 2014, Kees Cook wrote:
+On 07/16/2014 05:50 PM, MyungJoo Ham wrote:
+> On Wed, Jul 16, 2014 at 12:01 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> Some devices use freq_table instead of OPP. For those devices, the
+>> available_frequencies sysfs file shows up empty. So, add a
+>> possible_frequencies attribute/syfs file that list all the possible
+>> frequencies.
+>>
+>> For devices that use OPP, the output of this file will match
+>> available_frequencies. It may change in the future to show all OPP
+>> frequencies -- even the disabled ones.
+>>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> 
+> Hi,
+> 
+> 
+> Please add a documentation entry for this new ABI having a little justification and usage included.
 
-> Twelfth time's the charm! :)
+Will do.
 
-Btw, there doesn't seem to be an official seccomp maintainer.  Kees, would 
-you like to volunteer for this?  If so, send in a patch for MAINTAINERS, 
-and set up a git tree for me to pull from.
+> 
+> Plus, I am considering to move trans_stat along with this entry to somewhere such as .../stat/*
+> (you don't need to take care of this.)
 
+Ok.
 
+> 
+> Besides, as OPP seems becoming the standard as imagined when devfreq development started,
+> soon, devfreq may require OPP unless the devfreq device has continuous frequencies.
+
+I agree. Only one caveat with OPP is that if a device isn't using OPP to
+do any voltage scaling, then it forces a voltage column with 0s. Also,
+even if we make OPP mandatory, we'll still want trans_stats that
+currently seem to depend on freq_table being populated. I was actually
+planning on sending out more patches later that'll do a lot of stuff
+automatically for devices with OPP. Like creating freq_table, etc.
+
+-Saravana
 
 -- 
-James Morris
-<jmorris@namei.org>
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
