@@ -1,41 +1,26 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Jul 2014 15:46:34 +0200
-Subject: [PATCH] ARM: at91/dt: add missing clocks property to pwm node
- in sam9x5.dtsi
-In-Reply-To: <1405623838-22496-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405623838-22496-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53C9253A.8020404@atmel.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 18 Jul 2014 09:47:30 -0400
+Subject: [PATCH v10 3/8] ata: libahci_platform: move port_map parameters
+ into the AHCI structure
+In-Reply-To: <1405686607-8126-4-git-send-email-antoine.tenart@free-electrons.com>
+References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1405686607-8126-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140718134730.GA13012@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/2014 21:03, Boris BREZILLON :
-> The pwm driver requires a clocks property referencing the pwm peripheral
-> clk.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+On Fri, Jul 18, 2014 at 02:30:02PM +0200, Antoine T?nart wrote:
+> @@ -321,6 +321,8 @@ struct ahci_host_priv {
+>  	u32			cap;		/* cap to use */
+>  	u32			cap2;		/* cap2 to use */
+>  	u32			port_map;	/* port map to use */
+> +	u32			force_port_map;	/* force port map */
+> +	u32			mask_port_map;	/* mask out particular bits */
 
+So, ->flags and ->force/mask_port_map are the only input ones, right?
+Can we collect them to one spot and label them as such?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 2ebc421..6902f53 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -1124,6 +1124,7 @@
->  				compatible = "atmel,at91sam9rl-pwm";
->  				reg = <0xf8034000 0x300>;
->  				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 4>;
-> +				clocks = <&pwm_clk>;
->  				#pwm-cells = <3>;
->  				status = "disabled";
->  			};
-> 
-
+Thanks.
 
 -- 
-Nicolas Ferre
+tejun
