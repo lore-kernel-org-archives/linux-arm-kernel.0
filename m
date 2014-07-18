@@ -1,63 +1,53 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 18 Jul 2014 17:22:21 -0400
-Subject: [PATCH 2/4] ARM: add IPI tracepoints
-In-Reply-To: <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
- <20140718160418.54d11f6a@gandalf.local.home>
- <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
-Message-ID: <20140718172221.6dbe83e4@gandalf.local.home>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 18 Jul 2014 17:32:14 -0400
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.16 (round 3)
+Message-ID: <20140718213214.GL24496@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jul 2014 16:55:42 -0400 (EDT)
-Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+All,
 
-> 
-> Here's the patch I have at the head of the series now, with the above
-> ugliness changed to an unconditional __tracepoint_string attribute.
-> 
+Here is hopefully the last round of fixes for mvebu.
 
-I was thinking of something like this. Feel free to add this to your
-series.
+This is an incremental pull request from tags/mvebu-fixes-3.16-2 up to
+tags/mvebu-fixes-3.16-3 on the mvebu/fixes branch.
 
--- Steve
+Please pull.
 
-From: Steven Rostedt <rostedt@goodmis.org>
-Subject: [PATCH] tracing: Do not do anything special with tracepoint_string when tracing is disabled
+thx,
 
-When CONFIG_TRACING is not enabled, there's no reason to save the trace
-strings either by the linker or as a static variable that can be
-referenced later. Simply pass back the string that is given to
-tracepoint_string().
+Jason.
 
-Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
----
-diff --git a/include/linux/ftrace_event.h b/include/linux/ftrace_event.h
-index cff3106..b296363 100644
---- a/include/linux/ftrace_event.h
-+++ b/include/linux/ftrace_event.h
-@@ -574,6 +574,7 @@ do {									\
- 		__trace_printk(ip, fmt, ##args);			\
- } while (0)
- 
-+#ifdef CONFIG_TRACING
- /**
-  * tracepoint_string - register constant persistent string to trace system
-  * @str - a constant persistent string that will be referenced in tracepoints
-@@ -607,6 +608,15 @@ do {									\
- 		___tp_str;						\
- 	})
- #define __tracepoint_string	__attribute__((section("__tracepoint_str")))
-+#else
-+/*
-+ * tracepoint_string() is used to save the string address for userspace
-+ * tracing tools. When tracing isn't configured, there's no need to save
-+ * anything.
-+ */
-+# define tracepoint_string(str) str
-+# define __tracepoint_string
-+#endif
- 
- #ifdef CONFIG_PERF_EVENTS
- struct perf_event;
+The following changes since commit 6509dc74c9f55ffaa558738b96c4da8b98d39571:
+
+  ARM: mvebu: fix cpuidle implementation to work on big-endian systems (2014-06-30 18:15:11 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.16-3
+
+for you to fetch changes up to a728b977429383b3fe92b6e3bff9e69365609e0f:
+
+  ARM: mvebu: Fix coherency bus notifiers by using separate notifiers (2014-07-08 13:53:53 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.16 (round 3)
+
+ - Fix SMP boot on 38x/375 in big endian
+ - Fix operand list for pmsu on 370/XP
+ - Fix coherency bus notifiers
+
+----------------------------------------------------------------
+Ezequiel Garcia (1):
+      ARM: mvebu: Fix coherency bus notifiers by using separate notifiers
+
+Gregory CLEMENT (1):
+      ARM: mvebu: Fix the operand list in the inline asm of armada_370_xp_pmsu_idle_enter
+
+Thomas Petazzoni (1):
+      ARM: mvebu: fix SMP boot for Armada 38x and Armada 375 Z1 in big endian
+
+ arch/arm/mach-mvebu/coherency.c  |  6 +++++-
+ arch/arm/mach-mvebu/headsmp-a9.S |  9 ++++++++-
+ arch/arm/mach-mvebu/pmsu.c       | 10 +++++-----
+ 3 files changed, 18 insertions(+), 7 deletions(-)
