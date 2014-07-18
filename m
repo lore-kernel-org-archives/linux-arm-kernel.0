@@ -1,53 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 18 Jul 2014 21:27:28 +0400
-Subject: [PATCH v10 2/8] Documentation: bindings: add the Berlin SATA PHY
-In-Reply-To: <1405686607-8126-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405686607-8126-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53C95900.9050200@cogentembedded.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Fri, 18 Jul 2014 12:28:18 -0500
+Subject: [PATCH v3] arm64, ia64, ppc, s390, sh, tile, um, x86,
+ mm: Remove default gate area
+In-Reply-To: <CALCETrXve-=N5yzqDw2YQee4BmC6sb8GYWYJcV2780V38OuJiQ@mail.gmail.com>
+References: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
+ <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
+ <20140718101416.GB1818@arm.com> <53C8F4DF.8020103@nod.at>
+ <CALCETrXve-=N5yzqDw2YQee4BmC6sb8GYWYJcV2780V38OuJiQ@mail.gmail.com>
+Message-ID: <53C95932.206@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 07/18/2014 11:53 AM, Andy Lutomirski wrote:
+> 
+> On Jul 18, 2014 3:20 AM, "Richard Weinberger" <richard@nod.at
+> <mailto:richard@nod.at>> wrote:
+>>
+>> Am 18.07.2014 12:14, schrieb Will Deacon:
+>> > On Tue, Jul 15, 2014 at 03:47:26PM +0100, Andy Lutomirski wrote:
+>> >> On Sun, Jul 13, 2014 at 1:01 PM, Andy Lutomirski
+> <luto at amacapital.net <mailto:luto@amacapital.net>> wrote:
+>> >>> The core mm code will provide a default gate area based on
+>> >>> FIXADDR_USER_START and FIXADDR_USER_END if
+>> >>> !defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
+>> >>>
+>> >>> This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
+>> >>> 64-bit UML, and x86_32 have their own code just to disable it.  arm,
+>> >>> 32-bit UML, and x86_64 have gate areas, but they have their own
+>> >>> implementations.
+>> >>>
+>> >>> This gets rid of the default and moves the code into ia64.
+>> >>>
+>> >>> This should save some code on architectures without a gate area: it's
+>> >>> now possible to inline the gate_area functions in the default case.
+>> >>
+>> >> Can one of you pull this somewhere?  Otherwise I can put it somewhere
+>> >> stable and ask for -next inclusion, but that seems like overkill for a
+>> >> single patch.
+>>
+>> For the um bits:
+>> Acked-by: Richard Weinberger <richard at nod.at <mailto:richard@nod.at>>
+>>
+>> > I'd be happy to take the arm64 part, but it doesn't feel right for mm/*
+>> > changes (or changes to other archs) to go via our tree.
+>> >
+>> > I'm not sure what the best approach is if you want to send this via
+> a single
+>> > tree. Maybe you could ask akpm nicely?
+>>
+>> Going though Andrew's tree sounds sane to me.
+> 
+> Splitting this will be annoying: I'd probably have to add a flag asking
+> for the new behavior, update all the arches, then remove the flag.  The
+> chance of screwing up bisectability in the process seems pretty high. 
+> This seems like overkill for a patch that mostly deletes code.
+> 
+> Akpm, can you take this?
 
-On 07/18/2014 04:30 PM, Antoine T?nart wrote:
+FWIW:
 
-> The Berlin SATA PHY drives the PHY related to the SATA interface. Add
-> the corresponding documentation.
+Acked-by: Nathan Lynch <nathan_lynch@mentor.com>
 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   .../devicetree/bindings/phy/berlin-sata-phy.txt    | 34 ++++++++++++++++++++++
->   1 file changed, 34 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+This patch allows me to avoid adding a bunch of empty hooks to arch/arm
+when adding VDSO support:
 
-> diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-> new file mode 100644
-> index 000000000000..88f8c23384c0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-> @@ -0,0 +1,34 @@
-> +Berlin SATA PHY
-> +---------------
-> +
-> +Required properties:
-> +- compatible: should be "marvell,berlin2q-sata-phy"
-> +- address-cells: should be 1
-> +- size-cells: should be 0
-> +- phy-cells: from the generic PHY bindings, must be 1
-
-    It's "#address-cells", "#size-cells", and "#phy-cells".
-
-> +- reg: address and length of the register
-> +- clocks: reference to the clock entry
-> +
-> +Sub-nodes:
-> +Each PHY should be represented as a sub-node.
-
-    Then "#phy-cells" should also belong to the sub-nodes.
-
-> +
-> +Sub-nodes required properties:
-> +- reg: the PHY number
-
-WBR, Sergei
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/268045.html
