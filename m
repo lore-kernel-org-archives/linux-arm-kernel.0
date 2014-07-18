@@ -1,30 +1,30 @@
-From: m.olbrich@pengutronix.de (Michael Olbrich)
-Date: Fri, 18 Jul 2014 10:11:23 +0200
-Subject: [PATCH] ARM: versatile: allow enabling PCI for device tree only
- kernels
-Message-ID: <1405671083-18561-1-git-send-email-m.olbrich@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Jul 2014 10:12:22 +0200
+Subject: [PATCH 5/5] ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
+In-Reply-To: <1405323137-24287-6-git-send-email-wens@csie.org>
+References: <1405323137-24287-1-git-send-email-wens@csie.org>
+ <1405323137-24287-6-git-send-email-wens@csie.org>
+Message-ID: <20140718081222.GK20328@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes it possible to build a device tree only kernel with PCI support.
-This is necessary to access the i6300esb watchdog provided by qemu.
+On Mon, Jul 14, 2014 at 03:32:17PM +0800, Chen-Yu Tsai wrote:
+> Now that we have a driver for A31's RTC, enable it
+> in the default sunxi config.
 
-Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
----
- arch/arm/mach-versatile/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+It would be great if you could do this for multi_v7 as well.
 
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index 1dba368..993ed4b 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -20,6 +20,7 @@ config MACH_VERSATILE_AB
- config MACH_VERSATILE_DT
- 	bool "Support Versatile platform from device tree"
- 	select CPU_ARM926T
-+	select MIGHT_HAVE_PCI
- 	select USE_OF
- 	help
- 	  Include support for the ARM(R) Versatile/PB platform,
+Thanks!
+Maxime
+
 -- 
-2.0.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/7b00b43d/attachment.sig>
