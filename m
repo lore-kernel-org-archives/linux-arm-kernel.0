@@ -1,72 +1,91 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Fri, 18 Jul 2014 10:16:13 +0300
-Subject: [PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53C8C9BD.3070709@nvidia.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 18 Jul 2014 09:33:16 +0200
+Subject: [PATCH] CMA: generalize CMA reserved area management functionality
+ (fixup)
+In-Reply-To: <20140717150615.32c48786b6bdbc880bdc5ed4@linux-foundation.org>
+References: <53C78ED7.7030002@samsung.com>
+ <1405589767-17513-1-git-send-email-m.szyprowski@samsung.com>
+ <20140717150615.32c48786b6bdbc880bdc5ed4@linux-foundation.org>
+Message-ID: <53C8CDBC.3030600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So here's v5: this time, as suggested, I handle the sata clock myself 
-and let ahci_platform handle it too, leading it to be prepared+enabled 
-twice. This works fine, and allows us to remove the DT ordering requirement.
+Hello,
 
-I also have in the works a patchset that adds the name-based 
-ahci_platform_get_resources function, but that is not quite ready yet, 
-even if it is quite far along. Also, I am going on vacation and 
-returning on 28.7., so if this v5 is acceptable maybe it could be merged 
-for 3.17 and I could work on the new get_resources scheme after I get 
-back from vacation?
-
-Thanks, Mikko
-
-On 18/07/14 10:11, Mikko Perttunen wrote:
-> This patch adds device tree binding documentation for the SATA
-> controller found on NVIDIA Tegra SoCs.
+On 2014-07-18 00:06, Andrew Morton wrote:
+> On Thu, 17 Jul 2014 11:36:07 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 >
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>> MAX_CMA_AREAS is used by other subsystems (i.e. arch/arm/mm/dma-mapping.c),
+>> so we need to provide correct definition even if CMA is disabled.
+>> This patch fixes this issue.
+>>
+>> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   include/linux/cma.h | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/include/linux/cma.h b/include/linux/cma.h
+>> index 9a18a2b1934c..c077635cad76 100644
+>> --- a/include/linux/cma.h
+>> +++ b/include/linux/cma.h
+>> @@ -5,7 +5,11 @@
+>>    * There is always at least global CMA area and a few optional
+>>    * areas configured in kernel .config.
+>>    */
+>> +#ifdef CONFIG_CMA
+>>   #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
+>> +#else
+>> +#define MAX_CMA_AREAS	(0)
+>> +#endif
+>>   
+>>   struct cma;
+> Joonsoo already fixed this up, a bit differently:
+> http://ozlabs.org/~akpm/mmots/broken-out/cma-generalize-cma-reserved-area-management-functionality-fix.patch
+>
+> Which approach makes more sense?
+
+CMA_AREAS depends on CMA being enabled, so both approaches works exactly
+the same way. Please keep Joonsoo's patch and just ignore mine to avoid
+confusing others by disappearing patches. I'm sorry that I've missed it
+before sending mine.
+
+> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> Subject: CMA: fix ARM build failure related to MAX_CMA_AREAS definition
+>
+> If CMA is disabled, CONFIG_CMA_AREAS isn't defined so compile error
+> happens. To fix it, define MAX_CMA_AREAS if CONFIG_CMA_AREAS
+> isn't defined.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 > ---
-> v5: remove ordering requirement again
 >
->   .../devicetree/bindings/ata/tegra-sata.txt         | 30 ++++++++++++++++++++++
->   1 file changed, 30 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
+>   include/linux/cma.h |    6 ++++++
+>   1 file changed, 6 insertions(+)
 >
-> diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
-> new file mode 100644
-> index 0000000..946f207
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
-> @@ -0,0 +1,30 @@
-> +Tegra124 SoC SATA AHCI controller
+> diff -puN include/linux/cma.h~cma-generalize-cma-reserved-area-management-functionality-fix include/linux/cma.h
+> --- a/include/linux/cma.h~cma-generalize-cma-reserved-area-management-functionality-fix
+> +++ a/include/linux/cma.h
+> @@ -5,8 +5,14 @@
+>    * There is always at least global CMA area and a few optional
+>    * areas configured in kernel .config.
+>    */
+> +#ifdef CONFIG_CMA_AREAS
+>   #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
+>   
+> +#else
+> +#define MAX_CMA_AREAS	(0)
 > +
-> +Required properties :
-> +- compatible : "nvidia,tegra124-ahci".
-> +- reg : Should contain 2 entries:
-> +  - AHCI register set (SATA BAR5)
-> +  - SATA register set
-> +- interrupts : Defines the interrupt used by SATA
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names : Must include the following entries:
-> +  - sata
-> +  - sata-oob
-> +  - cml1
-> +  - pll_e
-> +- resets : Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names : Must include the following entries:
-> +  - sata
-> +  - sata-oob
-> +  - sata-cold
-> +- phys : Must contain an entry for each entry in phy-names.
-> +  See ../phy/phy-bindings.txt for details.
-> +- phy-names : Must include the following entries:
-> +  - sata-phy : XUSB PADCTL SATA PHY
-> +- hvdd-supply : Defines the SATA HVDD regulator
-> +- vddio-supply : Defines the SATA VDDIO regulator
-> +- avdd-supply : Defines the SATA AVDD regulator
-> +- target-5v-supply : Defines the SATA 5V power regulator
-> +- target-12v-supply : Defines the SATA 12V power regulator
->
+> +#endif
+> +
+>   struct cma;
+>   
+>   extern phys_addr_t cma_get_base(struct cma *cma);
+> _
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
