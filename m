@@ -1,37 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Jul 2014 15:13:35 +0100
-Subject: [PATCHv4 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <CAOesGMimCAYnqxkKoYpZ2ws7x9eH4K1Yw3LnLz9HC6MWyHEo3A@mail.gmail.com>
-References: <1404324218-4743-1-git-send-email-lauraa@codeaurora.org>
- <1404324218-4743-4-git-send-email-lauraa@codeaurora.org>
- <CAOesGMimCAYnqxkKoYpZ2ws7x9eH4K1Yw3LnLz9HC6MWyHEo3A@mail.gmail.com>
-Message-ID: <20140718141335.GC4608@arm.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 18 Jul 2014 16:21:12 +0200
+Subject: [PATCH 0/6] net/macb: add HW features to macb driver
+Message-ID: <cover.1405689937.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 09, 2014 at 11:46:56PM +0100, Olof Johansson wrote:
-> On Wed, Jul 2, 2014 at 11:03 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > For architectures without coherent DMA, memory for DMA may
-> > need to be remapped with coherent attributes. Factor out
-> > the the remapping code from arm and put it in a
-> > common location to reduced code duplication.
-> >
-> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> 
-> Hm. The switch from ioremap to map_vm_area() here seems to imply that
-> lib/ioremap can/should be reworked to use just wrap the vmalloc
-> functions too?
+Hi,
 
-ioremap_page_range() does not require the allocation of a map page array
-and assumes that the mapped memory is physically contiguous. This would
-be more efficient than the vmap() implementation which is generic enough
-to allow non-contiguous memory allocations.
+this series of patches adds new hardware features to macb driver. These
+features can be enabled/disabled at runtime using ethtool. Depending on
+hardware and design configuration, some are enabled by default whereas other
+are disabled.
 
-At some point, we'll have to support SMMU on arm64 and we can have 4
-combinations of coherency and IOMMU. When an IOMMU is present, we don't
-require physically contiguous memory but we may require non-cacheable
-mappings, in which case vmap comes in handy.
+For instance, checksum offload features are enabled by default for gem designed
+for packet buffer mode but disabled for fifo mode design or for old macb.
+
+Besides, the scatter-gather feature is enabled and tested on macb but disabled
+on sama5d3x gem. When testing this feature on sama5d3x gem, TX lockups occured
+frequently.
+
+These patches were made for net-next.git repository.
+
+Cyrille Pitchen (5):
+  net/macb: add scatter-gather hw feature
+  net/macb: add TX checksum offload feature
+  net/macb: add RX checksum offload feature
+  ARM: at91: change compatibility string for sama5d3x gem
+  net/macb: enable scatter-gather feature and set DMA burst length for
+    sama5d4 gem
+
+Nicolas Ferre (1):
+  net/macb: configure for FIFO mode and non-gigabit
+
+ arch/arm/boot/dts/sama5d3_gmac.dtsi |   2 +-
+ drivers/net/ethernet/cadence/macb.c | 409 ++++++++++++++++++++++++++++++------
+ drivers/net/ethernet/cadence/macb.h |  36 +++-
+ 3 files changed, 375 insertions(+), 72 deletions(-)
 
 -- 
-Catalin
+1.8.2.2
