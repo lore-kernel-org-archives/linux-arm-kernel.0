@@ -1,239 +1,348 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Fri, 18 Jul 2014 14:30:02 +0200
-Subject: [PATCH v10 3/8] ata: libahci_platform: move port_map parameters into
- the AHCI structure
+Date: Fri, 18 Jul 2014 14:30:00 +0200
+Subject: [PATCH v10 1/8] phy: add a driver for the Berlin SATA PHY
 In-Reply-To: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1405686607-8126-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1405686607-8126-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves force_port_map and mask_port_map into the
-ahci_host_priv structure. This allows to modify them into the AHCI
-framework. This is needed by the new dt bindings representing ports as
-the port_map mask is computed automatically.
+The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+
+The mode selection can let us think this PHY can be configured to fit
+other purposes. But there are reasons to think the SATA mode will be
+the only one usable: the PHY registers are only accessible indirectly
+through two registers in the SATA range, the PHY seems to be integrated
+and no information tells us the contrary. For these reasons, make the
+driver a SATA PHY driver.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- drivers/ata/ahci.h             |  6 +++---
- drivers/ata/ahci_da850.c       |  3 +--
- drivers/ata/ahci_imx.c         |  3 +--
- drivers/ata/ahci_mvebu.c       |  3 +--
- drivers/ata/ahci_platform.c    |  3 +--
- drivers/ata/ahci_st.c          |  2 +-
- drivers/ata/ahci_sunxi.c       |  2 +-
- drivers/ata/ahci_xgene.c       |  2 +-
- drivers/ata/libahci.c          | 17 +++++++----------
- drivers/ata/libahci_platform.c |  8 ++------
- include/linux/ahci_platform.h  |  4 +---
- 11 files changed, 20 insertions(+), 33 deletions(-)
+ drivers/phy/Kconfig           |   7 ++
+ drivers/phy/Makefile          |   1 +
+ drivers/phy/phy-berlin-sata.c | 284 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 292 insertions(+)
+ create mode 100644 drivers/phy/phy-berlin-sata.c
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 5513296e5e2e..cb8d58926851 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -321,6 +321,8 @@ struct ahci_host_priv {
- 	u32			cap;		/* cap to use */
- 	u32			cap2;		/* cap2 to use */
- 	u32			port_map;	/* port map to use */
-+	u32			force_port_map;	/* force port map */
-+	u32			mask_port_map;	/* mask out particular bits */
- 	u32			saved_cap;	/* saved initial cap */
- 	u32			saved_cap2;	/* saved initial cap2 */
- 	u32			saved_port_map;	/* saved initial port_map */
-@@ -361,9 +363,7 @@ unsigned int ahci_dev_classify(struct ata_port *ap);
- void ahci_fill_cmd_slot(struct ahci_port_priv *pp, unsigned int tag,
- 			u32 opts);
- void ahci_save_initial_config(struct device *dev,
--			      struct ahci_host_priv *hpriv,
--			      unsigned int force_port_map,
--			      unsigned int mask_port_map);
-+			      struct ahci_host_priv *hpriv);
- void ahci_init_controller(struct ata_host *host);
- int ahci_reset_controller(struct ata_host *host);
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 64b98d242ea6..458b15ae2e81 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -15,6 +15,13 @@ config GENERIC_PHY
+ 	  phy users can obtain reference to the PHY. All the users of this
+ 	  framework should select this config.
  
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 2b77d53bccf8..33b862b2c5db 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -85,8 +85,7 @@ static int ahci_da850_probe(struct platform_device *pdev)
++config PHY_BERLIN_SATA
++	tristate "Marvell Berlin SATA PHY driver"
++	depends on ARCH_BERLIN && HAS_IOMEM && OF
++	select GENERIC_PHY
++	help
++	  Enable this to support the SATA PHY on Marvell Berlin SoCs.
++
+ config PHY_EXYNOS_MIPI_VIDEO
+ 	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+ 	depends on HAS_IOMEM
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index b4f1d5770601..a137a2e23218 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -3,6 +3,7 @@
+ #
  
- 	da850_sata_init(dev, pwrdn_reg, hpriv->mmio);
- 
--	rc = ahci_platform_init_host(pdev, hpriv, &ahci_da850_port_info,
--				     0, 0, 0);
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_da850_port_info, 0);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index cac4360f272a..c8eef2d745d8 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -454,8 +454,7 @@ static int imx_ahci_probe(struct platform_device *pdev)
- 	reg_val = clk_get_rate(imxpriv->ahb_clk) / 1000;
- 	writel(reg_val, hpriv->mmio + IMX_TIMER1MS);
- 
--	ret = ahci_platform_init_host(pdev, hpriv, &ahci_imx_port_info,
--				      0, 0, 0);
-+	ret = ahci_platform_init_host(pdev, hpriv, &ahci_imx_port_info, 0);
- 	if (ret)
- 		goto disable_sata;
- 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index fd3dfd733b84..0ba0cf7a9ba9 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -88,8 +88,7 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 	ahci_mvebu_mbus_config(hpriv, dram);
- 	ahci_mvebu_regret_option(hpriv);
- 
--	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
--				     0, 0, 0);
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info, 0);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index b10d81ddb528..95f9ca82082a 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -60,8 +60,7 @@ static int ahci_probe(struct platform_device *pdev)
- 	if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
- 		hflags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
- 
--	rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
--				     hflags, 0, 0);
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info, hflags);
- 	if (rc)
- 		goto pdata_exit;
- 
-diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
-index 2595598df9ce..6767c7790b4a 100644
---- a/drivers/ata/ahci_st.c
-+++ b/drivers/ata/ahci_st.c
-@@ -166,7 +166,7 @@ static int st_ahci_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
--	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info, 0, 0, 0);
-+	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info, 0);
- 	if (err) {
- 		ahci_platform_disable_resources(hpriv);
- 		return err;
-diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
-index 02002f125bd4..9f8ff1f9e912 100644
---- a/drivers/ata/ahci_sunxi.c
-+++ b/drivers/ata/ahci_sunxi.c
-@@ -188,7 +188,7 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
- 		 AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_sunxi_port_info,
--				     hflags, 0, 0);
-+				     hflags);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index ee3a3659bd9e..87d39fbe616b 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -487,7 +487,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 	hflags = AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &xgene_ahci_port_info,
--				     hflags, 0, 0);
-+				     hflags);
- 	if (rc)
- 		goto disable_resources;
- 
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index d72ce0470309..3c0b623747bd 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -398,10 +398,7 @@ static ssize_t ahci_show_em_supported(struct device *dev,
-  *	LOCKING:
-  *	None.
-  */
--void ahci_save_initial_config(struct device *dev,
--			      struct ahci_host_priv *hpriv,
--			      unsigned int force_port_map,
--			      unsigned int mask_port_map)
-+void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
- {
- 	void __iomem *mmio = hpriv->mmio;
- 	u32 cap, cap2, vers, port_map;
-@@ -468,17 +465,17 @@ void ahci_save_initial_config(struct device *dev,
- 		cap &= ~HOST_CAP_FBS;
- 	}
- 
--	if (force_port_map && port_map != force_port_map) {
-+	if (hpriv->force_port_map && port_map != hpriv->force_port_map) {
- 		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
--			 port_map, force_port_map);
--		port_map = force_port_map;
-+			 port_map, hpriv->force_port_map);
-+		port_map = hpriv->force_port_map;
- 	}
- 
--	if (mask_port_map) {
-+	if (hpriv->mask_port_map) {
- 		dev_warn(dev, "masking port_map 0x%x -> 0x%x\n",
- 			port_map,
--			port_map & mask_port_map);
--		port_map &= mask_port_map;
-+			port_map & hpriv->mask_port_map);
-+		port_map &= hpriv->mask_port_map;
- 	}
- 
- 	/* cross check port_map and cap.n_ports */
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index b0077589f065..db9b90d876dd 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -289,8 +289,6 @@ EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
-  * @hpriv: ahci-host private data for the host
-  * @pi_template: template for the ata_port_info to use
-  * @host_flags: ahci host flags used in ahci_host_priv
-- * @force_port_map: param passed to ahci_save_initial_config
-- * @mask_port_map: param passed to ahci_save_initial_config
-  *
-  * This function does all the usual steps needed to bring up an
-  * ahci-platform host, note any necessary resources (ie clks, phy, etc.)
-@@ -302,9 +300,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
- int ahci_platform_init_host(struct platform_device *pdev,
- 			    struct ahci_host_priv *hpriv,
- 			    const struct ata_port_info *pi_template,
--			    unsigned long host_flags,
--			    unsigned int force_port_map,
--			    unsigned int mask_port_map)
-+			    unsigned long host_flags)
- {
- 	struct device *dev = &pdev->dev;
- 	struct ata_port_info pi = *pi_template;
-@@ -322,7 +318,7 @@ int ahci_platform_init_host(struct platform_device *pdev,
- 	pi.private_data = (void *)host_flags;
- 	hpriv->flags |= host_flags;
- 
--	ahci_save_initial_config(dev, hpriv, force_port_map, mask_port_map);
-+	ahci_save_initial_config(dev, hpriv);
- 
- 	if (hpriv->cap & HOST_CAP_NCQ)
- 		pi.flags |= ATA_FLAG_NCQ;
-diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index 6dfd51a04d77..554bcafa7eb4 100644
---- a/include/linux/ahci_platform.h
-+++ b/include/linux/ahci_platform.h
-@@ -44,9 +44,7 @@ struct ahci_host_priv *ahci_platform_get_resources(
- int ahci_platform_init_host(struct platform_device *pdev,
- 			    struct ahci_host_priv *hpriv,
- 			    const struct ata_port_info *pi_template,
--			    unsigned long host_flags,
--			    unsigned int force_port_map,
--			    unsigned int mask_port_map);
-+			    unsigned long host_flags);
- 
- int ahci_platform_suspend_host(struct device *dev);
- int ahci_platform_resume_host(struct device *dev);
+ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
++obj-$(CONFIG_PHY_BERLIN_SATA)		+= phy-berlin-sata.o
+ obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
+ obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
+new file mode 100644
+index 000000000000..c5e688b0899f
+--- /dev/null
++++ b/drivers/phy/phy-berlin-sata.c
+@@ -0,0 +1,284 @@
++/*
++ * Marvell Berlin SATA PHY driver
++ *
++ * Copyright (C) 2014 Marvell Technology Group Ltd.
++ *
++ * Antoine T?nart <antoine.tenart@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/phy/phy.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++
++#define HOST_VSA_ADDR		0x0
++#define HOST_VSA_DATA		0x4
++#define PORT_SCR_CTL		0x2c
++#define PORT_VSR_ADDR		0x78
++#define PORT_VSR_DATA		0x7c
++
++#define CONTROL_REGISTER	0x0
++#define MBUS_SIZE_CONTROL	0x4
++
++#define POWER_DOWN_PHY0			BIT(6)
++#define POWER_DOWN_PHY1			BIT(14)
++#define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
++#define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
++
++#define PHY_BASE		0x200
++
++/* register 0x01 */
++#define REF_FREF_SEL_25		BIT(0)
++#define PHY_MODE_SATA		(0x0 << 5)
++
++/* register 0x02 */
++#define USE_MAX_PLL_RATE	BIT(12)
++
++/* register 0x23 */
++#define DATA_BIT_WIDTH_10	(0x0 << 10)
++#define DATA_BIT_WIDTH_20	(0x1 << 10)
++#define DATA_BIT_WIDTH_40	(0x2 << 10)
++
++/* register 0x25 */
++#define PHY_GEN_MAX_1_5		(0x0 << 10)
++#define PHY_GEN_MAX_3_0		(0x1 << 10)
++#define PHY_GEN_MAX_6_0		(0x2 << 10)
++
++struct phy_berlin_desc {
++	struct phy	*phy;
++	u32		power_bit;
++	unsigned	index;
++};
++
++struct phy_berlin_priv {
++	void __iomem		*base;
++	spinlock_t		lock;
++	struct clk		*clk;
++	struct phy_berlin_desc	**phys;
++	unsigned		nphys;
++};
++
++static inline void phy_berlin_sata_reg_setbits(void __iomem *ctrl_reg, u32 reg,
++					       u32 mask, u32 val)
++{
++	u32 regval;
++
++	/* select register */
++	writel(PHY_BASE + reg, ctrl_reg + PORT_VSR_ADDR);
++
++	/* set bits */
++	regval = readl(ctrl_reg + PORT_VSR_DATA);
++	regval &= ~mask;
++	regval |= val;
++	writel(regval, ctrl_reg + PORT_VSR_DATA);
++}
++
++static int phy_berlin_sata_power_on(struct phy *phy)
++{
++	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
++	struct phy_berlin_priv *priv = dev_get_drvdata(phy->dev.parent);
++	void __iomem *ctrl_reg = priv->base + 0x60 + (desc->index * 0x80);
++	int ret = 0;
++	u32 regval;
++
++	clk_prepare_enable(priv->clk);
++
++	spin_lock(&priv->lock);
++
++	/* Power on PHY */
++	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
++	regval = readl(priv->base + HOST_VSA_DATA);
++	regval &= ~desc->power_bit;
++	writel(regval, priv->base + HOST_VSA_DATA);
++
++	/* Configure MBus */
++	writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
++	regval = readl(priv->base + HOST_VSA_DATA);
++	regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
++	writel(regval, priv->base + HOST_VSA_DATA);
++
++	/* set PHY mode and ref freq to 25 MHz */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x1, 0xff,
++				    REF_FREF_SEL_25 | PHY_MODE_SATA);
++
++	/* set PHY up to 6 Gbps */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x25, 0xc00, PHY_GEN_MAX_6_0);
++
++	/* set 40 bits width */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x23,  0xc00, DATA_BIT_WIDTH_40);
++
++	/* use max pll rate */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x2, 0x0, USE_MAX_PLL_RATE);
++
++	/* set Gen3 controller speed */
++	regval = readl(ctrl_reg + PORT_SCR_CTL);
++	regval &= ~GENMASK(7, 4);
++	regval |= 0x30;
++	writel(regval, ctrl_reg + PORT_SCR_CTL);
++
++	spin_unlock(&priv->lock);
++
++	clk_disable_unprepare(priv->clk);
++
++	return ret;
++}
++
++static int phy_berlin_sata_power_off(struct phy *phy)
++{
++	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
++	struct phy_berlin_priv *priv = dev_get_drvdata(phy->dev.parent);
++	u32 regval;
++
++	clk_prepare_enable(priv->clk);
++
++	spin_lock(&priv->lock);
++
++	/* Power down PHY */
++	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
++	regval = readl(priv->base + HOST_VSA_DATA);
++	regval |= desc->power_bit;
++	writel(regval, priv->base + HOST_VSA_DATA);
++
++	spin_unlock(&priv->lock);
++
++	clk_disable_unprepare(priv->clk);
++
++	return 0;
++}
++
++static struct phy *phy_berlin_sata_phy_xlate(struct device *dev,
++					     struct of_phandle_args *args)
++{
++	struct phy_berlin_priv *priv = dev_get_drvdata(dev);
++	int i;
++
++	if (WARN_ON(args->args[0] >= priv->nphys))
++		return ERR_PTR(-ENODEV);
++
++	for (i = 0; i < priv->nphys; i++) {
++		if (priv->phys[i]->index == args->args[0])
++			break;
++	}
++
++	if (i == priv->nphys)
++		return ERR_PTR(-ENODEV);
++
++	return priv->phys[i]->phy;
++}
++
++static struct phy_ops phy_berlin_sata_ops = {
++	.power_on	= phy_berlin_sata_power_on,
++	.power_off	= phy_berlin_sata_power_off,
++	.owner		= THIS_MODULE,
++};
++
++static u32 phy_berlin_power_down_bits[] = {
++	POWER_DOWN_PHY0,
++	POWER_DOWN_PHY1,
++};
++
++static int phy_berlin_sata_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *child;
++	struct phy *phy;
++	struct phy_provider *phy_provider;
++	struct phy_berlin_priv *priv;
++	struct resource *res;
++	int i = 0;
++	u32 phy_id;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
++
++	priv->base = devm_ioremap(dev, res->start, resource_size(res));
++	if (!priv->base)
++		return -ENOMEM;
++
++	priv->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(priv->clk))
++		return PTR_ERR(priv->clk);
++
++	priv->nphys = of_get_child_count(dev->of_node);
++	if (priv->nphys == 0)
++		return -ENODEV;
++
++	priv->phys = devm_kzalloc(dev, priv->nphys * sizeof(*priv->phys),
++				  GFP_KERNEL);
++	if (!priv->phys)
++		return -ENOMEM;
++
++	dev_set_drvdata(dev, priv);
++	spin_lock_init(&priv->lock);
++
++	for_each_available_child_of_node(dev->of_node, child) {
++		struct phy_berlin_desc *phy_desc;
++
++		if (of_property_read_u32(child, "reg", &phy_id)) {
++			dev_err(dev, "missing reg property in node %s\n",
++				child->name);
++			return -EINVAL;
++		}
++
++		if (phy_id >= ARRAY_SIZE(phy_berlin_power_down_bits)) {
++			dev_err(dev, "invalid reg in node %s\n", child->name);
++			return -EINVAL;
++		}
++
++		phy_desc = devm_kzalloc(dev, sizeof(*phy_desc), GFP_KERNEL);
++		if (!phy_desc)
++			return -ENOMEM;
++
++		phy = devm_phy_create(dev, &phy_berlin_sata_ops, NULL);
++		if (IS_ERR(phy)) {
++			dev_err(dev, "failed to create PHY %d\n", phy_id);
++			return PTR_ERR(phy);
++		}
++
++		phy_desc->phy = phy;
++		phy_desc->power_bit = phy_berlin_power_down_bits[phy_id];
++		phy_desc->index = phy_id;
++		phy_set_drvdata(phy, phy_desc);
++
++		priv->phys[i++] = phy_desc;
++
++		/* Make sure the PHY is off */
++		phy_berlin_sata_power_off(phy);
++	}
++
++	phy_provider =
++		devm_of_phy_provider_register(dev, phy_berlin_sata_phy_xlate);
++	if (IS_ERR(phy_provider))
++		return PTR_ERR(phy_provider);
++
++	return 0;
++}
++
++static const struct of_device_id phy_berlin_sata_of_match[] = {
++	{ .compatible = "marvell,berlin2q-sata-phy" },
++	{ },
++};
++
++static struct platform_driver phy_berlin_sata_driver = {
++	.probe	= phy_berlin_sata_probe,
++	.driver	= {
++		.name		= "phy-berlin-sata",
++		.owner		= THIS_MODULE,
++		.of_match_table	= phy_berlin_sata_of_match,
++	},
++};
++module_platform_driver(phy_berlin_sata_driver);
++
++MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
++MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
