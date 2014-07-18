@@ -1,114 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Jul 2014 12:07:18 +0100
-Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
-In-Reply-To: <1403620714.755.69.camel@deneb.redhat.com>
-References: <1403499924-11214-1-git-send-email-msalter@redhat.com>
- <20140623110937.GB15907@arm.com>
- <1403529423.755.49.camel@deneb.redhat.com>
- <20140624141455.GE4489@arm.com>
- <1403620714.755.69.camel@deneb.redhat.com>
-Message-ID: <20140718110718.GC19850@arm.com>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Fri, 18 Jul 2014 13:23:17 +0200
+Subject: [PATCH] watchdog: imx2_wdt: add support for WDOG_B signal generation
+Message-ID: <1405682597-22936-1-git-send-email-list-09_linux_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 03:38:34PM +0100, Mark Salter wrote:
-> On Tue, 2014-06-24 at 15:14 +0100, Catalin Marinas wrote:
-> > On Mon, Jun 23, 2014 at 02:17:03PM +0100, Mark Salter wrote:
-> > > On Mon, 2014-06-23 at 12:09 +0100, Catalin Marinas wrote:
-> > > > My proposal (in the absence of any kind of description) is to still
-> > > > create a ZONE_DMA if we have DMA memory below 32-bit, otherwise just add
-> > > > everything (>32-bit) to ZONE_DMA. Basically an extension from your CMA
-> > > > patch, make dma_phys_limit static in that file and set it to
-> > > > memblock_end_of_DRAM() if no 32-bit DMA. Re-use it in the
-> > > > zone_sizes_init() function for ZONE_DMA (maybe with a pr_info for no
-> > > > 32-bit only DMA zone).
-> > > 
-> > > There's a performance issue with all memory being in ZONE_DMA. It means
-> > > all normal allocations will fail on ZONE_NORMAL and then have to fall
-> > > back to ZONE_DMA. It would be better to put some percentage of memory
-> > > in ZONE_DMA.
-> > 
-> > Is the performance penalty real or just theoretical? I haven't run any
-> > benchmarks myself.
-> 
-> It is real insofar as you must eat cycles eliminating ZONE_NORMAL from
-> consideration in the page allocation hot path. How much that really
-> costs, I don't know. But it seems like it could be easily avoided by
-> limiting ZONE_DMA size. Is there any reason it needs to be larger than
-> 4GiB?
+From: Markus Niebel <Markus.Niebel@tq-group.com>
 
-Basically ZONE_DMA should allow a 32-bit dma mask. When memory starts
-above 4G, in the absence of an IOMMU, it is likely that 32-bit devices
-get some offset for the top bits to be able to address the bottom of the
-memory. The problem is that dma_to_phys() that early in the kernel has
-no idea about DMA offsets until later (they can be specified in DT per
-device).
+Watchdog unit of i.MX supports output of a signal at
+watchdog shutdown. This feature can be useful to signal an
+external supevisor that a watchdog reset occured.
+Support this feature as an option via devicetree.
 
-The patch belows tries to guess a DMA offset and use the bottom 32-bit
-of the DRAM as ZONE_DMA.
-
--------8<-----------------------
-
->From 133656f8378dbb838ad5f12ea29aa9303d7ca922 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Fri, 18 Jul 2014 11:54:37 +0100
-Subject: [PATCH] arm64: Create non-empty ZONE_DMA when DRAM starts above 4GB
-
-ZONE_DMA is created to allow 32-bit only devices to access memory in the
-absence of an IOMMU. On systems where the memory starts above 4GB, it is
-expected that some devices have a DMA offset hardwired to be able to
-access the bottom of the memory. Linux currently supports DT bindings
-for the DMA offsets but they are not (easily) available early during
-boot.
-
-This patch tries to guess a DMA offset and assumes that ZONE_DMA
-corresponds to the 32-bit mask above the start of DRAM.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Salter <msalter@redhat.com>
+Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
 ---
- arch/arm64/mm/init.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/watchdog/fsl-imx-wdt.txt   |    3 +++
+ drivers/watchdog/imx2_wdt.c                        |    9 ++++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 7f68804814a1..160bbaa4fc78 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -60,6 +60,17 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
+diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+index 2144af1..cb759cd 100644
+--- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+@@ -5,6 +5,9 @@ Required properties:
+ - reg : Should contain WDT registers location and length
+ - interrupts : Should contain WDT interrupt
  
-+/*
-+ * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-+ * currently assumes that for memory starting above 4G, 32-bit devices will
-+ * use a DMA offset.
-+ */
-+static phys_addr_t max_zone_dma_phys(void)
-+{
-+	phys_addr_t offset = memblock_start_of_DRAM() & GENMASK_ULL(63, 32);
-+	return min(offset + (1ULL << 32), memblock_end_of_DRAM());
-+}
++Optional properties:
++- fsl,use-wre: set if watchdog reset out (WDOG_B) signal shall be asserted
 +
- static void __init zone_sizes_init(unsigned long min, unsigned long max)
- {
- 	struct memblock_region *reg;
-@@ -70,9 +81,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ Examples:
  
- 	/* 4GB maximum for 32-bit only capable devices */
- 	if (IS_ENABLED(CONFIG_ZONE_DMA)) {
--		unsigned long max_dma_phys =
--			(unsigned long)(dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1);
--		max_dma = max(min, min(max, max_dma_phys >> PAGE_SHIFT));
-+		max_dma = PFN_DOWN(max_zone_dma_phys());
- 		zone_size[ZONE_DMA] = max_dma - min;
+ wdt at 73f98000 {
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+index 9d4874f..6497711 100644
+--- a/drivers/watchdog/imx2_wdt.c
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -58,6 +58,7 @@ struct imx2_wdt_device {
+ 	struct regmap *regmap;
+ 	struct timer_list timer;	/* Pings the watchdog when closed */
+ 	struct watchdog_device wdog;
++	unsigned int use_wre:1;		/* enable WRE feature */
+ };
+ 
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+@@ -88,7 +89,10 @@ static inline void imx2_wdt_setup(struct watchdog_device *wdog)
+ 	/* Strip the old watchdog Time-Out value */
+ 	val &= ~IMX2_WDT_WCR_WT;
+ 	/* Generate reset if WDOG times out */
+-	val &= ~IMX2_WDT_WCR_WRE;
++	if (wdev->use_wre)
++		val |= IMX2_WDT_WCR_WRE;
++	else
++		val &= ~IMX2_WDT_WCR_WRE;
+ 	/* Keep Watchdog Disabled */
+ 	val &= ~IMX2_WDT_WCR_WDE;
+ 	/* Set the watchdog's Time-Out value */
+@@ -219,6 +223,9 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+ 		return PTR_ERR(wdev->clk);
  	}
- 	zone_size[ZONE_NORMAL] = max - max_dma;
-@@ -142,7 +151,7 @@ void __init arm64_memblock_init(void)
  
- 	/* 4GB maximum for 32-bit only capable devices */
- 	if (IS_ENABLED(CONFIG_ZONE_DMA))
--		dma_phys_limit = dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1;
-+		dma_phys_limit = max_zone_dma_phys();
- 	dma_contiguous_reserve(dma_phys_limit);
- 
- 	memblock_allow_resize();
++	(of_property_read_bool(pdev->dev.of_node, "fsl,use-wre"))
++		wdev->use_wre = 1;
++
+ 	wdog			= &wdev->wdog;
+ 	wdog->info		= &imx2_wdt_info;
+ 	wdog->ops		= &imx2_wdt_ops;
+-- 
+1.7.9.5
