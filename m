@@ -1,223 +1,61 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 18 Jul 2014 19:01:40 +0200
-Subject: [PATCH 4/6] chipidea: usbmisc_imx: Add USB support for VF610 SoCs
-In-Reply-To: <cover.1405702442.git.stefan@agner.ch>
-References: <cover.1405702442.git.stefan@agner.ch>
-Message-ID: <e776c8a6ea0d919edb5e3ce1bf0697b23f09f028.1405702442.git.stefan@agner.ch>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 19 Jul 2014 02:02:09 +0900
+Subject: [PATCHv6 3/4] iio: devicetree: Add DT binding documentation for
+ Exynos3250 ADC
+In-Reply-To: <5835825.JtcDoyOP8b@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <6104032.PNRl85V92G@wuerfel>
+ <CAGTfZH3cH-QFMbfTWJJfTPTRT-Bij2TW=6CH_Yy-GaZqZvn-Xg@mail.gmail.com>
+ <5835825.JtcDoyOP8b@wuerfel>
+Message-ID: <CAGTfZH3mnPJ72wi7aFYoChe_OeuRVsUVo3KGRRLTV5scwPbO4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds Vybrid VF610 SoC support. The IP is very similar to i.MX6,
-however the non-core registers are spread in two different register
-areas. Hence we support multiple registers which are addressed by
-the index of usbmisc.
+On Sat, Jul 19, 2014 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 19 July 2014 01:23:15 Chanwoo Choi wrote:
+>> If don't add new compatible including specific exynos version,
+>> I would add new 'adc-needs-sclk' property with existing 'exynos-adc-v2'
+>> compatible name.
+>>
+>>
+>> Dear Naveen, Tomasz,
+>>
+>> If existing exynos-adc driver add just one property for 'sclk_adc'
+>> as following, exynos-adc could not include the exynos version
+>> in compatible name.
+>>
+>> I need your opinion about it.
+>>
+>>                 adc: adc at 126C0000 {
+>>                         compatible = "samsung,exynos-adc-v2";
+>>                         reg = <0x126C0000 0x100>, <0x10020718 0x4>;
+>>                         interrupts = <0 137 0>;
+>>                         clock-names = "adc", "sclk_adc";
+>>                         clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
+>> +                        adc-needs-sclk;
+>>                         #io-channel-cells = <1>;
+>>                         io-channel-ranges;
+>>                 }
+>
+> How about just making it an optional clock? That would be much
+> easier because then you can simply see if the clock itself is
+> there and use it, or otherwise ignore it.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-I tried first to create two usbmisc nodes and hoped it would instanciate
-the driver twice, however, the driver currently only supports one instance.
-In an short attempt to add support for that, I realized that since the
-data structure holding the information for each instance is within the
-driver ci_hdrc_imx. For Vybrid two instances would make much more sense,
-however, a i.MX6Q shares all the non-core registers in one register area,
-hence only one driver can map this area. I ended up with this multiple
-registers solution, altough for the Vybrid multiple instances would
-probably make more sense. Any thoughts on this?
+The v1 of this patchset[1] got the clock of 'sclk_adc'  but if the dt node
+of ADC in dtsi file didn't include 'sclk_adc', print just warning message
+without stopping probe as following:
 
- drivers/usb/chipidea/usbmisc_imx.c | 76 +++++++++++++++++++++++++++-----------
- 1 file changed, 54 insertions(+), 22 deletions(-)
+ [1] https://lkml.org/lkml/2014/4/10/710
 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 85293b8..61c2350 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -57,6 +57,10 @@
- 
- #define MX6_BM_OVER_CUR_DIS		BIT(7)
- 
-+#define VF610_OVER_CUR_DIS		BIT(7)
-+
-+#define MAX_BASE_ADDR			2
-+
- struct usbmisc_ops {
- 	/* It's called once when probe a usb device */
- 	int (*init)(struct imx_usbmisc_data *data);
-@@ -65,7 +69,7 @@ struct usbmisc_ops {
- };
- 
- struct imx_usbmisc {
--	void __iomem *base;
-+	void __iomem *base[MAX_BASE_ADDR];
- 	spinlock_t lock;
- 	struct clk *clk;
- 	const struct usbmisc_ops *ops;
-@@ -84,20 +88,20 @@ static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
- 	spin_lock_irqsave(&usbmisc->lock, flags);
- 	switch (data->index) {
- 	case 0:
--		val = readl(usbmisc->base);
-+		val = readl(usbmisc->base[0]);
- 		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
- 		val |= (MX25_EHCI_INTERFACE_DIFF_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
- 		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
--		writel(val, usbmisc->base);
-+		writel(val, usbmisc->base[0]);
- 		break;
- 	case 1:
--		val = readl(usbmisc->base);
-+		val = readl(usbmisc->base[0]);
- 		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
- 		val |= (MX25_EHCI_INTERFACE_SINGLE_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
- 		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
- 			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
- 
--		writel(val, usbmisc->base);
-+		writel(val, usbmisc->base[0]);
- 
- 		break;
- 	}
-@@ -115,7 +119,7 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
- 	if (data->index > 2)
- 		return -EINVAL;
- 
--	reg = usbmisc->base + MX25_USB_PHY_CTRL_OFFSET;
-+	reg = usbmisc->base[0] + MX25_USB_PHY_CTRL_OFFSET;
- 
- 	if (data->evdo) {
- 		spin_lock_irqsave(&usbmisc->lock, flags);
-@@ -149,10 +153,10 @@ static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
- 
- 	spin_lock_irqsave(&usbmisc->lock, flags);
- 	if (data->disable_oc)
--		val = readl(usbmisc->base) | val;
-+		val = readl(usbmisc->base[0]) | val;
- 	else
--		val = readl(usbmisc->base) & ~val;
--	writel(val, usbmisc->base);
-+		val = readl(usbmisc->base[0]) & ~val;
-+	writel(val, usbmisc->base[0]);
- 	spin_unlock_irqrestore(&usbmisc->lock, flags);
- 
- 	return 0;
-@@ -168,29 +172,29 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
- 		return -EINVAL;
- 
- 	/* Select a 24 MHz reference clock for the PHY  */
--	reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_1_OFFSET;
-+	reg = usbmisc->base[0] + MX53_USB_OTG_PHY_CTRL_1_OFFSET;
- 	val = readl(reg);
- 	val &= ~MX53_USB_PHYCTRL1_PLLDIV_MASK;
- 	val |= MX53_USB_PLL_DIV_24_MHZ;
--	writel(val, usbmisc->base + MX53_USB_OTG_PHY_CTRL_1_OFFSET);
-+	writel(val, usbmisc->base[0] + MX53_USB_OTG_PHY_CTRL_1_OFFSET);
- 
- 	if (data->disable_oc) {
- 		spin_lock_irqsave(&usbmisc->lock, flags);
- 		switch (data->index) {
- 		case 0:
--			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
-+			reg = usbmisc->base[0] + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
- 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_OTG;
- 			break;
- 		case 1:
--			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
-+			reg = usbmisc->base[0] + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
- 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_H1;
- 			break;
- 		case 2:
--			reg = usbmisc->base + MX53_USB_UH2_CTRL_OFFSET;
-+			reg = usbmisc->base[0] + MX53_USB_UH2_CTRL_OFFSET;
- 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
- 			break;
- 		case 3:
--			reg = usbmisc->base + MX53_USB_UH3_CTRL_OFFSET;
-+			reg = usbmisc->base[0] + MX53_USB_UH3_CTRL_OFFSET;
- 			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
- 			break;
- 		}
-@@ -212,15 +216,31 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- 
- 	if (data->disable_oc) {
- 		spin_lock_irqsave(&usbmisc->lock, flags);
--		reg = readl(usbmisc->base + data->index * 4);
-+		reg = readl(usbmisc->base[0] + data->index * 4);
- 		writel(reg | MX6_BM_OVER_CUR_DIS,
--			usbmisc->base + data->index * 4);
-+			usbmisc->base[0] + data->index * 4);
- 		spin_unlock_irqrestore(&usbmisc->lock, flags);
- 	}
- 
- 	return 0;
- }
- 
-+static int usbmisc_vf610_init(struct imx_usbmisc_data *data)
-+{
-+	u32 reg;
-+
-+	if (data->index >= 2)
-+		return -EINVAL;
-+
-+	if (data->disable_oc) {
-+		reg = readl(usbmisc->base[data->index]);
-+		writel(reg | VF610_OVER_CUR_DIS,
-+			usbmisc->base[data->index]);
-+	}
-+
-+	return 0;
-+}
-+
- static const struct usbmisc_ops imx25_usbmisc_ops = {
- 	.init = usbmisc_imx25_init,
- 	.post = usbmisc_imx25_post,
-@@ -238,6 +258,10 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
- 	.init = usbmisc_imx6q_init,
- };
- 
-+static const struct usbmisc_ops vf610_usbmisc_ops = {
-+	.init = usbmisc_vf610_init,
-+};
-+
- int imx_usbmisc_init(struct imx_usbmisc_data *data)
- {
- 	if (!usbmisc)
-@@ -283,6 +307,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
- 		.compatible = "fsl,imx6q-usbmisc",
- 		.data = &imx6q_usbmisc_ops,
- 	},
-+	{
-+		.compatible = "fsl,vf610-usbmisc",
-+		.data = &vf610_usbmisc_ops,
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
-@@ -291,7 +319,7 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- {
- 	struct resource	*res;
- 	struct imx_usbmisc *data;
--	int ret;
-+	int ret, i;
- 	struct of_device_id *tmp_dev;
- 
- 	if (usbmisc)
-@@ -303,10 +331,14 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&data->lock);
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	data->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(data->base))
--		return PTR_ERR(data->base);
-+	for (i = 0; i < MAX_BASE_ADDR; i++) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-+		data->base[i] = devm_ioremap_resource(&pdev->dev, res);
-+
-+		/* First base address is mandatory */
-+		if (IS_ERR(data->base) && !i)
-+			return PTR_ERR(data->base);
-+	}
- 
- 	data->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(data->clk)) {
--- 
-2.0.1
++       info->sclk = devm_clk_get(&pdev->dev, "sclk_adc");
++       if (IS_ERR(info->sclk)) {
++               dev_warn(&pdev->dev, "failed getting sclk clock, err = %ld\n",
++                                                       PTR_ERR(info->sclk));
++               info->sclk = NULL;
++       }
+
+But, Tomasz Figa suggested the method[2] of this patchset(v6).
+ [2] https://lkml.org/lkml/2014/4/11/189
+
+Thanks,
+Chanwoo Choi
