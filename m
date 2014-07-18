@@ -1,63 +1,54 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 18 Jul 2014 15:09:54 +0100
-Subject: [PATCH 2/2] PM / devfreq: exynos: Enable building exynos PPMU as
- module
-In-Reply-To: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
-References: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1405692594-19352-3-git-send-email-punit.agrawal@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Jul 2014 15:59:31 +0100
+Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
+In-Reply-To: <CALrVBkvWejppnR2+Qwc__LT2d=0bQtEwF325kMSmQ=7BeUBrdw@mail.gmail.com>
+References: <1403499924-11214-1-git-send-email-msalter@redhat.com>
+ <20140623110937.GB15907@arm.com>
+ <1403529423.755.49.camel@deneb.redhat.com>
+ <20140624141455.GE4489@arm.com>
+ <1403620714.755.69.camel@deneb.redhat.com>
+ <20140718110718.GC19850@arm.com>
+ <CALrVBkvWejppnR2+Qwc__LT2d=0bQtEwF325kMSmQ=7BeUBrdw@mail.gmail.com>
+Message-ID: <20140718145931.GD4608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export symbols from the PPMU driver needed to build the exynos bus
-driver as a module.
+On Fri, Jul 18, 2014 at 12:58:31PM +0100, Anup Patel wrote:
+> On 18 July 2014 16:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > From 133656f8378dbb838ad5f12ea29aa9303d7ca922 Mon Sep 17 00:00:00 2001
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> > Date: Fri, 18 Jul 2014 11:54:37 +0100
+> > Subject: [PATCH] arm64: Create non-empty ZONE_DMA when DRAM starts above 4GB
+> >
+> > ZONE_DMA is created to allow 32-bit only devices to access memory in the
+> > absence of an IOMMU. On systems where the memory starts above 4GB, it is
+> > expected that some devices have a DMA offset hardwired to be able to
+> > access the bottom of the memory. Linux currently supports DT bindings
+> > for the DMA offsets but they are not (easily) available early during
+> > boot.
+> >
+> > This patch tries to guess a DMA offset and assumes that ZONE_DMA
+> > corresponds to the 32-bit mask above the start of DRAM.
+> >
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Mark Salter <msalter@redhat.com>
+[...]
+> Linux-3.16-rcX is broken on X-Gene Mustang because
+> on X-Gene Mustang the DRAM starts at 0x4000000000.
+> 
+> I have tested your patch and the original patch from
+> this thread. Both patches fixes the issue for X-Gene
+> Mustang and Linux-3.16-rc5 happily boots on X-Gene.
+> 
+> Can you to send your patch as Linux-3.16-rcX fix?
 
-Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- drivers/devfreq/Kconfig              |    2 +-
- drivers/devfreq/exynos/exynos_ppmu.c |    3 +++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+It needs some more testing and if there is time, yes, otherwise it will
+just be cc stable.
 
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index 49e74c1..77bf126 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -79,7 +79,7 @@ config ARM_EXYNOS4_BUS_DEVFREQ
- 	  This does not yet operate with optimal voltages.
- 
- config ARM_EXYNOS5_BUS_DEVFREQ
--	bool "ARM Exynos5250 Bus DEVFREQ Driver"
-+	tristate "ARM Exynos5250 Bus DEVFREQ Driver"
- 	depends on SOC_EXYNOS5250
- 	select ARCH_HAS_OPP
- 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
-diff --git a/drivers/devfreq/exynos/exynos_ppmu.c b/drivers/devfreq/exynos/exynos_ppmu.c
-index 75fcc51..97b75e5 100644
---- a/drivers/devfreq/exynos/exynos_ppmu.c
-+++ b/drivers/devfreq/exynos/exynos_ppmu.c
-@@ -73,6 +73,7 @@ void busfreq_mon_reset(struct busfreq_ppmu_data *ppmu_data)
- 		exynos_ppmu_start(ppmu_base);
- 	}
- }
-+EXPORT_SYMBOL(busfreq_mon_reset);
- 
- void exynos_read_ppmu(struct busfreq_ppmu_data *ppmu_data)
- {
-@@ -97,6 +98,7 @@ void exynos_read_ppmu(struct busfreq_ppmu_data *ppmu_data)
- 
- 	busfreq_mon_reset(ppmu_data);
- }
-+EXPORT_SYMBOL(exynos_read_ppmu);
- 
- int exynos_get_busier_ppmu(struct busfreq_ppmu_data *ppmu_data)
- {
-@@ -114,3 +116,4 @@ int exynos_get_busier_ppmu(struct busfreq_ppmu_data *ppmu_data)
- 
- 	return busy;
- }
-+EXPORT_SYMBOL(exynos_get_busier_ppmu);
+> For your patch, you can have:
+> Tested-by: Anup Patel <anup.patel@linaro.org>
+
+Thanks.
+
 -- 
-1.7.10.4
+Catalin
