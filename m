@@ -1,75 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Jul 2014 11:47:42 +0200
-Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
- to support Exynos3250 ADC
-In-Reply-To: <1405663186-26464-3-git-send-email-cw00.choi@samsung.com>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <1405663186-26464-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <6485839.CnzmD0SeQj@wuerfel>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 18 Jul 2014 11:48:16 +0200
+Subject: [GIT PULL] Mediatek basic support for v3.17
+In-Reply-To: <CAL_JsqK-jJ-yCyMm=DXx=T9xjHQa3ZNefEco+fEi4ju_LO_Vtg@mail.gmail.com>
+References: <CABuKBe+h0Et5_+o4_i-Eu7EQ8Xka7YFoKmO=U0B7NnVQBdQ8FA@mail.gmail.com>
+ <20140715135913.GA18571@kroah.com> <14060966.Jhk08lR3XI@wuerfel>
+ <CABuKBe+pF4jxSqot5KhOfzvnyK1d3PmfsMuL2HJ9jbUPFaYCOg@mail.gmail.com>
+ <CAL_JsqK-jJ-yCyMm=DXx=T9xjHQa3ZNefEco+fEi4ju_LO_Vtg@mail.gmail.com>
+Message-ID: <CABuKBe+fq81iHZXMqjUtUPWaidXPiv9iEfT=rbZnw8sHaJaqMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 July 2014 14:59:44 Chanwoo Choi wrote:
-> This patch control special clock for ADC in Exynos series's FSYS block.
-> If special clock of ADC is registerd on clock list of common clk framework,
-> Exynos ADC drvier have to control this clock.
-> 
-> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
-> - 'adc' clock: bus clock for ADC
-> 
-> Exynos3250 has additional 'sclk_adc' clock as following:
-> - 'sclk_adc' clock: special clock for ADC which provide clock to internal ADC
-> 
-> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_adc' clock
-> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_adc'
-> clock in FSYS_BLK.
+2014-07-16 16:40 GMT+02:00 Rob Herring <robherring2@gmail.com>:
+> On Wed, Jul 16, 2014 at 8:47 AM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+>> 2014-07-15 17:17 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>>> On Tuesday 15 July 2014 06:59:13 Greg KH wrote:
+>>>> On Tue, Jul 15, 2014 at 01:11:42PM +0200, Matthias Brugger wrote:
+>>>> > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+>>>> >
+>>>> >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+>>>> >
+>>>> > are available in the git repository at:
+>>>> >
+>>>> >   https://github.com/mbgg/linux-mediatek.git tags/v3.17-next-basic-support
+>>>>
+>>>> As these are only 7 patches, why do a git pull?  And I know I can't take
+>>>> pull requests from github, I'm not sure what the rules are for the ARM
+>>>> SoC developers either...
+>>>>
+>>>> Just send patches, it's easier that way.
+>>>
+>>> We generally prefer pull requests, but patches also work for us.
+>>>
+>>> However, one note about the text in the pull request: Matthias,
+>>> please always try to be explicit about who you want to pull or
+>>> merge things when you are ready and list in the pull request the
+>>> other maintainers that have agreed to merging it (or whether they
+>>> have not sent an Ack yet, which is even more important).
+>>
+>> Ok, thank you for the advice. I will do so in the next pull request.
+>>
+>>>
+>>> In this case, the clocksource driver needs an Ack from the clocksource
+>>> maintainers, and the drivers/of/address.c changes need an Ack from the
+>>> OF maintainers. I assume you have those, but I'd have to first look
+>>> at the patches to be sure.
+>>>
+>>>         arnd
+>>
+>> For the drivers/of/address.c patch I used to have an Ack [1] from
+>> Grant Likely who told me to merge it through arm-soc. But I deleted
+>> the Ack after changing the patch because of some comments from Russel
+>> King [2].
+>> So at the moment I don't have any Ack anymore.
+>>
+>> I have an Ack for the clocksource driver from Thomas [0]. Daniel
+>> wanted to merge it through his branch, but because of the changes in
+>> the OF patch he never did.
+>>
+>> So I suppose I have to get some comments from the OF maintainer about
+>> the patch, before we can go on with the pull request.
+>
+> I've now acked the patch in question. If there's no other change to
+> the pull req, there's no reason to respin the branch to add the ack.
 
-Do you know if any of the older ADC blocks have an "sclk" input as well?
+I talked with Daniel Lezcano on IRC and he told me, that he will take
+the clocksource patches through his repository.
+For the rest of the patches I will send a new pull request.
 
-Further, why is it called "sclk_adc" rather than just "sclk"?
+Best regards,
+Matthias
 
-> @@ -199,13 +262,20 @@ static void exynos_adc_v2_start_conv(struct exynos_adc *info,
->         writel(con1 | ADC_CON_EN_START, ADC_V2_CON1(info->regs));
->  }
->  
-> +#define __EXYNOS_ADC_V2_DATA                           \
-> +       .num_channels   = MAX_ADC_V2_CHANNELS,          \
-> +       .init_hw        = exynos_adc_v2_init_hw,        \
-> +       .exit_hw        = exynos_adc_v2_exit_hw,        \
-> +       .clear_irq      = exynos_adc_v2_clear_irq,      \
-> +       .start_conv     = exynos_adc_v2_start_conv,     \
-> +
->  static struct exynos_adc_data const exynos_adc_v2_data = {
-> -       .num_channels   = MAX_ADC_V2_CHANNELS,
-> +       __EXYNOS_ADC_V2_DATA
-> +};
->  
-> -       .init_hw        = exynos_adc_v2_init_hw,
-> -       .exit_hw        = exynos_adc_v2_exit_hw,
-> -       .clear_irq      = exynos_adc_v2_clear_irq,
-> -       .start_conv     = exynos_adc_v2_start_conv,
-> +static struct exynos_adc_data const exynos3250_adc_v2_data = {
-> +       __EXYNOS_ADC_V2_DATA
-> +       .needs_sclk = true,
->  };
+>
+> Rob
 
-I think the macro hurts readability. Please just duplicate the definition
-here.
 
->  static const struct of_device_id exynos_adc_match[] = {
-> @@ -215,6 +285,9 @@ static const struct of_device_id exynos_adc_match[] = {
->         }, {
->                 .compatible = "samsung,exynos-adc-v2",
->                 .data = (void *)&exynos_adc_v2_data,
-> +       }, {
-> +               .compatible = "samsung,exynos3250-adc-v2",
-> +               .data = (void *)&exynos3250_adc_v2_data,
->         },
->         {},
 
-Remove the '(void *)' cast here and mark the structure as 'const'.
-We intentionally use a 'const void *' type here to verify that
-the driver doesn't modify the per-device type data at runtime,
-which would be bad if you ever have multiple device instances.
-
-	Arnd
+-- 
+motzblog.wordpress.com
