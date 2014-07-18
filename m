@@ -1,26 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 14:40:25 -0700
-Subject: [GIT PULL] ARM: imx: fixes for 3.16, 2nd take
-In-Reply-To: <20140718080754.GC8537@dragon>
-References: <20140718080754.GC8537@dragon>
-Message-ID: <CAOesGMhEm0TnOQ9uE538w+P9S2NkG0i76UjtjxBa9b8fU+ezZQ@mail.gmail.com>
+Date: Fri, 18 Jul 2014 14:43:26 -0700
+Subject: [PATCH] MAINTAINERS: Remove Kirkwood
+In-Reply-To: <20140717122313.GG13108@titan.lakedaemon.net>
+References: <1405542771-22258-1-git-send-email-andrew@lunn.ch>
+ <20140717122313.GG13108@titan.lakedaemon.net>
+Message-ID: <CAOesGMhGx_9eBhbJXd918un5JuP1jK2mpQ0gF6Z-Mp1=C-SjfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 1:07 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+On Thu, Jul 17, 2014 at 5:23 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> All,
 >
->   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.16-2
->
-> for you to fetch changes up to 03e97220b99b8b691ea5b130b7b4c135c9662792:
->
->   ARM: clk-imx6q: parent lvds_sel input from upstream clock gates (2014-07-18 15:57:17 +0800)
+> Original patch bounced to arm-soc maintainers and their email alias.
 
+Either something happened to the bounce, or gmail ignored it, since I
+certainly didn't get a copy of the original email in my inbox (nor the
+arm at kernel.org folder).
 
-Merged, thanks.
+Anyway, I'll dig it out of the list folder and apply it.
+
 
 -Olof
