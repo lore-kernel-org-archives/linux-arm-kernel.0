@@ -1,58 +1,50 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 18 Jul 2014 09:10:11 +0900
-Subject: [PATCHv2] ARM: dts: Add I2S dt node for Exynos3250
-In-Reply-To: <1404874819-8257-1-git-send-email-cw00.choi@samsung.com>
-References: <1404874819-8257-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53C865E3.5030806@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 18 Jul 2014 02:18:17 +0200
+Subject: [PATCH v2 0/7] ARM: rockchip: add initial support for rk3288
+Message-ID: <4868343.UFgjaXesOn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 12:00 PM, Chanwoo Choi wrote:
-> From: Tomasz Figa <t.figa@samsung.com>
-> 
-> This patch add I2S (Inter-IC Sound) dt node which supports 1-port stereo
-> (1 channels) IIS-bus for audio interface with DMA-based operation.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Tested-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changes from v1:
-> - Fix wrong name of property (pinctrl-names)
-> - Change phanle name (i2s->i2s2)
-> 
->  arch/arm/boot/dts/exynos3250.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index 3e678fa..77a06df 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -425,6 +425,19 @@
->  			status = "disabled";
->  		};
->  
-> +		i2s2: i2s at 13970000 {
-> +			compatible = "samsung,s3c6410-i2s";
-> +			reg = <0x13970000 0x100>;
-> +			interrupts = <0 126 0>;
-> +			clocks = <&cmu CLK_I2S>, <&cmu CLK_SCLK_I2S>;
-> +			clock-names = "iis", "i2s_opclk0";
-> +			dmas = <&pdma0 14>, <&pdma0 13>;
-> +			dma-names = "tx", "rx";
-> +			pinctrl-0 = <&i2s2_bus>;
-> +			pinctrl-names = "default";
-> +			status = "disabled";
-> +		};
-> +
->  		pwm: pwm at 139D0000 {
->  			compatible = "samsung,exynos4210-pwm";
->  			reg = <0x139D0000 0x1000>;
-> 
+This series adds the initial support for Rockchip rk3288 socs including
+debug uart and devicetree files for the rk3288 evaluation board and
+enables these boards to boot into an initramfs.
 
-Ping.
+Boards using uboot need an updated bootloader, which must start the timer
+supplying the architected timer, while the coreboot bootloader already does
+this. It also depends on the patch
+    "irqchip: gic: Add binding probe for ARM GIC400"
+which should have made it into the irqchip tree today.
 
-Best Regards,
-Chanwoo Choi
+changes since v1:
+- adress comments from Olof Johansson and Doug Anderson
+  - remove soc parent-node
+  - clarify cortex-a9 debug-uart descriptions
+  - a lot of dts changes
+
+Heiko Stuebner (7):
+  dt-bindings: arm: add cortex-a12 and cortex-a17 cpu compatible
+    properties
+  ARM: rockchip: clarify usability of DEBUG_RK3X_UART debug_ll options
+  ARM: rockchip: add debug uart used by rk3288
+  ARM: Kconfig: set default gpio number for rockchip SoCs
+  ARM: rockchip: enable support for RK3288 SoCs
+  ARM: dts: rockchip: add core rk3288 dtsi
+  ARM: dts: add rk3288 evaluation board
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   2 +
+ arch/arm/Kconfig                               |   1 +
+ arch/arm/Kconfig.debug                         |  20 +-
+ arch/arm/boot/dts/rk3288-evb-act8846.dts       | 134 ++++++
+ arch/arm/boot/dts/rk3288-evb-rk808.dts         |  18 +
+ arch/arm/boot/dts/rk3288-evb.dtsi              |  83 ++++
+ arch/arm/boot/dts/rk3288.dtsi                  | 552 +++++++++++++++++++++++++
+ arch/arm/mach-rockchip/Kconfig                 |   1 +
+ arch/arm/mach-rockchip/rockchip.c              |   1 +
+ 9 files changed, 807 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-evb-act8846.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-evb-rk808.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-evb.dtsi
+ create mode 100644 arch/arm/boot/dts/rk3288.dtsi
+
+-- 
+1.9.0
