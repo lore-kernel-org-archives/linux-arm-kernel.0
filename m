@@ -1,95 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 18 Jul 2014 01:18:55 -0400
-Subject: [PATCH 4/4] (RFC) X86: add IPI tracepoints
-In-Reply-To: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1405660735-13408-5-git-send-email-nicolas.pitre@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 17 Jul 2014 22:33:04 -0700
+Subject: [GIT PULL 2/3] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <53C889FF.4070206@wwwdotorg.org>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+ <1403558626-13422-2-git-send-email-swarren@wwwdotorg.org>
+ <20140707004417.GE8469@quad.lixom.net>
+ <20140708134359.GA23218@tbergstrom-lnx.Nvidia.com>
+ <53C889FF.4070206@wwwdotorg.org>
+Message-ID: <CAOesGMgJZdOUQ0ycdE5rYtX_=W+t49JoyRsCSzFbJpnHHfbJrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On X86 there are already tracepoints for IRQ vectors through which IPIs
-are handled.  However this is highly X86 specific, and the IPI signaling
-is not currently traced.
+On Thu, Jul 17, 2014 at 7:44 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 07/08/2014 07:43 AM, Peter De Schrijver wrote:
+>> On Mon, Jul 07, 2014 at 02:44:17AM +0200, Olof Johansson wrote:
+>>> On Mon, Jun 23, 2014 at 03:23:45PM -0600, Stephen Warren wrote:
+>>>> This branch moves code related to the Tegra fuses out of arch/arm and
+>>>> into a centralized location which could be shared with ARM64. It also
+>>>> adds support for reading the fuse data through sysfs.
+>>>
+>>> The new/moved misc driver isn't acked by any misc maintainer, so I can't
+>>> take this branch.
+>>>
+>>> I saw no indication from searching the mailing list of that either,
+>>> so it wasn't just a missed acked-by.
+>>>
+>>> I wonder if this code should go under drivers/soc/ instead?
+>>
+>> It's modelled after sunxi_sid.c which lives in drivers/misc/eeprom/.
+>> Originally this driver was also in drivers/misc/eeprom/, but Stephen objected
+>> and therefore it was moved to drivers/misc/fuse. I think that's the right
+>> place still. We anyway need this driver for sata and xhci.
+>
+> Sigh. This is exactly why (a) I suggested during that thread that the
+> driver should be in drivers/soc not drivers/misc and (b) I sent the pull
+> requests early enough so I could deal with any objections before my
+> vacation:-( I wish people would just respond to my review comments by
+> implementing them rather than persuading me to do the wrong thing. Since
+> this is all a dependency for pretty much everything for Tegra for 3.17,
+> I guess we should just drop all the Tegra pull requests for 3.17 and
+> we'll have to redo all the patches for 3.18:-( But if Thierry can (or
+> already has in another thread I haven't seen while on vacation) sort
+> this out be redoing all the Tegra branches, that might be fine too.
 
-This is an attempt at adding generic IPI tracepoints to X86.
+Thierry has been following up on it, I don't think we're too late for 3.17 yet.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- arch/x86/kernel/smp.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
 
-diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
-index be8e1bde07..e154d176cf 100644
---- a/arch/x86/kernel/smp.c
-+++ b/arch/x86/kernel/smp.c
-@@ -31,6 +31,12 @@
- #include <asm/apic.h>
- #include <asm/nmi.h>
- #include <asm/trace/irq_vectors.h>
-+
-+#define CREATE_TRACE_POINTS
-+#undef TRACE_INCLUDE_PATH
-+#undef TRACE_INCLUDE_FILE
-+#include <trace/events/ipi.h>
-+
- /*
-  *	Some notes on x86 processor bugs affecting SMP operation:
-  *
-@@ -124,11 +130,13 @@ static void native_smp_send_reschedule(int cpu)
- 		WARN_ON(1);
- 		return;
- 	}
-+	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("RESCHEDULE"));
- 	apic->send_IPI_mask(cpumask_of(cpu), RESCHEDULE_VECTOR);
- }
- 
- void native_send_call_func_single_ipi(int cpu)
- {
-+	trace_ipi_raise(cpumask_of(cpu), tracepoint_string("CALL_FUNCTION_SINGLE"));
- 	apic->send_IPI_mask(cpumask_of(cpu), CALL_FUNCTION_SINGLE_VECTOR);
- }
- 
-@@ -136,6 +144,8 @@ void native_send_call_func_ipi(const struct cpumask *mask)
- {
- 	cpumask_var_t allbutself;
- 
-+	trace_ipi_raise(mask, tracepoint_string("CALL_FUNCTION"));
-+
- 	if (!alloc_cpumask_var(&allbutself, GFP_ATOMIC)) {
- 		apic->send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
- 		return;
-@@ -252,8 +262,10 @@ finish:
-  */
- static inline void __smp_reschedule_interrupt(void)
- {
-+	trace_ipi_entry(tracepoint_string("RESCHEDULE"));
- 	inc_irq_stat(irq_resched_count);
- 	scheduler_ipi();
-+	trace_ipi_exit(tracepoint_string("RESCHEDULE"));
- }
- 
- __visible void smp_reschedule_interrupt(struct pt_regs *regs)
-@@ -291,8 +303,10 @@ __visible void smp_trace_reschedule_interrupt(struct pt_regs *regs)
- 
- static inline void __smp_call_function_interrupt(void)
- {
-+	trace_ipi_entry(tracepoint_string("CALL_FUNCTION"));
- 	generic_smp_call_function_interrupt();
- 	inc_irq_stat(irq_call_count);
-+	trace_ipi_exit(tracepoint_string("CALL_FUNCTION"));
- }
- 
- __visible void smp_call_function_interrupt(struct pt_regs *regs)
-@@ -313,8 +327,10 @@ __visible void smp_trace_call_function_interrupt(struct pt_regs *regs)
- 
- static inline void __smp_call_function_single_interrupt(void)
- {
-+	trace_ipi_entry(tracepoint_string("CALL_FUNCTION_SINGLE"));
- 	generic_smp_call_function_single_interrupt();
- 	inc_irq_stat(irq_call_count);
-+	trace_ipi_exit(tracepoint_string("CALL_FUNCTION_SINGLE"));
- }
- 
- __visible void smp_call_function_single_interrupt(struct pt_regs *regs)
--- 
-1.8.4.108.g55ea5f6
+-Olof
