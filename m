@@ -1,50 +1,32 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 18 Jul 2014 16:30:38 +0200
-Subject: [PATCH v10 5/8] ata: ahci_platform: add a generic AHCI compatible
-In-Reply-To: <1405686607-8126-6-git-send-email-antoine.tenart@free-electrons.com>
-References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405686607-8126-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53C92F8E.5000906@redhat.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 18 Jul 2014 16:32:33 +0200
+Subject: [PATCH 5/6] ARM: at91: change compatibility string for sama5d3x gem
+In-Reply-To: <cover.1405689937.git.cyrille.pitchen@atmel.com>
+References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
+Message-ID: <29ad475cb1470a5ff5555cda13a88d91bc4b3308.1405689937.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+this new compatibility string prevents macb/gem driver from using the
+scatter-gather and gso features on sama5d3x boards.
 
-On 07/18/2014 02:30 PM, Antoine T?nart wrote:
-> The ahci_platform driver is a generic driver using the libahci_platform
-> functions. Add a generic compatible to avoid having an endless list of
-> compatibles with no differences for the same driver.
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/ata/ahci_platform.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index 95f9ca82082a..61b15e784020 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -77,6 +77,8 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
->  			 ahci_platform_resume);
->  
->  static const struct of_device_id ahci_of_match[] = {
-> +	{ .compatible = "generic-ahci", },
-> +	/* Keep the following compatibles for device tree compatibility */
->  	{ .compatible = "snps,spear-ahci", },
->  	{ .compatible = "snps,exynos5440-ahci", },
->  	{ .compatible = "ibm,476gtr-ahci", },
-> 
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3_gmac.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'm not against this, I've introduced the same for the ehci / uhci platform
-driver after all, but this should be documented in Documentation/devicetree,
-and please make sure to mention in the docs that the correct way to use this
-inside a dts file is:
-
-	compatible = "manufacturer,soc-model-ahci", "generic-ahci";
-
-So that we can later add quirks for the specific soc if necessary without
-needing to change the dts.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/sama5d3_gmac.dtsi b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+index a6cb050..de5ed59 100644
+--- a/arch/arm/boot/dts/sama5d3_gmac.dtsi
++++ b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+@@ -74,7 +74,7 @@
+ 			};
+ 
+ 			macb0: ethernet at f0028000 {
+-				compatible = "cdns,pc302-gem", "cdns,gem";
++				compatible = "atmel,sama5d3-gem";
+ 				reg = <0xf0028000 0x100>;
+ 				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+-- 
+1.8.2.2
