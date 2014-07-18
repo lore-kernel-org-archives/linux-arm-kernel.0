@@ -1,52 +1,132 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Jul 2014 17:06:04 +0200
-Subject: [PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C8F6E6.6020901@redhat.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
- <53C8C9BD.3070709@nvidia.com> <53C8F6E6.6020901@redhat.com>
-Message-ID: <20140718150603.GA7196@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Jul 2014 16:08:40 +0100
+Subject: [PATCH] arm64: Fix barriers used for page table modifications
+Message-ID: <1405696120-22016-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 12:28:54PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 07/18/2014 09:16 AM, Mikko Perttunen wrote:
-> > So here's v5: this time, as suggested, I handle the sata clock myself and let ahci_platform handle it too, leading it to be prepared+enabled twice. This works fine, and allows us to remove the DT ordering requirement.
-> > 
-> > I also have in the works a patchset that adds the name-based ahci_platform_get_resources function, but that is not quite ready yet, even if it is quite far along. Also, I am going on vacation and returning on 28.7., so if this v5 is acceptable maybe it could be merged for 3.17 and I could work on the new get_resources scheme after I get back from vacation?
-> 
-> Yes that works for me v3 of all the patches with no newer version +
-> v5 of patch 1 and 7 are pretty clean and can go into 3.17 from my pov,
-> Tejun can you pick these up for 3.17 please?
+The architecture specification states that both DSB and ISB are required
+between page table modifications and subsequent memory accesses using the
+corresponding virtual address. When TLB invalidation takes place, the
+tlb_flush_* functions already have the necessary barriers. However, there are
+other functions like create_mapping() for which this is not the case.
 
-Tejun,
+The patch adds the DSB+ISB instructions in the set_pte() function for
+valid kernel mappings. The invalid pte case is handled by tlb_flush_*
+and the user mappings in general have a corresponding update_mmu_cache()
+call containing a DSB. Even when update_mmu_cache() isn't called, the
+kernel can still cope with an unlikely spurious page fault by
+re-executing the instruction.
 
-I think the following patches can go through your tree without causing
-breakage through unresolved dependencies:
+In addition, the set_pmd, set_pud() functions gain an ISB for
+architecture compliance when block mappings are created.
 
-	[PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
-	[PATCH v3 6/8] ata: ahci_platform: Increase AHCI_MAX_CLKS to 4
-	[PATCH v5 7/8] ata: Add support for the Tegra124 SATA controller
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Steve Capper <steve.capper@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+---
 
-Peter, you should probably pick up
+I'll do a similar patch for arch/arm but since there is no failure
+currently, it's not urgent. For arm64 it fails with fixmap mappings on
+some platforms during boot (Leif knows the details).
 
-	[PATCH v3 4/8] clk: tegra: Enable hardware control of SATA PLL
-	[PATCH v3 5/8] clk: tegra: Add SATA clocks to Tegra124 initialization table
+ arch/arm64/include/asm/cacheflush.h | 11 +----------
+ arch/arm64/include/asm/pgtable.h    | 13 +++++++++++++
+ arch/arm64/include/asm/tlbflush.h   |  5 +++--
+ 3 files changed, 17 insertions(+), 12 deletions(-)
 
-and send them off to Mike for 3.17 if there's still time.
-
-Stephen, the rest of the patches would probably best go through the
-Tegra tree so that we can handle the dependencies there. I've already
-sent out pull requests for 3.17 today, but maybe Arnd and Olof can be
-convinced to take one more.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/d894eea2/attachment.sig>
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index a5176cf32dad..f2defe1c380c 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -138,19 +138,10 @@ static inline void __flush_icache_all(void)
+ #define flush_icache_page(vma,page)	do { } while (0)
+ 
+ /*
+- * flush_cache_vmap() is used when creating mappings (eg, via vmap,
+- * vmalloc, ioremap etc) in kernel space for pages.  On non-VIPT
+- * caches, since the direct-mappings of these pages may contain cached
+- * data, we need to do a full cache flush to ensure that writebacks
+- * don't corrupt data placed into these pages via the new mappings.
++ * Not required on AArch64 (PIPT or VIPT non-aliasing D-cache).
+  */
+ static inline void flush_cache_vmap(unsigned long start, unsigned long end)
+ {
+-	/*
+-	 * set_pte_at() called from vmap_pte_range() does not
+-	 * have a DSB after cleaning the cache line.
+-	 */
+-	dsb(ish);
+ }
+ 
+ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index d7455fa83bc7..627b5080a4cc 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -138,6 +138,8 @@ extern struct page *empty_zero_page;
+ 
+ #define pte_valid_user(pte) \
+ 	((pte_val(pte) & (PTE_VALID | PTE_USER)) == (PTE_VALID | PTE_USER))
++#define pte_valid_not_user(pte) \
++	((pte_val(pte) & (PTE_VALID | PTE_USER)) == PTE_VALID)
+ 
+ static inline pte_t pte_wrprotect(pte_t pte)
+ {
+@@ -184,6 +186,15 @@ static inline pte_t pte_mkspecial(pte_t pte)
+ static inline void set_pte(pte_t *ptep, pte_t pte)
+ {
+ 	*ptep = pte;
++
++	/*
++	 * Only if the new pte is valid and kernel, otherwise TLB maintenance
++	 * or update_mmu_cache() have the necessary barriers.
++	 */
++	if (pte_valid_not_user(pte)) {
++		dsb(ishst);
++		isb();
++	}
+ }
+ 
+ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
+@@ -303,6 +314,7 @@ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+ {
+ 	*pmdp = pmd;
+ 	dsb(ishst);
++	isb();
+ }
+ 
+ static inline void pmd_clear(pmd_t *pmdp)
+@@ -333,6 +345,7 @@ static inline void set_pud(pud_t *pudp, pud_t pud)
+ {
+ 	*pudp = pud;
+ 	dsb(ishst);
++	isb();
+ }
+ 
+ static inline void pud_clear(pud_t *pudp)
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index b9349c4513ea..3796ea6bb734 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -122,6 +122,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+ 		asm("tlbi vaae1is, %0" : : "r"(addr));
+ 	dsb(ish);
++	isb();
+ }
+ 
+ /*
+@@ -131,8 +132,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+ 				    unsigned long addr, pte_t *ptep)
+ {
+ 	/*
+-	 * set_pte() does not have a DSB, so make sure that the page table
+-	 * write is visible.
++	 * set_pte() does not have a DSB for user mappings, so make sure that
++	 * the page table write is visible.
+ 	 */
+ 	dsb(ishst);
+ }
