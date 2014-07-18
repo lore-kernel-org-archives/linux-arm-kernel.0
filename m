@@ -1,53 +1,49 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Fri, 18 Jul 2014 11:31:25 +0200
-Subject: [PATCH 4/9] usb: phy: am335x-control: prevent module from being
- unloaded when in use
-In-Reply-To: <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
+Date: Fri, 18 Jul 2014 11:31:24 +0200
+Subject: [PATCH 3/9] usb: musb_am335x: source cleanup
+In-Reply-To: <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
 References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
  <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
  <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the real cause of the crash that was "fixed" by
-commit 7adb5c876e9c usb: musb: Fix panic upon musb_am335x module removal
+- remove comma after end of list delimiter
+  The empty entry must always be the last item in the list, thus there
+  is no point in having a trailing comma to facilitate adding
+  succeding entries.
+  Remove the comma, so that inadvertedly adding an entry after the end
+  of list sentinel will produce a compile time error rather than an
+  unreachable entry in the list.
+- consistently use tabs for indentation
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- drivers/usb/phy/phy-am335x-control.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/usb/musb/musb_am335x.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-am335x-control.c b/drivers/usb/phy/phy-am335x-control.c
-index 35b6083..df3e1ba 100644
---- a/drivers/usb/phy/phy-am335x-control.c
-+++ b/drivers/usb/phy/phy-am335x-control.c
-@@ -140,6 +140,9 @@ static int am335x_control_usb_probe(struct platform_device *pdev)
- 	const struct of_device_id *of_id;
- 	const struct phy_control *phy_ctrl;
+diff --git a/drivers/usb/musb/musb_am335x.c b/drivers/usb/musb/musb_am335x.c
+index 1e58ed2..164c868 100644
+--- a/drivers/usb/musb/musb_am335x.c
++++ b/drivers/usb/musb/musb_am335x.c
+@@ -21,14 +21,14 @@ err:
  
-+	if (!try_module_get(pdev->dev.parent->driver->owner))
-+		return -EPROBE_DEFER;
-+
- 	of_id = of_match_node(omap_control_usb_id_table, pdev->dev.of_node);
- 	if (!of_id)
- 		return -EINVAL;
-@@ -171,8 +174,15 @@ static int am335x_control_usb_probe(struct platform_device *pdev)
- 	return 0;
- }
+ static const struct of_device_id am335x_child_of_match[] = {
+ 	{ .compatible = "ti,am33xx-usb" },
+-	{  },
++	{  }
+ };
+ MODULE_DEVICE_TABLE(of, am335x_child_of_match);
  
-+static int am335x_control_usb_remove(struct platform_device *pdev)
-+{
-+	module_put(pdev->dev.parent->driver->owner);
-+	return 0;
-+}
-+
- static struct platform_driver am335x_control_driver = {
- 	.probe		= am335x_control_usb_probe,
-+	.remove		= am335x_control_usb_remove,
- 	.driver		= {
- 		.name	= "am335x-control-usb",
- 		.owner	= THIS_MODULE,
+ static struct platform_driver am335x_child_driver = {
+ 	.probe		= am335x_child_probe,
+-	.driver         = {
+-		.name   = "am335x-usb-childs",
++	.driver		= {
++		.name	= "am335x-usb-childs",
+ 		.of_match_table	= am335x_child_of_match,
+ 	},
+ };
 -- 
 1.7.10.4
