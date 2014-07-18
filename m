@@ -1,54 +1,91 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Jul 2014 10:27:44 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140717172858.GD4844@arm.com>
-References: <1405524767-30220-6-git-send-email-mark.rutland@arm.com>
- <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
- <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
- <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
- <20140717123533.GJ21153@arm.com>
- <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
- <20140717171058.GM18203@arm.com> <20140717172858.GD4844@arm.com>
-Message-ID: <20140718092744.GA19850@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 18 Jul 2014 11:26:39 +0200
+Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
+In-Reply-To: <CAJ+vNU0DNCT5pcvnptNBo-tPTVOH1HnrCwy7uCZt33dfyq8U-g@mail.gmail.com>
+References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+ <20140626031247.GN2224@dragon>
+ <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
+ <20140626054937.GB7859@dragon>
+ <CAJ+vNU0DNCT5pcvnptNBo-tPTVOH1HnrCwy7uCZt33dfyq8U-g@mail.gmail.com>
+Message-ID: <1405675599.6072.8.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 06:28:58PM +0100, Will Deacon wrote:
-> On Thu, Jul 17, 2014 at 06:10:58PM +0100, Catalin Marinas wrote:
-> > On Thu, Jul 17, 2014 at 02:55:37PM +0100, Peter Maydell wrote:
-> > > On 17 July 2014 13:35, Will Deacon <will.deacon@arm.com> wrote:
-> > > > We're not denying the possibility of heterogeneity, we're trying to expose a
-> > > > consistent view of the system to userspace. Differences between cores should
-> > > > be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
-> > > > passed off to userspace.
-> > > 
-> > > On that basis, why report anything at all about invididual cores?
-> > > Just have /proc/cpuinfo report "number of processors: 4" and
-> > > no per-CPU information at all...
-> > 
-> > We lost a lot of time on this already (given the internal threads). So
-> > my proposal is to go ahead with Mark's patch with per-CPU features. They
-> > currently just include the same elf_hwcap multiple times. If we ever
-> > need to present different features, the conditions would be:
-> > 
-> > 1. Never report more than elf_hwcap
-> > 2. elf_hwcap can only include non-symmetric features *if* Linux gets a
-> >    way to transparently handle migration or emulation
+Hi Tim,
+
+Am Donnerstag, den 26.06.2014, 17:29 -0700 schrieb Tim Harvey:
+[...]
+> Shawn / Richard,
 > 
-> ... making the point of a per-cpu field entirely pointless ;)
+> I am also affected by this issue on IMX6 boards that I support. If I
+> enable PCI in the bootloader I see similar hangs.
+> 
+> I have the following hardware configurations on my bench:
+>   1. IMX6DL + i210 (same PCI setup as Fabio's above, but DL instead of Q)
+>   2. IMX6Q + ath9k device
+>   3. IMX6DL + PLX PEX860x PCIe-to-PCIe bridge with various devices
+> behind the bridge, using a clock buffer from IMX6 PCIe clock
+>   4. IMX6Q + PLX PEX860x PCIe-to-PCIe bridge with various devices
+> behind the bridge, using a clock buffer from IMX6 PCIe clock
+>   5. IMX6Q + PLX PEX860x PCIe-to-PCIe bridge with various devices
+> behind the bridge using a clock generator (always on, ignoring the
+> PCIe clock)
+> 
+> For all of the above I have no PCI issues using
+> 3.14/3.15/3.16-rc2/vendor 3.10.17_1.0.0_ga unless I enable PCI in the
+> bootloader. When I do so, all of the above configurations hang
+> somewhere around PCI init/enumeration. The same occurs with the most
+> recent vendor kernel 3.10.17_1.0.0_ga kernel (works when PCI is
+> disabled in the bootloader, hangs otherwise).
+> 
+> When I apply Fabio's patch above to the 3.16-rc2 kernel I find that
+> scenarios #4 and #5 above then work, #3 boots but the PLX bridge fails
+> all config cycles (0xff's), #2 boots but with no PCIe link, and #1
+> above still hangs. Previously, when I have dug into this particular
+> 'hang' issue on 3.15 I found that the delay needed to be between
+> imx6_pcie_probe() requesting and asserting reset_gpio low, and before
+> setting IOMUX_GPR1:18 to power down the PCIe PHY (note here, that the
+> PHY is currently enabled in the bootloader when PCI is enabled there).
+> 
+> When I apply Fabio's patch above to the most recent vendor kernel
+> 3.10.17_1.0.0_ga I still hang in all cases.
+> 
+> So while I agree there is something horribly wrong with IMX6 PCI
+> still, I don't think Fabio's patch is the right solution and I don't
+> have anything better at this point in time. I'm happy to share any
+> hardware with anyone that can work through this issue.
+> 
+Can you try if the attached patch makes any difference?
 
-Well, if we can support such features in a transparent way,
-/proc/cpuinfo becomes more informative (e.g. user wondering why a
-process runs only on certain CPUs).
+Regards,
+Lucas
+------------------------------>8---------------------------------
+>From 0e2fc443c760290166f6371d50813e6c30a678da Mon Sep 17 00:00:00 2001
+From: Lucas Stach <l.stach@pengutronix.de>
+Date: Thu, 17 Jul 2014 18:54:44 +0200
+Subject: [PATCH] try forcing LTSSM into detect state
 
-But to be clear (and I think we are aligned), I don't trust user space
-to parse all processors in /proc/cpuinfo and make an informed selection
-of CPU affinity to avoid SIGILL.
+---
+ drivers/pci/host/pci-imx6.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yet another option would be to have a single features/hwcap line and
-present the extra features in a human (and only human) readable form
-(e.g. some haiku that changes with every kernel release ;)).
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index a568efaa331c..afa450c54aba 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -215,6 +215,8 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ {
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+ 
++	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+-- 
+2.0.1
+
 
 -- 
-Catalin
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
