@@ -1,46 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 18 Jul 2014 16:59:50 -0400 (EDT)
-Subject: [PATCH 4/4] (RFC) X86: add IPI tracepoints
-In-Reply-To: <20140718162750.62cbf965@gandalf.local.home>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-5-git-send-email-nicolas.pitre@linaro.org>
- <20140718162750.62cbf965@gandalf.local.home>
-Message-ID: <alpine.LFD.2.11.1407181656160.3647@knanqh.ubzr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Jul 2014 22:55:23 +0200
+Subject: [GIT PULL] Allwinner core additions for 3.17
+Message-ID: <20140718205523.GA28407@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jul 2014, Steven Rostedt wrote:
+Hi Arnd, Kevin, Olof, 
 
-> On Fri, 18 Jul 2014 01:18:55 -0400
-> Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> 
->  
-> > diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
-> > index be8e1bde07..e154d176cf 100644
-> > --- a/arch/x86/kernel/smp.c
-> > +++ b/arch/x86/kernel/smp.c
-> > @@ -31,6 +31,12 @@
-> >  #include <asm/apic.h>
-> >  #include <asm/nmi.h>
-> >  #include <asm/trace/irq_vectors.h>
-> > +
-> > +#define CREATE_TRACE_POINTS
-> > +#undef TRACE_INCLUDE_PATH
-> > +#undef TRACE_INCLUDE_FILE
-> 
-> I'm curious to why you added the #undefs. I wouldn't think they were
-> needed.
+Here are the few mach-sunxi patches to merge for the 3.17 release cycle.
 
-They are needed because asm/trace/irq_vectors.h included prior that 
-point defines them for itself and that makes the inclusion of 
-trace/events/ipi.h fail.
+Thanks!
+Maxime
 
-> -- Steve
-> 
-> > +#include <trace/events/ipi.h>
-> > +
-> >  /*
-> >   *	Some notes on x86 processor bugs affecting SMP operation:
-> >   *
-> 
-> 
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-3.17
+
+for you to fetch changes up to 5ba1657ecdee507df4adcd05b533d09e9934fc11:
+
+  ARM: sunxi: select MFD_SUN6I_PRCM when sun8i arch support is enabled (2014-07-07 11:00:06 +0200)
+
+----------------------------------------------------------------
+Allwinner core additions for 3.17
+
+Nothing very fancy here, only the introduction from the new Allwinner A23 SoC.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (3):
+      ARM: sunxi: Introduce Allwinner A23 support
+      ARM: sunxi: Add earlyprintk support using R_UART (sun6i/sun8i)
+      ARM: sunxi: select MFD_SUN6I_PRCM when sun8i arch support is enabled
+
+ arch/arm/Kconfig.debug      | 10 ++++++++++
+ arch/arm/mach-sunxi/Kconfig |  8 ++++++++
+ arch/arm/mach-sunxi/sunxi.c |  9 +++++++++
+ 3 files changed, 27 insertions(+)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/658ee78b/attachment.sig>
