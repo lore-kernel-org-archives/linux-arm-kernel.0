@@ -1,44 +1,42 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Fri, 18 Jul 2014 13:30:53 +0200
-Subject: [PATCH] spi: omap2-mcspi: fix blatant abuse of the resource subsystem
-Message-ID: <1405683053-14104-1-git-send-email-LW@KARO-electronics.de>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Fri, 18 Jul 2014 14:32:53 +0300
+Subject: [PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <53C8F6E6.6020901@redhat.com>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
+ <53C8C9BD.3070709@nvidia.com> <53C8F6E6.6020901@redhat.com>
+Message-ID: <53C905E5.2040406@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aua. This really hurts. I wonder how this could ever be admitted to
-the Linux kernel...
-Further comments suppressed because the would most likely violate the
-CDA.
+On 18/07/14 13:28, Hans de Goede wrote:
+> Hi,
+>
+> On 07/18/2014 09:16 AM, Mikko Perttunen wrote:
+>> So here's v5: this time, as suggested, I handle the sata clock myself and let ahci_platform handle it too, leading it to be prepared+enabled twice. This works fine, and allows us to remove the DT ordering requirement.
+>>
+>> I also have in the works a patchset that adds the name-based ahci_platform_get_resources function, but that is not quite ready yet, even if it is quite far along. Also, I am going on vacation and returning on 28.7., so if this v5 is acceptable maybe it could be merged for 3.17 and I could work on the new get_resources scheme after I get back from vacation?
+>
+> Yes that works for me v3 of all the patches with no newer version +
+> v5 of patch 1 and 7 are pretty clean and can go into 3.17 from my pov,
+> Tejun can you pick these up for 3.17 please?
 
-If someone should not grasp what this patch does, they should consider
-what happens upon unloading/reloading the kernel module.
+Note that the DTC step will fail if Thierry's xusb pinctrl series is not
+applied before this one. (The DTS changes depend on a node called 
+'padctl' and the pinctrl-tegra-xusb header)
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/spi/spi-omap2-mcspi.c |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> And thanks for working on a name-based ahci_platform_get_resources function
+> since what we've now in v5 is quite clean already I think it will be good
+> to take our time to get this right, so postponing this to 3.18 is fine
+> with me.
 
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index 68441fa..cb23f5d 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -1379,15 +1379,13 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		goto free_master;
- 	}
- 
--	r->start += regs_offset;
--	r->end += regs_offset;
--	mcspi->phys = r->start;
--
- 	mcspi->base = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(mcspi->base)) {
- 		status = PTR_ERR(mcspi->base);
- 		goto free_master;
- 	}
-+	mcspi->phys = r->start + regs_offset;
-+	mcspi->base += regs_offset;
- 
- 	mcspi->dev = &pdev->dev;
- 
--- 
-1.7.10.4
+Yes.
+
+>
+> Regards,
+>
+> Hans
+>
+
+Thanks, Mikko
