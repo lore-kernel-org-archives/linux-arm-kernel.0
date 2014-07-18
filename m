@@ -1,27 +1,51 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 18 Jul 2014 15:55:07 +0100
-Subject: [PATCH v13 7/8] arm64: add pmd_[dirty|mkclean] for THP
-In-Reply-To: <1405666386-15095-8-git-send-email-minchan@kernel.org>
-References: <1405666386-15095-1-git-send-email-minchan@kernel.org>
- <1405666386-15095-8-git-send-email-minchan@kernel.org>
-Message-ID: <20140718145506.GB18569@linaro.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 18 Jul 2014 15:09:53 +0100
+Subject: [PATCH 1/2] PM / devfreq: Export helper functions for drivers
+In-Reply-To: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
+References: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1405692594-19352-2-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 03:53:05PM +0900, Minchan Kim wrote:
-> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
-> overwrite of the contents since MADV_FREE syscall is called for
-> THP page.
-> 
-> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
-> support.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
+From: ?rjan Eide <orjan.eide@arm.com>
 
-Acked-by: Steve Capper <steve.capper@linaro.org> 
+These functions are indended for use by drivers and should be available
+also when the driver is built as a module.
+
+Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
+---
+ drivers/devfreq/devfreq.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 9f90369..30b538d8 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -1119,6 +1119,7 @@ struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
+ 
+ 	return opp;
+ }
++EXPORT_SYMBOL(devfreq_recommended_opp);
+ 
+ /**
+  * devfreq_register_opp_notifier() - Helper function to get devfreq notified
+@@ -1142,6 +1143,7 @@ int devfreq_register_opp_notifier(struct device *dev, struct devfreq *devfreq)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL(devfreq_register_opp_notifier);
+ 
+ /**
+  * devfreq_unregister_opp_notifier() - Helper function to stop getting devfreq
+@@ -1168,6 +1170,7 @@ int devfreq_unregister_opp_notifier(struct device *dev, struct devfreq *devfreq)
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL(devfreq_unregister_opp_notifier);
+ 
+ static void devm_devfreq_opp_release(struct device *dev, void *res)
+ {
+-- 
+1.7.10.4
