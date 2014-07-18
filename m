@@ -1,38 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Jul 2014 16:58:53 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <CAFEAcA-jdVxgUY03j12HDWzKwtVaxsmL-AarD5QyNb1jmYEa2g@mail.gmail.com>
-References: <20140717105415.GI21153@arm.com>
- <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
- <20140717123533.GJ21153@arm.com>
- <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
- <20140717171058.GM18203@arm.com> <20140717172858.GD4844@arm.com>
- <20140718092744.GA19850@arm.com> <20140718095311.GA1818@arm.com>
- <20140718135738.GA17328@leverpostej>
- <CAFEAcA-jdVxgUY03j12HDWzKwtVaxsmL-AarD5QyNb1jmYEa2g@mail.gmail.com>
-Message-ID: <20140718155852.GB16376@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 18 Jul 2014 18:10:39 +0200
+Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver through
+ DT
+In-Reply-To: <CANuQgHEPocfO8wDPDTJUkBNGEfw6FoLEYAJK-zPPA7kd_L-34Q@mail.gmail.com>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140717142019.GA21732@e102568-lin.cambridge.arm.com>
+ <CANuQgHEPocfO8wDPDTJUkBNGEfw6FoLEYAJK-zPPA7kd_L-34Q@mail.gmail.com>
+Message-ID: <1633432.ZfU5VfHtET@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 04:52:37PM +0100, Peter Maydell wrote:
-> On 18 July 2014 14:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Comments are added to guide userspace developers in the right direction
-> > (using the hwcaps provided in auxval). Hopefully where userspace
-> > applications parse /proc/cpuinfo rather than using the readily available
-> > hwcaps, they limit themselves to reading said first line.
+
+Hi,
+
+On Friday, July 18, 2014 02:15:01 PM Chander Kashyap wrote:
+> Hi Lorenzo,
 > 
-> Comments in the kernel sources aren't going to guide
-> anybody except kernel developers.
+> 
+> On 17 July 2014 19:50, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > On Wed, Jun 25, 2014 at 04:23:38PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> >>
+> >> Hi,
+> >>
+> >> On Wednesday, June 25, 2014 03:10:20 PM Lorenzo Pieralisi wrote:
+> >> > With the introduction of DT based idle states, CPUidle drivers for
+> >> > ARM can now initialize idle states data through properties in the device
+> >> > tree.
+> >> >
+> >> > This patch adds code to the Exynos CPUidle driver to dynamically
+> >> > initialize idle states data through the updated device tree source
+> >> > files.
+> >> >
+> >> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >> > Cc: Tomasz Figa <t.figa@samsung.com>
+> >> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> > ---
+> >> > Compile tested, I am not sure I patched the right dts files, please check.
+> >>
+> >> cpuidle-exynos driver is currently working properly in deeper cpuidle
+> >> mode (AFTR) on Exynos4210 and Exynos5250 (please also see the following
+> >> patch from Tomasz Figa: [1]).  There is ongoing work to AFTR mode work
+> >> also on Exynos4x12 and Exynos3250 but it is not complete yet.  Exynos5410
+> >> OTOH should probably use the generic big little cpuidle driver (this SoC
+> >> is similar to Exynos5420 one for which Chander Kashyap has developed
+> >> cpuidle-big_little support [2]).
+> >>
+> >> Making long story short, I think that your patch should depend on patch
+> >> [1] and update only exynos4210.dtsi and exynos5250.dtsi.  Also for your
+> >> patch #6 there needs to be some coordination with merging of Chander's
+> >> patchset ([2]).
+> >>
+> >> [1] http://www.spinics.net/lists/arm-kernel/msg341023.html
+> >> [2] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg664470.html
+> >
+> >
+> > exynos4210.dtsi does not even have cpu nodes in it. Should I add them or
+> > this might trigger regression (ie cpu_logical_map()) ?
+> 
+> Yes that can cause regression.
 
-That's not entirely true, some people skim the kernel sources to figure
-out how they're meant to use syscalls and such (though admitedly this
-isn't all that common).
+Yes, two patches from Tomasz Figa are needed to fix it:
 
-> I was expecting from this commit message that you were going to emit
-> actual comments in /proc/cpuinfo...
+- [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
 
-I don't think that's a good idea, and I can only see that reading when I
-squint quite hard. ;)
+- [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
 
-Thanks,
-Mark
+> > I will post a new version soon, should I just patch 5250 for now ?
+
+I posted patch adding CPU nodes for Exynos4 SoCs to DT:
+
+- [PATCH] ARM: dts: add CPU nodes for Exynos4 SoCs
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34378.html
+
+Please make your series depend on it and add Exynos4210 support.
+
+> > I would need help to test this patch thanks.
+> 
+> I can test the patch for 5250.
+
+I can do testing on Exynos4210 if needed.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> >
+> > Lorenzo
+> >
+> >> >  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
+> >> >  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
+> >> >  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
+> >> >  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
+> >> >  drivers/cpuidle/Kconfig.arm                        |  1 +
+> >> >  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
+> >> >  6 files changed, 93 insertions(+), 12 deletions(-)
+> >> >  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
