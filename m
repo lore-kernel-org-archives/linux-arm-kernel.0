@@ -1,101 +1,81 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 18 Jul 2014 19:01:37 +0200
-Subject: [PATCH 1/6] ARM: dts: vf610: add USB PHY and controller
+Date: Fri, 18 Jul 2014 19:01:38 +0200
+Subject: [PATCH 2/6] ARM: imx: clk-vf610: add USBPHY clocks
 In-Reply-To: <cover.1405702442.git.stefan@agner.ch>
 References: <cover.1405702442.git.stefan@agner.ch>
-Message-ID: <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
+Message-ID: <fe660ff42e95a286a954c0560b2b7b2aad81634b.1405702442.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds USB PHY and USB controller nodes. Vybrid SoCs have two
-independent USB cores which each supports DR (dual role). However,
-real OTG is not supported since the OTG ID pin is not available.
-
-The PHYs are located within the anadig register range, hence we need
-to change the length of the anadig registers.
+This commit adds PLL7 which is required for USBPHY1. It also adds
+the USB PHY and USB Controller clocks and the gates to enable them.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 3 deletions(-)
+All the main PLLs are currently turned on by boot ROM or boot loader, within
+the kernel we only set the fixed factor. Altough, the function imx_clk_pllv3
+would provide enabling and rate calculation support.
+Because PLL7 is _not_ enabled at boot up, we need enable support. With this,
+we make use of the imx_clk_pllv3 function the first time in clk-vf610. In
+order to be aligned, would it make sense to use the function for all the
+main PLLs? I think support for all types of PLL available in Vybrid is
+already there, altough this need to be verified first.
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 6a6190c..f6c3f02 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -25,6 +25,8 @@
- 		gpio2 = &gpio3;
- 		gpio3 = &gpio4;
- 		gpio4 = &gpio5;
-+		usbphy0 = &usbphy0;
-+		usbphy1 = &usbphy1;
- 	};
+ arch/arm/mach-imx/clk-vf610.c           | 12 ++++++++++--
+ include/dt-bindings/clock/vf610-clock.h |  5 ++++-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index 22dc3ee..159c5c4 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -58,6 +58,8 @@
+ #define PFD_PLL1_BASE		(anatop_base + 0x2b0)
+ #define PFD_PLL2_BASE		(anatop_base + 0x100)
+ #define PFD_PLL3_BASE		(anatop_base + 0xf0)
++#define PLL3_CTRL		(anatop_base + 0x10)
++#define PLL7_CTRL		(anatop_base + 0x20)
  
- 	cpus {
-@@ -285,9 +287,25 @@
- 				gpio-ranges = <&iomuxc 0 128 7>;
- 			};
+ static void __iomem *anatop_base;
+ static void __iomem *ccm_base;
+@@ -148,6 +150,9 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_PLL5_MAIN] = imx_clk_fixed_factor("pll5_main", "fast_clk_sel", 125, 6);
+ 	/* pll6: default 960Mhz */
+ 	clk[VF610_CLK_PLL6_MAIN] = imx_clk_fixed_factor("pll6_main", "fast_clk_sel", 40, 1);
++	/* pll7: USB1 PLL at 480MHz */
++	clk[VF610_CLK_PLL7_MAIN] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_main", "fast_clk_sel", PLL7_CTRL, 0x2);
++
+ 	clk[VF610_CLK_PLL1_PFD_SEL] = imx_clk_mux("pll1_pfd_sel", CCM_CCSR, 16, 3, pll1_sels, 5);
+ 	clk[VF610_CLK_PLL2_PFD_SEL] = imx_clk_mux("pll2_pfd_sel", CCM_CCSR, 19, 3, pll2_sels, 5);
+ 	clk[VF610_CLK_SYS_SEL] = imx_clk_mux("sys_sel", CCM_CCSR, 0, 3, sys_sels, ARRAY_SIZE(sys_sels));
+@@ -160,8 +165,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_PLL4_MAIN_DIV] = clk_register_divider_table(NULL, "pll4_main_div", "pll4_main", 0, CCM_CACRR, 6, 3, 0, pll4_main_div_table, &imx_ccm_lock);
+ 	clk[VF610_CLK_PLL6_MAIN_DIV] = imx_clk_divider("pll6_main_div", "pll6_main", CCM_CACRR, 21, 1);
  
--			anatop at 40050000 {
--				compatible = "fsl,vf610-anatop";
--				reg = <0x40050000 0x1000>;
-+			anatop: anatop at 40050000 {
-+				compatible = "fsl,vf610-anatop", "syscon";
-+				reg = <0x40050000 0x400>;
-+			};
+-	clk[VF610_CLK_USBC0] = imx_clk_gate2("usbc0", "pll3_main", CCM_CCGR1, CCM_CCGRx_CGn(4));
+-	clk[VF610_CLK_USBC1] = imx_clk_gate2("usbc1", "pll3_main", CCM_CCGR7, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_USBPHY0] = imx_clk_gate("usbphy0", "pll3_main", PLL3_CTRL, 6);
++	clk[VF610_CLK_USBPHY1] = imx_clk_gate("usbphy1", "pll7_main", PLL7_CTRL, 6);
 +
-+			usbphy0: usbphy at 40050800 {
-+				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
-+				reg = <0x40050800 0x400>;
-+				interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_USBPHY0>;
-+				fsl,anatop = <&anatop>;
-+			};
-+
-+			usbphy1: usbphy at 40050c00 {
-+				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
-+				reg = <0x40050c00 0x400>;
-+				interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_USBPHY1>;
-+				fsl,anatop = <&anatop>;
- 			};
++	clk[VF610_CLK_USBC0] = imx_clk_gate2("usbc0", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_USBC1] = imx_clk_gate2("usbc1", "ipg_bus", CCM_CCGR7, CCM_CCGRx_CGn(4));
  
- 			i2c0: i2c at 40066000 {
-@@ -309,6 +327,18 @@
- 				reg = <0x4006b000 0x1000>;
- 				#clock-cells = <1>;
- 			};
-+
-+			usbdev0: usb at 40034000 {
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x40034000 0x800>;
-+				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_USBC0>;
-+				fsl,usbphy = <&usbphy0>;
-+				dr_mode = "peripheral";
-+				status = "disabled";
-+			};
-+
-+
- 		};
+ 	clk[VF610_CLK_QSPI0_SEL] = imx_clk_mux("qspi0_sel", CCM_CSCMR1, 22, 2, qspi_sels, 4);
+ 	clk[VF610_CLK_QSPI0_EN] = imx_clk_gate("qspi0_en", "qspi0_sel", CCM_CSCDR3, 4);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index a916029..6593757 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -164,6 +164,9 @@
+ #define VF610_CLK_DMAMUX1		151
+ #define VF610_CLK_DMAMUX2		152
+ #define VF610_CLK_DMAMUX3		153
+-#define VF610_CLK_END			154
++#define VF610_CLK_PLL7_MAIN		154
++#define VF610_CLK_USBPHY0		155
++#define VF610_CLK_USBPHY1		156
++#define VF610_CLK_END			157
  
- 		aips1: aips-bus at 40080000 {
-@@ -371,6 +401,16 @@
- 				status = "disabled";
- 			};
- 
-+			usbh1: usb at 400b4000 {
-+				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				reg = <0x400b4000 0x800>;
-+				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_USBC1>;
-+				fsl,usbphy = <&usbphy1>;
-+				dr_mode = "host";
-+				status = "disabled";
-+			};
-+
- 			ftm: ftm at 400b8000 {
- 				compatible = "fsl,ftm-timer";
- 				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 2.0.1
