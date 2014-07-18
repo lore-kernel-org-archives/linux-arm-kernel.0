@@ -1,35 +1,42 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Fri, 18 Jul 2014 13:16:36 -0300
-Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
-In-Reply-To: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
-References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140718161636.GA18460@arch.cereza>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 18 Jul 2014 17:18:27 +0100
+Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <20140718155852.GB16376@leverpostej>
+References: <20140717105415.GI21153@arm.com>
+ <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
+ <20140717123533.GJ21153@arm.com>
+ <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
+ <20140717171058.GM18203@arm.com> <20140717172858.GD4844@arm.com>
+ <20140718092744.GA19850@arm.com> <20140718095311.GA1818@arm.com>
+ <20140718135738.GA17328@leverpostej>
+ <CAFEAcA-jdVxgUY03j12HDWzKwtVaxsmL-AarD5QyNb1jmYEa2g@mail.gmail.com>
+ <20140718155852.GB16376@leverpostej>
+Message-ID: <CAFEAcA8YvPeOEvn+-3mHzCwDv_2_mi=EPw0sFeAKrFk_0ZgBAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+On 18 July 2014 16:58, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jul 18, 2014 at 04:52:37PM +0100, Peter Maydell wrote:
+>> Comments in the kernel sources aren't going to guide
+>> anybody except kernel developers.
+>
+> That's not entirely true, some people skim the kernel sources to figure
+> out how they're meant to use syscalls and such (though admitedly this
+> isn't all that common).
 
-On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
-> The first three patches do some source code cleanup in the files that
-> are modified in the subsequent patches.
-> 
+Every time anybody has to do that it means you've failed to document
+something...
 
-I've applied patches 4 and 9 on a recent -next, after fixing a conflict
-due to patch 3 ("usb: musb_am335x: source cleanup"):
+>> I was expecting from this commit message that you were going to emit
+>> actual comments in /proc/cpuinfo...
+>
+> I don't think that's a good idea, and I can only see that reading when I
+> squint quite hard. ;)
 
-> Patch 4 carries the proper fix reported in commit:
->         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
-> 
-> Patch 9 reinstates module unloading support for the musb_am335x driver
->         which was disabled due to a false failure analysis
-> 
+You have to admit it would put the documentation right where
+the people looking at cpuinfo can find it :-)
 
-For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+How about a patch to Documentation/filesystems/proc.txt ?
 
-Tested on a beaglebone with a mass storage USB device, module load/unload
-works without issues. The module_get/put in the phy is now preventing the
-musb_am335x driver unload, which seems to be the real cause of the issue
-I reported. Thanks for providing a proper fix!
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+thanks
+-- PMM
