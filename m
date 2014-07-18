@@ -1,78 +1,87 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 18 Jul 2014 16:21:15 +0200
-Subject: [PATCH 3/6] net/macb: add TX checksum offload feature
-In-Reply-To: <cover.1405689937.git.cyrille.pitchen@atmel.com>
-References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
-Message-ID: <81148356bc5a52d07c49b18f68833fa7b2f97f2d.1405689937.git.cyrille.pitchen@atmel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Jul 2014 16:21:36 +0200
+Subject: [PATCH v3 1/2] ARM: at91/dt: describe rgmii ethernet phy connected
+ to sama5d3xek boards
+In-Reply-To: <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1405022394-8311-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1405022394-8311-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53C92D70.6050604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+On 10/07/2014 21:59, Boris BREZILLON :
+> Add ethernet-phy nodes and specify phy interrupt (connected to pin PB25)
+> and board specific timing configs.
+> 
+> Atmel has two different HW designs for its CPU modules: the first one
+> (produced by Embest) is connecting PHYAD[0-2] pins to pull up resistors
+> and the other one (produced by Ronetix) is connecting PHYAD0 to a pull up
+> resistor and PHYAD[1-2] to pull down resistors.
+> As a result, Ronetix design will have its PHY available at address 0x1 and
+> Embest design at 0x7.
+> By defining both phys we're letting the phy core detect the one actually
+> available on the MDIO bus.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+> 
+> Florian, I dropped your Reviewed-by tag because this patch has slightly
+> changed.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 06e9934..9bdcd1b 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1524,6 +1524,10 @@ static void macb_configure_dma(struct macb *bp)
- 			dmacfg = GEM_BFINS(FBLDO, bp->dma_burst_length, dmacfg);
- 		dmacfg |= GEM_BIT(TXPBMS) | GEM_BF(RXBMS, -1L);
- 		dmacfg &= ~GEM_BIT(ENDIA);
-+		if (bp->dev->features & NETIF_F_HW_CSUM)
-+			dmacfg |= GEM_BIT(TXCOEN);
-+		else
-+			dmacfg &= ~GEM_BIT(TXCOEN);
- 		netdev_dbg(bp->dev, "Cadence configure DMA with 0x%08x\n", dmacfg);
- 		gem_writel(bp, DMACFG, dmacfg);
- 	}
-@@ -1923,6 +1927,27 @@ int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
- }
- EXPORT_SYMBOL_GPL(macb_ioctl);
- 
-+static int macb_set_features(struct net_device *netdev,
-+			     netdev_features_t features)
-+{
-+	struct macb *bp = netdev_priv(netdev);
-+	netdev_features_t changed = features ^ netdev->features;
-+
-+	/* TX checksum offload */
-+	if ((changed & NETIF_F_HW_CSUM) && macb_is_gem(bp)) {
-+		u32 dmacfg;
-+
-+		dmacfg = gem_readl(bp, DMACFG);
-+		if (features & NETIF_F_HW_CSUM)
-+			dmacfg |= GEM_BIT(TXCOEN);
-+		else
-+			dmacfg &= ~GEM_BIT(TXCOEN);
-+		gem_writel(bp, DMACFG, dmacfg);
-+	}
-+
-+	return 0;
-+}
-+
- static const struct net_device_ops macb_netdev_ops = {
- 	.ndo_open		= macb_open,
- 	.ndo_stop		= macb_close,
-@@ -1936,6 +1961,7 @@ static const struct net_device_ops macb_netdev_ops = {
- #ifdef CONFIG_NET_POLL_CONTROLLER
- 	.ndo_poll_controller	= macb_poll_controller,
- #endif
-+	.ndo_set_features	= macb_set_features,
- };
- 
- #if defined(CONFIG_OF)
-@@ -2118,6 +2144,10 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	/* Set features */
- 	dev->hw_features = NETIF_F_SG;
-+	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE)) {
-+		/* Checksum offload is only available on packet buffer design */
-+		dev->hw_features |= NETIF_F_HW_CSUM;
-+	}
- 	if (bp->caps & MACB_CAPS_SG_DISABLED)
- 		dev->hw_features &= ~NETIF_F_SG;
- 	dev->features = dev->hw_features;
+Hi Florian,
+
+I would like to have your Ack on this one as we discussed this solution
+with you.
+
+Thanks, bye,
+
+
+>  arch/arm/boot/dts/sama5d3xcm.dtsi | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> index b0b1331..755369e 100644
+> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> @@ -34,6 +34,36 @@
+>  
+>  			macb0: ethernet at f0028000 {
+>  				phy-mode = "rgmii";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				ethernet-phy at 1 {
+> +					reg = <0x1>;
+> +					interrupt-parent = <&pioB>;
+> +					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+> +					txen-skew-ps = <800>;
+> +					txc-skew-ps = <3000>;
+> +					rxdv-skew-ps = <400>;
+> +					rxc-skew-ps = <3000>;
+> +					rxd0-skew-ps = <400>;
+> +					rxd1-skew-ps = <400>;
+> +					rxd2-skew-ps = <400>;
+> +					rxd3-skew-ps = <400>;
+> +				};
+> +
+> +				ethernet-phy at 7 {
+> +					reg = <0x7>;
+> +					interrupt-parent = <&pioB>;
+> +					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+> +					txen-skew-ps = <800>;
+> +					txc-skew-ps = <3000>;
+> +					rxdv-skew-ps = <400>;
+> +					rxc-skew-ps = <3000>;
+> +					rxd0-skew-ps = <400>;
+> +					rxd1-skew-ps = <400>;
+> +					rxd2-skew-ps = <400>;
+> +					rxd3-skew-ps = <400>;
+> +				};
+>  			};
+>  
+>  			pmc: pmc at fffffc00 {
+> 
+
+
 -- 
-1.8.2.2
+Nicolas Ferre
