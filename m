@@ -1,52 +1,54 @@
-From: heiko.stuebner@bq.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Jul 2014 12:47:53 +0200
-Subject: [PATCH v10 5/7] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <53C8ED0B.5080802@linaro.org>
-References: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
- <1404745988-32558-6-git-send-email-matthias.bgg@gmail.com>
- <53C8ED0B.5080802@linaro.org>
-Message-ID: <127793649.dTvqVjg5LM@diego>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 18 Jul 2014 12:49:54 +0200
+Subject: [PATCH v2 0/3] iommu: Remove OMAP IOVMM driver
+Message-ID: <1405680597-10012-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hello,
 
-Am Freitag, 18. Juli 2014, 11:46:51 schrieb Daniel Lezcano:
-> On 07/07/2014 05:13 PM, Matthias Brugger wrote:
-> > This adds a generic devicetree board file and a dtsi for boards
-> > based on MT6589 SoCs from Mediatek.
-> > 
-> > Apart from the generic parts (gic, clocks) the only component
-> > currently supported are the timers.
-> > 
-> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > --
-> 
-> I will take this patchset through my tree but this patch touches an area
-> I am not handling.
-> 
-> Olof, Arnd, do you mind to ack this patch ?
+The OMAP3 ISP driver was the only user of the OMAP IOVMM API. Now that is has
+been ported to the DMA API, remove the unused virtual memory manager.
 
-wouldn't it be easier to just take patches 1,2,3,4 through your tree and let 
-patches 5,6,7 go through arm-soc?
+The removal is split in three patches to ease upstream merge. The first patch
+removes the omap-iovmm driver, the second patch removes setting of now unused
+platform data fields from arch code, and the last patch cleans up the platform
+data structure.
 
-There is no compile-time dependency between the two parts, so they will come 
-together nicely in linux-next and during the merge-window.
+I'd like to get at least the first patch merged in v3.17. To avoid splitting
+the series across three kernel versions, it would be nice to also merge at
+least the second patch for v3.17. If there's no risk of conflict everything
+could be merged in one go through the ARM SoC tree. Otherwise a stable branch
+with patch 1/3 will be needed to base the arch change on.
 
+Joerg, Tony, how would you like to proceed ?
 
-Also in [0] Olof wrote:
+Changes compared to v1:
 
-----------
-Traditionally we usually take the DT changes through arm-soc, but as
-long as we share the branch we might be ok. We tend to stick them in
-different branches in our tree though, so rockchip will be a little
-mis-sorted this release. Not a big deal, and we can deal with it.
------------
+- Fix OMAP_IOMMU_DEBUG dependency on OMAP_IOMMU
+- Remove omap_iommu da_start and da_end fields
+- Added patches 2/3 and 3/3
 
-So I'd assume splitting the patchset this way might be a nice solution?
+Laurent Pinchart (3):
+  iommu/omap: Remove virtual memory manager
+  ARM: omap: Don't set iommu pdata da_start and da_end fields
+  iommu/omap: Remove platform data da_start and da_end fields
 
+ arch/arm/mach-omap2/omap-iommu.c           |   2 -
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   4 -
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   4 -
+ drivers/iommu/Kconfig                      |  10 +-
+ drivers/iommu/Makefile                     |   1 -
+ drivers/iommu/omap-iommu-debug.c           | 114 -----
+ drivers/iommu/omap-iommu.c                 |  13 -
+ drivers/iommu/omap-iommu.h                 |   8 +-
+ drivers/iommu/omap-iovmm.c                 | 791 -----------------------------
+ include/linux/omap-iommu.h                 |  37 +-
+ include/linux/platform_data/iommu-omap.h   |   6 -
+ 11 files changed, 8 insertions(+), 982 deletions(-)
+ delete mode 100644 drivers/iommu/omap-iovmm.c
 
-Heiko
+-- 
+Regards,
 
-
-[0] http://www.spinics.net/lists/arm-kernel/msg347053.html
+Laurent Pinchart
