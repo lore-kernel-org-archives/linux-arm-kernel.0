@@ -1,534 +1,99 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 18 Jul 2014 18:02:54 +0800
-Subject: [PATCH v3 3/3] ACPI / processor: Introduce ARCH_HAS_ACPI_PDC
-In-Reply-To: <1405677774-16787-1-git-send-email-hanjun.guo@linaro.org>
-References: <1405677774-16787-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1405677774-16787-4-git-send-email-hanjun.guo@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 18 Jul 2014 11:53:06 +0200
+Subject: [PATCH 2/2] clk: samsung: exynos3250: Enable ARMCLK down feature
+In-Reply-To: <1405677186-18678-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405677186-18678-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1405677186-18678-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of _PDC is deprecated in ACPI 3.0 in favor of _OSC,
-as ARM platform is supported only in ACPI 5.0 or higher version,
-_PDC will not be used in ARM platform, so make Make _PDC only for
-platforms with Intel CPUs.
+Enable ARMCLK down and up features on Exynos3250 SoC. The
+frequency of ARMCLK will be reduced upon entering idle mode (WFI or
+WFE).  Additionally upon exiting from idle mode the divider for ARMCLK
+will be brought back to 1.
 
-Introduce ARCH_MIGHT_HAVE_ACPI_PDC and move _PDC related code in
-ACPI processor driver into a single file processor_pdc.c, make x86
-and ia64 select it when ACPI is enabled.
+These are exactly the same settings as for Exynos5250
+(clk-exynos5250.c).
 
-This patch also use pr_* to replace printk to fix the checkpatch
-warning and factor acpi_processor_alloc_pdc() a little bit to
-avoid duplicate pr_err() code.
-
-Suggested-by: Robert Richter <rric@kernel.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/ia64/Kconfig             |    1 +
- arch/x86/Kconfig              |    1 +
- drivers/acpi/Kconfig          |    3 +
- drivers/acpi/Makefile         |    1 +
- drivers/acpi/internal.h       |    5 +
- drivers/acpi/processor_core.c |  198 ---------------------------------------
- drivers/acpi/processor_pdc.c  |  206 +++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 217 insertions(+), 198 deletions(-)
- create mode 100644 drivers/acpi/processor_pdc.c
+ drivers/clk/samsung/clk-exynos3250.c | 50 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 2f3abcf..44a6915 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -10,6 +10,7 @@ config IA64
- 	select ARCH_MIGHT_HAVE_PC_SERIO
- 	select PCI if (!IA64_HP_SIM)
- 	select ACPI if (!IA64_HP_SIM)
-+	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select PM if (!IA64_HP_SIM)
- 	select HAVE_UNSTABLE_SCHED_CLOCK
- 	select HAVE_IDE
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 6d9f1d8..6fd5d66 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -21,6 +21,7 @@ config X86_64
- ### Arch settings
- config X86
- 	def_bool y
-+	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_MIGHT_HAVE_PC_SERIO
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 970524c..3f5f745 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -45,6 +45,9 @@ if ACPI
- config ACPI_LEGACY_TABLES_LOOKUP
- 	bool
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index 7a17bd40d1dd..c80140270931 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -87,6 +87,29 @@
+ #define SRC_CPU			0x14200
+ #define DIV_CPU0		0x14500
+ #define DIV_CPU1		0x14504
++#define PWR_CTRL1		0x15020
++#define PWR_CTRL2		0x15024
++
++/* Below definitions are used for PWR_CTRL settings */
++#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
++#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
++#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
++#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
++#define PWR_CTRL1_USE_CORE3_WFE			(1 << 7)
++#define PWR_CTRL1_USE_CORE2_WFE			(1 << 6)
++#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
++#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
++#define PWR_CTRL1_USE_CORE3_WFI			(1 << 3)
++#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
++#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
++#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
++
++#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
++#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
++#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
++#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
++#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
++#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
  
-+config ARCH_MIGHT_HAVE_ACPI_PDC
-+	bool
-+
- config ACPI_SLEEP
- 	bool
- 	depends on SUSPEND || HIBERNATION
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index ea55e01..505d4d7 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -36,6 +36,7 @@ acpi-y				+= scan.o
- acpi-y				+= resource.o
- acpi-y				+= acpi_processor.o
- acpi-y				+= processor_core.o
-+acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
- acpi-y				+= ec.o
- acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
- acpi-y				+= pci_root.o pci_link.o pci_irq.o
-diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-index 151f3e7..4c5cf77 100644
---- a/drivers/acpi/internal.h
-+++ b/drivers/acpi/internal.h
-@@ -106,7 +106,12 @@ int acpi_power_transition(struct acpi_device *device, int state);
- int acpi_device_update_power(struct acpi_device *device, int *state_p);
+ /* list of PLLs to be registered */
+ enum exynos3250_plls {
+@@ -748,6 +771,31 @@ static struct samsung_pll_clock exynos3250_plls[nr_plls] __initdata = {
+ 			UPLL_LOCK, UPLL_CON0, NULL),
+ };
  
- int acpi_wakeup_device_init(void);
-+
-+#ifdef CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC
- void acpi_early_processor_set_pdc(void);
-+#else
-+static inline void acpi_early_processor_set_pdc(void) {}
-+#endif
- 
- /* --------------------------------------------------------------------------
-                                   Embedded Controller
-diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-index 71e2065..00f48d1 100644
---- a/drivers/acpi/processor_core.c
-+++ b/drivers/acpi/processor_core.c
-@@ -4,17 +4,11 @@
-  *
-  *	Alex Chiang <achiang@hp.com>
-  *	- Unified x86/ia64 implementations
-- *	Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
-- *	- Added _PDC for platforms with Intel CPUs
-  */
- #include <linux/export.h>
--#include <linux/dmi.h>
--#include <linux/slab.h>
- #include <linux/acpi.h>
- #include <acpi/processor.h>
- 
--#include "internal.h"
--
- #define _COMPONENT		ACPI_PROCESSOR_COMPONENT
- ACPI_MODULE_NAME("processor_core");
- 
-@@ -208,195 +202,3 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
- 	return acpi_map_cpuid(apic_id, acpi_id);
- }
- EXPORT_SYMBOL_GPL(acpi_get_cpuid);
--
--static bool __init processor_physically_present(acpi_handle handle)
--{
--	int cpuid, type;
--	u32 acpi_id;
--	acpi_status status;
--	acpi_object_type acpi_type;
--	unsigned long long tmp;
--	union acpi_object object = { 0 };
--	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
--
--	status = acpi_get_type(handle, &acpi_type);
--	if (ACPI_FAILURE(status))
--		return false;
--
--	switch (acpi_type) {
--	case ACPI_TYPE_PROCESSOR:
--		status = acpi_evaluate_object(handle, NULL, NULL, &buffer);
--		if (ACPI_FAILURE(status))
--			return false;
--		acpi_id = object.processor.proc_id;
--		break;
--	case ACPI_TYPE_DEVICE:
--		status = acpi_evaluate_integer(handle, "_UID", NULL, &tmp);
--		if (ACPI_FAILURE(status))
--			return false;
--		acpi_id = tmp;
--		break;
--	default:
--		return false;
--	}
--
--	type = (acpi_type == ACPI_TYPE_DEVICE) ? 1 : 0;
--	cpuid = acpi_get_cpuid(handle, type, acpi_id);
--
--	if (cpuid == -1)
--		return false;
--
--	return true;
--}
--
--static void acpi_set_pdc_bits(u32 *buf)
--{
--	buf[0] = ACPI_PDC_REVISION_ID;
--	buf[1] = 1;
--
--	/* Enable coordination with firmware's _TSD info */
--	buf[2] = ACPI_PDC_SMP_T_SWCOORD;
--
--	/* Twiddle arch-specific bits needed for _PDC */
--	arch_acpi_set_pdc_bits(buf);
--}
--
--static struct acpi_object_list *acpi_processor_alloc_pdc(void)
--{
--	struct acpi_object_list *obj_list;
--	union acpi_object *obj;
--	u32 *buf;
--
--	/* allocate and initialize pdc. It will be used later. */
--	obj_list = kmalloc(sizeof(struct acpi_object_list), GFP_KERNEL);
--	if (!obj_list) {
--		printk(KERN_ERR "Memory allocation error\n");
--		return NULL;
--	}
--
--	obj = kmalloc(sizeof(union acpi_object), GFP_KERNEL);
--	if (!obj) {
--		printk(KERN_ERR "Memory allocation error\n");
--		kfree(obj_list);
--		return NULL;
--	}
--
--	buf = kmalloc(12, GFP_KERNEL);
--	if (!buf) {
--		printk(KERN_ERR "Memory allocation error\n");
--		kfree(obj);
--		kfree(obj_list);
--		return NULL;
--	}
--
--	acpi_set_pdc_bits(buf);
--
--	obj->type = ACPI_TYPE_BUFFER;
--	obj->buffer.length = 12;
--	obj->buffer.pointer = (u8 *) buf;
--	obj_list->count = 1;
--	obj_list->pointer = obj;
--
--	return obj_list;
--}
--
--/*
-- * _PDC is required for a BIOS-OS handshake for most of the newer
-- * ACPI processor features.
-- */
--static acpi_status
--acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
--{
--	acpi_status status = AE_OK;
--
--	if (boot_option_idle_override == IDLE_NOMWAIT) {
--		/*
--		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
--		 * mode will be disabled in the parameter of _PDC object.
--		 * Of course C1_FFH access mode will also be disabled.
--		 */
--		union acpi_object *obj;
--		u32 *buffer = NULL;
--
--		obj = pdc_in->pointer;
--		buffer = (u32 *)(obj->buffer.pointer);
--		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
--
--	}
--	status = acpi_evaluate_object(handle, "_PDC", pdc_in, NULL);
--
--	if (ACPI_FAILURE(status))
--		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
--		    "Could not evaluate _PDC, using legacy perf. control.\n"));
--
--	return status;
--}
--
--void acpi_processor_set_pdc(acpi_handle handle)
--{
--	struct acpi_object_list *obj_list;
--
--	if (arch_has_acpi_pdc() == false)
--		return;
--
--	obj_list = acpi_processor_alloc_pdc();
--	if (!obj_list)
--		return;
--
--	acpi_processor_eval_pdc(handle, obj_list);
--
--	kfree(obj_list->pointer->buffer.pointer);
--	kfree(obj_list->pointer);
--	kfree(obj_list);
--}
--
--static acpi_status __init
--early_init_pdc(acpi_handle handle, u32 lvl, void *context, void **rv)
--{
--	if (processor_physically_present(handle) == false)
--		return AE_OK;
--
--	acpi_processor_set_pdc(handle);
--	return AE_OK;
--}
--
--#if defined(CONFIG_X86) || defined(CONFIG_IA64)
--static int __init set_no_mwait(const struct dmi_system_id *id)
--{
--	pr_notice(PREFIX "%s detected - disabling mwait for CPU C-states\n",
--		  id->ident);
--	boot_option_idle_override = IDLE_NOMWAIT;
--	return 0;
--}
--
--static struct dmi_system_id processor_idle_dmi_table[] __initdata = {
--	{
--	set_no_mwait, "Extensa 5220", {
--	DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
--	DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
--	DMI_MATCH(DMI_PRODUCT_VERSION, "0100"),
--	DMI_MATCH(DMI_BOARD_NAME, "Columbia") }, NULL},
--	{},
--};
--
--static void __init processor_dmi_check(void)
--{
--	/*
--	 * Check whether the system is DMI table. If yes, OSPM
--	 * should not use mwait for CPU-states.
--	 */
--	dmi_check_system(processor_idle_dmi_table);
--}
--#else
--static inline void processor_dmi_check(void) {}
--#endif
--
--void __init acpi_early_processor_set_pdc(void)
--{
--	processor_dmi_check();
--
--	acpi_walk_namespace(ACPI_TYPE_PROCESSOR, ACPI_ROOT_OBJECT,
--			    ACPI_UINT32_MAX,
--			    early_init_pdc, NULL, NULL, NULL);
--	acpi_get_devices(ACPI_PROCESSOR_DEVICE_HID, early_init_pdc, NULL, NULL);
--}
-diff --git a/drivers/acpi/processor_pdc.c b/drivers/acpi/processor_pdc.c
-new file mode 100644
-index 0000000..e5dd808
---- /dev/null
-+++ b/drivers/acpi/processor_pdc.c
-@@ -0,0 +1,206 @@
-+/*
-+ * Copyright (C) 2005 Intel Corporation
-+ * Copyright (C) 2009 Hewlett-Packard Development Company, L.P.
-+ *
-+ *      Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
-+ *      - Added _PDC for platforms with Intel CPUs
-+ */
-+
-+#define pr_fmt(fmt) "ACPI: " fmt
-+
-+#include <linux/dmi.h>
-+#include <linux/slab.h>
-+#include <linux/acpi.h>
-+#include <acpi/processor.h>
-+
-+#include "internal.h"
-+
-+#define _COMPONENT              ACPI_PROCESSOR_COMPONENT
-+ACPI_MODULE_NAME("processor_pdc");
-+
-+static bool __init processor_physically_present(acpi_handle handle)
++static void __init exynos3_core_down_clock(void)
 +{
-+	int cpuid, type;
-+	u32 acpi_id;
-+	acpi_status status;
-+	acpi_object_type acpi_type;
-+	unsigned long long tmp;
-+	union acpi_object object = { 0 };
-+	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
++	unsigned int tmp;
 +
-+	status = acpi_get_type(handle, &acpi_type);
-+	if (ACPI_FAILURE(status))
-+		return false;
-+
-+	switch (acpi_type) {
-+	case ACPI_TYPE_PROCESSOR:
-+		status = acpi_evaluate_object(handle, NULL, NULL, &buffer);
-+		if (ACPI_FAILURE(status))
-+			return false;
-+		acpi_id = object.processor.proc_id;
-+		break;
-+	case ACPI_TYPE_DEVICE:
-+		status = acpi_evaluate_integer(handle, "_UID", NULL, &tmp);
-+		if (ACPI_FAILURE(status))
-+			return false;
-+		acpi_id = tmp;
-+		break;
-+	default:
-+		return false;
-+	}
-+
-+	type = (acpi_type == ACPI_TYPE_DEVICE) ? 1 : 0;
-+	cpuid = acpi_get_cpuid(handle, type, acpi_id);
-+
-+	if (cpuid == -1)
-+		return false;
-+
-+	return true;
-+}
-+
-+static void acpi_set_pdc_bits(u32 *buf)
-+{
-+	buf[0] = ACPI_PDC_REVISION_ID;
-+	buf[1] = 1;
-+
-+	/* Enable coordination with firmware's _TSD info */
-+	buf[2] = ACPI_PDC_SMP_T_SWCOORD;
-+
-+	/* Twiddle arch-specific bits needed for _PDC */
-+	arch_acpi_set_pdc_bits(buf);
-+}
-+
-+static struct acpi_object_list *acpi_processor_alloc_pdc(void)
-+{
-+	struct acpi_object_list *obj_list;
-+	union acpi_object *obj;
-+	u32 *buf;
-+
-+	/* allocate and initialize pdc. It will be used later. */
-+	obj_list = kmalloc(sizeof(struct acpi_object_list), GFP_KERNEL);
-+	if (!obj_list)
-+		goto out;
-+
-+	obj = kmalloc(sizeof(union acpi_object), GFP_KERNEL);
-+	if (!obj) {
-+		kfree(obj_list);
-+		goto out;
-+	}
-+
-+	buf = kmalloc(12, GFP_KERNEL);
-+	if (!buf) {
-+		kfree(obj);
-+		kfree(obj_list);
-+		goto out;
-+	}
-+
-+	acpi_set_pdc_bits(buf);
-+
-+	obj->type = ACPI_TYPE_BUFFER;
-+	obj->buffer.length = 12;
-+	obj->buffer.pointer = (u8 *) buf;
-+	obj_list->count = 1;
-+	obj_list->pointer = obj;
-+
-+	return obj_list;
-+out:
-+	pr_err("Memory allocation error\n");
-+	return NULL;
-+}
-+
-+/*
-+ * _PDC is required for a BIOS-OS handshake for most of the newer
-+ * ACPI processor features.
-+ */
-+static acpi_status
-+acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
-+{
-+	acpi_status status = AE_OK;
-+
-+	if (boot_option_idle_override == IDLE_NOMWAIT) {
-+		/*
-+		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-+		 * mode will be disabled in the parameter of _PDC object.
-+		 * Of course C1_FFH access mode will also be disabled.
-+		 */
-+		union acpi_object *obj;
-+		u32 *buffer = NULL;
-+
-+		obj = pdc_in->pointer;
-+		buffer = (u32 *)(obj->buffer.pointer);
-+		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-+
-+	}
-+	status = acpi_evaluate_object(handle, "_PDC", pdc_in, NULL);
-+
-+	if (ACPI_FAILURE(status))
-+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-+		    "Could not evaluate _PDC, using legacy perf. control.\n"));
-+
-+	return status;
-+}
-+
-+void acpi_processor_set_pdc(acpi_handle handle)
-+{
-+	struct acpi_object_list *obj_list;
-+
-+	if (arch_has_acpi_pdc() == false)
-+		return;
-+
-+	obj_list = acpi_processor_alloc_pdc();
-+	if (!obj_list)
-+		return;
-+
-+	acpi_processor_eval_pdc(handle, obj_list);
-+
-+	kfree(obj_list->pointer->buffer.pointer);
-+	kfree(obj_list->pointer);
-+	kfree(obj_list);
-+}
-+
-+static acpi_status __init
-+early_init_pdc(acpi_handle handle, u32 lvl, void *context, void **rv)
-+{
-+	if (processor_physically_present(handle) == false)
-+		return AE_OK;
-+
-+	acpi_processor_set_pdc(handle);
-+	return AE_OK;
-+}
-+
-+static int __init set_no_mwait(const struct dmi_system_id *id)
-+{
-+	pr_notice("%s detected - disabling mwait for CPU C-states\n",
-+		  id->ident);
-+	boot_option_idle_override = IDLE_NOMWAIT;
-+	return 0;
-+}
-+
-+static struct dmi_system_id processor_idle_dmi_table[] __initdata = {
-+	{
-+	set_no_mwait, "Extensa 5220", {
-+	DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
-+	DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
-+	DMI_MATCH(DMI_PRODUCT_VERSION, "0100"),
-+	DMI_MATCH(DMI_BOARD_NAME, "Columbia") }, NULL},
-+	{},
-+};
-+
-+static void __init processor_dmi_check(void)
-+{
 +	/*
-+	 * Check whether the system is DMI table. If yes, OSPM
-+	 * should not use mwait for CPU-states.
++	 * Enable arm clock down (in idle) and set arm divider
++	 * ratios in WFI/WFE state.
 +	 */
-+	dmi_check_system(processor_idle_dmi_table);
++	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
++		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
++		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
++		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
++	__raw_writel(tmp, reg_base + PWR_CTRL1);
++
++	/*
++	 * Enable arm clock up (on exiting idle). Set arm divider
++	 * ratios when not in idle along with the standby duration
++	 * ratios.
++	 */
++	tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
++		PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
++		PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
++	__raw_writel(tmp, reg_base + PWR_CTRL2);
 +}
 +
-+void __init acpi_early_processor_set_pdc(void)
-+{
-+	processor_dmi_check();
+ static void __init exynos3250_cmu_init(struct device_node *np)
+ {
+ 	struct samsung_clk_provider *ctx;
+@@ -775,6 +823,8 @@ static void __init exynos3250_cmu_init(struct device_node *np)
+ 	samsung_clk_register_div(ctx, div_clks, ARRAY_SIZE(div_clks));
+ 	samsung_clk_register_gate(ctx, gate_clks, ARRAY_SIZE(gate_clks));
+ 
++	exynos3_core_down_clock();
 +
-+	acpi_walk_namespace(ACPI_TYPE_PROCESSOR, ACPI_ROOT_OBJECT,
-+			    ACPI_UINT32_MAX,
-+			    early_init_pdc, NULL, NULL, NULL);
-+	acpi_get_devices(ACPI_PROCESSOR_DEVICE_HID, early_init_pdc, NULL, NULL);
-+}
+ 	exynos3250_clk_sleep_init();
+ }
+ CLK_OF_DECLARE(exynos3250_cmu, "samsung,exynos3250-cmu", exynos3250_cmu_init);
 -- 
-1.7.9.5
+1.9.1
