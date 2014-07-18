@@ -1,20 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Jul 2014 10:12:22 +0200
-Subject: [PATCH 5/5] ARM: sunxi: Add A31 RTC driver to sunxi_defconfig
-In-Reply-To: <1405323137-24287-6-git-send-email-wens@csie.org>
+Date: Fri, 18 Jul 2014 10:11:34 +0200
+Subject: [PATCH 2/5] rtc: sunxi: Depend on platforms sun4i/sun7i that
+ actually have the rtc
+In-Reply-To: <1405323137-24287-3-git-send-email-wens@csie.org>
 References: <1405323137-24287-1-git-send-email-wens@csie.org>
- <1405323137-24287-6-git-send-email-wens@csie.org>
-Message-ID: <20140718081222.GK20328@lukather>
+ <1405323137-24287-3-git-send-email-wens@csie.org>
+Message-ID: <20140718081134.GJ20328@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 14, 2014 at 03:32:17PM +0800, Chen-Yu Tsai wrote:
-> Now that we have a driver for A31's RTC, enable it
-> in the default sunxi config.
+On Mon, Jul 14, 2014 at 03:32:14PM +0800, Chen-Yu Tsai wrote:
+> Now that we have Kconfig options for individual sunxi platforms, let
+> the rtc-sunxi driver depend on the platforms that actually have this
+> hardware, sun4i and sun7i.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-It would be great if you could do this for multi_v7 as well.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks!
+Thanks,
 Maxime
 
 -- 
@@ -27,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/7b00b43d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/0a7c12ae/attachment.sig>
