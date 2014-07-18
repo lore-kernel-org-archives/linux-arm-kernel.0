@@ -1,58 +1,45 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Sat, 19 Jul 2014 00:07:36 +0100
-Subject: [PATCH] arm64: Refactor compat.h into compat-types.h
-In-Reply-To: <20140717090758.GB21153@arm.com>
-References: <1405579538-17724-1-git-send-email-ijc@hellion.org.uk>
- <20140717090758.GB21153@arm.com>
-Message-ID: <1405724856.16944.44.camel@dagon.hellion.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 18 Jul 2014 19:07:40 -0400
+Subject: mvebu cpuidle and cpufreq branch handling for v3.17
+Message-ID: <20140718230740.GR24496@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-07-17 at 10:07 +0100, Will Deacon wrote:
-> On Thu, Jul 17, 2014 at 07:45:38AM +0100, Ian Campbell wrote:
-> > This reduces the complexity of the includes needed for linux/stat.h and removes
-> > some possibilities for causing include loops.
-> > 
-> > One such issue was exposed by the Debian kernel's application of the aufs
-> > patches which led to:
-> > 
-> > In file included from /?PKGBUILDDIR?/include/linux/mm.h:23:0,
-> >                  from /?PKGBUILDDIR?/include/linux/pid_namespace.h:6,
-> >                  from /?PKGBUILDDIR?/include/linux/ptrace.h:9,
-> >                  from /?PKGBUILDDIR?/arch/arm64/include/asm/compat.h:26,
-> >                  from /?PKGBUILDDIR?/arch/arm64/include/asm/stat.h:23,
-> >                  from /?PKGBUILDDIR?/include/linux/stat.h:5,
-> >                  from /?PKGBUILDDIR?/include/linux/module.h:10,
-> >                  from /?PKGBUILDDIR?/init/main.c:15:
-> > /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: 'struct kstat' declared inside parameter list [enabled by default]
-> >   int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
-> >                                                                 ^
-> > /?PKGBUILDDIR?/include/linux/fs.h:1575:64: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-> > 
-> > This is due to an extra fs.h include added to mm.h leading to a loop in the
-> > includes. Splitting out the type defintions from compat.h into compat-types.h
-> > allows asm/stat.h to only include the types header and avoids the loop.
-> > 
-> > Full logs in http://buildd.debian-ports.org/status/fetch.php?pkg=linux&arch=arm64&ver=3.14.12-1&stamp=1405234443
-> > 
-> > Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: debian-kernel at lists.debian.org
-> 
-> Looks good to me,
+Arnd, Olof, Kevin,
 
-Thanks.
+I have two branches with the remaining mvebu SoC changes for v3.17.
+They are mvebu/soc-cpuidle and mvebu/soc-cpufreq.  Each branch is
+slightly problematic because both contain changes to their respective
+code in drivers/.  To send the driver changes through the appropriate
+subsystems would be a garish nightmare of branch on branch on branch.
+Thankfully, the changes are isolated to drivers only mvebu uses, so
+keeping it all together should cause minimal, if any, conflicts.
 
->  but I note Arnd's prior comment about mm.h including fs.h
-> being a bug. If that's true, then this patch isn't needed at all and aufs
-> should be fixed instead.
+I've requested Acks from the appropriate maintainers but as it's summer
+I'm not confident that we'll receive those Acks in time for the arm-soc
+cutoff (-rc6 -ish).
 
-That's true as well and I've got a fix on the aufs side in the works
-too.
+As I see it, I could send arm-soc two topic branch pull requests, which
+arm-soc would keep out separate on the remote chance of an objection.
 
-Simplifying the twisty header maze seems worthwhile in its own right too
-though.
+Or, I could wait for the Acks (the code has already been in -next for
+several days), merge it into mvebu/soc, and send a, most likely, late
+pull request for it.
 
-Ian.
+Which would you guys prefer?
+
+The cpuidle branch and ML link:
+
+  git://git.infradead.org/linux-mvebu.git mvebu/soc-cpuidle
+
+  https://lkml.kernel.org/r/1404913221-17343-1-git-send-email-thomas.petazzoni at free-electrons.com
+
+The cpufreq branch and ML link:
+
+  git://git.infradead.org/linux-mvebu.git mvebu/soc-cpufreq
+
+  https://lkml.kernel.org/r/1404920715-19834-1-git-send-email-thomas.petazzoni at free-electrons.com
+
+thx,
+
+Jason.
