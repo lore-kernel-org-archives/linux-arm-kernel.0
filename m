@@ -1,133 +1,42 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 18 Jul 2014 15:01:18 +0200
-Subject: [PATCH 1/2] clk: samsung: exynos4x12: Enable ARMCLK down feature
-In-Reply-To: <1405677186-18678-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405677186-18678-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <53C91A9E.7020207@samsung.com>
+From: burlaprakash.linuxkernel@gmail.com (Prakash Burla)
+Date: Fri, 18 Jul 2014 18:45:01 +0530
+Subject: [PATCH v2 4/4] mfd: pm8921: rename pm8921-core driver
+In-Reply-To: <1405613855-27572-5-git-send-email-svarbanov@mm-sol.com>
+References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
+ <1405613855-27572-5-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <CABu_nUQDWbejZcQqFSJMhCokeMJXBcsCpsiJxz4gBsmtKiyivA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-On 18.07.2014 11:53, Krzysztof Kozlowski wrote:
-> Enable ARMCLK down and up features on Exynos4212 and 4412 SoCs. The
-> frequency of ARMCLK will be reduced upon entering idle mode (WFI or
-> WFE).  Additionally upon exiting from idle mode the divider for ARMCLK
-> will be brought back to 1.
-> 
-> These are exactly the same settings as for Exynos5250
-> (clk-exynos5250.c), except of Exynos4412 where ARMCLK down is enabled
-> for all 4 cores.
-
-Could you add a sentence or two about the purpose of this change? E.g.
-what it improves, in what conditions, etc.
-
-> 
-> Tested on Trats2 board (Exynos4412) and Samsung Gear 1 (Exynos4212).
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Thu, Jul 17, 2014 at 9:47 PM, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+> The pm8921-core driver presently supports pm8921 and pm8058
+> Qualcomm PMICs.  To avoid confusion with new generation PMICs
+> (like pm8941) rename the pm8921-core driver to more
+> appropriate name pm8xxx-ssbi, which reflects better that
+> those chips use SSBI interface.
+>
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 > ---
->  drivers/clk/samsung/clk-exynos4.c | 53 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index 7f4a473a7ad7..b8ea37b23984 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -114,11 +114,34 @@
->  #define DIV_CPU1		0x14504
->  #define GATE_SCLK_CPU		0x14800
->  #define GATE_IP_CPU		0x14900
-> +#define PWR_CTRL1		0x15020
-> +#define PWR_CTRL2		0x15024
-
-I guess these registers should be also added to save/restore list below
-in this driver.
-
->  #define E4X12_DIV_ISP0		0x18300
->  #define E4X12_DIV_ISP1		0x18304
->  #define E4X12_GATE_ISP0		0x18800
->  #define E4X12_GATE_ISP1		0x18804
->  
-> +/* Below definitions are used for PWR_CTRL settings */
-> +#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
-> +#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
-
-I think these macros could be defined to take the ratio as its argument,
-e.g.
-
-#define PWR_CTRL1_CORE2_DOWN_RATIO(x)		((x) << 28)
-
-> +#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
-> +#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
-> +#define PWR_CTRL1_USE_CORE3_WFE			(1 << 7)
-> +#define PWR_CTRL1_USE_CORE2_WFE			(1 << 6)
-> +#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
-> +#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
-> +#define PWR_CTRL1_USE_CORE3_WFI			(1 << 3)
-> +#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
-> +#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
-> +#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
-> +
-> +#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
-> +#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
-> +#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
-> +#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
-
-These two too.
-
-> +#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
-> +#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
-
-These two as well.
-
-> +
->  /* the exynos4 soc type */
->  enum exynos4_soc {
->  	EXYNOS4210,
-> @@ -1164,6 +1187,34 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
->  			VPLL_LOCK, VPLL_CON0, NULL),
->  };
->  
-> +static void __init exynos4_core_down_clock(void)
-> +{
-> +	unsigned int tmp;
-> +
-> +	/*
-> +	 * Enable arm clock down (in idle) and set arm divider
-> +	 * ratios in WFI/WFE state.
-> +	 */
-> +	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
-> +		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
-> +		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
-> +		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
-> +	if (of_machine_is_compatible("samsung,exynos4412"))
-
-Maybe you could use num_possible_cpus() here instead?
-
-> +		tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
-> +		       PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
-> +	__raw_writel(tmp, reg_base + PWR_CTRL1);
-> +
-> +	/*
-> +	 * Enable arm clock up (on exiting idle). Set arm divider
-> +	 * ratios when not in idle along with the standby duration
-> +	 * ratios.
-> +	 */
-> +	tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
-> +		PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
-> +		PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
-> +	__raw_writel(tmp, reg_base + PWR_CTRL2);
-
-Do we need the clock up feature at all? The values you set seem to
-configure both dividers to 2 (resulting in arm_clk = apll / 4) for a
-very short period of time (16 ticks of some, unfortunately unspecified,
-clock) between wake-up and setting the frequency back to normal.
-Moreover, for certain settings (div_core * div_core2 set to > 4 by
-cpufreq) this might cause issues with activating higher frequency than
-current voltage allows.
-
-I believe the same comments apply for patch 2/2 as well.
-
-Best regards,
-Tomasz
+>  drivers/mfd/Kconfig                          |   14 +++++-----
+>  drivers/mfd/Makefile                         |    2 +-
+>  drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} |   38 +++++++++++++-------------
+>  3 files changed, 27 insertions(+), 27 deletions(-)
+>  rename drivers/mfd/{pm8921-core.c => pm8xxx-ssbi.c} (92%)
+ .
+ [Nope]
+>  MODULE_LICENSE("GPL v2");
+> -MODULE_DESCRIPTION("PMIC 8921 core driver");
+> +MODULE_DESCRIPTION("PMIC PM8XXX SSBI driver");
+>  MODULE_VERSION("1.0");
+> -MODULE_ALIAS("platform:pm8921-core");
+> +MODULE_ALIAS("platform:pm8xxx-ssbi");
+ >How about adding the module author as svarbanov at mm-sol.com/qcom?
+      MODULE_AUTHOR("SVARBANOV<svarbanov@mm-sol.com>");
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
