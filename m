@@ -1,53 +1,96 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Jul 2014 22:55:23 +0200
-Subject: [GIT PULL] Allwinner core additions for 3.17
-Message-ID: <20140718205523.GA28407@lukather>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Fri, 18 Jul 2014 22:59:53 +0200
+Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic
+ {read,write}s*()
+In-Reply-To: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140718205953.GA21964@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof, 
+On Wed, Jul 16, 2014 at 01:01:22PM +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> Currently driver writers need to use io{read,write}{8,16,32}_rep() when
+> accessing FIFO registers portably. This is bad for two reasons: it is
+> inconsistent with how other registers are accessed using the standard
+> {read,write}{b,w,l}() functions, which can lead to confusion. On some
+> architectures the io{read,write}*() functions also need to perform some
+> extra checks to determine whether an address is memory-mapped or refers
+> to I/O space. Drivers which can be expected to never use I/O can safely
+> use the {read,write}s{b,w,l,q}(), just like they use their non-string
+> variants and there's no need for these extra checks.
+> 
+> This patch implements generic versions of readsb(), readsw(), readsl(),
+> readsq(), writesb(), writesw(), writesl() and writesq(). Variants of
+> these string functions for I/O accesses (ins*() and outs*() as well as
+> ioread*_rep() and iowrite*_rep()) are now implemented in terms of the
+> new functions.
+> 
+> Going forward, {read,write}{,s}{b,w,l,q}() should be used consistently
+> by drivers for devices that will only ever be memory-mapped and hence
+> don't need to access I/O space, whereas io{read,write}{8,16,32}_rep()
+> should be used by drivers for devices that can be either memory-mapped
+> or I/O-mapped.
+> 
+> While at it, also make sure that any of the functions provided as
+> fallback for architectures that don't override them can't be overridden
+> subsequently.
+> 
+> This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+> tested on Microblaze, s390, SPARC and Xtensa. For ARC, Blackfin, Metag,
+> OpenRISC, Score and Unicore32 which also use asm-generic/io.h I couldn't
+> find or build a cross-compiler that would run on my system. But by code
+> inspection they shouldn't break with this patch.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-Here are the few mach-sunxi patches to merge for the 3.17 release cycle.
+Hi Thierry.
 
-Thanks!
-Maxime
+While browsing the resulting asm-generic/io.h it is irritating
+that the functions are messed up like they are.
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+>From the start of the file the IO accessors are defined in following order:
+__raw_readb
+__raw_readw
+__raw_readl
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+readb
+readw
+readl
 
-are available in the git repository at:
+__raw_writeb
+__raw_writew
+__raw_writel
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-3.17
+writeb
+writew
+writel
 
-for you to fetch changes up to 5ba1657ecdee507df4adcd05b533d09e9934fc11:
+__raw_readq
 
-  ARM: sunxi: select MFD_SUN6I_PRCM when sun8i arch support is enabled (2014-07-07 11:00:06 +0200)
+readq
 
-----------------------------------------------------------------
-Allwinner core additions for 3.17
+__raw_writeq
 
-Nothing very fancy here, only the introduction from the new Allwinner A23 SoC.
+writeq
 
-----------------------------------------------------------------
-Chen-Yu Tsai (3):
-      ARM: sunxi: Introduce Allwinner A23 support
-      ARM: sunxi: Add earlyprintk support using R_UART (sun6i/sun8i)
-      ARM: sunxi: select MFD_SUN6I_PRCM when sun8i arch support is enabled
 
- arch/arm/Kconfig.debug      | 10 ++++++++++
- arch/arm/mach-sunxi/Kconfig |  8 ++++++++
- arch/arm/mach-sunxi/sunxi.c |  9 +++++++++
- 3 files changed, 27 insertions(+)
+See how strange it looks?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/658ee78b/attachment.sig>
+A semi related question.
+Why do we play all these macro tricks in io.h?
+
+Example:
+
+    #define writeb __raw_writeb
+
+The consensus these days is to use static inline to have the
+correct prototype but this file is contains a lot of these
+macro conversions.
+
+All these things are not introduced by your patch but now that
+you show some love and care for this file maybe we could take
+the next step and bring more order to the current semi chaos?
+
+	Sam
