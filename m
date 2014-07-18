@@ -1,63 +1,58 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 18 Jul 2014 11:21:03 +0200
-Subject: [PATCH 1/5] arm: dts: omap3-gta04: Add missing nodes to fully
- describe gta04 board
-In-Reply-To: <CAGhQ9VwTXdCHe693PBtaVsv28-heEHY3=qbnn+mdgk3ea3u7qQ@mail.gmail.com>
-References: <1405369228-27197-1-git-send-email-marek@goldelico.com>
- <1405369228-27197-2-git-send-email-marek@goldelico.com>
- <CAGhQ9Vx1gm9=vda9dUVYR25JK4VSUe9Qk5_xc_bo9ZPLFCtExA@mail.gmail.com>
- <0C2AB07A-C515-4D5E-A823-DDF7C871515A@goldelico.com>
- <CAGhQ9VwTXdCHe693PBtaVsv28-heEHY3=qbnn+mdgk3ea3u7qQ@mail.gmail.com>
-Message-ID: <CABxcv==sj5ZZ_f1gqgREFDNoiVv71k3rjQLPq6CpZbB-643Z4g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Jul 2014 10:20:47 +0100
+Subject: [PATCH v10 01/11] irq: gic: support hip04 gic
+In-Reply-To: <1404957850-13340-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1404957850-13340-1-git-send-email-haojian.zhuang@linaro.org>
+ <1404957850-13340-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140718092046.GD25180@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek and Dr. H. Nikolaus,
+On Thu, Jul 10, 2014 at 03:04:00AM +0100, Haojian Zhuang wrote:
+> There's a little difference between ARM GIC and HiP04 GIC.
 
-On Fri, Jul 18, 2014 at 8:55 AM, Joachim Eastwood <manabian@gmail.com> wrote:
-> On 16 July 2014 09:17, Dr. H. Nikolaus Schaller <hns@goldelico.com> wrote:
->> Am 15.07.2014 um 14:45 schrieb Joachim Eastwood:
->>
->>> Hi Marek,
->>>
->>> You seem to add some DT nodes for hw that doesn't have drivers in
->>> mainline. I think you should leave those out until the driver itself
->>> is upstream and the bindings for it is documented.
->> is there some policy for only having nodes for existing drivers in DT files?
+Given that we can't target interrupts correctly without this patch, and
+that the GIC in a HiP04 system can't claim compatibility with any other
+GIC, I'd call this a major difference.
+
 >
-
-I strongly agree with Joachim on this regard.
-
->> If I understand the device tree concept correctly, it should not describe drivers
->> (and hence nothing about the state of them being mainlined), but it should statically
->> describe the given hardware in a way that kernel and drivers can read it (or ignore).
->> And even other kernels can use it (because they run on the same hardware).
->>
-
-Yes, it should describe hardware but that description should be
-previously agreed and properly documented as was mentioned before.
-
->> So unless there is an important reason not to have "currently unused" nodes
->> in the DT source/binary (loading time is IMHO neglectable), I would ask that we
->> can keep with the complete DT instead of splitting it up artificially and getting back
->> to the same status (because the hardware does not change over time).
+> * HiP04 GIC could support 16 cores at most, and ARM GIC could support
+> 8 cores at most. So the difination on GIC_DIST_TARGET registers are
+> different since CPU interfaces are increased from 8-bit to 16-bit.
 >
+> * HiP04 GIC could support 510 interrupts at most, and ARM GIC could
+> support 1020 interrupts at most.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/gic.txt |   1 +
+>  drivers/irqchip/irq-gic.c                     | 141 +++++++++++++++++++-------
+>  2 files changed, 108 insertions(+), 34 deletions(-)
 
-I understand your motivation since it will allow you to not have to
-maintain a patch-set for your downstream DTS changes but I would like
-to ask you the opposite question. What's the benefit for the kernel
-community to keep in a mainline DTS a bunch of device nodes with DT
-bindings that have not been neither discussed nor documented?
+[...]
 
-Developers doing a board bring-up usually use the DTS in mainline as a
-reference for their boards and having non-documented/agreed DT binding
-on the upstream DTS will only bring confusion and frustration to them
-IMHO.
+> +static bool gic_is_standard(struct gic_chip_data *gic_data)
+> +{
+> +       return (gic_data->nr_cpu_if == 8);
+> +}
+> +
+> +static u32 irqs_per_target_reg(struct gic_chip_data *gic_data)
+> +{
+> +       return (32 / gic_data->nr_cpu_if);
+> +}
+> +
+> +static u32 irq_to_target_reg(struct gic_chip_data *gic_data, u32 irq)
+> +{
+> +       if (!gic_is_standard(gic_data))
+> +               irq *= 2;
 
-We already have some issues with Device Trees (bindings that broke
-backward compatibility, drivers implementing custom DT binding instead
-of using standard ones, bindings that don't really reflect the actual
-H/W, etc), please don't make this even more complicated to developers.
+If the function is called gic_is_standard, then the only thing we should
+know here is whether the GIC follows the GIC standard, not how it
+differs from the standard.
 
-Thanks a lot and best regards,
-Javier
+Please rename this function to something like gicd_has_16_bit_targets or
+anything else that clearly defines what you're ttrying to derive from
+it.
+
+Thanks,
+Mark.
