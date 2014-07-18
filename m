@@ -1,47 +1,35 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Fri, 18 Jul 2014 19:13:52 +0300
-Subject: [PATCH v2 0/4] Support for Qualcomm QPNP PMIC's
-In-Reply-To: <53C857DE.7030507@codeaurora.org>
-References: <1405613855-27572-1-git-send-email-svarbanov@mm-sol.com>
- <53C857DE.7030507@codeaurora.org>
-Message-ID: <53C947C0.5020604@mm-sol.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Fri, 18 Jul 2014 13:16:36 -0300
+Subject: [PATCH 0/9] usb: musb: several bugfixes for the musb driver
+In-Reply-To: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
+References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140718161636.GA18460@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2014 02:10 AM, Stephen Boyd wrote:
-> On 07/17/14 09:17, Stanimir Varbanov wrote:
->> Hello everyone,
->>
->> Here is the continuation of patch sets sent recently about Qualcomm
->> QPNP SPMI PMICs.
->>
->> The previous version of the patch set can be found at [1].
->>
->> Changes since v1:
->>  - removed completely custom *of* parser
->>  - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
->>  - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
->>
->> Removing of the custom *of* parser leads to that that the *reg* devicetree
->> property cannot exist and therefore cannot be parsed to get PMIC peripheral
->> resources. I took this step aside because no one from mfd drivers does this
->> parsing. This will lead to inconvenience in the peripheral drivers to define
->> internally the SPMI base addresses depending on the compatible property
->> i.e. PMIC version. 
-> 
-> We should teach the of platform layer to translate reg properties up
-> until the point that they can't be translated anymore. If they can't be
-> translated all the way back to cpu addresses we can make the resource
-> have IORESOURCE_REG instead of IORESOURCE_MEM and then said pmic
-> platform drivers can use platform_get_resource() with IORESOURCE_REG
-> instead of IORESOURCE_MEM to get the addresses.
+Hi Lothar,
+
+On 18 Jul 11:31 AM, Lothar Wa?mann wrote:
+> The first three patches do some source code cleanup in the files that
+> are modified in the subsequent patches.
 > 
 
-I considered this as an option, if it is acceptable by OF maintainers it
-will be awesome.
+I've applied patches 4 and 9 on a recent -next, after fixing a conflict
+due to patch 3 ("usb: musb_am335x: source cleanup"):
 
-Rob, Grant, is that feasible?
+> Patch 4 carries the proper fix reported in commit:
+>         7adb5c876e9c ("usb: musb: Fix panic upon musb_am335x module removal")
+> 
+> Patch 9 reinstates module unloading support for the musb_am335x driver
+>         which was disabled due to a false failure analysis
+> 
 
+For these two patches, Tested-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+
+Tested on a beaglebone with a mass storage USB device, module load/unload
+works without issues. The module_get/put in the phy is now preventing the
+musb_am335x driver unload, which seems to be the real cause of the issue
+I reported. Thanks for providing a proper fix!
 -- 
-regards,
-Stan
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
