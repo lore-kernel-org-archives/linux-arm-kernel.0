@@ -1,43 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Jul 2014 11:42:35 +0200
-Subject: [PATCHv6 1/4] iio: adc: exynos_adc: Add exynos_adc_data structure
- to improve readability
-In-Reply-To: <1405663186-26464-2-git-send-email-cw00.choi@samsung.com>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <1405663186-26464-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <6186153.TIYp5NXPIq@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 18 Jul 2014 11:46:51 +0200
+Subject: [PATCH v10 5/7] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <1404745988-32558-6-git-send-email-matthias.bgg@gmail.com>
+References: <1404745988-32558-1-git-send-email-matthias.bgg@gmail.com>
+ <1404745988-32558-6-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <53C8ED0B.5080802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 July 2014 14:59:43 Chanwoo Choi wrote:
-> This patchset add 'exynos_adc_data' structure which includes some functions
-> to control ADC operation and specific data according to ADC version (v1 or v2).
-> 
+On 07/07/2014 05:13 PM, Matthias Brugger wrote:
+> This adds a generic devicetree board file and a dtsi for boards
+> based on MT6589 SoCs from Mediatek.
+>
+> Apart from the generic parts (gic, clocks) the only component
+> currently supported are the timers.
+>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> --
 
-This new structure makes a lot of sense for covering the exynos specific
-versions, but it will likely give a little more complexity for the
-older models. We'll have to deal with that later then, no need to
-hold up your patch. Interestingly, the version numbers seem weird. The
-old driver uses
+I will take this patchset through my tree but this patch touches an area 
+I am not handling.
 
-	{
-                .name           = "s3c24xx-adc",
-                .driver_data    = TYPE_ADCV1,
-        }, {
-                .name           = "s3c2443-adc",
-                .driver_data    = TYPE_ADCV11,
-        }, {
-                .name           = "s3c2416-adc",
-                .driver_data    = TYPE_ADCV12,
-        }, {
-                .name           = "s3c64xx-adc",
-                .driver_data    = TYPE_ADCV2,
-        }, {
-                .name           = "samsung-adc-v3",
-                .driver_data    = TYPE_ADCV3,
-	}
+Olof, Arnd, do you mind to ack this patch ?
 
-Where TYPE_ADCV3 seems to be the same as the new ADC_V1 used in this
-driver. Do you have an explanation for that?
+Thanks !
 
-	Arnd
+     -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
