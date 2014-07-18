@@ -1,26 +1,39 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 18 Jul 2014 09:47:30 -0400
-Subject: [PATCH v10 3/8] ata: libahci_platform: move port_map parameters
- into the AHCI structure
-In-Reply-To: <1405686607-8126-4-git-send-email-antoine.tenart@free-electrons.com>
-References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
- <1405686607-8126-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140718134730.GA13012@htj.dyndns.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Jul 2014 15:48:31 +0200
+Subject: [PATCH] ARM: at91/dt: fix usb0 clocks definition in sam9n12 dtsi
+In-Reply-To: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53C925AF.9090302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 02:30:02PM +0200, Antoine T?nart wrote:
-> @@ -321,6 +321,8 @@ struct ahci_host_priv {
->  	u32			cap;		/* cap to use */
->  	u32			cap2;		/* cap2 to use */
->  	u32			port_map;	/* port map to use */
-> +	u32			force_port_map;	/* force port map */
-> +	u32			mask_port_map;	/* mask out particular bits */
+On 14/07/2014 08:39, Boris BREZILLON :
+> udphs_clk (USB Device Controller clock) is referenced instead of
+> uhphs_clk (USB Host Controller clock).
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-So, ->flags and ->force/mask_port_map are the only input ones, right?
-Can we collect them to one spot and label them as such?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks.
+> ---
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 2877959..b84bac5 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -925,7 +925,7 @@
+>  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>  			reg = <0x00500000 0x00100000>;
+>  			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+> -			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
+> +			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
+>  				 <&uhpck>;
+>  			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+>  			status = "disabled";
+> 
+
 
 -- 
-tejun
+Nicolas Ferre
