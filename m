@@ -1,42 +1,32 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Fri, 18 Jul 2014 14:32:53 +0300
-Subject: [PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <53C8F6E6.6020901@redhat.com>
-References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
- <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
- <53C8C9BD.3070709@nvidia.com> <53C8F6E6.6020901@redhat.com>
-Message-ID: <53C905E5.2040406@nvidia.com>
+From: d.mueller@elsoft.ch (=?UTF-8?B?IkRhdmlkIE3DvGxsZXIgKEVMU09GVCBBRyki?=)
+Date: Fri, 18 Jul 2014 13:44:21 +0200
+Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
+In-Reply-To: <1405675599.6072.8.camel@weser.hi.pengutronix.de>
+References: <1403637507-9424-1-git-send-email-festevam@gmail.com>	
+ <20140626031247.GN2224@dragon>	
+ <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>	
+ <20140626054937.GB7859@dragon>	
+ <CAJ+vNU0DNCT5pcvnptNBo-tPTVOH1HnrCwy7uCZt33dfyq8U-g@mail.gmail.com>
+ <1405675599.6072.8.camel@weser.hi.pengutronix.de>
+Message-ID: <53C90895.6070109@elsoft.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/14 13:28, Hans de Goede wrote:
-> Hi,
->
-> On 07/18/2014 09:16 AM, Mikko Perttunen wrote:
->> So here's v5: this time, as suggested, I handle the sata clock myself and let ahci_platform handle it too, leading it to be prepared+enabled twice. This works fine, and allows us to remove the DT ordering requirement.
->>
->> I also have in the works a patchset that adds the name-based ahci_platform_get_resources function, but that is not quite ready yet, even if it is quite far along. Also, I am going on vacation and returning on 28.7., so if this v5 is acceptable maybe it could be merged for 3.17 and I could work on the new get_resources scheme after I get back from vacation?
->
-> Yes that works for me v3 of all the patches with no newer version +
-> v5 of patch 1 and 7 are pretty clean and can go into 3.17 from my pov,
-> Tejun can you pick these up for 3.17 please?
+Hello
 
-Note that the DTC step will fail if Thierry's xusb pinctrl series is not
-applied before this one. (The DTS changes depend on a node called 
-'padctl' and the pinctrl-tegra-xusb header)
+Lucas Stach wrote:
+> @@ -215,6 +215,8 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  {
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+>  
+> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+>  			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> 
 
->
-> And thanks for working on a name-based ahci_platform_get_resources function
-> since what we've now in v5 is quite clean already I think it will be good
-> to take our time to get this right, so postponing this to 3.18 is fine
-> with me.
+Sorry, this doesn't seem to fix the problem (at least not with my
+hardware).
 
-Yes.
-
->
-> Regards,
->
-> Hans
->
-
-Thanks, Mikko
+Dave
