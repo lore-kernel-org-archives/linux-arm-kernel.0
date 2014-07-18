@@ -1,80 +1,155 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 18 Jul 2014 08:52:05 -0500
-Subject: [PATCH 6/9] usb: musb: core: properly setup the HW before
- registering it to the USB core
-In-Reply-To: <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
-References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-6-git-send-email-LW@KARO-electronics.de>
- <1405675890-8802-7-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140718135205.GF24914@saruman.home>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 18 Jul 2014 15:53:08 +0200
+Subject: [PATCH 1/2] clk: samsung: exynos4x12: Enable ARMCLK down feature
+In-Reply-To: <53C91A9E.7020207@samsung.com>
+References: <1405677186-18678-1-git-send-email-k.kozlowski@samsung.com>
+ <53C91A9E.7020207@samsung.com>
+Message-ID: <1405691588.6365.3.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 11:31:27AM +0200, Lothar Wa?mann wrote:
-> Without this patch overriding the USBOTG_ID pin by setting the iddig
-> bit in the USB_MODE register doesn't work because it happens too late
-> to be recognized correctly.
-
-and how did you test this ? Why is it too late ? What was your setup
-when testing this ?
-
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  drivers/usb/musb/musb_core.c |   12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+On pi?, 2014-07-18 at 15:01 +0200, Tomasz Figa wrote:
+> Hi Krzysztof,
 > 
-> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> index f867b44..bbf2aefb 100644
-> --- a/drivers/usb/musb/musb_core.c
-> +++ b/drivers/usb/musb/musb_core.c
-> @@ -1988,18 +1988,21 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
->  
->  	switch (musb->port_mode) {
->  	case MUSB_PORT_MODE_HOST:
-> -		status = musb_host_setup(musb, plat->power);
-> +		status = musb_platform_set_mode(musb, MUSB_HOST);
->  		if (status < 0)
->  			goto fail3;
-> -		status = musb_platform_set_mode(musb, MUSB_HOST);
-> +		status = musb_host_setup(musb, plat->power);
->  		break;
->  	case MUSB_PORT_MODE_GADGET:
-> -		status = musb_gadget_setup(musb);
-> +		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL);
->  		if (status < 0)
->  			goto fail3;
-> -		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL);
-> +		status = musb_gadget_setup(musb);
->  		break;
->  	case MUSB_PORT_MODE_DUAL_ROLE:
-> +		status = musb_platform_set_mode(musb, MUSB_OTG);
-> +		if (status < 0)
-> +			goto fail3;
->  		status = musb_host_setup(musb, plat->power);
->  		if (status < 0)
->  			goto fail3;
-> @@ -2008,7 +2011,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
->  			musb_host_cleanup(musb);
->  			goto fail3;
->  		}
-> -		status = musb_platform_set_mode(musb, MUSB_OTG);
->  		break;
->  	default:
->  		dev_err(dev, "unsupported port mode %d\n", musb->port_mode);
-> -- 
-> 1.7.10.4
+> On 18.07.2014 11:53, Krzysztof Kozlowski wrote:
+> > Enable ARMCLK down and up features on Exynos4212 and 4412 SoCs. The
+> > frequency of ARMCLK will be reduced upon entering idle mode (WFI or
+> > WFE).  Additionally upon exiting from idle mode the divider for ARMCLK
+> > will be brought back to 1.
+> > 
+> > These are exactly the same settings as for Exynos5250
+> > (clk-exynos5250.c), except of Exynos4412 where ARMCLK down is enabled
+> > for all 4 cores.
 > 
+> Could you add a sentence or two about the purpose of this change? E.g.
+> what it improves, in what conditions, etc.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/b38436e9/attachment.sig>
+Sure, I'll describe benefits.
+> 
+> > 
+> > Tested on Trats2 board (Exynos4412) and Samsung Gear 1 (Exynos4212).
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  drivers/clk/samsung/clk-exynos4.c | 53 +++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 53 insertions(+)
+> > 
+> > diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> > index 7f4a473a7ad7..b8ea37b23984 100644
+> > --- a/drivers/clk/samsung/clk-exynos4.c
+> > +++ b/drivers/clk/samsung/clk-exynos4.c
+> > @@ -114,11 +114,34 @@
+> >  #define DIV_CPU1		0x14504
+> >  #define GATE_SCLK_CPU		0x14800
+> >  #define GATE_IP_CPU		0x14900
+> > +#define PWR_CTRL1		0x15020
+> > +#define PWR_CTRL2		0x15024
+> 
+> I guess these registers should be also added to save/restore list below
+> in this driver.
+
+Yes, you're right.
+
+> 
+> >  #define E4X12_DIV_ISP0		0x18300
+> >  #define E4X12_DIV_ISP1		0x18304
+> >  #define E4X12_GATE_ISP0		0x18800
+> >  #define E4X12_GATE_ISP1		0x18804
+> >  
+> > +/* Below definitions are used for PWR_CTRL settings */
+> > +#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
+> > +#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
+> 
+> I think these macros could be defined to take the ratio as its argument,
+> e.g.
+> 
+> #define PWR_CTRL1_CORE2_DOWN_RATIO(x)		((x) << 28)
+
+OK.
+
+> 
+> > +#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
+> > +#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
+> > +#define PWR_CTRL1_USE_CORE3_WFE			(1 << 7)
+> > +#define PWR_CTRL1_USE_CORE2_WFE			(1 << 6)
+> > +#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
+> > +#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
+> > +#define PWR_CTRL1_USE_CORE3_WFI			(1 << 3)
+> > +#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
+> > +#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
+> > +#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
+> > +
+> > +#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
+> > +#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
+> > +#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
+> > +#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
+> 
+> These two too.
+> 
+> > +#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
+> > +#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
+> 
+> These two as well.
+> 
+> > +
+> >  /* the exynos4 soc type */
+> >  enum exynos4_soc {
+> >  	EXYNOS4210,
+> > @@ -1164,6 +1187,34 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+> >  			VPLL_LOCK, VPLL_CON0, NULL),
+> >  };
+> >  
+> > +static void __init exynos4_core_down_clock(void)
+> > +{
+> > +	unsigned int tmp;
+> > +
+> > +	/*
+> > +	 * Enable arm clock down (in idle) and set arm divider
+> > +	 * ratios in WFI/WFE state.
+> > +	 */
+> > +	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
+> > +		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
+> > +		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
+> > +		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
+> > +	if (of_machine_is_compatible("samsung,exynos4412"))
+> 
+> Maybe you could use num_possible_cpus() here instead?
+
+Sure.
+
+> 
+> > +		tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
+> > +		       PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
+> > +	__raw_writel(tmp, reg_base + PWR_CTRL1);
+> > +
+> > +	/*
+> > +	 * Enable arm clock up (on exiting idle). Set arm divider
+> > +	 * ratios when not in idle along with the standby duration
+> > +	 * ratios.
+> > +	 */
+> > +	tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
+> > +		PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
+> > +		PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
+> > +	__raw_writel(tmp, reg_base + PWR_CTRL2);
+> 
+> Do we need the clock up feature at all? The values you set seem to
+> configure both dividers to 2 (resulting in arm_clk = apll / 4) for a
+> very short period of time (16 ticks of some, unfortunately unspecified,
+> clock) between wake-up and setting the frequency back to normal.
+> Moreover, for certain settings (div_core * div_core2 set to > 4 by
+> cpufreq) this might cause issues with activating higher frequency than
+> current voltage allows.
+
+It seems that the clock up feature is not needed on Exynos 4x12. I'll
+remove it.
+
+Additionally I'll add support for 4210.
+
+Thanks for your feedback!
+Krzysztof
+
+> 
+> I believe the same comments apply for patch 2/2 as well.
+> 
+> Best regards,
+> Tomasz
