@@ -1,45 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Jul 2014 19:07:40 -0400
-Subject: mvebu cpuidle and cpufreq branch handling for v3.17
-Message-ID: <20140718230740.GR24496@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 18 Jul 2014 16:24:58 -0700
+Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
+In-Reply-To: <53C9A2E7.8020307@linaro.org>
+References: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
+ <53C99EC5.2060602@linaro.org> <53C9A1EC.8060905@codeaurora.org>
+ <53C9A2E7.8020307@linaro.org>
+Message-ID: <53C9ACCA.3070306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 07/18/14 15:42, John Stultz wrote:
+> If its a regression (and needs -stable backports) it needs to go in via
+> tip/timers/urgent, and not via the regular merge window.
+>
+> Whats the additional risk -stable wise for canceling the timer during
+> suspend and starting it back up during resume?
+>
 
-I have two branches with the remaining mvebu SoC changes for v3.17.
-They are mvebu/soc-cpuidle and mvebu/soc-cpufreq.  Each branch is
-slightly problematic because both contain changes to their respective
-code in drivers/.  To send the driver changes through the appropriate
-subsystems would be a garish nightmare of branch on branch on branch.
-Thankfully, the changes are isolated to drivers only mvebu uses, so
-keeping it all together should cause minimal, if any, conflicts.
+I'd say close to zero given that we'd only be making the timer run a
+little bit later and we have slack in there already. Here's that version.
 
-I've requested Acks from the appropriate maintainers but as it's summer
-I'm not confident that we'll receive those Acks in time for the arm-soc
-cutoff (-rc6 -ish).
+----8<-----
 
-As I see it, I could send arm-soc two topic branch pull requests, which
-arm-soc would keep out separate on the remote chance of an objection.
+Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
 
-Or, I could wait for the Acks (the code has already been in -next for
-several days), merge it into mvebu/soc, and send a, most likely, late
-pull request for it.
+During suspend we call sched_clock_poll() to update the epoch and
+accumulated time and reprogram the sched_clock_timer to fire
+before the next wrap-around time. Unfortunately,
+sched_clock_poll() doesn't restart the timer, instead it relies
+on the hrtimer layer to do that and during suspend we aren't
+calling that function from the hrtimer layer. Instead, we're
+reprogramming the expires time while the hrtimer is enqueued,
+which can cause the hrtimer tree to be corrupted. Furthermore, we
+restart the timer during suspend but we update the epoch during
+resume which seems counter-intuitive.
 
-Which would you guys prefer?
+Let's fix this by saving the accumulated state and canceling the
+timer during suspend. On resume we can update the epoch and
+restart the timer similar to what we would do if we were starting
+the clock for the first time.
 
-The cpuidle branch and ML link:
+Fixes: a08ca5d1089d "sched_clock: Use an hrtimer instead of timer"
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ kernel/time/sched_clock.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-  git://git.infradead.org/linux-mvebu.git mvebu/soc-cpuidle
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index 445106d2c729..01d2d15aa662 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -191,7 +191,8 @@ void __init sched_clock_postinit(void)
+ 
+ static int sched_clock_suspend(void)
+ {
+-	sched_clock_poll(&sched_clock_timer);
++	update_sched_clock();
++	hrtimer_cancel(&sched_clock_timer);
+ 	cd.suspended = true;
+ 	return 0;
+ }
+@@ -199,6 +200,7 @@ static int sched_clock_suspend(void)
+ static void sched_clock_resume(void)
+ {
+ 	cd.epoch_cyc = read_sched_clock();
++	hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
+ 	cd.suspended = false;
+ }
+ 
 
-  https://lkml.kernel.org/r/1404913221-17343-1-git-send-email-thomas.petazzoni at free-electrons.com
-
-The cpufreq branch and ML link:
-
-  git://git.infradead.org/linux-mvebu.git mvebu/soc-cpufreq
-
-  https://lkml.kernel.org/r/1404920715-19834-1-git-send-email-thomas.petazzoni at free-electrons.com
-
-thx,
-
-Jason.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
