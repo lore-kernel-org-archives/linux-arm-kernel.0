@@ -1,41 +1,75 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 18 Jul 2014 15:25:09 -0700
-Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
-In-Reply-To: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
-References: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <53C99EC5.2060602@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 18 Jul 2014 18:27:06 -0400
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17 (round 2)
+Message-ID: <20140718222706.GP24496@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2014 03:09 PM, Stephen Boyd wrote:
-> During suspend we call sched_clock_poll() to update the epoch and
-> accumulated time and reprogram the sched_clock_timer to fire
-> before the next wrap-around time. Unfortunately,
-> sched_clock_poll() doesn't restart the timer, instead it relies
-> on the hrtimer layer to do that and during suspend we aren't
-> calling that function from the hrtimer layer. Instead, we're
-> reprogramming the expires time while the hrtimer is enqueued,
-> which can cause the hrtimer tree to be corrupted. Fix this
-> problem by updating the state via update_sched_clock() and
-> properly restarting the timer via hrtimer_start().
->
-> Fixes: a08ca5d1089d "sched_clock: Use an hrtimer instead of timer"
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> I also wonder if we should be restarting the timer during resume
-> instead of suspend given that the resume path modifies the epoch.
-> At that point timers can't run because interrupts are disabled and
-> we don't really care if the timer fires earlier than it's supposed
-> to anyway because it's just there to avoid rollover events, but
-> does it seem better to do it that way? I didn't send that version
-> because this patch is to fix the code intention, but I'm curious
-> if anyone else feels like it should be changed.
+All,
 
-Yea, starting the timer on suspend seems unintuitive to me.
+Here's the accumulated DT changes for v3.17.
 
-Is this something you were hoping to get in for 3.17 or is this a urgent
-3.16 item?
+Incremental pull request from tags/mvebu-dt-3.17 up to
+tags/mvebu-dt-3.17-2 on the mvebu/dt branch.
 
-thanks
--john
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit d854fa8a1500bec982ed9cb26b82d96bd5ae8dab:
+
+  ARM: kirkwood: fix net5big regulator gpio assignments (2014-06-21 19:21:13 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.17-2
+
+for you to fetch changes up to 3843607838cc5436d02a6771e661969a54c2fee0:
+
+  ARM: mvebu: update Armada XP DT for dynamic frequency scaling (2014-07-16 12:54:13 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.17 (round 2)
+
+ - kirkwood
+   - Add d2 Network v2 board
+
+ - mvebu
+   - Add Armada 375 ethernet node
+   - Add CA9 MPcore SoC controller node
+   - Add support for dynamic freq scaling on Armada XP
+
+----------------------------------------------------------------
+Ezequiel Garcia (2):
+      ARM: mvebu: Add support for the network controller in Armada 375 SoC
+      ARM: mvebu: Enable the network controller in Armada 375 DB board
+
+Gregory CLEMENT (1):
+      ARM: mvebu: add CA9 MPcore SoC Controller node
+
+Simon Guinot (2):
+      ARM: Kirkwood: allow to use netxbig DTSI for d2net_v2 DTS
+      ARM: Kirkwood: add DT support for d2 Network v2
+
+Thomas Petazzoni (1):
+      ARM: mvebu: update Armada XP DT for dynamic frequency scaling
+
+ .../bindings/arm/armada-380-mpcore-soc-ctrl.txt    | 14 ++++++++
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/armada-375-db.dts                | 26 ++++++++++++++
+ arch/arm/boot/dts/armada-375.dtsi                  | 31 ++++++++++++++++
+ arch/arm/boot/dts/armada-38x.dtsi                  |  5 +++
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  2 ++
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  2 ++
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  4 +++
+ arch/arm/boot/dts/armada-xp.dtsi                   |  2 +-
+ arch/arm/boot/dts/kirkwood-d2net.dts               | 42 ++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-net2big.dts             | 30 ++++++++++++++++
+ arch/arm/boot/dts/kirkwood-net5big.dts             | 28 +++++++++++++++
+ arch/arm/boot/dts/kirkwood-netxbig.dtsi            | 26 --------------
+ 13 files changed, 186 insertions(+), 27 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-d2net.dts
