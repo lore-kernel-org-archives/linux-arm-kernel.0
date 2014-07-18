@@ -1,93 +1,52 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 18 Jul 2014 19:00:48 +0900
-Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
- to support Exynos3250 ADC
-In-Reply-To: <6485839.CnzmD0SeQj@wuerfel>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <1405663186-26464-3-git-send-email-cw00.choi@samsung.com>
- <6485839.CnzmD0SeQj@wuerfel>
-Message-ID: <53C8F050.6060104@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 18 Jul 2014 18:02:51 +0800
+Subject: [PATCH v3 0/3] Clean up ACPI core to prepare for running ACPI on ARM64
+Message-ID: <1405677774-16787-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This patch set have no function change for x86 and ia64 and
+just do some clean up to prepare for running ACPI on ARM64.
 
-On 07/18/2014 06:47 PM, Arnd Bergmann wrote:
-> On Friday 18 July 2014 14:59:44 Chanwoo Choi wrote:
->> This patch control special clock for ADC in Exynos series's FSYS block.
->> If special clock of ADC is registerd on clock list of common clk framework,
->> Exynos ADC drvier have to control this clock.
->>
->> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
->> - 'adc' clock: bus clock for ADC
->>
->> Exynos3250 has additional 'sclk_adc' clock as following:
->> - 'sclk_adc' clock: special clock for ADC which provide clock to internal ADC
->>
->> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_adc' clock
->> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_adc'
->> clock in FSYS_BLK.
-> 
-> Do you know if any of the older ADC blocks have an "sclk" input as well?
+This patch set is splited out from the patch set [1]
+"[PATCH v4 00/13] Enable ACPI on ARM64 in Kconfig" and hope it
+can be merged first before ARM64 ACPI core patches.
 
-No, I didn't check older ADC blocks. I only checked it on Exynos3250,
-Exynos4210/4212/4412, Exynos5250/5420.
+[1]: https://lkml.org/lkml/2014/6/26/627
 
-> 
-> Further, why is it called "sclk_adc" rather than just "sclk"?
+update from v2:
+Don not select ACPI_LEGACY_TABLES_LOOKUP on IA64 which
+is catched by Peter.
 
-The sclk means 'special clock' in Exynos TRM. Exynos SoC has varisou sclk clocks.
-'sclk_adc' is only used for ADC IP.
+update from v1:
+1. Drop "Make EC debugfs depend on X86 || IA64 in Kconfig";
+2. Rename ACPI_SCAN_BIOS_NOT_EFI to ACPI_LEGACY_TABLES_LOOKUP
+   suggested by Rafael;
+3. Rename ARCH_HAS_ACPI_PDC to ARCH_MIGHT_HAVE_ACPI_PDC suggested by Rafael;
+4. Remove the help for ARCH_MIGHT_HAVE_ACPI_PDC because it can't be selected;
+5. Rename acpi_arch_is_smp() to acpi_has_cpu_in_madt() to be more
+   explicit and easy understanding.
 
-> 
->> @@ -199,13 +262,20 @@ static void exynos_adc_v2_start_conv(struct exynos_adc *info,
->>         writel(con1 | ADC_CON_EN_START, ADC_V2_CON1(info->regs));
->>  }
->>  
->> +#define __EXYNOS_ADC_V2_DATA                           \
->> +       .num_channels   = MAX_ADC_V2_CHANNELS,          \
->> +       .init_hw        = exynos_adc_v2_init_hw,        \
->> +       .exit_hw        = exynos_adc_v2_exit_hw,        \
->> +       .clear_irq      = exynos_adc_v2_clear_irq,      \
->> +       .start_conv     = exynos_adc_v2_start_conv,     \
->> +
->>  static struct exynos_adc_data const exynos_adc_v2_data = {
->> -       .num_channels   = MAX_ADC_V2_CHANNELS,
->> +       __EXYNOS_ADC_V2_DATA
->> +};
->>  
->> -       .init_hw        = exynos_adc_v2_init_hw,
->> -       .exit_hw        = exynos_adc_v2_exit_hw,
->> -       .clear_irq      = exynos_adc_v2_clear_irq,
->> -       .start_conv     = exynos_adc_v2_start_conv,
->> +static struct exynos_adc_data const exynos3250_adc_v2_data = {
->> +       __EXYNOS_ADC_V2_DATA
->> +       .needs_sclk = true,
->>  };
-> 
-> I think the macro hurts readability. Please just duplicate the definition
-> here.
+Graeme Gregory (2):
+  ACPI: ARM64 does not have a BIOS add config for BIOS table scan.
+  ACPI: Don't use acpi_lapic in ACPI core code
 
-OK, I'll fix it.
+Hanjun Guo (1):
+  ACPI / processor: Introduce ARCH_HAS_ACPI_PDC
 
-> 
->>  static const struct of_device_id exynos_adc_match[] = {
->> @@ -215,6 +285,9 @@ static const struct of_device_id exynos_adc_match[] = {
->>         }, {
->>                 .compatible = "samsung,exynos-adc-v2",
->>                 .data = (void *)&exynos_adc_v2_data,
->> +       }, {
->> +               .compatible = "samsung,exynos3250-adc-v2",
->> +               .data = (void *)&exynos3250_adc_v2_data,
->>         },
->>         {},
-> 
-> Remove the '(void *)' cast here and mark the structure as 'const'.
-> We intentionally use a 'const void *' type here to verify that
-> the driver doesn't modify the per-device type data at runtime,
-> which would be bad if you ever have multiple device instances.
+ arch/ia64/Kconfig             |    1 +
+ arch/ia64/include/asm/acpi.h  |    5 +
+ arch/x86/Kconfig              |    2 +
+ arch/x86/include/asm/acpi.h   |    5 +
+ drivers/acpi/Kconfig          |    6 ++
+ drivers/acpi/Makefile         |    1 +
+ drivers/acpi/acpi_processor.c |    2 +-
+ drivers/acpi/internal.h       |    5 +
+ drivers/acpi/osl.c            |    4 +-
+ drivers/acpi/processor_core.c |  198 ---------------------------------------
+ drivers/acpi/processor_pdc.c  |  206 +++++++++++++++++++++++++++++++++++++++++
+ 11 files changed, 235 insertions(+), 200 deletions(-)
+ create mode 100644 drivers/acpi/processor_pdc.c
 
-OK, I'll remove it.
-
-Thanks,
-Chanwoo Choi
+-- 
+1.7.9.5
