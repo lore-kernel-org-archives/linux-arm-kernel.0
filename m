@@ -1,52 +1,67 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 18 Jul 2014 15:09:52 -0700
-Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
-Message-ID: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 18 Jul 2014 18:13:51 -0400
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.17 (round 2)
+Message-ID: <20140718221351.GN24496@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During suspend we call sched_clock_poll() to update the epoch and
-accumulated time and reprogram the sched_clock_timer to fire
-before the next wrap-around time. Unfortunately,
-sched_clock_poll() doesn't restart the timer, instead it relies
-on the hrtimer layer to do that and during suspend we aren't
-calling that function from the hrtimer layer. Instead, we're
-reprogramming the expires time while the hrtimer is enqueued,
-which can cause the hrtimer tree to be corrupted. Fix this
-problem by updating the state via update_sched_clock() and
-properly restarting the timer via hrtimer_start().
+All,
 
-Fixes: a08ca5d1089d "sched_clock: Use an hrtimer instead of timer"
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Here's all the defconfig changes we have for mvebu this time around.
+The big one is the removal of kirkwood_defconfig, cooresponding to the
+mach-kirkwood/ removal in mvebu/soc.
 
-I also wonder if we should be restarting the timer during resume
-instead of suspend given that the resume path modifies the epoch.
-At that point timers can't run because interrupts are disabled and
-we don't really care if the timer fires earlier than it's supposed
-to anyway because it's just there to avoid rollover events, but
-does it seem better to do it that way? I didn't send that version
-because this patch is to fix the code intention, but I'm curious
-if anyone else feels like it should be changed.
+This is an incremental pull request from tags/mvebu-defconfig-3.17 up to
+tags/mvebu-defconfig-3.17-2 on the mvebu/defconfig branch.
 
- kernel/time/sched_clock.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Please pull.
 
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index 445106d2c729..9e32ce88e9ee 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -191,7 +191,9 @@ void __init sched_clock_postinit(void)
- 
- static int sched_clock_suspend(void)
- {
--	sched_clock_poll(&sched_clock_timer);
-+	update_sched_clock();
-+	/* Restart the timer because we forced an update */
-+	hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
- 	cd.suspended = true;
- 	return 0;
- }
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+thx,
+
+Jason.
+
+The following changes since commit 5658d58545388850c77a070fb3b882ddd958eb88:
+
+  ARM: multi_v5: Enable LaCie 2Big and 5Big Network v2 (2014-06-20 20:50:23 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.17-2
+
+for you to fetch changes up to c1eed8d2ff67b18f3892016f40ad6899ac6cf477:
+
+  ARM: mvebu: update mvebu_v7_defconfig with cpufreq support (2014-07-16 12:51:39 +0000)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v3.17 (round 2)
+
+ - mvebu
+   - Add appended_dtb support
+   - Add devtmpfs support
+   - Add 375 network driver
+   - Add cpuidle support
+   - Add cpufreq support
+
+ - kirkwood
+   - Remove kirkwood_defconfig
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Remove kirkwood_defconfig
+
+Gregory CLEMENT (1):
+      ARM: mvebu: defconfig: enable cpuidle support in mvebu_v7_defconfig
+
+Marcin Wojtas (1):
+      ARM: mvebu: enable Armada 375 network driver in mvebu_v7_defconfig
+
+Thomas Petazzoni (3):
+      ARM: mvebu: add appended DTB support in mvebu_v5_defconfig
+      ARM: mvebu: add devtmpfs to mvebu_v5_defconfig
+      ARM: mvebu: update mvebu_v7_defconfig with cpufreq support
+
+ arch/arm/configs/kirkwood_defconfig | 181 ------------------------------------
+ arch/arm/configs/mvebu_v5_defconfig |   4 +
+ arch/arm/configs/mvebu_v7_defconfig |   5 +
+ 3 files changed, 9 insertions(+), 181 deletions(-)
+ delete mode 100644 arch/arm/configs/kirkwood_defconfig
