@@ -1,53 +1,101 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 18 Jul 2014 19:01:39 +0200
-Subject: [PATCH 3/6] ARM: dts: vf610: Add usbmisc for non-core registers
+Date: Fri, 18 Jul 2014 19:01:37 +0200
+Subject: [PATCH 1/6] ARM: dts: vf610: add USB PHY and controller
 In-Reply-To: <cover.1405702442.git.stefan@agner.ch>
 References: <cover.1405702442.git.stefan@agner.ch>
-Message-ID: <4b3b16a8de1bd916d51c951aca286616f7ec8a9d.1405702442.git.stefan@agner.ch>
+Message-ID: <839af70e8acf139bc0f7bbdb4dd68dd146b5d6a8.1405702442.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree node for usbmisc which controls the non-core USB
-registers. This is required to use the property to disable the over-
-current detection.
+This adds USB PHY and USB controller nodes. Vybrid SoCs have two
+independent USB cores which each supports DR (dual role). However,
+real OTG is not supported since the OTG ID pin is not available.
+
+The PHYs are located within the anadig register range, hence we need
+to change the length of the anadig registers.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610.dtsi | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf610.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 43 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index f6c3f02..b20ce4f 100644
+index 6a6190c..f6c3f02 100644
 --- a/arch/arm/boot/dts/vf610.dtsi
 +++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -334,11 +334,19 @@
- 				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks VF610_CLK_USBC0>;
- 				fsl,usbphy = <&usbphy0>;
-+				fsl,usbmisc = <&usbmisc 0>;
- 				dr_mode = "peripheral";
- 				status = "disabled";
+@@ -25,6 +25,8 @@
+ 		gpio2 = &gpio3;
+ 		gpio3 = &gpio4;
+ 		gpio4 = &gpio5;
++		usbphy0 = &usbphy0;
++		usbphy1 = &usbphy1;
+ 	};
+ 
+ 	cpus {
+@@ -285,9 +287,25 @@
+ 				gpio-ranges = <&iomuxc 0 128 7>;
  			};
  
--
-+			usbmisc: usb at 40034800 {
-+				#index-cells = <1>;
-+				compatible = "fsl,vf610-usbmisc";
-+				reg = <0x40034800 0x200>,
-+					<0x400b4800 0x200>;
-+				clocks = <&clks VF610_CLK_USBC0>,
-+					<&clks VF610_CLK_USBC1>;
+-			anatop at 40050000 {
+-				compatible = "fsl,vf610-anatop";
+-				reg = <0x40050000 0x1000>;
++			anatop: anatop at 40050000 {
++				compatible = "fsl,vf610-anatop", "syscon";
++				reg = <0x40050000 0x400>;
 +			};
++
++			usbphy0: usbphy at 40050800 {
++				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
++				reg = <0x40050800 0x400>;
++				interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBPHY0>;
++				fsl,anatop = <&anatop>;
++			};
++
++			usbphy1: usbphy at 40050c00 {
++				compatible = "fsl,vf610-usbphy", "fsl,imx23-usbphy";
++				reg = <0x40050c00 0x400>;
++				interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			i2c0: i2c at 40066000 {
+@@ -309,6 +327,18 @@
+ 				reg = <0x4006b000 0x1000>;
+ 				#clock-cells = <1>;
+ 			};
++
++			usbdev0: usb at 40034000 {
++				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				reg = <0x40034000 0x800>;
++				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBC0>;
++				fsl,usbphy = <&usbphy0>;
++				dr_mode = "peripheral";
++				status = "disabled";
++			};
++
++
  		};
  
  		aips1: aips-bus at 40080000 {
-@@ -407,6 +415,7 @@
- 				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks VF610_CLK_USBC1>;
- 				fsl,usbphy = <&usbphy1>;
-+				fsl,usbmisc = <&usbmisc 1>;
- 				dr_mode = "host";
+@@ -371,6 +401,16 @@
  				status = "disabled";
  			};
+ 
++			usbh1: usb at 400b4000 {
++				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				reg = <0x400b4000 0x800>;
++				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBC1>;
++				fsl,usbphy = <&usbphy1>;
++				dr_mode = "host";
++				status = "disabled";
++			};
++
+ 			ftm: ftm at 400b8000 {
+ 				compatible = "fsl,ftm-timer";
+ 				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
 -- 
 2.0.1
