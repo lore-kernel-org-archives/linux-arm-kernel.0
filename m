@@ -1,58 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Jul 2014 10:53:12 +0100
-Subject: [PATCHv4 5/5] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140718092744.GA19850@arm.com>
-References: <20140716155747.GR29414@arm.com>
- <CAFEAcA-_GawEimGS4q8=C7BK6gLzSA+xVSUtLFkUS5=Mf8syBw@mail.gmail.com>
- <53C7A980.8050601@arm.com> <20140717105415.GI21153@arm.com>
- <CAFEAcA8wZ9z8+0Q-2D_B3tkuQnksdWFeWEAadkHyB72oS6ae=A@mail.gmail.com>
- <20140717123533.GJ21153@arm.com>
- <CAFEAcA_ZXDDRycNVXmw1FSgRFiPgtB_2qqe-ioj91jMeBJR7PQ@mail.gmail.com>
- <20140717171058.GM18203@arm.com> <20140717172858.GD4844@arm.com>
- <20140718092744.GA19850@arm.com>
-Message-ID: <20140718095311.GA1818@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 18 Jul 2014 11:53:05 +0200
+Subject: [PATCH 1/2] clk: samsung: exynos4x12: Enable ARMCLK down feature
+Message-ID: <1405677186-18678-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 10:27:44AM +0100, Catalin Marinas wrote:
-> On Thu, Jul 17, 2014 at 06:28:58PM +0100, Will Deacon wrote:
-> > On Thu, Jul 17, 2014 at 06:10:58PM +0100, Catalin Marinas wrote:
-> > > On Thu, Jul 17, 2014 at 02:55:37PM +0100, Peter Maydell wrote:
-> > > > On 17 July 2014 13:35, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > We're not denying the possibility of heterogeneity, we're trying to expose a
-> > > > > consistent view of the system to userspace. Differences between cores should
-> > > > > be dealt with by the kernel (e.g. IKS, HMP scheduling), not blindly
-> > > > > passed off to userspace.
-> > > > 
-> > > > On that basis, why report anything at all about invididual cores?
-> > > > Just have /proc/cpuinfo report "number of processors: 4" and
-> > > > no per-CPU information at all...
-> > > 
-> > > We lost a lot of time on this already (given the internal threads). So
-> > > my proposal is to go ahead with Mark's patch with per-CPU features. They
-> > > currently just include the same elf_hwcap multiple times. If we ever
-> > > need to present different features, the conditions would be:
-> > > 
-> > > 1. Never report more than elf_hwcap
-> > > 2. elf_hwcap can only include non-symmetric features *if* Linux gets a
-> > >    way to transparently handle migration or emulation
-> > 
-> > ... making the point of a per-cpu field entirely pointless ;)
-> 
-> Well, if we can support such features in a transparent way,
-> /proc/cpuinfo becomes more informative (e.g. user wondering why a
-> process runs only on certain CPUs).
-> 
-> But to be clear (and I think we are aligned), I don't trust user space
-> to parse all processors in /proc/cpuinfo and make an informed selection
-> of CPU affinity to avoid SIGILL.
-> 
-> Yet another option would be to have a single features/hwcap line and
-> present the extra features in a human (and only human) readable form
-> (e.g. some haiku that changes with every kernel release ;)).
+Enable ARMCLK down and up features on Exynos4212 and 4412 SoCs. The
+frequency of ARMCLK will be reduced upon entering idle mode (WFI or
+WFE).  Additionally upon exiting from idle mode the divider for ARMCLK
+will be brought back to 1.
 
-Or just have the single features line, then the per-cpu line can be called
-`flags' or something, like Ard suggested. If userspace decides to parse
-flags, it deserves all the pain that it gets.
+These are exactly the same settings as for Exynos5250
+(clk-exynos5250.c), except of Exynos4412 where ARMCLK down is enabled
+for all 4 cores.
 
-Will
+Tested on Trats2 board (Exynos4412) and Samsung Gear 1 (Exynos4212).
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c | 53 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 7f4a473a7ad7..b8ea37b23984 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -114,11 +114,34 @@
+ #define DIV_CPU1		0x14504
+ #define GATE_SCLK_CPU		0x14800
+ #define GATE_IP_CPU		0x14900
++#define PWR_CTRL1		0x15020
++#define PWR_CTRL2		0x15024
+ #define E4X12_DIV_ISP0		0x18300
+ #define E4X12_DIV_ISP1		0x18304
+ #define E4X12_GATE_ISP0		0x18800
+ #define E4X12_GATE_ISP1		0x18804
+ 
++/* Below definitions are used for PWR_CTRL settings */
++#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
++#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
++#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
++#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
++#define PWR_CTRL1_USE_CORE3_WFE			(1 << 7)
++#define PWR_CTRL1_USE_CORE2_WFE			(1 << 6)
++#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
++#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
++#define PWR_CTRL1_USE_CORE3_WFI			(1 << 3)
++#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
++#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
++#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
++
++#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
++#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
++#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
++#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
++#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
++#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
++
+ /* the exynos4 soc type */
+ enum exynos4_soc {
+ 	EXYNOS4210,
+@@ -1164,6 +1187,34 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+ 			VPLL_LOCK, VPLL_CON0, NULL),
+ };
+ 
++static void __init exynos4_core_down_clock(void)
++{
++	unsigned int tmp;
++
++	/*
++	 * Enable arm clock down (in idle) and set arm divider
++	 * ratios in WFI/WFE state.
++	 */
++	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
++		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
++		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
++		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
++	if (of_machine_is_compatible("samsung,exynos4412"))
++		tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
++		       PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
++	__raw_writel(tmp, reg_base + PWR_CTRL1);
++
++	/*
++	 * Enable arm clock up (on exiting idle). Set arm divider
++	 * ratios when not in idle along with the standby duration
++	 * ratios.
++	 */
++	tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
++		PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
++		PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
++	__raw_writel(tmp, reg_base + PWR_CTRL2);
++}
++
+ /* register exynos4 clocks */
+ static void __init exynos4_clk_init(struct device_node *np,
+ 				    enum exynos4_soc soc)
+@@ -1250,6 +1301,8 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 	samsung_clk_register_alias(ctx, exynos4_aliases,
+ 			ARRAY_SIZE(exynos4_aliases));
+ 
++	if (exynos4_soc == EXYNOS4X12)
++		exynos4_core_down_clock();
+ 	exynos4_clk_sleep_init();
+ 
+ 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
+-- 
+1.9.1
