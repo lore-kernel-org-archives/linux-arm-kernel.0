@@ -1,27 +1,30 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 18 Jul 2014 01:18:53 -0400
-Subject: [PATCH 2/4] ARM: add IPI tracepoints
+Date: Fri, 18 Jul 2014 01:18:54 -0400
+Subject: [PATCH 3/4] ARM64: add IPI tracepoints
 In-Reply-To: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1405660735-13408-4-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The strings used to list IPIs in /proc/interrupts are reused for tracing
 purposes.
 
+While at it, the code is slightly cleaned up so the ipi_types array
+indices are no longer offset by IPI_RESCHEDULE whose value is 0 anyway.
+
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/kernel/smp.c | 72 ++++++++++++++++++++++++++++++++-------------------
- 1 file changed, 45 insertions(+), 27 deletions(-)
+ arch/arm64/kernel/smp.c | 67 +++++++++++++++++++++++++++++++------------------
+ 1 file changed, 42 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 7c4fada440..daedff319b 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -47,6 +47,9 @@
- #include <asm/mach/arch.h>
- #include <asm/mpu.h>
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 40f38f46c8..78a5904994 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -50,6 +50,9 @@
+ #include <asm/tlbflush.h>
+ #include <asm/ptrace.h>
  
 +#define CREATE_TRACE_POINTS
 +#include <trace/events/ipi.h>
@@ -29,17 +32,24 @@ index 7c4fada440..daedff319b 100644
  /*
   * as from 2.5, kernels no longer have an init_tasks structure
   * so we need some other way of telling a new secondary core
-@@ -430,38 +433,19 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	}
+@@ -307,8 +310,6 @@ void __init smp_prepare_boot_cpu(void)
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
  }
  
 -static void (*smp_cross_call)(const struct cpumask *, unsigned int);
+-
+ /*
+  * Enumerate the possible CPU set from the device tree and build the
+  * cpu logical map array containing MPIDR values related to logical
+@@ -463,32 +464,19 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ }
+ 
 +static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
  
  void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
  {
--	if (!smp_cross_call)
--		smp_cross_call = fn;
+-	smp_cross_call = fn;
 -}
 -
 -void arch_send_call_function_ipi_mask(const struct cpumask *mask)
@@ -47,36 +57,32 @@ index 7c4fada440..daedff319b 100644
 -	smp_cross_call(mask, IPI_CALL_FUNC);
 -}
 -
--void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
--{
--	smp_cross_call(mask, IPI_WAKEUP);
--}
--
 -void arch_send_call_function_single_ipi(int cpu)
 -{
 -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-+	if (!__smp_cross_call)
-+		__smp_cross_call = fn;
++	__smp_cross_call = fn;
  }
  
 -#ifdef CONFIG_IRQ_WORK
 -void arch_irq_work_raise(void)
 -{
--	if (is_smp())
+-	if (smp_cross_call)
 -		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
 -}
-+static const char *ipi_types[NR_IPI]
++static const char *ipi_types[NR_IPI] 
 +#ifdef CONFIG_TRACING
 +__tracepoint_string
  #endif
 -
 -static const char *ipi_types[NR_IPI] = {
+-#define S(x,s)	[x - IPI_RESCHEDULE] = s
 += {
- #define S(x,s)	[x] = s
- 	S(IPI_WAKEUP, "CPU wakeup interrupts"),
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
-@@ -473,6 +457,12 @@ static const char *ipi_types[NR_IPI] = {
- 	S(IPI_COMPLETION, "completion interrupts"),
++#define S(x,s)	[x] = s
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+@@ -497,12 +485,18 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
  };
  
 +static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
@@ -88,18 +94,20 @@ index 7c4fada440..daedff319b 100644
  void show_ipi_list(struct seq_file *p, int prec)
  {
  	unsigned int cpu, i;
-@@ -499,6 +489,29 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+ 
+ 	for (i = 0; i < NR_IPI; i++) {
+-		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i + IPI_RESCHEDULE,
++		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i,
+ 			   prec >= 4 ? " " : "");
+ 		for_each_online_cpu(cpu)
+ 			seq_printf(p, "%10u ",
+@@ -522,6 +516,24 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
  	return sum;
  }
  
 +void arch_send_call_function_ipi_mask(const struct cpumask *mask)
 +{
 +	smp_cross_call(mask, IPI_CALL_FUNC);
-+}
-+
-+void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
-+{
-+	smp_cross_call(mask, IPI_WAKEUP);
 +}
 +
 +void arch_send_call_function_single_ipi(int cpu)
@@ -110,28 +118,29 @@ index 7c4fada440..daedff319b 100644
 +#ifdef CONFIG_IRQ_WORK
 +void arch_irq_work_raise(void)
 +{
-+	if (is_smp())
++	if (__smp_cross_call)
 +		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
 +}
 +#endif
 +
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- void tick_broadcast(const struct cpumask *mask)
- {
-@@ -556,8 +569,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ static DEFINE_RAW_SPINLOCK(stop_lock);
+ 
+ /*
+@@ -553,8 +565,10 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
  	unsigned int cpu = smp_processor_id();
  	struct pt_regs *old_regs = set_irq_regs(regs);
  
--	if (ipinr < NR_IPI)
+-	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
+-		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
 +	if ((unsigned)ipinr < NR_IPI) {
 +		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
++		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
 +	}
  
  	switch (ipinr) {
- 	case IPI_WAKEUP:
-@@ -612,6 +627,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		       cpu, ipinr);
+ 	case IPI_RESCHEDULE:
+@@ -599,6 +613,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
  		break;
  	}
 +
