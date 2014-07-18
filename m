@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Jul 2014 16:45:40 +0200
-Subject: [GIT PULL 7/7] ARM: tegra: defconfig updates for 3.17
+Date: Fri, 18 Jul 2014 16:45:38 +0200
+Subject: [GIT PULL 5/7] ARM: create a cros-ec-keyboard DT fragment
 In-Reply-To: <1405694740-4090-1-git-send-email-thierry.reding@gmail.com>
 References: <1405694740-4090-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1405694740-4090-7-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1405694740-4090-5-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +13,28 @@ The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.17-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.17-dt-cros-ec-kbd
 
-for you to fetch changes up to dff15d4c2b1a4f3992a670b445e2131a400aef76:
+for you to fetch changes up to 1a395e3b4f2e9038964c9eec392ed5300a4b5b83:
 
-  ARM: tegra: enable igb, stmpe, i2c chardev, lm95245, pwm leds (2014-06-16 12:55:49 -0600)
-
-----------------------------------------------------------------
-ARM: tegra: defconfig updates for 3.17
-
-This set of patches update the tegra_defconfig by first regenerating on
-top of v3.16-rc1 to prune all non-existent symbols or symbols which are
-now selected by default.
+  ARM: dts: Use the cros-ec-keyboard fragment in exynos5250-snow (2014-06-16 12:11:32 -0600)
 
 ----------------------------------------------------------------
-Marcel Ziswiler (1):
-      ARM: tegra: enable igb, stmpe, i2c chardev, lm95245, pwm leds
+ARM: create a cros-ec-keyboard DT fragment
 
-Stephen Warren (1):
-      ARM: tegra: rebuild tegra_defconfig
+This branch contains a series from Doug Anderson that creates a DT
+include file to share some common DT content between Tegra and Exynos
+boards that use cros-ec. I'll be pulling this into Tegra's for-3.17/dt
+branch, and I assume the Samsung maintainers will do something similar.
 
- arch/arm/configs/tegra_defconfig | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+----------------------------------------------------------------
+Doug Anderson (3):
+      ARM: dts: Create a cros-ec-keyboard fragment
+      ARM: tegra: Use the cros-ec-keyboard fragment in venice2
+      ARM: dts: Use the cros-ec-keyboard fragment in exynos5250-snow
+
+ arch/arm/boot/dts/cros-ec-keyboard.dtsi | 105 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-snow.dts   |  93 +---------------------------
+ arch/arm/boot/dts/tegra124-venice2.dts  |  96 +----------------------------
+ 3 files changed, 111 insertions(+), 183 deletions(-)
+ create mode 100644 arch/arm/boot/dts/cros-ec-keyboard.dtsi
