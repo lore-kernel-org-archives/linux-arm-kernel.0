@@ -1,46 +1,205 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Fri, 18 Jul 2014 12:20:15 +0200
-Subject: [PATCH v3] arm64, ia64, ppc, s390, sh, tile, um, x86,
- mm: Remove default gate area
-In-Reply-To: <20140718101416.GB1818@arm.com>
-References: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
- <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
- <20140718101416.GB1818@arm.com>
-Message-ID: <53C8F4DF.8020103@nod.at>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Fri, 18 Jul 2014 12:23:05 +0200
+Subject: [PATCH] cpufreq: tests: Providing cpufreq regression test
+Message-ID: <1405678985-21677-1-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 18.07.2014 12:14, schrieb Will Deacon:
-> On Tue, Jul 15, 2014 at 03:47:26PM +0100, Andy Lutomirski wrote:
->> On Sun, Jul 13, 2014 at 1:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->>> The core mm code will provide a default gate area based on
->>> FIXADDR_USER_START and FIXADDR_USER_END if
->>> !defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
->>>
->>> This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
->>> 64-bit UML, and x86_32 have their own code just to disable it.  arm,
->>> 32-bit UML, and x86_64 have gate areas, but they have their own
->>> implementations.
->>>
->>> This gets rid of the default and moves the code into ia64.
->>>
->>> This should save some code on architectures without a gate area: it's
->>> now possible to inline the gate_area functions in the default case.
->>
->> Can one of you pull this somewhere?  Otherwise I can put it somewhere
->> stable and ask for -next inclusion, but that seems like overkill for a
->> single patch.
+This commit adds first regression test "cpufreq_freq_test.sh" for the
+cpufreq subsystem.
 
-For the um bits:
-Acked-by: Richard Weinberger <richard@nod.at>
+Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+---
+ drivers/cpufreq/tests/README               |  23 +++++
+ drivers/cpufreq/tests/cpufreq_freq_test.sh | 149 +++++++++++++++++++++++++++++
+ 2 files changed, 172 insertions(+)
+ create mode 100644 drivers/cpufreq/tests/README
+ create mode 100755 drivers/cpufreq/tests/cpufreq_freq_test.sh
 
-> I'd be happy to take the arm64 part, but it doesn't feel right for mm/*
-> changes (or changes to other archs) to go via our tree.
-> 
-> I'm not sure what the best approach is if you want to send this via a single
-> tree. Maybe you could ask akpm nicely?
-
-Going though Andrew's tree sounds sane to me.
-
-Thanks,
-//richard
+diff --git a/drivers/cpufreq/tests/README b/drivers/cpufreq/tests/README
+new file mode 100644
+index 0000000..66638d2
+--- /dev/null
++++ b/drivers/cpufreq/tests/README
+@@ -0,0 +1,23 @@
++This file contains list of cpufreq's available regression tests with a short
++usage description.
++
++1. cpufreq_freq_test.sh
++
++Description:
++------------
++This test is supposed to test if cpufreq attributes exported by sysfs are
++exposing a correct values.
++
++It can work with or without boost enabled and helps spotting errors related to
++cpufreq and common clock framework.
++
++Used attributes:
++----------------
++- "scaling_available_frequencies"
++- "cpuinfo_cur_freq"
++- "scaling_governor"
++
++Target devices:
++---------------
++
++All devices which exports mentioned above sysfs attributes.
+\ No newline at end of file
+diff --git a/drivers/cpufreq/tests/cpufreq_freq_test.sh b/drivers/cpufreq/tests/cpufreq_freq_test.sh
+new file mode 100755
+index 0000000..53156ca
+--- /dev/null
++++ b/drivers/cpufreq/tests/cpufreq_freq_test.sh
+@@ -0,0 +1,149 @@
++#!/bin/bash
++#
++# This file provides a simple mean to test if all declared freqs at
++# "scaling_available_frequencies" can be set and if "cpuinfo_cur_freq"
++# returns this value.
++#
++# Usage: ./cpufreq_freq_test.sh
++# Requisite: Compile in "performance" governor
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, you can access it online at
++# http://www.gnu.org/licenses/gpl-2.0.html.
++#
++# Copyright (C) Samsung Electronics, 2014
++#
++# Author: Lukasz Majewski <l.majewski@samsung.com>
++
++set +x
++
++COLOUR_RED="\33[31m"
++COLOUR_BLUE="\33[34m"
++COLOUR_GREEN="\33[32m"
++COLOUR_DEFAULT="\33[0m"
++
++T_PATCH=/sys/devices/system/cpu/cpu0/cpufreq
++BOOST_PATCH=/sys/devices/system/cpu/cpufreq
++
++if [ ! -d "$T_PATCH" ]; then
++    printf "   $COLOUR_RED No patch to CPUFREQ $COLOUR_DEFAULT\n"
++    exit 1
++fi
++
++ERRORS=0
++
++OLD_GOV=`cat $T_PATCH/scaling_governor`
++echo "CURRENT GOVERNOR: $OLD_GOV"
++echo "SET GOVERNOR: performance"
++echo "performance" > $T_PATCH/scaling_governor
++
++function test_freqs1 {
++    FREQS=`cat $1`
++    for I in $FREQS; do
++	cpufreq_set_freq $I
++	if [ "$2" ]; then
++	    printf "$COLOUR_BLUE BOOST $COLOUR_DEFAULT" $I
++	fi
++	cpufreq_test_freq $I
++    done
++}
++
++function test_freqs2 {
++    FREQ=`cat $1`
++    FREQS_ARRAY=($FREQ)
++
++    for freq in ${FREQS_ARRAY[@]}
++    do
++	echo "REFERENCE FREQ: $freq"
++	for f in ${FREQS_ARRAY[@]}
++	do
++	    cpufreq_set_freq $freq
++	    echo -n "----> "
++	    cpufreq_set_freq $f
++	    cpufreq_test_freq $f
++	done
++    done
++}
++
++function restore {
++    if [ -f $BOOST_PATCH/boost ]; then
++	cpufreq_boost_state $BOOST_STATE
++    fi
++
++    echo "SET GOVERNOR: $OLD_GOV"
++    echo $OLD_GOV > $T_PATCH/scaling_governor
++}
++
++function die {
++    printf "   $COLOUR_RED FAILED $COLOUR_DEFAULT\n"
++    restore_gov
++    exit 1
++}
++
++function cpufreq_test_freq {
++    gzip < /dev/urandom > /dev/null &
++    pid=$!
++    sleep 0.1
++    CURR_FREQ=`cat $T_PATCH/cpuinfo_cur_freq`
++    if [ $1 -eq $CURR_FREQ ]; then
++	printf "\t$COLOUR_GREEN OK $COLOUR_DEFAULT\n"
++    else
++	printf "$COLOUR_RED CURRENT $CURR_FREQ $COLOUR_DEFAULT\n"
++	ERRORS=`expr $ERRORS + 1`
++	#die
++    fi
++    kill -9 $pid
++    wait $! 2>/dev/null
++}
++
++function cpufreq_set_freq {
++    echo $1 > $T_PATCH/scaling_max_freq || die $?
++    printf "FREQ:$COLOUR_GREEN %s $COLOUR_DEFAULT" $1
++}
++
++function cpufreq_boost_state {
++   echo $1 > $BOOST_PATCH/boost
++}
++
++function cpufreq_boost_status {
++   cat $BOOST_PATCH/boost
++}
++
++if [ -f $BOOST_PATCH/boost ]; then
++    echo "######################################"
++    echo "TEST BOOST OPERATION"
++    echo "######################################"
++
++    BOOST_STATE=$(cpufreq_boost_status)
++    if [ $BOOST_STATE -eq 0 ]; then
++	cpufreq_boost_state 1
++    fi
++    test_freqs1 $T_PATCH/scaling_boost_frequencies 1
++fi
++
++echo "######################################"
++echo "TEST AVAILABLE FREQS"
++echo "######################################"
++test_freqs1 $T_PATCH/scaling_available_frequencies
++
++echo "######################################"
++echo "TEST FREQS SWITCHING"
++echo "######################################"
++test_freqs2 $T_PATCH/scaling_available_frequencies
++
++echo "######################################"
++echo "ERRORS: $ERRORS"
++echo "######################################"
++
++restore
++exit 0
+-- 
+2.0.0.rc2
