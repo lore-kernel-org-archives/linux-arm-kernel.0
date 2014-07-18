@@ -1,41 +1,45 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 18 Jul 2014 00:34:13 -0700
-Subject: [PATCH v5 4/7] power/restart: Call machine_restart instead of
- arm_pm_restart
-In-Reply-To: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1405668856-13738-5-git-send-email-linux@roeck-us.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 18 Jul 2014 15:55:49 +0800
+Subject: [PATCH] arm: clk-imx6q: parent lvds_sel input from upstream
+ clock gates
+In-Reply-To: <20140717150826.GT2197@dragon>
+References: <1405592414-19550-1-git-send-email-l.stach@pengutronix.de>
+ <20140717150826.GT2197@dragon>
+Message-ID: <20140718075548.GA5485@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-machine_restart is supported on non-ARM platforms, and and ultimately calls
-arm_pm_restart, so dont call arm_pm_restart directly but use the more
-generic function.
+On Thu, Jul 17, 2014 at 11:08:28PM +0800, Shawn Guo wrote:
+> On Thu, Jul 17, 2014 at 12:20:14PM +0200, Lucas Stach wrote:
+> > The i.MX6 reference manual doesn't make a clear distinction
+> > between the fixed clock divider and the enable gate for the
+> > pcie and sata reference clocks. This lead to the lvds mux
+> > inputs in the imx6q clk driver to be parented from the
+> > ref clock (which is the divider) instead of the actual gate,
+> > which in turn prevents the upstream clock to actually be
+> > enabled when lvds clk out is active.
+> > 
+> > This fixes a hard machine hang regression in kernel 3.16 for
+> > boards where only pcie is active but no sata, as with this
+> > kernel version the imx6-pcie driver is no longer enabling
+> > the upstream clock directly but only lvds clk out.
+> > 
+> > Reported-by: Arne Ruhnau <arne.ruhnau@target-sg.com>
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > Tested-by: Arne Ruhnau <arne.ruhnau@target-sg.com>
+> > ---
+> > Shawn, this is an urgent fix for 3.16. Can you please
+> > Ack it so arm-soc people can take this directly?
+> > ---
+> 
+> Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+> It will conflict with the patch switching to use macro for clock IDs,
+> which I'm about to send for 3.17, though.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v5: No change.
-v4: No change.
-v3: No change.
-v2: Added patch.
+Arnd, Olof,
 
- drivers/power/reset/restart-poweroff.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Please do not apply the patch manually.  I will send you a git tag for
+it, so that I can sort out the conflict in my tree.
 
-diff --git a/drivers/power/reset/restart-poweroff.c b/drivers/power/reset/restart-poweroff.c
-index 5758033..47f10eb 100644
---- a/drivers/power/reset/restart-poweroff.c
-+++ b/drivers/power/reset/restart-poweroff.c
-@@ -20,7 +20,8 @@
- 
- static void restart_poweroff_do_poweroff(void)
- {
--	arm_pm_restart(REBOOT_HARD, NULL);
-+	reboot_mode = REBOOT_HARD;
-+	machine_restart(NULL);
- }
- 
- static int restart_poweroff_probe(struct platform_device *pdev)
--- 
-1.9.1
+Shawn
