@@ -1,57 +1,159 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Jul 2014 23:24:56 -0700
-Subject: [PATCH 5/5] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <53C7A01C.50107@linutronix.de>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-6-git-send-email-bigeasy@linutronix.de>
- <20140717070859.GD18374@atomide.com>
- <20140717074219.GA29193@linutronix.de>
- <20140717081232.GH18374@atomide.com> <53C7A01C.50107@linutronix.de>
-Message-ID: <20140718062456.GJ18374@atomide.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 18 Jul 2014 12:10:08 +0530
+Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
+In-Reply-To: <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
+ <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
+Message-ID: <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140717 03:09]:
-> On 07/17/2014 10:12 AM, Tony Lindgren wrote:
-> > Hmm it could be that it works for a while because the clocks are on
-> > from the bootloader and pm_runtime calls won't do anything. This
-> > could happen if the interconnect data based on the ti,hwmods entry
-> > is not getting matched to the new driver. This gets initialized when
-> > the device entry gets created in omap_device_build_from_dt().
-> > 
-> > Or maybe something now affects the clock aliases? It seems that we
-> > are still missing the clocks entries in the .dtsi files, see the
-> > mappings with $ git grep uart drivers/clk/ti/
-> 
-> I've been looking for something completely different while I noticed
-> this:
-> 
-> in drivers/tty/serial/omap-serial.c
-> | static struct platform_driver serial_omap_driver = {
-> |         .driver         = {
-> |                 .name   = DRIVER_NAME,
-> |         },
-> | };
-> |
-> 
-> and DRIVER_NAME should come from include/linux/platform_data/serial-omap.h
-> Looking further, I've found arch/arm/mach-omap2/serial.c:
-> | void __init omap_serial_init_port(struct omap_board_data *bdata,
-> |                         struct omap_uart_port_info *info)
-> | {
-> |         char *name
-> ?
-> |	name = DRIVER_NAME;
-> ?
-> |	pdev = omap_device_build(name, uart->num, oh, pdata, pdata_size);
-> ?
-> |
-> 
-> Would this explain it?
+On 18 July 2014 11:47, Olof Johansson <olof@lixom.net> wrote:
+> Why complicate it by using two properties?
+>
+> If there is no property, then the CPUs are assumed to be controlled
+> independently.
+>
+> if there is a clock-master = <phandle> property, then that points at
+> the cpu that is the main one controlling clock for the group.
+>
+> There's really no need to label the master -- it will be the only one
+> with incoming links but nothing outgoing. And a master without slaves
+> is an independently controlled cpu so you should be fine in that
+> aspect too.
 
-That would explain it for legacy booting, but not for device tree
-based booting. I can try to debug it further on Monday.
+I thought so earlier, but then I remembered something I read long back.
+Don't remember which thread now, but I *might* be wrong..
 
-Regards,
+"Bindings are like APIs and new bindings shouldn't break existing stuff.."
 
-Tony
+And:
+
+> If there is no property, then the CPUs are assumed to be controlled
+> independently.
+
+seems to break the existing API.
+
+But if that isn't the case, the bindings are very simple & clear to handle.
+Diff for new bindings:
+
+diff --git a/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+index 30ce9ad..d127bba 100644
+--- a/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
++++ b/Documentation/devicetree/bindings/cpufreq/cpu_clocks.txt
+@@ -9,15 +9,14 @@ Clock lines may or may not be shared among different
+CPUs on a platform.
+     separate line for itself
+
+ Optional Properties:
+-- clock-master: This declares cpu as clock master. Other CPUs can either define
+-  "clock-ganged" or "clock-master" property, but shouldn't be missing both.
++- clock-master: Contains phandle of the master cpu controlling clocks.
+
+-- clock-ganged: Should have phandle of a cpu declared as "clock-master".
+-
+-If any cpu node, doesn't have both "clock-master" and "clock-ganged" properties
+-defined, it would be assumed that all CPUs on that platform share a
+single clock
+-line. This will help supporting already upstreamed platforms.
++  Ideally there is nothing like a "master" CPU as any CPU can play with DVFS
++  settings. But we have to choose one cpu out of a group, so that others can
++  point to it.
+
++  If there is no "clock-master" property for a cpu node, it is considered as
++  master. It may or may not have other slave CPUs pointing towards it.
+
+ Examples:
+ 1.) All CPUs share a single clock line
+@@ -30,34 +29,6 @@ cpus {
+                compatible = "arm,cortex-a15";
+                reg = <0>;
+                next-level-cache = <&L2>;
+-               clock-master;
+-               operating-points = <
+-                       /* kHz    uV */
+-                       792000  1100000
+-                       396000  950000
+-                       198000  850000
+-               >;
+-               clock-latency = <61036>; /* two CLK32 periods */
+-       };
+-
+-       cpu1: cpu at 1 {
+-               compatible = "arm,cortex-a15";
+-               reg = <1>;
+-               next-level-cache = <&L2>;
+-               clock-ganged = <&cpu0>;
+-       };
+-};
+-
+-OR (clock-master/ganged aren't defined)
+-
+-cpus {
+-       #address-cells = <1>;
+-       #size-cells = <0>;
+-
+-       cpu0: cpu at 0 {
+-               compatible = "arm,cortex-a15";
+-               reg = <0>;
+-               next-level-cache = <&L2>;
+                operating-points = <
+                        /* kHz    uV */
+                        792000  1100000
+@@ -71,6 +42,7 @@ cpus {
+                compatible = "arm,cortex-a15";
+                reg = <1>;
+                next-level-cache = <&L2>;
++               clock-master = <&cpu0>;
+        };
+ };
+
+@@ -83,7 +55,6 @@ cpus {
+                compatible = "arm,cortex-a15";
+                reg = <0>;
+                next-level-cache = <&L2>;
+-               clock-master;
+                operating-points = <
+                        /* kHz    uV */
+                        792000  1100000
+@@ -97,7 +68,6 @@ cpus {
+                compatible = "arm,cortex-a15";
+                reg = <1>;
+                next-level-cache = <&L2>;
+-               clock-master;
+                operating-points = <
+                        /* kHz    uV */
+                        792000  1100000
+@@ -119,7 +89,6 @@ cpus {
+                compatible = "arm,cortex-a15";
+                reg = <0>;
+                next-level-cache = <&L2>;
+-               clock-master;
+                operating-points = <
+                        /* kHz    uV */
+                        792000  1100000
+@@ -133,14 +102,13 @@ cpus {
+                compatible = "arm,cortex-a15";
+                reg = <1>;
+                next-level-cache = <&L2>;
+-               clock-ganged = <&cpu0>;
++               clock-master = <&cpu0>;
+        };
+
+        cpu2: cpu at 100 {
+                compatible = "arm,cortex-a7";
+                reg = <100>;
+                next-level-cache = <&L2>;
+-               clock-master;
+                operating-points = <
+                        /* kHz    uV */
+                        792000  950000
+@@ -154,6 +122,6 @@ cpus {
+                compatible = "arm,cortex-a7";
+                reg = <101>;
+                next-level-cache = <&L2>;
+-               clock-ganged = <&cpu2>;
++               clock-master = <&cpu2>;
+        };
+ };
