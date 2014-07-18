@@ -1,48 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 14:52:25 -0700
-Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
-In-Reply-To: <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
-References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
- <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
- <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
-Message-ID: <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 18 Jul 2014 17:54:04 -0400
+Subject: [PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <20140718150603.GA7196@ulmo>
+References: <1405500863-19696-2-git-send-email-mperttunen@nvidia.com>
+ <1405667500-7402-1-git-send-email-mperttunen@nvidia.com>
+ <53C8C9BD.3070709@nvidia.com> <53C8F6E6.6020901@redhat.com>
+ <20140718150603.GA7196@ulmo>
+Message-ID: <20140718215404.GA1819@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 11:40 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 18 July 2014 11:47, Olof Johansson <olof@lixom.net> wrote:
->> Why complicate it by using two properties?
->>
->> If there is no property, then the CPUs are assumed to be controlled
->> independently.
->>
->> if there is a clock-master = <phandle> property, then that points at
->> the cpu that is the main one controlling clock for the group.
->>
->> There's really no need to label the master -- it will be the only one
->> with incoming links but nothing outgoing. And a master without slaves
->> is an independently controlled cpu so you should be fine in that
->> aspect too.
->
-> I thought so earlier, but then I remembered something I read long back.
-> Don't remember which thread now, but I *might* be wrong..
->
-> "Bindings are like APIs and new bindings shouldn't break existing stuff.."
->
-> And:
->
->> If there is no property, then the CPUs are assumed to be controlled
->> independently.
->
-> seems to break the existing API.
+On Fri, Jul 18, 2014 at 05:06:04PM +0200, Thierry Reding wrote:
+> I think the following patches can go through your tree without causing
+> breakage through unresolved dependencies:
+> 
+> 	[PATCH v5 1/8] of: Add NVIDIA Tegra SATA controller binding
+> 	[PATCH v3 6/8] ata: ahci_platform: Increase AHCI_MAX_CLKS to 4
+> 	[PATCH v5 7/8] ata: Add support for the Tegra124 SATA controller
 
-What is the current API that is being broken, in your opinion?
+Applied to libata/for-3.17 w/ Hans' acks added.  Please check the
+following branch and give me a holler if something is amiss.
 
-> But if that isn't the case, the bindings are very simple & clear to handle.
-> Diff for new bindings:
+ git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git for-3.17
 
-It's somewhat confusing to see a diff to the patch instead of a new
-version. It seems to remove the cpu 0 entry now?
+Thanks.
 
-
--Olof
+-- 
+tejun
