@@ -1,105 +1,139 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 18 Jul 2014 16:36:33 +0200
-Subject: [PATCH v2 2/2] clk: samsung: exynos3250: Enable ARMCLK down feature
-In-Reply-To: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
-References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1405694193-29643-2-git-send-email-k.kozlowski@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 18 Jul 2014 09:40:44 -0500
+Subject: [RFC PATCH] usb: dwc3: core: allow vendor drivers to check probe
+ status
+In-Reply-To: <20140718071115.GH30888@lee--X1>
+References: <1405617213-27360-1-git-send-email-lee.jones@linaro.org>
+ <20140717172045.GM10459@saruman.home>
+ <20140718071115.GH30888@lee--X1>
+Message-ID: <20140718144044.GJ24914@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ARMCLK down feature on Exynos3250 SoC. The frequency of
-ARMCLK will be reduced upon entering idle mode (WFI or WFE).
+Hi,
 
-The feature behaves like very fast cpufreq ondemand governor.
+On Fri, Jul 18, 2014 at 08:11:15AM +0100, Lee Jones wrote:
 
-The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
-except it disables clock up feature.
+<snip>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> > > index eb69eb9..171ca52 100644
+> > > --- a/drivers/usb/dwc3/core.c
+> > > +++ b/drivers/usb/dwc3/core.c
+> > > @@ -47,6 +47,14 @@
+> > >  
+> > >  /* -------------------------------------------------------------------------- */
+> > >  
+> > > +static bool is_enabled = false;
+> > > +
+> > > +int dwc3_is_enabled(void)
+> > > +{
+> > > +	return is_enabled;
+> > > +}
+> > > +EXPORT_SYMBOL(dwc3_is_enabled);
+> > 
+> > no, no, no, no. Let me try that again, hello no! You _do_ realise there
+> > are systems with more than one dwc3 instance, right ? And this is the
+> > most fragile possible way of doing this.
+> > 
+> > You never explained what's a dwc3 subordinate driver, you don't show any
+> > example of how this would be used and why/where does the PHY need to
+> > poke into DWC3. Why isn't probe defer enough for you ? Which platform
+> > are you working on ? what is the problem that you're trying to solve ?
+> > 
+> > From this patch, all I can is NAK this patch with no mercy, sorry.
+> 
+> That's okay, I knew this was going to happen hence the RFC status of
+> the patch.  In the DT case, I describe 'subordinate devices' as are
+> drivers which register the DWC3 core using of_platform_populate(), 
+> so, for now:
+> 
+>   drivers/usb/dwc3/dwc3-exynos.c
+>   drivers/usb/dwc3/dwc3-keystone.c
+>   drivers/usb/dwc3/dwc3-omap.c
+> 
+> We're attempting to use the same process; however, at the moment we are
+> suffering with a 'boot order' issue.  If the PHYs aren't up and we
+> attempt to configure through the glue-layer our board locks up.  
 
----
+what are you configuring through the glue-layer ? Which glue-layer is
+causing that ?
 
-Changes since v1:
-1. Add PWR_CTRL registers to the list of saved clk registers on
-   Exynos3250. Suggested by Tomasz Figa.
-2. Disable the clock up feature. (sug. Tomasz Figa)
-3. Use macros for setting clock down ratio. (sug. Tomasz Figa)
----
- drivers/clk/samsung/clk-exynos3250.c | 41 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+> Presumably waiting for a read to return, forever.  Whist the core does
+> the correct thing i.e. -EPROBE_DEFER, we (dwc3-st.c) have no way of
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index 7a17bd40d1dd..a50dc88f0e8f 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -87,6 +87,22 @@
- #define SRC_CPU			0x14200
- #define DIV_CPU0		0x14500
- #define DIV_CPU1		0x14504
-+#define PWR_CTRL1		0x15020
-+#define PWR_CTRL2		0x15024
-+
-+/* Below definitions are used for PWR_CTRL settings */
-+#define PWR_CTRL1_CORE2_DOWN_RATIO(x)		(((x) & 0x7) << 28)
-+#define PWR_CTRL1_CORE1_DOWN_RATIO(x)		(((x) & 0x7) << 16)
-+#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
-+#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
-+#define PWR_CTRL1_USE_CORE3_WFE			(1 << 7)
-+#define PWR_CTRL1_USE_CORE2_WFE			(1 << 6)
-+#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
-+#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
-+#define PWR_CTRL1_USE_CORE3_WFI			(1 << 3)
-+#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
-+#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
-+#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
- 
- /* list of PLLs to be registered */
- enum exynos3250_plls {
-@@ -168,6 +184,8 @@ static unsigned long exynos3250_cmu_clk_regs[] __initdata = {
- 	SRC_CPU,
- 	DIV_CPU0,
- 	DIV_CPU1,
-+	PWR_CTRL1,
-+	PWR_CTRL2,
- };
- 
- static int exynos3250_clk_suspend(void)
-@@ -748,6 +766,27 @@ static struct samsung_pll_clock exynos3250_plls[nr_plls] __initdata = {
- 			UPLL_LOCK, UPLL_CON0, NULL),
- };
- 
-+static void __init exynos3_core_down_clock(void)
-+{
-+	unsigned int tmp;
-+
-+	/*
-+	 * Enable arm clock down (in idle) and set arm divider
-+	 * ratios in WFI/WFE state.
-+	 */
-+	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO(7) | PWR_CTRL1_CORE1_DOWN_RATIO(7) |
-+		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
-+		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
-+		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
-+	__raw_writel(tmp, reg_base + PWR_CTRL1);
-+
-+	/*
-+	 * Disable the clock up feature on Exynos4x12, in case it was
-+	 * enabled by bootloader.
-+	 */
-+	__raw_writel(0x0, reg_base + PWR_CTRL2);
-+}
-+
- static void __init exynos3250_cmu_init(struct device_node *np)
- {
- 	struct samsung_clk_provider *ctx;
-@@ -775,6 +814,8 @@ static void __init exynos3250_cmu_init(struct device_node *np)
- 	samsung_clk_register_div(ctx, div_clks, ARRAY_SIZE(div_clks));
- 	samsung_clk_register_gate(ctx, gate_clks, ARRAY_SIZE(gate_clks));
- 
-+	exynos3_core_down_clock();
-+
- 	exynos3250_clk_sleep_init();
- }
- CLK_OF_DECLARE(exynos3250_cmu, "samsung,exynos3250-cmu", exynos3250_cmu_init);
+ah! finally, the glue layer.
+
+> checking the return status of dwc3_probe().  As mentioned in the
+
+yeah, because glue layers are not supposed to know. There should be no
+coupling what so ever between glue layer and core driver, other than the
+fact that glue layer is the one which triggers platform_device creation
+through of_platform_population(). But the glue layer has (or should
+have) no interest in exactly when the core driver finishes probing.
+
+> commit message, another way of ensuring the PHYs are available is to
+> request them, but this would mean an awful lot of code duplication.
+> 
+> In your opinion, what's the best way to handle this?
+
+How can I know ? You still haven't fully explained what you need. All
+you said was that you're trying to "configure through the glue-layer".
+
+Care to further explain what the problem really is ? I'm assuming below
+is what you're concerned about which I had to go dig in the archives
+because there was no reference to that patch anywhere here.
+
+> +static void st_dwc3_init(struct st_dwc3 *dwc3_data)
+> +{
+> +	u32 reg = st_dwc3_readl(dwc3_data->glue_base, USB2_CLKRST_CTRL);
+> +
+> +	reg |= aux_clk_en(1) | ext_cfg_reset_n(1) | xhci_revision(1);
+
+so you have auxiliary clock, an external config reset, what's this
+xhci_revision ?
+
+> +	reg &= ~sw_pipew_reset_n(1);
+
+another reset
+
+> +	st_dwc3_writel(dwc3_data->glue_base, USB2_CLKRST_CTRL, reg);
+
+looks like it should be split between a CCF and reset drivers. Or maybe
+a single driver which does both. Do you have a clock/reset control for
+all IPs ? That might be a good way to hide stuff, driver would simply
+call clk_get()/clk_prepare_enable() and reset_assert()/deassert() when
+necessary (sure, this doesn't solve the 'when has that guy probe' but
+you still haven't explained why you need it).
+
+> +	reg = st_dwc3_readl(dwc3_data->glue_base, USB2_VBUS_MNGMNT_SEL1);
+> +	reg |= SEL_OVERRIDE_VBUSVALID(1) | SEL_OVERRIDE_POWERPRESENT(1) |
+> +	    SEL_OVERRIDE_BVALID(1);
+
+this is not correct. You don't know if VBUS is really valid at this
+time. We have used a gpio which gets pull high/low depending on the
+state of VBUS/ID.
+
+> +	st_dwc3_writel(dwc3_data->glue_base, USB2_VBUS_MNGMNT_SEL1, reg);
+> +	udelay(100);
+> +
+> +	reg = st_dwc3_readl(dwc3_data->glue_base, USB2_CLKRST_CTRL);
+> +	reg |= sw_pipew_reset_n(1);
+> +	st_dwc3_writel(dwc3_data->glue_base, USB2_CLKRST_CTRL, reg);
+
+let me ask you something else. Isn't the DWC3_GUSB3PIPECTL_PHYSOFTRST
+bit functional for you guys ? This sw_pipe2_reset_n looks suspicious.
+
+ps: I read that the board hangs, but why ? Have you checked with IP
+folks ? Maybe that's a silicon bug they're going to fix and we can hack
+things for now with an errata ID/revision check ?
+
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/9c304de5/attachment.sig>
