@@ -1,59 +1,38 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Fri, 18 Jul 2014 15:43:18 +0530
-Subject: [PATCHv6 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and
- code clean
-In-Reply-To: <59765980.V0Hsx6tyKd@wuerfel>
-References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
- <59765980.V0Hsx6tyKd@wuerfel>
-Message-ID: <CAHfPSqBiDZXxSVaK3PHrGhDQxi4TU=szKA06Odm9yeB8a5rDFw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Jul 2014 11:14:16 +0100
+Subject: [PATCH v3] arm64, ia64, ppc, s390, sh, tile, um, x86,
+ mm: Remove default gate area
+In-Reply-To: <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
+References: <70f331f59e620dc4e66bd3fa095e6f6b744b532b.1405281639.git.luto@amacapital.net>
+ <CALCETrXG6nL4K=Er+kv5-CXBDVa0TLg9yR6iePnMyE2ufXgKkw@mail.gmail.com>
+Message-ID: <20140718101416.GB1818@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Tue, Jul 15, 2014 at 03:47:26PM +0100, Andy Lutomirski wrote:
+> On Sun, Jul 13, 2014 at 1:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> > The core mm code will provide a default gate area based on
+> > FIXADDR_USER_START and FIXADDR_USER_END if
+> > !defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
+> >
+> > This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
+> > 64-bit UML, and x86_32 have their own code just to disable it.  arm,
+> > 32-bit UML, and x86_64 have gate areas, but they have their own
+> > implementations.
+> >
+> > This gets rid of the default and moves the code into ia64.
+> >
+> > This should save some code on architectures without a gate area: it's
+> > now possible to inline the gate_area functions in the default case.
+> 
+> Can one of you pull this somewhere?  Otherwise I can put it somewhere
+> stable and ask for -next inclusion, but that seems like overkill for a
+> single patch.
 
-On 18 July 2014 15:08, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 18 July 2014 14:59:42 Chanwoo Choi wrote:
->> This patchset support Exynos3250 ADC (Analog Digital Converter) because
->> Exynos3250 has additional special clock for ADC IP.
->>
->
-> by coincidence, I have just looked at the same driver in order to
-> add support for s3c24xx and s3c64xx, so we can remove the plat-samsung
-> adc framework they still use.  Those changes would naturally conflict
-> with yours, but I think it makes sense for your patches to come first.
->
-> I'll comment a bit more on the individual patches. I didn't have
-> interest in them earlier, so I didn't comment so far.
->
-> Another aspect that came up is the touchscreen support. Right now,
-> there is drivers/input/touchscreen/s3c2410_ts.c which is intimately
-> tied to arch/arm/plat-samsung/adc.c. The best way forward (as discussed
-> on IRC as few days ago) seems to be to integrate support for that into
-> the exynos_adc driver. Can you comment on which parts actually support
-> touchscreen? Did touchscreen support get dropped in the exynos hardware,
-> or is the driver just missing at the moment?
+I'd be happy to take the arm64 part, but it doesn't feel right for mm/*
+changes (or changes to other archs) to go via our tree.
 
-SoCs from Samsung before Exynos4 had and ADC based Touch screen
-and the driver under arch/arm/plat-samsung/adc.c and
-drivers/input/touchscreen/s3c2410_ts.c used to work together.
+I'm not sure what the best approach is if you want to send this via a single
+tree. Maybe you could ask akpm nicely?
 
-Infact, the interrupt routine and priorities in plat-samsung/adc.c
-driver as written keeping the Touchscreen in mind.
-
-After Exynos4, ADC IP remained. But, the touch screen was removed in hardware.
-
-As per suggestion from Doug Anderson, I've implemented IIO based ADC
-driver started to support from exynos5250.
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Shine bright,
-(: Nav :)
+Will
