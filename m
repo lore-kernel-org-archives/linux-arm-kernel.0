@@ -1,98 +1,78 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 18 Jul 2014 16:21:16 +0200
-Subject: [PATCH 4/6] net/macb: add RX checksum offload feature
+Date: Fri, 18 Jul 2014 16:21:15 +0200
+Subject: [PATCH 3/6] net/macb: add TX checksum offload feature
 In-Reply-To: <cover.1405689937.git.cyrille.pitchen@atmel.com>
 References: <cover.1405689937.git.cyrille.pitchen@atmel.com>
-Message-ID: <f29965fee23dc0de99b388373017efeffa1aac10.1405689937.git.cyrille.pitchen@atmel.com>
+Message-ID: <81148356bc5a52d07c49b18f68833fa7b2f97f2d.1405689937.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/net/ethernet/cadence/macb.c | 29 ++++++++++++++++++++++++++++-
- drivers/net/ethernet/cadence/macb.h |  2 ++
- 2 files changed, 30 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/cadence/macb.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
 diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 9bdcd1b..6acd6e2 100644
+index 06e9934..9bdcd1b 100644
 --- a/drivers/net/ethernet/cadence/macb.c
 +++ b/drivers/net/ethernet/cadence/macb.c
-@@ -766,6 +766,8 @@ static int gem_rx(struct macb *bp, int budget)
- 
- 		skb->protocol = eth_type_trans(skb, bp->dev);
- 		skb_checksum_none_assert(skb);
-+		if (bp->dev->features & NETIF_F_RXCSUM)
-+			skb->ip_summed = CHECKSUM_UNNECESSARY;
- 
- 		bp->stats.rx_packets++;
- 		bp->stats.rx_bytes += skb->len;
-@@ -1506,6 +1508,18 @@ static u32 macb_dbw(struct macb *bp)
+@@ -1524,6 +1524,10 @@ static void macb_configure_dma(struct macb *bp)
+ 			dmacfg = GEM_BFINS(FBLDO, bp->dma_burst_length, dmacfg);
+ 		dmacfg |= GEM_BIT(TXPBMS) | GEM_BF(RXBMS, -1L);
+ 		dmacfg &= ~GEM_BIT(ENDIA);
++		if (bp->dev->features & NETIF_F_HW_CSUM)
++			dmacfg |= GEM_BIT(TXCOEN);
++		else
++			dmacfg &= ~GEM_BIT(TXCOEN);
+ 		netdev_dbg(bp->dev, "Cadence configure DMA with 0x%08x\n", dmacfg);
+ 		gem_writel(bp, DMACFG, dmacfg);
+ 	}
+@@ -1923,6 +1927,27 @@ int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  }
+ EXPORT_SYMBOL_GPL(macb_ioctl);
  
- /*
-+ * Configure the RX checksum offload
-+ */
-+static u32 macb_rxcsum(struct macb *bp)
++static int macb_set_features(struct net_device *netdev,
++			     netdev_features_t features)
 +{
-+	if (macb_is_gem(bp) &&
-+	    (bp->dev->features & NETIF_F_RXCSUM))
-+		return GEM_BIT(RXCOEN);
++	struct macb *bp = netdev_priv(netdev);
++	netdev_features_t changed = features ^ netdev->features;
++
++	/* TX checksum offload */
++	if ((changed & NETIF_F_HW_CSUM) && macb_is_gem(bp)) {
++		u32 dmacfg;
++
++		dmacfg = gem_readl(bp, DMACFG);
++		if (features & NETIF_F_HW_CSUM)
++			dmacfg |= GEM_BIT(TXCOEN);
++		else
++			dmacfg &= ~GEM_BIT(TXCOEN);
++		gem_writel(bp, DMACFG, dmacfg);
++	}
 +
 +	return 0;
 +}
 +
-+/*
-  * Configure the receive DMA engine
-  * - use the correct receive buffer size
-  * - set best burst length for DMA operations
-@@ -1550,6 +1564,7 @@ static void macb_init_hw(struct macb *bp)
- 	if (!(bp->dev->flags & IFF_BROADCAST))
- 		config |= MACB_BIT(NBC);	/* No BroadCast */
- 	config |= macb_dbw(bp);
-+	config |= macb_rxcsum(bp);
- 	macb_writel(bp, NCFGR, config);
- 	bp->speed = SPEED_10;
- 	bp->duplex = DUPLEX_HALF;
-@@ -1945,6 +1960,18 @@ static int macb_set_features(struct net_device *netdev,
- 		gem_writel(bp, DMACFG, dmacfg);
- 	}
+ static const struct net_device_ops macb_netdev_ops = {
+ 	.ndo_open		= macb_open,
+ 	.ndo_stop		= macb_close,
+@@ -1936,6 +1961,7 @@ static const struct net_device_ops macb_netdev_ops = {
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller	= macb_poll_controller,
+ #endif
++	.ndo_set_features	= macb_set_features,
+ };
  
-+	/* RX checksum offload */
-+	if ((changed & NETIF_F_RXCSUM) && macb_is_gem(bp)) {
-+		u32 netcfg;
-+
-+		netcfg = gem_readl(bp, NCFGR);
-+		if (features & NETIF_F_RXCSUM)
-+			netcfg |= GEM_BIT(RXCOEN);
-+		else
-+			netcfg &= ~GEM_BIT(RXCOEN);
-+		gem_writel(bp, NCFGR, netcfg);
-+	}
-+
- 	return 0;
- }
+ #if defined(CONFIG_OF)
+@@ -2118,6 +2144,10 @@ static int __init macb_probe(struct platform_device *pdev)
  
-@@ -2146,7 +2173,7 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	/* Set features */
  	dev->hw_features = NETIF_F_SG;
- 	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE)) {
- 		/* Checksum offload is only available on packet buffer design */
--		dev->hw_features |= NETIF_F_HW_CSUM;
-+		dev->hw_features |= NETIF_F_HW_CSUM | NETIF_F_RXCSUM;
- 	}
++	if (macb_is_gem(bp) && !(bp->caps & MACB_CAPS_FIFO_MODE)) {
++		/* Checksum offload is only available on packet buffer design */
++		dev->hw_features |= NETIF_F_HW_CSUM;
++	}
  	if (bp->caps & MACB_CAPS_SG_DISABLED)
  		dev->hw_features &= ~NETIF_F_SG;
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 7bf8285..3678b83 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -164,6 +164,8 @@
- #define GEM_CLK_SIZE				3
- #define GEM_DBW_OFFSET				21
- #define GEM_DBW_SIZE				2
-+#define GEM_RXCOEN_OFFSET			24
-+#define GEM_RXCOEN_SIZE				1
- 
- /* Constants for data bus width. */
- #define GEM_DBW32				0
+ 	dev->features = dev->hw_features;
 -- 
 1.8.2.2
