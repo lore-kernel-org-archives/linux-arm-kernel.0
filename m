@@ -1,91 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 18 Jul 2014 09:33:16 +0200
-Subject: [PATCH] CMA: generalize CMA reserved area management functionality
- (fixup)
-In-Reply-To: <20140717150615.32c48786b6bdbc880bdc5ed4@linux-foundation.org>
-References: <53C78ED7.7030002@samsung.com>
- <1405589767-17513-1-git-send-email-m.szyprowski@samsung.com>
- <20140717150615.32c48786b6bdbc880bdc5ed4@linux-foundation.org>
-Message-ID: <53C8CDBC.3030600@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 18 Jul 2014 00:34:09 -0700
+Subject: [PATCH v5 0/7] kernel: Add support for restart handler call chain
+Message-ID: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Various drivers implement architecture and/or device specific means
+to restart (reset) the system. Various mechanisms have been implemented
+to support those schemes. The best known mechanism is arm_pm_restart,
+which is a function pointer to be set either from platform specific code
+or from drivers. Another mechanism is to use hardware watchdogs to issue
+a reset; this mechanism is used if there is no other method available
+to reset a board or system. Two examples are alim7101_wdt, which currently
+uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
+the arm_pm_restart function. Several other restart drivers for arm, all
+directly calling arm_pm_restart, are in the process of being integrated
+into the kernel. All those drivers would benefit from the new API.
 
-On 2014-07-18 00:06, Andrew Morton wrote:
-> On Thu, 17 Jul 2014 11:36:07 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
->> MAX_CMA_AREAS is used by other subsystems (i.e. arch/arm/mm/dma-mapping.c),
->> so we need to provide correct definition even if CMA is disabled.
->> This patch fixes this issue.
->>
->> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   include/linux/cma.h | 4 ++++
->>   1 file changed, 4 insertions(+)
->>
->> diff --git a/include/linux/cma.h b/include/linux/cma.h
->> index 9a18a2b1934c..c077635cad76 100644
->> --- a/include/linux/cma.h
->> +++ b/include/linux/cma.h
->> @@ -5,7 +5,11 @@
->>    * There is always at least global CMA area and a few optional
->>    * areas configured in kernel .config.
->>    */
->> +#ifdef CONFIG_CMA
->>   #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
->> +#else
->> +#define MAX_CMA_AREAS	(0)
->> +#endif
->>   
->>   struct cma;
-> Joonsoo already fixed this up, a bit differently:
-> http://ozlabs.org/~akpm/mmots/broken-out/cma-generalize-cma-reserved-area-management-functionality-fix.patch
->
-> Which approach makes more sense?
+The existing mechanisms have a number of drawbacks. Typically only one scheme
+to restart the system is supported (at least if arm_pm_restart is used).
+At least in theory there can be multiple means to restart the system, some of
+which may be less desirable (for example one mechanism may only reset the CPU,
+while another may reset the entire system). Using arm_pm_restart can also be
+racy if the function pointer is set from a driver, as the driver may be in
+the process of being unloaded when arm_pm_restart is called.
+Using the reboot notifier is always racy, as it is unknown if and when
+other functions using the reboot notifier have completed execution
+by the time the watchdog fires.
 
-CMA_AREAS depends on CMA being enabled, so both approaches works exactly
-the same way. Please keep Joonsoo's patch and just ignore mine to avoid
-confusing others by disappearing patches. I'm sorry that I've missed it
-before sending mine.
+Introduce a system restart handler call chain to solve the described problems.
+This call chain is expected to be executed from the architecture specific
+machine_restart() function. Drivers providing system restart functionality
+(such as the watchdog drivers mentioned above) are expected to register
+with this call chain. By using the priority field in the notifier block,
+callers can control restart handler execution sequence and thus ensure that
+the restart handler with the optimal restart capabilities for a given system
+is called first.
 
-> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> Subject: CMA: fix ARM build failure related to MAX_CMA_AREAS definition
->
-> If CMA is disabled, CONFIG_CMA_AREAS isn't defined so compile error
-> happens. To fix it, define MAX_CMA_AREAS if CONFIG_CMA_AREAS
-> isn't defined.
->
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
-> ---
->
->   include/linux/cma.h |    6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff -puN include/linux/cma.h~cma-generalize-cma-reserved-area-management-functionality-fix include/linux/cma.h
-> --- a/include/linux/cma.h~cma-generalize-cma-reserved-area-management-functionality-fix
-> +++ a/include/linux/cma.h
-> @@ -5,8 +5,14 @@
->    * There is always at least global CMA area and a few optional
->    * areas configured in kernel .config.
->    */
-> +#ifdef CONFIG_CMA_AREAS
->   #define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
->   
-> +#else
-> +#define MAX_CMA_AREAS	(0)
-> +
-> +#endif
-> +
->   struct cma;
->   
->   extern phys_addr_t cma_get_base(struct cma *cma);
-> _
+Since the first revision of this patchset, a number of separate patch
+submissions have been made which either depend on it or could make use of it.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
+	registers three notifiers.
+https://lkml.org/lkml/2014/7/8/962
+	would benefit from it.
+
+Patch 1 of this series implements the restart handler function. Patches 2 and 3
+implement calling the restart handler chain from arm and arm64 restart code.
+
+Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
+directly but machine_restart. This is done to avoid calling arm_pm_restart
+from more than one place. The change makes the driver architecture independent,
+so it would be possible to drop the arm dependency from its Kconfig entry.
+
+Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
+that no one gets the idea to implement a restart handler as module.
+
+---
+v5: Rebased series to v3.16-rc5
+    Function renames:
+    register_restart_notifier -> register_restart_handler
+    unregister_restart_notifier -> unregister_restart_handler
+    kernel_restart_notify -> do_kernel_restart
+v4: Document restart notifier priorities
+    Select 128 as default priority for newly introduced notifiers
+    Fix checkpatch warning (line too long) in moxart patch
+v3: Drop RFC.
+    Add kernel_restart_notify wrapper function to execute notifier
+    Improve documentation.
+    Move restart_notifier_list into kernel/reboot.c and make it static.
+v2: Add patch 4.
+    Only call blocking notifier call chain if arm_pm_restart was not set.
