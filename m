@@ -1,38 +1,25 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 18 Jul 2014 11:14:27 -0400
-Subject: [PATCH v6 3/5] PCI: designware: enhance dw_pcie_host_init() to
- support v3.65 DW hardware
+Date: Fri, 18 Jul 2014 11:14:25 -0400
+Subject: [PATCH v6 1/5] PCI: designware: add rd[wr]_other_conf API
 In-Reply-To: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
 References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1405696469-7172-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1405696469-7172-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-keystone PCI controller is based on v3.65 designware hardware. This
-version differs from newer versions of the hardware in few functional
-areas discussed below that makes it necessary to change dw_pcie_host_init()
-to support v3.65 based PCI controller.
-
- 1. No support for ATU port. So any ATU specific resource handling code
-    is to be bypassed for v3.65 h/w.
- 2. MSI controller uses Application space to implement MSI and 32 MSI
-    interrupts are multiplexed over 8 IRQs to the host. Hence the code
-    to process MSI IRQ needs to be different. This patch allows platform
-    driver to provide its own irq_domain_ops ptr to irq_domain_add_linear()
-    through an API callback from the designware core driver.
- 3. MSI interrupt generation requires EP to write to the RC's application
-    register. So enhance the driver to allow setup of inbound access to
-    MSI irq register as a post scan bus API callback.
+v3.65 version of the designware h/w, requires application space
+registers to be configured to access the remote EP config space.
+To support this, add rd[wr]_other_conf API in the pcie_host_opts
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 Reviewed-by: Pratyush Anand <pratyush.anand@st.com>
-Acked-by: Mohit KUMAR <mohit.kumar@st.com>
+Acked-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
 CC: Russell King <linux@arm.linux.org.uk>
 CC: Grant Likely <grant.likely@linaro.org>
 CC: Rob Herring <robh+dt@kernel.org>
-CC: Jingoo Han <jg1.han@samsung.com>
 CC: Bjorn Helgaas <bhelgaas@google.com>
 CC: Richard Zhu <r65037@freescale.com>
 CC: Kishon Vijay Abraham I <kishon@ti.com>
@@ -43,118 +30,57 @@ CC: Mark Rutland <mark.rutland@arm.com>
 CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
 CC: Kumar Gala <galak@codeaurora.org>
 CC: Randy Dunlap <rdunlap@infradead.org>
-CC: Grant Likely <grant.likely@linaro.org>
+CC: Grant Likely <grant.likely@linaro.org> 
 
 ---
- drivers/pci/host/pcie-designware.c |   54 +++++++++++++++++++++++-------------
- drivers/pci/host/pcie-designware.h |    2 ++
- 2 files changed, 36 insertions(+), 20 deletions(-)
+ drivers/pci/host/pcie-designware.c |   12 ++++++++++--
+ drivers/pci/host/pcie-designware.h |    4 ++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 905941c..35bb4af 100644
+index 1eaf4df..d8f3af7 100644
 --- a/drivers/pci/host/pcie-designware.c
 +++ b/drivers/pci/host/pcie-designware.c
-@@ -420,8 +420,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	struct device_node *np = pp->dev->of_node;
- 	struct of_pci_range range;
- 	struct of_pci_range_parser parser;
-+	int i, ret;
- 	u32 val;
--	int i;
- 
- 	if (of_pci_range_parser_init(&parser, np)) {
- 		dev_err(pp->dev, "missing ranges property\n");
-@@ -467,21 +467,26 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 		}
+@@ -656,7 +656,11 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
  	}
  
--	pp->cfg0_base = pp->cfg.start;
--	pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
- 	pp->mem_base = pp->mem.start;
+ 	if (bus->number != pp->root_bus_nr)
+-		ret = dw_pcie_rd_other_conf(pp, bus, devfn,
++		if (pp->ops->rd_other_conf)
++			ret = pp->ops->rd_other_conf(pp, bus, devfn,
++						where, size, val);
++		else
++			ret = dw_pcie_rd_other_conf(pp, bus, devfn,
+ 						where, size, val);
+ 	else
+ 		ret = dw_pcie_rd_own_conf(pp, where, size, val);
+@@ -679,7 +683,11 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
  
--	pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
--					pp->config.cfg0_size);
- 	if (!pp->va_cfg0_base) {
--		dev_err(pp->dev, "error with ioremap in function\n");
--		return -ENOMEM;
-+		pp->cfg0_base = pp->cfg.start;
-+		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
-+						pp->config.cfg0_size);
-+		if (!pp->va_cfg0_base) {
-+			dev_err(pp->dev, "error with ioremap in function\n");
-+			return -ENOMEM;
-+		}
- 	}
--	pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
--					pp->config.cfg1_size);
-+
- 	if (!pp->va_cfg1_base) {
--		dev_err(pp->dev, "error with ioremap\n");
--		return -ENOMEM;
-+		pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
-+		pp->va_cfg1_base = devm_ioremap(pp->dev, pp->cfg1_base,
-+						pp->config.cfg1_size);
-+		if (!pp->va_cfg1_base) {
-+			dev_err(pp->dev, "error with ioremap\n");
-+			return -ENOMEM;
-+		}
- 	}
- 
- 	if (of_property_read_u32(np, "num-lanes", &pp->lanes)) {
-@@ -490,16 +495,22 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	}
- 
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
--		pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
--					MAX_MSI_IRQS, &msi_domain_ops,
--					&dw_pcie_msi_chip);
--		if (!pp->irq_domain) {
--			dev_err(pp->dev, "irq domain init failed\n");
--			return -ENXIO;
--		}
-+		if (!pp->ops->msi_host_init) {
-+			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-+						MAX_MSI_IRQS, &msi_domain_ops,
-+						&dw_pcie_msi_chip);
-+			if (!pp->irq_domain) {
-+				dev_err(pp->dev, "irq domain init failed\n");
-+				return -ENXIO;
-+			}
- 
--		for (i = 0; i < MAX_MSI_IRQS; i++)
--			irq_create_mapping(pp->irq_domain, i);
-+			for (i = 0; i < MAX_MSI_IRQS; i++)
-+				irq_create_mapping(pp->irq_domain, i);
-+		} else {
-+			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
-+			if (ret < 0)
-+				return ret;
-+		}
- 	}
- 
- 	if (pp->ops->host_init)
-@@ -759,6 +770,9 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 		BUG();
- 	}
- 
-+	if (bus && pp->ops->scan_bus)
-+		pp->ops->scan_bus(pp);
-+
- 	return bus;
- }
- 
+ 	if (bus->number != pp->root_bus_nr)
+-		ret = dw_pcie_wr_other_conf(pp, bus, devfn,
++		if (pp->ops->wr_other_conf)
++			ret = pp->ops->wr_other_conf(pp, bus, devfn,
++						where, size, val);
++		else
++			ret = dw_pcie_wr_other_conf(pp, bus, devfn,
+ 						where, size, val);
+ 	else
+ 		ret = dw_pcie_wr_own_conf(pp, where, size, val);
 diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 387f69e..080c649 100644
+index 77f592f..8121901 100644
 --- a/drivers/pci/host/pcie-designware.h
 +++ b/drivers/pci/host/pcie-designware.h
-@@ -70,6 +70,8 @@ struct pcie_host_ops {
- 	void (*msi_set_irq)(struct pcie_port *pp, int irq);
- 	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
- 	u32 (*get_msi_data)(struct pcie_port *pp);
-+	void (*scan_bus)(struct pcie_port *pp);
-+	int (*msi_host_init)(struct pcie_port *pp, struct msi_chip *chip);
+@@ -61,6 +61,10 @@ struct pcie_host_ops {
+ 			u32 val, void __iomem *dbi_base);
+ 	int (*rd_own_conf)(struct pcie_port *pp, int where, int size, u32 *val);
+ 	int (*wr_own_conf)(struct pcie_port *pp, int where, int size, u32 val);
++	int (*rd_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
++			unsigned int devfn, int where, int size, u32 *val);
++	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
++			unsigned int devfn, int where, int size, u32 val);
+ 	int (*link_up)(struct pcie_port *pp);
+ 	void (*host_init)(struct pcie_port *pp);
  };
- 
- int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
 -- 
 1.7.9.5
