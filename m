@@ -1,101 +1,62 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 18 Jul 2014 18:10:39 +0200
-Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver through
- DT
-In-Reply-To: <CANuQgHEPocfO8wDPDTJUkBNGEfw6FoLEYAJK-zPPA7kd_L-34Q@mail.gmail.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20140717142019.GA21732@e102568-lin.cambridge.arm.com>
- <CANuQgHEPocfO8wDPDTJUkBNGEfw6FoLEYAJK-zPPA7kd_L-34Q@mail.gmail.com>
-Message-ID: <1633432.ZfU5VfHtET@amdc1032>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 19 Jul 2014 01:11:53 +0900
+Subject: [PATCHv6 2/4] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <32226622.5gSmvBRKvZ@wuerfel>
+References: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
+ <6917971.QKItNU3coA@wuerfel>
+ <CAGTfZH1EHiTpo2Abua=+kDfNoOQx+ydPHU51=+qW8mgCL4Lwvg@mail.gmail.com>
+ <32226622.5gSmvBRKvZ@wuerfel>
+Message-ID: <CAGTfZH3vz9MLN+1fPM22zKE64oMNDgcib3is0nfzZhhLkmdNvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Jul 19, 2014 at 12:23 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 19 July 2014 00:15:35 Chanwoo Choi wrote:
+>> On Fri, Jul 18, 2014 at 8:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 18 July 2014 19:00:48 Chanwoo Choi wrote:
+>> >> On 07/18/2014 06:47 PM, Arnd Bergmann wrote:
+>> >> >
+>> >> > Further, why is it called "sclk_adc" rather than just "sclk"?
+>> >>
+>> >> The sclk means 'special clock' in Exynos TRM. Exynos SoC has varisou sclk clocks.
+>> >> 'sclk_adc' is only used for ADC IP.
+>> >
+>> > But that sounds like sclk_adc is the name of the global name
+>> > of the clock signal coming out of the clock controller.
+>> >
+>> > I still think it would be best to name it 'sclk' as the input
+>> > for the adc. It shouldn't rely on a particular name of the
+>> > clock controller.
+>>
+>> I think 'sclk' is too common name. 'sclk' don't include specific device name.
+>> As I know, usual clock name includes the name of IP or includes the
+>> specific meaning for each IP.
+>
+> No, normally it does not include the name of the IP, that's my whole point.
+> Including the name of the IP is completely pointless because that is
+> implied by the fact that it's being used by that particular IP.
+>
+> Ideally you would find the data sheet for the ADC IP block and figure
+> out what this clock is used for, then find the right name for that.
 
-Hi,
+I mentioned the meaning of clocks ('adc', 'sclk_adc') as following in
+patch description.
+But, you think that need the more proper name instead of 'sclk_adc' to mean the
+correct operation of 'sclk_adc'. I'll check once again the meaning of
+'sclk_adc' in data sheet
+and renaming it.
 
-On Friday, July 18, 2014 02:15:01 PM Chander Kashyap wrote:
-> Hi Lorenzo,
-> 
-> 
-> On 17 July 2014 19:50, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > On Wed, Jun 25, 2014 at 04:23:38PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> >>
-> >> Hi,
-> >>
-> >> On Wednesday, June 25, 2014 03:10:20 PM Lorenzo Pieralisi wrote:
-> >> > With the introduction of DT based idle states, CPUidle drivers for
-> >> > ARM can now initialize idle states data through properties in the device
-> >> > tree.
-> >> >
-> >> > This patch adds code to the Exynos CPUidle driver to dynamically
-> >> > initialize idle states data through the updated device tree source
-> >> > files.
-> >> >
-> >> > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >> > Cc: Tomasz Figa <t.figa@samsung.com>
-> >> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> > ---
-> >> > Compile tested, I am not sure I patched the right dts files, please check.
-> >>
-> >> cpuidle-exynos driver is currently working properly in deeper cpuidle
-> >> mode (AFTR) on Exynos4210 and Exynos5250 (please also see the following
-> >> patch from Tomasz Figa: [1]).  There is ongoing work to AFTR mode work
-> >> also on Exynos4x12 and Exynos3250 but it is not complete yet.  Exynos5410
-> >> OTOH should probably use the generic big little cpuidle driver (this SoC
-> >> is similar to Exynos5420 one for which Chander Kashyap has developed
-> >> cpuidle-big_little support [2]).
-> >>
-> >> Making long story short, I think that your patch should depend on patch
-> >> [1] and update only exynos4210.dtsi and exynos5250.dtsi.  Also for your
-> >> patch #6 there needs to be some coordination with merging of Chander's
-> >> patchset ([2]).
-> >>
-> >> [1] http://www.spinics.net/lists/arm-kernel/msg341023.html
-> >> [2] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg664470.html
-> >
-> >
-> > exynos4210.dtsi does not even have cpu nodes in it. Should I add them or
-> > this might trigger regression (ie cpu_logical_map()) ?
-> 
-> Yes that can cause regression.
+  Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+  - 'adc' clock: bus clock for ADC
 
-Yes, two patches from Tomasz Figa are needed to fix it:
+  Exynos3250 has additional 'sclk_adc' clock as following:
+  - 'sclk_adc' clock: special clock for ADC which provide clock to internal ADC
 
-- [PATCH 2/6] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32811.html
+> In a lot of cases, we are actually better off not naming the clocks
+> at all but simply enumerating them if nobody knows what they are good
+> for. In that case, you would simply have the first clock and the second
+> clock of the ADC part and enable them both.
 
-- [PATCH] irqchip: gic: Fix core ID calculation when topology is read from DT
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34277.html
-
-> > I will post a new version soon, should I just patch 5250 for now ?
-
-I posted patch adding CPU nodes for Exynos4 SoCs to DT:
-
-- [PATCH] ARM: dts: add CPU nodes for Exynos4 SoCs
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34378.html
-
-Please make your series depend on it and add Exynos4210 support.
-
-> > I would need help to test this patch thanks.
-> 
-> I can test the patch for 5250.
-
-I can do testing on Exynos4210 if needed.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> >
-> > Lorenzo
-> >
-> >> >  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
-> >> >  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
-> >> >  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
-> >> >  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
-> >> >  drivers/cpuidle/Kconfig.arm                        |  1 +
-> >> >  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
-> >> >  6 files changed, 93 insertions(+), 12 deletions(-)
-> >> >  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
+Thanks for your  review.
+Chanwoo Choi
