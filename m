@@ -1,87 +1,63 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 18 Jul 2014 14:18:15 -0700
-Subject: [PATCH v2 7/7] x86_64,
- entry: Use split-phase syscall_trace_enter for 64-bit syscalls
-In-Reply-To: <cover.1405717901.git.luto@amacapital.net>
-References: <cover.1405717901.git.luto@amacapital.net>
-Message-ID: <8e9ca6cff0bda4b1ec730efbe6dcfeb27db87ed9.1405717901.git.luto@amacapital.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 18 Jul 2014 17:22:21 -0400
+Subject: [PATCH 2/4] ARM: add IPI tracepoints
+In-Reply-To: <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
+References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
+ <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
+ <20140718160418.54d11f6a@gandalf.local.home>
+ <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
+Message-ID: <20140718172221.6dbe83e4@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On KVM on my box, this reduces the overhead from an always-accept
-seccomp filter from ~130ns to ~17ns.  Most of that comes from
-avoiding IRET on every syscall when seccomp is enabled.
+On Fri, 18 Jul 2014 16:55:42 -0400 (EDT)
+Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
 
-In extremely approximate hacked-up benchmarking, just bypassing IRET
-saves about 80ns, so there's another 43ns of savings here from
-simplifying the seccomp path.
+> 
+> Here's the patch I have at the head of the series now, with the above
+> ugliness changed to an unconditional __tracepoint_string attribute.
+> 
 
-The diffstat is also rather nice :)
+I was thinking of something like this. Feel free to add this to your
+series.
 
-Signed-off-by: Andy Lutomirski <luto@amacapital.net>
+-- Steve
+
+From: Steven Rostedt <rostedt@goodmis.org>
+Subject: [PATCH] tracing: Do not do anything special with tracepoint_string when tracing is disabled
+
+When CONFIG_TRACING is not enabled, there's no reason to save the trace
+strings either by the linker or as a static variable that can be
+referenced later. Simply pass back the string that is given to
+tracepoint_string().
+
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
 ---
- arch/x86/kernel/entry_64.S | 38 +++++++++++++++-----------------------
- 1 file changed, 15 insertions(+), 23 deletions(-)
-
-diff --git a/arch/x86/kernel/entry_64.S b/arch/x86/kernel/entry_64.S
-index 1eb3094..13e0c1d 100644
---- a/arch/x86/kernel/entry_64.S
-+++ b/arch/x86/kernel/entry_64.S
-@@ -479,22 +479,6 @@ sysret_signal:
+diff --git a/include/linux/ftrace_event.h b/include/linux/ftrace_event.h
+index cff3106..b296363 100644
+--- a/include/linux/ftrace_event.h
++++ b/include/linux/ftrace_event.h
+@@ -574,6 +574,7 @@ do {									\
+ 		__trace_printk(ip, fmt, ##args);			\
+ } while (0)
  
- #ifdef CONFIG_AUDITSYSCALL
- 	/*
--	 * Fast path for syscall audit without full syscall trace.
--	 * We just call __audit_syscall_entry() directly, and then
--	 * jump back to the normal fast path.
--	 */
--auditsys:
--	movq %r10,%r9			/* 6th arg: 4th syscall arg */
--	movq %rdx,%r8			/* 5th arg: 3rd syscall arg */
--	movq %rsi,%rcx			/* 4th arg: 2nd syscall arg */
--	movq %rdi,%rdx			/* 3rd arg: 1st syscall arg */
--	movq %rax,%rsi			/* 2nd arg: syscall number */
--	movl $AUDIT_ARCH_X86_64,%edi	/* 1st arg: audit arch */
--	call __audit_syscall_entry
--	LOAD_ARGS 0		/* reload call-clobbered registers */
--	jmp system_call_fastpath
--
--	/*
- 	 * Return fast path for syscall audit.  Call __audit_syscall_exit()
- 	 * directly and then jump back to the fast path with TIF_SYSCALL_AUDIT
- 	 * masked off.
-@@ -511,17 +495,25 @@ sysret_audit:
++#ifdef CONFIG_TRACING
+ /**
+  * tracepoint_string - register constant persistent string to trace system
+  * @str - a constant persistent string that will be referenced in tracepoints
+@@ -607,6 +608,15 @@ do {									\
+ 		___tp_str;						\
+ 	})
+ #define __tracepoint_string	__attribute__((section("__tracepoint_str")))
++#else
++/*
++ * tracepoint_string() is used to save the string address for userspace
++ * tracing tools. When tracing isn't configured, there's no need to save
++ * anything.
++ */
++# define tracepoint_string(str) str
++# define __tracepoint_string
++#endif
  
- 	/* Do syscall tracing */
- tracesys:
--#ifdef CONFIG_AUDITSYSCALL
--	testl $(_TIF_WORK_SYSCALL_ENTRY & ~_TIF_SYSCALL_AUDIT),TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET)
--	jz auditsys
--#endif
-+	leaq -REST_SKIP(%rsp), %rdi
-+	movq $AUDIT_ARCH_X86_64, %rsi
-+	call syscall_trace_enter_phase1
-+	test %rax, %rax
-+	jnz tracesys_phase2		/* if needed, run the slow path */
-+	LOAD_ARGS 0			/* else restore clobbered regs */
-+	jmp system_call_fastpath	/*      and return to the fast path */
-+
-+tracesys_phase2:
- 	SAVE_REST
- 	FIXUP_TOP_OF_STACK %rdi
--	movq %rsp,%rdi
--	call syscall_trace_enter
-+	movq %rsp, %rdi
-+	movq $AUDIT_ARCH_X86_64, %rsi
-+	movq %rax,%rdx
-+	call syscall_trace_enter_phase2
-+
- 	/*
- 	 * Reload arg registers from stack in case ptrace changed them.
--	 * We don't reload %rax because syscall_trace_enter() returned
-+	 * We don't reload %rax because syscall_trace_entry_phase2() returned
- 	 * the value it wants us to use in the table lookup.
- 	 */
- 	LOAD_ARGS ARGOFFSET, 1
--- 
-1.9.3
+ #ifdef CONFIG_PERF_EVENTS
+ struct perf_event;
