@@ -1,51 +1,41 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 18 Jul 2014 00:34:16 -0700
-Subject: [PATCH v5 7/7] arm/arm64: Unexport restart handlers
+Date: Fri, 18 Jul 2014 00:34:13 -0700
+Subject: [PATCH v5 4/7] power/restart: Call machine_restart instead of
+ arm_pm_restart
 In-Reply-To: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
 References: <1405668856-13738-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1405668856-13738-8-git-send-email-linux@roeck-us.net>
+Message-ID: <1405668856-13738-5-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing a restart handler in a module don't make sense
-as there would be no guarantee that the module is loaded when
-a restart is needed. Unexport arm_pm_restart to ensure that
-no one gets the idea to do it anyway.
+machine_restart is supported on non-ARM platforms, and and ultimately calls
+arm_pm_restart, so dont call arm_pm_restart directly but use the more
+generic function.
 
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
-v5: No change
-v4: No change
-v3: No change
-v2: No change
+v5: No change.
+v4: No change.
+v3: No change.
+v2: Added patch.
 
- arch/arm/kernel/process.c   | 1 -
- arch/arm64/kernel/process.c | 1 -
- 2 files changed, 2 deletions(-)
+ drivers/power/reset/restart-poweroff.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 84ca0d5..27bdf11 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -125,7 +125,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL(pm_power_off);
+diff --git a/drivers/power/reset/restart-poweroff.c b/drivers/power/reset/restart-poweroff.c
+index 5758033..47f10eb 100644
+--- a/drivers/power/reset/restart-poweroff.c
++++ b/drivers/power/reset/restart-poweroff.c
+@@ -20,7 +20,8 @@
  
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
--EXPORT_SYMBOL_GPL(arm_pm_restart);
+ static void restart_poweroff_do_poweroff(void)
+ {
+-	arm_pm_restart(REBOOT_HARD, NULL);
++	reboot_mode = REBOOT_HARD;
++	machine_restart(NULL);
+ }
  
- /*
-  * This is our default idle handler.
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 9591e60..f5fddff 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -92,7 +92,6 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL_GPL(pm_power_off);
- 
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
--EXPORT_SYMBOL_GPL(arm_pm_restart);
- 
- /*
-  * This is our default idle handler.
+ static int restart_poweroff_probe(struct platform_device *pdev)
 -- 
 1.9.1
