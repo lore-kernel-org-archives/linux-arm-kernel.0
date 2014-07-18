@@ -1,48 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Jul 2014 13:44:53 +0100
-Subject: [PATCH v10 01/11] irq: gic: support hip04 gic
-In-Reply-To: <20140718120526.GC24496@titan.lakedaemon.net>
-References: <1404957850-13340-1-git-send-email-haojian.zhuang@linaro.org>
- <1404957850-13340-2-git-send-email-haojian.zhuang@linaro.org>
- <20140718120526.GC24496@titan.lakedaemon.net>
-Message-ID: <20140718124453.GB17179@leverpostej>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Fri, 18 Jul 2014 18:24:22 +0530
+Subject: [PATCH v10 1/8] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <1405686607-8126-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1405686607-8126-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <53C918FE.8040303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 01:05:26PM +0100, Jason Cooper wrote:
-> Haojian,
-> 
-> On Thu, Jul 10, 2014 at 10:04:00AM +0800, Haojian Zhuang wrote:
-> > There's a little difference between ARM GIC and HiP04 GIC.
-> > 
-> > * HiP04 GIC could support 16 cores at most, and ARM GIC could support
-> > 8 cores at most. So the difination on GIC_DIST_TARGET registers are
-> > different since CPU interfaces are increased from 8-bit to 16-bit.
-> > 
-> > * HiP04 GIC could support 510 interrupts at most, and ARM GIC could
-> > support 1020 interrupts at most.
-> > 
-> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/arm/gic.txt |   1 +
-> >  drivers/irqchip/irq-gic.c                     | 141 +++++++++++++++++++-------
-> >  2 files changed, 108 insertions(+), 34 deletions(-)
-> 
-> I need to apologize.  This is my first full cycle maintaining irqchip
-> and I'm still coming up to speed.  The tl;dr is, I'm just not
-> comfortable with the approach in this patch.
-> 
-> If irq-gic.c was only used by one SoC, it'd be different, but in the
-> scenario we have, I think it would be best if this were a separate
-> driver, say irq-gic-hip04.c.  You can link in irq-gic-common.o to get
-> gic_dist_config(), and you'll be able to remove a lot of the static
-> functions and conditionals.
+On 07/18/2014 06:00 PM, Antoine T?nart wrote:
+> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+>
+> The mode selection can let us think this PHY can be configured to fit
+> other purposes. But there are reasons to think the SATA mode will be
+> the only one usable: the PHY registers are only accessible indirectly
+> through two registers in the SATA range, the PHY seems to be integrated
+> and no information tells us the contrary. For these reasons, make the
+> driver a SATA PHY driver.
+>
+(...)
 
-A better approach might be to have some function pointers with each
-compatible string, and then have associated with the HiP04 compatible
-string, and then have those call common (inline) function variants. The
-compiler can then deal with the different variants and we don't end up
-with multiple GIC drivers getting out-of-sync.
+> +
+> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+> +	{ .compatible = "marvell,berlin2q-sata-phy" },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver phy_berlin_sata_driver = {
+> +	.probe	= phy_berlin_sata_probe,
+> +	.driver	= {
+> +		.name		= "phy-berlin-sata",
+> +		.owner		= THIS_MODULE,
 
-Thanks,
-Mark.
+owner filed automatically update with module_platform_driver().
+
+see:http://lxr.free-electrons.com/source/include/linux/platform_device.h#L190
+  
+
+-- 
+Regards,
+Varka Bhadram.
