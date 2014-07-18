@@ -1,56 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Jul 2014 09:29:21 +0100
-Subject: [PATCH] ARM: rockchip: Add cpu hotplug support for RK3XXX SoCs
-In-Reply-To: <53C8BBA2.7060308@gmail.com>
-References: <1405617110-1136-1-git-send-email-romain.perier@gmail.com>
- <20140717221436.GZ21766@n2100.arm.linux.org.uk> <53C8BBA2.7060308@gmail.com>
-Message-ID: <20140718082921.GB21766@n2100.arm.linux.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 18 Jul 2014 10:35:10 +0200
+Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
+In-Reply-To: <20140717161848.GK10459@saruman.home>
+References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
+ <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
+ <20140716151604.GG1365@saruman.home> <53C6A050.2050409@linutronix.de>
+ <20140716160614.GI1365@saruman.home> <53C7EC6F.6060902@hurleysoftware.com>
+ <20140717154300.GA16623@linutronix.de> <20140717160206.GI10459@saruman.home>
+ <53C7F4A3.5080508@linutronix.de> <20140717161848.GK10459@saruman.home>
+Message-ID: <53C8DC3E.3020701@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 08:16:02AM +0200, Romain Perier wrote:
-> you're probably talking about __cpu_die at  
-> http://lxr.free-electrons.com/source/arch/arm/kernel/smp.c#L223 . The  
-> problem being that the thread below which executes cpu_die completes the  
-> completion before executing smp_ops.cpu_die. So smp_ops.cpu_kill might  
-> be executed before smp_ops.cpu_die (in some cases cache coherency would  
-> not be turned off). Note that almost all SoCs do the same thing.
+On 07/17/2014 06:18 PM, Felipe Balbi wrote:
 
-Look at what's happening:
+>> No, this is okay. If you look, it checks for "up->ier & 
+>> UART_IER_THRI". On the second invocation it will see that this
+>> bit is already set and therefore won't call get_sync() for the
+>> second time. That bit is removed in the _stop_tx() path.
+> 
+> oh, right. But that's actually unnecessary. Calling
+> pm_runtime_get() multiple times will just increment the usage
+> counter multiple times, which means you can call __stop_tx()
+> multiple times too and everything gets balanced, right ?
 
-	CPU0				CPU1
-	wait_for_completion_timeout()
-					idle_task_exit()
-					flush_cache_louis()
-					complete(&cpu_died);
+No. start_tx() will be called multiple times but only the first
+invocation invoke pm_runtime_get(). Now I noticed that I forgot to
+remove pm_runtime_put_autosuspend() at the bottom of it. But you get
+the idea right?
+pm_get() on the while the UART_IER_THRI is not yet set. pm_put() once
+the fifo is completely empty.
 
-At this point, it is safe for CPU1 to be powered down.
+>> Do you have other ideas? It doesn't look like this is exported at
+>> all. If we call _stop_tx() right away, then we have 64 bytes in
+>> the TX fifo in the worst case. They should be gone "soon" but the
+>> HW-flow control may delay it (in theory for a long time)).
+> 
+> this can be problematic, specially for OMAP which can go into OFF
+> while idle. Whatever is in the FIFO would get lost. It seems like
+> omap-serial solved this within transmit_chars().
 
-	smp_ops.cpu_kill(cpu);
-					flush_cache_louis();
-					smp_ops.cpu_die(cpu);
+No, it didn't.
 
-If we include your code at that point, then the sequence in totality
-becomes:
+> See how transmit_chars() is called from within IRQ handler with
+> clocks enabled then it conditionally calls serial_omap_stop_tx()
+> which will pm_runtime_get_sync() -> do_the_harlem_shake() -> 
+> pm_runtime_put_autosuspend(). That leaves one unbalanced 
+> pm_runtime_get() which is balanced when we're exitting the IRQ
+> handler.
 
-	wait_for_completion_timeout()
-					idle_task_exit()
-					flush_cache_louis()
-					complete(&cpu_died);
-	--- rockchip_cpu_kill ---
-	wait_for_completion_timeout()
-					flush_cache_louis();
-					--- rockchip_cpu_die ---
-					complete(&cpu_died);
-	pmu_set_power_domain(0 + cpu, false);
-					flush_cache_louis();
-					v7_exit_coherency_flush(louis);
-					while(1)
-						cpu_do_idle();
+omap-serial and the 8250 do the following on tx path:
+- start_tx()
+  -> sets UART_IER_THRI. This will generate an interrupt once the FIFO
+     is empty.
+- interrupt, notices the empty fifo, invokes serial8250_start_tx()/
+  transmit_chars().
+  Both have a while loop that fills the FIFO. This loop is left once
+  the tty-buffer is empty (uart_circ_empty() is true) or the FIFO full.
 
-So, I repeat my question.  What is the point of your additional wait
-in rockchip_cpu_kill() and complete in rockchip_cpu_die()?
+Lets say you filled 64 bytes into the FIFO and then left because your
+FIFO is full and tty-buffer is empty. That means you will invoke
+serial_omap_stop_tx() and remove UART_IER_THRI bit.
+This is okay because you are not interested in further FIFO empty
+interrupts because you don't have any TX-bytes to be sent. However,
+once you leave the transmit_chars() you leave serial_omap_irq() which
+does the last pm_put(). That means you have data in the TX FIFO that is
+about to be sent and the device is in auto-suspend.
+This is "fine" as long as the timeout is greater then the time required
+for the data be sent (plus assuming HW-float control does not stall it
+for too long) so nobody notices a thing.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+For that reason I added the hack / #if0 block in the 8250 driver. To
+ensure we do not disable the TX-FIFO-empty interrupt even if there is
+nothing to send. Instead we enter serial8250_tx_chars() once again with
+empty FIFO and empty tty-buffer and will invoke _stop_tx() which also
+finally does the pm_put().
+That is the plan. The problem I have is how to figure out that the
+device is using auto-suspend. If I don't then I would have to remove
+the #if0 block and that would mean for everybody an extra interrupt
+(which I wanted to avoid).
+
+> This seems work fine and dandy without DMA, but for DMA work, I
+> think we need to make sure this IP stays powered until we get DMA
+> completion callback. But that's future, I guess.
+
+Yes, probably. That means one get at dma start, one put at dma complete
+callback. And I assume we get that callbacks once the DMA transfer is
+complete, not when the FIFO is empty :) So lets leave it to the future
+for now?
+
+Sebastian
