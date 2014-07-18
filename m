@@ -1,20 +1,26 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 18 Jul 2014 09:49:01 +0530
-Subject: [PATCH v3 1/2] cpufreq: Don't destroy/realloc policy/sysfs on
- hotplug/suspend
-In-Reply-To: <53C8938F.1070706@codeaurora.org>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1405464473-3916-2-git-send-email-skannan@codeaurora.org>
- <CAKohpok2hzwDLy77CZJ+7pHV-Nj4XTviJxVeXQYJRYtKXME00w@mail.gmail.com>
- <53C65F03.1050609@mit.edu> <53C6D8EC.1030609@codeaurora.org>
- <CAKohpongsNtEVbHL=w1fbw5tEXK=WaMcp1N03ar9Sx_CU=1O-w@mail.gmail.com>
- <53C8938F.1070706@codeaurora.org>
-Message-ID: <CAKohpo=puU-AifGAXMAOs1pnyvTk64u-Fkra5i=-QNn_a-isXQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 18 Jul 2014 01:18:51 -0400
+Subject: [PATCH 0/4] basic IPI tracing
+Message-ID: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2014 08:55, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Not really. We much never do it during hotplug. We only do it when the
-> cpufreq driver unregisters.
+Part of the energy aware scheduler work is concerned by test and
+measurement tools such as idlestat[1].  This relies on the ability to
+trace wake-up events, mainly IRQs and IPIs.
 
-Oh yes.
+While IRQs are already well instrumented with tracepoints, IPIs are rather
+lacking on that front, and completely invisible on ARM.
+
+This series defines generic IPI tracepoints and adds them to ARM and
+ARM64. An attempt at adding them to X86 is also included for comments.
+
+[1] https://wiki.linaro.org/WorkingGroups/PowerManagement/Resources/Tools/Idlestat
+
+diffstat:
+
+ arch/arm/kernel/smp.c      | 72 ++++++++++++++++++++------------
+ arch/arm64/kernel/smp.c    | 67 +++++++++++++++++++-----------
+ arch/x86/kernel/smp.c      | 16 ++++++++
+ include/trace/events/ipi.h | 89 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 192 insertions(+), 52 deletions(-)
