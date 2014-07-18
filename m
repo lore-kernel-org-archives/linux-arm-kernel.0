@@ -1,39 +1,61 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Jul 2014 15:48:31 +0200
-Subject: [PATCH] ARM: at91/dt: fix usb0 clocks definition in sam9n12 dtsi
-In-Reply-To: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1405319967-20807-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53C925AF.9090302@atmel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 18 Jul 2014 08:50:13 -0500
+Subject: [PATCH 4/9] usb: phy: am335x-control: prevent module from being
+ unloaded when in use
+In-Reply-To: <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
+References: <1405675890-8802-1-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-2-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-3-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-4-git-send-email-LW@KARO-electronics.de>
+ <1405675890-8802-5-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140718135012.GD24914@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/2014 08:39, Boris BREZILLON :
-> udphs_clk (USB Device Controller clock) is referenced instead of
-> uhphs_clk (USB Host Controller clock).
+On Fri, Jul 18, 2014 at 11:31:25AM +0200, Lothar Wa?mann wrote:
+> This patch fixes the real cause of the crash that was "fixed" by
+> commit 7adb5c876e9c usb: musb: Fix panic upon musb_am335x module removal
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+what is the "real cause of the crash" ? You don't explain that here.
 
 > ---
->  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/usb/phy/phy-am335x-control.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 2877959..b84bac5 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -925,7 +925,7 @@
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00500000 0x00100000>;
->  			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-> -			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
-> +			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
->  				 <&uhpck>;
->  			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
->  			status = "disabled";
-> 
+> diff --git a/drivers/usb/phy/phy-am335x-control.c b/drivers/usb/phy/phy-am335x-control.c
+> index 35b6083..df3e1ba 100644
+> --- a/drivers/usb/phy/phy-am335x-control.c
+> +++ b/drivers/usb/phy/phy-am335x-control.c
+> @@ -140,6 +140,9 @@ static int am335x_control_usb_probe(struct platform_device *pdev)
+>  	const struct of_device_id *of_id;
+>  	const struct phy_control *phy_ctrl;
+>  
+> +	if (!try_module_get(pdev->dev.parent->driver->owner))
+> +		return -EPROBE_DEFER;
+> +
+>  	of_id = of_match_node(omap_control_usb_id_table, pdev->dev.of_node);
+>  	if (!of_id)
+>  		return -EINVAL;
+> @@ -171,8 +174,15 @@ static int am335x_control_usb_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static int am335x_control_usb_remove(struct platform_device *pdev)
+> +{
+> +	module_put(pdev->dev.parent->driver->owner);
+> +	return 0;
+> +}
 
+I can't see how this can make any difference. Care to explain ?
 
 -- 
-Nicolas Ferre
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140718/86c76737/attachment.sig>
