@@ -1,61 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Jul 2014 21:50:08 +0200
-Subject: [PATCH v6 4/5] PCI: add PCI controller for keystone PCIe h/w
-In-Reply-To: <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
-References: <1405696469-7172-1-git-send-email-m-karicheri2@ti.com>
- <1405696469-7172-5-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqKheoWrSGtxPO=AE8g9iOAqfwRa=81Ku=Cfx8_gpDysOg@mail.gmail.com>
-Message-ID: <5467203.eMVRoNeSx1@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 18 Jul 2014 15:57:08 -0400
+Subject: [PATCH] irqchip: gicv2m: Clean up logic for detecting MSI support
+In-Reply-To: <1405689996-3601-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1405689996-3601-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <20140718195708.GH24496@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 July 2014 14:31:39 Rob Herring wrote:
-> > +
-> > + Example:
-> > +       pcie_msi_intc: msi-interrupt-controller {
-> > +                       interrupt-controller;
-> > +                       #interrupt-cells = <1>;
-> > +                       interrupt-parent = <&gic>;
-> > +                       interrupts = <GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
-> > +                                       <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
-> > +       };
-> > +
-> > +pcie_intc: Interrupt controller device node for Legacy irq chip
-> > +       interrupt-cells: should be set to 1
-> > +       interrupt-parent: Parent interrupt controller phandle
-> > +       interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
-> > +
-> > + Example:
-> > +       pcie_intc: legacy-interrupt-controller {
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <1>;
-> > +               interrupt-parent = <&gic>;
-> > +               interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
-> > +                       <GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
-> > +                       <GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
-> > +                       <GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
-> > +       };
+On Fri, Jul 18, 2014 at 08:26:36AM -0500, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> This seems wrong. Legacy interrupts should be described with
-> interrupt-map and then PCI child devices have a standard interrupt
-> specifier.
+> It's not quite clear that msi-controller is already checked
+> by of_msi_chip_add. So, this patch add a note to clarify.
 > 
-> I'm not sure about MSIs, but I would think they would have a standard
-> format too.
+> Also, clean up redundant logic and unnecessary pr_info.
 > 
+> Cc: Mark Rutland <Mark.Rutland@arm.com>
+> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
+> Cc: Will Deacon <Will.Deacon@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+> 
+> Note: This patch is created against irqchip/gic branch.
+> 
+>  drivers/irqchip/irq-gic-v2m.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 
-IIRC, it's actually the correct way to do this here: the problem is that
-the PCI IRQs are not directly connected to the GIC, but instead there is
-a nested irqchip that has each PCI IRQ routed to it and that requires
-an extra EOI for each interrupt.
+Applied to the unstable branch irqchip/gic-v2m until Marc returns from
+vacation.  Please see my email to MarkR on your previous series
+regarding the re-shuffling of the branches.
 
-The interrupt-map in the PCI host points to this special irqchip rather
-than to the GIC.
+thx,
 
-	Arnd
+Jason.
