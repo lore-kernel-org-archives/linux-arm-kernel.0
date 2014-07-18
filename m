@@ -1,69 +1,53 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Thu, 17 Jul 2014 22:47:22 -0700
-Subject: [PATCH RFCv3 08/14] arm64: introduce aarch64_insn_gen_movewide()
-In-Reply-To: <20140717094101.GD21153@arm.com>
-References: <1405405512-4423-1-git-send-email-zlim.lnx@gmail.com>
- <1405405512-4423-9-git-send-email-zlim.lnx@gmail.com>
- <20140716161715.GU29414@arm.com> <20140716220422.GB18109@gup76>
- <20140717094101.GD21153@arm.com>
-Message-ID: <CABg9mcv4t_BwcaM0qgLivDBDGEfH0FwfTAR2QjJc4+i=M58cng@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 18 Jul 2014 14:59:42 +0900
+Subject: [PATCHv6 0/4] iio: adc: exynos_adc: Support Exynos3250 ADC and code
+ clean
+Message-ID: <1405663186-26464-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(resending this email in case the first one got caught in your spam
-filter. sorry.)
+This patchset support Exynos3250 ADC (Analog Digital Converter) because
+Exynos3250 has additional special clock for ADC IP.
 
-On Thu, Jul 17, 2014 at 10:41:02AM +0100, Will Deacon wrote:
-> On Wed, Jul 16, 2014 at 11:04:22PM +0100, Zi Shen Lim wrote:
-> > On Wed, Jul 16, 2014 at 05:17:15PM +0100, Will Deacon wrote:
-> > > On Tue, Jul 15, 2014 at 07:25:06AM +0100, Zi Shen Lim wrote:
-> > > > Introduce function to generate move wide (immediate) instructions.
-[...]
-> > > > +       switch (variant) {
-> > > > +       case AARCH64_INSN_VARIANT_32BIT:
-> > > > +               BUG_ON(shift != 0 && shift != 16);
-> > > > +               break;
-> > > > +       case AARCH64_INSN_VARIANT_64BIT:
-> > > > +               insn |= BIT(31);
-> > > > +               BUG_ON(shift != 0 && shift != 16 && shift != 32 &&
-> > > > +                      shift != 48);
-> > >
-> > > Would be neater as a nested switch, perhaps? If you reorder the
-> > > outer-switch, you could probably fall-through too and combine the shift
-> > > checks.
-> >
-> > Not sure I picture what you had in mind... I couldn't come up with a
-> > neater version with the properties you described.
-> >
-> > The alternative I had was using masks instead of integer values, but
-> > one could argue that while neater, it could also be harder to read:
-> >
-> >     switch (variant) {
-> >     case AARCH64_INSN_VARIANT_32BIT:
-> >             BUG_ON(shift & ~BIT(4));
-> >             break;
-> >     case AARCH64_INSN_VARIANT_64BIT:
-> >             insn |= BIT(31);
-> >             BUG_ON(shift & ~GENMASK(5, 4));
-> >     ...
->
-> I was thinking of using nested switches, but that doesn't fall out like I
-> hoped. How about:
->
->       switch (variant) {
->       case AARCH64_INSN_VARIANT_64BIT:
->               BUG_ON(shift != 32 && shift != 48);
+Changes from v5:
+- Add acked message by Kukjin Kim
+- Add reviewed messgae by Tomasz Figa
+- Fix typo (for for -> for)
 
-Sorry this won't work. For example, on the valid case of shift==0,
-we'll barf right here - no fallthrough.
+Changes from v4:
+- Use 'exynos_adc_data' structure instead of 'exynos_adc_ops' structure
+  and remove enum variable of ADC version
+- Fix wrong name of special clock (sclk_tsadc -> sclk_adc)
+- Add reviewed message by Naveen Krishna Chatradhi
+- Add functions for ADC clock control
 
-Shall we just leave the code as is? :)
+Changes from v3:
+- Add new 'exynos_adc_ops' structure to improve readability according to
+ Tomasz Figa comment[1]
+ [1] https://lkml.org/lkml/2014/4/16/238
+- Add new 'exynos3250-adc-v2' compatible string to support Exynos3250 ADC
+- Fix wrong compaitlbe string of ADC in Exynos3250 dtsi file
 
+Changes from v2:
+- Check return value of clock function to deal with error exception
+- Fix minor coding style to improve readability
 
->       case AARCH64_INSN_VARIANT_32BIT:
->               BUG_ON(shift != 0 && shift != 16);
->       };
->
-> ?
->
-> Will
+Changes from v1:
+- Add new "samsung,exynos-adc-v3" compatible to support Exynos3250 ADC
+- Add a patch about DT binding documentation
+
+Chanwoo Choi (4):
+  iio: adc: exynos_adc: Add exynos_adc_data structure to improve
+    readability
+  iio: adc: exynos_adc: Control special clock of ADC to support
+    Exynos3250 ADC
+  iio: devicetree: Add DT binding documentation for Exynos3250 ADC
+  ARM: dts: Fix wrong compatible string for Exynos3250 ADC
+
+ .../devicetree/bindings/arm/samsung/exynos-adc.txt |  25 +-
+ arch/arm/boot/dts/exynos3250.dtsi                  |   4 +-
+ drivers/iio/adc/exynos_adc.c                       | 326 +++++++++++++++------
+ 3 files changed, 267 insertions(+), 88 deletions(-)
+
+-- 
+1.8.0
