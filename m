@@ -1,43 +1,58 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 18 Jul 2014 15:00:48 +0100
-Subject: [PATCH 2/7] arm: add new asm macro update_sctlr
+Date: Fri, 18 Jul 2014 15:00:49 +0100
+Subject: [PATCH 3/7] arm: add strstr to compressed string.c
 In-Reply-To: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
 References: <1405692053-7514-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1405692053-7514-3-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1405692053-7514-4-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new macro for setting/clearing bits in the SCTLR.
+From: Roy Franz <roy.franz@linaro.org>
 
+The shared efi-stub-helper.c functions require a strstr implementation.
+The EFI stub is part of the decompressor, so it does not use the kernel
+strstr() implementation.  This patch adds a strstr() implementation to
+the string.c file for the decompressor, with the implementation copied
+from the arch/x86/boot/string.c file used by the x86 decompressor.
+
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
 ---
- arch/arm/include/asm/assembler.h |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/compressed/string.c |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 57f0584..c0cabba 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -425,4 +425,18 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
- 	.endm
+diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+index 36e53ef..5397792 100644
+--- a/arch/arm/boot/compressed/string.c
++++ b/arch/arm/boot/compressed/string.c
+@@ -111,6 +111,27 @@ char *strchr(const char *s, int c)
+ 	return (char *)s;
+ }
  
-+#ifdef CONFIG_CPU_CP15
-+/* Macro for setting/clearing bits in sctlr */
-+	.macro	update_sctlr, tmp:req, set=, clear=
-+	mrc	p15, 0, \tmp, c1, c0, 0
-+	.ifnc	\set,
-+	orr	\tmp, \tmp, \set
-+	.endif
-+	.ifnc	\clear,
-+	bic	\tmp, \tmp, \clear
-+	.endif
-+	mcr	p15, 0, \tmp, c1, c0, 0
-+	.endm
-+#endif
++/**
++ * strstr - Find the first substring in a %NUL terminated string
++ * @s1: The string to be searched
++ * @s2: The string to search for
++ */
++char *strstr(const char *s1, const char *s2)
++{
++	size_t l1, l2;
 +
- #endif /* __ASM_ASSEMBLER_H__ */
++	l2 = strlen(s2);
++	if (!l2)
++		return (char *)s1;
++	l1 = strlen(s1);
++	while (l1 >= l2) {
++		l1--;
++		if (!memcmp(s1, s2, l2))
++			return (char *)s1;
++		s1++;
++	}
++	return NULL;
++}
+ #undef memset
+ 
+ void *memset(void *s, int c, size_t count)
 -- 
 1.7.10.4
