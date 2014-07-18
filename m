@@ -1,82 +1,63 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Jul 2014 09:17:24 +0100
-Subject: [PATCH v7 02/24] mfd: max77686: Add power management support
-In-Reply-To: <1404505467-26526-3-git-send-email-javier.martinez@collabora.co.uk>
+Date: Fri, 18 Jul 2014 09:17:42 +0100
+Subject: [PATCH v7 03/24] mfd: max77686: Don't define dummy function if
+ OF isn't enabled
+In-Reply-To: <1404505467-26526-4-git-send-email-javier.martinez@collabora.co.uk>
 References: <1404505467-26526-1-git-send-email-javier.martinez@collabora.co.uk>
- <1404505467-26526-3-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140718081724.GL30888@lee--X1>
+ <1404505467-26526-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140718081742.GM30888@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 04 Jul 2014, Javier Martinez Canillas wrote:
 
-> The driver doesn't have PM operations defined so add a suspend
-> and resume function handlers to allow the PMIC IRQ to wakeup
-> the system when it is put into a sleep state.
+> When the CONFIG_OF option was not enabled, a dummy function
+> max77686_i2c_parse_dt_pdata() was defined since this is called
+> unconditionally on probe(). Just always define the real function
+> and conditionally call it if CONFIG_OF is enabled instead.
 > 
 > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/mfd/max77686.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+>  drivers/mfd/max77686.c | 10 +---------
+>  1 file changed, 1 insertion(+), 9 deletions(-)
 
 Applied now, thanks.
 
 > diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-> index 3cb41d0..a38e9ee 100644
+> index a38e9ee..d1f9d04 100644
 > --- a/drivers/mfd/max77686.c
 > +++ b/drivers/mfd/max77686.c
-> @@ -240,10 +240,50 @@ static const struct i2c_device_id max77686_i2c_id[] = {
+> @@ -96,7 +96,6 @@ static const struct regmap_irq_chip max77686_rtc_irq_chip = {
+>  	.num_irqs		= ARRAY_SIZE(max77686_rtc_irqs),
 >  };
->  MODULE_DEVICE_TABLE(i2c, max77686_i2c_id);
 >  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int max77686_suspend(struct device *dev)
-> +{
-> +	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
-> +	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
-> +
-> +	if (device_may_wakeup(dev))
-> +		enable_irq_wake(max77686->irq);
-> +
-> +	/*
-> +	 * IRQ must be disabled during suspend because if it happens
-> +	 * while suspended it will be handled before resuming I2C.
-> +	 *
-> +	 * When device is woken up from suspend (e.g. by RTC wake alarm),
-> +	 * an interrupt occurs before resuming I2C bus controller.
-> +	 * Interrupt handler tries to read registers but this read
-> +	 * will fail because I2C is still suspended.
-> +	 */
-> +	disable_irq(max77686->irq);
-> +
-> +	return 0;
-> +}
-> +
-> +static int max77686_resume(struct device *dev)
-> +{
-> +	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
-> +	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
-> +
-> +	if (device_may_wakeup(dev))
-> +		disable_irq_wake(max77686->irq);
-> +
-> +	enable_irq(max77686->irq);
-> +
-> +	return 0;
-> +}
-> +#endif /* CONFIG_PM_SLEEP */
-> +
-> +static SIMPLE_DEV_PM_OPS(max77686_pm, max77686_suspend, max77686_resume);
-> +
->  static struct i2c_driver max77686_i2c_driver = {
->  	.driver = {
->  		   .name = "max77686",
->  		   .owner = THIS_MODULE,
-> +		   .pm = &max77686_pm,
->  		   .of_match_table = of_match_ptr(max77686_pmic_dt_match),
->  	},
->  	.probe = max77686_i2c_probe,
+> -#ifdef CONFIG_OF
+>  static const struct of_device_id max77686_pmic_dt_match[] = {
+>  	{.compatible = "maxim,max77686", .data = NULL},
+>  	{},
+> @@ -116,13 +115,6 @@ static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+>  	dev->platform_data = pd;
+>  	return pd;
+>  }
+> -#else
+> -static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+> -								  *dev)
+> -{
+> -	return 0;
+> -}
+> -#endif
+>  
+>  static int max77686_i2c_probe(struct i2c_client *i2c,
+>  			      const struct i2c_device_id *id)
+> @@ -132,7 +124,7 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>  	unsigned int data;
+>  	int ret = 0;
+>  
+> -	if (i2c->dev.of_node)
+> +	if (IS_ENABLED(CONFIG_OF) && i2c->dev.of_node)
+>  		pdata = max77686_i2c_parse_dt_pdata(&i2c->dev);
+>  
+>  	if (!pdata) {
 
 -- 
 Lee Jones
