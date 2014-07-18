@@ -1,35 +1,69 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 18 Jul 2014 15:09:52 +0100
-Subject: [PATCH 0/2] Convert exynos PPMU driver to be built as module
-Message-ID: <1405692594-19352-1-git-send-email-punit.agrawal@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 18 Jul 2014 15:54:22 +0100
+Subject: [PATCH v13 6/8] arm: add pmd_[dirty|mkclean] for THP
+In-Reply-To: <1405666386-15095-7-git-send-email-minchan@kernel.org>
+References: <1405666386-15095-1-git-send-email-minchan@kernel.org>
+ <1405666386-15095-7-git-send-email-minchan@kernel.org>
+Message-ID: <20140718145421.GA18569@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 18, 2014 at 03:53:04PM +0900, Minchan Kim wrote:
+> MADV_FREE needs pmd_dirty and pmd_mkclean for detecting recent
+> overwrite of the contents since MADV_FREE syscall is called for
+> THP page.
+> 
+> This patch adds pmd_dirty and pmd_mkclean for THP page MADV_FREE
+> support.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
 
-There's no reason why the exynos PPMU can't be built as a module
-except you need -
+This patch looks good to me:
+Acked-by: Steve Capper <steve.capper@linaro.org>
 
-- The first patch exports the functions that are needed to build
-devfreq drivers as modules.
+There is another patch that introduces a helper function to test for
+pmd bits, please see below.
 
-- The second patch then converts the exynos PPMU devfreq driver to be
-  built as a module.
+> ---
+>  arch/arm/include/asm/pgtable-3level.h | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 85c60adc8b60..830f84f2d277 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -220,6 +220,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>  #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+>  #endif
+>  
+> +#define pmd_dirty(pmd)		(pmd_val(pmd) & PMD_SECT_DIRTY)
 
-Compile tested only.
+Russell,
+Should this be folded into my {pte|pmd}_isset patch?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268979.html
 
-Thanks
-
-Punit Agrawal (1):
-  PM / devfreq: exynos: Enable building exynos PPMU as module
-
-?rjan Eide (1):
-  PM / devfreq: Export helper functions for drivers
-
- drivers/devfreq/Kconfig              |    2 +-
- drivers/devfreq/devfreq.c            |    3 +++
- drivers/devfreq/exynos/exynos_ppmu.c |    3 +++
- 3 files changed, 7 insertions(+), 1 deletion(-)
-
+Cheers,
 -- 
-1.7.10.4
+Steve
+
+
+> +
+>  #define PMD_BIT_FUNC(fn,op) \
+>  static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+>  
+> @@ -228,6 +230,7 @@ PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
+>  PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
+>  PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
+>  PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
+> +PMD_BIT_FUNC(mkclean,   &= ~PMD_SECT_DIRTY);
+>  PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+>  
+>  #define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
+> -- 
+> 2.0.0
+> 
