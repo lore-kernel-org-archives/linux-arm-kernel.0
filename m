@@ -1,45 +1,32 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 18 Jul 2014 15:55:49 +0800
-Subject: [PATCH] arm: clk-imx6q: parent lvds_sel input from upstream
- clock gates
-In-Reply-To: <20140717150826.GT2197@dragon>
-References: <1405592414-19550-1-git-send-email-l.stach@pengutronix.de>
- <20140717150826.GT2197@dragon>
-Message-ID: <20140718075548.GA5485@dragon>
+Date: Fri, 18 Jul 2014 16:07:55 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.16, 2nd take
+Message-ID: <20140718080754.GC8537@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 11:08:28PM +0800, Shawn Guo wrote:
-> On Thu, Jul 17, 2014 at 12:20:14PM +0200, Lucas Stach wrote:
-> > The i.MX6 reference manual doesn't make a clear distinction
-> > between the fixed clock divider and the enable gate for the
-> > pcie and sata reference clocks. This lead to the lvds mux
-> > inputs in the imx6q clk driver to be parented from the
-> > ref clock (which is the divider) instead of the actual gate,
-> > which in turn prevents the upstream clock to actually be
-> > enabled when lvds clk out is active.
-> > 
-> > This fixes a hard machine hang regression in kernel 3.16 for
-> > boards where only pcie is active but no sata, as with this
-> > kernel version the imx6-pcie driver is no longer enabling
-> > the upstream clock directly but only lvds clk out.
-> > 
-> > Reported-by: Arne Ruhnau <arne.ruhnau@target-sg.com>
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > Tested-by: Arne Ruhnau <arne.ruhnau@target-sg.com>
-> > ---
-> > Shawn, this is an urgent fix for 3.16. Can you please
-> > Ack it so arm-soc people can take this directly?
-> > ---
-> 
-> Acked-by: Shawn Guo <shawn.guo@freescale.com>
-> 
-> It will conflict with the patch switching to use macro for clock IDs,
-> which I'm about to send for 3.17, though.
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
 
-Arnd, Olof,
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
 
-Please do not apply the patch manually.  I will send you a git tag for
-it, so that I can sort out the conflict in my tree.
+are available in the git repository at:
 
-Shawn
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.16-2
+
+for you to fetch changes up to 03e97220b99b8b691ea5b130b7b4c135c9662792:
+
+  ARM: clk-imx6q: parent lvds_sel input from upstream clock gates (2014-07-18 15:57:17 +0800)
+
+----------------------------------------------------------------
+The i.MX fixes for 3.16, 2nd take:
+
+It fixes a hard machine hang regression for boards where only pcie is
+active but no sata, as the latest imx6-pcie driver is no longer enabling
+the upstream clock directly but only lvds clk out.
+
+----------------------------------------------------------------
+Lucas Stach (1):
+      ARM: clk-imx6q: parent lvds_sel input from upstream clock gates
+
+ arch/arm/mach-imx/clk-imx6q.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
