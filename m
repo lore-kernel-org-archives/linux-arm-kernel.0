@@ -1,42 +1,53 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 18 Jul 2014 19:01:36 +0200
-Subject: [PATCH 0/6] vf610: Add USB support
-Message-ID: <cover.1405702442.git.stefan@agner.ch>
+Date: Fri, 18 Jul 2014 19:01:39 +0200
+Subject: [PATCH 3/6] ARM: dts: vf610: Add usbmisc for non-core registers
+In-Reply-To: <cover.1405702442.git.stefan@agner.ch>
+References: <cover.1405702442.git.stefan@agner.ch>
+Message-ID: <4b3b16a8de1bd916d51c951aca286616f7ec8a9d.1405702442.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds USB support for Vybrid VF610 SoC. It extends the
-clock framework to support the USB PHY cocks, extends the device
-tree files and adds support for the non-core registers in the
-usbmisc_imx driver.
+Add device tree node for usbmisc which controls the non-core USB
+registers. This is required to use the property to disable the over-
+current detection.
 
-This patchset needs the eSDHC length fix available in Shawn's
-for-next branch.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf610.dtsi | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-The whole patchset proved to be working on a Colibri VF61. The
-first USB controller runs in peripheral mode. I could successfully
-use RNDIS, however with some stability issues: Suddenly the other
-side was not reachable anymore and the interface needed to brought
-down and back up again. I'm still investigating this.
-
-The second USB controller, running in USB host mode, showed no
-issues so far.
-
-Stefan Agner (6):
-  ARM: dts: vf610: add USB PHY and controller
-  ARM: imx: clk-vf610: add USBPHY clocks
-  ARM: dts: vf610: Add usbmisc for non-core registers
-  chipidea: usbmisc_imx: Add USB support for VF610 SoCs
-  usb: phy: mxs: Add VF610 USB PHY support
-  ARM: dts: vf610-colibri: add USB support
-
- arch/arm/boot/dts/vf610-colibri.dts     | 10 +++++
- arch/arm/boot/dts/vf610.dtsi            | 55 ++++++++++++++++++++++--
- arch/arm/mach-imx/clk-vf610.c           | 12 +++++-
- drivers/usb/chipidea/usbmisc_imx.c      | 76 +++++++++++++++++++++++----------
- drivers/usb/phy/phy-mxs-usb.c           |  5 +++
- include/dt-bindings/clock/vf610-clock.h |  5 ++-
- 6 files changed, 135 insertions(+), 28 deletions(-)
-
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index f6c3f02..b20ce4f 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -334,11 +334,19 @@
+ 				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_USBC0>;
+ 				fsl,usbphy = <&usbphy0>;
++				fsl,usbmisc = <&usbmisc 0>;
+ 				dr_mode = "peripheral";
+ 				status = "disabled";
+ 			};
+ 
+-
++			usbmisc: usb at 40034800 {
++				#index-cells = <1>;
++				compatible = "fsl,vf610-usbmisc";
++				reg = <0x40034800 0x200>,
++					<0x400b4800 0x200>;
++				clocks = <&clks VF610_CLK_USBC0>,
++					<&clks VF610_CLK_USBC1>;
++			};
+ 		};
+ 
+ 		aips1: aips-bus at 40080000 {
+@@ -407,6 +415,7 @@
+ 				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_USBC1>;
+ 				fsl,usbphy = <&usbphy1>;
++				fsl,usbmisc = <&usbmisc 1>;
+ 				dr_mode = "host";
+ 				status = "disabled";
+ 			};
 -- 
 2.0.1
