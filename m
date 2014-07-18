@@ -1,47 +1,47 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 18 Jul 2014 15:32:00 -0700
-Subject: [PATCH v2 8/7] seccomp: Document two-phase seccomp and arch-provided
- seccomp_data
-In-Reply-To: <cover.1405717901.git.luto@amacapital.net>
+Date: Fri, 18 Jul 2014 15:26:13 -0700
+Subject: [PATCH v2 3/7] seccomp: Allow arch code to provide seccomp_data
+In-Reply-To: <CAGXu5jLsnSujJdZmA=nzHw1_K3eYhSiUEnntJ3S2hCZ8DFVYpg@mail.gmail.com>
 References: <cover.1405717901.git.luto@amacapital.net>
-Message-ID: <0a79fe55572054ac3b533548481ad1d2b6104eb6.1405722642.git.luto@amacapital.net>
+ <ce65e0e8be18ae8fab437899db44ca41c912b506.1405717901.git.luto@amacapital.net>
+ <CAGXu5jLsnSujJdZmA=nzHw1_K3eYhSiUEnntJ3S2hCZ8DFVYpg@mail.gmail.com>
+Message-ID: <CALCETrX=hN1yKh=cfcOHffMprjP74PdeRfhTFOYCK7oPhURV_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The description of how arches should implement seccomp filters was
-still strictly correct, but it failed to describe the newly
-available optimizations.
+On Fri, Jul 18, 2014 at 3:16 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, Jul 18, 2014 at 2:18 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> populate_seccomp_data is expensive: it works by inspecting
+>> task_pt_regs and various other bits to piece together all the
+>> information, and it's does so in multiple partially redundant steps.
+>>
+>> Arch-specific code in the syscall entry path can do much better.
+>>
+>> Admittedly this adds a bit of additional room for error, but the
+>> speedup should be worth it.
+>
+> I still think we should gain either a note in the
+> HAVE_ARCH_SECCOMP_FILTER help text in arch/Kconfig, or possibly a new
+> section in Documentation/prctl/seccomp.txt (or similar) on how do
+> implement filter support for an architecture, that mentions the
+> arch-supplied seccomp_data and how two-phase can be done.
 
-Signed-off-by: Andy Lutomirski <luto@amacapital.net>
----
+I would have sworn I did that.  I distinctly remember typing that
+text.  I must have failed to commit it.
 
-I lost this somehow.  Here it as an an extra patch.  If I end up sending
-a v3, I'll fold it in.
+I'll send a followup patch.
 
- arch/Kconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+--Andy
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 0eae9df..05d7a8a 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -323,6 +323,17 @@ config HAVE_ARCH_SECCOMP_FILTER
- 	    results in the system call being skipped immediately.
- 	  - seccomp syscall wired up
- 
-+	  For best performance, an arch should use seccomp_phase1 and
-+	  seccomp_phase2 directly.  It should call seccomp_phase1 for all
-+	  syscalls if TIF_SECCOMP is set, but seccomp_phase1 does not
-+	  need to be called from a ptrace-safe context.  It must then
-+	  call seccomp_phase2 if seccomp_phase1 returns anything other
-+	  than SECCOMP_PHASE1_OK or SECCOMP_PHASE1_SKIP.
-+
-+	  As an additional optimization, an arch may provide seccomp_data
-+	  directly to seccomp_phase1; this avoids multiple calls
-+	  to the syscall_xyz helpers for every syscall.
-+
- config SECCOMP_FILTER
- 	def_bool y
- 	depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
+>
+> -Kees
+>
+> --
+> Kees Cook
+> Chrome OS Security
+
+
+
 -- 
-1.9.3
+Andy Lutomirski
+AMA Capital Management, LLC
