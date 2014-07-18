@@ -1,26 +1,19 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 18 Jul 2014 16:36:32 +0200
-Subject: [PATCH v2 1/2] clk: samsung: exynos4: Enable ARMCLK down feature
-Message-ID: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 18 Jul 2014 16:36:33 +0200
+Subject: [PATCH v2 2/2] clk: samsung: exynos3250: Enable ARMCLK down feature
+In-Reply-To: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
+References: <1405694193-29643-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1405694193-29643-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ARMCLK down feature on all Exynos4 SoCs. The frequency of
+Enable ARMCLK down feature on Exynos3250 SoC. The frequency of
 ARMCLK will be reduced upon entering idle mode (WFI or WFE).
 
-The feature behaves like very fast cpufreq ondemand governor. In idle
-mode this reduces energy consumption on full frequency chosen by
-cpufreq governor by approximately:
- - Trats2:  6.5% (153 mA -> 143 mA)
- - Trats:  33.0% (180 mA -> 120 mA)
- - Gear1:  27.0% (180 mA -> 130 mA)
+The feature behaves like very fast cpufreq ondemand governor.
 
 The patch uses simillar settings as Exynos5250 (clk-exynos5250.c),
-except it disables clock up feature and on Exynos4412 ARMCLK down is
-enabled for all 4 cores.
-
-Tested on Trats board (Exynos4210), Trats2 board (Exynos4412) and
-Samsung Gear 1 (Exynos4212).
+except it disables clock up feature.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
@@ -28,31 +21,24 @@ Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Changes since v1:
 1. Add PWR_CTRL registers to the list of saved clk registers on
-   Exynos4x12. Suggested by Tomasz Figa.
+   Exynos3250. Suggested by Tomasz Figa.
 2. Disable the clock up feature. (sug. Tomasz Figa)
 3. Use macros for setting clock down ratio. (sug. Tomasz Figa)
-4. Use num_possible_cpus() for exception on Exynos4x12. (sug. Tomasz
-   Figa)
-5. Enable the clock down feature also on Exynos4210 Trats board.
 ---
- drivers/clk/samsung/clk-exynos4.c | 46 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ drivers/clk/samsung/clk-exynos3250.c | 41 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 7f4a473a7ad7..86c7709dc6d6 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -114,11 +114,27 @@
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index 7a17bd40d1dd..a50dc88f0e8f 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -87,6 +87,22 @@
+ #define SRC_CPU			0x14200
+ #define DIV_CPU0		0x14500
  #define DIV_CPU1		0x14504
- #define GATE_SCLK_CPU		0x14800
- #define GATE_IP_CPU		0x14900
 +#define PWR_CTRL1		0x15020
-+#define E4X12_PWR_CTRL2		0x15024
- #define E4X12_DIV_ISP0		0x18300
- #define E4X12_DIV_ISP1		0x18304
- #define E4X12_GATE_ISP0		0x18800
- #define E4X12_GATE_ISP1		0x18804
- 
++#define PWR_CTRL2		0x15024
++
 +/* Below definitions are used for PWR_CTRL settings */
 +#define PWR_CTRL1_CORE2_DOWN_RATIO(x)		(((x) & 0x7) << 28)
 +#define PWR_CTRL1_CORE1_DOWN_RATIO(x)		(((x) & 0x7) << 16)
@@ -66,32 +52,23 @@ index 7f4a473a7ad7..86c7709dc6d6 100644
 +#define PWR_CTRL1_USE_CORE2_WFI			(1 << 2)
 +#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
 +#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
-+
- /* the exynos4 soc type */
- enum exynos4_soc {
- 	EXYNOS4210,
-@@ -155,6 +171,7 @@ static unsigned long exynos4210_clk_save[] __initdata = {
- 	E4210_GATE_IP_LCD1,
- 	E4210_GATE_IP_PERIR,
- 	E4210_MPLL_CON0,
+ 
+ /* list of PLLs to be registered */
+ enum exynos3250_plls {
+@@ -168,6 +184,8 @@ static unsigned long exynos3250_cmu_clk_regs[] __initdata = {
+ 	SRC_CPU,
+ 	DIV_CPU0,
+ 	DIV_CPU1,
 +	PWR_CTRL1,
++	PWR_CTRL2,
  };
  
- static unsigned long exynos4x12_clk_save[] __initdata = {
-@@ -164,6 +181,8 @@ static unsigned long exynos4x12_clk_save[] __initdata = {
- 	E4X12_DIV_ISP,
- 	E4X12_DIV_CAM1,
- 	E4X12_MPLL_CON0,
-+	PWR_CTRL1,
-+	E4X12_PWR_CTRL2,
+ static int exynos3250_clk_suspend(void)
+@@ -748,6 +766,27 @@ static struct samsung_pll_clock exynos3250_plls[nr_plls] __initdata = {
+ 			UPLL_LOCK, UPLL_CON0, NULL),
  };
  
- static unsigned long exynos4_clk_pll_regs[] __initdata = {
-@@ -1164,6 +1183,32 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
- 			VPLL_LOCK, VPLL_CON0, NULL),
- };
- 
-+static void __init exynos4_core_down_clock(enum exynos4_soc soc)
++static void __init exynos3_core_down_clock(void)
 +{
 +	unsigned int tmp;
 +
@@ -103,30 +80,26 @@ index 7f4a473a7ad7..86c7709dc6d6 100644
 +		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
 +		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
 +		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
-+	/* On Exynos4412 enable it also on core 2 and 3 */
-+	if (num_possible_cpus() == 4)
-+		tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
-+		       PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
 +	__raw_writel(tmp, reg_base + PWR_CTRL1);
 +
 +	/*
 +	 * Disable the clock up feature on Exynos4x12, in case it was
 +	 * enabled by bootloader.
 +	 */
-+	if (exynos4_soc == EXYNOS4X12)
-+		__raw_writel(0x0, reg_base + E4X12_PWR_CTRL2);
++	__raw_writel(0x0, reg_base + PWR_CTRL2);
 +}
 +
- /* register exynos4 clocks */
- static void __init exynos4_clk_init(struct device_node *np,
- 				    enum exynos4_soc soc)
-@@ -1250,6 +1295,7 @@ static void __init exynos4_clk_init(struct device_node *np,
- 	samsung_clk_register_alias(ctx, exynos4_aliases,
- 			ARRAY_SIZE(exynos4_aliases));
+ static void __init exynos3250_cmu_init(struct device_node *np)
+ {
+ 	struct samsung_clk_provider *ctx;
+@@ -775,6 +814,8 @@ static void __init exynos3250_cmu_init(struct device_node *np)
+ 	samsung_clk_register_div(ctx, div_clks, ARRAY_SIZE(div_clks));
+ 	samsung_clk_register_gate(ctx, gate_clks, ARRAY_SIZE(gate_clks));
  
-+	exynos4_core_down_clock(soc);
- 	exynos4_clk_sleep_init();
- 
- 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
++	exynos3_core_down_clock();
++
+ 	exynos3250_clk_sleep_init();
+ }
+ CLK_OF_DECLARE(exynos3250_cmu, "samsung,exynos3250-cmu", exynos3250_cmu_init);
 -- 
 1.9.1
