@@ -1,92 +1,56 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 18 Jul 2014 10:35:10 +0200
-Subject: [PATCH 4/5] tty: serial: 8250 core: add runtime pm
-In-Reply-To: <20140717161848.GK10459@saruman.home>
-References: <1405521903-5877-1-git-send-email-bigeasy@linutronix.de>
- <1405521903-5877-5-git-send-email-bigeasy@linutronix.de>
- <20140716151604.GG1365@saruman.home> <53C6A050.2050409@linutronix.de>
- <20140716160614.GI1365@saruman.home> <53C7EC6F.6060902@hurleysoftware.com>
- <20140717154300.GA16623@linutronix.de> <20140717160206.GI10459@saruman.home>
- <53C7F4A3.5080508@linutronix.de> <20140717161848.GK10459@saruman.home>
-Message-ID: <53C8DC3E.3020701@linutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Jul 2014 09:40:30 +0100
+Subject: HYP panic with 3.16-rc5, arm64 + 64k pages
+In-Reply-To: <53C8086E.5060903@amd.com>
+References: <20140717152808.GO21153@arm.com>
+ <53C8086E.5060903@amd.com>
+Message-ID: <20140718084030.GA9548@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2014 06:18 PM, Felipe Balbi wrote:
+Hi Joel, Don,
 
->> No, this is okay. If you look, it checks for "up->ier & 
->> UART_IER_THRI". On the second invocation it will see that this
->> bit is already set and therefore won't call get_sync() for the
->> second time. That bit is removed in the _stop_tx() path.
+On Thu, Jul 17, 2014 at 06:31:26PM +0100, Joel Schopp wrote:
 > 
-> oh, right. But that's actually unnecessary. Calling
-> pm_runtime_get() multiple times will just increment the usage
-> counter multiple times, which means you can call __stop_tx()
-> multiple times too and everything gets balanced, right ?
-
-No. start_tx() will be called multiple times but only the first
-invocation invoke pm_runtime_get(). Now I noticed that I forgot to
-remove pm_runtime_put_autosuspend() at the bottom of it. But you get
-the idea right?
-pm_get() on the while the UART_IER_THRI is not yet set. pm_put() once
-the fifo is completely empty.
-
->> Do you have other ideas? It doesn't look like this is exported at
->> all. If we call _stop_tx() right away, then we have 64 bytes in
->> the TX fifo in the worst case. They should be gone "soon" but the
->> HW-flow control may delay it (in theory for a long time)).
+> On 07/17/2014 10:28 AM, Will Deacon wrote:
+> > Initializing cgroup subsys cpu
+> > Linux version 3.16.0-rc5 (will at edgewater-inn) (gcc version 4.9.0 20140214 (experimental) (aarch64-trunk.530) ) #1 SMP PREEMPT Thu Jul 17 16:19:36 BST 2014
+> > CPU: AArch64 Processor [410fd070] revision 0
+> > Early serial console at I/O port 0x0 (options '')
+> > bootconsole [uart0] enabled
+> > efi: Getting parameters from FDT:
+> > efi: Can't find System Table in device tree!
+> > cma: CMA: failed to reserve 512 MiB
+> > psci: probing for conduit method from DT.
+> > psci: Using PSCI v0.1 Function IDs from DT
+> > PERCPU: Embedded 1 pages/cpu @fffffe0023e80000 s13120 r8192 d44224 u65536
+> > Built 1 zonelists in Zone order, mobility grouping off.  Total pages: 9208
+> > Kernel command line: console=hvc0,38400 earlycon=uart8250,0x3f8 root=/dev/root rw rootflags=rw,trans=virtio,version=9p2000.L rootfstype=9p init=/virt/init  ip=dhcp
+> > PID hash table entries: 4096 (order: -1, 32768 bytes)
+> > Dentry cache hash table entries: 131072 (order: 4, 1048576 bytes)
+> > Inode-cache hash table entries: 65536 (order: 3, 524288 bytes)
+> > Memory: 579264K/589824K available (4359K kernel code, 455K rwdata, 1536K rodata, 332K init, 280K bss, 10560K reserved)
+> > Virtual kernel memory layout:
+> >     vmalloc : 0xfffffc0000000000 - 0xfffffdfbffff0000   (2080767 MB)
+> >     vmemmap : 0xfffffdfc001c0000 - 0xfffffdfc0023e000   (     0 MB)
+> >     modules : 0xfffffdfffc000000 - 0xfffffe0000000000   (    64 MB)
+> >     memory  : 0xfffffe0000000000 - 0xfffffe0024000000   (   576 MB)
+> >       .init : 0xfffffe0000660000 - 0xfffffe00006b3340   (   333 kB)
+> >       .text : 0xfffffe0000080000 - 0xfffffe0000651f94   (  5960 kB)
+> >       .data : 0xfffffe00006c0000 - 0xfffffe0000731ca8   (   456 kB)
+> > SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+> > Preemptible hierarchical RCU implementation.
+> > 	RCU restricting CPUs from NR_CPUS=8 to nr_cpu_ids=4.
+> > RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=4
+> > NR_IRQS:64 nr_irqs:64 0
 > 
-> this can be problematic, specially for OMAP which can go into OFF
-> while idle. Whatever is in the FIFO would get lost. It seems like
-> omap-serial solved this within transmit_chars().
+> Not a lot to go on there.  If you get desperate you can configure FTRACE
+> and pass "ftrace=function ftrace_dump_on_oops" as additional additional
+> kernel command line arguments.  If you get really desperate you can do
+> the same on the host.  Just beware the output is really long.
 
-No, it didn't.
+Cheers for the replies. It could be that I'm tickling something with kvmtool
+that qemu doesn't do, so I'll add some traces and try to figure out some more
+information later on today.
 
-> See how transmit_chars() is called from within IRQ handler with
-> clocks enabled then it conditionally calls serial_omap_stop_tx()
-> which will pm_runtime_get_sync() -> do_the_harlem_shake() -> 
-> pm_runtime_put_autosuspend(). That leaves one unbalanced 
-> pm_runtime_get() which is balanced when we're exitting the IRQ
-> handler.
-
-omap-serial and the 8250 do the following on tx path:
-- start_tx()
-  -> sets UART_IER_THRI. This will generate an interrupt once the FIFO
-     is empty.
-- interrupt, notices the empty fifo, invokes serial8250_start_tx()/
-  transmit_chars().
-  Both have a while loop that fills the FIFO. This loop is left once
-  the tty-buffer is empty (uart_circ_empty() is true) or the FIFO full.
-
-Lets say you filled 64 bytes into the FIFO and then left because your
-FIFO is full and tty-buffer is empty. That means you will invoke
-serial_omap_stop_tx() and remove UART_IER_THRI bit.
-This is okay because you are not interested in further FIFO empty
-interrupts because you don't have any TX-bytes to be sent. However,
-once you leave the transmit_chars() you leave serial_omap_irq() which
-does the last pm_put(). That means you have data in the TX FIFO that is
-about to be sent and the device is in auto-suspend.
-This is "fine" as long as the timeout is greater then the time required
-for the data be sent (plus assuming HW-float control does not stall it
-for too long) so nobody notices a thing.
-
-For that reason I added the hack / #if0 block in the 8250 driver. To
-ensure we do not disable the TX-FIFO-empty interrupt even if there is
-nothing to send. Instead we enter serial8250_tx_chars() once again with
-empty FIFO and empty tty-buffer and will invoke _stop_tx() which also
-finally does the pm_put().
-That is the plan. The problem I have is how to figure out that the
-device is using auto-suspend. If I don't then I would have to remove
-the #if0 block and that would mean for everybody an extra interrupt
-(which I wanted to avoid).
-
-> This seems work fine and dandy without DMA, but for DMA work, I
-> think we need to make sure this IP stays powered until we get DMA
-> completion callback. But that's future, I guess.
-
-Yes, probably. That means one get at dma start, one put at dma complete
-callback. And I assume we get that callbacks once the DMA transfer is
-complete, not when the FIFO is empty :) So lets leave it to the future
-for now?
-
-Sebastian
+Will
