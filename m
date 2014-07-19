@@ -1,9 +1,13 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 19 Jul 2014 09:52:41 +0900
-Subject: [GIT PULL 3/5] Samsung exynos cpuidle update for v3.17
-Message-ID: <53C9C159.4070305@samsung.com>
+Date: Sat, 19 Jul 2014 09:52:52 +0900
+Subject: [GIT PULL 4/5] Samsung exynos_mct update for v3.17
+Message-ID: <53C9C164.9030404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Note that this is also based on 3.16-rc5 because of dependency with 
+previous samsung fixes including exynos_mct already merged in mainline 
+during -rc.
 
 The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
 
@@ -12,38 +16,27 @@ The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/exynos-cpuidle
+tags/exynos-mct
 
-for you to fetch changes up to fc2cac41ebbfb16da8b036cba6ec6714ab780a6d:
+for you to fetch changes up to 1a631118c1d085fe162f3b6d44f710c72206ef2d:
 
-   ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm 
-(2014-07-19 03:36:00 +0900)
-
-----------------------------------------------------------------
-exynos cpuidle update for v3.17
-
-- add callbacks exynos_suspend() and exynos_powered_up()
-   for support cpuidle through mcpm
-- skip exynos_cpuidle for exynos5420 because is uses
-   cpuidle-big-liggle generic cpuidle driver
-- add generic functions to calculate cpu number is used
-   for pmu and this is required for exynos5420 multi-cluster
-- add of_device_id structure for big.LITTLE cpuidle and
-   add "samsung,exynos5420" compatible string for exynos5420
+   clocksource: exynos_mct: Only use 32-bits where possible (2014-07-19 
+03:07:52 +0900)
 
 ----------------------------------------------------------------
-Chander Kashyap (6):
-       cpuidle: big.LITTLE: add of_device_id structure
-       ARM: EXYNOS: add generic function to calculate cpu number
-       cpuidle: big.LITTLE: Add ARCH_EXYNOS entry in config
-       cpuidle: big.LITTLE: init driver for exynos5420
-       ARM: EXYNOS: do not allow cpuidle registration for exynos5420
-       ARM: EXYNOS: populate suspend and powered_up callbacks for mcpm
+exynos_mct update for v3.17
+- only use 32-bit access for performance benefits on exynos
+   32-bit system and this means ARCH timer should be supported
+   on exynos 64-bit system instead of current MCT.
+- use readl_relaxed/writel_relaxed to consistently use the
+   proper functions in exynos_mct.
 
-  arch/arm/mach-exynos/exynos.c        |  4 +++-
-  arch/arm/mach-exynos/mcpm-exynos.c   | 36 
-++++++++++++++++++++++++++++++++++++
-  arch/arm/mach-exynos/regs-pmu.h      |  9 +++++++++
-  drivers/cpuidle/Kconfig.arm          |  2 +-
-  drivers/cpuidle/cpuidle-big_little.c | 12 +++++++++++-
-  5 files changed, 60 insertions(+), 3 deletions(-)
+----------------------------------------------------------------
+Doug Anderson (2):
+       clocksource: exynos_mct: use readl_relaxed/writel_relaxed
+       clocksource: exynos_mct: Only use 32-bits where possible
+
+  drivers/clocksource/Kconfig      |  1 +
+  drivers/clocksource/exynos_mct.c | 63 
+++++++++++++++++++++++++++++------------
+  2 files changed, 45 insertions(+), 19 deletions(-)
