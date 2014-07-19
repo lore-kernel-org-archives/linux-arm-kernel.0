@@ -1,42 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 Jul 2014 12:18:27 -0700
-Subject: [GIT PULL] Xilinx Zynq changes for v3.17
-In-Reply-To: <53C8F828.8000804@monstr.eu>
-References: <53C8F828.8000804@monstr.eu>
-Message-ID: <20140719191827.GF4265@quad.lixom.net>
+From: liquid.acid@gmx.net (Tobias Jakobi)
+Date: Sat, 19 Jul 2014 21:20:27 +0200
+Subject: [PATCH v7 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
+References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53CAC4FB.9030703@gmx.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 12:34:16PM +0200, Michal Simek wrote:
-> Hi,
-> 
-> please pull these two patches to your arm-soc tree.
-> 
-> Thanks,
-> Michal
-> 
-> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
-> 
->   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.17
-> 
-> for you to fetch changes up to 8fe9346b945d76ddb3f08c00e34d701174c62fa0:
-> 
->   ARM: zynq: DT: Migrate UART to Cadence binding (2014-07-18 11:54:24 +0200)
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq dt patches for v3.17
-> 
-> - Document and use new cadence serial binding
-> 
-> ----------------------------------------------------------------
-> Soren Brinkmann (2):
->       tty: cadence: Document DT binding
->       ARM: zynq: DT: Migrate UART to Cadence binding
+Hello,
 
-Merged, thanks.
+I have a question concerning an older version of this patchset, the one
+which still included exynos4x12 support and where the clocking data was
+provided through DT.
 
--Olof
+I tried to get this working for my ODROID-X2, which does work well,
+including the usage of the boost frequences. Since the X2 has an
+Exynos4412 Prime I added additional clocking data and operating points.
+
+clocking data (comes from the vendor kernel):
+<1704000 3 7 0 6 1 2 7 0 7>
+<1600000 3 7 0 6 1 2 6 0 7>
+
+operating points (again from vendor kernel):
+1704000 1375000
+1600000 1350000
+
+Doing this I get correct output from scaling_available_frequencies and
+scaling_boost_frequencies and the driver seems to select these
+frequences. However when reading from cpufreq_cur_freq, which I think
+returns the frequency of the armclk, the maximum freq never exceeds
+1.5GHz. So effectively the additional clocking data and opps are not used.
+
+I wonder this happens? Is there some kind of limit enforced?
+
+
+With best wishes,
+Tobias Jakobi
