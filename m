@@ -1,33 +1,57 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 18 Jul 2014 23:30:10 -0400
-Subject: [PATCH 2/4] ARM: add IPI tracepoints
-In-Reply-To: <alpine.LFD.2.11.1407182249020.3647@knanqh.ubzr>
-References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
- <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
- <20140718160418.54d11f6a@gandalf.local.home>
- <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
- <20140718172221.6dbe83e4@gandalf.local.home>
- <alpine.LFD.2.11.1407182249020.3647@knanqh.ubzr>
-Message-ID: <20140718233010.620d7a79@gandalf.local.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 Jul 2014 21:21:22 -0700
+Subject: [GIT PULL] Samsung fixes-4 for v3.16
+In-Reply-To: <53C9BF34.2030903@samsung.com>
+References: <53C9AF23.6030007@samsung.com>
+ <CAOesGMgt50Ut8qv+ifDHoSQCBV4NNu-tx6B_t=T7D5SHVx0XMg@mail.gmail.com>
+ <53C9B952.6010000@samsung.com> <53C9BF34.2030903@samsung.com>
+Message-ID: <CAOesGMgX2m4UbO756JbtQLZVJv3SY+dXDE+My-OeY0oCFA-aew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Jul 2014 22:55:12 -0400 (EDT)
-Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+On Fri, Jul 18, 2014 at 5:43 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 07/19/14 09:18, Kukjin Kim wrote:
+>>
+>> On 07/19/14 09:12, Olof Johansson wrote:
+>>>
+>>> On Fri, Jul 18, 2014 at 4:34 PM, Kukjin Kim<kgene.kim@samsung.com> wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> This is a regression for v3.16 so please take this in -rc.
+>>>>
+>>>> Thanks,
+>>>> Kukjin
+>>>>
+>>>> The following changes since commit
+>>>> 1795cd9b3a91d4b5473c97f491d63892442212ab:
+>>>>
+>>>> Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>>> tags/samsung-fixes-4
+>>>>
+>>>> for you to fetch changes up to 4e3a498d6fc438d8c203c51aadc6ca8fb47b0577:
+>>>>
+>>>> ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-16
+>>>> 02:59:18 +0900)
+>>>
+>>>
+>>> This is based on a newer branch than our current fixes. So I've cherry
+>>> picked the patch instead of merged the branch -- if you have the
+>>> branch in linux-next you should remove it.
+>>>
+>> OK, I will.
+>>
+> BTW, other pm related branches in my tree have dependencies with the change
+> so I just reverted that in my -next.
+>
+> If any problems, please let me know.
 
-> Any comments / ACKs on the other patches?  I'd like to see 1/4 to 3/4 
-> (and your patch) merged upstream during the next window.  4/4 is up for 
-> debate.
+Are they part of the branches you sent now? Is that patch a base in
+those branches?
 
-You can add my Acked-by for patches 1,2 and 3, after the clean up of
-the #ifdefs there.
 
-I still don't like the fact that you need to add the #undef in patch 4.
-I'm looking at other ways to fix that. I tried to do a few different
-clean ups in the tracing infrastructure, but it seems that it may be
-required. The other method I may try is to move the #undefs into the
-ipi.h header itself.
-
-I'll play more with this on Monday.
-
--- Steve
+-Olof
