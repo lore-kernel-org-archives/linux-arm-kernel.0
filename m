@@ -1,49 +1,94 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Sat, 19 Jul 2014 11:11:56 +0200
-Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic
- {read,write}s*()
-In-Reply-To: <4967546.K5Yf5hcJE1@wuerfel>
-References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
- <43703371.jktNRIezc3@wuerfel> <20140719084152.GA31564@ravnborg.org>
- <4967546.K5Yf5hcJE1@wuerfel>
-Message-ID: <20140719091156.GA31772@ravnborg.org>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Sat, 19 Jul 2014 11:54:31 +0200
+Subject: [PATCH 1/5] arm: dts: omap3-gta04: Add missing nodes to fully
+ describe gta04 board
+In-Reply-To: <CABxcv==sj5ZZ_f1gqgREFDNoiVv71k3rjQLPq6CpZbB-643Z4g@mail.gmail.com>
+References: <1405369228-27197-1-git-send-email-marek@goldelico.com>
+ <1405369228-27197-2-git-send-email-marek@goldelico.com>
+ <CAGhQ9Vx1gm9=vda9dUVYR25JK4VSUe9Qk5_xc_bo9ZPLFCtExA@mail.gmail.com>
+ <0C2AB07A-C515-4D5E-A823-DDF7C871515A@goldelico.com>
+ <CAGhQ9VwTXdCHe693PBtaVsv28-heEHY3=qbnn+mdgk3ea3u7qQ@mail.gmail.com>
+ <CABxcv==sj5ZZ_f1gqgREFDNoiVv71k3rjQLPq6CpZbB-643Z4g@mail.gmail.com>
+Message-ID: <C50C18E2-6286-4DC0-8856-CEC3B2FA25B9@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 19, 2014 at 11:05:33AM +0200, Arnd Bergmann wrote:
-> On Saturday 19 July 2014 10:41:52 Sam Ravnborg wrote:
-> > > > 
-> > > > This set:
-> > > > #define inb_p(addr)     inb(addr)
-> > > > #define inw_p(addr)     inw(addr)
-> > > > #define inl_p(addr)     inl(addr)
-> > > > #define outb_p(x, addr) outb((x), (addr))
-> > > > #define outw_p(x, addr) outw((x), (addr))
-> > > > #define outl_p(x, addr) outl((x), (addr))
-> > > > 
-> > > > Should have a comment that say they are deprecated.
-> > > > Especially the "b" variants still have many users.
-> > > 
-> > > Are they? I don't remember ever seeing a reason to deprecate
-> > > them. We could perhaps enclose them in #ifdef CONFIG_ISA, but
-> > > there may also be some drivers that use the same code for ISA
-> > > and PCI, and it doesn't really hurt on PCI.
-> > 
-> > It is my understanding that inl and inl_p are the same these days.
-> > A quick grep indicate that only m68k define the
-> > _p variant different from the other.
-> > But I failed to find and description of the difference between the
-> > two which is why I assumed they were identical and thus no need for both.
+Hi all,
+
+Am 18.07.2014 um 11:21 schrieb Javier Martinez Canillas:
+
+> Hello Marek and Dr. H. Nikolaus,
 > 
-> I don't know why m68k needs it, it's really an x86-specific
-> thing, see slow_down_io() in arch/x86/include/asm/io.h.
+> On Fri, Jul 18, 2014 at 8:55 AM, Joachim Eastwood <manabian@gmail.com> wrote:
+>> On 16 July 2014 09:17, Dr. H. Nikolaus Schaller <hns@goldelico.com> wrote:
+>>> Am 15.07.2014 um 14:45 schrieb Joachim Eastwood:
+>>> 
+>>>> Hi Marek,
+>>>> 
+>>>> You seem to add some DT nodes for hw that doesn't have drivers in
+>>>> mainline. I think you should leave those out until the driver itself
+>>>> is upstream and the bindings for it is documented.
+>>> is there some policy for only having nodes for existing drivers in DT files?
+>> 
+> 
+> I strongly agree with Joachim on this regard.
+> 
+>>> If I understand the device tree concept correctly, it should not describe drivers
+>>> (and hence nothing about the state of them being mainlined), but it should statically
+>>> describe the given hardware in a way that kernel and drivers can read it (or ignore).
+>>> And even other kernels can use it (because they run on the same hardware).
+>>> 
+> 
+> Yes, it should describe hardware but that description should be
+> previously agreed and properly documented as was mentioned before.
 
-I had missed the x86 versions when grepping.
-Hmm, and with the macro tricks they play in asm/io.h this
-file is not at all grep friendly.
+Ok, it is a little a hen and egg problem - who should start with the documentation.
+The device tree file, more or less describing what the hardware requirements
+are. Or the drivers which describe what they support.
 
-So xxx_p is for pause (or something like that).
-This also matches that m68k do some tricks with delay() in the _p variants.
-Thanks for the explanation.
+And you are right - these two ends must match and that can only be resolved by
+discussions and negotiations between both ends.
 
-	Sam
+> 
+>>> So unless there is an important reason not to have "currently unused" nodes
+>>> in the DT source/binary (loading time is IMHO neglectable), I would ask that we
+>>> can keep with the complete DT instead of splitting it up artificially and getting back
+>>> to the same status (because the hardware does not change over time).
+>> 
+> 
+> I understand your motivation since it will allow you to not have to
+> maintain a patch-set for your downstream DTS changes but I would like
+> to ask you the opposite question. What's the benefit for the kernel
+> community to keep in a mainline DTS a bunch of device nodes with DT
+> bindings that have not been neither discussed nor documented?
+
+Less patches to review individually. Just a single one instead.
+But this might be a weak benefit.
+
+> 
+> Developers doing a board bring-up usually use the DTS in mainline as a
+> reference for their boards and having non-documented/agreed DT binding
+> on the upstream DTS will only bring confusion and frustration to them
+> IMHO.
+
+Well, my experience (at least for the current status) is that in most times new
+boards need new drivers and DT nodes anyways. But this might change.
+
+> 
+> We already have some issues with Device Trees (bindings that broke
+> backward compatibility, drivers implementing custom DT binding instead
+> of using standard ones, bindings that don't really reflect the actual
+> H/W, etc), please don't make this even more complicated to developers.
+
+Ok, then I think we will do the way as suggested and only submit DT nodes
+for already existing drivers. Or submit new ones bundled with driver and
+documentation patches.
+
+Marek will update the patches anyways, so that they apply without errors.
+
+> 
+> Thanks a lot and best regards,
+> Javier
+
+BR,
+Nikolaus
