@@ -1,91 +1,67 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 22:27:58 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC DT Timers Updates for v3.17
-In-Reply-To: <cover.1405556312.git.horms+renesas@verge.net.au>
-References: <cover.1405556312.git.horms+renesas@verge.net.au>
-Message-ID: <20140719052758.GE20064@quad.lixom.net>
+Date: Fri, 18 Jul 2014 22:49:27 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.16-rc
+Message-ID: <20140719054927.GA31580@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 09:40:20AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC DT Timers updates for v3.17.
-> 
-> This pull request is based on a merge of the following to provide
-> all dependencies and try to eliminate conflicts. It turns out the changes
-> in this pull requests are a nexus for dependencies due to modifying DT,
-> SoC, board and recently moved header files as well as requiring driver
-> changes.
-> 
-> * The clockevents/renesas-timers-dt branch of Daniel Lezcano's tree.
->   He has indicated that this branch has stable commit ids and will
->   be included in v3.17. Olof and arm at kernel.org were CCed on the
->   thread where he, Laurent Pinchart and I discussed the use of that branch.
-> 
->   The clockevents/renesas-timers-dt's branch is in turn based on v3.16-rc3.
-> 
-> * "Third Round of Renesas ARM Based SoC DT Updates for v3.17",
->   tagged as renesas-dt3-for-v3.17, which I have sent a pull request for.
-> 
-> * "Renesas ARM Based SoC Clock Updates for v3.17",
->   tagged as renesas-clock-for-v3.17, which you have merged
->   into next/soc
-> 
-> * "Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17",
->   tagged as renesas-soc-cleanup2-for-v3.17, which you have merged
->   into next/cleanup.
-> 
-> * "Third Round of Renesas ARM Based SoC r8a7779 Multiplatform Updates for
->   v3.17", tagged as renesas-r8a7779-multiplatform3-for-v3.17, which
->   you have merged into next/soc
-> 
-> * "Renesas ARM Based SoC Boards Updates for v3.17",
->   tagged as renesas-boards-for-v3.17, which you have merged
->   into next/boards
-> 
-> * "Third Round of Renesas ARM Based SoC Updates for v3.17",
->   tagged as renesas-soc3-for-v3.17, which you have merged
->   into next/soc
-> 
-> 
-> The following changes since commit 5c174afd407acc7a90701900b279578151bc007f:
-> 
->   Merge branch 'clockevents/renesas-timers-dt' of git://git.linaro.org/people/daniel.lezcano/linux into dt-timers-for-v3.17.base (2014-07-15 16:31:45 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-timers-for-v3.17
-> 
-> for you to fetch changes up to 9394af4314554d15762585a3464cefaa2e6d0420:
-> 
->   ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-07-15 21:26:42 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Timers Updates for v3.17
-> 
-> * Enable timers using DT when booting boards without Legacy-C code
-> 
-> ----------------------------------------------------------------
-> Laurent Pinchart (8):
->       ARM: shmobile: r8a7790: Add CMT devices to DT
->       ARM: shmobile: r8a7791: Add CMT devices to DT
->       ARM: shmobile: r8a7779: Add TMU devices to DT
->       ARM: shmobile: lager-reference: Enable CMT0 in device tree
->       ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
->       ARM: shmobile: marzen-reference: Enable TMU0 in device tree
->       ARM: shmobile: r7s72100: Add MTU2 device to DT
->       ARM: shmobile: genmai-reference: Enable MTU2 in device tree
+Hi Linus,
 
-Ok, this branch definitely contains a lot more than this. For dependent
-external branches such as clocksource, we still prefer to see a pull request so
-that we can merge in the dependency and get a clean diffstat when we do the
-merge of your branch, otherwise it gets awkward to compare that what we're
-getting is what you thought you sent (which is one of the things we check on
-merges).
+The following changes since commit cacadb4ff969a82628d47db87b5a531be466b134:
 
-Please regenerate this pull request as appropriate.
+  Merge tag 'samsung-fixes-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2014-07-12 21:19:21 -0700)
 
+are available in the git repository at:
 
--Olof
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 9637f30e6b7bc394c08fa9d27d63622f141142e9:
+
+  ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-18 17:12:57 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.16-rc
+
+A smaller set of fixes this week, and all regression fixes:
+ - a handful of issues fixed on at91 with common clock conversion
+ - a set of fixes for Marvell mvebu (SMP, coherency, PM)
+ - a clock fix for i.MX6Q.
+ - ... and a SMP/hotplug fix for Exynos
+
+----------------------------------------------------------------
+Bo Shen (1):
+      ARM: at91: at91sam9x5: correct typo error for ohci clock
+
+Boris BREZILLON (2):
+      ARM: at91/dt: fix usb0 clocks definition in sam9n12 dtsi
+      ARM: at91/dt: add missing clocks property to pwm node in sam9x5.dtsi
+
+Ezequiel Garcia (1):
+      ARM: mvebu: Fix coherency bus notifiers by using separate notifiers
+
+Gregory CLEMENT (1):
+      ARM: mvebu: Fix the operand list in the inline asm of armada_370_xp_pmsu_idle_enter
+
+Lucas Stach (1):
+      ARM: clk-imx6q: parent lvds_sel input from upstream clock gates
+
+Olof Johansson (3):
+      Merge tag 'mvebu-fixes-3.16-3' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
+      Merge tag 'imx-fixes-3.16-2' of git://git.kernel.org/.../shawnguo/linux into fixes
+
+Thomas Petazzoni (1):
+      ARM: mvebu: fix SMP boot for Armada 38x and Armada 375 Z1 in big endian
+
+Tomasz Figa (1):
+      ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+
+ arch/arm/boot/dts/at91sam9n12.dtsi |  2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi  |  4 ++--
+ arch/arm/mach-exynos/hotplug.c     | 10 ++++++----
+ arch/arm/mach-exynos/platsmp.c     | 34 +++++++++++++++++++---------------
+ arch/arm/mach-imx/clk-imx6q.c      |  4 ++--
+ arch/arm/mach-mvebu/coherency.c    |  6 +++++-
+ arch/arm/mach-mvebu/headsmp-a9.S   |  9 ++++++++-
+ arch/arm/mach-mvebu/pmsu.c         | 10 +++++-----
+ 8 files changed, 48 insertions(+), 31 deletions(-)
