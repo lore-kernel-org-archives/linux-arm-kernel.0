@@ -1,57 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 21:21:22 -0700
-Subject: [GIT PULL] Samsung fixes-4 for v3.16
-In-Reply-To: <53C9BF34.2030903@samsung.com>
-References: <53C9AF23.6030007@samsung.com>
- <CAOesGMgt50Ut8qv+ifDHoSQCBV4NNu-tx6B_t=T7D5SHVx0XMg@mail.gmail.com>
- <53C9B952.6010000@samsung.com> <53C9BF34.2030903@samsung.com>
-Message-ID: <CAOesGMgX2m4UbO756JbtQLZVJv3SY+dXDE+My-OeY0oCFA-aew@mail.gmail.com>
+Date: Fri, 18 Jul 2014 21:31:15 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clock Updates
+ for v3.17
+In-Reply-To: <cover.1405398284.git.horms+renesas@verge.net.au>
+References: <cover.1405398284.git.horms+renesas@verge.net.au>
+Message-ID: <20140719043115.GA20064@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 5:43 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 07/19/14 09:18, Kukjin Kim wrote:
->>
->> On 07/19/14 09:12, Olof Johansson wrote:
->>>
->>> On Fri, Jul 18, 2014 at 4:34 PM, Kukjin Kim<kgene.kim@samsung.com> wrote:
->>>>
->>>> Hi,
->>>>
->>>> This is a regression for v3.16 so please take this in -rc.
->>>>
->>>> Thanks,
->>>> Kukjin
->>>>
->>>> The following changes since commit
->>>> 1795cd9b3a91d4b5473c97f491d63892442212ab:
->>>>
->>>> Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>>> tags/samsung-fixes-4
->>>>
->>>> for you to fetch changes up to 4e3a498d6fc438d8c203c51aadc6ca8fb47b0577:
->>>>
->>>> ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-16
->>>> 02:59:18 +0900)
->>>
->>>
->>> This is based on a newer branch than our current fixes. So I've cherry
->>> picked the patch instead of merged the branch -- if you have the
->>> branch in linux-next you should remove it.
->>>
->> OK, I will.
->>
-> BTW, other pm related branches in my tree have dependencies with the change
-> so I just reverted that in my -next.
->
-> If any problems, please let me know.
+On Tue, Jul 15, 2014 at 06:16:22PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC clock updates for v3.17.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-clock-for-v3.17,
+> which you have already pulled into next/soc.
+> 
+> CCF support for the SoCs in question is being worked on,
+> so I expect this code to be a temporary measure.
+> 
+> 
+> The following changes since commit edc8fb1d6ebdfc4efa009073586d3567c3368475:
+> 
+>   ARM: shmobile: Fix device node reference leakage in shmobile_init_delay (2014-06-16 19:52:00 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock2-for-v3.17
+> 
+> for you to fetch changes up to ff4ce48e1f163d945c037c1c90ce12950961d91d:
+> 
+>   ARM: shmobile: sh73a0: add SCI clock support for DT (2014-07-12 15:15:39 +0200)
 
-Are they part of the branches you sent now? Is that patch a base in
-those branches?
+Merged, thanks.
 
 
 -Olof
