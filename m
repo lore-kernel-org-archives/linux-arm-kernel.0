@@ -1,27 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 Jul 2014 12:56:08 -0700
-Subject: [GIT PULL 7/7] ARM: tegra: defconfig updates for 3.17
-In-Reply-To: <1405694740-4090-7-git-send-email-thierry.reding@gmail.com>
-References: <1405694740-4090-1-git-send-email-thierry.reding@gmail.com>
- <1405694740-4090-7-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140719195608.GF10514@quad.lixom.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Sat, 19 Jul 2014 16:28:10 -0400
+Subject: [PATCH 2/4] ARM: add IPI tracepoints
+In-Reply-To: <CAKv+Gu_71vJFf3aUZso1X7m7fULUMhxj+MZVYq+LGNRLJvGyAA@mail.gmail.com>
+References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
+ <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
+ <20140718160418.54d11f6a@gandalf.local.home>
+ <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
+ <20140718172221.6dbe83e4@gandalf.local.home>
+ <CAKv+Gu_71vJFf3aUZso1X7m7fULUMhxj+MZVYq+LGNRLJvGyAA@mail.gmail.com>
+Message-ID: <20140719162810.02285fc8@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 04:45:40PM +0200, Thierry Reding wrote:
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+On Sat, 19 Jul 2014 21:10:37 +0200
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+
+> On 18 July 2014 23:22, Steven Rostedt <rostedt@goodmis.org> wrote:
+> > On Fri, 18 Jul 2014 16:55:42 -0400 (EDT)
+> > Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >
+> >>
+> >> Here's the patch I have at the head of the series now, with the above
+> >> ugliness changed to an unconditional __tracepoint_string attribute.
+> >>
+> >
+> > I was thinking of something like this. Feel free to add this to your
+> > series.
+> >
+> > -- Steve
+> >
 > 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> Nico,
 > 
-> are available in the git repository at:
+> If this patch addresses the issue where 3 RCU related tracepoint
+> strings turn up /after/ _edata on !CONFIG_TRACING, there is already a
+> patch queued up here
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.17-defconfig
+> http://marc.info/?l=linux-kernel&m=140518452623148&w=2
 > 
-> for you to fetch changes up to dff15d4c2b1a4f3992a670b445e2131a400aef76:
-> 
->   ARM: tegra: enable igb, stmpe, i2c chardev, lm95245, pwm leds (2014-06-16 12:55:49 -0600)
+> As far as In know, these were the only occurrences using a __used
+> modifier, which is why they weren't dropped by the compiler in the
+> !CONFIG_TRACING case.
 > 
 
-Merged, thanks.
+Ard,
 
--Olof
+Similar but different problem. Nicolas's problem was with new use cases
+for tracepoint_string. My patch fixes the issue for the general case.
+
+-- Steve
