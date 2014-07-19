@@ -1,52 +1,50 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 21:48:29 -0700
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for
- v3.17
-In-Reply-To: <cover.1405398515.git.horms+renesas@verge.net.au>
-References: <cover.1405398515.git.horms+renesas@verge.net.au>
-Message-ID: <20140719044829.GB20064@quad.lixom.net>
+Date: Fri, 18 Jul 2014 21:58:04 -0700
+Subject: [GIT PULL] ARM: SPEAr13xx PCIe updates for v3.17
+In-Reply-To: <CAKohpo=T3taZx8e39tenCRBNxCUr=7H2xG7Ng=e+YQXuuY9u8Q@mail.gmail.com>
+References: <CAKohpo=T3taZx8e39tenCRBNxCUr=7H2xG7Ng=e+YQXuuY9u8Q@mail.gmail.com>
+Message-ID: <20140719045804.GC20064@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 15, 2014 at 06:16:36PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Wed, Jul 16, 2014 at 02:33:03PM +0530, Viresh Kumar wrote:
+> Hi Olof/Arnd,
 > 
-> Please consider these third round of Renesas ARM based SoC DT updates for v3.17.
+> This is another attempt to merge SPEAr PCIe updates after olof
+> pointed out *enough* issues with initial PULL request:
 > 
-> This pull request is based on a merge of:
+> https://lkml.org/lkml/2014/7/9/641
 > 
-> * The previous round of such requests, tagged as renesas-dt2-for-v3.17,
->   which you have already pulled into next/dt and;
-> * The second round of Renesas ARM Based SoC Clock Updates for v3.17,
->   tagged as renesas-clock2-for-v3.17, which I have send a pull request for.
+> Last version was sent here: http://patchwork.ozlabs.org/patch/368479/
+> and all the nits pointed out by Kishon & Bjorn are fixed in this pull
+> request.
 > 
-> The reason for the clock update is to provide run-time dependencies
-> to allow SCI to be initialised on DT on SoCs that do not yet have
-> CCF support. The key word being yet, it is being worked on.
+> Apart from ARM specific changes, this updates drivers/{pci|phy}. Bjorn
+> advised to get complete series via arm-soc tree earlier:
 > 
-> which I have already sent a pull-request for.
+> http://www.spinics.net/lists/linux-pci/msg30271.html
 > 
+> Please let me know if I couldn't get it right this time.
+
+Looks good. Thanks for following up on this and fixing up stuff.
+
 > 
-> The following changes since commit 963b0c359bf5d284fc597bed07a668cb7396bfd2:
+> The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
 > 
->   Merge branch 'clock-for-v3.17' into dt-for-v3.17 (2014-07-12 15:16:37 +0200)
+>   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
 > 
 > are available in the git repository at:
 > 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git
+> spear/pcie-support-v10
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.17
+> for you to fetch changes up to f6e670a3b62d23722d04e801244a068755a45b7a:
 > 
-> for you to fetch changes up to 700ce7c2bb2a4963472d95eba1436d6b0945918e:
-> 
->   ARM: shmobile: kzm9g-reference: Initialise SCIF device using DT (2014-07-12 15:16:58 +0200)
+>   ARM: SPEAr13xx: Update defconfigs (2014-07-14 11:04:44 +0530)
 
-Hi,
+Merged into next/drivers.
 
-The diffstat I got were not the same as you, I get more diffs, and more
-patches. It seems that you specified your merge commit as the base, while you
-had new patches applied before the merge too.
-
-Anyway, merged since the contents looked generally OK.
+If anything, just one thing: you should consider using signed tags. :)
 
 
 -Olof
