@@ -1,71 +1,37 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Sat, 19 Jul 2014 10:53:38 +0200
-Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic
- {read,write}s*()
-In-Reply-To: <5913515.3g98ODuH6W@wuerfel>
-References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
- <20140718205953.GA21964@ravnborg.org> <5913515.3g98ODuH6W@wuerfel>
-Message-ID: <20140719085338.GB31564@ravnborg.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 19 Jul 2014 11:03:39 +0200
+Subject: [PATCH v10 0/8] ARM: berlin: add AHCI support
+In-Reply-To: <20140718135758.GB13012@htj.dyndns.org>
+References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140718135758.GB13012@htj.dyndns.org>
+Message-ID: <53CA346B.1050802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > A semi related question.
-> > Why do we play all these macro tricks in io.h?
-> > 
-> > Example:
-> > 
-> >     #define writeb __raw_writeb
-> > 
-> > The consensus these days is to use static inline to have the
-> > correct prototype but this file is contains a lot of these
-> > macro conversions.
-> > 
-> > All these things are not introduced by your patch but now that
-> > you show some love and care for this file maybe we could take
-> > the next step and bring more order to the current semi chaos?
+On 07/18/2014 03:57 PM, Tejun Heo wrote:
+> On Fri, Jul 18, 2014 at 02:29:59PM +0200, Antoine T?nart wrote:
+>> In both cases we do not have time to do this for the next release, as
+>> the request popped up quite late.
+>>
+>> So as of now:
+>>   - Either the series is merged as is and changes to the AHCI framework
+>>     can be made for 3.18, as it's not particularly linked to this
+>>     series.
+>>   - Or you really do not want it. Then that would be great if patches
+>>     1-2 and 7-8 could be merged so that we do not end up with this big
+>>     series going for yet another cycle... I think Kishon already took
+>>     patches 1-2.
 > 
-> The macros are mainly there so we can test their presence with
-> #ifdef.
+> I don't wanna take in code which isn't in the shape that it should be.
+> Things like this accumulate to become a large maintenance burden over
+> time.  Sure, urgent things can slip in and then later be fixed up but
+> who are gonna do that here?  You guys already seem to be under time
+> pressure as it is.
+> 
+> If you guys can figure something out with Hans regarding how to
+> proceed on this, I'll be happy take the code as is.
 
-There are two types of macros in io.h:
+I cannot say much about AHCI, but if the PHY driver is fine I can
+take the DT patches adding it to BG2Q and BG2Q-DMP at any time.
 
-    #define __raw_writeb __raw_writeb
-    #ifndef __raw_writeb
-
-This is the one you talk about which allows an architecture to
-provide a local implementation of a function.
-These are prefectly OK and are required.
-
-
-Then there are the other type where one IO access function
-may re-use the implementation of another IO access function:
-
-    #ifndef writeb
-    #define writeb __raw_writeb
-    #endif
-
-This could have been implmented like this:
-
-#ifndef writeb
-#define writeb writeb
-static inline void writeb(u8 b, volatile void __iomem *addr)
-{
-   __raw_writeb(b, addr);
-}
-#endif
-
-In this way the prototype of the function is easy to understand and
-we avoid the macro tricks were we blindly replace one function name,
-with another function name.
-And we also use the same pattarn all over for the various functions.
-
-Concerning the efficiency the compiler should be smart enough to
-do the same independent on the two implmentations.
-
-The only drawback I see is that the above is 6 lines of codes,
-where the macro expansion is 3 lines of code.
-
-And when we talk about simpler expansion like ioread8()
-then we replace one line with 4 lines.
-
-	Sam
+Sebastian
