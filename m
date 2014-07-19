@@ -1,39 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 17:12:24 -0700
-Subject: [GIT PULL] Samsung fixes-4 for v3.16
-In-Reply-To: <53C9AF23.6030007@samsung.com>
-References: <53C9AF23.6030007@samsung.com>
-Message-ID: <CAOesGMgt50Ut8qv+ifDHoSQCBV4NNu-tx6B_t=T7D5SHVx0XMg@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 18 Jul 2014 17:14:26 -0700
+Subject: [PATCH] sched_clock: Avoid corrupting hrtimer tree during suspend
+In-Reply-To: <53C9ACCA.3070306@codeaurora.org>
+References: <1405721392-30795-1-git-send-email-sboyd@codeaurora.org>
+ <53C99EC5.2060602@linaro.org> <53C9A1EC.8060905@codeaurora.org>
+ <53C9A2E7.8020307@linaro.org> <53C9ACCA.3070306@codeaurora.org>
+Message-ID: <53C9B862.5050106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 4:34 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi,
->
-> This is a regression for v3.16 so please take this in -rc.
->
-> Thanks,
-> Kukjin
->
-> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
->
->   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-fixes-4
->
-> for you to fetch changes up to 4e3a498d6fc438d8c203c51aadc6ca8fb47b0577:
->
->   ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-16
-> 02:59:18 +0900)
+On 07/18/2014 04:24 PM, Stephen Boyd wrote:
+> On 07/18/14 15:42, John Stultz wrote:
+>> If its a regression (and needs -stable backports) it needs to go in via
+>> tip/timers/urgent, and not via the regular merge window.
+>>
+>> Whats the additional risk -stable wise for canceling the timer during
+>> suspend and starting it back up during resume?
+>>
+> I'd say close to zero given that we'd only be making the timer run a
+> little bit later and we have slack in there already. Here's that version.
 
-This is based on a newer branch than our current fixes. So I've cherry
-picked the patch instead of merged the branch -- if you have the
-branch in linux-next you should remove it.
+Ok, thanks. I'll try to do a closer review it and get it queued. Is
+there anyone who might be able to validate this and provide a Tested-by: ?
 
-
-Thanks,
-
--Olof
+thanks
+-john
