@@ -1,39 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 Jul 2014 14:59:42 -0700
-Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v3.17
-In-Reply-To: <53C9C121.6090403@samsung.com>
-References: <53C9C121.6090403@samsung.com>
-Message-ID: <20140719215942.GC15676@quad.lixom.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 19 Jul 2014 17:59:52 -0400 (EDT)
+Subject: [PATCH 2/4] ARM: add IPI tracepoints
+In-Reply-To: <CAKv+Gu_71vJFf3aUZso1X7m7fULUMhxj+MZVYq+LGNRLJvGyAA@mail.gmail.com>
+References: <1405660735-13408-1-git-send-email-nicolas.pitre@linaro.org>
+ <1405660735-13408-3-git-send-email-nicolas.pitre@linaro.org>
+ <20140718160418.54d11f6a@gandalf.local.home>
+ <alpine.LFD.2.11.1407181652080.3647@knanqh.ubzr>
+ <20140718172221.6dbe83e4@gandalf.local.home>
+ <CAKv+Gu_71vJFf3aUZso1X7m7fULUMhxj+MZVYq+LGNRLJvGyAA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1407191758190.3647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 19, 2014 at 09:51:45AM +0900, Kukjin Kim wrote:
-> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
-> 
->   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
-> 
-> are available in the git repository at:
-> 
+On Sat, 19 Jul 2014, Ard Biesheuvel wrote:
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/fixes-for-3.17
+> On 18 July 2014 23:22, Steven Rostedt <rostedt@goodmis.org> wrote:
+> > On Fri, 18 Jul 2014 16:55:42 -0400 (EDT)
+> > Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >
+> >>
+> >> Here's the patch I have at the head of the series now, with the above
+> >> ugliness changed to an unconditional __tracepoint_string attribute.
+> >>
+> >
+> > I was thinking of something like this. Feel free to add this to your
+> > series.
+> >
+> > -- Steve
+> >
 > 
-> for you to fetch changes up to 042b687f880adcca77847688aac35e2e16927944:
+> Nico,
 > 
->   ARM: EXYNOS: Fix build breakge with PM_SLEEP=n (2014-07-19
-> 04:45:02 +0900)
+> If this patch addresses the issue where 3 RCU related tracepoint
+> strings turn up /after/ _edata on !CONFIG_TRACING, there is already a
+> patch queued up here
 > 
-> ----------------------------------------------------------------
-> Samsung non critical fixes for v3.17
-> - update exynos_defconfig for remove outdated configs and
-> enable most of the configs used on latest exynos platforms
-> - fix build breakge for exynos_defconfig with PM_SLEEP=n
+> http://marc.info/?l=linux-kernel&m=140518452623148&w=2
 
-Hi,
+No, that doesn't help my case.  Please see the initial comment from 
+Steven in this thread and you'll understand.
 
-We now separate out defconfigs (as you might have noticed if you looked
-at our tree). I don't see any dependencies between these changes and
-the rest so I'll cherry-pick the patches into fixes-non-critical (for
-the build fix) and defconfig for that patch.
 
--Olof
+Nicolas
