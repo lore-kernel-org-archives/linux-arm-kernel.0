@@ -1,38 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 Jul 2014 12:23:26 -0700
-Subject: [GIT PULL] Allwinner core additions for 3.17
-In-Reply-To: <20140718205523.GA28407@lukather>
-References: <20140718205523.GA28407@lukather>
-Message-ID: <20140719192326.GH4265@quad.lixom.net>
+Date: Sat, 19 Jul 2014 12:29:51 -0700
+Subject: [GIT PULL 1/7] ARM: tegra: move fuse code out of arch/arm
+In-Reply-To: <1405694740-4090-1-git-send-email-thierry.reding@gmail.com>
+References: <1405694740-4090-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140719192951.GA10514@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 10:55:23PM +0200, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof, 
-> 
-> Here are the few mach-sunxi patches to merge for the 3.17 release cycle.
-> 
-> Thanks!
-> Maxime
-> 
+On Fri, Jul 18, 2014 at 04:45:34PM +0200, Thierry Reding wrote:
 > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
 >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-3.17
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.17-fuse-move
 > 
-> for you to fetch changes up to 5ba1657ecdee507df4adcd05b533d09e9934fc11:
+> for you to fetch changes up to 2fa937a767bd0933dfe6017cabd038ce52594171:
 > 
->   ARM: sunxi: select MFD_SUN6I_PRCM when sun8i arch support is enabled (2014-07-07 11:00:06 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner core additions for 3.17
-> 
-> Nothing very fancy here, only the introduction from the new Allwinner A23 SoC.
+>   soc/tegra: fuse: fix dummy functions (2014-07-17 14:38:29 +0200)
 
-Merged, thanks.
+Merged into next/cleanup. Thanks for following up on the previous merge request
+and respinning this, Theirry!
 
 
 -Olof
