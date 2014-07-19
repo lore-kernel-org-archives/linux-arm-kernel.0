@@ -1,37 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 19 Jul 2014 11:03:39 +0200
-Subject: [PATCH v10 0/8] ARM: berlin: add AHCI support
-In-Reply-To: <20140718135758.GB13012@htj.dyndns.org>
-References: <1405686607-8126-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140718135758.GB13012@htj.dyndns.org>
-Message-ID: <53CA346B.1050802@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 19 Jul 2014 11:05:33 +0200
+Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic {read,
+ write}s*()
+In-Reply-To: <20140719084152.GA31564@ravnborg.org>
+References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+ <43703371.jktNRIezc3@wuerfel> <20140719084152.GA31564@ravnborg.org>
+Message-ID: <4967546.K5Yf5hcJE1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2014 03:57 PM, Tejun Heo wrote:
-> On Fri, Jul 18, 2014 at 02:29:59PM +0200, Antoine T?nart wrote:
->> In both cases we do not have time to do this for the next release, as
->> the request popped up quite late.
->>
->> So as of now:
->>   - Either the series is merged as is and changes to the AHCI framework
->>     can be made for 3.18, as it's not particularly linked to this
->>     series.
->>   - Or you really do not want it. Then that would be great if patches
->>     1-2 and 7-8 could be merged so that we do not end up with this big
->>     series going for yet another cycle... I think Kishon already took
->>     patches 1-2.
+On Saturday 19 July 2014 10:41:52 Sam Ravnborg wrote:
+> > > 
+> > > This set:
+> > > #define inb_p(addr)     inb(addr)
+> > > #define inw_p(addr)     inw(addr)
+> > > #define inl_p(addr)     inl(addr)
+> > > #define outb_p(x, addr) outb((x), (addr))
+> > > #define outw_p(x, addr) outw((x), (addr))
+> > > #define outl_p(x, addr) outl((x), (addr))
+> > > 
+> > > Should have a comment that say they are deprecated.
+> > > Especially the "b" variants still have many users.
+> > 
+> > Are they? I don't remember ever seeing a reason to deprecate
+> > them. We could perhaps enclose them in #ifdef CONFIG_ISA, but
+> > there may also be some drivers that use the same code for ISA
+> > and PCI, and it doesn't really hurt on PCI.
 > 
-> I don't wanna take in code which isn't in the shape that it should be.
-> Things like this accumulate to become a large maintenance burden over
-> time.  Sure, urgent things can slip in and then later be fixed up but
-> who are gonna do that here?  You guys already seem to be under time
-> pressure as it is.
-> 
-> If you guys can figure something out with Hans regarding how to
-> proceed on this, I'll be happy take the code as is.
+> It is my understanding that inl and inl_p are the same these days.
+> A quick grep indicate that only m68k define the
+> _p variant different from the other.
+> But I failed to find and description of the difference between the
+> two which is why I assumed they were identical and thus no need for both.
 
-I cannot say much about AHCI, but if the PHY driver is fine I can
-take the DT patches adding it to BG2Q and BG2Q-DMP at any time.
+I don't know why m68k needs it, it's really an x86-specific
+thing, see slow_down_io() in arch/x86/include/asm/io.h.
 
-Sebastian
+	Arnd
