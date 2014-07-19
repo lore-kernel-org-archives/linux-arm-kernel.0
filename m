@@ -1,72 +1,30 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Sat, 19 Jul 2014 10:21:10 -0700
-Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic
- {read,write}s*()
-In-Reply-To: <20140719091156.GA31772@ravnborg.org>
-References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
- <43703371.jktNRIezc3@wuerfel> <20140719084152.GA31564@ravnborg.org>
- <4967546.K5Yf5hcJE1@wuerfel> <20140719091156.GA31772@ravnborg.org>
-Message-ID: <1405790470.2032.10.camel@jarvis.lan>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 19 Jul 2014 11:50:20 -0700
+Subject: [GIT PULL] Keystone DTS update for 3.17
+In-Reply-To: <1405618897-10350-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1405618897-10350-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140719185020.GA4265@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-07-19 at 11:11 +0200, Sam Ravnborg wrote:
-> On Sat, Jul 19, 2014 at 11:05:33AM +0200, Arnd Bergmann wrote:
-> > On Saturday 19 July 2014 10:41:52 Sam Ravnborg wrote:
-> > > > > 
-> > > > > This set:
-> > > > > #define inb_p(addr)     inb(addr)
-> > > > > #define inw_p(addr)     inw(addr)
-> > > > > #define inl_p(addr)     inl(addr)
-> > > > > #define outb_p(x, addr) outb((x), (addr))
-> > > > > #define outw_p(x, addr) outw((x), (addr))
-> > > > > #define outl_p(x, addr) outl((x), (addr))
-> > > > > 
-> > > > > Should have a comment that say they are deprecated.
-> > > > > Especially the "b" variants still have many users.
-> > > > 
-> > > > Are they? I don't remember ever seeing a reason to deprecate
-> > > > them. We could perhaps enclose them in #ifdef CONFIG_ISA, but
-> > > > there may also be some drivers that use the same code for ISA
-> > > > and PCI, and it doesn't really hurt on PCI.
-> > > 
-> > > It is my understanding that inl and inl_p are the same these days.
-> > > A quick grep indicate that only m68k define the
-> > > _p variant different from the other.
-> > > But I failed to find and description of the difference between the
-> > > two which is why I assumed they were identical and thus no need for both.
-> > 
-> > I don't know why m68k needs it, it's really an x86-specific
-> > thing, see slow_down_io() in arch/x86/include/asm/io.h.
+On Thu, Jul 17, 2014 at 01:41:37PM -0400, Santosh Shilimkar wrote:
+> Hi Arm-soc folks,
 > 
-> I had missed the x86 versions when grepping.
-> Hmm, and with the macro tricks they play in asm/io.h this
-> file is not at all grep friendly.
+> Please pull below keystone DTS updates for 3.17.
 > 
-> So xxx_p is for pause (or something like that).
-> This also matches that m68k do some tricks with delay() in the _p variants.
-> Thanks for the explanation.
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> 
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
+> 
+> for you to fetch changes up to 6592f671a4e6ee6308ddd67c2459dd71836770df:
+> 
+>   ARM: dts: keystone-evm: add 1g ethernet phys nodes (2014-07-17 13:29:06 -0400)
 
-Yes, the original x86 problem is that the CPU has a direct IO output bus
-which you can connect to.  The in/out instructions activate the I/O pin
-of the CPU indicating the address should be decoded by the device space.
-Some devices are two slow to latch at the CPU speed, so if you do a
-succession of in's or out's, particularly to mailbox locations, the
-device misses some of the I/O transactions.  Adding the delay slows the
-sequence down to the point where the device can react to it.
+Merged, thanks.
 
-I/O cycle addressing is also problematic for architectures which don't
-have an in/out instruction or the concept of I/O access (parisc uses a
-special bridge to translate memory access to I/O cycles).
 
-In theory, modern devices should be memory mapped (so capable of
-reacting at CPU bus speed) but the PCI spec keeps the concept of I/O
-mapping (triggering an I/O cycle instead of a memory one).  Most modern
-PCI devices offer both memory and I/O mapped access and we always choose
-the memory mapped one in that case.  Any device supporting both would
-never need the delay.  However, the PCI spec still preserves the concept
-of a legacy device that only has I/O ports, which would possibly need
-the delay  ... the PCI SIG keeps threatening to deprecate the I/O BAR,
-but haven't yet done so yes (as of PCIe version 3.0).
-
-James
+-Olof
