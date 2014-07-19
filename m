@@ -1,56 +1,91 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Jul 2014 22:33:59 -0700
-Subject: [GIT PULL] ARM: SPEAr13xx PCIe updates for v3.17
-In-Reply-To: <20140719045804.GC20064@quad.lixom.net>
-References: <CAKohpo=T3taZx8e39tenCRBNxCUr=7H2xG7Ng=e+YQXuuY9u8Q@mail.gmail.com>
- <20140719045804.GC20064@quad.lixom.net>
-Message-ID: <20140719053359.GF20064@quad.lixom.net>
+Date: Fri, 18 Jul 2014 22:27:58 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC DT Timers Updates for v3.17
+In-Reply-To: <cover.1405556312.git.horms+renesas@verge.net.au>
+References: <cover.1405556312.git.horms+renesas@verge.net.au>
+Message-ID: <20140719052758.GE20064@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 09:58:04PM -0700, Olof Johansson wrote:
-> On Wed, Jul 16, 2014 at 02:33:03PM +0530, Viresh Kumar wrote:
-> > Hi Olof/Arnd,
-> > 
-> > This is another attempt to merge SPEAr PCIe updates after olof
-> > pointed out *enough* issues with initial PULL request:
-> > 
-> > https://lkml.org/lkml/2014/7/9/641
-> > 
-> > Last version was sent here: http://patchwork.ozlabs.org/patch/368479/
-> > and all the nits pointed out by Kishon & Bjorn are fixed in this pull
-> > request.
-> > 
-> > Apart from ARM specific changes, this updates drivers/{pci|phy}. Bjorn
-> > advised to get complete series via arm-soc tree earlier:
-> > 
-> > http://www.spinics.net/lists/linux-pci/msg30271.html
-> > 
-> > Please let me know if I couldn't get it right this time.
+On Thu, Jul 17, 2014 at 09:40:20AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Looks good. Thanks for following up on this and fixing up stuff.
+> Please consider these Renesas ARM based SoC DT Timers updates for v3.17.
 > 
-> > 
-> > The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
-> > 
-> >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git
-> > spear/pcie-support-v10
-> > 
-> > for you to fetch changes up to f6e670a3b62d23722d04e801244a068755a45b7a:
-> > 
-> >   ARM: SPEAr13xx: Update defconfigs (2014-07-14 11:04:44 +0530)
+> This pull request is based on a merge of the following to provide
+> all dependencies and try to eliminate conflicts. It turns out the changes
+> in this pull requests are a nexus for dependencies due to modifying DT,
+> SoC, board and recently moved header files as well as requiring driver
+> changes.
 > 
-> Merged into next/drivers.
+> * The clockevents/renesas-timers-dt branch of Daniel Lezcano's tree.
+>   He has indicated that this branch has stable commit ids and will
+>   be included in v3.17. Olof and arm at kernel.org were CCed on the
+>   thread where he, Laurent Pinchart and I discussed the use of that branch.
 > 
-> If anything, just one thing: you should consider using signed tags. :)
+>   The clockevents/renesas-timers-dt's branch is in turn based on v3.16-rc3.
+> 
+> * "Third Round of Renesas ARM Based SoC DT Updates for v3.17",
+>   tagged as renesas-dt3-for-v3.17, which I have sent a pull request for.
+> 
+> * "Renesas ARM Based SoC Clock Updates for v3.17",
+>   tagged as renesas-clock-for-v3.17, which you have merged
+>   into next/soc
+> 
+> * "Second Round of Renesas ARM Based SoC soc-cleanup Updates for v3.17",
+>   tagged as renesas-soc-cleanup2-for-v3.17, which you have merged
+>   into next/cleanup.
+> 
+> * "Third Round of Renesas ARM Based SoC r8a7779 Multiplatform Updates for
+>   v3.17", tagged as renesas-r8a7779-multiplatform3-for-v3.17, which
+>   you have merged into next/soc
+> 
+> * "Renesas ARM Based SoC Boards Updates for v3.17",
+>   tagged as renesas-boards-for-v3.17, which you have merged
+>   into next/boards
+> 
+> * "Third Round of Renesas ARM Based SoC Updates for v3.17",
+>   tagged as renesas-soc3-for-v3.17, which you have merged
+>   into next/soc
+> 
+> 
+> The following changes since commit 5c174afd407acc7a90701900b279578151bc007f:
+> 
+>   Merge branch 'clockevents/renesas-timers-dt' of git://git.linaro.org/people/daniel.lezcano/linux into dt-timers-for-v3.17.base (2014-07-15 16:31:45 +0900)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-timers-for-v3.17
+> 
+> for you to fetch changes up to 9394af4314554d15762585a3464cefaa2e6d0420:
+> 
+>   ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-07-15 21:26:42 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC DT Timers Updates for v3.17
+> 
+> * Enable timers using DT when booting boards without Legacy-C code
+> 
+> ----------------------------------------------------------------
+> Laurent Pinchart (8):
+>       ARM: shmobile: r8a7790: Add CMT devices to DT
+>       ARM: shmobile: r8a7791: Add CMT devices to DT
+>       ARM: shmobile: r8a7779: Add TMU devices to DT
+>       ARM: shmobile: lager-reference: Enable CMT0 in device tree
+>       ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
+>       ARM: shmobile: marzen-reference: Enable TMU0 in device tree
+>       ARM: shmobile: r7s72100: Add MTU2 device to DT
+>       ARM: shmobile: genmai-reference: Enable MTU2 in device tree
 
-Also, there's a conflict with one of the fixes that were sent earlier.
-It'd been nice to keep this based on the -rc that had that fix to avoid the
-conflict. Please check the contents in our for-next.
+Ok, this branch definitely contains a lot more than this. For dependent
+external branches such as clocksource, we still prefer to see a pull request so
+that we can merge in the dependency and get a clean diffstat when we do the
+merge of your branch, otherwise it gets awkward to compare that what we're
+getting is what you thought you sent (which is one of the things we check on
+merges).
+
+Please regenerate this pull request as appropriate.
 
 
 -Olof
