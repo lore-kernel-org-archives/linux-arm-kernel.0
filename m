@@ -1,40 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 20 Jul 2014 00:00:12 +0100
-Subject: bios32.c: Fix me in pci_fixup_it8152
-In-Reply-To: <CAPDOMVibN_jYoxHyaE1sRXj6garOmKvFoMXGV62B4FONTgJGMQ@mail.gmail.com>
-References: <CAPDOMVibN_jYoxHyaE1sRXj6garOmKvFoMXGV62B4FONTgJGMQ@mail.gmail.com>
-Message-ID: <20140719230012.GC21766@n2100.arm.linux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 20 Jul 2014 01:45:29 +0200
+Subject: [PATCH v3 0/3] Clean up ACPI core to prepare for running ACPI on
+ ARM64
+In-Reply-To: <1405677774-16787-1-git-send-email-hanjun.guo@linaro.org>
+References: <1405677774-16787-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <12808483.rIsXFzJSCT@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 19, 2014 at 06:47:37PM -0400, Nick Krause wrote:
-> Hey Russell and others,
-> Before I clean this fix me up I wanted to known how to define the values
-> as stated in the fix me in this function or if this is invalid as of the
-> latest kernel trees.
+On Friday, July 18, 2014 06:02:51 PM Hanjun Guo wrote:
+> This patch set have no function change for x86 and ia64 and
+> just do some clean up to prepare for running ACPI on ARM64.
+> 
+> This patch set is splited out from the patch set [1]
+> "[PATCH v4 00/13] Enable ACPI on ARM64 in Kconfig" and hope it
+> can be merged first before ARM64 ACPI core patches.
+> 
+> [1]: https://lkml.org/lkml/2014/6/26/627
+> 
+> update from v2:
+> Don not select ACPI_LEGACY_TABLES_LOOKUP on IA64 which
+> is catched by Peter.
+> 
+> update from v1:
+> 1. Drop "Make EC debugfs depend on X86 || IA64 in Kconfig";
+> 2. Rename ACPI_SCAN_BIOS_NOT_EFI to ACPI_LEGACY_TABLES_LOOKUP
+>    suggested by Rafael;
+> 3. Rename ARCH_HAS_ACPI_PDC to ARCH_MIGHT_HAVE_ACPI_PDC suggested by Rafael;
+> 4. Remove the help for ARCH_MIGHT_HAVE_ACPI_PDC because it can't be selected;
+> 5. Rename acpi_arch_is_smp() to acpi_has_cpu_in_madt() to be more
+>    explicit and easy understanding.
+> 
+> Graeme Gregory (2):
+>   ACPI: ARM64 does not have a BIOS add config for BIOS table scan.
+>   ACPI: Don't use acpi_lapic in ACPI core code
+> 
+> Hanjun Guo (1):
+>   ACPI / processor: Introduce ARCH_HAS_ACPI_PDC
 
-If you would like to fix it properly, then that's fine.  The comment
-there says:
-
-        /* FIXME: add defines for class 0x68000 and 0x80103 */
-        if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
-            dev->class == 0x68000 ||
-            dev->class == 0x80103) {
-
-The thing that's slightly confusing here is that dev->class contains
-the class in bits 24..8, but also the programming interface in bits
-7..0.
-
-So, the comment is slightly wrong in that it's actually meaning
-class 0x0680 with a programming interface of 0x00, and a class of
-0x0801 with a programming interface of 0x03.
-
-Your challenge is to _not_ add defines for these, but to use the
-existing defines for these classes, and modify the code to use those
-defines /without/ changing the effect of the checks.  Ignore that
-there's no definitions of the programming interfaces - they can
-stay as raw numbers.
+Series queued up for 3.17 with minor changes of patch subjects.  Thanks!
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
