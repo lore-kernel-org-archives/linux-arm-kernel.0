@@ -1,64 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 19 Jul 2014 14:11:36 +0900
-Subject: [GIT PULL] Samsung fixes-4 for v3.16
-In-Reply-To: <CAOesGMgX2m4UbO756JbtQLZVJv3SY+dXDE+My-OeY0oCFA-aew@mail.gmail.com>
-References: <53C9AF23.6030007@samsung.com>
- <CAOesGMgt50Ut8qv+ifDHoSQCBV4NNu-tx6B_t=T7D5SHVx0XMg@mail.gmail.com>
- <53C9B952.6010000@samsung.com> <53C9BF34.2030903@samsung.com>
- <CAOesGMgX2m4UbO756JbtQLZVJv3SY+dXDE+My-OeY0oCFA-aew@mail.gmail.com>
-Message-ID: <022101cfa30f$e9fa0fb0$bdee2f10$@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 Jul 2014 22:15:52 -0700
+Subject: [GIT PULL] omap dts changes for v3.17 merge window, part1
+In-Reply-To: <20140716125553.GC18374@atomide.com>
+References: <20140716125553.GC18374@atomide.com>
+Message-ID: <20140719051552.GD20064@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On Wed, Jul 16, 2014 at 05:55:58AM -0700, Tony Lindgren wrote:
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
-> On Fri, Jul 18, 2014 at 5:43 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > On 07/19/14 09:18, Kukjin Kim wrote:
-> >>
-> >> On 07/19/14 09:12, Olof Johansson wrote:
-> >>>
-> >>> On Fri, Jul 18, 2014 at 4:34 PM, Kukjin Kim<kgene.kim@samsung.com> wrote:
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> This is a regression for v3.16 so please take this in -rc.
-> >>>>
-> >>>> Thanks,
-> >>>> Kukjin
-> >>>>
-> >>>> The following changes since commit
-> >>>> 1795cd9b3a91d4b5473c97f491d63892442212ab:
-> >>>>
-> >>>> Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
-> >>>>
-> >>>> are available in the git repository at:
-> >>>>
-> >>>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >>>> tags/samsung-fixes-4
-> >>>>
-> >>>> for you to fetch changes up to 4e3a498d6fc438d8c203c51aadc6ca8fb47b0577:
-> >>>>
-> >>>> ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-16
-> >>>> 02:59:18 +0900)
-> >>>
-> >>>
-> >>> This is based on a newer branch than our current fixes. So I've cherry
-> >>> picked the patch instead of merged the branch -- if you have the
-> >>> branch in linux-next you should remove it.
-> >>>
-> >> OK, I will.
-> >>
-> > BTW, other pm related branches in my tree have dependencies with the change
-> > so I just reverted that in my -next.
-> >
-> > If any problems, please let me know.
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 > 
-> Are they part of the branches you sent now? Is that patch a base in
-> those branches?
+> are available in the git repository at:
 > 
-No, I didn't send out any branch including the fix to arm-soc because I also
-don't want to make any conflict or inconvenience for you :) Just thought, I
-need to sort it out once it has been merged into mainline.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/dt-part1
+> 
+> for you to fetch changes up to 3c9464ed75d6c15ee864da6d8f6a4cd3b0f2c934:
+> 
+>   ARM: DTS: omap5-uevm: Enable basic audio (McPDM <-> twl6040) (2014-07-15 00:21:25 -0700)
+> 
+> ----------------------------------------------------------------
+> First set of .dts changes for omaps for v3.17 merge
+> window:
+> 
+> - Enable irqchip crossbar interrupt mapping. These changes
+>   are based on an immutable irqchip branch set up by Jason
+>   Cooper to make it easier to merge the related .dts changes.
+> 
+> - Removal of omap2 related static clock data that now comes
+>   from device tree.
+> 
+> - Enabling of PHY regulators for various omaps
+> 
+> - Enabling of PCIe for dra7
+> 
+> - Add support for am437x starterkit
+> 
+> - Enable audio for for omap5
+> 
+> - Enable display and am335x-evmsk
 
-Thanks,
-Kukjin
+Merged, but:
+
+1) There was a conflict in the qspi node of dra7.dtsi due to a fix to
+   remove the interrupts property. It'd be nice to get these branches
+   based on the fixes so that we don't see these conflicts (or at least
+   get told about them). Besides, if we happen to have an older base in
+   our branch than what had the fix, it'll bubble all the way up to Linus.
+
+2) There was an add/add conflict in the dra7.dtsi file, due to new
+   entries just being appended. Please keep these sorted on address to
+   avoid that.
+
+-Olof
