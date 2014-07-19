@@ -1,55 +1,122 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 19 Jul 2014 15:15:13 +0200
-Subject: [GIT PULL] Samsung fixes-4 for v3.16
-In-Reply-To: <53C9AF23.6030007@samsung.com>
-References: <53C9AF23.6030007@samsung.com>
-Message-ID: <53CA6F61.1020709@gmail.com>
+Date: Sat, 19 Jul 2014 15:18:00 +0200
+Subject: [PATCH v7 4/6] ARM: dts: Exynos: add cpu nodes, opp and cpu clock
+ configuration data
+In-Reply-To: <1405345118-4269-5-git-send-email-thomas.ab@samsung.com>
+References: <1405345118-4269-1-git-send-email-thomas.ab@samsung.com>
+ <1405345118-4269-5-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53CA7008.7000106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi Thomas,
 
-On 19.07.2014 01:34, Kukjin Kim wrote:
-> Hi,
-> 
-> This is a regression for v3.16 so please take this in -rc.
-> 
-> Thanks,
-> Kukjin
-> 
-> The following changes since commit
-> 1795cd9b3a91d4b5473c97f491d63892442212ab:
-> 
->   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-fixes-4
-> 
-> for you to fetch changes up to 4e3a498d6fc438d8c203c51aadc6ca8fb47b0577:
-> 
->   ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-16
-> 02:59:18 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung fixes-4 for v3.16
-> - Fix core ID for platsmp and hotplug
->   This fixes existing calculation of PMU register offsets on
->   exynos SoCs and this also fixes CPU hotplug with more than
->   2 cores, because it removes incorrect condition check in
->   platform_do_lowpower().
-> 
-> ----------------------------------------------------------------
-> Tomasz Figa (1):
->       ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
-> 
->  arch/arm/mach-exynos/hotplug.c | 10 ++++++----
->  arch/arm/mach-exynos/platsmp.c | 34 +++++++++++++++++++---------------
->  2 files changed, 25 insertions(+), 19 deletions(-)
+Please see my comments inline.
 
-Could you also merge this branch to your for-next so we can base other
-patches for 3.17 on this fix?
+On 14.07.2014 15:38, Thomas Abraham wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> For Exynos 4210/5250/5420 based platforms, add CPU nodes, operating points and
+> cpu clock data for migrating from Exynos specific cpufreq driver to using
+> generic cpufreq drivers.
+
+[snip]
+
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index ee3001f..c3a73bf 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -31,6 +31,33 @@
+>  		pinctrl2 = &pinctrl_2;
+>  	};
+>  
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		cpu at 0 {
+
+nit: Missing blank line after last property.
+
+The cluster ID field of MPIDR on Exynos4210 is 0x9 not zero, which means
+that this should be cpu at 900.
+
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+
+			reg = <0x900>;
+
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +
+> +			operating-points = <
+> +				1200000 1250000
+> +				1000000 1150000
+> +				800000	1075000
+> +				500000	975000
+> +				400000	975000
+> +				200000	950000
+> +			>;
+> +		};
+> +
+> +		cpu at 1 {
+
+		cpu at 901
+
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <1>;
+
+			reg = <0x901>;
+
+> +		};
+
+In general this wouldn't have even booted, because there were several
+places where code relied on CPUs being 0, 1, 2... However I have sent
+necessary fixes and they should hit linux-next in few days.
+
+> +	};
+> +
+>  	sysram at 02020000 {
+>  		compatible = "mmio-sram";
+>  		reg = <0x02020000 0x20000>;
+
+[snip]
+
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 834fb5a..66b0f98 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -63,6 +63,29 @@
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+>  			clock-frequency = <1700000000>;
+> +
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +
+> +			operating-points = <
+> +				1700000 1300000
+> +				1600000 1250000
+> +				1500000 1225000
+> +				1400000 1200000
+> +				1300000 1150000
+> +				1200000 1125000
+> +				1100000 1100000
+> +				1000000 1075000
+> +				 900000 1050000
+> +				 800000 1025000
+> +				 700000 1012500
+> +				 600000 1000000
+> +				 500000  975000
+> +				 400000  950000
+> +				 300000  937500
+> +				 200000  925000
+> +			>;
+> +			clock-latency = <200000>;
+
+I don't see this property specified for Exynos4210. Have you missed it
+there?
 
 Best regards,
 Tomasz
