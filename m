@@ -1,63 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 19 Jul 2014 01:36:23 +0200
-Subject: mvebu cpuidle and cpufreq branch handling for v3.17
-In-Reply-To: <4295346.6091tevmKX@vostro.rjw.lan>
-References: <20140718230740.GR24496@titan.lakedaemon.net>
- <4295346.6091tevmKX@vostro.rjw.lan>
-Message-ID: <53C9AF77.3030104@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 18 Jul 2014 17:12:24 -0700
+Subject: [GIT PULL] Samsung fixes-4 for v3.16
+In-Reply-To: <53C9AF23.6030007@samsung.com>
+References: <53C9AF23.6030007@samsung.com>
+Message-ID: <CAOesGMgt50Ut8qv+ifDHoSQCBV4NNu-tx6B_t=T7D5SHVx0XMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2014 01:51 AM, Rafael J. Wysocki wrote:
-> On Friday, July 18, 2014 07:07:40 PM Jason Cooper wrote:
->> Arnd, Olof, Kevin,
->>
->> I have two branches with the remaining mvebu SoC changes for v3.17.
->> They are mvebu/soc-cpuidle and mvebu/soc-cpufreq.  Each branch is
->> slightly problematic because both contain changes to their respective
->> code in drivers/.  To send the driver changes through the appropriate
->> subsystems would be a garish nightmare of branch on branch on branch.
->> Thankfully, the changes are isolated to drivers only mvebu uses, so
->> keeping it all together should cause minimal, if any, conflicts.
->>
->> I've requested Acks from the appropriate maintainers but as it's summer
->> I'm not confident that we'll receive those Acks in time for the arm-soc
->> cutoff (-rc6 -ish).
->>
->> As I see it, I could send arm-soc two topic branch pull requests, which
->> arm-soc would keep out separate on the remote chance of an objection.
->>
->> Or, I could wait for the Acks (the code has already been in -next for
->> several days), merge it into mvebu/soc, and send a, most likely, late
->> pull request for it.
->>
->> Which would you guys prefer?
->>
->> The cpuidle branch and ML link:
->>
->>    git://git.infradead.org/linux-mvebu.git mvebu/soc-cpuidle
->>
->>    https://lkml.kernel.org/r/1404913221-17343-1-git-send-email-thomas.petazzoni at free-electrons.com
->>
->> The cpufreq branch and ML link:
->>
->>    git://git.infradead.org/linux-mvebu.git mvebu/soc-cpufreq
->>
->>    https://lkml.kernel.org/r/1404920715-19834-1-git-send-email-thomas.petazzoni at free-electrons.com
+On Fri, Jul 18, 2014 at 4:34 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi,
 >
-> I'm generally OK with the cpufreq/cpuidle changes here in drivers/, but as I
-> said in response to the cpuidle series, I'd like someone from the ARM side of
-> things to look at those changes too.
+> This is a regression for v3.16 so please take this in -rc.
+>
+> Thanks,
+> Kukjin
+>
+> The following changes since commit 1795cd9b3a91d4b5473c97f491d63892442212ab:
+>
+>   Linux 3.16-rc5 (2014-07-13 14:04:33 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-4
+>
+> for you to fetch changes up to 4e3a498d6fc438d8c203c51aadc6ca8fb47b0577:
+>
+>   ARM: EXYNOS: Fix core ID used by platsmp and hotplug code (2014-07-16
+> 02:59:18 +0900)
 
-I am currently in vacation. I will be back Monday and look at this patchset.
+This is based on a newer branch than our current fixes. So I've cherry
+picked the patch instead of merged the branch -- if you have the
+branch in linux-next you should remove it.
 
-Thanks
-   -- Daniel
 
+Thanks,
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-Olof
