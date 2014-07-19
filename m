@@ -1,40 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 Jul 2014 12:44:16 -0700
-Subject: [GIT PULL 3/7] ARM: tegra: rework PCIe regulators
-In-Reply-To: <1405694740-4090-3-git-send-email-thierry.reding@gmail.com>
+Date: Sat, 19 Jul 2014 12:50:18 -0700
+Subject: [GIT PULL 4/7] ARM: tegra: Add XUSB pad controller support
+In-Reply-To: <1405694740-4090-4-git-send-email-thierry.reding@gmail.com>
 References: <1405694740-4090-1-git-send-email-thierry.reding@gmail.com>
- <1405694740-4090-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140719194416.GC10514@quad.lixom.net>
+ <1405694740-4090-4-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140719195018.GD10514@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 04:45:36PM +0200, Thierry Reding wrote:
+On Fri, Jul 18, 2014 at 04:45:37PM +0200, Thierry Reding wrote:
 > The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
 >   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.17-pcie-regulators
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.17-xusb-padctl
 > 
-> for you to fetch changes up to 122ee17dc2adb5c4a63d3a29af9f4e6e331087e5:
+> for you to fetch changes up to dc0a3938668706f3a63cde4ceb431e9189fb2a0a:
 > 
->   ARM: tegra: Remove legacy PCIe power supply properties (2014-07-18 11:20:10 +0200)
+>   pinctrl: Add NVIDIA Tegra XUSB pad controller support (2014-07-11 14:41:06 +0200)
 > 
 > ----------------------------------------------------------------
-> ARM: tegra: rework PCIe regulators
+> ARM: tegra: Add XUSB pad controller support
 > 
-> This branch reworks the set of regulators that the Tegra PCIe driver
-> uses, so that the driver and DT bindings more correctly model what's
-> really going on in HW. For backwards-compatibility the driver will
-> fallback to using the old set of regulators if the new ones can't be
-> found.
+> Adds device tree bindings and a driver for the XUSB pad controller found
+> on Tegra114 and later. This is a prerequisites for PCIe, SATA and XUSB
+> drivers which are all currently being reviewed or pending for merge.
 > 
-> I've made this a separate branch in case it needs to be pulled into the
-> PCIe tree to resolve any conflicts.
+> This is a separate branch in case it needs to be pulled into the pinctrl
+> tree to resolve conflicts.
 
-Merged into next/drivers. Again, thanks for respinning and making it handle the
-old bindings too. I'm glad it wasn't too hard to sort out.
+Merged, thanks.
 
 
 -Olof
