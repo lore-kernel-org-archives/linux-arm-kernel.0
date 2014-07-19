@@ -1,28 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 19 Jul 2014 11:50:20 -0700
-Subject: [GIT PULL] Keystone DTS update for 3.17
-In-Reply-To: <1405618897-10350-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1405618897-10350-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140719185020.GA4265@quad.lixom.net>
+Date: Sat, 19 Jul 2014 11:52:07 -0700
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Defconfig
+ Updates for v3.17
+In-Reply-To: <cover.1405640905.git.horms+renesas@verge.net.au>
+References: <cover.1405640905.git.horms+renesas@verge.net.au>
+Message-ID: <20140719185207.GB4265@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 01:41:37PM -0400, Santosh Shilimkar wrote:
-> Hi Arm-soc folks,
+On Fri, Jul 18, 2014 at 08:55:47AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please pull below keystone DTS updates for 3.17.
+> Please consider these fourth round of Renesas ARM based SoC defconfig
+> updates for v3.17.
 > 
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-defconfig3-for-v3.17,
+> which you have merged into renesas/defconfig3.
 > 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> I will follow-up with a pull request that removes
+> the Genmai board code.
+> 
+> 
+> The following changes since commit 8cbf869a0a278c4d39e50daa4f4101b394a72a93:
+> 
+>   ARM: shmobile: Enable R-Car Gen 2 PCIe in shmobile_defconfig (2014-07-09 10:44:12 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig4-for-v3.17
 > 
-> for you to fetch changes up to 6592f671a4e6ee6308ddd67c2459dd71836770df:
+> for you to fetch changes up to 92db2b7af591d3c3212183a34856b4cb190b6999:
 > 
->   ARM: dts: keystone-evm: add 1g ethernet phys nodes (2014-07-17 13:29:06 -0400)
+>   ARM: shmobile: defconfig: Remove MACH_GENMAI (2014-07-17 00:02:34 +0900)
 
 Merged, thanks.
 
