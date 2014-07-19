@@ -1,178 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 19 Jul 2014 11:24:05 -0400
-Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
-In-Reply-To: <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
-References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>	<CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>	<CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>	<CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
- <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
-Message-ID: <53CA8D95.8010108@ti.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 19 Jul 2014 10:21:10 -0700
+Subject: [PATCH v3 1/3] asm-generic/io.h: Implement generic
+ {read,write}s*()
+In-Reply-To: <20140719091156.GA31772@ravnborg.org>
+References: <1405508484-18303-1-git-send-email-thierry.reding@gmail.com>
+ <43703371.jktNRIezc3@wuerfel> <20140719084152.GA31564@ravnborg.org>
+ <4967546.K5Yf5hcJE1@wuerfel> <20140719091156.GA31772@ravnborg.org>
+Message-ID: <1405790470.2032.10.camel@jarvis.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh,
+On Sat, 2014-07-19 at 11:11 +0200, Sam Ravnborg wrote:
+> On Sat, Jul 19, 2014 at 11:05:33AM +0200, Arnd Bergmann wrote:
+> > On Saturday 19 July 2014 10:41:52 Sam Ravnborg wrote:
+> > > > > 
+> > > > > This set:
+> > > > > #define inb_p(addr)     inb(addr)
+> > > > > #define inw_p(addr)     inw(addr)
+> > > > > #define inl_p(addr)     inl(addr)
+> > > > > #define outb_p(x, addr) outb((x), (addr))
+> > > > > #define outw_p(x, addr) outw((x), (addr))
+> > > > > #define outl_p(x, addr) outl((x), (addr))
+> > > > > 
+> > > > > Should have a comment that say they are deprecated.
+> > > > > Especially the "b" variants still have many users.
+> > > > 
+> > > > Are they? I don't remember ever seeing a reason to deprecate
+> > > > them. We could perhaps enclose them in #ifdef CONFIG_ISA, but
+> > > > there may also be some drivers that use the same code for ISA
+> > > > and PCI, and it doesn't really hurt on PCI.
+> > > 
+> > > It is my understanding that inl and inl_p are the same these days.
+> > > A quick grep indicate that only m68k define the
+> > > _p variant different from the other.
+> > > But I failed to find and description of the difference between the
+> > > two which is why I assumed they were identical and thus no need for both.
+> > 
+> > I don't know why m68k needs it, it's really an x86-specific
+> > thing, see slow_down_io() in arch/x86/include/asm/io.h.
+> 
+> I had missed the x86 versions when grepping.
+> Hmm, and with the macro tricks they play in asm/io.h this
+> file is not at all grep friendly.
+> 
+> So xxx_p is for pause (or something like that).
+> This also matches that m68k do some tricks with delay() in the _p variants.
+> Thanks for the explanation.
 
-On Saturday 19 July 2014 10:46 AM, Viresh Kumar wrote:
-> On 19 July 2014 03:22, Olof Johansson <olof@lixom.net> wrote:
->> What is the current API that is being broken, in your opinion?
-> 
-> So, currently the nodes doesn't have any such property. And drivers
-> consider all of them as sharing clocks, for eg: cpufreq-cpu0.
-> 
-> Now, if we use those older DT's after the new changes, drivers would
-> consider CPUs as having separate clocks. And that would be opposite
-> of what currently happens.
-> 
-> Not sure if this counts as broken.
-> 
->>> But if that isn't the case, the bindings are very simple & clear to handle.
->>> Diff for new bindings:
->>
->> It's somewhat confusing to see a diff to the patch instead of a new
->> version. It seems to remove the cpu 0 entry now?
-> 
-> Not really, I removed an unwanted example. This is how it looks:
-> 
-> 
-> 
-> * Generic CPUFreq clock bindings
-> 
-> Clock lines may or may not be shared among different CPUs on a platform.
-> 
-> Possible configurations:
-> 1.) All CPUs share a single clock line
-> 2.) All CPUs have independent clock lines
-> 3.) CPUs within a group/cluster share clock line but each group/cluster have a
->     separate line for itself
-> 
-> Optional Properties:
-> - clock-master: Contains phandle of the master cpu controlling clocks.
-> 
->   Ideally there is nothing like a "master" CPU as any CPU can play with DVFS
->   settings. But we have to choose one cpu out of a group, so that others can
->   point to it.
-> 
->   If there is no "clock-master" property for a cpu node, it is considered as
->   master. It may or may not have other slave CPUs pointing towards it.
-> 
+Yes, the original x86 problem is that the CPU has a direct IO output bus
+which you can connect to.  The in/out instructions activate the I/O pin
+of the CPU indicating the address should be decoded by the device space.
+Some devices are two slow to latch at the CPU speed, so if you do a
+succession of in's or out's, particularly to mailbox locations, the
+device misses some of the I/O transactions.  Adding the delay slows the
+sequence down to the point where the device can react to it.
 
-Sorry for jumping late, but one of the point I was raising as part of your
-other series was to extend the CPU topology bindings to cover the voltage
-domain information which is probably what is really needed to let the
-CPUfreq extract the information. Not sure if it was already discussed.
+I/O cycle addressing is also problematic for architectures which don't
+have an in/out instruction or the concept of I/O access (parisc uses a
+special bridge to translate memory access to I/O cycles).
 
-After all the CPU clocks, cluster, clock-gating, power domains are pretty much
-related. So instead of having new binding for CPUFreq, I was wondering whether
-we can extend the CPU topology binding information to include missing information.
-Scheduler work anyway needs that information.
+In theory, modern devices should be memory mapped (so capable of
+reacting at CPU bus speed) but the PCI spec keeps the concept of I/O
+mapping (triggering an I/O cycle instead of a memory one).  Most modern
+PCI devices offer both memory and I/O mapped access and we always choose
+the memory mapped one in that case.  Any device supporting both would
+never need the delay.  However, the PCI spec still preserves the concept
+of a legacy device that only has I/O ports, which would possibly need
+the delay  ... the PCI SIG keeps threatening to deprecate the I/O BAR,
+but haven't yet done so yes (as of PCIe version 3.0).
 
-Ref: Documentation/devicetree/bindings/arm/topology.txt
-
-Does that make sense ?
-
-> Examples:
-> 1.) All CPUs share a single clock line
-> 
-> cpus {
->         #address-cells = <1>;
->         #size-cells = <0>;
-> 
->         cpu0: cpu at 0 {
->                 compatible = "arm,cortex-a15";
->                 reg = <0>;
->                 next-level-cache = <&L2>;
->                 operating-points = <
->                         /* kHz    uV */
->                         792000  1100000
->                         396000  950000
->                         198000  850000
->                 >;
->                 clock-latency = <61036>; /* two CLK32 periods */
->         };
-> 
->         cpu1: cpu at 1 {
->                 compatible = "arm,cortex-a15";
->                 reg = <1>;
->                 next-level-cache = <&L2>;
->                 clock-master = <&cpu0>;
->         };
-> };
-> 
-> 2.) All CPUs have independent clock lines
-> cpus {
->         #address-cells = <1>;
->         #size-cells = <0>;
-> 
->         cpu0: cpu at 0 {
->                 compatible = "arm,cortex-a15";
->                 reg = <0>;
->                 next-level-cache = <&L2>;
->                 operating-points = <
->                         /* kHz    uV */
->                         792000  1100000
->                         396000  950000
->                         198000  850000
->                 >;
->                 clock-latency = <61036>; /* two CLK32 periods */
->         };
-> 
->         cpu1: cpu at 1 {
->                 compatible = "arm,cortex-a15";
->                 reg = <1>;
->                 next-level-cache = <&L2>;
->                 operating-points = <
->                         /* kHz    uV */
->                         792000  1100000
->                         396000  950000
->                         198000  850000
->                 >;
->                 clock-latency = <61036>; /* two CLK32 periods */
->         };
-> };
-> 
-> 3.) CPUs within a group/cluster share single clock line but each group/cluster
-> have a separate line for itself
-> 
-> cpus {
->         #address-cells = <1>;
->         #size-cells = <0>;
-> 
->         cpu0: cpu at 0 {
->                 compatible = "arm,cortex-a15";
->                 reg = <0>;
->                 next-level-cache = <&L2>;
->                 operating-points = <
->                         /* kHz    uV */
->                         792000  1100000
->                         396000  950000
->                         198000  850000
->                 >;
->                 clock-latency = <61036>; /* two CLK32 periods */
->         };
-> 
->         cpu1: cpu at 1 {
->                 compatible = "arm,cortex-a15";
->                 reg = <1>;
->                 next-level-cache = <&L2>;
->                 clock-master = <&cpu0>;
->         };
-> 
->         cpu2: cpu at 100 {
->                 compatible = "arm,cortex-a7";
->                 reg = <100>;
->                 next-level-cache = <&L2>;
->                 operating-points = <
->                         /* kHz    uV */
->                         792000  950000
->                         396000  750000
->                         198000  450000
->                 >;
->                 clock-latency = <61036>; /* two CLK32 periods */
->         };
-> 
->         cpu3: cpu at 101 {
->                 compatible = "arm,cortex-a7";
->                 reg = <101>;
->                 next-level-cache = <&L2>;
->                 clock-master = <&cpu2>;
->         };
-> };
-> 
+James
