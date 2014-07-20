@@ -1,45 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 20 Jul 2014 17:37:32 +0530
-Subject: [RFC] cpufreq: Add bindings for CPU clock sharing topology
-In-Reply-To: <53CA8D95.8010108@ti.com>
-References: <7e097b71342c9f5f63b07ff2e135eb7beb626aab.1405661369.git.viresh.kumar@linaro.org>
- <CAOesGMhTkTEXp99gpU8cZBwYmiXpsySG5zMn6oSyo_Mf5PAiUg@mail.gmail.com>
- <CAKohpo=MmoALOHg-=7cf0jm=OJO57TWQZQXqkRwhRwU-DGPMmA@mail.gmail.com>
- <CAOesGMhuNzVtUkaUjF+JjNgHcgf08WiM0DG-kzwtcyUxkK_zow@mail.gmail.com>
- <CAKohpokLqrydV3b=innvOWrW9ijXtZwPKdT5Ew65cjMxsY2Mvw@mail.gmail.com>
- <53CA8D95.8010108@ti.com>
-Message-ID: <CAKohpok-C+JCebjJkZExx6EjBctoyJF7fV71Vjj7bi1TAdXrFQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 20 Jul 2014 22:35:57 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Cleanups Updates for v3.17
+In-Reply-To: <20140719185548.GC4265@quad.lixom.net>
+References: <cover.1405641497.git.horms+renesas@verge.net.au>
+ <20140719185548.GC4265@quad.lixom.net>
+Message-ID: <20140720133549.GA31336@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 July 2014 20:54, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> Sorry for jumping late
+On Sat, Jul 19, 2014 at 11:55:48AM -0700, Olof Johansson wrote:
+> On Fri, Jul 18, 2014 at 08:59:25AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC Boards Cleanups updates for v3.17.
+> > 
+> > This pull request is based on a merge of:
+> > 
+> > * "Fourth Round of Renesas ARM Based SoC Defconfig Updates for v3.17",
+> >   tagged as renesas-defconfig4-for-v3.17,
+> >   which I have sent a pull request for.
+> > 
+> >   The reason for this dependency is to avoid attempts to use
+> >   genmai_defconfig after the board code it relies on has been removed.
+> 
+> I'd prefer not to add this dependency. It's not a big deal to have a defconfig
+> that won't build momentarily, it doesn't cause any real harm and I'd rather
+> avoid keeping this merge/dependency. Can you respin this?
 
-No, you aren't late. Its just 2 days old thread :)
+Thanks for the clarification, I'll respin this as you suggest.
 
-> but one of the point I was raising as part of your
-> other series was to extend the CPU topology bindings to cover the voltage
-> domain information which is probably what is really needed to let the
-> CPUfreq extract the information. Not sure if it was already discussed.
+> > * "Renesas ARM Based SoC DT Timers Updates for v3.17",
+> >   tagged as renesas-dt-timers-for-v3.17,
+> >   which I have sent a pull request for.
+> 
+> Hmm. You're doing cleanups on top of new development instead of the other way
+> around. Try to avoid that in future releases if you can.
 
-Not it wasn't.
-
-> After all the CPU clocks, cluster, clock-gating, power domains are pretty much
-> related. So instead of having new binding for CPUFreq, I was wondering whether
-> we can extend the CPU topology binding information to include missing information.
-> Scheduler work anyway needs that information.
->
-> Ref: Documentation/devicetree/bindings/arm/topology.txt
->
-> Does that make sense ?
-
-Yeah it does, but I am not sure what exactly the bindings should look then.
-So, the most basic step could be moving the new bindings to topology.txt
-and name clock-master to dvfs-master.
-
-What else?
-
-If its going to be much controversial then we *can* go for just dvfs bindings
-for now and then update them later.
-
-Doesn't make sense? :)
+This relates to the order that the code was developed,
+although I agree it is not ideal with the benifit of 20/20 hind-sight.
