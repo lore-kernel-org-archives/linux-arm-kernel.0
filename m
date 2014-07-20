@@ -1,42 +1,88 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Sun, 20 Jul 2014 19:06:34 +1000
-Subject: [linux-sunxi] GSoC 2014 #1 status report - Improving Allwinner
- SoC support
-In-Reply-To: <53CAC9ED.9080302@elopez.com.ar>
-References: <53BE0B4F.1090001@elopez.com.ar> <53CAC9ED.9080302@elopez.com.ar>
-Message-ID: <CAGRGNgXBnCMKXVf0fxfcDXYY+dKMJ=-X2WLCBpWScqZX-SxXYg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 20 Jul 2014 10:09:35 +0100
+Subject: [PATCH] arm: Fix me in bios32.c
+In-Reply-To: <1405829179-19476-1-git-send-email-xerofoify@gmail.com>
+References: <1405829179-19476-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20140720090935.GD21766@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On Sun, Jul 20, 2014 at 12:06:19AM -0400, Nicholas Krause wrote:
+> This fixs a fix me in bios32.c for pci_fixup_it8152 as this if
+> statement is incorrect needs to be checked against the class bits
+> not the whole address for the two or conditions and since they don't
+> have define statements outside of their numeratical value.
 
-On Sun, Jul 20, 2014 at 5:41 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> Hi everyone,
->
-> Here's this week's update on my GSoC project; if you missed the first issue
-> or you want a refresher of what this is about, you can read it on the list
-> archives[0]
->
-> A couple of days after the last report, and with the help of Jon Smirl, I
-> got the hardware working on mainline Linux, first on only 16 bit stereo
-> mode, then mono as well, and later on, also on 24 bit mode. The first thing
-> I had to do was rework the cyclic DMA code to make it perform decently and
-> avoid underruns. The rest took a bit of playing with values and reading the
-> Allwinner documentation. There is one unresolved issue with 24 bit audio
-> still - for some reason, the volume is really low compared to the same track
-> played on 16 bit. Unfortunately the SDK driver doesn't support 24 bit, so
-> it's hard to compare with anything else.
+Unfortunately, this does not address the FIXME at all.  The FIXME does
+not state that the if statement is incorrect at all.
 
-It might be worth trying to generate some 24 bit audio samples that
-only exercise one bit, then check that playing them produces output,
-because it sounds to me (and Chen-Yu) that there's something in your
-code that's shifting or clipping the samples.
+> -	/* fixup for ITE 8152 devices */
+> -	/* FIXME: add defines for class 0x68000 and 0x80103 */
+>  	if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
+> -	    dev->class == 0x68000 ||
+> -	    dev->class == 0x80103) {
+> +	   (dev->class >> 8) == 0x680 ||
+> +	   (dev->class >> 8) == 0x801) {
 
-Thanks,
+The FIXME states that there should be defines for these values (0x68000
+and 0x80103).
+
+The FIXME statement itself is slightly wrong in that these values are
+*not* class IDs.  0x680 and 0x801 are the class ID values.
+
+We have definitions for class IDs 0x680 and 0x801 in
+include/linux/pci_ids.h, which are:
+
+#define PCI_CLASS_BRIDGE_OTHER          0x0680
+#define PCI_CLASS_SYSTEM_DMA            0x0801
+
+So, to fix the stated issue, without changing the functionality of the
+code, this is what I expected you to produce:
+
+	/* fixup for ITE 8152 devices */
+	if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
+	    dev->class == PCI_CLASS_BRIDGE_OTHER << 8 ||
+	    def->class == PCI_CLASS_SYSTEM_DMA << 8 | 0x03)
+
+The reason is that "PCI_CLASS_BRIDGE_OTHER << 8" evaluates to 0x68000
+and "PCI_CLASS_SYSTEM_DMA << 8 | 0x03" evaluates to 0x80103.  Therefore,
+the compiled code is the same as the original, because the actual
+numerical check is the same as it always was.
+
+As your solution results in a functional change to the code, that would
+introduce a new bug - it results in this test matching any PCI device
+with any programming interface for class "Bridge other" and "System DMA",
+whereas before the code was looking for a specific value there.
+
+Whether this results in the code incorrectly matching devices on the
+system(s) which use this code is difficult to know, so my only choice
+here is to reject your change.
+
+This is why my fellow kernel developers are asking you to stop trying to
+fix this stuff - unless you can produce provably correct patches (or at
+least patches that appear to have no functional change) then you are
+burdening people with your education, and you will get yourself an
+undesirable reputation.
+
+Even with patches which appear to have no functional change, some
+maintainers won't take them unless they have actually been tested on
+real hardware, or that other people agree that the change is a correct
+one.  That is because there is a long history of apparantly correct
+changes being made which result in subtle bugs.
+
+Bear in mind that a "FIXME" comment indicates that something is not
+fully correct in some way, and even though it may not be fully correct,
+the resulting code _works_ on the devices that it has been tested with.
+Fixing the "FIXME" may result in the code stopping working on those
+devices - especially if it changes the functionality of the code like
+your patch above.
+
+So, it's often best to leave FIXMEs alone if you don't know what the
+right solution should be.
+
+I hope you will pause, and think about the issues I've raised before
+continuing with your current project of trying to fix FIXMEs.
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
-.Plan: http://sites.google.com/site/juliancalaby/
+FTTC broadband for 0.8mile line: currently@9.5Mbps down 400kbps up
+according to speedtest.net.
